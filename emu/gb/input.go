@@ -1,0 +1,101 @@
+package gameboy
+
+import (
+	"github.com/veandco/go-sdl2/sdl"
+)
+
+func (gb *GameBoy) UpdateKeyboardInput(keyEvent *sdl.KeyboardEvent) {
+
+    var tempJoypad uint8 = gb.Joypad
+    reqInterrupt := false
+
+    switch key := keyEvent.Keysym.Sym; key {
+    case sdl.K_x: // A
+        handleKey(&tempJoypad, 0b10000, &reqInterrupt, keyEvent)
+    case sdl.K_z: // B
+        handleKey(&tempJoypad, 0b100000, &reqInterrupt, keyEvent)
+    case sdl.K_BACKSPACE: // SELECT
+        handleKey(&tempJoypad, 0b1000000, &reqInterrupt, keyEvent)
+    case sdl.K_RETURN: // START
+        handleKey(&tempJoypad, 0b10000000, &reqInterrupt, keyEvent)
+    case sdl.K_RIGHT:
+        handleKey(&tempJoypad, 0b1, &reqInterrupt, keyEvent)
+    case sdl.K_LEFT:
+        handleKey(&tempJoypad, 0b10, &reqInterrupt, keyEvent)
+    case sdl.K_UP:
+        handleKey(&tempJoypad, 0b100, &reqInterrupt, keyEvent)
+    case sdl.K_DOWN:
+        handleKey(&tempJoypad, 0b1000, &reqInterrupt, keyEvent)
+    } 
+
+    if reqInterrupt {
+        const JOYPAD uint8 = 0b10000
+        gb.RequestInterrupt(JOYPAD)
+    }
+
+    gb.Joypad = tempJoypad
+}
+
+func (gb *GameBoy) UpdateControllerInput(controllerEvent *sdl.ControllerButtonEvent) {
+
+    var tempJoypad uint8 = gb.Joypad
+    reqInterrupt := false
+
+    switch key := controllerEvent.Button; key {
+    case sdl.CONTROLLER_BUTTON_A: // A
+        handleButton(&tempJoypad, 0b10000, &reqInterrupt, controllerEvent)
+    case sdl.CONTROLLER_BUTTON_B: // B
+        handleButton(&tempJoypad, 0b100000, &reqInterrupt, controllerEvent)
+    case sdl.CONTROLLER_BUTTON_X: // SELECT
+        handleButton(&tempJoypad, 0b1000000, &reqInterrupt, controllerEvent)
+    case sdl.CONTROLLER_BUTTON_Y: // START
+        handleButton(&tempJoypad, 0b10000000, &reqInterrupt, controllerEvent)
+    case sdl.CONTROLLER_BUTTON_DPAD_RIGHT:
+        handleButton(&tempJoypad, 0b1, &reqInterrupt, controllerEvent)
+    case sdl.CONTROLLER_BUTTON_DPAD_LEFT:
+        handleButton(&tempJoypad, 0b10, &reqInterrupt, controllerEvent)
+    case sdl.CONTROLLER_BUTTON_DPAD_UP:
+        handleButton(&tempJoypad, 0b100, &reqInterrupt, controllerEvent)
+    case sdl.CONTROLLER_BUTTON_DPAD_DOWN:
+        handleButton(&tempJoypad, 0b1000, &reqInterrupt, controllerEvent)
+    } 
+
+    if reqInterrupt {
+        const JOYPAD uint8 = 0b10000
+        gb.RequestInterrupt(JOYPAD)
+    }
+
+    gb.Joypad = tempJoypad
+}
+
+func handleKey(tempJoypad *uint8, mask uint8, reqInterrupt *bool, keyEvent *sdl.KeyboardEvent) {
+
+    if keyEvent.Type == sdl.KEYDOWN {
+
+        *tempJoypad &^= mask
+
+        if !*reqInterrupt {
+            *reqInterrupt = true
+        }
+    }
+
+    if keyEvent.Type == sdl.KEYUP {
+        *tempJoypad |= mask
+    }
+}
+
+func handleButton(tempJoypad *uint8, mask uint8, reqInterrupt *bool, controllerEvent *sdl.ControllerButtonEvent) {
+
+    if controllerEvent.Type == sdl.CONTROLLERBUTTONDOWN {
+
+        *tempJoypad &^= mask
+
+        if !*reqInterrupt {
+            *reqInterrupt = true
+        }
+    }
+
+    if controllerEvent.Type == sdl.CONTROLLERBUTTONUP {
+        *tempJoypad |= mask
+    }
+}

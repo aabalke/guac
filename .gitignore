@@ -1,0 +1,7 @@
+# folders
+sav
+rom
+.git
+
+# dev dependencies
+*.dll
