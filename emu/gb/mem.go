@@ -12,6 +12,7 @@ type MemoryBus struct {
 	Memory [0x10000]uint8
     WRAM [0x9000]uint8
     VRAM [0x4000]uint8
+    OAM [0x100]uint8
 
     ramSaved bool
 
@@ -90,15 +91,10 @@ func (gb *GameBoy) ReadByte(addr uint16) (uint8, error) {
 	}
 
 	switch {
-    //case addr == 0xFF4C, addr == 0xFF6C:
-    //    panic("DMG COMPADIBBILITY REG")
 	case addr == 0xFF00:
 		return gb.getJoypad(), nil
 	case addr == 0xFF01:
         return Memory[addr], nil
-
-	//case addr == 0xFF44: return 0x90, nil // testing
-
     case addr == 0xFF68:
 
         if gb.Color {
@@ -130,7 +126,6 @@ func (gb *GameBoy) ReadByte(addr uint16) (uint8, error) {
 
         return 0, nil
 
-
     case addr == 0xFF4D: 
 
         var b uint8 = 0
@@ -155,7 +150,10 @@ func (gb *GameBoy) ReadByte(addr uint16) (uint8, error) {
 	case addr < 0x8000:
 		return gb.Cartridge.Mbc.ReadRom(gb.Cartridge, addr), nil
 	case addr < 0xA000:
-        offset := uint16(gb.MemoryBus.VRAMBank) * 0x2000
+        var offset uint16
+        if gb.Color {
+            offset = uint16(gb.MemoryBus.VRAMBank) * 0x2000
+        }
         return gb.MemoryBus.VRAM[addr-0x8000+offset], nil
 	case addr < 0xC000:
 		return gb.Cartridge.Mbc.ReadRam(gb.Cartridge, addr), nil
@@ -163,6 +161,16 @@ func (gb *GameBoy) ReadByte(addr uint16) (uint8, error) {
         return gb.MemoryBus.WRAM[addr-0xC000], nil
     case addr < 0xE000:
         return gb.MemoryBus.WRAM[(addr - 0xC000) + (uint16(gb.MemoryBus.WRAMBank)*0x1000)], nil
+    case addr < 0xFE00:
+        return 0xFF, nil
+    case addr < 0xFEA0:
+        return gb.MemoryBus.OAM[addr - 0xFE00], nil
+    case addr < 0xFF00:
+        return 0xFF, nil
+    case addr < 0xFF10:
+        return Memory[addr], nil
+    case addr < 0xFF40:
+        return Memory[addr], nil
 	default:
 		return Memory[addr], nil
 	}
@@ -177,8 +185,6 @@ func (gb *GameBoy) WriteByte(addr uint16, byte uint8) error {
 	}
 
 	switch addr {
-    //case 0xFF4C, 0xFF6C:
-    //    panic("DMG COMPADIBBILITY REG")
 	case 0xFF04: // DIV
         gb.Timer.Counter = 0
         gb.Timer.DivReg = 0
@@ -186,8 +192,10 @@ func (gb *GameBoy) WriteByte(addr uint16, byte uint8) error {
 		return nil
     case 0xFF05:
         Memory[0xFF05] = byte
+        return nil
     case 0xFF06:
         Memory[0xFF06] = byte
+        return nil
 	case 0xFF07:
 		currFreq := Memory[0xFF07] & 0x03
 		Memory[0xFF07] = byte | 0xF8
@@ -214,6 +222,7 @@ func (gb *GameBoy) WriteByte(addr uint16, byte uint8) error {
     case 0xFF4D:
         if gb.Color {
             gb.PrepareSpeedToggle = gb.flagEnabled(byte, 0)
+            Memory[0xFF4D] = Memory[0xFF4D] * 0x80 | (byte & 0x1)
         }
 
         return nil
@@ -275,7 +284,10 @@ func (gb *GameBoy) WriteByte(addr uint16, byte uint8) error {
 	case addr < 0x8000:
 		gb.Cartridge.Mbc.Handle(addr, byte)
 	case addr < 0xA000:
-        offset := uint16(gb.MemoryBus.VRAMBank) * 0x2000
+        var offset uint16
+        if gb.Color {
+            offset = uint16(gb.MemoryBus.VRAMBank) * 0x2000
+        }
         gb.MemoryBus.VRAM[addr-0x8000+offset] = byte
 	case addr < 0xC000:
 		gb.Cartridge.Mbc.WriteRam(gb.Cartridge, addr, byte)
@@ -289,7 +301,7 @@ func (gb *GameBoy) WriteByte(addr uint16, byte uint8) error {
 		_ = gb.WriteByte(addr-0x2000, byte)
 	case addr < 0xFEA0:
         // OAM
-		Memory[addr] = byte
+        gb.MemoryBus.OAM[addr - 0xFE00] = byte
 	case addr < 0xFEFF:
         // Prohibited Memory sometimes debugged in ROM only cartridges
 		Memory[addr] = byte
@@ -329,6 +341,25 @@ func (gb *GameBoy) cgbDMATransfer(byte uint8) {
     gb.MemoryBus.HdmaActive = true
 }
 
+func (gb *GameBoy) hdmaTransfer() {
+
+    MemBus := &gb.MemoryBus
+
+    if !MemBus.HdmaActive {
+        return
+    }
+
+    gb.performDMATransfer(0x10)
+    if MemBus.HdmaLength > 0 {
+        MemBus.HdmaLength--
+        MemBus.Memory[0xFF55] = MemBus.HdmaLength
+        return
+    }
+
+    MemBus.Memory[0xFF55] = 0xFF
+    MemBus.HdmaActive = false
+}
+
 func (gb *GameBoy) performDMATransfer(length uint16) {
 
     Mem := &gb.MemoryBus.Memory
@@ -348,23 +379,4 @@ func (gb *GameBoy) performDMATransfer(length uint16) {
     Mem[0xFF52] = uint8(src & 0xFF)
     Mem[0xFF53] = uint8(dst >> 8)
     Mem[0xFF54] = uint8(dst & 0xF0)
-}
-
-func (gb *GameBoy) hdmaTransfer() {
-
-    MemBus := &gb.MemoryBus
-
-    if !MemBus.HdmaActive {
-        return
-    }
-
-    gb.performDMATransfer(0x10)
-    if MemBus.HdmaLength > 0 {
-        MemBus.HdmaLength--
-        MemBus.Memory[0xFF55] = MemBus.HdmaLength
-        return
-    }
-
-    MemBus.Memory[0xFF55] = 0xFF
-    MemBus.HdmaActive = false
 }

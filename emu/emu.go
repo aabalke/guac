@@ -10,3 +10,7 @@ type Emulator interface {
     Update(*bool, int) int
     GetSize() (int32, int32)
 }
+
+//type Debugger interface {
+//    GetPixels() []byte
+//}

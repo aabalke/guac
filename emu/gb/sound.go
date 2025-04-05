@@ -148,9 +148,14 @@ func (a *APU) Init() {
 
 func (a *APU) Update(addr uint16, data uint8, gb *GameBoy) {
 
+    multipler := 1.0
+    if gb.DoubleSpeed {
+        multipler = 2 //maybe 1/2?
+    }
+
 	Mem := &gb.MemoryBus.Memory
 
-    if 0xFF30 < addr {
+    if addr >= 0xFF30 && addr <= 0xFF3F {
         idx := 0
         for i := range 16 {
             a.WavRam[idx] = float64(Mem[0xFF30 + i] >> 4)
@@ -186,8 +191,8 @@ func (a *APU) Update(addr uint16, data uint8, gb *GameBoy) {
 		a.Channel1.Freq = 131072.0 / (2048.0 - float64(periodHi+periodLo))
 
 		// duration
-		MAX_TIMER := 64.0
-		DIV_APU_RATE := 1.0 / 256.0
+		MAX_TIMER := 64.0 * multipler
+		DIV_APU_RATE := 1.0 / 256.0 * multipler
 		INIT_LENGTH_TIMER := float64(Mem[CH1_LENGTH_DUTY&0b111111])
 		a.Channel1.duration = (MAX_TIMER - INIT_LENGTH_TIMER) * DIV_APU_RATE
 
@@ -218,8 +223,8 @@ func (a *APU) Update(addr uint16, data uint8, gb *GameBoy) {
 		a.Channel2.Freq = 131072.0 / (2048.0 - float64(periodHi+periodLo))
 
 		// duration
-		MAX_TIMER := 64.0
-		DIV_APU_RATE := 1.0 / 256.0
+		MAX_TIMER := 64.0 * multipler
+		DIV_APU_RATE := 1.0 / 256.0 * multipler
 		INIT_LENGTH_TIMER := float64(Mem[CH2_LENGTH_DUTY&0b111111])
 		a.Channel2.duration = (MAX_TIMER - INIT_LENGTH_TIMER) * DIV_APU_RATE
 
@@ -253,8 +258,8 @@ func (a *APU) Update(addr uint16, data uint8, gb *GameBoy) {
         a.Channel3.Reset()
 
 		// duration
-		MAX_TIMER := 256.0
-		DIV_APU_RATE := 1.0 / 256.0
+		MAX_TIMER := 256.0 * multipler
+		DIV_APU_RATE := 1.0 / 256.0 * multipler
 		INIT_LENGTH_TIMER := float64(Mem[CH3_LENGTH])
 		a.Channel3.duration = (MAX_TIMER - INIT_LENGTH_TIMER) * DIV_APU_RATE
 
@@ -283,8 +288,8 @@ func (a *APU) Update(addr uint16, data uint8, gb *GameBoy) {
 		a.Channel4.EnvelopePace = Mem[CH4_VOLUME] & 0b111
 		a.Channel4.Volume = a.Channel4.InitialVolume
 
-		MAX_TIMER := 64.0
-		DIV_APU_RATE := 1.0 / 256.0
+		MAX_TIMER := 64.0 * multipler
+		DIV_APU_RATE := 1.0 / 256.0 * multipler
 		INIT_LENGTH_TIMER := float64(Mem[CH4_LENGTH&0b111111])
 		a.Channel4.duration = (MAX_TIMER - INIT_LENGTH_TIMER) * DIV_APU_RATE
 

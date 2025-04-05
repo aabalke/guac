@@ -36,6 +36,7 @@ func (s *SDLStruct) Init() {
 		800,
 		600,
 		sdl.WINDOW_SHOWN|sdl.WINDOW_RESIZABLE)
+		//sdl.WINDOW_SHOWN)
 
 	if err != nil {
 		panic(err)
@@ -93,6 +94,8 @@ func (s *SDLStruct) Update() {
 	)
 
 	scene.Add(NewEmulatorFrame(s.Renderer, scene, 160.0/144, &scene.H, 0, 0, 1, emu))
+    //var debug_h int32 = 128
+	//scene.Add(NewDebugFrame(s.Renderer, scene, 1, &scene.H, 0, 0, 2, emu))
 
     if *debug && *maxInstr == 0 {
         panic("In debug mode max instruction count is required")
@@ -100,7 +103,14 @@ func (s *SDLStruct) Update() {
 
 	frameTime := time.Second / FPS
 	ticker := time.NewTicker(frameTime)
+    count := 0
+    //switched := false
     for i := range ticker.C {
+
+        //if emu.DoubleSpeed && !switched {
+        //    switched = true
+        //    emu.MemoryBus.Memory[0xFF26] = 0x80
+        //}
 
 		if !scene.Active {
 			ticker.Stop()
@@ -112,7 +122,7 @@ func (s *SDLStruct) Update() {
             scene.DeleteInactive()
         }
 
-		emu.Update(&scene.Active, 0)
+		count = emu.Update(&scene.Active, count)
 
 		s.Renderer.SetDrawColor(0, 0, 0, 255)
 		s.Renderer.Clear()

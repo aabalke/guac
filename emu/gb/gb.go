@@ -1,6 +1,7 @@
 package gameboy
 
 import (
+
 	"fmt"
 	"os"
 
@@ -50,6 +51,9 @@ type GameBoy struct {
 	ScanLineBG [160]bool
 
     Cycles int
+
+    Paused bool
+    Muted bool
 }
 
 type Timer struct {
@@ -73,7 +77,8 @@ func NewGameBoy() *GameBoy {
 		Cartridge: cartridge.Cartridge{
 			Data: make([]uint8, 0),
 		},
-        Palette: palettes["custom"],
+        //Palette: palettes["custom"],
+        Palette: palettes["greyscale"],
         bgPalette: NewColorPalette(),
         spPalette: NewColorPalette(),
 	}
@@ -102,27 +107,19 @@ func (gb *GameBoy) InputHandler(event sdl.Event) {
 }
 
 func (gb *GameBoy) GetPixels() []byte {
-
     return *gb.Pixels
 }
 
-
 func (gb *GameBoy) Update(exit *bool, instCount int) int {
 
-    cyclesPerFrame := (gb.Clock / gb.FPS)
+    multiplier := 1
     if gb.DoubleSpeed {
-        cyclesPerFrame *= 2
+        multiplier = 2
     }
 
-	for updateCycles := 0; updateCycles < cyclesPerFrame; {
+    for updateCycles := 0; updateCycles < (gb.Clock / gb.FPS * multiplier); {
 
 		cycles := 4
-
-		//driver.HandleEvents(exit, gb)
-
-		//if instCount > MAX_INSTR && MAX_INSTR != 0 {
-		//	return instCount
-		//}
 
 		opcode, err := gb.ReadByte(gb.Cpu.PC)
 
@@ -134,26 +131,28 @@ func (gb *GameBoy) Update(exit *bool, instCount int) int {
 			cycles = gb.Execute(opcode)
 		}
 
+        if gb.DoubleSpeed {
+            cycles /= 2
+        }
+
 		updateCycles += cycles
         gb.Cycles = cycles
 
 		gb.UpdateGraphics()
-        // should timer be before interrupts?
-		gb.UpdateTimers()
 
 		interruptCycles := gb.UpdateInterrupt()
+        if gb.DoubleSpeed {
+            interruptCycles /= 2
+        }
         updateCycles += interruptCycles
         gb.Cycles += interruptCycles
 
-		//case LOGGING:
-		//	gameboy.WriteLog(instCount, *gb, opcode, bufWriter)
-		//}
+		gb.UpdateTimers()
 
 		instCount++
 	}
 
     gb.UpdateDisplay()
-
 
 	return instCount
 }
@@ -226,14 +225,19 @@ func (gb *GameBoy) loadCartridge() {
 
 	fmt.Printf("Title: %s\n", gb.Cartridge.Title)
 
+    // Debug DMG mode
     //gb.Cartridge.ColorMode = false
 
     if gb.Cartridge.ColorMode {
         gb.Color = true
-        gb.Cpu.Registers.a = 0x11
     }
 
-    println("color", gb.Color)
+    if gb.Color {
+        gb.Cpu.Registers.a = 0x11
+        println("Color Mode: CMG")
+    } else {
+        println("Color Mode: DMG")
+    }
 
 	ramData, err := cartridge.ReadRam(gb.Cartridge.Path)
 
@@ -298,7 +302,7 @@ func (gb *GameBoy) UpdateInterrupt() (cycles int) {
 	interruptFlag := gb.MemoryBus.Memory[0xFF0F]
 	interruptEnabled := gb.MemoryBus.Memory[0xFFFF]
 
-	if !(interruptFlag > 0) {
+	if interruptFlag == 0 {
 		return 0
 	}
 
@@ -357,10 +361,17 @@ func (gb *GameBoy) UpdateInterrupt() (cycles int) {
 
 func (gb *GameBoy) UpdateTimers() {
 
+    cycles := gb.Cycles
+
+    if gb.DoubleSpeed {
+        cycles *= 2
+    }
+
 	Mem := &gb.MemoryBus.Memory
     t := &gb.Timer
 
-	t.DivReg += gb.Cycles
+	//t.DivReg += gb.Cycles
+	t.DivReg += cycles
 
 	if t.DivReg >= 0xFF {
 		t.DivReg -= 0xFF
@@ -371,7 +382,8 @@ func (gb *GameBoy) UpdateTimers() {
 		return
 	}
 
-	t.Counter += gb.Cycles
+	//t.Counter += gb.Cycles
+	t.Counter += cycles
 
 	freq := gb.SelectCycleFreq()
 
@@ -419,7 +431,6 @@ func (gb *GameBoy) SelectCycleFreq() int {
 func (gb *GameBoy) RequestInterrupt(mask uint8) {
 
 	interruptFlag := gb.MemoryBus.Memory[0xFF0F] | 0xE0
-	//interruptFlag := gb.MemoryBus.Memory[0xFF0F]
 
 	newFlag := interruptFlag | mask // may need ^
 	err := gb.WriteByte(0xFF0F, newFlag)
@@ -434,7 +445,17 @@ func (gb *GameBoy) toggleDoubleSpeed() {
         return
     }
 
+
     gb.PrepareSpeedToggle = false
     gb.DoubleSpeed = !gb.DoubleSpeed
     gb.Cpu.Halted = false
+
+
+    var v uint8 = 0
+
+    if gb.DoubleSpeed {
+        v = 0b10000000
+    }
+
+    gb.MemoryBus.Memory[0xFF4D] = v
 }

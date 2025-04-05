@@ -45,9 +45,6 @@ func NewCpu() *Cpu {
 
 func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 
-    //v := gb.MemoryBus.Memory[0xFF44]
-    //fmt.Printf("Op: %X, Mem: %X\n", opcode, v)
-
     reg := &gb.Cpu.Registers
 
     cycles = 1
@@ -61,10 +58,11 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
     case 0x00: // nop
     case 0x10: // stop / toggle speed
 
-        gb.Cpu.Halted = true
-
-        if gb.Color {
+        if gb.Color && gb.PrepareSpeedToggle {
+            gb.WriteByte(0xFF26, 0)
             gb.toggleDoubleSpeed()
+        } else {
+            gb.Cpu.Halted = true
         }
 
         pc++
@@ -135,7 +133,7 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
     case 0x73: gb.execLdMem(hl, reg.e, false); cycles = 2
     case 0x74: gb.execLdMem(hl, reg.h, false); cycles = 2
     case 0x75: gb.execLdMem(hl, reg.l, false); cycles = 2
-    case 0x76: gb.Cpu.Halted = true
+    case 0x76: gb.Cpu.Halted = true; 
         
     case 0x77: gb.execLdMem(hl, reg.a, false); cycles = 2
 

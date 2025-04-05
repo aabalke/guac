@@ -5,11 +5,12 @@ import (
 	"unsafe"
 
 	comp "github.com/aabalke33/go-sdl2-components/Components"
-	"github.com/aabalke33/guac/emu"
+	//"github.com/aabalke33/guac/emu"
+	gameboy "github.com/aabalke33/guac/emu/gb"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-type EmulatorFrame struct {
+type DebugFrame struct {
 	renderer   *sdl.Renderer
 	texture    *sdl.Texture
 	pixels     chan []byte
@@ -20,20 +21,21 @@ type EmulatorFrame struct {
 	h          *int32
 	ratio      float64
 	Active     bool
-    Emulator   *emu.Emulator
+    Gameboy   *gameboy.GameBoy
 }
 
-func NewEmulatorFrame(renderer *sdl.Renderer, parent comp.Component, ratio float64, h *int32, x, y, z int32, emulator emu.Emulator) *EmulatorFrame {
+func NewDebugFrame(renderer *sdl.Renderer, parent comp.Component, ratio float64, h *int32, x, y, z int32, gb *gameboy.GameBoy) *DebugFrame {
 
     pixels := make(chan []byte, 1)
 
-    tH, tW := emulator.GetSize()
-
+    var tW int32 = 8
+    var tH int32 = 8
 	texture, _ := renderer.CreateTexture(sdl.PIXELFORMAT_ABGR8888, sdl.TEXTUREACCESS_STREAMING, tW, tH)
 
-	b := EmulatorFrame{
+
+	b := DebugFrame{
 		renderer: renderer,
-        Emulator: &emulator,
+        Gameboy:  gb,
 		parent:   parent,
 		texture:  texture,
 		pixels:   pixels,
@@ -54,29 +56,29 @@ func NewEmulatorFrame(renderer *sdl.Renderer, parent comp.Component, ratio float
 	return &b
 }
 
-func (b *EmulatorFrame) UpdatePixels() {
+func (b *DebugFrame) UpdatePixels() {
 
     for {
         select {
-        case b.pixels <- (*b.Emulator).GetPixels():
+        case b.pixels <- b.Gameboy.GetBgTiles():
         }
     }
 }
 
-func (b *EmulatorFrame) Update(dt float64, event sdl.Event) {
+func (b *DebugFrame) Update(dt float64, event sdl.Event) {
 
 	if !b.Active {
 		return
 	}
 
-    (*b.Emulator).InputHandler(event)
+    //(*b.Emulator).InputHandler(event)
 
     comp.ChildFunc(b, func(child *comp.Component) {
         (*child).Update(1/comp.FPS, event)
     })
 }
 
-func (b *EmulatorFrame) View(renderer *sdl.Renderer) {
+func (b *DebugFrame) View(renderer *sdl.Renderer) {
 	if !b.Active {
 		return
 	}
@@ -101,34 +103,34 @@ func (b *EmulatorFrame) View(renderer *sdl.Renderer) {
 	})
 }
 
-func (b *EmulatorFrame) Add(c comp.Component) {
+func (b *DebugFrame) Add(c comp.Component) {
 	b.children = append(b.children, &c)
 }
 
-func (b *EmulatorFrame) GetZ() int32 {
+func (b *DebugFrame) GetZ() int32 {
 	return b.z
 }
 
-func (b *EmulatorFrame) Resize() {
+func (b *DebugFrame) Resize() {
 	b.w = int32(math.Floor(float64(*b.h) * b.ratio))
 }
 
-func (b *EmulatorFrame) IsActive() bool {
+func (b *DebugFrame) IsActive() bool {
 	return b.Active
 }
 
-func (b *EmulatorFrame) GetChildren() []*comp.Component {
+func (b *DebugFrame) GetChildren() []*comp.Component {
 	return b.children
 }
 
-func (b *EmulatorFrame) GetParent() *comp.Component {
+func (b *DebugFrame) GetParent() *comp.Component {
 	return &b.parent
 }
 
-func (b *EmulatorFrame) GetSize() (int32, int32) {
+func (b *DebugFrame) GetSize() (int32, int32) {
 	return *b.h, b.w
 }
 
-func (b *EmulatorFrame) SetChildren(c []*comp.Component) {
+func (b *DebugFrame) SetChildren(c []*comp.Component) {
     b.children = c
 }
