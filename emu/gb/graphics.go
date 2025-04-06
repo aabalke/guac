@@ -23,14 +23,10 @@ const (
 	InterruptVBlank = 0b1
 	InterruptLCD    = 0b10
 
-	DisplayHeight = 144
-	DisplayWidth  = 160
-
 	SpritePriorityOffset = 100
 )
 
-var last uint16
-var tileScanline [DisplayWidth]uint8
+var tileScanline [width]uint8
 
 func (gb *GameBoy) flagEnabled(reg uint8, bit uint8) bool {
 	mask := uint8(0b1) << bit
@@ -66,7 +62,7 @@ func (gb *GameBoy) UpdateGraphics() {
 		gb.MemoryBus.Memory[LY] = 0
 	}
 
-	if currentLine == 144 {
+	if currentLine == height {
 		gb.RequestInterrupt(InterruptVBlank)
 	}
 }
@@ -93,7 +89,7 @@ func (gb *GameBoy) setLCDStatus() {
 	var newMode uint8 = 0
 	modeSelected := false
 
-	vBlank := currentLine >= 144                      // mode 1
+	vBlank := currentLine >= height                      // mode 1
 	oam := gb.Timer.ScanlineCounter >= 456-80         // mode 2
 	drawing := gb.Timer.ScanlineCounter >= 456-80-172 // mode 3
 
@@ -210,7 +206,8 @@ func (gb *GameBoy) renderTiles() {
 	// start drawing the 160 horizontal pixels for this scanline
 	//gb.tileScanline = [160]uint8{}
 
-	for pixel := range 160 {
+    tileScanline = [width]uint8{}
+	for pixel := range width {
 		xPos := (pixel + scrollX) % 256
 
 		// Translate the current x pos to window space if necessary
@@ -287,8 +284,15 @@ func (gb *GameBoy) renderTiles() {
 			continue
 		}
 
-		gb.bgPriority[pixel][scanline] = priority
-		gb.Display.Screen[pixel][scanline] = color
+        if !gb.bgPriority[pixel][scanline] || tileScanline[scanline] == 0 {
+            gb.Display.Screen[pixel][scanline] = color
+        }
+
+        if gb.Color {
+            gb.bgPriority[pixel][scanline] = priority
+        }
+
+        tileScanline[pixel] = colorNum
 	}
 }
 
@@ -305,8 +309,7 @@ func (gb *GameBoy) renderSprites() {
 		ySize = 16
 	}
 
-	//var minx [DisplayWidth]int32
-    tileScanline = [DisplayWidth]uint8{}
+	var minx [width]int32
 	var lineSprites = 0
 	for sprite := uint16(0); sprite < 40; sprite++ {
 		index := sprite * 4
@@ -346,29 +349,19 @@ func (gb *GameBoy) renderSprites() {
 			line = ySize - line - 1
 		}
 
-		// Load the data containing the sprite data for this line
 		dataAddress := (uint16(tileLocation) * 0x10) + uint16(line*2) + (bank * 0x2000)
-
-
 		data1 := gb.MemoryBus.VRAM[dataAddress]
 		data2 := gb.MemoryBus.VRAM[dataAddress+1]
 
-
-		// Draw the line of the sprite
 		for tilePixel := byte(0); tilePixel < 8; tilePixel++ {
 			pixel := int16(xPos) + int16(7-tilePixel)
-			if pixel < 0 || pixel >= DisplayWidth {
+			if pixel < 0 || pixel >= width {
 				continue
 			}
 
-			// Check if the pixel has priority.
-			//  - In DMG this is determined by the sprite with the smallest X coordinate,
-			//    then the first sprite in the OAM.
-			//  - In CGB this is determined by the first sprite appearing in the OAM.
-			// We add a fixed 100 to the xPos so we can use the 0 value as the absence of a sprite.
-			//if minx[pixel] != 0 && (gb.Color || minx[pixel] <= xPos+spritePriorityOffset) {
-			//	continue
-			//}
+			if minx[pixel] != 0 && (gb.Color || minx[pixel] <= int32(xPos)+SpritePriorityOffset) {
+				continue
+			}
 
 			colorBit := tilePixel
 			if xFlip {
@@ -385,8 +378,6 @@ func (gb *GameBoy) renderSprites() {
             if colorNum == 0 {
                 continue
             }
-
-
 
             if scanline < 0 || scanline > 143 || pixel < 0 || pixel > 159 {
                 continue
@@ -407,12 +398,12 @@ func (gb *GameBoy) renderSprites() {
                 color = uint32(gb.getColor(colorNum, colorAddr))
             }
 
-            drawPixel := (priority && gb.bgPriority[pixel][scanline]) || tileScanline[pixel] == 0 
+            drawPixel := (priority && !gb.bgPriority[pixel][scanline]) || tileScanline[pixel] == 0 
             if drawPixel {
                 gb.Display.Screen[pixel][scanline] = color
             }
 
-            tileScanline[pixel] = colorNum
+            minx[pixel] = int32(xPos) + SpritePriorityOffset
 		}
 	}
 }

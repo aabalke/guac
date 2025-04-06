@@ -395,11 +395,9 @@ func (gb *GameBoy) toggleDoubleSpeed() {
         return
     }
 
-
     gb.PrepareSpeedToggle = false
     gb.DoubleSpeed = !gb.DoubleSpeed
     gb.Cpu.Halted = false
-
 
     var v uint8 = 0
 
