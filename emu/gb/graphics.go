@@ -111,7 +111,7 @@ func (gb *GameBoy) setLCDStatus() {
 		stat = setStat(stat, newMode)
 
         if newMode != currMode {
-            gb.drawScanline()
+            gb.drawScanline(int32(currentLine))
         }
 
 	default:
@@ -144,7 +144,7 @@ func (gb *GameBoy) setLCDStatus() {
 	gb.MemoryBus.Memory[STAT] = stat
 }
 
-func (gb *GameBoy) drawScanline() {
+func (gb *GameBoy) drawScanline(scanline int32) {
 
 	lcdc := gb.MemoryBus.Memory[LCDC]
 
@@ -153,7 +153,7 @@ func (gb *GameBoy) drawScanline() {
 	}
 
 	if objEnabled := gb.flagEnabled(lcdc, 1); objEnabled {
-		gb.renderSprites()
+		gb.renderSprites(scanline)
 	}
 }
 
@@ -296,13 +296,9 @@ func (gb *GameBoy) renderTiles() {
 	}
 }
 
-func (gb *GameBoy) renderSprites() {
-
-
-    Mem := &gb.MemoryBus.Memory
+func (gb *GameBoy) renderSprites(scanline int32) {
 
     lcdControl, _ := gb.ReadByte(LCDC)
-    scanline := int32(Mem[LY])
 
 	var ySize int32 = 8
 	if gb.flagEnabled(lcdControl, 2) {
@@ -315,8 +311,7 @@ func (gb *GameBoy) renderSprites() {
 		index := sprite * 4
 
 		yP, _ := gb.ReadByte(0xFE00+index)
-		yP -= 16
-        yPos := int32(yP)
+        yPos := int32(yP) - 16
 
 		if scanline < yPos || scanline >= (yPos+ySize) {
 			continue
@@ -328,8 +323,8 @@ func (gb *GameBoy) renderSprites() {
 		}
 		lineSprites++
 
-		xPos, _ := gb.ReadByte(uint16(0xFE00+index+1))
-        xPos -= 8
+		xP, _ := gb.ReadByte(uint16(0xFE00+index+1))
+        xPos := int32(xP) - 8
 		tileLocation, _ := gb.ReadByte(uint16(0xFE00 + index + 2))
 		attributes, _ := gb.ReadByte(uint16(0xFE00 + index + 3))
 
@@ -349,12 +344,13 @@ func (gb *GameBoy) renderSprites() {
 			line = ySize - line - 1
 		}
 
+
 		dataAddress := (uint16(tileLocation) * 0x10) + uint16(line*2) + (bank * 0x2000)
 		data1 := gb.MemoryBus.VRAM[dataAddress]
 		data2 := gb.MemoryBus.VRAM[dataAddress+1]
 
 		for tilePixel := byte(0); tilePixel < 8; tilePixel++ {
-			pixel := int16(xPos) + int16(7-tilePixel)
+			pixel := int16(xPos) + 7-int16(tilePixel)
 			if pixel < 0 || pixel >= width {
 				continue
 			}
@@ -379,12 +375,7 @@ func (gb *GameBoy) renderSprites() {
                 continue
             }
 
-            if scanline < 0 || scanline > 143 || pixel < 0 || pixel > 159 {
-                continue
-            }
-
             var color uint32
-
             if gb.Color {
                 cgbPalette := attributes & 0x7
                 color = gb.spPalette.get(cgbPalette, colorNum)
