@@ -6,9 +6,19 @@
 👍 Instruction Timings
 ❌ Interrupt Timings
 ❌ Memory Timings 2
-❌ OAM Bug 2
 ❌ DMG Sound 2
 ❌ CGB Sound 2
+
+## OAM Bug 2
+❌ Lcd Sync
+❌ Causes
+👍 Non Causes
+❌ Scanline Timing
+❌ Timing Bug
+👍 Timing No Bug
+❌ Timing Effect
+❌ Inst Timing
+
 
 # Mooneye Acceptance Test
 
@@ -80,7 +90,7 @@
 
 ## Misc Tests
 
-❌ Manual Sprite Priority
+👍 Manual Sprite Priority
 👍 Daa Instruction
 ❌ Interrupt Handling ie Push
 ❌ Serial boot sclk align dmgABCmgb
