@@ -36,9 +36,6 @@ func (gb *GameBoy) GetOAMTile() [] byte {
 	output := gb.ConvertPixels(pixels)
 
 	return output
-
-
-    return nil
 }
 
 func (gb *GameBoy) GetBgTiles() []byte {

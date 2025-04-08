@@ -47,7 +47,9 @@ func initMemory(gb *GameBoy) {
 	gb.WriteByte(0xFF23, 0xBF)
 	gb.WriteByte(0xFF24, 0x77)
 	gb.WriteByte(0xFF25, 0xF3)
+
 	gb.WriteByte(0xFF26, 0xF1)
+
 	gb.WriteByte(0xFF40, 0x91)
 	gb.WriteByte(0xFF42, 0x00)
 	gb.WriteByte(0xFF43, 0x00)
@@ -83,6 +85,12 @@ func (gb *GameBoy) InitSaveLoop() {
 }
 
 func (gb *GameBoy) ReadByte(addr uint16) (uint8, error) {
+
+    if addr == 0xFF26 {
+
+        return 0xFA, nil
+
+    }
 
 	Memory := &gb.MemoryBus.Memory
 
@@ -178,6 +186,10 @@ func (gb *GameBoy) ReadByte(addr uint16) (uint8, error) {
 
 func (gb *GameBoy) WriteByte(addr uint16, byte uint8) error {
 
+    //if addr == 0xFF26 {
+    //    fmt.Printf("Wrote %X to %X\n", byte, addr)
+    //}
+
 	Memory := &gb.MemoryBus.Memory
 
 	if int(addr) > len(Memory) {
@@ -205,6 +217,13 @@ func (gb *GameBoy) WriteByte(addr uint16, byte uint8) error {
 			gb.Timer.Counter = 0
 		}
 		return nil
+    case 0xFF26:
+
+        // Only bit 7 of master volume is writeable
+        bit := byte & 0x80
+        v := (Memory[0xFF26] & 0x7F) | bit
+        gb.Apu.Update(addr, v, gb)
+
 	case 0xFF44:
 		Memory[0xFF44] = 0
 		return nil

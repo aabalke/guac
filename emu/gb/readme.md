@@ -1,5 +1,8 @@
 # Gameboy Emulator
 
+## Todo
+- Fix Sound Implimentation
+- Fix Controller input
 
 ## Goals
 
@@ -28,3 +31,7 @@ DMG and CGB support.
 - Cartridge HuC1
 - Cartridge HuC3
 - Cartridge MMM01
+
+## Notes
+
+1. Keyboard Ghosting: On some keyboards combinations of keys are not able to be pressed. Change the keys to ones that you can use at the same time. https://www.microsoft.com/applied-sciences/projects/anti-ghosting-demo

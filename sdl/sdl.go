@@ -86,6 +86,7 @@ func (s *SDLStruct) Update() {
 
 	emu := gameboy.NewGameBoy()
 	emu.LoadGame(*romPath)
+    defer emu.Logger.Close()
 
 	w, h := s.Window.GetSize()
 
@@ -130,4 +131,5 @@ func (s *SDLStruct) Update() {
 		scene.View(s.Renderer)
 		s.Renderer.Present()
 	}
+
 }

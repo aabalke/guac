@@ -4,29 +4,17 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-func (gb *GameBoy) UpdateKeyboardInput(keyEvent *sdl.KeyboardEvent) {
+func (gb *GameBoy) InputHandler(event sdl.Event) {
 
     var tempJoypad uint8 = gb.Joypad
     reqInterrupt := false
 
-    switch key := keyEvent.Keysym.Sym; key {
-    case sdl.K_x: // A
-        handleKey(&tempJoypad, 0b10000, &reqInterrupt, keyEvent)
-    case sdl.K_z: // B
-        handleKey(&tempJoypad, 0b100000, &reqInterrupt, keyEvent)
-    case sdl.K_BACKSPACE: // SELECT
-        handleKey(&tempJoypad, 0b1000000, &reqInterrupt, keyEvent)
-    case sdl.K_RETURN: // START
-        handleKey(&tempJoypad, 0b10000000, &reqInterrupt, keyEvent)
-    case sdl.K_RIGHT:
-        handleKey(&tempJoypad, 0b1, &reqInterrupt, keyEvent)
-    case sdl.K_LEFT:
-        handleKey(&tempJoypad, 0b10, &reqInterrupt, keyEvent)
-    case sdl.K_UP:
-        handleKey(&tempJoypad, 0b100, &reqInterrupt, keyEvent)
-    case sdl.K_DOWN:
-        handleKey(&tempJoypad, 0b1000, &reqInterrupt, keyEvent)
-    } 
+    switch e := event.(type) {
+    case *sdl.KeyboardEvent:
+        gb.UpdateKeyboardInput(e, &tempJoypad, &reqInterrupt)
+    //case *sdl.ControllerButtonEvent:
+    //    gb.UpdateControllerInput(e)
+    }
 
     if reqInterrupt {
         const JOYPAD uint8 = 0b10000
@@ -34,6 +22,33 @@ func (gb *GameBoy) UpdateKeyboardInput(keyEvent *sdl.KeyboardEvent) {
     }
 
     gb.Joypad = tempJoypad
+    return
+}
+
+func (gb *GameBoy) UpdateKeyboardInput(keyEvent *sdl.KeyboardEvent, tempJoypad *uint8, reqInterrupt *bool) {
+
+    switch key := keyEvent.Keysym.Sym; key {
+    //case sdl.K_x: // A
+    case sdl.K_j: // A
+        handleKey(tempJoypad, 0b10000, reqInterrupt, keyEvent)
+    //case sdl.K_z: // B
+    case sdl.K_k: // B
+        handleKey(tempJoypad, 0b100000, reqInterrupt, keyEvent)
+    //case sdl.K_BACKSPACE: // SELECT
+    case sdl.K_l: // SELECT
+        handleKey(tempJoypad, 0b1000000, reqInterrupt, keyEvent)
+    //case sdl.K_RETURN: // START
+    case sdl.K_SEMICOLON: // START
+        handleKey(tempJoypad, 0b10000000, reqInterrupt, keyEvent)
+    case sdl.K_RIGHT:
+        handleKey(tempJoypad, 0b1, reqInterrupt, keyEvent)
+    case sdl.K_LEFT:
+        handleKey(tempJoypad, 0b10, reqInterrupt, keyEvent)
+    case sdl.K_UP:
+        handleKey(tempJoypad, 0b100, reqInterrupt, keyEvent)
+    case sdl.K_DOWN:
+        handleKey(tempJoypad, 0b1000, reqInterrupt, keyEvent)
+    } 
 }
 
 func (gb *GameBoy) UpdateControllerInput(controllerEvent *sdl.ControllerButtonEvent) {
@@ -70,16 +85,20 @@ func (gb *GameBoy) UpdateControllerInput(controllerEvent *sdl.ControllerButtonEv
 
 func handleKey(tempJoypad *uint8, mask uint8, reqInterrupt *bool, keyEvent *sdl.KeyboardEvent) {
 
-    if keyEvent.Type == sdl.KEYDOWN {
+    if keyEvent.State == sdl.PRESSED {
+    //if keyEvent.Type == sdl.KEYDOWN || keyEvent.State == sdl.PRESSED {
 
         *tempJoypad &^= mask
 
         if !*reqInterrupt {
             *reqInterrupt = true
         }
+
+        return
     }
 
-    if keyEvent.Type == sdl.KEYUP {
+    if keyEvent.State == sdl.RELEASED {
+    //if keyEvent.Type == sdl.KEYUP || keyEvent.State == sdl.RELEASED{
         *tempJoypad |= mask
     }
 }

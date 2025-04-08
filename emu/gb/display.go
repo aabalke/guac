@@ -10,7 +10,7 @@ func (gb *GameBoy) UpdateDisplay() {
     for y := range height {
         for x := range width {
 
-			v := gb.Display.Screen[x][y]
+			v := gb.Screen[x][y]
 
             if !gb.Color {
                 switch v {

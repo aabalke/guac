@@ -936,8 +936,10 @@ func (gb *GameBoy) execCPL() {
 
 func (gb *GameBoy) execLdh(target *uint8, from uint16) {
 
+
     f := 0xFF00+from
     v, err := gb.ReadByte(f)
+
     if err != nil {
         panic(err)
     }

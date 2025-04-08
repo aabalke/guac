@@ -161,12 +161,12 @@ func (gb *GameBoy) renderTiles() {
 
     //Mem := &gb.MemoryBus.Memory
 
-	scrollY := int(gb.MemoryBus.Memory[0xFF42])
-	scrollX := int(gb.MemoryBus.Memory[0xFF43])
-	windowY := int(gb.MemoryBus.Memory[0xFF4A])
+	scrollY := (gb.MemoryBus.Memory[0xFF42])
+	scrollX := (gb.MemoryBus.Memory[0xFF43])
+	windowY := (gb.MemoryBus.Memory[0xFF4A])
 	windowX := int(gb.MemoryBus.Memory[0xFF4B]) - 7
 	lcdc := gb.MemoryBus.Memory[LCDC]
-	scanline := int(gb.MemoryBus.Memory[LY])
+	scanline := (gb.MemoryBus.Memory[LY])
 
 	winAddr := gb.flagEnabled(lcdc, 6)
 	winEnabled := gb.flagEnabled(lcdc, 5)
@@ -174,7 +174,7 @@ func (gb *GameBoy) renderTiles() {
 	bgAddr := gb.flagEnabled(lcdc, 3)
 
 	useWindow := false
-	scanLineInWindow := windowY <= int(scanline)
+	scanLineInWindow := windowY <= (scanline)
 	if winEnabled && scanLineInWindow {
 		useWindow = true
 	}
@@ -192,27 +192,21 @@ func (gb *GameBoy) renderTiles() {
 	// yPos is used to calc which of 32 v-lines the current scanline is drawing
 	var yPos uint8
 	if !useWindow {
-		yPos = uint8((scrollY + scanline) % 256)
+		yPos = uint8((scrollY + scanline))
 	} else {
-		yPos = uint8((scanline - windowY) % 256)
+		yPos = uint8((scanline - windowY))
 	}
 
 	// which of the 8 vertical pixels of the current tile is the scanline on?
 	var tileRow = uint16(yPos/8) * 32
 
-	// Load the palette which will be used to draw the tiles
-	//var palette = gb.MemoryBus.Memory[0xFF47]
-
-	// start drawing the 160 horizontal pixels for this scanline
-	//gb.tileScanline = [160]uint8{}
-
     tileScanline = [width]uint8{}
 	for pixel := range width {
-		xPos := (pixel + scrollX) % 256
+		xPos := (uint8(pixel) + scrollX)
 
 		// Translate the current x pos to window space if necessary
 		if useWindow && pixel >= windowX {
-			xPos = (pixel - windowX) % 256
+			xPos = uint8((int(pixel) - windowX))
 		}
 
 		// Which of the 32 horizontal tiles does this x_pox fall within?
@@ -285,7 +279,7 @@ func (gb *GameBoy) renderTiles() {
 		}
 
         if !gb.bgPriority[pixel][scanline] || tileScanline[scanline] == 0 {
-            gb.Display.Screen[pixel][scanline] = color
+            gb.Screen[pixel][scanline] = color
         }
 
         if gb.Color {
@@ -391,7 +385,7 @@ func (gb *GameBoy) renderSprites(scanline int32) {
 
             drawPixel := (priority && !gb.bgPriority[pixel][scanline]) || tileScanline[pixel] == 0 
             if drawPixel {
-                gb.Display.Screen[pixel][scanline] = color
+                gb.Screen[pixel][scanline] = color
             }
 
             minx[pixel] = int32(xPos) + SpritePriorityOffset

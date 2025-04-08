@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/aabalke33/guac/emu/gb/cartridge"
-	"github.com/veandco/go-sdl2/sdl"
 )
 
 const (
@@ -20,14 +19,9 @@ const (
 	height    = 144
 )
 
-type Display struct {
-	Screen [width][height]uint32
-}
-
 type GameBoy struct {
 
     Palette   [][]uint8
-
     Pixels *[]byte
 
     Color     bool
@@ -38,7 +32,6 @@ type GameBoy struct {
 	Cpu       Cpu
 	Apu       APU
 	MemoryBus MemoryBus
-	Display   Display
 	FPS       int
 
 	Clock int
@@ -48,12 +41,15 @@ type GameBoy struct {
 
 	Joypad uint8
 
+	Screen [width][height]uint32
 	bgPriority [width][height]bool
 
     Cycles int
 
     Paused bool
     Muted bool
+
+    Logger *Logger
 }
 
 type Timer struct {
@@ -77,7 +73,6 @@ func NewGameBoy() *GameBoy {
 		Cartridge: cartridge.Cartridge{
 			Data: make([]uint8, 0),
 		},
-        //Palette: palettes["custom"],
         Palette: palettes["bgb"],
         bgPalette: NewColorPalette(),
         spPalette: NewColorPalette(),
@@ -85,6 +80,7 @@ func NewGameBoy() *GameBoy {
 
     pixels := make([]byte, width*height*4)
     gb.Pixels = &pixels
+    gb.Logger = NewLogger("./logging", &gb)
 
 	gb.Apu.Init()
 
@@ -93,17 +89,6 @@ func NewGameBoy() *GameBoy {
 
 func (gb *GameBoy) GetSize() (int32, int32) {
     return height, width
-}
-
-func (gb *GameBoy) InputHandler(event sdl.Event) {
-
-    switch e := event.(type) {
-    case *sdl.KeyboardEvent:
-        gb.UpdateKeyboardInput(e)
-    case *sdl.ControllerButtonEvent:
-        gb.UpdateControllerInput(e)
-    }
-    return
 }
 
 func (gb *GameBoy) Update(exit *bool, instCount int) int {
@@ -118,6 +103,15 @@ func (gb *GameBoy) Update(exit *bool, instCount int) int {
 		cycles := 4
 
 		opcode, err := gb.ReadByte(gb.Cpu.PC)
+
+        //if instCount > 16_971_850 {
+        //    gb.Logger.Close()
+        //    os.Exit(0)
+        //}
+
+        //if instCount > 16_971_830 {
+        //    gb.Logger.WriteLog(instCount, opcode)
+        //}
 
 		if err != nil {
 			panic(err)
@@ -144,6 +138,7 @@ func (gb *GameBoy) Update(exit *bool, instCount int) int {
         gb.Cycles += interruptCycles
 
 		gb.UpdateTimers()
+
 
 		instCount++
 	}
