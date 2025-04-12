@@ -52,17 +52,17 @@ func (s *Scene) Update(_ sdl.Event) bool {
 			resized = true
 
 		case *sdl.KeyboardEvent:
-            if e.State != sdl.RELEASED {
-                continue
-            }
-
 			switch e.Keysym.Sym {
 			case sdl.K_F11:
-                s.toggleFullscreen()
-                resized = true
-                continue
+                if e.State == sdl.RELEASED {
+                    s.toggleFullscreen()
+                    resized = true
+                    continue
+                }
 			case sdl.K_q:
-                s.Status.Active = false
+                if e.State == sdl.RELEASED {
+                    s.Status.Active = false
+                }
 			}
 		}
 

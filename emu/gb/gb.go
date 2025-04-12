@@ -76,6 +76,7 @@ func NewGameBoy() *GameBoy {
         Palette: palettes["bgb"],
         bgPalette: NewColorPalette(),
         spPalette: NewColorPalette(),
+        Paused: true,
 	}
 
     pixels := make([]byte, width*height*4)
@@ -196,6 +197,8 @@ func (gb *GameBoy) loadCartridge() {
     if gb.Cartridge.ColorMode {
         gb.Color = true
     }
+
+    gb.Color = false
 
     if gb.Color {
         gb.Cpu.Registers.a = 0x11

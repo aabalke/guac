@@ -1,7 +1,6 @@
 package sdl
 
 import (
-	"github.com/aabalke33/guac/emu"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -11,11 +10,10 @@ type Container struct {
 	children      []*Component
 	W, H, X, Y, Z int32
 	Status        Status
-	Emulator      *emu.Emulator
 	color         sdl.Color
 }
 
-func NewContainer(renderer *sdl.Renderer, parent Component, layout Layout, emulator emu.Emulator, color sdl.Color) *Container {
+func NewContainer(renderer *sdl.Renderer, parent Component, layout Layout, color sdl.Color) *Container {
 
 	s := Status{
 		Active:   true,
@@ -27,7 +25,6 @@ func NewContainer(renderer *sdl.Renderer, parent Component, layout Layout, emula
 	b := Container{
         Renderer: renderer,
 		color:    color,
-		Emulator: &emulator,
 		parent:   &parent,
 		X:        layout.X,
 		Y:        layout.Y,

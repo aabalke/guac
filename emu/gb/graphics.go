@@ -184,8 +184,18 @@ func (gb *GameBoy) renderTiles() {
 		tileData = 0x8800
 	}
 
+	//var bgMemory uint16 = 0x9800
+	//if (!useWindow && bgAddr) || (useWindow && winAddr) {
+	//	bgMemory = 0x9C00
+	//}
+
+    var winMemory uint16 = 0x9800
+    if winAddr {
+		winMemory = 0x9C00
+    }
+
 	var bgMemory uint16 = 0x9800
-	if (!useWindow && bgAddr) || (useWindow && winAddr) {
+	if bgAddr {
 		bgMemory = 0x9C00
 	}
 
@@ -213,7 +223,12 @@ func (gb *GameBoy) renderTiles() {
 		tileCol := uint16(xPos / 8)
 
 		// Get the tile identity number
-		tileAddress := bgMemory + tileRow + tileCol
+
+        // PER PIXEL OF SCAN LINE, NEED TO CHECK IF PIXEL >= WX AS WELL TO CHOOSE TILE ADDR (BG VS WIN)
+        tileAddress := bgMemory + tileRow + tileCol
+        if useWindow && pixel >= windowX {
+            tileAddress = winMemory + tileRow + tileCol
+        }
 
 		// Deduce where this tile id is in memory
 		tileLocation := tileData

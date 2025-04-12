@@ -101,6 +101,15 @@ func (s *SDLStruct) Update() {
 	scene := NewScene(s.Renderer, w, h, 10, C_Grey)
 
 	scene.Add(NewGbFrame(s.Renderer, scene, 160.0/144, &scene.H, 0, 0, 1, gb))
+    duration := 3 * time.Second
+    InitLoadingScreen(s.Renderer, scene, duration)
+
+    timer := time.NewTimer(duration - (time.Second / 5))
+
+    go func() {
+        <- timer.C
+        gb.Paused = false
+    }()
 
 	//var debug_h int32 = 128
 	//scene.Add(NewDebugFrame(s.Renderer, scene, 1, &scene.H, 0, 0, 2, emu))
@@ -141,21 +150,45 @@ func (s *SDLStruct) Update() {
 }
 
 func InitPauseMenu(renderer *sdl.Renderer, scene *Scene, gb *gameboy.GameBoy) {
+	c := sdl.Color{R: 228, G: 199, B: 153, A: 255}
+    c2 := sdl.Color{R: 255, G: 255, B: 255, A: 255}
+
 	pause := NewGbMenu(renderer, scene, &scene.H, &scene.W, 0, 0, 2, gb, C_Brown)
 	containerLayout := Layout{W: 200, H: 400, X: 100, Y: 100, Z: 3}
-	container := NewContainer(renderer, pause, containerLayout, gb, C_Transparent)
+	container := NewContainer(renderer, pause, containerLayout, C_Transparent)
 
 	text := "mute"
 	if gb.Muted {
 		text = "unmute"
 	}
 
-	container.Add(NewText(renderer, container, 5, "resume", 48))
-	container.Add(NewText(renderer, container, 5, text, 48))
-	container.Add(NewText(renderer, container, 5, "exit", 48))
+	container.Add(NewText(renderer, container, 5, "resume", 48, c, c2))
+	container.Add(NewText(renderer, container, 5, text, 48, c, c2))
+	container.Add(NewText(renderer, container, 5, "exit", 48, c, c2))
 	pause.Add(container)
 	//pause.Add(NewText(s.Renderer, container, 5, "always save your game in the emulator before exiting", 16))
 	scene.Add(pause)
 
 	pause.InitOptions()
+}
+
+func InitLoadingScreen(renderer *sdl.Renderer, scene *Scene, duration time.Duration) {
+    c := sdl.Color{R: 255, G: 255, B: 255, A: 255}
+
+    loadingScreen := NewLoadingScreen(renderer, scene, &scene.H, &scene.W, 0, 0, 2, C_Green, duration)
+
+	containerLayout := Layout{W: 200, H: 200, X: 100, Y: 100, Z: 3}
+	container := NewContainer(renderer, loadingScreen, containerLayout, C_Transparent)
+    container.Add(NewText(renderer, container, 5, "guac emulator", 48, c, c))
+
+	containerLayout = Layout{W: 200, H: 50, X: 100, Y: 100, Z: 3}
+	container2 := NewContainer(renderer, container, containerLayout, C_Transparent)
+    container2.Add(NewText(renderer, container2, 5, "alpha 0.0.1", 24, c, c))
+    container2.Add(NewText(renderer, container2, 5, "developed by aaron balke", 24, c, c))
+
+    container.Add(container2)
+    loadingScreen.Add(container)
+    scene.Add(loadingScreen)
+
+    loadingScreen.InitOptions()
 }

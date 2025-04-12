@@ -45,6 +45,7 @@ func (gb *GameBoy) UpdateKeyboardInput(keyEvent *sdl.KeyboardEvent, tempJoypad *
     case sdl.K_s: //
         handleKey(tempJoypad, 0b1000, reqInterrupt, keyEvent)
     } 
+
 }
 
 func (gb *GameBoy) UpdateControllerInput(controllerEvent *sdl.ControllerButtonEvent) {
@@ -83,7 +84,6 @@ func handleKey(tempJoypad *uint8, mask uint8, reqInterrupt *bool, keyEvent *sdl.
 
     if keyEvent.State == sdl.PRESSED {
     //if keyEvent.Type == sdl.KEYDOWN || keyEvent.State == sdl.PRESSED {
-
         *tempJoypad &^= mask
 
         if !*reqInterrupt {
@@ -97,6 +97,7 @@ func handleKey(tempJoypad *uint8, mask uint8, reqInterrupt *bool, keyEvent *sdl.
     //if keyEvent.Type == sdl.KEYUP || keyEvent.State == sdl.RELEASED{
         *tempJoypad |= mask
     }
+
 }
 
 func handleButton(tempJoypad *uint8, mask uint8, reqInterrupt *bool, controllerEvent *sdl.ControllerButtonEvent) {

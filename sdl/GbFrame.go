@@ -104,7 +104,6 @@ func (b *GbFrame) Update(event sdl.Event) bool {
 	})
 
     return false
-
 }
 
 func (b *GbFrame) View() {

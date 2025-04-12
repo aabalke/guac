@@ -53,7 +53,8 @@ func ChildFuncUpdate(c Component, childFunc func(*Component) bool) {
                 continue
             }
 
-            if block := childFunc(child); block {
+            block := childFunc(child)
+            if block {
                 return
 			}
 		}

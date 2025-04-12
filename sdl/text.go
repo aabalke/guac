@@ -14,9 +14,10 @@ type Text struct {
 	W, H, X, Y, Z int32
 	surW, surH    int32
 	Status        Status
+    Color, ColorAlt sdl.Color
 }
 
-func NewText(renderer *sdl.Renderer, parent Component, z int32, text string, fontSize int) *Text {
+func NewText(renderer *sdl.Renderer, parent Component, z int32, text string, fontSize int, color, colorAlt sdl.Color) *Text {
 
 	font, err := ttf.OpenFont("./museo.otf", fontSize)
 	if err != nil {
@@ -39,6 +40,8 @@ func NewText(renderer *sdl.Renderer, parent Component, z int32, text string, fon
 		Y:        parent.GetLayout().Y,
 		Z:        z,
 		Status:   s,
+        Color: color,
+        ColorAlt: colorAlt,
 	}
 
 	b.Resize()
@@ -61,9 +64,9 @@ func (b *Text) View() {
 		return
 	}
 
-	c := sdl.Color{R: 228, G: 199, B: 153, A: 255}
+    c := b.Color
 	if b.Status.Selected {
-		c = sdl.Color{R: 255, G: 255, B: 255, A: 255}
+        c = b.ColorAlt
 	}
 
 	//surface, err := b.font.RenderUTF8Solid(b.text, c)
