@@ -9,6 +9,8 @@ type Emulator interface {
     InputHandler(e sdl.Event)
     Update(*bool, int) int
     GetSize() (int32, int32)
+    TogglePause() bool
+    ToggleMute() bool
 }
 
 //type Debugger interface {

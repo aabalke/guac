@@ -82,6 +82,8 @@ func NewGameBoy() *GameBoy {
     gb.Pixels = &pixels
     gb.Logger = NewLogger("./logging", &gb)
 
+    gb.Apu.GameBoy = &gb
+
 	gb.Apu.Init()
 
 	return &gb
@@ -92,6 +94,10 @@ func (gb *GameBoy) GetSize() (int32, int32) {
 }
 
 func (gb *GameBoy) Update(exit *bool, instCount int) int {
+
+    if gb.Paused {
+        return 0
+    }
 
     multiplier := 1
     if gb.DoubleSpeed {
@@ -139,13 +145,27 @@ func (gb *GameBoy) Update(exit *bool, instCount int) int {
 
 		gb.UpdateTimers()
 
-
 		instCount++
 	}
 
     gb.UpdateDisplay()
 
 	return instCount
+}
+
+func (gb *GameBoy) ToggleMute() bool {
+
+    gb.Muted = !gb.Muted
+
+    return gb.Muted
+}
+
+
+func (gb *GameBoy) TogglePause() bool {
+
+    gb.Paused = !gb.Paused
+
+    return gb.Paused
 }
 
 func (gb *GameBoy) LoadGame(filepath string) {

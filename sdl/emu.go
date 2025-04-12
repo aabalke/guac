@@ -4,131 +4,170 @@ import (
 	"math"
 	"unsafe"
 
-	comp "github.com/aabalke33/go-sdl2-components/Components"
-	"github.com/aabalke33/guac/emu"
+	gameboy "github.com/aabalke33/guac/emu/gb"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-type EmulatorFrame struct {
-	renderer   *sdl.Renderer
+type GbFrame struct {
+	Renderer   *sdl.Renderer
 	texture    *sdl.Texture
 	pixels     chan []byte
-	parent     comp.Component
-	children   []*comp.Component
-	w, x, y, z int32
+	parent     Component
+	children   []*Component
+	W, X, Y, Z int32
 	tH, tW     int32
-	h          *int32
+	H          *int32
 	ratio      float64
-	Active     bool
-    Emulator   *emu.Emulator
+	Status     Status
+	Gb         *gameboy.GameBoy
 }
 
-func NewEmulatorFrame(renderer *sdl.Renderer, parent comp.Component, ratio float64, h *int32, x, y, z int32, emulator emu.Emulator) *EmulatorFrame {
+func NewGbFrame(Renderer *sdl.Renderer, parent Component, ratio float64, h *int32, x, y, z int32, gb *gameboy.GameBoy) *GbFrame {
 
-    pixels := make(chan []byte, 1)
+	pixels := make(chan []byte, 1)
 
-    tH, tW := emulator.GetSize()
+	tH, tW := gb.GetSize()
 
-	texture, _ := renderer.CreateTexture(sdl.PIXELFORMAT_ABGR8888, sdl.TEXTUREACCESS_STREAMING, tW, tH)
+	texture, _ := Renderer.CreateTexture(sdl.PIXELFORMAT_ABGR8888, sdl.TEXTUREACCESS_STREAMING, tW, tH)
 
-	b := EmulatorFrame{
-		renderer: renderer,
-        Emulator: &emulator,
+	s := Status{
+		Active:   true,
+		Visible:  true,
+		Hovered:  false,
+		Selected: false,
+	}
+
+	b := GbFrame{
+		Renderer: Renderer,
+		Gb:       gb,
 		parent:   parent,
 		texture:  texture,
 		pixels:   pixels,
 		ratio:    ratio,
-		x:        x,
-		y:        y,
-		h:        h,
-		z:        z,
+		X:        x,
+		Y:        y,
+		H:        h,
+		Z:        z,
 		tH:       tH,
 		tW:       tW,
-		Active:   true,
+		Status:   s,
 	}
 
-    go b.UpdatePixels()
+	go b.UpdatePixels()
 
 	b.Resize()
 
 	return &b
 }
 
-func (b *EmulatorFrame) UpdatePixels() {
+func (b *GbFrame) UpdatePixels() {
 
-    for {
-        select {
-        case b.pixels <- (*b.Emulator).GetPixels():
-        }
-    }
+	for {
+		select {
+		case b.pixels <- (*b.Gb).GetPixels():
+		}
+	}
 }
 
-func (b *EmulatorFrame) Update(dt float64, event sdl.Event) {
+func (b *GbFrame) Update(event sdl.Event) bool {
 
-	if !b.Active {
-		return
+	//if !b.Active {
+	//	return
+	//}
+
+	switch e := event.(type) {
+	case *sdl.KeyboardEvent:
+		if e.State != sdl.RELEASED {
+			break
+		}
+
+		switch e.Keysym.Sym {
+		case sdl.K_p:
+			(*b.Gb).TogglePause()
+
+			switch c := b.parent.(type) {
+			case *Scene:
+				InitPauseMenu(b.Renderer, c, b.Gb)
+			default:
+				panic("Parent of Gameboy Emulator Frame is not Scene")
+			}
+
+		case sdl.K_m:
+			(*b.Gb).ToggleMute()
+		}
 	}
 
-    (*b.Emulator).InputHandler(event)
+	(*b.Gb).InputHandler(event)
 
-    comp.ChildFunc(b, func(child *comp.Component) {
-        (*child).Update(1/comp.FPS, event)
-    })
+	ChildFuncUpdate(b, func(child *Component) bool {
+		return (*child).Update(event)
+	})
+
+    return false
+
 }
 
-func (b *EmulatorFrame) View(renderer *sdl.Renderer) {
-	if !b.Active {
-		return
+func (b *GbFrame) View() {
+	//if !b.Active {
+	//	return
+	//}
+
+	select {
+	case pixels := <-b.pixels:
+		b.texture.Update(nil, unsafe.Pointer(&pixels[0]), int(b.tW*4))
 	}
 
-    select {
-    case pixels := <-b.pixels:
-        b.texture.Update(nil, unsafe.Pointer(&pixels[0]), int(b.tW*4))
-    }
-
-	b.renderer.Clear()
-	win, _ := b.renderer.GetWindow()
+	b.Renderer.Clear()
+	win, _ := b.Renderer.GetWindow()
 	w, h := win.GetSize()
 
-	b.x = int32(math.Floor(float64(w)/2 - float64(b.w)/2))
-	b.y = int32(math.Floor(float64(h)/2 - float64(*b.h)/2))
+	b.X = int32(math.Floor(float64(w)/2 - float64(b.W)/2))
+	b.Y = int32(math.Floor(float64(h)/2 - float64(*b.H)/2))
 
-	rect := sdl.Rect{X: b.x, Y: b.y, W: b.w, H: *b.h}
-	b.renderer.Copy(b.texture, nil, &rect)
+	rect := sdl.Rect{X: b.X, Y: b.Y, W: b.W, H: *b.H}
+	b.Renderer.Copy(b.texture, nil, &rect)
 
-	comp.ChildFunc(b, func(child *comp.Component) {
-		(*child).View(renderer)
+	ChildFunc(b, func(child *Component) {
+		(*child).View()
 	})
 }
 
-func (b *EmulatorFrame) Add(c comp.Component) {
+func (b *GbFrame) Add(c Component) {
 	b.children = append(b.children, &c)
 }
 
-func (b *EmulatorFrame) GetZ() int32 {
-	return b.z
+func (b *GbFrame) Resize() {
+	b.W = int32(math.Floor(float64(*b.H) * b.ratio))
 }
 
-func (b *EmulatorFrame) Resize() {
-	b.w = int32(math.Floor(float64(*b.h) * b.ratio))
-}
-
-func (b *EmulatorFrame) IsActive() bool {
-	return b.Active
-}
-
-func (b *EmulatorFrame) GetChildren() []*comp.Component {
+func (b *GbFrame) GetChildren() []*Component {
 	return b.children
 }
 
-func (b *EmulatorFrame) GetParent() *comp.Component {
+func (b *GbFrame) GetParent() *Component {
 	return &b.parent
 }
 
-func (b *EmulatorFrame) GetSize() (int32, int32) {
-	return *b.h, b.w
+func (b *GbFrame) GetLayout() Layout {
+	return Layout{X: b.X, Y: b.Y, H: *b.H, W: b.W, Z: b.Z}
 }
 
-func (b *EmulatorFrame) SetChildren(c []*comp.Component) {
-    b.children = c
+func (b *GbFrame) GetStatus() Status {
+	return b.Status
+}
+
+func (b *GbFrame) SetChildren(c []*Component) {
+	b.children = c
+}
+
+func (b *GbFrame) SetStatus(s Status) {
+	b.Status = s
+}
+
+func (b *GbFrame) SetLayout(l Layout) {
+	b.W = l.W
+	//b.H = l.H
+	b.X = l.X
+	b.Y = l.Y
+	b.Z = l.Z
 }

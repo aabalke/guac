@@ -28,25 +28,21 @@ func (gb *GameBoy) InputHandler(event sdl.Event) {
 func (gb *GameBoy) UpdateKeyboardInput(keyEvent *sdl.KeyboardEvent, tempJoypad *uint8, reqInterrupt *bool) {
 
     switch key := keyEvent.Keysym.Sym; key {
-    //case sdl.K_x: // A
     case sdl.K_j: // A
         handleKey(tempJoypad, 0b10000, reqInterrupt, keyEvent)
-    //case sdl.K_z: // B
     case sdl.K_k: // B
         handleKey(tempJoypad, 0b100000, reqInterrupt, keyEvent)
-    //case sdl.K_BACKSPACE: // SELECT
     case sdl.K_l: // SELECT
         handleKey(tempJoypad, 0b1000000, reqInterrupt, keyEvent)
-    //case sdl.K_RETURN: // START
     case sdl.K_SEMICOLON: // START
         handleKey(tempJoypad, 0b10000000, reqInterrupt, keyEvent)
-    case sdl.K_RIGHT:
+    case sdl.K_d: //
         handleKey(tempJoypad, 0b1, reqInterrupt, keyEvent)
-    case sdl.K_LEFT:
+    case sdl.K_a: //
         handleKey(tempJoypad, 0b10, reqInterrupt, keyEvent)
-    case sdl.K_UP:
+    case sdl.K_w: //
         handleKey(tempJoypad, 0b100, reqInterrupt, keyEvent)
-    case sdl.K_DOWN:
+    case sdl.K_s: //
         handleKey(tempJoypad, 0b1000, reqInterrupt, keyEvent)
     } 
 }

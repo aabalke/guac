@@ -43,6 +43,7 @@ const (
 )
 
 type APU struct {
+    GameBoy *GameBoy
 	MemoryBus *MemoryBus
 
 	SampleRate float64
@@ -135,7 +136,6 @@ func (a *APU) Init() {
 	}
 
     mixer.Add(&a.Channel1, &a.Channel2, &a.Channel3, &a.Channel4)
-	//mixer.Add(&a.Channel1)
 
 	amplifier := &effects.Volume{
 		Streamer: mixer,
@@ -147,6 +147,10 @@ func (a *APU) Init() {
 }
 
 func (a *APU) Update(addr uint16, data uint8, gb *GameBoy) {
+
+    if gb.Paused || gb.Muted {
+        return
+    }
 
     multipler := 1.0
     if gb.DoubleSpeed {
@@ -385,7 +389,13 @@ func (c *Channel) Err() error {
 
 func (c *Channel) BlockAudio() bool {
 
-	if !c.Apu.Enabled || !c.Enabled || c.Freq <= 0 || c.duty == 0 || (c.LengthTimer && c.duration <= 0) {
+    if  c.Apu.GameBoy.Muted ||
+        c.Apu.GameBoy.Paused ||
+        !c.Apu.Enabled ||
+        !c.Enabled ||
+        c.Freq <= 0 ||
+        c.duty == 0 ||
+        (c.LengthTimer && c.duration <= 0) {
 		return true
 	}
 
