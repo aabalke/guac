@@ -33,6 +33,18 @@ func distributeEvenlyVertical(c Component) {
 	}
 }
 
+func positionRelative(cLayout Layout, pLayout Layout) (int32, int32, int32, int32, int32) {
+
+	x := pLayout.X  + cLayout.X
+	y := pLayout.Y  + cLayout.Y
+	w := cLayout.W
+	h := cLayout.H
+    z := cLayout.Z
+
+    return x, y, w, h, z
+    //return Layout{X: x, Y: y, W: w, H: h, Z: z}
+}
+
 /** Apply childFunc to all Component children with z index as priority **/
 func ChildFuncUpdate(c Component, childFunc func(*Component) bool) {
 

@@ -84,6 +84,8 @@ func (s *Scene) View() {
 		return
 	}
 
+    s.Renderer.Clear()
+
 	s.Renderer.SetDrawColor(s.color.R, s.color.G, s.color.B, s.color.A)
 	rect := sdl.Rect{X: 0, Y: 0, W: s.W, H: s.H}
 	s.Renderer.FillRect(&rect)

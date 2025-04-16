@@ -198,8 +198,6 @@ func (gb *GameBoy) loadCartridge() {
         gb.Color = true
     }
 
-    gb.Color = false
-
     if gb.Color {
         gb.Cpu.Registers.a = 0x11
         println("Color Mode: CMG")

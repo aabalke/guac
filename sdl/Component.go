@@ -21,8 +21,10 @@ type Component interface {
     SetStatus(Status)
 }
 
-type Layout struct {
-    X, Y, H, W, Z int32
+
+
+type Layout  struct {
+    X, Y, H, W, Z I32
 }
 
 type Status struct {

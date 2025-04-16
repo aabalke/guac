@@ -14,15 +14,17 @@ type GbFrame struct {
 	pixels     chan []byte
 	parent     Component
 	children   []*Component
-	W, X, Y, Z int32
+	//W, X, Y, Z int32
 	tH, tW     int32
-	H          *int32
+	//H          *int32
+    Layout Layout
 	ratio      float64
 	Status     Status
 	Gb         *gameboy.GameBoy
 }
 
-func NewGbFrame(Renderer *sdl.Renderer, parent Component, ratio float64, h *int32, x, y, z int32, gb *gameboy.GameBoy) *GbFrame {
+//func NewGbFrame(Renderer *sdl.Renderer, parent Component, ratio float64, h *int32, x, y, z int32, gb *gameboy.GameBoy) *GbFrame {
+func NewGbFrame(Renderer *sdl.Renderer, parent Component, ratio float64, layout Layout, gb *gameboy.GameBoy) *GbFrame {
 
 	pixels := make(chan []byte, 1)
 
@@ -44,10 +46,11 @@ func NewGbFrame(Renderer *sdl.Renderer, parent Component, ratio float64, h *int3
 		texture:  texture,
 		pixels:   pixels,
 		ratio:    ratio,
-		X:        x,
-		Y:        y,
-		H:        h,
-		Z:        z,
+        Layout: layout,
+		//X:        x,
+		//Y:        y,
+		//H:        h,
+		//Z:        z,
 		tH:       tH,
 		tW:       tW,
 		Status:   s,

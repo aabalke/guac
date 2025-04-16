@@ -8,12 +8,19 @@ type Container struct {
     Renderer      *sdl.Renderer
 	parent        *Component
 	children      []*Component
-	W, H, X, Y, Z int32
+	//W, H, X, Y, Z int32
+	//initW, initH, initX, initY, initZ int32
+
+    Layout Layout
+    InitLayout Layout
+
+
 	Status        Status
 	color         sdl.Color
+    positionMethod string
 }
 
-func NewContainer(renderer *sdl.Renderer, parent Component, layout Layout, color sdl.Color) *Container {
+func NewContainer(renderer *sdl.Renderer, parent Component, layout Layout, color sdl.Color, positionMethod string) *Container {
 
 	s := Status{
 		Active:   true,
@@ -26,12 +33,22 @@ func NewContainer(renderer *sdl.Renderer, parent Component, layout Layout, color
         Renderer: renderer,
 		color:    color,
 		parent:   &parent,
-		X:        layout.X,
-		Y:        layout.Y,
-		W:        layout.W,
-		H:        layout.H,
-		Z:        layout.Z,
+        Layout: layout,
+        InitLayout: layout,
+		//X:        layout.X,
+		//Y:        layout.Y,
+		//W:        layout.W,
+		//H:        layout.H,
+		//Z:        layout.Z,
+		//initX:        layout.X,
+		//initY:        layout.Y,
+		//initW:        layout.W,
+		//initH:        layout.H,
+		//initZ:        layout.Z,
+
+
 		Status:   s,
+        positionMethod: positionMethod,
 	}
 
 	b.Resize()
@@ -57,13 +74,30 @@ func (b *Container) View() {
 	//	return
 	//}
 
-	b.X, b.Y, b.W, b.H = positionCenter(b, b.parent)
+    var x, y, w, h, z int32
 
-	distributeEvenlyVertical(b)
+    switch b.positionMethod {
+    case "centerParent":
+        x, y, w, h = positionCenter(b, b.parent)
+    case "evenlyVertical":
+        x, y, w, h = positionCenter(b, b.parent)
+        distributeEvenlyVertical(b)
+    case "relativeParent":
+        //l := Layout{X: b.initX, Y: b.initY, H: b.initH, W: b.initW, Z: b.Z}
+        x, y, w, h, z = positionRelative(b.InitLayout, (*b.parent).GetLayout())
+        SetI32(&b.Layout.Z, z)
+    case "":
+    default: panic("position method unknown")
+    }
+
+    SetI32(&b.Layout.X, x)
+    SetI32(&b.Layout.Y, y)
+    SetI32(&b.Layout.W, w)
+    SetI32(&b.Layout.H, h)
 
 	if b.color.A != 0 {
 		b.Renderer.SetDrawColor(b.color.R, b.color.G, b.color.B, b.color.A)
-		rect := sdl.Rect{X: b.X, Y: b.Y, W: b.W, H: b.H}
+		rect := sdl.Rect{X: GetI32(b.Layout.X), Y: GetI32(b.Layout.Y), W: GetI32(b.Layout.W), H: GetI32(b.Layout.H)}
 		b.Renderer.FillRect(&rect)
 	}
 
@@ -91,7 +125,7 @@ func (b *Container) GetParent() *Component {
 }
 
 func (b *Container) GetLayout() Layout {
-	return Layout{X: b.X, Y: b.Y, H: b.H, W: b.W, Z: b.Z}
+	return b.Layout
 }
 
 func (b *Container) GetStatus() Status {
@@ -107,9 +141,5 @@ func (b *Container) SetStatus(s Status) {
 }
 
 func (b *Container) SetLayout(l Layout) {
-	b.W = l.W
-	b.H = l.H
-	b.X = l.X
-	b.Y = l.Y
-	b.Z = l.Z
+    b.Layout = l
 }

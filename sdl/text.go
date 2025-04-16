@@ -12,12 +12,14 @@ type Text struct {
 	parent        *Component
 	children      []*Component
 	W, H, X, Y, Z int32
+	initX, initY int32
 	surW, surH    int32
 	Status        Status
     Color, ColorAlt sdl.Color
+    positionMethod string
 }
 
-func NewText(renderer *sdl.Renderer, parent Component, z int32, text string, fontSize int, color, colorAlt sdl.Color) *Text {
+func NewText(renderer *sdl.Renderer, parent Component, layout Layout, text string, fontSize int, color, colorAlt sdl.Color, positionMethod string) *Text {
 
 	font, err := ttf.OpenFont("./museo.otf", fontSize)
 	if err != nil {
@@ -36,12 +38,17 @@ func NewText(renderer *sdl.Renderer, parent Component, z int32, text string, fon
 		text:     text,
 		renderer: renderer,
 		parent:   &parent,
-		X:        parent.GetLayout().X,
-		Y:        parent.GetLayout().Y,
-		Z:        z,
+		//X:        parent.GetLayout().X,
+		//Y:        parent.GetLayout().Y,
+		X:        layout.X,
+		Y:        layout.Y,
+		Z:        layout.Z,
+		initX:        layout.X,
+		initY:        layout.Y,
 		Status:   s,
         Color: color,
         ColorAlt: colorAlt,
+        positionMethod: positionMethod,
 	}
 
 	b.Resize()
@@ -82,11 +89,29 @@ func (b *Text) View() {
 
 	b.W, b.H = surface.W, surface.H
 
+
+    switch b.positionMethod {
+    case "centerParent":
+        b.X, b.Y, b.W, b.H = positionCenter(b, b.parent)
+    //case "evenlyVertical":
+    //    b.X, b.Y, b.W, b.H = positionCenter(b, b.parent)
+    //    distributeEvenlyVertical(b)
+    case "relativeParent":
+        l := Layout{X: b.initX, Y: b.initY, H: b.H, W: b.H, Z: b.Z}
+        b.X, b.Y, b.W, b.H, b.Z = positionRelative(l, (*b.parent).GetLayout())
+    case "":
+    default: panic("Unknown position Method Text")
+    }
+
+
+
 	rect := sdl.Rect{X: b.X, Y: b.Y, W: surface.W, H: surface.H}
 
 	surface.Free()
 
 	b.renderer.Copy(texture, nil, &rect)
+
+    texture.Destroy()
 
 	ChildFunc(b, func(child *Component) {
 		(*child).View()
