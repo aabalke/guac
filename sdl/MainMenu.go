@@ -61,6 +61,21 @@ func (b *MainMenu) Update(event sdl.Event) bool {
 	}
 
 	switch e := event.(type) {
+    case *sdl.ControllerButtonEvent:
+
+		if e.State != sdl.RELEASED {
+			break
+		}
+
+        switch key := e.Button; key {
+        case sdl.CONTROLLER_BUTTON_DPAD_DOWN:
+			b.UpdateSelected(false)
+        case sdl.CONTROLLER_BUTTON_DPAD_UP:
+			b.UpdateSelected(true)
+        case sdl.CONTROLLER_BUTTON_A:
+			b.HandleSelected()
+        }
+
 	case *sdl.KeyboardEvent:
 
 		if e.State != sdl.RELEASED {

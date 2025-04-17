@@ -2,10 +2,6 @@ module github.com/aabalke33/guac
 
 go 1.24.0
 
-require github.com/aabalke33/go-sdl2-components v0.0.0
-
-replace github.com/aabalke33/go-sdl2-components v0.0.0 => ../../../utils/go-sdl2-components
-
 require (
 	github.com/gopxl/beep v1.4.1
 	github.com/veandco/go-sdl2 v0.4.40

@@ -54,6 +54,24 @@ func (b *GbMenu) Update(event sdl.Event) bool {
 	childrenDirty := false
 
 	switch e := event.(type) {
+    case *sdl.ControllerButtonEvent:
+
+		if e.State != sdl.RELEASED {
+			break
+		}
+
+        switch key := e.Button; key {
+        case sdl.CONTROLLER_BUTTON_DPAD_DOWN:
+			b.UpdateSelected(false)
+			childrenDirty = true
+        case sdl.CONTROLLER_BUTTON_DPAD_UP:
+			b.UpdateSelected(true)
+			childrenDirty = true
+        case sdl.CONTROLLER_BUTTON_A:
+			b.HandleSelected()
+			childrenDirty = true
+        }
+
 	case *sdl.KeyboardEvent:
 
 		if e.State != sdl.RELEASED {

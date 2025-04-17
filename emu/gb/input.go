@@ -12,8 +12,8 @@ func (gb *GameBoy) InputHandler(event sdl.Event) {
     switch e := event.(type) {
     case *sdl.KeyboardEvent:
         gb.UpdateKeyboardInput(e, &tempJoypad, &reqInterrupt)
-    //case *sdl.ControllerButtonEvent:
-    //    gb.UpdateControllerInput(e)
+    case *sdl.ControllerButtonEvent:
+        gb.UpdateControllerInput(e, &tempJoypad, &reqInterrupt)
     }
 
     if reqInterrupt {
@@ -48,36 +48,26 @@ func (gb *GameBoy) UpdateKeyboardInput(keyEvent *sdl.KeyboardEvent, tempJoypad *
 
 }
 
-func (gb *GameBoy) UpdateControllerInput(controllerEvent *sdl.ControllerButtonEvent) {
-
-    var tempJoypad uint8 = gb.Joypad
-    reqInterrupt := false
+func (gb *GameBoy) UpdateControllerInput(controllerEvent *sdl.ControllerButtonEvent, tempJoypad *uint8, reqInterrupt *bool) {
 
     switch key := controllerEvent.Button; key {
-    case sdl.CONTROLLER_BUTTON_A: // A
-        handleButton(&tempJoypad, 0b10000, &reqInterrupt, controllerEvent)
+    case sdl.CONTROLLER_BUTTON_A: // A //ps x
+        handleButton(tempJoypad, 0b10000, reqInterrupt, controllerEvent)
     case sdl.CONTROLLER_BUTTON_B: // B
-        handleButton(&tempJoypad, 0b100000, &reqInterrupt, controllerEvent)
+        handleButton(tempJoypad, 0b100000, reqInterrupt, controllerEvent)
     case sdl.CONTROLLER_BUTTON_X: // SELECT
-        handleButton(&tempJoypad, 0b1000000, &reqInterrupt, controllerEvent)
+        handleButton(tempJoypad, 0b1000000, reqInterrupt, controllerEvent)
     case sdl.CONTROLLER_BUTTON_Y: // START
-        handleButton(&tempJoypad, 0b10000000, &reqInterrupt, controllerEvent)
+        handleButton(tempJoypad, 0b10000000, reqInterrupt, controllerEvent)
     case sdl.CONTROLLER_BUTTON_DPAD_RIGHT:
-        handleButton(&tempJoypad, 0b1, &reqInterrupt, controllerEvent)
+        handleButton(tempJoypad, 0b1, reqInterrupt, controllerEvent)
     case sdl.CONTROLLER_BUTTON_DPAD_LEFT:
-        handleButton(&tempJoypad, 0b10, &reqInterrupt, controllerEvent)
+        handleButton(tempJoypad, 0b10, reqInterrupt, controllerEvent)
     case sdl.CONTROLLER_BUTTON_DPAD_UP:
-        handleButton(&tempJoypad, 0b100, &reqInterrupt, controllerEvent)
+        handleButton(tempJoypad, 0b100, reqInterrupt, controllerEvent)
     case sdl.CONTROLLER_BUTTON_DPAD_DOWN:
-        handleButton(&tempJoypad, 0b1000, &reqInterrupt, controllerEvent)
+        handleButton(tempJoypad, 0b1000, reqInterrupt, controllerEvent)
     } 
-
-    if reqInterrupt {
-        const JOYPAD uint8 = 0b10000
-        gb.RequestInterrupt(JOYPAD)
-    }
-
-    gb.Joypad = tempJoypad
 }
 
 func handleKey(tempJoypad *uint8, mask uint8, reqInterrupt *bool, keyEvent *sdl.KeyboardEvent) {

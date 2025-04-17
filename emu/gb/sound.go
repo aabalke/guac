@@ -134,7 +134,8 @@ func (a *APU) Init() {
 	amplifier := &effects.Volume{
 		Streamer: mixer,
 		Base:     2,
-		Volume:   -10,
+		//Volume:   -10,
+		Volume:   -8,
 	}
 
 	speaker.Play(amplifier)

@@ -73,7 +73,20 @@ func (b *GbFrame) Update(event sdl.Event) bool {
 	//	return
 	//}
 
+    pause := false
+
 	switch e := event.(type) {
+    case *sdl.ControllerButtonEvent:
+
+		if e.State != sdl.RELEASED {
+			break
+		}
+
+        switch key := e.Button; key {
+        case sdl.CONTROLLER_BUTTON_GUIDE:
+            pause = true
+        }
+
 	case *sdl.KeyboardEvent:
 		if e.State != sdl.RELEASED {
 			break
@@ -81,19 +94,19 @@ func (b *GbFrame) Update(event sdl.Event) bool {
 
 		switch e.Keysym.Sym {
 		case sdl.K_p:
-			(*b.Gb).TogglePause()
-
-			switch c := b.parent.(type) {
-			case *Scene:
-				InitPauseMenu(b.Renderer, c, b.Gb)
-			default:
-				panic("Parent of Gameboy Emulator Frame is not Scene")
-			}
-
+            pause = true
 		case sdl.K_m:
 			(*b.Gb).ToggleMute()
 		}
 	}
+
+    if pause {
+        (*b.Gb).TogglePause()
+        switch c := b.parent.(type) {
+        case *Scene: InitPauseMenu(b.Renderer, c, b.Gb)
+        default: panic("Parent of Gameboy Emulator Frame is not Scene")
+        }
+    }
 
 	(*b.Gb).InputHandler(event)
 
