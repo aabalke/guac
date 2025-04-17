@@ -8,26 +8,50 @@ func positionCenter(c Component, p *Component) (int32, int32, int32, int32) {
 	pLayout := (*p).GetLayout()
 	cLayout := c.GetLayout()
 
-	x := pLayout.X - (cLayout.W / 2) + (pLayout.W / 2)
-	y := pLayout.Y - (cLayout.H / 2) + (pLayout.H / 2)
-	w := cLayout.W
-	h := cLayout.H
+	x := GetI32(pLayout.X) - (GetI32(cLayout.W) / 2) + (GetI32(pLayout.W) / 2)
+	y := GetI32(pLayout.Y) - (GetI32(cLayout.H) / 2) + (GetI32(pLayout.H) / 2)
+	w := GetI32(cLayout.W)
+	h := GetI32(cLayout.H)
+
+	return x, y, w, h
+}
+
+func positionHorizontal(c Component, p *Component) (int32, int32, int32, int32) {
+
+	pLayout := (*p).GetLayout()
+	cLayout := c.GetLayout()
+
+	x := GetI32(pLayout.X) - (GetI32(cLayout.W) / 2) + (GetI32(pLayout.W) / 2)
+	y := GetI32(cLayout.Y)
+	w := GetI32(cLayout.W)
+	h := GetI32(cLayout.H)
 
 	return x, y, w, h
 }
 
 func distributeEvenlyVertical(c Component) {
 
-	layout := c.GetLayout()
 	children := c.GetChildren()
-	size := int(layout.H) / (len(children))
+	if len(children) == 0 {
+		return
+	}
+
+	cLayout := c.GetLayout()
+	x := GetI32(cLayout.X)
+	y := GetI32(cLayout.Y)
+	w := GetI32(cLayout.W)
+	h := GetI32(cLayout.H)
+
+	size := int(h / int32(len(children)))
 
 	for i, child := range children {
 
 		l := (*child).GetLayout()
+		cW := GetI32(l.W)
+		cH := GetI32(l.H)
 
-		height := layout.Y + int32(size*i) + int32(size/2) - (l.H / 2)
-		width := layout.X + (layout.W / 2) - (l.W / 2)
+		height := I32(y + int32(size*i) + int32(size/2) - (cH / 2))
+		width := I32(x + (w / 2) - (cW / 2))
 
 		(*child).SetLayout(Layout{X: width, Y: height, W: l.W, H: l.H, Z: l.Z})
 	}
@@ -35,14 +59,14 @@ func distributeEvenlyVertical(c Component) {
 
 func positionRelative(cLayout Layout, pLayout Layout) (int32, int32, int32, int32, int32) {
 
-	x := pLayout.X  + cLayout.X
-	y := pLayout.Y  + cLayout.Y
-	w := cLayout.W
-	h := cLayout.H
-    z := cLayout.Z
+	x := GetI32(pLayout.X) + GetI32(cLayout.X)
+	y := GetI32(pLayout.Y) + GetI32(cLayout.Y)
+	w := GetI32(cLayout.W)
+	h := GetI32(cLayout.H)
+	z := GetI32(cLayout.Z)
 
-    return x, y, w, h, z
-    //return Layout{X: x, Y: y, W: w, H: h, Z: z}
+	return x, y, w, h, z
+	//return Layout{X: x, Y: y, W: w, H: h, Z: z}
 }
 
 /** Apply childFunc to all Component children with z index as priority **/
@@ -53,7 +77,7 @@ func ChildFuncUpdate(c Component, childFunc func(*Component) bool) {
 	countRendered := 0
 	var z, i int32 = 0, MAX_Z
 	for i = range MAX_Z {
-        z = MAX_Z - i
+		z = MAX_Z - i
 
 		if len(children) == countRendered {
 			return
@@ -61,13 +85,13 @@ func ChildFuncUpdate(c Component, childFunc func(*Component) bool) {
 
 		for _, child := range children {
 
-            if cLayout := (*child).GetLayout(); cLayout.Z != z {
-                continue
-            }
+			if cLayout := (*child).GetLayout(); cLayout.Z != z {
+				continue
+			}
 
-            block := childFunc(child)
-            if block {
-                return
+			block := childFunc(child)
+			if block {
+				return
 			}
 		}
 	}
@@ -88,11 +112,11 @@ func ChildFunc(c Component, childFunc func(*Component)) {
 
 		for _, child := range children {
 
-            if cLayout := (*child).GetLayout(); cLayout.Z != z {
-                continue
-            }
+			if cLayout := (*child).GetLayout(); cLayout.Z != z {
+				continue
+			}
 
-            childFunc(child)
+			childFunc(child)
 		}
 	}
 }

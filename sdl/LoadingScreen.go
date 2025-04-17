@@ -8,18 +8,17 @@ import (
 )
 
 type LoadingScreen struct {
-    Renderer *sdl.Renderer
+	Renderer    *sdl.Renderer
 	parent      Component
 	children    []*Component
-	X, Y, Z     int32
-	W, H        *int32
+	Layout      Layout
 	ratio       float64
 	Status      Status
 	color       sdl.Color
 	SelectedIdx int
 }
 
-func NewLoadingScreen(renderer *sdl.Renderer, parent Component, h, w *int32, x, y, z int32, color sdl.Color, duration time.Duration) *LoadingScreen {
+func NewLoadingScreen(parent Component, layout Layout, color sdl.Color, duration time.Duration) *LoadingScreen {
 
 	ratio := 1.0
 
@@ -31,25 +30,20 @@ func NewLoadingScreen(renderer *sdl.Renderer, parent Component, h, w *int32, x, 
 	}
 
 	b := LoadingScreen{
-        Renderer: renderer,
-		color:  color,
-		parent: parent,
-		ratio:  ratio,
-		X:      x,
-		Y:      y,
-		W:      w,
-		H:      h,
-		Z:      z,
-		Status: s,
+		Renderer: parent.GetRenderer(),
+		color:    color,
+		parent:   parent,
+		ratio:    ratio,
+		Layout:   layout,
+		Status:   s,
 	}
 
-    timer := time.NewTimer(duration)
+	timer := time.NewTimer(duration)
 
-    go func() {
-        <- timer.C
-        b.Status.Active = false
-
-    }()
+	go func() {
+		<-timer.C
+		b.Status.Active = false
+	}()
 
 	b.Resize()
 
@@ -71,8 +65,7 @@ func (b *LoadingScreen) Update(event sdl.Event) bool {
 
 		switch e.Keysym.Sym {
 		case sdl.K_RETURN:
-			b.HandleSelected()
-            return true
+			return true
 		}
 	}
 
@@ -80,7 +73,7 @@ func (b *LoadingScreen) Update(event sdl.Event) bool {
 		return (*child).Update(event)
 	})
 
-    return false
+	return false
 }
 
 func (b *LoadingScreen) View() {
@@ -89,13 +82,18 @@ func (b *LoadingScreen) View() {
 	}
 
 	win, _ := b.Renderer.GetWindow()
-	w, h := win.GetSize()
+	winW, winH := win.GetSize()
 
-	b.X = int32(math.Floor(float64(w)/2 - float64(*b.W)/2))
-	b.Y = int32(math.Floor(float64(h)/2 - float64(*b.H)/2))
+	SetI32(&b.Layout.X, math.Floor(float64(winW)/2-float64(GetI32(b.Layout.W))/2))
+	SetI32(&b.Layout.Y, math.Floor(float64(winH)/2-float64(GetI32(b.Layout.H))/2))
+
+	x := GetI32(b.Layout.X)
+	y := GetI32(b.Layout.Y)
+	w := GetI32(b.Layout.W)
+	h := GetI32(b.Layout.H)
+	rect := sdl.Rect{X: x, Y: y, W: w, H: h}
 
 	b.Renderer.SetDrawColor(b.color.R, b.color.G, b.color.B, b.color.A)
-	rect := sdl.Rect{X: b.X, Y: b.Y, W: *b.W, H: *b.H}
 	b.Renderer.FillRect(&rect)
 
 	ChildFunc(b, func(child *Component) {
@@ -108,8 +106,6 @@ func (b *LoadingScreen) Add(c Component) {
 }
 
 func (b *LoadingScreen) Resize() {
-	//b.W = int32(math.Floor(float64(*b.H) * b.ratio))
-
 	ChildFunc(b, func(child *Component) {
 		(*child).Resize()
 	})
@@ -123,8 +119,8 @@ func (b *LoadingScreen) GetParent() *Component {
 	return &b.parent
 }
 
-func (b *LoadingScreen) GetLayout() Layout {
-	return Layout{X: b.X, Y: b.Y, H: *b.H, W: *b.W, Z: b.Z}
+func (b *LoadingScreen) GetLayout() *Layout {
+	return &b.Layout
 }
 
 func (b *LoadingScreen) GetStatus() Status {
@@ -140,71 +136,32 @@ func (b *LoadingScreen) SetStatus(s Status) {
 }
 
 func (b *LoadingScreen) SetLayout(l Layout) {
-	//b.W = l.W
-	//b.H = l.H
-	b.X = l.X
-	b.Y = l.Y
-	b.Z = l.Z
+	b.Layout = l
 }
 
-func (b *LoadingScreen) InitOptions() {
-
-    return
-
-	container := *(b.GetChildren()[0])
-	options := container.GetChildren()
-
-	oStatus := (*options[0]).GetStatus()
-	nStatus := Status{
-		Active:   oStatus.Active,
-		Visible:  oStatus.Visible,
-		Hovered:  oStatus.Hovered,
-		Selected: true,
-	}
-	(*options[0]).SetStatus(nStatus)
+func (b *LoadingScreen) GetRenderer() *sdl.Renderer {
+	return b.Renderer
 }
 
-func (b *LoadingScreen) UpdateSelected(reverse bool) {
-    return
+func InitLoadingScreen(renderer *sdl.Renderer, scene *Scene, duration time.Duration) {
 
-	originalIdx := b.SelectedIdx
+	z := 25
 
-	if reverse {
-		b.SelectedIdx--
-	} else {
-		b.SelectedIdx++
-	}
+	c := C_White
 
-	if b.SelectedIdx < 0 {
-		b.SelectedIdx = 0
-	}
+	l := NewLayout(&scene.H, &scene.W, 0, 0, z)
+	loadingScreen := NewLoadingScreen(scene, l, C_Green, duration)
 
-	container := *(b.GetChildren()[0])
-	options := container.GetChildren()
+	l = NewLayout(100, 600, 0, 0, z+1)
+	container := NewContainer(loadingScreen, l, C_Transparent, "evenlyVertical")
+	container.Add(NewText(container, NewLayout(0, 0, 0, 0, z+2), "guac emulator", 48, c, c, ""))
 
-	if b.SelectedIdx >= len(options) {
-		b.SelectedIdx = len(options) - 1
-	}
+	l = NewLayout(50, 600, 0, 0, z+1)
+	container2 := NewContainer(container, l, C_Transparent, "evenlyVertical")
+	container2.Add(NewText(container2, NewLayout(0, 0, 0, 0, z+2), "alpha 0.0.1", 24, c, c, ""))
+	container2.Add(NewText(container2, NewLayout(0, 0, 0, 0, z+2), "developed by aaron balke", 24, c, c, ""))
 
-	oStatus := (*options[originalIdx]).GetStatus()
-	nStatus := Status{
-		Active:   oStatus.Active,
-		Visible:  oStatus.Visible,
-		Hovered:  oStatus.Hovered,
-		Selected: false,
-	}
-	(*options[originalIdx]).SetStatus(nStatus)
-
-	oStatus = (*options[b.SelectedIdx]).GetStatus()
-	nStatus = Status{
-		Active:   oStatus.Active,
-		Visible:  oStatus.Visible,
-		Hovered:  oStatus.Hovered,
-		Selected: true,
-	}
-	(*options[b.SelectedIdx]).SetStatus(nStatus)
-}
-
-func (b *LoadingScreen) HandleSelected() {
-    b.Status.Active = false
+	container.Add(container2)
+	loadingScreen.Add(container)
+	scene.Add(loadingScreen)
 }

@@ -8,11 +8,10 @@ import (
 )
 
 type GbMenu struct {
-    Renderer *sdl.Renderer
+	Renderer    *sdl.Renderer
 	parent      Component
 	children    []*Component
-	X, Y, Z     int32
-	W, H        *int32
+	Layout      Layout
 	ratio       float64
 	Status      Status
 	Gb          *gameboy.GameBoy
@@ -20,7 +19,7 @@ type GbMenu struct {
 	SelectedIdx int
 }
 
-func NewGbMenu(renderer *sdl.Renderer, parent Component, h, w *int32, x, y, z int32, gb *gameboy.GameBoy, color sdl.Color) *GbMenu {
+func NewGbMenu(parent Component, layout Layout, gb *gameboy.GameBoy, color sdl.Color) *GbMenu {
 
 	ratio := 1.0
 
@@ -32,17 +31,13 @@ func NewGbMenu(renderer *sdl.Renderer, parent Component, h, w *int32, x, y, z in
 	}
 
 	b := GbMenu{
-        Renderer: renderer,
-		color:  color,
-		Gb:     gb,
-		parent: parent,
-		ratio:  ratio,
-		X:      x,
-		Y:      y,
-		W:      w,
-		H:      h,
-		Z:      z,
-		Status: s,
+		Renderer: parent.GetRenderer(),
+		color:    color,
+		Gb:       gb,
+		parent:   parent,
+		ratio:    ratio,
+		Layout:   layout,
+		Status:   s,
 	}
 
 	b.Resize()
@@ -56,6 +51,8 @@ func (b *GbMenu) Update(event sdl.Event) bool {
 		return false
 	}
 
+	childrenDirty := false
+
 	switch e := event.(type) {
 	case *sdl.KeyboardEvent:
 
@@ -66,20 +63,44 @@ func (b *GbMenu) Update(event sdl.Event) bool {
 		switch e.Keysym.Sym {
 		case sdl.K_DOWN:
 			b.UpdateSelected(false)
+			childrenDirty = true
 		case sdl.K_UP:
 			b.UpdateSelected(true)
+			childrenDirty = true
 		case sdl.K_RETURN:
 			b.HandleSelected()
-        case sdl.K_p:
-            return true
+			childrenDirty = true
+		case sdl.K_p:
+			return true
 		}
+	}
+
+	if childrenDirty {
+
+		var updateText func(child *Component)
+
+		updateText = func(child *Component) {
+			switch t := (*child).(type) {
+			case *Text:
+				t.Dirty = true
+				return
+			}
+
+			for _, c := range (*child).GetChildren() {
+				updateText(c)
+			}
+		}
+
+		ChildFunc(b, func(child *Component) {
+			updateText(child)
+		})
 	}
 
 	ChildFuncUpdate(b, func(child *Component) bool {
 		return (*child).Update(event)
 	})
 
-    return false
+	return false
 }
 
 func (b *GbMenu) View() {
@@ -88,13 +109,18 @@ func (b *GbMenu) View() {
 	}
 
 	win, _ := b.Renderer.GetWindow()
-	w, h := win.GetSize()
+	winW, winH := win.GetSize()
 
-	b.X = int32(math.Floor(float64(w)/2 - float64(*b.W)/2))
-	b.Y = int32(math.Floor(float64(h)/2 - float64(*b.H)/2))
+	SetI32(&b.Layout.X, math.Floor(float64(winW)/2-float64(GetI32(b.Layout.W))/2))
+	SetI32(&b.Layout.Y, math.Floor(float64(winH)/2-float64(GetI32(b.Layout.H))/2))
+
+	x := GetI32(b.Layout.X)
+	y := GetI32(b.Layout.Y)
+	w := GetI32(b.Layout.W)
+	h := GetI32(b.Layout.H)
 
 	b.Renderer.SetDrawColor(b.color.R, b.color.G, b.color.B, b.color.A)
-	rect := sdl.Rect{X: b.X, Y: b.Y, W: *b.W, H: *b.H}
+	rect := sdl.Rect{X: x, Y: y, W: w, H: h}
 	b.Renderer.FillRect(&rect)
 
 	ChildFunc(b, func(child *Component) {
@@ -107,8 +133,6 @@ func (b *GbMenu) Add(c Component) {
 }
 
 func (b *GbMenu) Resize() {
-	//b.W = int32(math.Floor(float64(*b.H) * b.ratio))
-
 	ChildFunc(b, func(child *Component) {
 		(*child).Resize()
 	})
@@ -122,8 +146,8 @@ func (b *GbMenu) GetParent() *Component {
 	return &b.parent
 }
 
-func (b *GbMenu) GetLayout() Layout {
-	return Layout{X: b.X, Y: b.Y, H: *b.H, W: *b.W, Z: b.Z}
+func (b *GbMenu) GetLayout() *Layout {
+	return &b.Layout
 }
 
 func (b *GbMenu) GetStatus() Status {
@@ -139,11 +163,7 @@ func (b *GbMenu) SetStatus(s Status) {
 }
 
 func (b *GbMenu) SetLayout(l Layout) {
-	//b.W = l.W
-	//b.H = l.H
-	b.X = l.X
-	b.Y = l.Y
-	b.Z = l.Z
+	b.Layout = l
 }
 
 func (b *GbMenu) InitOptions() {
@@ -221,8 +241,56 @@ func (b *GbMenu) HandleSelected() {
 		}
 
 	case 2:
-		b.parent.SetStatus(Status{Active: false})
+
+        switch p := b.parent.(type) {
+        case *Scene:
+            Gb.Close()
+
+            for _, child := range p.GetChildren() {
+                switch g := (*child).(type) {
+                case *GbFrame:
+                    g.SetStatus(Status{Active: false})
+                }
+            }
+
+            b.SetStatus(Status{Active: false})
+            Gb = gameboy.NewGameBoy()
+            InitMainMenu(p, 0)
+            return
+        }
+
+        panic("Parent of Gb Menu is not a Scene")
+
 	default:
 		panic("Gb Menu Container has no children")
 	}
+}
+func (b *GbMenu) GetRenderer() *sdl.Renderer {
+	return b.Renderer
+}
+
+func InitPauseMenu(renderer *sdl.Renderer, scene *Scene, gb *gameboy.GameBoy) {
+
+	c := sdl.Color{R: 228, G: 199, B: 153, A: 255}
+	c2 := sdl.Color{R: 255, G: 255, B: 255, A: 255}
+
+	l := NewLayout(&scene.H, &scene.W, 0, 0, 2)
+	pause := NewGbMenu(scene, l, gb, C_Brown)
+
+	l = NewLayout(400, 200, 100, 100, 3)
+	container := NewContainer(pause, l, C_Transparent, "evenlyVertical")
+
+	text := "mute"
+	if gb.Muted {
+		text = "unmute"
+	}
+
+	container.Add(NewText(container, NewLayout(0, 0, 0, 0, 5), "resume", 48, c, c2, ""))
+	container.Add(NewText(container, NewLayout(0, 0, 0, 0, 5), text, 48, c, c2, ""))
+	container.Add(NewText(container, NewLayout(0, 0, 0, 0, 5), "exit", 48, c, c2, ""))
+	pause.Add(container)
+	//pause.Add(NewText(s.Renderer, container, 5, "always save your game in the emulator before exiting", 16))
+	scene.Add(pause)
+
+	pause.InitOptions()
 }

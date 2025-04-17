@@ -4,18 +4,18 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-type Container struct {
-	Renderer       *sdl.Renderer
-	parent         *Component
-	children       []*Component
-	Layout         Layout
-	InitLayout     Layout
-	Status         Status
-	color          sdl.Color
-	positionMethod string
+type SelectableContainer struct {
+	Renderer        *sdl.Renderer
+	parent          *Component
+	children        []*Component
+	Layout          Layout
+	InitLayout      Layout
+	Status          Status
+	Color, ColorAlt sdl.Color
+	positionMethod  string
 }
 
-func NewContainer(parent Component, layout Layout, color sdl.Color, positionMethod string) *Container {
+func NewSelectableContainer(parent Component, layout Layout, color, colorAlt sdl.Color, positionMethod string) *SelectableContainer {
 
 	s := Status{
 		Active:   true,
@@ -24,9 +24,10 @@ func NewContainer(parent Component, layout Layout, color sdl.Color, positionMeth
 		Selected: false,
 	}
 
-	b := Container{
+	b := SelectableContainer{
 		Renderer:       parent.GetRenderer(),
-		color:          color,
+		Color:          color,
+		ColorAlt:       colorAlt,
 		parent:         &parent,
 		Layout:         layout,
 		InitLayout:     layout,
@@ -39,7 +40,7 @@ func NewContainer(parent Component, layout Layout, color sdl.Color, positionMeth
 	return &b
 }
 
-func (b *Container) Update(event sdl.Event) bool {
+func (b *SelectableContainer) Update(event sdl.Event) bool {
 
 	//if !b.Active {
 	//	return
@@ -52,10 +53,16 @@ func (b *Container) Update(event sdl.Event) bool {
 	return false
 }
 
-func (b *Container) View() {
-	//if !b.Active {
-	//	return
-	//}
+func (b *SelectableContainer) View() {
+
+	if !b.Status.Visible {
+		return
+	}
+
+	c := b.Color
+	if b.Status.Selected {
+		c = b.ColorAlt
+	}
 
 	var x, y, w, h int32
 	switch b.positionMethod {
@@ -84,7 +91,7 @@ func (b *Container) View() {
 	SetI32(&b.Layout.W, w)
 	SetI32(&b.Layout.H, h)
 
-	b.Renderer.SetDrawColor(b.color.R, b.color.G, b.color.B, b.color.A)
+	b.Renderer.SetDrawColor(c.R, c.G, c.B, c.A)
 	rect := sdl.Rect{X: GetI32(b.Layout.X), Y: GetI32(b.Layout.Y), W: GetI32(b.Layout.W), H: GetI32(b.Layout.H)}
 	b.Renderer.FillRect(&rect)
 
@@ -93,44 +100,44 @@ func (b *Container) View() {
 	})
 }
 
-func (b *Container) Add(c Component) {
+func (b *SelectableContainer) Add(c Component) {
 	b.children = append(b.children, &c)
 }
 
-func (b *Container) Resize() {
+func (b *SelectableContainer) Resize() {
 	ChildFunc(b, func(child *Component) {
 		(*child).Resize()
 	})
 }
 
-func (b *Container) GetChildren() []*Component {
+func (b *SelectableContainer) GetChildren() []*Component {
 	return b.children
 }
 
-func (b *Container) GetParent() *Component {
+func (b *SelectableContainer) GetParent() *Component {
 	return b.parent
 }
 
-func (b *Container) GetLayout() *Layout {
+func (b *SelectableContainer) GetLayout() *Layout {
 	return &b.Layout
 }
 
-func (b *Container) GetStatus() Status {
+func (b *SelectableContainer) GetStatus() Status {
 	return b.Status
 }
 
-func (b *Container) SetChildren(c []*Component) {
+func (b *SelectableContainer) SetChildren(c []*Component) {
 	b.children = c
 }
 
-func (b *Container) SetStatus(s Status) {
+func (b *SelectableContainer) SetStatus(s Status) {
 	b.Status = s
 }
 
-func (b *Container) SetLayout(l Layout) {
+func (b *SelectableContainer) SetLayout(l Layout) {
 	b.Layout = l
 }
 
-func (b *Container) GetRenderer() *sdl.Renderer {
+func (b *SelectableContainer) GetRenderer() *sdl.Renderer {
 	return b.Renderer
 }

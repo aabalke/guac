@@ -423,3 +423,12 @@ func (gb *GameBoy) toggleDoubleSpeed() {
 
     gb.MemoryBus.Memory[0xFF4D] = v
 }
+
+func (gb *GameBoy) Close() {
+
+    gb.Muted = true
+    gb.Paused = true
+
+
+
+}

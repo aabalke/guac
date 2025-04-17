@@ -3,7 +3,6 @@ package gameboy
 import (
 	"math"
 	"math/rand"
-	"time"
 
 	"github.com/gopxl/beep"
 	"github.com/gopxl/beep/effects"
@@ -56,16 +55,11 @@ type APU struct {
 	Channel4 Channel
 
     WavRam   [32]float64
+
+    Mixer      *beep.Mixer 
 }
 
 func (a *APU) Init() {
-
-	sampleRate := beep.SampleRate(a.SampleRate)
-	bufferSize := sampleRate.N(time.Second / 30)
-	err := speaker.Init(sampleRate, bufferSize)
-	if err != nil {
-		panic(err)
-	}
 
 	mixer := &beep.Mixer{}
 
@@ -144,6 +138,9 @@ func (a *APU) Init() {
 	}
 
 	speaker.Play(amplifier)
+}
+
+func (a *APU) Close() {
 }
 
 func (a *APU) Update(addr uint16, data uint8, gb *GameBoy) {

@@ -9,28 +9,27 @@ import (
 )
 
 type GbFrame struct {
-	Renderer   *sdl.Renderer
-	texture    *sdl.Texture
-	pixels     chan []byte
-	parent     Component
-	children   []*Component
-	//W, X, Y, Z int32
-	tH, tW     int32
-	//H          *int32
-    Layout Layout
-	ratio      float64
-	Status     Status
-	Gb         *gameboy.GameBoy
+	Renderer *sdl.Renderer
+	texture  *sdl.Texture
+	pixels   chan []byte
+	parent   Component
+	children []*Component
+	tH, tW   int32
+	Layout   Layout
+	ratio    float64
+	Status   Status
+	Gb       *gameboy.GameBoy
 }
 
-//func NewGbFrame(Renderer *sdl.Renderer, parent Component, ratio float64, h *int32, x, y, z int32, gb *gameboy.GameBoy) *GbFrame {
-func NewGbFrame(Renderer *sdl.Renderer, parent Component, ratio float64, layout Layout, gb *gameboy.GameBoy) *GbFrame {
+func NewGbFrame(parent Component, ratio float64, layout Layout, gb *gameboy.GameBoy) *GbFrame {
+
+	r := parent.GetRenderer()
 
 	pixels := make(chan []byte, 1)
 
 	tH, tW := gb.GetSize()
 
-	texture, _ := Renderer.CreateTexture(sdl.PIXELFORMAT_ABGR8888, sdl.TEXTUREACCESS_STREAMING, tW, tH)
+	texture, _ := r.CreateTexture(sdl.PIXELFORMAT_ABGR8888, sdl.TEXTUREACCESS_STREAMING, tW, tH)
 
 	s := Status{
 		Active:   true,
@@ -40,17 +39,13 @@ func NewGbFrame(Renderer *sdl.Renderer, parent Component, ratio float64, layout 
 	}
 
 	b := GbFrame{
-		Renderer: Renderer,
+		Renderer: r,
 		Gb:       gb,
 		parent:   parent,
 		texture:  texture,
 		pixels:   pixels,
 		ratio:    ratio,
-        Layout: layout,
-		//X:        x,
-		//Y:        y,
-		//H:        h,
-		//Z:        z,
+		Layout:   layout,
 		tH:       tH,
 		tW:       tW,
 		Status:   s,
@@ -106,7 +101,7 @@ func (b *GbFrame) Update(event sdl.Event) bool {
 		return (*child).Update(event)
 	})
 
-    return false
+	return false
 }
 
 func (b *GbFrame) View() {
@@ -121,12 +116,17 @@ func (b *GbFrame) View() {
 
 	b.Renderer.Clear()
 	win, _ := b.Renderer.GetWindow()
-	w, h := win.GetSize()
+	winW, winH := win.GetSize()
 
-	b.X = int32(math.Floor(float64(w)/2 - float64(b.W)/2))
-	b.Y = int32(math.Floor(float64(h)/2 - float64(*b.H)/2))
+	SetI32(&b.Layout.X, math.Floor(float64(winW)/2-float64(GetI32(b.Layout.W))/2))
+	SetI32(&b.Layout.Y, math.Floor(float64(winH)/2-float64(GetI32(b.Layout.H))/2))
 
-	rect := sdl.Rect{X: b.X, Y: b.Y, W: b.W, H: *b.H}
+	x := GetI32(b.Layout.X)
+	y := GetI32(b.Layout.Y)
+	w := GetI32(b.Layout.W)
+	h := GetI32(b.Layout.H)
+	rect := sdl.Rect{X: x, Y: y, W: w, H: h}
+
 	b.Renderer.Copy(b.texture, nil, &rect)
 
 	ChildFunc(b, func(child *Component) {
@@ -139,7 +139,8 @@ func (b *GbFrame) Add(c Component) {
 }
 
 func (b *GbFrame) Resize() {
-	b.W = int32(math.Floor(float64(*b.H) * b.ratio))
+	h := GetI32(b.Layout.H)
+	SetI32(&b.Layout.W, math.Floor(float64(h)*b.ratio))
 }
 
 func (b *GbFrame) GetChildren() []*Component {
@@ -150,8 +151,8 @@ func (b *GbFrame) GetParent() *Component {
 	return &b.parent
 }
 
-func (b *GbFrame) GetLayout() Layout {
-	return Layout{X: b.X, Y: b.Y, H: *b.H, W: b.W, Z: b.Z}
+func (b *GbFrame) GetLayout() *Layout {
+	return &b.Layout
 }
 
 func (b *GbFrame) GetStatus() Status {
@@ -167,9 +168,8 @@ func (b *GbFrame) SetStatus(s Status) {
 }
 
 func (b *GbFrame) SetLayout(l Layout) {
-	b.W = l.W
-	//b.H = l.H
-	b.X = l.X
-	b.Y = l.Y
-	b.Z = l.Z
+	b.Layout = l
+}
+func (b *GbFrame) GetRenderer() *sdl.Renderer {
+	return b.Renderer
 }

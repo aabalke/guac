@@ -6,20 +6,22 @@ import (
 )
 
 type Text struct {
-	renderer      *sdl.Renderer
-	font          *ttf.Font
-	text          string
-	parent        *Component
-	children      []*Component
-	W, H, X, Y, Z int32
-	initX, initY int32
-	surW, surH    int32
-	Status        Status
-    Color, ColorAlt sdl.Color
-    positionMethod string
+	Renderer        *sdl.Renderer
+	Texture         *sdl.Texture
+	Dirty           bool
+	font            *ttf.Font
+	text            string
+	parent          *Component
+	children        []*Component
+	Layout          Layout
+	InitLayout      Layout
+	surW, surH      int32
+	Status          Status
+	Color, ColorAlt sdl.Color
+	positionMethod  string
 }
 
-func NewText(renderer *sdl.Renderer, parent Component, layout Layout, text string, fontSize int, color, colorAlt sdl.Color, positionMethod string) *Text {
+func NewText(parent Component, layout Layout, text string, fontSize int, color, colorAlt sdl.Color, positionMethod string) *Text {
 
 	font, err := ttf.OpenFont("./museo.otf", fontSize)
 	if err != nil {
@@ -34,21 +36,16 @@ func NewText(renderer *sdl.Renderer, parent Component, layout Layout, text strin
 	}
 
 	b := Text{
-		font:     font,
-		text:     text,
-		renderer: renderer,
-		parent:   &parent,
-		//X:        parent.GetLayout().X,
-		//Y:        parent.GetLayout().Y,
-		X:        layout.X,
-		Y:        layout.Y,
-		Z:        layout.Z,
-		initX:        layout.X,
-		initY:        layout.Y,
-		Status:   s,
-        Color: color,
-        ColorAlt: colorAlt,
-        positionMethod: positionMethod,
+		font:           font,
+		text:           text,
+		Renderer:       parent.GetRenderer(),
+		parent:         &parent,
+		Layout:         layout,
+		InitLayout:     layout,
+		Status:         s,
+		Color:          color,
+		ColorAlt:       colorAlt,
+		positionMethod: positionMethod,
 	}
 
 	b.Resize()
@@ -58,11 +55,11 @@ func NewText(renderer *sdl.Renderer, parent Component, layout Layout, text strin
 
 func (b *Text) Update(event sdl.Event) bool {
 
-	ChildFuncUpdate(b, func(child *Component) bool{
+	ChildFuncUpdate(b, func(child *Component) bool {
 		return (*child).Update(event)
 	})
 
-    return false
+	return false
 }
 
 func (b *Text) View() {
@@ -71,47 +68,41 @@ func (b *Text) View() {
 		return
 	}
 
-    c := b.Color
-	if b.Status.Selected {
-        c = b.ColorAlt
+	if b.Dirty {
+		b.Dirty = false
+		b.RenderText()
 	}
 
-	//surface, err := b.font.RenderUTF8Solid(b.text, c)
-	surface, err := b.font.RenderUTF8Blended(b.text, c)
-	if err != nil {
-		panic(err)
+	var x, y, w, h int32
+	switch b.positionMethod {
+	case "centerHorizontal":
+		x, y, w, h = positionHorizontal(b, b.parent)
+	case "centerParent":
+		x, y, w, h = positionCenter(b, b.parent)
+	case "evenlyVertical":
+		x, y, w, h = positionCenter(b, b.parent)
+		distributeEvenlyVertical(b)
+	case "relativeParent":
+		pLayout := *(*b.parent).GetLayout()
+		x, y, w, h, _ = positionRelative(b.InitLayout, pLayout)
+	case "":
+		x = GetI32(b.Layout.X)
+		y = GetI32(b.Layout.Y)
+		w = GetI32(b.Layout.W)
+		h = GetI32(b.Layout.H)
+
+	default:
+		panic("position method unknown")
 	}
 
-	texture, err := b.renderer.CreateTextureFromSurface(surface)
-	if err != nil {
-		panic(err)
-	}
+	SetI32(&b.Layout.X, x)
+	SetI32(&b.Layout.Y, y)
+	SetI32(&b.Layout.W, w)
+	SetI32(&b.Layout.H, h)
 
-	b.W, b.H = surface.W, surface.H
+	rect := sdl.Rect{X: GetI32(b.Layout.X), Y: GetI32(b.Layout.Y), W: b.surW, H: b.surH}
 
-
-    switch b.positionMethod {
-    case "centerParent":
-        b.X, b.Y, b.W, b.H = positionCenter(b, b.parent)
-    //case "evenlyVertical":
-    //    b.X, b.Y, b.W, b.H = positionCenter(b, b.parent)
-    //    distributeEvenlyVertical(b)
-    case "relativeParent":
-        l := Layout{X: b.initX, Y: b.initY, H: b.H, W: b.H, Z: b.Z}
-        b.X, b.Y, b.W, b.H, b.Z = positionRelative(l, (*b.parent).GetLayout())
-    case "":
-    default: panic("Unknown position Method Text")
-    }
-
-
-
-	rect := sdl.Rect{X: b.X, Y: b.Y, W: surface.W, H: surface.H}
-
-	surface.Free()
-
-	b.renderer.Copy(texture, nil, &rect)
-
-    texture.Destroy()
+	b.Renderer.Copy(b.Texture, nil, &rect)
 
 	ChildFunc(b, func(child *Component) {
 		(*child).View()
@@ -124,9 +115,7 @@ func (b *Text) Add(c Component) {
 
 func (b *Text) Resize() {
 
-	//if !b.Active {
-	//	return
-	//}
+	b.Dirty = true
 
 	ChildFunc(b, func(child *Component) {
 		(*child).Resize()
@@ -141,8 +130,8 @@ func (b *Text) GetParent() *Component {
 	return b.parent
 }
 
-func (b *Text) GetLayout() Layout {
-	return Layout{X: b.X, Y: b.Y, H: b.H, W: b.W, Z: b.Z}
+func (b *Text) GetLayout() *Layout {
+	return &b.Layout
 }
 
 func (b *Text) GetStatus() Status {
@@ -158,14 +147,49 @@ func (b *Text) SetStatus(s Status) {
 }
 
 func (b *Text) SetLayout(l Layout) {
-	b.W = l.W
-	b.H = l.H
-	b.X = l.X
-	b.Y = l.Y
-	b.Z = l.Z
+	b.Layout = l
 }
 
 func (b *Text) UpdateText(s string) {
 	b.text = s
+	b.Dirty = true
 	b.View()
+}
+func (b *Text) GetRenderer() *sdl.Renderer {
+	return b.Renderer
+}
+
+func (b *Text) RenderText() {
+
+	// cleanup previous
+	b.Texture.Destroy()
+
+	c := b.Color
+	if b.Status.Selected {
+		c = b.ColorAlt
+	}
+
+	// only change surface blend on change??
+	//surface, err := b.font.RenderUTF8Solid(b.text, c)
+	surface, err := b.font.RenderUTF8Blended(b.text, c)
+	if err != nil {
+		panic(err)
+	}
+
+	b.Texture, err = b.Renderer.CreateTextureFromSurface(surface)
+	if err != nil {
+		panic(err)
+	}
+
+	if surface.W == 0 || surface.H == 0 {
+		panic("Surface is 0")
+	}
+
+	b.surH = surface.H
+	b.surW = surface.W
+
+	SetI32(&b.Layout.W, surface.W)
+	SetI32(&b.Layout.H, surface.H)
+
+	surface.Free()
 }

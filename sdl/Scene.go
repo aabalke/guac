@@ -54,15 +54,15 @@ func (s *Scene) Update(_ sdl.Event) bool {
 		case *sdl.KeyboardEvent:
 			switch e.Keysym.Sym {
 			case sdl.K_F11:
-                if e.State == sdl.RELEASED {
-                    s.toggleFullscreen()
-                    resized = true
-                    continue
-                }
+				if e.State == sdl.RELEASED {
+					s.toggleFullscreen()
+					resized = true
+					continue
+				}
 			case sdl.K_q:
-                if e.State == sdl.RELEASED {
-                    s.Status.Active = false
-                }
+				if e.State == sdl.RELEASED {
+					s.Status.Active = false
+				}
 			}
 		}
 
@@ -75,7 +75,7 @@ func (s *Scene) Update(_ sdl.Event) bool {
 		s.Resize()
 	}
 
-    return false
+	return false
 }
 
 func (s *Scene) View() {
@@ -84,7 +84,7 @@ func (s *Scene) View() {
 		return
 	}
 
-    s.Renderer.Clear()
+	s.Renderer.Clear()
 
 	s.Renderer.SetDrawColor(s.color.R, s.color.G, s.color.B, s.color.A)
 	rect := sdl.Rect{X: 0, Y: 0, W: s.W, H: s.H}
@@ -135,8 +135,8 @@ func (s *Scene) GetParent() *Component {
 	return s.parent
 }
 
-func (b *Scene) GetLayout() Layout {
-	return Layout{X: 0, Y: 0, H: b.H, W: b.W, Z: 0}
+func (b *Scene) GetLayout() *Layout {
+	return &Layout{X: 0, Y: 0, H: b.H, W: b.W, Z: 0}
 }
 
 func (b *Scene) GetStatus() Status {
@@ -170,4 +170,7 @@ func (b *Scene) SetStatus(s Status) {
 }
 
 func (b *Scene) SetLayout(l Layout) {
+}
+func (b *Scene) GetRenderer() *sdl.Renderer {
+	return b.Renderer
 }

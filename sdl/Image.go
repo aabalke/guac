@@ -13,23 +13,26 @@ import (
 )
 
 type Image struct {
-	Renderer   *sdl.Renderer
-	texture    *sdl.Texture
-	pixels     []byte
-	parent     *Component
-	children   []*Component
-	W, H, X, Y, Z, tH, tW int32
-	initW, initH, initX, initY, initZ int32
-	Status     Status
-    positionMethod string
+	Renderer       *sdl.Renderer
+	texture        *sdl.Texture
+	pixels         []byte
+	parent         *Component
+	children       []*Component
+	Layout         Layout
+	InitLayout     Layout
+	tH, tW         int32
+	Status         Status
+	positionMethod string
 }
 
-func NewImage(Renderer *sdl.Renderer, parent Component, layout Layout, filepath string, positionMethod string) *Image {
+func NewImage(parent Component, layout Layout, filepath string, positionMethod string) *Image {
 
-    pixels, tW, tH := GetImage(filepath)
+	Renderer := parent.GetRenderer()
 
-    texture, _ := Renderer.CreateTexture(sdl.PIXELFORMAT_ABGR8888, sdl.TEXTUREACCESS_STREAMING, tW, tH)
-    texture.Update(nil, unsafe.Pointer(&(pixels)[0]), int(tW*4))
+	pixels, tW, tH := GetImage(filepath)
+
+	texture, _ := Renderer.CreateTexture(sdl.PIXELFORMAT_ABGR8888, sdl.TEXTUREACCESS_STREAMING, tW, tH)
+	texture.Update(nil, unsafe.Pointer(&(pixels)[0]), int(tW*4))
 
 	s := Status{
 		Active:   true,
@@ -39,24 +42,16 @@ func NewImage(Renderer *sdl.Renderer, parent Component, layout Layout, filepath 
 	}
 
 	b := Image{
-		Renderer: Renderer,
-		parent:   &parent,
-		texture:  texture,
-		pixels:   pixels,
-		X:        layout.X,
-		Y:        layout.Y,
-		W:        layout.W,
-		H:        layout.H,
-		Z:        layout.Z,
-		initX:        layout.X,
-		initY:        layout.Y,
-		initW:        layout.W,
-		initH:        layout.H,
-		initZ:        layout.Z,
-		tH:       tH,
-		tW:       tW,
-		Status:   s,
-        positionMethod: positionMethod,
+		Renderer:       Renderer,
+		parent:         &parent,
+		texture:        texture,
+		pixels:         pixels,
+		Layout:         layout,
+		InitLayout:     layout,
+		tH:             tH,
+		tW:             tW,
+		Status:         s,
+		positionMethod: positionMethod,
 	}
 
 	b.Resize()
@@ -65,46 +60,44 @@ func NewImage(Renderer *sdl.Renderer, parent Component, layout Layout, filepath 
 }
 
 func (b *Image) Close() {
-    b.texture.Destroy()
+	b.texture.Destroy()
 }
 
 func GetImage(filepath string) (pixels []byte, width, height int32) {
 
-    f, err := os.Open(filepath)
-    if err != nil {
-        panic(err)
-    }
+	f, err := os.Open(filepath)
+	if err != nil {
+		panic(err)
+	}
 
-    defer f.Close()
+	defer f.Close()
 
-    img, _, err := image.Decode(f)
-    if err != nil {
-        panic(err)
-    }
+	img, _, err := image.Decode(f)
+	if err != nil {
+		panic(err)
+	}
 
-    width =  int32(img.Bounds().Max.X)
-    height = int32(img.Bounds().Max.Y)
+	width = int32(img.Bounds().Max.X)
+	height = int32(img.Bounds().Max.Y)
 
-    for y := range int(height) {
-        for x := range int(height) {
-            r, g, b, a := img.At(x, y).RGBA()
+	for y := range int(height) {
+		for x := range int(height) {
+			r, g, b, a := img.At(x, y).RGBA()
 
-            r1 := uint8(float64(r) / 0x10000 * 0x100)
-            g1 := uint8(float64(g) / 0x10000 * 0x100)
-            b1 := uint8(float64(b) / 0x10000 * 0x100)
-            a1 := uint8(float64(a) / 0x10000 * 0x100)
+			r1 := uint8(float64(r) / 0x10000 * 0x100)
+			g1 := uint8(float64(g) / 0x10000 * 0x100)
+			b1 := uint8(float64(b) / 0x10000 * 0x100)
+			a1 := uint8(float64(a) / 0x10000 * 0x100)
 
-            pixels = append(pixels, r1)
-            pixels = append(pixels, g1)
-            pixels = append(pixels, b1)
-            pixels = append(pixels, a1)
-        }
-    }
+			pixels = append(pixels, r1)
+			pixels = append(pixels, g1)
+			pixels = append(pixels, b1)
+			pixels = append(pixels, a1)
+		}
+	}
 
-    return pixels, width, height
+	return pixels, width, height
 }
-
-
 
 func (b *Image) Update(event sdl.Event) bool {
 
@@ -116,35 +109,42 @@ func (b *Image) Update(event sdl.Event) bool {
 		return (*child).Update(event)
 	})
 
-    return false
+	return false
 }
 
 func (b *Image) View() {
 	//if !b.Active {
 	//	return
 	//}
-    switch b.positionMethod {
-    case "centerParent":
-        b.X, b.Y, b.W, b.H = positionCenter(b, b.parent)
-    case "evenlyVertical":
-        b.X, b.Y, b.W, b.H = positionCenter(b, b.parent)
-        distributeEvenlyVertical(b)
-    case "relativeParent":
-        l := Layout{X: b.initX, Y: b.initY, H: b.initH, W: b.initW, Z: b.Z}
-        b.X, b.Y, b.W, b.H, b.Z = positionRelative(l, (*b.parent).GetLayout())
-    case "":
-    default: panic("position method unknown")
-    }
 
+	var x, y, w, h, z int32
+	switch b.positionMethod {
+	case "centerHorizontal":
+		x, y, w, h = positionHorizontal(b, b.parent)
+	case "centerParent":
+		x, y, w, h = positionCenter(b, b.parent)
+	case "evenlyVertical":
+		x, y, w, h = positionCenter(b, b.parent)
+		distributeEvenlyVertical(b)
+	case "relativeParent":
+		//l := Layout{X: b.initX, Y: b.initY, H: b.initH, W: b.initW, Z: b.Z}
+		x, y, w, h, z = positionRelative(b.InitLayout, *(*b.parent).GetLayout())
+		SetI32(&b.Layout.Z, z)
+	case "":
+		x = GetI32(b.Layout.X)
+		y = GetI32(b.Layout.Y)
+		w = GetI32(b.Layout.W)
+		h = GetI32(b.Layout.H)
+	default:
+		panic("position method unknown")
+	}
 
-	//b.Renderer.Clear()
-	//win, _ := b.Renderer.GetWindow()
-	//w, h := win.GetSize()
+	SetI32(&b.Layout.X, x)
+	SetI32(&b.Layout.Y, y)
+	SetI32(&b.Layout.W, w)
+	SetI32(&b.Layout.H, h)
 
-	//b.X = int32(math.Floor(float64(w)/2 - float64(b.W)/2))
-	//b.Y = int32(math.Floor(float64(h)/2 - float64(b.H)/2))
-
-	rect := sdl.Rect{X: b.X, Y: b.Y, W: b.W, H: b.H}
+	rect := sdl.Rect{X: GetI32(b.Layout.X), Y: GetI32(b.Layout.Y), W: GetI32(b.Layout.W), H: GetI32(b.Layout.H)}
 	b.Renderer.Copy(b.texture, nil, &rect)
 
 	ChildFunc(b, func(child *Component) {
@@ -170,8 +170,8 @@ func (b *Image) GetParent() *Component {
 	return b.parent
 }
 
-func (b *Image) GetLayout() Layout {
-	return Layout{X: b.X, Y: b.Y, H: b.H, W: b.W, Z: b.Z}
+func (b *Image) GetLayout() *Layout {
+	return &b.Layout
 }
 
 func (b *Image) GetStatus() Status {
@@ -187,9 +187,8 @@ func (b *Image) SetStatus(s Status) {
 }
 
 func (b *Image) SetLayout(l Layout) {
-	b.W = l.W
-	b.H = l.H
-	b.X = l.X
-	b.Y = l.Y
-	b.Z = l.Z
+	b.Layout = l
+}
+func (b *Image) GetRenderer() *sdl.Renderer {
+	return b.Renderer
 }
