@@ -3,8 +3,10 @@ package sdl
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
+	"github.com/aabalke33/guac/emu/gba"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -259,26 +261,44 @@ func (b *MainMenu) UpdateSelected(reverse bool) {
 
 func (b *MainMenu) HandleSelected() {
 
-	switch scene := b.parent.(type) {
-	case *Scene:
-		path := b.GameDatas[b.SelectedIdx].RomPath
+    scene, ok := b.parent.(*Scene)
+    if !ok {
+	    panic("Parent of Main Menu is not Scene")
+    }
 
-		Gb.LoadGame(path)
+    path := b.GameDatas[b.SelectedIdx].RomPath
 
-		l := NewLayout(&scene.H, 0, 0, 0, 1)
-		(b.parent).Add(NewGbFrame(scene, 160.0/144, l, Gb))
-		Gb.Paused = false
+    ActivateConsole(scene, path)
 
-		b.Status.Active = false
+    b.Status.Active = false
 
-        b.GameDatas = ReorderGameData(&b.GameDatas, b.SelectedIdx)
+    b.GameDatas = ReorderGameData(&b.GameDatas, b.SelectedIdx)
 
-        WriteGameData(&b.GameDatas)
+    WriteGameData(&b.GameDatas)
+}
 
-		return
-	}
+func ActivateConsole(scene *Scene, path string) {
 
-	panic("Parent of Main Menu is not Scene")
+    isGb := strings.HasSuffix(path, "gb") || strings.HasSuffix(path, "gbc")
+    isGba := strings.HasSuffix(path, "gba")
+
+    l := NewLayout(&scene.H, 0, 0, 0, 1)
+
+    switch {
+    case isGb:
+        Gb.LoadGame(path)
+        scene.Add(NewGbFrame(scene, 160.0/144, l, Gb))
+        Gb.Paused = false
+        return
+    case isGba:
+        Gba.LoadGame(path)
+        ratio := float64(gba.SCREEN_WIDTH)/float64(gba.SCREEN_HEIGHT)
+        scene.Add(NewGbaFrame(scene, ratio, l, Gba))
+        Gba.Paused = false
+        return
+    }
+
+    panic("unknown console")
 }
 
 func InitMainMenu(scene *Scene, duration time.Duration) {

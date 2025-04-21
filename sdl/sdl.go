@@ -5,6 +5,7 @@ import (
 	"time"
 
 	gameboy "github.com/aabalke33/guac/emu/gb"
+	"github.com/aabalke33/guac/emu/gba"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
 
@@ -27,6 +28,7 @@ var (
 	C_Transparent50 = sdl.Color{R: 0, G: 0, B: 0, A: 127}
 
 	Gb *gameboy.GameBoy
+	Gba *gba.GBA
 )
 
 type SDLStruct struct {
@@ -96,21 +98,26 @@ func (s *SDLStruct) Close() {
 
 func (s *SDLStruct) Update() {
 
-	//romPath := flag.String("r", "", "rom path")
+	romPath := flag.String("r", "", "rom path")
 	debug := flag.Bool("debug", false, "debug")
 	maxInstr := flag.Int("i", 0, "max instruction count")
 	flag.Parse()
     InitSound()
 	Gb = gameboy.NewGameBoy()
+    Gba = gba.NewGBA()
 	defer Gb.Logger.Close()
 
 	w, h := s.Window.GetSize()
 
 	scene := NewScene(s.Renderer, w, h, 10, C_Grey)
 
-	duration := 3 * time.Second
-	InitLoadingScreen(s.Renderer, scene, duration)
-	InitMainMenu(scene, 0)
+    if *romPath == "" {
+        duration := 3 * time.Second
+        InitLoadingScreen(s.Renderer, scene, duration)
+        InitMainMenu(scene, 0)
+    } else {
+        ActivateConsole(scene, *romPath)
+    }
 
 	//var debug_h int32 = 128
 	//scene.Add(NewDebugFrame(s.Renderer, scene, 1, &scene.H, 0, 0, 2, emu))

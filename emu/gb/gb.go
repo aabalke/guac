@@ -73,7 +73,7 @@ func NewGameBoy() *GameBoy {
 		Cartridge: cartridge.Cartridge{
 			Data: make([]uint8, 0),
 		},
-        Palette: palettes["bgb"],
+        Palette: palettes["greyscale"],
         bgPalette: NewColorPalette(),
         spPalette: NewColorPalette(),
         Paused: true,
@@ -425,10 +425,6 @@ func (gb *GameBoy) toggleDoubleSpeed() {
 }
 
 func (gb *GameBoy) Close() {
-
     gb.Muted = true
     gb.Paused = true
-
-
-
 }
