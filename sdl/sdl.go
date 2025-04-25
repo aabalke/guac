@@ -128,7 +128,8 @@ func (s *SDLStruct) Update() {
 
 	frameTime := time.Second / FPS
 	ticker := time.NewTicker(frameTime)
-	count := 0
+
+	//count := 0
 
 	//switched := false
 	for i := range ticker.C {
@@ -148,7 +149,11 @@ func (s *SDLStruct) Update() {
 			scene.DeleteInactive()
 		}
 
-		count = Gb.Update(&scene.Status.Active, count)
+		//count = Gb.Update(&scene.Status.Active, count)
+        end := Gba.Update()
+        if end {
+            return
+        }
 
 		s.Renderer.SetDrawColor(0, 0, 0, 255)
 		s.Renderer.Clear()

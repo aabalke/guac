@@ -1,4 +1,4 @@
-package cpu
+package gba
 
 //  |..3 ..................2 ..................1 ..................0|
 //  |1_0_9_8_7_6_5_4_3_2_1_0_9_8_7_6_5_4_3_2_1_0_9_8_7_6_5_4_3_2_1_0|
@@ -31,22 +31,83 @@ package cpu
 //  |_Cond__|1_1_0_0_0_1_0|L|__Rn___|__Rd___|__CP#__|_CPopc_|__CRm__| CoRR ARM9
 //  |_Cond__|1_1_1_0|_CPopc_|__CRn__|__CRd__|__CP#__|_CP__|0|__CRm__| CoDataOp
 //  |_Cond__|1_1_1_0|CPopc|L|__CRn__|__Rd___|__CP#__|_CP__|1|__CRm__| CoRegTrans
-//  |_Cond__|1_1_1_1|_____________Ignored_by_Processor______________| SWI 
+//  |_Cond__|1_1_1_1|_____________Ignored_by_Processor______________| SWI
 
 func (cpu *Cpu) DecodeARM(opcode uint32) {
+
+    if !cpu.CheckCond(opcode) {
+        
+        cpu.Reg.R[PC] += 4
+        return
+    }
+
 	switch {
-	case isBX(opcode):
-	case isBT(opcode):
-
-
-    case isUD(opcode): // UNDEFINED
-    case isSI(opcode): // SWI
+    case isSWI(opcode): panic("Need SWI Functionality")
+    case isB(opcode): cpu.B(opcode)
+	case isBX(opcode): panic("Need BX functionality")
+    case isSDT(opcode): cpu.Sdt(opcode)
+    case isHalf(opcode): cpu.Half(opcode)
+	case isBlock(opcode): cpu.Block(opcode)
+    case isUD(opcode): panic("Need Undefined functionality")
+    case isALU(opcode): cpu.Alu(opcode)
+    default: panic("Unable to Decode")
 	}
 }
 
+
 func isOpcodeFormat(opcode, mask, format uint32) bool {
     return opcode&mask == format
+}
 
+func isBlock(opcode uint32) bool {
+    return isOpcodeFormat( opcode,
+		0b0000_1110_0000_0000_0000_0000_0000_0000,
+		0b0000_1000_0000_0000_0000_0000_0000_0000,
+    )
+}
+func isCo(opcode uint32) bool {
+    return isOpcodeFormat( opcode,
+		0b0000_1111_0000_0000_0000_0000_0000_0000,
+		0b0000_1110_0000_0000_0000_0000_0000_0000,
+    )
+}
+
+func isHalf(opcode uint32) bool {
+
+    is := false
+
+    // LDRH
+    is = is || isOpcodeFormat( opcode,
+        0b0000_1110_0001_0000_0000_0000_1111_0000,
+        0b0000_0000_0001_0000_0000_0000_1011_0000,
+    )
+
+    // LDRSB
+    is = is || isOpcodeFormat( opcode,
+        0b0000_1110_0001_0000_0000_0000_1111_0000,
+        0b0000_0000_0001_0000_0000_0000_1101_0000,
+    )
+
+    // LDRSH
+    is = is || isOpcodeFormat( opcode,
+        0b0000_1110_0001_0000_0000_0000_1111_0000,
+        0b0000_0000_0001_0000_0000_0000_1111_0000,
+    )
+
+    // STRH
+    is = is || isOpcodeFormat( opcode,
+        0b0000_1110_0001_0000_0000_0000_1111_0000,
+        0b0000_0000_0000_0000_0000_0000_1011_0000,
+    )
+
+    return is
+}
+
+func isALU(opcode uint32) bool {
+    return isOpcodeFormat( opcode,
+		0b0000_1100_0000_0000_0000_0000_0000_0000,
+		0b0000_0000_0000_0000_0000_0000_0000_0000,
+	)
 }
 
 func isBX(opcode uint32) bool {
@@ -56,23 +117,9 @@ func isBX(opcode uint32) bool {
 	)
 }
 
-func isBT(opcode uint32) bool {
-    return isOpcodeFormat( opcode,
-		0b0000_1110_0000_0000_0000_0000_0000_0000,
-		0b0000_1000_0000_0000_0000_0000_0000_0000,
-	)
-}
-
 func isB(opcode uint32) bool {
     return isOpcodeFormat( opcode,
-		0b0000_1111_0000_0000_0000_0000_0000_0000,
-		0b0000_1010_0000_0000_0000_0000_0000_0000,
-	)
-}
-
-func isBL(opcode uint32) bool {
-    return isOpcodeFormat( opcode,
-		0b0000_1011_0000_0000_0000_0000_0000_0000,
+		0b0000_1110_0000_0000_0000_0000_0000_0000,
 		0b0000_1010_0000_0000_0000_0000_0000_0000,
 	)
 }
@@ -91,7 +138,7 @@ func isML(opcode uint32) bool {
 	)
 }
 
-func isSI(opcode uint32) bool {
+func isSWI(opcode uint32) bool {
     return isOpcodeFormat(
         opcode,
 		0b0000_1111_0000_0000_0000_0000_0000_0000,
@@ -110,16 +157,8 @@ func isUD(opcode uint32) bool {
 func isSDT(opcode uint32) bool {
     return isOpcodeFormat(
         opcode,
-		0b0000_1100_0001_0000_0000_0000_0000_0000,
+		0b0000_1100_0000_0000_0000_0000_0000_0000,
 		0b0000_0100_0000_0000_0000_0000_0000_0000,
-    )
-}
-
-func isSDTL(opcode uint32) bool {
-    return isOpcodeFormat(
-        opcode,
-		0b0000_1100_0001_0000_0000_0000_0000_0000,
-		0b0000_0100_0001_0000_0000_0000_0000_0000,
     )
 }
 
