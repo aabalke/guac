@@ -173,10 +173,15 @@ func (cpu *Cpu) arithmetic(alu *Alu) {
     case SUB: oper = func(u1, u2, u3 uint64) uint64 { return u1 - u2 }
     case SBC: oper = func(u1, u2, u3 uint64) uint64 { return u1 - u2 + u3 - 1 }
     case RSB: oper = func(u1, u2, u3 uint64) uint64 { return u2 - u1 }
-    case RSC: oper = func(u1, u2, u3 uint64) uint64 { return u2 + u1 + u3 - 1 }
+    case RSC: oper = func(u1, u2, u3 uint64) uint64 { return u2 - u1 + u3 - 1 }
     }
 
-    res := oper(uint64(alu.RnValue), uint64(alu.Op2), 0) // cy
+    carry := uint64(0)
+    if cpu.Reg.CPSR.GetFlag(FLAG_C) {
+        carry = 1
+    }
+
+    res := oper(uint64(alu.RnValue), uint64(alu.Op2), carry)
     cpu.Reg.R[alu.Rd] = uint32(res)
 
     cpu.setArithmeticFlags(alu, res)
@@ -201,7 +206,10 @@ func (cpu *Cpu) setArithmeticFlags(alu *Alu, res uint64) {
         case SUB, SBC, CMP:
             v = (rnSign != opSign) && (rSign != rnSign)
             c = res < 0x1_0000_0000
-        case RSB, RSC: v = (rnSign != opSign) && (rSign != opSign)
+
+        case RSB, RSC:
+            v = (rnSign != opSign) && (rSign != opSign)
+            c = res < 0x1_0000_0000
         }
 
         cpu.Reg.CPSR.SetFlag(FLAG_V, v)
@@ -224,8 +232,6 @@ func (cpu *Cpu) test(alu *Alu) {
     }
 
     res := oper(uint64(alu.RnValue), uint64(alu.Op2))
-
-    //cpu.SetAluArithmeticData(alu, res)
 
     switch alu.Inst {
     case TST, TEQ: cpu.setLogicalFlags(alu, uint32(res))
@@ -613,6 +619,37 @@ func (c *Cpu) B(opcode uint32) {
 }
 
 const (
+    INST_BX = 1 + iota
+    INST_BXJ
+    INST_BLX
+)
+
+type BX struct {
+    Cond, Inst, Rn uint32
+}
+
+func NewBX(opcode uint32, cpu *Cpu) *BX {
+    return &BX{
+        Cond: utils.GetByte(opcode, 28),
+        Inst: utils.GetByte(opcode, 4),
+        Rn: utils.GetByte(opcode, 0),
+    }
+}
+
+func (c *Cpu) BX(opcode uint32) {
+
+    bx := NewBX(opcode, c)
+
+    switch bx.Inst {
+    case INST_BX:
+        c.Reg.R[PC] = c.Reg.R[bx.Rn]
+        c.Gba.toggleThumb()
+    case INST_BXJ: panic("Unsupported BXJ Instruction")
+    case INST_BLX: panic("Unsupported BLX Instruction")
+    }
+}
+
+const (
     RESERVED = iota
     STRH
     LDRD
@@ -737,10 +774,6 @@ func generateAddress(half *Half, cpu *Cpu) (pre uint32, post int32, writeBack bo
     // writeback???
 }
 
-const (
-
-)
-
 type Block struct {
 
     // Load == Pop, Store == Push
@@ -782,6 +815,7 @@ func (c *Cpu) Block(opcode uint32) {
     if block.Load {
         c.ldm(block)
     } else {
+
         c.stm(block)
     }
 
@@ -793,6 +827,7 @@ func (c *Cpu) Block(opcode uint32) {
 }
 
 func (c *Cpu) ldm(block *Block) {
+
     r := &c.Reg.R
 
     for reg := range 16 {
@@ -804,21 +839,21 @@ func (c *Cpu) ldm(block *Block) {
         case block.Pre  &&  block.Up && regBitEnabled:
 
             r[block.Rn] += 4
-            c.Gba.Mem.Write32(r[block.Rn], r[reg])
+            r[reg] = c.Gba.Mem.Read32(r[block.Rn])
 
         case !block.Pre &&  block.Up && regBitEnabled:
 
-            c.Gba.Mem.Write32(r[block.Rn], r[reg])
+            r[reg] = c.Gba.Mem.Read32(r[block.Rn])
             r[block.Rn] += 4
 
         case block.Pre  &&  !block.Up && decRegBitEnabled: // pop
 
             r[block.Rn] -= 4
-            c.Gba.Mem.Write32(r[block.Rn], r[15 - reg])
+            r[15 - reg] = c.Gba.Mem.Read32(r[block.Rn])
 
         case !block.Pre &&  !block.Up && decRegBitEnabled:
 
-            c.Gba.Mem.Write32(r[block.Rn], r[15 - reg])
+            r[15 - reg] = c.Gba.Mem.Read32(r[block.Rn])
             r[block.Rn] -= 4
         }
     }
@@ -834,21 +869,113 @@ func (c *Cpu) stm(block *Block) {
 
         switch {
         case block.Pre  &&  block.Up && regBitEnabled:
+
             r[block.Rn] += 4
             c.Gba.Mem.Write32(r[block.Rn], r[reg])
 
         case !block.Pre &&  block.Up && regBitEnabled:
+
             c.Gba.Mem.Write32(r[block.Rn], r[reg])
             r[block.Rn] += 4
 
         case block.Pre  &&  !block.Up && decRegBitEnabled: // push
+
             r[block.Rn] -= 4
             c.Gba.Mem.Write32(r[block.Rn], r[15 - reg])
 
         case !block.Pre &&  !block.Up && decRegBitEnabled:
+
             c.Gba.Mem.Write32(r[block.Rn], r[15 - reg])
             r[block.Rn] -= 4
         }
     }
+}
 
+type PSR struct {
+    Opcode, Cond, Rd, Rm, Shift, Imm uint32
+    SPSR, MSR, Immediate, F, S, X, C bool 
+}
+
+func NewPSR(opcode uint32, cpu *Cpu) *PSR {
+
+    psr := &PSR{
+        Opcode: opcode,
+        Cond: utils.GetByte(opcode, 28),
+        Immediate: utils.BitEnabled(opcode, 25),
+        SPSR: utils.BitEnabled(opcode, 22),
+        MSR: utils.BitEnabled(opcode, 21),
+    }
+
+    if !psr.MSR {
+        psr.Rd = utils.GetByte(opcode, 12)
+        return psr
+    }
+
+    if psr.MSR {
+        psr.F = utils.BitEnabled(opcode, 19)
+        psr.S = utils.BitEnabled(opcode, 18)
+        psr.X = utils.BitEnabled(opcode, 17)
+        psr.C = utils.BitEnabled(opcode, 16)
+    }
+
+    if psr.Immediate {
+        psr.Shift = utils.GetByte(opcode, 8)
+        psr.Imm = utils.GetVarData(opcode, 0, 7)
+        return psr
+    }
+
+    psr.Rm = utils.GetByte(opcode, 0)
+
+
+    return psr
+}
+
+func (cpu *Cpu) Psr(opcode uint32) {
+
+    psr := NewPSR(opcode, cpu)
+
+    if psr.MSR {
+        cpu.msr(psr)
+        cpu.Reg.R[15] += 4
+        return
+    }
+
+    cpu.mrs(psr)
+    cpu.Reg.R[15] += 4
+}
+
+func (cpu *Cpu) mrs(psr *PSR) {
+
+    r := &cpu.Reg.R
+
+    if psr.SPSR {
+        r[psr.Rd] = uint32(cpu.Reg.SPSR)
+        return
+    }
+
+    // masks
+
+    r[psr.Rd] = uint32(cpu.Reg.CPSR)
+}
+
+func (cpu *Cpu) msr(psr *PSR) {
+
+    r := &cpu.Reg.R
+
+    p := &cpu.Reg.CPSR
+    if psr.SPSR {
+        p = &cpu.Reg.SPSR
+    }
+
+    if psr.Immediate {
+        panic("IMMEDIATE MSR")
+        // shift
+        // immediate
+        return
+    }
+
+    if psr.F { p.SetField(24, (r[psr.Rm] >> 24) & 0xFF) }
+    if psr.S { p.SetField(16, (r[psr.Rm] >> 16) & 0xFF) }
+    if psr.X { p.SetField(8, (r[psr.Rm] >> 8) & 0xFF) }
+    if psr.C { p.SetField(0, r[psr.Rm] & 0xFF) }
 }

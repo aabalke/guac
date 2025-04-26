@@ -1,6 +1,9 @@
 package gba
 
 import (
+	"fmt"
+	"time"
+
 	cart "github.com/aabalke33/guac/emu/gba/cart"
 )
 
@@ -11,8 +14,10 @@ const (
 
 var (
     CURR_INST = 0
-    //MAX_COUNT = 380
-    MAX_COUNT = 380
+
+    // MAX_COUNT = 200_000
+
+    MAX_COUNT = 200_000
 )
 
 type GBA struct {
@@ -25,11 +30,17 @@ type GBA struct {
 
 	Paused bool
 	Muted  bool
+
+    Clock int
+    FPS int
 }
 
 func NewGBA() *GBA {
 
-	gba := GBA{}
+	gba := GBA{
+        Clock: 16780000,
+        FPS: 60,
+    }
 	pixels := make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)
 	gba.Pixels = &pixels
 
@@ -64,24 +75,54 @@ func (gba *GBA) Close() {
 }
 
 func (gba *GBA) LoadGame(path string) {
-
 	gba.Cartridge = cart.NewCartridge(path, "")
 }
 
-func (gba *GBA) Update() bool {
+func (gba *GBA) Update(exit *bool, instCount int) int {
+
+    if gba.Paused {
+        return 0
+    }
+
+    s := time.Now().UnixNano()
 
     for range MAX_COUNT + 1 {
-        if CURR_INST == MAX_COUNT {
-            gba.Debugger.print(CURR_INST)
-            return true
-        }
-
+    //for updateCycles := 0; updateCycles < (gba.Clock / gba.FPS); {
         opcode := gba.Mem.Read32(gba.Cpu.Reg.R[15])
 
         gba.Cpu.Execute(opcode)
 
+        if CURR_INST == MAX_COUNT {
+            gba.Paused = true
+            t := time.Now().UnixNano()
+            fmt.Printf("ACTUAL %08fms\n", float64(t-s) * 0.000001)
+            gba.Debugger.print(CURR_INST)
+
+            return 0
+        }
+
         CURR_INST++
 	}
 
-    return true
+    return 0
+}
+
+func (gba *GBA) toggleThumb() {
+
+    reg := &gba.Cpu.Reg
+
+    newFlag := reg.R[PC] & 1 > 0
+
+    reg.CPSR.SetFlag(FLAG_T, newFlag)
+
+    if newFlag {
+        reg.R[PC] &^= 1
+        // pipe
+        return
+    }
+
+    reg.R[PC] &^= 3
+    // pipe
+
+
 }

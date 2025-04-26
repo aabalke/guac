@@ -11,7 +11,7 @@ type Debugger struct {
 
 func (d *Debugger) print(i int) {
     reg := d.gba.Cpu.Reg
-    p := func(a string, b uint32) { fmt.Printf("% 8s: %08X\n", a, b)}
+    p := func(a string, b uint32) { fmt.Printf("% 8s: % 8X\n", a, b)}
     s := func(a string) { fmt.Printf("%s\n", a)}
 
     s("--------  --------")
@@ -39,7 +39,7 @@ func (d *Debugger) print(i int) {
     p("spsr", uint32(reg.SPSR))
     //p("mem5", uint32(d.gba.Mem.Read32(0x500_0000)))
 
-    //for i := 0x300_7E90; i <= 0x300_7EC0; i += 4 {
-    //    p(fmt.Sprintf("mem4 %X", i), d.gba.Mem.Read32(uint32(i)))
-    //}
+    for i := 0x300_7E90; i <= 0x300_7EC0; i += 4 {
+        p(fmt.Sprintf("mem4 %X", i), d.gba.Mem.Read32(uint32(i)))
+    }
 }

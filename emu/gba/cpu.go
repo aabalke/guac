@@ -1,7 +1,7 @@
 package gba
 
 type Cpu struct {
-    Gba *GBA
+	Gba *GBA
 	Reg Reg
 	Loc uint32
 }
@@ -16,7 +16,7 @@ func NewCpu(gba *GBA) *Cpu {
 
 	c := &Cpu{
 		Reg: Reg{},
-        Gba: gba,
+		Gba: gba,
 	}
 
 	c.Reg.R[0] = 0x0000_0CA5
@@ -76,4 +76,11 @@ func (c *Cond) SetFlag(flag uint32, value bool) {
 	}
 
 	panic("Unknown Cond Flag Set")
+}
+
+func (c *Cond) SetField(loBit uint32, value uint32) {
+	mask := 0b1111_1111 << loBit
+	*c &^= Cond(mask)
+    value <<= loBit
+	*c |= Cond(value)
 }
