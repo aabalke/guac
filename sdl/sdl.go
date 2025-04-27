@@ -119,9 +119,6 @@ func (s *SDLStruct) Update() {
         ActivateConsole(scene, *romPath)
     }
 
-	//var debug_h int32 = 128
-	//scene.Add(NewDebugFrame(s.Renderer, scene, 1, &scene.H, 0, 0, 2, emu))
-
 	if *debug && *maxInstr == 0 {
 		panic("In debug mode max instruction count is required")
 	}
@@ -129,7 +126,7 @@ func (s *SDLStruct) Update() {
 	frameTime := time.Second / FPS
 	ticker := time.NewTicker(frameTime)
 
-	//count := 0
+	count := 0
 
 	//switched := false
 	for i := range ticker.C {
@@ -150,10 +147,10 @@ func (s *SDLStruct) Update() {
 		}
 
 		//count = Gb.Update(&scene.Status.Active, count)
-        end := Gba.Update()
-        if end {
-            return
-        }
+        count = Gba.Update(&scene.Status.Active, count)
+        //if count == 0 {
+        //    return
+        //}
 
 		s.Renderer.SetDrawColor(0, 0, 0, 255)
 		s.Renderer.Clear()

@@ -16,6 +16,7 @@ func (cpu *Cpu) DecodeARM(opcode uint32) {
 	case isBlock(opcode):   cpu.Block(opcode)
     case isUD(opcode):      panic("Need Undefined functionality")
     case isPSR(opcode):     cpu.Psr(opcode)
+    case isSWP(opcode):     cpu.Swp(opcode)
     case isALU(opcode):     cpu.Alu(opcode)
     default:                panic("Unable to Decode")
 	}
@@ -23,6 +24,14 @@ func (cpu *Cpu) DecodeARM(opcode uint32) {
 
 func isOpcodeFormat(opcode, mask, format uint32) bool {
     return opcode&mask == format
+}
+
+func isSWP(opcode uint32) bool {
+
+    return isOpcodeFormat(opcode,
+        0b0000_1111_1011_0000_0000_1111_1111_0000,
+        0b0000_0001_0000_0000_0000_0000_1001_0000,
+    )
 }
 
 func isBlock(opcode uint32) bool {
@@ -131,11 +140,19 @@ func isUD(opcode uint32) bool {
 }
 
 func isSDT(opcode uint32) bool {
-    return isOpcodeFormat(
+    is := false
+    is = is || isOpcodeFormat(
         opcode,
 		0b0000_1100_0000_0000_0000_0000_0000_0000,
 		0b0000_0100_0000_0000_0000_0000_0000_0000,
     )
+    is = is || isOpcodeFormat(
+        opcode,
+        0b0000_1100_0001_0000_0000_0000_0000_0000,
+        0b0000_0100_0000_0000_0000_0000_0000_0000,
+    )
+
+    return is
 }
 
 func isDP(opcode uint32) bool {

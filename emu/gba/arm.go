@@ -64,11 +64,6 @@ func (cpu *Cpu) Alu(opcode uint32) {
 
     alu := NewAluData(opcode, cpu)
 
-    //if CURR_INST == MAX_COUNT - 2 {
-    //    fmt.Printf("-----------------------\n")
-    //    fmt.Printf("-----------------------\n")
-    //}
-
     switch alu.Inst {
     case AND, EOR, ORR, MOV, MVN, BIC: cpu.logical(alu)
     case ADD, ADC, SUB, SBC, RSB, RSC: cpu.arithmetic(alu)
@@ -463,7 +458,11 @@ func (c *Cpu) Sdt(opcode uint32) {
         }
 
     } else {
-        panic("Need to handle SDT Inst")
+        if sdt.Byte {
+            c.Gba.Mem.Write8(pre, uint8(r[sdt.Rd]))
+        } else {
+            c.Gba.Mem.Write32(pre, r[sdt.Rd])
+        }
     }
 
     if (sdt.WriteBack || !sdt.Pre) && sdt.Rn != sdt.Rd {
@@ -493,7 +492,6 @@ func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack 
     }
 
     if sdt.Pre {
-        // untested
         switch {
         case offset == 0: return r[sdt.Rn], 0, false
         case sdt.Immediate: return r[sdt.Rn], 0, true
@@ -978,4 +976,42 @@ func (cpu *Cpu) msr(psr *PSR) {
     if psr.S { p.SetField(16, (r[psr.Rm] >> 16) & 0xFF) }
     if psr.X { p.SetField(8, (r[psr.Rm] >> 8) & 0xFF) }
     if psr.C { p.SetField(0, r[psr.Rm] & 0xFF) }
+}
+
+type Swp struct {
+    Cond, Opcode, Rn, Rd, Rm uint32
+    Byte bool
+}
+
+func NewSwp(opcode uint32, cpu *Cpu) *Swp {
+    return &Swp{
+        Cond: utils.GetByte(opcode, 28),
+        Opcode: opcode,
+        Byte: utils.BitEnabled(opcode, 22),
+        Rn: utils.GetByte(opcode, 16),
+        Rd: utils.GetByte(opcode, 12),
+        Rm: utils.GetByte(opcode, 0),
+    }
+}
+
+func (cpu *Cpu) Swp(opcode uint32) {
+
+    r := &cpu.Reg.R
+
+    swp := NewSwp(opcode, cpu)
+
+    rmValue := r[swp.Rm]
+    rnValue := r[swp.Rn]
+
+    var rnMemValue uint32
+    if swp.Byte {
+        rnMemValue = cpu.Gba.Mem.Read8(rnValue)
+    } else {
+        rnMemValue = cpu.Gba.Mem.Read32(rnValue)
+    }
+
+    r[swp.Rd] = rnMemValue
+    cpu.Gba.Mem.Write32(rnValue, rmValue)
+
+    cpu.Reg.R[15] += 4
 }
