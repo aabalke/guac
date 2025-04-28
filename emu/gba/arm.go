@@ -237,13 +237,13 @@ func (cpu *Cpu) test(alu *Alu) {
 // MULTIPLY MUTIPLY MULTIPLY  MULTIPLY  MULTIPLY  MULTIPLY  MULTIPLY  MULTIPLY 
 
 const (
-    MUL = iota
-    MLA
-    UMAAL
-    UMULL
-    UMLAL
-    SMULL
-    SMLAL
+    MUL = 0b0
+    MLA = 0b1
+    UMAAL = 0b010
+    UMULL = 0b100
+    UMLAL = 0b101
+    SMULL = 0b110
+    SMLAL = 0b111
 )
 
 type Mul struct {
@@ -277,6 +277,7 @@ func NewMulData(opcode uint32, cpu *Cpu) *Mul {
 func (cpu *Cpu) Mul(opcode uint32) {
 
     mul := NewMulData(opcode, cpu)
+    //fmt.Printf("res: %X\n", res)
 
     switch mul.Inst {
     case MUL: cpu.mul(mul)
@@ -287,6 +288,8 @@ func (cpu *Cpu) Mul(opcode uint32) {
     case SMULL: cpu.smull(mul)
     case SMLAL: cpu.smlal(mul)
     }
+
+    cpu.Reg.R[PC] += 4
 }
 
 func (cpu *Cpu) mul(mul *Mul) {
@@ -300,7 +303,12 @@ func (cpu *Cpu) mul(mul *Mul) {
     res := oper(r[mul.Rm], r[mul.Rs])
     r[mul.Rd] = res
 
-    // set flags
+    if mul.Set {
+        cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
+        cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 31 & 0b1) != 0)
+        // FLAG_C "destroyed" ARM <5, ignored ARM >=5
+        cpu.Reg.CPSR.SetFlag(FLAG_C, false)
+    }
 }
 
 func (cpu *Cpu) mla(mul *Mul) {
@@ -314,7 +322,12 @@ func (cpu *Cpu) mla(mul *Mul) {
     res := oper(r[mul.Rm], r[mul.Rs], r[mul.Rn])
     r[mul.Rd] = res
 
-    // set flags
+    if mul.Set {
+        cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
+        cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 31 & 0b1) != 0)
+        // FLAG_C "destroyed" ARM <5, ignored ARM >=5
+        cpu.Reg.CPSR.SetFlag(FLAG_C, false)
+    }
 }
 
 func (cpu *Cpu) umull(mul *Mul) {
@@ -326,10 +339,17 @@ func (cpu *Cpu) umull(mul *Mul) {
     oper = func (u1, u2 uint64) uint64 { return u1 * u2}
 
     res := oper(uint64(r[mul.Rm]), uint64(r[mul.Rs]))
+
     r[mul.Rd] = uint32(res >> 32)
     r[mul.Rn] = uint32(res)
 
-    // set flags
+    if mul.Set {
+        cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
+        cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 63 & 0b1) != 0)
+        // FLAG_C "destroyed" ARM <5, ignored ARM >=5
+        cpu.Reg.CPSR.SetFlag(FLAG_C, false)
+        // FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
+    }
 }
 
 func (cpu *Cpu) umlal(mul *Mul) {
@@ -344,7 +364,13 @@ func (cpu *Cpu) umlal(mul *Mul) {
     r[mul.Rd] = uint32(res >> 32)
     r[mul.Rn] = uint32(res)
 
-    // set flags
+    if mul.Set {
+        cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
+        cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 63 & 0b1) != 0)
+        // FLAG_C "destroyed" ARM <5, ignored ARM >=5
+        cpu.Reg.CPSR.SetFlag(FLAG_C, false)
+        // FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
+    }
 }
 
 func (cpu *Cpu) smull(mul *Mul) {
@@ -356,11 +382,17 @@ func (cpu *Cpu) smull(mul *Mul) {
     oper = func (u1, u2 int64) int64 { return u1 * u2 }
 
     res := oper(int64(int32(r[mul.Rm])), int64(int32(r[mul.Rs])))
+
     r[mul.Rd] = uint32(res >> 32)
     r[mul.Rn] = uint32(res)
 
-    // set flags
-
+    if mul.Set {
+        cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
+        cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 63 & 0b1) != 0)
+        // FLAG_C "destroyed" ARM <5, ignored ARM >=5
+        cpu.Reg.CPSR.SetFlag(FLAG_C, false)
+        // FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
+    }
 }
 
 func (cpu *Cpu) smlal(mul *Mul) {
@@ -371,11 +403,18 @@ func (cpu *Cpu) smlal(mul *Mul) {
 
     oper = func (u1, u2, u3, u4 int64) int64 { return u1 * u2 + (u3<<32 | u4) }
 
-    res := oper(int64(int32(r[mul.Rm])), int64(int32(r[mul.Rs])), int64(int32(r[mul.Rd])), int64(int32(r[mul.Rn])))
+    res := oper(int64(int32(r[mul.Rm])), int64(int32(r[mul.Rs])), int64(r[mul.Rd]), int64(r[mul.Rn]))
     r[mul.Rd] = uint32(res >> 32)
     r[mul.Rn] = uint32(res)
 
-    // set flags
+    if mul.Set {
+        cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
+        cpu.Reg.CPSR.SetFlag(FLAG_N, ((res) >> 63 & 0b1) != 0)
+        cpu.Reg.CPSR.SetFlag(FLAG_N, false)
+        // FLAG_C "destroyed" ARM <5, ignored ARM >=5
+        cpu.Reg.CPSR.SetFlag(FLAG_C, false)
+        // FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
+    }
 }
 
 const (
@@ -450,19 +489,23 @@ func (c *Cpu) Sdt(opcode uint32) {
         panic("Need to handle PLD Inst")
     }
 
-    if sdt.Load {
-        if sdt.Byte {
-            r[sdt.Rd] = uint32(c.Gba.Mem.Read8(pre))
-        } else {
-            r[sdt.Rd] = c.Gba.Mem.Read32(pre)
-        }
+    if CURR_INST == MAX_COUNT {
+        fmt.Printf("SDT SB ADDR: %X VALUE: %X WRITE: %X\n", pre, c.Gba.Mem.Read8(pre), uint8(r[sdt.Rd]))
+    }
 
-    } else {
-        if sdt.Byte {
-            c.Gba.Mem.Write8(pre, uint8(r[sdt.Rd]))
-        } else {
-            c.Gba.Mem.Write32(pre, r[sdt.Rd])
-        }
+    switch {
+    case sdt.Load && sdt.Byte:
+        r[sdt.Rd] = uint32(c.Gba.Mem.Read8(pre))
+    case sdt.Load && !sdt.Byte:
+        r[sdt.Rd] = c.Gba.Mem.Read32(pre)
+    case !sdt.Load && sdt.Byte:
+        c.Gba.Mem.Write8(pre, uint8(r[sdt.Rd]))
+    case !sdt.Load && !sdt.Byte:
+        c.Gba.Mem.Write32(pre, r[sdt.Rd])
+    }
+
+    if CURR_INST == MAX_COUNT {
+        fmt.Printf("SDT SB ADDR: %X VALUE: %X \n", pre, c.Gba.Mem.Read8(pre))
     }
 
     if (sdt.WriteBack || !sdt.Pre) && sdt.Rn != sdt.Rd {
@@ -648,14 +691,14 @@ func (c *Cpu) BX(opcode uint32) {
 }
 
 const (
-    RESERVED = iota
-    STRH
-    LDRD
-    STRD
+    RESERVED = 0
+    STRH = 1
+    LDRD = 2
+    STRD = 3
 
-    LDRH = 1 + iota
-    LDRSB
-    LDRSH
+    LDRH =  1
+    LDRSB = 2
+    LDRSH = 3
 )
 
 type Half struct {
@@ -718,11 +761,10 @@ func NewHalf(opcode uint32, c *Cpu) *Half {
 
 func (c *Cpu) Half(opcode uint32) {
 
+    r := &c.Reg.R
     half := NewHalf(opcode, c)
     //pre, post, writeBack := generateAddress(half, c)
     pre, _, _ := generateAddress(half, c)
-
-    //go fmt.Printf("pre: %X, post: %X, writeback: %t, Rd: %X\n", pre, post, writeBack, half.RdValue)
 
     if !half.Load {
         switch half.Inst {
@@ -735,11 +777,15 @@ func (c *Cpu) Half(opcode uint32) {
         c.Reg.R[15] += 4
         return
     }
+
     switch half.Inst {
     case RESERVED: panic("RESERVED HALF (Store) NOT SUPPORTED")
-    case LDRH: panic("LDRH need to handle")
-    case LDRSB: panic("LDRSB need to handle")
-    case LDRSH: panic("LDRSH need to handle")
+    case LDRH: // unsigned half
+        r[half.Rd] = c.Gba.Mem.Read16(r[half.Rn])
+    case LDRSB: // signed byte
+        r[half.Rd] = uint32(int8(uint8(c.Gba.Mem.Read8(r[half.Rn]))))
+    case LDRSH: // signed half
+        r[half.Rd] = uint32(int16(c.Gba.Mem.Read16(r[half.Rn])))
     }
 
     c.Reg.R[15] += 4
@@ -773,9 +819,6 @@ func generateAddress(half *Half, cpu *Cpu) (pre uint32, post int32, writeBack bo
 }
 
 type Block struct {
-
-    // Load == Pop, Store == Push
-
     Opcode, Cond, Rn, RnValue, Rlist uint32
     Pre, Up, PSR, Writeback, Load bool
 }

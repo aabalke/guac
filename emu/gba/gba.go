@@ -11,8 +11,8 @@ const (
 
 var (
     CURR_INST = 0
-    //MAX_COUNT = 23_632
-    MAX_COUNT = 23_632
+    //MAX_COUNT = 10_000_000
+    MAX_COUNT = 10_000_000
     //MAX_COUNT = 50_000_000
 )
 
