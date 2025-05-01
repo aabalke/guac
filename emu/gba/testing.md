@@ -5,8 +5,8 @@
 👍 ARM_DataProcessing
 👍 ARM_Any
 👍 THUMB_DataProcessing
-❌ THUMB_Any
-❌ FuzzARM
+👍 THUMB_Any
+👍 FuzzARM
 
 ### jsmolka / gba-tests
 

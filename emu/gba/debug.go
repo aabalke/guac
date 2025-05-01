@@ -52,7 +52,7 @@ func (d *Debugger) print(i int) {
     p("spsr", uint32(reg.SPSR))
     //p("mem5", uint32(d.gba.Mem.Read32(0x500_0000)))
 
-    for i := 0x80004D0; i <= 0x80004E0; i += 4 {
+    for i := 0x3007EA8; i <= 0x3007EC0; i += 4 {
         p(fmt.Sprintf("mem4 %X", i), d.gba.Mem.Read32(uint32(i)))
     }
 }

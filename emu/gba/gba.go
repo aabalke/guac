@@ -11,9 +11,7 @@ const (
 
 var (
     CURR_INST = 0
-    MAX_COUNT = 8_887
-    //MAX_COUNT = 1_912_469
-    //MAX_COUNT = 100_000_000
+    MAX_COUNT = 100_000_000
 )
 
 type GBA struct {
@@ -82,8 +80,8 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
     }
 
     updateCycles := 0
-    for range MAX_COUNT + 1 {
-    //for updateCycles < (gba.Clock / gba.FPS) {
+    //for range MAX_COUNT + 1 {
+    for updateCycles < (gba.Clock / gba.FPS) {
 
         cycles := 4
 

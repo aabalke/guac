@@ -1,63 +1,35 @@
 package gba
 
-//import "fmt"
+import "fmt"
 
 func (cpu *Cpu) DecodeTHUMB(opcode uint16) {
 
-	// initial switch 0x803155C, 40D3
-
-    //fmt.Printf("OP: %X %b\n", opcode, opcode >> 12)
-
 	switch {
 	case isThumbAddSub(opcode):
-        cpu.ThumbAddSub(opcode)
+		cpu.ThumbAddSub(opcode)
 	case isThumbShift(opcode):
 		panic("SHIFTED")
 	case isThumbImm(opcode):
 		panic("IMMEDIATE")
 	case isThumbAlu(opcode):
-        cpu.ThumbAlu(opcode)
+		cpu.ThumbAlu(opcode)
 	case isThumbHiReg(opcode):
-        cpu.HiRegBX(opcode)
+		cpu.HiRegBX(opcode)
+	case isLSHalf(opcode):
+		cpu.thumbLSHalf(opcode)
+	case isLSSigned(opcode):
+		cpu.thumbLSSigned(opcode)
+	case isLPC(opcode):
+		cpu.thumbLPC(opcode)
+	case isLSR(opcode):
+		cpu.thumbLSR(opcode)
+	case isLSImm(opcode):
+		cpu.thumbLSImm(opcode)
+	case isPushPop(opcode):
+		cpu.thumbPushPop(opcode)
 	default:
-		panic("UNKNOWN THUMB OPCODE")
+		panic(fmt.Sprintf("UNKNOWN OPCODE %X", opcode))
 	}
-
-	//	if !cpu.CheckCond(opcode) {
-	//		cpu.Reg.R[PC] += 4
-	//		return
-	//	}
-	//
-	//	switch {
-	//	case isSWI(opcode):
-	//		panic("Need SWI Functionality")
-	//	case isB(opcode):
-	//		cpu.B(opcode)
-	//	case isBX(opcode):
-	//		cpu.BX(opcode)
-	//	case isSDT(opcode):
-	//		cpu.Sdt(opcode)
-	//	case isHalf(opcode):
-	//		cpu.Half(opcode)
-	//	case isBlock(opcode):
-	//		cpu.Block(opcode)
-	//	case isUD(opcode):
-	//		panic("Need Undefined functionality")
-	//	case isPSR(opcode):
-	//		cpu.Psr(opcode)
-	//	case isSWP(opcode):
-	//		cpu.Swp(opcode)
-	//    case isM(opcode):
-	//        cpu.Mul(opcode)
-	//	case isALU(opcode):
-	//		cpu.Alu(opcode)
-	//	default:
-	//		panic("Unable to Decode")
-	//	}
-	//
-	//    // Notes: Coprocessor instructions do not matter since gba
-	//    // uses a single processor (NDS is a different story)
-
 }
 
 func isThumbOpcodeFormat(opcode, mask, format uint16) bool {
@@ -96,5 +68,47 @@ func isThumbHiReg(opcode uint16) bool {
 	return isThumbOpcodeFormat(opcode,
 		0b1111_1100_0000_0000,
 		0b0100_0100_0000_0000,
+	)
+}
+
+func isLSHalf(opcode uint16) bool {
+	return isThumbOpcodeFormat(opcode,
+		0b1111_0000_0000_0000,
+		0b1000_0000_0000_0000,
+	)
+}
+
+func isLSSigned(opcode uint16) bool {
+	return isThumbOpcodeFormat(opcode,
+		0b1111_0010_0000_0000,
+		0b0101_0010_0000_0000,
+	)
+}
+
+func isLPC(opcode uint16) bool {
+	return isThumbOpcodeFormat(opcode,
+		0b1111_1000_0000_0000,
+		0b0100_1000_0000_0000,
+	)
+}
+
+func isLSR(opcode uint16) bool {
+	return isThumbOpcodeFormat(opcode,
+		0b1111_0010_0000_0000,
+		0b0101_0000_0000_0000,
+	)
+}
+
+func isLSImm(opcode uint16) bool {
+	return isThumbOpcodeFormat(opcode,
+		0b1110_0000_0000_0000,
+		0b0110_0000_0000_0000,
+	)
+}
+
+func isPushPop(opcode uint16) bool {
+	return isThumbOpcodeFormat(opcode,
+        0b1111_0110_0000_0000,
+        0b1011_0100_0000_0000,
 	)
 }
