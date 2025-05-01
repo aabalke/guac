@@ -410,7 +410,6 @@ func (cpu *Cpu) smlal(mul *Mul) {
     if mul.Set {
         cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
         cpu.Reg.CPSR.SetFlag(FLAG_N, ((res) >> 63 & 0b1) != 0)
-        cpu.Reg.CPSR.SetFlag(FLAG_N, false)
         // FLAG_C "destroyed" ARM <5, ignored ARM >=5
         cpu.Reg.CPSR.SetFlag(FLAG_C, false)
         // FLAG_V maybe destroyed on ARM <5. ignored ARM <=5

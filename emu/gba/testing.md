@@ -3,14 +3,14 @@
 ### DenSinH / FuzzARM
 
 👍 ARM_DataProcessing
-❌ ARM_Any
-❌ THUMB_DataProcessing
+👍 ARM_Any
+👍 THUMB_DataProcessing
 ❌ THUMB_Any
 ❌ FuzzARM
 
 ### jsmolka / gba-tests
 
-❌ asm
+❌ arm
 ❌ bios
 ❌ memory
 ❌ nes

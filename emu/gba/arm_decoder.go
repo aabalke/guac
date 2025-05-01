@@ -1,6 +1,5 @@
 package gba
 
-
 func (cpu *Cpu) DecodeARM(opcode uint32) {
 
 	if !cpu.CheckCond(opcode) {
@@ -34,6 +33,9 @@ func (cpu *Cpu) DecodeARM(opcode uint32) {
 	default:
 		panic("Unable to Decode")
 	}
+
+    // Notes: Coprocessor instructions do not matter since gba 
+    // uses a single processor (NDS is a different story)
 }
 
 func isOpcodeFormat(opcode, mask, format uint32) bool {
@@ -63,12 +65,6 @@ func isBlock(opcode uint32) bool {
 	)
 
 	return is
-}
-func isCo(opcode uint32) bool {
-	return isOpcodeFormat(opcode,
-		0b0000_1111_0000_0000_0000_0000_0000_0000,
-		0b0000_1110_0000_0000_0000_0000_0000_0000,
-	)
 }
 
 func isHalf(opcode uint32) bool {
@@ -169,14 +165,6 @@ func isSDT(opcode uint32) bool {
 	)
 
 	return is
-}
-
-func isDP(opcode uint32) bool {
-	return isOpcodeFormat(
-		opcode,
-		0b0000_0010_0000_0000_0000_0000_0000_0000,
-		0b0000_0010_0000_0000_0000_0000_0000_0000,
-	)
 }
 
 func isPSR(opcode uint32) bool {

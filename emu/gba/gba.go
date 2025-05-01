@@ -11,9 +11,9 @@ const (
 
 var (
     CURR_INST = 0
-    //MAX_COUNT = 10_000_000
-    MAX_COUNT = 10_000_000
-    //MAX_COUNT = 50_000_000
+    MAX_COUNT = 8_887
+    //MAX_COUNT = 1_912_469
+    //MAX_COUNT = 100_000_000
 )
 
 type GBA struct {
@@ -123,6 +123,4 @@ func (gba *GBA) toggleThumb() {
 
     reg.R[PC] &^= 3
     // pipe
-
-
 }

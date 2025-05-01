@@ -28,7 +28,13 @@ func NewCpu(gba *GBA) *Cpu {
 }
 
 func (c *Cpu) Execute(opcode uint32) {
-	c.DecodeARM(opcode)
+
+    if c.Reg.CPSR.GetFlag(FLAG_T) {
+        c.DecodeTHUMB(uint16(opcode))
+    } else {
+        c.DecodeARM(opcode)
+    }
+
 }
 
 type Reg struct {

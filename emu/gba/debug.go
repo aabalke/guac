@@ -24,7 +24,12 @@ func (d *Debugger) print(i int) {
 
     s("--------  --------")
     p("inst", uint32(i))
-    p("opcode", d.gba.Mem.Read32(reg.R[15]))
+
+    if d.gba.Cpu.Reg.CPSR.GetFlag(FLAG_T) {
+        p("opcode", d.gba.Mem.Read16(reg.R[15]))
+    } else {
+        p("opcode", d.gba.Mem.Read32(reg.R[15]))
+    }
     s("--------  --------")
     p("r00", reg.R[0])
     p("r01", reg.R[1])
