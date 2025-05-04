@@ -1,0 +1,8 @@
+
+
+
+
+SET SPSR / MODE needs
+EXCEPTIONS needs
+IRQ needs
+SWI

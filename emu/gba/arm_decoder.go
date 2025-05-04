@@ -9,7 +9,9 @@ func (cpu *Cpu) DecodeARM(opcode uint32) {
 
 	switch {
 	case isSWI(opcode):
-		panic("Need SWI Functionality")
+        cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
+        cpu.Gba.SysCall(opcode)
+        cpu.Reg.R[PC] += 4
 	case isB(opcode):
 		cpu.B(opcode)
 	case isBX(opcode):

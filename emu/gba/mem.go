@@ -10,16 +10,19 @@ type Memory struct {
 	VRAM [0x18000]uint8
 	OAM  [0x400]uint8
 
-    IO   [0x400]uint8 // THIS IS TEMP
+	IO [0x400]uint8 // THIS IS TEMP
+
+	BIOS_MODE uint32
 }
 
 func NewMemory(gba *GBA) *Memory {
-    m := &Memory{GBA: gba}
+	m := &Memory{GBA: gba}
 
-    m.Write(0x4000000, 0x80)
+	m.Write(0x4000000, 0x80)
 
+	m.BIOS_MODE = BIOS_STARTUP
 
-    return m
+	return m
 }
 
 func (m *Memory) Read(addr uint32) uint8 {
@@ -60,13 +63,23 @@ func (m *Memory) Read(addr uint32) uint8 {
 	}
 }
 
+func (m *Memory) ReadBios(addr uint32) uint32 {
+
+	addr, ok := BIOS_ADDR[m.BIOS_MODE]
+	if !ok {
+		return 0xE129F000
+	}
+
+	return addr
+}
+
 func (m *Memory) ReadIO(addr uint32) uint8 {
 
 	// this addr should be relative. - 0x400000
 
-    v := m.IO[addr]
+	v := m.IO[addr]
 
-    return v
+	return v
 
 	switch {
 	case addr < 0x060:
@@ -99,6 +112,9 @@ func (m *Memory) Read16(addr uint32) uint32 {
 }
 
 func (m *Memory) Read32(addr uint32) uint32 {
+	if addr == 0x0 {
+		return m.ReadBios(addr)
+	}
 	return uint32(m.Read16(addr+2))<<16 | uint32(m.Read16(addr))
 }
 
@@ -144,9 +160,9 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 
 	// this addr should be relative. - 0x400000
 
-    m.IO[addr] = v
+	m.IO[addr] = v
 
-    return
+	return
 
 	switch {
 	case addr < 0x060:
@@ -179,5 +195,5 @@ func (m *Memory) Write16(addr uint32, v uint16) {
 
 func (m *Memory) Write32(addr uint32, v uint32) {
 	m.Write16(addr, uint16(v))
-    m.Write16(addr+2, uint16(v>>16))
+	m.Write16(addr+2, uint16(v>>16))
 }

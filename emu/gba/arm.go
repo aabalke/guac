@@ -2,7 +2,6 @@ package gba
 
 import (
 	"fmt"
-
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
@@ -70,7 +69,9 @@ func (cpu *Cpu) Alu(opcode uint32) {
     case TST, TEQ, CMP, CMN:           cpu.test(alu)
     }
 
-    cpu.Reg.R[15] += 4
+    if alu.Rd != PC {
+        cpu.Reg.R[15] += 4
+    }
 }
 
 func (cpu *Cpu) GetOp2(opcode uint32) uint32 {
@@ -96,15 +97,15 @@ func (cpu *Cpu) GetOp2(opcode uint32) uint32 {
     is := utils.GetVarData(opcode, 7, 11)
     var additional uint32
     rm := utils.GetByte(opcode, 0)
+    if rm == PC {
+        additional += 8
+    }
 
     shiftRegister := utils.BitEnabled(opcode, 4)
     if shiftRegister {
         // timer increase 1
         is = reg.R[(opcode>>8)&0b1111] & 0b1111_1111
 
-        if rm == PC {
-            additional += 4
-        }
     }
 
     shiftArgs := utils.ShiftArgs{
@@ -139,6 +140,10 @@ func (cpu *Cpu) logical(alu *Alu) {
     }
 
     res := oper(alu.RnValue, alu.Op2)
+
+    if CURR_INST == MAX_COUNT {
+        printer(map[string]any{"OP2": alu.Op2})
+    }
 
     cpu.Reg.R[alu.Rd] = res
 
@@ -176,7 +181,9 @@ func (cpu *Cpu) arithmetic(alu *Alu) {
         carry = 1
     }
 
-    res := oper(uint64(alu.RnValue), uint64(alu.Op2), carry)
+    var res uint64
+
+    res = oper(uint64(alu.RnValue), uint64(alu.Op2), carry)
     cpu.Reg.R[alu.Rd] = uint32(res)
 
     cpu.setArithmeticFlags(alu, res)
@@ -187,7 +194,9 @@ func (cpu *Cpu) setArithmeticFlags(alu *Alu, res uint64) {
     case alu.Rd == PC && alu.Set: // private mode
         panic("Unhandled arith")
         return
-    //case alu.Rd == PC && !test: pipelining
+    //case alu.Rd == PC && !test:
+    case alu.Rd == PC:
+        panic("pipelining")
     case alu.Set:
         var v, c bool
         rnSign := uint8(alu.RnValue >> 31) & 1
@@ -230,11 +239,10 @@ func (cpu *Cpu) test(alu *Alu) {
 
     switch alu.Inst {
     case TST, TEQ: cpu.setLogicalFlags(alu, uint32(res))
-    case CMP, CMN: cpu.setArithmeticFlags(alu, res)
+    case CMP, CMN:
+        cpu.setArithmeticFlags(alu, res)
     }
 }
-
-// MULTIPLY MUTIPLY MULTIPLY  MULTIPLY  MULTIPLY  MULTIPLY  MULTIPLY  MULTIPLY 
 
 const (
     MUL = 0b0
@@ -246,174 +254,80 @@ const (
     SMLAL = 0b111
 )
 
-type Mul struct {
-    Opcode, Rd, Rn, Rs, Rm, Cond, Inst uint32
-    Set bool
-}
-
-func NewMulData(opcode uint32, cpu *Cpu) *Mul {
-
-    valid := utils.GetByte(opcode, 4) == 0b1001
-    valid = valid && utils.GetVarData(opcode, 25, 27) == 0b000
-
-    if !valid {
-        panic("Malformed Muliply Instruction")
-    }
-
-    mul := Mul{
-        // halfword multiplies are for ARM9 +
-        Opcode: opcode,
-        Cond: utils.GetByte(opcode, 28),
-        Inst: utils.GetByte(opcode, 21),
-        Set: utils.BitEnabled(opcode, 20),
-        Rd: utils.GetByte(opcode, 16),
-        Rn: utils.GetByte(opcode, 12),
-        Rs: utils.GetByte(opcode, 8),
-        Rm: utils.GetByte(opcode, 0),
-    }
-    return &mul
-}
-
 func (cpu *Cpu) Mul(opcode uint32) {
 
-    mul := NewMulData(opcode, cpu)
-    //fmt.Printf("res: %X\n", res)
-
-    switch mul.Inst {
-    case MUL: cpu.mul(mul)
-    case MLA: cpu.mla(mul)
-    case UMAAL: panic("UMAAL is unsupported")
-    case UMULL: cpu.umull(mul)
-    case UMLAL: cpu.umlal(mul)
-    case SMULL: cpu.smull(mul)
-    case SMLAL: cpu.smlal(mul)
-    }
-
-    cpu.Reg.R[PC] += 4
-}
-
-func (cpu *Cpu) mul(mul *Mul) {
-
+    inst := utils.GetByte(opcode, 21)
+    set := utils.BitEnabled(opcode, 20)
+    rd := utils.GetByte(opcode, 16)
+    rn := utils.GetByte(opcode, 12)
+    rs := utils.GetByte(opcode, 8)
+    rm := utils.GetByte(opcode, 0)
     r := &cpu.Reg.R
 
-    var oper func (uint32, uint32) uint32
+    if mulHalf := inst == MUL || inst == MLA; mulHalf {
 
-    oper = func (u1, u2 uint32) uint32 { return u1 * u2 }
+        res := r[rd] * r[rs]
 
-    res := oper(r[mul.Rm], r[mul.Rs])
-    r[mul.Rd] = res
+        if inst == MLA {
+            res += r[rn]
+        }
 
-    if mul.Set {
-        cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
-        cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 31 & 0b1) != 0)
-        // FLAG_C "destroyed" ARM <5, ignored ARM >=5
-        cpu.Reg.CPSR.SetFlag(FLAG_C, false)
+        r[rd] = res
+
+        if set {
+            cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
+            cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 31 & 0b1) != 0)
+            // FLAG_C "destroyed" ARM <5, ignored ARM >=5
+            cpu.Reg.CPSR.SetFlag(FLAG_C, false)
+        }
+
+        r[PC] += 4
+        return
     }
-}
 
-func (cpu *Cpu) mla(mul *Mul) {
-
-    r := &cpu.Reg.R
-
-    var oper func (uint32, uint32, uint32) uint32
-
-    oper = func (u1, u2, u3 uint32) uint32 { return u1 * u2 + u3}
-
-    res := oper(r[mul.Rm], r[mul.Rs], r[mul.Rn])
-    r[mul.Rd] = res
-
-    if mul.Set {
-        cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
-        cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 31 & 0b1) != 0)
-        // FLAG_C "destroyed" ARM <5, ignored ARM >=5
-        cpu.Reg.CPSR.SetFlag(FLAG_C, false)
+    if inst == UMAAL {
+        panic("UMAAL is UNSUPPORTED")
     }
-}
 
-func (cpu *Cpu) umull(mul *Mul) {
+    if mulUnsignedWord := inst == UMULL || inst == UMLAL; mulUnsignedWord {
+        res := uint64(r[rm]) * uint64(r[rs])
 
-    r := &cpu.Reg.R
+        if inst == UMLAL {
+            res += uint64(r[rd])<<32 | uint64(r[rn])
+        }
 
-    var oper func (uint64, uint64) uint64
+        r[rd] = uint32(res >> 32)
+        r[rn] = uint32(res)
 
-    oper = func (u1, u2 uint64) uint64 { return u1 * u2}
+        if set {
+            cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
+            cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 63 & 0b1) != 0)
+            // FLAG_C "destroyed" ARM <5, ignored ARM >=5
+            cpu.Reg.CPSR.SetFlag(FLAG_C, false)
+            // FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
+        }
 
-    res := oper(uint64(r[mul.Rm]), uint64(r[mul.Rs]))
+        r[PC] += 4
+        return
+    }
 
-    r[mul.Rd] = uint32(res >> 32)
-    r[mul.Rn] = uint32(res)
+    res := int64(int32(r[rm])) * int64(int32(r[rs]))
+    if inst == SMLAL {
+        res += int64(r[rd])<<32 | int64(r[rn])
+    }
 
-    if mul.Set {
+    r[rd] = uint32(res >> 32)
+    r[rn] = uint32(res)
+
+    if set {
         cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
         cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 63 & 0b1) != 0)
         // FLAG_C "destroyed" ARM <5, ignored ARM >=5
         cpu.Reg.CPSR.SetFlag(FLAG_C, false)
         // FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
     }
-}
 
-func (cpu *Cpu) umlal(mul *Mul) {
-
-    r := &cpu.Reg.R
-
-    var oper func (uint64, uint64, uint64, uint64) uint64
-
-    oper = func (u1, u2, u3, u4 uint64) uint64 { return u1 * u2 + (u3<<32 | u4) }
-
-    res := oper(uint64(r[mul.Rm]), uint64(r[mul.Rs]), uint64(r[mul.Rd]), uint64(r[mul.Rn]))
-    r[mul.Rd] = uint32(res >> 32)
-    r[mul.Rn] = uint32(res)
-
-    if mul.Set {
-        cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
-        cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 63 & 0b1) != 0)
-        // FLAG_C "destroyed" ARM <5, ignored ARM >=5
-        cpu.Reg.CPSR.SetFlag(FLAG_C, false)
-        // FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
-    }
-}
-
-func (cpu *Cpu) smull(mul *Mul) {
-
-    r := &cpu.Reg.R
-
-    var oper func (int64, int64) int64
-
-    oper = func (u1, u2 int64) int64 { return u1 * u2 }
-
-    res := oper(int64(int32(r[mul.Rm])), int64(int32(r[mul.Rs])))
-
-    r[mul.Rd] = uint32(res >> 32)
-    r[mul.Rn] = uint32(res)
-
-    if mul.Set {
-        cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
-        cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 63 & 0b1) != 0)
-        // FLAG_C "destroyed" ARM <5, ignored ARM >=5
-        cpu.Reg.CPSR.SetFlag(FLAG_C, false)
-        // FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
-    }
-}
-
-func (cpu *Cpu) smlal(mul *Mul) {
-
-    r := &cpu.Reg.R
-
-    var oper func (int64, int64, int64, int64) int64
-
-    oper = func (u1, u2, u3, u4 int64) int64 { return u1 * u2 + (u3<<32 | u4) }
-
-    res := oper(int64(int32(r[mul.Rm])), int64(int32(r[mul.Rs])), int64(r[mul.Rd]), int64(r[mul.Rn]))
-    r[mul.Rd] = uint32(res >> 32)
-    r[mul.Rn] = uint32(res)
-
-    if mul.Set {
-        cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
-        cpu.Reg.CPSR.SetFlag(FLAG_N, ((res) >> 63 & 0b1) != 0)
-        // FLAG_C "destroyed" ARM <5, ignored ARM >=5
-        cpu.Reg.CPSR.SetFlag(FLAG_C, false)
-        // FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
-    }
+    r[PC] += 4
 }
 
 const (
@@ -488,9 +402,7 @@ func (c *Cpu) Sdt(opcode uint32) {
         panic("Need to handle PLD Inst")
     }
 
-    if CURR_INST == MAX_COUNT {
-        fmt.Printf("SDT SB ADDR: %X VALUE: %X WRITE: %X\n", pre, c.Gba.Mem.Read8(pre), uint8(r[sdt.Rd]))
-    }
+
 
     switch {
     case sdt.Load && sdt.Byte:
@@ -501,10 +413,6 @@ func (c *Cpu) Sdt(opcode uint32) {
         c.Gba.Mem.Write8(pre, uint8(r[sdt.Rd]))
     case !sdt.Load && !sdt.Byte:
         c.Gba.Mem.Write32(pre, r[sdt.Rd])
-    }
-
-    if CURR_INST == MAX_COUNT {
-        fmt.Printf("SDT SB ADDR: %X VALUE: %X \n", pre, c.Gba.Mem.Read8(pre))
     }
 
     if (sdt.WriteBack || !sdt.Pre) && sdt.Rn != sdt.Rd {
@@ -621,37 +529,13 @@ func (cpu *Cpu) Sds(opcode uint32) {
 
 }
 
-const ()
+func (cpu *Cpu) B(opcode uint32) {
 
-type B struct {
-	Cond, Opcode, nn uint32
-	Link                    bool
-}
+    isLink := utils.BitEnabled(opcode, 24)
 
-func NewB(opcode uint32, cpu *Cpu) *B {
-	b := &B{
-        Opcode: opcode,
-		Cond: utils.GetByte(opcode, 28),
-        nn: utils.GetVarData(opcode, 0, 23),
-        Link: utils.BitEnabled(opcode, 24),
-	}
+    r := &cpu.Reg.R
 
-    if utils.GetVarData(opcode, 25, 27) != 0b101 {
-        panic("Malformed B Instruction Called")
-    }
-
-	return b
-}
-
-func (c *Cpu) B(opcode uint32) {
-
-	// B, BL
-
-    r := &c.Reg.R
-
-	b := NewB(opcode, c)
-
-    if b.Link {
+    if isLink {
         r[14] = r[15] + 4
     }
 
@@ -664,25 +548,14 @@ const (
     INST_BLX
 )
 
-type BX struct {
-    Cond, Inst, Rn uint32
-}
-
-func NewBX(opcode uint32, cpu *Cpu) *BX {
-    return &BX{
-        Cond: utils.GetByte(opcode, 28),
-        Inst: utils.GetByte(opcode, 4),
-        Rn: utils.GetByte(opcode, 0),
-    }
-}
-
 func (c *Cpu) BX(opcode uint32) {
 
-    bx := NewBX(opcode, c)
+    inst := utils.GetByte(opcode, 4)
+    rn := utils.GetByte(opcode, 0)
 
-    switch bx.Inst {
+    switch inst {
     case INST_BX:
-        c.Reg.R[PC] = c.Reg.R[bx.Rn]
+        c.Reg.R[PC] = c.Reg.R[rn]
         c.Gba.toggleThumb()
     case INST_BXJ: panic("Unsupported BXJ Instruction")
     case INST_BLX: panic("Unsupported BLX Instruction")
@@ -852,10 +725,17 @@ func (c *Cpu) Block(opcode uint32) {
 
     block := NewBlock(opcode, c)
 
-    if block.Load {
-        c.ldm(block)
-    } else {
+    incPc := true
 
+    mode := c.Reg.getMode()
+
+    if forceUser := block.PSR; forceUser {
+        c.Reg.setMode(MODE_USR)
+    }
+
+    if block.Load {
+        incPc = c.ldm(block)
+    } else {
         c.stm(block)
     }
 
@@ -863,10 +743,18 @@ func (c *Cpu) Block(opcode uint32) {
         r[block.Rn] = block.RnValue
     }
 
-    c.Reg.R[15] += 4
+    if forceUser := block.PSR; forceUser {
+        c.Reg.setMode(mode)
+    }
+
+    if incPc {
+        c.Reg.R[PC] += 4
+    }
 }
 
-func (c *Cpu) ldm(block *Block) {
+func (c *Cpu) ldm(block *Block) bool {
+
+    incPC := true
 
     r := &c.Reg.R
 
@@ -881,22 +769,46 @@ func (c *Cpu) ldm(block *Block) {
             r[block.Rn] += 4
             r[reg] = c.Gba.Mem.Read32(r[block.Rn])
 
+            if reg == PC {
+                incPC = false
+            }
+
         case !block.Pre &&  block.Up && regBitEnabled:
 
             r[reg] = c.Gba.Mem.Read32(r[block.Rn])
+
+            if CURR_INST == MAX_COUNT {
+                printer(map[string]any{"REG": reg, "R": r[reg]})
+            }
+
             r[block.Rn] += 4
+
+            if reg == PC {
+                incPC = false
+            }
 
         case block.Pre  &&  !block.Up && decRegBitEnabled: // pop
 
             r[block.Rn] -= 4
             r[15 - reg] = c.Gba.Mem.Read32(r[block.Rn])
 
+            if 15 - reg == PC {
+                incPC = false
+            }
+
         case !block.Pre &&  !block.Up && decRegBitEnabled:
 
             r[15 - reg] = c.Gba.Mem.Read32(r[block.Rn])
             r[block.Rn] -= 4
+
+            if 15 - reg == PC {
+                incPC = false
+            }
+
         }
     }
+
+    return incPC
 }
 
 func (c *Cpu) stm(block *Block) {
@@ -959,7 +871,7 @@ func NewPSR(opcode uint32, cpu *Cpu) *PSR {
     }
 
     if psr.Immediate {
-        psr.Shift = utils.GetByte(opcode, 8)
+        psr.Shift = utils.GetByte(opcode, 8) * 2
         psr.Imm = utils.GetVarData(opcode, 0, 7)
         return psr
     }
@@ -989,7 +901,8 @@ func (cpu *Cpu) mrs(psr *PSR) {
     r := &cpu.Reg.R
 
     if psr.SPSR {
-        r[psr.Rd] = uint32(cpu.Reg.SPSR)
+        mode := cpu.Reg.getMode()
+        r[psr.Rd] = uint32(cpu.Reg.SPSR[BANK_ID[mode]])
         return
     }
 
@@ -1000,59 +913,80 @@ func (cpu *Cpu) mrs(psr *PSR) {
 
 func (cpu *Cpu) msr(psr *PSR) {
 
+    reg := &cpu.Reg
     r := &cpu.Reg.R
 
     p := &cpu.Reg.CPSR
+
+    currMode := cpu.Reg.getMode()
+
     if psr.SPSR {
-        p = &cpu.Reg.SPSR
+        mode := cpu.Reg.getMode()
+        p = &cpu.Reg.SPSR[BANK_ID[mode]]
     }
 
+
     if psr.Immediate {
-        panic("IMMEDIATE MSR")
-        // shift
-        // immediate
+
+        // assumes user mode
+        imm, _, _:= utils.Ror(psr.Imm, psr.Shift, false, false, false)
+
+        if psr.SPSR {
+            //spsr := cpu.Reg.SPSR[BANK_ID[currMode]]
+
+            // set spsr
+            panic("NEED SET SPRS LOGIC IN MSR")
+            return
+        }
+
+        if psr.C { *p = Cond((uint32(*p) &^ 0x000000FF) | (imm & 0x000000FF)) }
+        if psr.F { *p = Cond((uint32(*p) &^ 0xF0000000) | (imm & 0xF0000000)) }
+        if psr.X { *p = Cond((uint32(*p) &^ 0x0FF00000) | (imm & 0x0FF00000)) }
+        if psr.S { *p = Cond((uint32(*p) &^ 0x000FFF00) | (imm & 0x000FFF00)) }
+
+        mode := cpu.Reg.getMode()
+
+        if BANK_ID[currMode] == BANK_ID[mode] {
+            return
+        }
+
+        reg.SP[BANK_ID[currMode]] = reg.R[SP]
+        reg.LR[BANK_ID[currMode]] = reg.R[LR]
+
+        reg.R[SP] = reg.SP[BANK_ID[mode]]
+        reg.R[LR] = reg.LR[BANK_ID[mode]]
+
+        // check irq
         return
     }
 
+    // unsure on this part
     if psr.F { p.SetField(24, (r[psr.Rm] >> 24) & 0xFF) }
     if psr.S { p.SetField(16, (r[psr.Rm] >> 16) & 0xFF) }
     if psr.X { p.SetField(8, (r[psr.Rm] >> 8) & 0xFF) }
     if psr.C { p.SetField(0, r[psr.Rm] & 0xFF) }
 }
 
-type Swp struct {
-    Cond, Opcode, Rn, Rd, Rm uint32
-    Byte bool
-}
-
-func NewSwp(opcode uint32, cpu *Cpu) *Swp {
-    return &Swp{
-        Cond: utils.GetByte(opcode, 28),
-        Opcode: opcode,
-        Byte: utils.BitEnabled(opcode, 22),
-        Rn: utils.GetByte(opcode, 16),
-        Rd: utils.GetByte(opcode, 12),
-        Rm: utils.GetByte(opcode, 0),
-    }
-}
-
 func (cpu *Cpu) Swp(opcode uint32) {
+
+    isByte := utils.BitEnabled(opcode, 22)
+    rn := utils.GetByte(opcode, 16)
+    rd := utils.GetByte(opcode, 12)
+    rm := utils.GetByte(opcode, 0)
 
     r := &cpu.Reg.R
 
-    swp := NewSwp(opcode, cpu)
-
-    rmValue := r[swp.Rm]
-    rnValue := r[swp.Rn]
+    rmValue := r[rm]
+    rnValue := r[rn]
 
     var rnMemValue uint32
-    if swp.Byte {
+    if isByte {
         rnMemValue = cpu.Gba.Mem.Read8(rnValue)
     } else {
         rnMemValue = cpu.Gba.Mem.Read32(rnValue)
     }
 
-    r[swp.Rd] = rnMemValue
+    r[rd] = rnMemValue
     cpu.Gba.Mem.Write32(rnValue, rmValue)
 
     cpu.Reg.R[15] += 4

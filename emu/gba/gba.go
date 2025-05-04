@@ -11,7 +11,8 @@ const (
 
 var (
     CURR_INST = 0
-    MAX_COUNT = 100_000_000
+    MAX_COUNT = 73
+    //MAX_COUNT = 73 // test against bios.asm
 )
 
 type GBA struct {
@@ -42,6 +43,19 @@ func NewGBA() *GBA {
     gba.Mem = NewMemory(&gba)
     gba.Cpu = NewCpu(&gba)
     gba.Debugger = &Debugger{&gba}
+
+    //gba.LoadBios("./emu/gba/bios.gba")
+    //gba.LoadBios("./emu/gba/bios_custom.gba")
+
+    // custom bios
+    //gba.Mem.Write32(0x00, 0xE129F000)
+    //gba.Mem.Write32(0x04, 0xE59FD00C)
+    //gba.Mem.Write32(0x08, 0xE3A0F000)
+    //gba.Mem.Write32(0x0C, 0xE1A0E00F)
+    //gba.Mem.Write32(0x10, 0xEA00008D)
+    //gba.Mem.Write32(0x14, 0xE3A00000)
+    //gba.Mem.Write32(0x18, 0xE3A01002)
+    //gba.Mem.Write32(0x1C, 0xE12FFF1E)
 
 	return &gba
 }
@@ -80,8 +94,8 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
     }
 
     updateCycles := 0
-    //for range MAX_COUNT + 1 {
-    for updateCycles < (gba.Clock / gba.FPS) {
+    for range MAX_COUNT + 1 {
+    //for updateCycles < (gba.Clock / gba.FPS) {
 
         cycles := 4
 
