@@ -2,6 +2,7 @@ package gba
 
 import (
 	cart "github.com/aabalke33/guac/emu/gba/cart"
+	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
 const (
@@ -11,8 +12,9 @@ const (
 
 var (
     CURR_INST = 0
-    MAX_COUNT = 73
-    //MAX_COUNT = 73 // test against bios.asm
+    MAX_COUNT = 781
+    //MAX_COUNT = 781 // test against arm_a3...
+    //MAX_COUNT = 72 // test against bios.asm
 )
 
 type GBA struct {
@@ -109,6 +111,8 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
             gba.Debugger.saveBg2()
         }
 
+        gba.updateIRQ()
+
         updateCycles += cycles
         CURR_INST++
         instCount++
@@ -135,4 +139,46 @@ func (gba *GBA) toggleThumb() {
 
     reg.R[PC] &^= 3
     // pipe
+}
+
+func (gba *GBA) updateIRQ() {
+
+    //for i := range 160 {
+    //    // scanline
+    //}
+
+    const DISPSTAT = 0x0400_0004
+    if dispstat := gba.Mem.Read8(DISPSTAT); utils.BitEnabled(dispstat, 3) {
+        const IRQ_VBLANK = 0x00
+        gba.triggerIRQ(IRQ_VBLANK)
+    }
+}
+
+func (gba *GBA) triggerIRQ(irq uint32) {
+
+    const IF = 0x202
+
+    gba.Mem.BIOS_MODE = BIOS_IRQ
+
+    iack := uint16(gba.Mem.Read8(IF))
+	iack = iack | (1 << irq)
+	gba.Mem.IO[IF] = uint8(iack)
+    gba.Mem.IO[IF+1] = uint8(iack>>8)
+	//gba.halt = false
+	gba.checkIRQ()
+}
+
+func (gba *GBA) checkIRQ() {
+
+    const IE = 0x200
+    const IF = 0x202
+    const IME = 0x208
+
+    cond1 := !gba.Cpu.Reg.CPSR.GetFlag(FLAG_I)
+    cond2 := gba.Mem.IO[IME] & 1 > 0
+    cond3 := (uint16(gba.Mem.Read8(IE)) & uint16(gba.Mem.Read8(IF))) > 0
+    if cond1 && cond2 && cond3 {
+        panic("EXECPTION IN CHECK IRQ")
+        //g.exception(irqVec, IRQ)
+    }
 }

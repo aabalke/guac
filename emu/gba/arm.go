@@ -27,6 +27,8 @@ const (
 type Alu struct {
     Opcode, Rd, Rn, RnValue, Cond, Op2, Inst uint32
     Immediate, Set bool
+    LogicalFlags, Test bool
+    Carry bool
 }
 
 func NewAluData(opcode uint32, cpu *Cpu) *Alu {
@@ -41,7 +43,7 @@ func NewAluData(opcode uint32, cpu *Cpu) *Alu {
         Rn: utils.GetByte(opcode, 16),
     }
 
-    alu.Op2 = cpu.GetOp2(opcode)
+    alu.Op2, alu.Carry = cpu.GetOp2(opcode)
 
     if alu.Rn != PC {
         alu.RnValue = cpu.Reg.R[alu.Rn]
@@ -64,9 +66,22 @@ func (cpu *Cpu) Alu(opcode uint32) {
     alu := NewAluData(opcode, cpu)
 
     switch alu.Inst {
-    case AND, EOR, ORR, MOV, MVN, BIC: cpu.logical(alu)
-    case ADD, ADC, SUB, SBC, RSB, RSC: cpu.arithmetic(alu)
-    case TST, TEQ, CMP, CMN:           cpu.test(alu)
+    case AND, EOR, ORR, MOV, MVN, BIC:
+        alu.LogicalFlags = true
+        alu.Test = false
+        cpu.logical(alu)
+    case ADD, ADC, SUB, SBC, RSB, RSC:
+        alu.LogicalFlags = false
+        alu.Test = false
+        cpu.arithmetic(alu)
+    case TST, TEQ:
+        alu.Test = true
+        alu.LogicalFlags = true
+        cpu.test(alu)
+    case CMP, CMN:
+        alu.Test = true
+        alu.LogicalFlags = false
+        cpu.test(alu)
     }
 
     if alu.Rd != PC {
@@ -74,7 +89,7 @@ func (cpu *Cpu) Alu(opcode uint32) {
     }
 }
 
-func (cpu *Cpu) GetOp2(opcode uint32) uint32 {
+func (cpu *Cpu) GetOp2(opcode uint32) (uint32, bool) {
 
     reg := &cpu.Reg
 
@@ -91,7 +106,7 @@ func (cpu *Cpu) GetOp2(opcode uint32) uint32 {
             reg.CPSR.SetFlag(FLAG_C, carry)
         }
 
-        return op2
+        return op2, currCarry
     }
 
     is := utils.GetVarData(opcode, 7, 11)
@@ -105,6 +120,10 @@ func (cpu *Cpu) GetOp2(opcode uint32) uint32 {
     if shiftRegister {
         // timer increase 1
         is = reg.R[(opcode>>8)&0b1111] & 0b1111_1111
+
+        if rm == PC {
+            additional += 4
+        }
 
     }
 
@@ -123,7 +142,7 @@ func (cpu *Cpu) GetOp2(opcode uint32) uint32 {
         reg.CPSR.SetFlag(FLAG_C, carry)
     }
 
-    return op2
+    return op2, currCarry
 }
 
 func (cpu *Cpu) logical(alu *Alu) {
@@ -141,26 +160,9 @@ func (cpu *Cpu) logical(alu *Alu) {
 
     res := oper(alu.RnValue, alu.Op2)
 
-    if CURR_INST == MAX_COUNT {
-        printer(map[string]any{"OP2": alu.Op2})
-    }
-
     cpu.Reg.R[alu.Rd] = res
 
-    cpu.setLogicalFlags(alu, res)
-}
-
-func (cpu *Cpu) setLogicalFlags(alu *Alu, res uint32) {
-    switch {
-    case alu.Rd == PC && alu.Set: // private mode
-        panic("Unhandled logic")
-        return
-    //case alu.Rd == PC && !test: pipelining
-    case alu.Set:
-        cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(res, 31))
-        cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
-        return
-    }
+    cpu.setAluFlags(alu, uint64(res))
 }
 
 func (cpu *Cpu) arithmetic(alu *Alu) {
@@ -177,8 +179,11 @@ func (cpu *Cpu) arithmetic(alu *Alu) {
     }
 
     carry := uint64(0)
-    if cpu.Reg.CPSR.GetFlag(FLAG_C) {
+    if alu.Carry {
         carry = 1
+    }
+    if CURR_INST == MAX_COUNT {
+        fmt.Printf("u1\n\n\n")
     }
 
     var res uint64
@@ -186,18 +191,44 @@ func (cpu *Cpu) arithmetic(alu *Alu) {
     res = oper(uint64(alu.RnValue), uint64(alu.Op2), carry)
     cpu.Reg.R[alu.Rd] = uint32(res)
 
-    cpu.setArithmeticFlags(alu, res)
+    cpu.setAluFlags(alu, res)
 }
 
-func (cpu *Cpu) setArithmeticFlags(alu *Alu, res uint64) {
+func (cpu *Cpu) test(alu *Alu) {
+
+    var oper func (uint64, uint64) uint64
+
+    switch alu.Inst {
+    case TST: oper = func(u1, u2 uint64) uint64 { return u1 & u2 }
+    case TEQ: oper = func(u1, u2 uint64) uint64 { return u1 ^ u2 }
+    case CMP: oper = func(u1, u2 uint64) uint64 { return u1 - u2 }
+    case CMN: oper = func(u1, u2 uint64) uint64 { return u1 + u2 }
+    }
+
+    res := oper(uint64(alu.RnValue), uint64(alu.Op2))
+
+    switch alu.Inst {
+    case TST, TEQ: cpu.setAluFlags(alu, uint64(uint32(res)))
+    case CMP, CMN: cpu.setAluFlags(alu, res)
+    }
+}
+
+func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
     switch {
     case alu.Rd == PC && alu.Set: // private mode
-        panic("Unhandled arith")
+        cpu.AluChangeMode(!alu.Test)
         return
     //case alu.Rd == PC && !test:
-    case alu.Rd == PC:
-        panic("pipelining")
+    case alu.Rd == PC && !alu.Test:
+        //panic("pipelining")
     case alu.Set:
+
+        if alu.LogicalFlags {
+            cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
+            cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+            return
+        }
+
         var v, c bool
         rnSign := uint8(alu.RnValue >> 31) & 1
         opSign := uint8(alu.Op2 >> 31) & 1
@@ -224,24 +255,20 @@ func (cpu *Cpu) setArithmeticFlags(alu *Alu, res uint64) {
     }
 }
 
-func (cpu *Cpu) test(alu *Alu) {
+func (cpu *Cpu) AluChangeMode(flush bool) {
 
-    var oper func (uint64, uint64) uint64
+    reg := &cpu.Reg
 
-    switch alu.Inst {
-    case TST: oper = func(u1, u2 uint64) uint64 { return u1 & u2 }
-    case TEQ: oper = func(u1, u2 uint64) uint64 { return u1 ^ u2 }
-    case CMP: oper = func(u1, u2 uint64) uint64 { return u1 - u2 }
-    case CMN: oper = func(u1, u2 uint64) uint64 { return u1 + u2 }
-    }
+    // restore prev
+    curr := reg.getMode()
+    reg.CPSR = reg.SPSR[BANK_ID[curr]]
+    prev := reg.getMode()
 
-    res := oper(uint64(alu.RnValue), uint64(alu.Op2))
+    reg.setMode(curr, prev)
 
-    switch alu.Inst {
-    case TST, TEQ: cpu.setLogicalFlags(alu, uint32(res))
-    case CMP, CMN:
-        cpu.setArithmeticFlags(alu, res)
-    }
+    // if flush pipeline
+
+    cpu.Gba.checkIRQ()
 }
 
 const (
@@ -266,7 +293,7 @@ func (cpu *Cpu) Mul(opcode uint32) {
 
     if mulHalf := inst == MUL || inst == MLA; mulHalf {
 
-        res := r[rd] * r[rs]
+        res := r[rm] * r[rs]
 
         if inst == MLA {
             res += r[rn]
@@ -398,21 +425,39 @@ func (c *Cpu) Sdt(opcode uint32) {
 
     pre, post, _ := generateSdtAddress(sdt, c)
 
+    addr := utils.WordAlign(pre)
+
     if sdt.Pld {
         panic("Need to handle PLD Inst")
     }
 
-
-
     switch {
     case sdt.Load && sdt.Byte:
-        r[sdt.Rd] = uint32(c.Gba.Mem.Read8(pre))
+
+        r[sdt.Rd] = uint32(c.Gba.Mem.Read8(addr))
+
     case sdt.Load && !sdt.Byte:
-        r[sdt.Rd] = c.Gba.Mem.Read32(pre)
+
+        v := c.Gba.Mem.Read32(addr)
+        is := (pre & 0b11) * 8
+        v, _, _ = utils.Ror(v, is, false, false ,false)
+
+        if sdt.Rd == PC { // not sure if this is right
+            v -= 4
+        }
+        r[sdt.Rd] = v
+
     case !sdt.Load && sdt.Byte:
-        c.Gba.Mem.Write8(pre, uint8(r[sdt.Rd]))
+        c.Gba.Mem.Write8(addr, uint8(r[sdt.Rd]))
+
     case !sdt.Load && !sdt.Byte:
-        c.Gba.Mem.Write32(pre, r[sdt.Rd])
+
+        v := r[sdt.Rd]
+        if sdt.Rd == PC {
+            v += 12
+        }
+
+        c.Gba.Mem.Write32(addr, v)
     }
 
     if (sdt.WriteBack || !sdt.Pre) && sdt.Rn != sdt.Rd {
@@ -429,6 +474,7 @@ func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack 
     var offset uint32
     if sdt.Immediate {
         offset = sdt.Offset
+
     } else {
         shift := sdt.Opcode >> 7 & 0b11111 // I = 1 shift reg
         offset = cpu.RegShiftOffset(sdt.Opcode, shift)
@@ -443,9 +489,9 @@ func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack 
 
     if sdt.Pre {
         switch {
-        case offset == 0: return r[sdt.Rn], 0, false
-        case sdt.Immediate: return r[sdt.Rn], 0, true
-        default: return r[sdt.Rn], 0, true
+        case offset == 0: return addr, 0, false
+        case sdt.Immediate: return addr, addr, true
+        default: return addr, addr, true
         }
     }
 
@@ -730,7 +776,7 @@ func (c *Cpu) Block(opcode uint32) {
     mode := c.Reg.getMode()
 
     if forceUser := block.PSR; forceUser {
-        c.Reg.setMode(MODE_USR)
+        c.Reg.setMode(mode, MODE_USR)
     }
 
     if block.Load {
@@ -744,7 +790,7 @@ func (c *Cpu) Block(opcode uint32) {
     }
 
     if forceUser := block.PSR; forceUser {
-        c.Reg.setMode(mode)
+        c.Reg.setMode(MODE_USR, mode)
     }
 
     if incPc {
@@ -917,32 +963,24 @@ func (cpu *Cpu) msr(psr *PSR) {
     r := &cpu.Reg.R
 
     p := &cpu.Reg.CPSR
-
     currMode := cpu.Reg.getMode()
-
     if psr.SPSR {
-        mode := cpu.Reg.getMode()
-        p = &cpu.Reg.SPSR[BANK_ID[mode]]
+        p = &cpu.Reg.SPSR[BANK_ID[currMode]]
     }
-
 
     if psr.Immediate {
 
-        // assumes user mode
+        // assumes user mode???
         imm, _, _:= utils.Ror(psr.Imm, psr.Shift, false, false, false)
-
-        if psr.SPSR {
-            //spsr := cpu.Reg.SPSR[BANK_ID[currMode]]
-
-            // set spsr
-            panic("NEED SET SPRS LOGIC IN MSR")
-            return
-        }
 
         if psr.C { *p = Cond((uint32(*p) &^ 0x000000FF) | (imm & 0x000000FF)) }
         if psr.F { *p = Cond((uint32(*p) &^ 0xF0000000) | (imm & 0xF0000000)) }
         if psr.X { *p = Cond((uint32(*p) &^ 0x0FF00000) | (imm & 0x0FF00000)) }
         if psr.S { *p = Cond((uint32(*p) &^ 0x000FFF00) | (imm & 0x000FFF00)) }
+
+        if psr.SPSR {
+            return
+        }
 
         mode := cpu.Reg.getMode()
 
@@ -950,13 +988,10 @@ func (cpu *Cpu) msr(psr *PSR) {
             return
         }
 
-        reg.SP[BANK_ID[currMode]] = reg.R[SP]
-        reg.LR[BANK_ID[currMode]] = reg.R[LR]
+        reg.switchRegisterBanks(currMode, mode)
 
-        reg.R[SP] = reg.SP[BANK_ID[mode]]
-        reg.R[LR] = reg.LR[BANK_ID[mode]]
+        cpu.Gba.checkIRQ()
 
-        // check irq
         return
     }
 
