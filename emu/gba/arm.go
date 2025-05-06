@@ -182,9 +182,6 @@ func (cpu *Cpu) arithmetic(alu *Alu) {
     if alu.Carry {
         carry = 1
     }
-    if CURR_INST == MAX_COUNT {
-        fmt.Printf("u1\n\n\n")
-    }
 
     var res uint64
 
@@ -431,6 +428,7 @@ func (c *Cpu) Sdt(opcode uint32) {
         panic("Need to handle PLD Inst")
     }
 
+
     switch {
     case sdt.Load && sdt.Byte:
 
@@ -445,9 +443,11 @@ func (c *Cpu) Sdt(opcode uint32) {
         if sdt.Rd == PC { // not sure if this is right
             v -= 4
         }
+
         r[sdt.Rd] = v
 
     case !sdt.Load && sdt.Byte:
+
         c.Gba.Mem.Write8(addr, uint8(r[sdt.Rd]))
 
     case !sdt.Load && !sdt.Byte:
@@ -457,10 +457,15 @@ func (c *Cpu) Sdt(opcode uint32) {
             v += 12
         }
 
+
         c.Gba.Mem.Write32(addr, v)
     }
 
-    if (sdt.WriteBack || !sdt.Pre) && sdt.Rn != sdt.Rd {
+
+    // if rn == rd and loading, skip writeback, if store, do not
+    skipLoadWriteBack := sdt.Load && (sdt.Rn == sdt.Rd)
+
+    if (sdt.WriteBack || !sdt.Pre) && !skipLoadWriteBack {
         r[sdt.Rn] = post
     }
 
@@ -483,6 +488,7 @@ func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack 
     addr := r[sdt.Rn]
     if sdt.Up {
         addr += offset
+
     } else {
         addr -= offset
     }
@@ -526,53 +532,6 @@ func (cpu *Cpu) RegShiftOffset(opcode uint32, shift uint32) uint32 {
     }
 
     return ofs
-}
-
-const (
-    SWP = iota
-)
-
-type Sds struct {
-    Cond, Opcode, Inst, Rn, Rd, Rm uint32
-    Byte bool
-}
-
-func NewSds(opcode uint32, cpu *Cpu) *Sds {
-
-    sds := &Sds{
-        Cond: utils.GetByte(opcode, 28),
-        Opcode: opcode,
-        Inst: utils.GetByte(opcode, 23),
-        Byte: utils.BitEnabled(opcode, 22),
-        Rn: utils.GetByte(opcode, 16),
-        Rd: utils.GetByte(opcode, 12),
-        Rm: utils.GetByte(opcode, 0),
-    }
-
-    valid := utils.GetVarData(opcode, 23, 27) == 0b00010 &&
-             utils.GetVarData(opcode, 4, 11) == 0b00001001
-
-    if !valid {
-        panic("Malformed SDS (SWP) Instruction")
-    }
-
-    return sds
-}
-
-func (cpu *Cpu) Sds(opcode uint32) {
-
-    r := &cpu.Reg.R
-
-    sds := NewSds(opcode, cpu)
-
-    if sds.Inst != SWP {
-        panic("Malformed SDS Instruction. Is not SWP.")
-    }
-
-
-    r[sds.Rd] = r[sds.Rn]
-    r[sds.Rn] = r[sds.Rm]
-
 }
 
 func (cpu *Cpu) B(opcode uint32) {
@@ -620,7 +579,7 @@ const (
 )
 
 type Half struct {
-    Cond, Rn, Rd, Offset, Inst, Rm, RdValue, RnValue, RmValue uint32
+    Cond, Rn, Rd, Imm, Inst, Rm, RdValue, RnValue, RmValue uint32
     Pre, Up, Immediate, WriteBack, Load, MemoryManagement bool
 }
 
@@ -656,13 +615,9 @@ func NewHalf(opcode uint32, c *Cpu) *Half {
         if fail { panic(fmt.Sprintf("Malformed Half Instruction %d", i)) }
     }
 
-    if h.Immediate {
-        h.Rm = utils.GetByte(opcode, 0)
-        h.RmValue = r[h.Rm]
-    } else {
-        h.Offset = utils.GetByte(opcode, 8) << 4 | utils.GetByte(opcode, 0)
-    }
-
+    h.Rm = utils.GetByte(opcode, 0)
+    h.RmValue = r[h.Rm]
+    h.Imm = utils.GetByte(opcode, 8) << 4 | utils.GetByte(opcode, 0)
 
     h.RnValue = r[h.Rn]
     if h.Rn == PC {
@@ -679,15 +634,12 @@ func NewHalf(opcode uint32, c *Cpu) *Half {
 
 func (c *Cpu) Half(opcode uint32) {
 
-    r := &c.Reg.R
     half := NewHalf(opcode, c)
-    //pre, post, writeBack := generateAddress(half, c)
-    pre, _, _ := generateAddress(half, c)
 
     if !half.Load {
         switch half.Inst {
         case RESERVED: panic("RESERVED HALF (Load) NOT SUPPORTED")
-        case STRH: c.Gba.Mem.Write16(pre, uint16(half.RdValue))
+        case STRH: unsignedHalfStd(half, c)
         case LDRD: panic("LDRD NOT SUPPORTED")
         case STRD: panic("STRD NOT SUPPORTED")
         }
@@ -698,43 +650,156 @@ func (c *Cpu) Half(opcode uint32) {
 
     switch half.Inst {
     case RESERVED: panic("RESERVED HALF (Store) NOT SUPPORTED")
-    case LDRH: // unsigned half
-        r[half.Rd] = c.Gba.Mem.Read16(r[half.Rn])
-    case LDRSB: // signed byte
-        r[half.Rd] = uint32(int8(uint8(c.Gba.Mem.Read8(r[half.Rn]))))
-    case LDRSH: // signed half
-        r[half.Rd] = uint32(int16(c.Gba.Mem.Read16(r[half.Rn])))
+    case LDRH: unsignedHalfStd(half, c)
+    case LDRSB: signedByteStd(half, c)
+    case LDRSH: signedHalfStd(half, c)
     }
 
     c.Reg.R[15] += 4
 }
 
-func generateAddress(half *Half, cpu *Cpu) (pre uint32, post int32, writeBack bool) {
+func signedByteStd(half *Half, cpu *Cpu) {
+
+    r := &cpu.Reg.R
+    pre, post := halfUnsignedAddress(half, cpu)
+    addr := utils.HalfAlign(pre)
+
+    if half.Load {
+        // sign-expand byte value
+        unexpanded := int8(cpu.Gba.Mem.Read8(pre))
+        expanded := uint32(unexpanded)
+
+        if int8(unexpanded) < 0 {
+            expanded |= (0xFFFFFF << 8)
+        }
+
+        r[half.Rd] = expanded
+    } else {
+        cpu.Gba.Mem.Write16(addr, uint16(int16(half.RdValue)))
+    }
+
+    skipLoadWriteBack := half.Load && (half.Rn == half.Rd)
+    if (half.WriteBack || !half.Pre) && !skipLoadWriteBack {
+        r[half.Rn] = post
+    }
+}
+
+func signedHalfStd(half *Half, cpu *Cpu) {
+
+    r := &cpu.Reg.R
+    pre, post := halfUnsignedAddress(half, cpu)
+    addr := utils.HalfAlign(pre)
+
+    if half.Load {
+        // sign-expand byte value
+        unexpanded := int16(cpu.Gba.Mem.Read16(pre))
+        expanded := uint32(unexpanded)
+
+        if int8(unexpanded) < 0 { // or unexpanded >> 7 == 1???
+            expanded |= (0xFFFFFF << 8)
+        }
+
+        r[half.Rd] = expanded
+    } else {
+        cpu.Gba.Mem.Write16(addr, uint16(int16(half.RdValue)))
+    }
+
+    skipLoadWriteBack := half.Load && (half.Rn == half.Rd)
+    if (half.WriteBack || !half.Pre) && !skipLoadWriteBack {
+        r[half.Rn] = post
+    }
+}
+
+func unsignedHalfStd(half *Half, cpu *Cpu) {
+    r := &cpu.Reg.R
+    pre, post := halfUnsignedAddress(half, cpu)
+    addr := utils.HalfAlign(pre)
+
+    if half.Load {
+        v := uint32(cpu.Gba.Mem.Read16(addr))
+        is := (pre & 0b1) * 8
+        v, _, _ = utils.Ror(v, is, false, false ,false)
+        r[half.Rd] = v
+    } else {
+        cpu.Gba.Mem.Write16(addr, uint16(half.RdValue))
+    }
+
+    skipLoadWriteBack := half.Load && (half.Rn == half.Rd)
+    if (half.WriteBack || !half.Pre) && !skipLoadWriteBack {
+        r[half.Rn] = post
+    }
+}
+
+func halfUnsignedAddress(half *Half, cpu *Cpu) (uint32, uint32) {
 
     r := &cpu.Reg.R
 
-    var offset int32 = int32(half.Offset)
-    var rm int32 = int32(half.Rm)
-    if half.Up {
-        offset = int32(half.Offset) * -1
-        rm = int32(half.Rm) * -1
+    var offset uint32
+    if half.Immediate {
+        offset = half.Imm
+    } else {
+        offset = half.RmValue
     }
+
+    addr := r[half.Rn]
+
+    if half.Up {
+        addr += offset
+    } else {
+        addr -= offset
+    }
+
+    if CURR_INST == MAX_COUNT { printer(map[string]any{"ADDR": addr, "OFF": offset})}
 
     if half.Pre {
         switch {
-        case offset == 0: return r[half.Rn], 0, false
-        case half.Immediate: return uint32(int32(r[half.Rn]) + offset), 0, true
-        default: return uint32(int32(r[half.Rn]) + rm), 0, true
+        case offset == 0: return addr, 0
+        default: return addr, addr
         }
     }
 
     switch {
-    case half.Immediate: return r[half.Rn], offset, false
-    default: return r[half.Rn], rm, false
+    case half.Immediate: return r[half.Rn], addr
+    default: return r[half.Rn], addr
     }
-
-    // writeback???
 }
+
+//func generateAddress(half *Half, cpu *Cpu) (pre uint32, post int32, writeBack bool) {
+//
+//    r := &cpu.Reg.R
+//
+//    var offset int32
+//
+//    if half.Immediate {
+//        offset = int32(half.Imm)
+//    } else {
+//
+//        printer(map[string]any{"RM": half.Rm, "RMV": half.RmValue, "RMC": r[half.Rm]})
+//
+//        offset = int32(half.RmValue)
+//    }
+//
+//    if half.Up {
+//        offset *= -1
+//    }
+//
+//    if half.Pre {
+//
+//        if offset == 0 {
+//            return r[half.Rn], 0, false
+//        }
+//
+//        return uint32(int32(r[half.Rn]) + offset), 0, true
+//    }
+//
+//    switch {
+//    case half.Immediate: return r[half.Rn], offset, false
+//    //default: return r[half.Rn], rm, false
+//    default: return r[half.Rn], offset, false
+//    }
+//
+//    // writeback???
+//}
 
 type Block struct {
     Opcode, Cond, Rn, RnValue, Rlist uint32
@@ -767,6 +832,7 @@ func NewBlock(opcode uint32, c *Cpu) *Block {
 
 func (c *Cpu) Block(opcode uint32) {
 
+
     r := &c.Reg.R
 
     block := NewBlock(opcode, c)
@@ -781,13 +847,28 @@ func (c *Cpu) Block(opcode uint32) {
 
     if block.Load {
         incPc = c.ldm(block)
+
+        //if CURR_INST == MAX_COUNT {
+        //    //printer(map[string]any{"WBLOAD": wbLoad, "R2": r[2], "RNV": r[block.Rn], "OR": block.RnValue})
+        //}
+
+        if !block.Writeback {
+            r[block.Rn] = block.RnValue
+        }
+
     } else {
+        //printer(map[string]any{"CURR": CURR_INST})
         c.stm(block)
+        if !block.Writeback {
+            r[block.Rn] = block.RnValue
+        }
+
     }
 
-    if block.Pre && !block.Writeback {
-        r[block.Rn] = block.RnValue
-    }
+    //if block.Pre && !block.Writeback {
+    //if !block.Writeback {
+    //    r[block.Rn] = block.RnValue
+    //}
 
     if forceUser := block.PSR; forceUser {
         c.Reg.setMode(MODE_USR, mode)
@@ -801,10 +882,32 @@ func (c *Cpu) Block(opcode uint32) {
 func (c *Cpu) ldm(block *Block) bool {
 
     incPC := true
-
     r := &c.Reg.R
 
-    for reg := range 16 {
+    if block.Rlist == 0 {
+
+        c.Reg.R[PC] += 16 // i believe this is short cut for {} => {r15} behavior
+
+        if block.Up {
+            r[block.Rn] += 0x40
+            return false
+        }
+
+        r[block.Rn] -= 0x40
+        return false
+    }
+
+    regCount := utils.CountBits(block.Rlist)
+   
+    if (block.Rlist >> block.Rn) & 1 == 1 {
+        regCount--
+        block.Writeback = false
+    }
+
+    addr := utils.WordAlign(r[block.Rn])
+
+    reg := uint32(0)
+    for reg = range 16 {
 
         regBitEnabled := utils.BitEnabled(block.Rlist, uint8(reg))
         decRegBitEnabled := utils.BitEnabled(block.Rlist, uint8(15 - reg))
@@ -812,53 +915,84 @@ func (c *Cpu) ldm(block *Block) bool {
         switch {
         case block.Pre  &&  block.Up && regBitEnabled:
 
-            r[block.Rn] += 4
-            r[reg] = c.Gba.Mem.Read32(r[block.Rn])
+            addr += 4
+            r[reg] = c.Gba.Mem.Read32(addr)
 
-            if reg == PC {
-                incPC = false
+            if reg == PC { incPC = incPC && false }
+            if reg == block.Rn {
+                block.RnValue = r[block.Rn]
             }
 
         case !block.Pre &&  block.Up && regBitEnabled:
 
-            r[reg] = c.Gba.Mem.Read32(r[block.Rn])
+            r[reg] = c.Gba.Mem.Read32(addr)
 
-            if CURR_INST == MAX_COUNT {
-                printer(map[string]any{"REG": reg, "R": r[reg]})
+            if reg == PC { incPC = incPC && false }
+            if reg == block.Rn {
+                block.RnValue = r[block.Rn]
             }
 
-            r[block.Rn] += 4
+            addr += 4
 
-            if reg == PC {
-                incPC = false
-            }
+        case block.Pre  && !block.Up && decRegBitEnabled: // pop
 
-        case block.Pre  &&  !block.Up && decRegBitEnabled: // pop
+            addr -= 4
+            r[15 - reg] = c.Gba.Mem.Read32(addr)
 
-            r[block.Rn] -= 4
-            r[15 - reg] = c.Gba.Mem.Read32(r[block.Rn])
-
-            if 15 - reg == PC {
-                incPC = false
+            if 15 - reg == PC { incPC = incPC && false }
+            if 15 - reg == block.Rn {
+                block.RnValue = r[block.Rn]
             }
 
         case !block.Pre &&  !block.Up && decRegBitEnabled:
 
-            r[15 - reg] = c.Gba.Mem.Read32(r[block.Rn])
-            r[block.Rn] -= 4
+            r[15 - reg] = c.Gba.Mem.Read32(addr)
+            addr -= 4
 
-            if 15 - reg == PC {
-                incPC = false
+            if 15 - reg == PC { incPC = incPC && false }
+            if 15 - reg == block.Rn {
+                block.RnValue = r[block.Rn]
             }
-
         }
+    }
+
+    if block.Up {
+        r[block.Rn] += (regCount * 4)
+    } else {
+        r[block.Rn] -= (regCount * 4)
     }
 
     return incPC
 }
 
 func (c *Cpu) stm(block *Block) {
+
     r := &c.Reg.R
+
+    if block.Rlist == 0 {
+
+        // i believe this is short cut for {} => {r15} behavior
+        c.Gba.Mem.Write32(r[block.Rn], r[PC]+12)
+
+        if block.Up {
+            r[block.Rn] += 0x40
+            return
+        }
+
+        r[block.Rn] -= 0x40
+        return
+    }
+
+    regCount := utils.CountBits(block.Rlist)
+
+    smallest := (block.Rlist & -block.Rlist) == 1 << block.Rn
+    matchingRn := (block.Rlist >> block.Rn) & 1 == 1
+
+    //if block.Writeback && matchingRn && !smallest {
+    //    regCount++
+    //}
+
+    addr := utils.WordAlign(r[block.Rn])
 
     for reg := range 16 {
 
@@ -869,23 +1003,89 @@ func (c *Cpu) stm(block *Block) {
         case block.Pre  &&  block.Up && regBitEnabled:
 
             r[block.Rn] += 4
-            c.Gba.Mem.Write32(r[block.Rn], r[reg])
+            addr += 4
+
+            if reg == int(block.Rn) {
+                regCount = 0 // not sure about this. May need to inc/dev instead
+                c.Gba.Mem.Write32(addr, r[reg] - 4)
+                continue
+            }
+
+            if reg == PC {
+                c.Gba.Mem.Write32(addr, r[reg] + 12)
+                continue
+            }
+
+            c.Gba.Mem.Write32(addr, r[reg])
 
         case !block.Pre &&  block.Up && regBitEnabled:
 
-            c.Gba.Mem.Write32(r[block.Rn], r[reg])
+            c.Gba.Mem.Write32(addr, r[reg])
+
+            if reg == int(block.Rn) {
+                regCount = 0
+                c.Gba.Mem.Write32(addr, r[reg] - 4)
+                continue
+            }
+
+            if reg == PC {
+                c.Gba.Mem.Write32(addr, r[reg] + 12)
+                continue
+            }
             r[block.Rn] += 4
+            addr += 4
 
         case block.Pre  &&  !block.Up && decRegBitEnabled: // push
 
             r[block.Rn] -= 4
-            c.Gba.Mem.Write32(r[block.Rn], r[15 - reg])
+            addr -= 4
+            if 15 - reg == PC {
+                c.Gba.Mem.Write32(addr, r[15 - reg] + 12)
+                continue
+            }
+            c.Gba.Mem.Write32(addr, r[15 - reg])
 
         case !block.Pre &&  !block.Up && decRegBitEnabled:
 
-            c.Gba.Mem.Write32(r[block.Rn], r[15 - reg])
+            c.Gba.Mem.Write32(addr, r[15 - reg])
+
+            if 15 - reg == int(block.Rn) {
+                c.Gba.Mem.Write32(addr, r[15 - reg] + 4)
+            }
+
+            if 15 - reg == PC {
+                c.Gba.Mem.Write32(addr, r[15 - reg] + 12)
+                continue
+            }
             r[block.Rn] -= 4
+            addr -= 4
         }
+    }
+
+    if block.Writeback && smallest {
+
+        fmt.Printf("ADDR V %X\n\n", c.Gba.Mem.Read32(0x3004748))
+
+        v := c.Gba.Mem.Read32(addr)
+
+        if block.Up {
+            //c.Gba.Mem.Write32(r[block.Rn], v - (regCount * 4))
+            c.Gba.Mem.Write32(r[block.Rn], v)
+        } else {
+            c.Gba.Mem.Write32(r[block.Rn], v + (regCount * 4))
+        }
+        return
+    }
+
+    if block.Writeback && matchingRn {
+//
+//        v := c.Gba.Mem.Read32(r[block.Rn])
+//
+//        if block.Up {
+//            c.Gba.Mem.Write32(r[block.Rn], v + (regCount * 4))
+//        } else {
+//            c.Gba.Mem.Write32(r[block.Rn], v - (regCount * 4))
+//        }
     }
 }
 
@@ -1014,15 +1214,22 @@ func (cpu *Cpu) Swp(opcode uint32) {
     rmValue := r[rm]
     rnValue := r[rn]
 
+    aligned := rnValue
+
     var rnMemValue uint32
     if isByte {
+        // sign expanded???
         rnMemValue = cpu.Gba.Mem.Read8(rnValue)
     } else {
-        rnMemValue = cpu.Gba.Mem.Read32(rnValue)
+        aligned = utils.WordAlign(rnValue)
+        rnMemValue = cpu.Gba.Mem.Read32(aligned)
+        is := (rnValue & 0b11) * 8
+        rnMemValue, _, _ = utils.Ror(rnMemValue, is, false, false ,false)
     }
 
+
     r[rd] = rnMemValue
-    cpu.Gba.Mem.Write32(rnValue, rmValue)
+    cpu.Gba.Mem.Write32(aligned, rmValue)
 
     cpu.Reg.R[15] += 4
 }

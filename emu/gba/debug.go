@@ -50,15 +50,15 @@ func (d *Debugger) print(i int) {
     p("spsr", uint32(reg.SPSR[BANK_ID[mode]]))
     p("MODE", BANK_ID[mode])
 
-    p("USR r8", reg.USR[0])
+    //p("USR r8", reg.USR[0])
 
     //p("mem5", uint32(d.gba.Mem.Read32(0x500_0000)))
 
     //for i := 0x3007EF4; i <= 0x3007EFC; i += 4 {
-    p(fmt.Sprintf("mem3 %X", i), d.gba.Mem.Read32(0x0300_00E0))
-    //for i := 0x0300_0080; i <= 0x0300_00C0; i += 4 {
-    //    p(fmt.Sprintf("mem3 %X", i), d.gba.Mem.Read32(uint32(i)))
-    //}
+    //p("mem3040", d.gba.Mem.Read32(0x0300_3040))
+    for i := 0x0300_4744; i <= 0x0300_4748; i += 4 {
+        p(fmt.Sprintf("mem3 %X", i), d.gba.Mem.Read32(uint32(i)))
+    }
 }
 
 func (d *Debugger) saveBg2() {

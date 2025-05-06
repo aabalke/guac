@@ -42,3 +42,11 @@ func GetVarData(i uint32, s, e uint8) uint32 {
     return (i >> s) & mask
 }
 
+func CountBits(v uint32) uint32 {
+    count := uint32(0)
+    for v != 0 {
+        count += (v & 1)
+        v >>= 1
+    }
+    return count
+}

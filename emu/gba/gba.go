@@ -12,8 +12,8 @@ const (
 
 var (
     CURR_INST = 0
-    MAX_COUNT = 781
-    //MAX_COUNT = 781 // test against arm_a3...
+    MAX_COUNT = 1172
+    //MAX_COUNT = 1172 // test against arm_a3...
     //MAX_COUNT = 72 // test against bios.asm
 )
 
