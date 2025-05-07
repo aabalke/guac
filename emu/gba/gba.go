@@ -12,8 +12,7 @@ const (
 
 var (
     CURR_INST = 0
-    MAX_COUNT = 1172
-    //MAX_COUNT = 1172 // test against arm_a3...
+    MAX_COUNT = 100_000_000
     //MAX_COUNT = 72 // test against bios.asm
 )
 
@@ -26,7 +25,7 @@ type GBA struct {
 	Pixels *[]byte
 
 	Paused bool
-	Muted  bool
+	Muted  bool 
 
     Clock int
     FPS int
@@ -96,8 +95,8 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
     }
 
     updateCycles := 0
-    for range MAX_COUNT + 1 {
-    //for updateCycles < (gba.Clock / gba.FPS) {
+    //for range MAX_COUNT + 1 {
+    for updateCycles < (gba.Clock / gba.FPS) {
 
         cycles := 4
 

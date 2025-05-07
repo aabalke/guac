@@ -1,6 +1,7 @@
 package gba
 
 func (gba *GBA) updateDisplay() {
+
 	Mem := gba.Mem
 
 	index := 0
