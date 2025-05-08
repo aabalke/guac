@@ -1,39 +1,5 @@
 package gba
 
-// JUST FOR PASSING ARM TEST //
-
-func SpecialArmTestIORead(addr uint32, v uint8) uint8 {
-
-    if CURR_INST <= 0x50A {
-
-        switch addr {
-        case 0x00: return 0x04
-        case 0x01: return 0x04
-
-        case 0x04: return 0x00
-        case 0x05: return 0x00
-
-        case 0x06: return 0x87
-        }
-        return v
-    }
-
-    // these are temp to pass arm
-    switch addr {
-    case 0x00: return 0x04
-    case 0x01: return 0x04
-
-    case 0x04: return 0x01
-    case 0x05: return 0x00
-
-    case 0x06: return 0xA0
-    }
-
-	return v
-}
-
-// JUST FOR PASSING ARM TEST //
-
 type Memory struct {
 	GBA   *GBA
 	BIOS  [0x4000]uint8
@@ -113,8 +79,21 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 
 	v := m.IO[addr]
 
-    // this is necessary as long as vcount is not implimented
-    return SpecialArmTestIORead(addr, v)
+    switch addr {
+    case 0x00: return 0x04
+    case 0x01: return 0x04
+
+    case 0x04:
+        // this is temp for testing cpu
+        if VCOUNT >= 160 && VCOUNT < 227 {
+            return 0x1
+        }
+
+        return 0x00
+
+    case 0x05: return 0x00
+    case 0x06: return VCOUNT
+    }
 
     return v
 
@@ -196,6 +175,12 @@ func (m *Memory) Write(addr uint32, v uint8) {
 func (m *Memory) WriteIO(addr uint32, v uint8) {
 
 	// this addr should be relative. - 0x400000
+
+    switch addr {
+    case 0x06:
+        VCOUNT = v
+        return
+    }
 
 	m.IO[addr] = v
 

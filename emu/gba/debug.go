@@ -3,6 +3,7 @@ package gba
 import (
 	"fmt"
 	"image"
+    "bufio"
 
 	"image/color"
 	"image/png"
@@ -62,6 +63,36 @@ func (d *Debugger) print(i int) {
     }
 }
 
+func (d *Debugger) saveBg4() {
+
+    Mem := d.gba.Mem
+
+    WIDTH_BG2 := 240
+    HEIGHT_BG2 := 160
+
+    img := image.NewRGBA(image.Rectangle{image.Point{0, 0}, image.Point{WIDTH_BG2, HEIGHT_BG2}})
+
+    for y := range HEIGHT_BG2 {
+        for x := range WIDTH_BG2 {
+
+
+
+            palIdx := Mem.VRAM[(y * WIDTH_BG2) + x]
+
+            palData := uint32(Mem.PRAM[(palIdx * 2) + 1]) << 8 | uint32(Mem.PRAM[palIdx * 2])
+            r := uint8((palData >> 10) & 0b11111)
+            g := uint8((palData >> 5) & 0b11111)
+            b := uint8(palData & 0b11111)
+
+            c := convertTo24bit(r, g, b)
+            img.Set(x, y, c)
+        }
+    }
+
+    f, _ := os.Create("bg2.png")
+    png.Encode(f, img)
+}
+
 func (d *Debugger) saveBg2() {
 
     Mem := d.gba.Mem
@@ -97,4 +128,22 @@ func convertTo24bit(r, g, b uint8) color.RGBA {
         B: (b << 3) | (b >> 2),
         A: 0xFF,
     }
+}
+
+func (d *Debugger) dump(s, e uint32) {
+
+    // fix to buffer some day
+    tmp := ""
+
+    for i := s; i <= e; i += 4 {
+        tmp += fmt.Sprintf("%08X %08X\n", i, d.gba.Mem.Read32(uint32(i)))
+    }
+    f, err := os.Create("./dump")
+    if err != nil { panic(err) } 
+    w := bufio.NewWriter(f)
+    _, err = w.WriteString(tmp)
+
+    if err != nil { panic(err) } 
+
+    w.Flush()
 }

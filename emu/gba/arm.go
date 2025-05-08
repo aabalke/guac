@@ -208,11 +208,27 @@ func (cpu *Cpu) test(alu *Alu) {
     case TST, TEQ: cpu.setAluFlags(alu, uint64(uint32(res)))
     case CMP, CMN: cpu.setAluFlags(alu, res)
     }
+
+    if alu.Rd == PC {
+        // ARM 3: Bad CMP / CMN / TST / TEQ change the mode
+        cpu.Reg.setMode(cpu.Reg.getMode(), MODE_SYS) // this may be not SYS MODE
+        // i know it isnt stored spsr, becuase in tests this was zero
+        // maybe spsr but with some more work???
+
+        cpu.Reg.R[PC] += 4
+        return
+    }
+
 }
 
 func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
     switch {
+    //case alu.Rd == PC && alu.Set && !alu.Test: // private mode
     case alu.Rd == PC && alu.Set: // private mode
+
+        if alu.Inst == CMN || alu.Inst == CMP {
+            return
+        }
         cpu.AluChangeMode(!alu.Test)
         return
     //case alu.Rd == PC && !test:
@@ -767,8 +783,6 @@ func halfUnsignedAddress(half *Half, cpu *Cpu) (uint32, uint32) {
     } else {
         addr -= offset
     }
-
-    if CURR_INST == MAX_COUNT { printer(map[string]any{"ADDR": addr, "OFF": offset})}
 
     if half.Pre {
         switch {

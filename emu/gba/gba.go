@@ -12,7 +12,7 @@ const (
 
 var (
     CURR_INST = 0
-    MAX_COUNT = 100_000_000
+    MAX_COUNT = 100_000
     //MAX_COUNT = 72 // test against bios.asm
 )
 
@@ -29,6 +29,8 @@ type GBA struct {
 
     Clock int
     FPS int
+    Cycles int
+    ScanlineCounter int
 }
 
 func NewGBA() *GBA {
@@ -95,6 +97,8 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
     }
 
     updateCycles := 0
+
+    VCOUNT = 0
     //for range MAX_COUNT + 1 {
     for updateCycles < (gba.Clock / gba.FPS) {
 
@@ -107,7 +111,9 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
         if CURR_INST == MAX_COUNT {
             gba.Paused = true
             gba.Debugger.print(CURR_INST)
-            gba.Debugger.saveBg2()
+            //gba.Debugger.saveBg2()
+            //gba.Debugger.saveBg4()
+            //gba.Debugger.dump(0x600_0000, 0x06017FFF)
         }
 
         gba.updateIRQ()
@@ -115,11 +121,30 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
         updateCycles += cycles
         CURR_INST++
         instCount++
+
+        gba.Cycles = cycles
+
+        gba.updateGraphics()
+
+
 	}
 
     gba.updateDisplay()
 
     return instCount
+}
+
+func (gba *GBA) updateGraphics() {
+
+    gba.ScanlineCounter -= gba.Cycles
+
+    if gba.ScanlineCounter > 0 {
+        return
+    }
+
+    VCOUNT++
+    //fmt.Printf("VCOUNT %X\n", VCOUNT)
+    //if VCOUNT > 0xFF { panic("TOO BIG") }
 }
 
 func (gba *GBA) toggleThumb() {
