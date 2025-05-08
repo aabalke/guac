@@ -12,8 +12,8 @@ const (
 
 var (
     CURR_INST = 0
-    MAX_COUNT = 100_000
-    //MAX_COUNT = 72 // test against bios.asm
+    //MAX_COUNT = 312
+    //MAX_COUNT = 312 thumb.gba
 )
 
 type GBA struct {
@@ -108,13 +108,13 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
 
         gba.Cpu.Execute(opcode)
 
-        if CURR_INST == MAX_COUNT {
-            gba.Paused = true
-            gba.Debugger.print(CURR_INST)
-            //gba.Debugger.saveBg2()
-            //gba.Debugger.saveBg4()
-            //gba.Debugger.dump(0x600_0000, 0x06017FFF)
-        }
+        //if CURR_INST == MAX_COUNT {
+        //    gba.Paused = true
+        //    gba.Debugger.print(CURR_INST)
+        //    //gba.Debugger.saveBg2()
+        //    //gba.Debugger.saveBg4()
+        //    //gba.Debugger.dump(0x600_0000, 0x06017FFF)
+        //}
 
         gba.updateIRQ()
 

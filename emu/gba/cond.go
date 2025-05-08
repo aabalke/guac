@@ -42,8 +42,7 @@ var masks = map[uint32]uint16{
     15: 0x0000,
 }
 
-func (cpu *Cpu) CheckCond(opcode uint32) bool {
-    cond := utils.GetByte(opcode, 28)
+func (cpu *Cpu) CheckCond(cond uint32) bool {
     cpsrFlags := utils.GetByte(uint32(cpu.Reg.CPSR), 28)
     return (masks[cond] & (1 << cpsrFlags)) != 0
 }

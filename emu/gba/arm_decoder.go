@@ -1,8 +1,12 @@
 package gba
 
+import (
+	"github.com/aabalke33/guac/emu/gba/utils"
+)
+
 func (cpu *Cpu) DecodeARM(opcode uint32) {
 
-	if !cpu.CheckCond(opcode) {
+	if !cpu.CheckCond(utils.GetByte(opcode, 28)) {
 		cpu.Reg.R[PC] += 4
 		return
 	}

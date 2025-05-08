@@ -8,7 +8,7 @@ func (cpu *Cpu) DecodeTHUMB(opcode uint16) {
 	case isThumbAddSub(opcode):
 		cpu.ThumbAddSub(opcode)
 	case isThumbShift(opcode):
-		panic("SHIFTED")
+        cpu.thumbShifted(opcode)
 	case isThumbImm(opcode):
         cpu.thumbImm(opcode)
 	case isThumbAlu(opcode):
@@ -29,6 +29,10 @@ func (cpu *Cpu) DecodeTHUMB(opcode uint16) {
 		cpu.thumbPushPop(opcode)
     case isRelative(opcode):
         cpu.thumbRelative(opcode)
+    case isThumbB(opcode):
+        cpu.thumbB(opcode)
+    case isJumpCall(opcode):
+        cpu.thumbJumpCalls(opcode)
 	default:
 		panic(fmt.Sprintf("UNKNOWN OPCODE %X", opcode))
 	}
@@ -119,5 +123,19 @@ func isRelative(opcode uint16) bool {
 	return isThumbOpcodeFormat(opcode,
         0b1111_0000_0000_0000,
         0b1010_0000_0000_0000,
+	)
+}
+
+func isJumpCall(opcode uint16) bool {
+	return isThumbOpcodeFormat(opcode,
+        0b1111_0000_0000_0000,
+        0b1101_0000_0000_0000,
+	)
+}
+
+func isThumbB(opcode uint16) bool {
+	return isThumbOpcodeFormat(opcode,
+        0b1111_1000_0000_0000,
+        0b1110_0000_0000_0000,
 	)
 }
