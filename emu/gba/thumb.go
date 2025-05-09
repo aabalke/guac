@@ -1,7 +1,6 @@
 package gba
 
 import (
-
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
@@ -56,7 +55,7 @@ func (cpu *Cpu) thumbMuliply(alu *ThumbAlu) {
     r[alu.Rd] = uint32(res)
 
     // ARM < 4, carry flag destroyed, ARM >= 5, carry flag unchanged
-    cpu.Reg.CPSR.SetFlag(FLAG_C, false)
+    //cpu.Reg.CPSR.SetFlag(FLAG_C, false)
 
     cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
     cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
@@ -230,8 +229,11 @@ func (cpu *Cpu) thumbTest(alu *ThumbAlu) {
 
 func (cpu *Cpu) HiRegBX(opcode uint16) {
 
+    // only cmp effects flags
+
     inst := uint16(utils.GetVarData(uint32(opcode), 8, 9))
     mSBd := utils.BitEnabled(uint32(opcode), 7)
+    mSBs := utils.BitEnabled(uint32(opcode), 6)
     rs := uint16(utils.GetVarData(uint32(opcode), 3, 6))
     rd := uint16(utils.GetVarData(uint32(opcode), 0, 2))
 
@@ -239,12 +241,65 @@ func (cpu *Cpu) HiRegBX(opcode uint16) {
         rd |= 0b1000
     }
 
+    if mSBs {
+        rs |= 0b1000
+    }
+
     r := &cpu.Reg.R
     cpsr := &cpu.Reg.CPSR
 
     switch {
-    case inst == 0: panic("HI ADD") // may need to align to word
-    case inst == 1: panic("HI CMP") // may need to align to word
+    case inst == 0: 
+
+        rsValue := uint64(r[rs])
+
+        if rs == PC {
+            rsValue += 4
+        }
+
+        rdValue := uint64(r[rd])
+
+        res := rsValue + rdValue
+
+        if rd == PC {
+            r[rd] = utils.WordAlign(uint32(res)) + 4
+        } else {
+            r[rd] = uint32(res)
+            r[PC] += 2
+        }
+        return
+
+    case inst == 1:
+
+        rsValue := uint64(r[rs])
+
+        if rs == PC {
+            rsValue += 4
+        }
+
+        rdValue := uint64(r[rd])
+
+        res := rsValue - rdValue
+
+        if rd != PC {
+            r[PC] += 2
+        }
+
+        // Flags effected???
+
+        rsSign := uint8(rsValue >> 31) & 1
+        rdSign := uint8(uint32(rdValue) >> 31) & 1
+        rSign  := uint8(int32(uint32(res)) >> 31) & 1
+
+        v := (rsSign == rdSign) && (rSign != rsSign)
+        c := res >= 0x1_0000_0000
+
+        cpsr.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
+        cpsr.SetFlag(FLAG_Z, uint32(res) == 0)
+        cpsr.SetFlag(FLAG_C, c)
+        cpsr.SetFlag(FLAG_V, v)
+        return
+
     case inst == 2:
 
         if nop := rs == 8 && rd == 8; nop {
@@ -252,12 +307,18 @@ func (cpu *Cpu) HiRegBX(opcode uint16) {
             return
         }
 
+        rsValue := uint64(r[rs])
+        if rs == PC {
+            rsValue += 4
+        }
+
+
         if rd == PC {
-            r[rd] = utils.WordAlign(r[rs])
+            r[rd] = utils.WordAlign(uint32(rsValue))
             return
         }
 
-        r[rd] = r[rs]
+        r[rd] = uint32(rsValue)
         r[PC] += 2
         return
 
@@ -268,11 +329,12 @@ func (cpu *Cpu) HiRegBX(opcode uint16) {
             cpsr.SetFlag(FLAG_T, false)
         }
 
-        r[PC] = r[rs] //&^ 0b1
+        r[PC] = r[rs] &^ 0b1
 
         if rs == PC {
             r[PC] += 4
         }
+
         return
     }
 }
@@ -572,62 +634,6 @@ func (cpu *Cpu) thumbPushPop(opcode uint16) {
 
 }
 
-const (
-    THUMB_BEQ = iota
-    THUMB_BNE
-    THUMB_BCS
-    THUMB_BCC
-    THUMB_BMI
-    THUMB_BPL
-    THUMB_BVS
-    THUMB_BVC
-    THUMB_BHI
-    THUMB_BLS
-    THUMB_BGE
-    THUMB_BLT
-    THUMB_BGT
-    THUMB_BLE
-    THUMB_UNDEFINED
-    THUMB_SWI
-)
-
-func (cpu *Cpu) thumbCond(opcode uint16) {
-
-    r := &cpu.Reg.R
-    cpsr := &cpu.Reg.CPSR
-    inst := utils.GetByte(uint32(opcode), 8)
-    offset := uint32(int32(int8(utils.GetVarData(uint32(opcode), 0, 7)) * 2))
-
-    c := cpsr.GetFlag(FLAG_C)
-    z := cpsr.GetFlag(FLAG_Z)
-    n := cpsr.GetFlag(FLAG_N)
-    v := cpsr.GetFlag(FLAG_V)
-
-    switch {
-    case inst == THUMB_BEQ && z: return
-    case inst == THUMB_BNE && !z: return
-    case inst == THUMB_BCS && c: return
-    case inst == THUMB_BCC && !c: return
-    case inst == THUMB_BMI && n: return
-    case inst == THUMB_BPL && !n: return
-    case inst == THUMB_BVS && v: return
-    case inst == THUMB_BVC && !v: return
-    case inst == THUMB_BHI && (c && !z): return
-    case inst == THUMB_BLS && (!c || z): return
-    case inst == THUMB_BGE && (n==v): return
-    case inst == THUMB_BLT && (n!=v): return
-    case inst == THUMB_BGT && (!z && (n==v)): return
-    case inst == THUMB_BLE && (z || (n!=v)): return
-    case inst == THUMB_UNDEFINED: panic("Thumb Cond Undefined")
-    case inst == THUMB_SWI: 
-        cpu.thumbSWI(opcode)
-        return
-    }
-
-    r[PC] += (4 + offset)
-
-}
-
 func (cpu *Cpu) thumbSWI(opcode uint16) {}
 
 func (cpu *Cpu) thumbRelative(opcode uint16) {
@@ -643,7 +649,8 @@ func (cpu *Cpu) thumbRelative(opcode uint16) {
         return
     }
 
-    r[rd] = r[PC] + 4 + nn
+    //r[rd] = r[PC] + 4 + nn
+    r[rd] = utils.WordAlign(r[PC] + 4) + nn
     r[PC] += 2
 }
 
@@ -667,15 +674,37 @@ func (cpu *Cpu) thumbJumpCalls(opcode uint16) {
         return
     }
 
-    offset := int(utils.GetVarData(uint32(opcode), 0, 7)) * 2
-    r[PC] = uint32(int(r[PC]) + 2 + offset)
+    mask := uint32(0b1_1111_1111)
+    nn := utils.GetVarData(uint32(opcode), 0, 7) << 1
+    negative := (nn >> 8) == 1
+    nn &= mask
+
+    if negative {
+        nn |= ^mask
+    }
+
+    offset := int(nn)
+
+    //offset := int(utils.GetVarData(uint32(opcode), 0, 7)) * 2
+    r[PC] = (uint32(int(r[PC]) + 4 + offset))
 }
 
 func (cpu *Cpu) thumbB(opcode uint16) {
     r := &cpu.Reg.R
-    offset := int(utils.GetVarData(uint32(opcode), 0, 10)) * 2
 
-    r[PC] = uint32(int(r[PC]) + 4 + offset) // this +4 may be wrong
+    mask := uint32(0b111_1111_1111)
+
+    nn := (utils.GetVarData(uint32(opcode), 0, 10))
+    negative := (nn >> 10) == 1
+    nn = nn & mask
+
+    if negative {
+        nn |= ^mask
+    }
+
+    offset := int32(nn) * 2
+
+    r[PC] = uint32(int32(r[PC]) + 4 + offset)
 }
 
 func (cpu *Cpu) thumbShifted(opcode uint16) {
@@ -710,4 +739,48 @@ func (cpu *Cpu) thumbShifted(opcode uint16) {
     r[rd] = res
 
     r[PC] += 2
+}
+
+func (cpu *Cpu) thumbStack(opcode uint16) {
+
+    r := &cpu.Reg.R
+    nn := utils.GetVarData(uint32(opcode), 0, 6) * 4
+    sub := utils.BitEnabled(uint32(opcode), 7)
+
+    if sub {
+        r[SP] -= nn
+    } else {
+        r[SP] += nn
+    }
+
+    r[PC] += 2
+}
+
+func (cpu *Cpu) thumbLongBranch(opcode uint16) {
+
+    r := &cpu.Reg.R
+
+    op2 := cpu.Gba.Mem.Read16(r[PC] + 2)
+
+    upper := utils.GetVarData(uint32(opcode), 0, 10)
+    lower := utils.GetVarData(uint32(op2), 0, 10)
+    exchange := utils.GetVarData(uint32(op2), 11, 15) == 0b11101
+
+    if exchange {
+        panic("BLX LONG BRANCH WITH LINK NOT SUPPORTED")
+    }
+
+    mask := uint32(0b111_1111_1111_1111_1111_1111)
+    nn := (upper << 12) | (lower << 1)
+    negative := (nn >> 22) == 1
+    nn &= mask
+
+    if negative {
+        nn |= ^mask
+    }
+
+    offset := int32(nn)
+
+    r[LR] = utils.HalfAlign(r[PC] + 4) + 1
+    r[PC] = uint32(int32(r[PC]) + 4 + offset)
 }

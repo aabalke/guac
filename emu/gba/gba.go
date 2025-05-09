@@ -12,8 +12,9 @@ const (
 
 var (
     CURR_INST = 0
-    //MAX_COUNT = 312
-    //MAX_COUNT = 312 thumb.gba
+    MAX_COUNT = 469_000 //ldr 80005EA
+    //MAX_COUNT = 469 //ldr 80005EA
+    //MAX_COUNT = 469 thumb.gba t156
 )
 
 type GBA struct {
@@ -99,8 +100,8 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
     updateCycles := 0
 
     VCOUNT = 0
-    //for range MAX_COUNT + 1 {
-    for updateCycles < (gba.Clock / gba.FPS) {
+    for range MAX_COUNT + 1 {
+    //for updateCycles < (gba.Clock / gba.FPS) {
 
         cycles := 4
 
@@ -108,13 +109,13 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
 
         gba.Cpu.Execute(opcode)
 
-        //if CURR_INST == MAX_COUNT {
-        //    gba.Paused = true
-        //    gba.Debugger.print(CURR_INST)
-        //    //gba.Debugger.saveBg2()
-        //    //gba.Debugger.saveBg4()
-        //    //gba.Debugger.dump(0x600_0000, 0x06017FFF)
-        //}
+        if CURR_INST == MAX_COUNT {
+            gba.Paused = true
+            gba.Debugger.print(CURR_INST)
+            //gba.Debugger.saveBg2()
+            //gba.Debugger.saveBg4()
+            //gba.Debugger.dump(0x600_0000, 0x06017FFF)
+        }
 
         gba.updateIRQ()
 
