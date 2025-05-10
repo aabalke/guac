@@ -7,7 +7,8 @@ import (
 type Cartridge struct {
 	RomPath string
 	SavPath string
-	Data    []uint8
+	Data    [0x0200_0000]uint8
+    SRAM    [0x1_000]uint8
 	Header  *Header
 }
 
@@ -16,7 +17,7 @@ func NewCartridge(rom, sav string) *Cartridge {
 	c := &Cartridge{
 		RomPath: rom,
 		SavPath: sav,
-        Data: []uint8{},
+        Data: [0x0200_0000]uint8{},
 	}
 
     c.load()
@@ -33,7 +34,13 @@ func (c *Cartridge) load() {
         panic(err)
     }
 
+    // no save means sram full of 0xFF
+    for i := range len(c.SRAM) {
+        c.SRAM[i] = 0xFF
+    }
+
     for i:= range len(buf) {
-        c.Data = append(c.Data, uint8(buf[i]))
+        c.Data[i] = uint8(buf[i])
+        //c.Data = append(c.Data, uint8(buf[i]))
     }
 }

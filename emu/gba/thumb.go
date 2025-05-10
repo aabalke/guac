@@ -303,7 +303,7 @@ func (cpu *Cpu) HiRegBX(opcode uint16) {
     case inst == 2:
 
         if nop := rs == 8 && rd == 8; nop {
-            panic("HI NOP")
+            r[PC] += 2
             return
         }
 
@@ -367,6 +367,7 @@ func (cpu *Cpu) ThumbAddSub(opcode uint16) {
     }
 
     rsValue := r[rs]
+    rnValue := r[rn]
 
     res := oper(uint64(rsValue), uint64(r[rn]), uint64(imm))
 
@@ -374,9 +375,10 @@ func (cpu *Cpu) ThumbAddSub(opcode uint16) {
 
     var v, c bool
     rsSign := uint8(rsValue >> 31) & 1
-    rnSign := uint8(uint32(r[rn]) >> 31) & 1
+    rnSign := uint8(rnValue >> 31) & 1
     imSign := uint8(uint32(imm) >> 31) & 1
     rSign  := uint8(int32(uint32(res)) >> 31) & 1
+    //rSign  := uint8(int32(uint32(res)) >> 31) & 1
 
 
     switch inst {
@@ -390,7 +392,7 @@ func (cpu *Cpu) ThumbAddSub(opcode uint16) {
         v = (rsSign != rnSign) && (rSign != rsSign)
         c = res < 0x1_0000_0000
     case THUMB_SUBImm:
-        v = (rsSign != imSign) && (rSign != imSign)
+        v = (rsSign != imSign) && (rSign != rsSign)
         c = res < 0x1_0000_0000
     }
 
@@ -440,12 +442,12 @@ func (cpu *Cpu) thumbImm(opcode uint16) {
         res = rdValue + nn
         rSign  := uint8(res >> 31) & 1
         v = (rdSign == nnSign) && (rSign != rdSign)
-        c = uint64(res) >= 0x1_0000_0000
+        c = res >= 0x1_0000_0000
     case THUMB_IMM_SUB:
         res = rdValue - nn
         rSign  := uint8(res >> 31) & 1
         v = (rdSign != nnSign) && (rSign != rdSign)
-        c = uint64(res) < 0x1_0000_0000
+        c = res < 0x1_0000_0000
     }
 
     if inst != THUMB_IMM_CMP {
@@ -469,7 +471,9 @@ func (cpu *Cpu) thumbImm(opcode uint16) {
 
 func (cpu *Cpu) thumbLSHalf(opcode uint16) {
 
-    offset := utils.GetVarData(uint32(opcode), 6, 10) * 2
+    // STRH // LDRH
+
+    offset := utils.GetVarData(uint32(opcode), 6, 10) << 1
     rb := utils.GetVarData(uint32(opcode), 3, 5)
     rd := utils.GetVarData(uint32(opcode), 0, 2)
     ldr := utils.BitEnabled(uint32(opcode), 11)
@@ -479,7 +483,10 @@ func (cpu *Cpu) thumbLSHalf(opcode uint16) {
     addr := r[rb] + offset
 
     if ldr {
-        r[rd] = cpu.Gba.Mem.Read16(addr)
+        v := uint32(cpu.Gba.Mem.Read16(utils.HalfAlign(addr)))
+        is := (addr & 0b1) * 8
+        v, _, _ = utils.Ror(v, is, false, false ,false)
+        r[rd] = v
     } else {
         cpu.Gba.Mem.Write16(addr, uint16(r[rd]))
     }
@@ -506,10 +513,47 @@ func (cpu *Cpu) thumbLSSigned(opcode uint16) {
     addr := r[rb] + r[ro]
 
     switch inst {
-    case THUMB_STRH: cpu.Gba.Mem.Write16(addr, uint16(r[rd]))
+    case THUMB_STRH: 
+        cpu.Gba.Mem.Write16(addr, uint16(r[rd]))
+
     case THUMB_LDSB: r[rd] = uint32(int8(uint8(cpu.Gba.Mem.Read8(addr))))
-    case THUMB_LDRH: r[rd] = cpu.Gba.Mem.Read16(addr)
-    case THUMB_LDSH: r[rd] = uint32(int16(cpu.Gba.Mem.Read16(addr)))
+    case THUMB_LDRH:
+        v := cpu.Gba.Mem.Read16(utils.HalfAlign(addr))
+        is := (addr & 0b1) * 8
+        v, _, _ = utils.Ror(v, is, false, false ,false)
+        r[rd] = v
+
+    case THUMB_LDSH:
+
+        // On ARM7 aka ARMv4 aka NDS7/GBA:
+        // LDRSH Rd,[odd]  -->  LDRSB Rd,[odd]         ;sign-expand BYTE value
+        // On ARM9 aka ARMv5 aka NDS9:
+        // LDRSH Rd,[odd]  -->  LDRSH Rd,[odd-1]       ;forced align
+
+        if misaligned := addr & 1 == 1; misaligned {
+            // sign-expand BYTE value
+            unexpanded := int16(cpu.Gba.Mem.Read16(addr))
+            expanded := uint32(unexpanded)
+
+            if int8(unexpanded) < 0 {
+                expanded |= (0xFFFFFF << 8)
+            }
+
+            r[rd] = expanded
+        } else {
+
+            aligned := utils.HalfAlign(addr)
+
+            // sign-expand half value
+            unexpanded := int16(cpu.Gba.Mem.Read16(aligned))
+            expanded := uint32(unexpanded)
+
+            if unexpanded < 0 {
+                expanded |= (0xFFFF << 16)
+            }
+
+            r[rd] = expanded
+        }
     }
 
     r[PC] += 2
@@ -520,12 +564,11 @@ func (cpu *Cpu) thumbLPC(opcode uint16) {
     r := &cpu.Reg.R
 
     rd := utils.GetVarData(uint32(opcode), 8, 10)
-    nn := utils.GetVarData(uint32(opcode), 0, 7)
-    addr := r[PC] + 2 + nn
+    nn := utils.GetVarData(uint32(opcode), 0, 7) << 2
+    addr := utils.WordAlign(r[PC] + 4 + nn)
 
     r[rd] = cpu.Gba.Mem.Read32(addr)
-
-    r[PC] += 4
+    r[PC] += 2
 }
 
 const (
@@ -552,7 +595,9 @@ func (cpu *Cpu) thumbLSR(opcode uint16) {
     case THUMB_STRB_REG:
         cpu.Gba.Mem.Write8(addr, uint8(r[rd]))
     case THUMB_LDR_REG:
-        r[rd] = cpu.Gba.Mem.Read32(addr)
+        v := cpu.Gba.Mem.Read32(utils.WordAlign(addr))
+        is := (addr & 0b11) * 8
+        r[rd], _, _ = utils.Ror(v, is, false, false ,false)
     case THUMB_LDRB_REG:
         r[rd] = cpu.Gba.Mem.Read8(addr)
     }
@@ -575,16 +620,21 @@ func (cpu *Cpu) thumbLSImm(opcode uint16) {
     nn := utils.GetVarData(uint32(opcode), 6, 10)
     rb := utils.GetVarData(uint32(opcode), 3, 5)
     rd := utils.GetVarData(uint32(opcode), 0, 2)
-    addr := r[rb] + nn
 
     switch inst {
     case THUMB_STR_IMM:
+        addr := r[rb] + (nn << 2)
         cpu.Gba.Mem.Write32(addr, r[rd])
     case THUMB_LDR_IMM:
-        r[rd] = cpu.Gba.Mem.Read32(addr)
+        addr := r[rb] + (nn << 2)
+        v := cpu.Gba.Mem.Read32(utils.WordAlign(addr))
+        is := (addr & 0b11) * 8
+        r[rd], _, _ = utils.Ror(v, is, false, false ,false)
     case THUMB_STRB_IMM:
+        addr := r[rb] + nn
         cpu.Gba.Mem.Write8(addr, uint8(r[rd]))
     case THUMB_LDRB_IMM:
+        addr := r[rb] + nn
         r[rd] = cpu.Gba.Mem.Read8(addr)
     }
 
@@ -600,43 +650,44 @@ func (cpu *Cpu) thumbPushPop(opcode uint16) {
     rlist := utils.GetVarData(uint32(opcode), 0, 7)
 
     if isPop {
-        for reg := range 7 {
+        for reg := range 8 {
             if utils.BitEnabled(rlist, uint8(reg)) {
-                r[reg] = cpu.Gba.Mem.Read32(r[13])
-                r[13] += 4
+                r[reg] = cpu.Gba.Mem.Read32(r[SP])
+                r[SP] += 4
             }
         }
 
         if pclr {
-            r[PC] = cpu.Gba.Mem.Read32(r[13])
-            r[13] += 4
+
+            r[PC] = utils.HalfAlign(cpu.Gba.Mem.Read32(r[SP]))
+            r[SP] += 4
             //piplining
+            return
         }
 
         r[PC] += 2
-
         return
     }
 
     if pclr {
-        r[13] -= 4
-        cpu.Gba.Mem.Write32(r[13], r[14])
+        r[SP] -= 4
+        cpu.Gba.Mem.Write32(r[SP], r[14])
     }
 
-    for reg := range 7 {
-        if utils.BitEnabled(rlist, uint8(7 - reg)) {
-            r[13] -= 4
-            cpu.Gba.Mem.Write32(r[13], r[7-reg])
+    for reg := 7; reg >= 0; reg-- {
+        if utils.BitEnabled(rlist, uint8(reg)) {
+            r[SP] -= 4
+            cpu.Gba.Mem.Write32(r[SP], r[reg])
         }
     }
 
     r[PC] += 2
-
 }
 
 func (cpu *Cpu) thumbSWI(opcode uint16) {}
 
 func (cpu *Cpu) thumbRelative(opcode uint16) {
+
 
     r := &cpu.Reg.R
     isSP := utils.BitEnabled(uint32(opcode), 11)
@@ -652,17 +703,6 @@ func (cpu *Cpu) thumbRelative(opcode uint16) {
     //r[rd] = r[PC] + 4 + nn
     r[rd] = utils.WordAlign(r[PC] + 4) + nn
     r[PC] += 2
-}
-
-func (cpu *Cpu) thumbStackOffset(opcode uint16) {
-
-    panic("THUMB 13 STACK OFFSET")
-//    r := &cpu.Reg.R
-//    isSP := utils.BitEnabled(uint32(opcode), 11)
-//    rd := utils.GetVarData(uint32(opcode), 8, 10)
-//    nn := utils.GetVarData(uint32(opcode), 0, 7)
-
-
 }
 
 func (cpu *Cpu) thumbJumpCalls(opcode uint16) {
@@ -685,7 +725,6 @@ func (cpu *Cpu) thumbJumpCalls(opcode uint16) {
 
     offset := int(nn)
 
-    //offset := int(utils.GetVarData(uint32(opcode), 0, 7)) * 2
     r[PC] = (uint32(int(r[PC]) + 4 + offset))
 }
 
@@ -783,4 +822,122 @@ func (cpu *Cpu) thumbLongBranch(opcode uint16) {
 
     r[LR] = utils.HalfAlign(r[PC] + 4) + 1
     r[PC] = uint32(int32(r[PC]) + 4 + offset)
+}
+
+func (cpu *Cpu) thumbLSSP(opcode uint16) {
+
+    r := &cpu.Reg.R
+
+    rd := utils.GetVarData(uint32(opcode), 8, 10)
+    nn := utils.GetVarData(uint32(opcode), 0, 7) << 2
+    ldr := utils.BitEnabled(uint32(opcode), 11)
+
+    addr := r[SP] + nn
+
+    if ldr {
+        v := cpu.Gba.Mem.Read32(utils.WordAlign(addr))
+        is := (addr & 0b11) * 8
+        r[rd], _, _ = utils.Ror(v, is, false, false ,false)
+    } else {
+        cpu.Gba.Mem.Write32(addr, r[rd])
+    }
+
+    r[PC] += 2
+}
+
+func (cpu *Cpu) thumbMulti(opcode uint16) {
+
+    r := &cpu.Reg.R
+
+    ldmia := utils.BitEnabled(uint32(opcode), 11)
+    rb := utils.GetVarData(uint32(opcode), 8, 10)
+    rlist := utils.GetVarData(uint32(opcode), 0, 7)
+    addr := utils.WordAlign(r[rb])
+
+    if !ldmia {
+
+        regCount := utils.CountBits(rlist)
+        matchingValue := uint32(0)
+        matchingAddr := uint32(0) // rn during regs
+        smallest := (rlist & -rlist) == 1 << rb
+        matchingRb := (rlist >> rb) & 1 == 1
+
+        rbIdx := uint32(0)
+        count := uint32(0)
+
+        if rlist == 0 {
+            cpu.Gba.Mem.Write32(r[rb], r[PC]+6)
+            r[rb] += 0x40
+            r[PC] += 2
+            return
+        }
+
+        for reg := range 8 {
+            if notEnabled := !utils.BitEnabled(rlist, uint8(reg)); notEnabled {
+                continue
+            }
+
+            if reg == int(rb) {
+                cpu.Gba.Mem.Write32(addr, r[reg])
+                matchingValue = r[reg] + 4
+                matchingAddr = addr
+                rbIdx = regCount - count
+                r[rb] += 4
+                addr += 4
+                continue
+            }
+
+            cpu.Gba.Mem.Write32(addr, r[reg])
+
+            r[rb] += 4
+            addr += 4
+        }
+
+        if smallest {
+            v := cpu.Gba.Mem.Read32(addr)
+            cpu.Gba.Mem.Write32(r[rb], v - (regCount * 2))
+            r[PC] += 2
+            return
+        }
+
+        if matchingRb {
+            cpu.Gba.Mem.Write32(matchingAddr, matchingValue + (rbIdx * 2))
+            r[PC] += 2
+            return
+        }
+
+        r[PC] += 2
+        return
+    }
+
+    rbValue := r[rb]
+    matchingRb := false
+
+    if rlist == 0 {
+        r[rb] += 0x40
+        r[PC] += 8
+        return
+    }
+
+    for reg := range 8 {
+        if notEnabled := !utils.BitEnabled(rlist, uint8(reg)); notEnabled {
+            continue
+        }
+
+        r[reg] = cpu.Gba.Mem.Read32(addr)
+
+        if reg == int(rb) {
+            matchingRb = true
+            //rbValue = r[rb]
+        }
+
+        r[rb] += 4
+        addr += 4
+    }
+
+    if matchingRb {
+        r[rb] = rbValue
+    }
+
+    r[PC] += 2
 }

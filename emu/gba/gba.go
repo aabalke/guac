@@ -12,9 +12,8 @@ const (
 
 var (
     CURR_INST = 0
-    MAX_COUNT = 469_000 //ldr 80005EA
-    //MAX_COUNT = 469 //ldr 80005EA
-    //MAX_COUNT = 469 thumb.gba t156
+    //MAX_COUNT = 500_000
+    //MAX_COUNT = 196_746
 )
 
 type GBA struct {
@@ -27,6 +26,7 @@ type GBA struct {
 
 	Paused bool
 	Muted  bool 
+    Joypad uint16
 
     Clock int
     FPS int
@@ -100,8 +100,8 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
     updateCycles := 0
 
     VCOUNT = 0
-    for range MAX_COUNT + 1 {
-    //for updateCycles < (gba.Clock / gba.FPS) {
+    //for range MAX_COUNT + 1 {
+    for updateCycles < (gba.Clock / gba.FPS) {
 
         cycles := 4
 
@@ -109,13 +109,13 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
 
         gba.Cpu.Execute(opcode)
 
-        if CURR_INST == MAX_COUNT {
-            gba.Paused = true
-            gba.Debugger.print(CURR_INST)
-            //gba.Debugger.saveBg2()
-            //gba.Debugger.saveBg4()
-            //gba.Debugger.dump(0x600_0000, 0x06017FFF)
-        }
+        //if CURR_INST == MAX_COUNT {
+        //    gba.Paused = true
+        //    gba.Debugger.print(CURR_INST)
+        //    //gba.Debugger.saveBg2()
+        //    //gba.Debugger.saveBg4()
+        //    //gba.Debugger.dump(0x600_0000, 0x06017FFF)
+        //}
 
         gba.updateIRQ()
 
@@ -126,8 +126,6 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
         gba.Cycles = cycles
 
         gba.updateGraphics()
-
-
 	}
 
     gba.updateDisplay()

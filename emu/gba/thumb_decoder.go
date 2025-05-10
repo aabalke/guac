@@ -37,6 +37,10 @@ func (cpu *Cpu) DecodeTHUMB(opcode uint16) {
         cpu.thumbStack(opcode)
     case isLongBranch(opcode):
         cpu.thumbLongBranch(opcode)
+    case isLSSP(opcode):
+        cpu.thumbLSSP(opcode)
+    case isMulti(opcode):
+        cpu.thumbMulti(opcode)
 	default:
 		panic(fmt.Sprintf("UNKNOWN OPCODE %X", opcode))
 	}
@@ -155,5 +159,19 @@ func isLongBranch(opcode uint16) bool {
 	return isThumbOpcodeFormat(opcode,
         0b1111_1000_0000_0000,
         0b1111_0000_0000_0000,
+	)
+}
+
+func isLSSP(opcode uint16) bool {
+	return isThumbOpcodeFormat(opcode,
+        0b1111_0000_0000_0000,
+        0b1001_0000_0000_0000,
+	)
+}
+
+func isMulti(opcode uint16) bool {
+	return isThumbOpcodeFormat(opcode,
+        0b1111_0000_0000_0000,
+        0b1100_0000_0000_0000,
 	)
 }

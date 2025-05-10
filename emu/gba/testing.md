@@ -11,15 +11,31 @@
 ### jsmolka / gba-tests
 
 👍 arm
-❌ arm
+👍 thumb
 ❌ bios
-❌ memory
+❌ memory (passing mirroring, failing str video)
 ❌ nes
-❌ ppu
-❌ save
-❌ thumb
+
+   ppu
+👍 hello
+❌ shades
+❌ stripes
+
+   save
+❌ flash64
+❌ flash128
+👍 none
+❌ sram
+
+### Arm Wrestler
+👍 ARM ALU
+❌ ARM LDR/STR
+❌ ARM LDM/STM
+👍 THUMB ALU
+👍 THUMB LDR/STR
+👍 THUMB LDM/STM
+❌ ARM V5TE
 
 ### Other
  
-❌ arm_wrestler
 ❌ deadbody Cpu Test

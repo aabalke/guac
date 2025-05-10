@@ -377,7 +377,7 @@ const (
 
 type Sdt struct {
     Opcode, Rd, Rn, RnValue, RdValue, Cond, Offset, Shift, ShiftType, Rm uint32
-    Set, Immediate, Load, WriteBack, MemoryMgmt, Pre, Up, Byte, Pld bool
+    Set, I, Load, WriteBack, MemoryMgmt, Pre, Up, Byte, Pld bool
 }
 
 func NewSdtData(opcode uint32, cpu *Cpu) *Sdt {
@@ -389,7 +389,7 @@ func NewSdtData(opcode uint32, cpu *Cpu) *Sdt {
     sdt := Sdt{
         Opcode: opcode,
         Cond: utils.GetByte(opcode, 28),
-        Immediate: !utils.BitEnabled(opcode, 25),
+        I: utils.BitEnabled(opcode, 25),
         Pre: utils.BitEnabled(opcode, 24),
         Up: utils.BitEnabled(opcode, 23),
         Byte: utils.BitEnabled(opcode, 22),
@@ -404,9 +404,7 @@ func NewSdtData(opcode uint32, cpu *Cpu) *Sdt {
         sdt.MemoryMgmt = utils.BitEnabled(opcode, 21)
     }
 
-    if sdt.Immediate {
-        sdt.Offset = utils.GetVarData(opcode, 0, 11)
-    } else {
+    if sdt.I {
         sdt.Shift = utils.GetVarData(opcode, 7, 11)
         sdt.ShiftType = utils.GetVarData(opcode, 5, 6)
 
@@ -415,6 +413,8 @@ func NewSdtData(opcode uint32, cpu *Cpu) *Sdt {
         }
 
         sdt.Rm = utils.GetByte(opcode, 0)
+    } else {
+        sdt.Offset = utils.GetVarData(opcode, 0, 11)
     }
 
     sdt.RdValue = cpu.Reg.R[sdt.Rd]
@@ -435,6 +435,7 @@ func (c *Cpu) Sdt(opcode uint32) {
     r := &c.Reg.R
 
     sdt := NewSdtData(opcode, c)
+    //printer(map[string]any{"offset": offset, "Immediate": sdt.Immediate, "UP": sdt.Up, "ADDR": addr, "RN": sdt.Rn})
 
     pre, post, _ := generateSdtAddress(sdt, c)
 
@@ -465,8 +466,6 @@ func (c *Cpu) Sdt(opcode uint32) {
 
     case !sdt.Load && sdt.Byte:
 
-        // SHOULD THIS NOT BE WORD ALIGNED???
-
         c.Gba.Mem.Write8(addr, uint8(r[sdt.Rd]))
 
     case !sdt.Load && !sdt.Byte:
@@ -494,15 +493,17 @@ func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack 
     r := &cpu.Reg.R
 
     var offset uint32
-    if sdt.Immediate {
+    if !sdt.I {
         offset = sdt.Offset
-
     } else {
         shift := sdt.Opcode >> 7 & 0b11111 // I = 1 shift reg
         offset = cpu.RegShiftOffset(sdt.Opcode, shift)
     }
 
     addr := r[sdt.Rn]
+    if sdt.Rn == PC {
+        addr += 8
+    }
     if sdt.Up {
         addr += offset
 
@@ -511,17 +512,13 @@ func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack 
     }
 
     if sdt.Pre {
-        switch {
-        case offset == 0: return addr, 0, false
-        case sdt.Immediate: return addr, addr, true
-        default: return addr, addr, true
+        if offset == 0 {
+            return addr, 0, false
         }
+        return addr, addr, true
     }
 
-    switch {
-    case sdt.Immediate: return r[sdt.Rn], addr, false
-    default: return r[sdt.Rn], addr, false
-    }
+    return r[sdt.Rn], addr, false
 }
 
 func (cpu *Cpu) RegShiftOffset(opcode uint32, shift uint32) uint32 {
@@ -1176,38 +1173,32 @@ func (cpu *Cpu) msr(psr *PSR) {
         p = &cpu.Reg.SPSR[BANK_ID[currMode]]
     }
 
+    var v uint32
     if psr.Immediate {
-
         // assumes user mode???
-        imm, _, _:= utils.Ror(psr.Imm, psr.Shift, false, false, false)
+        v, _, _ = utils.Ror(psr.Imm, psr.Shift, false, false, false)
+    } else {
+        v = r[psr.Rm]
+    }
 
-        if psr.C { *p = Cond((uint32(*p) &^ 0x000000FF) | (imm & 0x000000FF)) }
-        if psr.F { *p = Cond((uint32(*p) &^ 0xF0000000) | (imm & 0xF0000000)) }
-        if psr.X { *p = Cond((uint32(*p) &^ 0x0FF00000) | (imm & 0x0FF00000)) }
-        if psr.S { *p = Cond((uint32(*p) &^ 0x000FFF00) | (imm & 0x000FFF00)) }
+    if psr.C { *p = Cond((uint32(*p) &^ 0x000000FF) | (v & 0x000000FF)) }
+    if psr.F { *p = Cond((uint32(*p) &^ 0xF0000000) | (v & 0xF0000000)) }
+    if psr.X { *p = Cond((uint32(*p) &^ 0x0FF00000) | (v & 0x0FF00000)) }
+    if psr.S { *p = Cond((uint32(*p) &^ 0x000FFF00) | (v & 0x000FFF00)) }
 
-        if psr.SPSR {
-            return
-        }
-
-        mode := cpu.Reg.getMode()
-
-        if BANK_ID[currMode] == BANK_ID[mode] {
-            return
-        }
-
-        reg.switchRegisterBanks(currMode, mode)
-
-        cpu.Gba.checkIRQ()
-
+    if psr.SPSR {
         return
     }
 
-    // unsure on this part
-    if psr.F { p.SetField(24, (r[psr.Rm] >> 24) & 0xFF) }
-    if psr.S { p.SetField(16, (r[psr.Rm] >> 16) & 0xFF) }
-    if psr.X { p.SetField(8, (r[psr.Rm] >> 8) & 0xFF) }
-    if psr.C { p.SetField(0, r[psr.Rm] & 0xFF) }
+    mode := cpu.Reg.getMode()
+
+    if BANK_ID[currMode] == BANK_ID[mode] {
+        return
+    }
+
+    reg.switchRegisterBanks(currMode, mode)
+
+    cpu.Gba.checkIRQ()
 }
 
 func (cpu *Cpu) Swp(opcode uint32) {
@@ -1226,8 +1217,12 @@ func (cpu *Cpu) Swp(opcode uint32) {
 
     var rnMemValue uint32
     if isByte {
-        // sign expanded???
         rnMemValue = cpu.Gba.Mem.Read8(rnValue)
+        r[rd] = rnMemValue
+        cpu.Gba.Mem.Write8(rnValue, uint8(rmValue))
+        r[PC] += 4
+        return
+
     } else {
         aligned = utils.WordAlign(rnValue)
         rnMemValue = cpu.Gba.Mem.Read32(aligned)
@@ -1235,9 +1230,7 @@ func (cpu *Cpu) Swp(opcode uint32) {
         rnMemValue, _, _ = utils.Ror(rnMemValue, is, false, false ,false)
     }
 
-
     r[rd] = rnMemValue
     cpu.Gba.Mem.Write32(aligned, rmValue)
-
-    cpu.Reg.R[15] += 4
+    r[PC] += 4
 }
