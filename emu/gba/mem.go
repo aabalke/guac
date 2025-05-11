@@ -99,11 +99,19 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 
         return 0x00
 
-    case 0x05: return 0x00
-    case 0x06: return VCOUNT
-    case 0x0204: panic("CHANGE CART WAIT STATE")
-    case 0x0130: return m.GBA.getJoypad(false)
-    case 0x0131: return m.GBA.getJoypad(true)
+    case 0x05:          return 0x00
+    case 0x06:          return VCOUNT
+    case 0x0204:        panic("CHANGE CART WAIT STATE")
+    case KEYINPUT:      return m.GBA.getJoypad(false)
+    case KEYINPUT+1:    return m.GBA.getJoypad(true)
+    case BG0CNT:        return uint8(Bg0Control)
+    case BG0CNT+1:      return uint8(Bg0Control>>8)
+    case BG1CNT:        return uint8(Bg1Control)
+    case BG1CNT+1:      return uint8(Bg1Control>>8)
+    case BG2CNT:        return uint8(Bg2Control)
+    case BG2CNT+1:      return uint8(Bg2Control>>8)
+    case BG3CNT:        return uint8(Bg3Control)
+    case BG3CNT+1:      return uint8(Bg3Control>>8)
     }
 
 	v := m.IO[addr]
@@ -210,33 +218,17 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 	// this addr should be relative. - 0x400000
 
     switch addr {
-    case 0x06:
-        VCOUNT = v
-        return
+    case 0x06: VCOUNT = v
+    case BG0CNT: Bg0Control = BgControl((uint32(Bg0Control) &^ 0b11) | uint32(v))
+    case BG0CNT+1: Bg0Control = BgControl((uint32(Bg0Control) &^ 0b1100) | (uint32(v) << 8))
+    case BG1CNT: Bg1Control = BgControl((uint32(Bg1Control) &^ 0b11) | uint32(v))
+    case BG1CNT+1: Bg1Control = BgControl((uint32(Bg1Control) &^ 0b1100) | (uint32(v) << 8))
+    case BG2CNT: Bg2Control = BgControl((uint32(Bg2Control) &^ 0b11) | uint32(v))
+    case BG2CNT+1: Bg2Control = BgControl((uint32(Bg2Control) &^ 0b1100) | (uint32(v) << 8))
+    case BG3CNT: Bg3Control = BgControl((uint32(Bg3Control) &^ 0b11) | uint32(v))
+    case BG3CNT+1: Bg3Control = BgControl((uint32(Bg3Control) &^ 0b1100) | (uint32(v) << 8))
+    default: m.IO[addr] = v
     }
-
-	m.IO[addr] = v
-
-	return
-
-	switch {
-	case addr < 0x060:
-		println("IO:Write - LCD")
-	case addr < 0x0B0:
-		println("IO:Write - SOUND")
-	case addr < 0x100:
-		println("IO:Write - DMA")
-	case addr < 0x120:
-		println("IO:Write - TIMER")
-	case addr < 0x130:
-		println("IO:Write - SERIAL1")
-	case addr < 0x134:
-		println("IO:Write - KEYPAD")
-	case addr < 0x200:
-		println("IO:Write - SERIAL2")
-	default:
-		println("IO:Write - OTHER")
-	}
 }
 
 func (m *Memory) Write8(addr uint32, v uint8) {

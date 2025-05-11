@@ -19,7 +19,7 @@
    ppu
 👍 hello
 ❌ shades
-❌ stripes
+👍 stripes
 
    save
 ❌ flash64
@@ -28,13 +28,22 @@
 ❌ sram
 
 ### Arm Wrestler
+
+https://github.com/destoer/armwrestler-gba-fixed/
+
+Preface: The Standard version of Arm Wrestler floating around is for NDS emulation.
+Accurate GBA emulators will fail on LDM--! instructions, since ARMv4 behavior differs.
+(LDM opcodes with writeback: if the base register is included in the register list, writeback never happens)
+Additionally, other ARMv5 instructions will fail.
+
+This emulator is tested against the destoer/armwrestler-gba-fixed version, which has fixed these problems.
+
 👍 ARM ALU
-❌ ARM LDR/STR
-❌ ARM LDM/STM
+👍 ARM LDR/STR
+👍 ARM LDM/STM
 👍 THUMB ALU
 👍 THUMB LDR/STR
 👍 THUMB LDM/STM
-❌ ARM V5TE
 
 ### Other
  

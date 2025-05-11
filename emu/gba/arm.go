@@ -496,8 +496,20 @@ func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack 
     if !sdt.I {
         offset = sdt.Offset
     } else {
-        shift := sdt.Opcode >> 7 & 0b11111 // I = 1 shift reg
-        offset = cpu.RegShiftOffset(sdt.Opcode, shift)
+        shift := sdt.Opcode >> 7 & 0b11111
+
+        rm := sdt.Opcode & 0b1111
+
+        shiftArgs := utils.ShiftArgs{
+            SType: sdt.Opcode >> 5 & 0b11,
+            Val: r[rm],
+            Is: shift,
+            IsCarry: false,
+            Immediate: true,
+            CurrCarry: cpu.Reg.CPSR.GetFlag(FLAG_C),
+        }
+
+        offset, _, _ = utils.Shift(shiftArgs)
     }
 
     addr := r[sdt.Rn]
@@ -519,33 +531,6 @@ func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack 
     }
 
     return r[sdt.Rn], addr, false
-}
-
-func (cpu *Cpu) RegShiftOffset(opcode uint32, shift uint32) uint32 {
-
-    if !utils.BitEnabled(opcode, 25) {
-        return opcode & 0b1111_1111_1111
-    }
-
-    reg := &cpu.Reg
-	rm := opcode & 0b1111
-
-    shiftArgs := utils.ShiftArgs{
-        SType: opcode >> 5 & 0b11,
-        Val: reg.R[rm],
-        Is: shift,
-        IsCarry: false,
-        Immediate: true,
-        CurrCarry: reg.CPSR.GetFlag(FLAG_C),
-    }
-
-    ofs, setCarry, carry := utils.Shift(shiftArgs)
-
-    if setCarry {
-        reg.CPSR.SetFlag(FLAG_C, carry)
-    }
-
-    return ofs
 }
 
 func (cpu *Cpu) B(opcode uint32) {
@@ -1050,9 +1035,11 @@ func (c *Cpu) stm(block *Block) {
 
             count++
 
-            if 15 - reg == int(block.Rn) {
-                c.Gba.Mem.Write32(addr, r[15 - reg] + 4)
-                matchingValue = r[15-reg] - 4 // -4 offsets above +4 when matching Value (not first smallest)
+            decReg := 15 - reg
+
+            if decReg == int(block.Rn) {
+                c.Gba.Mem.Write32(addr, r[decReg] + (count - 1) * 4)
+                matchingValue = r[decReg] - 4 // -4 offsets above +4 when matching Value (not first smallest)
                 matchingAddr = addr
                 rnIdx = regCount - count
                 r[block.Rn] -= 4
@@ -1060,11 +1047,12 @@ func (c *Cpu) stm(block *Block) {
                 continue
             }
 
-            if 15 - reg == PC {
-                c.Gba.Mem.Write32(addr, r[15 - reg] + 12)
+            if decReg == PC {
+                c.Gba.Mem.Write32(addr, r[decReg] + 12)
                 continue
             }
-            c.Gba.Mem.Write32(addr, r[15 - reg])
+
+            c.Gba.Mem.Write32(addr, r[decReg])
 
 
             r[block.Rn] -= 4
@@ -1089,6 +1077,7 @@ func (c *Cpu) stm(block *Block) {
             c.Gba.Mem.Write32(matchingAddr, matchingValue + (rnIdx * 4))
             return
         }
+
         c.Gba.Mem.Write32(matchingAddr, matchingValue - (rnIdx * 4))
         return
     }

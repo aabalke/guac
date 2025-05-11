@@ -3,6 +3,7 @@ package gba
 import (
 	cart "github.com/aabalke33/guac/emu/gba/cart"
 	"github.com/aabalke33/guac/emu/gba/utils"
+    //"os"
 )
 
 const (
@@ -12,8 +13,8 @@ const (
 
 var (
     CURR_INST = 0
-    //MAX_COUNT = 500_000
-    //MAX_COUNT = 196_746
+    MAX_COUNT = 7000
+    //MAX_COUNT = 6900
 )
 
 type GBA struct {
@@ -99,7 +100,7 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
 
     updateCycles := 0
 
-    VCOUNT = 0
+    //VCOUNT = 0
     //for range MAX_COUNT + 1 {
     for updateCycles < (gba.Clock / gba.FPS) {
 
@@ -109,13 +110,18 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
 
         gba.Cpu.Execute(opcode)
 
-        //if CURR_INST == MAX_COUNT {
-        //    gba.Paused = true
+        //if gba.Cpu.Reg.R[PC] == 0x80020E8 {
         //    gba.Debugger.print(CURR_INST)
-        //    //gba.Debugger.saveBg2()
-        //    //gba.Debugger.saveBg4()
-        //    //gba.Debugger.dump(0x600_0000, 0x06017FFF)
+        //    os.Exit(0)
         //}
+
+        if CURR_INST == MAX_COUNT {
+            gba.Paused = true
+            gba.Debugger.print(CURR_INST)
+            //gba.Debugger.saveBg2()
+            //gba.Debugger.saveBg4()
+            //gba.Debugger.dump(0x600_0000, 0x06017FFF)
+        }
 
         gba.updateIRQ()
 
@@ -128,7 +134,8 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
         gba.updateGraphics()
 	}
 
-    gba.updateDisplay()
+    //gba.updateDisplay()
+    gba.graphics()
 
     return instCount
 }
@@ -142,6 +149,14 @@ func (gba *GBA) updateGraphics() {
     }
 
     VCOUNT++
+
+    if VCOUNT > 227 {
+        VCOUNT = 0
+    }
+
+    //currenLine := VCOUNT
+
+
     //fmt.Printf("VCOUNT %X\n", VCOUNT)
     //if VCOUNT > 0xFF { panic("TOO BIG") }
 }

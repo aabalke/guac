@@ -108,7 +108,7 @@ func (b *GbaFrame) Update(event sdl.Event) bool {
         //}
     }
 
-	//(*b.GBA).InputHandler(event)
+	(*b.GBA).InputHandler(event)
 
 	ChildFuncUpdate(b, func(child *Component) bool {
 		return (*child).Update(event)
