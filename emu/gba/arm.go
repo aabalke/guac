@@ -435,7 +435,6 @@ func (c *Cpu) Sdt(opcode uint32) {
     r := &c.Reg.R
 
     sdt := NewSdtData(opcode, c)
-    //printer(map[string]any{"offset": offset, "Immediate": sdt.Immediate, "UP": sdt.Up, "ADDR": addr, "RN": sdt.Rn})
 
     pre, post, _ := generateSdtAddress(sdt, c)
 
@@ -466,7 +465,7 @@ func (c *Cpu) Sdt(opcode uint32) {
 
     case !sdt.Load && sdt.Byte:
 
-        c.Gba.Mem.Write8(addr, uint8(r[sdt.Rd]))
+        c.Gba.Mem.Write8(pre, uint8(r[sdt.Rd]))
 
     case !sdt.Load && !sdt.Byte:
 

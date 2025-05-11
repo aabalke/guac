@@ -24,10 +24,10 @@ func (gba *GBA) graphics() {
 	//}
 	//gba.updateDisplay()
 
-	gba.updateBg0()
+	gba.updateBg2()
 }
 
-func (gba *GBA) updateDisplay() {
+func (gba *GBA) updateBg2() {
 
 	Mem := gba.Mem
 
@@ -101,18 +101,6 @@ func (gba *GBA) applyColor(palData, index uint32) {
 
 func (gba *GBA) updateBg0() {
 
-	// assumes 4 bit, 600_4000 addr
-
-	// shades test, shows tiles, unconnected to bg0
-	//for offset := range 0xF {
-	//    //offset := 0xE
-	//    tileOffset := offset * 0x20
-	//    tileAddr := 0x600_4000 + tileOffset
-	//    gba.getTile(uint(tileAddr), 8, offset, 0)
-	//}
-
-    //return
-
 	base := uint32(0x0600_0000)
 	tileBaseAddr := base + uint32(Bg0Control.getCharacterBaseBlock())*0x4000+0x4000
 	mapBaseAddr := base + uint32(Bg0Control.getScreenBaseBlock())*0x800
@@ -126,6 +114,18 @@ func (gba *GBA) updateBg0() {
 
 			gba.getTile(uint(v), 8, x, y)
 		}
+	}
+}
+
+func (gba *GBA) getTiles(baseAddr, count int) {
+
+    // base addr usually inc of 0x4000 over 0x0600_0000
+    // count is # of tiles to view
+
+	for offset := range count {
+	    tileOffset := offset * 0x20
+	    tileAddr := baseAddr + tileOffset
+	    gba.getTile(uint(tileAddr), 8, offset, 0)
 	}
 }
 
@@ -163,7 +163,5 @@ func (gba *GBA) getTile(tileAddr uint, tileSize, xOffset, yOffset int) {
                 byteOffset += 1
             }
 		}
-
-		//byteOffset += bitDepth
 	}
 }

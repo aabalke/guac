@@ -18,7 +18,7 @@
 
    ppu
 👍 hello
-❌ shades
+👍 shades
 👍 stripes
 
    save
@@ -47,4 +47,4 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 
 ### Other
  
-❌ deadbody Cpu Test
+👍 deadbody Cpu Test
