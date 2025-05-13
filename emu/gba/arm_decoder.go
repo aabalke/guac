@@ -2,12 +2,15 @@ package gba
 
 import (
 	"github.com/aabalke33/guac/emu/gba/utils"
+    "fmt"
 )
 
 func (cpu *Cpu) DecodeARM(opcode uint32) {
 
+    r := &cpu.Reg.R
+
 	if !cpu.CheckCond(utils.GetByte(opcode, 28)) {
-		cpu.Reg.R[PC] += 4
+		r[PC] += 4
 		return
 	}
 
@@ -15,7 +18,7 @@ func (cpu *Cpu) DecodeARM(opcode uint32) {
 	case isSWI(opcode):
         cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
         cpu.Gba.SysCall(opcode)
-        cpu.Reg.R[PC] += 4
+        r[PC] += 4
 	case isB(opcode):
 		cpu.B(opcode)
 	case isBX(opcode):
@@ -37,7 +40,7 @@ func (cpu *Cpu) DecodeARM(opcode uint32) {
 	case isALU(opcode):
 		cpu.Alu(opcode)
 	default:
-		panic("Unable to Decode")
+		panic(fmt.Sprintf("Unable to Decode %X, at PC %X, INSTR %d", opcode, r[PC], CURR_INST))
 	}
 
     // Notes: Coprocessor instructions do not matter since gba 

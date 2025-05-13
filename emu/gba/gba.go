@@ -3,7 +3,6 @@ package gba
 import (
 	cart "github.com/aabalke33/guac/emu/gba/cart"
 	"github.com/aabalke33/guac/emu/gba/utils"
-    //"os"
 )
 
 const (
@@ -13,8 +12,8 @@ const (
 
 var (
     CURR_INST = 0
-    MAX_COUNT = 7000
-    //MAX_COUNT = 6900
+    //MAX_COUNT = 100_000_000
+    //MAX_COUNT = 100_000 pokemon fire red
 )
 
 type GBA struct {
@@ -40,7 +39,7 @@ func NewGBA() *GBA {
 	pixels := make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)
 
 	gba := GBA{
-        Clock: 16780000,
+        Clock: 16_780_000,
         FPS: 60,
         Pixels: &pixels,
     }
@@ -100,7 +99,10 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
 
     updateCycles := 0
 
-    //VCOUNT = 0
+    VCOUNT = 0
+
+    scanlineCycles := 0
+
     //for range MAX_COUNT + 1 {
     for updateCycles < (gba.Clock / gba.FPS) {
 
@@ -115,23 +117,30 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
         //    os.Exit(0)
         //}
 
-        if CURR_INST == MAX_COUNT {
-            gba.Paused = true
-            gba.Debugger.print(CURR_INST)
-            //gba.Debugger.saveBg2()
-            //gba.Debugger.saveBg4()
-            //gba.Debugger.dump(0x600_0000, 0x06017FFF)
-        }
+        //if gba.Cpu.Reg.R[PC] == 0x81DD60A && CURR_INST > 0x989 {
+        //    gba.Paused = true
+        //    gba.Debugger.print(CURR_INST)
+        //}
+
+        //if CURR_INST == MAX_COUNT {
+        //    gba.Paused = true
+        //    gba.Debugger.print(CURR_INST)
+        //    //gba.Debugger.saveBg2()
+        //    //gba.Debugger.saveBg4()
+        //    //gba.Debugger.dump(0x600_0000, 0x06017FFF)
+        //}
 
         gba.updateIRQ()
 
         updateCycles += cycles
-        CURR_INST++
-        instCount++
 
-        gba.Cycles = cycles
+        scanlineCycles += cycles
+        //CURR_INST++
+        //instCount++
 
-        gba.updateGraphics()
+        //gba.Cycles = cycles
+
+        gba.updateGraphics(&scanlineCycles)
 	}
 
     //gba.updateDisplay()
@@ -140,15 +149,19 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
     return instCount
 }
 
-func (gba *GBA) updateGraphics() {
+func (gba *GBA) updateGraphics(scanlineCycles *int) {
 
-    gba.ScanlineCounter -= gba.Cycles
+    //gba.ScanlineCounter -= gba.Cycles
 
-    if gba.ScanlineCounter > 0 {
-        return
+    //if gba.ScanlineCounter > 0 {
+    //    return
+    //}
+
+    if *scanlineCycles > 1232 {
+        VCOUNT += 1
+        *scanlineCycles = 0
     }
 
-    VCOUNT++
 
     if VCOUNT > 227 {
         VCOUNT = 0

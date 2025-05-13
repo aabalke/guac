@@ -4,6 +4,8 @@ import "fmt"
 
 func (cpu *Cpu) DecodeTHUMB(opcode uint16) {
 
+    r := &cpu.Reg.R
+
 	switch {
 	case isThumbAddSub(opcode):
 		cpu.ThumbAddSub(opcode)
@@ -42,7 +44,7 @@ func (cpu *Cpu) DecodeTHUMB(opcode uint16) {
     case isMulti(opcode):
         cpu.thumbMulti(opcode)
 	default:
-		panic(fmt.Sprintf("UNKNOWN OPCODE %X", opcode))
+		panic(fmt.Sprintf("Unable to Decode %X, at PC %X, INSTR %d", opcode, r[PC], CURR_INST))
 	}
 }
 

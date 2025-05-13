@@ -307,6 +307,8 @@ func (cpu *Cpu) HiRegBX(opcode uint16) {
             return
         }
 
+        // MOV HI REG //
+
         rsValue := uint64(r[rs])
         if rs == PC {
             rsValue += 4
@@ -314,7 +316,8 @@ func (cpu *Cpu) HiRegBX(opcode uint16) {
 
 
         if rd == PC {
-            r[rd] = utils.WordAlign(uint32(rsValue))
+            //r[rd] = utils.WordAlign(uint32(rsValue)) + 2 // need 2 for pokemon, may be different calc
+            r[rd] = utils.HalfAlign(uint32(rsValue)) // need 2 for pokemon, may be different calc
             return
         }
 

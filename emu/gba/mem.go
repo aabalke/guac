@@ -88,16 +88,16 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 
 
     switch addr {
-    case 0x00: return 0x04
-    case 0x01: return 0x04
+    //case 0x00: return 0x04
+    //case 0x01: return 0x04
 
-    case 0x04:
-        // this is temp for testing cpu
-        if VCOUNT >= 160 && VCOUNT < 227 {
-            return 0x1
-        }
+    //case 0x04:
+    //    // this is temp for testing cpu
+    //    if VCOUNT >= 160 && VCOUNT < 227 {
+    //        return 0x1
+    //    }
 
-        return 0x00
+    //    return 0x00
 
     case 0x05:          return 0x00
     case 0x06:          return VCOUNT
@@ -218,7 +218,7 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 	// this addr should be relative. - 0x400000
 
     switch addr {
-    case 0x06: VCOUNT = v
+    //case 0x06: VCOUNT = v // not writable
     case BG0CNT: Bg0Control = BgControl((uint32(Bg0Control) &^ 0b11) | uint32(v))
     case BG0CNT+1: Bg0Control = BgControl((uint32(Bg0Control) &^ 0b1100) | (uint32(v) << 8))
     case BG1CNT: Bg1Control = BgControl((uint32(Bg1Control) &^ 0b11) | uint32(v))
