@@ -24,13 +24,17 @@ func (gba *GBA) LoadBios(path string) {
     }
 }
 
-func (gba *GBA) SysCall(opcode uint32) {
-    switch inst := utils.GetVarData(opcode, 16, 23); inst {
+func (gba *GBA) SysCall(inst uint32) {
+    switch inst {
+    //switch inst := utils.GetVarData(opcode, 16, 23); inst {
     case SYS_SoftReset: SoftReset(gba)
+    case SYS_RegisterRamReset: RegisterRamReset(gba)
     case SYS_Div: Div(gba, false)
     case SYS_DivArm: Div(gba, true)
     case SYS_Sqrt: Sqrt(gba)
-    default:panic(fmt.Sprintf("EXCEPTION OR UNHANDLED SYS CALL %b\n", utils.GetVarData(opcode, 16, 23)))
+    case SYS_CpuSet: CpuSet(gba)
+    case SYS_BitUnPack: BitUnPack(gba)
+    default:panic(fmt.Sprintf("EXCEPTION OR UNHANDLED SYS CALL TYPE 0x%X\n", inst))
     }
 }
 
@@ -77,6 +81,70 @@ func SoftReset(gba *GBA) {
 	reg.R[PC] = reg.R[LR]
 
 	// pipelining
+}
+
+func RegisterRamReset(gba *GBA) {
+
+    mem := gba.Mem
+	r := &gba.Cpu.Reg.R
+    flags := r[0]
+
+    if clearWRAM1 := utils.BitEnabled(flags, 0); clearWRAM1 {
+        mem.WRAM1 = [0x40000]uint8{}
+    }
+
+    if clearWRAM2 := utils.BitEnabled(flags, 1); clearWRAM2 {
+
+        // need to exclude last 0x200
+        for i := range (0x8000 - 0x200) {
+            mem.WRAM2[i] = 0x0
+        }
+    }
+
+    if clearPRAM := utils.BitEnabled(flags, 2); clearPRAM {
+        mem.PRAM = [0x400]uint8{}
+    }
+
+    if clearVRAM := utils.BitEnabled(flags, 3); clearVRAM {
+        mem.VRAM = [0x18000]uint8{}
+    }
+        
+    if clearOAM := utils.BitEnabled(flags, 4); clearOAM {
+        mem.OAM = [0x400]uint8{}
+    }
+
+    if clearSIO := utils.BitEnabled(flags, 5); clearSIO {
+
+        for i := 0x120; i <= 0x12C; i++ {
+            mem.IO[i] = 0x0
+        }
+
+        for i := 0x134; i <= 0x154; i++ {
+            mem.IO[i] = 0x0
+        }
+    }
+        
+    if clearSound := utils.BitEnabled(flags, 6); clearSound {
+
+        for i := 0x60; i <= 0xA8; i++ {
+            mem.IO[i] = 0x0
+        }
+    }
+
+    if clearOther := utils.BitEnabled(flags, 7); clearOther {
+        for i := range 0x400 {
+
+            sio1 := i >= 0x120 && i <= 0x12C
+            sio2 := i >= 0x134 && i <= 0x154
+            sound := i >= 0x60 && i <= 0xA8
+
+            if sio1 || sio2 || sound {
+                continue
+            }
+
+            mem.IO[i] = 0x0
+        }
+    }
 }
 
 func Div(gba *GBA, arm bool) {
@@ -173,3 +241,130 @@ func Sqrt(gba *GBA) {
 
 func ArcTan()  { panic("ARCTAN IS NOT FUNCTIONAL") }
 func ArcTan2() { panic("ARCTAN2 IS NOT FUNCTIONAL") }
+
+func BitUnPack(gba *GBA) {
+
+    mem := gba.Mem
+    r := &gba.Cpu.Reg.R
+    rs := r[0]
+    rd := utils.WordAlign(r[1])
+
+    pointer := r[2]
+
+    length := mem.Read16(pointer)
+    sBitWidth := mem.Read8(pointer+2)
+    dBitWidth := mem.Read8(pointer+3)
+    s := mem.Read32(pointer+4)
+
+    offset := s & 0b0111_1111_1111_1111_1111_1111_1111_1111
+    zeroFlag := (s >> 31) & 1 == 1
+
+    if length > 0xFFFF {
+        panic("bitunpack length failed")
+    }
+
+    //fmt.Printf("rs %X, rd %X, pointer %X\n", rs, rd, pointer)
+    //fmt.Printf("length %X, sWidth %X, dWidth %X, s %X\n", length, sBitWidth, dBitWidth, s)
+
+    if sBitWidth != 1 || dBitWidth != 4 || offset != 0 || zeroFlag {
+        panic("LIMITED UNPACK SUPPORT")
+    }
+
+    src := []uint32{}
+    dst := []uint32{}
+
+    for i := uint32(0); i < length; i += 4 {
+        v := mem.Read32(rs+i)
+        src = append(src, (v >> 0) & 0b1111)
+        src = append(src, (v >> 4) & 0b1111)
+        src = append(src, (v >> 8) & 0b1111)
+        src = append(src, (v >> 12) & 0b1111)
+        src = append(src, (v >> 16) & 0b1111)
+        src = append(src, (v >> 20) & 0b1111)
+        src = append(src, (v >> 24) & 0b1111)
+        src = append(src, (v >> 28) & 0b1111)
+    }
+
+    for i := 0; i < len(src); i += 2 {
+
+        lo := uint32(0)
+        hi := uint32(0)
+
+        a := src[i]
+        b := src[i+1]
+        for j := range 8 {
+
+            if (a >> j) & 1 == 1 {
+                lo |= (1 << (j * 4))
+            }
+
+            if (b >> j) & 1 == 1 {
+                hi |= (1 << (j * 4))
+            }
+        }
+
+        dst = append(dst, (hi << 16) | lo)
+    }
+
+    for i, v := range dst {
+        mem.Write32(rd + uint32(i * 4), v)
+    }
+
+    return
+}
+
+func CpuSet(gba *GBA) {
+
+    mem := gba.Mem
+    r := &gba.Cpu.Reg.R
+
+    rs := r[0]
+    rd := r[1]
+    info := r[2]
+
+    wordCount := utils.GetVarData(info, 0, 20)
+    fill := utils.BitEnabled(info, 24)
+    isWord := utils.BitEnabled(info, 26)
+
+    switch {
+    case fill && isWord:
+
+        rs &= 0xfffffffc
+        rd &= 0xfffffffc
+
+        word := mem.Read32(rs)
+        for i := range wordCount {
+            mem.Write32(rd+(i<<2), word)
+        }
+
+    case fill && !isWord:
+
+        rs &= 0xfffffffe
+        rd &= 0xfffffffe
+
+        word := mem.Read16(rs)
+        for i := range wordCount {
+            mem.Write16(rd+(i<<1), uint16(word))
+        }
+
+    case !fill && isWord:
+
+        rs &= 0xfffffffc
+        rd &= 0xfffffffc
+
+        for i := range wordCount {
+            word := mem.Read32(rs + (i << 2))
+            mem.Write32(rd+(i<<2), word)
+        }
+
+    case !fill && !isWord:
+
+        rs &= 0xfffffffe
+        rd &= 0xfffffffe
+
+        for i := range wordCount {
+            word := mem.Read16(rs + (i << 1))
+            mem.Write16(rd+(i<<1), uint16(word))
+        }
+    }
+}

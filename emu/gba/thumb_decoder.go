@@ -7,6 +7,10 @@ func (cpu *Cpu) DecodeTHUMB(opcode uint16) {
     r := &cpu.Reg.R
 
 	switch {
+    case isthumbSWI(opcode):
+        cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
+        cpu.Gba.SysCall(uint32(opcode) & 0xFF)
+        r[PC] += 2
 	case isThumbAddSub(opcode):
 		cpu.ThumbAddSub(opcode)
 	case isThumbShift(opcode):
@@ -175,5 +179,12 @@ func isMulti(opcode uint16) bool {
 	return isThumbOpcodeFormat(opcode,
         0b1111_0000_0000_0000,
         0b1100_0000_0000_0000,
+	)
+}
+
+func isthumbSWI(opcode uint16) bool {
+	return isThumbOpcodeFormat(opcode,
+        0b1111_1111_0000_0000,
+        0b1101_1111_0000_0000,
 	)
 }

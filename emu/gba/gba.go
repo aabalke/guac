@@ -12,7 +12,8 @@ const (
 
 var (
     CURR_INST = 0
-    //MAX_COUNT = 100_000_000
+    //MAX_COUNT = 198_417
+    //MAX_COUNT = 198_410 //198_450 fail
     //MAX_COUNT = 100_000 pokemon fire red
 )
 
@@ -135,7 +136,7 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
         updateCycles += cycles
 
         scanlineCycles += cycles
-        //CURR_INST++
+        CURR_INST++
         //instCount++
 
         //gba.Cycles = cycles

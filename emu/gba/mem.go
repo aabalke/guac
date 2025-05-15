@@ -86,57 +86,18 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 
 	// this addr should be relative. - 0x400000
 
+    // do not touch the damn bg control regs
 
     switch addr {
-    //case 0x00: return 0x04
-    //case 0x01: return 0x04
-
-    //case 0x04:
-    //    // this is temp for testing cpu
-    //    if VCOUNT >= 160 && VCOUNT < 227 {
-    //        return 0x1
-    //    }
-
-    //    return 0x00
-
     case 0x05:          return 0x00
     case 0x06:          return VCOUNT
     case 0x0204:        panic("CHANGE CART WAIT STATE")
     case KEYINPUT:      return m.GBA.getJoypad(false)
     case KEYINPUT+1:    return m.GBA.getJoypad(true)
-    case BG0CNT:        return uint8(Bg0Control)
-    case BG0CNT+1:      return uint8(Bg0Control>>8)
-    case BG1CNT:        return uint8(Bg1Control)
-    case BG1CNT+1:      return uint8(Bg1Control>>8)
-    case BG2CNT:        return uint8(Bg2Control)
-    case BG2CNT+1:      return uint8(Bg2Control>>8)
-    case BG3CNT:        return uint8(Bg3Control)
-    case BG3CNT+1:      return uint8(Bg3Control>>8)
     }
 
 	v := m.IO[addr]
     return v
-
-	switch {
-	case addr < 0x060:
-		println("IO:Read - LCD")
-	case addr < 0x0B0:
-		println("IO:Read - SOUND")
-	case addr < 0x100:
-		println("IO:Read - DMA")
-	case addr < 0x120:
-		println("IO:Read - TIMER")
-	case addr < 0x130:
-		println("IO:Read - SERIAL1")
-	case addr < 0x134:
-		println("IO:Read - KEYPAD")
-	case addr < 0x200:
-		println("IO:Read - SERIAL2")
-	default:
-		println("IO:Read - OTHER")
-	}
-
-	return v
 }
 
 func (m *Memory) Read8(addr uint32) uint32 {
@@ -216,19 +177,10 @@ func (m *Memory) Write(addr uint32, v uint8) {
 func (m *Memory) WriteIO(addr uint32, v uint8) {
 
 	// this addr should be relative. - 0x400000
+    // do not make bg control addrs special, unless you know what the f you are doing
+    // VCOUNT is not writable, no touchy
 
-    switch addr {
-    //case 0x06: VCOUNT = v // not writable
-    case BG0CNT: Bg0Control = BgControl((uint32(Bg0Control) &^ 0b11) | uint32(v))
-    case BG0CNT+1: Bg0Control = BgControl((uint32(Bg0Control) &^ 0b1100) | (uint32(v) << 8))
-    case BG1CNT: Bg1Control = BgControl((uint32(Bg1Control) &^ 0b11) | uint32(v))
-    case BG1CNT+1: Bg1Control = BgControl((uint32(Bg1Control) &^ 0b1100) | (uint32(v) << 8))
-    case BG2CNT: Bg2Control = BgControl((uint32(Bg2Control) &^ 0b11) | uint32(v))
-    case BG2CNT+1: Bg2Control = BgControl((uint32(Bg2Control) &^ 0b1100) | (uint32(v) << 8))
-    case BG3CNT: Bg3Control = BgControl((uint32(Bg3Control) &^ 0b11) | uint32(v))
-    case BG3CNT+1: Bg3Control = BgControl((uint32(Bg3Control) &^ 0b1100) | (uint32(v) << 8))
-    default: m.IO[addr] = v
-    }
+    m.IO[addr] = v
 }
 
 func (m *Memory) Write8(addr uint32, v uint8) {

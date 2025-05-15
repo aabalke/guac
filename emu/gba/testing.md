@@ -54,11 +54,22 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 ❌ bigmap
 ❌ bld_demo
 👍 bm_modes
-❌ brin_demo
-❌ cbb_demo
+
+👍  brin_demo
+   👍 move
+   👍 screenblock
+   👍 wrap
+
+👍  cbb_demo
+    ❌  obj tile in top left (not sure if needed?)
+    👍 0102/1011
+    👍 2122/3031
+    👍 no extra
+
 ❌ dma_demo
 👍 first
-❌ hello
+👍 hello
+
 ❌ irq_demo
 👍 key_demo
 👍 m3_demo
@@ -81,7 +92,7 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 👍 pageflip
 ❌ prio_demo
 ❌ sbb_aff
-❌ sbb_reg
+👍 sbb_reg (has obj in top left, not sure if problem)
 👍 second
 ❌ snd1_demo
 ❌ swi_demo

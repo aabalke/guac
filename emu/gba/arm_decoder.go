@@ -17,7 +17,7 @@ func (cpu *Cpu) DecodeARM(opcode uint32) {
 	switch {
 	case isSWI(opcode):
         cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
-        cpu.Gba.SysCall(opcode)
+        cpu.Gba.SysCall(utils.GetVarData(opcode, 16, 23))
         r[PC] += 4
 	case isB(opcode):
 		cpu.B(opcode)
