@@ -1,5 +1,7 @@
 # Testing
 
+https://emulation.gametechwiki.com/index.php/GBA_Tests
+
 ### DenSinH / FuzzARM
 
 👍 ARM_DataProcessing
@@ -78,7 +80,18 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 ❌ m7_ex
 ❌ mos_demo
 ❌ oacombo
+
 ❌ obj_aff
+   👍 move
+   👍 rotate
+   👍 scale
+   👍 shear
+   ❌ text (works on 1.3) (related to VCOUNT and scanlines)
+   👍 mask
+   👍 double size
+   👍 origin
+   ❌ edge jerking / disappearing (normal and double mode also does work)
+   👍 bg and obj layering
 
 👍 obj_demo
     👍 move
@@ -95,9 +108,9 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 👍 sbb_reg (has obj in top left, not sure if problem)
 👍 second
 ❌ snd1_demo
-❌ swi_demo
-❌ swi_vsync
-❌ tmr_demo
+👍 swi_demo (1.3 works)
+👍 swi_vsync (works but speed is off from cycle counts)
+👍 tmr_demo (1.3 works) (uses faux cycle * 4)
 ❌ tte_demo
 ❌ txt_bm
 ❌ txt_obj

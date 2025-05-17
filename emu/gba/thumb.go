@@ -1,7 +1,13 @@
 package gba
 
 import (
+	"fmt"
+
 	"github.com/aabalke33/guac/emu/gba/utils"
+)
+
+var (
+    _ = fmt.Sprintf("")
 )
 
 const (
@@ -35,6 +41,7 @@ func (cpu *Cpu) ThumbAlu(opcode uint16) {
         Rs: uint16(utils.GetVarData(uint32(opcode), 3, 5)),
         Rd: uint16(utils.GetVarData(uint32(opcode), 0, 2)),
 	}
+
 
     switch alu.Inst {
     case THUMB_LSL, THUMB_LSR, THUMB_ASR, THUMB_ADC, THUMB_SBC, THUMB_ROR, THUMB_NEG: cpu.thumbArithmetic(alu)
@@ -164,10 +171,10 @@ func (cpu *Cpu) thumbArithmetic(alu *ThumbAlu) {
     switch alu.Inst {
     case THUMB_ADC:
         v = (rdSign == rsSign) && (rSign != rdSign)
-        c = uint64(res) >= 0x1_0000_0000
+        c = res >= 0x1_0000_0000
     case THUMB_SBC, THUMB_NEG:
         v = (rdSign != rsSign) && (rSign != rdSign)
-        c = uint64(res) < 0x1_0000_0000
+        c =  res < 0x1_0000_0000
     }
 
     cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
@@ -209,16 +216,16 @@ func (cpu *Cpu) thumbTest(alu *ThumbAlu) {
     rdSign := uint8(rdValue >> 31) & 1
     rsSign := uint8(r[alu.Rs] >> 31) & 1
     resSign  := uint8(res >> 31) & 1
-
     switch alu.Inst {
     case THUMB_CMP:
         v := (rdSign != rsSign) && (resSign != rdSign)
         c := res < 0x1_0000_0000
+
         cpu.Reg.CPSR.SetFlag(FLAG_V, v)
         cpu.Reg.CPSR.SetFlag(FLAG_C, c)
     case THUMB_CMN:
         v := (rdSign == rsSign) && (resSign != rdSign)
-        c := res >= 0x1_0000_0000 // HERE MIGHT BE eRROR
+        c := res >= 0x1_0000_0000
         cpu.Reg.CPSR.SetFlag(FLAG_V, v)
         cpu.Reg.CPSR.SetFlag(FLAG_C, c)
     }
@@ -271,6 +278,8 @@ func (cpu *Cpu) HiRegBX(opcode uint16) {
 
     case inst == 1:
 
+        // HI REG CMP
+
         rsValue := uint64(r[rs])
 
         if rs == PC {
@@ -285,14 +294,12 @@ func (cpu *Cpu) HiRegBX(opcode uint16) {
             r[PC] += 2
         }
 
-        // Flags effected???
-
         rsSign := uint8(rsValue >> 31) & 1
         rdSign := uint8(uint32(rdValue) >> 31) & 1
         rSign  := uint8(int32(uint32(res)) >> 31) & 1
 
-        v := (rsSign == rdSign) && (rSign != rsSign)
-        c := res >= 0x1_0000_0000
+        v := (rsSign != rdSign) && (rSign != rdSign)
+        c := res < 0x1_0000_0000
 
         cpsr.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
         cpsr.SetFlag(FLAG_Z, uint32(res) == 0)
@@ -437,10 +444,11 @@ func (cpu *Cpu) thumbImm(opcode uint16) {
     case THUMB_IMM_MOV:
         res = nn
     case THUMB_IMM_CMP:
+
         res = rdValue - nn
         rSign  := uint8(res >> 31) & 1
         v = (rdSign != nnSign) && (rSign != rdSign)
-        c = uint64(res) < 0x1_0000_0000
+        c = res < 0x1_0000_0000
     case THUMB_IMM_ADD:
         res = rdValue + nn
         rSign  := uint8(res >> 31) & 1

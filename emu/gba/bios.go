@@ -26,16 +26,133 @@ func (gba *GBA) LoadBios(path string) {
 
 func (gba *GBA) SysCall(inst uint32) {
     switch inst {
-    //switch inst := utils.GetVarData(opcode, 16, 23); inst {
     case SYS_SoftReset: SoftReset(gba)
     case SYS_RegisterRamReset: RegisterRamReset(gba)
+    case SYS_IntrWait: IntrWait(gba)
+    case SYS_VBlankIntrWait: VBlankIntrWait(gba)
     case SYS_Div: Div(gba, false)
     case SYS_DivArm: Div(gba, true)
     case SYS_Sqrt: Sqrt(gba)
+    case SYS_ArcTan: ArcTan(gba)
+    case SYS_ArcTan2: ArcTan2(gba)
     case SYS_CpuSet: CpuSet(gba)
+    case SYS_CpuFastSet: CpuFastSet(gba)
     case SYS_BitUnPack: BitUnPack(gba)
+    case SYS_LZ77UnCompReadNormalWrite8bit: LZ77UnCompReadNormalWrite8bit(gba)
+    case SYS_LZ77UnCompReadNormalWrite16bit: LZ77UnCompReadNormalWrite16bit(gba)
+    case SYS_RLUnCompReadNormalWrite8bit: RLUUnCompReadNormalWrite8bit(gba)
+    case SYS_RLUnCompReadNormalWrite16bit: RLUUnCompReadNormalWrite16bit(gba)
+    case SYS_ObjAffineSet: ObjAffineSet(gba)
+    case SYS_BgAffineSet: BGAffineSet(gba)
+    case SYS_GetBiosChecksum: GetBiosChecksum(gba)
     default:panic(fmt.Sprintf("EXCEPTION OR UNHANDLED SYS CALL TYPE 0x%X\n", inst))
     }
+}
+
+func BGAffineSet(gba *GBA) {
+
+    r := &gba.Cpu.Reg.R
+    mem := gba.Mem
+
+    i := r[2]
+    var ox, oy float64
+    var cx, cy float64
+    var sx, sy float64
+    var theta float64
+    offset, destination := r[0], r[1]
+    var a, b, c, d float64
+    var rx, ry float64
+    for ; i > 0; i-- {
+        // [ sx   0  0 ]   [ cos(theta)  -sin(theta)  0 ]   [ 1  0  cx - ox ]   [ A B rx ]
+        // [  0  sy  0 ] * [ sin(theta)   cos(theta)  0 ] * [ 0  1  cy - oy ] = [ C D ry ]
+        // [  0   0  1 ]   [     0            0       1 ]   [ 0  0     1    ]   [ 0 0  1 ]
+
+        ox = float64(mem.Read32(offset)) / 256
+        oy = float64(mem.Read32(offset+4)) / 256
+        cx = float64(uint16(mem.Read16(offset + 8)))
+        cy = float64(uint16(mem.Read16(offset + 10)))
+        sx = float64(uint16(mem.Read16(offset+12))) / 256
+        sy = float64(uint16(mem.Read16(offset+14))) / 256
+        theta = (float64(mem.Read16(offset+16)>>8) / 128) * math.Pi
+        offset += 20
+
+        // Rotation
+        a = math.Cos(theta)
+        d = a
+        b = math.Sin(theta)
+        c = b
+
+        // Scale
+        a *= sx
+        b *= -sx
+        c *= sy
+        d *= sy
+
+        // Translate
+        rx = ox - (a*cx + b*cy)
+        ry = oy - (c*cx + d*cy)
+
+        mem.Write16(destination, uint16(a*256))
+        mem.Write16(destination+2, uint16(b*256))
+        mem.Write16(destination+4, uint16(c*256))
+        mem.Write16(destination+6, uint16(d*256))
+        mem.Write32(destination+8, uint32(rx*256))
+        mem.Write32(destination+12, uint32(ry*256))
+        destination += 16
+    }
+}
+
+func ObjAffineSet(gba *GBA) {
+
+    r := &gba.Cpu.Reg.R
+    mem := gba.Mem
+
+    i := r[2]
+    var sx, sy float64
+    var theta float64
+    offset := r[0]
+    destination := r[1]
+    diff := r[3]
+    var a, b, c, d float64
+    for ; i > 0; i-- {
+        // [ sx   0 ]   [ cos(theta)  -sin(theta) ]   [ A B ]
+        // [  0  sy ] * [ sin(theta)   cos(theta) ] = [ C D ]
+        sx = float64(uint16(mem.Read16(offset))) / 256
+        sy = float64(uint16(mem.Read16(offset+2))) / 256
+        theta = (float64(uint16(mem.Read16(offset+4))>>8) / 128) * math.Pi
+        offset += 6
+
+        // Rotation
+        a = math.Cos(theta)
+        d = a
+        b = math.Sin(theta)
+        c = b
+
+        // Scale
+        a *= sx
+        b *= -sx
+        c *= sy
+        d *= sy
+
+        mem.Write16(destination, uint16(a*256))
+        mem.Write16(destination+diff, uint16(b*256))
+        mem.Write16(destination+diff*2, uint16(c*256))
+        mem.Write16(destination+diff*3, uint16(d*256))
+        destination += diff * 4
+    }
+}
+
+func IntrWait(gba *GBA) {
+    //fmt.Printf("IntrWait is called, but is not completely setup\n")
+}
+
+func VBlankIntrWait(gba *GBA) {
+	r := &gba.Cpu.Reg.R
+
+    r[0] = 1
+    r[1] = 1
+
+    IntrWait(gba)
 }
 
 func SoftReset(gba *GBA) {
@@ -239,8 +356,76 @@ func Sqrt(gba *GBA) {
 	reg.R[0] = bound
 }
 
-func ArcTan()  { panic("ARCTAN IS NOT FUNCTIONAL") }
-func ArcTan2() { panic("ARCTAN2 IS NOT FUNCTIONAL") }
+func ArcTan(gba *GBA) {
+
+    r := &gba.Cpu.Reg.R
+    r[0], r[1], r[2] = _ArcTan(int32(r[0]))
+}
+
+func ArcTan2(gba *GBA) {
+
+    r := &gba.Cpu.Reg.R
+
+    x := int32(r[0])
+    y := int32(r[1])
+
+    outX := uint32(0)
+    outY := uint32(0)
+
+    switch {
+    case y == 0:
+        if x < 0 {
+            outX = 0x8000
+        }
+    case x == 0:
+        if y >= 0 {
+            outX = 0x4000
+            outY = uint32(y)
+        } else {
+            outX = 0xC000
+            outY = uint32(y)
+        }
+    case y >= 0:
+        if x >= 0 && x >= y {
+            outX, outY, _ = _ArcTan((y << 14) / x)
+        } else if -x >= y {
+            outX, outY, _ = _ArcTan((y << 14) / x)
+            outX += 0x8000
+        } else {
+            outX, outY, _ = _ArcTan((x << 14) / y)
+            outX = 0x4000 - outX
+        }
+    case y < 0:
+        if x <= 0 && -x > -y {
+            outX, outY, _ = _ArcTan((y << 14) / x)
+            outX += 0x8000
+        } else if x >= -y {
+            outX, outY, _ = _ArcTan((y << 14) / x)
+            outX += 0x10000
+        } else {
+            outX, outY, _ = _ArcTan((x << 14) / y)
+            outX = 0xC000 - outX
+        }
+    }
+
+    r[0] = outX
+    r[1] = outY
+    r[3] = 0x170
+}
+
+func _ArcTan(src int32) (uint32, uint32, uint32) {
+
+    a := -((src * src) >> 14)
+	b := (int32(0xA9*a) >> 14) + 0x390
+	b = ((b * a) >> 14) + 0x91C
+	b = ((b * a) >> 14) + 0xFB6
+	b = ((b * a) >> 14) + 0x16AA
+	b = ((b * a) >> 14) + 0x2081
+	b = ((b * a) >> 14) + 0x3651
+	b = ((b * a) >> 14) + 0xA2F9
+
+    return uint32((int32(src)*b)>>16), uint32(a), uint32(b)
+}
 
 func BitUnPack(gba *GBA) {
 
@@ -367,4 +552,159 @@ func CpuSet(gba *GBA) {
             mem.Write16(rd+(i<<1), uint16(word))
         }
     }
+}
+
+func CpuFastSet(gba *GBA) {
+
+    r := &gba.Cpu.Reg.R
+    mem := gba.Mem
+
+    src := r[0] & 0xffff_fffc
+    dst := r[1] & 0xffff_fffc
+    mode := r[2]
+
+    count := ((mode&0x000f_ffff + 7) >> 3) << 3
+    fill := utils.BitEnabled(mode, 24)
+    if fill {
+        word := mem.Read32(src)
+        for i := uint32(0); i < count; i++ {
+            mem.Write32(dst+(i<<2), word)
+        }
+
+    } else {
+        for i := uint32(0); i < count; i++ {
+            word := mem.Read32(src + (i << 2))
+            mem.Write32(dst+(i<<2), word)
+        }
+    }
+}
+
+func LZ77UnCompReadNormalWrite8bit(gba *GBA) {
+
+    r := &gba.Cpu.Reg.R
+    src := r[0]
+    dst := r[1]
+
+    DecompressLZ77(gba, src, dst)
+}
+
+func LZ77UnCompReadNormalWrite16bit(gba *GBA) {
+
+    r := &gba.Cpu.Reg.R
+    src := r[0]
+    dst := r[1]
+
+    DecompressLZ77(gba, src, dst)
+}
+
+func DecompressLZ77(gba *GBA, src, dst uint32) {
+
+    // need to align half and pad 16bit?
+
+    mem := gba.Mem
+
+	header := mem.Read32(src)
+	decompressedSize := int(header >> 8)
+	src += 4
+
+	end := int(dst) + decompressedSize
+
+	for int(dst) < end {
+
+		flagByte := mem.Read8(src)
+		src++
+
+		for i := range 8 {
+			if int(dst) >= end {
+				break
+			}
+
+			flag := (flagByte >> (7 - i)) & 1
+			if flag == 0 {
+				// Uncompressed
+                mem.Write8(dst, uint8(mem.Read8(src)))
+				dst++
+				src++
+
+			} else {
+				// Compressed
+                first := mem.Read8(src)
+                second := mem.Read8(src+1)
+
+				src += 2
+
+				length := int((first >> 4) + 3)
+				disp := int(((int(first) & 0xF) << 8) | int(second))
+				copyFrom := int(dst) - (disp + 1)
+
+				for j := range length {
+                    mem.Write8(dst, uint8(mem.Read8(uint32(copyFrom+j))))
+					dst++
+				}
+			}
+		}
+	}
+}
+
+func RLUUnCompReadNormalWrite8bit(gba *GBA) {
+
+    r := &gba.Cpu.Reg.R
+    src := r[0]
+    dst := r[1]
+
+    DecompressRLU(gba, src, dst)
+}
+
+func RLUUnCompReadNormalWrite16bit(gba *GBA) {
+
+    r := &gba.Cpu.Reg.R
+    src := r[0]
+    dst := r[1]
+
+    DecompressRLU(gba, src, dst)
+}
+
+func DecompressRLU(gba *GBA, src, dst uint32) {
+
+    // need to align half and pad 16bit?
+
+	mem := gba.Mem
+
+	header := mem.Read32(src)
+	decompressedSize := int(header >> 8)
+	src += 4
+
+	end := int(dst) + decompressedSize
+
+	for int(dst) < end {
+		flag := mem.Read8(src)
+		src++
+
+		if (flag & 0x80) == 0 {
+			// Uncompressed block: copy (flag + 1) bytes
+			count := int(flag&0x7F) + 1
+			for range count {
+				b := mem.Read8(src)
+				mem.Write8(dst, uint8(b))
+				src++
+				dst++
+			}
+		} else {
+			// Compressed block: repeat 1 byte for (flag & 0x7F) + 3 times
+			count := int(flag&0x7F) + 3
+			value := mem.Read8(src)
+			src++
+			for range count {
+				mem.Write8(dst, uint8(value))
+				dst++
+			}
+		}
+	}
+}
+
+func GetBiosChecksum(gba *GBA) {
+    r := &gba.Cpu.Reg.R
+    r[0] = 0xBAAE_187F
+    r[1] = 1
+    r[3] = 0x0000_4000
 }

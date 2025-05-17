@@ -610,7 +610,7 @@ func NewHalf(opcode uint32, c *Cpu) *Half {
     }
 
     for i, fail := range fails {
-        if fail { panic(fmt.Sprintf("Malformed Half Instruction %d", i)) }
+        if fail { panic(fmt.Sprintf("Malformed Half Instruction %d %08X %d", i, opcode, CURR_INST)) }
     }
 
     h.Rm = utils.GetByte(opcode, 0)

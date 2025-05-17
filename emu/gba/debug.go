@@ -51,19 +51,14 @@ func (d *Debugger) print(i int) {
     p("spsr", uint32(reg.SPSR[BANK_ID[mode]]))
     p("MODE", BANK_ID[mode])
 
-    //p("USR r8", reg.USR[0])
-
-    //p("mem5", uint32(d.gba.Mem.Read32(0x500_0000)))
-
-    //for i := 0x3007EF4; i <= 0x3007EFC; i += 4 {
-    //p("mem3040", d.gba.Mem.Read32(0x0300_3040))
-    for i := 0x0600_0020; i <= 0x0600_0040; i += 4 {
+    //for i := 0x0300_7E98; i <= 0x0300_7ec0; i += 4 {
+    ////for i := 0x0300_1B00; i <= 0x0300_1B40; i += 4 {
+    //    p(fmt.Sprintf("VRAM %X", i), d.gba.Mem.Read32(uint32(i)))
+    //}
+    s("--------  --------")
+    for i := 0x0300_1BD0; i <= 0x0300_1C20; i += 4 {
+    //for i := 0x0300_1B08; i <= 0x0300_1B38; i += 4 {
         p(fmt.Sprintf("VRAM %X", i), d.gba.Mem.Read32(uint32(i)))
-        //fmt.Printf("VRAM %X = %X", i, d.gba.Mem.Read8(uint32(i+3)))
-        //fmt.Printf("%X", d.gba.Mem.Read8(uint32(i+2)))
-        //fmt.Printf("%X", d.gba.Mem.Read8(uint32(i+1)))
-        //fmt.Printf("%X\n", d.gba.Mem.Read8(uint32(i)))
-        //fmt.Printf("VRAM %X = %X\n", i, d.gba.Mem.Read32(uint32(i)))
     }
 }
 
@@ -140,7 +135,7 @@ func (d *Debugger) dump(s, e uint32) {
     tmp := ""
 
     for i := s; i <= e; i += 4 {
-        tmp += fmt.Sprintf("%08X %08X\n", i, d.gba.Mem.Read32(uint32(i)))
+        tmp += fmt.Sprintf("%08X", d.gba.Mem.Read32(uint32(i)))
     }
     f, err := os.Create("./dump")
     if err != nil { panic(err) } 

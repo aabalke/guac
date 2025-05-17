@@ -94,6 +94,23 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
     case 0x0204:        panic("CHANGE CART WAIT STATE")
     case KEYINPUT:      return m.GBA.getJoypad(false)
     case KEYINPUT+1:    return m.GBA.getJoypad(true)
+
+    case 0x100: return m.GBA.Timers[0].ReadD(false)
+    case 0x101: return m.GBA.Timers[0].ReadD(true)
+    case 0x102: return m.GBA.Timers[0].ReadCnt(false)
+    case 0x103: return m.GBA.Timers[0].ReadCnt(true)
+    case 0x104: return m.GBA.Timers[1].ReadD(false)
+    case 0x105: return m.GBA.Timers[1].ReadD(true)
+    case 0x106: return m.GBA.Timers[1].ReadCnt(false)
+    case 0x107: return m.GBA.Timers[1].ReadCnt(true)
+    case 0x108: return m.GBA.Timers[2].ReadD(false)
+    case 0x109: return m.GBA.Timers[2].ReadD(true)
+    case 0x10A: return m.GBA.Timers[2].ReadCnt(false)
+    case 0x10B: return m.GBA.Timers[2].ReadCnt(true)
+    case 0x10C: return m.GBA.Timers[3].ReadD(false)
+    case 0x10D: return m.GBA.Timers[3].ReadD(true)
+    case 0x10E: return m.GBA.Timers[3].ReadCnt(false)
+    case 0x10F: return m.GBA.Timers[3].ReadCnt(true)
     }
 
 	v := m.IO[addr]
@@ -180,7 +197,26 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
     // do not make bg control addrs special, unless you know what the f you are doing
     // VCOUNT is not writable, no touchy
 
-    m.IO[addr] = v
+    switch addr {
+    case 0x100: m.GBA.Timers[0].WriteD(v, false)
+    case 0x101: m.GBA.Timers[0].WriteD(v, true)
+    case 0x102: m.GBA.Timers[0].WriteCnt(v, false)
+    case 0x103: m.GBA.Timers[0].WriteCnt(v, true)
+    case 0x104: m.GBA.Timers[1].WriteD(v, false)
+    case 0x105: m.GBA.Timers[1].WriteD(v, true)
+    case 0x106: m.GBA.Timers[1].WriteCnt(v, false)
+    case 0x107: m.GBA.Timers[1].WriteCnt(v, true)
+    case 0x108: m.GBA.Timers[2].WriteD(v, false)
+    case 0x109: m.GBA.Timers[2].WriteD(v, true)
+    case 0x10A: m.GBA.Timers[2].WriteCnt(v, false)
+    case 0x10B: m.GBA.Timers[2].WriteCnt(v, true)
+    case 0x10C: m.GBA.Timers[3].WriteD(v, false)
+    case 0x10D: m.GBA.Timers[3].WriteD(v, true)
+    case 0x10E: m.GBA.Timers[3].WriteCnt(v, false)
+    case 0x10F: m.GBA.Timers[3].WriteCnt(v, true)
+    default: m.IO[addr] = v
+    }
+
 }
 
 func (m *Memory) Write8(addr uint32, v uint8) {
