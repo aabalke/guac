@@ -2,15 +2,21 @@ package gba
 
 import "fmt"
 
-func (cpu *Cpu) DecodeTHUMB(opcode uint16) {
+func (cpu *Cpu) DecodeTHUMB(opcode uint16) int {
 
     r := &cpu.Reg.R
+
+
+    
 
 	switch {
     case isthumbSWI(opcode):
         cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
-        cpu.Gba.SysCall(uint32(opcode) & 0xFF)
+        cycles := cpu.Gba.SysCall(uint32(opcode) & 0xFF)
         r[PC] += 2
+
+        return cycles
+
 	case isThumbAddSub(opcode):
 		cpu.ThumbAddSub(opcode)
 	case isThumbShift(opcode):
@@ -50,6 +56,8 @@ func (cpu *Cpu) DecodeTHUMB(opcode uint16) {
 	default:
 		panic(fmt.Sprintf("Unable to Decode %X, at PC %X, INSTR %d", opcode, r[PC], CURR_INST))
 	}
+
+    return 2
 }
 
 func isThumbOpcodeFormat(opcode, mask, format uint16) bool {

@@ -11,13 +11,48 @@ const (
 	BG3CNT   = 0x000E
 )
 
-var (
-	VCOUNT = uint8(0)
+type Dispstat uint16
 
-    Bg0Control = BgControl(0)
-    Bg1Control = BgControl(0)
-    Bg2Control = BgControl(0)
-    Bg3Control = BgControl(0)
-)
+func (d *Dispstat) Write(v uint8, hi bool) {
 
-type BgControl uint16
+    if hi {
+        *d = Dispstat(uint16(v) << 8)
+        return
+    }
+
+    v &^= 0b111
+    *d = Dispstat(uint16(v))
+}
+
+func (d *Dispstat) SetVBlank(v bool) {
+
+    if v {
+        *d = Dispstat((uint16(*d) &^ 1) | 1)
+        return
+    }
+
+    *d = Dispstat((uint16(*d) &^ 1))
+}
+
+func (d *Dispstat) SetHBlank(v bool) {
+
+    if v {
+        *d = Dispstat((uint16(*d) &^ 10) | 10)
+        return
+    }
+
+    *d = Dispstat((uint16(*d) &^ 10))
+}
+
+func (d *Dispstat) SetVCounter(scanline int) {
+
+    lyc := int(*d >> 8)
+
+    if scanline == lyc {
+        *d = Dispstat((uint16(*d) &^ 100) | 100)
+        return
+
+    }
+
+    *d = Dispstat((uint16(*d) &^ 100))
+}

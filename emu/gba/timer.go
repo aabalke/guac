@@ -1,7 +1,6 @@
 package gba
 
 import (
-	"fmt"
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
@@ -9,12 +8,9 @@ type Timers [4]Timer
 
 func (tt *Timers) Increment(newCycles uint32) {
 
-    //println(2, newCycles, tt[2].getCycles(), tt[2].SavedCycles, tt[2].SavedCycles / tt[2].getCycles())
-
     for i := range tt {
 
         t := &tt[i]
-
 
         if !t.isEnabled() || t.isCascade() {
             continue
@@ -30,7 +26,7 @@ func (tt *Timers) Increment(newCycles uint32) {
                 }
 
                 if t.isOverflowIRQ() {
-                    tt.raiseIRQ()
+                    t.raiseIRQ()
                 }
             }
         }
@@ -52,20 +48,21 @@ func (tt *Timers) cascade(overflowTimerIdx int) {
     if overflow {
         tt.cascade(cascadeIdx)
         if tt[cascadeIdx].isOverflowIRQ() {
-            tt.raiseIRQ()
+            tt[cascadeIdx].raiseIRQ()
         }
     }
 }
 
-func (tt *Timers) raiseIRQ() {
-
-    fmt.Printf("Timer Interrupt Raised\n")
-}
-
 type Timer struct {
+    Gba *GBA
+    Idx int
 	CNT, D uint32
     SavedInitialValue uint32
     SavedCycles uint32
+}
+
+func (t *Timer) raiseIRQ() {
+    t.Gba.triggerIRQ(0x3 + uint32(t.Idx))
 }
 
 func (t *Timer) ReadCnt(hi bool) uint8 {

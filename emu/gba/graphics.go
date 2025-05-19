@@ -6,6 +6,46 @@ import (
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
+type GraphicsTiming struct {
+    Gba             *GBA
+    RefreshCycles   int
+    Scanline        int
+    HBlank          bool
+    VBlank          bool
+}
+
+func (gt *GraphicsTiming) reset() {
+    gt.RefreshCycles = 0
+    gt.Scanline = 0
+    gt.HBlank = false
+    gt.VBlank = false
+}
+
+func (gt *GraphicsTiming) update(cycles int) {
+
+    const (
+        REFRESH = 280_896 // should this be replaced by clock / fps?
+        SCANLINE = 1232
+        HDRAW = 960
+        HBLANK = 272
+        VDRAW = 197120
+        VBLANK = 83776
+    )
+
+    gt.RefreshCycles += cycles
+    gt.HBlank = gt.RefreshCycles % SCANLINE > HDRAW
+    gt.Scanline = gt.RefreshCycles / SCANLINE
+    gt.VBlank = gt.RefreshCycles > VDRAW
+
+    dispstat := &gt.Gba.Mem.Dispstat
+    dispstat.SetVBlank(gt.VBlank)
+    dispstat.SetHBlank(gt.HBlank)
+    dispstat.SetVCounter(gt.Scanline)
+
+    if gt.VBlank { gt.Gba.checkDmas(DMA_MODE_VBL) }
+    if gt.HBlank { gt.Gba.checkDmas(DMA_MODE_HBL) }
+}
+
 var ( 
     _ = fmt.Sprintf("")
 )
@@ -18,8 +58,9 @@ func (gba *GBA) graphics() {
 
 	flip := utils.BitEnabled(dispcnt, 4)
 
-    //gba.getTiles(0x600_0000, 0x20, false)
 
+    //gba.getTiles(0x600_0000, 0x10, false)
+    //gba.debugPalette()
     //return
 
     gba.clear()
@@ -277,8 +318,6 @@ func (gba *GBA) outBoundsAffine(obj *Object, x, y uint32) bool {
     if (yWrappedInBounds || yUnwrappedInBounds) && (xWrappedInBounds || xUnwrappedInBounds) {
         return false
     }
-
-
 
     return true
 }
@@ -785,6 +824,7 @@ func (bg *Background) setSize() {
 
 func (gba *GBA) updateMode3() {
 
+
 	const (
 		SIZE           = 0x12C00
 		BASE           = 0x0600_0000
@@ -821,6 +861,7 @@ func (gba *GBA) updateMode4(flip bool) {
 		palIdx := Mem.Read8(BASE + i)
 
 		palData := gba.getPalette(uint32(palIdx), 0, false)
+
         gba.applyColor(palData, uint32(index))
 		index += 4
 	}
@@ -874,7 +915,7 @@ func (gba *GBA) debugPalette() {
 	// prints single palette in corner
 	// palIdx is idx of palette not memory address (which is palIdx * 2)
 
-	palIdx := 0xF1
+	palIdx := 0x20
 	index := 0
 	for y := range 8 {
 		iY := SCREEN_WIDTH * y

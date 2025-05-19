@@ -8,7 +8,7 @@ type Cartridge struct {
 	RomPath string
 	SavPath string
 	Data    [0x0200_0000]uint8
-    SRAM    [0x1_000]uint8
+    SRAM    [0x1_0000]uint8
 	Header  *Header
 }
 

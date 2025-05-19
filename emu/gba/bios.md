@@ -1,9 +1,9 @@
 BIOS Functions
 
 GBA Basic Functions
-❌ 0x00 SoftReset
-❌ 0x01 RegisterRamReset
-❌ 0x02 Halt
+👍 0x00 SoftReset
+👍 0x01 RegisterRamReset
+👍 0x02 Halt
 ❌ 0x03 Stop/Sleep
 ➗ 0x04 IntrWait
 ➗ 0x05 VBlankIntrWait

@@ -680,6 +680,8 @@ func (cpu *Cpu) thumbPushPop(opcode uint16) {
         return
     }
 
+    //if CURR_INST > 0xc000 && opcode == 0xB5F0 { fmt.Printf("CURR %08X PC %08X\n\n", CURR_INST, r[PC])}
+
     if pclr {
         r[SP] -= 4
         cpu.Gba.Mem.Write32(r[SP], r[14])

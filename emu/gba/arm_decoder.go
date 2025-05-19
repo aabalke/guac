@@ -5,13 +5,13 @@ import (
     "fmt"
 )
 
-func (cpu *Cpu) DecodeARM(opcode uint32) {
+func (cpu *Cpu) DecodeARM(opcode uint32) int {
 
     r := &cpu.Reg.R
 
 	if !cpu.CheckCond(utils.GetByte(opcode, 28)) {
 		r[PC] += 4
-		return
+		return 4
 	}
 
 	switch {
@@ -19,6 +19,9 @@ func (cpu *Cpu) DecodeARM(opcode uint32) {
         cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
         cpu.Gba.SysCall(utils.GetVarData(opcode, 16, 23))
         r[PC] += 4
+
+        return 20
+
 	case isB(opcode):
 		cpu.B(opcode)
 	case isBX(opcode):
@@ -42,6 +45,8 @@ func (cpu *Cpu) DecodeARM(opcode uint32) {
 	default:
 		panic(fmt.Sprintf("Unable to Decode %X, at PC %X, INSTR %d", opcode, r[PC], CURR_INST))
 	}
+
+    return 4
 
     // Notes: Coprocessor instructions do not matter since gba 
     // uses a single processor (NDS is a different story)

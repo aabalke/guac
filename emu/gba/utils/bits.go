@@ -50,3 +50,9 @@ func CountBits(v uint32) uint32 {
     }
     return count
 }
+
+func ReplaceByte(value uint32, newByte uint32, byteOffset uint32) uint32 {
+    bitOffset := 8 * byteOffset
+    mask := uint32(0b1111_1111)
+    return (value &^ (mask << bitOffset)) | (newByte << bitOffset)
+}

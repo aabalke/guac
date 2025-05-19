@@ -21,6 +21,7 @@ func (d *Debugger) print(i int) {
     s := func(a string) { fmt.Printf("%s\n", a)}
 
     s("--------  --------")
+    fmt.Printf("inst dec %d\n", uint32(i))
     p("inst", uint32(i))
 
     if d.gba.Cpu.Reg.CPSR.GetFlag(FLAG_T) {
@@ -51,13 +52,9 @@ func (d *Debugger) print(i int) {
     p("spsr", uint32(reg.SPSR[BANK_ID[mode]]))
     p("MODE", BANK_ID[mode])
 
-    //for i := 0x0300_7E98; i <= 0x0300_7ec0; i += 4 {
-    ////for i := 0x0300_1B00; i <= 0x0300_1B40; i += 4 {
-    //    p(fmt.Sprintf("VRAM %X", i), d.gba.Mem.Read32(uint32(i)))
-    //}
     s("--------  --------")
-    for i := 0x0300_1BD0; i <= 0x0300_1C20; i += 4 {
-    //for i := 0x0300_1B08; i <= 0x0300_1B38; i += 4 {
+    for i := 0x0500_0000; i <= 0x0500_0080; i += 4 {
+    //for i := 0x0300_28E0; i <= 0x0300_2900; i += 4 {
         p(fmt.Sprintf("VRAM %X", i), d.gba.Mem.Read32(uint32(i)))
     }
 }

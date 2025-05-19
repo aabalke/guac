@@ -1,6 +1,8 @@
 package gba
 
 import (
+	"fmt"
+
 	cart "github.com/aabalke33/guac/emu/gba/cart"
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
@@ -11,11 +13,10 @@ const (
 )
 
 var (
+    _ = fmt.Sprintln("")
     CURR_INST = 0
-    //MAX_COUNT = 1_000_000
-    //MAX_COUNT = 0x10000
-    //MAX_COUNT = 211_000
-    //MAX_COUNT = 210_200
+    //MAX_COUNT = 21500
+    //MAX_COUNT = 21853 DMA Test WRAM addr
 )
 
 type GBA struct {
@@ -35,9 +36,68 @@ type GBA struct {
     Clock int
     FPS int
     Cycles int
-    ScanlineCycles int
+    Scanline int
+ 
     Timers Timers
+    Dma    [4]DMA
+
+    Gt *GraphicsTiming
 }
+
+func (gba *GBA) Update(exit *bool, instCount int) int {
+
+    gt := gba.Gt
+    r := &gba.Cpu.Reg.R
+
+    if gba.Paused {
+        return 0
+    }
+
+    gt.reset()
+
+    //for range MAX_COUNT + 1 {
+    for gba.Gt.RefreshCycles < (gba.Clock / gba.FPS) {
+
+        cycles := 4
+
+        opcode := gba.Mem.Read32(r[PC])
+
+        if gba.Halted && gba.ExitHalt {
+            gba.Halted = false
+        } 
+
+        if !gba.Halted {
+            cycles = gba.Cpu.Execute(opcode)
+        }
+
+        //if CURR_INST == MAX_COUNT {
+        //    gba.Paused = true
+        //    gba.Debugger.print(CURR_INST)
+        //}
+
+        gba.updateIRQ()
+
+        CURR_INST++
+
+        gba.Timers.Increment(uint32(cycles)* 4)
+        gt.update(cycles)
+	}
+
+    gba.checkDmas(DMA_MODE_REF)
+
+    gba.graphics()
+
+    return instCount
+}
+
+func (gba *GBA) checkDmas(mode uint32) {
+    for i := range gba.Dma {
+        if gba.Dma[i].checkMode(mode) {
+            gba.Dma[i].transfer()
+        }
+    }
+}
+
 
 func NewGBA() *GBA {
 
@@ -45,26 +105,36 @@ func NewGBA() *GBA {
 
 	gba := GBA{
         Clock: 16_780_000,
-        FPS: 60,
+        FPS: 60, // 59.7374117111
         Pixels: &pixels,
     }
 
     gba.Mem = NewMemory(&gba)
     gba.Cpu = NewCpu(&gba)
     gba.Debugger = &Debugger{&gba}
+    gba.Gt = &GraphicsTiming{
+        Gba: &gba,
+    }
 
-    //gba.LoadBios("./emu/gba/bios.gba")
-    //gba.LoadBios("./emu/gba/bios_custom.gba")
+    gba.Timers[0].Gba = &gba
+    gba.Timers[1].Gba = &gba
+    gba.Timers[2].Gba = &gba
+    gba.Timers[3].Gba = &gba
 
-    // custom bios
-    //gba.Mem.Write32(0x00, 0xE129F000)
-    //gba.Mem.Write32(0x04, 0xE59FD00C)
-    //gba.Mem.Write32(0x08, 0xE3A0F000)
-    //gba.Mem.Write32(0x0C, 0xE1A0E00F)
-    //gba.Mem.Write32(0x10, 0xEA00008D)
-    //gba.Mem.Write32(0x14, 0xE3A00000)
-    //gba.Mem.Write32(0x18, 0xE3A01002)
-    //gba.Mem.Write32(0x1C, 0xE12FFF1E)
+    gba.Timers[0].Idx = 0
+    gba.Timers[1].Idx = 1
+    gba.Timers[2].Idx = 2
+    gba.Timers[3].Idx = 3
+
+    gba.Dma[0].Gba = &gba
+    gba.Dma[1].Gba = &gba
+    gba.Dma[2].Gba = &gba
+    gba.Dma[3].Gba = &gba
+
+    gba.Dma[0].Idx = 0
+    gba.Dma[1].Idx = 1
+    gba.Dma[2].Idx = 2
+    gba.Dma[3].Idx = 3
 
 	return &gba
 }
@@ -94,89 +164,6 @@ func (gba *GBA) Close() {
 
 func (gba *GBA) LoadGame(path string) {
 	gba.Cartridge = cart.NewCartridge(path, "")
-}
-
-func (gba *GBA) Update(exit *bool, instCount int) int {
-
-    if gba.Paused {
-        return 0
-    }
-
-    updateCycles := 0
-
-    VCOUNT = 0
-
-    //for range MAX_COUNT + 1 {
-    for updateCycles < (gba.Clock / gba.FPS) {
-
-        cycles := 4
-
-        opcode := gba.Mem.Read32(gba.Cpu.Reg.R[15])
-
-        if gba.Halted {
-            if gba.ExitHalt {
-                gba.Halted = false
-            }
-        } 
-
-        if !gba.Halted {
-            gba.Cpu.Execute(opcode)
-        }
-
-        //if CURR_INST == MAX_COUNT {
-        //    gba.Paused = true
-        //    gba.Debugger.print(CURR_INST)
-        //    //gba.Debugger.saveBg2()
-        //    //gba.Debugger.saveBg4()
-        //    //gba.Debugger.dump(0x600_0000, 0x06017FFF)
-        //}
-
-        gba.updateIRQ()
-
-        updateCycles += cycles
-
-        gba.ScanlineCycles += cycles
-        CURR_INST++
-        //instCount++
-        gba.Timers.Increment(uint32(cycles)* 4)
-
-        //gba.Cycles = cycles
-
-        gba.updateGraphics()
-	}
-
-
-
-    //println(gba.Timers[3].D)
-
-    //gba.updateDisplay()
-    gba.graphics()
-
-    return instCount
-}
-
-func (gba *GBA) updateGraphics() {
-
-    //gba.ScanlineCounter -= gba.Cycles
-
-    //if gba.ScanlineCounter > 0 {
-    //    return
-    //}
-
-    if gba.ScanlineCycles % 1232 == 0 {
-        gba.ScanlineCycles = gba.ScanlineCycles % 1232
-        VCOUNT += 1
-        //*scanlineCycles = 0
-    }
-
-    if VCOUNT > 227 {
-        VCOUNT = 0
-    }
-
-    //currenLine := VCOUNT
-
-    //fmt.Printf("VCOUNT %X\n", VCOUNT)
-    //if VCOUNT > 0xFF { panic("TOO BIG") }
 }
 
 func (gba *GBA) toggleThumb() {
@@ -220,7 +207,8 @@ func (gba *GBA) triggerIRQ(irq uint32) {
 	iack = iack | (1 << irq)
 	gba.Mem.IO[IF] = uint8(iack)
     gba.Mem.IO[IF+1] = uint8(iack>>8)
-	//gba.halt = false
+	gba.Halted = false
+
 	gba.checkIRQ()
 }
 
