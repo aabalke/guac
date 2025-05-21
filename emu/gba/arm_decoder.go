@@ -28,10 +28,10 @@ func (cpu *Cpu) DecodeARM(opcode uint32) int {
 		cpu.BX(opcode)
 	case isSDT(opcode):
 		cpu.Sdt(opcode)
-	case isHalf(opcode):
-		cpu.Half(opcode)
 	case isBlock(opcode):
 		cpu.Block(opcode)
+	case isHalf(opcode):
+		cpu.Half(opcode)
 	case isUD(opcode):
 		panic("Need Undefined functionality")
 	case isPSR(opcode):

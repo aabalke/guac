@@ -340,9 +340,13 @@ func (cpu *Cpu) Mul(opcode uint32) {
         r[rn] = uint32(res)
 
         if set {
+            //cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 63 & 0b1) != 0)
+            cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 63 & 1) == 1)
             cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
-            cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 63 & 0b1) != 0)
             // FLAG_C "destroyed" ARM <5, ignored ARM >=5
+            // need carry to pass mgba suite
+            //c := res >= 0x1_0000_0000
+            //cpu.Reg.CPSR.SetFlag(FLAG_C, c)
             cpu.Reg.CPSR.SetFlag(FLAG_C, false)
             // FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
         }
@@ -360,8 +364,8 @@ func (cpu *Cpu) Mul(opcode uint32) {
     r[rn] = uint32(res)
 
     if set {
+        cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 63 & 1) == 1)
         cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
-        cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 63 & 0b1) != 0)
         // FLAG_C "destroyed" ARM <5, ignored ARM >=5
         cpu.Reg.CPSR.SetFlag(FLAG_C, false)
         // FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
@@ -606,7 +610,7 @@ func NewHalf(opcode uint32, c *Cpu) *Half {
         !h.Pre && utils.BitEnabled(opcode, 21),
         !utils.BitEnabled(opcode, 7),
         !utils.BitEnabled(opcode, 4),
-        h.Immediate && !(utils.GetByte(opcode, 8) == 0b0000),
+        //h.Immediate && !(utils.GetByte(opcode, 8) == 0b0000),
     }
 
     for i, fail := range fails {

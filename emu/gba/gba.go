@@ -10,13 +10,21 @@ import (
 const (
 	SCREEN_WIDTH  = 240
 	SCREEN_HEIGHT = 160
+
+	RESET_VEC           uint32 = 0x00
+	UND_VEC             uint32 = 0x04
+	SWI_VEC             uint32 = 0x08
+	PREFETCH_VEC        uint32 = 0x0C
+	DATA_ABORT_VEC      uint32 = 0x10
+	ADDR_26_VEC         uint32 = 0x14
+	IRQ_VEC             uint32 = 0x18
+	FIQ_VEC             uint32 = 0x1C
 )
 
 var (
     _ = fmt.Sprintln("")
     CURR_INST = 0
-    //MAX_COUNT = 21500
-    //MAX_COUNT = 21853 DMA Test WRAM addr
+    //MAX_COUNT = 1_000_000
 )
 
 type GBA struct {
@@ -26,6 +34,7 @@ type GBA struct {
     Mem *Memory
 	Screen [SCREEN_WIDTH][SCREEN_HEIGHT]uint32
 	Pixels *[]byte
+	DebugPixels *[]byte
 
 	Paused bool
 	Muted  bool 
@@ -70,21 +79,22 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
             cycles = gba.Cpu.Execute(opcode)
         }
 
-        //if CURR_INST == MAX_COUNT {
+        //if CURR_INST == 1_000_000 {
         //    gba.Paused = true
         //    gba.Debugger.print(CURR_INST)
+        //    return instCount
         //}
-
-        gba.updateIRQ()
 
         CURR_INST++
 
-        gba.Timers.Increment(uint32(cycles)* 4)
         gt.update(cycles)
+        gba.Timers.Increment(uint32(cycles))
+        gba.updateIRQ()
 	}
 
     gba.checkDmas(DMA_MODE_REF)
 
+    gba.debugGraphics()
     gba.graphics()
 
     return instCount
@@ -98,15 +108,16 @@ func (gba *GBA) checkDmas(mode uint32) {
     }
 }
 
-
 func NewGBA() *GBA {
 
 	pixels := make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)
+	debugPixels := make([]byte, 1080*1080*4)
 
 	gba := GBA{
         Clock: 16_780_000,
         FPS: 60, // 59.7374117111
         Pixels: &pixels,
+        DebugPixels: &debugPixels,
     }
 
     gba.Mem = NewMemory(&gba)
@@ -136,6 +147,8 @@ func NewGBA() *GBA {
     gba.Dma[2].Idx = 2
     gba.Dma[3].Idx = 3
 
+    gba.LoadBios("./emu/gba/res/bios.gba")
+
 	return &gba
 }
 
@@ -145,6 +158,10 @@ func (gba *GBA) GetSize() (int32, int32) {
 
 func (gba *GBA) GetPixels() []byte {
 	return *gba.Pixels
+}
+
+func (gba *GBA) GetDebugPixels() []byte {
+	return *gba.DebugPixels
 }
 
 func (gba *GBA) ToggleMute() bool {
@@ -225,4 +242,51 @@ func (gba *GBA) checkIRQ() {
         panic("EXECPTION IN CHECK IRQ")
         //g.exception(irqVec, IRQ)
     }
+}
+
+func (gba *GBA) exception(addr uint32, mode uint32) {
+
+    reg := &gba.Cpu.Reg
+
+	cpsr := reg.CPSR
+    curr := reg.getMode()
+	reg.setMode(curr, mode)
+	reg.SPSR[BANK_ID[curr]] = cpsr
+
+	reg.R[14] = gba.exceptionReturn(addr)
+	reg.CPSR.SetFlag(FLAG_T, false)
+	reg.CPSR.SetFlag(FLAG_I, true)
+
+    const (
+        RESET_VEC = 0x0
+        FIQ_VEC = 0x1C
+    )
+
+	switch addr & 0xff {
+	case RESET_VEC, FIQ_VEC:
+        reg.CPSR.SetFlag(FLAG_F, true)
+	}
+	reg.R[15] = addr
+	//gba.pipelining()
+}
+
+func (gba *GBA) exceptionReturn(vec uint32) uint32 {
+    reg := &gba.Cpu.Reg
+
+	pc := reg.R[15]
+
+	t := reg.CPSR.GetFlag(FLAG_T)
+	switch vec {
+	case UND_VEC, SWI_VEC:
+		if t {
+			pc -= 2
+		} else {
+			pc -= 4
+		}
+	case FIQ_VEC, IRQ_VEC, PREFETCH_VEC:
+		if !t {
+			pc -= 4
+		}
+	}
+	return pc
 }

@@ -12,6 +12,8 @@ type GraphicsTiming struct {
     Scanline        int
     HBlank          bool
     VBlank          bool
+    hasVBlankDma    bool
+    hasHBlankDma    bool
 }
 
 func (gt *GraphicsTiming) reset() {
@@ -19,6 +21,8 @@ func (gt *GraphicsTiming) reset() {
     gt.Scanline = 0
     gt.HBlank = false
     gt.VBlank = false
+    gt.hasVBlankDma = false
+    gt.hasHBlankDma = false
 }
 
 func (gt *GraphicsTiming) update(cycles int) {
@@ -42,30 +46,69 @@ func (gt *GraphicsTiming) update(cycles int) {
     dispstat.SetHBlank(gt.HBlank)
     dispstat.SetVCounter(gt.Scanline)
 
-    if gt.VBlank { gt.Gba.checkDmas(DMA_MODE_VBL) }
-    if gt.HBlank { gt.Gba.checkDmas(DMA_MODE_HBL) }
+    if gt.VBlank {
+        gt.Gba.checkDmas(DMA_MODE_VBL)
+    }
+    if gt.HBlank {
+        gt.Gba.checkDmas(DMA_MODE_HBL)
+    }
 }
 
 var ( 
     _ = fmt.Sprintf("")
 )
 
+type Dispcnt struct {
+    Mode uint32
+    CGB bool
+    DisplayFrame1 bool
+    HBlankIntervalFree bool
+    OneDimensional bool
+    ForcedBlank bool
+    DisplayBg0 bool
+    DisplayBg1 bool
+    DisplayBg2 bool
+    DisplayBg3 bool
+    DisplayObj bool
+    DisplayWin0 bool
+    DisplayWin1 bool
+    DisplayObjWin bool
+}
+
+func NewDispcnt(dispcnt uint32) *Dispcnt {
+
+    d := &Dispcnt{}
+    d.Mode = utils.GetVarData(dispcnt, 0, 2)
+    d.CGB = utils.BitEnabled(dispcnt, 3)
+    d.DisplayFrame1 = utils.BitEnabled(dispcnt, 4)
+    d.HBlankIntervalFree = utils.BitEnabled(dispcnt, 5)
+    d.OneDimensional = utils.BitEnabled(dispcnt, 6)
+    d.ForcedBlank = utils.BitEnabled(dispcnt, 7)
+    d.DisplayBg0 = utils.BitEnabled(dispcnt, 8)
+    d.DisplayBg1 = utils.BitEnabled(dispcnt, 9)
+    d.DisplayBg2 = utils.BitEnabled(dispcnt, 10)
+    d.DisplayBg3 = utils.BitEnabled(dispcnt, 11)
+    d.DisplayObj = utils.BitEnabled(dispcnt, 12)
+    d.DisplayWin0 = utils.BitEnabled(dispcnt, 13)
+    d.DisplayWin1 = utils.BitEnabled(dispcnt, 14)
+    d.DisplayObjWin = utils.BitEnabled(dispcnt, 15)
+
+    return d
+}
+
 func (gba *GBA) graphics() {
 
-	dispcnt := gba.Mem.Read16(0x0400_0000 + DISPCNT)
+    addr := gba.Mem.Read16(0x0400_0000 + DISPCNT)
+    dispcnt := NewDispcnt(addr)
 
-	mode := dispcnt & 0b111
-
-	flip := utils.BitEnabled(dispcnt, 4)
-
-
-    //gba.getTiles(0x600_0000, 0x10, false)
+    //gba.background(0x400_000A, dispcnt, false)
+    //gba.getTiles(0x600_4020, 0x10, false)
     //gba.debugPalette()
     //return
 
     gba.clear()
 
-	switch mode {
+	switch dispcnt.Mode {
 	case 0:
 		gba.updateMode0(dispcnt)
 	case 1:
@@ -76,13 +119,13 @@ func (gba *GBA) graphics() {
 	case 3:
 		gba.updateMode3()
 	case 4:
-		gba.updateMode4(flip)
+		gba.updateMode4(dispcnt)
 	case 5:
-		gba.updateMode5(flip)
+		gba.updateMode5(dispcnt)
     default: panic("UNKNOWN MODE")
 	}
 
-    if obj := utils.BitEnabled(dispcnt, 12); obj {
+    if obj := dispcnt.DisplayObj; obj {
         for i := 127; i >= 0; i-- {
             gba.object(dispcnt, uint32(i) * 0x8)
         }
@@ -98,7 +141,7 @@ func (gba *GBA) clear() {
     }
 }
 
-func (gba *GBA) object(dispcnt uint32, oamOffset uint32) {
+func (gba *GBA) object(dispcnt *Dispcnt, oamOffset uint32) {
 
     OAM_BASE := uint32(0x0700_0000)
     mem := gba.Mem
@@ -437,7 +480,7 @@ type Object struct {
     OneDimensional bool
 }
 
-func NewObject(attr0, attr1, attr2, dispcnt uint32) *Object {
+func NewObject(attr0, attr1, attr2 uint32, dispcnt *Dispcnt) *Object {
 
     obj := &Object{}
 
@@ -465,7 +508,7 @@ func NewObject(attr0, attr1, attr2, dispcnt uint32) *Object {
     obj.Priority = utils.GetVarData(attr2, 10, 11)
     obj.Palette = utils.GetVarData(attr2, 12, 15)
 
-    obj.OneDimensional = utils.BitEnabled(dispcnt, 6)
+    obj.OneDimensional = dispcnt.OneDimensional
 
     obj.setSize(obj.Shape, obj.Size)
 
@@ -506,42 +549,56 @@ func (obj *Object) setSize(shape, size uint32) {
     }
 }
 
-func (gba *GBA) updateMode0(dispcnt uint32) {
+func (gba *GBA) updateMode0(dispcnt *Dispcnt) {
 
     priorities := gba.getBgPriority(0)
-    bgToggle := utils.GetByte(dispcnt, 8)
-
     for i := range priorities {
 
-        if skipBgLayer := (bgToggle >> i) & 1 != 1; skipBgLayer {
+        if !bgEnabled(dispcnt, i) {
             continue
         }
 
         controlAddr := uint32(0x0400_0008 + ((i) * 0x2))
 
-        gba.background(controlAddr, false)
+        gba.background(controlAddr, dispcnt, false)
     }
 }
 
-func (gba *GBA) updateMode1(dispcnt uint32) {
+func bgEnabled(dispcnt *Dispcnt, idx int) bool {
+    switch idx {
+    case 0: return dispcnt.DisplayBg0
+    case 1: return dispcnt.DisplayBg1
+    case 2: return dispcnt.DisplayBg2
+    case 3: return dispcnt.DisplayBg3
+    }
+
+    return false
+}
+
+func (gba *GBA) updateMode1(dispcnt *Dispcnt) {
+
+
+    //controlAddr := uint32(0x0400_0008 + (1 * 0x2))
+    //fmt.Printf("CONTROL ADDR %08X\n", controlAddr)
+    //gba.background(controlAddr, dispcnt, false)
+
 
     priorities := gba.getBgPriority(0)
-    bgToggle := utils.GetByte(dispcnt, 8)
 
     for i := range priorities {
 
-        if skipBgLayer := (bgToggle >> i) & 1 != 1; skipBgLayer {
+        if !bgEnabled(dispcnt, i) {
             continue
         }
 
         controlAddr := uint32(0x0400_0008 + ((i) * 0x2))
 
         if i == 2 {
-            gba.background(controlAddr, true)
+            gba.background(controlAddr, dispcnt, true)
             continue
         }
 
-        gba.background(controlAddr, false)
+        gba.background(controlAddr, dispcnt, false)
     }
 }
 
@@ -565,7 +622,7 @@ func (gba *GBA) getBgPriority(mode uint32) [4]uint32 {
     return out
 }
 
-func (gba *GBA) background(base uint32, affine bool) {
+func (gba *GBA) background(base uint32, dispcnt *Dispcnt, affine bool) {
 
     mem := gba.Mem
 
@@ -587,6 +644,7 @@ func (gba *GBA) background(base uint32, affine bool) {
         }
     }
 }
+
 func (gba *GBA) setAffineBackgroundPixel(bg *Background, x, y uint32) {
 
     index := (x + (y*SCREEN_WIDTH)) * 4
@@ -722,7 +780,6 @@ func (gba *GBA) setBackgroundPixel(bg *Background, x, y uint32) {
     vFlip := utils.BitEnabled(screenData, 11)
     palette := utils.GetVarData(screenData, 12, 15)
 
-
     inTileY := int(y % 8)
     inTileX := int(x % 8)
 
@@ -760,9 +817,10 @@ func (gba *GBA) setBackgroundPixel(bg *Background, x, y uint32) {
     palData := gba.getPalette(uint32(palIdx), palette, false)
 
     // this will need to be updated
-    if palIdx == 0 {
-        return
-    }
+    //if palIdx == 0 {
+    //    return
+    //}
+
     gba.applyColor(palData, uint32(index))
 }
 
@@ -785,7 +843,8 @@ func NewBackground(cnt, hof, vof uint32, affine bool) *Background {
     bg := &Background{}
     bg.Affine = affine
     bg.Priority = utils.GetVarData(cnt, 0, 1)
-    bg.CharBaseBlock = utils.GetVarData(cnt, 2, 5)
+    //bg.CharBaseBlock = utils.GetVarData(cnt, 2, 5)
+    bg.CharBaseBlock = (cnt >> 2) & 0b11
     bg.Mosaic = utils.BitEnabled(cnt, 6)
     bg.Palette256 = utils.BitEnabled(cnt, 7)
     bg.ScreenBaseBlock = utils.GetVarData(cnt, 8, 12)
@@ -841,7 +900,7 @@ func (gba *GBA) updateMode3() {
 	}
 }
 
-func (gba *GBA) updateMode4(flip bool) {
+func (gba *GBA) updateMode4(dispcnt *Dispcnt) {
 
 	const (
 		SIZE = 0x9600
@@ -849,7 +908,7 @@ func (gba *GBA) updateMode4(flip bool) {
 
     BASE := uint32(0x0600_0000)
 
-    if flip {
+    if dispcnt.DisplayFrame1 {
         BASE += 0xA_000
     }
 
@@ -867,7 +926,7 @@ func (gba *GBA) updateMode4(flip bool) {
 	}
 }
 
-func (gba *GBA) updateMode5(flip bool) {
+func (gba *GBA) updateMode5(dispcnt *Dispcnt) {
 
 	const (
 		SIZE           = 0xA000
@@ -878,7 +937,7 @@ func (gba *GBA) updateMode5(flip bool) {
 
     BASE := uint32(0x0600_0000)
 
-    if flip {
+    if dispcnt.DisplayFrame1 {
         BASE += 0xA_000
     }
 
@@ -938,6 +997,18 @@ func (gba *GBA) applyColor(data, index uint32) {
 	(*gba.Pixels)[index+1] = c.G
 	(*gba.Pixels)[index+2] = c.B
 	(*gba.Pixels)[index+3] = c.A
+}
+
+func (gba *GBA) applyDebugColor(data, index uint32) {
+	r := uint8((data) & 0b11111)
+	g := uint8((data >> 5) & 0b11111)
+	b := uint8((data >> 10) & 0b11111)
+	c := convertTo24bit(r, g, b)
+
+	(*gba.DebugPixels)[index] = c.R
+	(*gba.DebugPixels)[index+1] = c.G
+	(*gba.DebugPixels)[index+2] = c.B
+	(*gba.DebugPixels)[index+3] = c.A
 }
 
 func (gba *GBA) getTiles(baseAddr, count int, palette256 bool) {

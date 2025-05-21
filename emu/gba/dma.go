@@ -39,6 +39,7 @@ type DMA struct {
 	SrcAdj  uint32
 	Repeat  bool
 	isWord  bool
+    DRQ     bool
 	Mode    uint32
 	IRQ     bool
 	Enabled bool
@@ -86,16 +87,18 @@ func (dma *DMA) WriteControl(v uint8, hi bool) {
 
 	if hi {
 		dma.Control = (dma.Control & 0b1111_1111) | (uint32(v) << 8)
-		dma.SrcAdj = uint32(v) & 0b11
-		dma.Repeat = utils.BitEnabled(uint32(v), 2)
-		dma.isWord = utils.BitEnabled(uint32(v), 3)
-		dma.Mode = (uint32(v) >> 4) & 0b11
+		dma.SrcAdj = (dma.SrcAdj &^ 0b10) | (uint32(v) & 1) << 1
+		dma.Repeat = utils.BitEnabled(uint32(v), 1)
+		dma.isWord = utils.BitEnabled(uint32(v), 2)
+        dma.DRQ = utils.BitEnabled(uint32(v), 3)
+        dma.Mode = utils.GetVarData(uint32(v), 4, 5)
 		dma.IRQ = utils.BitEnabled(uint32(v), 6)
 		dma.Enabled = utils.BitEnabled(uint32(v), 7)
 
 	} else {
 		dma.Control = (dma.Control &^ 0b1111_1111) | uint32(v)
-		dma.SrcAdj = (uint32(v) >> 5) & 0b11
+		dma.DstAdj = (uint32(v) >> 5) & 0b11
+		dma.SrcAdj = (dma.SrcAdj &^ 0b1) | ((uint32(v) >> 6) & 1)
 	}
 
 	if dma.Mode >= 0b100 {
@@ -114,32 +117,60 @@ func (dma *DMA) WriteControl(v uint8, hi bool) {
 	}
 }
 
-func (dma *DMA) transfer() {
+func (dma *DMA) disable() {
+    dma.Enabled = false
+    dma.Control &^= 0b1000_0000_0000_0000
+}
 
-    //fmt.Printf("Dst %08X Src %08X Cnt %08X\n", dma.Dst, dma.Src, dma.WordCount)
+func (dma *DMA) transfer() {
 
     mem := dma.Gba.Mem
 
     count := dma.WordCount
 
+    //if sram := (dma.Dst >= 0xE00_0000 || dma.Src >= 0xE00_0000); sram {
+    //    return
+    //}
+
+    //dstInPak := (dma.Dst >= 0x800_0000 && dma.Dst < 0xE00_0000)
+    //srcInPak := (dma.Src >= 0x800_0000 && dma.Src < 0xE00_0000)
+    //if srcInPak && dma.Idx != 3 {
+    //    // not sure how to handle drq
+    //    dma.disable()
+    //    return
+    //}
+
     dstOffset := int64(0)
     srcOffset := int64(0)
 
+    if dma.isWord {
+        dma.Dst &^= 0b11
+        dma.Src &^= 0b11
+    } else {
+        dma.Dst &^= 0b1
+        dma.Src &^= 0b1
+    }
+
     switch {
-    case dma.isWord && dma.DstAdj == DMA_ADJ_INC:  dstOffset = 4
+    case dma.isWord && dma.DstAdj  == DMA_ADJ_INC: dstOffset = 4
     case !dma.isWord && dma.DstAdj == DMA_ADJ_INC: dstOffset = 2
-    case dma.isWord && dma.DstAdj == DMA_ADJ_DEC:  dstOffset = -4
+    case dma.isWord && dma.DstAdj  == DMA_ADJ_DEC: dstOffset = -4
     case !dma.isWord && dma.DstAdj == DMA_ADJ_DEC: dstOffset = -2
     }
 
     switch {
-    case dma.isWord && dma.SrcAdj == DMA_ADJ_INC:  srcOffset = 4
+    case dma.isWord && dma.SrcAdj  == DMA_ADJ_INC: srcOffset = 4
     case !dma.isWord && dma.SrcAdj == DMA_ADJ_INC: srcOffset = 2
-    case dma.isWord && dma.SrcAdj == DMA_ADJ_DEC:  srcOffset = -4
+    case dma.isWord && dma.SrcAdj  == DMA_ADJ_DEC: srcOffset = -4
     case !dma.isWord && dma.SrcAdj == DMA_ADJ_DEC: srcOffset = -2
     }
 
-    for count > 0 {
+    for i := uint32(0); i < count; i++ {
+
+        // not sure about this
+        if dma.Dst >= 0x800_0000 && dma.Idx != 3 {
+            continue
+        }
 
         if dma.isWord {
             v := mem.Read32(dma.Src)
@@ -151,16 +182,20 @@ func (dma *DMA) transfer() {
 
         dma.Dst = uint32(int64(dma.Dst) + dstOffset)
         dma.Src = uint32(int64(dma.Src) + srcOffset)
-        count--
+
+    }
+
+
+    dma.disable()
+    
+    return
+
+    if !dma.Repeat {
+        return
     }
 
     if dma.IRQ {
         dma.Gba.triggerIRQ(0x8 + uint32(dma.Idx))
-    }
-
-    if !dma.Repeat {
-        dma.Enabled = false
-        return
     }
 
     //dma.count = ch.wordCount()

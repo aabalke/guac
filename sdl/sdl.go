@@ -1,8 +1,8 @@
 package sdl
 
 import (
-	"flag"
 	"time"
+    "fmt"
 
 	gameboy "github.com/aabalke33/guac/emu/gb"
 	"github.com/aabalke33/guac/emu/gba"
@@ -35,9 +35,11 @@ type SDLStruct struct {
 	name     string
 	Window   *sdl.Window
 	Renderer *sdl.Renderer
+	DebugWindow   *sdl.Window
+	DebugRenderer *sdl.Renderer
 }
 
-func (s *SDLStruct) Init() {
+func (s *SDLStruct) Init(debugger bool) {
 	err := sdl.Init(sdl.INIT_EVERYTHING)
 	err = ttf.Init()
 
@@ -51,6 +53,8 @@ func (s *SDLStruct) Init() {
 		s.name,
 		sdl.WINDOWPOS_UNDEFINED,
 		sdl.WINDOWPOS_UNDEFINED,
+		//1080,
+		//0,
 		1280,
 		720,
 		sdl.WINDOW_SHOWN|sdl.WINDOW_RESIZABLE)
@@ -68,6 +72,31 @@ func (s *SDLStruct) Init() {
 
 	s.Window = window
 	s.Renderer = renderer
+
+    if debugger {
+
+        debugWindow, err := sdl.CreateWindow(
+            fmt.Sprintf("%s Debug\n", s.name),
+            0,
+            0,
+            1080,
+            1080,
+            sdl.WINDOW_SHOWN|sdl.WINDOW_RESIZABLE)
+
+        if err != nil {
+            panic(err)
+        }
+
+        debugRenderer, err := sdl.CreateRenderer(debugWindow, -1, sdl.RENDERER_ACCELERATED|sdl.RENDERER_PRESENTVSYNC)
+        if err != nil {
+            panic(err)
+        }
+
+        debugRenderer.SetDrawBlendMode(sdl.BLENDMODE_BLEND)
+
+        s.DebugWindow = debugWindow
+        s.DebugRenderer = debugRenderer
+    }
 }
 
 func (s *SDLStruct) initController() {
@@ -89,54 +118,50 @@ func (s *SDLStruct) initController() {
 	println("Controller Attached")
 }
 
-func (s *SDLStruct) Close() {
+func (s *SDLStruct) Close(debug bool) {
 	sdl.Quit()
 	ttf.Quit()
 	s.Window.Destroy()
 	s.Renderer.Destroy()
+
+    if debug {
+        s.DebugWindow.Destroy()
+        s.DebugRenderer.Destroy()
+    }
 }
 
-func (s *SDLStruct) Update() {
+func (s *SDLStruct) Update(debug bool, romPath string) {
 
-	romPath := flag.String("r", "", "rom path")
-	debug := flag.Bool("debug", false, "debug")
-	maxInstr := flag.Int("i", 0, "max instruction count")
-	flag.Parse()
     InitSound()
 	Gb = gameboy.NewGameBoy()
     Gba = gba.NewGBA()
 	defer Gb.Logger.Close()
 
 	w, h := s.Window.GetSize()
-
 	scene := NewScene(s.Renderer, w, h, 10, C_Grey)
 
-    if *romPath == "" {
+    var debugScene *Scene
+    if debug {
+        debugW, debugH := s.DebugWindow.GetSize()
+        debugScene = NewScene(s.DebugRenderer, debugW, debugH, 10, C_Grey)
+    }
+
+    if romPath == "" {
         duration := 3 * time.Second
         InitLoadingScreen(s.Renderer, scene, duration)
         InitMainMenu(scene, 0)
     } else {
-        ActivateConsole(scene, *romPath)
+        ActivateConsole(scene, debugScene, romPath, debug)
     }
 
-	if *debug && *maxInstr == 0 {
-		panic("In debug mode max instruction count is required")
-	}
-
 	frameTime := time.Second / FPS
+	//frameTime := time.Second
 	ticker := time.NewTicker(frameTime)
 
 	count := 0
-
-	//switched := false
 	for i := range ticker.C {
 
-		//if emu.DoubleSpeed && !switched {
-		//    switched = true
-		//    emu.MemoryBus.Memory[0xFF26] = 0x80
-		//}
-
-		if !scene.Status.Active {
+		if !scene.Status.Active || (debug && !debugScene.Status.Active) {
 			ticker.Stop()
 			break
 		}
@@ -148,15 +173,23 @@ func (s *SDLStruct) Update() {
 
 		//count = Gb.Update(&scene.Status.Active, count)
         count = Gba.Update(&scene.Status.Active, count)
-        //if count == 0 {
-        //    return
-        //}
 
 		s.Renderer.SetDrawColor(0, 0, 0, 255)
 		s.Renderer.Clear()
+        if debug {
+            s.DebugRenderer.SetDrawColor(0, 0, 0, 255)
+            s.DebugRenderer.Clear()
+        }
+
 		scene.Update(nil)
 		scene.View()
 		s.Renderer.Present()
+
+        if debug {
+            debugScene.Update(nil)
+            debugScene.View()
+            s.DebugRenderer.Present()
+        }
 	}
 }
 
@@ -167,5 +200,4 @@ func InitSound() {
 	if err != nil {
         panic(err)
 	}
-
 }

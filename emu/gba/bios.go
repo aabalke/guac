@@ -62,17 +62,22 @@ func (gba *GBA) SysCall(inst uint32) int {
 		CpuFastSet(gba)
 	case SYS_BitUnPack:
 		BitUnPack(gba)
+    case SYS_HuffUnCompReadNormal:
+        cycles += HuffUnCompReadNormal(gba)
 	case SYS_LZ77UnCompReadNormalWrite8bit:
-        gba.Debugger.print(CURR_INST)
 		cycles += LZ77UnCompReadNormalWrite8bit(gba)
-        gba.Debugger.print(CURR_INST)
-        panic("HERE")
 	case SYS_LZ77UnCompReadNormalWrite16bit:
 		cycles += LZ77UnCompReadNormalWrite16bit(gba)
 	case SYS_RLUnCompReadNormalWrite8bit:
 		cycles += RLUUnCompReadNormalWrite8bit(gba)
 	case SYS_RLUnCompReadNormalWrite16bit:
 		cycles += RLUUnCompReadNormalWrite16bit(gba)
+    case SYS_Diff16bitUnFilter:
+        cycles += DecompressDiff16bit(gba, gba.Cpu.Reg.R[0], gba.Cpu.Reg.R[1])
+    case SYS_Diff8bitUnFilterWrite8bit:
+        cycles += DecompressDiff8bit(gba, gba.Cpu.Reg.R[0], gba.Cpu.Reg.R[1])
+    case SYS_Diff8bitUnFilterWrite16bit:
+        cycles += DecompressDiff8bit(gba, gba.Cpu.Reg.R[0], gba.Cpu.Reg.R[1])
 	case SYS_ObjAffineSet:
 		cycles += ObjAffineSet(gba)
 	case SYS_BgAffineSet:
@@ -80,6 +85,7 @@ func (gba *GBA) SysCall(inst uint32) int {
 	case SYS_GetBiosChecksum:
 		GetBiosChecksum(gba)
         cycles += 168948
+    //default :gba.exception(SWI_VEC, MODE_SWI)
 	default:
 		panic(fmt.Sprintf("EXCEPTION OR UNHANDLED SYS CALL TYPE 0x%X\n", inst))
 	}
@@ -311,6 +317,7 @@ func RegisterRamReset(gba *GBA) {
 func Div(gba *GBA, arm bool) {
 
 	const MAX = 0x8000_0000
+    const I32_MIN = -2147483647 - 1
 
 	r := &gba.Cpu.Reg.R
 
@@ -323,14 +330,21 @@ func Div(gba *GBA, arm bool) {
 		de = tmp
 	}
 
-	if de == 0 {
-		panic("SYS CALL DIV BY 0. WHAT HAPPENED")
-	}
-
-	if de == -1 && nu == -MAX {
+    switch {
+    case de == 0 && nu < 0:
+        r[0] = 0xFFFF_FFFF
+        r[1] = uint32(nu)
+        r[3] = 1
+        return
+    case de == 0:
+        r[0] = 1
+        r[1] = uint32(nu)
+        r[3] = 1
+        return
+    case de == -1 && nu == I32_MIN:
 		r[0] = MAX
 		r[1] = 0
-		r[2] = MAX
+		r[3] = MAX
 		return
 	}
 
@@ -340,7 +354,7 @@ func Div(gba *GBA, arm bool) {
 
 	r[0] = res
 	r[1] = mod
-	r[2] = abs
+	r[3] = abs
 }
 
 func Sqrt(gba *GBA) {
@@ -403,7 +417,7 @@ func Sqrt(gba *GBA) {
 func ArcTan(gba *GBA) {
 
 	r := &gba.Cpu.Reg.R
-	r[0], r[1], r[2] = _ArcTan(int32(r[0]))
+	r[0], r[1], r[3] = _ArcTan(int32(r[0]))
 }
 
 func ArcTan2(gba *GBA) {
@@ -558,8 +572,8 @@ func CpuSet(gba *GBA) {
 	switch {
 	case fill && isWord:
 
-		rs &= 0xfffffffc
-		rd &= 0xfffffffc
+		rs &^= 0b11
+		rd &^= 0b11
 
 		word := mem.Read32(rs)
 		for i := range wordCount {
@@ -568,16 +582,20 @@ func CpuSet(gba *GBA) {
 
         r[0] += 4
         r[1] += wordCount * 4
-        r[3] = 0x170
 
 	case fill && !isWord:
 
-		rs &= 0xfffffffe
-		rd &= 0xfffffffe
+		rd &^= 0b1
 
-		word := mem.Read16(rs)
+        srcAddr := (rs)
+		word := mem.Read16(srcAddr)
+        if unaligned := srcAddr & 1 == 1; unaligned {
+            word = mem.Read8(srcAddr)
+        }
+
 		for i := range wordCount {
-			mem.Write16(rd+(i<<1), uint16(word))
+            addr := rd + (i << 1)
+			mem.Write16(addr, uint16(word))
 		}
 
         r[0] += 4
@@ -585,8 +603,8 @@ func CpuSet(gba *GBA) {
 
 	case !fill && isWord:
 
-		rs &= 0xfffffffc
-		rd &= 0xfffffffc
+		rs &^= 0b11
+		rd &^= 0b11
 
 		for i := range wordCount {
 			word := mem.Read32(rs + (i << 2))
@@ -598,12 +616,18 @@ func CpuSet(gba *GBA) {
 
 	case !fill && !isWord:
 
-		rs &= 0xfffffffe
-		rd &= 0xfffffffe
+		rd &^= 0b1
 
 		for i := range wordCount {
-			word := mem.Read16(rs + (i << 1))
-			mem.Write16(rd+(i<<1), uint16(word))
+
+            srcAddr := (rs + (i<<1))
+			word := mem.Read16(srcAddr)
+            if unaligned := srcAddr & 1 == 1; unaligned {
+                word = mem.Read8(srcAddr)
+            }
+
+            dstAddr := (rd + (i<<1))
+			mem.Write16(dstAddr, uint16(word))
 		}
 
         r[0] += 4
@@ -618,8 +642,8 @@ func CpuFastSet(gba *GBA) {
 	r := &gba.Cpu.Reg.R
 	mem := gba.Mem
 
-	src := r[0] & 0xffff_fffc
-	dst := r[1] & 0xffff_fffc
+	src := r[0] & 0xFFFF_FFFC
+	dst := r[1] & 0xFFFF_FFFC
 	mode := r[2]
 
 	count := ((mode&0x000f_ffff + 7) >> 3) << 3
@@ -774,6 +798,120 @@ func DecompressRLU(gba *GBA, src, dst uint32) int {
 	}
 
     return bytesOutputted
+}
+
+
+func HuffUnCompReadNormal(gba *GBA) int {
+
+	r := &gba.Cpu.Reg.R
+	src := r[0]
+	dst := r[1]
+
+    bytesOutputted := DecompressHuff(gba, src, dst)
+    return bytesOutputted * 2
+}
+func DecompressHuff(gba *GBA, src, dst uint32) int {
+
+	// need to align half and pad 16bit?
+
+	mem := gba.Mem
+
+	header := mem.Read32(src)
+	decompressedSize := int(header >> 8)
+	src += 4
+
+	end := int(dst) + decompressedSize
+
+    bytesOutputted := 0
+	for int(dst) < end {
+		flag := mem.Read8(src)
+		src++
+
+		if (flag & 0x80) == 0 {
+			// Uncompressed block: copy (flag + 1) bytes
+			count := int(flag&0x7F) + 1
+			for range count {
+				b := mem.Read8(src)
+				mem.Write8(dst, uint8(b))
+                bytesOutputted++
+				src++
+				dst++
+			}
+		} else {
+			// Compressed block: repeat 1 byte for (flag & 0x7F) + 3 times
+			count := int(flag&0x7F) + 3
+			value := mem.Read8(src)
+			src++
+			for range count {
+				mem.Write8(dst, uint8(value))
+                bytesOutputted++
+				dst++
+			}
+		}
+	}
+
+    return bytesOutputted
+}
+
+func DecompressDiff8bit(gba *GBA, src, dst uint32) int {
+	mem := gba.Mem
+
+	header := mem.Read32(src)
+	dataSize := int(header >> 8)
+	src += 4
+
+	end := dst + uint32(dataSize)
+	if dataSize <= 0 {
+		return 0
+	}
+
+	// First byte is raw
+	prev := mem.Read8(src)
+	mem.Write8(dst, uint8(prev))
+	src++
+	dst++
+
+	// Remaining bytes are differences
+	for dst < end {
+		diff := int8(mem.Read8(src))
+		val := uint8(int(prev) + int(diff))
+		mem.Write8(dst, val)
+		prev = uint32(val)
+		src++
+		dst++
+	}
+
+	return dataSize
+}
+
+func DecompressDiff16bit(gba *GBA, src, dst uint32) int {
+	mem := gba.Mem
+
+	header := mem.Read32(src)
+	dataSize := int(header >> 8)
+	src += 4
+
+	end := dst + uint32(dataSize)
+	if dataSize <= 0 || dataSize%2 != 0 {
+		return 0 // Must be even number of bytes for 16-bit data
+	}
+
+	// First 16-bit unit is raw
+	prev := mem.Read16(src)
+	mem.Write16(dst, uint16(prev))
+	src += 2
+	dst += 2
+
+	for dst < end {
+		diff := int16(mem.Read16(src))
+		val := uint16(int(prev) + int(diff))
+		mem.Write16(dst, val)
+		prev = uint32(val)
+		src += 2
+		dst += 2
+	}
+
+	return dataSize
 }
 
 func GetBiosChecksum(gba *GBA) {

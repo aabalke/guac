@@ -51,19 +51,36 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
  
 👍 deadbody Cpu Test
 
+### MGBA Test Suite
+
+❌ Memory tests [820/1552]
+❌ I/O read tests [12/130]
+❌ Timing tests [240/2020]
+❌ Timer count-up tests [crash]
+❌ Timer IRQ tests [crash]
+👍 Shifter tests [140/140]
+👍 Carry tests [93/93]
+❌ Multiply long tests [52/72] (matches mgba)
+👍 BIOS math tests [615/615]
+❌ DMA tests [889/1256]
+❌ SIO register R/W tests [7/90]
+❌ SIO timing tests [crash]
+❌ Misc. edge case tests [0/10]
+❌ Video tests
+
 ### Tonc
 
 ❌ bigmap
 ❌ bld_demo
 👍 bm_modes
 
-👍  brin_demo
+👍 brin_demo
    👍 move
    👍 screenblock
    👍 wrap
 
-👍  cbb_demo
-    ❌  obj tile in top left (not sure if needed?)
+👍 cbb_demo
+    ❌ obj tile in top left (not sure if needed?)
     👍 0102/1011
     👍 2122/3031
     👍 no extra
@@ -86,7 +103,7 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
    👍 rotate
    👍 scale
    👍 shear
-   ❌ text (works on 1.3) (related to VCOUNT and scanlines)
+   👍 text
    👍 mask
    👍 double size
    👍 origin

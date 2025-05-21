@@ -288,17 +288,27 @@ func (cpu *Cpu) HiRegBX(opcode uint16) {
 
         rdValue := uint64(r[rd])
 
-        res := rsValue - rdValue
+        //res := rsValue - rdValue
+        res := rdValue - rsValue
 
         if rd != PC {
             r[PC] += 2
         }
 
-        rsSign := uint8(rsValue >> 31) & 1
-        rdSign := uint8(uint32(rdValue) >> 31) & 1
-        rSign  := uint8(int32(uint32(res)) >> 31) & 1
+        //if CURR_INST == 271_361 {
+        //    fmt.Printf("RS %08X, RD %08X, RES %08X\n", rsValue, rdValue, res)
+        //    fmt.Printf("RS %d, RD %d\n", rs, rd)
 
-        v := (rsSign != rdSign) && (rSign != rdSign)
+        //}
+
+        //rdSign := uint8(uint32(rdValue) >> 31) & 1
+        //rsSign := uint8(rsValue >> 31) & 1
+        //rSign  := uint8(int32(uint32(res)) >> 31) & 1
+        rdSign := uint8(rdValue >> 31) & 1
+        rsSign := uint8(rsValue >> 31) & 1
+        rSign  := uint8(res >> 31) & 1
+
+        v := (rdSign != rsSign) && (rSign != rdSign)
         c := res < 0x1_0000_0000
 
         cpsr.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))

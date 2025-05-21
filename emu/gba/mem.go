@@ -1,7 +1,5 @@
 package gba
 
-import "fmt"
-
 type Memory struct {
 	GBA   *GBA
 	BIOS  [0x4000]uint8
@@ -23,6 +21,7 @@ func NewMemory(gba *GBA) *Memory {
 	m := &Memory{GBA: gba}
 
 	m.Write(0x4000000, 0x80)
+
 
 	//m.Write(0x4000130, 0xFF) // KEY INPUT
 
@@ -71,10 +70,6 @@ func (m *Memory) Read(addr uint32) uint8 {
 		return m.GBA.Cartridge.Data[(addr-0x0A00_0000)%0x0200_0000]
 	case addr < 0x1000_0000:
 
-		if CURR_INST > 786_000 {
-			panic(fmt.Sprintf("hit sram. curr %d addr %08X\n", CURR_INST, addr))
-		}
-
 		if device := addr == 0x0E00_0001; device {
 			return 0x09 // temp for pokemon fire
 		}
@@ -82,7 +77,6 @@ func (m *Memory) Read(addr uint32) uint8 {
 		if manufacturer := addr == 0xE00_0000; manufacturer {
 			return 0xC2 // temp for pokemon fire
 		}
-
 
 		return m.GBA.Cartridge.SRAM[(addr-0x0E00_0000)%0x1_0000]
 	default:
@@ -121,6 +115,9 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 		return m.GBA.getJoypad(false)
 	case KEYINPUT + 1:
 		return m.GBA.getJoypad(true)
+
+    case 0x0088: return 0x00 // temp sound bias value for ruby
+    case 0x0089: return 0x42 // temp sound bias value for ruby
 
     case 0x00B0: return m.GBA.Dma[0].ReadSrc(0)
     case 0x00B1: return m.GBA.Dma[0].ReadSrc(1)
@@ -225,6 +222,7 @@ func (m *Memory) Read16(addr uint32) uint32 {
 }
 
 func (m *Memory) Read32(addr uint32) uint32 {
+
 	if addr == 0x0 {
 		return m.ReadBios(addr)
 	}
@@ -268,9 +266,9 @@ func (m *Memory) Write(addr uint32, v uint8) {
 	case addr < 0x0800_0000:
 		return
 	case addr < 0x0A00_0000:
-		m.GBA.Cartridge.Data[addr-0x0800_0000] = v
+        return
 	case addr < 0x0E00_0000:
-		m.GBA.Cartridge.Data[(addr-0x0A00_0000)%0x0200_0000] = v
+        return
 	case addr < 0x1000_0000:
 		m.GBA.Cartridge.SRAM[(addr-0x0E00_0000)%0x1_0000] = v
 	default:
@@ -298,6 +296,18 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
         return
     case 0x007:
         return
+    case 0x0009: m.IO[addr] = v &^ 0b0010_0000 // BG0CNT mask
+    case 0x000B: m.IO[addr] = v &^ 0b0010_0000 // BG1CNT mask
+
+    case 0x0011: m.IO[addr] = v &^ 0b1111_1110 // BG0HOFS mask
+    case 0x0013: m.IO[addr] = v &^ 0b1111_1110 // BG0VOFS mask
+    case 0x0015: m.IO[addr] = v &^ 0b1111_1110 // BG1HOFS mask
+    case 0x0017: m.IO[addr] = v &^ 0b1111_1110 // BG1VOFS mask
+    case 0x0019: m.IO[addr] = v &^ 0b1111_1110 // BG2HOFS mask
+    case 0x001B: m.IO[addr] = v &^ 0b1111_1110 // BG2VOFS mask
+    case 0x001D: m.IO[addr] = v &^ 0b1111_1110 // BG3HOFS mask
+    case 0x001F: m.IO[addr] = v &^ 0b1111_1110 // BG3VOFS mask
+
     case 0x00B0: m.GBA.Dma[0].WriteSrc(v, 0)
     case 0x00B1: m.GBA.Dma[0].WriteSrc(v, 1)
     case 0x00B2: m.GBA.Dma[0].WriteSrc(v, 2)
@@ -381,7 +391,6 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 	default:
 		m.IO[addr] = v
 	}
-
 }
 
 func (m *Memory) Write8(addr uint32, v uint8) {

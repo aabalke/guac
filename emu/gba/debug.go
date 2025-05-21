@@ -53,8 +53,11 @@ func (d *Debugger) print(i int) {
     p("MODE", BANK_ID[mode])
 
     s("--------  --------")
-    for i := 0x0500_0000; i <= 0x0500_0080; i += 4 {
-    //for i := 0x0300_28E0; i <= 0x0300_2900; i += 4 {
+//    for i := 0x0300_7B50; i >= 0x0300_7ADC; i -= 4 {
+//    //for i := 0x0300_28E0; i <= 0x0300_2900; i += 4 {
+//        p(fmt.Sprintf("STACK %X", i), d.gba.Mem.Read32(uint32(i)))
+//    }
+    for i := 0x0600_0000; i <= 0x0600_0030; i += 4 {
         p(fmt.Sprintf("VRAM %X", i), d.gba.Mem.Read32(uint32(i)))
     }
 }
@@ -142,4 +145,85 @@ func (d *Debugger) dump(s, e uint32) {
     if err != nil { panic(err) } 
 
     w.Flush()
+}
+
+func (gba *GBA) debugGraphics() {
+
+    const (
+        DEBUG_WIDTH = 1080
+        DEBUG_HEIGHT = 1080
+        palette256 = true
+        baseAddr = 0x600_0000
+        count = 0x08
+    )
+
+    tileSize := 0x20
+    if palette256 {
+        tileSize = 0x40
+    }
+
+	// base addr usually inc of 0x4000 over 0x0600_0000
+	// count is # of tiles to view
+
+	for offset := range count {
+		tileOffset := offset * tileSize
+		tileAddr := baseAddr + tileOffset
+		debugTile(gba, uint(tileAddr), tileSize, offset, 0, false, palette256)
+	}
+
+}
+
+func debugTile(gba *GBA, tileAddr uint, tileSize, xOffset, yOffset int, obj, palette256 bool) {
+    const (
+        DEBUG_WIDTH = 120
+        DEBUG_HEIGHT = 600
+    )
+
+	xOffset *= tileSize
+	yOffset *= tileSize
+
+	indexOffset := xOffset + (yOffset * DEBUG_WIDTH)
+
+	mem := gba.Mem
+	index := 0
+	byteOffset := 0
+
+	for y := range 8 {
+
+		iY := DEBUG_WIDTH * y
+
+		for x := range 8 {
+
+			tileData := mem.Read16(uint32(tileAddr) + uint32(byteOffset))
+
+            //fmt.Printf("%08X %08X\n", tileAddr, mem.VRAM[0x20])
+
+            var palIdx uint32
+            if !palette256 {
+                bitDepth := 4
+                palIdx = (tileData >> uint32(bitDepth)) & 0b1111
+                if x%2 == 0 {
+                    palIdx = tileData & 0b1111
+                }
+            } else {
+                palIdx = tileData & 0b1111_1111
+            }
+
+
+			palData := gba.getPalette(uint32(palIdx), 0, obj)
+			index = (iY + x + indexOffset) * 4
+
+			gba.applyDebugColor(palData, uint32(index))
+
+            if !palette256 {
+
+                if x%2 == 1 {
+                    byteOffset += 1
+                }
+
+            } else {
+                byteOffset += 1
+            }
+		}
+	}
 }
