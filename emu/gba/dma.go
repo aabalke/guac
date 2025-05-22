@@ -1,8 +1,6 @@
 package gba
 
 import (
-	//"fmt"
-
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
@@ -47,12 +45,12 @@ type DMA struct {
 
 func (dma *DMA) ReadSrc(byte uint32) uint8 {
     bitOffset := 8 * byte
-    return uint8(dma.Src >> bitOffset) & 0xF
+    return uint8(dma.Src >> bitOffset) & 0xFF
 }
 
 func (dma *DMA) ReadDst(byte uint32) uint8 {
     bitOffset := 8 * byte
-    return uint8(dma.Dst >> bitOffset) & 0xF
+    return uint8(dma.Dst >> bitOffset) & 0xFF
 }
 
 func (dma *DMA) ReadCount(hi bool) uint8 {
@@ -67,10 +65,20 @@ func (dma *DMA) ReadControl(hi bool) uint8 {
 
 func (dma *DMA) WriteSrc(v uint8, byte uint32) {
     dma.Src = utils.ReplaceByte(dma.Src, uint32(v), byte)
+    if dma.Idx == 0 {
+        dma.Src &= 0x7FF_FFFF
+        return
+    }
+    dma.Src &= 0xFFF_FFFF
 }
 
 func (dma *DMA) WriteDst(v uint8, byte uint32) {
     dma.Dst = utils.ReplaceByte(dma.Dst, uint32(v), byte)
+    if dma.Idx == 0 {
+        dma.Dst &= 0x7FF_FFFF
+        return
+    }
+    dma.Dst &= 0xFFF_FFFF
 }
 
 func (dma *DMA) WriteCount(v uint8, hi bool) {
@@ -80,7 +88,12 @@ func (dma *DMA) WriteCount(v uint8, hi bool) {
         return
     }
 
-	dma.WordCount = (dma.WordCount &^ 0b1111_1111) |  uint32(v)
+    mask := 0x7F
+    if dma.Idx == 3 {
+        mask = 0x1FF
+    }
+
+	dma.WordCount = (dma.WordCount &^ 0b1111_1111) |  (uint32(v) & uint32(mask))
 }
 
 func (dma *DMA) WriteControl(v uint8, hi bool) {
@@ -128,17 +141,26 @@ func (dma *DMA) transfer() {
 
     count := dma.WordCount
 
-    //if sram := (dma.Dst >= 0xE00_0000 || dma.Src >= 0xE00_0000); sram {
-    //    return
-    //}
+    switch {
+    case count == 0 && dma.Idx == 3:
+        count  = 0x10000
+    case count == 0:
+        count  = 0x4000
+    }
 
-    //dstInPak := (dma.Dst >= 0x800_0000 && dma.Dst < 0xE00_0000)
-    //srcInPak := (dma.Src >= 0x800_0000 && dma.Src < 0xE00_0000)
-    //if srcInPak && dma.Idx != 3 {
-    //    // not sure how to handle drq
-    //    dma.disable()
-    //    return
-    //}
+    if dma.Idx == 0 && dma.Mode == 3 {
+        return
+    }
+
+    if dma.Mode == DMA_MODE_HBL {
+        srcInLimited := dma.Src >= 0x600_0000 && dma.Src < 0xA00_0000
+        dstInLimited := dma.Dst >= 0x600_0000 && dma.Dst < 0xA00_0000
+        allowed := utils.BitEnabled(dma.Gba.Mem.Read16(0x400_0000), 5)
+
+        if (srcInLimited || dstInLimited) && !allowed {
+            return
+        }
+    }
 
     dstOffset := int64(0)
     srcOffset := int64(0)
@@ -165,38 +187,40 @@ func (dma *DMA) transfer() {
     case !dma.isWord && dma.SrcAdj == DMA_ADJ_DEC: srcOffset = -2
     }
 
+    tmpDst := dma.Dst
+    tmpSrc := dma.Src
+
     for i := uint32(0); i < count; i++ {
 
         // not sure about this
-        if dma.Dst >= 0x800_0000 && dma.Idx != 3 {
+        if tmpDst >= 0x800_0000 && dma.Idx != 3 {
             continue
         }
 
         if dma.isWord {
-            v := mem.Read32(dma.Src)
-            mem.Write32(dma.Dst, v)
+            v := mem.Read32(tmpSrc)
+            mem.Write32(tmpDst, v)
         } else {
-            v := mem.Read16(dma.Src)
-            mem.Write16(dma.Dst, uint16(v))
+            v := mem.Read16(tmpSrc)
+            mem.Write16(tmpDst, uint16(v))
+
         }
+        tmpDst = uint32(int64(tmpDst) + dstOffset)
+        tmpSrc = uint32(int64(tmpSrc) + srcOffset)
 
-        dma.Dst = uint32(int64(dma.Dst) + dstOffset)
-        dma.Src = uint32(int64(dma.Src) + srcOffset)
-
-    }
-
-
-    dma.disable()
-    
-    return
-
-    if !dma.Repeat {
-        return
     }
 
     if dma.IRQ {
         dma.Gba.triggerIRQ(0x8 + uint32(dma.Idx))
     }
+
+    if !dma.Repeat {
+        dma.disable()
+    }
+    //dma.Dst = tmpDst
+    //dma.Src = tmpSrc
+    
+    return
 
     //dma.count = ch.wordCount()
     if dma.DstAdj == DMA_ADJ_RES {

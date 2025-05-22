@@ -53,20 +53,27 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 
 ### MGBA Test Suite
 
-❌ Memory tests [820/1552]
+❌ Memory tests [832/1552]
 ❌ I/O read tests [12/130]
 ❌ Timing tests [240/2020]
 ❌ Timer count-up tests [crash]
-❌ Timer IRQ tests [crash]
+❌ Timer IRQ tests [0/90]
 👍 Shifter tests [140/140]
 👍 Carry tests [93/93]
-❌ Multiply long tests [52/72] (matches mgba)
+👍 Multiply long tests [52/72] (matches mgba)
 👍 BIOS math tests [615/615]
-❌ DMA tests [889/1256]
+❌ DMA tests [938/1256]
 ❌ SIO register R/W tests [7/90]
-❌ SIO timing tests [crash]
+❌ SIO timing tests [0/8]
 ❌ Misc. edge case tests [0/10]
 ❌ Video tests
+    ❌ Basic Mode 3
+    ❌ Basic Mode 4
+    ❌ Degenerate OBJ transoforms
+    ❌ Layer toggle
+    ❌ Layer toggle 2
+    ❌ OAM Update Delay
+    ❌ Window offscreen reset
 
 ### Tonc
 

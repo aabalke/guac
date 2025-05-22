@@ -173,7 +173,7 @@ func (cpu *Cpu) thumbArithmetic(alu *ThumbAlu) {
         v = (rdSign == rsSign) && (rSign != rdSign)
         c = res >= 0x1_0000_0000
     case THUMB_SBC, THUMB_NEG:
-        v = (rdSign != rsSign) && (rSign != rdSign)
+        v = (rdSign != rsSign) && (rSign != rsSign)
         c =  res < 0x1_0000_0000
     }
 

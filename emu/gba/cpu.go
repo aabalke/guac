@@ -78,6 +78,7 @@ func NewCpu(gba *GBA) *Cpu {
     c.Reg.LR[BANK_ID[MODE_IRQ]] =   0x0000_0000
     c.Reg.SPSR[BANK_ID[MODE_IRQ]] = 0x0000_0010
 
+    c.Reg.SP[BANK_ID[MODE_SYS]] =   0x0300_7FA0
 	return c
 }
 

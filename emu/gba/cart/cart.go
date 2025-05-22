@@ -2,6 +2,7 @@ package gba
 
 import (
 	"os"
+    "fmt"
 )
 
 type Cartridge struct {
@@ -10,6 +11,7 @@ type Cartridge struct {
 	Data    [0x0200_0000]uint8
     SRAM    [0x1_0000]uint8
 	Header  *Header
+    RomLength uint32
 }
 
 func NewCartridge(rom, sav string) *Cartridge {
@@ -38,6 +40,11 @@ func (c *Cartridge) load() {
     for i := range len(c.SRAM) {
         c.SRAM[i] = 0xFF
     }
+
+    c.RomLength = uint32(len(buf))
+
+    fmt.Printf("LENGTH OF ROM IS %08X\n", len(buf))
+
 
     for i:= range len(buf) {
         c.Data[i] = uint8(buf[i])

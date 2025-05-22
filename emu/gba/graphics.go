@@ -36,21 +36,30 @@ func (gt *GraphicsTiming) update(cycles int) {
         VBLANK = 83776
     )
 
+    prevHBlank := gt.HBlank
+    prevVBlank := gt.VBlank
+    
     gt.RefreshCycles += cycles
     gt.HBlank = gt.RefreshCycles % SCANLINE > HDRAW
     gt.Scanline = gt.RefreshCycles / SCANLINE
-    gt.VBlank = gt.RefreshCycles > VDRAW
+    gt.VBlank = gt.Scanline > 160
 
     dispstat := &gt.Gba.Mem.Dispstat
     dispstat.SetVBlank(gt.VBlank)
     dispstat.SetHBlank(gt.HBlank)
     dispstat.SetVCounter(gt.Scanline)
 
-    if gt.VBlank {
+    if gt.VBlank && !prevVBlank {
+    //if gt.VBlank {
         gt.Gba.checkDmas(DMA_MODE_VBL)
+
+        gt.Gba.triggerIRQ(1)
+
     }
-    if gt.HBlank {
+    if gt.HBlank && !prevHBlank {
+    //if gt.HBlank {
         gt.Gba.checkDmas(DMA_MODE_HBL)
+        gt.Gba.triggerIRQ(0)
     }
 }
 
@@ -208,12 +217,6 @@ func (gba *GBA) setObjectAffinePixel(obj *Object, x, y uint32) {
         objY += obj.H / 2
     }
 
-    bitDepth := 4
-    if obj.Palette256 {
-        bitDepth = 8
-    }
-
-    VRAM_BASE := int(0x0601_0000)
 	mem := gba.Mem
 
     xIdx := int(float32(x) - float32(objX))
@@ -243,70 +246,25 @@ func (gba *GBA) setObjectAffinePixel(obj *Object, x, y uint32) {
         return
     }
 
-    enTileY := int(yIdx / 8)
-    enTileX := int(xIdx / 8)
-    inTileY := int(yIdx % 8)
-    inTileX := int(xIdx % 8)
 
-    if obj.HFlip {
-        enTileX = 7 - enTileX
-        inTileX = 7 - inTileX
-    }
-    if obj.VFlip {
-        enTileY = 7 - enTileY
-        inTileY = 7 - inTileY
-    }
+    enTileX, enTileY, inTileX, inTileY := getPositions(obj, uint32(xIdx), uint32(yIdx))
 
-    index := (x + (y*SCREEN_WIDTH)) * 4
-    var addr uint32
-
-    tileIdx := (enTileX * 0x20) + (enTileY * 0x100)
-    if !obj.OneDimensional {
-        tileIdx += enTileY * 0x400 - 0x100 // offsets previous 0x100 added
-    }
-
-    //MAX_NUM_TILES := 1024 // not sure if this is correct or two wrap at (obj h * obj W)
-
-    tileOffset := 0x20
-    if obj.Palette256 { tileOffset = 0x40}
-
-    tileIdx = ((tileIdx + int(obj.CharName * uint32(tileOffset)) ) % (1024 * 0x20))
-
-    tileAddr := uint32(VRAM_BASE + tileIdx)
-
-    var inTileIdx uint32
-    if obj.Palette256 {
-        inTileIdx = uint32(inTileX) + uint32(inTileY * 8)
-    } else {
-        inTileIdx = uint32(inTileX / 2) + uint32(inTileY * 4)
-    }
-
-    addr = uint32(tileAddr) + inTileIdx
+    addr := getTileAddr(obj, enTileX, enTileY, inTileX, inTileY)
 
     tileData := mem.Read16(addr)
 
-    var palIdx uint32
-    if obj.Palette256 {
-        palIdx = tileData & 0b1111_1111
-        obj.Palette = 0
-    } else {
-        if inTileX % 2 == 0 {
-            palIdx = tileData & 0b1111
-        } else {
-            palIdx = (tileData >> uint32(bitDepth)) & 0b1111
-        }
-    }
-
-    palData := gba.getPalette(uint32(palIdx), obj.Palette, true)
+    palIdx, palData := getPaletteData(gba, obj, tileData, uint32(inTileX))
 
     if !inScreenBounds(int(x), int(y)) {
         return
     }
 
-    // this will need to be updated
     if palIdx == 0 {
+        // this will need to be updated
         return
     }
+
+    index := (x + (y*SCREEN_WIDTH)) * 4
     gba.applyColor(palData, uint32(index))
 }
 
@@ -367,14 +325,6 @@ func (gba *GBA) outBoundsAffine(obj *Object, x, y uint32) bool {
 
 func (gba *GBA) setObjectPixel(obj *Object, x, y uint32) {
 
-    bitDepth := 4
-    if obj.Palette256 {
-        bitDepth = 8
-    }
-
-    // assummes 4bit
-
-    VRAM_BASE := int(0x0601_0000)
 	mem := gba.Mem
 
     yIdx := int(y) - int(obj.Y)
@@ -394,10 +344,33 @@ func (gba *GBA) setObjectPixel(obj *Object, x, y uint32) {
         return
     }
 
-    enTileY := int(yIdx / 8)
-    enTileX := int(xIdx / 8)
-    inTileY := int(yIdx % 8)
-    inTileX := int(xIdx % 8)
+    enTileX, enTileY, inTileX, inTileY := getPositions(obj, uint32(xIdx), uint32(yIdx))
+
+    addr := getTileAddr(obj, enTileX, enTileY, inTileX, inTileY)
+
+    tileData := mem.Read16(addr)
+
+    palIdx, palData := getPaletteData(gba, obj, tileData, uint32(inTileX))
+
+    if !inScreenBounds(int(x), int(y)) {
+        return
+    }
+
+    if palIdx == 0 {
+        // this will need to be updated
+        return
+    }
+
+    index := (x + (y*SCREEN_WIDTH)) * 4
+    gba.applyColor(palData, uint32(index))
+}
+
+func getPositions (obj *Object, xIdx, yIdx uint32) (uint32, uint32, uint32, uint32) {
+
+    enTileY := yIdx / 8
+    enTileX := xIdx / 8
+    inTileY := yIdx % 8
+    inTileX := xIdx % 8
 
     if obj.HFlip {
         enTileX = 7 - enTileX
@@ -408,20 +381,27 @@ func (gba *GBA) setObjectPixel(obj *Object, x, y uint32) {
         inTileY = 7 - inTileY
     }
 
-    index := (x + (y*SCREEN_WIDTH)) * 4
-    var addr uint32
+    return enTileX, enTileY, inTileX, inTileY
+}
 
-    tileIdx := (enTileX * 0x20) + (enTileY * 0x100)
-    if !obj.OneDimensional {
-        tileIdx += enTileY * 0x400 - 0x100 // offsets previous 0x100 added
+func getTileAddr(obj *Object, enTileX, enTileY, inTileX, inTileY uint32) uint32 {
+
+    VRAM_BASE := int(0x0601_0000)
+    tileWidth := 0x20
+    tileHeight := 0x80
+
+    if obj.Palette256 {
+        tileWidth *= 2
+        tileHeight *= 2
     }
 
-    //MAX_NUM_TILES := 1024 // not sure if this is correct or two wrap at (obj h * obj W)
+    tileIdx := (int(enTileX) * tileWidth) + (int(enTileY) * tileHeight)
+    if !obj.OneDimensional {
+        tileIdx += (int(enTileY) * 0x400) - tileHeight
+    }
 
-    tileOffset := 0x20
-    if obj.Palette256 { tileOffset = 0x40}
-
-    tileIdx = ((tileIdx + int(obj.CharName * uint32(tileOffset)) ) % (1024 * 0x20))
+    const MAX_NUM_TILE = 1024
+    tileIdx = (tileIdx + int(obj.CharName) * tileWidth) % (MAX_NUM_TILE * tileWidth)
 
     tileAddr := uint32(VRAM_BASE + tileIdx)
 
@@ -432,9 +412,10 @@ func (gba *GBA) setObjectPixel(obj *Object, x, y uint32) {
         inTileIdx = uint32(inTileX / 2) + uint32(inTileY * 4)
     }
 
-    addr = uint32(tileAddr) + inTileIdx
+    return uint32(tileAddr) + inTileIdx
+}
 
-    tileData := mem.Read16(addr)
+func getPaletteData(gba *GBA, obj *Object, tileData, inTileX uint32) (uint32, uint32) {
 
     var palIdx uint32
     if obj.Palette256 {
@@ -444,21 +425,14 @@ func (gba *GBA) setObjectPixel(obj *Object, x, y uint32) {
         if inTileX % 2 == 0 {
             palIdx = tileData & 0b1111
         } else {
-            palIdx = (tileData >> uint32(bitDepth)) & 0b1111
+            const BIT_DEPTH = 4
+            palIdx = (tileData >> 4) & 0b1111
         }
     }
 
     palData := gba.getPalette(uint32(palIdx), obj.Palette, true)
 
-    if !inScreenBounds(int(x), int(y)) {
-        return
-    }
-
-    // this will need to be updated
-    if palIdx == 0 {
-        return
-    }
-    gba.applyColor(palData, uint32(index))
+    return palIdx, palData
 }
 
 type Object struct {

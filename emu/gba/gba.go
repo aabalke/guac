@@ -24,7 +24,7 @@ const (
 var (
     _ = fmt.Sprintln("")
     CURR_INST = 0
-    //MAX_COUNT = 1_000_000
+    MAX_COUNT = 100_000
 )
 
 type GBA struct {
@@ -79,9 +79,18 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
             cycles = gba.Cpu.Execute(opcode)
         }
 
-        //if CURR_INST == 1_000_000 {
-        //    gba.Paused = true
+        //if CURR_INST > 100_000 && r[PC] == 0x80B063E { 237603
+        // 243_270
+        //if CURR_INST == 243_285 pass
+        //if CURR_INST == 243242 || CURR_INST == 243243 { //grabs dma3 which is 0 and should be 1
+        ////if r[PC] == 0x80B159A {
+        //    //gba.Paused = true
         //    gba.Debugger.print(CURR_INST)
+        //    //return instCount
+        //}
+
+        //if CURR_INST == 243244 {
+        //    gba.Paused = true
         //    return instCount
         //}
 
@@ -91,6 +100,8 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
         gba.Timers.Increment(uint32(cycles))
         gba.updateIRQ()
 	}
+
+    //fmt.Printf("DMA3 WC %08X\n", gba.Mem.Read8(0x400_00DC))
 
     gba.checkDmas(DMA_MODE_REF)
 

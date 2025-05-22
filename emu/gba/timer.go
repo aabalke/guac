@@ -18,10 +18,10 @@ func (tt *Timers) Increment(newCycles uint32) {
         t.SavedCycles += newCycles
 
         for range t.SavedCycles / t.getCycles() {
-            overflow := t.Increment()
+            overflow := t.Increment(false)
             if overflow {
 
-                if tt[i+1].isCascade() {
+                if i < 3 && tt[i+1].isCascade() {
                     tt.cascade(i)
                 }
 
@@ -43,7 +43,7 @@ func (tt *Timers) cascade(overflowTimerIdx int) {
 
     cascadeIdx := overflowTimerIdx + 1
 
-    overflow := tt[cascadeIdx].CascadeIncrement()
+    overflow := tt[cascadeIdx].Increment(true)
 
     if overflow {
         tt.cascade(cascadeIdx)
@@ -104,37 +104,25 @@ func (t *Timer) WriteD(v uint8, hi bool) {
     t.SavedInitialValue |= uint32(v)
 }
 
-func (t *Timer) CascadeIncrement() bool {
+func (t *Timer) Increment(cascade bool) bool {
 
-    if !t.isCascade() {
+    if t.isCascade() && !cascade {
+        return false
+    }
+    if !t.isCascade() && cascade {
         panic("NON-CASCADE TImER INCREMENTING IN CASCADE")
     }
 
-    cnt := t.D + 1
 
-    if overflow := cnt > 0xFFFF; overflow {
-        t.D = 0
-        return true
-    }
-
-    t.D = cnt
-
-    return false
-}
-
-func (t *Timer) Increment() bool {
-
-    if t.isCascade() {
-        return false
-    }
+    overflow := t.D == 0xFFFF
 
     t.D++
 
-    if overflow := t.D > 0xFFFF; overflow {
+    if overflow {
         t.D = 0
     }
 
-    return t.D == 0
+    return overflow
 }
 
 func (t *Timer) getCycles() uint32 {
