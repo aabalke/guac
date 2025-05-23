@@ -77,7 +77,7 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 
 ### Tonc
 
-❌ bigmap
+👍 bigmap
 ❌ bld_demo
 👍 bm_modes
 
@@ -103,7 +103,7 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 ❌ m7_demo_mb
 ❌ m7_ex
 ❌ mos_demo
-❌ oacombo
+👍 oacombo
 
 ❌ obj_aff
    👍 move

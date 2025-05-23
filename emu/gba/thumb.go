@@ -234,7 +234,7 @@ func (cpu *Cpu) thumbTest(alu *ThumbAlu) {
     cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
 }
 
-func (cpu *Cpu) HiRegBX(opcode uint16) {
+func (cpu *Cpu) HiRegBX(opcode uint16) int {
 
     // only cmp effects flags
 
@@ -274,7 +274,7 @@ func (cpu *Cpu) HiRegBX(opcode uint16) {
             r[rd] = uint32(res)
             r[PC] += 2
         }
-        return
+        return 4
 
     case inst == 1:
 
@@ -315,13 +315,22 @@ func (cpu *Cpu) HiRegBX(opcode uint16) {
         cpsr.SetFlag(FLAG_Z, uint32(res) == 0)
         cpsr.SetFlag(FLAG_C, c)
         cpsr.SetFlag(FLAG_V, v)
-        return
+        return 4
 
     case inst == 2:
 
         if nop := rs == 8 && rd == 8; nop {
+
+            seq := cpu.Gba.Ct.popSequential(r[PC], true)
+
+            cycles := 6
+            if seq {
+                cycles = 4
+            }
+
+
             r[PC] += 2
-            return
+            return cycles
         }
 
         // MOV HI REG //
@@ -335,12 +344,12 @@ func (cpu *Cpu) HiRegBX(opcode uint16) {
         if rd == PC {
             //r[rd] = utils.WordAlign(uint32(rsValue)) + 2 // need 2 for pokemon, may be different calc
             r[rd] = utils.HalfAlign(uint32(rsValue)) // need 2 for pokemon, may be different calc
-            return
+            return 4
         }
 
         r[rd] = uint32(rsValue)
         r[PC] += 2
-        return
+        return 4
 
     case inst == 3 && mSBd: panic("UNSUPPORTED HI BLX")
     case inst == 3:
@@ -355,8 +364,10 @@ func (cpu *Cpu) HiRegBX(opcode uint16) {
             r[PC] += 4
         }
 
-        return
+        return 4
     }
+
+    return 4
 }
 
 const (

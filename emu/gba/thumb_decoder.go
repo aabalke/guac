@@ -26,7 +26,7 @@ func (cpu *Cpu) DecodeTHUMB(opcode uint16) int {
 	case isThumbAlu(opcode):
 		cpu.ThumbAlu(opcode)
 	case isThumbHiReg(opcode):
-		cpu.HiRegBX(opcode)
+        return cpu.HiRegBX(opcode)
 	case isLSHalf(opcode):
 		cpu.thumbLSHalf(opcode)
 	case isLSSigned(opcode):

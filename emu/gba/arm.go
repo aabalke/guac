@@ -84,6 +84,13 @@ func (cpu *Cpu) Alu(opcode uint32) {
         cpu.test(alu)
     }
 
+
+    if seq := cpu.Gba.Ct.popSequential(cpu.Reg.R[PC], false); seq {
+        cpu.Gba.Ct.instCycles = 4
+    } else {
+        cpu.Gba.Ct.instCycles = 4
+    }
+
     if alu.Rd != PC {
         cpu.Reg.R[15] += 4
     }
@@ -163,6 +170,7 @@ func (cpu *Cpu) logical(alu *Alu) {
     cpu.Reg.R[alu.Rd] = res
 
     cpu.setAluFlags(alu, uint64(res))
+
 }
 
 func (cpu *Cpu) arithmetic(alu *Alu) {

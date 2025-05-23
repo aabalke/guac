@@ -42,6 +42,11 @@ func (cpu *Cpu) DecodeARM(opcode uint32) int {
         cpu.Mul(opcode)
 	case isALU(opcode):
 		cpu.Alu(opcode)
+
+        if cpu.Gba.Ct.instCycles != 0 {
+            return cpu.Gba.Ct.instCycles
+        }
+
 	default:
 		panic(fmt.Sprintf("Unable to Decode %X, at PC %X, INSTR %d", opcode, r[PC], CURR_INST))
 	}

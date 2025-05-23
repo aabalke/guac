@@ -51,6 +51,7 @@ type GBA struct {
     Dma    [4]DMA
 
     Gt *GraphicsTiming
+    Ct *CycleTiming
 }
 
 func (gba *GBA) Update(exit *bool, instCount int) int {
@@ -66,6 +67,8 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
 
     //for range MAX_COUNT + 1 {
     for gba.Gt.RefreshCycles < (gba.Clock / gba.FPS) {
+
+        gba.Ct.instCycles = 0
 
         cycles := 4
 
@@ -136,6 +139,10 @@ func NewGBA() *GBA {
     gba.Debugger = &Debugger{&gba}
     gba.Gt = &GraphicsTiming{
         Gba: &gba,
+    }
+
+    gba.Ct = &CycleTiming{
+        prevAddr: 0x800_0000,
     }
 
     gba.Timers[0].Gba = &gba

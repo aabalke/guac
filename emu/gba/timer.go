@@ -113,7 +113,6 @@ func (t *Timer) Increment(cascade bool) bool {
         panic("NON-CASCADE TImER INCREMENTING IN CASCADE")
     }
 
-
     overflow := t.D == 0xFFFF
 
     t.D++
