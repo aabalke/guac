@@ -2,6 +2,7 @@ package gba
 
 import (
 	"github.com/aabalke33/guac/emu/gba/utils"
+    "fmt"
 )
 
 const (
@@ -111,7 +112,8 @@ func (dma *DMA) WriteControl(v uint8, hi bool) {
 	} else {
 		dma.Control = (dma.Control &^ 0b1111_1111) | uint32(v)
 		dma.DstAdj = (uint32(v) >> 5) & 0b11
-		dma.SrcAdj = (dma.SrcAdj &^ 0b1) | ((uint32(v) >> 6) & 1)
+		dma.SrcAdj = (dma.SrcAdj &^ 0b1) | ((uint32(v) >> 7) & 1)
+		//dma.SrcAdj = (dma.SrcAdj &^ 0b1) | ((uint32(v) >> 6) & 1)
 	}
 
 	if dma.Mode >= 0b100 {
@@ -161,6 +163,8 @@ func (dma *DMA) transfer() {
             return
         }
     }
+
+    fmt.Printf("DMA OCCUR %08X %08x\n", dma.Dst, dma.Src)
 
     dstOffset := int64(0)
     srcOffset := int64(0)

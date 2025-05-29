@@ -24,7 +24,10 @@ const (
 var (
     _ = fmt.Sprintln("")
     CURR_INST = 0
-    MAX_COUNT = 100_000
+    //MAX_COUNT = 100_000
+
+    IN_EXCEPTION = false
+    EXCEPTION_COUNT = 0
 )
 
 type GBA struct {
@@ -52,7 +55,12 @@ type GBA struct {
 
     Gt *GraphicsTiming
     Ct *CycleTiming
+
+    //Logger *Logger
+
+    IntrWait uint32
 }
+
 
 func (gba *GBA) Update(exit *bool, instCount int) int {
 
@@ -72,7 +80,29 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
 
         cycles := 4
 
+        //gba.Logger.WriteLog()
+        //if CURR_INST == 10_000 {
+        //    gba.Logger.Close()
+        //}
+
+
         opcode := gba.Mem.Read32(r[PC])
+
+        //if r[PC] > 0xA00_0000 {
+        //    panic("CRAZY")
+        //}
+
+        //if IN_EXCEPTION {
+        //    EXCEPTION_COUNT++
+        //    fmt.Printf("PC %08X: OP %08X MODE %02X CPSR %08X SPSR CURR %08X SPSR BANKS %08X LR %08X R11 %08X R12 %08X R13 %08X R14 %08X\n", r[PC], opcode, gba.Cpu.Reg.getMode(), gba.Cpu.Reg.CPSR, gba.Cpu.Reg.SPSR[BANK_ID[gba.Cpu.Reg.getMode()]], gba.Cpu.Reg.SPSR, gba.Cpu.Reg.R[LR], gba.Cpu.Reg.R[11], gba.Cpu.Reg.R[12], gba.Cpu.Reg.R[13], gba.Cpu.Reg.R[14])
+        //}
+
+        //if EXCEPTION_COUNT > 20 { panic("END EXCEPTION LOG")}
+
+        if gba.Halted {
+            AckIntrWait(gba)
+        }
+
 
         if gba.Halted && gba.ExitHalt {
             gba.Halted = false
@@ -80,35 +110,62 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
 
         if !gba.Halted {
             cycles = gba.Cpu.Execute(opcode)
+            //gba.Ct.prevAddr = r[PC]
         }
 
-        //if CURR_INST > 100_000 && r[PC] == 0x80B063E { 237603
-        // 243_270
-        //if CURR_INST == 243_285 pass
-        //if CURR_INST == 243242 || CURR_INST == 243243 { //grabs dma3 which is 0 and should be 1
-        ////if r[PC] == 0x80B159A {
-        //    //gba.Paused = true
-        //    gba.Debugger.print(CURR_INST)
-        //    //return instCount
+        //if gba.Mem.Read32(0x3007FFC) == 0x300_0000 {
+        //    panic("HEREHEREHERE")
         //}
 
-        //if CURR_INST == 243244 {
+        //const DEBUG_START = 204768
+
+        //if CURR_INST >= DEBUG_START - 2 {
+        //    gba.Debugger.debugIRQ()
+        //}
+
+        //if CURR_INST == DEBUG_START + 2 {
         //    gba.Paused = true
+        //    gba.Debugger.print(CURR_INST)
         //    return instCount
         //}
+
+        // 35 // 458
+        //if r[0] == 0xADE03C && r[1] == 0xB65B5B22 {
+        //    gba.Paused = true
+        //    gba.Debugger.print(CURR_INST)
+        //    return instCount
+        //}
+
+        //if CURR_INST == 204500 { GOOD
+        //if CURR_INST == 204700 { GOOD
+        //if CURR_INST == 204722 { GOOD
+        //if CURR_INST == 204725 { FAILED
+        //if CURR_INST == 204750 { FAILED
+        //if CURR_INST == 204723 {
+        //    gba.Paused = true
+        //    gba.Debugger.print(CURR_INST)
+        //    return instCount
+        //}
+        //if r[PC] == 0x80029F8 && CURR_INST >= 295791 {
+        //    panic(fmt.Sprintf("CORRECT BEHAVIOR! %X\n", r[PC]))
+        //}
+
 
         CURR_INST++
 
         gt.update(cycles)
         gba.Timers.Increment(uint32(cycles))
-        gba.updateIRQ()
 	}
-
-    //fmt.Printf("DMA3 WC %08X\n", gba.Mem.Read8(0x400_00DC))
 
     gba.checkDmas(DMA_MODE_REF)
 
-    gba.debugGraphics()
+    //for y := range gt.Scanline - gt.PrevScanline {
+    //    gba.scanlineMode0(min(159, uint32(gt.PrevScanline + y)))
+    //}
+
+    //gt.PrevScanline = gt.Scanline
+
+    //gba.debugGraphics()
     gba.graphics()
 
     return instCount
@@ -145,6 +202,10 @@ func NewGBA() *GBA {
         prevAddr: 0x800_0000,
     }
 
+    //gba.Cpu.Reg.setMode(MODE_SYS, MODE_SWI)
+
+    gba.Cpu.Reg.CPSR.SetFlag(FLAG_I, false)
+
     gba.Timers[0].Gba = &gba
     gba.Timers[1].Gba = &gba
     gba.Timers[2].Gba = &gba
@@ -165,7 +226,11 @@ func NewGBA() *GBA {
     gba.Dma[2].Idx = 2
     gba.Dma[3].Idx = 3
 
-    gba.LoadBios("./emu/gba/res/bios.gba")
+    //gba.Logger = NewLogger(".log.txt", &gba)
+
+    gba.LoadBios("./emu/gba/res/bios_magia.gba")
+
+    //gba.SoftReset()
 
 	return &gba
 }
@@ -219,29 +284,17 @@ func (gba *GBA) toggleThumb() {
     // pipe
 }
 
-func (gba *GBA) updateIRQ() {
-
-    //for i := range 160 {
-    //    // scanline
-    //}
-
-    const DISPSTAT = 0x0400_0004
-    if dispstat := gba.Mem.Read8(DISPSTAT); utils.BitEnabled(dispstat, 3) {
-        const IRQ_VBLANK = 0x00
-        gba.triggerIRQ(IRQ_VBLANK)
-    }
-}
-
 func (gba *GBA) triggerIRQ(irq uint32) {
 
-    const IF = 0x202
+    mem := gba.Mem
 
-    gba.Mem.BIOS_MODE = BIOS_IRQ
+    mem.BIOS_MODE = BIOS_IRQ
 
-    iack := uint16(gba.Mem.Read8(IF))
-	iack = iack | (1 << irq)
-	gba.Mem.IO[IF] = uint8(iack)
-    gba.Mem.IO[IF+1] = uint8(iack>>8)
+    iack := mem.Read16(0x400_0202)
+
+    iack |= (1 << irq)
+    mem.IO[0x202] = uint8(iack)
+    mem.IO[0x203] = uint8(iack>>8)
 	gba.Halted = false
 
 	gba.checkIRQ()
@@ -249,62 +302,11 @@ func (gba *GBA) triggerIRQ(irq uint32) {
 
 func (gba *GBA) checkIRQ() {
 
-    const IE = 0x200
-    const IF = 0x202
-    const IME = 0x208
+    interruptEnabled := !gba.Cpu.Reg.CPSR.GetFlag(FLAG_I)
+    ime := utils.BitEnabled(gba.Mem.Read16(0x400_0208), 0)
+    interrupts := (gba.Mem.Read16(0x400_0200) & gba.Mem.Read16(0x400_0202)) != 0
 
-    cond1 := !gba.Cpu.Reg.CPSR.GetFlag(FLAG_I)
-    cond2 := gba.Mem.IO[IME] & 1 > 0
-    cond3 := (uint16(gba.Mem.Read8(IE)) & uint16(gba.Mem.Read8(IF))) > 0
-    if cond1 && cond2 && cond3 {
-        panic("EXECPTION IN CHECK IRQ")
-        //g.exception(irqVec, IRQ)
+    if interruptEnabled && ime && interrupts {
+        gba.handleInterrupt()
     }
-}
-
-func (gba *GBA) exception(addr uint32, mode uint32) {
-
-    reg := &gba.Cpu.Reg
-
-	cpsr := reg.CPSR
-    curr := reg.getMode()
-	reg.setMode(curr, mode)
-	reg.SPSR[BANK_ID[curr]] = cpsr
-
-	reg.R[14] = gba.exceptionReturn(addr)
-	reg.CPSR.SetFlag(FLAG_T, false)
-	reg.CPSR.SetFlag(FLAG_I, true)
-
-    const (
-        RESET_VEC = 0x0
-        FIQ_VEC = 0x1C
-    )
-
-	switch addr & 0xff {
-	case RESET_VEC, FIQ_VEC:
-        reg.CPSR.SetFlag(FLAG_F, true)
-	}
-	reg.R[15] = addr
-	//gba.pipelining()
-}
-
-func (gba *GBA) exceptionReturn(vec uint32) uint32 {
-    reg := &gba.Cpu.Reg
-
-	pc := reg.R[15]
-
-	t := reg.CPSR.GetFlag(FLAG_T)
-	switch vec {
-	case UND_VEC, SWI_VEC:
-		if t {
-			pc -= 2
-		} else {
-			pc -= 4
-		}
-	case FIQ_VEC, IRQ_VEC, PREFETCH_VEC:
-		if !t {
-			pc -= 4
-		}
-	}
-	return pc
 }

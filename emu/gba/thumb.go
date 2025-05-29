@@ -173,7 +173,7 @@ func (cpu *Cpu) thumbArithmetic(alu *ThumbAlu) {
         v = (rdSign == rsSign) && (rSign != rdSign)
         c = res >= 0x1_0000_0000
     case THUMB_SBC, THUMB_NEG:
-        v = (rdSign != rsSign) && (rSign != rsSign)
+        v = (rdSign != rsSign) && (rSign != rdSign)
         c =  res < 0x1_0000_0000
     }
 
@@ -321,12 +321,10 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
 
         if nop := rs == 8 && rd == 8; nop {
 
-            seq := cpu.Gba.Ct.popSequential(r[PC], true)
-
-            cycles := 6
-            if seq {
-                cycles = 4
-            }
+            cycles := 3
+            //if seq := cpu.Gba.Ct.popSequential(r[PC], true); seq {
+            //    cycles = 2
+            //}
 
 
             r[PC] += 2
@@ -717,8 +715,6 @@ func (cpu *Cpu) thumbPushPop(opcode uint16) {
 
     r[PC] += 2
 }
-
-func (cpu *Cpu) thumbSWI(opcode uint16) {}
 
 func (cpu *Cpu) thumbRelative(opcode uint16) {
 

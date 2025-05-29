@@ -1,9 +1,9 @@
 package gba
 
 import (
+	"bufio"
 	"fmt"
 	"image"
-    "bufio"
 
 	"image/color"
 	"image/png"
@@ -51,16 +51,38 @@ func (d *Debugger) print(i int) {
     p("cpsr", uint32(reg.CPSR))
     p("spsr", uint32(reg.SPSR[BANK_ID[mode]]))
     p("MODE", BANK_ID[mode])
+    p("0x3007FFC", d.gba.Mem.Read32(0x3007FFC))
 
     s("--------  --------")
+
+    for i := range len(reg.LR) {
+        p(fmt.Sprintf("LR %02d", i), uint32(reg.LR[uint32(i)]))
+    }
+
+    s("--------  --------")
+
+    //j := uint32(0x4000208)
+    //p(fmt.Sprintf("IME %04X", j), d.gba.Mem.Read16(uint32(j)))
+    //j = uint32(0x4000204)
+    //p(fmt.Sprintf("WS  %04X", j), d.gba.Mem.Read16(uint32(j)))
+    //j = uint32(0x4000202)
+    //p(fmt.Sprintf("IF  %04X", j), d.gba.Mem.Read16(uint32(j)))
+    //j = uint32(0x4000200)
+    //p(fmt.Sprintf("IE  %04X", j), d.gba.Mem.Read16(uint32(j)))
+
+    //s("\n\n")
     //p(fmt.Sprintf("STACK %X", 0x3007E2E), d.gba.Mem.Read32(0x3007E2E))
     //for i := 0x0400_00E0; i >= 0x0400_00D0; i -= 4 {
-    for i := 0x0400_00E0; i >= 0x0400_00D0; i -= 4 {
-        p(fmt.Sprintf("DMA3 %X", i), d.gba.Mem.Read32(uint32(i)))
+    //for i := 0x0400_0060; i >= 0x0400_0040; i -= 4 {
+    for i := 0x0300_7F00; i >= 0x0300_7EF0; i -= 4 {
+        p(fmt.Sprintf("IO %X", i), d.gba.Mem.Read32(uint32(i)))
     }
-    for i := 0x0300_7EA8; i >= 0x0300_7E24; i -= 4 {
-        p(fmt.Sprintf("STACK %X", i), d.gba.Mem.Read32(uint32(i)))
-    }
+    //for i := 0x0400_00E0; i >= 0x0400_00D0; i -= 4 {
+    //    p(fmt.Sprintf("DMA3 %X", i), d.gba.Mem.Read32(uint32(i)))
+    //}
+    //for i := 0x0300_7EA8; i >= 0x0300_7E24; i -= 4 {
+    //    p(fmt.Sprintf("STACK %X", i), d.gba.Mem.Read32(uint32(i)))
+    //}
     //for i := 0x0600_0000; i <= 0x0600_0030; i += 4 {
     //    p(fmt.Sprintf("VRAM %X", i), d.gba.Mem.Read32(uint32(i)))
     //}
@@ -228,4 +250,37 @@ func debugTile(gba *GBA, tileAddr uint, tileSize, xOffset, yOffset int, obj, pal
             }
 		}
 	}
+}
+
+func (d *Debugger) debugIRQ() {
+
+    gba := d.gba
+    mem := gba.Mem
+    reg := gba.Cpu.Reg
+    r := gba.Cpu.Reg.R
+
+    t := reg.CPSR.GetFlag(FLAG_T)
+    opcode := uint32(0)
+    if !t {
+        opcode = mem.Read32(r[PC])
+    } else {
+        opcode = mem.Read16(r[PC])
+    }
+
+    usrBank := BANK_ID[MODE_USR]
+    irqBank := BANK_ID[MODE_IRQ]
+
+    fmt.Printf("-----------------------------------------------------------\n")
+    fmt.Printf("IRQ CURR INST %d\n", CURR_INST)
+    fmt.Printf("PC %08X T %t OPCODE %08X CPSR %08X\n", r[PC], t, opcode, reg.CPSR)
+    fmt.Printf("R0 %08X R1 %08X R2 %08X R3 %08X R4 %08X\n", r[0], r[1], r[2], r[3], r[4])
+    fmt.Printf("R5 %08X R6 %08X R7 %08X R8 %08X R9 %08X\n", r[5], r[6], r[7], r[8], r[9])
+    fmt.Printf("R10 %08X R11 %08X R12 %08X\n", r[10], r[11], r[12])
+    fmt.Printf("IRQ STACK ADDR (0x03007FFC) %08X\n", mem.Read32(0x03007FFC))
+    fmt.Printf("STACK ADDR %08X, VALUE %08X\n", r[SP]+20, mem.Read32(r[SP]+20))
+    fmt.Printf("MODE %02X (If Mode %02X IRQ,if %02X USR)\n", reg.getMode(), MODE_IRQ, MODE_USR)
+    fmt.Printf("CURR SP %08X, LR %08X SPSR %08X\n", r[SP], r[LR], reg.SPSR[BANK_ID[reg.getMode()]])
+    fmt.Printf("USR  SP %08X, LR %08X SPSR %08X\n", reg.SP[usrBank], reg.LR[usrBank], reg.SPSR[usrBank])
+    fmt.Printf("IRQ  SP %08X, LR %08X SPSR %08X\n", reg.SP[irqBank], reg.LR[irqBank], reg.SPSR[irqBank])
+    fmt.Printf("-----------------------------------------------------------\n")
 }

@@ -1,6 +1,7 @@
 package gba
 
 import (
+    //"fmt"
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
@@ -17,9 +18,12 @@ func (tt *Timers) Increment(newCycles uint32) {
         }
         t.SavedCycles += newCycles
 
+        //fmt.Printf("Incrementing Timer %d, count=%04X\n", t.Idx, t.D)
+
         for range t.SavedCycles / t.getCycles() {
             overflow := t.Increment(false)
             if overflow {
+                    //fmt.Printf("Timer %d overflow: D=0x%04X, reload=0x%04X\n", t.Idx, t.D, t.SavedInitialValue)
 
                 if i < 3 && tt[i+1].isCascade() {
                     tt.cascade(i)
@@ -42,6 +46,10 @@ func (tt *Timers) cascade(overflowTimerIdx int) {
     }
 
     cascadeIdx := overflowTimerIdx + 1
+
+    if !tt[cascadeIdx].isEnabled() {
+        return
+    }
 
     overflow := tt[cascadeIdx].Increment(true)
 
@@ -97,11 +105,12 @@ func (t *Timer) ReadD(hi bool) uint8 {
 func (t *Timer) WriteD(v uint8, hi bool) {
 
     if hi {
-        t.SavedInitialValue |= (uint32(v) << 8)
+        //t.SavedInitialValue |= (uint32(v) << 8)
+        t.SavedInitialValue = (t.SavedInitialValue & 0x00FF) | (uint32(v) << 8)
         return
     }
 
-    t.SavedInitialValue |= uint32(v)
+    t.SavedInitialValue = (t.SavedInitialValue & 0xFF00) | uint32(v)
 }
 
 func (t *Timer) Increment(cascade bool) bool {
@@ -118,7 +127,8 @@ func (t *Timer) Increment(cascade bool) bool {
     t.D++
 
     if overflow {
-        t.D = 0
+        t.D = t.SavedInitialValue
+        //t.D = 0
     }
 
     return overflow

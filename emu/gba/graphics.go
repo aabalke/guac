@@ -9,6 +9,7 @@ import (
 type GraphicsTiming struct {
     Gba             *GBA
     RefreshCycles   int
+    PrevScanline    int
     Scanline        int
     HBlank          bool
     VBlank          bool
@@ -18,6 +19,7 @@ type GraphicsTiming struct {
 
 func (gt *GraphicsTiming) reset() {
     gt.RefreshCycles = 0
+    gt.PrevScanline = 0
     gt.Scanline = 0
     gt.HBlank = false
     gt.VBlank = false
@@ -49,17 +51,21 @@ func (gt *GraphicsTiming) update(cycles int) {
     dispstat.SetHBlank(gt.HBlank)
     dispstat.SetVCounter(gt.Scanline)
 
+    if gt.VBlank {
+        gt.Gba.Mem.IO[0x202] |= 1
+    }
+
+    if gt.HBlank {
+        gt.Gba.Mem.IO[0x202] |= 10
+    }
+
     if gt.VBlank && !prevVBlank {
-    //if gt.VBlank {
         gt.Gba.checkDmas(DMA_MODE_VBL)
-
-        gt.Gba.triggerIRQ(1)
-
+        //gt.Gba.triggerIRQ(0)
     }
     if gt.HBlank && !prevHBlank {
-    //if gt.HBlank {
         gt.Gba.checkDmas(DMA_MODE_HBL)
-        gt.Gba.triggerIRQ(0)
+        //gt.Gba.triggerIRQ(1)
     }
 }
 
@@ -110,12 +116,13 @@ func (gba *GBA) graphics() {
     addr := gba.Mem.Read16(0x0400_0000 + DISPCNT)
     dispcnt := NewDispcnt(addr)
 
-    //gba.background(0x400_0008, dispcnt, false)
+    //gba.background(0x400_0008, dispcnt, false, NewWindows(dispcnt, gba))
     //gba.getTiles(0x601_0000, 0x1E, true, false)
+    //gba.getTiles(0x600_4020, 0x1E, false, false)
     //gba.debugPalette()
     //return
 
-    gba.clear()
+    //gba.clear()
 
 	switch dispcnt.Mode {
 	case 0:
@@ -134,19 +141,90 @@ func (gba *GBA) graphics() {
 		gba.updateMode5(dispcnt)
     default: panic("UNKNOWN MODE")
 	}
-
 }
 
+func (gba *GBA) scanlineMode0(y uint32) {
+
+    addr := gba.Mem.Read16(0x0400_0000 + DISPCNT)
+    dispcnt := NewDispcnt(addr)
+    bgPriorities := gba.getBgPriority(0)
+    wins := NewWindows(dispcnt, gba)
+    bld := NewBlend(gba)
+    bldPal := NewBlendPalette(bld)
+
+    objPriorities := gba.getObjPriority(y, dispcnt)
+
+    x := uint32(0)
+    for x = range SCREEN_WIDTH {
+
+        index := (x + (y*SCREEN_WIDTH)) * 4
+
+        bldPal.reset(gba)
+
+        var objTransparent bool
+
+        for i := range 4 {
+
+            // 0 is highest priority
+            decIdx := 3 - i
+
+            // bg and objs are prioritized so obj0, is above obj1 if both same
+            // priority. this is why [bgCount - 1 - j]
+
+            bgCount := len(bgPriorities[decIdx])
+            for j := range bgCount {
+
+                bgIdx := bgPriorities[decIdx][bgCount - 1 - j]
+
+                if bgEnabled(dispcnt, int(bgIdx)) {
+                    palData, ok, palZero := gba.background(x, y, bgIdx, false, wins)
+                    if ok && !palZero {
+                        bldPal.setBlendPalettes(palData, bgIdx, false)
+                    }
+                }
+            }
+
+            if obj := dispcnt.DisplayObj; obj {
+
+                objPal := uint32(0)
+                objExists := false
+                objCount := len(objPriorities[decIdx])
+
+                for j := range objCount {
+                    objIdx := objPriorities[decIdx][objCount - 1 - j]
+                    palData, ok, palZero, obj := gba.object(x, y, dispcnt, objIdx * 0x8, wins)
+
+                    if ok && !palZero {
+                        objTransparent = obj.Mode == 1
+                        objExists = true
+                        objPal = palData
+                    }
+                }
+
+                if objExists {
+                    bldPal.setBlendPalettes(objPal, 0, true)
+                }
+            }
+        }
+
+        finalPalData := bldPal.blend(objTransparent)
+
+        gba.applyColor(finalPalData, uint32(index))
+    }
+}
+
+
 func (gba *GBA) clear() {
+    palData := gba.getPalette(0, 0, false)
     y, x := uint32(0), uint32(0)
     for y = range SCREEN_HEIGHT {
         for x = range SCREEN_WIDTH {
-            gba.applyColor(0, (x + (y * SCREEN_WIDTH))*4)
+            gba.applyColor(palData, (x + (y * SCREEN_WIDTH))*4)
         }
     }
 }
 
-func (gba *GBA) object(dispcnt *Dispcnt, oamOffset uint32, wins *Windows) {
+func (gba *GBA) object(x, y uint32, dispcnt *Dispcnt, oamOffset uint32, wins *Windows) (uint32, bool, bool, *Object) {
 
     OAM_BASE := uint32(0x0700_0000)
     mem := gba.Mem
@@ -158,7 +236,7 @@ func (gba *GBA) object(dispcnt *Dispcnt, oamOffset uint32, wins *Windows) {
     obj := NewObject(attr0, attr1, attr2, dispcnt)
 
     if obj.Disable && !obj.RotScale {
-        return
+        return 0, false, false, obj
     }
 
     if obj.RotScale {
@@ -169,23 +247,16 @@ func (gba *GBA) object(dispcnt *Dispcnt, oamOffset uint32, wins *Windows) {
         obj.Pd = mem.Read16(paramsAddr + 0x1E)
     }
 
-    x, y := uint32(0), uint32(0)
-
-    for y = range SCREEN_HEIGHT {
-        for x = range SCREEN_WIDTH {
-
-            if !windowObjPixelAllowed(x, y, wins) {
-                continue
-            }
-
-            if obj.RotScale {
-                gba.setObjectAffinePixel(obj, x, y)
-                continue
-            }
-
-            gba.setObjectPixel(obj, x, y)
-        }
+    if !windowObjPixelAllowed(x, y, wins) {
+        return 0, false, false, obj
     }
+
+    //if obj.RotScale {
+    //    palData, ok := gba.setObjectAffinePixel(obj, x, y)
+    //}
+
+    palData, ok, palZero := gba.setObjectPixel(obj, x, y)
+    return palData, ok, palZero, obj
 }
 
 func outObjectBound(obj *Object, xIdx, yIdx int) bool {
@@ -252,7 +323,7 @@ func (gba *GBA) setObjectAffinePixel(obj *Object, x, y uint32) {
 
     tileData := mem.Read16(addr)
 
-    palIdx, palData := getPaletteData(gba, obj, tileData, uint32(inTileX))
+    palIdx, palData := getPaletteData(gba, obj.Palette256, obj.Palette, tileData, uint32(inTileX))
 
     if !inScreenBounds(int(x), int(y)) {
         return
@@ -322,7 +393,7 @@ func (gba *GBA) outBoundsAffine(obj *Object, x, y uint32) bool {
     return true
 }
 
-func (gba *GBA) setObjectPixel(obj *Object, x, y uint32) {
+func (gba *GBA) setObjectPixel(obj *Object, x, y uint32) (uint32, bool, bool) {
 
 	mem := gba.Mem
 
@@ -340,7 +411,7 @@ func (gba *GBA) setObjectPixel(obj *Object, x, y uint32) {
     if outObjectBound(obj, xIdx, yIdx) {
         // blank color
         //gba.applyColor(0, (x + (y * SCREEN_WIDTH))*4)
-        return
+        return 0, false, false
     }
 
     enTileX, enTileY, inTileX, inTileY := getPositions(obj, uint32(xIdx), uint32(yIdx))
@@ -349,19 +420,19 @@ func (gba *GBA) setObjectPixel(obj *Object, x, y uint32) {
 
     tileData := mem.Read16(addr)
 
-    palIdx, palData := getPaletteData(gba, obj, tileData, uint32(inTileX))
+    palIdx, palData := getPaletteData(gba, obj.Palette256, obj.Palette, tileData, uint32(inTileX))
 
     if !inScreenBounds(int(x), int(y)) {
-        return
+        return 0, false, false
     }
 
     if palIdx == 0 {
         // this will need to be updated
-        return
+        return palData, false, true
     }
 
-    index := (x + (y*SCREEN_WIDTH)) * 4
-    gba.applyColor(palData, uint32(index))
+    return palData, true, false
+
 }
 
 func getPositions (obj *Object, xIdx, yIdx uint32) (uint32, uint32, uint32, uint32) {
@@ -414,12 +485,12 @@ func getTileAddr(obj *Object, enTileX, enTileY, inTileX, inTileY uint32) uint32 
     return uint32(tileAddr) + inTileIdx
 }
 
-func getPaletteData(gba *GBA, obj *Object, tileData, inTileX uint32) (uint32, uint32) {
+func getPaletteData(gba *GBA, pal256 bool, pal uint32, tileData, inTileX uint32) (uint32, uint32) {
 
     var palIdx uint32
-    if obj.Palette256 {
+    if pal256 {
         palIdx = tileData & 0b1111_1111
-        obj.Palette = 0
+        pal = 0
     } else {
         if inTileX % 2 == 0 {
             palIdx = tileData & 0b1111
@@ -429,7 +500,7 @@ func getPaletteData(gba *GBA, obj *Object, tileData, inTileX uint32) (uint32, ui
         }
     }
 
-    palData := gba.getPalette(uint32(palIdx), obj.Palette, true)
+    palData := gba.getPalette(uint32(palIdx), pal, true)
 
     return palIdx, palData
 }
@@ -536,84 +607,142 @@ func bgEnabled(dispcnt *Dispcnt, idx int) bool {
 
 func (gba *GBA) updateMode0(dispcnt *Dispcnt) {
 
-    priorities := gba.getBgPriority(0)
-    objPriorities := gba.getObjPriority()
-
+    bgPriorities := gba.getBgPriority(0)
     wins := NewWindows(dispcnt, gba)
+    bld := NewBlend(gba)
+    bldPal := NewBlendPalette(bld)
 
-    for i := range priorities {
+    x, y := uint32(0), uint32(0)
+    for y = range SCREEN_HEIGHT {
 
-        // 0 is highest priority
-        decIdx := 3 - i
+        objPriorities := gba.getObjPriority(y, dispcnt)
 
-        if bgEnabled(dispcnt, decIdx) {
-            gba.background(uint32(decIdx), dispcnt, false, wins)
-        }
+        for x = range SCREEN_WIDTH {
 
-        if obj := dispcnt.DisplayObj; obj {
-            objCount := len(objPriorities[decIdx])
-            for j := range objCount {
-                objIdx := objPriorities[decIdx][objCount - 1 - j]
-                gba.object(dispcnt, objIdx * 0x8, wins)
+            index := (x + (y*SCREEN_WIDTH)) * 4
+
+            bldPal.reset(gba)
+
+            var objTransparent bool
+
+            for i := range 4 {
+
+                // 0 is highest priority
+                decIdx := 3 - i
+
+                // bg and objs are prioritized so obj0, is above obj1 if both same
+                // priority. this is why [bgCount - 1 - j]
+
+                bgCount := len(bgPriorities[decIdx])
+                for j := range bgCount {
+
+                    bgIdx := bgPriorities[decIdx][bgCount - 1 - j]
+
+                    if bgEnabled(dispcnt, int(bgIdx)) {
+                        palData, ok, palZero := gba.background(x, y, bgIdx, false, wins)
+                        if ok && !palZero {
+                            bldPal.setBlendPalettes(palData, bgIdx, false)
+                        }
+                    }
+                }
+
+                if obj := dispcnt.DisplayObj; obj {
+
+                    objPal := uint32(0)
+                    objExists := false
+                    objCount := len(objPriorities[decIdx])
+
+                    for j := range objCount {
+                        objIdx := objPriorities[decIdx][objCount - 1 - j]
+                        palData, ok, palZero, obj := gba.object(x, y, dispcnt, objIdx * 0x8, wins)
+
+                        if ok && !palZero {
+                            objTransparent = obj.Mode == 1
+                            objExists = true
+                            objPal = palData
+                        }
+                    }
+
+                    if objExists {
+                        bldPal.setBlendPalettes(objPal, 0, true)
+                    }
+                }
             }
+
+            finalPalData := bldPal.blend(objTransparent)
+
+            gba.applyColor(finalPalData, uint32(index))
         }
     }
 }
 
 func (gba *GBA) updateMode1(dispcnt *Dispcnt) {
 
-    priorities := gba.getBgPriority(1)
-
-    wins := NewWindows(dispcnt, gba)
-
-    for i := range priorities {
-
-        // 0 is highest priority
-        decIdx := 3 - i
-
-        if !bgEnabled(dispcnt, decIdx) {
-            continue
-        }
-
-        if decIdx == 2 {
-            gba.background(uint32(decIdx), dispcnt, true, wins)
-            return
-        }
-
-        gba.background(uint32(decIdx), dispcnt, false, wins)
-    }
+//    priorities := gba.getBgPriority(1)
+//
+//    wins := NewWindows(dispcnt, gba)
+//
+//    for i := range priorities {
+//
+//        // 0 is highest priority
+//        decIdx := 3 - i
+//
+//        if !bgEnabled(dispcnt, decIdx) {
+//            continue
+//        }
+//
+//        if decIdx == 2 {
+//            gba.background(uint32(decIdx), dispcnt, true, wins)
+//            return
+//        }
+//
+//        gba.background(uint32(decIdx), dispcnt, false, wins)
+//    }
 }
 
-func (gba *GBA) getBgPriority(mode uint32) [4]uint32 {
+func (gba *GBA) getBgPriority(mode uint32) [4][]uint32 {
 
     mem := gba.Mem
+    priorities := [4][]uint32{}
+    base := uint32(0x400_0008)
 
-    pr0 := mem.Read16(0x400_0008) & 0b11
-    pr1 := mem.Read16(0x400_000A) & 0b11
-    pr2 := mem.Read16(0x400_000C) & 0b11
-    pr3 := mem.Read16(0x400_000E) & 0b11
+    for i := range 4 {
 
-    out := [4]uint32{}
-
-    for i, v := range []uint32{pr0, pr1, pr2, pr3} {
         if mode == 1 && i > 2 { continue }
         if mode == 2 && i < 2 { continue }
-        out[v] = uint32(i)
+
+        priority := mem.Read16(base + uint32(i * 0x2)) & 0b11
+        priorities[priority] = append(priorities[priority], uint32(i))
     }
 
-    return out
+    return priorities
 }
 
-func (gba *GBA) getObjPriority() [4][]uint32 {
+func (gba *GBA) getObjPriority(y uint32, dispcnt *Dispcnt) [4][]uint32 {
 
     mem := gba.Mem
+    attr0Base := uint32(0x700_0000)
+    attr1Base := uint32(0x700_0002)
     attr2Base := uint32(0x700_0004)
 
     priorities := [4][]uint32{}
 
     for i := range 128 {
+        attr0 := mem.Read16(attr0Base + (uint32(i) * 0x8))
+        attr1 := mem.Read16(attr1Base + (uint32(i) * 0x8))
         attr2 := mem.Read16(attr2Base + (uint32(i) * 0x8))
         priority := utils.GetVarData(attr2, 10, 11)
+
+        if disabled := utils.BitEnabled(attr0, 9); disabled { // may need to make more effective
+            continue
+        }
+
+        obj := NewObject(attr0, attr1, attr2, dispcnt)
+
+        if y < obj.Y || y > obj.Y + obj.H {
+            continue
+        }
+
         priorities[priority] = append(priorities[priority], uint32(i))
     }
 
@@ -621,35 +750,37 @@ func (gba *GBA) getObjPriority() [4][]uint32 {
 
 }
 
-func (gba *GBA) background(idx uint32, dispcnt *Dispcnt, affine bool, wins *Windows) {
+func (gba *GBA) background(x, y, idx uint32, affine bool, wins *Windows) (uint32, bool, bool) {
 
     mem := gba.Mem
-
     cnt := mem.Read16(uint32(0x0400_0008 + ((idx) * 0x2)))
     hof := mem.Read16(uint32(0x0400_0010 + ((idx) * 0x4)))
     vof := mem.Read16(uint32(0x0400_0012 + ((idx) * 0x4)))
     bg := NewBackground(cnt, hof, vof, affine)
 
-
-    x, y := uint32(0), uint32(0)
-    for y = range SCREEN_HEIGHT {
-        for x = range SCREEN_WIDTH {
-
-            if !windowPixelAllowed(idx, x, y, wins) {
-                continue
-            }
-
-            if affine {
-                gba.setAffineBackgroundPixel(bg, x, y)
-                continue
-            }
-
-            gba.setBackgroundPixel(bg, x, y)
-        }
+    if !windowPixelAllowed(idx, x, y, wins) {
+        return 0, false, false
     }
+
+    //if affine {
+    //    gba.setAffineBackgroundPixel(bg, x, y)
+    //    return
+    //}
+
+    if !inScreenBounds(int(x), int(y)) {
+        return 0, false, false
+    }
+
+    palData, ok, palZero := gba.setBackgroundPixel(bg, x, y)
+
+    return palData, ok, palZero
 }
 
 func windowPixelAllowed(idx, x, y uint32, wins *Windows) bool {
+
+    if !wins.Enabled {
+        return true
+    }
 
     inWindow := func(win *Window) bool {
 
@@ -658,15 +789,21 @@ func windowPixelAllowed(idx, x, y uint32, wins *Windows) bool {
         t := win.T
         b := win.B
 
-        // need to handle wrapping
-
-        // should max be removed in NewWindow?
-
-        return (x >= l && x < r) && (y >= t && y < b)
+        switch {
+        case r < l && b < t:
+            return (x >= l || x < r) && (y >= t || y < b)
+        case r < l:                                    
+            return (x >= l || x < r) && (y >= t && y < b)
+        case b < t:                                    
+            return (x >= l && x < r) && (y >= t || y < b)
+        default:                                       
+            return (x >= l && x < r) && (y >= t && y < b)
+        }
     }
 
     for _, win := range []*Window{wins.Win0, wins.Win1} {
         if win.Enabled && inWindow(win) {
+            //return false
             switch idx {
             case 0: return win.InBg0
             case 1: return win.InBg1
@@ -682,9 +819,13 @@ func windowPixelAllowed(idx, x, y uint32, wins *Windows) bool {
     case 3: return wins.OutBg3
     }
 
-    return false
+    return true
 }
 func windowObjPixelAllowed(x, y uint32, wins *Windows) bool {
+
+    if !wins.Win0.Enabled && !wins.Win1.Enabled {
+        return true
+    }
 
     inWindow := func(win *Window) bool {
         return (x >= win.L && x < win.R) && (y >= win.T && y < win.B)
@@ -782,23 +923,17 @@ func (gba *GBA) setAffineBackgroundPixel(bg *Background, x, y uint32) {
     palData := gba.getPalette(uint32(palIdx), palette, false)
 
     // this will need to be updated
-    if palIdx == 0 {
-        return
-    }
+    //if palIdx == 0 {
+    //    return
+    //}
     gba.applyColor(palData, uint32(index))
 }
 
-func (gba *GBA) setBackgroundPixel(bg *Background, x, y uint32) {
-
-
-    index := (x + (y*SCREEN_WIDTH)) * 4
-
-    if !inScreenBounds(int(x), int(y)) {
-        return
-    }
+func (gba *GBA) setBackgroundPixel(bg *Background, x, y uint32) (uint32, bool, bool) {
 
     x = (x + bg.XOffset) % (bg.W * 8)
     y = (y + bg.YOffset) % (bg.H * 8)
+
     tileX := x / 8
     tileY := y / 8
 
@@ -827,7 +962,7 @@ func (gba *GBA) setBackgroundPixel(bg *Background, x, y uint32) {
     }
 
     if inObjTiles := tileAddr >= 0x601_0000; inObjTiles {
-        return
+        return 0, false, false
     }
 
     hFlip := utils.BitEnabled(screenData, 10)
@@ -870,12 +1005,11 @@ func (gba *GBA) setBackgroundPixel(bg *Background, x, y uint32) {
 
     palData := gba.getPalette(uint32(palIdx), palette, false)
 
-    // this will need to be updated
     if palIdx == 0 {
-        return
+        return palData, true, true
     }
 
-    gba.applyColor(palData, uint32(index))
+    return palData, true, false
 }
 
 type Background struct {
@@ -889,15 +1023,12 @@ type Background struct {
     Size uint32
     XOffset, YOffset uint32
     Affine bool
-
-    // need hof and vof
 }
 
 func NewBackground(cnt, hof, vof uint32, affine bool) *Background {
     bg := &Background{}
     bg.Affine = affine
     bg.Priority = utils.GetVarData(cnt, 0, 1)
-    //bg.CharBaseBlock = utils.GetVarData(cnt, 2, 5)
     bg.CharBaseBlock = (cnt >> 2) & 0b11
     bg.Mosaic = utils.BitEnabled(cnt, 6)
     bg.Palette256 = utils.BitEnabled(cnt, 7)
@@ -1129,6 +1260,7 @@ func (gba *GBA) getTile(tileAddr uint, tileSize, xOffset, yOffset int, obj, pale
 }
 
 type Windows struct {
+    Enabled bool
     Win0, Win1, WinObj *Window
     OutBg0, OutBg1, OutBg2, OutBg3, OutObj, OutBld bool
 }
@@ -1150,73 +1282,77 @@ func NewWindows(dispcnt *Dispcnt, gba *GBA) *Windows {
     mem := gba.Mem
 
     if dispcnt.DisplayWin0 {
-        wins.Win0.Enabled = true
+
+        win := wins.Win0
+
+        win.Enabled = true
 
         winH := mem.Read16(0x400_0040)
-        wins.Win0.R = utils.GetVarData(winH, 0, 7) + 1
-        wins.Win0.L = utils.GetVarData(winH, 8, 15)
+        win.R = utils.GetVarData(winH, 0, 7)
+        win.L = utils.GetVarData(winH, 8, 15)
 
-        if wins.Win0.R  > 240 || wins.Win0.L > wins.Win0.R {
-            wins.Win0.R = 240
+        if win.R == 0 && win.L == 0 {
+            win.R = 240
         }
 
         winV := mem.Read16(0x400_0044)
-        wins.Win0.B = utils.GetVarData(winV, 0, 7) + 1
-        wins.Win0.T = utils.GetVarData(winV, 8, 15)
-
-
-        if wins.Win0.B  > 160 || wins.Win0.T > wins.Win0.B {
-            wins.Win0.B = 160
+        win.B = utils.GetVarData(winV, 0, 7)
+        win.T = utils.GetVarData(winV, 8, 15)
+        if win.T == 0 && win.B == 0 {
+            win.B = 160
         }
 
         winIn := mem.Read16(0x400_0048)
-        wins.Win0.InBg0 = utils.BitEnabled(winIn, 0)
-        wins.Win0.InBg1 = utils.BitEnabled(winIn, 1)
-        wins.Win0.InBg2 = utils.BitEnabled(winIn, 2)
-        wins.Win0.InBg3 = utils.BitEnabled(winIn, 3)
-        wins.Win0.InObj = utils.BitEnabled(winIn, 4)
-        wins.Win0.InBld = utils.BitEnabled(winIn, 5)
+        win.InBg0 = utils.BitEnabled(winIn, 0)
+        win.InBg1 = utils.BitEnabled(winIn, 1)
+        win.InBg2 = utils.BitEnabled(winIn, 2)
+        win.InBg3 = utils.BitEnabled(winIn, 3)
+        win.InObj = utils.BitEnabled(winIn, 4)
+        win.InBld = utils.BitEnabled(winIn, 5)
     }
 
     if dispcnt.DisplayWin1 {
-        wins.Win1.Enabled = true
+        win := wins.Win1
+
+        win.Enabled = true
 
         winH := mem.Read16(0x400_0042)
-        wins.Win1.R = utils.GetVarData(winH, 0, 7) + 1
-        wins.Win1.L = utils.GetVarData(winH, 8, 15)
+        win.R = utils.GetVarData(winH, 0, 7)
+        win.L = utils.GetVarData(winH, 8, 15)
 
-        if wins.Win1.R  > 240 || wins.Win1.L > wins.Win1.R {
-            wins.Win1.R = 240
+        if win.R == 0 && win.L == 0 {
+            win.R = 240
         }
 
         winV := mem.Read16(0x400_0046)
-        wins.Win1.B = utils.GetVarData(winV, 0, 7) + 1
-        wins.Win1.T = utils.GetVarData(winV, 8, 15)
-
-        if wins.Win1.B  > 160 || wins.Win1.T > wins.Win1.B {
-            wins.Win1.B = 160
+        win.B = utils.GetVarData(winV, 0, 7)
+        win.T = utils.GetVarData(winV, 8, 15)
+        if win.T == 0 && win.B == 0 {
+            win.B = 160
         }
 
         winIn := mem.Read16(0x400_0048)
-        wins.Win1.InBg0 = utils.BitEnabled(winIn, 8)
-        wins.Win1.InBg1 = utils.BitEnabled(winIn, 9)
-        wins.Win1.InBg2 = utils.BitEnabled(winIn, 10)
-        wins.Win1.InBg3 = utils.BitEnabled(winIn, 11)
-        wins.Win1.InObj = utils.BitEnabled(winIn, 12)
-        wins.Win1.InBld = utils.BitEnabled(winIn, 13)
+        win.InBg0 = utils.BitEnabled(winIn, 8)
+        win.InBg1 = utils.BitEnabled(winIn, 9)
+        win.InBg2 = utils.BitEnabled(winIn, 10)
+        win.InBg3 = utils.BitEnabled(winIn, 11)
+        win.InObj = utils.BitEnabled(winIn, 12)
+        win.InBld = utils.BitEnabled(winIn, 13)
     }
 
     if dispcnt.DisplayObjWin {
         panic("OBJ WINDOW UNSET") // i dont know how dims are set with obj mode objs
 
-        wins.WinObj.Enabled = true
+        win := wins.WinObj
+
+        win.Enabled = true
         winOut := mem.Read16(0x400_004A)
-        wins.WinObj.InBg0 = utils.BitEnabled(winOut, 8)
-        wins.WinObj.InBg1 = utils.BitEnabled(winOut, 9)
-        wins.WinObj.InBg2 = utils.BitEnabled(winOut, 10)
-        wins.WinObj.InBg3 = utils.BitEnabled(winOut, 11)
-        wins.WinObj.InObj = utils.BitEnabled(winOut, 12)
-        wins.WinObj.InBld = utils.BitEnabled(winOut, 13)
+        win.InBg0 = utils.BitEnabled(winOut, 8)
+        win.InBg1 = utils.BitEnabled(winOut, 9)
+        win.InBg2 = utils.BitEnabled(winOut, 10)
+        win.InBg3 = utils.BitEnabled(winOut, 11)
+        win.InObj = utils.BitEnabled(winOut, 12)
+        win.InBld = utils.BitEnabled(winOut, 13)
     }
 
     winOut := mem.Read16(0x400_004A)
@@ -1227,5 +1363,211 @@ func NewWindows(dispcnt *Dispcnt, gba *GBA) *Windows {
     wins.OutObj = utils.BitEnabled(winOut, 4)
     wins.OutBld = utils.BitEnabled(winOut, 5)
 
+    if wins.Win0.Enabled || wins.Win1.Enabled || wins.WinObj.Enabled {
+        wins.Enabled = true
+    }
+
+    //w0 := wins.Win0
+    //w1 := wins.Win1
+
+    //fmt.Printf("0 %t, 1 %t\n", w0.Enabled, w1.Enabled)
+    //fmt.Printf("w0 l %d, r %d, t %d, b %d\n", w0.L, w0.R, w0.T, w0.B)
+    //fmt.Printf("w1 l %d, r %d, t %d, b %d\n", w1.L, w1.R, w1.T, w1.B)
+
     return wins
+}
+
+const (
+    BLD_MODE_OFF = 0
+    BLD_MODE_STD = 1
+    BLD_MODE_WHITE = 2
+    BLD_MODE_BLACK = 3
+)
+
+// blends are [6]... because Bg0, Bg1, Bg2, Bg3, Obj, Bd
+type Blend struct {
+    Mode uint32
+    a, b [6]bool
+    aEv, bEv, yEv uint32
+}
+
+func NewBlend(gba *GBA) *Blend {
+
+    // will need to setup semi transparent objs
+    // will need to setup windows
+
+    mem := gba.Mem
+
+    bld := &Blend{}
+
+    cnt := mem.Read16(0x400_0050)
+
+    bld.a[0] = utils.BitEnabled(cnt, 0)
+    bld.a[1] = utils.BitEnabled(cnt, 1)
+    bld.a[2] = utils.BitEnabled(cnt, 2)
+    bld.a[3] = utils.BitEnabled(cnt, 3)
+    bld.a[4] = utils.BitEnabled(cnt, 4)
+    bld.a[5] = utils.BitEnabled(cnt, 5)
+    bld.Mode = utils.GetVarData(cnt, 6, 7)
+    bld.b[0] = utils.BitEnabled(cnt, 8)
+    bld.b[1] = utils.BitEnabled(cnt, 9)
+    bld.b[2] = utils.BitEnabled(cnt, 10)
+    bld.b[3] = utils.BitEnabled(cnt, 11)
+    bld.b[4] = utils.BitEnabled(cnt, 12)
+    bld.b[5] = utils.BitEnabled(cnt, 13)
+
+    alpha := mem.Read16(0x400_0052)
+
+    bld.aEv = min(16, utils.GetVarData(alpha, 0, 4))
+    bld.bEv = min(16, utils.GetVarData(alpha, 8, 12))
+
+    y := mem.Read16(0x400_0054)
+    bld.yEv = utils.GetVarData(y, 0, 4)
+
+    return bld
+}
+
+type BlendPalettes struct {
+    Bld *Blend
+    NoBlendPalette uint32
+    APalette uint32
+    BPalette uint32
+    hasA, hasB bool
+}
+
+func NewBlendPalette(bld *Blend) *BlendPalettes {
+    return &BlendPalettes{ Bld: bld }
+}
+
+func (bp *BlendPalettes) reset(gba *GBA) {
+    bp.NoBlendPalette = 0
+    bp.APalette = 0
+    bp.BPalette = 0
+    bp.hasA = false
+    bp.hasB = false
+
+    backdrop := gba.getPalette(0, 0, false)
+
+    bp.NoBlendPalette = backdrop
+
+    if bp.Bld.a[5] {
+        bp.APalette = backdrop
+        bp.hasA = true
+    }
+
+    if bp.Bld.b[5] {
+        bp.BPalette = backdrop
+        bp.hasB = true
+    }
+
+}
+
+func (bp *BlendPalettes) setBlendPalettes(palData uint32, bgIdx uint32, obj bool) {
+
+    if obj {
+
+        bp.NoBlendPalette = palData
+
+        if bp.Bld.a[4] {
+            bp.APalette = palData
+            bp.hasA = true
+        }
+
+        if bp.Bld.b[4] {
+            bp.BPalette = palData
+            bp.hasB = true
+        }
+        return 
+    }
+
+    bp.NoBlendPalette = palData
+
+    if bp.Bld.a[bgIdx] {
+        bp.APalette = palData
+        bp.hasA = true
+    }
+
+    if bp.Bld.b[bgIdx] {
+        bp.BPalette = palData
+        bp.hasB = true
+    }
+}
+
+func (bp *BlendPalettes) blend(objTransparent bool) uint32 {
+
+    switch bp.Bld.Mode {
+    case BLD_MODE_OFF: return bp.noBlend(objTransparent)
+    case BLD_MODE_STD: return bp.alphaBlend()
+    //case BLD_MODE_WHITE:
+    //case BLD_MODE_BLACK:
+    }
+
+    return bp.noBlend(objTransparent)
+}
+
+func (bp *BlendPalettes) noBlend(objTransprent bool) uint32 {
+
+    if !objTransprent {
+        return bp.NoBlendPalette
+    }
+
+    aEv := bp.Bld.aEv
+    bEv := bp.Bld.bEv
+
+    if !bp.hasA || !bp.hasB {
+        return bp.NoBlendPalette
+    }
+
+    rA := (bp.APalette) & 0x1F
+    gA := (bp.APalette >> 5) & 0x1F
+    bA := (bp.APalette >> 10) & 0x1F
+
+    rB := (bp.BPalette) & 0x1F
+    gB := (bp.BPalette >> 5) & 0x1F
+    bB := (bp.BPalette >> 10) & 0x1F
+
+    blend := func(a, b uint32) uint32 {
+        //val := (int(a)*int(aEv) + int(b)*int(bEv)) >> 4
+        val := (int(a)*int(aEv) + int(b)*int(bEv)) >> 4
+        if val > 31 {
+            return 31
+        }
+        return uint32(val)
+    }
+    r := blend(rA, rB)
+    g := blend(gA, gB)
+    b := blend(bA, bB)
+
+    return r | (g << 5) | (b << 10)
+}
+
+func (bp *BlendPalettes) alphaBlend() uint32 {
+
+    aEv := bp.Bld.aEv
+    bEv := bp.Bld.bEv
+
+    if !bp.hasA || !bp.hasB {
+        return bp.NoBlendPalette
+    }
+
+    rA := (bp.APalette) & 0x1F
+    gA := (bp.APalette >> 5) & 0x1F
+    bA := (bp.APalette >> 10) & 0x1F
+
+    rB := (bp.BPalette) & 0x1F
+    gB := (bp.BPalette >> 5) & 0x1F
+    bB := (bp.BPalette >> 10) & 0x1F
+
+    blend := func(a, b uint32) uint32 {
+        val := (int(a)*int(aEv) + int(b)*int(bEv)) >> 4
+        if val > 31 {
+            return 31
+        }
+        return uint32(val)
+    }
+    r := blend(rA, rB)
+    g := blend(gA, gB)
+    b := blend(bA, bB)
+
+    return r | (g << 5) | (b << 10)
 }

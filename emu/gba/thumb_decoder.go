@@ -12,8 +12,11 @@ func (cpu *Cpu) DecodeTHUMB(opcode uint16) int {
 	switch {
     case isthumbSWI(opcode):
         cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
-        cycles := cpu.Gba.SysCall(uint32(opcode) & 0xFF)
-        r[PC] += 2
+        cycles, incPc := cpu.Gba.SysCall(uint32(opcode) & 0xFF)
+
+        if incPc {
+            r[PC] += 2
+        }
 
         return cycles
 

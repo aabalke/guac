@@ -168,6 +168,7 @@ func (s *SDLStruct) Update(debug bool, romPath string) {
 
 		// free inactive components every few seconds
 		if i.UnixMicro()%7 == 0 {
+            
 			scene.DeleteInactive()
 		}
 

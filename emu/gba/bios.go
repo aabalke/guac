@@ -8,6 +8,11 @@ import (
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
+const (
+    INTRWAIT_NONE = 0
+    INTRWAIT_VBLANK = 1
+)
+
 func (gba *GBA) LoadBios(path string) {
 
 	buf, err := os.ReadFile(path)
@@ -24,19 +29,27 @@ func (gba *GBA) LoadBios(path string) {
 	}
 }
 
-func (gba *GBA) SysCall(inst uint32) int {
+func (gba *GBA) SysCall(inst uint32) (int, bool) {
 
 	cycles := 0
 
+    fmt.Printf("SYS CALL %08X\n", inst)
+
+    if inst > 0x2A {
+        panic(fmt.Sprintf("INVALID SWI SYSCALL %08X", inst))
+    }
+
 	switch inst {
-	case SYS_SoftReset:
-		SoftReset(gba)
-		cycles += 200 // approx
+	//case SYS_SoftReset:
+	//	SoftReset(gba)
+	////	cycles += 200 // approx
 	case SYS_RegisterRamReset:
 		RegisterRamReset(gba)
 		cycles += 30 // approx
-    case SYS_Halt:
-        gba.Halted = true
+    //case SYS_Halt:
+    //    //panic("HALT")
+    //    gba.Halted = true
+    //    gba.IntrWait = 0xFFFF
 	case SYS_IntrWait:
 		IntrWait(gba)
 	case SYS_VBlankIntrWait:
@@ -87,12 +100,17 @@ func (gba *GBA) SysCall(inst uint32) int {
         cycles += 168948
     //default :gba.exception(SWI_VEC, MODE_SWI)
 	default:
+
+        //fmt.Printf("SWI %04X\n", inst)
+
+        //gba.exception(SWI_VEC, MODE_SWI)
+        //return cycles, false // keeps from inc PC after setting in exception
 		panic(fmt.Sprintf("EXCEPTION OR UNHANDLED SYS CALL TYPE 0x%X\n", inst))
 	}
 
     cycles += 6
 
-	return cycles
+	return cycles, true
 }
 
 func BGAffineSet(gba *GBA) int {
@@ -194,6 +212,29 @@ func ObjAffineSet(gba *GBA) int {
 
 func IntrWait(gba *GBA) {
 	//fmt.Printf("IntrWait is called, but is not completely setup\n")
+
+    //panic("INTRAWAIT")
+
+    mem := gba.Mem
+	reg := &gba.Cpu.Reg.R
+	waitMode := reg[0]
+	irqMask := uint32(reg[1])
+
+    IF := mem.Read16(0x400_0202)
+    mem.Write16(0x400_0208, 0x1)
+    //fmt.Printf("CURR %08d, PC %08X INTR WAIT MASK %08X IF %08X, COMBO %1b\n", CURR_INST, reg[PC], irqMask, IF, irqMask & IF)
+
+    if waitMode == 0 && (IF&irqMask) != 0 {
+        return
+	}
+    gba.IntrWait = irqMask
+	// Discard old IF flags if waitMode == 1
+	if waitMode == 1 {
+        if (IF & irqMask) != 0 {
+            return
+        }
+        gba.Halted = true
+    }
 }
 
 func VBlankIntrWait(gba *GBA) {
@@ -203,6 +244,32 @@ func VBlankIntrWait(gba *GBA) {
 	r[1] = 1
 
 	IntrWait(gba)
+}
+
+func AckIntrWait(gba *GBA) {
+
+    mem := gba.Mem
+
+
+    if gba.IntrWait & mem.Read16(0x400_0202) == 0 {
+        return
+    }
+
+    fmt.Printf("STORED %08X, IF %08X\n", gba.IntrWait, mem.Read16(0x400_0202))
+
+    gba.Halted = false
+    gba.IntrWait = 0
+
+    //gba.ExitHalt = true
+
+	reg := &gba.Cpu.Reg.R
+
+	irqMask := uint32(reg[1])
+    // Acknowledge selected IRQs
+	mem.Write16(0x400_0202, uint16(irqMask))
+	// Update BIOS IRQ mirror at 0x03007FF8
+	// Assume this is mapped to mem.BIOSFlags (or use raw memory slice)
+	mem.Write16(0x300_7FF8, uint16(irqMask))
 }
 
 func SoftReset(gba *GBA) {
@@ -255,6 +322,8 @@ func RegisterRamReset(gba *GBA) {
 	mem := gba.Mem
 	r := &gba.Cpu.Reg.R
 	flags := r[0]
+
+    fmt.Printf("Flags %08b\n", uint8(flags))
 
 	if clearWRAM1 := utils.BitEnabled(flags, 0); clearWRAM1 {
 		mem.WRAM1 = [0x40000]uint8{}
@@ -312,6 +381,14 @@ func RegisterRamReset(gba *GBA) {
 			mem.IO[i] = 0x0
 		}
 	}
+
+    //mem.Write16(0x400_0000, 0x80)
+    mem.IO[0x120] = 0
+    mem.IO[0x121] = 0
+    mem.IO[0x122] = 0
+    mem.IO[0x123] = 0
+    mem.IO[0x00] = 0x80
+    mem.IO[0x01] = 0x00
 }
 
 func Div(gba *GBA, arm bool) {
@@ -571,6 +648,7 @@ func CpuSet(gba *GBA) {
 
 	switch {
 	case fill && isWord:
+
 
 		rs &^= 0b11
 		rd &^= 0b11

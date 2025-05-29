@@ -25,7 +25,7 @@ const (
 )
 
 type Alu struct {
-    Opcode, Rd, Rn, RnValue, Cond, Op2, Inst uint32
+    Opcode, Rd, Rn, Rm, RnValue, Cond, Op2, Inst uint32
     Immediate, Set bool
     LogicalFlags, Test bool
     Carry bool
@@ -41,6 +41,7 @@ func NewAluData(opcode uint32, cpu *Cpu) *Alu {
         Set: utils.BitEnabled(opcode, 20),
         Rd: utils.GetByte(opcode, 12),
         Rn: utils.GetByte(opcode, 16),
+        Rm: utils.GetByte(opcode, 0),
     }
 
     alu.Op2, alu.Carry = cpu.GetOp2(opcode)
@@ -63,6 +64,7 @@ func NewAluData(opcode uint32, cpu *Cpu) *Alu {
 
 func (cpu *Cpu) Alu(opcode uint32) {
 
+
     alu := NewAluData(opcode, cpu)
 
     switch alu.Inst {
@@ -84,16 +86,15 @@ func (cpu *Cpu) Alu(opcode uint32) {
         cpu.test(alu)
     }
 
-
-    if seq := cpu.Gba.Ct.popSequential(cpu.Reg.R[PC], false); seq {
-        cpu.Gba.Ct.instCycles = 4
-    } else {
-        cpu.Gba.Ct.instCycles = 4
-    }
-
     if alu.Rd != PC {
         cpu.Reg.R[15] += 4
     }
+
+    //if seq := cpu.Gba.Ct.popSequential(cpu.Reg.R[PC], false); seq {
+    //    cpu.Gba.Ct.instCycles = 4
+    //} else {
+    //    cpu.Gba.Ct.instCycles = 6
+    //}
 }
 
 func (cpu *Cpu) GetOp2(opcode uint32) (uint32, bool) {
@@ -170,7 +171,6 @@ func (cpu *Cpu) logical(alu *Alu) {
     cpu.Reg.R[alu.Rd] = res
 
     cpu.setAluFlags(alu, uint64(res))
-
 }
 
 func (cpu *Cpu) arithmetic(alu *Alu) {
@@ -219,28 +219,33 @@ func (cpu *Cpu) test(alu *Alu) {
 
     if alu.Rd == PC {
         // ARM 3: Bad CMP / CMN / TST / TEQ change the mode
-        cpu.Reg.setMode(cpu.Reg.getMode(), MODE_SYS) // this may be not SYS MODE
         // i know it isnt stored spsr, becuase in tests this was zero
+        cpu.Reg.setMode(cpu.Reg.getMode(), MODE_SYS) // this may be not SYS MODE
         // maybe spsr but with some more work???
 
         cpu.Reg.R[PC] += 4
         return
     }
-
 }
 
 func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
+
+    if interruptExit := cpu.Reg.getMode() == MODE_IRQ && alu.Rd == PC && alu.Rm == LR && alu.Inst == MOV; interruptExit {
+        cpu.AluChangeMode(false)
+        return
+    }
+
     switch {
-    //case alu.Rd == PC && alu.Set && !alu.Test: // private mode
-    case alu.Rd == PC && alu.Set: // private mode
+    case alu.Rd == PC && alu.Set && !alu.Test:
 
         if alu.Inst == CMN || alu.Inst == CMP {
             return
         }
-        cpu.AluChangeMode(!alu.Test)
+
+        cpu.AluChangeOriginal(!alu.Test)
         return
-    //case alu.Rd == PC && !test:
-    case alu.Rd == PC && !alu.Test:
+
+    //case alu.Rd == PC && !alu.Test:
         //panic("pipelining")
     case alu.Set:
 
@@ -277,6 +282,11 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
 }
 
 func (cpu *Cpu) AluChangeMode(flush bool) {
+    cpu.Gba.handleInterruptExit()
+    return
+}
+
+func (cpu *Cpu) AluChangeOriginal(flush bool) {
 
     reg := &cpu.Reg
 
@@ -286,8 +296,12 @@ func (cpu *Cpu) AluChangeMode(flush bool) {
     prev := reg.getMode()
 
     reg.setMode(curr, prev)
+    //fmt.Printf("Return from IRQ: CPSR=0x%X (mode %d), LR=%08X, PC=%08X\n",
+    //reg.CPSR, reg.getMode(), reg.R[LR], reg.R[PC])
 
     // if flush pipeline
+
+    //reg.R[LR] = 0x800280B
 
     cpu.Gba.checkIRQ()
 }
@@ -568,6 +582,12 @@ func (c *Cpu) BX(opcode uint32) {
     inst := utils.GetByte(opcode, 4)
     rn := utils.GetByte(opcode, 0)
 
+    if rn == LR && c.Reg.getMode() == MODE_IRQ {
+        c.AluChangeMode(false)
+        //c.AluChangeOriginal(false)
+        //panic("LEAVING THRU BX")
+    }
+
     switch inst {
     case INST_BX:
         c.Reg.R[PC] = c.Reg.R[rn]
@@ -833,6 +853,13 @@ func (c *Cpu) Block(opcode uint32) {
 
     if forceUser := block.PSR; forceUser {
         c.Reg.setMode(MODE_USR, mode)
+    }
+
+    if utils.BitEnabled(block.Opcode, 15) && c.Reg.getMode() == MODE_IRQ {
+        //panic("EHR")
+        c.AluChangeMode(false)
+        //c.AluChangeOriginal(false)
+        //c.Gba.checkIRQ()
     }
 
     if incPc {
@@ -1139,11 +1166,13 @@ func (cpu *Cpu) Psr(opcode uint32) {
 
     if psr.MSR {
         cpu.msr(psr)
+        //cpu.armMSR(opcode)
         cpu.Reg.R[15] += 4
         return
     }
 
     cpu.mrs(psr)
+    //cpu.armMRS(opcode)
     cpu.Reg.R[15] += 4
 }
 
@@ -1161,6 +1190,81 @@ func (cpu *Cpu) mrs(psr *PSR) {
 
     r[psr.Rd] = uint32(cpu.Reg.CPSR)
 }
+
+const (
+	PRIV_MASK  uint32 = 0xF8FF_03DF
+	USR_MASK   uint32 = 0xF8FF_0000
+	STATE_MASK uint32 = 0x0100_0020
+)
+
+//func (cpu *Cpu) armMRS(inst uint32) {
+//	rd := (inst >> 12) & 0b1111
+//	if useSpsr := utils.BitEnabled(inst, 22); useSpsr {
+//		mode := cpu.Reg.getMode()
+//		cpu.Reg.R[rd] = uint32(cpu.Reg.SPSR[BANK_ID[mode]])
+//		return
+//	}
+//
+//	mask := PRIV_MASK
+//	if cpu.Reg.getMode() == MODE_USR {
+//		mask = USR_MASK
+//	}
+//	cpu.Reg.R[rd] = uint32(cpu.Reg.CPSR) & mask
+//}
+//func (cpu *Cpu) armMSR(inst uint32) {
+//	mask := uint32(0)
+//	if c := utils.BitEnabled(inst, 16); c {
+//		mask = 0x0000_00ff
+//	}
+//	if x := utils.BitEnabled(inst, 17); x {
+//		mask |= 0x0000_ff00
+//	}
+//	if s := utils.BitEnabled(inst, 18); s {
+//		mask |= 0x00ff_0000
+//	}
+//	if f := utils.BitEnabled(inst, 19); f {
+//		mask |= 0xff00_0000
+//	}
+//
+//	secMask := PRIV_MASK
+//
+//    if cpu.Reg.getMode() == MODE_USR {
+//		secMask = USR_MASK
+//	}
+//
+//	r := utils.BitEnabled(inst, 22)
+//	if r {
+//		secMask |= STATE_MASK
+//	}
+//
+//	mask &= secMask
+//	psr := uint32(0)
+//	if utils.BitEnabled(inst, 25) {
+//		// register Psr[field] = Imm
+//		is, imm := ((inst>>8)&0b1111)*2, inst&0b1111_1111
+//		psr, _, _ = utils.Ror(imm, (is), false, false ,false)
+//	} else {
+//		// immediate Psr[field] = Rm
+//
+//		rm := inst & 0b1111
+//        //fmt.Printf("RM %d, RMVALUE %08X\n", rm, cpu.Reg.R[rm])
+//		psr = cpu.Reg.R[rm]
+//	}
+//	psr &= mask
+//
+//	if r {
+//		spsr := uint32(cpu.Reg.SPSR[BANK_ID[cpu.Reg.getMode()]])
+//        mode := cpu.Reg.getMode()
+//		cpu.Reg.SPSR[BANK_ID[mode]] = Cond((spsr & ^mask) | psr)
+//	} else {
+//		currMode := cpu.Reg.getMode()
+//		newMode := psr & 0b11111
+//		cpu.Reg.CPSR = Cond(uint32(cpu.Reg.CPSR) &^ mask)
+//		cpu.Reg.CPSR = Cond(uint32(cpu.Reg.CPSR) | psr)
+//        cpu.Reg.setMode(currMode, newMode)
+//		cpu.Gba.checkIRQ()
+//	}
+//}
 
 func (cpu *Cpu) msr(psr *PSR) {
 

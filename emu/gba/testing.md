@@ -53,7 +53,7 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 
 ### MGBA Test Suite
 
-❌ Memory tests [832/1552]
+❌ Memory tests [1153/1552]
 ❌ I/O read tests [12/130]
 ❌ Timing tests [240/2020]
 ❌ Timer count-up tests [crash]
@@ -62,7 +62,7 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 👍 Carry tests [93/93]
 👍 Multiply long tests [52/72] (matches mgba)
 👍 BIOS math tests [615/615]
-❌ DMA tests [938/1256]
+❌ DMA tests [1018/1256]
 ❌ SIO register R/W tests [7/90]
 ❌ SIO timing tests [0/8]
 ❌ Misc. edge case tests [0/10]
@@ -77,8 +77,10 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 
 ### Tonc
 
+! Affine and Mode 1, Mode 2 are temp disabled !
+
 👍 bigmap
-❌ bld_demo
+❌ bld_demo (need to complete black and white blend)
 👍 bm_modes
 
 👍 brin_demo
@@ -87,7 +89,7 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
    👍 wrap
 
 👍 cbb_demo
-    ❌ obj tile in top left (not sure if needed?)
+    👍 obj tile in top left (not sure if needed?)
     👍 0102/1011
     👍 2122/3031
     👍 no extra
@@ -127,7 +129,7 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 
 ❌ octtest
 👍 pageflip
-❌ prio_demo
+👍 prio_demo
 ❌ sbb_aff
 👍 sbb_reg (has obj in top left, not sure if problem)
 👍 second
@@ -138,6 +140,6 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 ❌ tte_demo
 ❌ txt_bm
 ❌ txt_obj
-❌ txt_se1
-❌ txt_se2
-❌ win_demo
+👍 txt_se1
+👍 txt_se2 (text has different amounts)
+👍 win_demo

@@ -70,15 +70,16 @@ func NewCpu(gba *GBA) *Cpu {
 	c.Reg.FIQ[3] = 0x16A0_439B
 	c.Reg.FIQ[4] = 0x4482_0443
 
-	c.Reg.SP[BANK_ID[MODE_FIQ]] =   0x0041_0C81
 	c.Reg.LR[BANK_ID[MODE_FIQ]] =   0xA928_314E
-	c.Reg.SPSR[BANK_ID[MODE_FIQ]] = 0xF000_00FF
-
-    c.Reg.SP[BANK_ID[MODE_IRQ]] =   0x0300_7FA0
     c.Reg.LR[BANK_ID[MODE_IRQ]] =   0x0000_0000
+
+	c.Reg.SPSR[BANK_ID[MODE_FIQ]] = 0xF000_00FF
     c.Reg.SPSR[BANK_ID[MODE_IRQ]] = 0x0000_0010
 
-    c.Reg.SP[BANK_ID[MODE_SYS]] =   0x0300_7FA0
+	c.Reg.SP[BANK_ID[MODE_FIQ]] =   0x0041_0C81
+    c.Reg.SP[BANK_ID[MODE_SYS]] =   0x0300_7F00
+    c.Reg.SP[BANK_ID[MODE_IRQ]] =   0x0300_7FA0
+    c.Reg.SP[BANK_ID[MODE_SWI]] =   0x0300_7FE0
 	return c
 }
 
@@ -158,12 +159,14 @@ func (r *Reg) setMode(prev, curr uint32) {
 		return
 	}
 
-
-
 	r.switchRegisterBanks(prev, curr)
 }
 
 func (r *Reg) switchRegisterBanks(prev, curr uint32) {
+
+    //if BANK_ID[prev] == BANK_ID[curr] {
+    //    return
+    //}
 
 	if prev != MODE_FIQ {
 		for i := range 5 {
@@ -185,6 +188,8 @@ func (r *Reg) switchRegisterBanks(prev, curr uint32) {
 			r.R[8+i] = r.USR[i]
 		}
 	}
+
+    //println("HERE", BANK_ID[curr], curr)
 
 	r.R[SP] = r.SP[BANK_ID[curr]]
 	r.R[LR] = r.LR[BANK_ID[curr]]
