@@ -1,6 +1,8 @@
 package gba
 
-import "fmt"
+import (
+	"fmt"
+)
 
 var (
     _ = fmt.Sprintf("")
@@ -15,8 +17,7 @@ type Memory struct {
 	PRAM [0x400]uint8
 	VRAM [0x18000]uint8
 	OAM  [0x400]uint8
-
-	IO [0x400]uint8 // THIS IS TEMP
+	IO [0x400]uint8
 
 	BIOS_MODE uint32
 
@@ -27,8 +28,7 @@ type Memory struct {
 func NewMemory(gba *GBA) *Memory {
 	m := &Memory{GBA: gba}
 
-	m.Write(0x4000000, 0x80)
-
+	m.Write32(0x4000000, 0x80)
 
 	//m.Write(0x4000130, 0xFF) // KEY INPUT
 
@@ -39,7 +39,7 @@ func NewMemory(gba *GBA) *Memory {
 	return m
 }
 
-func (m *Memory) Read(addr uint32) uint8 {
+func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
 
 	switch {
 	case addr < 0x0000_4000:
@@ -48,37 +48,29 @@ func (m *Memory) Read(addr uint32) uint8 {
 		//return m.BIOS[addr % 0x0000_4000]
         fmt.Printf("READING FROM UNUSED MEMORY ADDR %08X\n", addr)
 		return 0
-	case addr < 0x0204_0000:
-		return m.WRAM1[addr-0x0200_0000]
 	case addr < 0x0300_0000:
-		return m.WRAM1[(addr-0x0204_0000)%0x4_000]
-	case addr < 0x0300_8000:
-		return m.WRAM2[addr-0x0300_0000]
+		return m.WRAM1[(addr-0x0200_0000)%0x4_0000]
 	case addr < 0x0400_0000:
-		return m.WRAM2[(addr-0x0300_8000)%0x8_000]
+		return m.WRAM2[(addr-0x0300_0000)%0x8_000]
 	case addr < 0x0400_0400:
 		return m.ReadIO(addr - 0x0400_0000)
 	case addr < 0x0500_0000:
-        fmt.Printf("READING FROM UNUSED MEMORY ADDR %08X\n", addr)
+        //fmt.Printf("READING FROM UNUSED MEMORY ADDR %08X\n", addr)
 		return 0
-	case addr < 0x0500_0400:
-		return m.PRAM[addr-0x0500_0000]
 	case addr < 0x0600_0000:
-		return m.PRAM[(addr-0x0500_0400)%0x400]
-	case addr < 0x0601_8000:
-		return m.VRAM[addr-0x0600_0000]
-	case addr < 0x0700_0000:
+		return m.PRAM[(addr-0x0500_0000)%0x400]
+    case addr < 0x700_0000:
 
-        mirrorAddr := (addr - 0x601_8000) % 0x2_0000
-        if mirrorAddr > 0x1_8000 {
+        mirrorAddr := (addr - 0x600_0000) % 0x2_0000
+        if mirrorAddr >= 0x1_8000 {
             mirrorAddr -= 0x8000 // 32k internal mirror
         }
 
 		return m.VRAM[mirrorAddr]
-	case addr < 0x0700_0400:
-		return m.OAM[addr-0x0700_0000]
+
 	case addr < 0x0800_0000:
-		return m.OAM[(addr-0x0700_0400)%0x400]
+		return m.OAM[(addr-0x0700_0000)%0x400]
+
 	case addr < 0x0A00_0000:
 		return m.GBA.Cartridge.Data[addr-0x0800_0000]
 	case addr < 0x0E00_0000:
@@ -86,6 +78,12 @@ func (m *Memory) Read(addr uint32) uint8 {
         //offset := (addr - 0x0A00_0000) % 0x200_0000 // should be rom length?
         offset := (addr - 0x0A00_0000) % m.GBA.Cartridge.RomLength // should be rom length?
 		return m.GBA.Cartridge.Data[offset]
+
+//	case addr < 0x0E00_0000:
+//        // do not make rom length
+//        //offset := (addr - 0x0800_0000) % 0x200_0000
+//        offset := (addr - 0x0800_0000) % 0x200_0000
+//		return m.GBA.Cartridge.Data[offset]
 
 	case addr < 0x1000_0000:
 
@@ -96,6 +94,9 @@ func (m *Memory) Read(addr uint32) uint8 {
 		//if manufacturer := addr == 0xE00_0000; manufacturer {
 		//	return 0xC2 // temp for pokemon fire
 		//}
+
+        if !byteRead {
+        }
 
 		return m.GBA.Cartridge.SRAM[(addr-0x0E00_0000)%0x1_0000]
 	default:
@@ -125,7 +126,7 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 	case 0x0005:
 		return uint8(m.Dispstat >> 8)
 	case 0x0006:
-		return uint8(m.GBA.Gt.Scanline)
+		return uint8(m.GBA.VCOUNT)
 
 	case 0x0007:
 		return 0x0
@@ -236,7 +237,7 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 
 func (m *Memory) Read8(addr uint32) uint32 {
 
-	return uint32(m.Read(addr))
+	return uint32(m.Read(addr, true))
 }
 
 // Accessing SRAM Area by 16bit/32bit
@@ -244,94 +245,107 @@ func (m *Memory) Read8(addr uint32) uint32 {
 func (m *Memory) Read16(addr uint32) uint32 {
 
 	if sram := addr > 0xE00_0000 && addr < 0x1000_0000; sram {
-		return uint32(m.Read(addr)) * 0x0101
+		return uint32(m.Read(addr, false)) * 0x0101
 	}
 
-	return m.Read8(addr+1) <<8 | m.Read8(addr)
+	return uint32(m.Read(addr+1, false)) <<8 | uint32(m.Read(addr, false))
 }
 
 func (m *Memory) Read32(addr uint32) uint32 {
-
 
 	//if addr == 0x0 {
 	//	return m.ReadBios(addr)
 	//}
 
 	if sram := addr > 0xE00_0000 && addr < 0x1000_0000; sram {
-		return uint32(m.Read(addr)) * 0x01010101
+		return uint32(m.Read(addr, false)) * 0x01010101
 	}
 
 	return m.Read16(addr+2)<<16 | m.Read16(addr)
 }
 
-func (m *Memory) Write(addr uint32, v uint8) {
+func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
 
 	switch {
 	case addr < 0x0000_4000:
 		m.BIOS[addr] = v
 	case addr < 0x0200_0000:
-        fmt.Printf("COULD NOT WRITE %08X TO ADDR %08X\n", v, addr)
+        //fmt.Printf("COULD NOT WRITE %08X TO ADDR %08X\n", v, addr)
 		return
-	case addr < 0x0204_0000:
-		m.WRAM1[addr-0x0200_0000] = v
-        return
 	case addr < 0x0300_0000:
-		m.WRAM1[(addr-0x0204_0000)%0x4_000] = v
-        return
-	case addr < 0x0300_8000:
-		m.WRAM2[addr-0x0300_0000] = v
+		m.WRAM1[(addr-0x0200_0000)%0x4_0000] = v
         return
 	case addr < 0x0400_0000:
-		m.WRAM2[(addr-0x0300_8000)%0x8_000] = v
+		m.WRAM2[(addr-0x0300_0000)%0x8_000] = v
         return
 	case addr < 0x0400_0400:
 		m.WriteIO(addr-0x0400_0000, v)
         return
 	case addr < 0x0500_0000:
-        fmt.Printf("COULD NOT WRITE %08X TO ADDR %08X\n", v, addr)
+        //fmt.Printf("COULD NOT WRITE %08X TO ADDR %08X\n", v, addr)
 		return
-	case addr < 0x0500_0400:
-		m.PRAM[addr-0x0500_0000] = v
-        return
 	case addr < 0x0600_0000:
-		m.PRAM[(addr-0x0500_0400)%0x400] = v
-        return
-	case addr < 0x0601_8000:
-		m.VRAM[addr-0x0600_0000] = v
+
+        relative := (addr-0x0500_0000)%0x400
+
+        if byteWrite {
+            m.PRAM[relative] = v
+            m.PRAM[relative + 1] = v
+            return
+        }
+		m.PRAM[relative] = v
+
         return
 	case addr < 0x0700_0000:
-
         /*
              0x16000, 0x8000, 0x8000 | 24_000
             | 64k, 32k 32k (mirror) | mirror of block |
         */
-
-        mirrorAddr := (addr - 0x601_8000) % 0x2_0000
-        if mirrorAddr > 0x1_8000 {
+        mirrorAddr := (addr - 0x600_0000) % 0x2_0000
+        if mirrorAddr >= 0x1_8000 {
             mirrorAddr -= 0x8000 // 32k internal mirror
+        }
+
+        mode := m.Read(0x400_0000, false) & 0b111
+        if bitmap := mode > 2; bitmap && byteWrite && mirrorAddr > 0x1_0000 {
+            return
+        }
+
+        if byteWrite {
+            m.VRAM[mirrorAddr] = v
+            m.VRAM[mirrorAddr + 1] = v
+            return
         }
 
 		m.VRAM[mirrorAddr] = v
         return
-	case addr < 0x0700_0400:
-		m.OAM[addr-0x0700_0000] = v
-        return
-	case addr < 0x0800_0000:
-		m.OAM[(addr-0x0700_0400)%0x400] = v
-        return
 
-        // mirrors???
+	case addr < 0x0800_0000:
+        if byteWrite {
+            return
+        }
+		m.OAM[(addr-0x0700_0000)%0x400] = v
+        return
 	case addr < 0x0A00_0000:
-        fmt.Printf("COULD NOT WRITE %08X TO ADDR %08X\n", v, addr)
+        //fmt.Printf("COULD NOT WRITE %08X TO ADDR %08X\n", v, addr)
         return
 	case addr < 0x0E00_0000:
-        fmt.Printf("COULD NOT WRITE %08X TO ADDR %08X\n", v, addr)
+        //fmt.Printf("COULD NOT WRITE %08X TO ADDR %08X\n", v, addr)
         return
 	case addr < 0x1000_0000:
-		m.GBA.Cartridge.SRAM[(addr-0x0E00_0000)%0x1_0000] = v
+
+        relative := (addr - 0xE00_0000) % 0x1_000
+
+        if byteWrite {
+            m.GBA.Cartridge.SRAM[relative] = v
+            m.GBA.Cartridge.SRAM[relative + 1] = v
+            return
+        }
+
+		m.GBA.Cartridge.SRAM[relative] = v
         return
 	default:
-        fmt.Printf("COULD NOT WRITE %08X TO ADDR %08X\n", v, addr)
+        //fmt.Printf("COULD NOT WRITE %08X TO ADDR %08X\n", v, addr)
 		return
 	}
 }
@@ -445,8 +459,13 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 		m.GBA.Timers[3].WriteCnt(v, true)
 
 
-    case 0x200, 0x201, 0x208, 0x209:
+    case 0x200, 0x201:
 		m.IO[addr] = v
+        //fmt.Printf("IRQ EXCEPTION CHECK AT MEM IE\n")
+        m.GBA.checkIRQ()
+    case 0x208, 0x209:
+		m.IO[addr] = v
+        //fmt.Printf("IRQ EXCEPTION CHECK AT MEM IME\n")
         m.GBA.checkIRQ()
 
     // manual clear IF by writing 1
@@ -461,19 +480,22 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 }
 
 func (m *Memory) Write8(addr uint32, v uint8) {
-	m.Write(addr, v)
+	m.Write(addr, v, true)
 }
 
 func (m *Memory) Write16(addr uint32, v uint16) {
-	//if sram := addr > 0xE00_0000 && addr < 0x1000_0000; sram {
-	//    v, _, _ := utils.Ror(uint32(v), (addr & 0xFFFFFF) * 8, false, false, false)
-	//    m.Write8(addr, uint8(v))
-	//    //m.Write8(addr+1, uint8(v>>8))
+
+	//if sram := addr >= 0xE00_0000; sram {
+    //    //fmt.Printf("ADDR  %08X V %08X\n", addr, v)
+    //    //_, _, _ = utils.Ror(uint32(v), (addr+1) * 8, false, false, false)
+    //    //fmt.Printf("ADDR2 %08X V %08X\n", addr, v)
+	//    //m.Write(addr, uint8(v), false)
+	//    ////m.Write(addr+1, uint8(v>>8), false)
 	//    return
 	//}
 
-	m.Write8(addr, uint8(v))
-	m.Write8(addr+1, uint8(v>>8))
+	m.Write(addr, uint8(v), false)
+	m.Write(addr+1, uint8(v>>8), false)
 }
 
 func (m *Memory) Write32(addr uint32, v uint32) {

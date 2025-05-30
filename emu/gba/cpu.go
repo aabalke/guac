@@ -155,6 +155,11 @@ func (r *Reg) setMode(prev, curr uint32) {
 
 	r.CPSR.SetMode(curr)
 
+    //r._setMode(prev, curr)
+//}
+//
+//func (r *Reg) _setMode(prev, curr uint32) {
+
 	if BANK_ID[prev] == BANK_ID[curr] {
 		return
 	}
@@ -201,3 +206,11 @@ func (r *Reg) switchRegisterBanks(prev, curr uint32) {
 	}
 
 }
+
+func (r *Reg) restoreMode() {
+    curr := r.getMode()
+    r.CPSR = r.SPSR[BANK_ID[curr]]
+    prev := r.getMode()
+    r.setMode(curr, prev)
+}
+

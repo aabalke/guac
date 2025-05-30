@@ -1,12 +1,12 @@
-BIOS Functions
+HLE BIOS Functions
 
 GBA Basic Functions
 👍 0x00 SoftReset
 👍 0x01 RegisterRamReset
 👍 0x02 Halt
 ❌ 0x03 Stop/Sleep
-➗ 0x04 IntrWait
-➗ 0x05 VBlankIntrWait
+👍 0x04 IntrWait
+👍 0x05 VBlankIntrWait
 👍 0x06 Div
 👍 0x07 DivArm
 👍 0x08 Sqrt

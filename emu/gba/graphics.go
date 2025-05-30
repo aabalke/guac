@@ -6,69 +6,6 @@ import (
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
-type GraphicsTiming struct {
-    Gba             *GBA
-    RefreshCycles   int
-    PrevScanline    int
-    Scanline        int
-    HBlank          bool
-    VBlank          bool
-    hasVBlankDma    bool
-    hasHBlankDma    bool
-}
-
-func (gt *GraphicsTiming) reset() {
-    gt.RefreshCycles = 0
-    gt.PrevScanline = 0
-    gt.Scanline = 0
-    gt.HBlank = false
-    gt.VBlank = false
-    gt.hasVBlankDma = false
-    gt.hasHBlankDma = false
-}
-
-func (gt *GraphicsTiming) update(cycles int) {
-
-    const (
-        REFRESH = 280_896 // should this be replaced by clock / fps?
-        SCANLINE = 1232
-        HDRAW = 960
-        HBLANK = 272
-        VDRAW = 197120
-        VBLANK = 83776
-    )
-
-    prevHBlank := gt.HBlank
-    prevVBlank := gt.VBlank
-    
-    gt.RefreshCycles += cycles
-    gt.HBlank = gt.RefreshCycles % SCANLINE > HDRAW
-    gt.Scanline = gt.RefreshCycles / SCANLINE
-    gt.VBlank = gt.Scanline > 160
-
-    dispstat := &gt.Gba.Mem.Dispstat
-    dispstat.SetVBlank(gt.VBlank)
-    dispstat.SetHBlank(gt.HBlank)
-    dispstat.SetVCounter(gt.Scanline)
-
-    if gt.VBlank {
-        gt.Gba.Mem.IO[0x202] |= 1
-    }
-
-    if gt.HBlank {
-        gt.Gba.Mem.IO[0x202] |= 10
-    }
-
-    if gt.VBlank && !prevVBlank {
-        gt.Gba.checkDmas(DMA_MODE_VBL)
-        //gt.Gba.triggerIRQ(0)
-    }
-    if gt.HBlank && !prevHBlank {
-        gt.Gba.checkDmas(DMA_MODE_HBL)
-        //gt.Gba.triggerIRQ(1)
-    }
-}
-
 var ( 
     _ = fmt.Sprintf("")
 )
@@ -118,7 +55,7 @@ func (gba *GBA) graphics() {
 
     //gba.background(0x400_0008, dispcnt, false, NewWindows(dispcnt, gba))
     //gba.getTiles(0x601_0000, 0x1E, true, false)
-    //gba.getTiles(0x600_4020, 0x1E, false, false)
+    //gba.getTiles(0x601_0000, 0x1E, true, false)
     //gba.debugPalette()
     //return
 

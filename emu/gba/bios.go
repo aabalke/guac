@@ -33,16 +33,16 @@ func (gba *GBA) SysCall(inst uint32) (int, bool) {
 
 	cycles := 0
 
-    fmt.Printf("SYS CALL %08X\n", inst)
+    //fmt.Printf("SYS CALL %08X\n", inst)
 
     if inst > 0x2A {
         panic(fmt.Sprintf("INVALID SWI SYSCALL %08X", inst))
     }
 
 	switch inst {
-	//case SYS_SoftReset:
-	//	SoftReset(gba)
-	////	cycles += 200 // approx
+	case SYS_SoftReset:
+		SoftReset(gba)
+		cycles += 200 // approx
 	case SYS_RegisterRamReset:
 		RegisterRamReset(gba)
 		cycles += 30 // approx
@@ -101,10 +101,10 @@ func (gba *GBA) SysCall(inst uint32) (int, bool) {
     //default :gba.exception(SWI_VEC, MODE_SWI)
 	default:
 
-        //fmt.Printf("SWI %04X\n", inst)
+    //    //fmt.Printf("SWI %04X\n", inst)
 
-        //gba.exception(SWI_VEC, MODE_SWI)
-        //return cycles, false // keeps from inc PC after setting in exception
+    //    //gba.exception(SWI_VEC, MODE_SWI)
+    //    //return cycles, false // keeps from inc PC after setting in exception
 		panic(fmt.Sprintf("EXCEPTION OR UNHANDLED SYS CALL TYPE 0x%X\n", inst))
 	}
 
@@ -255,7 +255,7 @@ func AckIntrWait(gba *GBA) {
         return
     }
 
-    fmt.Printf("STORED %08X, IF %08X\n", gba.IntrWait, mem.Read16(0x400_0202))
+    //fmt.Printf("STORED %08X, IF %08X\n", gba.IntrWait, mem.Read16(0x400_0202))
 
     gba.Halted = false
     gba.IntrWait = 0
@@ -291,7 +291,7 @@ func SoftReset(gba *GBA) {
 		ZERO_FILL   = 0x0300_7E00
 	)
 
-	flag := gba.Mem.Read(RETURN_ADDR)
+	flag := gba.Mem.Read(RETURN_ADDR, false)
 
 	i := uint32(0)
 	for i = range 0x200 {
@@ -379,6 +379,8 @@ func RegisterRamReset(gba *GBA) {
 			}
 
 			mem.IO[i] = 0x0
+            //mem.GBA.checkIRQ()
+
 		}
 	}
 

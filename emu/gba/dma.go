@@ -2,7 +2,6 @@ package gba
 
 import (
 	"github.com/aabalke33/guac/emu/gba/utils"
-    "fmt"
 )
 
 const (
@@ -121,7 +120,7 @@ func (dma *DMA) WriteControl(v uint8, hi bool) {
 	}
 
     // need to make sure entire 16 bit of control is written before transfer
-	dma.singleByteSet = !dma.singleByteSet
+    dma.singleByteSet = !dma.singleByteSet
 	if dma.singleByteSet {
 		return
 	}
@@ -164,17 +163,17 @@ func (dma *DMA) transfer() {
         }
     }
 
-    fmt.Printf("DMA OCCUR %08X %08x\n", dma.Dst, dma.Src)
-
     dstOffset := int64(0)
     srcOffset := int64(0)
+    tmpDst := dma.Dst
+    tmpSrc := dma.Src
 
     if dma.isWord {
-        dma.Dst &^= 0b11
-        dma.Src &^= 0b11
+        tmpDst &^= 0b11
+        tmpSrc &^= 0b11
     } else {
-        dma.Dst &^= 0b1
-        dma.Src &^= 0b1
+        tmpDst &^= 0b1
+        tmpSrc &^= 0b1
     }
 
     switch {
@@ -191,15 +190,21 @@ func (dma *DMA) transfer() {
     case !dma.isWord && dma.SrcAdj == DMA_ADJ_DEC: srcOffset = -2
     }
 
-    tmpDst := dma.Dst
-    tmpSrc := dma.Src
-
     for i := uint32(0); i < count; i++ {
 
         // not sure about this
-        if tmpDst >= 0x800_0000 && dma.Idx != 3 {
+        dstRom := tmpDst >= 0x800_0000 && tmpDst < 0xE00_0000
+        //srcRom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
+        //dstSram := tmpDst >= 0xE00_0000 && tmpDst < 0x1000_0000
+        //srcSram := tmpSrc >= 0xE00_0000 && tmpSrc < 0x1000_0000
+
+        if (dstRom) && dma.Idx != 3 {
             continue
         }
+
+        //if dstSram || srcSram {
+        //    continue
+        //}
 
         if dma.isWord {
             v := mem.Read32(tmpSrc)
@@ -213,6 +218,9 @@ func (dma *DMA) transfer() {
         tmpSrc = uint32(int64(tmpSrc) + srcOffset)
 
     }
+
+    dma.Src = tmpSrc
+    dma.Dst = tmpDst
 
     if dma.IRQ {
         dma.Gba.triggerIRQ(0x8 + uint32(dma.Idx))

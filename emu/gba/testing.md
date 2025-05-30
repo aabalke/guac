@@ -15,7 +15,7 @@ https://emulation.gametechwiki.com/index.php/GBA_Tests
 👍 arm
 👍 thumb
 ❌ bios
-❌ memory (passing mirroring, failing str video)
+👍 memory
 ❌ nes
 
    ppu
@@ -53,7 +53,7 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 
 ### MGBA Test Suite
 
-❌ Memory tests [1153/1552]
+❌ Memory tests [1256/1552]
 ❌ I/O read tests [12/130]
 ❌ Timing tests [240/2020]
 ❌ Timer count-up tests [crash]
@@ -62,7 +62,7 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 👍 Carry tests [93/93]
 👍 Multiply long tests [52/72] (matches mgba)
 👍 BIOS math tests [615/615]
-❌ DMA tests [1018/1256]
+❌ DMA tests [964/1256]
 ❌ SIO register R/W tests [7/90]
 ❌ SIO timing tests [0/8]
 ❌ Misc. edge case tests [0/10]
@@ -74,6 +74,26 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
     ❌ Layer toggle 2
     ❌ OAM Update Delay
     ❌ Window offscreen reset
+
+### NBA-EMU Test Suite
+
+❌ bus: 128kb Boundary
+❌ dma: burst into tears
+❌ dma: force nseq access
+❌ dma: latch
+❌ dma: start delay
+❌ halt: halt cnt
+❌ irq: irq delay
+❌ ppu: bgpd
+❌ ppu: bgx
+❌ ppu: dispcnt-latch
+❌ ppu: greenswap
+❌ ppu: ram-access-timing
+❌ ppu: sprite-hmosaic
+❌ ppu: status-irq-dma
+❌ ppu: vram-mirror [7/10]
+❌ timer: start stop [0/2]
+❌ timer: reload [0/7]
 
 ### Tonc
 

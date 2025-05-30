@@ -23,6 +23,8 @@ func (gba *GBA) handleInterrupt() {
     r := &gba.Cpu.Reg.R
 
     fmt.Printf("ENTER SP %08X PC %08X\n\n", r[SP], r[PC])
+
+    gba.Debugger.print(0)
     
     //currMode := uint32(reg.CPSR) & 0b11111
     //curBank := BANK_ID[currMode]
@@ -83,6 +85,8 @@ func (gba *GBA) handleInterrupt() {
 
     fmt.Printf("USER ADDR %08X THUMB %t\n", userAddr, thumb)
 
+    //r[PC] = userAddr &^ 11
+
     r[PC] = userAddr - 2 // -2 is temp, im not sure of a better way
 
     return
@@ -124,4 +128,5 @@ func (gba *GBA) handleInterruptExit() {
     //reg.CPSR = reg.SPSR[curBank]
     reg.CPSR = Cond(IRQ_SPSR)
     fmt.Printf("EXIT SP %08X PC %08X THUMB %t\n\n", r[SP], r[PC], reg.CPSR.GetFlag(FLAG_T))
+    //gba.Debugger.print(1)
 }
