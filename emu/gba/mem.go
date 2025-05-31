@@ -2,6 +2,7 @@ package gba
 
 import (
 	"fmt"
+    "time"
 )
 
 var (
@@ -23,6 +24,14 @@ type Memory struct {
 
 	Dispstat Dispstat
     IRQFlags IRQFlags
+
+	GamePak0                     [0x200_0000]byte
+	SRAM                         [0x1_0000]byte
+	Flash                        [0x2_0000]byte // multiple banks
+	flashMode                    FlashMode
+	flashBank                    uint32
+	flashIDMode                  bool
+	HasFlash                     bool
 }
 
 func NewMemory(gba *GBA) *Memory {
@@ -36,7 +45,27 @@ func NewMemory(gba *GBA) *Memory {
 
 	m.BIOS_MODE = BIOS_STARTUP
 
+    m.InitSaveLoop()
+
 	return m
+}
+
+func (m *Memory) SaveSRAM() {
+    if m.GBA.Save {
+        m.GBA.Cartridge.save()
+        m.GBA.Save = false
+    }
+}
+
+func (m *Memory) InitSaveLoop() {
+
+    saveTicker := time.Tick(time.Second)
+
+    go func()  {
+        for range saveTicker {
+            m.SaveSRAM()
+        }
+    }()
 }
 
 func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
@@ -46,7 +75,7 @@ func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
 		return m.BIOS[addr]
 	case addr < 0x0200_0000:
 		//return m.BIOS[addr % 0x0000_4000]
-        fmt.Printf("READING FROM UNUSED MEMORY ADDR %08X\n", addr)
+        //fmt.Printf("READING FROM UNUSED MEMORY ADDR %08X\n", addr)
 		return 0
 	case addr < 0x0300_0000:
 		return m.WRAM1[(addr-0x0200_0000)%0x4_0000]
@@ -72,12 +101,14 @@ func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
 		return m.OAM[(addr-0x0700_0000)%0x400]
 
 	case addr < 0x0A00_0000:
-		return m.GBA.Cartridge.Data[addr-0x0800_0000]
+		//return m.GBA.Cartridge.Data[addr-0x0800_0000]
+		return m.GamePak0[addr-0x0800_0000]
 	case addr < 0x0E00_0000:
 
-        //offset := (addr - 0x0A00_0000) % 0x200_0000 // should be rom length?
-        offset := (addr - 0x0A00_0000) % m.GBA.Cartridge.RomLength // should be rom length?
-		return m.GBA.Cartridge.Data[offset]
+        offset := (addr - 0x0A00_0000) % 0x200_0000 // should be rom length?
+        //offset := (addr - 0x0A00_0000) % m.GBA.Cartridge.RomLength // should be rom length?
+		//return m.GBA.Cartridge.Data[offset]
+		return m.GamePak0[offset]
 
 //	case addr < 0x0E00_0000:
 //        // do not make rom length
@@ -95,10 +126,12 @@ func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
 		//	return 0xC2 // temp for pokemon fire
 		//}
 
-        if !byteRead {
-        }
+        //if !byteRead {
+        //}
 
-		return m.GBA.Cartridge.SRAM[(addr-0x0E00_0000)%0x1_0000]
+		//return m.GBA.Cartridge.SRAM[(addr-0x0E00_0000)%0x1_0000]
+
+        return m.GBA.Mem.FlashRead(addr)
 	default:
 		return 0
 	}
@@ -334,15 +367,20 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
         return
 	case addr < 0x1000_0000:
 
-        relative := (addr - 0xE00_0000) % 0x1_000
+        m.GBA.Save = true
 
-        if byteWrite {
-            m.GBA.Cartridge.SRAM[relative] = v
-            m.GBA.Cartridge.SRAM[relative + 1] = v
-            return
-        }
+        //relative := (addr - 0xE00_0000) % 0x1_000
 
-		m.GBA.Cartridge.SRAM[relative] = v
+        //if byteWrite {
+        //    m.GBA.Cartridge.SRAM[relative] = v
+        //    m.GBA.Cartridge.SRAM[relative + 1] = v
+        //    return
+        //}
+
+		//m.GBA.Cartridge.SRAM[relative] = v
+
+        m.FlashWrite(addr, v)
+
         return
 	default:
         //fmt.Printf("COULD NOT WRITE %08X TO ADDR %08X\n", v, addr)

@@ -110,77 +110,77 @@ package gba
 //    return instCount
 //}
 
-type GraphicsTiming struct {
-    Gba             *GBA
-    RefreshCycles   int
-    PrevScanline    int
-    Scanline        int
-    HBlank          bool
-    VBlank          bool
-    hasVBlankDma    bool
-    hasHBlankDma    bool
-}
-
-func (gt *GraphicsTiming) reset() {
-    gt.RefreshCycles = 0
-    gt.PrevScanline = 0
-    gt.Scanline = 0
-    gt.HBlank = false
-    gt.VBlank = false
-    gt.hasVBlankDma = false
-    gt.hasHBlankDma = false
-}
-
-func (gt *GraphicsTiming) update(cycles int) {
-
-    const (
-        REFRESH = 280_896 // should this be replaced by clock / fps?
-        SCANLINE = 1232
-        HDRAW = 960
-        HBLANK = 272
-        VDRAW = 197120
-        VBLANK = 83776
-    )
-
-    //prevHBlank := gt.HBlank
-    //prevVBlank := gt.VBlank
-    
-    //gt.RefreshCycles += cycles
-    //gt.HBlank = gt.RefreshCycles % SCANLINE > HDRAW
-    //gt.Scanline = gt.RefreshCycles / SCANLINE
-    //gt.VBlank = gt.Scanline > 160
-
-    //dispstat := &gt.Gba.Mem.Dispstat
-
-    //dispstat.SetVBlank(gt.VBlank)
-    //dispstat.SetHBlank(gt.HBlank)
-    //dispstat.SetVCounter(gt.Scanline)
-    //vcounter := (uint32(*dispstat) >> 8) & 0b1111_1111
-
-    //if gt.VBlank {
-    //    gt.Gba.Mem.IO[0x202] |= 1
-    //    //fmt.Printf("IRQ EXCEPTION CHECK AT MEM IE\n")
-    //    //gt.Gba.checkIRQ()
-    //    //gt.Gba.triggerIRQ(0)
-    //}
-
-    //if gt.HBlank {
-    //    gt.Gba.Mem.IO[0x202] |= 10
-    //    //gt.Gba.checkIRQ()
-    //    //gt.Gba.triggerIRQ(1)
-    //}
-
-    //if gt.Scanline == int(vcounter) {
-    //    gt.Gba.Mem.IO[0x202] |= 100
-    //    *dispstat = Dispstat(uint32(*dispstat) | uint32(100))
-    //}
-
-    //if gt.VBlank && !prevVBlank {
-    //    gt.Gba.checkDmas(DMA_MODE_VBL)
-    //    //gt.Gba.triggerIRQ(0)
-    //}
-    //if gt.HBlank && !prevHBlank {
-    //    gt.Gba.checkDmas(DMA_MODE_HBL)
-    //    //gt.Gba.triggerIRQ(1)
-    //}
-}
+//type GraphicsTiming struct {
+//    Gba             *GBA
+//    RefreshCycles   int
+//    PrevScanline    int
+//    Scanline        int
+//    HBlank          bool
+//    VBlank          bool
+//    hasVBlankDma    bool
+//    hasHBlankDma    bool
+//}
+//
+//func (gt *GraphicsTiming) reset() {
+//    gt.RefreshCycles = 0
+//    gt.PrevScanline = 0
+//    gt.Scanline = 0
+//    gt.HBlank = false
+//    gt.VBlank = false
+//    gt.hasVBlankDma = false
+//    gt.hasHBlankDma = false
+//}
+//
+//func (gt *GraphicsTiming) update(cycles int) {
+//
+//    const (
+//        REFRESH = 280_896 // should this be replaced by clock / fps?
+//        SCANLINE = 1232
+//        HDRAW = 960
+//        HBLANK = 272
+//        VDRAW = 197120
+//        VBLANK = 83776
+//    )
+//
+//    //prevHBlank := gt.HBlank
+//    //prevVBlank := gt.VBlank
+//    
+//    //gt.RefreshCycles += cycles
+//    //gt.HBlank = gt.RefreshCycles % SCANLINE > HDRAW
+//    //gt.Scanline = gt.RefreshCycles / SCANLINE
+//    //gt.VBlank = gt.Scanline > 160
+//
+//    //dispstat := &gt.Gba.Mem.Dispstat
+//
+//    //dispstat.SetVBlank(gt.VBlank)
+//    //dispstat.SetHBlank(gt.HBlank)
+//    //dispstat.SetVCounter(gt.Scanline)
+//    //vcounter := (uint32(*dispstat) >> 8) & 0b1111_1111
+//
+//    //if gt.VBlank {
+//    //    gt.Gba.Mem.IO[0x202] |= 1
+//    //    //fmt.Printf("IRQ EXCEPTION CHECK AT MEM IE\n")
+//    //    //gt.Gba.checkIRQ()
+//    //    //gt.Gba.triggerIRQ(0)
+//    //}
+//
+//    //if gt.HBlank {
+//    //    gt.Gba.Mem.IO[0x202] |= 10
+//    //    //gt.Gba.checkIRQ()
+//    //    //gt.Gba.triggerIRQ(1)
+//    //}
+//
+//    //if gt.Scanline == int(vcounter) {
+//    //    gt.Gba.Mem.IO[0x202] |= 100
+//    //    *dispstat = Dispstat(uint32(*dispstat) | uint32(100))
+//    //}
+//
+//    //if gt.VBlank && !prevVBlank {
+//    //    gt.Gba.checkDmas(DMA_MODE_VBL)
+//    //    //gt.Gba.triggerIRQ(0)
+//    //}
+//    //if gt.HBlank && !prevHBlank {
+//    //    gt.Gba.checkDmas(DMA_MODE_HBL)
+//    //    //gt.Gba.triggerIRQ(1)
+//    //}
+//}

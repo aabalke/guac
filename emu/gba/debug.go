@@ -73,8 +73,8 @@ func (d *Debugger) print(i int) {
     //s("\n\n")
     //p(fmt.Sprintf("STACK %X", 0x3007E2E), d.gba.Mem.Read32(0x3007E2E))
     //for i := 0x0400_00E0; i >= 0x0400_00D0; i -= 4 {
-    //for i := 0x0400_0060; i >= 0x0400_0040; i -= 4 {
-    for i := 0x0300_7F00; i >= 0x0300_7EF0; i -= 4 {
+    for i := 0x0300_6F80; i >= 0x0300_6F00; i -= 4 {
+    //for i := 0x0300_1770; i >= 0x0300_1750; i -= 4 {
         p(fmt.Sprintf("IO %X", i), d.gba.Mem.Read32(uint32(i)))
     }
     //for i := 0x0400_00E0; i >= 0x0400_00D0; i -= 4 {

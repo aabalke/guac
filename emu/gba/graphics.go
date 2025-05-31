@@ -188,9 +188,10 @@ func (gba *GBA) object(x, y uint32, dispcnt *Dispcnt, oamOffset uint32, wins *Wi
         return 0, false, false, obj
     }
 
-    //if obj.RotScale {
-    //    palData, ok := gba.setObjectAffinePixel(obj, x, y)
-    //}
+    if obj.RotScale {
+        palData, ok, palZero := gba.setObjectAffinePixel(obj, x, y)
+        return palData, ok, palZero, obj
+    }
 
     palData, ok, palZero := gba.setObjectPixel(obj, x, y)
     return palData, ok, palZero, obj
@@ -209,7 +210,7 @@ func inScreenBounds(x, y int) bool {
     return true
 }
 
-func (gba *GBA) setObjectAffinePixel(obj *Object, x, y uint32) {
+func (gba *GBA) setObjectAffinePixel(obj *Object, x, y uint32) (uint32, bool, bool) {
 
     // will need to fix. Large Scaled sprites "pop" into place when wrapping on bottom and right
 
@@ -247,11 +248,11 @@ func (gba *GBA) setObjectAffinePixel(obj *Object, x, y uint32) {
     yIdx = int(pc * float32(xOrigin) + pd * float32(yOrigin)) + (int(obj.H) / 2 )
 
     if gba.outBoundsAffine(obj, x, y) {
-        return
+        return 0, false, false
     }
 
     if outObjectBound(obj, xIdx, yIdx) {
-        return
+        return 0, false, false
     }
 
     enTileX, enTileY, inTileX, inTileY := getPositions(obj, uint32(xIdx), uint32(yIdx))
@@ -263,16 +264,15 @@ func (gba *GBA) setObjectAffinePixel(obj *Object, x, y uint32) {
     palIdx, palData := getPaletteData(gba, obj.Palette256, obj.Palette, tileData, uint32(inTileX))
 
     if !inScreenBounds(int(x), int(y)) {
-        return
+        return 0, false, false
     }
 
     if palIdx == 0 {
         // this will need to be updated
-        return
+        return palData, false, true
     }
 
-    index := (x + (y*SCREEN_WIDTH)) * 4
-    gba.applyColor(palData, uint32(index))
+    return palData, true, false
 }
 
 func (gba *GBA) outBoundsAffine(obj *Object, x, y uint32) bool {

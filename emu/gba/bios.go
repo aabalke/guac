@@ -46,10 +46,10 @@ func (gba *GBA) SysCall(inst uint32) (int, bool) {
 	case SYS_RegisterRamReset:
 		RegisterRamReset(gba)
 		cycles += 30 // approx
-    //case SYS_Halt:
-    //    //panic("HALT")
-    //    gba.Halted = true
-    //    gba.IntrWait = 0xFFFF
+    case SYS_Halt:
+        //panic("HALT")
+        gba.Halted = true
+        gba.IntrWait = 0xFFFF
 	case SYS_IntrWait:
 		IntrWait(gba)
 	case SYS_VBlankIntrWait:
@@ -103,7 +103,7 @@ func (gba *GBA) SysCall(inst uint32) (int, bool) {
 
     //    //fmt.Printf("SWI %04X\n", inst)
 
-    //    //gba.exception(SWI_VEC, MODE_SWI)
+        //gba.exception(SWI_VEC, MODE_SWI)
     //    //return cycles, false // keeps from inc PC after setting in exception
 		panic(fmt.Sprintf("EXCEPTION OR UNHANDLED SYS CALL TYPE 0x%X\n", inst))
 	}
@@ -224,15 +224,26 @@ func IntrWait(gba *GBA) {
     mem.Write16(0x400_0208, 0x1)
     //fmt.Printf("CURR %08d, PC %08X INTR WAIT MASK %08X IF %08X, COMBO %1b\n", CURR_INST, reg[PC], irqMask, IF, irqMask & IF)
 
+    if waitMode == 0 {
+        // Clear irqMask bits from IE (just like bic) chatgpt
+        ie := mem.Read16(0x400_0200)
+        ie &^= irqMask
+        mem.Write16(0x400_0200, uint16(ie))
+    }
+
     if waitMode == 0 && (IF&irqMask) != 0 {
         return
 	}
     gba.IntrWait = irqMask
 	// Discard old IF flags if waitMode == 1
 	if waitMode == 1 {
-        if (IF & irqMask) != 0 {
-            return
-        }
+
+        mem.IO[0x202] = 0x0
+        mem.IO[0x203] = 0x0
+
+        //if (IF & irqMask) != 0 {
+        //    return
+        //}
         gba.Halted = true
     }
 }
@@ -250,7 +261,6 @@ func AckIntrWait(gba *GBA) {
 
     mem := gba.Mem
 
-
     if gba.IntrWait & mem.Read16(0x400_0202) == 0 {
         return
     }
@@ -265,10 +275,7 @@ func AckIntrWait(gba *GBA) {
 	reg := &gba.Cpu.Reg.R
 
 	irqMask := uint32(reg[1])
-    // Acknowledge selected IRQs
 	mem.Write16(0x400_0202, uint16(irqMask))
-	// Update BIOS IRQ mirror at 0x03007FF8
-	// Assume this is mapped to mem.BIOSFlags (or use raw memory slice)
 	mem.Write16(0x300_7FF8, uint16(irqMask))
 }
 
@@ -379,8 +386,25 @@ func RegisterRamReset(gba *GBA) {
 			}
 
 			mem.IO[i] = 0x0
-            //mem.GBA.checkIRQ()
 
+            // default values pulled from ruby
+            mem.IO[0x0021] = 0x1
+            mem.IO[0x0027] = 0x1
+            mem.IO[0x0031] = 0x1
+            mem.IO[0x0037] = 0x1
+
+            mem.IO[0x0082] = 0xE
+            mem.IO[0x0083] = 0x88
+            mem.IO[0x0089] = 0x2
+
+            mem.IO[0x0128] = 0x4
+            mem.IO[0x0130] = 0xFF
+            mem.IO[0x0131] = 0x3
+            mem.IO[0x0134] = 0xF
+            mem.IO[0x0135] = 0x80
+            mem.IO[0x0300] = 0x1
+
+            //mem.GBA.checkIRQ()
 		}
 	}
 
@@ -391,6 +415,8 @@ func RegisterRamReset(gba *GBA) {
     mem.IO[0x123] = 0
     mem.IO[0x00] = 0x80
     mem.IO[0x01] = 0x00
+
+    r[3] = 0x170 // CLOBBER
 }
 
 func Div(gba *GBA, arm bool) {
@@ -678,7 +704,7 @@ func CpuSet(gba *GBA) {
 			mem.Write16(addr, uint16(word))
 		}
 
-        r[0] += 4
+        r[0] += 2
         r[1] += wordCount * 2
 
 	case !fill && isWord:
@@ -691,7 +717,8 @@ func CpuSet(gba *GBA) {
 			mem.Write32(rd+(i<<2), word)
 		}
 
-        r[0] += 4
+        //r[0] += 4 // this does not match ruby
+        r[0] += wordCount * 4
         r[1] += wordCount * 4
 
 	case !fill && !isWord:
@@ -710,7 +737,7 @@ func CpuSet(gba *GBA) {
 			mem.Write16(dstAddr, uint16(word))
 		}
 
-        r[0] += 4
+        r[0] += wordCount * 2
         r[1] += wordCount * 2
 	}
 

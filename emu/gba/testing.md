@@ -62,10 +62,10 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 👍 Carry tests [93/93]
 👍 Multiply long tests [52/72] (matches mgba)
 👍 BIOS math tests [615/615]
-❌ DMA tests [964/1256]
+❌ DMA tests [1016/1256]
 ❌ SIO register R/W tests [7/90]
 ❌ SIO timing tests [0/8]
-❌ Misc. edge case tests [0/10]
+❌ Misc. edge case tests [2/10]
 ❌ Video tests
     ❌ Basic Mode 3
     ❌ Basic Mode 4
@@ -82,7 +82,7 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 ❌ dma: force nseq access
 ❌ dma: latch
 ❌ dma: start delay
-❌ halt: halt cnt
+❌ halt: halt cnt[0/6]
 ❌ irq: irq delay
 ❌ ppu: bgpd
 ❌ ppu: bgx

@@ -2,8 +2,8 @@ package gba
 
 import (
 	"fmt"
+    "os"
 
-	cart "github.com/aabalke33/guac/emu/gba/cart"
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
@@ -32,7 +32,7 @@ var (
 
 type GBA struct {
     Debugger *Debugger
-    Cartridge *cart.Cartridge
+    Cartridge *Cartridge
     Cpu *Cpu
     Mem *Memory
 	Screen [SCREEN_WIDTH][SCREEN_HEIGHT]uint32
@@ -53,7 +53,6 @@ type GBA struct {
     Timers Timers
     Dma    [4]DMA
 
-    Gt *GraphicsTiming
     Ct *CycleTiming
 
     VCOUNT uint32
@@ -61,6 +60,8 @@ type GBA struct {
     //Logger *Logger
 
     IntrWait uint32
+
+    Save bool
 }
 
 
@@ -166,8 +167,14 @@ func (gba *GBA) Exec(requiredCycles, frameCycles uint32) uint32 {
             cycles = gba.Cpu.Execute(opcode)
         }
 
+        if r[PC] == 0x81E07EC && r[12] == 0x2 && false { // ruby pre ramreset
+        //if CURR_INST == 227 {
+        //if gba.Mem.Read32(0x3007E44) != PREV_VALUE {
+            gba.Debugger.print(CURR_INST)
+            os.Exit(0)
+        }
+
         CURR_INST++
-        gba.Gt.update(cycles)
         gba.Timers.Increment(uint32(cycles))
 
         accCycles += uint32(cycles)
@@ -175,6 +182,8 @@ func (gba *GBA) Exec(requiredCycles, frameCycles uint32) uint32 {
 
     return accCycles - requiredCycles
 }
+
+var PREV_VALUE uint32
 
 func (gba *GBA) checkDmas(mode uint32) {
     for i := range gba.Dma {
@@ -199,9 +208,6 @@ func NewGBA() *GBA {
     gba.Mem = NewMemory(&gba)
     gba.Cpu = NewCpu(&gba)
     gba.Debugger = &Debugger{&gba}
-    gba.Gt = &GraphicsTiming{
-        Gba: &gba,
-    }
 
     gba.Ct = &CycleTiming{
         prevAddr: 0x800_0000,
@@ -268,7 +274,7 @@ func (gba *GBA) Close() {
 }
 
 func (gba *GBA) LoadGame(path string) {
-	gba.Cartridge = cart.NewCartridge(path, "")
+    gba.Cartridge = NewCartridge(gba, path, path + ".save")
 }
 
 func (gba *GBA) toggleThumb() {

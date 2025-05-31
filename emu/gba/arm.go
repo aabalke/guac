@@ -244,9 +244,9 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) bool {
             return true
         }
 
-        cpu.AluChangeOriginal(!alu.Test)
+        //cpu.AluChangeOriginal(!alu.Test)
 
-        //cpu.Reg.restoreMode()
+        cpu.Reg.restoreMode()
         return true
         // pipeline
 
@@ -580,9 +580,9 @@ func (cpu *Cpu) B(opcode uint32) {
 func (c *Cpu) BX(opcode uint32) {
 
     const (
-        INST_BX = 1 + iota
-        INST_BXJ
-        INST_BLX
+        INST_BX  = 1
+        INST_BXJ = 2
+        INST_BLX = 3
     )
 
     inst := utils.GetByte(opcode, 4)
