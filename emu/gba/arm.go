@@ -592,9 +592,9 @@ func (c *Cpu) BX(opcode uint32) {
     switch inst {
     case INST_BX:
         if rn == LR && c.Reg.getMode() == MODE_IRQ {
-            fmt.Printf("AT THIS POINT PC %08X\n", c.Reg.R[PC])
+            //fmt.Printf("AT THIS POINT PC %08X\n", c.Reg.R[PC])
             c.AluChangeMode(false)
-            fmt.Printf("AT THIS POINT PC %08X\n", c.Reg.R[PC])
+            //fmt.Printf("AT THIS POINT PC %08X\n", c.Reg.R[PC])
             // DO NOT REMOVE RETURN
             //return
             //c.AluChangeOriginal(false)

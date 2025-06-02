@@ -32,7 +32,7 @@ func (gba *GBA) handleInterrupt() {
     reg := &gba.Cpu.Reg
     r := &gba.Cpu.Reg.R
     irqBank := BANK_ID[MODE_IRQ]
-    //fmt.Printf("ENTER SP %08X PC %08X MODE %02X CURR %08d LR %08X\n\n", r[SP], r[PC], reg.getMode(), CURR_INST, r[LR])
+    //fmt.Printf("ENTR SP %08X PC %08X THUMB %t MODE %02X CURR %08d LR %08X\n\n", r[SP], r[PC], reg.CPSR.GetFlag(FLAG_T), reg.getMode(), CURR_INST, r[LR])
     //fmt.Printf("SP ADDR %08X\n", r[SP])
     //fmt.Printf("LR %08X\n", r[LR])
     //fmt.Printf("12 %08X\n", r[12])
@@ -41,17 +41,10 @@ func (gba *GBA) handleInterrupt() {
     //fmt.Printf("01 %08X\n", r[1])
     //fmt.Printf("00 %08X\n", r[0])
 
-    thumb := reg.CPSR.GetFlag(FLAG_T)
-    if thumb {
-        IRQ_PC = r[PC]// + 2
-    } else {
-        IRQ_PC = r[PC]// + 4
-    }
+    IRQ_PC = r[PC]
     
-    currMode := uint32(reg.CPSR) & 0b11111
-    curBank := BANK_ID[currMode]
-
-    // avoid multiple Interrupt handling per instruction
+    curMode := uint32(reg.CPSR) & 0b11111
+    curBank := BANK_ID[curMode]
 
     reg.SP[curBank] = r[SP]
     reg.LR[curBank] = r[LR]
@@ -68,21 +61,19 @@ func (gba *GBA) handleInterrupt() {
 
     reg.CPSR |= 0b1000_0000 // disable IRQ
 
-    thumb = reg.CPSR.GetFlag(FLAG_T)
+    thumb := reg.CPSR.GetFlag(FLAG_T)
     if thumb {
-        //reg.LR[irqBank] = r[PC]// + 2
-        r[LR] = r[PC]// + 2
+        reg.LR[irqBank] = r[PC]
+        r[LR] = r[PC]
         IRQ_RETURN_THUMB = true
     } else {
-        //reg.LR[irqBank] = r[PC]// + 4
-        r[LR] = r[PC]// + 4
+        reg.LR[irqBank] = r[PC]
+        r[LR] = r[PC]
         IRQ_RETURN_THUMB = false
     }
 
     reg.CPSR.SetFlag(FLAG_T, false)
 
-    // BIOS
-    //stackAddr := r[SP]
     r[SP] -= 4
     mem.Write32(r[SP], r[LR])
     r[SP] -= 4
@@ -95,36 +86,22 @@ func (gba *GBA) handleInterrupt() {
     mem.Write32(r[SP], r[1])
     r[SP] -= 4
     mem.Write32(r[SP], r[0])
-    //r[SP] -= 24
-
-    //IRQ_SP_DURING = r[SP]
-
 
     userAddr := mem.Read32(0x03007FFC)
-    r[PC] = userAddr// is temp, im not sure of a better way
+    r[PC] = userAddr
 
-    fmt.Printf("PC IN IRQ %08X\n", r[PC])
+    //fmt.Printf("PC IN IRQ %08X\n", r[PC])
 
     return
 }
 
 func (gba *GBA) handleInterruptExit() {
 
-    //return
-
     mem := gba.Mem
     reg := &gba.Cpu.Reg
     r := &gba.Cpu.Reg.R
 
-    //mem.Write16(0x400_0208, 1)
-    //irqBank := BANK_ID[MODE_IRQ]
-    //curBank := BANK_ID[reg.getMode()]
-
-    //panic("INTERRUPT EXIT")
-
-    //r[SP] = IRQ_SP_DURING
-
-    //tmpLR := IRQ_LR
+    irqBank := BANK_ID[MODE_IRQ]
 
     r[0] = mem.Read32(r[SP])
     r[SP] += 4
@@ -139,12 +116,12 @@ func (gba *GBA) handleInterruptExit() {
     r[LR] = mem.Read32(r[SP])
     r[SP] += 4
 
-    reg.SP[BANK_ID[MODE_IRQ]] = r[SP]
-    reg.LR[BANK_ID[MODE_IRQ]] = r[LR]
+    reg.SP[irqBank] = r[SP]
+    reg.LR[irqBank] = r[LR]
+    reg.CPSR = reg.SPSR[irqBank]
 
-    reg.CPSR = reg.SPSR[BANK_ID[MODE_IRQ]]
-    currMode := uint32(reg.CPSR) & 0b11111
-    curBank := BANK_ID[currMode]
+    curMode := uint32(reg.CPSR) & 0b11111
+    curBank := BANK_ID[curMode]
 
     if IRQ_RETURN_THUMB {
         r[PC] = IRQ_PC //r[LR] - 2
@@ -156,10 +133,7 @@ func (gba *GBA) handleInterruptExit() {
     r[SP] = reg.SP[curBank]
 
     IRQ_RETURN_THUMB = false
-    //mem.Write16(0x400_0208, 0)
 
-    //reg.CPSR = reg.SPSR[curBank]
-    //reg.CPSR = Cond(IRQ_SPSR)
     //fmt.Printf("SP ADDR %08X\n", r[SP])
     //fmt.Printf("LR %08X\n", r[LR])
     //fmt.Printf("12 %08X\n", r[12])
@@ -167,9 +141,8 @@ func (gba *GBA) handleInterruptExit() {
     //fmt.Printf("02 %08X\n", r[2])
     //fmt.Printf("01 %08X\n", r[1])
     //fmt.Printf("00 %08X\n", r[0])
-    //fmt.Printf("EXIT SP %08X PC %08X THUMB %t MODE %02X CURR %08d\n\n", r[SP], r[PC], reg.CPSR.GetFlag(FLAG_T), currMode, CURR_INST)
-
-    //panic("END INTERRUPT")
+    //fmt.Printf("EXIT SP %08X PC %08X THUMB %t MODE %02X CURR %08d LR %08X\n\n", r[SP], r[PC], reg.CPSR.GetFlag(FLAG_T), reg.getMode(), CURR_INST, r[LR])
+    //fmt.Printf("-----------------------------------------------------\n")
 }
 
 //func (gba *GBA) exception(addr uint32, mode uint32) {

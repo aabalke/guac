@@ -140,7 +140,7 @@ func (dma *DMA) disable() {
 
 func (dma *DMA) transfer() {
 
-    fmt.Printf("DMA TRANSFER CURR %08d SRC %08X, DST %08X, WORD COUNT %08X 0x202EEC8 %08X TYPE %02b\n", CURR_INST, dma.Dst, dma.Src, dma.WordCount, dma.Gba.Mem.Read32(0x202EEC8), dma.Mode)
+    //fmt.Printf("DMA TRANSFER CURR %08d SRC %08X, DST %08X, WORD COUNT %08X 0x202EEC8 %08X TYPE %02b\n", CURR_INST, dma.Dst, dma.Src, dma.WordCount, dma.Gba.Mem.Read32(0x202EEC8), dma.Mode)
 
     mem := dma.Gba.Mem
 

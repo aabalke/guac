@@ -165,29 +165,17 @@ func (gba *GBA) Exec(requiredCycles, frameCycles uint32) uint32 {
             gba.Halted = false
         } 
 
-        //if CURR_INST == 542764 { panic(fmt.Sprintf("??? HALTED %t CURR %08d PC %08X, OPCODE %04X\n", gba.Halted, CURR_INST, r[PC], opcode)) }
         if !gba.Halted {
             cycles = gba.Cpu.Execute(opcode)
         }
 
-        //if CURR_INST == 238970 { // GOOD PALETTE
-        //if CURR_INST == 238849 { // GOOD PALETTE
-        //if CURR_INST == 542_800 { // GOOD PALETTE
-        //if CURR_INST == 542_853 { // GOOD PALETTE
-        //if CURR_INST == 543669 { // BADDDDD
-        //if CURR_INST == 543669 { // BADDDDD
-        //if r[PC] == 0x08073B04 { // GOOD PALETTE
-        //if CURR_INST == 543669 || CURR_INST == 542853 { // GOOD PALETTE
-        ////if r[PC] == 0x804128A && r[4] == 0x6F7B { // GOOD PALETTE
-        //if CURR_INST > 544000  && CURR_INST < 545000 {
+        //if CURR_INST == 25_983_644 {
+        //    r[0] = 0x0
+        //}
 
-        if CURR_INST == 542980 {
-            //r[SP] = 0x3007E20
-            //panic("HERE")
-        }
-
-        //if r[PC] == 0x8073AFE {
-        //    //fmt.Printf("r[PC] %08X CURR %d\n", r[PC], CURR_INST)
+        //if CURR_INST == 25_983_644 {
+        //if CURR_INST == 25_983_299 {
+        ////if r[15] == 0x8002932 && r[13] == 0x3007DB8 {
         //    gba.Debugger.print(CURR_INST)
         //    gba.Paused = true
         //    //return accCycles - requiredCycles

@@ -777,7 +777,7 @@ func LZ77UnCompReadNormalWrite8bit(gba *GBA) int {
 	src := r[0]
 	dst := r[1]
 
-    bytesOutputted := DecompressLZ77(gba, src, dst)
+    bytesOutputted := DecompressLZ77(gba, src, dst, false)
     return bytesOutputted * 5
 }
 
@@ -787,20 +787,19 @@ func LZ77UnCompReadNormalWrite16bit(gba *GBA) int {
 	src := r[0]
 	dst := r[1]
 
-    bytesOutputted := DecompressLZ77(gba, src, dst)
+    bytesOutputted := DecompressLZ77(gba, src, dst, true)
     return bytesOutputted * 4
 }
 
-func DecompressLZ77(gba *GBA, src, dst uint32) int {
+func DecompressLZ77(gba *GBA, src, dst uint32, half bool) int {
 
 	// need to align half and pad 16bit?
-
     // I'm not sure how final r0 value is calculated, it does not match src
 
 	mem := gba.Mem
 
-	header := mem.Read32(src)
-    oSrc := src
+	header := mem.Read32(utils.WordAlign(src))
+    //oSrc := src
 	decompressedSize := int(header >> 8)
 
 	src += 4
@@ -816,7 +815,7 @@ func DecompressLZ77(gba *GBA, src, dst uint32) int {
 
 		for i := range 8 {
 
-			if int(dst) > end {
+			if half && (int(dst) > end) || !half && (int(dst) >= end) {
 				break
 			}
 
@@ -850,10 +849,10 @@ func DecompressLZ77(gba *GBA, src, dst uint32) int {
 
     gba.Cpu.Reg.R[0] = src
     gba.Cpu.Reg.R[1] += uint32(decompressedSize)
-    gba.Cpu.Reg.R[2] = 0x0
-    gba.Cpu.Reg.R[3] = 0x0
+    //gba.Cpu.Reg.R[2] = 0x0
+    gba.Cpu.Reg.R[3] = 0x0 // CLOBBER
 
-    fmt.Printf("srcSize %08X LEN %08X DCOMP %08X BYTES %08X\n", src, src - oSrc, decompressedSize, bytesOutputted)
+    //fmt.Printf("srcSize %08X LEN %08X DCOMP %08X BYTES %08X\n", src, src - oSrc, decompressedSize, bytesOutputted)
 
     return bytesOutputted
 }

@@ -78,22 +78,16 @@ func (d *Debugger) print(i int) {
     //p(fmt.Sprintf("STACK %X", 0x3007E2E), d.gba.Mem.Read32(0x3007E2E))
     //for i := 0x0400_00E0; i >= 0x0400_00D0; i -= 4 {
 
-    start := 0x40000DC
-    //start := 0x300_8000
-    count := 6
-    //for i := start; i < start + (count * 4); i += 4 {
+    start := 0x2000070
+    count := 0x19
     for i := start; i >= start - (count * 4); i -= 4 {
-    //for i := 0x0300_1770; i >= 0x0300_1750; i -= 4 {
         p(fmt.Sprintf("IO %X", i), d.gba.Mem.Read32(uint32(i)))
     }
-    //for i := 0x0400_00E0; i >= 0x0400_00D0; i -= 4 {
-    //    p(fmt.Sprintf("DMA3 %X", i), d.gba.Mem.Read32(uint32(i)))
-    //}
-    //for i := 0x0300_7EA8; i >= 0x0300_7E24; i -= 4 {
-    //    p(fmt.Sprintf("STACK %X", i), d.gba.Mem.Read32(uint32(i)))
-    //}
-    //for i := 0x0600_0000; i <= 0x0600_0030; i += 4 {
-    //    p(fmt.Sprintf("VRAM %X", i), d.gba.Mem.Read32(uint32(i)))
+
+    //start = 0x2000010
+    //count = 6
+    //for i := start; i >= start - (count * 4); i -= 4 {
+    //    p(fmt.Sprintf("IO %X", i), d.gba.Mem.Read32(uint32(i)))
     //}
 }
 

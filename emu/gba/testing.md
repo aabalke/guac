@@ -57,7 +57,7 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 ❌ I/O read tests [12/130]
 ❌ Timing tests [240/2020]
 ❌ Timer count-up tests [crash]
-❌ Timer IRQ tests [0/90]
+❌ Timer IRQ tests [10/90]
 👍 Shifter tests [140/140]
 👍 Carry tests [93/93]
 👍 Multiply long tests [52/72] (matches mgba)
