@@ -588,17 +588,21 @@ func (c *Cpu) BX(opcode uint32) {
     inst := utils.GetByte(opcode, 4)
     rn := utils.GetByte(opcode, 0)
 
-    if rn == LR && c.Reg.getMode() == MODE_IRQ {
-        c.AluChangeMode(false)
-        //return
-        //c.AluChangeOriginal(false)
-        //panic("LEAVING THRU BX")
-    }
 
     switch inst {
     case INST_BX:
-        c.Reg.R[PC] = c.Reg.R[rn]
-        c.Gba.toggleThumb()
+        if rn == LR && c.Reg.getMode() == MODE_IRQ {
+            fmt.Printf("AT THIS POINT PC %08X\n", c.Reg.R[PC])
+            c.AluChangeMode(false)
+            fmt.Printf("AT THIS POINT PC %08X\n", c.Reg.R[PC])
+            // DO NOT REMOVE RETURN
+            //return
+            //c.AluChangeOriginal(false)
+            //panic("LEAVING THRU BX")
+        } else {
+            c.Reg.R[PC] = c.Reg.R[rn]
+            c.Gba.toggleThumb()
+        }
     case INST_BXJ: panic("Unsupported BXJ Instruction")
     case INST_BLX: panic("Unsupported BLX Instruction")
     }

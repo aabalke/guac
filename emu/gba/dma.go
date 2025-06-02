@@ -2,8 +2,10 @@ package gba
 
 import (
 	"github.com/aabalke33/guac/emu/gba/utils"
+    "fmt"
 )
 
+var _ = fmt.Sprintf("")
 const (
 	DMA_MODE_IMM = 0
 	DMA_MODE_VBL = 1
@@ -138,6 +140,8 @@ func (dma *DMA) disable() {
 
 func (dma *DMA) transfer() {
 
+    fmt.Printf("DMA TRANSFER CURR %08d SRC %08X, DST %08X, WORD COUNT %08X 0x202EEC8 %08X TYPE %02b\n", CURR_INST, dma.Dst, dma.Src, dma.WordCount, dma.Gba.Mem.Read32(0x202EEC8), dma.Mode)
+
     mem := dma.Gba.Mem
 
     count := dma.WordCount
@@ -228,7 +232,10 @@ func (dma *DMA) transfer() {
 
     if !dma.Repeat {
         dma.disable()
+        return
     }
+
+    panic("REPEAT DMA")
     //dma.Dst = tmpDst
     //dma.Src = tmpSrc
     

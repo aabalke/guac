@@ -20,86 +20,90 @@ var (
     _ = fmt.Sprintf("")
 
     IRQ_RETURN_THUMB = false
-    IRQ_SP = uint32(0)
-    IRQ_LR = uint32(0)
     IRQ_SPSR = uint32(0)
+    IRQ_PC = uint32(0)
+
+    IN_INTERRUPT = false
 )
 
 func (gba *GBA) handleInterrupt() {
 
-    //return
-
     mem := gba.Mem
     reg := &gba.Cpu.Reg
     r := &gba.Cpu.Reg.R
-
-    //fmt.Printf("ENTER SP %08X PC %08X\n\n", r[SP], r[PC])
-
-    //gba.Debugger.debugIRQ()
-    
-    //currMode := uint32(reg.CPSR) & 0b11111
-    //curBank := BANK_ID[currMode]
-
-    // avoid multiple Interrupt handling per instruction
-    mem.Write16(0x400_0208, 0)
-
-    // CPU
     irqBank := BANK_ID[MODE_IRQ]
-    IRQ_SPSR = uint32(reg.CPSR)
-
-    reg.CPSR = (reg.CPSR &^ 0b11111) | MODE_IRQ
-
-    // will need logic for FIQ at some point
-    tmpSP := r[SP]
-    tmpLR := r[LR]
-    r[SP] = reg.SP[irqBank]
-    r[LR] = reg.LR[irqBank]
-    reg.SP[irqBank] = tmpSP
-    reg.LR[irqBank] = tmpLR
-    IRQ_LR = tmpLR
-    IRQ_SP = tmpSP
-
-    reg.SPSR[irqBank] = reg.CPSR
-
-    reg.CPSR |= 0b1000_0000 // disable IRQ
+    //fmt.Printf("ENTER SP %08X PC %08X MODE %02X CURR %08d LR %08X\n\n", r[SP], r[PC], reg.getMode(), CURR_INST, r[LR])
+    //fmt.Printf("SP ADDR %08X\n", r[SP])
+    //fmt.Printf("LR %08X\n", r[LR])
+    //fmt.Printf("12 %08X\n", r[12])
+    //fmt.Printf("03 %08X\n", r[3])
+    //fmt.Printf("02 %08X\n", r[2])
+    //fmt.Printf("01 %08X\n", r[1])
+    //fmt.Printf("00 %08X\n", r[0])
 
     thumb := reg.CPSR.GetFlag(FLAG_T)
     if thumb {
-        reg.LR[irqBank] = r[PC] + 2
-        r[LR] = r[PC] + 2
+        IRQ_PC = r[PC]// + 2
+    } else {
+        IRQ_PC = r[PC]// + 4
+    }
+    
+    currMode := uint32(reg.CPSR) & 0b11111
+    curBank := BANK_ID[currMode]
+
+    // avoid multiple Interrupt handling per instruction
+
+    reg.SP[curBank] = r[SP]
+    reg.LR[curBank] = r[LR]
+
+    // CPU
+    IRQ_SPSR = uint32(reg.CPSR)
+
+    reg.SPSR[irqBank] = reg.CPSR
+    reg.CPSR = (reg.CPSR &^ 0b11111) | MODE_IRQ
+
+    // will need logic for FIQ at some point
+    r[SP] = reg.SP[irqBank]
+    r[LR] = reg.LR[irqBank]
+
+    reg.CPSR |= 0b1000_0000 // disable IRQ
+
+    thumb = reg.CPSR.GetFlag(FLAG_T)
+    if thumb {
+        //reg.LR[irqBank] = r[PC]// + 2
+        r[LR] = r[PC]// + 2
         IRQ_RETURN_THUMB = true
     } else {
-        reg.LR[irqBank] = r[PC] + 4
-        r[LR] = r[PC] + 4
+        //reg.LR[irqBank] = r[PC]// + 4
+        r[LR] = r[PC]// + 4
         IRQ_RETURN_THUMB = false
     }
 
     reg.CPSR.SetFlag(FLAG_T, false)
 
     // BIOS
-    stackAddr := r[SP]
-    mem.Write32(stackAddr - 4, r[LR])
-    mem.Write32(stackAddr - 8, r[12])
-    mem.Write32(stackAddr - 12, r[3])
-    mem.Write32(stackAddr - 16, r[2])
-    mem.Write32(stackAddr - 20, r[1])
-    mem.Write32(stackAddr - 24, r[0])
-    r[SP] -= 24
+    //stackAddr := r[SP]
+    r[SP] -= 4
+    mem.Write32(r[SP], r[LR])
+    r[SP] -= 4
+    mem.Write32(r[SP], r[12])
+    r[SP] -= 4
+    mem.Write32(r[SP], r[3])
+    r[SP] -= 4
+    mem.Write32(r[SP], r[2])
+    r[SP] -= 4
+    mem.Write32(r[SP], r[1])
+    r[SP] -= 4
+    mem.Write32(r[SP], r[0])
+    //r[SP] -= 24
 
-    // not sure one this, may also not matter
-    //r[LR] = 0x12C
-    //reg.LR[irqBank] = 0x12C
+    //IRQ_SP_DURING = r[SP]
 
-    //fmt.Printf("THUMB %t\n\n", thumb)
 
     userAddr := mem.Read32(0x03007FFC)
+    r[PC] = userAddr// is temp, im not sure of a better way
 
-    //fmt.Printf("USER ADDR %08X THUMB %t \n", userAddr, thumb)
-    //reg.CPSR.SetFlag(FLAG_T, userThumb)
-
-    //r[PC] = userAddr &^ 1
-
-    r[PC] = userAddr - 2 // -2 is temp, im not sure of a better way
+    fmt.Printf("PC IN IRQ %08X\n", r[PC])
 
     return
 }
@@ -117,35 +121,55 @@ func (gba *GBA) handleInterruptExit() {
     //curBank := BANK_ID[reg.getMode()]
 
     //panic("INTERRUPT EXIT")
-    stackAddr := r[SP]
-    r[0] = mem.Read32(stackAddr + 0)
-    r[1] = mem.Read32(stackAddr + 4)
-    r[2] = mem.Read32(stackAddr + 8)
-    r[3] = mem.Read32(stackAddr + 12)
-    r[12] = mem.Read32(stackAddr + 16)
-    r[LR] = mem.Read32(stackAddr + 20)
 
-    reg.SP[BANK_ID[MODE_IRQ]] = 0x3007FA0
-    reg.LR[BANK_ID[MODE_IRQ]] = 0x0
-    reg.SPSR[BANK_ID[MODE_IRQ]] = 0x10
+    //r[SP] = IRQ_SP_DURING
 
-    r[SP] = IRQ_SP
+    //tmpLR := IRQ_LR
+
+    r[0] = mem.Read32(r[SP])
+    r[SP] += 4
+    r[1] = mem.Read32(r[SP])
+    r[SP] += 4
+    r[2] = mem.Read32(r[SP])
+    r[SP] += 4
+    r[3] = mem.Read32(r[SP])
+    r[SP] += 4
+    r[12] = mem.Read32(r[SP])
+    r[SP] += 4
+    r[LR] = mem.Read32(r[SP])
+    r[SP] += 4
+
+    reg.SP[BANK_ID[MODE_IRQ]] = r[SP]
+    reg.LR[BANK_ID[MODE_IRQ]] = r[LR]
+
+    reg.CPSR = reg.SPSR[BANK_ID[MODE_IRQ]]
+    currMode := uint32(reg.CPSR) & 0b11111
+    curBank := BANK_ID[currMode]
 
     if IRQ_RETURN_THUMB {
-        r[PC] = r[LR] - 2
+        r[PC] = IRQ_PC //r[LR] - 2
     } else {
-        r[PC] = r[LR] - 4
+        r[PC] = IRQ_PC //r[LR] + 4
     }
 
-    r[LR] = IRQ_LR
+    r[LR] = reg.LR[curBank]
+    r[SP] = reg.SP[curBank]
 
     IRQ_RETURN_THUMB = false
+    //mem.Write16(0x400_0208, 0)
 
     //reg.CPSR = reg.SPSR[curBank]
-    reg.CPSR = Cond(IRQ_SPSR)
-    //fmt.Printf("EXIT SP %08X PC %08X THUMB %t\n\n", r[SP], r[PC], reg.CPSR.GetFlag(FLAG_T))
-    //gba.Debugger.debugIRQ()
-    //gba.Debugger.print(1)
+    //reg.CPSR = Cond(IRQ_SPSR)
+    //fmt.Printf("SP ADDR %08X\n", r[SP])
+    //fmt.Printf("LR %08X\n", r[LR])
+    //fmt.Printf("12 %08X\n", r[12])
+    //fmt.Printf("03 %08X\n", r[3])
+    //fmt.Printf("02 %08X\n", r[2])
+    //fmt.Printf("01 %08X\n", r[1])
+    //fmt.Printf("00 %08X\n", r[0])
+    //fmt.Printf("EXIT SP %08X PC %08X THUMB %t MODE %02X CURR %08d\n\n", r[SP], r[PC], reg.CPSR.GetFlag(FLAG_T), currMode, CURR_INST)
+
+    //panic("END INTERRUPT")
 }
 
 //func (gba *GBA) exception(addr uint32, mode uint32) {

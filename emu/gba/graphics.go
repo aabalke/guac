@@ -55,8 +55,8 @@ func (gba *GBA) graphics() {
 
     //gba.background(0x400_0008, dispcnt, false, NewWindows(dispcnt, gba))
     //gba.getTiles(0x601_0000, 0x1E, true, false)
-    //gba.getTiles(0x601_0000, 0x1E, true, false)
-    //gba.debugPalette()
+    //gba.getTiles(0x600_3800, 0x1E, false, false)
+    ////gba.debugPalette()
     //return
 
     //gba.clear()
@@ -66,7 +66,7 @@ func (gba *GBA) graphics() {
 		gba.updateMode0(dispcnt)
 	case 1:
         panic("mode 1")
-		gba.updateMode1(dispcnt)
+		//gba.updateMode1(dispcnt)
 	case 2:
         panic("mode 2")
 		//gba.updateMode2()
@@ -1096,7 +1096,7 @@ func (gba *GBA) debugPalette() {
 	// prints single palette in corner
 	// palIdx is idx of palette not memory address (which is palIdx * 2)
 
-	palIdx := 0x20
+	palIdx := 0x0F
 	index := 0
 	for y := range 8 {
 		iY := SCREEN_WIDTH * y

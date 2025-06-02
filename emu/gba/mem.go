@@ -23,7 +23,7 @@ type Memory struct {
 	BIOS_MODE uint32
 
 	Dispstat Dispstat
-    IRQFlags IRQFlags
+    //IRQFlags IRQFlags
 
 	GamePak0                     [0x200_0000]byte
 	SRAM                         [0x1_0000]byte

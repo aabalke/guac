@@ -224,6 +224,8 @@ func IntrWait(gba *GBA) {
     mem.Write16(0x400_0208, 0x1)
     //fmt.Printf("CURR %08d, PC %08X INTR WAIT MASK %08X IF %08X, COMBO %1b\n", CURR_INST, reg[PC], irqMask, IF, irqMask & IF)
 
+    reg[3] = 0x0
+
     if waitMode == 0 {
         // Clear irqMask bits from IE (just like bic) chatgpt
         ie := mem.Read16(0x400_0200)
@@ -271,12 +273,12 @@ func AckIntrWait(gba *GBA) {
     gba.IntrWait = 0
 
     //gba.ExitHalt = true
-
 	reg := &gba.Cpu.Reg.R
 
 	irqMask := uint32(reg[1])
 	mem.Write16(0x400_0202, uint16(irqMask))
 	mem.Write16(0x300_7FF8, uint16(irqMask))
+
 }
 
 func SoftReset(gba *GBA) {
@@ -793,10 +795,14 @@ func DecompressLZ77(gba *GBA, src, dst uint32) int {
 
 	// need to align half and pad 16bit?
 
+    // I'm not sure how final r0 value is calculated, it does not match src
+
 	mem := gba.Mem
 
 	header := mem.Read32(src)
+    oSrc := src
 	decompressedSize := int(header >> 8)
+
 	src += 4
 
 	end := int(dst) + decompressedSize
@@ -809,7 +815,8 @@ func DecompressLZ77(gba *GBA, src, dst uint32) int {
 		src++
 
 		for i := range 8 {
-			if int(dst) >= end {
+
+			if int(dst) > end {
 				break
 			}
 
@@ -840,6 +847,13 @@ func DecompressLZ77(gba *GBA, src, dst uint32) int {
 			}
 		}
 	}
+
+    gba.Cpu.Reg.R[0] = src
+    gba.Cpu.Reg.R[1] += uint32(decompressedSize)
+    gba.Cpu.Reg.R[2] = 0x0
+    gba.Cpu.Reg.R[3] = 0x0
+
+    fmt.Printf("srcSize %08X LEN %08X DCOMP %08X BYTES %08X\n", src, src - oSrc, decompressedSize, bytesOutputted)
 
     return bytesOutputted
 }

@@ -52,6 +52,10 @@ func (d *Debugger) print(i int) {
     p("spsr", uint32(reg.SPSR[BANK_ID[mode]]))
     p("MODE", BANK_ID[mode])
     p("0x3007FFC", d.gba.Mem.Read32(0x3007FFC))
+    p("0x4000004", d.gba.Mem.Read16(0x4000004))
+    p("0x4000208", d.gba.Mem.Read16(0x4000208))
+    p("0x4000200", d.gba.Mem.Read16(0x4000200))
+    p("0x4000202", d.gba.Mem.Read16(0x4000202))
 
     s("--------  --------")
 
@@ -73,7 +77,12 @@ func (d *Debugger) print(i int) {
     //s("\n\n")
     //p(fmt.Sprintf("STACK %X", 0x3007E2E), d.gba.Mem.Read32(0x3007E2E))
     //for i := 0x0400_00E0; i >= 0x0400_00D0; i -= 4 {
-    for i := 0x0300_6F80; i >= 0x0300_6F00; i -= 4 {
+
+    start := 0x40000DC
+    //start := 0x300_8000
+    count := 6
+    //for i := start; i < start + (count * 4); i += 4 {
+    for i := start; i >= start - (count * 4); i -= 4 {
     //for i := 0x0300_1770; i >= 0x0300_1750; i -= 4 {
         p(fmt.Sprintf("IO %X", i), d.gba.Mem.Read32(uint32(i)))
     }

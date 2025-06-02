@@ -23,6 +23,7 @@ const (
 
 var (
     _ = fmt.Sprintln("")
+    _ = os.Args
     CURR_INST = 0
     //MAX_COUNT = 100_000
 
@@ -101,7 +102,7 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
 
     SAVED_CYCLES = frameCycles - (1232 * 228)
 
-    gba.checkDmas(DMA_MODE_REF)
+    //gba.checkDmas(DMA_MODE_REF)
 
     gba.graphics()
 
@@ -155,6 +156,7 @@ func (gba *GBA) Exec(requiredCycles, frameCycles uint32) uint32 {
 
         opcode := gba.Mem.Read32(r[PC])
 
+
         if gba.Halted {
             AckIntrWait(gba)
         }
@@ -163,18 +165,38 @@ func (gba *GBA) Exec(requiredCycles, frameCycles uint32) uint32 {
             gba.Halted = false
         } 
 
+        //if CURR_INST == 542764 { panic(fmt.Sprintf("??? HALTED %t CURR %08d PC %08X, OPCODE %04X\n", gba.Halted, CURR_INST, r[PC], opcode)) }
         if !gba.Halted {
             cycles = gba.Cpu.Execute(opcode)
         }
 
-        if r[PC] == 0x81E07EC && r[12] == 0x2 && false { // ruby pre ramreset
-        //if CURR_INST == 227 {
-        //if gba.Mem.Read32(0x3007E44) != PREV_VALUE {
-            gba.Debugger.print(CURR_INST)
-            os.Exit(0)
+        //if CURR_INST == 238970 { // GOOD PALETTE
+        //if CURR_INST == 238849 { // GOOD PALETTE
+        //if CURR_INST == 542_800 { // GOOD PALETTE
+        //if CURR_INST == 542_853 { // GOOD PALETTE
+        //if CURR_INST == 543669 { // BADDDDD
+        //if CURR_INST == 543669 { // BADDDDD
+        //if r[PC] == 0x08073B04 { // GOOD PALETTE
+        //if CURR_INST == 543669 || CURR_INST == 542853 { // GOOD PALETTE
+        ////if r[PC] == 0x804128A && r[4] == 0x6F7B { // GOOD PALETTE
+        //if CURR_INST > 544000  && CURR_INST < 545000 {
+
+        if CURR_INST == 542980 {
+            //r[SP] = 0x3007E20
+            //panic("HERE")
         }
 
-        CURR_INST++
+        //if r[PC] == 0x8073AFE {
+        //    //fmt.Printf("r[PC] %08X CURR %d\n", r[PC], CURR_INST)
+        //    gba.Debugger.print(CURR_INST)
+        //    gba.Paused = true
+        //    //return accCycles - requiredCycles
+        //    os.Exit(0)
+        //}
+
+        if !gba.Halted {
+            CURR_INST++
+        }
         gba.Timers.Increment(uint32(cycles))
 
         accCycles += uint32(cycles)
@@ -296,6 +318,7 @@ func (gba *GBA) toggleThumb() {
 }
 
 func (gba *GBA) triggerIRQ(irq uint32) {
+
 
     mem := gba.Mem
 
