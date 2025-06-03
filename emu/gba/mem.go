@@ -500,11 +500,11 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
     case 0x200, 0x201:
 		m.IO[addr] = v
         //fmt.Printf("IRQ EXCEPTION CHECK AT MEM IE\n")
-        m.GBA.checkIRQ()
+        //m.GBA.checkIRQ()
     case 0x208, 0x209:
 		m.IO[addr] = v
         //fmt.Printf("IRQ EXCEPTION CHECK AT MEM IME\n")
-        m.GBA.checkIRQ()
+        //m.GBA.checkIRQ()
 
     // manual clear IF by writing 1
     case 0x202: m.IO[addr] &^= v

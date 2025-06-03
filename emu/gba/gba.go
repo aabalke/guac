@@ -104,7 +104,7 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
 
     //gba.checkDmas(DMA_MODE_REF)
 
-    gba.graphics()
+    //gba.graphics()
 
     return instCount
 }
@@ -136,6 +136,9 @@ func (gba *GBA) UpdateScanline(frameCycles uint32) uint32 {
     gba.Mem.IO[0x202] &^= 10
 
     // draw scanline here once converted to scanline version
+    gba.scanlineGraphics(gba.VCOUNT)
+
+    gba.Dma[3].transferVideo(gba.VCOUNT)
 
     gba.VCOUNT++
 
@@ -156,7 +159,6 @@ func (gba *GBA) Exec(requiredCycles, frameCycles uint32) uint32 {
 
         opcode := gba.Mem.Read32(r[PC])
 
-
         if gba.Halted {
             AckIntrWait(gba)
         }
@@ -170,11 +172,7 @@ func (gba *GBA) Exec(requiredCycles, frameCycles uint32) uint32 {
         }
 
         //if CURR_INST == 25_983_644 {
-        //    r[0] = 0x0
-        //}
-
-        //if CURR_INST == 25_983_644 {
-        //if CURR_INST == 25_983_299 {
+        //if CURR_INST == 98634 {
         ////if r[15] == 0x8002932 && r[13] == 0x3007DB8 {
         //    gba.Debugger.print(CURR_INST)
         //    gba.Paused = true
@@ -185,6 +183,7 @@ func (gba *GBA) Exec(requiredCycles, frameCycles uint32) uint32 {
         if !gba.Halted {
             CURR_INST++
         }
+
         gba.Timers.Increment(uint32(cycles))
 
         accCycles += uint32(cycles)

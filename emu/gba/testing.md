@@ -53,7 +53,7 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 
 ### MGBA Test Suite
 
-❌ Memory tests [1256/1552]
+❌ Memory tests [1254/1552]
 ❌ I/O read tests [12/130]
 ❌ Timing tests [240/2020]
 ❌ Timer count-up tests [crash]
@@ -62,23 +62,23 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 👍 Carry tests [93/93]
 👍 Multiply long tests [52/72] (matches mgba)
 👍 BIOS math tests [615/615]
-❌ DMA tests [1016/1256]
+❌ DMA tests [1018/1256]
 ❌ SIO register R/W tests [7/90]
 ❌ SIO timing tests [0/8]
 ❌ Misc. edge case tests [2/10]
 ❌ Video tests
     ❌ Basic Mode 3
     ❌ Basic Mode 4
-    ❌ Degenerate OBJ transoforms
+    👍 Degenerate OBJ transforms
     ❌ Layer toggle
     ❌ Layer toggle 2
     ❌ OAM Update Delay
-    ❌ Window offscreen reset
+    👍 Window offscreen reset (matches mgba)
 
 ### NBA-EMU Test Suite
 
 ❌ bus: 128kb Boundary
-❌ dma: burst into tears
+❌ dma: burst into tears[0/3]
 ❌ dma: force nseq access
 ❌ dma: latch
 ❌ dma: start delay
@@ -118,7 +118,7 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 👍 first
 👍 hello
 
-❌ irq_demo
+❌ irq_demo (1.3 passes)
 👍 key_demo
 👍 m3_demo
 ❌ m7_demo
@@ -163,3 +163,10 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 👍 txt_se1
 👍 txt_se2 (text has different amounts)
 👍 win_demo
+
+### Games
+Pokemon
+
+
+
+

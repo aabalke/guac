@@ -54,25 +54,27 @@ func (gba *GBA) UpdateKeyboardInput(keyEvent *sdl.KeyboardEvent, tempJoypad *uin
 
 func (gba *GBA) UpdateControllerInput(controllerEvent *sdl.ControllerButtonEvent, tempJoypad *uint16, reqInterrupt *bool) {
 
-    panic("NEED CONTROLLER SUPPORT FOR GBA")
-
     switch key := controllerEvent.Button; key {
     case sdl.CONTROLLER_BUTTON_A: // A //ps x
-        handleButton(tempJoypad, 0b10000, reqInterrupt, controllerEvent)
-    case sdl.CONTROLLER_BUTTON_B: // B
-        handleButton(tempJoypad, 0b100000, reqInterrupt, controllerEvent)
-    case sdl.CONTROLLER_BUTTON_X: // SELECT
-        handleButton(tempJoypad, 0b1000000, reqInterrupt, controllerEvent)
-    case sdl.CONTROLLER_BUTTON_Y: // START
-        handleButton(tempJoypad, 0b10000000, reqInterrupt, controllerEvent)
-    case sdl.CONTROLLER_BUTTON_DPAD_RIGHT:
         handleButton(tempJoypad, 0b1, reqInterrupt, controllerEvent)
-    case sdl.CONTROLLER_BUTTON_DPAD_LEFT:
+    case sdl.CONTROLLER_BUTTON_B: // B
         handleButton(tempJoypad, 0b10, reqInterrupt, controllerEvent)
-    case sdl.CONTROLLER_BUTTON_DPAD_UP:
+    case sdl.CONTROLLER_BUTTON_X: // SELECT
         handleButton(tempJoypad, 0b100, reqInterrupt, controllerEvent)
-    case sdl.CONTROLLER_BUTTON_DPAD_DOWN:
+    case sdl.CONTROLLER_BUTTON_Y: // START
         handleButton(tempJoypad, 0b1000, reqInterrupt, controllerEvent)
+    case sdl.CONTROLLER_BUTTON_DPAD_RIGHT:
+        handleButton(tempJoypad, 0b1_0000, reqInterrupt, controllerEvent)
+    case sdl.CONTROLLER_BUTTON_DPAD_LEFT:
+        handleButton(tempJoypad, 0b10_0000, reqInterrupt, controllerEvent)
+    case sdl.CONTROLLER_BUTTON_DPAD_UP:
+        handleButton(tempJoypad, 0b100_0000, reqInterrupt, controllerEvent)
+    case sdl.CONTROLLER_BUTTON_DPAD_DOWN:
+        handleButton(tempJoypad, 0b1000_0000, reqInterrupt, controllerEvent)
+    case sdl.CONTROLLER_BUTTON_RIGHTSHOULDER:
+        handleButton(tempJoypad, 0b1_0000_0000, reqInterrupt, controllerEvent)
+    case sdl.CONTROLLER_BUTTON_LEFTSHOULDER:
+        handleButton(tempJoypad, 0b10_0000_0000, reqInterrupt, controllerEvent)
     } 
 }
 

@@ -216,35 +216,43 @@ func (dma *DMA) transfer() {
         } else {
             v := mem.Read16(tmpSrc)
             mem.Write16(tmpDst, uint16(v))
-
         }
+
         tmpDst = uint32(int64(tmpDst) + dstOffset)
         tmpSrc = uint32(int64(tmpSrc) + srcOffset)
-
     }
-
-    dma.Src = tmpSrc
-    dma.Dst = tmpDst
 
     if dma.IRQ {
         dma.Gba.triggerIRQ(0x8 + uint32(dma.Idx))
     }
 
     if !dma.Repeat {
+        dma.Src = tmpSrc
+        dma.Dst = tmpDst
         dma.disable()
         return
     }
 
-    panic("REPEAT DMA")
-    //dma.Dst = tmpDst
-    //dma.Src = tmpSrc
-    
-    return
-
-    //dma.count = ch.wordCount()
     if dma.DstAdj == DMA_ADJ_RES {
-        panic("DMA IDK")
-        //dma.dst = util.LE32(ch.io[4:])
+        // dma.Dst stays the same
+        dma.Src = tmpSrc
+        return
+    }
+
+    dma.Src = tmpSrc
+    dma.Dst = tmpDst
+
+    return
+}
+
+func (dma *DMA) transferVideo(vcount uint32) {
+
+    if dma.Idx != 3 || dma.Mode != 3 || !dma.Enabled {
+        return
+    }
+
+    if vcount >= 2 && vcount <= 162 {
+        dma.transfer()
     }
 }
 
