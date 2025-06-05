@@ -130,7 +130,7 @@ func (s *SDLStruct) Close(debug bool) {
     }
 }
 
-func (s *SDLStruct) Update(debug bool, romPath string) {
+func (s *SDLStruct) Update(debug bool, romPath string, useSaveState bool) {
 
     InitSound()
 	Gb = gameboy.NewGameBoy()
@@ -151,7 +151,7 @@ func (s *SDLStruct) Update(debug bool, romPath string) {
         InitLoadingScreen(s.Renderer, scene, duration)
         InitMainMenu(scene, 0)
     } else {
-        ActivateConsole(scene, debugScene, romPath, debug)
+        ActivateConsole(scene, debugScene, romPath, debug, useSaveState)
     }
 
 	frameTime := time.Second / FPS

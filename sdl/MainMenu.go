@@ -268,7 +268,7 @@ func (b *MainMenu) HandleSelected() {
 
     path := b.GameDatas[b.SelectedIdx].RomPath
 
-    ActivateConsole(scene, nil, path, false)
+    ActivateConsole(scene, nil, path, false, false)
 
     b.Status.Active = false
 
@@ -277,7 +277,7 @@ func (b *MainMenu) HandleSelected() {
     WriteGameData(&b.GameDatas)
 }
 
-func ActivateConsole(scene *Scene, debugScene *Scene, path string, debug bool) {
+func ActivateConsole(scene *Scene, debugScene *Scene, path string, debug bool, useSaveState bool) {
 
     isGb := strings.HasSuffix(path, "gb") || strings.HasSuffix(path, "gbc")
     isGba := strings.HasSuffix(path, "gba")
@@ -291,7 +291,7 @@ func ActivateConsole(scene *Scene, debugScene *Scene, path string, debug bool) {
         Gb.Paused = false
         return
     case isGba:
-        Gba.LoadGame(path)
+        Gba.LoadGame(path, useSaveState)
         ratio := float64(gba.SCREEN_WIDTH)/float64(gba.SCREEN_HEIGHT)
         scene.Add(NewGbaFrame(scene, ratio, l, Gba))
 
@@ -299,7 +299,10 @@ func ActivateConsole(scene *Scene, debugScene *Scene, path string, debug bool) {
             InitDebugMenu(debugScene)
         }
 
-        Gba.Paused = false
+        if !useSaveState {
+            Gba.Paused = false
+        }
+
         return
     }
 

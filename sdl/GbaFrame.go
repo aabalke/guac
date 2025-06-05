@@ -93,10 +93,9 @@ func (b *GbaFrame) Update(event sdl.Event) bool {
 		}
 
 		switch e.Keysym.Sym {
-		case sdl.K_p:
-            pause = true
-		case sdl.K_m:
-			(*b.GBA).ToggleMute()
+		case sdl.K_p: pause = true
+		case sdl.K_m: (*b.GBA).ToggleMute()
+        case sdl.K_i: (*b.GBA).ToggleSaveState()
 		}
 	}
 
