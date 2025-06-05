@@ -60,7 +60,7 @@ func (cpu *Cpu) DecodeARM(opcode uint32) int {
         //}
 
 	default:
-		panic(fmt.Sprintf("Unable to Decode %X, at PC %X, INSTR %d", opcode, r[PC], CURR_INST))
+		panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X, INSTR %d", opcode, r[PC], CURR_INST))
 	}
 
     return 4

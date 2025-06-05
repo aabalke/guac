@@ -32,6 +32,7 @@ var (
 )
 
 type GBA struct {
+    GamePath string
     Debugger *Debugger
     Cartridge *Cartridge
     Cpu *Cpu
@@ -53,8 +54,6 @@ type GBA struct {
  
     Timers Timers
     Dma    [4]DMA
-
-    Ct *CycleTiming
 
     VCOUNT uint32
 
@@ -83,6 +82,8 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
 
     dispstat := uint32(gba.Mem.Dispstat)
     if utils.BitEnabled(dispstat, 3) {
+
+        INTERRUPT_CAUSE = "VBLANK"
         gba.triggerIRQ(0)
     }
 
@@ -114,6 +115,7 @@ func (gba *GBA) UpdateScanline(frameCycles uint32) uint32 {
     dispstat := gba.Mem.Read16(0x400_0004)
     lyc := gba.Mem.Read8(0x400_0005)
     if vcounter := utils.BitEnabled(dispstat, 5) && gba.VCOUNT == lyc; vcounter {
+        INTERRUPT_CAUSE = "VCOUNTER"
         gba.triggerIRQ(2)
     }
 
@@ -123,6 +125,7 @@ func (gba *GBA) UpdateScanline(frameCycles uint32) uint32 {
     dispstat = uint32(gba.Mem.Dispstat)
     vblank := utils.BitEnabled(dispstat, 0) 
     if utils.BitEnabled(dispstat, 4) && !vblank {
+        INTERRUPT_CAUSE = "HBLANK"
         gba.triggerIRQ(1)
     }
 
@@ -155,9 +158,18 @@ func (gba *GBA) Exec(requiredCycles, frameCycles uint32) uint32 {
 
         cycles := 4
 
-        gba.Ct.instCycles = 0
+        if gba.Paused {
+            return 0
+        }
 
         opcode := gba.Mem.Read32(r[PC])
+
+        if r[PC] >= 0x400_0000 && r[PC] < 0x800_0000 {
+
+            r := &gba.Cpu.Reg.R
+
+            panic(fmt.Sprintf("INVALID PC CURR %d PC %08X OPCODE %08X", CURR_INST, r[PC], gba.Mem.Read32(r[PC])))
+        }
 
         if gba.Halted {
             AckIntrWait(gba)
@@ -171,13 +183,16 @@ func (gba *GBA) Exec(requiredCycles, frameCycles uint32) uint32 {
             cycles = gba.Cpu.Execute(opcode)
         }
 
-        //if CURR_INST == 25_983_644 {
-        //if CURR_INST == 98634 {
-        ////if r[15] == 0x8002932 && r[13] == 0x3007DB8 {
+        //if CURR_INST == 2347037 { //temp mario kart
+        //    r[0] = 0x80CDB5C
+        //}
+
+        //if CURR_INST == 242299 {
+        //    //fmt.Printf("PC %08X CURR %d\n", r[PC], CURR_INST)
         //    gba.Debugger.print(CURR_INST)
         //    gba.Paused = true
-        //    //return accCycles - requiredCycles
         //    os.Exit(0)
+        //    //return accCycles - requiredCycles
         //}
 
         if !gba.Halted {
@@ -214,15 +229,10 @@ func NewGBA() *GBA {
         DebugPixels: &debugPixels,
     }
 
+    gba.Debugger = &Debugger{gba: &gba}
+
     gba.Mem = NewMemory(&gba)
     gba.Cpu = NewCpu(&gba)
-    gba.Debugger = &Debugger{&gba}
-
-    gba.Ct = &CycleTiming{
-        prevAddr: 0x800_0000,
-    }
-
-    //gba.Cpu.Reg.setMode(MODE_SYS, MODE_SWI)
 
     gba.Cpu.Reg.CPSR.SetFlag(FLAG_I, false)
 
@@ -277,13 +287,25 @@ func (gba *GBA) TogglePause() bool {
 	return gba.Paused
 }
 
+func (gba *GBA) ToggleSaveState() {
+    path := gba.GamePath + ".gob"
+    SaveState(gba, path)
+}
+
 func (gba *GBA) Close() {
 	gba.Muted = true
 	gba.Paused = true
 }
 
-func (gba *GBA) LoadGame(path string) {
+func (gba *GBA) LoadGame(path string, useState bool) {
+    gba.GamePath = path
     gba.Cartridge = NewCartridge(gba, path, path + ".save")
+
+    if useState {
+        path := gba.GamePath + ".gob"
+        LoadState(gba, path)
+        gba.Paused = true
+    }
 }
 
 func (gba *GBA) toggleThumb() {
@@ -327,7 +349,6 @@ func (gba *GBA) checkIRQ() {
     interruptEnabled := !gba.Cpu.Reg.CPSR.GetFlag(FLAG_I)
     ime := utils.BitEnabled(gba.Mem.Read16(0x400_0208), 0)
     interrupts := (gba.Mem.Read16(0x400_0200) & gba.Mem.Read16(0x400_0202)) != 0
-
     if interruptEnabled && ime && interrupts {
         gba.handleInterrupt()
     }

@@ -47,7 +47,7 @@ var BANK_ID = map[uint32]uint32{
 var BIOS_ADDR = map[uint32]uint32{
 	BIOS_STARTUP:  0xE129F000,
 	BIOS_SWI:      0xE3A02004,
-	BIOS_IRQ:      0x03007FFC,
+	BIOS_IRQ:      0xE25EF004,
 	BIOS_IRQ_POST: 0xE55EC002,
 }
 

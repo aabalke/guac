@@ -32,7 +32,7 @@ type DMA struct {
 	Dst uint32
 
 	Control       uint32
-	singleByteSet bool
+	SingleByteSet bool
 	WordCount     uint32
 
 	DstAdj  uint32
@@ -75,6 +75,7 @@ func (dma *DMA) WriteSrc(v uint8, byte uint32) {
 }
 
 func (dma *DMA) WriteDst(v uint8, byte uint32) {
+
     dma.Dst = utils.ReplaceByte(dma.Dst, uint32(v), byte)
     if dma.Idx == 0 {
         dma.Dst &= 0x7FF_FFFF
@@ -86,23 +87,22 @@ func (dma *DMA) WriteDst(v uint8, byte uint32) {
 func (dma *DMA) WriteCount(v uint8, hi bool) {
 
     if hi {
-        dma.WordCount = (dma.WordCount & 0b1111_1111) |  (uint32(v) << 8)
+        mask := 0x7F
+        if dma.Idx == 3 {
+            mask = 0x1FF
+        }
+        dma.WordCount = (dma.WordCount & 0b1111_1111) | ((uint32(v) & uint32(mask)) << 8)
         return
     }
 
-    mask := 0x7F
-    if dma.Idx == 3 {
-        mask = 0x1FF
-    }
-
-	dma.WordCount = (dma.WordCount &^ 0b1111_1111) |  (uint32(v) & uint32(mask))
+	dma.WordCount = (dma.WordCount &^ 0b1111_1111) |  uint32(v)
 }
 
 func (dma *DMA) WriteControl(v uint8, hi bool) {
 
 	if hi {
 		dma.Control = (dma.Control & 0b1111_1111) | (uint32(v) << 8)
-		dma.SrcAdj = (dma.SrcAdj &^ 0b10) | (uint32(v) & 1) << 1
+		dma.SrcAdj = (dma.SrcAdj & 1) | (uint32(v) & 1) << 1
 		dma.Repeat = utils.BitEnabled(uint32(v), 1)
 		dma.isWord = utils.BitEnabled(uint32(v), 2)
         dma.DRQ = utils.BitEnabled(uint32(v), 3)
@@ -113,8 +113,7 @@ func (dma *DMA) WriteControl(v uint8, hi bool) {
 	} else {
 		dma.Control = (dma.Control &^ 0b1111_1111) | uint32(v)
 		dma.DstAdj = (uint32(v) >> 5) & 0b11
-		dma.SrcAdj = (dma.SrcAdj &^ 0b1) | ((uint32(v) >> 7) & 1)
-		//dma.SrcAdj = (dma.SrcAdj &^ 0b1) | ((uint32(v) >> 6) & 1)
+		dma.SrcAdj = (dma.SrcAdj &^ 1) | ((uint32(v) >> 7) & 1)
 	}
 
 	if dma.Mode >= 0b100 {
@@ -122,8 +121,8 @@ func (dma *DMA) WriteControl(v uint8, hi bool) {
 	}
 
     // need to make sure entire 16 bit of control is written before transfer
-    dma.singleByteSet = !dma.singleByteSet
-	if dma.singleByteSet {
+    dma.SingleByteSet = !dma.SingleByteSet
+	if dma.SingleByteSet {
 		return
 	}
 
@@ -141,6 +140,11 @@ func (dma *DMA) disable() {
 func (dma *DMA) transfer() {
 
     //fmt.Printf("DMA TRANSFER CURR %08d SRC %08X, DST %08X, WORD COUNT %08X 0x202EEC8 %08X TYPE %02b\n", CURR_INST, dma.Dst, dma.Src, dma.WordCount, dma.Gba.Mem.Read32(0x202EEC8), dma.Mode)
+
+
+    if dma.Idx == 3 {
+        //fmt.Printf("DMA TRANSFER CNTRL %04X CNT %04X CNTRLM %08X CURR %d SRC %08X, DST %08X\n", dma.Control, dma.WordCount, dma.Gba.Mem.Read32(0x400_00DC), CURR_INST, dma.Src, dma.Dst)
+    }
 
     mem := dma.Gba.Mem
 
@@ -194,6 +198,7 @@ func (dma *DMA) transfer() {
     case !dma.isWord && dma.SrcAdj == DMA_ADJ_DEC: srcOffset = -2
     }
 
+
     for i := uint32(0); i < count; i++ {
 
         // not sure about this
@@ -223,12 +228,12 @@ func (dma *DMA) transfer() {
     }
 
     if dma.IRQ {
+        INTERRUPT_CAUSE = fmt.Sprintf("DMA%d", dma.Idx)
         dma.Gba.triggerIRQ(0x8 + uint32(dma.Idx))
     }
 
     if !dma.Repeat {
-        dma.Src = tmpSrc
-        dma.Dst = tmpDst
+        // DO NOT WRITEBACK DST AND SRC UNLESS REPEAT
         dma.disable()
         return
     }

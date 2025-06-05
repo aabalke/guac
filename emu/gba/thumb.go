@@ -326,7 +326,6 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
             //    cycles = 2
             //}
 
-
             r[PC] += 2
             return cycles
         }
@@ -336,6 +335,12 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
         rsValue := uint64(r[rs])
         if rs == PC {
             rsValue += 4
+        }
+
+        if interruptExit := cpu.Reg.getMode() == MODE_IRQ && rd == PC && rs == LR; interruptExit {
+            fmt.Printf("UNSURE IRQ EXIT THUMB\n")
+            cpu.AluChangeMode(false)
+            return 4
         }
 
 
@@ -351,6 +356,12 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
 
     case inst == 3 && mSBd: panic("UNSUPPORTED HI BLX")
     case inst == 3:
+
+        if rs == LR && cpu.Reg.getMode() == MODE_IRQ {
+            cpsr.SetFlag(FLAG_T, false)
+            cpu.AluChangeMode(false)
+            return 4
+        }
 
         if !utils.BitEnabled(r[rs], 0) {
             cpsr.SetFlag(FLAG_T, false)

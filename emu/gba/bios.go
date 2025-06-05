@@ -33,10 +33,13 @@ func (gba *GBA) SysCall(inst uint32) (int, bool) {
 
 	cycles := 0
 
-    //fmt.Printf("SYS CALL %08X\n", inst)
+    fmt.Printf("SYS CALL %08X\n", inst)
 
     if inst > 0x2A {
-        panic(fmt.Sprintf("INVALID SWI SYSCALL %08X", inst))
+
+        r := &gba.Cpu.Reg.R
+
+        panic(fmt.Sprintf("INVALID SWI SYSCALL %08X PC %08X OPCODE %08X", inst, r[PC], gba.Mem.Read32(r[PC])))
     }
 
 	switch inst {
@@ -95,6 +98,8 @@ func (gba *GBA) SysCall(inst uint32) (int, bool) {
 		cycles += ObjAffineSet(gba)
 	case SYS_BgAffineSet:
 		cycles += BGAffineSet(gba)
+    case SYS_MidiKey2Freq:
+        MidiKey2Freq(gba)
 	case SYS_GetBiosChecksum:
 		GetBiosChecksum(gba)
         cycles += 168948
@@ -679,7 +684,6 @@ func CpuSet(gba *GBA) {
 	switch {
 	case fill && isWord:
 
-
 		rs &^= 0b11
 		rd &^= 0b11
 
@@ -751,24 +755,36 @@ func CpuFastSet(gba *GBA) {
 	r := &gba.Cpu.Reg.R
 	mem := gba.Mem
 
-	src := r[0] & 0xFFFF_FFFC
-	dst := r[1] & 0xFFFF_FFFC
-	mode := r[2]
+	src := r[0] &^ 0b11
+	dst := r[1] &^ 0b11
+	count := (utils.GetVarData(r[2], 0, 20) + 7) &^ 7 // round up 32 bytes (8 words)
+	fill := utils.BitEnabled(r[2], 24)
 
-	count := ((mode&0x000f_ffff + 7) >> 3) << 3
-	fill := utils.BitEnabled(mode, 24)
 	if fill {
 		word := mem.Read32(src)
 		for i := uint32(0); i < count; i++ {
 			mem.Write32(dst+(i<<2), word)
 		}
 
-	} else {
-		for i := uint32(0); i < count; i++ {
-			word := mem.Read32(src + (i << 2))
-			mem.Write32(dst+(i<<2), word)
-		}
+        //fmt.Printf("%08X\n", count)
+
+        r[1] += count * 4
+
+        r[3] = 0x0
+
+        return
+    }
+
+    for i := uint32(0); i < count; i++ {
+        word := mem.Read32(src + (i << 2))
+        mem.Write32(dst+(i<<2), word)
 	}
+
+    // assuming r1 is incremented since fill does
+    r[1] += count * 4
+
+    r[3] = 0x0
+
 }
 
 func LZ77UnCompReadNormalWrite8bit(gba *GBA) int {
@@ -1039,4 +1055,13 @@ func GetBiosChecksum(gba *GBA) {
 	r[0] = 0xBAAE_187F
 	r[1] = 1
 	r[3] = 0x0000_4000
+}
+
+func MidiKey2Freq(gba *GBA) {
+    mem := gba.Mem
+	r := &gba.Cpu.Reg.R
+
+    key := float64(mem.Read32(r[0] + 4))
+    r[0] = uint32(key / math.Pow(2, (float64(180-r[1]-r[2])/256)/12))
+
 }

@@ -72,6 +72,7 @@ func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
 
 	switch {
 	case addr < 0x0000_4000:
+        //panic(fmt.Sprintf("READING BIOS CURR %d, PC %08X ADDR %08X", CURR_INST, m.GBA.Cpu.Reg.R[PC], addr))
 		return m.BIOS[addr]
 	case addr < 0x0200_0000:
 		//return m.BIOS[addr % 0x0000_4000]
@@ -119,15 +120,14 @@ func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
 	case addr < 0x1000_0000:
 
 		//if device := addr == 0x0E00_0001; device {
-		//	return 0x09 // temp for pokemon fire
+		//	return 0xD4 // temp for mario kart SST
+		//	//return 0x09 // temp for pokemon fire Macronix
 		//}
 
 		//if manufacturer := addr == 0xE00_0000; manufacturer {
-		//	return 0xC2 // temp for pokemon fire
+		//	return 0xBF // temp for mario kart SST
+		//	//return 0xC2 // temp for pokemon fire Macronix
 		//}
-
-        //if !byteRead {
-        //}
 
 		//return m.GBA.Cartridge.SRAM[(addr-0x0E00_0000)%0x1_0000]
 
@@ -221,12 +221,8 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
     case 0x00D9: return m.GBA.Dma[3].ReadDst(1)
     case 0x00DA: return m.GBA.Dma[3].ReadDst(2)
     case 0x00DB: return m.GBA.Dma[3].ReadDst(3)
-    case 0x00DC:
-        v := m.GBA.Dma[3].ReadCount(false)
-        return v
-    case 0x00DD:
-        v := m.GBA.Dma[3].ReadCount(true)
-        return v
+    case 0x00DC: return m.GBA.Dma[3].ReadCount(false)
+    case 0x00DD: return m.GBA.Dma[3].ReadCount(true)
     case 0x00DE: return m.GBA.Dma[3].ReadControl(false)
     case 0x00DF: return m.GBA.Dma[3].ReadControl(true)
 
@@ -286,9 +282,9 @@ func (m *Memory) Read16(addr uint32) uint32 {
 
 func (m *Memory) Read32(addr uint32) uint32 {
 
-	//if addr == 0x0 {
-	//	return m.ReadBios(addr)
-	//}
+	if addr == 0x0 {
+		return m.ReadBios(addr)
+	}
 
 	if sram := addr > 0xE00_0000 && addr < 0x1000_0000; sram {
 		return uint32(m.Read(addr, false)) * 0x01010101
@@ -323,6 +319,10 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
 
         if byteWrite {
             m.PRAM[relative] = v
+            if relative + 1 >= uint32(len(m.PRAM)) {
+                return
+            }
+
             m.PRAM[relative + 1] = v
             return
         }
@@ -346,7 +346,13 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
 
         if byteWrite {
             m.VRAM[mirrorAddr] = v
+
+            if mirrorAddr + 1 >= uint32(len(m.VRAM)) {
+                return
+            }
+
             m.VRAM[mirrorAddr + 1] = v
+
             return
         }
 

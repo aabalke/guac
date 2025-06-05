@@ -118,13 +118,11 @@ func (gba *GBA) scanlineTileMode(dispcnt *Dispcnt, y uint32) {
                     }
 
                     if ok && !palZero {
-                        bldPal.setBlendPalettes(palData, bgIdx, false)
+                        bldPal.setBlendPalettes(palData, uint32(bgIdx), false)
                     }
                 }
 
                 if obj := dispcnt.DisplayObj; obj {
-
-                    //println("HERE")
                     objPal := uint32(0)
                     objExists := false
                     objCount := len(objPriorities[decIdx])
@@ -477,19 +475,20 @@ func getTileAddr(obj *Object, enTileX, enTileY, inTileX, inTileY uint32) uint32 
         tileHeight *= 2
     }
 
-    tileIdx := (int(enTileX) * tileWidth) + (int(enTileY) * tileHeight)
-    if !obj.OneDimensional {
-        tileIdx += (int(enTileY) * 0x400) - tileHeight
-    }
-
     const MAX_NUM_TILE = 1024
-    tileIdx = (tileIdx + int(obj.CharName) * tileWidth) % (MAX_NUM_TILE * tileWidth)
+    var tileIdx int
+    if obj.OneDimensional {
+        tileIdx = (int(enTileX) * tileWidth) + (int(enTileY) * tileHeight)
+        tileIdx = (tileIdx + int(obj.CharName) * tileWidth) % (MAX_NUM_TILE * tileWidth)
+    } else {
+        tileIdx = (int(enTileX)) + (int(enTileY) * 32)
+        tileIdx = (tileIdx + int(obj.CharName) % (MAX_NUM_TILE)) * tileWidth
+    }
 
     tileAddr := uint32(VRAM_BASE + tileIdx)
 
     var inTileIdx uint32
     if obj.Palette256 {
-        //inTileIdx = uint32(inTileX) + uint32(inTileY * 8)
         inTileIdx = uint32(inTileX) + uint32(inTileY * 8)
     } else {
         inTileIdx = uint32(inTileX / 2) + uint32(inTileY * 4)
@@ -1329,6 +1328,8 @@ type BlendPalettes struct {
     APalette uint32
     BPalette uint32
     hasA, hasB bool
+
+    targetATop bool
 }
 
 func NewBlendPalette(bld *Blend) *BlendPalettes {
@@ -1341,6 +1342,7 @@ func (bp *BlendPalettes) reset(gba *GBA) {
     bp.BPalette = 0
     bp.hasA = false
     bp.hasB = false
+    bp.targetATop = false
 
     backdrop := gba.getPalette(0, 0, false)
 
@@ -1349,6 +1351,9 @@ func (bp *BlendPalettes) reset(gba *GBA) {
     if bp.Bld.a[5] {
         bp.APalette = backdrop
         bp.hasA = true
+        bp.targetATop = true
+    } else {
+        bp.targetATop = false
     }
 
     if bp.Bld.b[5] {
@@ -1360,13 +1365,16 @@ func (bp *BlendPalettes) reset(gba *GBA) {
 
 func (bp *BlendPalettes) setBlendPalettes(palData uint32, bgIdx uint32, obj bool) {
 
-    if obj {
+    bp.NoBlendPalette = palData
 
-        bp.NoBlendPalette = palData
+    if obj {
 
         if bp.Bld.a[4] {
             bp.APalette = palData
             bp.hasA = true
+            bp.targetATop = true
+        } else {
+            bp.targetATop = false
         }
 
         if bp.Bld.b[4] {
@@ -1376,11 +1384,12 @@ func (bp *BlendPalettes) setBlendPalettes(palData uint32, bgIdx uint32, obj bool
         return 
     }
 
-    bp.NoBlendPalette = palData
-
     if bp.Bld.a[bgIdx] {
         bp.APalette = palData
         bp.hasA = true
+        bp.targetATop = true
+    } else {
+        bp.targetATop = false
     }
 
     if bp.Bld.b[bgIdx] {
@@ -1407,12 +1416,13 @@ func (bp *BlendPalettes) noBlend(objTransprent bool) uint32 {
         return bp.NoBlendPalette
     }
 
-    aEv := bp.Bld.aEv
-    bEv := bp.Bld.bEv
-
     if !bp.hasA || !bp.hasB {
         return bp.NoBlendPalette
     }
+
+
+    aEv := bp.Bld.aEv
+    bEv := bp.Bld.bEv
 
     rA := (bp.APalette) & 0x1F
     gA := (bp.APalette >> 5) & 0x1F
@@ -1442,7 +1452,8 @@ func (bp *BlendPalettes) alphaBlend() uint32 {
     aEv := bp.Bld.aEv
     bEv := bp.Bld.bEv
 
-    if !bp.hasA || !bp.hasB {
+    if !bp.hasA || !bp.hasB || !bp.targetATop {
+        //return 0
         return bp.NoBlendPalette
     }
 
@@ -1456,10 +1467,8 @@ func (bp *BlendPalettes) alphaBlend() uint32 {
 
     blend := func(a, b uint32) uint32 {
         val := (int(a)*int(aEv) + int(b)*int(bEv)) >> 4
-        if val > 31 {
-            return 31
-        }
-        return uint32(val)
+        //val := int((float32(a)*float32(aEv)/16) + float32(b)*float32(bEv)/16)
+        return uint32(min(31, val))
     }
     r := blend(rA, rB)
     g := blend(gA, gB)

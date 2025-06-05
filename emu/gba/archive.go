@@ -184,3 +184,266 @@ package gba
 //    //    //gt.Gba.triggerIRQ(1)
 //    //}
 //}
+//
+//func (gba *GBA) updateMode0(dispcnt *Dispcnt) {
+//
+//    bgPriorities := gba.getBgPriority(0)
+//    wins := NewWindows(dispcnt, gba)
+//    bld := NewBlend(gba)
+//    bldPal := NewBlendPalette(bld)
+//
+//    x, y := uint32(0), uint32(0)
+//    for y = range SCREEN_HEIGHT {
+//
+//        objPriorities := gba.getObjPriority(y, dispcnt)
+//
+//        for x = range SCREEN_WIDTH {
+//
+//            index := (x + (y*SCREEN_WIDTH)) * 4
+//
+//            bldPal.reset(gba)
+//
+//            var objTransparent bool
+//
+//            for i := range 4 {
+//
+//                // 0 is highest priority
+//                decIdx := 3 - i
+//
+//                // bg and objs are prioritized so obj0, is above obj1 if both same
+//                // priority. this is why [bgCount - 1 - j]
+//
+//                bgCount := len(bgPriorities[decIdx])
+//                for j := range bgCount {
+//
+//                    bgIdx := bgPriorities[decIdx][bgCount - 1 - j]
+//
+//                    if bgEnabled(dispcnt, int(bgIdx)) {
+//                        palData, ok, palZero := gba.background(x, y, bgIdx, false, wins)
+//                        if ok && !palZero {
+//                            bldPal.setBlendPalettes(palData, bgIdx, false)
+//                        }
+//                    }
+//                }
+//
+//                if obj := dispcnt.DisplayObj; obj {
+//
+//                    objPal := uint32(0)
+//                    objExists := false
+//                    objCount := len(objPriorities[decIdx])
+//
+//                    for j := range objCount {
+//                        objIdx := objPriorities[decIdx][objCount - 1 - j]
+//                        palData, ok, palZero, obj := gba.object(x, y, dispcnt, objIdx * 0x8, wins)
+//
+//                        if ok && !palZero {
+//                            objTransparent = obj.Mode == 1
+//                            objExists = true
+//                            objPal = palData
+//                        }
+//                    }
+//
+//                    if objExists {
+//                        bldPal.setBlendPalettes(objPal, 0, true)
+//                    }
+//                }
+//            }
+//
+//            finalPalData := bldPal.blend(objTransparent)
+//
+//            gba.applyColor(finalPalData, uint32(index))
+//        }
+//    }
+//}
+//
+//func (gba *GBA) updateMode1(dispcnt *Dispcnt) {
+//
+//    bgPriorities := gba.getBgPriority(0)
+//    wins := NewWindows(dispcnt, gba)
+//    bld := NewBlend(gba)
+//    bldPal := NewBlendPalette(bld)
+//
+//    x, y := uint32(0), uint32(0)
+//    for y = range SCREEN_HEIGHT {
+//
+//        objPriorities := gba.getObjPriority(y, dispcnt)
+//
+//        for x = range SCREEN_WIDTH {
+//
+//            index := (x + (y*SCREEN_WIDTH)) * 4
+//
+//            bldPal.reset(gba)
+//
+//            var objTransparent bool
+//
+//            for i := range 4 {
+//
+//                // 0 is highest priority
+//                decIdx := 3 - i
+//
+//                // bg and objs are prioritized so obj0, is above obj1 if both same
+//                // priority. this is why [bgCount - 1 - j]
+//
+//                bgCount := len(bgPriorities[decIdx])
+//                for j := range bgCount {
+//
+//                    bgIdx := bgPriorities[decIdx][bgCount - 1 - j]
+//
+//                    if !bgEnabled(dispcnt, int(bgIdx)) {
+//                        continue
+//                    }
+//
+//                    palData, ok, palZero := uint32(0), false, false
+//
+//                    if bgIdx == 2 {
+//                        palData, ok, palZero = gba.background(x, y, bgIdx, true, wins)
+//                    } else {
+//                        palData, ok, palZero = gba.background(x, y, bgIdx, false, wins)
+//                    }
+//
+//                    if ok && !palZero {
+//                        bldPal.setBlendPalettes(palData, bgIdx, false)
+//                    }
+//                }
+//
+//                if obj := dispcnt.DisplayObj; obj {
+//
+//                    objPal := uint32(0)
+//                    objExists := false
+//                    objCount := len(objPriorities[decIdx])
+//
+//                    for j := range objCount {
+//                        objIdx := objPriorities[decIdx][objCount - 1 - j]
+//                        palData, ok, palZero, obj := gba.object(x, y, dispcnt, objIdx * 0x8, wins)
+//
+//                        if ok && !palZero {
+//                            objTransparent = obj.Mode == 1
+//                            objExists = true
+//                            objPal = palData
+//                        }
+//                    }
+//
+//                    if objExists {
+//                        bldPal.setBlendPalettes(objPal, 0, true)
+//                    }
+//                }
+//            }
+//
+//            finalPalData := bldPal.blend(objTransparent)
+//
+//            gba.applyColor(finalPalData, uint32(index))
+//        }
+//    }
+//}
+//
+//func (gba *GBA) updateMode3() {
+//
+//
+//	const (
+//		SIZE           = 0x12C00
+//		BASE           = 0x0600_0000
+//		BYTE_PER_PIXEL = 2
+//	)
+//
+//	Mem := gba.Mem
+//
+//	index := 0
+//	for i := uint32(0); i < SIZE; i += BYTE_PER_PIXEL {
+//		data := Mem.Read16(BASE + i)
+//        gba.applyColor(data, uint32(index))
+//		index += 4
+//	}
+//}
+//
+//func (gba *GBA) updateMode4(dispcnt *Dispcnt) {
+//
+//	const (
+//		SIZE = 0x9600
+//	)
+//
+//    BASE := uint32(0x0600_0000)
+//
+//    if dispcnt.DisplayFrame1 {
+//        BASE += 0xA_000
+//    }
+//
+//	Mem := gba.Mem
+//
+//	index := 0
+//	for i := uint32(0); i < SIZE; i++ {
+//
+//		palIdx := Mem.Read8(BASE + i)
+//
+//		palData := gba.getPalette(uint32(palIdx), 0, false)
+//
+//        gba.applyColor(palData, uint32(index))
+//		index += 4
+//	}
+//}
+//
+//func (gba *GBA) updateMode5(dispcnt *Dispcnt) {
+//
+//	const (
+//        MAP_WIDTH = 160
+//        MAP_HEIGHT = 128
+//	)
+//
+//    BASE := uint32(0x0600_0000)
+//
+//    if dispcnt.DisplayFrame1 {
+//        BASE += 0xA_000
+//    }
+//
+//	Mem := gba.Mem
+//
+//	index := 0
+//    i := uint32(0)
+//    for range MAP_HEIGHT {
+//        for range MAP_WIDTH {
+//            data := Mem.Read16(BASE + i)
+//            gba.applyColor(data, uint32(index))
+//            index += 4
+//            i += 2
+//        }
+//
+//        index += 4 * (SCREEN_WIDTH - MAP_WIDTH) // map diff screen width and map width
+//    }
+//}
+
+func (gba *GBA) graphics() {
+
+    //addr := gba.Mem.Read16(0x0400_0000 + DISPCNT)
+    //dispcnt := NewDispcnt(addr)
+
+    //x, y := uint32(0), uint32(0)
+
+    //for x = range SCREEN_WIDTH {
+    //    for y = range SCREEN_HEIGHT {
+    //        gba.background(x, y, 0, false, NewWindows(dispcnt, gba))
+    //    }
+    //}
+
+    //gba.getTiles(0x601_0000, 0x1E, true, false)
+    //gba.getTiles(0x600_3800, 0x1E, false, false)
+    //gba.debugPalette()
+    return
+
+    //gba.clear()
+
+	//switch dispcnt.Mode {
+	//case 0:
+	//	gba.updateMode0(dispcnt)
+	//case 1:
+	//	gba.updateMode1(dispcnt)
+	//case 2:
+    //    panic("mode 2")
+	//	//gba.updateMode2()
+	//case 3:
+	//	gba.updateMode3()
+	//case 4:
+	//	gba.updateMode4(dispcnt)
+	//case 5:
+	//	gba.updateMode5(dispcnt)
+    //default: panic("UNKNOWN MODE")
+	//}
+}

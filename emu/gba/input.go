@@ -17,6 +17,7 @@ func (gba *GBA) InputHandler(event sdl.Event) {
     }
 
     if reqInterrupt {
+        INTERRUPT_CAUSE = "KEY"
         gba.triggerIRQ(12)
     }
 
@@ -49,19 +50,18 @@ func (gba *GBA) UpdateKeyboardInput(keyEvent *sdl.KeyboardEvent, tempJoypad *uin
     case sdl.K_t: //
         handleKey(tempJoypad, 0b10_0000_0000, reqInterrupt, keyEvent)
     } 
-
 }
 
 func (gba *GBA) UpdateControllerInput(controllerEvent *sdl.ControllerButtonEvent, tempJoypad *uint16, reqInterrupt *bool) {
 
     switch key := controllerEvent.Button; key {
-    case sdl.CONTROLLER_BUTTON_A: // A //ps x
+    case sdl.CONTROLLER_BUTTON_A:
         handleButton(tempJoypad, 0b1, reqInterrupt, controllerEvent)
-    case sdl.CONTROLLER_BUTTON_B: // B
+    case sdl.CONTROLLER_BUTTON_B:
         handleButton(tempJoypad, 0b10, reqInterrupt, controllerEvent)
-    case sdl.CONTROLLER_BUTTON_X: // SELECT
+    case sdl.CONTROLLER_BUTTON_X:
         handleButton(tempJoypad, 0b100, reqInterrupt, controllerEvent)
-    case sdl.CONTROLLER_BUTTON_Y: // START
+    case sdl.CONTROLLER_BUTTON_Y:
         handleButton(tempJoypad, 0b1000, reqInterrupt, controllerEvent)
     case sdl.CONTROLLER_BUTTON_DPAD_RIGHT:
         handleButton(tempJoypad, 0b1_0000, reqInterrupt, controllerEvent)

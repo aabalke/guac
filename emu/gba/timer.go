@@ -1,7 +1,7 @@
 package gba
 
 import (
-    //"fmt"
+    "fmt"
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
@@ -70,6 +70,7 @@ type Timer struct {
 }
 
 func (t *Timer) raiseIRQ() {
+    INTERRUPT_CAUSE = fmt.Sprintf("TIMER%d", t.Idx)
     t.Gba.triggerIRQ(0x3 + uint32(t.Idx))
 }
 

@@ -311,6 +311,7 @@ func (cpu *Cpu) AluChangeOriginal(flush bool) {
 
     //reg.R[LR] = 0x800280B
     //fmt.Printf("IRQ EXCEPTION CHECK AT ALU CHANGE PRIV\n")
+
     cpu.Gba.checkIRQ()
 }
 
@@ -592,13 +593,8 @@ func (c *Cpu) BX(opcode uint32) {
     switch inst {
     case INST_BX:
         if rn == LR && c.Reg.getMode() == MODE_IRQ {
-            //fmt.Printf("AT THIS POINT PC %08X\n", c.Reg.R[PC])
             c.AluChangeMode(false)
-            //fmt.Printf("AT THIS POINT PC %08X\n", c.Reg.R[PC])
-            // DO NOT REMOVE RETURN
-            //return
-            //c.AluChangeOriginal(false)
-            //panic("LEAVING THRU BX")
+            return
         } else {
             c.Reg.R[PC] = c.Reg.R[rn]
             c.Gba.toggleThumb()

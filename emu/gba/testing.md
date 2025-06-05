@@ -14,7 +14,7 @@ https://emulation.gametechwiki.com/index.php/GBA_Tests
 
 👍 arm
 👍 thumb
-❌ bios
+👍 bios
 👍 memory
 ❌ nes
 
@@ -53,16 +53,16 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 
 ### MGBA Test Suite
 
-❌ Memory tests [1254/1552]
+❌ Memory tests [1264/1552]
 ❌ I/O read tests [12/130]
-❌ Timing tests [240/2020]
+❌ Timing tests [228/2020]
 ❌ Timer count-up tests [crash]
 ❌ Timer IRQ tests [10/90]
 👍 Shifter tests [140/140]
 👍 Carry tests [93/93]
 👍 Multiply long tests [52/72] (matches mgba)
 👍 BIOS math tests [615/615]
-❌ DMA tests [1018/1256]
+❌ DMA tests [1026/1256]
 ❌ SIO register R/W tests [7/90]
 ❌ SIO timing tests [0/8]
 ❌ Misc. edge case tests [2/10]
@@ -154,8 +154,8 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 👍 sbb_reg (has obj in top left, not sure if problem)
 👍 second
 ❌ snd1_demo
-👍 swi_demo (1.3 works)
-👍 swi_vsync (works but speed is off from cycle counts)
+👍 swi_demo
+👍 swi_vsync
 👍 tmr_demo (1.3 works) (uses faux cycle * 4)
 ❌ tte_demo
 ❌ txt_bm
@@ -165,8 +165,30 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 👍 win_demo
 
 ### Games
-Pokemon
-
-
-
-
+Boots Harvest Moon Friends of Mineral Town
+Boots Hello Kitty Happy Party Pals
+Boots Kirby Nightmare in Dream Land
+Boots Lord of The Rings Fellowship
+      Mario Kart Super Circuit
+Boots Mega Man Zero
+Boots Metroid Fusion
+NOIRQ Mother 12
+NOIRQ Mother 3
+Boots Pokémon Mystery Dungeon Red Rescue Team
+Boots Pokémon Firered
+Boots Pokémon LeafGreen
+Boots Pokémon Emerald
+Boots Pokémon Ruby
+Boots Pokémon Sapphire
+      Sonic Advance
+      Spyro Season of Ice
+      Superstar Saga
+NOIRQ Super Dodge Ball Advance
+      Super Mario Advance
+      Tetris Worlds
+Boots The Minish Cap
+Boots Ultimate Puzzle Games
+      Warioware Twisted
+      Wolfenstein 3D
+Boots Doom
+      Zelda Link to the Past

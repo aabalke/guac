@@ -78,17 +78,17 @@ func (d *Debugger) print(i int) {
     //p(fmt.Sprintf("STACK %X", 0x3007E2E), d.gba.Mem.Read32(0x3007E2E))
     //for i := 0x0400_00E0; i >= 0x0400_00D0; i -= 4 {
 
-    start := 0x2000070
-    count := 0x19
-    for i := start; i >= start - (count * 4); i -= 4 {
-        p(fmt.Sprintf("IO %X", i), d.gba.Mem.Read32(uint32(i)))
-    }
-
-    //start = 0x2000010
-    //count = 6
+    //start := 0x40000E0
+    //count := 0x10
     //for i := start; i >= start - (count * 4); i -= 4 {
     //    p(fmt.Sprintf("IO %X", i), d.gba.Mem.Read32(uint32(i)))
     //}
+    //s("------")
+    start := 0x40000C0
+    count := 0x10
+    for i := start; i >= start - (count * 4); i -= 4 {
+        p(fmt.Sprintf("IO %X", i), d.gba.Mem.Read32(uint32(i)))
+    }
 }
 
 func (d *Debugger) saveBg4() {
