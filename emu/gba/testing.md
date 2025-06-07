@@ -114,11 +114,11 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
     👍 2122/3031
     👍 no extra
 
-❌ dma_demo
+👍 dma_demo
 👍 first
 👍 hello
 
-❌ irq_demo (1.3 passes)
+❌ irq_demo (fails nested irq)
 👍 key_demo
 👍 m3_demo
 ❌ m7_demo
@@ -147,7 +147,7 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
     👍 decrease / increase starting tile
     👍 1d / 2d mappings
 
-❌ octtest
+👍 octtest (blinks)
 👍 pageflip
 👍 prio_demo
 ❌ sbb_aff

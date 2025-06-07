@@ -62,8 +62,14 @@ type GBA struct {
     IntrWait uint32
 
     Save bool
-}
 
+    Interrupt Interrupt
+    IRQ_ADDR uint32
+    IN_IRQ bool
+    GBA_LOCK bool
+
+    OpenBusOpcode uint32
+}
 
 var SAVED_CYCLES = uint32(0)
 
@@ -92,14 +98,14 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
 
     gba.checkDmas(DMA_MODE_VBL)
 
-    for range 67 {
+    for range 68 {
         frameCycles = gba.UpdateScanline(frameCycles)
     }
 
     gba.Mem.Dispstat.SetVBlank(false)
     gba.Mem.IO[0x202] &^= 1
 
-    frameCycles = gba.UpdateScanline(frameCycles) // 227
+    //frameCycles = gba.UpdateScanline(frameCycles) // 227
 
     SAVED_CYCLES = frameCycles - (1232 * 228)
 
@@ -112,9 +118,12 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
 
 func (gba *GBA) UpdateScanline(frameCycles uint32) uint32 {
 
+    gba.scanlineGraphics(gba.VCOUNT)
+
     dispstat := gba.Mem.Read16(0x400_0004)
     lyc := gba.Mem.Read8(0x400_0005)
-    if vcounter := utils.BitEnabled(dispstat, 5) && gba.VCOUNT == lyc; vcounter {
+    vcounter := utils.BitEnabled(dispstat, 5)
+    if vcounter && gba.VCOUNT == lyc {
         INTERRUPT_CAUSE = "VCOUNTER"
         gba.triggerIRQ(2)
     }
@@ -131,7 +140,11 @@ func (gba *GBA) UpdateScanline(frameCycles uint32) uint32 {
 
     gba.Mem.Dispstat.SetHBlank(true)
     gba.Mem.IO[0x202] |= 10
-    gba.checkDmas(DMA_MODE_HBL)
+
+
+    if !vblank {
+        gba.checkDmas(DMA_MODE_HBL)
+    }
 
     frameCycles = gba.Exec(1232 - 1006, frameCycles)
 
@@ -139,7 +152,6 @@ func (gba *GBA) UpdateScanline(frameCycles uint32) uint32 {
     gba.Mem.IO[0x202] &^= 10
 
     // draw scanline here once converted to scanline version
-    gba.scanlineGraphics(gba.VCOUNT)
 
     gba.Dma[3].transferVideo(gba.VCOUNT)
 
@@ -164,7 +176,10 @@ func (gba *GBA) Exec(requiredCycles, frameCycles uint32) uint32 {
 
         opcode := gba.Mem.Read32(r[PC])
 
-        if r[PC] >= 0x400_0000 && r[PC] < 0x800_0000 {
+        gba.OpenBusOpcode = gba.Mem.Read32(r[PC] + 8)
+
+
+        if (r[PC] >= 0x400_0000 && r[PC] < 0x800_0000) || r[PC] % 2 != 0 {
 
             r := &gba.Cpu.Reg.R
 
@@ -183,11 +198,43 @@ func (gba *GBA) Exec(requiredCycles, frameCycles uint32) uint32 {
             cycles = gba.Cpu.Execute(opcode)
         }
 
+        //if r[PC] == IRQ_ADDR && IN_IRQ {
+        //    gba.handleInterruptExit()
+        //    r[PC] += 4
+        //}
+
         //if CURR_INST == 2347037 { //temp mario kart
         //    r[0] = 0x80CDB5C
         //}
 
-        //if CURR_INST == 242299 {
+        //if CURR_INST == 242298 {
+        //    gba.Mem.BIOS_MODE = BIOS_IRQ_POST
+        //}
+
+        //if CURR_INST == 799958 {
+        //    r[3] = 0x4000200
+        //    r[4] = 0x4000208
+        //    r[5] = 0x0
+        //}
+
+        //if CURR_INST >= 4060780 {
+        //if r[PC] == 0x805B0D8 { // bad
+        //if r[PC] == 0x805B098 { // ok
+        //if r[PC] == 0x805B09C { // ok
+        //if r[PC] == 0x805B0A4 { // ok
+        //    FLAG = true
+        //    gba.Mem.Write32(0x2015E0C, 0x2)
+        //    gba.Mem.Write32(0x2015E08, 0x1F)
+        //    gba.Mem.Write32(0x2015E04, 0xFFFF)
+        //    gba.Mem.Write32(0x2015E00, 0x3F0000)
+        //}
+
+        //if r[PC] == 0x805B0A8 {
+        //    gba.Cpu.Reg.CPSR = 0x6000003F
+        //}
+
+
+        //if CURR_INST == 682710 {
         //    //fmt.Printf("PC %08X CURR %d\n", r[PC], CURR_INST)
         //    gba.Debugger.print(CURR_INST)
         //    gba.Paused = true
@@ -206,6 +253,8 @@ func (gba *GBA) Exec(requiredCycles, frameCycles uint32) uint32 {
 
     return accCycles - requiredCycles
 }
+
+var FLAG bool
 
 var PREV_VALUE uint32
 
@@ -227,9 +276,10 @@ func NewGBA() *GBA {
         FPS: 60, // 59.7374117111
         Pixels: &pixels,
         DebugPixels: &debugPixels,
+        Interrupt: Interrupt{},
     }
 
-    gba.Debugger = &Debugger{gba: &gba}
+    gba.Debugger = &Debugger{Gba: &gba, Version: 1}
 
     gba.Mem = NewMemory(&gba)
     gba.Cpu = NewCpu(&gba)

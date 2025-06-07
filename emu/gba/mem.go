@@ -21,9 +21,7 @@ type Memory struct {
 	IO [0x400]uint8
 
 	BIOS_MODE uint32
-
 	Dispstat Dispstat
-    //IRQFlags IRQFlags
 
 	GamePak0                     [0x200_0000]byte
 	SRAM                         [0x1_0000]byte
@@ -51,10 +49,10 @@ func NewMemory(gba *GBA) *Memory {
 }
 
 func (m *Memory) SaveSRAM() {
-    if m.GBA.Save {
-        m.GBA.Cartridge.save()
-        m.GBA.Save = false
-    }
+    //if m.GBA.Save {
+    //    m.GBA.Cartridge.save()
+    //    m.GBA.Save = false
+    //}
 }
 
 func (m *Memory) InitSaveLoop() {
@@ -72,9 +70,19 @@ func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
 
 	switch {
 	case addr < 0x0000_4000:
-        //panic(fmt.Sprintf("READING BIOS CURR %d, PC %08X ADDR %08X", CURR_INST, m.GBA.Cpu.Reg.R[PC], addr))
-		return m.BIOS[addr]
+        //panic(fmt.Sprintf("READING BIOS CURR %d, PC %08X ADDR %08X BIOS %08X CPSR %08X", CURR_INST, m.GBA.Cpu.Reg.R[PC], addr, BIOS_ADDR[m.BIOS_MODE], m.GBA.Cpu.Reg.CPSR))
+
+        //if m.GBA.Cpu.Reg.R[PC] < 0x4000 {
+        //    return m.BIOS[addr]
+        //}
+
+        return m.ReadBios(addr)
+
+		//return m.BIOS[addr]
 	case addr < 0x0200_0000:
+
+        return m.ReadOpenBus(addr)
+
 		//return m.BIOS[addr % 0x0000_4000]
         //fmt.Printf("READING FROM UNUSED MEMORY ADDR %08X\n", addr)
 		return 0
@@ -133,18 +141,27 @@ func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
 
         return m.GBA.Mem.FlashRead(addr)
 	default:
+        return m.ReadOpenBus(addr)
 		return 0
 	}
 }
 
-func (m *Memory) ReadBios(addr uint32) uint32 {
+func (m *Memory) ReadBios(addr uint32) uint8 {
 
-	addr, ok := BIOS_ADDR[m.BIOS_MODE]
+	nAddr, ok := BIOS_ADDR[m.BIOS_MODE]
 	if !ok {
-		return 0xE129F000
+		nAddr = 0xE129F000
 	}
 
-	return addr
+    offset := (addr % 4) * 8
+
+    return uint8(nAddr >> offset)
+}
+
+func (m *Memory) ReadOpenBus(addr uint32) uint8 {
+    offset := (addr % 4) * 8
+
+    return uint8(m.GBA.OpenBusOpcode >> offset)
 }
 
 func (m *Memory) ReadIO(addr uint32) uint8 {
@@ -282,9 +299,9 @@ func (m *Memory) Read16(addr uint32) uint32 {
 
 func (m *Memory) Read32(addr uint32) uint32 {
 
-	if addr == 0x0 {
-		return m.ReadBios(addr)
-	}
+	//if addr == 0x0 {
+	//	return m.ReadBios(addr)
+	//}
 
 	if sram := addr > 0xE00_0000 && addr < 0x1000_0000; sram {
 		return uint32(m.Read(addr, false)) * 0x01010101
@@ -297,7 +314,7 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
 
 	switch {
 	case addr < 0x0000_4000:
-		m.BIOS[addr] = v
+		//m.BIOS[addr] = v
 	case addr < 0x0200_0000:
         //fmt.Printf("COULD NOT WRITE %08X TO ADDR %08X\n", v, addr)
 		return

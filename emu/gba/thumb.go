@@ -363,6 +363,15 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
             return 4
         }
 
+        //if interruptStubExit := r[rs] == IRQ_ADDR && cpu.Reg.getMode() == MODE_IRQ; interruptStubExit {
+        if interruptStubExit := r[rs] == cpu.Gba.IRQ_ADDR && cpu.Gba.IN_IRQ; interruptStubExit {
+            cpsr.SetFlag(FLAG_T, false)
+            cpu.Gba.handleInterruptExit()
+            //r[PC] += 4
+            return 4
+        }
+
+
         if !utils.BitEnabled(r[rs], 0) {
             cpsr.SetFlag(FLAG_T, false)
         }

@@ -20,18 +20,18 @@ var (
     SKIP_INTERRUPT = false
     PRINT_INTERRUPT = false
     INTERRUPT_CAUSE = ""
-    IRQ = Interrupt{}
 )
 
 type Interrupt struct {
+    Reg Reg
     LR, R0, R1, R2, R3, R12 uint32
 }
 
 func (gba *GBA) printInterrupt(exit bool) {
 
-    if CURR_INST <= 379180 {
-        return
-    }
+    //if CURR_INST <= 379180 {
+    //    return
+    //}
 
     if !PRINT_INTERRUPT {
         return
@@ -65,11 +65,15 @@ func (gba *GBA) handleInterrupt() {
         return
     }
 
-    gba.Mem.BIOS_MODE = BIOS_IRQ
-
     mem := gba.Mem
     reg := &gba.Cpu.Reg
     r := &gba.Cpu.Reg.R
+
+    if gba.IN_IRQ {
+        panic(fmt.Sprintf("NESTED IRQ CAUSE %s PC %08X LR %08X SP %08X CPSR %08X T %t MODE %02X OP %08X CURR %08d\n", INTERRUPT_CAUSE, r[PC], r[LR], r[SP], reg.CPSR, reg.CPSR.GetFlag(FLAG_T), reg.getMode(), gba.Mem.Read32(r[PC]), CURR_INST))
+    }
+
+    gba.Mem.BIOS_MODE = BIOS_IRQ
 
     irqBank := BANK_ID[MODE_IRQ]
 
@@ -103,7 +107,8 @@ func (gba *GBA) handleInterrupt() {
 
     reg.CPSR.SetFlag(FLAG_T, false)
 
-    IRQ = Interrupt{
+    gba.Interrupt = Interrupt{
+        Reg: gba.Cpu.Reg,
         LR: r[LR],
         R0: r[0],
         R1: r[1],
@@ -125,10 +130,17 @@ func (gba *GBA) handleInterrupt() {
     r[SP] -= 4
     mem.Write32(r[SP], r[0])
 
+    gba.IRQ_ADDR = r[LR]
+
+    gba.IN_IRQ = true
+
+    //r[LR] = 0x30
+    //reg.SPSR[irqBank] = 0x400003F
+
     userAddr := mem.Read32(0x03007FFC)
     r[PC] = userAddr
 
-    //fmt.Printf("PC IN IRQ %08X IRQ LR %08X \n", r[PC], reg.LR[irqBank])
+    //fmt.Printf("PC IN IRQ %08X IRQ LR %08X %08X\n", r[PC], reg.LR[irqBank], r[LR])
 
     return
 }
@@ -158,12 +170,14 @@ func (gba *GBA) handleInterruptExit() {
     r[LR] = mem.Read32(r[SP])
     r[SP] += 4
 
-    r[0] = IRQ.R0
-    r[1] = IRQ.R1
-    r[2] = IRQ.R2
-    r[3] = IRQ.R3
-    r[12] = IRQ.R12
-    r[LR] = IRQ.LR
+    gba.Cpu.Reg = gba.Interrupt.Reg
+
+    //r[0] = IRQ.R0
+    //r[1] = IRQ.R1
+    //r[2] = IRQ.R2
+    //r[3] = IRQ.R3
+    //r[12] = IRQ.R12
+    //r[LR] = IRQ.LR
 
     //r[PC] = reg.LR[irqBank]
     if reg.CPSR.GetFlag(FLAG_T) {
@@ -175,6 +189,7 @@ func (gba *GBA) handleInterruptExit() {
     reg.SP[irqBank] = r[SP]
     reg.LR[irqBank] = r[LR]
 
+    // DO NOT REMOVE TEMP
     tmpCPSR := reg.CPSR
     reg.CPSR = reg.SPSR[irqBank]
     reg.SPSR[irqBank] = tmpCPSR
@@ -190,4 +205,8 @@ func (gba *GBA) handleInterruptExit() {
     gba.Mem.BIOS_MODE = BIOS_IRQ_POST
 
     gba.printInterrupt(true)
+
+    gba.IN_IRQ = false
+
+    gba.IRQ_ADDR = 0
 }

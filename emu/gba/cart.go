@@ -1,9 +1,10 @@
 package gba
 
 import (
-    "bufio"
+	"bufio"
+	"fmt"
 	"os"
-    "fmt"
+	"slices"
 )
 
 type Cartridge struct {
@@ -50,10 +51,19 @@ func (c *Cartridge) load() {
         mem.SRAM[i] = 0xFF
     }
 
+    for i := range len(mem.Flash) {
+        mem.Flash[i] = 0xFF
+    }
+
 	sBuf, err := os.ReadFile(c.SavPath)
     if err == nil {
         for i := range len(sBuf) {
-            mem.SRAM[i] = uint8(sBuf[i])
+            if i < len(mem.Flash) {
+                mem.Flash[i] = uint8(sBuf[i])
+                return
+            }
+
+            mem.SRAM[i - len(mem.Flash)] = uint8(sBuf[i])
         }
     }
 }
@@ -72,7 +82,9 @@ func (c *Cartridge) save() {
     defer f.Close()
 
     writer := bufio.NewWriter(f)
-    _, err = writer.Write(mem.SRAM[:])
+
+    bytes := slices.Concat(mem.Flash[:], mem.SRAM[:])
+    _, err = writer.Write(bytes)
     if err != nil {
         panic(err)
     }

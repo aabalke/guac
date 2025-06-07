@@ -1310,6 +1310,10 @@ func (cpu *Cpu) msr(psr *PSR) {
 
     mode := cpu.Reg.getMode()
 
+    //if mode == currMode {
+    //    panic("SAME MODE")
+    //}
+
     if BANK_ID[currMode] == BANK_ID[mode] {
         return
     }

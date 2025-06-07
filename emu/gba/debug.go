@@ -12,11 +12,12 @@ import (
 )
 
 type Debugger struct {
-    gba *GBA
+    Gba *GBA
+    Version int
 }
 
 func (d *Debugger) print(i int) {
-    reg := d.gba.Cpu.Reg
+    reg := d.Gba.Cpu.Reg
     p := func(a string, b uint32) { fmt.Printf("% 8s: % 9X\n", a, b)}
     s := func(a string) { fmt.Printf("%s\n", a)}
 
@@ -24,12 +25,12 @@ func (d *Debugger) print(i int) {
     fmt.Printf("inst dec %d\n", uint32(i))
     p("inst", uint32(i))
 
-    if d.gba.Cpu.Reg.CPSR.GetFlag(FLAG_T) {
-        p("opcode", d.gba.Mem.Read16(reg.R[15]))
+    if d.Gba.Cpu.Reg.CPSR.GetFlag(FLAG_T) {
+        p("opcode", d.Gba.Mem.Read16(reg.R[15]))
     } else {
-        p("opcode", d.gba.Mem.Read32(reg.R[15]))
+        p("opcode", d.Gba.Mem.Read32(reg.R[15]))
     }
-    mode := d.gba.Cpu.Reg.getMode()
+    mode := d.Gba.Cpu.Reg.getMode()
     s("--------  --------")
     p("r00", reg.R[0])
     p("r01", reg.R[1])
@@ -51,11 +52,11 @@ func (d *Debugger) print(i int) {
     p("cpsr", uint32(reg.CPSR))
     p("spsr", uint32(reg.SPSR[BANK_ID[mode]]))
     p("MODE", BANK_ID[mode])
-    p("0x3007FFC", d.gba.Mem.Read32(0x3007FFC))
-    p("0x4000004", d.gba.Mem.Read16(0x4000004))
-    p("0x4000208", d.gba.Mem.Read16(0x4000208))
-    p("0x4000200", d.gba.Mem.Read16(0x4000200))
-    p("0x4000202", d.gba.Mem.Read16(0x4000202))
+    p("0x3007FFC", d.Gba.Mem.Read32(0x3007FFC))
+    p("0x4000004", d.Gba.Mem.Read16(0x4000004))
+    p("0x4000208", d.Gba.Mem.Read16(0x4000208))
+    p("0x4000200", d.Gba.Mem.Read16(0x4000200))
+    p("0x4000202", d.Gba.Mem.Read16(0x4000202))
 
     s("--------  --------")
 
@@ -66,7 +67,7 @@ func (d *Debugger) print(i int) {
     s("--------  --------")
 
     //j := uint32(0x4000208)
-    //p(fmt.Sprintf("IME %04X", j), d.gba.Mem.Read16(uint32(j)))
+    //p(fmt.Sprintf("IME %04X", j), d.Gba.Mem.Read16(uint32(j)))
     //j = uint32(0x4000204)
     //p(fmt.Sprintf("WS  %04X", j), d.gba.Mem.Read16(uint32(j)))
     //j = uint32(0x4000202)
@@ -84,16 +85,16 @@ func (d *Debugger) print(i int) {
     //    p(fmt.Sprintf("IO %X", i), d.gba.Mem.Read32(uint32(i)))
     //}
     //s("------")
-    start := 0x40000C0
+    start := 0x2006020
     count := 0x10
     for i := start; i >= start - (count * 4); i -= 4 {
-        p(fmt.Sprintf("IO %X", i), d.gba.Mem.Read32(uint32(i)))
+        p(fmt.Sprintf("IO %X", i), d.Gba.Mem.Read32(uint32(i)))
     }
 }
 
 func (d *Debugger) saveBg4() {
 
-    Mem := d.gba.Mem
+    Mem := d.Gba.Mem
 
     WIDTH_BG2 := 240
     HEIGHT_BG2 := 160
@@ -121,7 +122,7 @@ func (d *Debugger) saveBg4() {
 
 func (d *Debugger) saveBg2() {
 
-    Mem := d.gba.Mem
+    Mem := d.Gba.Mem
 
     WIDTH_BG2 := 240
     HEIGHT_BG2 := 160
@@ -162,7 +163,7 @@ func (d *Debugger) dump(s, e uint32) {
     tmp := ""
 
     for i := s; i <= e; i += 4 {
-        tmp += fmt.Sprintf("%08X", d.gba.Mem.Read32(uint32(i)))
+        tmp += fmt.Sprintf("%08X", d.Gba.Mem.Read32(uint32(i)))
     }
     f, err := os.Create("./dump")
     if err != nil { panic(err) } 
@@ -257,7 +258,7 @@ func debugTile(gba *GBA, tileAddr uint, tileSize, xOffset, yOffset int, obj, pal
 
 func (d *Debugger) debugIRQ() {
 
-    gba := d.gba
+    gba := d.Gba
     mem := gba.Mem
     reg := gba.Cpu.Reg
     r := gba.Cpu.Reg.R

@@ -144,7 +144,7 @@ func (gba *GBA) scanlineTileMode(dispcnt *Dispcnt, y uint32) {
                 }
             }
 
-            finalPalData := bldPal.blend(objTransparent)
+            finalPalData := bldPal.blend(objTransparent, x, y, wins)
 
             gba.applyColor(finalPalData, uint32(index))
     }
@@ -752,6 +752,7 @@ func windowPixelAllowed(idx, x, y uint32, wins *Windows) bool {
 
     return true
 }
+
 func windowObjPixelAllowed(x, y uint32, wins *Windows) bool {
 
     if !wins.Win0.Enabled && !wins.Win1.Enabled {
@@ -769,6 +770,25 @@ func windowObjPixelAllowed(x, y uint32, wins *Windows) bool {
     }
 
     return wins.OutObj
+}
+
+func windowBldPixelAllowed(x, y uint32, wins *Windows) bool {
+
+    if !wins.Win0.Enabled && !wins.Win1.Enabled {
+        return true
+    }
+
+    inWindow := func(win *Window) bool {
+        return (x >= win.L && x < win.R) && (y >= win.T && y < win.B)
+    }
+
+    for _, win := range []*Window{wins.Win0, wins.Win1} {
+        if win.Enabled && inWindow(win) {
+            return win.InBld
+        }
+    }
+
+    return wins.OutBld
 }
 
 func convert28Float(v uint32) float32 {
@@ -1122,8 +1142,6 @@ func (gba *GBA) getTile(tileAddr uint, tileSize, xOffset, yOffset int, obj, pale
 
 			tileData := mem.Read16(uint32(tileAddr) + uint32(byteOffset))
 
-            //fmt.Printf("%08X %08X\n", tileAddr, mem.VRAM[0x20])
-
             var palIdx uint32
             if !palette256 {
                 bitDepth := 4
@@ -1186,16 +1204,16 @@ func NewWindows(dispcnt *Dispcnt, gba *GBA) *Windows {
         win.R = utils.GetVarData(winH, 0, 7)
         win.L = utils.GetVarData(winH, 8, 15)
 
-        if win.R == 0 && win.L == 0 {
-            win.R = 240
-        }
+        //if win.R == 0 && win.L == 0 {
+        //    win.R = 240
+        //}
 
         winV := mem.Read16(0x400_0044)
         win.B = utils.GetVarData(winV, 0, 7)
         win.T = utils.GetVarData(winV, 8, 15)
-        if win.T == 0 && win.B == 0 {
-            win.B = 160
-        }
+        //if win.T == 0 && win.B == 0 {
+        //    win.B = 160
+        //}
 
         winIn := mem.Read16(0x400_0048)
         win.InBg0 = utils.BitEnabled(winIn, 0)
@@ -1289,7 +1307,6 @@ type Blend struct {
 func NewBlend(gba *GBA) *Blend {
 
     // will need to setup semi transparent objs
-    // will need to setup windows
 
     mem := gba.Mem
 
@@ -1398,28 +1415,31 @@ func (bp *BlendPalettes) setBlendPalettes(palData uint32, bgIdx uint32, obj bool
     }
 }
 
-func (bp *BlendPalettes) blend(objTransparent bool) uint32 {
+func (bp *BlendPalettes) blend(objTransparent bool, x ,y uint32, wins *Windows) uint32 {
+
+    if !windowBldPixelAllowed(x, y, wins) {
+        return bp.noBlend(objTransparent)
+    }
 
     switch bp.Bld.Mode {
     case BLD_MODE_OFF: return bp.noBlend(objTransparent)
     case BLD_MODE_STD: return bp.alphaBlend()
-    //case BLD_MODE_WHITE:
-    //case BLD_MODE_BLACK:
+    //case BLD_MODE_WHITE: panic("WHITE")
+    //case BLD_MODE_BLACK: panic("BLACK")
     }
 
     return bp.noBlend(objTransparent)
 }
 
-func (bp *BlendPalettes) noBlend(objTransprent bool) uint32 {
+func (bp *BlendPalettes) noBlend(objTransparent bool) uint32 {
 
-    if !objTransprent {
+    if !objTransparent {
         return bp.NoBlendPalette
     }
 
     if !bp.hasA || !bp.hasB {
         return bp.NoBlendPalette
     }
-
 
     aEv := bp.Bld.aEv
     bEv := bp.Bld.bEv
