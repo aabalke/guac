@@ -115,7 +115,8 @@ func (s *SDLStruct) initController() {
 	if !controller.Attached() {
 		return
 	}
-	println("Controller Attached")
+
+	//println("Controller Attached")
 }
 
 func (s *SDLStruct) Close(debug bool) {
@@ -168,9 +169,14 @@ func (s *SDLStruct) Update(debug bool, romPath string, useSaveState bool) {
 
 		// free inactive components every few seconds
 		if i.UnixMicro()%7 == 0 {
+
             
 			scene.DeleteInactive()
 		}
+
+		if i.UnixMicro()%13 == 0 {
+            s.initController()
+        }
 
 		//count = Gb.Update(&scene.Status.Active, count)
         count = Gba.Update(&scene.Status.Active, count)

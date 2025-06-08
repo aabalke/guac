@@ -70,8 +70,8 @@ type Timer struct {
 }
 
 func (t *Timer) raiseIRQ() {
-    INTERRUPT_CAUSE = fmt.Sprintf("TIMER%d", t.Idx)
-    t.Gba.triggerIRQ(0x3 + uint32(t.Idx))
+    cause := fmt.Sprintf("TIMER%d", t.Idx)
+    t.Gba.triggerIRQ(0x3 + uint32(t.Idx), cause)
 }
 
 func (t *Timer) ReadCnt(hi bool) uint8 {

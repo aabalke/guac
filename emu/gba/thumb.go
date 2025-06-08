@@ -364,9 +364,17 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
         }
 
         //if interruptStubExit := r[rs] == IRQ_ADDR && cpu.Reg.getMode() == MODE_IRQ; interruptStubExit {
-        if interruptStubExit := r[rs] == cpu.Gba.IRQ_ADDR && cpu.Gba.IN_IRQ; interruptStubExit {
+
+        s := cpu.Gba.InterruptStack
+
+        //if CURR_INST >= 256600 {
+        //    fmt.Printf("RS %08X, RETURN ADDR %08X\n", r[rs], s.ReturnAddr())
+        //}
+
+
+        if interruptStubExit := r[rs] == s.ReturnAddr() && !s.IsEmpty(); interruptStubExit {
             cpsr.SetFlag(FLAG_T, false)
-            cpu.Gba.handleInterruptExit()
+            s.Exit()
             //r[PC] += 4
             return 4
         }

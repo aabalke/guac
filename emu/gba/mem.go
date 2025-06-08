@@ -87,6 +87,7 @@ func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
         //fmt.Printf("READING FROM UNUSED MEMORY ADDR %08X\n", addr)
 		return 0
 	case addr < 0x0300_0000:
+
 		return m.WRAM1[(addr-0x0200_0000)%0x4_0000]
 	case addr < 0x0400_0000:
 		return m.WRAM2[(addr-0x0300_0000)%0x8_000]

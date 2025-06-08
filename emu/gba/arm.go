@@ -290,7 +290,7 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) bool {
 }
 
 func (cpu *Cpu) AluChangeMode(flush bool) {
-    cpu.Gba.handleInterruptExit()
+    cpu.Gba.InterruptStack.Exit()
     return
 }
 
@@ -312,7 +312,7 @@ func (cpu *Cpu) AluChangeOriginal(flush bool) {
     //reg.R[LR] = 0x800280B
     //fmt.Printf("IRQ EXCEPTION CHECK AT ALU CHANGE PRIV\n")
 
-    cpu.Gba.checkIRQ()
+    cpu.Gba.checkIRQ("UNKNOWN")
 }
 
 const (
@@ -578,7 +578,7 @@ func (cpu *Cpu) B(opcode uint32) {
     r[PC] += uint32((int32(opcode) << 8) >> 6) + 8
 }
 
-func (c *Cpu) BX(opcode uint32) {
+func (cpu *Cpu) BX(opcode uint32) {
 
     const (
         INST_BX  = 1
@@ -592,13 +592,23 @@ func (c *Cpu) BX(opcode uint32) {
 
     switch inst {
     case INST_BX:
-        if rn == LR && c.Reg.getMode() == MODE_IRQ {
-            c.AluChangeMode(false)
+        if rn == LR && cpu.Reg.getMode() == MODE_IRQ {
+            cpu.AluChangeMode(false)
             return
-        } else {
-            c.Reg.R[PC] = c.Reg.R[rn]
-            c.Gba.toggleThumb()
         }
+
+        r := &cpu.Reg.R
+        cpsr := &cpu.Reg.CPSR
+        s := cpu.Gba.InterruptStack
+        if interruptStubExit := r[rn] == s.ReturnAddr() && !s.IsEmpty(); interruptStubExit {
+            cpsr.SetFlag(FLAG_T, false)
+            s.Exit()
+            //r[PC] += 4
+            return
+        }
+
+        cpu.Reg.R[PC] = cpu.Reg.R[rn]
+        cpu.Gba.toggleThumb()
     case INST_BXJ: panic("Unsupported BXJ Instruction")
     case INST_BLX: panic("Unsupported BLX Instruction")
     }
@@ -1276,7 +1286,7 @@ func (cpu *Cpu) armMSR(inst uint32) {
 		cpu.Reg.CPSR = Cond(uint32(cpu.Reg.CPSR) | psr)
         cpu.Reg.setMode(currMode, newMode)
         //fmt.Printf("IRQ EXCEPTION CHECK AT MSR\n")
-		cpu.Gba.checkIRQ()
+		cpu.Gba.checkIRQ("MSR")
 	}
 }
 
@@ -1321,7 +1331,7 @@ func (cpu *Cpu) msr(psr *PSR) {
     reg.switchRegisterBanks(currMode, mode)
 
     //fmt.Printf("IRQ EXCEPTION CHECK AT MSR\n")
-    cpu.Gba.checkIRQ()
+    cpu.Gba.checkIRQ("MSR")
 }
 
 func (cpu *Cpu) Swp(opcode uint32) {

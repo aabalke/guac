@@ -228,8 +228,8 @@ func (dma *DMA) transfer() {
     }
 
     if dma.IRQ {
-        INTERRUPT_CAUSE = fmt.Sprintf("DMA%d", dma.Idx)
-        dma.Gba.triggerIRQ(0x8 + uint32(dma.Idx))
+        cause := fmt.Sprintf("DMA%d", dma.Idx)
+        dma.Gba.triggerIRQ(0x8 + uint32(dma.Idx), cause)
     }
 
     if !dma.Repeat {

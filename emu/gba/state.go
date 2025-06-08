@@ -31,8 +31,6 @@ func LoadState(gba *GBA, path string) {
 
 func SaveState(gba *GBA, path string) {
 
-    gba.GBA_LOCK = true
-
     breakState(gba)
 
     err := os.Rename(path, path + ".backup")
@@ -54,9 +52,6 @@ func SaveState(gba *GBA, path string) {
 
     returnState(gba)
 
-    gba.GBA_LOCK = false
-
-
     fmt.Printf("State File Encoded\n")
 
 }
@@ -76,6 +71,7 @@ func breakState(gba *GBA) {
     gba.Timers[3].Gba = nil
     gba.Mem.GBA = nil
     gba.Debugger.Gba = nil
+    gba.InterruptStack.Gba = nil
 }
 
 func returnState(gba *GBA) {
@@ -93,4 +89,5 @@ func returnState(gba *GBA) {
     gba.Timers[3].Gba = gba
     gba.Mem.GBA = gba
     gba.Debugger.Gba = gba
+    gba.InterruptStack.Gba = gba
 }

@@ -63,9 +63,11 @@ type GBA struct {
 
     Save bool
 
-    Interrupt Interrupt
-    IRQ_ADDR uint32
-    IN_IRQ bool
+    InterruptStack *InterruptStack
+
+    //Interrupt Interrupt
+    //IRQ_ADDR uint32
+    //IN_IRQ bool
     GBA_LOCK bool
 
     OpenBusOpcode uint32
@@ -88,13 +90,10 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
 
     dispstat := uint32(gba.Mem.Dispstat)
     if utils.BitEnabled(dispstat, 3) {
-
-        INTERRUPT_CAUSE = "VBLANK"
-        gba.triggerIRQ(0)
+        gba.triggerIRQ(0, "VBLANK")
     }
 
     gba.Mem.Dispstat.SetVBlank(true)
-    gba.Mem.IO[0x202] |= 1
 
     gba.checkDmas(DMA_MODE_VBL)
 
@@ -103,7 +102,6 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
     }
 
     gba.Mem.Dispstat.SetVBlank(false)
-    gba.Mem.IO[0x202] &^= 1
 
     //frameCycles = gba.UpdateScanline(frameCycles) // 227
 
@@ -122,26 +120,31 @@ func (gba *GBA) UpdateScanline(frameCycles uint32) uint32 {
 
     dispstat := gba.Mem.Read16(0x400_0004)
     lyc := gba.Mem.Read8(0x400_0005)
-    vcounter := utils.BitEnabled(dispstat, 5)
-    if vcounter && gba.VCOUNT == lyc {
-        INTERRUPT_CAUSE = "VCOUNTER"
-        gba.triggerIRQ(2)
+    vcounterIRQ := utils.BitEnabled(dispstat, 5)
+
+
+    if vcounterIRQ && gba.VCOUNT == lyc {
+        gba.triggerIRQ(2, "VCOUNTER")
+    }
+
+    if gba.VCOUNT == lyc {
+        gba.Mem.Dispstat.SetVCFlag(true)
+    } else {
+        gba.Mem.Dispstat.SetVCFlag(false)
     }
 
     //Although the drawing time is only 960 cycles (240*4), the H-Blank flag is "0" for a total of 1006 cycles. gbatek
     frameCycles = gba.Exec(1006, frameCycles)
 
     dispstat = uint32(gba.Mem.Dispstat)
-    vblank := utils.BitEnabled(dispstat, 0) 
-    if utils.BitEnabled(dispstat, 4) && !vblank {
-        INTERRUPT_CAUSE = "HBLANK"
-        gba.triggerIRQ(1)
+    if utils.BitEnabled(dispstat, 4) && gba.VCOUNT < 160 {
+        gba.triggerIRQ(1, "HBLANK")
     }
 
+
     gba.Mem.Dispstat.SetHBlank(true)
-    gba.Mem.IO[0x202] |= 10
 
-
+    vblank := utils.BitEnabled(dispstat, 0) 
     if !vblank {
         gba.checkDmas(DMA_MODE_HBL)
     }
@@ -149,9 +152,7 @@ func (gba *GBA) UpdateScanline(frameCycles uint32) uint32 {
     frameCycles = gba.Exec(1232 - 1006, frameCycles)
 
     gba.Mem.Dispstat.SetHBlank(false)
-    gba.Mem.IO[0x202] &^= 10
-
-    // draw scanline here once converted to scanline version
+    //gba.Mem.IO[0x202] &^= 0b10
 
     gba.Dma[3].transferVideo(gba.VCOUNT)
 
@@ -234,11 +235,11 @@ func (gba *GBA) Exec(requiredCycles, frameCycles uint32) uint32 {
         //}
 
 
-        //if CURR_INST == 682710 {
-        //    //fmt.Printf("PC %08X CURR %d\n", r[PC], CURR_INST)
-        //    gba.Debugger.print(CURR_INST)
-        //    gba.Paused = true
-        //    os.Exit(0)
+        //if r[PC] == 0x80008C6 {
+        //    //fmt.Printf("PC %08X R2 %08X V %08X CURR %d\n", r[PC], r[2], gba.Mem.Read32(r[2]), CURR_INST)
+        //    //gba.Debugger.print(CURR_INST)
+        //    //gba.Paused = true
+        //    //os.Exit(0)
         //    //return accCycles - requiredCycles
         //}
 
@@ -276,7 +277,13 @@ func NewGBA() *GBA {
         FPS: 60, // 59.7374117111
         Pixels: &pixels,
         DebugPixels: &debugPixels,
-        Interrupt: Interrupt{},
+    }
+
+    gba.InterruptStack = &InterruptStack{
+        Gba: &gba,
+        Interrupts: []Interrupt{},
+        Skip: false,
+        Print: false,
     }
 
     gba.Debugger = &Debugger{Gba: &gba, Version: 1}
@@ -376,7 +383,7 @@ func (gba *GBA) toggleThumb() {
     // pipe
 }
 
-func (gba *GBA) triggerIRQ(irq uint32) {
+func (gba *GBA) triggerIRQ(irq uint32, cause string) {
 
 
     mem := gba.Mem
@@ -391,15 +398,15 @@ func (gba *GBA) triggerIRQ(irq uint32) {
 	gba.Halted = false
 
     //fmt.Printf("IRQ EXCEPTION CHECK AT TRIGGER\n")
-	gba.checkIRQ()
+	gba.checkIRQ(cause)
 }
 
-func (gba *GBA) checkIRQ() {
+func (gba *GBA) checkIRQ(cause string) {
 
     interruptEnabled := !gba.Cpu.Reg.CPSR.GetFlag(FLAG_I)
     ime := utils.BitEnabled(gba.Mem.Read16(0x400_0208), 0)
     interrupts := (gba.Mem.Read16(0x400_0200) & gba.Mem.Read16(0x400_0202)) != 0
     if interruptEnabled && ime && interrupts {
-        gba.handleInterrupt()
+        gba.InterruptStack.Execute(cause)
     }
 }

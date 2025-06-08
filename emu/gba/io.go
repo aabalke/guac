@@ -44,18 +44,30 @@ func (d *Dispstat) SetHBlank(v bool) {
     *d = Dispstat((uint16(*d) &^ 0b10))
 }
 
-func (d *Dispstat) SetVCounter(scanline int) {
+func (d *Dispstat) SetVCFlag(v bool) {
 
-    lyc := int(uint32(*d >> 8))
-
-    if scanline == lyc {
+    if v {
         *d = Dispstat((uint16(*d) &^ 0b100) | 0b100)
         return
-
     }
 
     *d = Dispstat((uint16(*d) &^ 0b100))
 }
+
+
+
+//func (d *Dispstat) SetVCounter(scanline int) {
+//
+//    lyc := int(uint32(*d >> 8))
+//
+//    if scanline == lyc {
+//        *d = Dispstat((uint16(*d) &^ 0b100) | 0b100)
+//        return
+//
+//    }
+//
+//    *d = Dispstat((uint16(*d) &^ 0b100))
+//}
 
 //type IRQFlags uint32
 //
