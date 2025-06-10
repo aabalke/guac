@@ -5,6 +5,7 @@ import (
     "os"
 
 	"github.com/aabalke33/guac/emu/gba/utils"
+	"github.com/aabalke33/guac/emu/gba/cart"
 )
 
 const (
@@ -34,7 +35,7 @@ var (
 type GBA struct {
     GamePath string
     Debugger *Debugger
-    Cartridge *Cartridge
+    Cartridge *cart.Cartridge
     Cpu *Cpu
     Mem *Memory
 	Screen [SCREEN_WIDTH][SCREEN_HEIGHT]uint32
@@ -57,7 +58,7 @@ type GBA struct {
 
     VCOUNT uint32
 
-    //Logger *Logger
+    GraphicsDirty bool
 
     IntrWait uint32
 
@@ -65,9 +66,6 @@ type GBA struct {
 
     InterruptStack *InterruptStack
 
-    //Interrupt Interrupt
-    //IRQ_ADDR uint32
-    //IN_IRQ bool
     GBA_LOCK bool
 
     OpenBusOpcode uint32
@@ -356,7 +354,7 @@ func (gba *GBA) Close() {
 
 func (gba *GBA) LoadGame(path string, useState bool) {
     gba.GamePath = path
-    gba.Cartridge = NewCartridge(gba, path, path + ".save")
+    gba.Cartridge = cart.NewCartridge(path, path + ".save")
 
     if useState {
         path := gba.GamePath + ".gob"

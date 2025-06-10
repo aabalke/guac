@@ -23,13 +23,6 @@ type Memory struct {
 	BIOS_MODE uint32
 	Dispstat Dispstat
 
-	GamePak0                     [0x200_0000]byte
-	SRAM                         [0x1_0000]byte
-	Flash                        [0x2_0000]byte // multiple banks
-	flashMode                    FlashMode
-	flashBank                    uint32
-	flashIDMode                  bool
-	HasFlash                     bool
 }
 
 func NewMemory(gba *GBA) *Memory {
@@ -48,20 +41,16 @@ func NewMemory(gba *GBA) *Memory {
 	return m
 }
 
-func (m *Memory) SaveSRAM() {
-    //if m.GBA.Save {
-    //    m.GBA.Cartridge.save()
-    //    m.GBA.Save = false
-    //}
-}
-
 func (m *Memory) InitSaveLoop() {
 
     saveTicker := time.Tick(time.Second)
 
-    go func()  {
+    go func() {
         for range saveTicker {
-            m.SaveSRAM()
+            if m.GBA.Save {
+                m.GBA.Cartridge.Save()
+                m.GBA.Save = false
+            }
         }
     }()
 }
@@ -85,9 +74,7 @@ func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
 
 		//return m.BIOS[addr % 0x0000_4000]
         //fmt.Printf("READING FROM UNUSED MEMORY ADDR %08X\n", addr)
-		return 0
 	case addr < 0x0300_0000:
-
 		return m.WRAM1[(addr-0x0200_0000)%0x4_0000]
 	case addr < 0x0400_0000:
 		return m.WRAM2[(addr-0x0300_0000)%0x8_000]
@@ -108,17 +95,21 @@ func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
 		return m.VRAM[mirrorAddr]
 
 	case addr < 0x0800_0000:
+
 		return m.OAM[(addr-0x0700_0000)%0x400]
 
 	case addr < 0x0A00_0000:
 		//return m.GBA.Cartridge.Data[addr-0x0800_0000]
-		return m.GamePak0[addr-0x0800_0000]
+
+        return m.GBA.Cartridge.Rom[addr-0x800_0000]
 	case addr < 0x0E00_0000:
+
+        cartridge := m.GBA.Cartridge
 
         offset := (addr - 0x0A00_0000) % 0x200_0000 // should be rom length?
         //offset := (addr - 0x0A00_0000) % m.GBA.Cartridge.RomLength // should be rom length?
 		//return m.GBA.Cartridge.Data[offset]
-		return m.GamePak0[offset]
+        return cartridge.Rom[offset]
 
 //	case addr < 0x0E00_0000:
 //        // do not make rom length
@@ -127,23 +118,11 @@ func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
 //		return m.GBA.Cartridge.Data[offset]
 
 	case addr < 0x1000_0000:
+        relative := (addr - 0xE00_0000) % 0x1_0000
+        return m.GBA.Cartridge.Read(relative)
 
-		//if device := addr == 0x0E00_0001; device {
-		//	return 0xD4 // temp for mario kart SST
-		//	//return 0x09 // temp for pokemon fire Macronix
-		//}
-
-		//if manufacturer := addr == 0xE00_0000; manufacturer {
-		//	return 0xBF // temp for mario kart SST
-		//	//return 0xC2 // temp for pokemon fire Macronix
-		//}
-
-		//return m.GBA.Cartridge.SRAM[(addr-0x0E00_0000)%0x1_0000]
-
-        return m.GBA.Mem.FlashRead(addr)
 	default:
         return m.ReadOpenBus(addr)
-		return 0
 	}
 }
 
@@ -295,6 +274,10 @@ func (m *Memory) Read16(addr uint32) uint32 {
 		return uint32(m.Read(addr, false)) * 0x0101
 	}
 
+    if ok := CheckEeprom(m.GBA, addr); ok {
+        return uint32(m.GBA.Cartridge.EepromRead())
+    }
+
 	return uint32(m.Read(addr+1, false)) <<8 | uint32(m.Read(addr, false))
 }
 
@@ -388,12 +371,16 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
         return
 	case addr < 0x0E00_0000:
         //fmt.Printf("COULD NOT WRITE %08X TO ADDR %08X\n", v, addr)
+
         return
 	case addr < 0x1000_0000:
 
         m.GBA.Save = true
 
-        //relative := (addr - 0xE00_0000) % 0x1_000
+        cartridge := m.GBA.Cartridge
+
+
+        relative := (addr - 0xE00_0000) % 0x1_0000
 
         //if byteWrite {
         //    m.GBA.Cartridge.SRAM[relative] = v
@@ -403,7 +390,11 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
 
 		//m.GBA.Cartridge.SRAM[relative] = v
 
-        m.FlashWrite(addr, v)
+        //m.FlashWrite(addr, v)
+
+        //println("WRITING CART")
+
+        cartridge.Write(relative, v)
 
         return
 	default:
@@ -556,6 +547,12 @@ func (m *Memory) Write16(addr uint32, v uint16) {
 	//    return
 	//}
 
+    if ok := CheckEeprom(m.GBA, addr); ok {
+        m.GBA.Save = true
+        m.GBA.Cartridge.EepromWrite(v)
+        return
+    }
+
 	m.Write(addr, uint8(v), false)
 	m.Write(addr+1, uint8(v>>8), false)
 }
@@ -563,4 +560,21 @@ func (m *Memory) Write16(addr uint32, v uint16) {
 func (m *Memory) Write32(addr uint32, v uint32) {
 	m.Write16(addr, uint16(v))
 	m.Write16(addr+2, uint16(v>>16))
+}
+
+func CheckEeprom(gba *GBA, addr uint32) bool {
+
+    if addr < 0xD00_0000 || addr >= 0xE00_0000 {
+        return false
+    }
+
+    if gba.Cartridge.Id != 1 {
+        return false
+    }
+
+    if gba.Cartridge.RomLength > 0x1000_0000 && addr  < 0xDFF_FF00 {
+        return false
+    }
+
+    return true
 }

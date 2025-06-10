@@ -2,6 +2,7 @@ package gba
 
 import (
 	"github.com/aabalke33/guac/emu/gba/utils"
+	"github.com/aabalke33/guac/emu/gba/cart"
     "fmt"
 )
 
@@ -43,6 +44,8 @@ type DMA struct {
 	Mode    uint32
 	IRQ     bool
 	Enabled bool
+
+    EepromWidth uint32
 }
 
 func (dma *DMA) ReadSrc(byte uint32) uint8 {
@@ -139,13 +142,6 @@ func (dma *DMA) disable() {
 
 func (dma *DMA) transfer() {
 
-    //fmt.Printf("DMA TRANSFER CURR %08d SRC %08X, DST %08X, WORD COUNT %08X 0x202EEC8 %08X TYPE %02b\n", CURR_INST, dma.Dst, dma.Src, dma.WordCount, dma.Gba.Mem.Read32(0x202EEC8), dma.Mode)
-
-
-    if dma.Idx == 3 {
-        //fmt.Printf("DMA TRANSFER CNTRL %04X CNT %04X CNTRLM %08X CURR %d SRC %08X, DST %08X\n", dma.Control, dma.WordCount, dma.Gba.Mem.Read32(0x400_00DC), CURR_INST, dma.Src, dma.Dst)
-    }
-
     mem := dma.Gba.Mem
 
     count := dma.WordCount
@@ -203,12 +199,25 @@ func (dma *DMA) transfer() {
 
         // not sure about this
         dstRom := tmpDst >= 0x800_0000 && tmpDst < 0xE00_0000
-        //srcRom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
+        srcRom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
         //dstSram := tmpDst >= 0xE00_0000 && tmpDst < 0x1000_0000
         //srcSram := tmpSrc >= 0xE00_0000 && tmpSrc < 0x1000_0000
 
         if (dstRom) && dma.Idx != 3 {
             continue
+        }
+
+        if eeprom := CheckEeprom(dma.Gba, tmpDst); eeprom {
+
+            if count == 9 || count == 73 {
+                cart.EepromWidth = 6
+            } else if count == 17 || count == 81 {
+                cart.EepromWidth = 14
+            }
+
+            if srcRom && dstRom {
+                panic("EEPROM HAS BOTH SRC AND DST ROM ADDR")
+            }
         }
 
         //if dstSram || srcSram {

@@ -1,4 +1,4 @@
-package gba
+package cart
 
 import "fmt"
 
@@ -12,7 +12,7 @@ func NewHeader(c *Cartridge) *Header {
 
 	h := &Header{
 		Cartridge: c,
-		Title:     string(c.Gba.Mem.GamePak0[0xA0 : 0xA0+12]),
+		Title:     string(c.Rom[0xA0 : 0xA0+12]),
 	}
 
     h.valid()
@@ -23,9 +23,9 @@ func NewHeader(c *Cartridge) *Header {
 func (h *Header) valid() bool {
 
     tests := []bool{
-        h.Cartridge.Gba.Mem.GamePak0[0xB2] == 0x96,
-        h.Cartridge.Gba.Mem.GamePak0[0xB5] == 0x00,
-        h.Cartridge.Gba.Mem.GamePak0[0xBE] == 0x00,
+        h.Cartridge.Rom[0xB2] == 0x96,
+        h.Cartridge.Rom[0xB5] == 0x00,
+        h.Cartridge.Rom[0xBE] == 0x00,
     }
 
     for _, pass := range tests {

@@ -36,7 +36,7 @@ GBA Sound (and Multiboot/HardReset/CustomHalt)
 ❌ 0x1C SoundDriverMain
 ❌ 0x1D SoundDriverVSync
 ❌ 0x1E SoundChannelClear
-❌ 0x1F MidiKey2Freq
+👍 0x1F MidiKey2Freq
 ❌ 0x20 SoundWhatever0
 ❌ 0x21 SoundWhatever1
 ❌ 0x22 SoundWhatever2

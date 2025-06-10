@@ -172,8 +172,8 @@ Boots Lord of The Rings Fellowship
       Mario Kart Super Circuit
 Boots Mega Man Zero
 Boots Metroid Fusion
-NOIRQ Mother 12
-NOIRQ Mother 3
+Boots Mother 12
+Boots Mother 3
 Boots Pokémon Mystery Dungeon Red Rescue Team
 Boots Pokémon Firered
 Boots Pokémon LeafGreen
@@ -183,12 +183,12 @@ Boots Pokémon Sapphire
       Sonic Advance
       Spyro Season of Ice
       Superstar Saga
-NOIRQ Super Dodge Ball Advance
+Boots Super Dodge Ball Advance
       Super Mario Advance
       Tetris Worlds
 Boots The Minish Cap
 Boots Ultimate Puzzle Games
-      Warioware Twisted
-      Wolfenstein 3D
+Boots Warioware Twisted
+Boots Wolfenstein 3D
 Boots Doom
-      Zelda Link to the Past
+Boots Zelda Link to the Past

@@ -13,6 +13,52 @@ const (
     INTRWAIT_VBLANK = 1
 )
 
+const (
+	SYS_SoftReset                      = 0x00
+	SYS_RegisterRamReset               = 0x01
+	SYS_Halt                           = 0x02
+	SYS_StopSleep                      = 0x03
+	SYS_IntrWait                       = 0x04
+	SYS_VBlankIntrWait                 = 0x05
+	SYS_Div                            = 0x06
+	SYS_DivArm                         = 0x07
+	SYS_Sqrt                           = 0x08
+	SYS_ArcTan                         = 0x09
+	SYS_ArcTan2                        = 0x0A
+	SYS_CpuSet                         = 0x0B
+	SYS_CpuFastSet                     = 0x0C
+	SYS_GetBiosChecksum                = 0x0D
+	SYS_BgAffineSet                    = 0x0E
+	SYS_ObjAffineSet                   = 0x0F
+	SYS_BitUnPack                      = 0x10
+	SYS_LZ77UnCompReadNormalWrite8bit  = 0x11
+	SYS_LZ77UnCompReadNormalWrite16bit = 0x12
+	SYS_HuffUnCompReadNormal           = 0x13
+	SYS_RLUnCompReadNormalWrite8bit    = 0x14
+	SYS_RLUnCompReadNormalWrite16bit   = 0x15
+	SYS_Diff8bitUnFilterWrite8bit      = 0x16
+	SYS_Diff8bitUnFilterWrite16bit     = 0x17
+	SYS_Diff16bitUnFilter              = 0x18
+	SYS_SoundBias                      = 0x19
+	SYS_SoundDriverInit                = 0x1A
+	SYS_SoundDriverMode                = 0x1B
+	SYS_SoundDriverMain                = 0x1C
+	SYS_SoundDriverVSync               = 0x1D
+	SYS_SoundChannelClear              = 0x1E
+	SYS_MidiKey2Freq                   = 0x1F
+	SYS_SoundWhatever0                 = 0x20
+	SYS_SoundWhatever1                 = 0x21
+	SYS_SoundWhatever2                 = 0x22
+	SYS_SoundWhatever3                 = 0x23
+	SYS_SoundWhatever4                 = 0x24
+	SYS_MultiBoot                      = 0x25
+	SYS_HardReset                      = 0x26
+	SYS_CustomHalt                     = 0x27
+	SYS_SoundDriverVSyncOff            = 0x28
+	SYS_SoundDriverVSyncOn             = 0x29
+	SYS_SoundGetJumpList               = 0x2A
+)
+
 func (gba *GBA) LoadBios(path string) {
 
 	buf, err := os.ReadFile(path)
@@ -79,7 +125,7 @@ func (gba *GBA) SysCall(inst uint32) (int, bool) {
 	case SYS_BitUnPack:
 		BitUnPack(gba)
     case SYS_HuffUnCompReadNormal:
-        panic("HUFFMAN IS NOT IMPLIMENTED")
+        //panic("HUFFMAN IS NOT IMPLIMENTED")
         cycles += HuffUnCompReadNormal(gba)
 	case SYS_LZ77UnCompReadNormalWrite8bit:
 		cycles += LZ77UnCompReadNormalWrite8bit(gba)
@@ -949,162 +995,162 @@ func HuffUnCompReadNormal(gba *GBA) int {
     bytesOutputted := DecompressHuff(gba, src, dst)
     return bytesOutputted * 2
 }
-//func DecompressHuff(gba *GBA, src, dst uint32) int {
-//
-//	// need to align half and pad 16bit?
+func DecompressHuff(gba *GBA, src, dst uint32) int {
+
+	// need to align half and pad 16bit?
+
+	mem := gba.Mem
+
+	header := mem.Read32(src)
+	decompressedSize := int(header >> 8)
+	src += 4
+
+	end := int(dst) + decompressedSize
+
+    bytesOutputted := 0
+	for int(dst) < end {
+		flag := mem.Read8(src)
+		src++
+
+		if (flag & 0x80) == 0 {
+			// Uncompressed block: copy (flag + 1) bytes
+			count := int(flag&0x7F) + 1
+			for range count {
+				b := mem.Read8(src)
+				mem.Write8(dst, uint8(b))
+                bytesOutputted++
+				src++
+				dst++
+			}
+		} else {
+			// Compressed block: repeat 1 byte for (flag & 0x7F) + 3 times
+			count := int(flag&0x7F) + 3
+			value := mem.Read8(src)
+			src++
+			for range count {
+				mem.Write8(dst, uint8(value))
+                bytesOutputted++
+				dst++
+			}
+		}
+	}
+
+    return bytesOutputted
+}
+
+//func DecompressHuff(gba *GBA, srcAddr, dstAddr uint32) int {
 //
 //	mem := gba.Mem
+//	header := mem.Read32(srcAddr)
+//	srcAddr += 4
 //
-//	header := mem.Read32(src)
-//	decompressedSize := int(header >> 8)
-//	src += 4
+//	compType := (header >> 4) & 0xF
+//	decompressedSize := header >> 8
 //
-//	end := int(dst) + decompressedSize
+//	if compType != 2 {
+//		panic("Not Huffman compressed")
+//	}
 //
-//    bytesOutputted := 0
-//	for int(dst) < end {
-//		flag := mem.Read8(src)
-//		src++
+//	// --- Step 2: Tree size and read tree ---
+//	treeSizeByte := mem.Read8(srcAddr)
+//	srcAddr += 1
 //
-//		if (flag & 0x80) == 0 {
-//			// Uncompressed block: copy (flag + 1) bytes
-//			count := int(flag&0x7F) + 1
-//			for range count {
-//				b := mem.Read8(src)
-//				mem.Write8(dst, uint8(b))
-//                bytesOutputted++
-//				src++
-//				dst++
+//	treeSize := uint32((int(treeSizeByte)+1)*2)
+//	bitstreamStart := srcAddr + treeSize
+//
+//	tree := make([]uint32, treeSize)
+//    for i := range treeSize {
+//        tree[i] = mem.Read8(srcAddr)
+//
+//        srcAddr++
+//    }
+//
+//	// --- Step 3: Bitstream reader ---
+//	bitBuffer := uint32(0)
+//	bitCount := 0
+//	bitOffset := uint32(0)
+//
+//	getBit := func() int {
+//		if bitCount == 0 {
+//			bitBuffer = mem.Read32(bitstreamStart + bitOffset)
+//			bitOffset += 4
+//			bitCount = 32
+//		}
+//		bit := int((bitBuffer >> 31) & 1) // MSB first
+//		bitBuffer <<= 1
+//		bitCount--
+//		return bit
+//	}
+//
+//	// --- Step 4: Decode ---
+//	var outBuf uint32
+//	outOffset := 0
+//	var written uint32
+//
+//for written < decompressedSize {
+//	ptr := uint32(0) // start at root
+//
+//	for {
+//		if ptr >= uint32(len(tree)) {
+//			panic(fmt.Sprintf("tree pointer out of range: %d", ptr))
+//		}
+//
+//		node := tree[ptr]
+//		offset := uint32(node & 0x3F)
+//		node1IsData := (node>>6)&1 != 0
+//		node0IsData := (node>>7)&1 != 0
+//
+//		bit := getBit()
+//
+//		if bit == 0 {
+//			if node0IsData {
+//				dataAddr := (ptr &^ 1) + offset*2 + 2
+//				if dataAddr >= uint32(len(tree)) {
+//					panic("node0 data address out of range")
+//				}
+//				data := tree[dataAddr]
+//				outBuf |= uint32(data) << (8 * outOffset)
+//				outOffset++
+//				if outOffset == 4 {
+//					mem.Write32(dstAddr, outBuf)
+//					dstAddr += 4
+//					outBuf = 0
+//					outOffset = 0
+//				}
+//				written++
+//				break
+//			} else {
+//				ptr = (ptr &^ 1) + offset*2 + 2
 //			}
 //		} else {
-//			// Compressed block: repeat 1 byte for (flag & 0x7F) + 3 times
-//			count := int(flag&0x7F) + 3
-//			value := mem.Read8(src)
-//			src++
-//			for range count {
-//				mem.Write8(dst, uint8(value))
-//                bytesOutputted++
-//				dst++
+//			if node1IsData {
+//				dataAddr := (ptr &^ 1) + offset*2 + 3
+//				if dataAddr >= uint32(len(tree)) {
+//					panic("node1 data address out of range")
+//				}
+//				data := tree[dataAddr]
+//				outBuf |= uint32(data) << (8 * outOffset)
+//				outOffset++
+//				if outOffset == 4 {
+//					mem.Write32(dstAddr, outBuf)
+//					dstAddr += 4
+//					outBuf = 0
+//					outOffset = 0
+//				}
+//				written++
+//				break
+//			} else {
+//				ptr = (ptr &^ 1) + offset*2 + 3
 //			}
 //		}
 //	}
-//
-//    return bytesOutputted
 //}
-
-func DecompressHuff(gba *GBA, srcAddr, dstAddr uint32) int {
-
-	mem := gba.Mem
-	header := mem.Read32(srcAddr)
-	srcAddr += 4
-
-	compType := (header >> 4) & 0xF
-	decompressedSize := header >> 8
-
-	if compType != 2 {
-		panic("Not Huffman compressed")
-	}
-
-	// --- Step 2: Tree size and read tree ---
-	treeSizeByte := mem.Read8(srcAddr)
-	srcAddr += 1
-
-	treeSize := uint32((int(treeSizeByte)+1)*2)
-	bitstreamStart := srcAddr + treeSize
-
-	tree := make([]uint32, treeSize)
-    for i := range treeSize {
-        tree[i] = mem.Read8(srcAddr)
-
-        srcAddr++
-    }
-
-	// --- Step 3: Bitstream reader ---
-	bitBuffer := uint32(0)
-	bitCount := 0
-	bitOffset := uint32(0)
-
-	getBit := func() int {
-		if bitCount == 0 {
-			bitBuffer = mem.Read32(bitstreamStart + bitOffset)
-			bitOffset += 4
-			bitCount = 32
-		}
-		bit := int((bitBuffer >> 31) & 1) // MSB first
-		bitBuffer <<= 1
-		bitCount--
-		return bit
-	}
-
-	// --- Step 4: Decode ---
-	var outBuf uint32
-	outOffset := 0
-	var written uint32
-
-for written < decompressedSize {
-	ptr := uint32(0) // start at root
-
-	for {
-		if ptr >= uint32(len(tree)) {
-			panic(fmt.Sprintf("tree pointer out of range: %d", ptr))
-		}
-
-		node := tree[ptr]
-		offset := uint32(node & 0x3F)
-		node1IsData := (node>>6)&1 != 0
-		node0IsData := (node>>7)&1 != 0
-
-		bit := getBit()
-
-		if bit == 0 {
-			if node0IsData {
-				dataAddr := (ptr &^ 1) + offset*2 + 2
-				if dataAddr >= uint32(len(tree)) {
-					panic("node0 data address out of range")
-				}
-				data := tree[dataAddr]
-				outBuf |= uint32(data) << (8 * outOffset)
-				outOffset++
-				if outOffset == 4 {
-					mem.Write32(dstAddr, outBuf)
-					dstAddr += 4
-					outBuf = 0
-					outOffset = 0
-				}
-				written++
-				break
-			} else {
-				ptr = (ptr &^ 1) + offset*2 + 2
-			}
-		} else {
-			if node1IsData {
-				dataAddr := (ptr &^ 1) + offset*2 + 3
-				if dataAddr >= uint32(len(tree)) {
-					panic("node1 data address out of range")
-				}
-				data := tree[dataAddr]
-				outBuf |= uint32(data) << (8 * outOffset)
-				outOffset++
-				if outOffset == 4 {
-					mem.Write32(dstAddr, outBuf)
-					dstAddr += 4
-					outBuf = 0
-					outOffset = 0
-				}
-				written++
-				break
-			} else {
-				ptr = (ptr &^ 1) + offset*2 + 3
-			}
-		}
-	}
-}
-
-	if outOffset > 0 {
-		mem.Write32(dstAddr, outBuf)
-	}
-    return 0
-}
+//
+//	if outOffset > 0 {
+//		mem.Write32(dstAddr, outBuf)
+//	}
+//    return 0
+//}
 
 func DecompressDiff8bit(gba *GBA, src, dst uint32) int {
 	mem := gba.Mem
