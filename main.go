@@ -16,6 +16,7 @@ func main() {
 
 	romPath := flag.String("r", "", "rom path")
 	debug := flag.Bool("debug", false, "debug")
+	useSaveState := flag.Bool("s", false, "save state")
 	flag.Parse()
 
 	start := time.Now().UnixMilli()
@@ -24,7 +25,7 @@ func main() {
     s.Init(*debug)
     defer s.Close(*debug)
 
-    s.Update(*debug, *romPath)
+    s.Update(*debug, *romPath, *useSaveState)
 
 	end := time.Now().UnixMilli()
 	fmt.Printf("\n\nRuntime: %d ms\n\n", end-start)
