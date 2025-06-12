@@ -338,7 +338,6 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
         }
 
         if interruptExit := cpu.Reg.getMode() == MODE_IRQ && rd == PC && rs == LR; interruptExit {
-            fmt.Printf("UNSURE IRQ EXIT THUMB\n")
             cpu.AluChangeMode(false)
             return 4
         }
@@ -357,28 +356,24 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
     case inst == 3 && mSBd: panic("UNSUPPORTED HI BLX")
     case inst == 3:
 
-        if rs == LR && cpu.Reg.getMode() == MODE_IRQ {
-            cpsr.SetFlag(FLAG_T, false)
-            cpu.AluChangeMode(false)
-            return 4
-        }
+        // THIS MAY HAVE BEEN NEEDED I AM NOT SURE IT BROKE ZELDA LTTP
+        //if rs == LR && cpu.Reg.getMode() == MODE_IRQ {
+        //    r[rs] = r[rs] &^ 0b1
+
+        //    cpsr.SetFlag(FLAG_T, false)
+        //    cpu.AluChangeMode(false)
+        //    return 4
+        //}
 
         //if interruptStubExit := r[rs] == IRQ_ADDR && cpu.Reg.getMode() == MODE_IRQ; interruptStubExit {
 
         s := cpu.Gba.InterruptStack
 
-        //if CURR_INST >= 256600 {
-        //    fmt.Printf("RS %08X, RETURN ADDR %08X\n", r[rs], s.ReturnAddr())
-        //}
-
-
         if interruptStubExit := r[rs] == s.ReturnAddr() && !s.IsEmpty(); interruptStubExit {
             cpsr.SetFlag(FLAG_T, false)
             s.Exit()
-            //r[PC] += 4
             return 4
         }
-
 
         if !utils.BitEnabled(r[rs], 0) {
             cpsr.SetFlag(FLAG_T, false)

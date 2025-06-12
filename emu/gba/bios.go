@@ -125,7 +125,7 @@ func (gba *GBA) SysCall(inst uint32) (int, bool) {
 	case SYS_BitUnPack:
 		BitUnPack(gba)
     case SYS_HuffUnCompReadNormal:
-        //panic("HUFFMAN IS NOT IMPLIMENTED")
+        panic("HUFFMAN IS NOT IMPLIMENTED")
         cycles += HuffUnCompReadNormal(gba)
 	case SYS_LZ77UnCompReadNormalWrite8bit:
 		cycles += LZ77UnCompReadNormalWrite8bit(gba)

@@ -24,10 +24,10 @@ https://emulation.gametechwiki.com/index.php/GBA_Tests
 👍 stripes
 
    save
-❌ flash64
-❌ flash128
+❌ flash64 (matches mgba)
+❌ flash128 (matches mgba)
 👍 none
-❌ sram
+❌ sram (matches mgba)
 
 ### Arm Wrestler
 
@@ -56,8 +56,8 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 ❌ Memory tests [1264/1552]
 ❌ I/O read tests [12/130]
 ❌ Timing tests [228/2020]
-❌ Timer count-up tests [crash]
-❌ Timer IRQ tests [10/90]
+❌ Timer count-up tests [189/936]
+❌ Timer IRQ tests [4/90]
 👍 Shifter tests [140/140]
 👍 Carry tests [93/93]
 👍 Multiply long tests [52/72] (matches mgba)
@@ -96,8 +96,6 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 ❌ timer: reload [0/7]
 
 ### Tonc
-
-! Affine and Mode 1, Mode 2 are temp disabled !
 
 👍 bigmap
 ❌ bld_demo (need to complete black and white blend)
@@ -150,10 +148,10 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 👍 octtest (blinks)
 👍 pageflip
 👍 prio_demo
-❌ sbb_aff
+❌ sbb_aff (does not hide at edges)
 👍 sbb_reg (has obj in top left, not sure if problem)
 👍 second
-❌ snd1_demo
+👍 snd1_demo
 👍 swi_demo
 👍 swi_vsync
 👍 tmr_demo (1.3 works) (uses faux cycle * 4)
@@ -169,7 +167,7 @@ Boots Harvest Moon Friends of Mineral Town
 Boots Hello Kitty Happy Party Pals
 Boots Kirby Nightmare in Dream Land
 Boots Lord of The Rings Fellowship
-      Mario Kart Super Circuit
+Boots Mario Kart Super Circuit
 Boots Mega Man Zero
 Boots Metroid Fusion
 Boots Mother 12
@@ -182,10 +180,10 @@ Boots Pokémon Ruby
 Boots Pokémon Sapphire
       Sonic Advance
       Spyro Season of Ice
-      Superstar Saga
+Boots Superstar Saga
 Boots Super Dodge Ball Advance
-      Super Mario Advance
-      Tetris Worlds
+Boots Super Mario Advance
+      Tetris Worlds (Huff)
 Boots The Minish Cap
 Boots Ultimate Puzzle Games
 Boots Warioware Twisted

@@ -55,6 +55,8 @@ func (cpu *Cpu) DecodeARM(opcode uint32) int {
         if IN_EXCEPTION { fmt.Printf("PC %08X ALU\n", r[PC]) }
 		cpu.Alu(opcode)
 
+        return 4
+
         //if cpu.Gba.Ct.instCycles != 0 {
         //    return cpu.Gba.Ct.instCycles
         //}

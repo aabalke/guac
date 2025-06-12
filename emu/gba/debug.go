@@ -85,10 +85,15 @@ func (d *Debugger) print(i int) {
     //    p(fmt.Sprintf("IO %X", i), d.gba.Mem.Read32(uint32(i)))
     //}
     //s("------")
-    start := 0x2006020
+    //start := 0xE00_00D0
+    //count := 0x10
+    //for i := start; i >= start - (count * 4); i -= 4 {
+    //    p(fmt.Sprintf("IO %X", i), d.Gba.Mem.Read32(uint32(i)))
+    //}
+    start := 0xE00_00D0
     count := 0x10
-    for i := start; i >= start - (count * 4); i -= 4 {
-        p(fmt.Sprintf("IO %X", i), d.Gba.Mem.Read32(uint32(i)))
+    for i := start; i >= start - (count); i -- {
+        p(fmt.Sprintf("IO %X", i), d.Gba.Mem.Read8(uint32(i)))
     }
 }
 

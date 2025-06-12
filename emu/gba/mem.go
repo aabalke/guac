@@ -2,7 +2,7 @@ package gba
 
 import (
 	"fmt"
-    "time"
+	"time"
 )
 
 var (
@@ -47,7 +47,7 @@ func (m *Memory) InitSaveLoop() {
 
     go func() {
         for range saveTicker {
-            if m.GBA.Save {
+            if m.GBA.Save && false {
                 m.GBA.Cartridge.Save()
                 m.GBA.Save = false
             }
@@ -408,6 +408,11 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 	// this addr should be relative. - 0x400000
 	// do not make bg control addrs special, unless you know what the f you are doing
 	// VCOUNT is not writable, no touchy
+    if addr >= 0x60 && addr < 0xA0 {
+        m.IO[addr] = v
+        m.GBA.Apu.Update(uint16(addr), v)
+        return
+    }
 
 	switch addr {
 	case 0x004:
@@ -429,6 +434,15 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
     case 0x001B: m.IO[addr] = v &^ 0b1111_1110 // BG2VOFS mask
     case 0x001D: m.IO[addr] = v &^ 0b1111_1110 // BG3HOFS mask
     case 0x001F: m.IO[addr] = v &^ 0b1111_1110 // BG3VOFS mask
+
+    case 0x00A0: m.GBA.Apu.ChannelA.Write(uint32(v)); //fmt.Printf("WRITE PC %08X V %02X CURR %d\n", m.GBA.Cpu.Reg.R[PC], v, CURR_INST)
+    case 0x00A1: m.GBA.Apu.ChannelA.Write(uint32(v) << 8)
+    case 0x00A2: m.GBA.Apu.ChannelA.Write(uint32(v) << 16)
+    case 0x00A3: m.GBA.Apu.ChannelA.Write(uint32(v) << 24)
+    case 0x00A4: m.GBA.Apu.ChannelB.Write(uint32(v))
+    case 0x00A5: m.GBA.Apu.ChannelB.Write(uint32(v) << 8)
+    case 0x00A6: m.GBA.Apu.ChannelB.Write(uint32(v) << 16)
+    case 0x00A7: m.GBA.Apu.ChannelB.Write(uint32(v) << 24)
 
     case 0x00B0: m.GBA.Dma[0].WriteSrc(v, 0)
     case 0x00B1: m.GBA.Dma[0].WriteSrc(v, 1)
@@ -478,6 +492,7 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
     case 0x00DD: m.GBA.Dma[3].WriteCount(v, true)
     case 0x00DE: m.GBA.Dma[3].WriteControl(v, false)
     case 0x00DF: m.GBA.Dma[3].WriteControl(v, true)
+
 	case 0x100:
 		m.GBA.Timers[0].WriteD(v, false)
 	case 0x101:
@@ -538,12 +553,13 @@ func (m *Memory) Write8(addr uint32, v uint8) {
 
 func (m *Memory) Write16(addr uint32, v uint16) {
 
+
 	//if sram := addr >= 0xE00_0000; sram {
     //    //fmt.Printf("ADDR  %08X V %08X\n", addr, v)
-    //    //_, _, _ = utils.Ror(uint32(v), (addr+1) * 8, false, false, false)
+    //    a, _, _ := utils.Ror(uint32(v), (addr) * 8, false, false, false)
+    //    v = uint16(uint8(a))
     //    //fmt.Printf("ADDR2 %08X V %08X\n", addr, v)
-	//    //m.Write(addr, uint8(v), false)
-	//    ////m.Write(addr+1, uint8(v>>8), false)
+	//    m.Write(addr, uint8(v), false)
 	//    return
 	//}
 

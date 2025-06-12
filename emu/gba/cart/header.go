@@ -1,11 +1,15 @@
 package cart
 
-import "fmt"
+import (
+    "fmt"
+    "strings"
+)
 
 
 type Header struct {
 	Cartridge *Cartridge
 	Title     string
+    GameCode  string
 }
 
 func NewHeader(c *Cartridge) *Header {
@@ -13,7 +17,12 @@ func NewHeader(c *Cartridge) *Header {
 	h := &Header{
 		Cartridge: c,
 		Title:     string(c.Rom[0xA0 : 0xA0+12]),
+        GameCode: string(c.Rom[0xAC : 0xAC+4]),
 	}
+
+    if strings.HasPrefix(h.GameCode, "F") {
+        panic("NES CLASSIC GAME. NOT SUPPORTED")
+    }
 
     h.valid()
     h.print()

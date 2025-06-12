@@ -107,7 +107,7 @@ func (s *InterruptStack) Execute(cause string) {
     r[SP] = reg.SP[irqBank]
     r[LR] = reg.LR[irqBank]
 
-    reg.CPSR.SetFlag(FLAG_I, false)
+    reg.CPSR.SetFlag(FLAG_I, true) // true is disabled
 
     //if reg.CPSR.GetFlag(FLAG_T) {
     //    reg.LR[irqBank] = r[PC] + 2
@@ -128,14 +128,14 @@ func (s *InterruptStack) Execute(cause string) {
     {
         for i := range 13 {
 
-            ifBit := (s.Gba.Mem.Read32(0x400_0202) >> i) & 1 == 1
-            ieBit := (s.Gba.Mem.Read32(0x400_0200) >> i) & 1 == 1
+            ifBit := (s.Gba.Mem.Read16(0x400_0202) >> i) & 1 == 1
+            ieBit := (s.Gba.Mem.Read16(0x400_0200) >> i) & 1 == 1
 
             if ifBit && ieBit {
                 if i == 0 { // vblank breaks things for some reason
                     break // do i need to check if irq enabled to check priority? IE??
                 }
-                mem.Write32(0x400_0202, 1 << i)
+                mem.Write16(0x400_0202, 1 << i)
                 break
             }
         }
@@ -193,6 +193,7 @@ func (s *InterruptStack) Exit() {
     maxIdx := len(s.Interrupts)-1
     s.Gba.Cpu.Reg = s.Interrupts[maxIdx].Reg
     r[PC] = s.Interrupts[maxIdx].ReturnAddr
+
     //ifReg := s.Interrupts[maxIdx].IF
 
     s.Interrupts = s.Interrupts[:maxIdx]
@@ -219,9 +220,9 @@ func (s *InterruptStack) Exit() {
     r[LR] = reg.LR[curBank]
     r[SP] = reg.SP[curBank]
 
-    reg.CPSR &^= 0b1000_0000 // disable IRQ
-
     s.Gba.Mem.BIOS_MODE = BIOS_IRQ_POST
+
+    reg.CPSR.SetFlag(FLAG_I, false) // disable IRQ
 
     // ackPriority
 

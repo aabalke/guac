@@ -592,10 +592,10 @@ func (cpu *Cpu) BX(opcode uint32) {
 
     switch inst {
     case INST_BX:
-        if rn == LR && cpu.Reg.getMode() == MODE_IRQ {
-            cpu.AluChangeMode(false)
-            return
-        }
+        //if rn == LR && cpu.Reg.getMode() == MODE_IRQ {
+        //    cpu.AluChangeMode(false)
+        //    return
+        //}
 
         r := &cpu.Reg.R
         cpsr := &cpu.Reg.CPSR

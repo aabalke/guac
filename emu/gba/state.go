@@ -58,6 +58,7 @@ func SaveState(gba *GBA, path string) {
 
 func breakState(gba *GBA) {
     gba.Cartridge.Header.Cartridge = nil
+    gba.Apu.gba = nil
     gba.Cpu.Gba = nil
     gba.Cpu.Reg.Cpu = nil
     gba.Dma[0].Gba = nil
@@ -75,6 +76,7 @@ func breakState(gba *GBA) {
 
 func returnState(gba *GBA) {
     gba.Cartridge.Header.Cartridge = gba.Cartridge
+    gba.Apu.gba = gba
     gba.Cpu.Gba = gba
     gba.Cpu.Reg.Cpu = gba.Cpu
     gba.Dma[0].Gba = gba

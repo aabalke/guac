@@ -194,6 +194,24 @@ func (dma *DMA) transfer() {
     case !dma.isWord && dma.SrcAdj == DMA_ADJ_DEC: srcOffset = -2
     }
 
+    //if dma.Gba.Cpu.Reg.R[PC] == 0x80B06AA {
+
+    //    fmt.Printf("SRC %08X, %08X\n", dma.Src, mem.Read32(dma.Src))
+    //    dma.Gba.Debugger.print(CURR_INST)
+    //    panic("HERE")
+    //}
+
+    if fifo := (dma.Idx == 1 || dma.Idx == 2) && dma.Mode == DMA_MODE_REF; fifo {
+        dstOffset = 0
+        //dma.DstAdj = DMA_ADJ_NON
+        dma.isWord = false
+        count = 4
+        srcOffset = 4
+
+        if !dma.Repeat || (dma.Dst != 0x400_00A0 && dma.Dst != 0x400_00A4) {
+            panic("INVALID FIFO DMA")
+        }
+    }
 
     for i := uint32(0); i < count; i++ {
 
@@ -268,6 +286,19 @@ func (dma *DMA) transferVideo(vcount uint32) {
     if vcount >= 2 && vcount <= 162 {
         dma.transfer()
     }
+}
+
+func (dma *DMA) transferFifo() {
+
+    //if (dma.Idx != 1 && dma.Idx != 2) || dma.Mode != DMA_MODE_REF || !dma.Enabled {
+    //    return
+    //}
+
+    //if !dma.Repeat || (dma.Dst != 0x400_00A0 && dma.Dst != 0x400_00A4) {
+    //    return
+    //}
+
+    //dma.transfer()
 }
 
 func (dma *DMA) checkMode(mode uint32) bool {
