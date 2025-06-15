@@ -2,6 +2,7 @@ package gba
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
@@ -9,6 +10,121 @@ import (
 var ( 
     _ = fmt.Sprintf("")
 )
+
+type Object struct {
+    X, Y, W, H uint32
+    Pa, Pb, Pc, Pd uint32
+    RotScale bool
+    DoubleSize bool
+    Disable bool
+    Mode uint32
+    Mosaic bool
+    Palette256 bool
+    Shape uint32
+    HFlip, VFlip bool
+    Size uint32
+    RotParams uint32
+    CharName uint32
+    Priority uint32
+    Palette uint32
+    OneDimensional bool
+}
+
+func NewObjects(gba *GBA) *[128]Object {
+
+    addr := gba.Mem.Read16(0x0400_0000 + DISPCNT)
+    dispcnt := NewDispcnt(addr)
+
+    objects := &[128]Object{}
+
+    for i := range 128 {
+        objects[i] = *NewObject(gba, uint32(i), dispcnt)
+    }
+
+    return objects
+}
+
+func NewObject(gba *GBA, objIdx uint32, dispcnt *Dispcnt) *Object {
+
+    mem := gba.Mem
+    OAM_BASE := uint32(0x700_0000)
+    oamOffset := objIdx * 0x8
+
+    attr0 := mem.Read16(OAM_BASE + oamOffset)
+    attr1 := mem.Read16(OAM_BASE + oamOffset + 2)
+    attr2 := mem.Read16(OAM_BASE + oamOffset + 4)
+
+    obj := &Object{}
+
+    obj.Y = attr0 & 0b1111_1111
+    obj.RotScale = utils.BitEnabled(attr0, 8)
+
+    obj.Mode = utils.GetVarData(attr0, 10, 11)
+    obj.Mosaic = utils.BitEnabled(attr0, 12)
+    obj.Palette256 = utils.BitEnabled(attr0, 13)
+    obj.Shape = utils.GetVarData(attr0, 14, 15)
+    
+    obj.X = attr1 & 0b1_1111_1111
+
+    if obj.RotScale {
+        obj.DoubleSize = utils.BitEnabled(attr0, 9)
+        obj.RotParams = utils.GetVarData(attr1, 9, 13)
+        paramsAddr := OAM_BASE + (obj.RotParams * 0x20)
+        obj.Pa = mem.Read16(paramsAddr + 0x06)
+        obj.Pb = mem.Read16(paramsAddr + 0x0E)
+        obj.Pc = mem.Read16(paramsAddr + 0x16)
+        obj.Pd = mem.Read16(paramsAddr + 0x1E)
+    } else {
+        obj.Disable = utils.BitEnabled(attr0, 9)
+        obj.HFlip = utils.BitEnabled(attr1, 12)
+        obj.VFlip = utils.BitEnabled(attr1, 13)
+    }
+    obj.Size = utils.GetVarData(attr1, 14, 15)
+
+    obj.CharName = utils.GetVarData(attr2, 0, 9)
+    obj.Priority = utils.GetVarData(attr2, 10, 11)
+    obj.Palette = utils.GetVarData(attr2, 12, 15)
+
+    obj.OneDimensional = dispcnt.OneDimensional
+
+    obj.setSize(obj.Shape, obj.Size)
+
+    return obj
+}
+
+func (obj *Object) setSize(shape, size uint32) {
+
+    const (
+        SQUARE = 0
+        HORIZONTAL = 1
+        VERTICAL = 2
+    )
+
+    switch shape {
+    case SQUARE:
+        switch size {
+        case 0: obj.H, obj.W = 8, 8
+        case 1: obj.H, obj.W = 16, 16
+        case 2: obj.H, obj.W = 32, 32
+        case 3: obj.H, obj.W = 64, 64
+        }
+    case HORIZONTAL:
+        switch size {
+        case 0: obj.H, obj.W = 8, 16
+        case 1: obj.H, obj.W = 8, 32
+        case 2: obj.H, obj.W = 16, 32
+        case 3: obj.H, obj.W = 32, 64
+        }
+    case VERTICAL:
+        switch size {
+        case 0: obj.H, obj.W = 16, 8
+        case 1: obj.H, obj.W = 32, 8
+        case 2: obj.H, obj.W = 32, 16
+        case 3: obj.H, obj.W = 64, 32
+        }
+    //default: panic("PROHIBITTED OBJ SHAPE")
+    }
+}
 
 type Dispcnt struct {
     Mode uint32
@@ -66,15 +182,22 @@ func (gba *GBA) scanlineGraphics(y uint32) {
 
 func (gba *GBA) scanlineTileMode(dispcnt *Dispcnt, y uint32) {
 
+    wg := sync.WaitGroup{}
     bgPriorities := gba.getBgPriority(0)
+    objPriorities := gba.getObjPriority(y, gba.Objects)
     wins := NewWindows(dispcnt, gba)
     bld := NewBlend(gba)
-    bldPal := NewBlendPalette(bld)
 
-    objPriorities := gba.getObjPriority(y, dispcnt)
+    for xi := range SCREEN_WIDTH {
 
-    x := uint32(0)
-    for x = range SCREEN_WIDTH {
+        wg.Add(1)
+        x := uint32(xi)
+
+        bldPal := NewBlendPalette(bld)
+
+        go func(x uint32) {
+
+            defer wg.Done()
 
             index := (x + (y*SCREEN_WIDTH)) * 4
 
@@ -93,7 +216,8 @@ func (gba *GBA) scanlineTileMode(dispcnt *Dispcnt, y uint32) {
                 bgCount := len(bgPriorities[decIdx])
                 for j := range bgCount {
 
-                    bgIdx := bgPriorities[decIdx][bgCount - 1 - j]
+                    //bgIdx := bgPriorities[decIdx][bgCount - 1 - j]
+                    bgIdx := bgPriorities[decIdx][j]
 
                     if !bgEnabled(dispcnt, int(bgIdx)) {
                         continue
@@ -119,6 +243,7 @@ func (gba *GBA) scanlineTileMode(dispcnt *Dispcnt, y uint32) {
 
                     if ok && !palZero {
                         bldPal.setBlendPalettes(palData, uint32(bgIdx), false)
+                        break
                     }
                 }
 
@@ -128,13 +253,15 @@ func (gba *GBA) scanlineTileMode(dispcnt *Dispcnt, y uint32) {
                     objCount := len(objPriorities[decIdx])
 
                     for j := range objCount {
-                        objIdx := objPriorities[decIdx][objCount - 1 - j]
-                        palData, ok, palZero, obj := gba.object(x, y, dispcnt, objIdx * 0x8, wins)
+                        //objIdx := objPriorities[decIdx][objCount - 1 - j] this is old and slower
+                        objIdx := objPriorities[decIdx][j]
+                        palData, ok, palZero, obj := gba.object(x, y, &gba.Objects[objIdx], wins)
 
                         if ok && !palZero {
                             objTransparent = obj.Mode == 1
                             objExists = true
                             objPal = palData
+                            break
                         }
                     }
 
@@ -147,15 +274,24 @@ func (gba *GBA) scanlineTileMode(dispcnt *Dispcnt, y uint32) {
             finalPalData := bldPal.blend(objTransparent, x, y, wins)
 
             gba.applyColor(finalPalData, uint32(index))
+        }(x)
     }
+
+    wg.Wait()
 }
 
 func (gba *GBA) scanlineBitmapMode(dispcnt *Dispcnt, y uint32) {
 
+    wg := sync.WaitGroup{}
 	mem := gba.Mem
-    x := uint32(0)
 
-    for x = range SCREEN_WIDTH {
+    for xi := range SCREEN_WIDTH {
+
+        wg.Add(1)
+        x := uint32(xi)
+
+        go func(x uint32) {
+            defer wg.Done()
 
         index := (x + (y*SCREEN_WIDTH)) * 4
 
@@ -171,7 +307,7 @@ func (gba *GBA) scanlineBitmapMode(dispcnt *Dispcnt, y uint32) {
             idx := BASE + ((x + (y * WIDTH)) * BYTE_PER_PIXEL)
             data := mem.Read16(idx)
             gba.applyColor(data, uint32(index))
-            continue
+            return
 
         case 4:
 
@@ -190,7 +326,7 @@ func (gba *GBA) scanlineBitmapMode(dispcnt *Dispcnt, y uint32) {
             palIdx := mem.Read8(idx)
             palData := gba.getPalette(uint32(palIdx), 0, false)
             gba.applyColor(palData, uint32(index))
-            continue
+            return
 
         case 5:
 
@@ -204,7 +340,7 @@ func (gba *GBA) scanlineBitmapMode(dispcnt *Dispcnt, y uint32) {
             if x >= WIDTH || y >= HEIGHT {
                 palData := gba.getPalette(0, 0, false)
                 gba.applyColor(palData, uint32(index))
-                continue
+                return
             }
 
             idx := BASE + ((x + (y * WIDTH)) * BYTE_PER_PIXEL)
@@ -214,35 +350,22 @@ func (gba *GBA) scanlineBitmapMode(dispcnt *Dispcnt, y uint32) {
 
             data := mem.Read16(idx)
             gba.applyColor(data, uint32(index))
-            continue
+            return
 
         default:
             panic("INVALID BITMAP MODE GRAPHICS")
         }
+
+        }(x)
     }
+
+    wg.Wait()
 }
 
-func (gba *GBA) object(x, y uint32, dispcnt *Dispcnt, oamOffset uint32, wins *Windows) (uint32, bool, bool, *Object) {
+func (gba *GBA) object(x, y uint32, obj *Object, wins *Windows) (uint32, bool, bool, *Object) {
 
-    OAM_BASE := uint32(0x0700_0000)
-    mem := gba.Mem
-
-    attr0 := mem.Read16(OAM_BASE + oamOffset)
-    attr1 := mem.Read16(OAM_BASE + oamOffset + 2)
-    attr2 := mem.Read16(OAM_BASE + oamOffset + 4)
-
-    obj := NewObject(attr0, attr1, attr2, dispcnt)
-
-    if obj.Disable && !obj.RotScale {
+    if disabledStd := obj.Disable && !obj.RotScale; disabledStd {
         return 0, false, false, obj
-    }
-
-    if obj.RotScale {
-        paramsAddr := OAM_BASE + (obj.RotParams * 0x20)
-        obj.Pa = mem.Read16(paramsAddr + 0x06)
-        obj.Pb = mem.Read16(paramsAddr + 0x0E)
-        obj.Pc = mem.Read16(paramsAddr + 0x16)
-        obj.Pd = mem.Read16(paramsAddr + 0x1E)
     }
 
     if !windowObjPixelAllowed(x, y, wins) {
@@ -517,94 +640,6 @@ func getPaletteData(gba *GBA, pal256 bool, pal uint32, tileData, inTileX uint32)
     return palIdx, palData
 }
 
-type Object struct {
-    X, Y, W, H uint32
-    Pa, Pb, Pc, Pd uint32
-    RotScale bool
-    DoubleSize bool
-    Disable bool
-    Mode uint32
-    Mosaic bool
-    Palette256 bool
-    Shape uint32
-    HFlip, VFlip bool
-    Size uint32
-    RotParams uint32
-    CharName uint32
-    Priority uint32
-    Palette uint32
-    OneDimensional bool
-}
-
-func NewObject(attr0, attr1, attr2 uint32, dispcnt *Dispcnt) *Object {
-
-    obj := &Object{}
-
-    obj.Y = attr0 & 0b1111_1111
-    obj.RotScale = utils.BitEnabled(attr0, 8)
-
-    obj.Mode = utils.GetVarData(attr0, 10, 11)
-    obj.Mosaic = utils.BitEnabled(attr0, 12)
-    obj.Palette256 = utils.BitEnabled(attr0, 13)
-    obj.Shape = utils.GetVarData(attr0, 14, 15)
-    
-    obj.X = attr1 & 0b1_1111_1111
-
-    if obj.RotScale {
-        obj.DoubleSize = utils.BitEnabled(attr0, 9)
-        obj.RotParams = utils.GetVarData(attr1, 9, 13)
-    } else {
-        obj.Disable = utils.BitEnabled(attr0, 9)
-        obj.HFlip = utils.BitEnabled(attr1, 12)
-        obj.VFlip = utils.BitEnabled(attr1, 13)
-    }
-    obj.Size = utils.GetVarData(attr1, 14, 15)
-
-    obj.CharName = utils.GetVarData(attr2, 0, 9)
-    obj.Priority = utils.GetVarData(attr2, 10, 11)
-    obj.Palette = utils.GetVarData(attr2, 12, 15)
-
-    obj.OneDimensional = dispcnt.OneDimensional
-
-    obj.setSize(obj.Shape, obj.Size)
-
-    return obj
-}
-
-func (obj *Object) setSize(shape, size uint32) {
-
-    const (
-        SQUARE = 0
-        HORIZONTAL = 1
-        VERTICAL = 2
-    )
-
-    switch shape {
-    case SQUARE:
-        switch size {
-        case 0: obj.H, obj.W = 8, 8
-        case 1: obj.H, obj.W = 16, 16
-        case 2: obj.H, obj.W = 32, 32
-        case 3: obj.H, obj.W = 64, 64
-        }
-    case HORIZONTAL:
-        switch size {
-        case 0: obj.H, obj.W = 8, 16
-        case 1: obj.H, obj.W = 8, 32
-        case 2: obj.H, obj.W = 16, 32
-        case 3: obj.H, obj.W = 32, 64
-        }
-    case VERTICAL:
-        switch size {
-        case 0: obj.H, obj.W = 16, 8
-        case 1: obj.H, obj.W = 32, 8
-        case 2: obj.H, obj.W = 32, 16
-        case 3: obj.H, obj.W = 64, 32
-        }
-    //default: panic("PROHIBITTED OBJ SHAPE")
-    }
-}
-
 
 func bgEnabled(dispcnt *Dispcnt, idx int) bool {
     switch idx {
@@ -635,24 +670,19 @@ func (gba *GBA) getBgPriority(mode uint32) [4][]uint32 {
     return priorities
 }
 
-func (gba *GBA) getObjPriority(y uint32, dispcnt *Dispcnt) [4][]uint32 {
-
-    mem := gba.Mem
-    attr0Base := uint32(0x700_0000)
-    attr1Base := uint32(0x700_0002)
-    attr2Base := uint32(0x700_0004)
+func (gba *GBA) getObjPriority(y uint32, objects *[128]Object) [4][]uint32 {
 
     priorities := [4][]uint32{}
 
+    //maxPriority := uint32(0)
+
     for i := range 128 {
-        attr0 := mem.Read16(attr0Base + (uint32(i) * 0x8))
-        attr1 := mem.Read16(attr1Base + (uint32(i) * 0x8))
-        attr2 := mem.Read16(attr2Base + (uint32(i) * 0x8))
-        priority := utils.GetVarData(attr2, 10, 11)
 
-        obj := NewObject(attr0, attr1, attr2, dispcnt)
+        obj := &objects[i]
 
-        if disabled := utils.BitEnabled(attr0, 9); disabled && !obj.RotScale { // may need to make more effective
+        priority := obj.Priority
+
+        if disabled := obj.Disable && !obj.RotScale; disabled { // may need to make more effective
             continue
         }
 
@@ -665,6 +695,26 @@ func (gba *GBA) getObjPriority(y uint32, dispcnt *Dispcnt) [4][]uint32 {
         }
 
         priorities[priority] = append(priorities[priority], uint32(i))
+
+
+        //this all would work if pixel based not scanline
+
+        //if priority > maxPriority {
+        //    priorities[priority] = append(priorities[priority], uint32(i))
+        //    maxPriority = priority
+        //    continue
+        //}
+
+        //if priority == maxPriority {
+        //    maxIdx := len(priorities[priority])
+
+        //    if maxIdx == 0 {
+        //        priorities[priority] = append(priorities[priority], uint32(i))
+        //    } else {
+        //        priorities[priority][0] = uint32(i)
+        //    }
+
+        //}
     }
 
     return priorities

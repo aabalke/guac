@@ -42,7 +42,6 @@ func (cpu *Cpu) ThumbAlu(opcode uint16) {
         Rd: uint16(utils.GetVarData(uint32(opcode), 0, 2)),
 	}
 
-
     switch alu.Inst {
     case THUMB_LSL, THUMB_LSR, THUMB_ASR, THUMB_ADC, THUMB_SBC, THUMB_ROR, THUMB_NEG: cpu.thumbArithmetic(alu)
     case THUMB_AND, THUMB_EOR, THUMB_ORR, THUMB_BIC, THUMB_MVN: cpu.thumbLogical(alu)
@@ -337,11 +336,17 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
             rsValue += 4
         }
 
+        //s := cpu.Gba.InterruptStack
+        //if interruptStubExit := (r[rs] == s.ReturnAddr()) && !s.IsEmpty() && rd == PC; interruptStubExit {
+        //    cpsr.SetFlag(FLAG_T, false)
+        //    cpu.Gba.InterruptStack.Exit()
+        //    return 4
+        //}
+        //if interruptExit := cpu.Reg.getMode() == MODE_IRQ && rd == PC && rs == LR; interruptExit {
         if interruptExit := cpu.Reg.getMode() == MODE_IRQ && rd == PC && rs == LR; interruptExit {
-            cpu.AluChangeMode(false)
+            cpu.Gba.InterruptStack.Exit()
             return 4
         }
-
 
         if rd == PC {
             //r[rd] = utils.WordAlign(uint32(rsValue)) + 2 // need 2 for pokemon, may be different calc
@@ -356,20 +361,17 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
     case inst == 3 && mSBd: panic("UNSUPPORTED HI BLX")
     case inst == 3:
 
+        s := cpu.Gba.InterruptStack
+
         // THIS MAY HAVE BEEN NEEDED I AM NOT SURE IT BROKE ZELDA LTTP
         //if rs == LR && cpu.Reg.getMode() == MODE_IRQ {
-        //    r[rs] = r[rs] &^ 0b1
 
         //    cpsr.SetFlag(FLAG_T, false)
-        //    cpu.AluChangeMode(false)
+        //    s.Exit()
         //    return 4
         //}
 
-        //if interruptStubExit := r[rs] == IRQ_ADDR && cpu.Reg.getMode() == MODE_IRQ; interruptStubExit {
-
-        s := cpu.Gba.InterruptStack
-
-        if interruptStubExit := r[rs] == s.ReturnAddr() && !s.IsEmpty(); interruptStubExit {
+        if interruptStubExit := (r[rs] == s.ReturnAddr()) && !s.IsEmpty(); interruptStubExit {
             cpsr.SetFlag(FLAG_T, false)
             s.Exit()
             return 4

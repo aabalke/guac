@@ -17,7 +17,7 @@ func (gba *GBA) InputHandler(event sdl.Event) {
     }
 
     if reqInterrupt {
-        gba.triggerIRQ(12, "KEY")
+        gba.triggerIRQ(12)
     }
 
     gba.Joypad = tempJoypad

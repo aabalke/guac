@@ -3,6 +3,8 @@ package gba
 import (
 	"fmt"
 	"time"
+
+	//"github.com/aabalke33/guac/emu/gba"
 )
 
 var (
@@ -30,6 +32,7 @@ func NewMemory(gba *GBA) *Memory {
 
 	m.Write32(0x4000000, 0x80)
 
+	m.Write32(0x4000134, 0x800F) // IR requires bit 3 on. I believe this is auth check (sonic adv)
 	//m.Write(0x4000130, 0xFF) // KEY INPUT
 
 	m.GBA.Joypad = 0x3FF
@@ -119,6 +122,7 @@ func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
 
 	case addr < 0x1000_0000:
         relative := (addr - 0xE00_0000) % 0x1_0000
+
         return m.GBA.Cartridge.Read(relative)
 
 	default:
@@ -364,7 +368,9 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
         if byteWrite {
             return
         }
-		m.OAM[(addr-0x0700_0000)%0x400] = v
+        rel := (addr-0x0700_0000)%0x400
+        m.WriteOAM(rel)
+		m.OAM[rel] = v
         return
 	case addr < 0x0A00_0000:
         //fmt.Printf("COULD NOT WRITE %08X TO ADDR %08X\n", v, addr)
@@ -553,7 +559,6 @@ func (m *Memory) Write8(addr uint32, v uint8) {
 
 func (m *Memory) Write16(addr uint32, v uint16) {
 
-
 	//if sram := addr >= 0xE00_0000; sram {
     //    //fmt.Printf("ADDR  %08X V %08X\n", addr, v)
     //    a, _, _ := utils.Ror(uint32(v), (addr) * 8, false, false, false)
@@ -593,4 +598,19 @@ func CheckEeprom(gba *GBA, addr uint32) bool {
     }
 
     return true
+}
+
+func (m *Memory) WriteOAM(relAddr uint32) {
+
+    if affine := relAddr % 8 == 6 || relAddr % 8 == 7; affine {
+        m.GBA.Objects = NewObjects(m.GBA)
+        return
+    }
+
+    objIdx := relAddr / 8
+
+    addr := m.Read16(0x0400_0000 + DISPCNT)
+    dispcnt := NewDispcnt(addr)
+
+    m.GBA.Objects[objIdx] = *NewObject(m.GBA, uint32(objIdx), dispcnt)
 }

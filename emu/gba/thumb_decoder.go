@@ -6,8 +6,11 @@ func (cpu *Cpu) DecodeTHUMB(opcode uint16) int {
 
     r := &cpu.Reg.R
 
+    //if cpu.Gba.Cache.CheckThumb(cpu.Gba, opcode, r[PC]) {
+    //    return 2
+    //}
 
-    
+
 
 	switch {
     case isthumbSWI(opcode):

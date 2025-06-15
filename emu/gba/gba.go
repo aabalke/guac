@@ -6,6 +6,8 @@ import (
 
 	"github.com/aabalke33/guac/emu/gba/utils"
 	"github.com/aabalke33/guac/emu/gba/cart"
+    "time"
+
 )
 
 const (
@@ -17,11 +19,12 @@ var (
     _ = fmt.Sprintln("")
     _ = os.Args
     CURR_INST = 0
-    //MAX_COUNT = 100_000
-
     IN_EXCEPTION = false
     EXCEPTION_COUNT = 0
 )
+
+var start time.Time
+var end time.Time
 
 type GBA struct {
     GamePath string
@@ -40,6 +43,7 @@ type GBA struct {
     ExitHalt bool
 
     Apu *APU
+    Objects *[128]Object
 
     Clock int
     FPS int
@@ -52,18 +56,16 @@ type GBA struct {
     VCOUNT uint32
 
     GraphicsDirty bool
-
     IntrWait uint32
-
     Save bool
-
     InterruptStack *InterruptStack
-
     GBA_LOCK bool
-
     OpenBusOpcode uint32
-
     DmaOnRefresh bool
+
+    prevVcountMatch bool
+
+    //Cache *Cache
 }
 
 var SAVED_CYCLES = uint32(0)
@@ -81,22 +83,25 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
         frameCycles = gba.UpdateScanline(frameCycles)
     }
 
-    dispstat := uint32(gba.Mem.Dispstat)
-    if utils.BitEnabled(dispstat, 3) {
-        gba.triggerIRQ(0, "VBLANK")
-    }
 
     gba.Mem.Dispstat.SetVBlank(true)
 
     gba.checkDmas(DMA_MODE_VBL)
 
-    for range 68 {
+    frameCycles = gba.UpdateScanline(frameCycles)
+
+    dispstat := uint32(gba.Mem.Dispstat)
+    if utils.BitEnabled(dispstat, 3) {
+        gba.triggerIRQ(0)
+    }
+
+    for range 66 {
         frameCycles = gba.UpdateScanline(frameCycles)
     }
 
     gba.Mem.Dispstat.SetVBlank(false)
 
-    //frameCycles = gba.UpdateScanline(frameCycles) // 227
+    frameCycles = gba.UpdateScanline(frameCycles) // 227
 
     SAVED_CYCLES = frameCycles - (1232 * 228)
 
@@ -109,31 +114,30 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
 
 func (gba *GBA) UpdateScanline(frameCycles uint32) uint32 {
 
-    gba.scanlineGraphics(gba.VCOUNT)
 
-    dispstat := gba.Mem.Read16(0x400_0004)
+    dispstat := uint32(gba.Mem.Dispstat)
     lyc := gba.Mem.Read8(0x400_0005)
+    match := lyc == gba.VCOUNT
+    gba.Mem.Dispstat.SetVCFlag(match)
+
     vcounterIRQ := utils.BitEnabled(dispstat, 5)
-
-    if vcounterIRQ && gba.VCOUNT == lyc {
-        gba.triggerIRQ(2, "VCOUNTER")
+    if vcounterIRQ && match {
+        gba.triggerIRQ(2)
     }
 
-    if gba.VCOUNT == lyc {
-        gba.Mem.Dispstat.SetVCFlag(true)
-    } else {
-        gba.Mem.Dispstat.SetVCFlag(false)
-    }
 
     //Although the drawing time is only 960 cycles (240*4), the H-Blank flag is "0" for a total of 1006 cycles. gbatek
     frameCycles = gba.Exec(1006, frameCycles)
 
-    dispstat = uint32(gba.Mem.Dispstat)
-    if utils.BitEnabled(dispstat, 4) && gba.VCOUNT < 160 {
-        gba.triggerIRQ(1, "HBLANK")
-    }
+    gba.scanlineGraphics(gba.VCOUNT)
 
     gba.Mem.Dispstat.SetHBlank(true)
+
+    dispstat = uint32(gba.Mem.Dispstat)
+    if utils.BitEnabled(dispstat, 4) {
+        // hblank causes problems
+        gba.triggerIRQ(1)
+    }
 
     if vblank := utils.BitEnabled(dispstat, 0); !vblank { // this is necessary for dmas do not remove
         gba.checkDmas(DMA_MODE_HBL)
@@ -142,20 +146,18 @@ func (gba *GBA) UpdateScanline(frameCycles uint32) uint32 {
     frameCycles = gba.Exec(1232 - 1006, frameCycles)
 
     gba.Mem.Dispstat.SetHBlank(false)
-    //gba.Mem.IO[0x202] &^= 0b10
 
     //if gba.DmaOnRefresh {
-        gba.Dma[1].transferFifo()
-        gba.Dma[2].transferFifo()
+    //    gba.Dma[1].transferFifo()
+    //    gba.Dma[2].transferFifo()
     //}
+
     gba.Dma[3].transferVideo(gba.VCOUNT)
 
     gba.VCOUNT++
 
     return frameCycles
 }
-
-var AAAA bool
 
 func (gba *GBA) Exec(requiredCycles, frameCycles uint32) uint32 {
 
@@ -176,9 +178,7 @@ func (gba *GBA) Exec(requiredCycles, frameCycles uint32) uint32 {
         gba.OpenBusOpcode = gba.Mem.Read32(r[PC] + 8)
 
         if (r[PC] >= 0x400_0000 && r[PC] < 0x800_0000) || r[PC] % 2 != 0 {
-
             r := &gba.Cpu.Reg.R
-
             panic(fmt.Sprintf("INVALID PC CURR %d PC %08X OPCODE %08X", CURR_INST, r[PC], gba.Mem.Read32(r[PC])))
         }
 
@@ -186,37 +186,35 @@ func (gba *GBA) Exec(requiredCycles, frameCycles uint32) uint32 {
             AckIntrWait(gba)
         }
 
-        if gba.Halted && gba.ExitHalt {
-            gba.Halted = false
-        } 
-
         if !gba.Halted {
             cycles = gba.Cpu.Execute(opcode)
         }
 
-        //if r[PC] == 0x800_0230 {
-        //    //fmt.Printf("PC %08X R2 %08X CURR %d\n", r[PC], r[2], CURR_INST)
-        //    gba.Debugger.print(CURR_INST)
+        //if CURR_INST >= 17985169 {
+        //    fmt.Printf("PC %08X\n", r[PC])
+        //}
+
+        //if r[PC] == 0x3005E44 && CURR_INST >= 18_016_000 {
+        //if CURR_INST >= 18016033 {
+        //    //gba.Debugger.print(CURR_INST)
         //    gba.Paused = true
         //    os.Exit(0)
         //}
 
-        if !gba.Halted {
-            CURR_INST++
-        }
-
         //gba.Timers.Increment(uint32(cycles))
         gba.Timers.Update(uint32(cycles))
 
+        gba.checkIRQ()
+
         accCycles += uint32(cycles)
+
+        if !gba.Halted {
+            CURR_INST++
+        }
     }
 
     return accCycles - requiredCycles
 }
-
-var FLAG bool
-
-var PREV_VALUE uint32
 
 func (gba *GBA) checkDmas(mode uint32) {
     for i := range gba.Dma {
@@ -231,11 +229,20 @@ func NewGBA() *GBA {
 	pixels := make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)
 	debugPixels := make([]byte, 1080*1080*4)
 
+    obj := Object{}
+    objs := &[128]Object{}
+
+    for i := range 128 {
+        objs[i] = obj
+    }
+
 	gba := GBA{
         Clock: 16_780_000,
         FPS: 60, // 59.7374117111
         Pixels: &pixels,
         DebugPixels: &debugPixels,
+        Objects: objs,
+        VCOUNT: 126,
     }
 
     gba.InterruptStack = &InterruptStack{
@@ -280,9 +287,11 @@ func NewGBA() *GBA {
 
     gba.Apu.Init()
 
+    //gba.Cache = &Cache{}
+
     //gba.Logger = NewLogger(".log.txt", &gba)
 
-    gba.LoadBios("./emu/gba/res/bios_magia.gba")
+    //gba.LoadBios("./emu/gba/res/bios_magia.gba")
 
     //gba.SoftReset()
 
@@ -330,6 +339,8 @@ func (gba *GBA) LoadGame(path string, useState bool) {
         LoadState(gba, path)
         gba.Paused = true
     }
+
+    //gba.Cache.Build(gba)
 }
 
 func (gba *GBA) toggleThumb() {
@@ -350,32 +361,28 @@ func (gba *GBA) toggleThumb() {
     // pipe
 }
 
-func (gba *GBA) triggerIRQ(irq uint32, cause string) {
+func (gba *GBA) triggerIRQ(irq uint32) {
 
     mem := gba.Mem
-
-    mem.BIOS_MODE = BIOS_IRQ
-
+    //mem.BIOS_MODE = BIOS_IRQ
     iack := mem.Read16(0x400_0202)
-
     iack |= (1 << irq)
     mem.IO[0x202] = uint8(iack)
     mem.IO[0x203] = uint8(iack>>8)
-	gba.Halted = false
-
-    //fmt.Printf("IRQ EXCEPTION CHECK AT TRIGGER\n")
-	gba.checkIRQ(cause)
+    gba.Halted = false
 }
 
-func (gba *GBA) checkIRQ(cause string) {
+func (gba *GBA) checkIRQ() {
 
     interruptEnabled := !gba.Cpu.Reg.CPSR.GetFlag(FLAG_I)
     ime := utils.BitEnabled(gba.Mem.Read16(0x400_0208), 0)
     interrupts := (gba.Mem.Read16(0x400_0200) & gba.Mem.Read16(0x400_0202)) != 0
+
+    if interrupts {
+        gba.Halted = false
+    }
+
     if interruptEnabled && ime && interrupts {
-        //if AAAA {
-        //    fmt.Printf("INTERRUPT INTERRUPT %s\n", cause)
-        //}
-        gba.InterruptStack.Execute(cause)
+        gba.InterruptStack.Execute()
     }
 }

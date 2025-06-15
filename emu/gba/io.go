@@ -27,7 +27,7 @@ func (d *Dispstat) Write(v uint8, hi bool) {
 func (d *Dispstat) SetVBlank(v bool) {
 
     if v {
-        *d = Dispstat((uint16(*d) &^ 0b1) | 0b1)
+        *d = Dispstat(uint16(*d) | 0b1)
         return
     }
 
@@ -37,7 +37,7 @@ func (d *Dispstat) SetVBlank(v bool) {
 func (d *Dispstat) SetHBlank(v bool) {
 
     if v {
-        *d = Dispstat((uint16(*d) &^ 0b10) | 0b10)
+        *d = Dispstat(uint16(*d) | 0b10)
         return
     }
 
@@ -47,14 +47,12 @@ func (d *Dispstat) SetHBlank(v bool) {
 func (d *Dispstat) SetVCFlag(v bool) {
 
     if v {
-        *d = Dispstat((uint16(*d) &^ 0b100) | 0b100)
+        *d = Dispstat(uint16(*d) | 0b100)
         return
     }
 
     *d = Dispstat((uint16(*d) &^ 0b100))
 }
-
-
 
 //func (d *Dispstat) SetVCounter(scanline int) {
 //

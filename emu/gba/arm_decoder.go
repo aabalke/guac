@@ -9,10 +9,18 @@ func (cpu *Cpu) DecodeARM(opcode uint32) int {
 
     r := &cpu.Reg.R
 
+
 	if !cpu.CheckCond(utils.GetByte(opcode, 28)) {
 		r[PC] += 4
 		return 4
 	}
+
+    //if cpu.Gba.Cache.CheckArm(cpu.Gba, opcode, r[PC]) {
+    //    return 4
+    //}
+
+
+
 
 	switch {
 	case isSWI(opcode):
@@ -33,7 +41,9 @@ func (cpu *Cpu) DecodeARM(opcode uint32) int {
 		cpu.BX(opcode)
 	case isSDT(opcode):
         if IN_EXCEPTION { fmt.Printf("PC %08X SDT\n", r[PC]) }
-		cpu.Sdt(opcode)
+        cycles := cpu.Sdt(opcode)
+        return int(cycles)
+
 	case isBlock(opcode):
         if IN_EXCEPTION { fmt.Printf("PC %08X BLK\n", r[PC]) }
 		cpu.Block(opcode)
@@ -55,7 +65,6 @@ func (cpu *Cpu) DecodeARM(opcode uint32) int {
         if IN_EXCEPTION { fmt.Printf("PC %08X ALU\n", r[PC]) }
 		cpu.Alu(opcode)
 
-        return 4
 
         //if cpu.Gba.Ct.instCycles != 0 {
         //    return cpu.Gba.Ct.instCycles

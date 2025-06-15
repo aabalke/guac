@@ -270,7 +270,7 @@ func IntrWait(gba *GBA) {
     mem := gba.Mem
 	reg := &gba.Cpu.Reg.R
 	waitMode := reg[0]
-	irqMask := uint32(reg[1])
+	irqMask := reg[1]
 
     IF := mem.Read16(0x400_0202)
     mem.Write16(0x400_0208, 0x1)
@@ -286,14 +286,18 @@ func IntrWait(gba *GBA) {
     }
 
     if waitMode == 0 && (IF&irqMask) != 0 {
+        println("here")
         return
 	}
+
     gba.IntrWait = irqMask
 	// Discard old IF flags if waitMode == 1
 	if waitMode == 1 {
 
-        mem.IO[0x202] = 0x0
-        mem.IO[0x203] = 0x0
+        //mem.IO[0x202] = 0//uint8(irqMask)
+        //mem.IO[0x203] = 0//uint8(irqMask >> 8)
+        //mem.IO[0x202] = uint8(irqMask)
+        //mem.IO[0x203] = uint8(irqMask >> 8)
 
         //if (IF & irqMask) != 0 {
         //    return
@@ -316,15 +320,13 @@ func AckIntrWait(gba *GBA) {
     mem := gba.Mem
 
     if gba.IntrWait & mem.Read16(0x400_0202) == 0 {
+    //if mem.Read16(0x400_0200) & mem.Read16(0x400_0202) == 0 {
         return
     }
-
-    //fmt.Printf("STORED %08X, IF %08X\n", gba.IntrWait, mem.Read16(0x400_0202))
 
     gba.Halted = false
     gba.IntrWait = 0
 
-    //gba.ExitHalt = true
 	reg := &gba.Cpu.Reg.R
 
 	irqMask := uint32(reg[1])

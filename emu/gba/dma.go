@@ -142,6 +142,10 @@ func (dma *DMA) disable() {
 
 func (dma *DMA) transfer() {
 
+    //if CURR_INST > 1480 {
+    //    fmt.Printf("SRC %08X DST %08X\n", dma.Src, dma.Dst)
+    //}
+
     mem := dma.Gba.Mem
 
     count := dma.WordCount
@@ -255,8 +259,7 @@ func (dma *DMA) transfer() {
     }
 
     if dma.IRQ {
-        cause := fmt.Sprintf("DMA%d", dma.Idx)
-        dma.Gba.triggerIRQ(0x8 + uint32(dma.Idx), cause)
+        dma.Gba.triggerIRQ(0x8 + uint32(dma.Idx))
     }
 
     if !dma.Repeat {
@@ -289,6 +292,8 @@ func (dma *DMA) transferVideo(vcount uint32) {
 }
 
 func (dma *DMA) transferFifo() {
+
+    //return
 
     //if (dma.Idx != 1 && dma.Idx != 2) || dma.Mode != DMA_MODE_REF || !dma.Enabled {
     //    return
