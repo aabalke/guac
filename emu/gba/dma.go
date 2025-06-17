@@ -48,91 +48,91 @@ type DMA struct {
     EepromWidth uint32
 }
 
-func (dma *DMA) ReadSrc(byte uint32) uint8 {
-    bitOffset := 8 * byte
-    return uint8(dma.Src >> bitOffset) & 0xFF
-}
-
-func (dma *DMA) ReadDst(byte uint32) uint8 {
-    bitOffset := 8 * byte
-    return uint8(dma.Dst >> bitOffset) & 0xFF
-}
-
-func (dma *DMA) ReadCount(hi bool) uint8 {
-    if hi { return uint8(dma.WordCount >> 8) & 0xFF }
-    return uint8(dma.WordCount) & 0xFF
-}
-
 func (dma *DMA) ReadControl(hi bool) uint8 {
     if hi { return uint8(dma.Control >> 8) & 0xFF }
     return uint8(dma.Control) & 0xFF
 }
 
-func (dma *DMA) WriteSrc(v uint8, byte uint32) {
-    dma.Src = utils.ReplaceByte(dma.Src, uint32(v), byte)
-    if dma.Idx == 0 {
-        dma.Src &= 0x7FF_FFFF
-        return
+func (dma *DMA) MaskAddr(v uint32, src bool) uint32 {
+
+    switch {
+    case src && dma.Idx == 0: return v & 0x7FF_FFFF
+    case !src && dma.Idx == 0: return v & 0x7FF_FFFF
+    case !src && dma.Idx == 1: return v & 0x7FF_FFFF
+    case !src && dma.Idx == 2: return v & 0x7FF_FFFF
     }
-    dma.Src &= 0xFFF_FFFF
+
+    return v & 0xFFF_FFFF
+}
+
+func (dma *DMA) WriteSrc(v uint8, byte uint32) {
+
+    if byte == 3 {
+    switch dma.Idx {
+    case 0: v &= 0x07
+    case 1, 2, 3: v &= 0x0F
+    }
+    }
+
+    dma.Src = utils.ReplaceByte(dma.Src, uint32(v), byte)
 }
 
 func (dma *DMA) WriteDst(v uint8, byte uint32) {
 
-    dma.Dst = utils.ReplaceByte(dma.Dst, uint32(v), byte)
-    if dma.Idx == 0 {
-        dma.Dst &= 0x7FF_FFFF
-        return
+    if byte == 3 {
+    switch dma.Idx {
+    case 0, 1, 2: v &= 0x07
+    case 3: v &= 0x0F
     }
-    dma.Dst &= 0xFFF_FFFF
+    }
+
+    dma.Dst = utils.ReplaceByte(dma.Dst, uint32(v), byte)
 }
 
 func (dma *DMA) WriteCount(v uint8, hi bool) {
 
     if hi {
-        mask := 0x7F
+        mask := uint32(0x3F)
         if dma.Idx == 3 {
-            mask = 0x1FF
+            mask = 0xFF
         }
-        dma.WordCount = (dma.WordCount & 0b1111_1111) | ((uint32(v) & uint32(mask)) << 8)
+        dma.WordCount = (dma.WordCount & 0xFF) | ((uint32(v) & mask) << 8)
         return
     }
 
-	dma.WordCount = (dma.WordCount &^ 0b1111_1111) |  uint32(v)
+	dma.WordCount = (dma.WordCount &^ 0xFF) |  uint32(v)
 }
 
 func (dma *DMA) WriteControl(v uint8, hi bool) {
 
 	if hi {
-		dma.Control = (dma.Control & 0b1111_1111) | (uint32(v) << 8)
-		dma.SrcAdj = (dma.SrcAdj & 1) | (uint32(v) & 1) << 1
-		dma.Repeat = utils.BitEnabled(uint32(v), 1)
-		dma.isWord = utils.BitEnabled(uint32(v), 2)
-        dma.DRQ = utils.BitEnabled(uint32(v), 3)
-        dma.Mode = utils.GetVarData(uint32(v), 4, 5)
-		dma.IRQ = utils.BitEnabled(uint32(v), 6)
-		dma.Enabled = utils.BitEnabled(uint32(v), 7)
+        a := uint32(v) & 0xF7
+        if dma.Idx == 3 {
+            a = uint32(v) & 0xFF
+        }
 
-	} else {
-		dma.Control = (dma.Control &^ 0b1111_1111) | uint32(v)
-		dma.DstAdj = (uint32(v) >> 5) & 0b11
-		dma.SrcAdj = (dma.SrcAdj &^ 1) | ((uint32(v) >> 7) & 1)
-	}
+        wasDisabled := !dma.Enabled
+		dma.Control = (dma.Control & 0b1111_1111) | (a << 8)
+		dma.SrcAdj = (dma.SrcAdj & 1) | (a & 1) << 1
+		dma.Repeat = utils.BitEnabled(a, 1)
+		dma.isWord = utils.BitEnabled(a, 2)
+        dma.DRQ = utils.BitEnabled(a, 3)
+        dma.Mode = utils.GetVarData(a, 4, 5)
+		dma.IRQ = utils.BitEnabled(a, 6)
+		dma.Enabled = utils.BitEnabled(a, 7)
 
-	if dma.Mode >= 0b100 {
-		panic("DMA MODE HAS BEEN SET OVER b11")
-	}
+        // immediate should be 2 cycles after enabling
+        if isImmediate := wasDisabled && dma.checkMode(DMA_MODE_IMM); isImmediate {
+            dma.transfer()
+        }
 
-    // need to make sure entire 16 bit of control is written before transfer
-    dma.SingleByteSet = !dma.SingleByteSet
-	if dma.SingleByteSet {
-		return
-	}
+        return
+    }
 
-	// immediate should be 2 cycles after enabling
-	if isImmediate := dma.checkMode(DMA_MODE_IMM); isImmediate {
-		dma.transfer()
-	}
+    a := uint32(v) & 0xE0
+    dma.Control = (dma.Control &^ 0b1111_1111) | a
+    dma.DstAdj = (uint32(a) >> 5) & 0b11
+    dma.SrcAdj = (dma.SrcAdj &^ 1) | ((uint32(a) >> 7) & 1)
 }
 
 func (dma *DMA) disable() {
@@ -141,11 +141,6 @@ func (dma *DMA) disable() {
 }
 
 func (dma *DMA) transfer() {
-
-    //if CURR_INST > 1480 {
-    //    fmt.Printf("SRC %08X DST %08X\n", dma.Src, dma.Dst)
-    //}
-
     mem := dma.Gba.Mem
 
     count := dma.WordCount
@@ -162,8 +157,8 @@ func (dma *DMA) transfer() {
     }
 
     if dma.Mode == DMA_MODE_HBL {
-        srcInLimited := dma.Src >= 0x600_0000 && dma.Src < 0xA00_0000
-        dstInLimited := dma.Dst >= 0x600_0000 && dma.Dst < 0xA00_0000
+        srcInLimited := dma.Src >= 0x600_0000 && dma.Src < 0x800_0000
+        dstInLimited := dma.Dst >= 0x600_0000 && dma.Dst < 0x800_0000
         allowed := utils.BitEnabled(dma.Gba.Mem.Read16(0x400_0000), 5)
 
         if (srcInLimited || dstInLimited) && !allowed {
@@ -198,60 +193,69 @@ func (dma *DMA) transfer() {
     case !dma.isWord && dma.SrcAdj == DMA_ADJ_DEC: srcOffset = -2
     }
 
-    //if dma.Gba.Cpu.Reg.R[PC] == 0x80B06AA {
-
-    //    fmt.Printf("SRC %08X, %08X\n", dma.Src, mem.Read32(dma.Src))
-    //    dma.Gba.Debugger.print(CURR_INST)
-    //    panic("HERE")
-    //}
-
     if fifo := (dma.Idx == 1 || dma.Idx == 2) && dma.Mode == DMA_MODE_REF; fifo {
         dstOffset = 0
-        //dma.DstAdj = DMA_ADJ_NON
-        dma.isWord = false
+        dma.isWord = true
         count = 4
-        srcOffset = 4
+        //srcOffset = 4
 
         if !dma.Repeat || (dma.Dst != 0x400_00A0 && dma.Dst != 0x400_00A4) {
             panic("INVALID FIFO DMA")
         }
     }
 
-    for i := uint32(0); i < count; i++ {
-
-        // not sure about this
+    if eeprom := CheckEeprom(dma.Gba, tmpDst); eeprom {
         dstRom := tmpDst >= 0x800_0000 && tmpDst < 0xE00_0000
         srcRom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
-        //dstSram := tmpDst >= 0xE00_0000 && tmpDst < 0x1000_0000
-        //srcSram := tmpSrc >= 0xE00_0000 && tmpSrc < 0x1000_0000
 
-        if (dstRom) && dma.Idx != 3 {
-            continue
+        if count == 9 || count == 73 {
+            cart.EepromWidth = 6
+        } else if count == 17 || count == 81 {
+            cart.EepromWidth = 14
         }
 
-        if eeprom := CheckEeprom(dma.Gba, tmpDst); eeprom {
-
-            if count == 9 || count == 73 {
-                cart.EepromWidth = 6
-            } else if count == 17 || count == 81 {
-                cart.EepromWidth = 14
-            }
-
-            if srcRom && dstRom {
-                panic("EEPROM HAS BOTH SRC AND DST ROM ADDR")
-            }
+        if srcRom && dstRom {
+            panic("EEPROM HAS BOTH SRC AND DST ROM ADDR")
         }
 
-        //if dstSram || srcSram {
-        //    continue
-        //}
+        return
+    }
+
+    dstRom := tmpDst >= 0x800_0000 && tmpDst < 0xE00_0000
+    //srcRom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
+
+    dstSram := tmpDst >= 0xE00_0000 && tmpDst < 0x1000_0000
+    srcSram := tmpSrc >= 0xE00_0000 && tmpSrc < 0x1000_0000
+
+    if sram := (dstSram || srcSram) && dma.Gba.Cartridge.FlashType == 2; sram {
+        return
+    } else if rom := (dstRom || dstSram) && dma.Idx != 3; rom {
+        return
+    }
+
+
+    if (dstSram || srcSram) && dma.Gba.Cartridge.FlashType == 2 {
+        return
+    }
+
+    for i := uint32(0); i < count; i++ {
 
         if dma.isWord {
-            v := mem.Read32(tmpSrc)
-            mem.Write32(tmpDst, v)
+
+            if badAddr := tmpSrc < 0x200_0000; badAddr {
+                mem.Write32(tmpDst, 0)
+            } else {
+                v := mem.Read32(tmpSrc)
+                mem.Write32(tmpDst, v)
+            }
         } else {
-            v := mem.Read16(tmpSrc)
-            mem.Write16(tmpDst, uint16(v))
+
+            if badAddr := tmpSrc < 0x200_0000; badAddr {
+                mem.Write16(tmpDst, 0)
+            } else {
+                v := mem.Read16(tmpSrc)
+                mem.Write16(tmpDst, uint16(v))
+            }
         }
 
         tmpDst = uint32(int64(tmpDst) + dstOffset)
@@ -270,19 +274,19 @@ func (dma *DMA) transfer() {
 
     if dma.DstAdj == DMA_ADJ_RES {
         // dma.Dst stays the same
-        dma.Src = tmpSrc
+        dma.Src = dma.MaskAddr(tmpSrc, true)
         return
     }
 
-    dma.Src = tmpSrc
-    dma.Dst = tmpDst
+    dma.Src = dma.MaskAddr(tmpSrc, true)
+    dma.Dst = dma.MaskAddr(tmpDst, false)
 
     return
 }
 
 func (dma *DMA) transferVideo(vcount uint32) {
 
-    if dma.Idx != 3 || dma.Mode != 3 || !dma.Enabled {
+    if dma.Idx != 3 || dma.Mode != 3 || !dma.Enabled || (dma.Dst >= 0x600_0000 || dma.Dst <= 0x700_0000) {
         return
     }
 
@@ -293,17 +297,23 @@ func (dma *DMA) transferVideo(vcount uint32) {
 
 func (dma *DMA) transferFifo() {
 
-    //return
+    if (dma.Idx != 1 && dma.Idx != 2) || dma.Mode != DMA_MODE_REF || !dma.Enabled {
+        return
+    }
 
-    //if (dma.Idx != 1 && dma.Idx != 2) || dma.Mode != DMA_MODE_REF || !dma.Enabled {
-    //    return
-    //}
+    if !dma.Repeat {
+        return
+    }
 
-    //if !dma.Repeat || (dma.Dst != 0x400_00A0 && dma.Dst != 0x400_00A4) {
-    //    return
-    //}
+    if !dma.Gba.Apu.ChannelA.Refill && dma.Dst != 0x400_00A0 {
+        return
+    }
 
-    //dma.transfer()
+    if !dma.Gba.Apu.ChannelB.Refill && dma.Dst != 0x400_00A4 {
+        return
+    }
+
+    dma.transfer()
 }
 
 func (dma *DMA) checkMode(mode uint32) bool {

@@ -140,10 +140,10 @@ func (a *APU) Init() {
 
 		},
 	}
-	a.ChannelA = DigitalChannel{
+
+    digital := DigitalChannel{
 		Enabled: true,
 		Apu:     a,
-        Idx: 0,
 		WavShaper: func(i int, samples *[][2]float64, c *DigitalChannel) {
 
             if i % FIFO_SIZE == 0 {
@@ -192,7 +192,12 @@ func (a *APU) Init() {
 			(*samples)[i][0] = nLeft
 			(*samples)[i][1] = nRight
 		},
-	}
+    }
+
+    digital.Idx = 0
+	a.ChannelA = digital
+    //digital.Idx = 1
+	//a.ChannelB = digital update clamp bits
 
     //mixer.Add(&a.Channel1, &a.Channel2, &a.Channel3, &a.Channel4, &a.ChannelA)
     //mixer.Add(&a.ChannelA)
@@ -654,8 +659,8 @@ func (c *DigitalChannel) InitCallback() {
 
     dstRate := c.Apu.SampleRate
     c.Ratio = srcRate / dstRate
-    //c.Fraction = 0
-    //c.History = [4]float64{}
+    c.Fraction = 0
+    c.History = [4]float64{}
 }
 
 func cubicInterpolate(history [4]float64, mu float64) float64 {

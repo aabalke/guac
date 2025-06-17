@@ -79,7 +79,7 @@ func (gba *GBA) SysCall(inst uint32) (int, bool) {
 
 	cycles := 0
 
-    //fmt.Printf("SYS CALL %08X\n", inst)
+    //fmt.Printf("SYS CALL %08X CURR %d\n", inst, CURR_INST)
 
     if inst > 0x2A {
 

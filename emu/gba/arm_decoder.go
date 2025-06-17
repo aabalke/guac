@@ -19,9 +19,6 @@ func (cpu *Cpu) DecodeARM(opcode uint32) int {
     //    return 4
     //}
 
-
-
-
 	switch {
 	case isSWI(opcode):
         cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
@@ -34,42 +31,26 @@ func (cpu *Cpu) DecodeARM(opcode uint32) int {
         return cycles
 
 	case isB(opcode):
-        if IN_EXCEPTION { fmt.Printf("PC %08X B\n", r[PC]) }
 		cpu.B(opcode)
 	case isBX(opcode):
-        if IN_EXCEPTION { fmt.Printf("PC %08X BX\n", r[PC]) }
 		cpu.BX(opcode)
 	case isSDT(opcode):
-        if IN_EXCEPTION { fmt.Printf("PC %08X SDT\n", r[PC]) }
         cycles := cpu.Sdt(opcode)
         return int(cycles)
-
 	case isBlock(opcode):
-        if IN_EXCEPTION { fmt.Printf("PC %08X BLK\n", r[PC]) }
 		cpu.Block(opcode)
 	case isHalf(opcode):
-        if IN_EXCEPTION { fmt.Printf("PC %08X HALF\n", r[PC]) }
 		cpu.Half(opcode)
 	case isUD(opcode):
 		panic("Need Undefined functionality")
 	case isPSR(opcode):
-        if IN_EXCEPTION { fmt.Printf("PC %08X PSR\n", r[PC]) }
 		cpu.Psr(opcode)
 	case isSWP(opcode):
-        if IN_EXCEPTION { fmt.Printf("PC %08X SWP\n", r[PC]) }
 		cpu.Swp(opcode)
     case isM(opcode):
-        if IN_EXCEPTION { fmt.Printf("PC %08X MUL\n", r[PC]) }
         cpu.Mul(opcode)
 	case isALU(opcode):
-        if IN_EXCEPTION { fmt.Printf("PC %08X ALU\n", r[PC]) }
 		cpu.Alu(opcode)
-
-
-        //if cpu.Gba.Ct.instCycles != 0 {
-        //    return cpu.Gba.Ct.instCycles
-        //}
-
 	default:
 		panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X, INSTR %d", opcode, r[PC], CURR_INST))
 	}

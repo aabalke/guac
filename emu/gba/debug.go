@@ -65,6 +65,7 @@ func (d *Debugger) print(i int) {
     }
 
     s("--------  --------")
+    p(fmt.Sprintf("4744 %08X", i), d.Gba.Mem.Read32(0x802E7A4))
 
     //j := uint32(0x4000208)
     //p(fmt.Sprintf("IME %04X", j), d.Gba.Mem.Read16(uint32(j)))
@@ -88,8 +89,8 @@ func (d *Debugger) print(i int) {
 
     //start := 0x3007EB0
     //start := 0x30014B0
-    start := 0x3007DF0
-    count := 0x00
+    start := 0x40000E4
+    count := 0x10
     for i := start; i >= start - (count * 4); i -= 4 {
         p(fmt.Sprintf("IO %X", i), d.Gba.Mem.Read32(uint32(i)))
     }

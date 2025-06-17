@@ -535,6 +535,7 @@ func (cpu *Cpu) thumbLSHalf(opcode uint16) {
 
     r := &cpu.Reg.R
 
+
     addr := r[rb] + offset
 
     if ldr {
@@ -544,7 +545,9 @@ func (cpu *Cpu) thumbLSHalf(opcode uint16) {
         r[rd] = v
     } else {
         cpu.Gba.Mem.Write16(addr, uint16(r[rd]))
+
     }
+
 
     r[PC] += 2
 }
@@ -566,7 +569,6 @@ func (cpu *Cpu) thumbLSSigned(opcode uint16) {
     r := &cpu.Reg.R
 
     addr := r[rb] + r[ro]
-
     switch inst {
     case THUMB_STRH: 
         cpu.Gba.Mem.Write16(addr, uint16(r[rd]))

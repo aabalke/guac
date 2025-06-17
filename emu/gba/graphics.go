@@ -30,6 +30,28 @@ type Object struct {
     OneDimensional bool
 }
 
+func NewBackgrounds(gba *GBA, dispcnt *Dispcnt) *[4]Background {
+
+    bgs := &[4]Background{}
+
+    for i := range 4 {
+        isAffine := (
+            (dispcnt.Mode == 1 && i == 2) ||
+            (dispcnt.Mode == 2 && (i == 2 || i == 3)))
+        isStandard := (
+            (dispcnt.Mode == 0) ||
+            (dispcnt.Mode == 1 && (i == 0 || i == 1 || i == 2)))
+
+        if !isAffine && !isStandard {
+            continue
+        }
+
+        bgs[i] = *NewBackground(gba, dispcnt, uint32(i), isAffine)
+    }
+
+    return bgs
+}
+
 func NewObjects(gba *GBA) *[128]Object {
 
     addr := gba.Mem.Read16(0x0400_0000 + DISPCNT)
@@ -38,13 +60,13 @@ func NewObjects(gba *GBA) *[128]Object {
     objects := &[128]Object{}
 
     for i := range 128 {
-        objects[i] = *NewObject(gba, uint32(i), dispcnt)
+        objects[i] = NewObject(gba, uint32(i), dispcnt)
     }
 
     return objects
 }
 
-func NewObject(gba *GBA, objIdx uint32, dispcnt *Dispcnt) *Object {
+func NewObject(gba *GBA, objIdx uint32, dispcnt *Dispcnt) Object {
 
     mem := gba.Mem
     OAM_BASE := uint32(0x700_0000)
@@ -54,7 +76,7 @@ func NewObject(gba *GBA, objIdx uint32, dispcnt *Dispcnt) *Object {
     attr1 := mem.Read16(OAM_BASE + oamOffset + 2)
     attr2 := mem.Read16(OAM_BASE + oamOffset + 4)
 
-    obj := &Object{}
+    obj := Object{}
 
     obj.Y = attr0 & 0b1111_1111
     obj.RotScale = utils.BitEnabled(attr0, 8)
@@ -183,6 +205,8 @@ func (gba *GBA) scanlineGraphics(y uint32) {
 func (gba *GBA) scanlineTileMode(dispcnt *Dispcnt, y uint32) {
 
     wg := sync.WaitGroup{}
+
+    bgs := NewBackgrounds(gba, dispcnt)
     bgPriorities := gba.getBgPriority(0)
     objPriorities := gba.getObjPriority(y, gba.Objects)
     wins := NewWindows(dispcnt, gba)
@@ -193,53 +217,34 @@ func (gba *GBA) scanlineTileMode(dispcnt *Dispcnt, y uint32) {
         wg.Add(1)
         x := uint32(xi)
 
-        bldPal := NewBlendPalette(bld)
-
         go func(x uint32) {
 
             defer wg.Done()
+            bldPal := NewBlendPalette(bld)
 
             index := (x + (y*SCREEN_WIDTH)) * 4
 
             bldPal.reset(gba)
 
             var objTransparent bool
+            var objMaxIdx int
 
             for i := range 4 {
 
                 // 0 is highest priority
                 decIdx := 3 - i
 
-                // bg and objs are prioritized so obj0, is above obj1 if both same
-                // priority. this is why [bgCount - 1 - j]
-
                 bgCount := len(bgPriorities[decIdx])
                 for j := range bgCount {
 
-                    //bgIdx := bgPriorities[decIdx][bgCount - 1 - j]
                     bgIdx := bgPriorities[decIdx][j]
 
-                    if !bgEnabled(dispcnt, int(bgIdx)) {
+                    bg := bgs[bgIdx]
+                    if bg.Invalid || !bg.Enabled {
                         continue
                     }
 
-                    palData, ok, palZero := uint32(0), false, false
-
-                    isAffine := (
-                        (dispcnt.Mode == 1 && bgIdx == 2) ||
-                        (dispcnt.Mode == 2 && (bgIdx == 2 || bgIdx == 3)))
-                    isStandard := (
-                        (dispcnt.Mode == 0) ||
-                        (dispcnt.Mode == 1 && (bgIdx == 0 || bgIdx == 1 || bgIdx == 2)))
-
-                    switch {
-                    case isAffine:
-                        palData, ok, palZero = gba.background(dispcnt, x, y, bgIdx, true, wins)
-                    case isStandard:
-                        palData, ok, palZero = gba.background(dispcnt, x, y, bgIdx, false, wins)
-                    default:
-                        continue
-                    }
+                    palData, ok, palZero := gba.background(x, y, bgIdx, &bg, wins)
 
                     if ok && !palZero {
                         bldPal.setBlendPalettes(palData, uint32(bgIdx), false)
@@ -252,12 +257,12 @@ func (gba *GBA) scanlineTileMode(dispcnt *Dispcnt, y uint32) {
                     objExists := false
                     objCount := len(objPriorities[decIdx])
 
-                    for j := range objCount {
-                        //objIdx := objPriorities[decIdx][objCount - 1 - j] this is old and slower
-                        objIdx := objPriorities[decIdx][j]
+                    for j := range objCount - objMaxIdx {
+                        objIdx := objPriorities[decIdx][j + objMaxIdx]
                         palData, ok, palZero, obj := gba.object(x, y, &gba.Objects[objIdx], wins)
 
                         if ok && !palZero {
+                            objMaxIdx = int(objIdx)
                             objTransparent = obj.Mode == 1
                             objExists = true
                             objPal = palData
@@ -721,29 +726,13 @@ func (gba *GBA) getObjPriority(y uint32, objects *[128]Object) [4][]uint32 {
 
 }
 
-func (gba *GBA) background(dispcnt *Dispcnt, x, y, idx uint32, affine bool, wins *Windows) (uint32, bool, bool) {
-
-    mem := gba.Mem
-    cnt := mem.Read16(uint32(0x0400_0008 + ((idx) * 0x2)))
-    hof := mem.Read16(uint32(0x0400_0010 + ((idx) * 0x4)))
-    vof := mem.Read16(uint32(0x0400_0012 + ((idx) * 0x4)))
-    bg := NewBackground(dispcnt, idx, cnt, hof, vof, affine)
+func (gba *GBA) background(x, y, idx uint32, bg *Background, wins *Windows) (uint32, bool, bool) {
 
     if !windowPixelAllowed(idx, x, y, wins) {
         return 0, false, false
     }
 
     if bg.Affine {
-        paramsAddr := 0x400_0000 + (0x20 * (idx - 1))
-        bg.Pa = mem.Read16(paramsAddr + 0x0)
-        bg.Pb = mem.Read16(paramsAddr + 0x2)
-        bg.Pc = mem.Read16(paramsAddr + 0x4)
-        bg.Pd = mem.Read16(paramsAddr + 0x6)
-        bg.XOffset = mem.Read32(paramsAddr + 0x8)
-        bg.YOffset = mem.Read32(paramsAddr + 0xC)
-
-        //fmt.Printf("IDX %02d, XOFFSET %08X, Y OFFSET %08X\n", idx, bg.XOffset, bg.YOffset)
-
         palData, ok, palZero := gba.setAffineBackgroundPixel(bg, x, y)
         return palData, ok, palZero
     }
@@ -763,7 +752,7 @@ func windowPixelAllowed(idx, x, y uint32, wins *Windows) bool {
         return true
     }
 
-    inWindow := func(win *Window) bool {
+    inWindow := func(win Window) bool {
 
         l := win.L
         r := win.R
@@ -782,7 +771,7 @@ func windowPixelAllowed(idx, x, y uint32, wins *Windows) bool {
         }
     }
 
-    for _, win := range []*Window{wins.Win0, wins.Win1} {
+    for _, win := range []Window{wins.Win0, wins.Win1} {
         if win.Enabled && inWindow(win) {
             //return false
             switch idx {
@@ -809,11 +798,11 @@ func windowObjPixelAllowed(x, y uint32, wins *Windows) bool {
         return true
     }
 
-    inWindow := func(win *Window) bool {
+    inWindow := func(win Window) bool {
         return (x >= win.L && x < win.R) && (y >= win.T && y < win.B)
     }
 
-    for _, win := range []*Window{wins.Win0, wins.Win1} {
+    for _, win := range []Window{wins.Win0, wins.Win1} {
         if win.Enabled && inWindow(win) {
             return win.InObj
         }
@@ -828,11 +817,11 @@ func windowBldPixelAllowed(x, y uint32, wins *Windows) bool {
         return true
     }
 
-    inWindow := func(win *Window) bool {
+    inWindow := func(win Window) bool {
         return (x >= win.L && x < win.R) && (y >= win.T && y < win.B)
     }
 
-    for _, win := range []*Window{wins.Win0, wins.Win1} {
+    for _, win := range []Window{wins.Win0, wins.Win1} {
         if win.Enabled && inWindow(win) {
             return win.InBld
         }
@@ -1044,6 +1033,8 @@ func getPositionsBg(screenData, xIdx, yIdx uint32) (uint32, uint32) {
 }
 
 type Background struct {
+    Enabled bool
+    Invalid bool
     W, H uint32
     Pa, Pb, Pc, Pd uint32
     Priority uint32
@@ -1057,7 +1048,14 @@ type Background struct {
     Affine bool
 }
 
-func NewBackground(dispcnt *Dispcnt, idx, cnt, hof, vof uint32, affine bool) *Background {
+func NewBackground(gba *GBA, dispcnt *Dispcnt, idx uint32, affine bool) *Background {
+
+    mem := gba.Mem
+
+    cnt := mem.Read16(uint32(0x0400_0008 + (idx * 0x2)))
+    hof := mem.Read16(uint32(0x0400_0010 + (idx * 0x4)))
+    vof := mem.Read16(uint32(0x0400_0012 + (idx * 0x4)))
+
     bg := &Background{}
     bg.Affine = affine
     bg.Priority = utils.GetVarData(cnt, 0, 1)
@@ -1069,7 +1067,18 @@ func NewBackground(dispcnt *Dispcnt, idx, cnt, hof, vof uint32, affine bool) *Ba
     bg.Size = utils.GetVarData(cnt, 14, 15)
     bg.XOffset = utils.GetVarData(hof, 0, 9)
     bg.YOffset = utils.GetVarData(vof, 0, 9)
+    bg.Enabled = bgEnabled(dispcnt, int(idx))
     bg.setSize()
+
+    if bg.Affine {
+        paramsAddr := 0x400_0000 + (0x20 * (idx - 1))
+        bg.Pa = mem.Read16(paramsAddr + 0x0)
+        bg.Pb = mem.Read16(paramsAddr + 0x2)
+        bg.Pc = mem.Read16(paramsAddr + 0x4)
+        bg.Pd = mem.Read16(paramsAddr + 0x6)
+        bg.XOffset = mem.Read32(paramsAddr + 0x8)
+        bg.YOffset = mem.Read32(paramsAddr + 0xC)
+    }
 
     switch dispcnt.Mode {
     case 1:
@@ -1224,7 +1233,7 @@ func (gba *GBA) getTile(tileAddr uint, tileSize, xOffset, yOffset int, obj, pale
 
 type Windows struct {
     Enabled bool
-    Win0, Win1, WinObj *Window
+    Win0, Win1, WinObj Window
     OutBg0, OutBg1, OutBg2, OutBg3, OutObj, OutBld bool
 }
 
@@ -1237,16 +1246,16 @@ type Window struct {
 func NewWindows(dispcnt *Dispcnt, gba *GBA) *Windows {
 
     wins := &Windows{
-        Win0: &Window{},
-        Win1: &Window{},
-        WinObj: &Window{},
+        Win0: Window{},
+        Win1: Window{},
+        WinObj: Window{},
     }
 
     mem := gba.Mem
 
     if dispcnt.DisplayWin0 {
 
-        win := wins.Win0
+        win := Window{}
 
         win.Enabled = true
 
@@ -1272,10 +1281,12 @@ func NewWindows(dispcnt *Dispcnt, gba *GBA) *Windows {
         win.InBg3 = utils.BitEnabled(winIn, 3)
         win.InObj = utils.BitEnabled(winIn, 4)
         win.InBld = utils.BitEnabled(winIn, 5)
+
+        wins.Win0 = win
     }
 
     if dispcnt.DisplayWin1 {
-        win := wins.Win1
+        win := Window{}
 
         win.Enabled = true
 
@@ -1301,12 +1312,13 @@ func NewWindows(dispcnt *Dispcnt, gba *GBA) *Windows {
         win.InBg3 = utils.BitEnabled(winIn, 11)
         win.InObj = utils.BitEnabled(winIn, 12)
         win.InBld = utils.BitEnabled(winIn, 13)
+        wins.Win1 = win
     }
 
     if dispcnt.DisplayObjWin {
         //panic("OBJ WINDOW UNSET") // i dont know how dims are set with obj mode objs
 
-        win := wins.WinObj
+        win := Window{}
 
         win.Enabled = true
         winOut := mem.Read16(0x400_004A)
@@ -1316,6 +1328,7 @@ func NewWindows(dispcnt *Dispcnt, gba *GBA) *Windows {
         win.InBg3 = utils.BitEnabled(winOut, 11)
         win.InObj = utils.BitEnabled(winOut, 12)
         win.InBld = utils.BitEnabled(winOut, 13)
+        wins.WinObj = win
     }
 
     winOut := mem.Read16(0x400_004A)

@@ -27,6 +27,9 @@ type Memory struct {
 
 }
 
+var prevAddr uint32
+var SEQ bool
+
 func NewMemory(gba *GBA) *Memory {
 	m := &Memory{GBA: gba}
 
@@ -59,6 +62,9 @@ func (m *Memory) InitSaveLoop() {
 }
 
 func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
+
+    SEQ = addr == prevAddr + 1
+    prevAddr = addr
 
 	switch {
 	case addr < 0x0000_4000:
@@ -178,52 +184,52 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
     //case 0x0052: return 0x10
     //case 0x0053: return 0x00
 
-    case 0x00B0: return m.GBA.Dma[0].ReadSrc(0)
-    case 0x00B1: return m.GBA.Dma[0].ReadSrc(1)
-    case 0x00B2: return m.GBA.Dma[0].ReadSrc(2)
-    case 0x00B3: return m.GBA.Dma[0].ReadSrc(3)
-    case 0x00B4: return m.GBA.Dma[0].ReadDst(0)
-    case 0x00B5: return m.GBA.Dma[0].ReadDst(1)
-    case 0x00B6: return m.GBA.Dma[0].ReadDst(2)
-    case 0x00B7: return m.GBA.Dma[0].ReadDst(3)
-    case 0x00B8: return m.GBA.Dma[0].ReadCount(false)
-    case 0x00B9: return m.GBA.Dma[0].ReadCount(true)
+    case 0x00B0: return 0
+    case 0x00B1: return 0
+    case 0x00B2: return 0
+    case 0x00B3: return 0
+    case 0x00B4: return 0
+    case 0x00B5: return 0
+    case 0x00B6: return 0
+    case 0x00B7: return 0
+    case 0x00B8: return 0
+    case 0x00B9: return 0
     case 0x00BA: return m.GBA.Dma[0].ReadControl(false)
     case 0x00BB: return m.GBA.Dma[0].ReadControl(true)
-    case 0x00BC: return m.GBA.Dma[1].ReadSrc(0)
-    case 0x00BD: return m.GBA.Dma[1].ReadSrc(1)
-    case 0x00BE: return m.GBA.Dma[1].ReadSrc(2)
-    case 0x00BF: return m.GBA.Dma[1].ReadSrc(3)
-    case 0x00C0: return m.GBA.Dma[1].ReadDst(0)
-    case 0x00C1: return m.GBA.Dma[1].ReadDst(1)
-    case 0x00C2: return m.GBA.Dma[1].ReadDst(2)
-    case 0x00C3: return m.GBA.Dma[1].ReadDst(3)
-    case 0x00C4: return m.GBA.Dma[1].ReadCount(false)
-    case 0x00C5: return m.GBA.Dma[1].ReadCount(true)
+    case 0x00BC: return 0
+    case 0x00BD: return 0
+    case 0x00BE: return 0
+    case 0x00BF: return 0
+    case 0x00C0: return 0
+    case 0x00C1: return 0
+    case 0x00C2: return 0
+    case 0x00C3: return 0
+    case 0x00C4: return 0
+    case 0x00C5: return 0
     case 0x00C6: return m.GBA.Dma[1].ReadControl(false)
     case 0x00C7: return m.GBA.Dma[1].ReadControl(true)
-    case 0x00C8: return m.GBA.Dma[2].ReadSrc(0)
-    case 0x00C9: return m.GBA.Dma[2].ReadSrc(1)
-    case 0x00CA: return m.GBA.Dma[2].ReadSrc(2)
-    case 0x00CB: return m.GBA.Dma[2].ReadSrc(3)
-    case 0x00CC: return m.GBA.Dma[2].ReadDst(0)
-    case 0x00CD: return m.GBA.Dma[2].ReadDst(1)
-    case 0x00CE: return m.GBA.Dma[2].ReadDst(2)
-    case 0x00CF: return m.GBA.Dma[2].ReadDst(3)
-    case 0x00D0: return m.GBA.Dma[2].ReadCount(false)
-    case 0x00D1: return m.GBA.Dma[2].ReadCount(true)
+    case 0x00C8: return 0
+    case 0x00C9: return 0
+    case 0x00CA: return 0
+    case 0x00CB: return 0
+    case 0x00CC: return 0
+    case 0x00CD: return 0
+    case 0x00CE: return 0
+    case 0x00CF: return 0
+    case 0x00D0: return 0
+    case 0x00D1: return 0
     case 0x00D2: return m.GBA.Dma[2].ReadControl(false)
     case 0x00D3: return m.GBA.Dma[2].ReadControl(true)
-    case 0x00D4: return m.GBA.Dma[3].ReadSrc(0)
-    case 0x00D5: return m.GBA.Dma[3].ReadSrc(1)
-    case 0x00D6: return m.GBA.Dma[3].ReadSrc(2)
-    case 0x00D7: return m.GBA.Dma[3].ReadSrc(3)
-    case 0x00D8: return m.GBA.Dma[3].ReadDst(0)
-    case 0x00D9: return m.GBA.Dma[3].ReadDst(1)
-    case 0x00DA: return m.GBA.Dma[3].ReadDst(2)
-    case 0x00DB: return m.GBA.Dma[3].ReadDst(3)
-    case 0x00DC: return m.GBA.Dma[3].ReadCount(false)
-    case 0x00DD: return m.GBA.Dma[3].ReadCount(true)
+    case 0x00D4: return 0
+    case 0x00D5: return 0
+    case 0x00D6: return 0
+    case 0x00D7: return 0
+    case 0x00D8: return 0
+    case 0x00D9: return 0
+    case 0x00DA: return 0
+    case 0x00DB: return 0
+    case 0x00DC: return 0
+    case 0x00DD: return 0
     case 0x00DE: return m.GBA.Dma[3].ReadControl(false)
     case 0x00DF: return m.GBA.Dma[3].ReadControl(true)
 
@@ -259,6 +265,30 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 		return m.GBA.Timers[3].ReadCnt(false)
 	case 0x10F:
 		return m.GBA.Timers[3].ReadCnt(true)
+
+    case 0x136: return 0
+    case 0x137: return 0
+    case 0x138: return 0
+    case 0x139: return 0
+
+    case 0x142: return 0
+    case 0x143: return 0
+
+    case 0x15A: return 0
+    case 0x15B: return 0
+
+    case 0x204: return m.IO[addr]
+    case 0x205: return m.IO[addr]
+    case 0x206: return 0
+    case 0x207: return 0
+
+    case 0x20A: return 0
+    case 0x20B: return 0
+
+    case 0x301: return 0
+    case 0x302: return 0
+    case 0x303: return 0
+    case 0x304: return 0
 	}
 
 	v := m.IO[addr]
@@ -441,7 +471,12 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
     case 0x001D: m.IO[addr] = v &^ 0b1111_1110 // BG3HOFS mask
     case 0x001F: m.IO[addr] = v &^ 0b1111_1110 // BG3VOFS mask
 
-    case 0x00A0: m.GBA.Apu.ChannelA.Write(uint32(v)); //fmt.Printf("WRITE PC %08X V %02X CURR %d\n", m.GBA.Cpu.Reg.R[PC], v, CURR_INST)
+    case 0x0050: m.IO[addr] = v// bldcnt
+    case 0x0051: m.IO[addr] = v &^ 0b1100_0000 // bldcnt
+    case 0x0052: m.IO[addr] = v &^ 0b1110_0000 // bldalpha
+    case 0x0053: m.IO[addr] = v &^ 0b1110_0000 // bldalpha
+
+    case 0x00A0: m.GBA.Apu.ChannelA.Write(uint32(v))
     case 0x00A1: m.GBA.Apu.ChannelA.Write(uint32(v) << 8)
     case 0x00A2: m.GBA.Apu.ChannelA.Write(uint32(v) << 16)
     case 0x00A3: m.GBA.Apu.ChannelA.Write(uint32(v) << 24)
@@ -532,21 +567,24 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 	case 0x10F:
 		m.GBA.Timers[3].WriteCnt(v, true)
 
-
     case 0x200, 0x201:
 		m.IO[addr] = v
-        //fmt.Printf("IRQ EXCEPTION CHECK AT MEM IE\n")
-        //m.GBA.checkIRQ()
+
+    case 0x204: m.IO[addr] = v
+    case 0x205: m.IO[addr] = (m.IO[addr] & 0x80) | (v & 0x5F)
+    case 0x206: return
+    case 0x207: return
+
     case 0x208, 0x209:
 		m.IO[addr] = v
-        //fmt.Printf("IRQ EXCEPTION CHECK AT MEM IME\n")
-        //m.GBA.checkIRQ()
 
     // manual clear IF by writing 1
     case 0x202: m.IO[addr] &^= v
     case 0x203: m.IO[addr] &^= v
 
-    case 0x301: m.GBA.Halted = true
+    case 0x301:
+        m.IO[addr] = v & 0b1000_0000
+        m.GBA.Halted = true
 
 	default:
 		m.IO[addr] = v
@@ -612,5 +650,5 @@ func (m *Memory) WriteOAM(relAddr uint32) {
     addr := m.Read16(0x0400_0000 + DISPCNT)
     dispcnt := NewDispcnt(addr)
 
-    m.GBA.Objects[objIdx] = *NewObject(m.GBA, uint32(objIdx), dispcnt)
+    m.GBA.Objects[objIdx] = NewObject(m.GBA, uint32(objIdx), dispcnt)
 }

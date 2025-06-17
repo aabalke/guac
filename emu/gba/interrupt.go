@@ -4,17 +4,6 @@ import (
 	"fmt"
 )
 
-const (
-	resetVec         uint32 = 0x00
-	undVec           uint32 = 0x04
-	swiVec           uint32 = 0x08
-	prefetchAbortVec uint32 = 0xc
-	dataAbortVec     uint32 = 0x10
-	addr26BitVec     uint32 = 0x14
-	irqVec           uint32 = 0x18
-	fiqVec           uint32 = 0x1c
-)
-
 var (
     _ = fmt.Sprintf("")
 )
@@ -29,7 +18,6 @@ type InterruptStack struct {
 type Interrupt struct {
     Reg Reg
     ReturnAddr uint32
-    IF uint32
 }
 
 func (s *InterruptStack) IsEmpty() bool {
@@ -42,10 +30,6 @@ func (s *InterruptStack) ReturnAddr() uint32 {
 }
 
 func (s *InterruptStack) print(exit bool) {
-
-    if !(CURR_INST >= 18_000_000 && CURR_INST < 19_000_000) {
-        return
-    }
 
     if !s.Print {
         return
@@ -76,7 +60,6 @@ func (s *InterruptStack) print(exit bool) {
 }
 
 func (s *InterruptStack) Execute() {
-    // PUSH
 
     if s.Skip {
         return
@@ -85,10 +68,6 @@ func (s *InterruptStack) Execute() {
     mem := s.Gba.Mem
     reg := &s.Gba.Cpu.Reg
     r := &s.Gba.Cpu.Reg.R
-
-    //if CURR_INST >= 17_985_169 && CURR_INST < 19_000_000 {
-    //    fmt.Printf("USER ENTE PC %08X CURR %d\n", r[PC], CURR_INST)
-    //}
 
     s.print(false)
 
@@ -134,7 +113,6 @@ func (s *InterruptStack) Execute() {
     s.Interrupts = append(s.Interrupts, Interrupt{
         Reg: s.Gba.Cpu.Reg,
         ReturnAddr: r[PC],
-        IF: s.Gba.Mem.Read16(0x400_0202),
     })
 
     r[SP] -= 4
@@ -161,7 +139,6 @@ func (s *InterruptStack) Exit() {
         return
     }
 
-
     if len(s.Interrupts) == 0 {
         panic(fmt.Sprintf("ERROR: A Interrupt Exit was called without an Interrupt PC %08X, CURR %d", s.Gba.Cpu.Reg.R[PC], CURR_INST))
     }
@@ -169,10 +146,6 @@ func (s *InterruptStack) Exit() {
     mem := s.Gba.Mem
     reg := &s.Gba.Cpu.Reg
     r := &s.Gba.Cpu.Reg.R
-
-    //if CURR_INST >= 18_000_000 && CURR_INST < 19_000_000 {
-    //    fmt.Printf("USER EXIT PC %08X CURR %d\n", r[PC], CURR_INST)
-    //}
 
     irqBank := BANK_ID[MODE_IRQ]
 
