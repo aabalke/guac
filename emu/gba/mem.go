@@ -62,6 +62,7 @@ func (m *Memory) InitSaveLoop() {
 }
 
 func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
+    //m.GBA.Timers.Update(uint32(1))
 
     SEQ = addr == prevAddr + 1
     prevAddr = addr
@@ -291,8 +292,7 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
     case 0x304: return 0
 	}
 
-	v := m.IO[addr]
-	return v
+	return m.IO[addr]
 }
 
 func (m *Memory) Read8(addr uint32) uint32 {
@@ -329,6 +329,8 @@ func (m *Memory) Read32(addr uint32) uint32 {
 }
 
 func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
+
+    //m.GBA.Timers.Update(uint32(1))
 
 	switch {
 	case addr < 0x0000_4000:
@@ -470,6 +472,11 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
     case 0x001B: m.IO[addr] = v &^ 0b1111_1110 // BG2VOFS mask
     case 0x001D: m.IO[addr] = v &^ 0b1111_1110 // BG3HOFS mask
     case 0x001F: m.IO[addr] = v &^ 0b1111_1110 // BG3VOFS mask
+
+    case 0x0048: m.IO[addr] = v & 0x3F //winin
+    case 0x0049: m.IO[addr] = v & 0x3F //winin
+    case 0x004A: m.IO[addr] = v & 0x3F //winout
+    case 0x004B: m.IO[addr] = v & 0x3F //winout
 
     case 0x0050: m.IO[addr] = v// bldcnt
     case 0x0051: m.IO[addr] = v &^ 0b1100_0000 // bldcnt

@@ -184,6 +184,8 @@ func (dma *DMA) transfer() {
     case !dma.isWord && dma.DstAdj == DMA_ADJ_INC: dstOffset = 2
     case dma.isWord && dma.DstAdj  == DMA_ADJ_DEC: dstOffset = -4
     case !dma.isWord && dma.DstAdj == DMA_ADJ_DEC: dstOffset = -2
+    case dma.isWord && dma.DstAdj == DMA_ADJ_RES: dstOffset = 4
+    case dma.isWord && dma.DstAdj == DMA_ADJ_RES: dstOffset = 2
     }
 
     switch {
@@ -191,35 +193,26 @@ func (dma *DMA) transfer() {
     case !dma.isWord && dma.SrcAdj == DMA_ADJ_INC: srcOffset = 2
     case dma.isWord && dma.SrcAdj  == DMA_ADJ_DEC: srcOffset = -4
     case !dma.isWord && dma.SrcAdj == DMA_ADJ_DEC: srcOffset = -2
+    case dma.SrcAdj == DMA_ADJ_RES: panic("DMA SRC SET TO PROHIBITTED")
+
     }
 
     if fifo := (dma.Idx == 1 || dma.Idx == 2) && dma.Mode == DMA_MODE_REF; fifo {
+
+        if dma.isWord {
+            count = 1
+        } else {
+            count = 2
+        }
+
         dstOffset = 0
-        dma.isWord = true
-        count = 4
-        //srcOffset = 4
+        srcOffset = 4
 
         if !dma.Repeat || (dma.Dst != 0x400_00A0 && dma.Dst != 0x400_00A4) {
             panic("INVALID FIFO DMA")
         }
     }
 
-    if eeprom := CheckEeprom(dma.Gba, tmpDst); eeprom {
-        dstRom := tmpDst >= 0x800_0000 && tmpDst < 0xE00_0000
-        srcRom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
-
-        if count == 9 || count == 73 {
-            cart.EepromWidth = 6
-        } else if count == 17 || count == 81 {
-            cart.EepromWidth = 14
-        }
-
-        if srcRom && dstRom {
-            panic("EEPROM HAS BOTH SRC AND DST ROM ADDR")
-        }
-
-        return
-    }
 
     dstRom := tmpDst >= 0x800_0000 && tmpDst < 0xE00_0000
     //srcRom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
@@ -233,12 +226,28 @@ func (dma *DMA) transfer() {
         return
     }
 
-
     if (dstSram || srcSram) && dma.Gba.Cartridge.FlashType == 2 {
         return
     }
 
     for i := uint32(0); i < count; i++ {
+
+        if eeprom := CheckEeprom(dma.Gba, tmpDst); eeprom {
+            dstRom := tmpDst >= 0x800_0000 && tmpDst < 0xE00_0000
+            srcRom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
+
+            if count == 9 || count == 73 {
+                cart.EepromWidth = 6
+            } else if count == 17 || count == 81 {
+                cart.EepromWidth = 14
+            }
+
+            if srcRom && dstRom {
+                panic("EEPROM HAS BOTH SRC AND DST ROM ADDR")
+            }
+
+            // do not continue this., do not put this outside loop
+        }
 
         if dma.isWord {
 
@@ -248,6 +257,7 @@ func (dma *DMA) transfer() {
                 v := mem.Read32(tmpSrc)
                 mem.Write32(tmpDst, v)
             }
+
         } else {
 
             if badAddr := tmpSrc < 0x200_0000; badAddr {

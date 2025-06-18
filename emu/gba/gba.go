@@ -185,40 +185,6 @@ func (gba *GBA) Exec(requiredCycles, frameCycles uint32) uint32 {
             cycles = gba.Cpu.Execute(opcode)
         }
 
-        //if CURR_INST > 100_000 {
-        //    fmt.Printf("PC %08X\n", r[PC])
-        //    gba.Paused = true
-        //    os.Exit(0)
-        //}
-//
-//        if CURR_INST == 5223 {
-//            r[5] = 0x4744
-//        }
-//
-//        if CURR_INST == 5488 {
-//            r[5] = 0x4744
-//        }
-//
-//        if r[5] == 0x4700 {
-//            r[5] = 0x4744
-//        }
-
-        // 5082
-        //if CURR_INST == 6_000 {
-        //if CURR_INST == 5_500 { BAD
-        //if CURR_INST == 5_400 { BAD
-        //if CURR_INST == 5_350 { BAD
-        //if CURR_INST == 5_325 { BAD
-        //if CURR_INST == 5_000 { GOOD
-        //if CURR_INST == 5_301 { GOOD
-        //if CURR_INST == 5_320 { GOOD
-        //if CURR_INST == 5_318 {
-        ////if r[PC] == 0x30028CC {
-        //    gba.Debugger.print(CURR_INST)
-        //    gba.Paused = true
-        //    os.Exit(0)
-        //}
-
         gba.Timers.Update(uint32(cycles))
 
         accCycles += gba.checkIRQ()

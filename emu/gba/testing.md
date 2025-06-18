@@ -54,7 +54,7 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 ### MGBA Test Suite
 
 ❌ Memory tests [1252/1552]
-❌ I/O read tests [28/130]
+❌ I/O read tests [30/130]
 ❌ Timing tests [228/2020]
 ❌ Timer count-up tests [264/936]
 ❌ Timer IRQ tests [0/90]
@@ -116,7 +116,7 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 👍 first
 👍 hello
 
-❌ irq_demo (fails nested irq)
+❌ irq_demo (blinking text hblank irq)
 👍 key_demo
 👍 m3_demo
 ❌ m7_demo
@@ -189,4 +189,5 @@ Boots Ultimate Puzzle Games
 Boots Warioware Twisted
 Boots Wolfenstein 3D
 Boots Doom
+      Doom II
 Boots Zelda Link to the Past

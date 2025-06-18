@@ -369,7 +369,7 @@ func SoftReset(gba *GBA) {
 	reg.R[SP] = 0x0300_7F00
 
 	reg.R[LR] = 0x0200_0000
-	if flag > 0 {
+	if flag == 0 {
 		reg.R[LR] = 0x0800_0000
 	}
 
