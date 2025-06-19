@@ -96,7 +96,7 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
     }
 
     if t.isOverflowIRQ() {
-        t.Gba.triggerIRQ(0x3 + uint32(t.Idx))
+        t.Gba.setIRQ(0x3 + uint32(t.Idx))
     }
 
     return true

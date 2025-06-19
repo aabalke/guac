@@ -166,7 +166,8 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 Boots Harvest Moon Friends of Mineral Town
 Boots Hello Kitty Happy Party Pals
 Boots Kirby Nightmare in Dream Land
-DISHB Lord of The Rings Fellowship
+Boots Lord of The Rings Fellowship
+Boots Lord of The Rings Two Towers
 Boots Mario Kart Super Circuit
 Boots Mega Man Zero
 Boots Metroid Fusion
@@ -178,8 +179,8 @@ Boots Pokémon LeafGreen
 Boots Pokémon Emerald
 Boots Pokémon Ruby
 Boots Pokémon Sapphire
-DISHB Sonic Advance
-      Spyro Season of Ice
+Boots Sonic Advance
+Boots Spyro Season of Ice
 Boots Superstar Saga
 Boots Super Dodge Ball Advance
 Boots Super Mario Advance
@@ -191,3 +192,5 @@ Boots Wolfenstein 3D
 Boots Doom
       Doom II
 Boots Zelda Link to the Past
+Boots Iridion II
+Boots Iridion 3D

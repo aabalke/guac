@@ -247,7 +247,7 @@ func (gba *GBA) scanlineTileMode(dispcnt *Dispcnt, y uint32) {
                     palData, ok, palZero := gba.background(x, y, bgIdx, &bg, wins)
 
                     if ok && !palZero {
-                        bldPal.setBlendPalettes(palData, uint32(bgIdx), false)
+                        bldPal.setBlendPalettes(palData, uint32(bgIdx), false, false)
                     }
                 }
 
@@ -274,7 +274,7 @@ func (gba *GBA) scanlineTileMode(dispcnt *Dispcnt, y uint32) {
                     }
 
                     if objExists {
-                        bldPal.setBlendPalettes(objPal, 0, true)
+                        bldPal.setBlendPalettes(objPal, 0, true, objMode == 1)
                     }
                 }
             }
@@ -853,7 +853,8 @@ func (gba *GBA) setAffineBackgroundPixel(bg *Background, x, y uint32) (uint32, b
         //    yBound = -yIdx
         //}
         ////if xBound < 0 || xBound - 0x7FFFF >= int(bg.W * 8) || yBound < 0 || yBound - 0x7FFFF >= int(bg.H * 8) {
-        //if xBound < 0 || yBound < 0 {
+        ////if xBound < 0 || yBound < 0 {
+        //if xBound < 0 || xBound - 0x7FFFF >= int(bg.W * 0x10) || yBound < 0 || yBound - 0x7FFFF >= int(bg.H * 0x10) {
 
         //    return 0, false, false
         //}
@@ -944,6 +945,7 @@ func (gba *GBA) setBackgroundPixel(bg *Background, x, y uint32) (uint32, bool, b
 
     var tileAddr uint32
     if bg.Palette256 {
+        //tileAddr += uint32(VRAM_BASE) + cbb + (tileIdx * 0x40)
         tileAddr += uint32(VRAM_BASE) + cbb + (tileIdx * 0x40)
     } else {
         tileAddr += uint32(VRAM_BASE) + cbb + (tileIdx * 0x20)
@@ -1402,13 +1404,13 @@ func (bp *BlendPalettes) reset(gba *GBA) {
 
 }
 
-func (bp *BlendPalettes) setBlendPalettes(palData uint32, bgIdx uint32, obj bool) {
+func (bp *BlendPalettes) setBlendPalettes(palData uint32, bgIdx uint32, obj bool, semiTransparent bool) {
 
     bp.NoBlendPalette = palData
 
     if obj {
 
-        if bp.Bld.a[4] {
+        if bp.Bld.a[4] || semiTransparent {
             bp.APalette = palData
             bp.hasA = true
             bp.targetATop = true

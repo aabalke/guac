@@ -55,11 +55,8 @@ func (dma *DMA) ReadControl(hi bool) uint8 {
 
 func (dma *DMA) MaskAddr(v uint32, src bool) uint32 {
 
-    switch {
-    case src && dma.Idx == 0: return v & 0x7FF_FFFF
-    case !src && dma.Idx == 0: return v & 0x7FF_FFFF
-    case !src && dma.Idx == 1: return v & 0x7FF_FFFF
-    case !src && dma.Idx == 2: return v & 0x7FF_FFFF
+    if dma.Idx == 0 || !src && dma.Idx == 1 || !src && dma.Idx == 2 {
+        return v & 0x7FF_FFFF
     }
 
     return v & 0xFFF_FFFF
@@ -273,7 +270,7 @@ func (dma *DMA) transfer() {
     }
 
     if dma.IRQ {
-        dma.Gba.triggerIRQ(0x8 + uint32(dma.Idx))
+        dma.Gba.setIRQ(0x8 + uint32(dma.Idx))
     }
 
     if !dma.Repeat {

@@ -664,19 +664,6 @@ func (c *DigitalChannel) InitCallback() {
 }
 
 func cubicInterpolate(history [4]float64, mu float64) float64 {
-
-    //p := false
-    //for _, v := range history {
-    //    if v != 0 {
-    //        p = true
-    //        break
-    //    }
-    //}
-
-    //if p {
-    //    fmt.Printf("0 %02f, 1 %02f, 2 %02f, 3 %02f\n", history[0], history[1], history[2], history[3])
-    //}
-
     a := history[3] - history[2] - history[0] + history[1]
     b := history[0] - history[1] - a
     c := history[2] - history[0]

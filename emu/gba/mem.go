@@ -3,8 +3,6 @@ package gba
 import (
 	"fmt"
 	"time"
-
-	//"github.com/aabalke33/guac/emu/gba"
 )
 
 var (

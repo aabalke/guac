@@ -46,13 +46,13 @@ func (s *InterruptStack) print(exit bool) {
     fmt.Printf("%s PC %08X LR %08X SP %08X CPSR %08X T %t MODE %02X OP %08X CURR %08d\n", a, r[PC], r[LR], r[SP], reg.CPSR, reg.CPSR.GetFlag(FLAG_T), reg.getMode(), s.Gba.Mem.Read32(r[PC]), CURR_INST)
     //fmt.Printf("SP ADDR %08X\n", r[SP])
     //fmt.Printf("LR %08X\n", r[LR])
-    fmt.Printf("0x300_22DC %08X\n", s.Gba.Mem.Read32(r[2] + 0x1C))
-    fmt.Printf("0x300_7FFC %08X\n", s.Gba.Mem.Read32(0x3007FFC))
-    fmt.Printf("12 %08X\n", r[12])
-    fmt.Printf("03 %08X\n", r[3])
-    fmt.Printf("02 %08X\n", r[2])
-    fmt.Printf("01 %08X\n", r[1])
-    fmt.Printf("00 %08X\n", r[0])
+    //fmt.Printf("0x300_22DC %08X\n", s.Gba.Mem.Read32(r[2] + 0x1C))
+    //fmt.Printf("0x300_7FFC %08X\n", s.Gba.Mem.Read32(0x3007FFC))
+    //fmt.Printf("12 %08X\n", r[12])
+    //fmt.Printf("03 %08X\n", r[3])
+    //fmt.Printf("02 %08X\n", r[2])
+    //fmt.Printf("01 %08X\n", r[1])
+    //fmt.Printf("00 %08X\n", r[0])
 
     if exit {
         fmt.Printf("--------------------------------------------------------\n")
@@ -91,6 +91,7 @@ func (s *InterruptStack) Execute() {
 
     reg.CPSR.SetFlag(FLAG_I, true) // true is disabled
     reg.CPSR.SetFlag(FLAG_T, false)
+    //s.Gba.Mem.IO[0x208] = 0
 
     //{
     //    for i := range 13 {
@@ -184,6 +185,8 @@ func (s *InterruptStack) Exit() {
     r[SP] = reg.SP[curBank]
 
     s.Gba.Mem.BIOS_MODE = BIOS_IRQ_POST
+
+    //s.Gba.Mem.IO[0x208] = 1
 
     reg.CPSR.SetFlag(FLAG_I, false) // disable IRQ
 
