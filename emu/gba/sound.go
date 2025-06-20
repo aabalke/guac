@@ -653,9 +653,9 @@ func (c *DigitalChannel) InitCallback() {
 
     srcRate := float64(16777216) / (65536 - float64(c.Reload))
 
-    if c.Reload >= 65536 || c.Reload == 0 {
-        c.Ratio = 0
-    }
+    //if c.Reload >= 65536 || c.Reload == 0 {
+    //    c.Ratio = 0
+    //}
 
     dstRate := c.Apu.SampleRate
     c.Ratio = srcRate / dstRate

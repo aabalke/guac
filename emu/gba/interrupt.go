@@ -13,12 +13,73 @@ type InterruptStack struct {
     Interrupts []Interrupt
     Skip bool
     Print bool
+
+    IF, IE uint16
+    IME bool
 }
 
 type Interrupt struct {
     Reg Reg
     ReturnAddr uint32
 }
+
+func (s *InterruptStack) WriteIME(v uint8) {
+    s.IME = v & 1 == 1
+}
+
+func (s *InterruptStack) ReadIME() uint8 {
+
+    if s.IME {
+        return 1
+    }
+
+    return 0
+
+}
+
+func (s *InterruptStack) WriteIE(v uint8, hi bool) {
+
+    if hi {
+        s.IE = (s.IE &^ 0xFF00) | (uint16(v) << 8)
+        return
+    }
+
+    s.IE = (s.IE &^ 0xFF) | uint16(v)
+}
+
+func (s *InterruptStack) WriteIF(v uint8, hi bool) {
+
+    if hi {
+        s.IF &^= (uint16(v) << 8)
+        return
+    }
+
+    s.IF &^= uint16(v)
+}
+
+func (s *InterruptStack) setIRQ(irq uint32) {
+
+    s.IF |= (1 << irq)
+
+    if interrupt := s.IF & s.IE != 0; interrupt {
+        s.Gba.Halted = false
+    }
+}
+
+func (s *InterruptStack) checkIRQ() uint32 {
+
+    interruptEnabled := !s.Gba.Cpu.Reg.CPSR.GetFlag(FLAG_I)
+    ime := s.IME
+    interrupts := s.IF & s.IE != 0
+
+    if interruptEnabled && ime && interrupts {
+        s.Execute()
+        return 0
+    }
+
+    return 0
+}
+
 
 func (s *InterruptStack) IsEmpty() bool {
     return len(s.Interrupts) == 0
@@ -91,7 +152,7 @@ func (s *InterruptStack) Execute() {
 
     reg.CPSR.SetFlag(FLAG_I, true) // true is disabled
     reg.CPSR.SetFlag(FLAG_T, false)
-    //s.Gba.Mem.IO[0x208] = 0
+    s.IME = false
 
     //{
     //    for i := range 13 {
@@ -186,7 +247,7 @@ func (s *InterruptStack) Exit() {
 
     s.Gba.Mem.BIOS_MODE = BIOS_IRQ_POST
 
-    //s.Gba.Mem.IO[0x208] = 1
+    s.IME = true
 
     reg.CPSR.SetFlag(FLAG_I, false) // disable IRQ
 

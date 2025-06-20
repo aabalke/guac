@@ -89,14 +89,17 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
         }
     }
 
-    if apu.ChannelA.Refill || apu.ChannelB.Refill {
-        t.Gba.DmaOnRefresh = true
+    if apu.ChannelA.Refill {
+    //if apu.ChannelA.Refill || apu.ChannelB.Refill {
+        //t.Gba.DmaOnRefresh = true
         apu.ChannelA.Refill = false
-        apu.ChannelB.Refill = false
+        //apu.ChannelB.Refill = false
+        t.Gba.Dma[1].transferFifo()
+        //t.Gba.Dma[2].transferFifo()
     }
 
     if t.isOverflowIRQ() {
-        t.Gba.setIRQ(0x3 + uint32(t.Idx))
+        t.Gba.InterruptStack.setIRQ(3 + uint32(t.Idx))
     }
 
     return true

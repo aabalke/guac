@@ -196,14 +196,18 @@ func (dma *DMA) transfer() {
 
     if fifo := (dma.Idx == 1 || dma.Idx == 2) && dma.Mode == DMA_MODE_REF; fifo {
 
-        if dma.isWord {
-            count = 1
-        } else {
-            count = 2
-        }
+        //if dma.isWord {
+        //    count = 1
+        //} else {
+        //    count = 2
+        //}
+
+        dma.isWord = true
+        dma.DstAdj = DMA_ADJ_NON
+        count = 4
 
         dstOffset = 0
-        srcOffset = 4
+        //srcOffset = 4
 
         if !dma.Repeat || (dma.Dst != 0x400_00A0 && dma.Dst != 0x400_00A4) {
             panic("INVALID FIFO DMA")
@@ -270,7 +274,7 @@ func (dma *DMA) transfer() {
     }
 
     if dma.IRQ {
-        dma.Gba.setIRQ(0x8 + uint32(dma.Idx))
+        dma.Gba.InterruptStack.setIRQ(8 + uint32(dma.Idx))
     }
 
     if !dma.Repeat {

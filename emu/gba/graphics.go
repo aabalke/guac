@@ -299,7 +299,7 @@ func (gba *GBA) scanlineBitmapMode(dispcnt *Dispcnt, y uint32) {
         x := uint32(xi)
 
         go func(x uint32) {
-            defer wg.Done()
+        defer wg.Done()
 
         index := (x + (y*SCREEN_WIDTH)) * 4
 
@@ -332,8 +332,17 @@ func (gba *GBA) scanlineBitmapMode(dispcnt *Dispcnt, y uint32) {
             }
 
             palIdx := mem.Read8(idx)
-            palData := gba.getPalette(uint32(palIdx), 0, false)
-            gba.applyColor(palData, uint32(index))
+            //if palIdx != 0 {
+            //    palData := gba.getPalette(uint32(palIdx), 0, false)
+            //    gba.applyColor(palData, uint32(index))
+            //}
+                palData := gba.getPalette(uint32(palIdx), 0, false)
+                gba.applyColor(palData, uint32(index))
+
+            // need objs
+
+
+
             return
 
         case 5:

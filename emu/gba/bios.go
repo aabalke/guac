@@ -105,23 +105,24 @@ func (gba *GBA) SysCall(inst uint32) (int, bool) {
 		VBlankIntrWait(gba)
 	case SYS_Div:
 		Div(gba, false)
-		cycles += 36 // approx
+		cycles += 370 // approx
 	case SYS_DivArm:
 		Div(gba, true)
-		cycles += 36 // approx
+		cycles += 130 // approx
 	case SYS_Sqrt:
 		Sqrt(gba)
-        cycles += 17
+        cycles += 130
 	case SYS_ArcTan:
 		ArcTan(gba)
-        cycles += 5
+        cycles += 140
 	case SYS_ArcTan2:
 		ArcTan2(gba)
 		cycles += 520 // approx
 	case SYS_CpuSet:
-		CpuSet(gba)
+		cycles += CpuSet(gba)
 	case SYS_CpuFastSet:
-		CpuFastSet(gba)
+		cycles += CpuFastSet(gba)
+
 	case SYS_BitUnPack:
 		BitUnPack(gba)
     case SYS_HuffUnCompReadNormal:
@@ -267,42 +268,39 @@ func IntrWait(gba *GBA) {
 
     //panic("INTRAWAIT")
 
-    mem := gba.Mem
 	reg := &gba.Cpu.Reg.R
+    s := gba.InterruptStack
 	waitMode := reg[0]
-	irqMask := reg[1]
+	irqMask := uint16(reg[1])
 
-    IF := mem.Read16(0x400_0202)
-    mem.Write16(0x400_0208, 0x1)
-    //fmt.Printf("CURR %08d, PC %08X INTR WAIT MASK %08X IF %08X, COMBO %1b\n", CURR_INST, reg[PC], irqMask, IF, irqMask & IF)
-
+    s.IME = true
     reg[3] = 0x0
 
     if waitMode == 0 {
         // Clear irqMask bits from IE (just like bic) chatgpt
-        ie := mem.Read16(0x400_0200)
-        ie &^= irqMask
-        mem.Write16(0x400_0200, uint16(ie))
+        panic("WAIT MODE 0 AND I DONT KNOW IF IE NEEDS TO BE SET")
+        //s.IE &^= irqMask
     }
 
-    if waitMode == 0 && (IF&irqMask) != 0 {
-        println("here")
+    if waitMode == 0 && (s.IF&irqMask) != 0 {
         return
 	}
 
-    gba.IntrWait = irqMask
 	// Discard old IF flags if waitMode == 1
 	if waitMode == 1 {
+
+        //s.IF = irqMask
 
         //mem.IO[0x202] = 0//uint8(irqMask)
         //mem.IO[0x203] = 0//uint8(irqMask >> 8)
         //mem.IO[0x202] = uint8(irqMask)
         //mem.IO[0x203] = uint8(irqMask >> 8)
 
-        //if (IF & irqMask) != 0 {
+        //if (s.IF & irqMask) != 0 {
         //    return
         //}
         gba.Halted = true
+        gba.IntrWait = uint32(irqMask)
     }
 }
 
@@ -318,21 +316,28 @@ func VBlankIntrWait(gba *GBA) {
 func AckIntrWait(gba *GBA) {
 
     mem := gba.Mem
+    s := gba.InterruptStack
 
-    if gba.IntrWait & mem.Read16(0x400_0202) == 0 {
+    if gba.IntrWait == 0 {
+        return
+    }
+
+    if uint16(gba.IntrWait) & s.IF == 0 {
     //if mem.Read16(0x400_0200) & mem.Read16(0x400_0202) == 0 {
         return
     }
 
+	//reg := &gba.Cpu.Reg.R
+	//irqMask := uint16(reg[1])
+	//mem.Write16(0x400_0202, uint16(irqMask))
+	//mem.Write16(0x300_7FF8, uint16(irqMask))
+	irqMask := uint16(gba.IntrWait)
+	mem.Write16(0x400_0202, uint16(irqMask))
+    prev := uint16(mem.Read16(0x300_7FF8))
+	mem.Write16(0x300_7FF8, prev | uint16(irqMask))
+
     gba.Halted = false
     gba.IntrWait = 0
-
-	reg := &gba.Cpu.Reg.R
-
-	irqMask := uint32(reg[1])
-	mem.Write16(0x400_0202, uint16(irqMask))
-	mem.Write16(0x300_7FF8, uint16(irqMask))
-
 }
 
 func SoftReset(gba *GBA) {
@@ -388,7 +393,7 @@ func RegisterRamReset(gba *GBA) {
 	r := &gba.Cpu.Reg.R
 	flags := r[0]
 
-    fmt.Printf("Flags %08b\n", uint8(flags))
+    fmt.Printf("Flags %08b PC %08X\n", uint8(flags), r[PC])
 
 	if clearWRAM1 := utils.BitEnabled(flags, 0); clearWRAM1 {
 		mem.WRAM1 = [0x40000]uint8{}
@@ -416,19 +421,19 @@ func RegisterRamReset(gba *GBA) {
 
 	if clearSIO := utils.BitEnabled(flags, 5); clearSIO {
 
-		for i := 0x120; i <= 0x12C; i++ {
-			mem.IO[i] = 0x0
+		for i := uint32(0x120); i <= 0x12C; i++ {
+            mem.Write8(0x400_0000 + i, 0)
 		}
 
-		for i := 0x134; i <= 0x154; i++ {
-			mem.IO[i] = 0x0
+		for i := uint32(0x134); i <= 0x154; i++ {
+            mem.Write8(0x400_0000 + i, 0)
 		}
 	}
 
 	if clearSound := utils.BitEnabled(flags, 6); clearSound {
 
-		for i := 0x60; i <= 0xA8; i++ {
-			mem.IO[i] = 0x0
+		for i := uint32(0x60); i <= 0xA8; i++ {
+            mem.Write8(0x400_0000 + i, 0)
 		}
 	}
 
@@ -438,32 +443,34 @@ func RegisterRamReset(gba *GBA) {
 			sio1 := i >= 0x120 && i <= 0x12C
 			sio2 := i >= 0x134 && i <= 0x154
 			sound := i >= 0x60 && i <= 0xA8
+            //other := i >= 0x200 && i <= 0x20B
 
 			if sio1 || sio2 || sound {
 				continue
 			}
 
-			mem.IO[i] = 0x0
 
-            // default values pulled from ruby
-            mem.IO[0x0021] = 0x1
-            mem.IO[0x0027] = 0x1
-            mem.IO[0x0031] = 0x1
-            mem.IO[0x0037] = 0x1
-
-            mem.IO[0x0082] = 0xE
-            mem.IO[0x0083] = 0x88
-            mem.IO[0x0089] = 0x2
-
-            mem.IO[0x0128] = 0x4
-            mem.IO[0x0130] = 0xFF
-            mem.IO[0x0131] = 0x3
-            mem.IO[0x0134] = 0xF
-            mem.IO[0x0135] = 0x80
-            mem.IO[0x0300] = 0x1
-
-            //mem.GBA.checkIRQ()
 		}
+
+        mem.Write8(0x400_0000 + uint32(0x208), 0)
+            //// default values pulled from ruby
+            //mem.IO[0x0021] = 0x1
+            //mem.IO[0x0027] = 0x1
+            //mem.IO[0x0031] = 0x1
+            //mem.IO[0x0037] = 0x1
+
+            //mem.IO[0x0082] = 0xE
+            //mem.IO[0x0083] = 0x88
+            //mem.IO[0x0089] = 0x2
+
+            //mem.IO[0x0128] = 0x4
+            //mem.IO[0x0130] = 0xFF
+            //mem.IO[0x0131] = 0x3
+            //mem.IO[0x0134] = 0xF
+            //mem.IO[0x0135] = 0x80
+            //mem.IO[0x0300] = 0x1
+
+            ////mem.GBA.checkIRQ()
 	}
 
     //mem.Write16(0x400_0000, 0x80)
@@ -719,7 +726,7 @@ func BitUnPack(gba *GBA) {
 	return
 }
 
-func CpuSet(gba *GBA) {
+func CpuSet(gba *GBA) int {
 
 	mem := gba.Mem
 	r := &gba.Cpu.Reg.R
@@ -799,9 +806,11 @@ func CpuSet(gba *GBA) {
 	}
 
     r[3] = 0x170 // offical bios clobbers r3
+
+    return int(wordCount) * 4
 }
 
-func CpuFastSet(gba *GBA) {
+func CpuFastSet(gba *GBA) int {
 
 	r := &gba.Cpu.Reg.R
 	mem := gba.Mem
@@ -810,6 +819,8 @@ func CpuFastSet(gba *GBA) {
 	dst := r[1] &^ 0b11
 	count := (utils.GetVarData(r[2], 0, 20) + 7) &^ 7 // round up 32 bytes (8 words)
 	fill := utils.BitEnabled(r[2], 24)
+
+    cycles := int(count) * 12
 
 	if fill {
 		word := mem.Read32(src)
@@ -823,7 +834,7 @@ func CpuFastSet(gba *GBA) {
 
         r[3] = 0x0
 
-        return
+        return cycles
     }
 
     for i := uint32(0); i < count; i++ {
@@ -835,6 +846,8 @@ func CpuFastSet(gba *GBA) {
     r[1] += count * 4
 
     r[3] = 0x0
+
+    return cycles
 
 }
 

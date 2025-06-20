@@ -377,14 +377,22 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
             return 4
         }
 
-        if !utils.BitEnabled(r[rs], 0) {
-            cpsr.SetFlag(FLAG_T, false)
-        }
-
-        r[PC] = r[rs] &^ 0b1
 
         if rs == PC {
-            r[PC] += 4
+            cpsr.SetFlag(FLAG_T, false)
+            //R15: CPU switches to ARM state, and PC is auto-aligned as (($+4) AND NOT 2).
+            r[PC] = (r[PC] + 4) &^ 2
+            //println(fmt.Sprintf("PC %08X should be 0x30001C0\n", r[PC]))
+
+            return 4
+        }
+
+
+        if setThumb := !utils.BitEnabled(r[rs], 0); setThumb {
+            cpsr.SetFlag(FLAG_T, false)
+            r[PC] = r[rs] &^ 0b11
+        } else {
+            r[PC] = r[rs] &^ 0b1
         }
 
         return 4
@@ -854,9 +862,11 @@ func (cpu *Cpu) thumbStack(opcode uint16) {
 
 func (cpu *Cpu) thumbLongBranch(opcode uint16) {
 
+
     r := &cpu.Reg.R
 
     op2 := cpu.Gba.Mem.Read16(r[PC] + 2)
+
 
     upper := utils.GetVarData(uint32(opcode), 0, 10)
     lower := utils.GetVarData(uint32(op2), 0, 10)
@@ -879,6 +889,34 @@ func (cpu *Cpu) thumbLongBranch(opcode uint16) {
 
     r[LR] = utils.HalfAlign(r[PC] + 4) + 1
     r[PC] = uint32(int32(r[PC]) + 4 + offset)
+}
+
+func (cpu *Cpu) thumbShortLongBranch(opcode uint16) {
+    // Using only the 2nd half of BL as "BL LR+imm" is possible
+    // (for example, Mario Golf Advance Tour for GBA uses opcode F800h as "BL LR+0").
+    // BL LR + nn
+
+    r := &cpu.Reg.R
+    //fmt.Printf("START: LR %08X PC %08X END: ", r[LR], r[PC])
+
+    lower := utils.GetVarData(uint32(opcode), 0, 10)
+
+    mask := uint32(0b111_1111_1111_1111_1111_1111)
+    nn := (lower << 1)
+    negative := (nn >> 22) == 1
+    nn &= mask
+
+    if negative {
+        nn |= ^mask
+    }
+
+    offset := int32(nn)
+
+    tmpLR := r[LR]
+    r[LR] = utils.HalfAlign(r[PC] + 2) + 1
+    r[PC] = utils.HalfAlign(uint32(int32(tmpLR) + offset))
+
+    //fmt.Printf("LR %08X PC %08X CURR %d\n", r[LR], r[PC], CURR_INST)
 }
 
 func (cpu *Cpu) thumbLSSP(opcode uint16) {
@@ -985,7 +1023,8 @@ func (cpu *Cpu) thumbMulti(opcode uint16) {
 
         if reg == int(rb) {
             matchingRb = true
-            //rbValue = r[rb]
+            // do not remove this, needed for golden sun and others
+            rbValue = r[rb]
         }
 
         r[rb] += 4

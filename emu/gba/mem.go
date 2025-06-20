@@ -276,10 +276,17 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
     case 0x15A: return 0
     case 0x15B: return 0
 
+    case 0x200: return uint8(m.GBA.InterruptStack.IE)
+    case 0x201: return uint8(m.GBA.InterruptStack.IE >> 8)
+    case 0x202: return uint8(m.GBA.InterruptStack.IF)
+    case 0x203: return uint8(m.GBA.InterruptStack.IF >> 8)
+
     case 0x204: return m.IO[addr]
     case 0x205: return m.IO[addr]
     case 0x206: return 0
     case 0x207: return 0
+    case 0x208: m.GBA.InterruptStack.ReadIME()
+    case 0x209: return 0
 
     case 0x20A: return 0
     case 0x20B: return 0
@@ -572,20 +579,22 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 	case 0x10F:
 		m.GBA.Timers[3].WriteCnt(v, true)
 
-    case 0x200, 0x201:
-		m.IO[addr] = v
+
+    case 0x200: m.GBA.InterruptStack.WriteIE(v, false)
+    case 0x201: m.GBA.InterruptStack.WriteIE(v, true)
+    case 0x202: m.GBA.InterruptStack.WriteIF(v, false)
+    case 0x203: m.GBA.InterruptStack.WriteIF(v, true)
 
     case 0x204: m.IO[addr] = v
     case 0x205: m.IO[addr] = (m.IO[addr] & 0x80) | (v & 0x5F)
     case 0x206: return
     case 0x207: return
 
-    case 0x208, 0x209:
-		m.IO[addr] = v
-
-    // manual clear IF by writing 1
-    case 0x202: m.IO[addr] &^= v
-    case 0x203: m.IO[addr] &^= v
+    // IME
+    case 0x208: m.GBA.InterruptStack.WriteIME(v); m.IO[addr] = v
+    case 0x209: return
+    case 0x20A: return
+    case 0x20B: return
 
     case 0x301:
         m.IO[addr] = v & 0b1000_0000

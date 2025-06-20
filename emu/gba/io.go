@@ -53,37 +53,3 @@ func (d *Dispstat) SetVCFlag(v bool) {
 
     *d = Dispstat((uint16(*d) &^ 0b100))
 }
-
-//func (d *Dispstat) SetVCounter(scanline int) {
-//
-//    lyc := int(uint32(*d >> 8))
-//
-//    if scanline == lyc {
-//        *d = Dispstat((uint16(*d) &^ 0b100) | 0b100)
-//        return
-//
-//    }
-//
-//    *d = Dispstat((uint16(*d) &^ 0b100))
-//}
-
-//type IRQFlags uint32
-//
-//func (f *IRQFlags) write(v uint8, hi bool) {
-//
-//    if hi {
-//        *f &^= IRQFlags(uint32(v) << 8)
-//        return
-//    }
-//
-//    *f &^= IRQFlags(uint32(v))
-//}
-//
-//func (f *IRQFlags) read(hi bool) uint8 {
-//
-//    if hi {
-//        return uint8(uint32(*f) >> 8)
-//    }
-//
-//    return uint8(uint32(*f))
-//}
