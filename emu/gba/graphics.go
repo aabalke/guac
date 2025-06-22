@@ -55,8 +55,7 @@ func NewBackgrounds(gba *GBA, dispcnt *Dispcnt) *[4]Background {
 
 func NewObjects(gba *GBA) *[128]Object {
 
-    addr := gba.Mem.Read16(0x0400_0000 + DISPCNT)
-    dispcnt := NewDispcnt(addr)
+    dispcnt := NewDispcnt(gba.Mem.ReadIODirect(0x0, 2))
 
     objects := &[128]Object{}
 
@@ -191,8 +190,7 @@ func (gba *GBA) scanlineGraphics(y uint32) {
         return
     }
 
-    addr := gba.Mem.Read16(0x0400_0000 + DISPCNT)
-    dispcnt := NewDispcnt(addr)
+    dispcnt := NewDispcnt(gba.Mem.ReadIODirect(0x0, 2))
 
 	switch dispcnt.Mode {
 	case 0, 1, 2: gba.scanlineTileMode(dispcnt, y)
@@ -671,14 +669,13 @@ func (gba *GBA) getBgPriority(mode uint32) [4][]uint32 {
 
     mem := gba.Mem
     priorities := [4][]uint32{}
-    base := uint32(0x400_0008)
 
     for i := range 4 {
 
         if mode == 1 && i > 2 { continue }
         if mode == 2 && i < 2 { continue }
 
-        priority := mem.Read16(base + uint32(i * 0x2)) & 0b11
+        priority := mem.ReadIODirect(0x8 + uint32(i * 0x2), 2) & 0b11
         priorities[priority] = append(priorities[priority], uint32(i))
     }
 
@@ -1031,9 +1028,9 @@ func NewBackground(gba *GBA, dispcnt *Dispcnt, idx uint32, affine bool) *Backgro
 
     mem := gba.Mem
 
-    cnt := mem.Read16(uint32(0x0400_0008 + (idx * 0x2)))
-    hof := mem.Read16(uint32(0x0400_0010 + (idx * 0x4)))
-    vof := mem.Read16(uint32(0x0400_0012 + (idx * 0x4)))
+    cnt := mem.ReadIODirect(uint32(0x08 + (idx * 0x2)), 2)
+    hof := mem.ReadIODirect(uint32(0x10 + (idx * 0x4)), 2)
+    vof := mem.ReadIODirect(uint32(0x12 + (idx * 0x4)), 2)
 
     bg := &Background{}
     bg.Affine = affine
@@ -1050,13 +1047,13 @@ func NewBackground(gba *GBA, dispcnt *Dispcnt, idx uint32, affine bool) *Backgro
     bg.setSize()
 
     if bg.Affine {
-        paramsAddr := 0x400_0000 + (0x20 * (idx - 1))
-        bg.Pa = mem.Read16(paramsAddr + 0x0)
-        bg.Pb = mem.Read16(paramsAddr + 0x2)
-        bg.Pc = mem.Read16(paramsAddr + 0x4)
-        bg.Pd = mem.Read16(paramsAddr + 0x6)
-        bg.XOffset = mem.Read32(paramsAddr + 0x8)
-        bg.YOffset = mem.Read32(paramsAddr + 0xC)
+        paramsAddr := 0x20 * (idx - 1)
+        bg.Pa = mem.ReadIODirect(paramsAddr + 0x0, 2)
+        bg.Pb = mem.ReadIODirect(paramsAddr + 0x2, 2)
+        bg.Pc = mem.ReadIODirect(paramsAddr + 0x4, 2)
+        bg.Pd = mem.ReadIODirect(paramsAddr + 0x6, 2)
+        bg.XOffset = mem.ReadIODirect(paramsAddr + 0x8, 2)
+        bg.YOffset = mem.ReadIODirect(paramsAddr + 0xC, 2)
     }
 
     if (dispcnt.Mode == 1 && idx == 2) || dispcnt.Mode == 2 {
@@ -1232,7 +1229,9 @@ func NewWindows(dispcnt *Dispcnt, gba *GBA) *Windows {
 
         win.Enabled = true
 
-        winH := mem.Read16(0x400_0040)
+        winH := mem.ReadIODirect(0x40, 2)
+
+
         win.R = utils.GetVarData(winH, 0, 7)
         win.L = utils.GetVarData(winH, 8, 15)
 
@@ -1240,14 +1239,14 @@ func NewWindows(dispcnt *Dispcnt, gba *GBA) *Windows {
         //    win.R = 240
         //}
 
-        winV := mem.Read16(0x400_0044)
+        winV := mem.ReadIODirect(0x44, 2)
         win.B = utils.GetVarData(winV, 0, 7)
         win.T = utils.GetVarData(winV, 8, 15)
         //if win.T == 0 && win.B == 0 {
         //    win.B = 160
         //}
 
-        winIn := mem.Read16(0x400_0048)
+        winIn := mem.ReadIODirect(0x48, 2)
         win.InBg0 = utils.BitEnabled(winIn, 0)
         win.InBg1 = utils.BitEnabled(winIn, 1)
         win.InBg2 = utils.BitEnabled(winIn, 2)
@@ -1263,7 +1262,7 @@ func NewWindows(dispcnt *Dispcnt, gba *GBA) *Windows {
 
         win.Enabled = true
 
-        winH := mem.Read16(0x400_0042)
+        winH := mem.ReadIODirect(0x42, 2)
         win.R = utils.GetVarData(winH, 0, 7)
         win.L = utils.GetVarData(winH, 8, 15)
 
@@ -1271,14 +1270,14 @@ func NewWindows(dispcnt *Dispcnt, gba *GBA) *Windows {
             win.R = 240
         }
 
-        winV := mem.Read16(0x400_0046)
+        winV := mem.ReadIODirect(0x46, 2)
         win.B = utils.GetVarData(winV, 0, 7)
         win.T = utils.GetVarData(winV, 8, 15)
         if win.T == 0 && win.B == 0 {
             win.B = 160
         }
 
-        winIn := mem.Read16(0x400_0048)
+        winIn := mem.ReadIODirect(0x48, 2)
         win.InBg0 = utils.BitEnabled(winIn, 8)
         win.InBg1 = utils.BitEnabled(winIn, 9)
         win.InBg2 = utils.BitEnabled(winIn, 10)
@@ -1294,7 +1293,7 @@ func NewWindows(dispcnt *Dispcnt, gba *GBA) *Windows {
         win := Window{}
 
         win.Enabled = true
-        winOut := mem.Read16(0x400_004A)
+        winOut := mem.ReadIODirect(0x4A, 2)
         win.InBg0 = utils.BitEnabled(winOut, 8)
         win.InBg1 = utils.BitEnabled(winOut, 9)
         win.InBg2 = utils.BitEnabled(winOut, 10)
@@ -1304,7 +1303,7 @@ func NewWindows(dispcnt *Dispcnt, gba *GBA) *Windows {
         wins.WinObj = win
     }
 
-    winOut := mem.Read16(0x400_004A)
+    winOut := mem.ReadIODirect(0x4A, 2)
     wins.OutBg0 = utils.BitEnabled(winOut, 0)
     wins.OutBg1 = utils.BitEnabled(winOut, 1)
     wins.OutBg2 = utils.BitEnabled(winOut, 2)
@@ -1341,7 +1340,7 @@ func NewBlend(gba *GBA) *Blend {
 
     bld := &Blend{}
 
-    cnt := mem.Read16(0x400_0050)
+    cnt := mem.ReadIODirect(0x50, 2)
 
     bld.a[0] = utils.BitEnabled(cnt, 0)
     bld.a[1] = utils.BitEnabled(cnt, 1)
@@ -1357,12 +1356,12 @@ func NewBlend(gba *GBA) *Blend {
     bld.b[4] = utils.BitEnabled(cnt, 12)
     bld.b[5] = utils.BitEnabled(cnt, 13)
 
-    alpha := mem.Read16(0x400_0052)
+    alpha := mem.ReadIODirect(0x52, 2)
 
     bld.aEv = min(16, utils.GetVarData(alpha, 0, 4))
     bld.bEv = min(16, utils.GetVarData(alpha, 8, 12))
 
-    y := mem.Read16(0x400_0054)
+    y := mem.ReadIODirect(0x54, 2)
     bld.yEv = utils.GetVarData(y, 0, 4)
 
     return bld

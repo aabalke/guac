@@ -77,9 +77,14 @@ func (gba *GBA) LoadBios(path string) {
 
 func (gba *GBA) SysCall(inst uint32) (int, bool) {
 
+    //savedIme := gba.InterruptStack.IME
+    //gba.InterruptStack.IME = false
+
+
 	cycles := 0
 
     //fmt.Printf("SYS CALL %08X CURR %d\n", inst, CURR_INST)
+    gba.Mem.BIOS_MODE = BIOS_SWI
 
     if inst > 0x2A {
 
@@ -160,6 +165,9 @@ func (gba *GBA) SysCall(inst uint32) (int, bool) {
     //    //return cycles, false // keeps from inc PC after setting in exception
 		panic(fmt.Sprintf("EXCEPTION OR UNHANDLED SYS CALL TYPE 0x%X\n", inst))
 	}
+
+    gba.Mem.BIOS_MODE = BIOS_SWI
+    //gba.InterruptStack.IME = savedIme
 
     cycles += 6
 
@@ -454,6 +462,7 @@ func RegisterRamReset(gba *GBA) {
 
         mem.Write8(0x400_0000 + uint32(0x208), 0)
             //// default values pulled from ruby
+            //mem.IO[0x00] = 0x80
             //mem.IO[0x0021] = 0x1
             //mem.IO[0x0027] = 0x1
             //mem.IO[0x0031] = 0x1
@@ -472,14 +481,6 @@ func RegisterRamReset(gba *GBA) {
 
             ////mem.GBA.checkIRQ()
 	}
-
-    //mem.Write16(0x400_0000, 0x80)
-    mem.IO[0x120] = 0
-    mem.IO[0x121] = 0
-    mem.IO[0x122] = 0
-    mem.IO[0x123] = 0
-    mem.IO[0x00] = 0x80
-    mem.IO[0x01] = 0x00
 
     r[3] = 0x170 // CLOBBER
 }
@@ -742,11 +743,18 @@ func CpuSet(gba *GBA) int {
 	switch {
 	case fill && isWord:
 
-		rs &^= 0b11
+
+        rs &^= 0b11
 		rd &^= 0b11
 
 		word := mem.Read32(rs)
+
+        if rs <= 0x200_0000 {
+            word = 0
+        }
+
 		for i := range wordCount {
+
 			mem.Write32(rd+(i<<2), word)
 		}
 
@@ -758,10 +766,18 @@ func CpuSet(gba *GBA) int {
 		rd &^= 0b1
 
         srcAddr := (rs)
+
+
 		word := mem.Read16(srcAddr)
+
         if unaligned := srcAddr & 1 == 1; unaligned {
             word = mem.Read8(srcAddr)
         }
+
+        if srcAddr <= 0x200_0000 {
+            word = 0
+        }
+
 
 		for i := range wordCount {
             addr := rd + (i << 1)
@@ -773,11 +789,19 @@ func CpuSet(gba *GBA) int {
 
 	case !fill && isWord:
 
-		rs &^= 0b11
-		rd &^= 0b11
+        if notSram := !(rs >= 0xE00_0000 && rs < 0x1000_0000); notSram {
+            rs &^= 0b11
+        }
+        if notSram := !(rd >= 0xE00_0000 && rd < 0x1000_0000); notSram {
+            rd &^= 0b11
+        }
 
 		for i := range wordCount {
 			word := mem.Read32(rs + (i << 2))
+            if rs <= 0x200_0000 {
+                word = 0
+            }
+
 			mem.Write32(rd+(i<<2), word)
 		}
 
@@ -795,6 +819,10 @@ func CpuSet(gba *GBA) int {
 			word := mem.Read16(srcAddr)
             if unaligned := srcAddr & 1 == 1; unaligned {
                 word = mem.Read8(srcAddr)
+            }
+
+            if srcAddr <= 0x200_0000{
+                word = 0
             }
 
             dstAddr := (rd + (i<<1))
@@ -815,8 +843,17 @@ func CpuFastSet(gba *GBA) int {
 	r := &gba.Cpu.Reg.R
 	mem := gba.Mem
 
-	src := r[0] &^ 0b11
-	dst := r[1] &^ 0b11
+    src := r[0]
+    dst := r[1]
+
+    if notSram := !(src >= 0xE00_0000 && src < 0x1000_0000); notSram {
+        src &^= 0b11
+    }
+
+    if notSram := !(dst >= 0xE00_0000 && dst < 0x1000_0000); notSram {
+        dst &^= 0b11
+    }
+
 	count := (utils.GetVarData(r[2], 0, 20) + 7) &^ 7 // round up 32 bytes (8 words)
 	fill := utils.BitEnabled(r[2], 24)
 
@@ -824,27 +861,34 @@ func CpuFastSet(gba *GBA) int {
 
 	if fill {
 		word := mem.Read32(src)
+        if src <= 0x200_0000 {
+            word = 0
+        }
+
 		for i := uint32(0); i < count; i++ {
 			mem.Write32(dst+(i<<2), word)
 		}
 
-        //fmt.Printf("%08X\n", count)
-
         r[1] += count * 4
-
         r[3] = 0x0
 
         return cycles
     }
 
     for i := uint32(0); i < count; i++ {
-        word := mem.Read32(src + (i << 2))
+
+        srcAddr := src + (i << 2)
+        word := mem.Read32(srcAddr)
+
+        if srcAddr <= 0x200_0000 {
+            word = 0
+        }
+
         mem.Write32(dst+(i<<2), word)
 	}
 
     // assuming r1 is incremented since fill does
     r[1] += count * 4
-
     r[3] = 0x0
 
     return cycles

@@ -46,6 +46,8 @@ type DMA struct {
 	Enabled bool
 
     EepromWidth uint32
+
+    Value uint32
 }
 
 func (dma *DMA) ReadControl(hi bool) uint8 {
@@ -55,7 +57,8 @@ func (dma *DMA) ReadControl(hi bool) uint8 {
 
 func (dma *DMA) MaskAddr(v uint32, src bool) uint32 {
 
-    if dma.Idx == 0 || !src && dma.Idx == 1 || !src && dma.Idx == 2 {
+    //if dma.Idx == 0 || !src && dma.Idx == 1 || !src && dma.Idx == 2 {
+    if !src && (dma.Idx == 0 || dma.Idx == 1 || dma.Idx == 2) {
         return v & 0x7FF_FFFF
     }
 
@@ -65,10 +68,13 @@ func (dma *DMA) MaskAddr(v uint32, src bool) uint32 {
 func (dma *DMA) WriteSrc(v uint8, byte uint32) {
 
     if byte == 3 {
-    switch dma.Idx {
-    case 0: v &= 0x07
-    case 1, 2, 3: v &= 0x0F
-    }
+        v &= 0x0F
+    //switch dma.Idx {
+
+    //case 0: v &= 0x0F
+    ////case 0: v &= 0x07
+    //case 1, 2, 3: v &= 0x0F
+    //}
     }
 
     dma.Src = utils.ReplaceByte(dma.Src, uint32(v), byte)
@@ -194,6 +200,11 @@ func (dma *DMA) transfer() {
 
     }
 
+    rom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
+    if rom && dma.Idx == 0 {
+        tmpSrc &= 0x7FF_FFFF
+    }
+
     if fifo := (dma.Idx == 1 || dma.Idx == 2) && dma.Mode == DMA_MODE_REF; fifo {
 
         //if dma.isWord {
@@ -212,23 +223,6 @@ func (dma *DMA) transfer() {
         if !dma.Repeat || (dma.Dst != 0x400_00A0 && dma.Dst != 0x400_00A4) {
             panic("INVALID FIFO DMA")
         }
-    }
-
-
-    dstRom := tmpDst >= 0x800_0000 && tmpDst < 0xE00_0000
-    //srcRom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
-
-    dstSram := tmpDst >= 0xE00_0000 && tmpDst < 0x1000_0000
-    srcSram := tmpSrc >= 0xE00_0000 && tmpSrc < 0x1000_0000
-
-    if sram := (dstSram || srcSram) && dma.Gba.Cartridge.FlashType == 2; sram {
-        return
-    } else if rom := (dstRom || dstSram) && dma.Idx != 3; rom {
-        return
-    }
-
-    if (dstSram || srcSram) && dma.Gba.Cartridge.FlashType == 2 {
-        return
     }
 
     for i := uint32(0); i < count; i++ {
@@ -250,23 +244,38 @@ func (dma *DMA) transfer() {
             // do not continue this., do not put this outside loop
         }
 
+        badAddr := tmpSrc < 0x200_0000
+        sram := tmpSrc >= 0xE00_0000 && tmpSrc < 0x1000_0000
+        //rom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
+
         if dma.isWord {
 
-            if badAddr := tmpSrc < 0x200_0000; badAddr {
-                mem.Write32(tmpDst, 0)
-            } else {
-                v := mem.Read32(tmpSrc)
-                mem.Write32(tmpDst, v)
+            switch {
+            case badAddr:
+                mem.Write32(tmpDst &^ 3, dma.Value)
+            case sram && dma.Idx == 0:
+                dma.Value = 0
+                mem.Write32(tmpDst &^ 3, dma.Value)
+            default:
+                dma.Value = mem.Read32(tmpSrc &^ 3)
+                mem.Write32(tmpDst &^ 3, dma.Value)
             }
 
         } else {
 
-            if badAddr := tmpSrc < 0x200_0000; badAddr {
-                mem.Write16(tmpDst, 0)
-            } else {
-                v := mem.Read16(tmpSrc)
-                mem.Write16(tmpDst, uint16(v))
+            switch {
+            case badAddr:
+                mem.Write16(tmpDst &^ 1, uint16(dma.Value))
+
+            case sram && dma.Idx == 0:
+                dma.Value = 0
+                mem.Write16(tmpDst &^ 1, uint16(dma.Value))
+            default:
+                dma.Value = mem.Read16(tmpSrc &^ 1)
+                dma.Value |= (dma.Value << 16)
+                mem.Write16(tmpDst &^ 1, uint16(dma.Value))
             }
+
         }
 
         tmpDst = uint32(int64(tmpDst) + dstOffset)

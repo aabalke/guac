@@ -76,6 +76,7 @@ func (a *APU) Init() {
 	mixer := &beep.Mixer{}
 
 	a.Channel1 = Channel{
+        Idx: 0,
 		Enabled: false,
 		Apu:   a,
 		WavShaper: func(i int, samples *[][2]float64, c *Channel) {
@@ -92,6 +93,7 @@ func (a *APU) Init() {
 		},
 	}
 	a.Channel2 = Channel{
+        Idx: 1,
 		Enabled: false,
 		Apu:     a,
 		WavShaper: func(i int, samples *[][2]float64, c *Channel) {
@@ -108,6 +110,7 @@ func (a *APU) Init() {
 		},
 	}
 	a.Channel3 = Channel{
+        Idx: 2,
 		Enabled: false,
 		Apu:     a,
 		WavShaper: func(i int, samples *[][2]float64, c *Channel) {
@@ -119,6 +122,7 @@ func (a *APU) Init() {
 		},
 	}
 	a.Channel4 = Channel{
+        Idx: 3,
 		Enabled: false,
 		Apu:     a,
 		WavShaper: func(i int, samples *[][2]float64, c *Channel) {
@@ -382,6 +386,7 @@ func (a *APU) Update(addr uint16, data uint8) {
 }
 
 type Channel struct {
+    Idx int
 	Apu         *APU
 	Enabled     bool
 	LengthTimer bool
@@ -429,14 +434,18 @@ func (c *Channel) Stream(samples [][2]float64) (n int, ok bool) {
 		c.SampleTick += float64(c.Freq) / c.Apu.SampleRate
 
 		if c.BlockAudio() {
+            //c.setChannelBit(false)
 			samples[i][0] = 0
 			samples[i][1] = 0
 
 			c.Envelope()
 			c.Sweep()
 
+
 			continue
 		}
+
+        //c.setChannelBit(true)
 
 		c.WavShaper(i, &samples, c)
 
@@ -444,10 +453,20 @@ func (c *Channel) Stream(samples [][2]float64) (n int, ok bool) {
 
 		c.Envelope()
 		c.Sweep()
+
 	}
 
 	return len(samples), true
 }
+
+//func (c *Channel) setChannelBit(on bool) {
+//
+//    if on {
+//        c.Apu.gba.Mem.IO[0x84] |= (1 << c.Idx)
+//    }
+//
+//    c.Apu.gba.Mem.IO[0x84] &^= (1 << c.Idx)
+//}
 
 func (c *Channel) Err() error {
 	return nil

@@ -442,6 +442,10 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 
     addr := utils.WordAlign(pre)
 
+    if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
+        addr = pre
+    }
+
     if sdt.Pld {
         panic("Need to handle PLD Inst")
     }
@@ -486,7 +490,7 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 
     c.Reg.R[PC] += 4
 
-    return 4 //uint32(ct.instCycles)
+    return 4
 }
 
 func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack bool) {
@@ -718,6 +722,8 @@ func signedHalfStd(half *Half, cpu *Cpu) {
 
             if int8(unexpanded) < 0 {
                 expanded |= (0xFFFFFF << 8)
+            } else {
+                expanded &= 0xFF
             }
 
             r[half.Rd] = expanded
@@ -749,12 +755,17 @@ func unsignedHalfStd(half *Half, cpu *Cpu) {
     pre, post := halfUnsignedAddress(half, cpu)
     addr := utils.HalfAlign(pre)
 
+    if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
+        addr = pre
+    }
+
     if half.Load {
         v := uint32(cpu.Gba.Mem.Read16(addr))
         is := (pre & 0b1) * 8
         v, _, _ = utils.Ror(v, is, false, false ,false)
         r[half.Rd] = v
     } else {
+
         cpu.Gba.Mem.Write16(addr, uint16(half.RdValue))
     }
 
@@ -842,6 +853,7 @@ func (c *Cpu) Block(opcode uint32) {
     }
 
     if utils.BitEnabled(block.Opcode, 15) && c.Reg.getMode() == MODE_IRQ {
+    //if utils.BitEnabled(block.Opcode, 15) && !c.Gba.InterruptStack.IsEmpty() {
         c.Gba.InterruptStack.Exit()
         return
     }

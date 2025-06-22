@@ -82,12 +82,12 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
 
     gba.checkDmas(DMA_MODE_VBL)
 
-    frameCycles = gba.UpdateScanline(frameCycles)
-
     dispstat := uint32(gba.Mem.Dispstat)
     if utils.BitEnabled(dispstat, 3) {
         gba.InterruptStack.setIRQ(0)
     }
+
+    frameCycles = gba.UpdateScanline(frameCycles)
 
     for range 66 {
         frameCycles = gba.UpdateScanline(frameCycles)
@@ -169,36 +169,18 @@ func (gba *GBA) Exec(requiredCycles uint32) uint32 {
 
 
         opcode := gba.Mem.Read32(r[PC])
-        gba.OpenBusOpcode = gba.Mem.Read32(r[PC] + 8)
+        gba.OpenBusOpcode = gba.Mem.Read32((r[PC] &^ 0b11) + 8)
 
 
         if !gba.Halted {
             cycles = gba.Cpu.Execute(opcode)
+        } else {
+            //cycles = 1
         }
 
-        //gba.Mem.Write8(0x30011AC, 0)
-
-        ////if CURR_INST >= 5488568 && CURR_INST <= 5488590 { good
-        ////if CURR_INST >= 5488590 && CURR_INST <= 5488650 {
-        ////    fmt.Printf("PC %08X OPCODE %08X MODE %02X THUMB %t CURR %d\n", r[PC], opcode, gba.Cpu.Reg.CPSR & 0xFF, gba.Cpu.Reg.CPSR.GetFlag(FLAG_T), CURR_INST)
-        ////    //gba.Debugger.print(0)
-        ////}
-
-        //if r[PC] == 0x8042DC2 {
-        //    gba.Debugger.print(0)
-        //    panic("HERE")
-        //}
-
-        //if CURR_INST == 5488568 {
-        ////if r[PC] == 0x80019FE {
-        ////if r[PC] == 0x3001DE0 && r[1] == 1 {
-        //    gba.Debugger.print(CURR_INST)
-        //    os.Exit(0)
-        //}
-
         gba.Timers.Update(uint32(cycles))
-
         accCycles += gba.InterruptStack.checkIRQ()
+
 
         accCycles += uint32(cycles)
 
@@ -281,13 +263,7 @@ func NewGBA() *GBA {
 
     gba.Apu.Init()
 
-    //gba.Cache = &Cache{}
-
-    //gba.Logger = NewLogger(".log.txt", &gba)
-
-    gba.LoadBios("./emu/gba/res/bios_magia.gba")
-
-    //gba.SoftReset()
+    //gba.LoadBios("./emu/gba/res/bios_magia.gba")
 
 	return &gba
 }

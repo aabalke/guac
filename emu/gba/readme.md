@@ -7,3 +7,5 @@ https://medium.com/@michelheily/hello-gba-journey-of-making-an-emulator-part-1-8
 3. NES
 4. RTC (GPIO)
 5. Timers
+
+Should IRQs occur during SWI? Is in bios memory at that time, but perhaps can be interrupted?

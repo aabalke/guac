@@ -74,7 +74,7 @@ func (s *InterruptStack) checkIRQ() uint32 {
 
     if interruptEnabled && ime && interrupts {
         s.Execute()
-        return 0
+        return 60
     }
 
     return 0
