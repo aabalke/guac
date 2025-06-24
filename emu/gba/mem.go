@@ -31,7 +31,6 @@ func NewMemory(gba *GBA) *Memory {
 
 	m.Write32(0x4000000, 0x80)
 	m.Write32(0x4000134, 0x800F) // IR requires bit 3 on. I believe this is auth check (sonic adv)
-
 	m.GBA.Joypad = 0x3FF
 
 	m.BIOS_MODE = BIOS_STARTUP
@@ -56,6 +55,8 @@ func (m *Memory) InitSaveLoop() {
 }
 
 func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
+
+    //m.GBA.VideoUpdate(1)
 
 	switch {
 	case addr < 0x0000_4000:
@@ -140,8 +141,10 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 		return uint8(m.Dispstat)
 	case 0x0005:
 		return uint8(m.Dispstat >> 8)
-	case 0x0006:
-		return uint8(m.GBA.VCOUNT)
+    case 0x0006:
+        return m.IO[addr]
+	//case 0x0006:
+	//	return uint8(m.GBA.VCOUNT)
 
 	case 0x0007:
 		return 0x0
@@ -484,6 +487,7 @@ func (m *Memory) ReadBadRom(addr uint32, bytesRead uint8) (uint32, bool) {
 }
 
 func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
+    //m.GBA.VideoUpdate(1)
 
     //CYCLES += cycles_byte_or_halfword(addr)
 
@@ -533,7 +537,7 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
             mirrorAddr -= 0x8000 // 32k internal mirror
         }
 
-        mode := m.Read(0x400_0000, false) & 0b111
+        mode := m.ReadIODirect(0x0, 1) & 0b111
         if bitmap := mode > 2; bitmap && byteWrite && mirrorAddr > 0x1_0000 {
             return
         }
@@ -803,20 +807,29 @@ func (m *Memory) WriteOAM(relAddr uint32) {
 }
 
 func (m *Memory) ReadIODirect(addr uint32, size uint32) uint32 {
+
     switch size {
     case 1:
-        return uint32(m.IO[addr])
+        return m.ReadIODirectByte(addr)
 
     case 2:
-        return uint32(m.IO[addr + 1]) << 8 | uint32(m.IO[addr])
+        return m.ReadIODirectByte(addr + 1) << 8 | m.ReadIODirectByte(addr)
     case 4:
-        a := uint32(m.IO[addr + 3]) << 8 | uint32(m.IO[addr + 2])
-        b := uint32(m.IO[addr + 1]) << 8 | uint32(m.IO[addr])
+        a := m.ReadIODirectByte(addr + 3) << 8 | m.ReadIODirectByte(addr + 2)
+        b := m.ReadIODirectByte(addr + 1) << 8 | m.ReadIODirectByte(addr)
 
         return (a << 16) | b
 
     default:
         panic("UNKOWN READ IO DIRECT SIZE")
+    }
+}
+
+func (m *Memory) ReadIODirectByte(addr uint32) uint32 {
+    switch addr {
+    case 0x4: return uint32(m.Dispstat)
+	case 0x5: return uint32(m.Dispstat >> 8)
+    default: return uint32(m.IO[addr])
     }
 }
 

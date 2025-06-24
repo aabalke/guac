@@ -1052,8 +1052,8 @@ func NewBackground(gba *GBA, dispcnt *Dispcnt, idx uint32, affine bool) *Backgro
         bg.Pb = mem.ReadIODirect(paramsAddr + 0x2, 2)
         bg.Pc = mem.ReadIODirect(paramsAddr + 0x4, 2)
         bg.Pd = mem.ReadIODirect(paramsAddr + 0x6, 2)
-        bg.XOffset = mem.ReadIODirect(paramsAddr + 0x8, 2)
-        bg.YOffset = mem.ReadIODirect(paramsAddr + 0xC, 2)
+        bg.XOffset = mem.ReadIODirect(paramsAddr + 0x8, 4)
+        bg.YOffset = mem.ReadIODirect(paramsAddr + 0xC, 4)
     }
 
     if (dispcnt.Mode == 1 && idx == 2) || dispcnt.Mode == 2 {

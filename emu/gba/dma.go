@@ -144,6 +144,7 @@ func (dma *DMA) disable() {
 }
 
 func (dma *DMA) transfer() {
+
     mem := dma.Gba.Mem
 
     count := dma.WordCount
@@ -162,7 +163,7 @@ func (dma *DMA) transfer() {
     if dma.Mode == DMA_MODE_HBL {
         srcInLimited := dma.Src >= 0x600_0000 && dma.Src < 0x800_0000
         dstInLimited := dma.Dst >= 0x600_0000 && dma.Dst < 0x800_0000
-        allowed := utils.BitEnabled(dma.Gba.Mem.Read16(0x400_0000), 5)
+        allowed := utils.BitEnabled(dma.Gba.Mem.ReadIODirect(0, 1), 5)
 
         if (srcInLimited || dstInLimited) && !allowed {
             return
@@ -246,10 +247,8 @@ func (dma *DMA) transfer() {
 
         badAddr := tmpSrc < 0x200_0000
         sram := tmpSrc >= 0xE00_0000 && tmpSrc < 0x1000_0000
-        //rom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
 
         if dma.isWord {
-
             switch {
             case badAddr:
                 mem.Write32(tmpDst &^ 3, dma.Value)

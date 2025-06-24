@@ -342,8 +342,8 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
         //    cpu.Gba.InterruptStack.Exit()
         //    return 4
         //}
-        //if interruptExit := cpu.Reg.getMode() == MODE_IRQ && rd == PC && rs == LR; interruptExit {
         if interruptExit := cpu.Reg.getMode() == MODE_IRQ && rd == PC && rs == LR; interruptExit {
+        //if interruptExit := !s.IsEmpty() && rd == PC && rs == LR; interruptExit {
             cpu.Gba.InterruptStack.Exit()
             return 4
         }
@@ -371,8 +371,9 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
         //    return 4
         //}
 
-        if interruptStubExit := (r[rs] == s.ReturnAddr()) && !s.IsEmpty(); interruptStubExit {
-            cpsr.SetFlag(FLAG_T, false)
+        //if interruptStubExit := (r[rs] == s.ReturnAddr()) && !s.IsEmpty(); interruptStubExit {
+        if interruptStubExit := r[rs] == s.ReturnAddr() && !s.IsEmpty(); interruptStubExit {
+            //cpsr.SetFlag(FLAG_T, false)
             s.Exit()
             return 4
         }

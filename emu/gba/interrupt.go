@@ -21,6 +21,7 @@ type InterruptStack struct {
 type Interrupt struct {
     Reg Reg
     ReturnAddr uint32
+    IME bool
 }
 
 func (s *InterruptStack) WriteIME(v uint8) {
@@ -152,7 +153,6 @@ func (s *InterruptStack) Execute() {
 
     reg.CPSR.SetFlag(FLAG_I, true) // true is disabled
     reg.CPSR.SetFlag(FLAG_T, false)
-    s.IME = false
 
     //{
     //    for i := range 13 {
@@ -175,7 +175,10 @@ func (s *InterruptStack) Execute() {
     s.Interrupts = append(s.Interrupts, Interrupt{
         Reg: s.Gba.Cpu.Reg,
         ReturnAddr: r[PC],
+        //IME: s.IME,
     })
+
+    //s.IME = false
 
     r[SP] -= 4
     mem.Write32(r[SP], r[LR])
@@ -246,8 +249,6 @@ func (s *InterruptStack) Exit() {
     r[SP] = reg.SP[curBank]
 
     s.Gba.Mem.BIOS_MODE = BIOS_IRQ_POST
-
-    s.IME = true
 
     reg.CPSR.SetFlag(FLAG_I, false) // disable IRQ
 

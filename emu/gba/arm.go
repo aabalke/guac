@@ -226,6 +226,7 @@ func (cpu *Cpu) test(alu *Alu) {
 
 func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) bool {
 
+    //if interruptExit := !cpu.Gba.InterruptStack.IsEmpty() && alu.Rd == PC && alu.Rm == LR && alu.Inst == MOV; interruptExit {
     if interruptExit := cpu.Reg.getMode() == MODE_IRQ && alu.Rd == PC && alu.Rm == LR && alu.Inst == MOV; interruptExit {
         cpu.Gba.InterruptStack.Exit()
         return false

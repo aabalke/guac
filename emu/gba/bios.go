@@ -371,7 +371,7 @@ func SoftReset(gba *GBA) {
 
 	i := uint32(0)
 	for i = range 0x200 {
-		gba.Mem.Write8(ZERO_FILL+i, 0)
+		gba.Mem.Write(ZERO_FILL+i, 0, false)
 	}
 
 	reg.CPSR.SetMode(MODE_SWI)
@@ -778,7 +778,6 @@ func CpuSet(gba *GBA) int {
             word = 0
         }
 
-
 		for i := range wordCount {
             addr := rd + (i << 1)
 			mem.Write16(addr, uint16(word))
@@ -946,7 +945,7 @@ func DecompressLZ77(gba *GBA, src, dst uint32, half bool) int {
 			flag := (flagByte >> (7 - i)) & 1
 			if flag == 0 {
 				// Uncompressed
-				mem.Write8(dst, uint8(mem.Read8(src)))
+				mem.Write(dst, uint8(mem.Read8(src)), false)
                 bytesOutputted++
 				dst++
 				src++
@@ -963,7 +962,7 @@ func DecompressLZ77(gba *GBA, src, dst uint32, half bool) int {
 				copyFrom := int(dst) - (disp + 1)
 
 				for j := range length {
-					mem.Write8(dst, uint8(mem.Read8(uint32(copyFrom+j))))
+					mem.Write(dst, uint8(mem.Read8(uint32(copyFrom+j))), false)
                     bytesOutputted++
 					dst++
 				}
@@ -1023,7 +1022,7 @@ func DecompressRLU(gba *GBA, src, dst uint32) int {
 			count := int(flag&0x7F) + 1
 			for range count {
 				b := mem.Read8(src)
-				mem.Write8(dst, uint8(b))
+				mem.Write(dst, uint8(b), false)
                 bytesOutputted++
 				src++
 				dst++
@@ -1034,7 +1033,7 @@ func DecompressRLU(gba *GBA, src, dst uint32) int {
 			value := mem.Read8(src)
 			src++
 			for range count {
-				mem.Write8(dst, uint8(value))
+				mem.Write(dst, uint8(value), false)
                 bytesOutputted++
 				dst++
 			}
@@ -1076,7 +1075,7 @@ func DecompressHuff(gba *GBA, src, dst uint32) int {
 			count := int(flag&0x7F) + 1
 			for range count {
 				b := mem.Read8(src)
-				mem.Write8(dst, uint8(b))
+				mem.Write(dst, uint8(b), false)
                 bytesOutputted++
 				src++
 				dst++
@@ -1087,7 +1086,7 @@ func DecompressHuff(gba *GBA, src, dst uint32) int {
 			value := mem.Read8(src)
 			src++
 			for range count {
-				mem.Write8(dst, uint8(value))
+				mem.Write(dst, uint8(value), false)
                 bytesOutputted++
 				dst++
 			}
@@ -1225,7 +1224,7 @@ func DecompressDiff8bit(gba *GBA, src, dst uint32) int {
 
 	// First byte is raw
 	prev := mem.Read8(src)
-	mem.Write8(dst, uint8(prev))
+	mem.Write(dst, uint8(prev), false)
 	src++
 	dst++
 
@@ -1233,7 +1232,7 @@ func DecompressDiff8bit(gba *GBA, src, dst uint32) int {
 	for dst < end {
 		diff := int8(mem.Read8(src))
 		val := uint8(int(prev) + int(diff))
-		mem.Write8(dst, val)
+		mem.Write(dst, val, false)
 		prev = uint32(val)
 		src++
 		dst++

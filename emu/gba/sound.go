@@ -178,7 +178,7 @@ func (a *APU) Init() {
             left := 0
             right := 0
 
-            soundcnt := c.Apu.gba.Mem.Read16(0x400_0082)
+            soundcnt := c.Apu.gba.Mem.ReadIODirect(0x82, 2)
 
             if utils.BitEnabled(soundcnt, 8) {
                 right = clamp(right + int(a), -512, 511)
@@ -655,9 +655,9 @@ func (c *DigitalChannel) InitCallback() {
 
     switch c.Idx {
     case 0:
-        c.Timer = utils.BitEnabled(gba.Mem.Read16(0x400_0082), 10)
+        c.Timer = utils.BitEnabled(gba.Mem.ReadIODirect(0x82, 2), 10)
     case 1:
-        c.Timer = utils.BitEnabled(gba.Mem.Read16(0x400_0082), 14)
+        c.Timer = utils.BitEnabled(gba.Mem.ReadIODirect(0x82, 2), 14)
     default:
         panic("SET ACCURATE IDXS ON CHANNEL A AND B")
     }

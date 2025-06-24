@@ -1,8 +1,12 @@
 package gba
 
 import (
+	"fmt"
+
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
+
+var _ = fmt.Sprintf("")
 
 type Timers [4]Timer
 
@@ -34,7 +38,7 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
         return false
     }
 
-    increment := 0
+    increment := uint32(0)
     if t.isCascade() && overflow {
         increment = 1
     }
@@ -44,8 +48,8 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
         t.Elapsed += cycles
 
         if freq := t.getCycles(); t.Elapsed >= freq {
-            increment = int(t.Elapsed) / int(freq)
-            t.Elapsed = t.Elapsed % freq
+            increment = t.Elapsed / freq
+            t.Elapsed %= freq
         }
     }
 
@@ -57,46 +61,47 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
             t.D = t.SavedInitialValue
             overflow = true
             continue
+        } else {
+            t.D = tmp
         }
-        t.D = tmp
     }
 
     if !overflow {
         return false
     }
 
-    apu := t.Gba.Apu
+    //apu := t.Gba.Apu
 
-    // bit 10 or 14: off == timer 0, on = timer 1
+    //// bit 10 or 14: off == timer 0, on = timer 1
 
-    if aTick := int((t.Gba.Mem.Read16(0x400_0082) >> 10) & 1) == t.Idx; aTick {
+    //if aTick := int((t.Gba.Mem.ReadIODirect(0x82, 2) >> 10) & 1) == t.Idx; aTick {
 
-        channel := &apu.ChannelA
+    //    channel := &apu.ChannelA
 
-        channel.Ticks = (channel.Ticks + 1) % 16
-        if channel.Ticks == 0 {
-            channel.Refill = true
-        }
-    }
+    //    channel.Ticks = (channel.Ticks + 1) % 16
+    //    if channel.Ticks == 0 {
+    //        channel.Refill = true
+    //    }
+    //}
 
-    if bTick := int((t.Gba.Mem.Read16(0x400_0082) >> 14) & 1) == t.Idx; bTick {
+    //if bTick := int((t.Gba.Mem.ReadIODirect(0x82, 2) >> 14) & 1) == t.Idx; bTick {
 
-        channel := &apu.ChannelB
+    //    channel := &apu.ChannelB
 
-        channel.Ticks = (channel.Ticks + 1) % 16
-        if channel.Ticks == 0 {
-            channel.Refill = true
-        }
-    }
+    //    channel.Ticks = (channel.Ticks + 1) % 16
+    //    if channel.Ticks == 0 {
+    //        channel.Refill = true
+    //    }
+    //}
 
-    if apu.ChannelA.Refill {
-    //if apu.ChannelA.Refill || apu.ChannelB.Refill {
-        //t.Gba.DmaOnRefresh = true
-        apu.ChannelA.Refill = false
-        //apu.ChannelB.Refill = false
-        t.Gba.Dma[1].transferFifo()
-        //t.Gba.Dma[2].transferFifo()
-    }
+    //if apu.ChannelA.Refill {
+    ////if apu.ChannelA.Refill || apu.ChannelB.Refill {
+    //    //t.Gba.DmaOnRefresh = true
+    //    apu.ChannelA.Refill = false
+    //    //apu.ChannelB.Refill = false
+    //    t.Gba.Dma[1].transferFifo()
+    //    //t.Gba.Dma[2].transferFifo()
+    //}
 
     if t.isOverflowIRQ() {
         t.Gba.InterruptStack.setIRQ(3 + uint32(t.Idx))
@@ -140,8 +145,7 @@ func (t *Timer) ReadD(hi bool) uint8 {
 func (t *Timer) WriteD(v uint8, hi bool) {
 
     if hi {
-        //t.SavedInitialValue |= (uint32(v) << 8)
-        t.SavedInitialValue = (t.SavedInitialValue & 0x00FF) | (uint32(v) << 8)
+        t.SavedInitialValue = (t.SavedInitialValue & 0xFF) | (uint32(v) << 8)
         return
     }
 

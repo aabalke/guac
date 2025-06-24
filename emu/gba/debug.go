@@ -89,11 +89,11 @@ func (d *Debugger) print(i int) {
 
     //start := 0x3007EB0
     //start := 0x30014B0
-    start := 0x40000E0
-    count := 0x20
-    for i := start; i >= start - (count * 4); i -= 4 {
-        p(fmt.Sprintf("IO %X", i), d.Gba.Mem.Read32(uint32(i)))
-    }
+    //start := 0xE000080
+    //count := 0x20
+    //for i := start; i >= start - (count * 4); i -= 4 {
+    //    p(fmt.Sprintf("IO %X", i), d.Gba.Mem.Read32(uint32(i)))
+    //}
 }
 
 func (d *Debugger) saveBg4() {
