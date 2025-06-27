@@ -2,11 +2,13 @@ package gba
 
 import (
 	"fmt"
-    "os"
+	"os"
 
-	"github.com/aabalke33/guac/emu/gba/utils"
+	"time"
+
+	"github.com/aabalke33/guac/emu/gba/apu"
 	"github.com/aabalke33/guac/emu/gba/cart"
-    "time"
+	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
 const (
@@ -26,7 +28,7 @@ var end time.Time
 
 var (
     DRAWN = false
-    video_cycles = uint32(0)
+    PRINT_EM = false
 )
 
 const (
@@ -57,6 +59,7 @@ type GBA struct {
     ExitHalt bool
 
     Apu *APU
+    DigitalApu *apu.DigitalAPU
     Objects *[128]Object
 
     Clock int
@@ -77,167 +80,24 @@ type GBA struct {
     OpenBusOpcode uint32
     DmaOnRefresh bool
 
-    prevVcountMatch bool
+    AccCycles uint32
+
 
     //Cache *Cache
 }
 
 func (gba *GBA) Update(exit *bool, instCount int) int {
 
-    //gba.DrawFrame(exit, instCount)
-    //return 0
+    gba.DrawFrame(exit, instCount)
+    apu.Play()
 
-    if gba.Paused {
-        return 0
-    }
-
-    //gba.VCOUNT = 0
-
-    gba.Mem.IO[VCOUNT] = 0
-
-    frameCycles := uint32(0)
-    for range 160 {
-        frameCycles = gba.UpdateScanline(frameCycles)
-    }
-
-    gba.Mem.Dispstat.SetVBlank(true)
-
-    gba.checkDmas(DMA_MODE_VBL)
-
-    //frameCycles = gba.UpdateScanline(frameCycles)
-
-    dispstat := uint32(gba.Mem.Dispstat)
-    if utils.BitEnabled(dispstat, 3) {
-        gba.InterruptStack.setIRQ(0)
-    }
-
-    for range 66 {
-        frameCycles = gba.UpdateScanline(frameCycles)
-    }
-
-    gba.Mem.Dispstat.SetVBlank(false)
-
-    frameCycles = gba.UpdateScanline(frameCycles)
-
-    return instCount
-}
-
-func (gba *GBA) UpdateScanline(frameCycles uint32) uint32 {
-
-    vcount := uint32(gba.Mem.IO[VCOUNT])
-
-    dispstat := uint32(gba.Mem.Dispstat)
-    lyc := gba.Mem.ReadIODirect(0x05, 1)
-    match := lyc == vcount
-    gba.Mem.Dispstat.SetVCFlag(match)
-
-    vcounterIRQ := utils.BitEnabled(dispstat, 5)
-    if vcounterIRQ && match {
-        gba.InterruptStack.setIRQ(2)
-    }
-
-    //Although the drawing time is only 960 cycles (240*4), the H-Blank flag is "0" for a total of 1006 cycles. gbatek
-    frameCycles += gba.Exec(1006)
-
-    gba.scanlineGraphics(vcount)
-
-    gba.Mem.Dispstat.SetHBlank(true)
-
-    dispstat = uint32(gba.Mem.Dispstat)
-    if utils.BitEnabled(dispstat, 4) {
-        gba.InterruptStack.setIRQ(1)
-    }
-
-    if vblank := utils.BitEnabled(dispstat, 0); !vblank { // this is necessary for dmas do not remove
-        gba.checkDmas(DMA_MODE_HBL)
-    }
-
-    frameCycles += gba.Exec(1232 - 1006)
-
-    gba.Mem.Dispstat.SetHBlank(false)
-
-    if gba.DmaOnRefresh {
-        gba.Dma[1].transferFifo()
-        gba.Dma[2].transferFifo()
-    }
-
-    gba.Dma[3].transferVideo(vcount)
-
-    gba.Mem.IO[VCOUNT]++
-
-    if gba.Mem.IO[VCOUNT] > 228 {
-        panic("VCOUNT SET TO MORE THAN 227")
-    }
-
-    return frameCycles
-}
-
-func (gba *GBA) Exec(requiredCycles uint32) uint32 {
-
-    r := &gba.Cpu.Reg.R
-
-    accCycles := uint32(0)
-
-    for accCycles < requiredCycles {
-
-        cycles := 4
-
-        if gba.Paused {
-            return 0
-        }
-
-        if (r[PC] >= 0x400_0000 && r[PC] < 0x800_0000) || r[PC] % 2 != 0 || r[PC] >= 0xE00_0000 {
-            r := &gba.Cpu.Reg.R
-            panic(fmt.Sprintf("INVALID PC CURR %d PC %08X OPCODE %08X", CURR_INST, r[PC], gba.Mem.Read32(r[PC])))
-        }
-
-        if gba.Halted {
-            AckIntrWait(gba)
-        }
-
-        opcode := gba.Mem.Read32(r[PC])
-        gba.OpenBusOpcode = gba.Mem.Read32((r[PC] &^ 0b11) + 8)
-
-
-        if !gba.Halted {
-            cycles = gba.Cpu.Execute(opcode)
-        } else {
-            cycles = 1
-        }
-
-        //if r[PC] == 0x8042FDE && r[0] == 0x1 {
-        //    r[0] = 1
-        //}
-        //if r[PC] == 0x80765E0 && CURR_INST > 5337054 {
-        //if r[PC] == 0x8077110 {
-        ////if r[PC] == 0x8044CCC {
-        //    gba.Debugger.print(CURR_INST)
-        //    os.Exit(0)
-        //}
-
-        //if CURR_INST >= 7_000_000 {
-        //    os.Exit(0)
-        //}
-
-        gba.Timers.Update(uint32(cycles))
-        //gba.Timers.Update(uint32(0))
-        accCycles += gba.InterruptStack.checkIRQ()
-
-
-        accCycles += uint32(cycles)
-
-        if !gba.Halted {
-            CURR_INST++
-        }
-    }
-
-    return accCycles
+    return 0
 }
 
 func (gba *GBA) checkDmas(mode uint32) {
     for i := range gba.Dma {
         if gba.Dma[i].checkMode(mode) {
-            gba.Dma[i].transfer()
+            gba.Dma[i].transfer(false)
         }
     }
 }
@@ -260,7 +120,7 @@ func NewGBA() *GBA {
         Pixels: &pixels,
         DebugPixels: &debugPixels,
         Objects: objs,
-        //VCOUNT: 126,
+        AccCycles: uint32(CYCLES_SCANLINE * 126 + 859),
     }
 
     gba.InterruptStack = &InterruptStack{
@@ -304,6 +164,11 @@ func NewGBA() *GBA {
 	}
 
     gba.Apu.Init()
+    gba.DigitalApu = &apu.DigitalAPU{}
+    apu.Init()
+    gba.SetAudioBuffer(apu.Stream)
+
+    gba.Mem.IO[VCOUNT] = 126
 
 	return &gba
 }
@@ -363,158 +228,133 @@ func (gba *GBA) toggleThumb() {
 
     if newFlag {
         reg.R[PC] &^= 1
-        // pipe
         return
     }
 
     reg.R[PC] &^= 3
-    // pipe
 }
 
-//func (gba *GBA) DrawFrame(exit *bool, instCount int) int {
-//
-//    r := &gba.Cpu.Reg.R
-//
-//    if gba.Paused {
-//        return 0
-//    }
-//
-//    gba.Mem.IO[VCOUNT] = 0
-//
-//    frameCycles := uint32(0)
-//    for range 160 {
-//        frameCycles = gba.UpdateScanline(frameCycles)
-//    }
-//
-//    gba.Mem.Dispstat.SetVBlank(true)
-//
-//    gba.checkDmas(DMA_MODE_VBL)
-//
-//    //frameCycles = gba.UpdateScanline(frameCycles)
-//
-//    dispstat := uint32(gba.Mem.Dispstat)
-//    if utils.BitEnabled(dispstat, 3) {
-//        gba.InterruptStack.setIRQ(0)
-//    }
-//
-//    for range 66 {
-//        frameCycles = gba.UpdateScanline(frameCycles)
-//    }
-//
-//    gba.Mem.Dispstat.SetVBlank(false)
-//
-//    frameCycles = gba.UpdateScanline(frameCycles)
-//
-//    c := uint32(0)
-//
-//    for c < 280896 {
-//
-//        cycles := 4
-//
-//        if gba.Paused {
-//            return 0
-//        }
-//
-//        if (r[PC] >= 0x400_0000 && r[PC] < 0x800_0000) || r[PC] % 2 != 0 || r[PC] >= 0xE00_0000 {
-//            r := &gba.Cpu.Reg.R
-//            panic(fmt.Sprintf("INVALID PC CURR %d PC %08X OPCODE %08X", CURR_INST, r[PC], gba.Mem.Read32(r[PC])))
-//        }
-//
-//        if gba.Halted {
-//            AckIntrWait(gba)
-//        }
-//
-//        opcode := gba.Mem.Read32(r[PC])
-//        gba.OpenBusOpcode = gba.Mem.Read32((r[PC] &^ 0b11) + 8)
-//
-//
-//        if !gba.Halted {
-//            cycles = gba.Cpu.Execute(opcode)
-//        } else {
-//            cycles = 1
-//        }
-//
-//        //gba.VideoUpdate(uint32(cycles))
-//
-//        gba.Timers.Update(uint32(cycles))
-//        //gba.Timers.Update(uint32(0))
-//        c += gba.InterruptStack.checkIRQ()
-//
-//
-//        c += uint32(cycles)
-//
-//        if !gba.Halted {
-//            CURR_INST++
-//        }
-//
-//
-//    }
-//
-//
-//    return instCount
-//
-//
-//}
-//
-//func (gba *GBA) VideoUpdate(cycles uint32) {
-//    last_frame_cycles := video_cycles
-//    video_cycles := (video_cycles + cycles) % CYCLES_FRAME
-//    frame_cycles := video_cycles
-//
-//    last_line_cycles := last_frame_cycles % CYCLES_SCANLINE;
-//    line_cycles := frame_cycles % CYCLES_SCANLINE;
-//
-//    if (line_cycles >= CYCLES_HDRAW && last_line_cycles < CYCLES_HDRAW) {
-//        vcount := uint32(gba.Mem.IO[VCOUNT])
-//        if vcount < SCREEN_HEIGHT {
-//
-//            gba.scanlineGraphics(vcount)
-//        }
-//
-//        gba.Mem.Dispstat.SetHBlank(true)
-//        dispstat := uint32(gba.Mem.Dispstat)
-//        if utils.BitEnabled(dispstat, 4) {
-//            gba.InterruptStack.setIRQ(1)
-//        }
-//
-//        vcount = uint32(gba.Mem.IO[VCOUNT])
-//        if vcount < SCREEN_HEIGHT {
-//            gba.checkDmas(DMA_MODE_HBL)
-//        }
-//    }
-//
-//    if (line_cycles < last_line_cycles) {
-//
-//        gba.Mem.Dispstat.SetHBlank(false)
-//        gba.Mem.IO[VCOUNT] = (gba.Mem.IO[VCOUNT] + 1) % NUM_SCANLINES
-//
-//        switch gba.Mem.IO[VCOUNT] {
-//        case 0:
-//        case SCREEN_HEIGHT:
-//            gba.Mem.Dispstat.SetVBlank(true)
-//            gba.checkDmas(DMA_MODE_VBL)
-//        case SCREEN_HEIGHT + 1:
-//            dispstat := uint32(gba.Mem.Dispstat)
-//            if utils.BitEnabled(dispstat, 3) {
-//                gba.InterruptStack.setIRQ(0)
-//            }
-//        case NUM_SCANLINES - 1:
-//            gba.Mem.Dispstat.SetVBlank(false)
-//        }
-//
-//        vcount := uint32(gba.Mem.IO[VCOUNT])
-//        dispstat := uint32(gba.Mem.Dispstat)
-//        lyc := gba.Mem.ReadIODirect(0x05, 1)
-//        match := lyc == vcount
-//        gba.Mem.Dispstat.SetVCFlag(match)
-//
-//        vcounterIRQ := utils.BitEnabled(dispstat, 5)
-//        if vcounterIRQ && match {
-//            gba.InterruptStack.setIRQ(2)
-//        }
-//    }
-//
-//    if (frame_cycles < last_frame_cycles) {
-//        DRAWN = true
-//    }
-//}
+func (gba *GBA) DrawFrame(exit *bool, instCount int) int {
+
+
+    time.Now()
+
+    r := &gba.Cpu.Reg.R
+
+    if gba.Paused {
+        return 0
+    }
+
+    DRAWN = false
+    for !DRAWN {
+
+        cycles := 4
+
+        if gba.Paused {
+            return 0
+        }
+
+        if (r[PC] >= 0x400_0000 && r[PC] < 0x800_0000) || r[PC] % 2 != 0 || r[PC] >= 0xE00_0000 {
+            r := &gba.Cpu.Reg.R
+            panic(fmt.Sprintf("INVALID PC CURR %d PC %08X OPCODE %08X", CURR_INST, r[PC], gba.Mem.Read32(r[PC])))
+        }
+
+        if gba.Halted {
+            AckIntrWait(gba)
+        }
+
+        opcode := gba.Mem.Read32(r[PC])
+        gba.OpenBusOpcode = gba.Mem.Read32((r[PC] &^ 0b11) + 8)
+
+        if !gba.Halted {
+            cycles = gba.Cpu.Execute(opcode)
+        } else {
+            cycles = 1
+        }
+
+        gba.VideoUpdate(uint32(cycles))
+
+        gba.DigitalApu.SoundClock(uint32(cycles))
+        gba.Timers.Update(uint32(cycles))
+        gba.InterruptStack.checkIRQ()
+
+        if !gba.Halted {
+            CURR_INST++
+        }
+    }
+
+    gba.DigitalApu.Play()
+
+    MULTIPLE = 0
+
+    return instCount
+}
+
+func (gba *GBA) VideoUpdate(cycles uint32) {
+
+    prevFrameCycles := gba.AccCycles
+    gba.AccCycles = (gba.AccCycles + cycles) % CYCLES_FRAME
+    currFrameCycles := gba.AccCycles
+
+    prevScanlineCycles := prevFrameCycles % CYCLES_SCANLINE
+    currScanlineCycles := currFrameCycles % CYCLES_SCANLINE
+
+    inHblank := currScanlineCycles >= CYCLES_HDRAW
+    prevInHdraw := prevScanlineCycles < CYCLES_HDRAW
+    if enteredHblank := inHblank && prevInHdraw; enteredHblank {
+
+        vcount := uint32(gba.Mem.IO[VCOUNT])
+
+        if vcount < SCREEN_HEIGHT {
+            gba.scanlineGraphics(vcount)
+        }
+
+        gba.Mem.Dispstat.SetHBlank(true)
+        dispstat := uint32(gba.Mem.Dispstat)
+        if utils.BitEnabled(dispstat, 4) {
+            gba.InterruptStack.setIRQ(1)
+        }
+
+        if vcount < SCREEN_HEIGHT {
+            gba.checkDmas(DMA_MODE_HBL)
+        }
+    }
+
+    if newScanline := currScanlineCycles < prevScanlineCycles; newScanline {
+
+        gba.Mem.Dispstat.SetHBlank(false)
+        gba.Mem.IO[VCOUNT] = (gba.Mem.IO[VCOUNT] + 1) % NUM_SCANLINES
+
+        switch vcount := gba.Mem.IO[VCOUNT]; vcount {
+        case 0: //
+        case SCREEN_HEIGHT:
+            gba.Mem.Dispstat.SetVBlank(true)
+            gba.checkDmas(DMA_MODE_VBL)
+        case SCREEN_HEIGHT + 1:
+            dispstat := uint32(gba.Mem.Dispstat)
+            if utils.BitEnabled(dispstat, 3) {
+                gba.InterruptStack.setIRQ(0)
+            }
+        case NUM_SCANLINES - 1:
+            gba.Mem.Dispstat.SetVBlank(false)
+        }
+
+        vcount := uint32(gba.Mem.IO[VCOUNT])
+        dispstat := uint32(gba.Mem.Dispstat)
+        lyc := gba.Mem.ReadIODirect(0x05, 1)
+        match := lyc == vcount
+        gba.Mem.Dispstat.SetVCFlag(match)
+
+        if vcounterIRQ := utils.BitEnabled(dispstat, 5); vcounterIRQ && match {
+            gba.InterruptStack.setIRQ(2)
+        }
+    }
+
+    if currFrameCycles < prevFrameCycles {
+        DRAWN = true
+    }
+}
+
+func (g *GBA) SetAudioBuffer(s []byte) {
+	g.DigitalApu.Stream = s
+}

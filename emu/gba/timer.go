@@ -4,7 +4,10 @@ import (
 	"fmt"
 
 	"github.com/aabalke33/guac/emu/gba/utils"
+	digitalApu "github.com/aabalke33/guac/emu/gba/apu"
 )
+
+var MULTIPLE = 0
 
 var _ = fmt.Sprintf("")
 
@@ -72,36 +75,16 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
 
     //apu := t.Gba.Apu
 
-    //// bit 10 or 14: off == timer 0, on = timer 1
+    // bit 10 or 14: off == timer 0, on = timer 1
 
-    //if aTick := int((t.Gba.Mem.ReadIODirect(0x82, 2) >> 10) & 1) == t.Idx; aTick {
+    if aTick := int((t.Gba.Mem.ReadIODirect(0x82, 2) >> 10) & 1) == t.Idx; aTick {
 
-    //    channel := &apu.ChannelA
-
-    //    channel.Ticks = (channel.Ticks + 1) % 16
-    //    if channel.Ticks == 0 {
-    //        channel.Refill = true
-    //    }
-    //}
-
-    //if bTick := int((t.Gba.Mem.ReadIODirect(0x82, 2) >> 14) & 1) == t.Idx; bTick {
-
-    //    channel := &apu.ChannelB
-
-    //    channel.Ticks = (channel.Ticks + 1) % 16
-    //    if channel.Ticks == 0 {
-    //        channel.Refill = true
-    //    }
-    //}
-
-    //if apu.ChannelA.Refill {
-    ////if apu.ChannelA.Refill || apu.ChannelB.Refill {
-    //    //t.Gba.DmaOnRefresh = true
-    //    apu.ChannelA.Refill = false
-    //    //apu.ChannelB.Refill = false
-    //    t.Gba.Dma[1].transferFifo()
-    //    //t.Gba.Dma[2].transferFifo()
-    //}
+        digitalApu.FifoALoad()
+        
+        if digitalApu.FifoALen <= 0x10 {
+            t.Gba.Dma[1].transferFifo()
+        }
+    }
 
     if t.isOverflowIRQ() {
         t.Gba.InterruptStack.setIRQ(3 + uint32(t.Idx))

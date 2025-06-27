@@ -146,21 +146,16 @@ func (a *APU) Init() {
 	}
 
     digital := DigitalChannel{
-		Enabled: true,
+		Enabled: false,
 		Apu:     a,
 		WavShaper: func(i int, samples *[][2]float64, c *DigitalChannel) {
 
-            if i % FIFO_SIZE == 0 {
-                c.InitCallback()
-            }
-
-            //v := c.Apu.WavRam[int(id)] * c.Volume
             c.History[0] = c.History[1]
             c.History[1] = c.History[2]
             c.History[2] = c.History[3]
             c.History[3] = 0
             if utils.BitEnabled(c.Control, 7) {
-                c.History[3] = float64(int8(c.Fifo[c.FifoReadSize]))
+                c.History[3] = float64((c.Fifo[c.FifoReadSize]))
             }
 
             a := cubicInterpolate(c.History, c.Fraction)
@@ -168,7 +163,7 @@ func (a *APU) Init() {
             c.Fraction += c.Ratio
 
             if c.Fraction >= 1 {
-                c.Fraction -= float64(int(c.Fraction))
+                c.Fraction -= float64((c.Fraction))
 
                 if (c.FifoReadSize + 1) % FIFO_SIZE != c.FifoWriteSize {
                     c.FifoReadSize = (c.FifoReadSize + 1) % FIFO_SIZE
@@ -181,17 +176,17 @@ func (a *APU) Init() {
             soundcnt := c.Apu.gba.Mem.ReadIODirect(0x82, 2)
 
             if utils.BitEnabled(soundcnt, 8) {
-                right = clamp(right + int(a), -512, 511)
+                right = clamp(int(a), -512, 511)
             }
 
             if utils.BitEnabled(soundcnt, 9) {
-                left = clamp(left + int(a), -512, 511)
+                left = clamp(int(a), -512, 511)
             }
+
+            // will need 12 and 13 for Channel B
 
             nLeft := (float64(left) + 512) / 1023
             nRight := (float64(right) + 512) / 1023
-
-            //fmt.Printf("LEFT %02f RIGHT %02f\n", nLeft, nRight)
 
 			(*samples)[i][0] = nLeft
 			(*samples)[i][1] = nRight
@@ -205,7 +200,8 @@ func (a *APU) Init() {
 
     //mixer.Add(&a.Channel1, &a.Channel2, &a.Channel3, &a.Channel4, &a.ChannelA)
     //mixer.Add(&a.ChannelA)
-    mixer.Add(&a.Channel1, &a.Channel2, &a.Channel3, &a.Channel4)
+    //mixer.Add(&a.Channel1, &a.Channel2, &a.Channel3, &a.Channel4)
+    //a.ChannelA.InitCallback()
 
 	amplifier := &effects.Volume{
 		Streamer: mixer,
@@ -601,11 +597,12 @@ type DigitalChannel struct {
     Ratio float64
 }
 
-
 func (c *DigitalChannel) Write(sample uint32) {
 
+    //c.Fifo[c.FifoWriteSize] = sample
+    //c.FifoWriteSize = (c.FifoWriteSize + 4) % FIFO_SIZE
     c.Fifo[c.FifoWriteSize] = sample
-    c.FifoWriteSize = (c.FifoWriteSize + 4) % FIFO_SIZE
+    c.FifoWriteSize = (c.FifoWriteSize + 1) % FIFO_SIZE
 }
 
 func (c *DigitalChannel) Reset() {
@@ -615,16 +612,18 @@ func (c *DigitalChannel) Reset() {
 
 func (c *DigitalChannel) Stream(samples [][2]float64) (n int, ok bool) {
 
+    c.InitCallback(samples)
+
 	for i := range samples {
 
 		//c.SampleTick += float64(c.Freq) / c.Apu.SampleRate
 		//c.SampleTick += float64(440) / c.Apu.SampleRate
 
-		if c.BlockAudio() {
-			samples[i][0] = 0
-			samples[i][1] = 0
-			continue
-		}
+		//if c.BlockAudio() {
+		//	samples[i][0] = 0
+		//	samples[i][1] = 0
+		//	continue
+		//}
 
 		c.WavShaper(i, &samples, c)
 
@@ -649,7 +648,7 @@ func (c *DigitalChannel) BlockAudio() bool {
 	return false
 }
 
-func (c *DigitalChannel) InitCallback() {
+func (c *DigitalChannel) InitCallback(samples[][2]float64) {
 
     gba := c.Apu.gba
 
@@ -691,7 +690,12 @@ func cubicInterpolate(history [4]float64, mu float64) float64 {
 }
 
 func clamp(x, minimum, maximum int) int {
-    x = max(x, minimum)
-    x = min(x, maximum)
-    return x;
+    if x < minimum {
+        x = minimum
+    }
+
+    if x > maximum {
+        x= maximum
+    }
+    return x
 }

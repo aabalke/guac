@@ -98,6 +98,8 @@ func (gba *GBA) SysCall(inst uint32) (int, bool) {
 		SoftReset(gba)
 		cycles += 200 // approx
 	case SYS_RegisterRamReset:
+        fmt.Printf("SYS CALL %08X CURR %d\n", inst, CURR_INST)
+        PRINT_EM = false
 		RegisterRamReset(gba)
 		cycles += 30 // approx
     case SYS_Halt:
@@ -132,7 +134,11 @@ func (gba *GBA) SysCall(inst uint32) (int, bool) {
 		BitUnPack(gba)
     case SYS_HuffUnCompReadNormal:
         panic("HUFFMAN IS NOT IMPLIMENTED")
-        cycles += HuffUnCompReadNormal(gba)
+
+
+        Huff(gba)
+
+        //cycles += HuffUnCompReadNormal(gba)
 	case SYS_LZ77UnCompReadNormalWrite8bit:
 		cycles += LZ77UnCompReadNormalWrite8bit(gba)
 	case SYS_LZ77UnCompReadNormalWrite16bit:
@@ -456,11 +462,13 @@ func RegisterRamReset(gba *GBA) {
 			if sio1 || sio2 || sound {
 				continue
 			}
-
-
 		}
 
-        mem.Write8(0x400_0000 + uint32(0x208), 0)
+        s := gba.InterruptStack
+        s.IF = 0
+        s.IE = 0
+        s.IME = false
+
             //// default values pulled from ruby
             //mem.IO[0x00] = 0x80
             //mem.IO[0x0021] = 0x1
@@ -481,6 +489,8 @@ func RegisterRamReset(gba *GBA) {
 
             ////mem.GBA.checkIRQ()
 	}
+
+    mem.Write8(0x80, 0)
 
     r[3] = 0x170 // CLOBBER
 }
@@ -1279,10 +1289,187 @@ func GetBiosChecksum(gba *GBA) {
 }
 
 func MidiKey2Freq(gba *GBA) {
+
     mem := gba.Mem
 	r := &gba.Cpu.Reg.R
 
     key := float64(mem.Read32(r[0] + 4))
     r[0] = uint32(key / math.Pow(2, (float64(180-r[1]-r[2])/256)/12))
 
+}
+
+func Huff(gba *GBA) int {
+
+    r := &gba.Cpu.Reg.R
+	mem := gba.Mem
+
+    src := r[0] &^ 0b11
+    dst := r[1]
+
+	header := mem.Read32(src)
+	dataSizeBits := int(header & 0xF)
+	if (header>>4)&0xF != 2 {
+		return 0 // Not Huffman
+	}
+	decompressedSize := int(header >> 8)
+	src += 4
+
+	treeSizeEntry := mem.Read8(src)
+	treeSize := uint32((treeSizeEntry + 1) * 2)
+	src += 1
+
+	// Load tree table
+	tree := make([]byte, treeSize)
+	for i := uint32(0); i < treeSize; i++ {
+		tree[i] = uint8(mem.Read8(src + i))
+	}
+	src += uint32(treeSize)
+
+	bitBuffer := uint32(0)
+	bitsLeft := 0
+	treeRoot := 0
+	out := dst
+	bitsPerUnit := dataSizeBits
+
+	for out < dst+uint32(decompressedSize) {
+		node := treeRoot
+		for {
+			if bitsLeft == 0 {
+				bitBuffer = mem.Read32(src)
+				src += 4
+				bitsLeft = 32
+			}
+			bit := (bitBuffer >> 31) & 1
+			bitBuffer <<= 1
+			bitsLeft--
+
+			nodeData := tree[node]
+			offset := int(nodeData & 0x3F)
+			isLeaf := false
+			if bit == 0 {
+				isLeaf = (nodeData & 0x80) != 0
+				node = (node &^ 1) + offset*2 + 2
+			} else {
+				isLeaf = (nodeData & 0x40) != 0
+				node = (node &^ 1) + offset*2 + 3
+			}
+
+			if isLeaf {
+				data := tree[node]
+				switch bitsPerUnit {
+				case 8:
+					mem.Write8(out, data)
+					out++
+				case 4:
+					// Store nibbles as packed bytes
+					if (out-dst)%2 == 0 {
+						mem.Write8(out, data&0x0F)
+					} else {
+						prev := uint8(mem.Read8(out - 1))
+						mem.Write8(out-1, prev|(data<<4))
+						out++
+					}
+				default:
+					// Unsupported size
+					return 0
+				}
+				break
+			}
+		}
+	}
+	return decompressedSize
+}
+
+
+func HuffA(gba *GBA) {
+
+    r := gba.Cpu.Reg.R
+    mem := gba.Mem
+
+    src := r[0] &^ 0b11
+    dst := r[1]
+    // is dst aligned???
+
+    // asserts to test tetris
+    assert(r[0] == 0x822305C, "R0")
+    assert(r[1] == 0x2005FEC, "R1")
+    assert(mem.Read32(src) == 0x50428, "MEM r0")
+    assert(mem.Read32(dst) == 0x20064F0, "MEM r1")
+
+    header := mem.Read32(src)
+    src += 4
+    treeHeader := mem.Read8(src)
+    src += 1
+
+    bitSize := utils.GetVarData(header, 0, 3)
+    compType := utils.GetVarData(header, 4, 7)
+    decompressedSize := utils.GetVarData(header, 8, 31)
+    treeTableSize := (treeHeader + 1) * 2
+
+    assert(compType == 2, "INVALID HUFF")
+
+    fmt.Printf("bitSize %d, decompsize %d, treetablesize %d compressedbitstream start %08X\n",
+        bitSize, decompressedSize, treeTableSize, treeTableSize + src)
+
+    assert(bitSize == 8, "BITSIZE NOT 8")
+
+    treeTable := map[uint32]*Node{}
+
+    for i := range treeTableSize {
+        treeTable[src + i] = &Node{
+            Data: mem.Read8(src + i),
+        }
+
+        //fmt.Printf("NODE ADDED %08X VALUE %02X\n", src + i, treeTable[src+ i].Data)
+    }
+
+    for nodeAddr, node := range treeTable {
+
+        if node.isLeaf {
+            continue
+        }
+
+        o := (utils.GetVarData(node.Data, 0, 5) * 2) + 2
+        base := uint32((nodeAddr) &^ 1)
+        offset := base + o
+
+        fmt.Printf("children of %08X at %08X and %08X, base %08X\n", nodeAddr, offset, offset + 1, base)
+
+        _, ok := treeTable[offset]
+        if !ok {
+            continue
+            panic(fmt.Sprintf("MISSING NODE A AT %08X", offset))
+        }
+
+        _, ok = treeTable[offset + 1]
+        if !ok {
+            continue
+            panic(fmt.Sprintf("MISSING NODE B AT %08X", offset + 1))
+        }
+
+        assert(!treeTable[offset].hasParent, "CHILD ALREADY HAS PARENT")
+        assert(!treeTable[offset + 1].hasParent, "CHILD ALREADY HAS PARENT")
+
+        node.A = treeTable[offset]
+        node.B = treeTable[offset+1]
+
+        treeTable[offset].hasParent = true
+        treeTable[offset + 1].hasParent = true
+
+        if childALeaf := utils.BitEnabled(node.Data, 6); childALeaf {
+            treeTable[offset].isLeaf = true
+        }
+
+        if childBLeaf := utils.BitEnabled(node.Data, 7); childBLeaf {
+            treeTable[offset+1].isLeaf = true
+        }
+    }
+}
+
+type Node struct {
+    hasParent bool
+    Addr uint32
+    Data uint32
+    isLeaf bool
+    A, B *Node
 }

@@ -17,6 +17,7 @@ func (gba *GBA) InputHandler(event sdl.Event) {
     }
 
     if reqInterrupt {
+        PRINT_EM = true
         gba.InterruptStack.setIRQ(12)
     }
 

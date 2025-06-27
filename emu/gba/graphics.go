@@ -330,12 +330,13 @@ func (gba *GBA) scanlineBitmapMode(dispcnt *Dispcnt, y uint32) {
             }
 
             palIdx := mem.Read8(idx)
-            //if palIdx != 0 {
+            if palIdx != 0 {
             //    palData := gba.getPalette(uint32(palIdx), 0, false)
             //    gba.applyColor(palData, uint32(index))
             //}
                 palData := gba.getPalette(uint32(palIdx), 0, false)
                 gba.applyColor(palData, uint32(index))
+            }
 
             // need objs
 

@@ -1,12 +1,17 @@
 package gba
 
 import (
-	"github.com/aabalke33/guac/emu/gba/utils"
+	"fmt"
+	"os"
+
+	"github.com/aabalke33/guac/emu/gba/apu"
 	"github.com/aabalke33/guac/emu/gba/cart"
-    "fmt"
+	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
 var _ = fmt.Sprintf("")
+var _ = os.Stdin
+
 const (
 	DMA_MODE_IMM = 0
 	DMA_MODE_VBL = 1
@@ -31,6 +36,8 @@ type DMA struct {
 
 	Src uint32
 	Dst uint32
+    InitSrc uint32
+    InitDst uint32
 
 	Control       uint32
 	SingleByteSet bool
@@ -78,6 +85,7 @@ func (dma *DMA) WriteSrc(v uint8, byte uint32) {
     }
 
     dma.Src = utils.ReplaceByte(dma.Src, uint32(v), byte)
+    dma.InitSrc = dma.Src
 }
 
 func (dma *DMA) WriteDst(v uint8, byte uint32) {
@@ -90,6 +98,7 @@ func (dma *DMA) WriteDst(v uint8, byte uint32) {
     }
 
     dma.Dst = utils.ReplaceByte(dma.Dst, uint32(v), byte)
+    dma.InitDst = dma.Dst
 }
 
 func (dma *DMA) WriteCount(v uint8, hi bool) {
@@ -125,8 +134,14 @@ func (dma *DMA) WriteControl(v uint8, hi bool) {
 		dma.Enabled = utils.BitEnabled(a, 7)
 
         // immediate should be 2 cycles after enabling
+
+        if wasDisabled && dma.Enabled {
+            dma.Src = dma.InitSrc
+            dma.Dst = dma.InitDst
+        }
+
         if isImmediate := wasDisabled && dma.checkMode(DMA_MODE_IMM); isImmediate {
-            dma.transfer()
+            dma.transfer(false)
         }
 
         return
@@ -143,10 +158,9 @@ func (dma *DMA) disable() {
     dma.Control &^= 0b1000_0000_0000_0000
 }
 
-func (dma *DMA) transfer() {
+func (dma *DMA) transfer(_ bool) {
 
     mem := dma.Gba.Mem
-
     count := dma.WordCount
 
     switch {
@@ -207,23 +221,7 @@ func (dma *DMA) transfer() {
     }
 
     if fifo := (dma.Idx == 1 || dma.Idx == 2) && dma.Mode == DMA_MODE_REF; fifo {
-
-        //if dma.isWord {
-        //    count = 1
-        //} else {
-        //    count = 2
-        //}
-
-        dma.isWord = true
-        dma.DstAdj = DMA_ADJ_NON
-        count = 4
-
-        dstOffset = 0
-        //srcOffset = 4
-
-        if !dma.Repeat || (dma.Dst != 0x400_00A0 && dma.Dst != 0x400_00A4) {
-            panic("INVALID FIFO DMA")
-        }
+        return
     }
 
     for i := uint32(0); i < count; i++ {
@@ -274,7 +272,6 @@ func (dma *DMA) transfer() {
                 dma.Value |= (dma.Value << 16)
                 mem.Write16(tmpDst &^ 1, uint16(dma.Value))
             }
-
         }
 
         tmpDst = uint32(int64(tmpDst) + dstOffset)
@@ -293,6 +290,7 @@ func (dma *DMA) transfer() {
 
     if dma.DstAdj == DMA_ADJ_RES {
         // dma.Dst stays the same
+        dma.Dst = dma.InitDst
         dma.Src = dma.MaskAddr(tmpSrc, true)
         return
     }
@@ -310,9 +308,14 @@ func (dma *DMA) transferVideo(vcount uint32) {
     }
 
     if vcount >= 2 && vcount <= 162 {
-        dma.transfer()
+        dma.transfer(false)
     }
 }
+
+var COUNT = 0
+
+const offset = 2700
+const c = 100
 
 func (dma *DMA) transferFifo() {
 
@@ -320,19 +323,32 @@ func (dma *DMA) transferFifo() {
         return
     }
 
-    if !dma.Repeat {
+    if !dma.Gba.DigitalApu.IsSoundMasterEnable() {
         return
     }
 
-    if !dma.Gba.Apu.ChannelA.Refill && dma.Dst != 0x400_00A0 {
-        return
+    if COUNT > offset + c {
+        os.Exit(0)
     }
 
-    if !dma.Gba.Apu.ChannelB.Refill && dma.Dst != 0x400_00A4 {
-        return
+    srcOffset := 4
+    switch dma.SrcAdj {
+    case DMA_ADJ_INC: srcOffset = 4
+    case DMA_ADJ_DEC: srcOffset = -4
+    case DMA_ADJ_NON: srcOffset = 0
+    case DMA_ADJ_RES: srcOffset = 4
     }
 
-    dma.transfer()
+    for range 4 {
+        v := dma.Gba.Mem.Read32(dma.Src)
+        dma.Gba.Mem.Write32(dma.Dst, v)
+        apu.FifoACopy(v)
+        dma.Src = uint32(int(dma.Src) + srcOffset)
+    }
+
+    if dma.IRQ {
+        dma.Gba.InterruptStack.setIRQ(8 + uint32(dma.Idx))
+    }
 }
 
 func (dma *DMA) checkMode(mode uint32) bool {

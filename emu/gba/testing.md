@@ -163,34 +163,77 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 👍 win_demo
 
 ### Games
-Boots Harvest Moon Friends of Mineral Town
-Boots Hello Kitty Happy Party Pals
-Boots Kirby Nightmare in Dream Land
-Boots Lord of The Rings Fellowship
-Boots Lord of The Rings Two Towers
-Boots Mario Kart Super Circuit
-Boots Mega Man Zero
-Boots Metroid Fusion
-Boots Mother 12
-Boots Mother 3
-Boots Pokémon Mystery Dungeon Red Rescue Team
-Boots Pokémon Firered
-Boots Pokémon LeafGreen
-Boots Pokémon Emerald
-Boots Pokémon Ruby
-Boots Pokémon Sapphire
-Boots Sonic Advance
-Boots Spyro Season of Ice
-Boots Superstar Saga
-Boots Super Dodge Ball Advance
-Boots Super Mario Advance
-      Tetris Worlds (Huff)
-Boots The Minish Cap
-Boots Ultimate Puzzle Games
-Boots Warioware Twisted
-Boots Wolfenstein 3D
-Boots Doom
-      Doom II
-Boots Zelda Link to the Past
-Boots Iridion II
-Boots Iridion 3D
+
+All games require Digital Sound
+
+Advance Wars
+    - No known errors (maybe menu)
+Fire Emblem
+    - Crashes
+Fire Emblem Sacred Stones
+    - No known errors
+Golden Sun
+    - Keyboard Interrupts cause RamReset
+Drill Dozer
+    - Objects not appearing, is affine at top of screen
+Harvest Moon Friends of Mineral Town
+    - Keyboard Interrupts cause RamReset
+Hello Kitty Happy Party Pals
+    - Some Mini games do not load
+Kirby Nightmare in Dream Land
+    - No known errors
+Lord of The Rings Fellowship
+    - No known errors
+Lord of The Rings Two Towers
+    - No known errors
+Mario Kart Super Circuit
+    - Mode 7
+    - Timing Oddness (Doubles randomly)
+Mega Man Zero
+    - Graphics
+Metroid Fusion
+    - No known errors
+Mother 12
+    - No known errors
+Mother 3
+    - No known errors
+Pokémon Mystery Dungeon Red Rescue Team
+    - Graphics Windows
+Pokémon Firered / LeafGreen
+    - No known errors
+Pokémon Emerald
+    - No known errors
+Pokémon Ruby / Sapphire
+    - No known errors
+Sonic Advance
+    - Chao Garden crashes
+Spyro Season of Ice
+    - No known errors
+Superstar Saga
+    - No known errors
+Super Dodge Ball Advance
+    - No known errors
+Super Mario Advance
+    - Mario II No problems
+    - Mario I needs Huff
+Tetris Worlds
+    - Needs Huff
+The Minish Cap
+    - No known errors
+Ultimate Puzzle Games
+    - No known errors
+Warioware Twisted
+    - I believe needs Mode 7
+Wolfenstein 3D
+    - Does not save (verify)
+Doom
+    - Does not save (verify)
+Doom II
+    - Does not boot
+Zelda Link to the Past
+    - No known errors
+Iridion II
+    - Odd Graphics Errors
+Iridion 3D
+    - Tiling Graphics Problem
+    - Requires Huff

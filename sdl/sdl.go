@@ -156,11 +156,12 @@ func (s *SDLStruct) Update(debug bool, romPath string, useSaveState bool) {
     }
 
 	frameTime := time.Second / FPS
-	//frameTime := time.Second
 	ticker := time.NewTicker(frameTime)
 
 	count := 0
 	for i := range ticker.C {
+
+        //st := time.Now()
 
 		if !scene.Status.Active || (debug && !debugScene.Status.Active) {
 			ticker.Stop()
@@ -195,6 +196,8 @@ func (s *SDLStruct) Update(debug bool, romPath string, useSaveState bool) {
             debugScene.View()
             s.DebugRenderer.Present()
         }
+
+        //fmt.Printf("Took %v\n", time.Since(st))
 	}
 }
 

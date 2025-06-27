@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/aabalke33/guac/emu/gba/utils"
+	"github.com/aabalke33/guac/emu/gba/apu"
 )
 
 var (
@@ -46,6 +47,7 @@ func (m *Memory) InitSaveLoop() {
 
     go func() {
         for range saveTicker {
+            //if m.GBA.Save && false {
             if m.GBA.Save && false {
                 m.GBA.Cartridge.Save()
                 m.GBA.Save = false
@@ -756,9 +758,16 @@ func (m *Memory) Write16(addr uint32, v uint16) {
         m.GBA.Cartridge.EepromWrite(v)
         return
     }
+    switch addr {
+    case 0x400_00A0: m.GBA.Apu.ChannelA.Write(uint32(v))
+    case 0x400_00A2: m.GBA.Apu.ChannelA.Write(uint32(v) << 16)
+    case 0x400_00A4: m.GBA.Apu.ChannelB.Write(uint32(v))
+    case 0x400_00A6: m.GBA.Apu.ChannelB.Write(uint32(v) << 16)
+    default:
+        m.Write(addr, uint8(v), false)
+        m.Write(addr+1, uint8(v>>8), false)
+    }
 
-	m.Write(addr, uint8(v), false)
-	m.Write(addr+1, uint8(v>>8), false)
 }
 
 func (m *Memory) Write32(addr uint32, v uint32) {
@@ -770,8 +779,14 @@ func (m *Memory) Write32(addr uint32, v uint32) {
         return
     }
 
-	m.Write16(addr, uint16(v))
-	m.Write16(addr+2, uint16(v>>16))
+    switch addr {
+    case 0x400_00A0: m.GBA.Apu.ChannelA.Write(uint32(v))
+    case 0x400_00A4: m.GBA.Apu.ChannelB.Write(uint32(v))
+    default:
+        m.Write16(addr, uint16(v))
+        m.Write16(addr+2, uint16(v>>16))
+    }
+
 }
 
 func CheckEeprom(gba *GBA, addr uint32) bool {
@@ -889,6 +904,7 @@ func (m *Memory) ReadSoundIO(addr uint32) uint8 {
 
 func (m *Memory) WriteSoundIO(addr uint32, v uint8) {
 
+
     switch addr {
     case 0xA0: m.GBA.Apu.ChannelA.Write(uint32(v))
     case 0xA1: m.GBA.Apu.ChannelA.Write(uint32(v) << 8)
@@ -898,9 +914,29 @@ func (m *Memory) WriteSoundIO(addr uint32, v uint8) {
     case 0xA5: m.GBA.Apu.ChannelB.Write(uint32(v) << 8)
     case 0xA6: m.GBA.Apu.ChannelB.Write(uint32(v) << 16)
     case 0xA7: m.GBA.Apu.ChannelB.Write(uint32(v) << 24)
-    case 0x84: v &= 0x8F // should be 0x80 but setting channel bit does not work rn
+    case 0x84: 
+        v &= 0x8F // should be 0x80 but setting channel bit does not work rn
+        old := byte(m.GBA.DigitalApu.Load32(0x84 - 0x60))
+        old = (old & 0xf) | (byte(v) & 0xf0)
+        m.GBA.DigitalApu.Store8(0x84 - 0x60, old)
+        if !apu.Bit(byte(v), 7) {
+            for i := uint32(0x4000060); i <= 0x4000081; i++ {
+                m.GBA.DigitalApu.Store8(i-0x4000060, 0)
+            }
+            m.GBA.DigitalApu.Store8(0x84 -0x60, 0)
+        }
+
+        return
+    }
+
+    if addr >= 0x60 && addr < 0x84 {
+        if apuOn := apu.Bit(byte(m.GBA.DigitalApu.Load32(0x84 - 0x60)), 7); apuOn {
+            m.GBA.DigitalApu.Store8(addr-0x60, v)
+            //m.IO[addr] = v
+		}
     }
 
     m.IO[addr] = v
     m.GBA.Apu.Update(uint16(addr), v)
 }
+
