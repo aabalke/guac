@@ -82,15 +82,11 @@ type GBA struct {
 
     AccCycles uint32
 
-
     //Cache *Cache
 }
 
 func (gba *GBA) Update(exit *bool, instCount int) int {
-
     gba.DrawFrame(exit, instCount)
-    apu.Play()
-
     return 0
 }
 
@@ -164,9 +160,7 @@ func NewGBA() *GBA {
 	}
 
     gba.Apu.Init()
-    gba.DigitalApu = &apu.DigitalAPU{}
-    apu.Init()
-    gba.SetAudioBuffer(apu.Stream)
+    gba.DigitalApu = apu.NewDigitalAPU()
 
     gba.Mem.IO[VCOUNT] = 126
 
@@ -236,7 +230,6 @@ func (gba *GBA) toggleThumb() {
 
 func (gba *GBA) DrawFrame(exit *bool, instCount int) int {
 
-
     time.Now()
 
     r := &gba.Cpu.Reg.R
@@ -274,8 +267,8 @@ func (gba *GBA) DrawFrame(exit *bool, instCount int) int {
 
         gba.VideoUpdate(uint32(cycles))
 
-        gba.DigitalApu.SoundClock(uint32(cycles))
         gba.Timers.Update(uint32(cycles))
+        gba.DigitalApu.SoundClock(uint32(cycles))
         gba.InterruptStack.checkIRQ()
 
         if !gba.Halted {
@@ -353,8 +346,4 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
     if currFrameCycles < prevFrameCycles {
         DRAWN = true
     }
-}
-
-func (g *GBA) SetAudioBuffer(s []byte) {
-	g.DigitalApu.Stream = s
 }

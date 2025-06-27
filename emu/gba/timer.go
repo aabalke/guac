@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/aabalke33/guac/emu/gba/utils"
-	digitalApu "github.com/aabalke33/guac/emu/gba/apu"
 )
 
 var MULTIPLE = 0
@@ -79,9 +78,11 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
 
     if aTick := int((t.Gba.Mem.ReadIODirect(0x82, 2) >> 10) & 1) == t.Idx; aTick {
 
-        digitalApu.FifoALoad()
-        
-        if digitalApu.FifoALen <= 0x10 {
+        fifo := t.Gba.DigitalApu.FifoA
+
+        fifo.Load()
+
+        if refill := fifo.Length <= 0x10; refill {
             t.Gba.Dma[1].transferFifo()
         }
     }

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/aabalke33/guac/emu/gba/utils"
-	"github.com/aabalke33/guac/emu/gba/apu"
 )
 
 var (
@@ -904,6 +903,7 @@ func (m *Memory) ReadSoundIO(addr uint32) uint8 {
 
 func (m *Memory) WriteSoundIO(addr uint32, v uint8) {
 
+    a := m.GBA.DigitalApu
 
     switch addr {
     case 0xA0: m.GBA.Apu.ChannelA.Write(uint32(v))
@@ -914,26 +914,28 @@ func (m *Memory) WriteSoundIO(addr uint32, v uint8) {
     case 0xA5: m.GBA.Apu.ChannelB.Write(uint32(v) << 8)
     case 0xA6: m.GBA.Apu.ChannelB.Write(uint32(v) << 16)
     case 0xA7: m.GBA.Apu.ChannelB.Write(uint32(v) << 24)
+    case 0x82:
+
+        a.SoundCntH &^= 0xFF
+        a.SoundCntH |= uint16(v)
+
+    case 0x83:
+        a.SoundCntH &= 0xFF
+        a.SoundCntH |= uint16(v) << 8
+
     case 0x84: 
+
         v &= 0x8F // should be 0x80 but setting channel bit does not work rn
-        old := byte(m.GBA.DigitalApu.Load32(0x84 - 0x60))
-        old = (old & 0xf) | (byte(v) & 0xf0)
-        m.GBA.DigitalApu.Store8(0x84 - 0x60, old)
-        if !apu.Bit(byte(v), 7) {
-            for i := uint32(0x4000060); i <= 0x4000081; i++ {
-                m.GBA.DigitalApu.Store8(i-0x4000060, 0)
-            }
-            m.GBA.DigitalApu.Store8(0x84 -0x60, 0)
+
+        a.SoundCntX = (a.SoundCntX & 0x0F) | (uint16(v) & 0xF0)
+
+        if disabled := !utils.BitEnabled(uint32(v), 7); disabled {
+            // this will need to clear fifo and psg
+            a.SoundCntH = 0
+            a.SoundCntX = 0
         }
 
         return
-    }
-
-    if addr >= 0x60 && addr < 0x84 {
-        if apuOn := apu.Bit(byte(m.GBA.DigitalApu.Load32(0x84 - 0x60)), 7); apuOn {
-            m.GBA.DigitalApu.Store8(addr-0x60, v)
-            //m.IO[addr] = v
-		}
     }
 
     m.IO[addr] = v

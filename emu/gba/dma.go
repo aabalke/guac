@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/aabalke33/guac/emu/gba/apu"
 	"github.com/aabalke33/guac/emu/gba/cart"
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
@@ -323,7 +322,7 @@ func (dma *DMA) transferFifo() {
         return
     }
 
-    if !dma.Gba.DigitalApu.IsSoundMasterEnable() {
+    if !dma.Gba.DigitalApu.IsSoundEnabled() {
         return
     }
 
@@ -342,7 +341,7 @@ func (dma *DMA) transferFifo() {
     for range 4 {
         v := dma.Gba.Mem.Read32(dma.Src)
         dma.Gba.Mem.Write32(dma.Dst, v)
-        apu.FifoACopy(v)
+        dma.Gba.DigitalApu.FifoA.Copy(v)
         dma.Src = uint32(int(dma.Src) + srcOffset)
     }
 

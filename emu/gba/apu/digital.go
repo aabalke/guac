@@ -1,56 +1,18 @@
 package apu
 
 import (
-    "fmt"
 
+	"github.com/aabalke33/guac/emu/gba/utils"
 	"github.com/hajimehoshi/oto"
 )
-
-const base = -0x60
-
-// Sound IO
-const (
-	SOUNDCNT_L, SOUNDCNT_H, SOUNDCNT_X    = base + 0x80, base + 0x82, base + 0x84
-	SOUNDBIAS                             = base + 0x88
-	FIFO_A                                = base + 0xa0
-)
-
-var (
-    _ = fmt.Sprint()
-    context *oto.Context
-    player *oto.Player
-    Stream []byte
-
-    CNTH uint32
-)
-
-func Init() {
-	Stream = make([]byte, STREAM_LEN)
-
-	var err error
-	context, err = oto.NewContext(SND_FREQUENCY, 2, 2, STREAM_LEN)
-	if err != nil {
-		panic(err)
-	}
-
-	player = context.NewPlayer()
-}
-
-func Play() {
-	if player == nil {
-		return
-	}
-
-	go player.Write(Stream)
-}
 
 const (
 	CPU_FREQ_HZ              = 16777216
 	SND_FREQUENCY            = 32768 // sample rate
 	SND_SAMPLES              = 512 * 2
 	SAMP_CYCLES              = (CPU_FREQ_HZ / SND_FREQUENCY)
-	BUFF_SAMPLES             = ((SND_SAMPLES) * 16 * 2)
-	BUFF_SAMPLES_MSK         = ((BUFF_SAMPLES) - 1)
+	BUFF_SIZE             = ((SND_SAMPLES) * 16 * 2)
+	BUFF_MSK         = ((BUFF_SIZE) - 1)
 	SAMPLE_TIME      float64 = 1.0 / SND_FREQUENCY
 	STREAM_LEN               = (2 * 2 * SND_FREQUENCY / 60) - (2*2*SND_FREQUENCY/60)%4
 
@@ -61,141 +23,153 @@ const (
 	SAMP_MIN = -0x200
 )
 
+var (
+	sndCycles = uint32(0)
+)
+
 type DigitalAPU struct {
 	Enable bool
-	Buffer [72]byte
 	Stream []byte
+    FifoA, FifoB *Fifo
+    SoundCntH, SoundCntX uint16
+    SoundBuffer [BUFF_SIZE]int16
+    ReadPointer, WritePointer uint32
+    Context *oto.Context
+    Player *oto.Player
 }
 
-func (a *DigitalAPU) Load32(ofs uint32) uint32 {
-	return LE32(a.Buffer[ofs:])
+func NewDigitalAPU() *DigitalAPU {
+
+    context, err := oto.NewContext(SND_FREQUENCY, 2, 2, STREAM_LEN)
+	if err != nil {
+		panic(err)
+	}
+
+    player := context.NewPlayer()
+
+    a := &DigitalAPU{
+        Stream: make([]byte, STREAM_LEN),
+        ReadPointer: 0,
+        WritePointer: 0x200,
+        FifoA: &Fifo{},
+        FifoB: &Fifo{},
+        Context: context,
+        Player: player,
+    }
+
+    return a
 }
 
-func (a *DigitalAPU) Store8(ofs uint32, val byte) {
-
-	a.Buffer[ofs] = val
-}
-func (a *DigitalAPU) IsSoundMasterEnable() bool {
-	cntx := byte(a.Load32(SOUNDCNT_X))
-	return Bit(cntx, 7)
+func (a *DigitalAPU) IsSoundEnabled() bool {
+    return utils.BitEnabled(uint32(a.SoundCntX), 7)
 }
 
 func (a *DigitalAPU) Play() {
+
 	a.Enable = true
+
 	if a.Stream == nil {
 		return
 	}
+
 	if len(a.Stream) == 0 {
 		return
 	}
 
 	a.soundMix()
+
+	if a.Player != nil {
+        go a.Player.Write(a.Stream)
+	}
 }
 
-var (
-	sndCurPlay  uint32 = 0
-	sndCurWrite uint32 = 0x200
-    sndBuffer [BUFF_SAMPLES]int16
-)
-
 func (a *DigitalAPU) soundMix() {
-	for i := 0; i < STREAM_LEN; i += 4 {
-		snd := sndBuffer[sndCurPlay&BUFF_SAMPLES_MSK] << 6
-		a.Stream[i+0], a.Stream[i+1] = byte(snd), byte(snd>>8)
-		sndCurPlay++
-		snd = sndBuffer[sndCurPlay&BUFF_SAMPLES_MSK] << 6
-		a.Stream[i+2], a.Stream[i+3] = byte(snd), byte(snd>>8)
-		sndCurPlay++
 
+	for i := 0; i < STREAM_LEN; i += 4 {
+        for j := range 2 {
+            snd := a.SoundBuffer[a.ReadPointer&BUFF_MSK] << 6
+            idx := i + (2 * j)
+            a.Stream[idx] = uint8(snd)
+            a.Stream[idx + 1] = uint8(snd>>8)
+            a.ReadPointer++
+        }
 	}
 
 	// Avoid desync between the Play cursor and the Write cursor
-	delta := (int32(sndCurWrite-sndCurPlay) >> 8) - (int32(sndCurWrite-sndCurPlay)>>8)%2
-	sndCurPlay = AddInt32(sndCurPlay, delta)
+	delta := (int32(a.WritePointer-a.ReadPointer) >> 8) - (int32(a.WritePointer-a.ReadPointer)>>8)%2
+	a.ReadPointer = AddInt32(a.ReadPointer, delta)
 }
 
-var (
-	FifoALen    byte
-	fifoA       [0x20]int8
-	fifoASamp int8
-	sndCycles = uint32(0)
-	psgVolLut = [8]int32{0x000, 0x024, 0x049, 0x06d, 0x092, 0x0b6, 0x0db, 0x100}
-	psgRshLut = [4]int32{0xa, 0x9, 0x8, 0x7}
-)
-
-
-func FifoACopy(val uint32) {
-	if FifoALen > 28 { // FIFO A full
-		FifoALen -= 28
-	}
-
-	for i := uint32(0); i < 4; i++ {
-		fifoA[FifoALen] = int8(val >> (8 * i))
-		FifoALen++
-	}
+type Fifo struct {
+    Buffer [0x20]int8
+    Length uint8
+    Sample int8
 }
 
-func FifoALoad() {
-	if FifoALen == 0 {
-		return
-	}
+func (f *Fifo) Copy(v uint32) {
 
-	fifoASamp = fifoA[0]
-	FifoALen--
+    if fifoFull := f.Length > 28; fifoFull {
+        f.Length = 0
+        //f.Length -= 28
+    }
 
-	for i := byte(0); i < FifoALen; i++ {
-		fifoA[i] = fifoA[i+1]
-	}
+    for i := range 4 {
+        f.Buffer[f.Length] = int8(v >> (8 * i))
+        f.Length++
+    }
 }
 
-func clip(val int32) int16 {
+func (f *Fifo) Load() {
 
-	if val > SAMP_MAX {
-		val = SAMP_MAX
-	}
-	if val < SAMP_MIN {
-		val = SAMP_MIN
-	}
+    if f.Length == 0 {
+        return
+    }
 
-	return int16(val)
+    f.Sample = f.Buffer[0]
+    f.Length--
+
+    for i := range f.Length {
+        f.Buffer[i] = f.Buffer[i+1]
+    }
+}
+
+func clip(v int32) int32 {
+    v = min(v, SAMP_MAX)
+    v = max(v, SAMP_MIN)
+	return int32(int16(v))
 }
 
 func (a *DigitalAPU) SoundClock(cycles uint32) {
 
+    // THIS IS ALL JUST A AND WILL NEED TO BE UPDATED TO SUPPORT B
+
 	sndCycles += cycles
 
-	sampPcmL, sampPcmR := int16(0), int16(0)
+    sampleLeft := int32(0)
+    sampleRight := int32(0)
 
-	cnth := uint16(a.Load32(SOUNDCNT_H)) // snd_pcm_vol
-	volADiv := int16((cnth>>2)&0b1)^1
-	sampCh4 := (int16(fifoASamp)<<1)>>volADiv
+	sample := int32(a.FifoA.Sample)<<1
 
-	// Left
-	if Bit(cnth, 9) {
-		sampPcmL = clip(int32(sampPcmL) + int32(sampCh4))
+    if halfA := !utils.BitEnabled(uint32(a.SoundCntH), 2); halfA {
+        sample /= 2
+    }
+
+    if leftEnabled := utils.BitEnabled(uint32(a.SoundCntH), 9); leftEnabled {
+        sampleLeft = clip(sample)
 	}
 
-	// Right
-	if Bit(cnth, 8) {
-		sampPcmR = clip(int32(sampPcmR) + int32(sampCh4))
+    if rightEnabled := utils.BitEnabled(uint32(a.SoundCntH), 8); rightEnabled {
+        sampleRight = clip(sample)
 	}
 
 	for sndCycles >= SAMP_CYCLES {
-		sampPsgL, sampPsgR := int32(0), int32(0)
 
-		cntl := uint16(a.Load32(SOUNDCNT_L)) // snd_psg_vol
-
-		sampPsgL *= psgVolLut[(cntl>>4)&7]
-		sampPsgR *= psgVolLut[(cntl>>0)&7]
-
-		sampPsgL >>= psgRshLut[(cnth>>0)&3]
-		sampPsgR >>= psgRshLut[(cnth>>0)&3]
-
-		sndBuffer[sndCurWrite&BUFF_SAMPLES_MSK] = clip(sampPsgL + int32(sampPcmL))
-		sndCurWrite++
-		sndBuffer[sndCurWrite&BUFF_SAMPLES_MSK] = clip(sampPsgR + int32(sampPcmR))
-		sndCurWrite++
+		a.SoundBuffer[a.WritePointer&BUFF_MSK] = int16(sampleLeft)
+		a.WritePointer++
+		a.SoundBuffer[a.WritePointer&BUFF_MSK] = int16(sampleRight)
+		a.WritePointer++
 
 		sndCycles -= SAMP_CYCLES
 	}
 }
+
