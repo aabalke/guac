@@ -63,7 +63,6 @@ func (dma *DMA) ReadControl(hi bool) uint8 {
 
 func (dma *DMA) MaskAddr(v uint32, src bool) uint32 {
 
-    //if dma.Idx == 0 || !src && dma.Idx == 1 || !src && dma.Idx == 2 {
     if !src && (dma.Idx == 0 || dma.Idx == 1 || dma.Idx == 2) {
         return v & 0x7FF_FFFF
     }
@@ -313,21 +312,19 @@ func (dma *DMA) transferVideo(vcount uint32) {
 
 var COUNT = 0
 
-const offset = 2700
-const c = 100
+const offset = 2757
+const c = 5
 
 func (dma *DMA) transferFifo() {
 
-    if (dma.Idx != 1 && dma.Idx != 2) || dma.Mode != DMA_MODE_REF || !dma.Enabled {
-        return
-    }
-
-    if !dma.Gba.DigitalApu.IsSoundEnabled() {
-        return
-    }
-
-    if COUNT > offset + c {
-        os.Exit(0)
+    switch {
+    case !dma.Gba.DigitalApu.IsSoundEnabled():  return
+    case !dma.Enabled:                          return
+    case !dma.Repeat:                           return
+    case dma.Mode != DMA_MODE_REF:              return
+    case dma.Idx != 1 && dma.Idx != 2:          return
+    case dma.Idx == 1 && dma.Dst != 0x400_00A0: return
+    case dma.Idx == 2 && dma.Dst != 0x400_00A4: return
     }
 
     srcOffset := 4
@@ -340,8 +337,13 @@ func (dma *DMA) transferFifo() {
 
     for range 4 {
         v := dma.Gba.Mem.Read32(dma.Src)
-        dma.Gba.Mem.Write32(dma.Dst, v)
-        dma.Gba.DigitalApu.FifoA.Copy(v)
+        //dma.Gba.Mem.Write32(dma.Dst, v) make sure this and fifoA / fifoB are not same
+
+        switch dma.Idx {
+        case 1: dma.Gba.DigitalApu.FifoA.Copy(v)
+        case 2: dma.Gba.DigitalApu.FifoB.Copy(v)
+        }
+
         dma.Src = uint32(int(dma.Src) + srcOffset)
     }
 

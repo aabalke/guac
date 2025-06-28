@@ -46,7 +46,6 @@ func (m *Memory) InitSaveLoop() {
 
     go func() {
         for range saveTicker {
-            //if m.GBA.Save && false {
             if m.GBA.Save && false {
                 m.GBA.Cartridge.Save()
                 m.GBA.Save = false
@@ -56,8 +55,6 @@ func (m *Memory) InitSaveLoop() {
 }
 
 func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
-
-    //m.GBA.VideoUpdate(1)
 
 	switch {
 	case addr < 0x0000_4000:
@@ -488,12 +485,6 @@ func (m *Memory) ReadBadRom(addr uint32, bytesRead uint8) (uint32, bool) {
 }
 
 func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
-    //m.GBA.VideoUpdate(1)
-
-    //CYCLES += cycles_byte_or_halfword(addr)
-
-    //m.GBA.Timers.Update(uint32(1))
-
 	switch {
 	case addr < 0x0000_4000:
 		//m.BIOS[addr] = v
@@ -758,10 +749,10 @@ func (m *Memory) Write16(addr uint32, v uint16) {
         return
     }
     switch addr {
-    case 0x400_00A0: m.GBA.Apu.ChannelA.Write(uint32(v))
-    case 0x400_00A2: m.GBA.Apu.ChannelA.Write(uint32(v) << 16)
-    case 0x400_00A4: m.GBA.Apu.ChannelB.Write(uint32(v))
-    case 0x400_00A6: m.GBA.Apu.ChannelB.Write(uint32(v) << 16)
+    //case 0x400_00A0: m.GBA.Apu.ChannelA.Write(uint32(v))
+    //case 0x400_00A2: m.GBA.Apu.ChannelA.Write(uint32(v) << 16)
+    //case 0x400_00A4: m.GBA.Apu.ChannelB.Write(uint32(v))
+    //case 0x400_00A6: m.GBA.Apu.ChannelB.Write(uint32(v) << 16)
     default:
         m.Write(addr, uint8(v), false)
         m.Write(addr+1, uint8(v>>8), false)
@@ -779,8 +770,8 @@ func (m *Memory) Write32(addr uint32, v uint32) {
     }
 
     switch addr {
-    case 0x400_00A0: m.GBA.Apu.ChannelA.Write(uint32(v))
-    case 0x400_00A4: m.GBA.Apu.ChannelB.Write(uint32(v))
+    case 0x400_00A0: m.GBA.DigitalApu.FifoA.Copy(v)
+    case 0x400_00A4: m.GBA.DigitalApu.FifoB.Copy(v)
     default:
         m.Write16(addr, uint16(v))
         m.Write16(addr+2, uint16(v>>16))
@@ -906,14 +897,6 @@ func (m *Memory) WriteSoundIO(addr uint32, v uint8) {
     a := m.GBA.DigitalApu
 
     switch addr {
-    case 0xA0: m.GBA.Apu.ChannelA.Write(uint32(v))
-    case 0xA1: m.GBA.Apu.ChannelA.Write(uint32(v) << 8)
-    case 0xA2: m.GBA.Apu.ChannelA.Write(uint32(v) << 16)
-    case 0xA3: m.GBA.Apu.ChannelA.Write(uint32(v) << 24)
-    case 0xA4: m.GBA.Apu.ChannelB.Write(uint32(v))
-    case 0xA5: m.GBA.Apu.ChannelB.Write(uint32(v) << 8)
-    case 0xA6: m.GBA.Apu.ChannelB.Write(uint32(v) << 16)
-    case 0xA7: m.GBA.Apu.ChannelB.Write(uint32(v) << 24)
     case 0x82:
 
         a.SoundCntH &^= 0xFF
@@ -922,6 +905,15 @@ func (m *Memory) WriteSoundIO(addr uint32, v uint8) {
     case 0x83:
         a.SoundCntH &= 0xFF
         a.SoundCntH |= uint16(v) << 8
+
+        if resetFifoA := utils.BitEnabled(uint32(a.SoundCntH), 11); resetFifoA {
+            a.FifoA.Length = 0
+        }
+
+        if resetFifoB := utils.BitEnabled(uint32(a.SoundCntH), 15); resetFifoB {
+            a.FifoB.Length = 0
+        }
+
 
     case 0x84: 
 
@@ -935,7 +927,7 @@ func (m *Memory) WriteSoundIO(addr uint32, v uint8) {
             a.SoundCntX = 0
         }
 
-        return
+        //return
     }
 
     m.IO[addr] = v

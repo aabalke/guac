@@ -278,8 +278,6 @@ func (gba *GBA) DrawFrame(exit *bool, instCount int) int {
 
     gba.DigitalApu.Play()
 
-    MULTIPLE = 0
-
     return instCount
 }
 

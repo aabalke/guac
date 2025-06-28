@@ -72,10 +72,6 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
         return false
     }
 
-    //apu := t.Gba.Apu
-
-    // bit 10 or 14: off == timer 0, on = timer 1
-
     if aTick := int((t.Gba.Mem.ReadIODirect(0x82, 2) >> 10) & 1) == t.Idx; aTick {
 
         fifo := t.Gba.DigitalApu.FifoA
@@ -84,6 +80,17 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
 
         if refill := fifo.Length <= 0x10; refill {
             t.Gba.Dma[1].transferFifo()
+        }
+    }
+
+    if bTick := int((t.Gba.Mem.ReadIODirect(0x82, 2) >> 14) & 1) == t.Idx; bTick {
+
+        fifo := t.Gba.DigitalApu.FifoB
+
+        fifo.Load()
+
+        if refill := fifo.Length <= 0x10; refill {
+            t.Gba.Dma[2].transferFifo()
         }
     }
 

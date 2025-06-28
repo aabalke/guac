@@ -1,6 +1,7 @@
 package apu
 
 import (
+	"fmt"
 
 	"github.com/aabalke33/guac/emu/gba/utils"
 	"github.com/hajimehoshi/oto"
@@ -11,10 +12,10 @@ const (
 	SND_FREQUENCY            = 32768 // sample rate
 	SND_SAMPLES              = 512 * 2
 	SAMP_CYCLES              = (CPU_FREQ_HZ / SND_FREQUENCY)
-	BUFF_SIZE             = ((SND_SAMPLES) * 16 * 2)
-	BUFF_MSK         = ((BUFF_SIZE) - 1)
+	BUFF_SIZE                = ((SND_SAMPLES) * 16 * 2)
+	BUFF_MSK                 = ((BUFF_SIZE) - 1)
 	SAMPLE_TIME      float64 = 1.0 / SND_FREQUENCY
-	STREAM_LEN               = (2 * 2 * SND_FREQUENCY / 60) - (2*2*SND_FREQUENCY/60)%4
+	STREAM_LEN               = ((2 * 2 * SND_FREQUENCY / 60) - (2*2*SND_FREQUENCY/60)%4)
 
 	PSG_MAX = 0x7f
 	PSG_MIN = -0x80
@@ -40,7 +41,9 @@ type DigitalAPU struct {
 
 func NewDigitalAPU() *DigitalAPU {
 
-    context, err := oto.NewContext(SND_FREQUENCY, 2, 2, STREAM_LEN)
+    // Stream Length is 1 Frames worth of buffer, * 3 gives more leeway, but some latency
+
+    context, err := oto.NewContext(SND_FREQUENCY, 2, 2, STREAM_LEN * 3)
 	if err != nil {
 		panic(err)
 	}
@@ -96,8 +99,8 @@ func (a *DigitalAPU) soundMix() {
 	}
 
 	// Avoid desync between the Play cursor and the Write cursor
-	delta := (int32(a.WritePointer-a.ReadPointer) >> 8) - (int32(a.WritePointer-a.ReadPointer)>>8)%2
-	a.ReadPointer = AddInt32(a.ReadPointer, delta)
+	//delta := (int32(a.WritePointer-a.ReadPointer) >> 8) - (int32(a.WritePointer-a.ReadPointer)>>8)%2
+	//a.ReadPointer = AddInt32(a.ReadPointer, delta)
 }
 
 type Fifo struct {
@@ -107,6 +110,10 @@ type Fifo struct {
 }
 
 func (f *Fifo) Copy(v uint32) {
+
+    if v != 0 {
+        fmt.Printf("COPY %08X\n", v)
+    }
 
     if fifoFull := f.Length > 28; fifoFull {
         f.Length = 0
@@ -143,24 +150,39 @@ func (a *DigitalAPU) SoundClock(cycles uint32) {
 
     // THIS IS ALL JUST A AND WILL NEED TO BE UPDATED TO SUPPORT B
 
+
 	sndCycles += cycles
 
     sampleLeft := int32(0)
     sampleRight := int32(0)
 
-	sample := int32(a.FifoA.Sample)<<1
+	sampleA := int32(a.FifoA.Sample)<<1
+	sampleB := int32(a.FifoB.Sample)<<1
 
     if halfA := !utils.BitEnabled(uint32(a.SoundCntH), 2); halfA {
-        sample /= 2
+        sampleA /= 2
     }
 
-    if leftEnabled := utils.BitEnabled(uint32(a.SoundCntH), 9); leftEnabled {
-        sampleLeft = clip(sample)
+    if halfB := !utils.BitEnabled(uint32(a.SoundCntH), 3); halfB {
+        sampleB /= 2
+    }
+
+    if leftEnabledA := utils.BitEnabled(uint32(a.SoundCntH), 9); leftEnabledA {
+        sampleLeft = clip(sampleA)
 	}
 
-    if rightEnabled := utils.BitEnabled(uint32(a.SoundCntH), 8); rightEnabled {
-        sampleRight = clip(sample)
+    if leftEnabledB := utils.BitEnabled(uint32(a.SoundCntH), 13); leftEnabledB {
+        sampleLeft = clip(sampleLeft + sampleB)
 	}
+
+    if rightEnabledA := utils.BitEnabled(uint32(a.SoundCntH), 8); rightEnabledA {
+        sampleRight = clip(sampleA)
+	}
+
+    if rightEnabledB := utils.BitEnabled(uint32(a.SoundCntH), 13); rightEnabledB {
+        sampleRight = clip(sampleRight + sampleB)
+	}
+
 
 	for sndCycles >= SAMP_CYCLES {
 
