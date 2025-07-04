@@ -1,8 +1,6 @@
 package apu
 
 import (
-	"fmt"
-
 	"github.com/aabalke33/guac/emu/gba/utils"
 	"github.com/hajimehoshi/oto"
 )
@@ -110,10 +108,6 @@ type Fifo struct {
 }
 
 func (f *Fifo) Copy(v uint32) {
-
-    if v != 0 {
-        fmt.Printf("COPY %08X\n", v)
-    }
 
     if fifoFull := f.Length > 28; fifoFull {
         f.Length = 0

@@ -63,9 +63,8 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
             t.D = t.SavedInitialValue
             overflow = true
             continue
-        } else {
-            t.D = tmp
         }
+        t.D = tmp
     }
 
     if !overflow {

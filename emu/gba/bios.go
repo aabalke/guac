@@ -135,7 +135,6 @@ func (gba *GBA) SysCall(inst uint32) (int, bool) {
     case SYS_HuffUnCompReadNormal:
         panic("HUFFMAN IS NOT IMPLIMENTED")
 
-
         Huff(gba)
 
         //cycles += HuffUnCompReadNormal(gba)
@@ -277,45 +276,69 @@ func ObjAffineSet(gba *GBA) int {
     return 13 + (int(i) * 18)
 }
 
+var IntrWaitReg Reg
+
 func IntrWait(gba *GBA) {
-	//fmt.Printf("IntrWait is called, but is not completely setup\n")
 
-    //panic("INTRAWAIT")
+	r := &gba.Cpu.Reg.R
 
-	reg := &gba.Cpu.Reg.R
-    s := gba.InterruptStack
-	waitMode := reg[0]
-	irqMask := uint16(reg[1])
+    IntrWaitReg = gba.Cpu.Reg
 
-    s.IME = true
-    reg[3] = 0x0
+	waitMode := r[0]
 
-    if waitMode == 0 {
-        // Clear irqMask bits from IE (just like bic) chatgpt
-        panic("WAIT MODE 0 AND I DONT KNOW IF IE NEEDS TO BE SET")
-        //s.IE &^= irqMask
-    }
-
-    if waitMode == 0 && (s.IF&irqMask) != 0 {
-        return
-	}
-
-	// Discard old IF flags if waitMode == 1
-	if waitMode == 1 {
-
-        //s.IF = irqMask
-
-        //mem.IO[0x202] = 0//uint8(irqMask)
-        //mem.IO[0x203] = 0//uint8(irqMask >> 8)
-        //mem.IO[0x202] = uint8(irqMask)
-        //mem.IO[0x203] = uint8(irqMask >> 8)
-
-        //if (s.IF & irqMask) != 0 {
-        //    return
-        //}
+    switch waitMode {
+    case 0:
         gba.Halted = true
-        gba.IntrWait = uint32(irqMask)
+        IntrWaitReturn(gba)
+
+    case 1:
+        // Discard old IF flags if waitMode == 1
+
+        // ldrh   r3, [r12, #-8]		set r3 to 0x3FF_FFF8 (0x300_7FF8)
+        r[3] = gba.Mem.Read16(0x3FF_FFF8)
+        // bic    r3, r1			    r3 &^= r1
+        r[3] &^= r[1]
+        // strh   r3, [r12, #-8]		set 0x3FF_FFF8 (0x300_7FF8) to r3
+        gba.Mem.Write16(0x3FF_FFF8, uint16(r[3]))
+
+        // strb   r0, [r12, #0x301]
+        gba.Halted = true
+
+    default:
+        panic("UNKNOWN INTRA WAIT MODE")
     }
+}
+
+func IntrWaitReturn(gba *GBA) {
+
+    // IRQ USER HANDLER MUST |= Interrupts to 0x300_7FF8 (0x3FF_FFF8)
+
+    // @ Check which interrupts were acknowledged
+	r := &gba.Cpu.Reg.R
+    // strb   r0, [r12, #0x208]
+    gba.InterruptStack.IME = false
+    // ldrh   r3, [r12, #-8]
+    r[3] = gba.Mem.Read16(0x3FF_FFF8)
+    // ands   r3, r1
+    r[3] = r[3] & r[1]
+
+    // eorne  r3, r1
+    if r[3] != 0 {
+        r[3] ^= r[1]
+        // strneh r3, [r12, #-8]
+        gba.Mem.Write16(0x3FF_FFF8, uint16(r[3]))
+    }
+    // strb   r2, [r12, #0x208]
+    gba.InterruptStack.IME = true
+    // beq    0b
+    if r[3] == 0 {
+        return
+    }
+
+    fmt.Printf("LEAVING INTRA\n")
+    // ldmfd  sp!, {r2-r3, pc}
+    gba.Cpu.Reg = IntrWaitReg
+    gba.Halted = false
 }
 
 func VBlankIntrWait(gba *GBA) {
@@ -325,33 +348,6 @@ func VBlankIntrWait(gba *GBA) {
 	r[1] = 1
 
 	IntrWait(gba)
-}
-
-func AckIntrWait(gba *GBA) {
-
-    mem := gba.Mem
-    s := gba.InterruptStack
-
-    if gba.IntrWait == 0 {
-        return
-    }
-
-    if uint16(gba.IntrWait) & s.IF == 0 {
-    //if mem.Read16(0x400_0200) & mem.Read16(0x400_0202) == 0 {
-        return
-    }
-
-	//reg := &gba.Cpu.Reg.R
-	//irqMask := uint16(reg[1])
-	//mem.Write16(0x400_0202, uint16(irqMask))
-	//mem.Write16(0x300_7FF8, uint16(irqMask))
-	irqMask := uint16(gba.IntrWait)
-	mem.Write16(0x400_0202, uint16(irqMask))
-    prev := uint16(mem.Read16(0x300_7FF8))
-	mem.Write16(0x300_7FF8, prev | uint16(irqMask))
-
-    gba.Halted = false
-    gba.IntrWait = 0
 }
 
 func SoftReset(gba *GBA) {

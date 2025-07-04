@@ -195,13 +195,22 @@ func (dma *DMA) transfer(_ bool) {
         tmpSrc &^= 0b1
     }
 
+    rom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
+    if rom && dma.Idx == 0 {
+        tmpSrc &= 0x7FF_FFFF
+    }
+
+    if rom {
+        dma.SrcAdj = DMA_ADJ_INC
+    }
+
     switch {
     case dma.isWord && dma.DstAdj  == DMA_ADJ_INC: dstOffset = 4
     case !dma.isWord && dma.DstAdj == DMA_ADJ_INC: dstOffset = 2
     case dma.isWord && dma.DstAdj  == DMA_ADJ_DEC: dstOffset = -4
     case !dma.isWord && dma.DstAdj == DMA_ADJ_DEC: dstOffset = -2
     case dma.isWord && dma.DstAdj == DMA_ADJ_RES: dstOffset = 4
-    case dma.isWord && dma.DstAdj == DMA_ADJ_RES: dstOffset = 2
+    case !dma.isWord && dma.DstAdj == DMA_ADJ_RES: dstOffset = 2
     }
 
     switch {
@@ -210,12 +219,6 @@ func (dma *DMA) transfer(_ bool) {
     case dma.isWord && dma.SrcAdj  == DMA_ADJ_DEC: srcOffset = -4
     case !dma.isWord && dma.SrcAdj == DMA_ADJ_DEC: srcOffset = -2
     case dma.SrcAdj == DMA_ADJ_RES: panic("DMA SRC SET TO PROHIBITTED")
-
-    }
-
-    rom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
-    if rom && dma.Idx == 0 {
-        tmpSrc &= 0x7FF_FFFF
     }
 
     if fifo := (dma.Idx == 1 || dma.Idx == 2) && dma.Mode == DMA_MODE_REF; fifo {
@@ -248,8 +251,13 @@ func (dma *DMA) transfer(_ bool) {
             switch {
             case badAddr:
                 mem.Write32(tmpDst &^ 3, dma.Value)
+            case sram && dma.Idx == 0 && dma.Mode == DMA_MODE_IMM && dma.DstAdj == DMA_ADJ_NON && dma.SrcAdj == DMA_ADJ_NON:
+
+                //fmt.Printf("%d DMA VALUE %08X SRC %08X\n", i, dma.Value, mem.Read32(tmpSrc + i))
+
             case sram && dma.Idx == 0:
                 dma.Value = 0
+
                 mem.Write32(tmpDst &^ 3, dma.Value)
             default:
                 dma.Value = mem.Read32(tmpSrc &^ 3)
@@ -261,7 +269,6 @@ func (dma *DMA) transfer(_ bool) {
             switch {
             case badAddr:
                 mem.Write16(tmpDst &^ 1, uint16(dma.Value))
-
             case sram && dma.Idx == 0:
                 dma.Value = 0
                 mem.Write16(tmpDst &^ 1, uint16(dma.Value))
@@ -325,6 +332,15 @@ func (dma *DMA) transferFifo() {
     case dma.Idx != 1 && dma.Idx != 2:          return
     case dma.Idx == 1 && dma.Dst != 0x400_00A0: return
     case dma.Idx == 2 && dma.Dst != 0x400_00A4: return
+    }
+
+    rom := dma.Src >= 0x800_0000 && dma.Src < 0xE00_0000
+    if rom && dma.Idx == 0 {
+        dma.Src &= 0x7FF_FFFF
+    }
+
+    if rom && dma.Idx != 0 {
+        dma.SrcAdj = DMA_ADJ_INC
     }
 
     srcOffset := 4
