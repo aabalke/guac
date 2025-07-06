@@ -232,6 +232,10 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) bool {
         return false
     }
 
+    //if swiExit := alu.Rd == PC && alu.Rn == LR && alu.Set && alu.Inst == MOV; swiExit {
+    //    fmt.Printf("EXIT SWI\n")
+    //}
+
     switch {
 
     case alu.Rd == PC && alu.Set && !alu.Test:
@@ -1167,7 +1171,6 @@ func (cpu *Cpu) Psr(opcode uint32) {
     }
 
     cpu.mrs(psr)
-    //cpu.armMRS(opcode)
     cpu.Reg.R[15] += 4
 }
 
@@ -1181,9 +1184,12 @@ func (cpu *Cpu) mrs(psr *PSR) {
         return
     }
 
-    // masks
+    mask := PRIV_MASK
+    if cpu.Reg.getMode() == MODE_USR {
+        mask = USR_MASK
+    }
 
-    r[psr.Rd] = uint32(cpu.Reg.CPSR)
+    r[psr.Rd] = uint32(cpu.Reg.CPSR) & mask
 }
 
 const (
@@ -1192,24 +1198,7 @@ const (
 	STATE_MASK uint32 = 0x0100_0020
 )
 
-//func (cpu *Cpu) armMRS(inst uint32) {
-//	rd := (inst >> 12) & 0b1111
-//	if useSpsr := utils.BitEnabled(inst, 22); useSpsr {
-//		mode := cpu.Reg.getMode()
-//		cpu.Reg.R[rd] = uint32(cpu.Reg.SPSR[BANK_ID[mode]])
-//		return
-//	}
-//
-//	mask := PRIV_MASK
-//	if cpu.Reg.getMode() == MODE_USR {
-//		mask = USR_MASK
-//	}
-//	cpu.Reg.R[rd] = uint32(cpu.Reg.CPSR) & mask
-//}
-
 func (cpu *Cpu) msr(psr *PSR) {
-
-    //fmt.Printf("MSR OCCUR\n")
 
     reg := &cpu.Reg
     r := &cpu.Reg.R
@@ -1222,37 +1211,45 @@ func (cpu *Cpu) msr(psr *PSR) {
     }
 
     mask := uint32(0)
-    if psr.C { mask |= (v & 0x000000FF) }
-    if psr.F { mask |= (v & 0xF0000000) }
+    if psr.C { mask |= 0x0000_00FF }
+    if psr.X { mask |= 0x0000_FF00 }
+    if psr.S { mask |= 0x00FF_0000 }
+    if psr.F { mask |= 0xFF00_0000 }
+
+    secMask := PRIV_MASK
+    if reg.getMode() == MODE_USR {
+        secMask = USR_MASK
+    }
+
+    if psr.SPSR {
+        secMask |= STATE_MASK
+    }
 
     curr := cpu.Reg.getMode()
 
     if psr.SPSR {
 
-        //if curr == MODE_USR || curr == MODE_SYS {
-        //    return
-        //}
+        var spsr uint32
 
-        //fmt.Printf("OLD SPSR %08X\n", reg.SPSR[BANK_ID[curr]])
+        if curr == MODE_USR || curr == MODE_SYS {
+            spsr = uint32(reg.CPSR) &^ mask
+        } else {
+            spsr = uint32(reg.SPSR[BANK_ID[curr]]) &^ mask
+        }
 
-        spsr := uint32(reg.SPSR[BANK_ID[curr]]) &^ mask
         spsr |= v & mask
         reg.SPSR[BANK_ID[curr]] = Cond(spsr)
 
-        //fmt.Printf("NEW SPSR %08X\n", reg.SPSR[BANK_ID[curr]])
         return
     }
 
-    //fmt.Printf("OLD CPSR %08X\n", reg.CPSR)
-
     next := v & 0b11111
     cpsr := uint32(reg.CPSR) &^ mask
+
     cpsr |= v & mask
     cpsr |= 0x10
 
     reg.CPSR = Cond(cpsr)
-
-    //fmt.Printf("NEW CPSR %08X\n", reg.CPSR)
 
     if skip := BANK_ID[curr] == BANK_ID[next]; skip {
         return

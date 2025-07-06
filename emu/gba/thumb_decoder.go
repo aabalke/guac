@@ -2,12 +2,17 @@ package gba
 
 import "fmt"
 
+var IN = false
+
 func (cpu *Cpu) DecodeTHUMB(opcode uint16) int {
 
     r := &cpu.Reg.R
 
 	switch {
     case isthumbSWI(opcode):
+
+        //cpu.Gba.exception(VEC_SWI, MODE_SWI)
+        //return 0
         cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
         cycles, incPc := cpu.Gba.SysCall(uint32(opcode) & 0xFF)
 

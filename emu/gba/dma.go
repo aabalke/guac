@@ -11,6 +11,10 @@ import (
 var _ = fmt.Sprintf("")
 var _ = os.Stdin
 
+//var DMA_ACTIVE = -1
+//var DMA_FINISHED = -1
+//var DMA_PC = uint32(0)
+
 const (
 	DMA_MODE_IMM = 0
 	DMA_MODE_VBL = 1
@@ -225,6 +229,10 @@ func (dma *DMA) transfer(_ bool) {
         return
     }
 
+    //prevActive := DMA_ACTIVE
+    //DMA_ACTIVE = dma.Idx
+    //DMA_PC = dma.Gba.Cpu.Reg.R[PC]
+
     for i := uint32(0); i < count; i++ {
 
         if eeprom := CheckEeprom(dma.Gba, tmpDst); eeprom {
@@ -251,13 +259,8 @@ func (dma *DMA) transfer(_ bool) {
             switch {
             case badAddr:
                 mem.Write32(tmpDst &^ 3, dma.Value)
-            case sram && dma.Idx == 0 && dma.Mode == DMA_MODE_IMM && dma.DstAdj == DMA_ADJ_NON && dma.SrcAdj == DMA_ADJ_NON:
-
-                //fmt.Printf("%d DMA VALUE %08X SRC %08X\n", i, dma.Value, mem.Read32(tmpSrc + i))
-
             case sram && dma.Idx == 0:
                 dma.Value = 0
-
                 mem.Write32(tmpDst &^ 3, dma.Value)
             default:
                 dma.Value = mem.Read32(tmpSrc &^ 3)
@@ -283,6 +286,9 @@ func (dma *DMA) transfer(_ bool) {
         tmpSrc = uint32(int64(tmpSrc) + srcOffset)
     }
 
+    //DMA_FINISHED = DMA_ACTIVE
+    //DMA_ACTIVE = prevActive
+
     if dma.IRQ {
         dma.Gba.InterruptStack.setIRQ(8 + uint32(dma.Idx))
     }
@@ -306,16 +312,16 @@ func (dma *DMA) transfer(_ bool) {
     return
 }
 
-func (dma *DMA) transferVideo(vcount uint32) {
-
-    if dma.Idx != 3 || dma.Mode != 3 || !dma.Enabled || (dma.Dst >= 0x600_0000 || dma.Dst <= 0x700_0000) {
-        return
-    }
-
-    if vcount >= 2 && vcount <= 162 {
-        dma.transfer(false)
-    }
-}
+//func (dma *DMA) transferVideo(vcount uint32) {
+//
+//    if dma.Idx != 3 || dma.Mode != 3 || !dma.Enabled || (dma.Dst >= 0x600_0000 || dma.Dst <= 0x700_0000) {
+//        return
+//    }
+//
+//    if vcount >= 2 && vcount <= 162 {
+//        dma.transfer(false)
+//    }
+//}
 
 var COUNT = 0
 
@@ -334,12 +340,7 @@ func (dma *DMA) transferFifo() {
     case dma.Idx == 2 && dma.Dst != 0x400_00A4: return
     }
 
-    rom := dma.Src >= 0x800_0000 && dma.Src < 0xE00_0000
-    if rom && dma.Idx == 0 {
-        dma.Src &= 0x7FF_FFFF
-    }
-
-    if rom && dma.Idx != 0 {
+    if rom := dma.Src >= 0x800_0000 && dma.Src < 0xE00_0000; rom {
         dma.SrcAdj = DMA_ADJ_INC
     }
 

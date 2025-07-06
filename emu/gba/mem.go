@@ -122,6 +122,18 @@ func (m *Memory) ReadBios(addr uint32) uint8 {
 }
 
 func (m *Memory) ReadOpenBus(addr uint32) uint8 {
+
+    //r := &m.GBA.Cpu.Reg.R
+
+    //thumb := m.GBA.Cpu.Reg.CPSR.GetFlag(FLAG_T)
+
+    //switch {
+    //case DMA_ACTIVE != -1:
+    //    return uint8(m.GBA.Dma[DMA_ACTIVE].Value)
+    //case thumb && r[PC] - DMA_PC == 2, !thumb && r[PC] - DMA_PC == 4:
+    //    return uint8(m.GBA.Dma[DMA_FINISHED].Value)
+    //}
+
     switch addr & 0b11 {
     case 0: return uint8(m.GBA.OpenBusOpcode)
     case 1: return uint8(m.GBA.OpenBusOpcode >> 8)
@@ -944,4 +956,3 @@ func (m *Memory) WriteSoundIO(addr uint32, v uint8) {
     m.IO[addr] = v
     //m.GBA.Apu.Update(uint16(addr), v)
 }
-

@@ -92,6 +92,7 @@ func (gba *GBA) SysCall(inst uint32) (int, bool) {
 
         panic(fmt.Sprintf("INVALID SWI SYSCALL %08X PC %08X OPCODE %08X", inst, r[PC], gba.Mem.Read32(r[PC])))
     }
+    //gba.exception(VEC_SWI, MODE_SWI)
 
 	switch inst {
 	case SYS_SoftReset:

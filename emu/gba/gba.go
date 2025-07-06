@@ -277,6 +277,12 @@ func (gba *GBA) DrawFrame(exit *bool, instCount int) int {
         //    os.Exit(0)
         //}
 
+        //if IN {
+        //    mem := gba.Mem
+        //    reg := &gba.Cpu.Reg
+        //    fmt.Printf("PC %08X OPCODE %08X CPSR %08X\n", r[PC], mem.Read32(r[PC]), reg.CPSR)
+        //}
+
         //cycles = 1
         gba.VideoUpdate(uint32(cycles))
         gba.Timers.Update(uint32(cycles))

@@ -16,6 +16,7 @@ func (cpu *Cpu) DecodeARM(opcode uint32) int {
 
 	switch {
 	case isSWI(opcode):
+        //cpu.Gba.exception(VEC_SWI, MODE_SWI)
         cycles, incPc := cpu.Gba.SysCall(utils.GetVarData(opcode, 16, 23))
 
         if incPc {
