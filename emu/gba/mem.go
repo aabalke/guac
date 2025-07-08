@@ -31,7 +31,6 @@ func NewMemory(gba *GBA) *Memory {
 
 	m.Write32(0x4000000, 0x80)
 	m.Write32(0x4000134, 0x800F) // IR requires bit 3 on. I believe this is auth check (sonic adv)
-	m.GBA.Joypad = 0x3FF
 
 	m.BIOS_MODE = BIOS_STARTUP
 
@@ -367,10 +366,14 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 	case 0x10F:
 		return m.GBA.Timers[3].ReadCnt(true)
 
-	case KEYINPUT:
-		return m.GBA.getJoypad(false)
-	case KEYINPUT + 1:
-		return m.GBA.getJoypad(true)
+	case 0x130:
+		return m.GBA.Keypad.readINPUT(false)
+	case 0x131:
+		return m.GBA.Keypad.readINPUT(true)
+	case 0x132:
+		return m.GBA.Keypad.readCNT(false)
+	case 0x133:
+		return m.GBA.Keypad.readCNT(true)
 
     case 0x136: return 0
     case 0x137: return 0
@@ -727,6 +730,15 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 		m.GBA.Timers[3].WriteCnt(v, false)
 	case 0x10F:
 		m.GBA.Timers[3].WriteCnt(v, true)
+
+	case 0x130:
+        return
+	case 0x131:
+        return
+	case 0x132:
+		m.GBA.Keypad.writeCNT(v, false)
+	case 0x133:
+		m.GBA.Keypad.writeCNT(v, true)
 
 
     case 0x200: m.GBA.InterruptStack.WriteIE(v, false)

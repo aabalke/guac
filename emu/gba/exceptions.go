@@ -12,8 +12,6 @@ const (
 	VEC_FIQ           = 0x1C
 )
 
-var IN = false
-
 func (gba *GBA) exception(addr uint32, mode uint32) {
 
     if mode != MODE_IRQ && mode != MODE_SWI {

@@ -23,12 +23,12 @@ var (
     CURR_INST = 0
 )
 
-var start time.Time
-var end time.Time
 
 var (
     DRAWN = false
-    PRINT_EM = false
+
+    start time.Time
+    end time.Time
 )
 
 const (
@@ -54,7 +54,6 @@ type GBA struct {
 
 	Paused bool
 	Muted  bool 
-    Joypad uint16
     Halted bool
     ExitHalt bool
 
@@ -81,6 +80,8 @@ type GBA struct {
     DmaOnRefresh bool
 
     AccCycles uint32
+
+    Keypad Keypad
 
     //Cache *Cache
 }
@@ -115,6 +116,9 @@ func NewGBA() *GBA {
         DebugPixels: &debugPixels,
         Objects: objs,
         AccCycles: uint32(CYCLES_SCANLINE * 126 + 859),
+        Keypad: Keypad{
+            KEYINPUT: 0x3FF,
+        },
     }
 
     gba.InterruptStack = &InterruptStack{ Gba: &gba }
@@ -257,7 +261,6 @@ func (gba *GBA) DrawFrame(exit *bool, instCount int) int {
         }
 
         //fmt.Printf("PC %08X OPCODE %08X CPSR %08X\n", r[PC], gba.Mem.Read32(r[PC]), gba.Cpu.Reg.CPSR)
-
 
         //cycles = 1
         gba.VideoUpdate(uint32(cycles))

@@ -169,15 +169,15 @@ All games require Digital Sound
 Advance Wars
     - No known errors (maybe menu)
 Fire Emblem
-    - Crashes
+    - No known errors
 Fire Emblem Sacred Stones
     - No known errors
 Golden Sun
-    - Keyboard Interrupts cause RamReset
+    - No known errors
 Drill Dozer
     - Objects not appearing, is affine at top of screen
 Harvest Moon Friends of Mineral Town
-    - Keyboard Interrupts cause RamReset
+    - Blending of Green
 Hello Kitty Happy Party Pals
     - Some Mini games do not load
 Kirby Nightmare in Dream Land
@@ -188,7 +188,6 @@ Lord of The Rings Two Towers
     - No known errors
 Mario Kart Super Circuit
     - Mode 7
-    - Timing Oddness (Doubles randomly)
 Mega Man Zero
     - Graphics
 Metroid Fusion
@@ -206,7 +205,7 @@ Pokémon Emerald
 Pokémon Ruby / Sapphire
     - No known errors
 Sonic Advance
-    - Chao Garden crashes
+    - No known errors
 Spyro Season of Ice
     - No known errors
 Superstar Saga
@@ -214,10 +213,9 @@ Superstar Saga
 Super Dodge Ball Advance
     - No known errors
 Super Mario Advance
-    - Mario II No problems
-    - Mario I needs Huff
+    - No known errors
 Tetris Worlds
-    - Needs Huff
+    - No known errors
 The Minish Cap
     - No known errors
 Ultimate Puzzle Games
@@ -236,4 +234,3 @@ Iridion II
     - Odd Graphics Errors
 Iridion 3D
     - Tiling Graphics Problem
-    - Requires Huff
