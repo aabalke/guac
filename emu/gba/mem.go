@@ -745,7 +745,9 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
     case 0x20A: return
     case 0x20B: return
 
-    case 0x301: m.GBA.Halted = true
+    case 0x301:
+        m.IO[addr] = v & 0x80
+        m.GBA.Halted = true
 
 	default:
 		m.IO[addr] = v

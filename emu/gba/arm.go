@@ -228,13 +228,14 @@ func (cpu *Cpu) test(alu *Alu) {
 func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) bool {
 
     if irqExit := alu.Rd == PC && alu.Rn == LR && alu.Set && alu.Inst == SUB; irqExit {
-        cpu.Gba.IrqExit()
+        cpu.Gba.ExitException(MODE_IRQ)
         return false
     }
 
-    //if swiExit := alu.Rd == PC && alu.Rn == LR && alu.Set && alu.Inst == MOV; swiExit {
-    //    fmt.Printf("EXIT SWI\n")
-    //}
+    if swiExit := alu.Rd == PC && alu.Rm == LR && alu.Inst == MOV && alu.Set; swiExit {
+        cpu.Gba.ExitException(MODE_SWI)
+        return false
+    }
 
     switch {
 
@@ -1033,6 +1034,8 @@ func (c *Cpu) stm(block *Block) {
             count++
 
             if reg == int(block.Rn) {
+
+
                 c.Gba.Mem.Write32(addr, r[reg])
                 matchingValue = r[reg] + 4
                 matchingAddr = addr
@@ -1217,7 +1220,8 @@ func (cpu *Cpu) msr(psr *PSR) {
     if psr.F { mask |= 0xFF00_0000 }
 
     secMask := PRIV_MASK
-    if reg.getMode() == MODE_USR {
+    curr := cpu.Reg.getMode()
+    if curr == MODE_USR {
         secMask = USR_MASK
     }
 
@@ -1225,7 +1229,7 @@ func (cpu *Cpu) msr(psr *PSR) {
         secMask |= STATE_MASK
     }
 
-    curr := cpu.Reg.getMode()
+    mask &= secMask
 
     if psr.SPSR {
 
@@ -1237,6 +1241,7 @@ func (cpu *Cpu) msr(psr *PSR) {
             spsr = uint32(reg.SPSR[BANK_ID[curr]]) &^ mask
         }
 
+
         spsr |= v & mask
         reg.SPSR[BANK_ID[curr]] = Cond(spsr)
 
@@ -1247,7 +1252,6 @@ func (cpu *Cpu) msr(psr *PSR) {
     cpsr := uint32(reg.CPSR) &^ mask
 
     cpsr |= v & mask
-    cpsr |= 0x10
 
     reg.CPSR = Cond(cpsr)
 
@@ -1259,10 +1263,35 @@ func (cpu *Cpu) msr(psr *PSR) {
         panic("USER MODE MSR")
     }
 
+    if curr != MODE_FIQ {
+        for i := range 5 {
+            reg.USR[i] = r[8+i]
+        }
+    }
+
 	reg.SP[BANK_ID[curr]] = r[SP]
 	reg.LR[BANK_ID[curr]] = r[LR]
+
+	if curr == MODE_FIQ {
+		for i := range 5 {
+			reg.FIQ[i] = r[8+i]
+		}
+	}
+
+	if next != MODE_FIQ {
+		for i := range 5 {
+			r[8+i] = reg.USR[i]
+		}
+	}
+
     r[SP] = reg.SP[BANK_ID[next]]
 	r[LR] = reg.LR[BANK_ID[next]]
+
+	if next == MODE_FIQ {
+		for i := range 5 {
+			r[8+i] = reg.FIQ[i]
+		}
+	}
 }
 
 func (cpu *Cpu) Swp(opcode uint32) {

@@ -27,7 +27,7 @@ https://emulation.gametechwiki.com/index.php/GBA_Tests
 ❌ flash64 (matches mgba)
 ❌ flash128 (matches mgba)
 👍 none
-❌ sram (matches mgba)
+👍 sram (matches mgba)
 
 ### Arm Wrestler
 
@@ -64,14 +64,14 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 👍 BIOS math tests [615/615]
 ❌ DMA tests [1240/1256]
 ❌ SIO register R/W tests [25/90]
-❌ SIO timing tests [CRASH]
+❌ SIO timing tests [0/4]
 ❌ Misc. edge case tests [3/10]
 ❌ Video tests
     ❌ Basic Mode 3
     ❌ Basic Mode 4
     👍 Degenerate OBJ transforms
-    ❌ Layer toggle
-    ❌ Layer toggle 2
+    👍 Layer toggle
+    👍 Layer toggle 2
     ❌ OAM Update Delay
     👍 Window offscreen reset (matches mgba)
 
@@ -116,7 +116,7 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 👍 first
 👍 hello
 
-❌ irq_demo (blinking text hblank irq)
+👍 irq_demo
 👍 key_demo
 👍 m3_demo
 ❌ m7_demo

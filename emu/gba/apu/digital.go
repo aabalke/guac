@@ -79,9 +79,11 @@ func (a *DigitalAPU) Play() {
 
 	a.soundMix()
 
-	if a.Player != nil {
-        go a.Player.Write(a.Stream)
+	if a.Player == nil {
+        return
 	}
+
+    go a.Player.Write(a.Stream)
 }
 
 func (a *DigitalAPU) soundMix() {
@@ -97,8 +99,8 @@ func (a *DigitalAPU) soundMix() {
 	}
 
 	// Avoid desync between the Play cursor and the Write cursor
-	//delta := (int32(a.WritePointer-a.ReadPointer) >> 8) - (int32(a.WritePointer-a.ReadPointer)>>8)%2
-	//a.ReadPointer = AddInt32(a.ReadPointer, delta)
+	delta := (int32(a.WritePointer-a.ReadPointer) >> 8) - (int32(a.WritePointer-a.ReadPointer)>>8)%2
+	a.ReadPointer = AddInt32(a.ReadPointer, delta)
 }
 
 type Fifo struct {
@@ -110,8 +112,8 @@ type Fifo struct {
 func (f *Fifo) Copy(v uint32) {
 
     if fifoFull := f.Length > 28; fifoFull {
-        f.Length = 0
-        //f.Length -= 28
+        //f.Length = 0
+        f.Length -= 28
     }
 
     for i := range 4 {

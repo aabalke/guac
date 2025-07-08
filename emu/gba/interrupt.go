@@ -30,7 +30,7 @@ func (s *InterruptStack) ReadIME() uint8 {
 func (s *InterruptStack) WriteIE(v uint8, hi bool) {
 
     if hi {
-        s.IE = (s.IE &^ 0xFF00) | (uint16(v & 0x3F) << 8)
+        s.IE = (s.IE &^ 0xFF00) | (uint16(v & 0xFF) << 8)
         return
     }
 
@@ -56,6 +56,10 @@ func (s *InterruptStack) checkIRQ() {
     interruptEnabled := !s.Gba.Cpu.Reg.CPSR.GetFlag(FLAG_I)
     ime := s.IME
     interrupts := s.IF & s.IE != 0
+
+    //if IN && s.IE == 0 {
+    //    fmt.Printf("IE IS BLANK\n")
+    //}
 
     if interrupts {
         s.Gba.Halted = false

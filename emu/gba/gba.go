@@ -225,6 +225,8 @@ func (gba *GBA) toggleThumb() {
 
 var N bool
 
+var COUNTY uint32
+
 func (gba *GBA) DrawFrame(exit *bool, instCount int) int {
 
     r := &gba.Cpu.Reg.R
@@ -236,7 +238,7 @@ func (gba *GBA) DrawFrame(exit *bool, instCount int) int {
     DRAWN = false
     for {
 
-        cycles := 4
+        cycles := 1
 
         if gba.Paused {
             return 0
@@ -252,36 +254,10 @@ func (gba *GBA) DrawFrame(exit *bool, instCount int) int {
 
         if !gba.Halted {
             cycles = gba.Cpu.Execute(opcode)
-        } else {
-            IntrWaitReturn(gba)
-            cycles = 8
         }
 
-        //if r[PC] == 0x130 {
-        //    gba.Cpu.Reg.CPSR.SetFlag(FLAG_T, false)
-        //}
+        //fmt.Printf("PC %08X OPCODE %08X CPSR %08X\n", r[PC], gba.Mem.Read32(r[PC]), gba.Cpu.Reg.CPSR)
 
-        //if IN_INTERRUPT {
-        //    fmt.Printf("PC %08X\n", r[PC])
-        //}
-
-        //if N && r[PC] == 0x3002870 {
-        //    gba.Debugger.print(CURR_INST)
-        //    os.Exit(0)
-        //}
-
-        //if r[PC] == 0x80625CC {
-        //if CURR_INST == 160052 {
-        //if CURR_INST == 160053 {
-        //    gba.Debugger.print(CURR_INST)
-        //    os.Exit(0)
-        //}
-
-        //if IN {
-        //    mem := gba.Mem
-        //    reg := &gba.Cpu.Reg
-        //    fmt.Printf("PC %08X OPCODE %08X CPSR %08X\n", r[PC], mem.Read32(r[PC]), reg.CPSR)
-        //}
 
         //cycles = 1
         gba.VideoUpdate(uint32(cycles))

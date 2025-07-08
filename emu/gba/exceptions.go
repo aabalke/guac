@@ -1,8 +1,5 @@
 package gba
 
-import (
-    //"os"
-)
 
 const (
 	VEC_RESET         = 0x00
@@ -15,22 +12,49 @@ const (
 	VEC_FIQ           = 0x1C
 )
 
+var IN = false
+
 func (gba *GBA) exception(addr uint32, mode uint32) {
+
+    if mode != MODE_IRQ && mode != MODE_SWI {
+        panic("UNKNOWN EXCEPTION MODE")
+    }
 
 	reg := &gba.Cpu.Reg
 	r := &gba.Cpu.Reg.R
 
+    curr := reg.getMode()
+
+    if mode == curr {
+        return
+    }
+
+    switch mode {
+    case MODE_IRQ:
+        gba.Mem.BIOS_MODE = BIOS_IRQ
+    case MODE_SWI:
+        gba.Mem.BIOS_MODE = BIOS_SWI
+    }
+
+    thumb := reg.CPSR.GetFlag(FLAG_T)
+
     c := BANK_ID[reg.getMode()]
     i := BANK_ID[mode]
-
     reg.SP[c] = r[SP]
     reg.LR[c] = r[LR]
     r[SP] = reg.SP[i]
     r[LR] = reg.LR[i]
+    //reg.CPSR = Cond((uint32(reg.CPSR) &^ 0b11111) | mode)
     reg.SPSR[i] = reg.CPSR
 
-    r[LR] = r[PC] + 4
-    reg.LR[i] = r[PC] + 4
+    switch {
+    case mode == MODE_SWI && thumb:
+        r[LR] = r[PC] + 2
+        reg.LR[i] = r[PC] + 2
+    default:
+        r[LR] = r[PC] + 4
+        reg.LR[i] = r[PC] + 4
+    }
 
     reg.CPSR.SetMode(mode)
     reg.CPSR.SetFlag(FLAG_T, false)
@@ -40,21 +64,25 @@ func (gba *GBA) exception(addr uint32, mode uint32) {
     return
 }
 
-func (gba *GBA) IrqExit() {
+func (gba *GBA) ExitException(mode uint32) {
+
+    if mode == MODE_IRQ {
+        gba.Mem.BIOS_MODE = BIOS_IRQ_POST
+    }
 
     cpu := gba.Cpu
     reg := &cpu.Reg
     r := &cpu.Reg.R
 
-    r[PC] = r[LR] - 4
+    // PC is updated in final bios inst
 
-    i := BANK_ID[MODE_IRQ]
+    i := BANK_ID[mode]
     reg.CPSR = reg.SPSR[i]
     c := BANK_ID[cpu.Reg.getMode()]
 
+    // if you set this up for fiq, get the special registers
     reg.LR[i] = r[LR]
     reg.SP[i] = r[SP]
     r[SP] = reg.SP[c]
     r[LR] = reg.LR[c]
-
 }

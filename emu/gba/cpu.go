@@ -58,26 +58,20 @@ func NewCpu(gba *GBA) *Cpu {
 		Gba: gba,
 	}
 
-	c.Reg.R[0] = 0x0000_0CA5
-	c.Reg.R[SP] = 0x0300_7F00
-	c.Reg.R[LR] = 0x0800_0000
 	c.Reg.R[PC] = 0x0800_0000
 	c.Reg.CPSR = 0x0000_001F
+    //c.Reg.SPSR[BANK_ID[MODE_IRQ]] = 0x0000_0010
+	//c.Reg.R[0] = 0x0000_0CA5
 
-	c.Reg.FIQ[0] = 0x4098_8194
-	c.Reg.FIQ[1] = 0x0410_0084
-	c.Reg.FIQ[2] = 0x808C_1042
-	c.Reg.FIQ[3] = 0x16A0_439B
-	c.Reg.FIQ[4] = 0x4482_0443
+	c.Reg.R[LR] = 0x0800_0000
+    c.Reg.LR[BANK_ID[MODE_SYS]] =   0x0800_0000
+    c.Reg.LR[BANK_ID[MODE_USR]] =   0x0800_0000
+    c.Reg.LR[BANK_ID[MODE_IRQ]] =   0x0800_0000
+    //c.Reg.LR[BANK_ID[MODE_SWI]] =   0x0800_0000
 
-	c.Reg.LR[BANK_ID[MODE_FIQ]] =   0xA928_314E
-    c.Reg.LR[BANK_ID[MODE_IRQ]] =   0x0000_0000
-
-	c.Reg.SPSR[BANK_ID[MODE_FIQ]] = 0xF000_00FF
-    c.Reg.SPSR[BANK_ID[MODE_IRQ]] = 0x0000_0010
-
-	c.Reg.SP[BANK_ID[MODE_FIQ]] =   0x0041_0C81
+	c.Reg.R[SP] = 0x0300_7F00
     c.Reg.SP[BANK_ID[MODE_SYS]] =   0x0300_7F00
+    c.Reg.SP[BANK_ID[MODE_USR]] =   0x0300_7F00
     c.Reg.SP[BANK_ID[MODE_IRQ]] =   0x0300_7FA0
     c.Reg.SP[BANK_ID[MODE_SWI]] =   0x0300_7FE0
 	return c

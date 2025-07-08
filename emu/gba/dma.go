@@ -354,7 +354,7 @@ func (dma *DMA) transferFifo() {
 
     for range 4 {
         v := dma.Gba.Mem.Read32(dma.Src)
-        //dma.Gba.Mem.Write32(dma.Dst, v) make sure this and fifoA / fifoB are not same
+        dma.Gba.Mem.Write32(dma.Dst, v) //make sure this and fifoA / fifoB are not same
 
         switch dma.Idx {
         case 1: dma.Gba.DigitalApu.FifoA.Copy(v)
