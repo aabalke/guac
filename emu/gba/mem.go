@@ -2,6 +2,7 @@ package gba
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/aabalke33/guac/emu/gba/utils"
@@ -31,7 +32,6 @@ func NewMemory(gba *GBA) *Memory {
 
 	m.Write32(0x4000000, 0x80)
 	m.Write32(0x4000134, 0x800F) // IR requires bit 3 on. I believe this is auth check (sonic adv)
-	m.GBA.Joypad = 0x3FF
 
 	m.BIOS_MODE = BIOS_STARTUP
 
@@ -58,7 +58,13 @@ func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
 
 	switch {
 	case addr < 0x0000_4000:
-        return m.ReadBios(addr)
+
+        if m.GBA.Cpu.Reg.R[PC] >= 0x4000 {
+            return m.ReadBios(addr)
+        }
+
+        return m.BIOS[addr]
+
 	case addr < 0x0200_0000:
         return m.ReadOpenBus(addr)
 	case addr < 0x0300_0000:
@@ -116,6 +122,18 @@ func (m *Memory) ReadBios(addr uint32) uint8 {
 }
 
 func (m *Memory) ReadOpenBus(addr uint32) uint8 {
+
+    //r := &m.GBA.Cpu.Reg.R
+
+    //thumb := m.GBA.Cpu.Reg.CPSR.GetFlag(FLAG_T)
+
+    //switch {
+    //case DMA_ACTIVE != -1:
+    //    return uint8(m.GBA.Dma[DMA_ACTIVE].Value)
+    //case thumb && r[PC] - DMA_PC == 2, !thumb && r[PC] - DMA_PC == 4:
+    //    return uint8(m.GBA.Dma[DMA_FINISHED].Value)
+    //}
+
     switch addr & 0b11 {
     case 0: return uint8(m.GBA.OpenBusOpcode)
     case 1: return uint8(m.GBA.OpenBusOpcode >> 8)
@@ -349,10 +367,14 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 	case 0x10F:
 		return m.GBA.Timers[3].ReadCnt(true)
 
-	case KEYINPUT:
-		return m.GBA.getJoypad(false)
-	case KEYINPUT + 1:
-		return m.GBA.getJoypad(true)
+	case 0x130:
+		return m.GBA.Keypad.readINPUT(false)
+	case 0x131:
+		return m.GBA.Keypad.readINPUT(true)
+	case 0x132:
+		return m.GBA.Keypad.readCNT(false)
+	case 0x133:
+		return m.GBA.Keypad.readCNT(true)
 
     case 0x136: return 0
     case 0x137: return 0
@@ -374,7 +396,7 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
     case 0x205: return m.IO[addr]
     case 0x206: return 0
     case 0x207: return 0
-    case 0x208: m.GBA.InterruptStack.ReadIME()
+    case 0x208: return m.GBA.InterruptStack.ReadIME()
     case 0x209: return 0
 
     case 0x20A: return 0
@@ -397,6 +419,7 @@ func (m *Memory) Read8(addr uint32) uint32 {
         return v
     }
 
+
 	return uint32(m.Read(addr, true))
 }
 
@@ -406,21 +429,29 @@ func (m *Memory) Read16(addr uint32) uint32 {
     //SEQ = addr == prevAddr + 2
     //prevAddr = addr
 
-	if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
-		return uint32(m.Read(addr, false)) * 0x0101
-	}
-
     if ok := CheckEeprom(m.GBA, addr); ok {
         return uint32(m.GBA.Cartridge.EepromRead())
     }
+
+	if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
+		return uint32(m.Read(addr, false)) * 0x0101
+	}
 
     if v, ok := m.ReadBadRom(addr, 2); ok {
         return v
     }
 
-
 	return uint32(m.Read(addr+1, false)) <<8 | uint32(m.Read(addr, false))
 }
+
+
+//func (m *Memory) Read16Test(addr uint32) uint8 {
+//
+//    if addr < 0xE00_0000 {
+//        //offset := (addr - 0x0800_0000) % 0x200_0000
+//        return m.GBA.Cartridge.Rom[addr & game_rom_mask & 0b1]
+//    }
+//}
 
 func (m *Memory) Read32(addr uint32) uint32 {
 
@@ -485,6 +516,17 @@ func (m *Memory) ReadBadRom(addr uint32, bytesRead uint8) (uint32, bool) {
 }
 
 func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
+
+    //if addr == 0x03006A80 {
+    //    fmt.Printf("WRITE %02X, at PC %08X OP %08X CURR %d\n", v, m.GBA.Cpu.Reg.R[PC], m.Read32(m.GBA.Cpu.Reg.R[PC]), CURR_INST)
+    //}
+
+    //m.GBA.Timers.Update(1)
+    //if fifoCount >= 75 && addr == 0x03006A50 {
+    //    fmt.Printf("ADDR %08X, V %02X\n", addr, v)
+    //}
+
+
 	switch {
 	case addr < 0x0000_4000:
 		//m.BIOS[addr] = v
@@ -702,6 +744,15 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 	case 0x10F:
 		m.GBA.Timers[3].WriteCnt(v, true)
 
+	case 0x130:
+        return
+	case 0x131:
+        return
+	case 0x132:
+		m.GBA.Keypad.writeCNT(v, false)
+	case 0x133:
+		m.GBA.Keypad.writeCNT(v, true)
+
 
     case 0x200: m.GBA.InterruptStack.WriteIE(v, false)
     case 0x201: m.GBA.InterruptStack.WriteIE(v, true)
@@ -720,7 +771,7 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
     case 0x20B: return
 
     case 0x301:
-        m.IO[addr] = v & 0b1000_0000
+        m.IO[addr] = v & 0x80
         m.GBA.Halted = true
 
 	default:
@@ -770,8 +821,8 @@ func (m *Memory) Write32(addr uint32, v uint32) {
     }
 
     switch addr {
-    case 0x400_00A0: m.GBA.DigitalApu.FifoA.Copy(v)
-    case 0x400_00A4: m.GBA.DigitalApu.FifoB.Copy(v)
+    //case 0x400_00A0: m.GBA.DigitalApu.FifoA.Copy(v)
+    //case 0x400_00A4: m.GBA.DigitalApu.FifoB.Copy(v)
     default:
         m.Write16(addr, uint16(v))
         m.Write16(addr+2, uint16(v>>16))
@@ -789,7 +840,7 @@ func CheckEeprom(gba *GBA, addr uint32) bool {
         return false
     }
 
-    if gba.Cartridge.RomLength > 0x1000_0000 && addr  < 0xDFF_FF00 {
+    if gba.Cartridge.RomLength > 0x1000_0000 && addr < 0xDFF_FF00 {
         return false
     }
 
@@ -840,6 +891,8 @@ func (m *Memory) ReadIODirectByte(addr uint32) uint32 {
 
 func (m *Memory) ReadSoundIO(addr uint32) uint8 {
 
+    a := m.GBA.DigitalApu
+
     switch addr {
     case 0x60: return m.IO[addr] &^ 0x80
     case 0x61: return 0
@@ -863,9 +916,9 @@ func (m *Memory) ReadSoundIO(addr uint32) uint8 {
 
     case 0x80: return m.IO[addr] & 0x77
     case 0x81: return m.IO[addr] & 0xFF
-    case 0x82: return m.IO[addr] & 0x0F
-    case 0x83: return m.IO[addr] & 0x77
-    case 0x84: return m.IO[addr] & 0x8F
+    case 0x82: return uint8(a.SoundCntH) & 0x0F
+    case 0x83: return uint8(a.SoundCntH >> 8) & 0x77
+    case 0x84: return uint8(a.SoundCntX) & 0x8F
     case 0x85: return 0
     }
 
@@ -898,13 +951,26 @@ func (m *Memory) WriteSoundIO(addr uint32, v uint8) {
 
     switch addr {
     case 0x82:
+        if disabled := !utils.BitEnabled(uint32(a.SoundCntX), 7); disabled {
+            return
+        }
 
-        a.SoundCntH &^= 0xFF
-        a.SoundCntH |= uint16(v)
+        a.SoundCntH &^= 0x00FF
+        a.SoundCntH |= uint16(v & 0xFF)
 
     case 0x83:
-        a.SoundCntH &= 0xFF
+
+        if disabled := !utils.BitEnabled(uint32(a.SoundCntX), 7); disabled {
+            return
+        }
+
+        a.SoundCntH &= 0x00FF
         a.SoundCntH |= uint16(v) << 8
+
+        if a.SoundCntH == 0x060E {
+            m.GBA.Debugger.print(CURR_INST)
+            os.Exit(0)
+        }
 
         if resetFifoA := utils.BitEnabled(uint32(a.SoundCntH), 11); resetFifoA {
             a.FifoA.Length = 0
@@ -914,23 +980,29 @@ func (m *Memory) WriteSoundIO(addr uint32, v uint8) {
             a.FifoB.Length = 0
         }
 
-
     case 0x84: 
 
-        v &= 0x8F // should be 0x80 but setting channel bit does not work rn
+        //v &= 0x8F // should be 0x80 but setting channel bit does not work rn
 
-        a.SoundCntX = (a.SoundCntX & 0x0F) | (uint16(v) & 0xF0)
+        a.SoundCntX = uint16((uint8(a.SoundCntX) & 0x0F) | (v & 0x80))
 
         if disabled := !utils.BitEnabled(uint32(v), 7); disabled {
             // this will need to clear fifo and psg
-            a.SoundCntH = 0
+
+            for i := range 0x21 {
+                m.IO[0x60 + i] = 0
+            }
+
+            //a.SoundCntH = 0
             a.SoundCntX = 0
         }
 
-        //return
+    case 0x85, 0x86, 0x87:
+        return
+    default:
+        m.IO[addr] = v
+
     }
 
-    m.IO[addr] = v
-    m.GBA.Apu.Update(uint16(addr), v)
+    //m.GBA.Apu.Update(uint16(addr), v)
 }
-

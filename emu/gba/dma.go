@@ -11,6 +11,10 @@ import (
 var _ = fmt.Sprintf("")
 var _ = os.Stdin
 
+//var DMA_ACTIVE = -1
+//var DMA_FINISHED = -1
+//var DMA_PC = uint32(0)
+
 const (
 	DMA_MODE_IMM = 0
 	DMA_MODE_VBL = 1
@@ -39,7 +43,6 @@ type DMA struct {
     InitDst uint32
 
 	Control       uint32
-	SingleByteSet bool
 	WordCount     uint32
 
 	DstAdj  uint32
@@ -50,8 +53,6 @@ type DMA struct {
 	Mode    uint32
 	IRQ     bool
 	Enabled bool
-
-    EepromWidth uint32
 
     Value uint32
 }
@@ -195,13 +196,22 @@ func (dma *DMA) transfer(_ bool) {
         tmpSrc &^= 0b1
     }
 
+    rom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
+    if rom && dma.Idx == 0 {
+        tmpSrc &= 0x7FF_FFFF
+    }
+
+    if rom {
+        dma.SrcAdj = DMA_ADJ_INC
+    }
+
     switch {
     case dma.isWord && dma.DstAdj  == DMA_ADJ_INC: dstOffset = 4
     case !dma.isWord && dma.DstAdj == DMA_ADJ_INC: dstOffset = 2
     case dma.isWord && dma.DstAdj  == DMA_ADJ_DEC: dstOffset = -4
     case !dma.isWord && dma.DstAdj == DMA_ADJ_DEC: dstOffset = -2
     case dma.isWord && dma.DstAdj == DMA_ADJ_RES: dstOffset = 4
-    case dma.isWord && dma.DstAdj == DMA_ADJ_RES: dstOffset = 2
+    case !dma.isWord && dma.DstAdj == DMA_ADJ_RES: dstOffset = 2
     }
 
     switch {
@@ -210,17 +220,16 @@ func (dma *DMA) transfer(_ bool) {
     case dma.isWord && dma.SrcAdj  == DMA_ADJ_DEC: srcOffset = -4
     case !dma.isWord && dma.SrcAdj == DMA_ADJ_DEC: srcOffset = -2
     case dma.SrcAdj == DMA_ADJ_RES: panic("DMA SRC SET TO PROHIBITTED")
-
-    }
-
-    rom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
-    if rom && dma.Idx == 0 {
-        tmpSrc &= 0x7FF_FFFF
     }
 
     if fifo := (dma.Idx == 1 || dma.Idx == 2) && dma.Mode == DMA_MODE_REF; fifo {
+        panic("AH")
         return
     }
+
+    //prevActive := DMA_ACTIVE
+    //DMA_ACTIVE = dma.Idx
+    //DMA_PC = dma.Gba.Cpu.Reg.R[PC]
 
     for i := uint32(0); i < count; i++ {
 
@@ -261,7 +270,6 @@ func (dma *DMA) transfer(_ bool) {
             switch {
             case badAddr:
                 mem.Write16(tmpDst &^ 1, uint16(dma.Value))
-
             case sram && dma.Idx == 0:
                 dma.Value = 0
                 mem.Write16(tmpDst &^ 1, uint16(dma.Value))
@@ -275,6 +283,9 @@ func (dma *DMA) transfer(_ bool) {
         tmpDst = uint32(int64(tmpDst) + dstOffset)
         tmpSrc = uint32(int64(tmpSrc) + srcOffset)
     }
+
+    //DMA_FINISHED = DMA_ACTIVE
+    //DMA_ACTIVE = prevActive
 
     if dma.IRQ {
         dma.Gba.InterruptStack.setIRQ(8 + uint32(dma.Idx))
@@ -299,23 +310,22 @@ func (dma *DMA) transfer(_ bool) {
     return
 }
 
-func (dma *DMA) transferVideo(vcount uint32) {
+//func (dma *DMA) transferVideo(vcount uint32) {
+//
+//    if dma.Idx != 3 || dma.Mode != 3 || !dma.Enabled || (dma.Dst >= 0x600_0000 || dma.Dst <= 0x700_0000) {
+//        return
+//    }
+//
+//    if vcount >= 2 && vcount <= 162 {
+//        dma.transfer(false)
+//    }
+//}
 
-    if dma.Idx != 3 || dma.Mode != 3 || !dma.Enabled || (dma.Dst >= 0x600_0000 || dma.Dst <= 0x700_0000) {
-        return
-    }
-
-    if vcount >= 2 && vcount <= 162 {
-        dma.transfer(false)
-    }
-}
-
-var COUNT = 0
-
-const offset = 2757
-const c = 5
+var fifoCount = 0
 
 func (dma *DMA) transferFifo() {
+
+    a := dma.Gba.DigitalApu
 
     switch {
     case !dma.Gba.DigitalApu.IsSoundEnabled():  return
@@ -325,7 +335,18 @@ func (dma *DMA) transferFifo() {
     case dma.Idx != 1 && dma.Idx != 2:          return
     case dma.Idx == 1 && dma.Dst != 0x400_00A0: return
     case dma.Idx == 2 && dma.Dst != 0x400_00A4: return
+    case dma.Idx == 1 && dma.Dst == 0x400_00A0 && !(a.FifoA.Length <= 0x10): return
+    case dma.Idx == 2 && dma.Dst == 0x400_00AA && !(a.FifoB.Length <= 0x10): return
     }
+
+    if dma.Idx == 1 && dma.Gba.Mem.Read32(dma.Src) != 0x0 {
+        fifoCount++
+    }
+
+    if rom := dma.Src >= 0x800_0000 && dma.Src < 0xE00_0000; rom {
+        dma.SrcAdj = DMA_ADJ_INC
+    }
+
 
     srcOffset := 4
     switch dma.SrcAdj {
@@ -337,7 +358,7 @@ func (dma *DMA) transferFifo() {
 
     for range 4 {
         v := dma.Gba.Mem.Read32(dma.Src)
-        //dma.Gba.Mem.Write32(dma.Dst, v) make sure this and fifoA / fifoB are not same
+        dma.Gba.Mem.Write32(dma.Dst, v) //make sure this and fifoA / fifoB are not same
 
         switch dma.Idx {
         case 1: dma.Gba.DigitalApu.FifoA.Copy(v)
@@ -355,3 +376,5 @@ func (dma *DMA) transferFifo() {
 func (dma *DMA) checkMode(mode uint32) bool {
 	return mode == dma.Mode && dma.Enabled
 }
+
+

@@ -9,6 +9,7 @@ func (cpu *Cpu) DecodeARM(opcode uint32) int {
 
     r := &cpu.Reg.R
 
+
 	if !cpu.CheckCond(utils.GetByte(opcode, 28)) {
 		r[PC] += 4
 		return 4
@@ -16,13 +17,16 @@ func (cpu *Cpu) DecodeARM(opcode uint32) int {
 
 	switch {
 	case isSWI(opcode):
-        cycles, incPc := cpu.Gba.SysCall(utils.GetVarData(opcode, 16, 23))
+        cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
+        cpu.Gba.exception(VEC_SWI, MODE_SWI)
+        return 4
+        //cycles, incPc := cpu.Gba.SysCall(utils.GetVarData(opcode, 16, 23))
 
-        if incPc {
-            r[PC] += 4
-        }
+        //if incPc {
+        //    r[PC] += 4
+        //}
 
-        return cycles
+        //return cycles
 
 	case isB(opcode):
 		cpu.B(opcode)

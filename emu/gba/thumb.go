@@ -342,15 +342,21 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
         //    cpu.Gba.InterruptStack.Exit()
         //    return 4
         //}
-        if interruptExit := cpu.Reg.getMode() == MODE_IRQ && rd == PC && rs == LR; interruptExit {
-        //if interruptExit := !s.IsEmpty() && rd == PC && rs == LR; interruptExit {
-            cpu.Gba.InterruptStack.Exit()
-            return 4
-        }
+        //if interruptExit := cpu.Reg.getMode() == MODE_IRQ && rd == PC && rs == LR; interruptExit {
+        //if interruptExit := cpu.Reg.getMode() == MODE_IRQ && rd == PC && rs == LR; interruptExit {
+        ////if interruptExit := !s.IsEmpty() && rd == PC && rs == LR; interruptExit {
+        //    cpu.Gba.InterruptStack.Exit()
+        //    return 4
+        //}
+
+        //if rd == PC && rs == LR && LR <= 0x1000 {
+        //    //cpu.Gba.Cpu.Reg.CPSR.SetFlag(FLAG_T, false)
+        //}
 
         if rd == PC {
             //r[rd] = utils.WordAlign(uint32(rsValue)) + 2 // need 2 for pokemon, may be different calc
             r[rd] = utils.HalfAlign(uint32(rsValue)) // need 2 for pokemon, may be different calc
+
             return 4
         }
 
@@ -361,7 +367,7 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
     case inst == 3 && mSBd: panic("UNSUPPORTED HI BLX")
     case inst == 3:
 
-        s := cpu.Gba.InterruptStack
+        //s := cpu.Gba.InterruptStack
 
         // THIS MAY HAVE BEEN NEEDED I AM NOT SURE IT BROKE ZELDA LTTP
         //if rs == LR && cpu.Reg.getMode() == MODE_IRQ {
@@ -372,12 +378,13 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
         //}
 
         //if interruptStubExit := (r[rs] == s.ReturnAddr()) && !s.IsEmpty(); interruptStubExit {
-        if interruptStubExit := r[rs] == s.ReturnAddr() && !s.IsEmpty(); interruptStubExit {
-            //cpsr.SetFlag(FLAG_T, false)
-            s.Exit()
-            return 4
-        }
+        //if interruptStubExit := r[rs] == s.ReturnAddr() && !s.IsEmpty(); interruptStubExit {
+        //if interruptStubExit := r[rs] == r[LR] && cpu.Reg.getMode() == MODE_IRQ;  interruptStubExit {
 
+        //    //cpsr.SetFlag(FLAG_T, false)
+        //    s.Exit()
+        //    return 4
+        //}
 
         if rs == PC {
             cpsr.SetFlag(FLAG_T, false)
@@ -696,6 +703,10 @@ func (cpu *Cpu) thumbLSImm(opcode uint16) {
         v := cpu.Gba.Mem.Read32(utils.WordAlign(addr))
         is := (addr & 0b11) * 8
         r[rd], _, _ = utils.Ror(v, is, false, false ,false)
+        e := 29221446
+        if CURR_INST >= e - 1150 && CURR_INST <= e - 1100 {
+            fmt.Printf("V %08X ADDR %08X\n", r[rd], addr)
+        }
     case THUMB_STRB_IMM:
         addr := r[rb] + nn
         cpu.Gba.Mem.Write8(addr, uint8(r[rd]))

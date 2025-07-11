@@ -27,7 +27,7 @@ https://emulation.gametechwiki.com/index.php/GBA_Tests
 ❌ flash64 (matches mgba)
 ❌ flash128 (matches mgba)
 👍 none
-❌ sram (matches mgba)
+👍 sram (matches mgba)
 
 ### Arm Wrestler
 
@@ -53,25 +53,25 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 
 ### MGBA Test Suite
 
-❌ Memory tests [1542/1552] (1552 with interrupts timed properly)
+❌ Memory tests [1552/1552]
 ❌ I/O read tests [129/130] (Final on is related to channel bits not being properly set off and on)
 ❌ Timing tests [228/2020]
-❌ Timer count-up tests [264/936]
-❌ Timer IRQ tests [0/90]
+❌ Timer count-up tests [186/936]
+❌ Timer IRQ tests [1/90]
 👍 Shifter tests [140/140]
 👍 Carry tests [93/93]
 👍 Multiply long tests [52/72] (matches mgba)
 👍 BIOS math tests [615/615]
-❌ DMA tests [1204/1256]
+❌ DMA tests [1240/1256]
 ❌ SIO register R/W tests [25/90]
-❌ SIO timing tests [0/8]
+❌ SIO timing tests [0/4]
 ❌ Misc. edge case tests [3/10]
 ❌ Video tests
     ❌ Basic Mode 3
     ❌ Basic Mode 4
     👍 Degenerate OBJ transforms
-    ❌ Layer toggle
-    ❌ Layer toggle 2
+    👍 Layer toggle
+    👍 Layer toggle 2
     ❌ OAM Update Delay
     👍 Window offscreen reset (matches mgba)
 
@@ -116,7 +116,7 @@ This emulator is tested against the destoer/armwrestler-gba-fixed version, which
 👍 first
 👍 hello
 
-❌ irq_demo (blinking text hblank irq)
+👍 irq_demo
 👍 key_demo
 👍 m3_demo
 ❌ m7_demo
@@ -169,15 +169,16 @@ All games require Digital Sound
 Advance Wars
     - No known errors (maybe menu)
 Fire Emblem
-    - Crashes
+    - No known errors
 Fire Emblem Sacred Stones
     - No known errors
 Golden Sun
-    - Keyboard Interrupts cause RamReset
+    - No known errors
+    - crashes in game
 Drill Dozer
     - Objects not appearing, is affine at top of screen
 Harvest Moon Friends of Mineral Town
-    - Keyboard Interrupts cause RamReset
+    - Blending of Green
 Hello Kitty Happy Party Pals
     - Some Mini games do not load
 Kirby Nightmare in Dream Land
@@ -188,7 +189,6 @@ Lord of The Rings Two Towers
     - No known errors
 Mario Kart Super Circuit
     - Mode 7
-    - Timing Oddness (Doubles randomly)
 Mega Man Zero
     - Graphics
 Metroid Fusion
@@ -206,7 +206,7 @@ Pokémon Emerald
 Pokémon Ruby / Sapphire
     - No known errors
 Sonic Advance
-    - Chao Garden crashes
+    - No known errors
 Spyro Season of Ice
     - No known errors
 Superstar Saga
@@ -214,10 +214,9 @@ Superstar Saga
 Super Dodge Ball Advance
     - No known errors
 Super Mario Advance
-    - Mario II No problems
-    - Mario I needs Huff
+    - No known errors
 Tetris Worlds
-    - Needs Huff
+    - No known errors
 The Minish Cap
     - No known errors
 Ultimate Puzzle Games
@@ -230,10 +229,11 @@ Doom
     - Does not save (verify)
 Doom II
     - Does not boot
+    - prior to 8337911b76c6e7430ebd092ef7c72522c9dcf0c5: WIDTH 0 EEPROM
+    - post: weird purple problem
 Zelda Link to the Past
     - No known errors
 Iridion II
     - Odd Graphics Errors
 Iridion 3D
     - Tiling Graphics Problem
-    - Requires Huff

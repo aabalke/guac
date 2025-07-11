@@ -2,6 +2,7 @@ package gba
 
 import (
 	"fmt"
+
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
@@ -188,6 +189,8 @@ func (cpu *Cpu) arithmetic(alu *Alu) {
     var res uint64
 
     res = oper(uint64(alu.RnValue), uint64(alu.Op2), carry)
+
+
     cpu.Reg.R[alu.Rd] = uint32(res)
 
     cpu.setAluFlags(alu, res)
@@ -216,7 +219,7 @@ func (cpu *Cpu) test(alu *Alu) {
     if alu.Rd == PC {
         // ARM 3: Bad CMP / CMN / TST / TEQ change the mode
         // i know it isnt stored spsr, becuase in tests this was zero
-        cpu.Reg.setMode(cpu.Reg.getMode(), MODE_SYS) // this may be not SYS MODE
+        //cpu.Reg.setMode(cpu.Reg.getMode(), MODE_SYS) // this may be not SYS MODE
         // maybe spsr but with some more work???
 
         cpu.Reg.R[PC] += 4
@@ -226,9 +229,13 @@ func (cpu *Cpu) test(alu *Alu) {
 
 func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) bool {
 
-    //if interruptExit := !cpu.Gba.InterruptStack.IsEmpty() && alu.Rd == PC && alu.Rm == LR && alu.Inst == MOV; interruptExit {
-    if interruptExit := cpu.Reg.getMode() == MODE_IRQ && alu.Rd == PC && alu.Rm == LR && alu.Inst == MOV; interruptExit {
-        cpu.Gba.InterruptStack.Exit()
+    if irqExit := alu.Rd == PC && alu.Rn == LR && alu.Set && alu.Inst == SUB; irqExit {
+        cpu.Gba.ExitException(MODE_IRQ)
+        return false
+    }
+
+    if swiExit := alu.Rd == PC && alu.Rm == LR && alu.Inst == MOV && alu.Set; swiExit {
+        cpu.Gba.ExitException(MODE_SWI)
         return false
     }
 
@@ -239,7 +246,7 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) bool {
             return true
         }
 
-        cpu.Reg.restoreMode()
+        //cpu.Reg.restoreMode()
         return true
         // pipeline
 
@@ -531,6 +538,7 @@ func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack 
 
     if sdt.Pre {
         if offset == 0 {
+            // this may be a problem, post addr was a problem on ldm
             return addr, 0, false
         }
         return addr, addr, true
@@ -571,15 +579,16 @@ func (cpu *Cpu) BX(opcode uint32) {
         //    return
         //}
 
-        r := &cpu.Reg.R
-        cpsr := &cpu.Reg.CPSR
-        s := cpu.Gba.InterruptStack
-        if interruptStubExit := r[rn] == s.ReturnAddr() && !s.IsEmpty(); interruptStubExit {
-            cpsr.SetFlag(FLAG_T, false)
-            s.Exit()
-            //r[PC] += 4
-            return
-        }
+        //r := &cpu.Reg.R
+        //cpsr := &cpu.Reg.CPSR
+        //s := cpu.Gba.InterruptStack
+        ////if interruptStubExit := r[rn] == s.ReturnAddr() && !s.IsEmpty(); interruptStubExit {
+        //if interruptStubExit := r[rn] == r[LR] && cpu.Reg.getMode() == MODE_IRQ; interruptStubExit {
+        //    cpsr.SetFlag(FLAG_T, false)
+        //    s.Exit()
+        //    //r[PC] += 4
+        //    return
+        //}
 
         cpu.Reg.R[PC] = cpu.Reg.R[rn]
         cpu.Gba.toggleThumb()
@@ -766,7 +775,6 @@ func unsignedHalfStd(half *Half, cpu *Cpu) {
         v, _, _ = utils.Ror(v, is, false, false ,false)
         r[half.Rd] = v
     } else {
-
         cpu.Gba.Mem.Write16(addr, uint16(half.RdValue))
     }
 
@@ -796,15 +804,9 @@ func halfUnsignedAddress(half *Half, cpu *Cpu) (uint32, uint32) {
     }
 
     if half.Pre {
-        switch {
-        case offset == 0: return addr, 0
-        default: return addr, addr
-        }
-    }
-
-    switch {
-    case half.Immediate: return r[half.Rn], addr
-    default: return r[half.Rn], addr
+        return addr, addr
+    } else {
+        return r[half.Rn], addr
     }
 }
 
@@ -835,7 +837,7 @@ func (c *Cpu) Block(opcode uint32) {
 
     mode := c.Reg.getMode()
 
-    if forceUser := block.PSR; forceUser {
+    if forceUser := block.PSR; forceUser && mode != MODE_USR {
         c.Reg.setMode(mode, MODE_USR)
     }
 
@@ -849,20 +851,14 @@ func (c *Cpu) Block(opcode uint32) {
         r[block.Rn] = block.RnValue
     }
 
-    if forceUser := block.PSR; forceUser {
+    if forceUser := block.PSR; forceUser && mode != MODE_USR {
         c.Reg.setMode(MODE_USR, mode)
     }
 
-    if utils.BitEnabled(block.Opcode, 15) && c.Reg.getMode() == MODE_IRQ {
-    //if utils.BitEnabled(block.Opcode, 15) && !c.Gba.InterruptStack.IsEmpty() {
-        c.Gba.InterruptStack.Exit()
+    if utils.BitEnabled(block.Opcode, 15) && block.PSR {
+        panic("LDM WITH R15 AND SET USED")
         return
     }
-
-    //if block.Load && utils.BitEnabled(block.Opcode, 15) && c.Reg.getMode() != MODE_IRQ {
-    //    fmt.Printf("IRQ EXCEPTION CHECK AT LDM BIT 15\n")
-    //    c.Gba.checkIRQ()
-    //}
 
     if incPc {
         c.Reg.R[PC] += 4
@@ -1034,6 +1030,8 @@ func (c *Cpu) stm(block *Block) {
             count++
 
             if reg == int(block.Rn) {
+
+
                 c.Gba.Mem.Write32(addr, r[reg])
                 matchingValue = r[reg] + 4
                 matchingAddr = addr
@@ -1047,6 +1045,7 @@ func (c *Cpu) stm(block *Block) {
                 c.Gba.Mem.Write32(addr, r[reg] + 12)
                 continue
             }
+
 
             c.Gba.Mem.Write32(addr, r[reg])
 
@@ -1172,7 +1171,6 @@ func (cpu *Cpu) Psr(opcode uint32) {
     }
 
     cpu.mrs(psr)
-    //cpu.armMRS(opcode)
     cpu.Reg.R[15] += 4
 }
 
@@ -1186,9 +1184,12 @@ func (cpu *Cpu) mrs(psr *PSR) {
         return
     }
 
-    // masks
+    mask := PRIV_MASK
+    if cpu.Reg.getMode() == MODE_USR {
+        mask = USR_MASK
+    }
 
-    r[psr.Rd] = uint32(cpu.Reg.CPSR)
+    r[psr.Rd] = uint32(cpu.Reg.CPSR) & mask
 }
 
 const (
@@ -1197,63 +1198,97 @@ const (
 	STATE_MASK uint32 = 0x0100_0020
 )
 
-//func (cpu *Cpu) armMRS(inst uint32) {
-//	rd := (inst >> 12) & 0b1111
-//	if useSpsr := utils.BitEnabled(inst, 22); useSpsr {
-//		mode := cpu.Reg.getMode()
-//		cpu.Reg.R[rd] = uint32(cpu.Reg.SPSR[BANK_ID[mode]])
-//		return
-//	}
-//
-//	mask := PRIV_MASK
-//	if cpu.Reg.getMode() == MODE_USR {
-//		mask = USR_MASK
-//	}
-//	cpu.Reg.R[rd] = uint32(cpu.Reg.CPSR) & mask
-//}
-
 func (cpu *Cpu) msr(psr *PSR) {
 
     reg := &cpu.Reg
     r := &cpu.Reg.R
 
-    p := &cpu.Reg.CPSR
-    currMode := cpu.Reg.getMode()
-    if psr.SPSR {
-        p = &cpu.Reg.SPSR[BANK_ID[currMode]]
-    }
-
     var v uint32
     if psr.Immediate {
-        // assumes user mode???
         v, _, _ = utils.Ror(psr.Imm, psr.Shift, false, false, false)
     } else {
         v = r[psr.Rm]
     }
 
-    if psr.C { *p = Cond((uint32(*p) &^ 0x000000FF) | (v & 0x000000FF)) }
-    if psr.F { *p = Cond((uint32(*p) &^ 0xF0000000) | (v & 0xF0000000)) }
-    if psr.X { *p = Cond((uint32(*p) &^ 0x0FF00000) | (v & 0x0FF00000)) }
-    if psr.S { *p = Cond((uint32(*p) &^ 0x000FFF00) | (v & 0x000FFF00)) }
+    mask := uint32(0)
+    if psr.C { mask |= 0x0000_00FF }
+    if psr.X { mask |= 0x0000_FF00 }
+    if psr.S { mask |= 0x00FF_0000 }
+    if psr.F { mask |= 0xFF00_0000 }
+
+    secMask := PRIV_MASK
+    curr := cpu.Reg.getMode()
+    if curr == MODE_USR {
+        secMask = USR_MASK
+    }
 
     if psr.SPSR {
+        secMask |= STATE_MASK
+    }
+
+    mask &= secMask
+
+    if psr.SPSR {
+
+        var spsr uint32
+
+        if curr == MODE_USR || curr == MODE_SYS {
+            spsr = uint32(reg.CPSR) &^ mask
+        } else {
+            spsr = uint32(reg.SPSR[BANK_ID[curr]]) &^ mask
+        }
+
+
+        spsr |= v & mask
+        reg.SPSR[BANK_ID[curr]] = Cond(spsr)
+
         return
     }
 
-    mode := cpu.Reg.getMode()
+    next := v & 0b11111
+    cpsr := uint32(reg.CPSR) &^ mask
 
-    //if mode == currMode {
-    //    panic("SAME MODE")
-    //}
+    cpsr |= v & mask
 
-    if BANK_ID[currMode] == BANK_ID[mode] {
+    reg.CPSR = Cond(cpsr)
+
+    if skip := BANK_ID[curr] == BANK_ID[next]; skip {
         return
     }
 
-    reg.switchRegisterBanks(currMode, mode)
+    if curr == MODE_USR {
+        panic("USER MODE MSR")
+    }
 
-    //fmt.Printf("IRQ EXCEPTION CHECK AT MSR\n")
-    //cpu.Gba.checkIRQ("MSR")
+    if curr != MODE_FIQ {
+        for i := range 5 {
+            reg.USR[i] = r[8+i]
+        }
+    }
+
+	reg.SP[BANK_ID[curr]] = r[SP]
+	reg.LR[BANK_ID[curr]] = r[LR]
+
+	if curr == MODE_FIQ {
+		for i := range 5 {
+			reg.FIQ[i] = r[8+i]
+		}
+	}
+
+	if next != MODE_FIQ {
+		for i := range 5 {
+			r[8+i] = reg.USR[i]
+		}
+	}
+
+    r[SP] = reg.SP[BANK_ID[next]]
+	r[LR] = reg.LR[BANK_ID[next]]
+
+	if next == MODE_FIQ {
+		for i := range 5 {
+			r[8+i] = reg.FIQ[i]
+		}
+	}
 }
 
 func (cpu *Cpu) Swp(opcode uint32) {

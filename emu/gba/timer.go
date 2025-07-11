@@ -6,6 +6,10 @@ import (
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
+var (
+    fifoA, fifoB bool
+)
+
 var MULTIPLE = 0
 
 var _ = fmt.Sprintf("")
@@ -63,9 +67,8 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
             t.D = t.SavedInitialValue
             overflow = true
             continue
-        } else {
-            t.D = tmp
         }
+        t.D = tmp
     }
 
     if !overflow {
