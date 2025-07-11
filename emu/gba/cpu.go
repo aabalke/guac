@@ -58,8 +58,8 @@ func NewCpu(gba *GBA) *Cpu {
 		Gba: gba,
 	}
 
-	c.Reg.R[PC] = 0x0800_0000
-	c.Reg.CPSR = 0x0000_001F
+	//c.Reg.R[PC] = 0x0800_0000
+	//c.Reg.CPSR = 0x0000_001F
     //c.Reg.SPSR[BANK_ID[MODE_IRQ]] = 0x0000_0010
 	//c.Reg.R[0] = 0x0000_0CA5
 
@@ -69,11 +69,11 @@ func NewCpu(gba *GBA) *Cpu {
     //c.Reg.LR[BANK_ID[MODE_IRQ]] =   0x0800_0000
     //c.Reg.LR[BANK_ID[MODE_SWI]] =   0x0800_0000
 
-	c.Reg.R[SP] = 0x0300_7F00
-    c.Reg.SP[BANK_ID[MODE_SYS]] =   0x0300_7F00
-    c.Reg.SP[BANK_ID[MODE_USR]] =   0x0300_7F00
-    c.Reg.SP[BANK_ID[MODE_IRQ]] =   0x0300_7FA0
-    c.Reg.SP[BANK_ID[MODE_SWI]] =   0x0300_7FE0
+	//c.Reg.R[SP] = 0x0300_7F00
+    //c.Reg.SP[BANK_ID[MODE_SYS]] =   0x0300_7F00
+    //c.Reg.SP[BANK_ID[MODE_USR]] =   0x0300_7F00
+    //c.Reg.SP[BANK_ID[MODE_IRQ]] =   0x0300_7FA0
+    //c.Reg.SP[BANK_ID[MODE_SWI]] =   0x0300_7FE0
 	return c
 }
 

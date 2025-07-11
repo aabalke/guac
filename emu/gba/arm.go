@@ -2,6 +2,7 @@ package gba
 
 import (
 	"fmt"
+
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
@@ -188,6 +189,7 @@ func (cpu *Cpu) arithmetic(alu *Alu) {
     var res uint64
 
     res = oper(uint64(alu.RnValue), uint64(alu.Op2), carry)
+
 
     cpu.Reg.R[alu.Rd] = uint32(res)
 
@@ -536,6 +538,7 @@ func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack 
 
     if sdt.Pre {
         if offset == 0 {
+            // this may be a problem, post addr was a problem on ldm
             return addr, 0, false
         }
         return addr, addr, true
@@ -772,7 +775,6 @@ func unsignedHalfStd(half *Half, cpu *Cpu) {
         v, _, _ = utils.Ror(v, is, false, false ,false)
         r[half.Rd] = v
     } else {
-
         cpu.Gba.Mem.Write16(addr, uint16(half.RdValue))
     }
 
@@ -802,15 +804,9 @@ func halfUnsignedAddress(half *Half, cpu *Cpu) (uint32, uint32) {
     }
 
     if half.Pre {
-        switch {
-        case offset == 0: return addr, 0
-        default: return addr, addr
-        }
-    }
-
-    switch {
-    case half.Immediate: return r[half.Rn], addr
-    default: return r[half.Rn], addr
+        return addr, addr
+    } else {
+        return r[half.Rn], addr
     }
 }
 
@@ -841,7 +837,7 @@ func (c *Cpu) Block(opcode uint32) {
 
     mode := c.Reg.getMode()
 
-    if forceUser := block.PSR; forceUser {
+    if forceUser := block.PSR; forceUser && mode != MODE_USR {
         c.Reg.setMode(mode, MODE_USR)
     }
 
@@ -855,7 +851,7 @@ func (c *Cpu) Block(opcode uint32) {
         r[block.Rn] = block.RnValue
     }
 
-    if forceUser := block.PSR; forceUser {
+    if forceUser := block.PSR; forceUser && mode != MODE_USR {
         c.Reg.setMode(MODE_USR, mode)
     }
 
@@ -1049,6 +1045,7 @@ func (c *Cpu) stm(block *Block) {
                 c.Gba.Mem.Write32(addr, r[reg] + 12)
                 continue
             }
+
 
             c.Gba.Mem.Write32(addr, r[reg])
 

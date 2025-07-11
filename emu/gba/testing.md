@@ -174,6 +174,7 @@ Fire Emblem Sacred Stones
     - No known errors
 Golden Sun
     - No known errors
+    - crashes in game
 Drill Dozer
     - Objects not appearing, is affine at top of screen
 Harvest Moon Friends of Mineral Town
@@ -228,6 +229,8 @@ Doom
     - Does not save (verify)
 Doom II
     - Does not boot
+    - prior to 8337911b76c6e7430ebd092ef7c72522c9dcf0c5: WIDTH 0 EEPROM
+    - post: weird purple problem
 Zelda Link to the Past
     - No known errors
 Iridion II

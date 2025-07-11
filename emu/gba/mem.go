@@ -2,6 +2,7 @@ package gba
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/aabalke33/guac/emu/gba/utils"
@@ -418,6 +419,7 @@ func (m *Memory) Read8(addr uint32) uint32 {
         return v
     }
 
+
 	return uint32(m.Read(addr, true))
 }
 
@@ -427,13 +429,13 @@ func (m *Memory) Read16(addr uint32) uint32 {
     //SEQ = addr == prevAddr + 2
     //prevAddr = addr
 
-	if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
-		return uint32(m.Read(addr, false)) * 0x0101
-	}
-
     if ok := CheckEeprom(m.GBA, addr); ok {
         return uint32(m.GBA.Cartridge.EepromRead())
     }
+
+	if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
+		return uint32(m.Read(addr, false)) * 0x0101
+	}
 
     if v, ok := m.ReadBadRom(addr, 2); ok {
         return v
@@ -514,6 +516,17 @@ func (m *Memory) ReadBadRom(addr uint32, bytesRead uint8) (uint32, bool) {
 }
 
 func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
+
+    //if addr == 0x03006A80 {
+    //    fmt.Printf("WRITE %02X, at PC %08X OP %08X CURR %d\n", v, m.GBA.Cpu.Reg.R[PC], m.Read32(m.GBA.Cpu.Reg.R[PC]), CURR_INST)
+    //}
+
+    //m.GBA.Timers.Update(1)
+    //if fifoCount >= 75 && addr == 0x03006A50 {
+    //    fmt.Printf("ADDR %08X, V %02X\n", addr, v)
+    //}
+
+
 	switch {
 	case addr < 0x0000_4000:
 		//m.BIOS[addr] = v
@@ -878,6 +891,8 @@ func (m *Memory) ReadIODirectByte(addr uint32) uint32 {
 
 func (m *Memory) ReadSoundIO(addr uint32) uint8 {
 
+    a := m.GBA.DigitalApu
+
     switch addr {
     case 0x60: return m.IO[addr] &^ 0x80
     case 0x61: return 0
@@ -901,9 +916,9 @@ func (m *Memory) ReadSoundIO(addr uint32) uint8 {
 
     case 0x80: return m.IO[addr] & 0x77
     case 0x81: return m.IO[addr] & 0xFF
-    case 0x82: return m.IO[addr] & 0x0F
-    case 0x83: return m.IO[addr] & 0x77
-    case 0x84: return m.IO[addr] & 0x8F
+    case 0x82: return uint8(a.SoundCntH) & 0x0F
+    case 0x83: return uint8(a.SoundCntH >> 8) & 0x77
+    case 0x84: return uint8(a.SoundCntX) & 0x8F
     case 0x85: return 0
     }
 
@@ -936,13 +951,26 @@ func (m *Memory) WriteSoundIO(addr uint32, v uint8) {
 
     switch addr {
     case 0x82:
+        if disabled := !utils.BitEnabled(uint32(a.SoundCntX), 7); disabled {
+            return
+        }
 
-        a.SoundCntH &^= 0xFF
-        a.SoundCntH |= uint16(v)
+        a.SoundCntH &^= 0x00FF
+        a.SoundCntH |= uint16(v & 0xFF)
 
     case 0x83:
-        a.SoundCntH &= 0xFF
+
+        if disabled := !utils.BitEnabled(uint32(a.SoundCntX), 7); disabled {
+            return
+        }
+
+        a.SoundCntH &= 0x00FF
         a.SoundCntH |= uint16(v) << 8
+
+        if a.SoundCntH == 0x060E {
+            m.GBA.Debugger.print(CURR_INST)
+            os.Exit(0)
+        }
 
         if resetFifoA := utils.BitEnabled(uint32(a.SoundCntH), 11); resetFifoA {
             a.FifoA.Length = 0
@@ -956,17 +984,25 @@ func (m *Memory) WriteSoundIO(addr uint32, v uint8) {
 
         //v &= 0x8F // should be 0x80 but setting channel bit does not work rn
 
-        a.SoundCntX = (a.SoundCntX & 0x0F) | (uint16(v) & 0xF0)
+        a.SoundCntX = uint16((uint8(a.SoundCntX) & 0x0F) | (v & 0x80))
 
         if disabled := !utils.BitEnabled(uint32(v), 7); disabled {
             // this will need to clear fifo and psg
-            a.SoundCntH = 0
+
+            for i := range 0x21 {
+                m.IO[0x60 + i] = 0
+            }
+
+            //a.SoundCntH = 0
             a.SoundCntX = 0
         }
 
-        //return
+    case 0x85, 0x86, 0x87:
+        return
+    default:
+        m.IO[addr] = v
+
     }
 
-    m.IO[addr] = v
     //m.GBA.Apu.Update(uint16(addr), v)
 }

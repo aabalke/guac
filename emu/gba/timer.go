@@ -6,6 +6,10 @@ import (
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
+var (
+    fifoA, fifoB bool
+)
+
 var MULTIPLE = 0
 
 var _ = fmt.Sprintf("")

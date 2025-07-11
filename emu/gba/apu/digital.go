@@ -8,12 +8,12 @@ import (
 const (
 	CPU_FREQ_HZ              = 16777216
 	SND_FREQUENCY            = 32768 // sample rate
-	SND_SAMPLES              = 512 * 2
+	SND_SAMPLES              = 512
 	SAMP_CYCLES              = (CPU_FREQ_HZ / SND_FREQUENCY)
 	BUFF_SIZE                = ((SND_SAMPLES) * 16 * 2)
 	BUFF_MSK                 = ((BUFF_SIZE) - 1)
 	SAMPLE_TIME      float64 = 1.0 / SND_FREQUENCY
-	STREAM_LEN               = ((2 * 2 * SND_FREQUENCY / 60) - (2*2*SND_FREQUENCY/60)%4)
+	STREAM_LEN               = (2 * 2 * SND_FREQUENCY / 60) - (2*2*SND_FREQUENCY/60)%4
 
 	PSG_MAX = 0x7f
 	PSG_MIN = -0x80
@@ -103,6 +103,15 @@ func (a *DigitalAPU) soundMix() {
 	a.ReadPointer = AddInt32(a.ReadPointer, delta)
 }
 
+func (a *DigitalAPU) SoundBufferWrap() {
+    l := a.ReadPointer / BUFF_SIZE
+    r := a.WritePointer / BUFF_SIZE
+	if l == r {
+        a.ReadPointer &= BUFF_MSK
+        a.WritePointer &= BUFF_MSK
+	}
+}
+
 type Fifo struct {
     Buffer [0x20]int8
     Length uint8
@@ -136,24 +145,21 @@ func (f *Fifo) Load() {
     }
 }
 
-func clip(v int32) int32 {
+func clip(v int32) int16 {
     v = min(v, SAMP_MAX)
     v = max(v, SAMP_MIN)
-	return int32(int16(v))
+	return int16(v)
 }
 
 func (a *DigitalAPU) SoundClock(cycles uint32) {
 
-    // THIS IS ALL JUST A AND WILL NEED TO BE UPDATED TO SUPPORT B
-
-
 	sndCycles += cycles
 
-    sampleLeft := int32(0)
-    sampleRight := int32(0)
+    sampleLeft := int16(0)
+    sampleRight := int16(0)
 
-	sampleA := int32(a.FifoA.Sample)<<1
-	sampleB := int32(a.FifoB.Sample)<<1
+	sampleA := int16(a.FifoA.Sample)<<1
+	sampleB := int16(a.FifoB.Sample)<<1
 
     if halfA := !utils.BitEnabled(uint32(a.SoundCntH), 2); halfA {
         sampleA /= 2
@@ -164,19 +170,19 @@ func (a *DigitalAPU) SoundClock(cycles uint32) {
     }
 
     if leftEnabledA := utils.BitEnabled(uint32(a.SoundCntH), 9); leftEnabledA {
-        sampleLeft = clip(sampleA)
+        sampleLeft = clip(int32(sampleA))
 	}
 
     if leftEnabledB := utils.BitEnabled(uint32(a.SoundCntH), 13); leftEnabledB {
-        sampleLeft = clip(sampleLeft + sampleB)
+        sampleLeft = clip(int32(sampleLeft) + int32(sampleB))
 	}
 
     if rightEnabledA := utils.BitEnabled(uint32(a.SoundCntH), 8); rightEnabledA {
-        sampleRight = clip(sampleA)
+        sampleRight = clip(int32(sampleA))
 	}
 
-    if rightEnabledB := utils.BitEnabled(uint32(a.SoundCntH), 13); rightEnabledB {
-        sampleRight = clip(sampleRight + sampleB)
+    if rightEnabledB := utils.BitEnabled(uint32(a.SoundCntH), 12); rightEnabledB {
+        sampleRight = clip(int32(sampleRight) + int32(sampleB))
 	}
 
 

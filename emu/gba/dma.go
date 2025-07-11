@@ -43,7 +43,6 @@ type DMA struct {
     InitDst uint32
 
 	Control       uint32
-	SingleByteSet bool
 	WordCount     uint32
 
 	DstAdj  uint32
@@ -54,8 +53,6 @@ type DMA struct {
 	Mode    uint32
 	IRQ     bool
 	Enabled bool
-
-    EepromWidth uint32
 
     Value uint32
 }
@@ -226,6 +223,7 @@ func (dma *DMA) transfer(_ bool) {
     }
 
     if fifo := (dma.Idx == 1 || dma.Idx == 2) && dma.Mode == DMA_MODE_REF; fifo {
+        panic("AH")
         return
     }
 
@@ -323,12 +321,11 @@ func (dma *DMA) transfer(_ bool) {
 //    }
 //}
 
-var COUNT = 0
-
-const offset = 2757
-const c = 5
+var fifoCount = 0
 
 func (dma *DMA) transferFifo() {
+
+    a := dma.Gba.DigitalApu
 
     switch {
     case !dma.Gba.DigitalApu.IsSoundEnabled():  return
@@ -338,11 +335,18 @@ func (dma *DMA) transferFifo() {
     case dma.Idx != 1 && dma.Idx != 2:          return
     case dma.Idx == 1 && dma.Dst != 0x400_00A0: return
     case dma.Idx == 2 && dma.Dst != 0x400_00A4: return
+    case dma.Idx == 1 && dma.Dst == 0x400_00A0 && !(a.FifoA.Length <= 0x10): return
+    case dma.Idx == 2 && dma.Dst == 0x400_00AA && !(a.FifoB.Length <= 0x10): return
+    }
+
+    if dma.Idx == 1 && dma.Gba.Mem.Read32(dma.Src) != 0x0 {
+        fifoCount++
     }
 
     if rom := dma.Src >= 0x800_0000 && dma.Src < 0xE00_0000; rom {
         dma.SrcAdj = DMA_ADJ_INC
     }
+
 
     srcOffset := 4
     switch dma.SrcAdj {
@@ -372,3 +376,5 @@ func (dma *DMA) transferFifo() {
 func (dma *DMA) checkMode(mode uint32) bool {
 	return mode == dma.Mode && dma.Enabled
 }
+
+

@@ -43,11 +43,11 @@ func (k *Keypad) keyIRQ() bool {
 
     andFlag := utils.BitEnabled(uint32(k.KEYCNT), 15)
 
-    if or := !andFlag && k.KEYCNT & k.KEYINPUT != 0; or {
+    if or := !andFlag && ^(k.KEYCNT) & k.KEYINPUT != 0; or {
         return true
     }
 
-    if and := andFlag && k.KEYCNT &^ k.KEYINPUT == 0; and {
+    if and := andFlag && ^(k.KEYCNT) &^ k.KEYINPUT == 0; and {
         return true
     }
 
