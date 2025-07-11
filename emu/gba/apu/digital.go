@@ -100,7 +100,11 @@ func (a *DigitalAPU) soundMix() {
 
 	// Avoid desync between the Play cursor and the Write cursor
 	delta := (int32(a.WritePointer-a.ReadPointer) >> 8) - (int32(a.WritePointer-a.ReadPointer)>>8)%2
-	a.ReadPointer = AddInt32(a.ReadPointer, delta)
+    if delta > 0 {
+        a.ReadPointer += uint32(delta)
+    } else {
+        a.ReadPointer -= uint32(delta)
+    }
 }
 
 func (a *DigitalAPU) SoundBufferWrap() {
@@ -121,7 +125,6 @@ type Fifo struct {
 func (f *Fifo) Copy(v uint32) {
 
     if fifoFull := f.Length > 28; fifoFull {
-        //f.Length = 0
         f.Length -= 28
     }
 

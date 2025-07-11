@@ -159,12 +159,8 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 		return uint8(m.Dispstat >> 8)
     case 0x0006:
         return m.IO[addr]
-	//case 0x0006:
-	//	return uint8(m.GBA.VCOUNT)
-
 	case 0x0007:
 		return 0x0
-	//case 0x0204:     panic("CHANGE CART WAIT STATE")
 
     case 0x0010: return m.ReadOpenBus(addr)
     case 0x0011: return m.ReadOpenBus(addr)
@@ -387,16 +383,16 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
     case 0x15A: return 0
     case 0x15B: return 0
 
-    case 0x200: return uint8(m.GBA.InterruptStack.IE)
-    case 0x201: return uint8(m.GBA.InterruptStack.IE >> 8)
-    case 0x202: return uint8(m.GBA.InterruptStack.IF)
-    case 0x203: return uint8(m.GBA.InterruptStack.IF >> 8)
+    case 0x200: return uint8(m.GBA.Irq.IE)
+    case 0x201: return uint8(m.GBA.Irq.IE >> 8)
+    case 0x202: return uint8(m.GBA.Irq.IF)
+    case 0x203: return uint8(m.GBA.Irq.IF >> 8)
 
     case 0x204: return m.IO[addr]
     case 0x205: return m.IO[addr]
     case 0x206: return 0
     case 0x207: return 0
-    case 0x208: return m.GBA.InterruptStack.ReadIME()
+    case 0x208: return m.GBA.Irq.ReadIME()
     case 0x209: return 0
 
     case 0x20A: return 0
@@ -418,7 +414,6 @@ func (m *Memory) Read8(addr uint32) uint32 {
     if v, ok := m.ReadBadRom(addr, 1); ok {
         return v
     }
-
 
 	return uint32(m.Read(addr, true))
 }
@@ -444,25 +439,7 @@ func (m *Memory) Read16(addr uint32) uint32 {
 	return uint32(m.Read(addr+1, false)) <<8 | uint32(m.Read(addr, false))
 }
 
-
-//func (m *Memory) Read16Test(addr uint32) uint8 {
-//
-//    if addr < 0xE00_0000 {
-//        //offset := (addr - 0x0800_0000) % 0x200_0000
-//        return m.GBA.Cartridge.Rom[addr & game_rom_mask & 0b1]
-//    }
-//}
-
 func (m *Memory) Read32(addr uint32) uint32 {
-
-    //SEQ = addr == prevAddr + 4
-    //prevAddr = addr
-
-
-
-	//if addr == 0x0 {
-	//	return m.ReadBios(addr)
-	//}
 
     if v, ok := m.ReadBadRom(addr, 4); ok {
         return v
@@ -517,21 +494,10 @@ func (m *Memory) ReadBadRom(addr uint32, bytesRead uint8) (uint32, bool) {
 
 func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
 
-    //if addr == 0x03006A80 {
-    //    fmt.Printf("WRITE %02X, at PC %08X OP %08X CURR %d\n", v, m.GBA.Cpu.Reg.R[PC], m.Read32(m.GBA.Cpu.Reg.R[PC]), CURR_INST)
-    //}
-
-    //m.GBA.Timers.Update(1)
-    //if fifoCount >= 75 && addr == 0x03006A50 {
-    //    fmt.Printf("ADDR %08X, V %02X\n", addr, v)
-    //}
-
-
 	switch {
 	case addr < 0x0000_4000:
-		//m.BIOS[addr] = v
+        return
 	case addr < 0x0200_0000:
-        //fmt.Printf("COULD NOT WRITE %08X TO ADDR %08X\n", v, addr)
 		return
 	case addr < 0x0300_0000:
 		m.WRAM1[(addr-0x0200_0000)%0x4_0000] = v
@@ -543,7 +509,6 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
 		m.WriteIO(addr-0x0400_0000, v)
         return
 	case addr < 0x0500_0000:
-        //fmt.Printf("COULD NOT WRITE %08X TO ADDR %08X\n", v, addr)
 		return
 	case addr < 0x0600_0000:
 
@@ -754,10 +719,10 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 		m.GBA.Keypad.writeCNT(v, true)
 
 
-    case 0x200: m.GBA.InterruptStack.WriteIE(v, false)
-    case 0x201: m.GBA.InterruptStack.WriteIE(v, true)
-    case 0x202: m.GBA.InterruptStack.WriteIF(v, false)
-    case 0x203: m.GBA.InterruptStack.WriteIF(v, true)
+    case 0x200: m.GBA.Irq.WriteIE(v, false)
+    case 0x201: m.GBA.Irq.WriteIE(v, true)
+    case 0x202: m.GBA.Irq.WriteIF(v, false)
+    case 0x203: m.GBA.Irq.WriteIF(v, true)
 
     case 0x204: m.IO[addr] = v
     case 0x205: m.IO[addr] = (m.IO[addr] & 0x80) | (v & 0x5F)
@@ -765,7 +730,7 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
     case 0x207: return
 
     // IME
-    case 0x208: m.GBA.InterruptStack.WriteIME(v); m.IO[addr] = v
+    case 0x208: m.GBA.Irq.WriteIME(v); m.IO[addr] = v
     case 0x209: return
     case 0x20A: return
     case 0x20B: return
@@ -799,16 +764,9 @@ func (m *Memory) Write16(addr uint32, v uint16) {
         m.GBA.Cartridge.EepromWrite(v)
         return
     }
-    switch addr {
-    //case 0x400_00A0: m.GBA.Apu.ChannelA.Write(uint32(v))
-    //case 0x400_00A2: m.GBA.Apu.ChannelA.Write(uint32(v) << 16)
-    //case 0x400_00A4: m.GBA.Apu.ChannelB.Write(uint32(v))
-    //case 0x400_00A6: m.GBA.Apu.ChannelB.Write(uint32(v) << 16)
-    default:
-        m.Write(addr, uint8(v), false)
-        m.Write(addr+1, uint8(v>>8), false)
-    }
 
+    m.Write(addr, uint8(v), false)
+    m.Write(addr+1, uint8(v>>8), false)
 }
 
 func (m *Memory) Write32(addr uint32, v uint32) {
@@ -820,14 +778,8 @@ func (m *Memory) Write32(addr uint32, v uint32) {
         return
     }
 
-    switch addr {
-    //case 0x400_00A0: m.GBA.DigitalApu.FifoA.Copy(v)
-    //case 0x400_00A4: m.GBA.DigitalApu.FifoB.Copy(v)
-    default:
-        m.Write16(addr, uint16(v))
-        m.Write16(addr+2, uint16(v>>16))
-    }
-
+    m.Write16(addr, uint16(v))
+    m.Write16(addr+2, uint16(v>>16))
 }
 
 func CheckEeprom(gba *GBA, addr uint32) bool {
@@ -867,13 +819,11 @@ func (m *Memory) ReadIODirect(addr uint32, size uint32) uint32 {
     switch size {
     case 1:
         return m.ReadIODirectByte(addr)
-
     case 2:
         return m.ReadIODirectByte(addr + 1) << 8 | m.ReadIODirectByte(addr)
     case 4:
         a := m.ReadIODirectByte(addr + 3) << 8 | m.ReadIODirectByte(addr + 2)
         b := m.ReadIODirectByte(addr + 1) << 8 | m.ReadIODirectByte(addr)
-
         return (a << 16) | b
 
     default:

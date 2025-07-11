@@ -134,9 +134,9 @@ func (s *SDLStruct) Close(debug bool) {
 func (s *SDLStruct) Update(debug bool, romPath string, useSaveState bool) {
 
     InitSound()
-	Gb = gameboy.NewGameBoy()
+	//Gb = gameboy.NewGameBoy()
     Gba = gba.NewGBA()
-	defer Gb.Logger.Close()
+	//defer Gb.Logger.Close()
 
 	w, h := s.Window.GetSize()
 	scene := NewScene(s.Renderer, w, h, 10, C_Grey)

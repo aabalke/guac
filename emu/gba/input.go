@@ -18,7 +18,7 @@ func (gba *GBA) InputHandler(event sdl.Event) {
     gba.Keypad.KEYINPUT = tempJoypad
 
     if gba.Keypad.keyIRQ() {
-        gba.InterruptStack.setIRQ(12)
+        gba.Irq.setIRQ(12)
     }
 
     return

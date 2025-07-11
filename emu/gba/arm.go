@@ -540,6 +540,7 @@ func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack 
         if offset == 0 {
             // this may be a problem, post addr was a problem on ldm
             return addr, 0, false
+            //return addr, addr, false
         }
         return addr, addr, true
     }
@@ -571,25 +572,8 @@ func (cpu *Cpu) BX(opcode uint32) {
     inst := utils.GetByte(opcode, 4)
     rn := utils.GetByte(opcode, 0)
 
-
     switch inst {
     case INST_BX:
-        //if rn == LR && cpu.Reg.getMode() == MODE_IRQ {
-        //    cpu.AluChangeMode(false)
-        //    return
-        //}
-
-        //r := &cpu.Reg.R
-        //cpsr := &cpu.Reg.CPSR
-        //s := cpu.Gba.InterruptStack
-        ////if interruptStubExit := r[rn] == s.ReturnAddr() && !s.IsEmpty(); interruptStubExit {
-        //if interruptStubExit := r[rn] == r[LR] && cpu.Reg.getMode() == MODE_IRQ; interruptStubExit {
-        //    cpsr.SetFlag(FLAG_T, false)
-        //    s.Exit()
-        //    //r[PC] += 4
-        //    return
-        //}
-
         cpu.Reg.R[PC] = cpu.Reg.R[rn]
         cpu.Gba.toggleThumb()
     case INST_BXJ: panic("Unsupported BXJ Instruction")

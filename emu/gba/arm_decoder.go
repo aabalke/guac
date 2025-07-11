@@ -9,7 +9,6 @@ func (cpu *Cpu) DecodeARM(opcode uint32) int {
 
     r := &cpu.Reg.R
 
-
 	if !cpu.CheckCond(utils.GetByte(opcode, 28)) {
 		r[PC] += 4
 		return 4
@@ -53,11 +52,7 @@ func (cpu *Cpu) DecodeARM(opcode uint32) int {
 		panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X, INSTR %d", opcode, r[PC], CURR_INST))
 	}
 
-    //return 4
     return 4
-
-    // Notes: Coprocessor instructions do not matter since gba 
-    // uses a single processor (NDS is a different story)
 }
 
 func isOpcodeFormat(opcode, mask, format uint32) bool {

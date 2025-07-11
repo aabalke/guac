@@ -12,7 +12,3 @@ type Emulator interface {
     TogglePause() bool
     ToggleMute() bool
 }
-
-//type Debugger interface {
-//    GetPixels() []byte
-//}

@@ -703,10 +703,7 @@ func (cpu *Cpu) thumbLSImm(opcode uint16) {
         v := cpu.Gba.Mem.Read32(utils.WordAlign(addr))
         is := (addr & 0b11) * 8
         r[rd], _, _ = utils.Ror(v, is, false, false ,false)
-        e := 29221446
-        if CURR_INST >= e - 1150 && CURR_INST <= e - 1100 {
-            fmt.Printf("V %08X ADDR %08X\n", r[rd], addr)
-        }
+
     case THUMB_STRB_IMM:
         addr := r[rb] + nn
         cpu.Gba.Mem.Write8(addr, uint8(r[rd]))

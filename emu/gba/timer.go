@@ -1,18 +1,8 @@
 package gba
 
 import (
-	"fmt"
-
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
-
-var (
-    fifoA, fifoB bool
-)
-
-var MULTIPLE = 0
-
-var _ = fmt.Sprintf("")
 
 type Timers [4]Timer
 
@@ -98,7 +88,7 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
     }
 
     if t.isOverflowIRQ() {
-        t.Gba.InterruptStack.setIRQ(3 + uint32(t.Idx))
+        t.Gba.Irq.setIRQ(3 + uint32(t.Idx))
     }
 
     return true

@@ -1,15 +1,9 @@
 package gba
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/aabalke33/guac/emu/gba/cart"
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
-
-var _ = fmt.Sprintf("")
-var _ = os.Stdin
 
 //var DMA_ACTIVE = -1
 //var DMA_FINISHED = -1
@@ -288,7 +282,7 @@ func (dma *DMA) transfer(_ bool) {
     //DMA_ACTIVE = prevActive
 
     if dma.IRQ {
-        dma.Gba.InterruptStack.setIRQ(8 + uint32(dma.Idx))
+        dma.Gba.Irq.setIRQ(8 + uint32(dma.Idx))
     }
 
     if !dma.Repeat {
@@ -369,7 +363,7 @@ func (dma *DMA) transferFifo() {
     }
 
     if dma.IRQ {
-        dma.Gba.InterruptStack.setIRQ(8 + uint32(dma.Idx))
+        dma.Gba.Irq.setIRQ(8 + uint32(dma.Idx))
     }
 }
 

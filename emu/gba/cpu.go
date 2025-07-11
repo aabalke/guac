@@ -188,14 +188,6 @@ func (r *Reg) switchRegisterBanks(prev, curr uint32) {
 		}
 	}
 
-    //fmt.Printf("LR %08X: LR0 %08X, LR1 %08X, LR2 %08X, LR3 %08X\n", r.R[LR],
-    //r.LR[0],
-    //r.LR[1],
-    //r.LR[2],
-    //r.LR[3])
-
-    //println("HERE", BANK_ID[curr], curr)
-
 	r.R[SP] = r.SP[BANK_ID[curr]]
 	r.R[LR] = r.LR[BANK_ID[curr]]
 

@@ -51,39 +51,26 @@ type GBA struct {
 	Screen [SCREEN_WIDTH][SCREEN_HEIGHT]uint32
 	Pixels *[]byte
 	DebugPixels *[]byte
-
 	Paused bool
 	Muted  bool 
     Halted bool
     ExitHalt bool
-
-    //Apu *APU
     DigitalApu *apu.DigitalAPU
     Objects *[128]Object
-
-    //Clock int
-    //FPS int
     Cycles int
     Scanline int
- 
     Timers Timers
     Dma    [4]DMA
-
-    //VCOUNT uint32
-
     GraphicsDirty bool
     IntrWait uint32
     Save bool
-    InterruptStack *InterruptStack
+    Irq *Irq
     GBA_LOCK bool
     OpenBusOpcode uint32
     DmaOnRefresh bool
-
     AccCycles uint32
-
     Keypad Keypad
 
-    //Cache *Cache
 }
 
 func (gba *GBA) SoftReset() {
@@ -105,10 +92,6 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
 
         cycles := 4
 
-        if gba.Paused {
-            return 0
-        }
-
         if (r[PC] >= 0x400_0000 && r[PC] < 0x800_0000) || r[PC] % 2 != 0 || r[PC] >= 0xE00_0000 {
             r := &gba.Cpu.Reg.R
             panic(fmt.Sprintf("INVALID PC CURR %d PC %08X OPCODE %08X", CURR_INST, r[PC], gba.Mem.Read32(r[PC])))
@@ -124,7 +107,7 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
         gba.Tick(uint32(cycles))
 
         // irq has to be at end (count up tests)
-        gba.InterruptStack.checkIRQ()
+        gba.Irq.checkIRQ()
 
         if !gba.Halted {
             CURR_INST++
@@ -166,13 +149,12 @@ func NewGBA() *GBA {
         Pixels: &pixels,
         DebugPixels: &debugPixels,
         Objects: objs,
-        //AccCycles: uint32(CYCLES_SCANLINE * 126 + 859),
         Keypad: Keypad{
             KEYINPUT: 0x3FF,
         },
     }
 
-    gba.InterruptStack = &InterruptStack{ Gba: &gba }
+    gba.Irq = &Irq{ Gba: &gba }
 
     gba.Debugger = &Debugger{Gba: &gba, Version: 1}
 
@@ -260,8 +242,6 @@ func (gba *GBA) LoadGame(path string, useState bool) {
         //LoadState(gba, path)
         gba.Paused = true
     }
-
-    //gba.Cache.Build(gba)
 }
 
 func (gba *GBA) toggleThumb() {
@@ -302,7 +282,7 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
         gba.Mem.Dispstat.SetHBlank(true)
         dispstat := uint32(gba.Mem.Dispstat)
         if utils.BitEnabled(dispstat, 4) {
-            gba.InterruptStack.setIRQ(1)
+            gba.Irq.setIRQ(1)
         }
 
         if vcount < SCREEN_HEIGHT {
@@ -323,7 +303,7 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
         case SCREEN_HEIGHT + 1:
             dispstat := uint32(gba.Mem.Dispstat)
             if utils.BitEnabled(dispstat, 3) {
-                gba.InterruptStack.setIRQ(0)
+                gba.Irq.setIRQ(0)
             }
         case NUM_SCANLINES - 1:
             gba.Mem.Dispstat.SetVBlank(false)
@@ -337,7 +317,7 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
         dispstat := uint32(gba.Mem.Dispstat)
 
         if vcounterIRQ := utils.BitEnabled(dispstat, 5); vcounterIRQ && match {
-            gba.InterruptStack.setIRQ(2)
+            gba.Irq.setIRQ(2)
         }
     }
 
