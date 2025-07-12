@@ -1,6 +1,7 @@
 package gba
 
 import (
+	"github.com/aabalke33/guac/emu/gba/apu"
 	"github.com/aabalke33/guac/emu/gba/cart"
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
@@ -319,10 +320,10 @@ var fifoCount = 0
 
 func (dma *DMA) transferFifo() {
 
-    a := dma.Gba.DigitalApu
+    a := &apu.ApuInstance
 
     switch {
-    case !dma.Gba.DigitalApu.IsSoundEnabled():  return
+    case !a.IsSoundEnabled():                   return
     case !dma.Enabled:                          return
     case !dma.Repeat:                           return
     case dma.Mode != DMA_MODE_REF:              return
@@ -353,10 +354,9 @@ func (dma *DMA) transferFifo() {
     for range 4 {
         v := dma.Gba.Mem.Read32(dma.Src)
         dma.Gba.Mem.Write32(dma.Dst, v) //make sure this and fifoA / fifoB are not same
-
         switch dma.Idx {
-        case 1: dma.Gba.DigitalApu.FifoA.Copy(v)
-        case 2: dma.Gba.DigitalApu.FifoB.Copy(v)
+        case 1: a.FifoA.Copy(v)
+        case 2: a.FifoB.Copy(v)
         }
 
         dma.Src = uint32(int(dma.Src) + srcOffset)
@@ -370,5 +370,3 @@ func (dma *DMA) transferFifo() {
 func (dma *DMA) checkMode(mode uint32) bool {
 	return mode == dma.Mode && dma.Enabled
 }
-
-

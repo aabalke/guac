@@ -1,6 +1,7 @@
 package gba
 
 import (
+	"github.com/aabalke33/guac/emu/gba/apu"
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
@@ -67,7 +68,7 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
 
     if aTick := int((t.Gba.Mem.ReadIODirect(0x82, 2) >> 10) & 1) == t.Idx; aTick {
 
-        fifo := t.Gba.DigitalApu.FifoA
+        fifo := apu.ApuInstance.FifoA
 
         fifo.Load()
 
@@ -78,7 +79,7 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
 
     if bTick := int((t.Gba.Mem.ReadIODirect(0x82, 2) >> 14) & 1) == t.Idx; bTick {
 
-        fifo := t.Gba.DigitalApu.FifoB
+        fifo := apu.ApuInstance.FifoB
 
         fifo.Load()
 

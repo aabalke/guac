@@ -55,7 +55,6 @@ type GBA struct {
 	Muted  bool 
     Halted bool
     ExitHalt bool
-    DigitalApu *apu.DigitalAPU
     Objects *[128]Object
     Cycles int
     Scanline int
@@ -118,15 +117,15 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
         }
     }
 
-    gba.DigitalApu.SoundBufferWrap()
-    gba.DigitalApu.Play()
+    apu.ApuInstance.SoundBufferWrap()
+    apu.ApuInstance.Play()
 
     return instCount
 }
 
 func (gba *GBA) Tick(cycles uint32) {
     gba.VideoUpdate(uint32(cycles))
-    gba.DigitalApu.SoundClock(uint32(cycles))
+    apu.ApuInstance.SoundClock(uint32(cycles))
     gba.Timers.Update(uint32(cycles))
 }
 
@@ -183,18 +182,10 @@ func NewGBA() *GBA {
     gba.Dma[2].Idx = 2
     gba.Dma[3].Idx = 3
 
-	//gba.Apu = &APU{
-	//	SampleRate: 44100,
-	//	Enabled:    true,
-    //    gba: &gba,
-	//}
-
-    //gba.Apu.Init()
-    gba.DigitalApu = apu.NewDigitalAPU()
-
     gba.LoadBios("./emu/gba/res/bios_magia.gba")
 
-    //gba.Mem.IO[VCOUNT] = 126
+    apu.InitApuInstance()
+    apu.InitAudio()
 
     gba.SoftReset()
 

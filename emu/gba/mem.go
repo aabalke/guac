@@ -2,9 +2,9 @@ package gba
 
 import (
 	"fmt"
-	"os"
 	"time"
 
+	"github.com/aabalke33/guac/emu/gba/apu"
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
@@ -841,46 +841,8 @@ func (m *Memory) ReadIODirectByte(addr uint32) uint32 {
 
 func (m *Memory) ReadSoundIO(addr uint32) uint8 {
 
-    a := m.GBA.DigitalApu
-
-    switch addr {
-    case 0x60: return m.IO[addr] &^ 0x80
-    case 0x61: return 0
-    case 0x62: return m.IO[addr] & 0xC0
-    case 0x63: return m.IO[addr]
-    case 0x64: return 0
-    case 0x65: return m.IO[addr] & 0x40
-
-    case 0x68: return m.IO[addr] & 0xC0
-    case 0x6C: return 0
-    case 0x6D: return m.IO[addr] & 0x40
-
-    case 0x70: return m.IO[addr] & 0xE0
-    case 0x71: return 0
-    case 0x72: return 0
-    case 0x73: return m.IO[addr] & 0xE0
-    case 0x74: return 0
-    case 0x75: return m.IO[addr] & 0x40
-    case 0x78: return 0
-    case 0x7D: return m.IO[addr] & 0x40
-
-    case 0x80: return m.IO[addr] & 0x77
-    case 0x81: return m.IO[addr] & 0xFF
-    case 0x82: return uint8(a.SoundCntH) & 0x0F
-    case 0x83: return uint8(a.SoundCntH >> 8) & 0x77
-    case 0x84: return uint8(a.SoundCntX) & 0x8F
-    case 0x85: return 0
-    }
 
     switch addr &^ 0b1 {
-    case 0x66: return 0
-    case 0x6A: return 0
-    case 0x6E: return 0
-    case 0x76: return 0
-    case 0x7A: return 0
-    case 0x7E: return 0
-    case 0x86: return 0
-    case 0x8A: return 0
     case 0x8C: return m.ReadOpenBus(addr)
     case 0x8E: return m.ReadOpenBus(addr - 2)
     case 0xA0: return m.ReadOpenBus(addr)
@@ -891,68 +853,13 @@ func (m *Memory) ReadSoundIO(addr uint32) uint8 {
     case 0xAA: return m.ReadOpenBus(addr - 2)
     case 0xAC: return m.ReadOpenBus(addr)
     case 0xAE: return m.ReadOpenBus(addr - 2)
-    default: return m.IO[addr]
+    default:
+        a := &apu.ApuInstance
+        return a.Read(addr)
     }
 }
 
 func (m *Memory) WriteSoundIO(addr uint32, v uint8) {
-
-    a := m.GBA.DigitalApu
-
-    switch addr {
-    case 0x82:
-        if disabled := !utils.BitEnabled(uint32(a.SoundCntX), 7); disabled {
-            return
-        }
-
-        a.SoundCntH &^= 0x00FF
-        a.SoundCntH |= uint16(v & 0xFF)
-
-    case 0x83:
-
-        if disabled := !utils.BitEnabled(uint32(a.SoundCntX), 7); disabled {
-            return
-        }
-
-        a.SoundCntH &= 0x00FF
-        a.SoundCntH |= uint16(v) << 8
-
-        if a.SoundCntH == 0x060E {
-            m.GBA.Debugger.print(CURR_INST)
-            os.Exit(0)
-        }
-
-        if resetFifoA := utils.BitEnabled(uint32(a.SoundCntH), 11); resetFifoA {
-            a.FifoA.Length = 0
-        }
-
-        if resetFifoB := utils.BitEnabled(uint32(a.SoundCntH), 15); resetFifoB {
-            a.FifoB.Length = 0
-        }
-
-    case 0x84: 
-
-        //v &= 0x8F // should be 0x80 but setting channel bit does not work rn
-
-        a.SoundCntX = uint16((uint8(a.SoundCntX) & 0x0F) | (v & 0x80))
-
-        if disabled := !utils.BitEnabled(uint32(v), 7); disabled {
-            // this will need to clear fifo and psg
-
-            for i := range 0x21 {
-                m.IO[0x60 + i] = 0
-            }
-
-            //a.SoundCntH = 0
-            a.SoundCntX = 0
-        }
-
-    case 0x85, 0x86, 0x87:
-        return
-    default:
-        m.IO[addr] = v
-
-    }
-
-    //m.GBA.Apu.Update(uint16(addr), v)
+    a := &apu.ApuInstance
+    a.Write(addr, v)
 }
