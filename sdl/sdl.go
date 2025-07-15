@@ -1,16 +1,19 @@
 package sdl
 
 import (
+	"fmt"
 	"time"
-    "fmt"
 
 	gameboy "github.com/aabalke33/guac/emu/gb"
 	"github.com/aabalke33/guac/emu/gba"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
 
-	"github.com/gopxl/beep"
-	"github.com/gopxl/beep/speaker"
+	//"github.com/gopxl/beep"
+	//"github.com/gopxl/beep/speaker"
+
+    "os"
+    "runtime/pprof"
 )
 
 const (
@@ -53,8 +56,6 @@ func (s *SDLStruct) Init(debugger bool) {
 		s.name,
 		sdl.WINDOWPOS_UNDEFINED,
 		sdl.WINDOWPOS_UNDEFINED,
-		//1080,
-		//0,
 		1280,
 		720,
 		sdl.WINDOW_SHOWN|sdl.WINDOW_RESIZABLE)
@@ -131,6 +132,7 @@ func (s *SDLStruct) Close(debug bool) {
     }
 }
 
+
 func (s *SDLStruct) Update(debug bool, romPath string, useSaveState bool) {
 
     InitSound()
@@ -155,13 +157,28 @@ func (s *SDLStruct) Update(debug bool, romPath string, useSaveState bool) {
         ActivateConsole(scene, debugScene, romPath, debug, useSaveState)
     }
 
-	frameTime := time.Second / FPS
+    Gba.Cache.BuildCache(Gba)
+
+	frameTime := time.Second / (FPS)
 	ticker := time.NewTicker(frameTime)
 
-	count := 0
-	for i := range ticker.C {
+    profile := false
 
-        //st := time.Now()
+    var f *os.File
+
+    if profile {
+        f, err := os.Create("cpu.prof")
+        if err != nil {
+            panic(err)
+        }
+
+        pprof.StartCPUProfile(f)
+    }
+
+    var count int
+
+	for i := range ticker.C {
+	//for range 1000 {
 
 		if !scene.Status.Active || (debug && !debugScene.Status.Active) {
 			ticker.Stop()
@@ -178,7 +195,7 @@ func (s *SDLStruct) Update(debug bool, romPath string, useSaveState bool) {
         }
 
 		//count = Gb.Update(&scene.Status.Active, count)
-        count = Gba.Update(&scene.Status.Active, count)
+        Gba.Update(&scene.Status.Active, count)
 
 		s.Renderer.SetDrawColor(0, 0, 0, 255)
 		s.Renderer.Clear()
@@ -197,15 +214,24 @@ func (s *SDLStruct) Update(debug bool, romPath string, useSaveState bool) {
             s.DebugRenderer.Present()
         }
 
-        //fmt.Printf("Took %v\n", time.Since(st))
+        count++
 	}
+
+    if profile {
+        pprof.StopCPUProfile()
+        f.Close()
+    }
 }
 
 func InitSound() {
-	sampleRate := beep.SampleRate(44100)
-	bufferSize := sampleRate.N(time.Second / 30)
-	err := speaker.Init(sampleRate, bufferSize)
-	if err != nil {
-        panic(err)
-	}
+
+    // DO NOT USE BEEP IT IS HOG
+
+
+	//sampleRate := beep.SampleRate(44100)
+	//bufferSize := sampleRate.N(time.Second / 30)
+	//err := speaker.Init(sampleRate, bufferSize)
+	//if err != nil {
+    //    panic(err)
+	//}
 }

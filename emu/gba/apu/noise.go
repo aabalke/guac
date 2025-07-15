@@ -14,44 +14,33 @@ type NoiseChannel struct {
     samples, lengthTime, envTime float64
 }
 
-
 func (ch *NoiseChannel) GetSample() int8 {
 
-    //if disabled := !ApuInstance.isSoundChanEnable(uint8(ch.Idx)); disabled {
-    //    return 0
-    //}
+    if !ApuInstance.isSoundChanEnable(uint8(ch.Idx)) {
+        return 0
+    }
 
-	// Actual frequency in Hertz (524288 / r / 2^(s+1))
-	r := float64(ch.CntH & 7)
-    s := float64((ch.CntH>>4)&0xf)
-	if r == 0 {
-		r = 0.5
-	}
-	frequency := (524288 / r) / math.Pow(2, s+1)
+    soundLength := utils.GetVarData(uint32(ch.CntL), 0, 5)
+	length := (64 - float64(soundLength)) / 256
 
-	// Full length of the generated wave (if enabled) in seconds
-	soundLen := ch.CntL & 0x3f
-	length := (64 - float64(soundLen)) / 256
-
-	// Length reached check (if so, just disable the channel and return silence)
-	if utils.BitEnabled(uint32(ch.CntH), 14) {
+    if stopAtLength := utils.BitEnabled(uint32(ch.CntH), 14); stopAtLength {
 		ch.lengthTime += SAMPLE_TIME
-		if ch.lengthTime >= length {
-            //ApuInstance.enableSoundChan(int(ch.Idx), false)
+        if stop := ch.lengthTime >= length; stop {
+            ApuInstance.enableSoundChan(int(ch.Idx), false)
 			return 0
 		}
 	}
 
-	// Envelope volume change interval in seconds
-	envStep := (ch.CntL >> 8) & 0x7
-	envelopeInterval := float64(envStep) / 64
+    envStep := float64(utils.GetVarData(uint32(ch.CntL), 8, 10))
+    envelope := uint16(utils.GetVarData(uint32(ch.CntL), 12, 15))
 
-	// Envelope volume
-	envelope := (ch.CntL >> 12) & 0xf
 	if envStep != 0 {
 		ch.envTime += SAMPLE_TIME
+        envelopeInterval := envStep / 64
+
 		if ch.envTime >= envelopeInterval {
 			ch.envTime -= envelopeInterval
+
 
 			if utils.BitEnabled(uint32(ch.CntL), 11) {
 				if envelope < 0xf {
@@ -67,7 +56,14 @@ func (ch *NoiseChannel) GetSample() int8 {
 		}
 	}
 
-	// Numbers of samples that a single cycle (pseudo-random noise value) takes at output sample rate
+    r := float64(utils.GetVarData(uint32(ch.CntH), 0, 2))
+    s := float64(utils.GetVarData(uint32(ch.CntH), 4, 7))
+
+	if r == 0 {
+		r = 0.5
+	}
+
+	frequency := (524288 / r) / math.Pow(2, s+1)
 	cycleSamples := SND_FREQUENCY / frequency
 
 	carry := byte(ch.lfsr & 0b1)
@@ -86,9 +82,7 @@ func (ch *NoiseChannel) GetSample() int8 {
 	}
 
 	if carry != 0 {
-		//return int8(float64(envelope) * PSG_MAX / 15)
 		return int8((float64(envelope) / 15) * PSG_MAX) // Out=HIGH
 	}
-    //return int8(float64(envelope) * PSG_MIN / 15)
 	return int8((float64(envelope) / 15) * PSG_MIN) // Out=LOW
 }

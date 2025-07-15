@@ -566,8 +566,8 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
             return
         }
         rel := (addr-0x0700_0000)%0x400
-        m.WriteOAM(rel)
 		m.OAM[rel] = v
+        m.GBA.PPU.UpdateOAM(rel)
         return
 	case addr < 0x0E00_0000:
         return
@@ -742,6 +742,14 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 	default:
 		m.IO[addr] = v
 	}
+
+    if addr == 0x0 || addr == 0x1 || addr >= 0x50 && addr < 0x55 {
+        m.GBA.PPU.UpdatePPU(addr, uint32(v))
+    }
+
+    if window := addr >= 0x8 && addr < 0x4C; window {
+        m.GBA.PPU.UpdatePPU(addr, uint32(v))
+    }
 }
 
 func (m *Memory) Write8(addr uint32, v uint8) {
@@ -797,21 +805,6 @@ func CheckEeprom(gba *GBA, addr uint32) bool {
     }
 
     return true
-}
-
-func (m *Memory) WriteOAM(relAddr uint32) {
-
-    if affine := relAddr % 8 == 6 || relAddr % 8 == 7; affine {
-        m.GBA.Objects = NewObjects(m.GBA)
-        return
-    }
-
-    objIdx := relAddr / 8
-
-    addr := m.Read16(0x0400_0000 + DISPCNT)
-    dispcnt := NewDispcnt(addr)
-
-    m.GBA.Objects[objIdx] = NewObject(m.GBA, uint32(objIdx), dispcnt)
 }
 
 func (m *Memory) ReadIODirect(addr uint32, size uint32) uint32 {

@@ -8,11 +8,14 @@ import (
 func (cpu *Cpu) DecodeARM(opcode uint32) int {
 
     r := &cpu.Reg.R
-
 	if !cpu.CheckCond(utils.GetByte(opcode, 28)) {
 		r[PC] += 4
 		return 4
 	}
+
+    //if cached := cpu.Gba.Cache.runCache(cpu.Gba, r[PC], opcode); cached {
+    //    return 4
+    //}
 
 	switch {
 	case isSWI(opcode):

@@ -1,6 +1,5 @@
 package apu
 
-
 const (
 	CPU_FREQ_HZ              = 16777216
 	SND_FREQUENCY            = 32768 // sample rate

@@ -14,30 +14,29 @@ type WaveChannel struct {
 }
 
 func (ch *WaveChannel) GetSample() int8 {
-	//wave := uint16(a.Load32(SOUND3CNT_L))
-	//if !(a.isSoundChanEnable(2) && util.Bit(wave, 7)) {
-	//	return 0
-	//}
 
-	// Actual frequency in Hertz
-	rate := ch.CntX & 2047
-	frequency := 2097152 / (2048 - float64(rate))
+    if !ApuInstance.isSoundChanEnable(uint8(ch.Idx)) {
+        return 0
+    }
 
-	// Full length of the generated wave (if enabled) in seconds
-	soundLen := ch.CntH & 0xff
-	length := (256 - float64(soundLen)) / 256.
+    if !utils.BitEnabled(uint32(ch.CntL), 7) {
+        return 0
+    }
 
-	// Numbers of samples that a single "cycle" (all entries on Wave RAM) takes at output sample rate
-	cycleSamples := SND_FREQUENCY / frequency
+    soundLength := utils.GetVarData(uint32(ch.CntH), 0, 7)
+	length := (256 - float64(soundLength)) / 256
 
-	// Length reached check (if so, just disable the channel and return silence)
-	if utils.BitEnabled(uint32(ch.CntX), 14) {
+    if stopAtLength := utils.BitEnabled(uint32(ch.CntX), 14); stopAtLength {
 		ch.lengthTime += SAMPLE_TIME
-		if ch.lengthTime >= length {
+        if stop := ch.lengthTime >= length; stop {
             ApuInstance.enableSoundChan(int(ch.Idx), false)
 			return 0
 		}
 	}
+
+    rate := utils.GetVarData(uint32(ch.CntX), 0, 10)
+	freq := 2097152 / (2048 - float64(rate))
+	cycleSamples := SND_FREQUENCY / freq
 
 	ch.samples++
 	if ch.samples >= cycleSamples {
@@ -54,32 +53,32 @@ func (ch *WaveChannel) GetSample() int8 {
 	wavedata := ch.WaveRam[(uint32(ch.WavePosition)>>1)&0x1f]
 	sample := (float64((wavedata>>((ch.WavePosition&1)<<2))&0xf) - 0x8) / 8
 
-	switch volume := (ch.CntH >> 13) & 0x7; volume {
-	case 0:
-		sample = 0 // 0%
-	case 1: // 100%
-	case 2:
-		sample /= 2 // 50%
-	case 3:
-		sample /= 4 // 25%
-	default:
-		sample *= 3 / 4 // 75%
-	}
+    if forceVolume := utils.BitEnabled(uint32(ch.CntH), 15); forceVolume {
+        sample *= 0.75
+    } else {
+        switch vol := utils.GetVarData(uint32(ch.CntH), 13, 14); vol {
+        case 0: sample = 0
+        case 1:
+        case 2: sample *= 0.5
+        case 3: sample *= 0.25
+        }
+    }
 
 	if sample >= 0 {
 		return int8(sample / 7 * PSG_MAX)
 	}
 	return int8(sample / (-8) * PSG_MIN)
-
 }
 
 func (ch *WaveChannel) Reset() {
 
-	if utils.BitEnabled(uint32(ch.CntL), 5) { // R/W Wave RAM Dimension
-		// 64 samples (at 4 bits each, uses both banks so initial position is always 0)
-		ch.WavePosition, ch.WaveSamples = 0, 64
+    if twoBanks := utils.BitEnabled(uint32(ch.CntL), 5); twoBanks {
+		ch.WavePosition = 0
+        ch.WaveSamples = 64
 		return
 	}
-	// 32 samples (at 4 bits each, bank selectable through Wave Control register)
-	ch.WavePosition, ch.WaveSamples = byte((ch.CntL>>1)&0x20), 32
+
+    bankIdx := (ch.CntL >> 6) & 0b1
+    ch.WavePosition = uint8(32 * bankIdx)
+    ch.WaveSamples = 32
 }

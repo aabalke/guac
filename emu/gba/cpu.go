@@ -100,30 +100,19 @@ type Reg struct {
 type Cond uint32
 
 func (c *Cond) GetFlag(flag uint32) bool {
-
-	switch flag {
-	case FLAG_N, FLAG_Z, FLAG_C, FLAG_V, FLAG_Q, FLAG_I, FLAG_F, FLAG_T:
-		return (uint32(*c)>>flag)&0b1 == 0b1
-	}
-
-	panic("Unknown Cond Flag Get")
+    return (uint32(*c)>>flag)&0b1 == 0b1
 }
 
 func (c *Cond) SetFlag(flag uint32, value bool) {
-	switch flag {
-	case FLAG_N, FLAG_Z, FLAG_C, FLAG_V, FLAG_Q, FLAG_I, FLAG_F, FLAG_T:
 
-		if value {
-			*c |= (0b1 << flag)
-			return
-		}
+    if value {
+        *c |= (0b1 << flag)
+        return
+    }
 
-		*c &^= (0b1 << flag)
+    *c &^= (0b1 << flag)
 
-		return
-	}
-
-	panic("Unknown Cond Flag Set")
+    return
 }
 
 func (c *Cond) SetField(loBit uint32, value uint32) {

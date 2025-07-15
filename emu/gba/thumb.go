@@ -33,20 +33,22 @@ type ThumbAlu struct {
 	Opcode, Inst, Rs, Rd uint16
 }
 
+var thumbAluData ThumbAlu
+
 func (cpu *Cpu) ThumbAlu(opcode uint16) {
 
-	alu := &ThumbAlu{
-		Opcode: opcode,
-		Inst: uint16(utils.GetByte(uint32(opcode), 6)),
-        Rs: uint16(utils.GetVarData(uint32(opcode), 3, 5)),
-        Rd: uint16(utils.GetVarData(uint32(opcode), 0, 2)),
-	}
+	thumbAluData.Opcode = opcode
+	thumbAluData.Inst = uint16(utils.GetByte(uint32(opcode), 6))
+    thumbAluData.Rs = uint16(utils.GetVarData(uint32(opcode), 3, 5))
+    thumbAluData.Rd = uint16(utils.GetVarData(uint32(opcode), 0, 2))
+
+    alu := &thumbAluData
 
     switch alu.Inst {
-    case THUMB_LSL, THUMB_LSR, THUMB_ASR, THUMB_ADC, THUMB_SBC, THUMB_ROR, THUMB_NEG: cpu.thumbArithmetic(alu)
-    case THUMB_AND, THUMB_EOR, THUMB_ORR, THUMB_BIC, THUMB_MVN: cpu.thumbLogical(alu)
-    case THUMB_TST, THUMB_CMN, THUMB_CMP: cpu.thumbTest(alu)
     case THUMB_MUL: cpu.thumbMuliply(alu)
+    case THUMB_TST, THUMB_CMN, THUMB_CMP: cpu.thumbTest(alu)
+    case THUMB_AND, THUMB_EOR, THUMB_ORR, THUMB_BIC, THUMB_MVN: cpu.thumbLogical(alu)
+    default: cpu.thumbArithmetic(alu)
     }
 
     cpu.Reg.R[15] += 2
@@ -71,17 +73,16 @@ func (cpu *Cpu) thumbLogical(alu *ThumbAlu) {
 
     r := &cpu.Reg.R
 
-    var oper func (uint32, uint32) uint32
+    var res uint32
+    a, b := r[alu.Rd], r[alu.Rs]
 
     switch alu.Inst {
-    case THUMB_AND: oper = func(u1, u2 uint32) uint32 { return u1 & u2 }
-    case THUMB_EOR: oper = func(u1, u2 uint32) uint32 { return u1 ^ u2 }
-    case THUMB_ORR: oper = func(u1, u2 uint32) uint32 { return u1 | u2 }
-    case THUMB_BIC: oper = func(u1, u2 uint32) uint32 { return u1 &^ u2 }
-    case THUMB_MVN: oper = func(_, u2 uint32) uint32 { return ^u2 }
+    case THUMB_AND: res = a & b
+    case THUMB_EOR: res = a ^ b
+    case THUMB_ORR: res = a | b
+    case THUMB_BIC: res = a &^ b
+    case THUMB_MVN: res = ^b
     }
-
-    res := oper(r[alu.Rd], r[alu.Rs])
 
     r[alu.Rd] = res
 
@@ -200,17 +201,15 @@ func (cpu *Cpu) thumbTest(alu *ThumbAlu) {
 
     r := &cpu.Reg.R
 
-    var oper func (uint64, uint64) uint64
-
-    switch alu.Inst {
-    case THUMB_TST: oper = func(u1, u2 uint64) uint64 { return u1 & u2 }
-    case THUMB_CMP: oper = func(u1, u2 uint64) uint64 { return u1 - u2 }
-    case THUMB_CMN: oper = func(u1, u2 uint64) uint64 { return u1 + u2 }
-    }
-
+    var res uint64
+    a, b := uint64(r[alu.Rd]), uint64(r[alu.Rs])
     rdValue := uint64(r[alu.Rd])
 
-    res := oper(rdValue, uint64(r[alu.Rs]))
+    switch alu.Inst {
+    case THUMB_TST: res = a & b
+    case THUMB_CMP: res = a - b
+    case THUMB_CMN: res = a + b
+    }
 
     rdSign := uint8(rdValue >> 31) & 1
     rsSign := uint8(r[alu.Rs] >> 31) & 1
@@ -287,22 +286,12 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
 
         rdValue := uint64(r[rd])
 
-        //res := rsValue - rdValue
         res := rdValue - rsValue
 
         if rd != PC {
             r[PC] += 2
         }
 
-        //if CURR_INST == 271_361 {
-        //    fmt.Printf("RS %08X, RD %08X, RES %08X\n", rsValue, rdValue, res)
-        //    fmt.Printf("RS %d, RD %d\n", rs, rd)
-
-        //}
-
-        //rdSign := uint8(uint32(rdValue) >> 31) & 1
-        //rsSign := uint8(rsValue >> 31) & 1
-        //rSign  := uint8(int32(uint32(res)) >> 31) & 1
         rdSign := uint8(rdValue >> 31) & 1
         rsSign := uint8(rsValue >> 31) & 1
         rSign  := uint8(res >> 31) & 1
@@ -321,9 +310,6 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
         if nop := rs == 8 && rd == 8; nop {
 
             cycles := 3
-            //if seq := cpu.Gba.Ct.popSequential(r[PC], true); seq {
-            //    cycles = 2
-            //}
 
             r[PC] += 2
             return cycles
@@ -336,26 +322,8 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
             rsValue += 4
         }
 
-        //s := cpu.Gba.InterruptStack
-        //if interruptStubExit := (r[rs] == s.ReturnAddr()) && !s.IsEmpty() && rd == PC; interruptStubExit {
-        //    cpsr.SetFlag(FLAG_T, false)
-        //    cpu.Gba.InterruptStack.Exit()
-        //    return 4
-        //}
-        //if interruptExit := cpu.Reg.getMode() == MODE_IRQ && rd == PC && rs == LR; interruptExit {
-        //if interruptExit := cpu.Reg.getMode() == MODE_IRQ && rd == PC && rs == LR; interruptExit {
-        ////if interruptExit := !s.IsEmpty() && rd == PC && rs == LR; interruptExit {
-        //    cpu.Gba.InterruptStack.Exit()
-        //    return 4
-        //}
-
-        //if rd == PC && rs == LR && LR <= 0x1000 {
-        //    //cpu.Gba.Cpu.Reg.CPSR.SetFlag(FLAG_T, false)
-        //}
-
         if rd == PC {
-            //r[rd] = utils.WordAlign(uint32(rsValue)) + 2 // need 2 for pokemon, may be different calc
-            r[rd] = utils.HalfAlign(uint32(rsValue)) // need 2 for pokemon, may be different calc
+            r[rd] = utils.HalfAlign(uint32(rsValue))
 
             return 4
         }
@@ -367,34 +335,13 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
     case inst == 3 && mSBd: panic("UNSUPPORTED HI BLX")
     case inst == 3:
 
-        //s := cpu.Gba.InterruptStack
-
-        // THIS MAY HAVE BEEN NEEDED I AM NOT SURE IT BROKE ZELDA LTTP
-        //if rs == LR && cpu.Reg.getMode() == MODE_IRQ {
-
-        //    cpsr.SetFlag(FLAG_T, false)
-        //    s.Exit()
-        //    return 4
-        //}
-
-        //if interruptStubExit := (r[rs] == s.ReturnAddr()) && !s.IsEmpty(); interruptStubExit {
-        //if interruptStubExit := r[rs] == s.ReturnAddr() && !s.IsEmpty(); interruptStubExit {
-        //if interruptStubExit := r[rs] == r[LR] && cpu.Reg.getMode() == MODE_IRQ;  interruptStubExit {
-
-        //    //cpsr.SetFlag(FLAG_T, false)
-        //    s.Exit()
-        //    return 4
-        //}
-
         if rs == PC {
             cpsr.SetFlag(FLAG_T, false)
             //R15: CPU switches to ARM state, and PC is auto-aligned as (($+4) AND NOT 2).
             r[PC] = (r[PC] + 4) &^ 2
-            //println(fmt.Sprintf("PC %08X should be 0x30001C0\n", r[PC]))
 
             return 4
         }
-
 
         if setThumb := !utils.BitEnabled(r[rs], 0); setThumb {
             cpsr.SetFlag(FLAG_T, false)
@@ -448,7 +395,6 @@ func (cpu *Cpu) ThumbAddSub(opcode uint16) {
     rnSign := uint8(rnValue >> 31) & 1
     imSign := uint8(uint32(imm) >> 31) & 1
     rSign  := uint8(int32(uint32(res)) >> 31) & 1
-    //rSign  := uint8(int32(uint32(res)) >> 31) & 1
 
 
     switch inst {
@@ -551,7 +497,6 @@ func (cpu *Cpu) thumbLSHalf(opcode uint16) {
 
     r := &cpu.Reg.R
 
-
     addr := r[rb] + offset
 
     if ldr {
@@ -563,7 +508,6 @@ func (cpu *Cpu) thumbLSHalf(opcode uint16) {
         cpu.Gba.Mem.Write16(addr, uint16(r[rd]))
 
     }
-
 
     r[PC] += 2
 }
@@ -906,7 +850,6 @@ func (cpu *Cpu) thumbShortLongBranch(opcode uint16) {
     // BL LR + nn
 
     r := &cpu.Reg.R
-    //fmt.Printf("START: LR %08X PC %08X END: ", r[LR], r[PC])
 
     lower := utils.GetVarData(uint32(opcode), 0, 10)
 
@@ -924,8 +867,6 @@ func (cpu *Cpu) thumbShortLongBranch(opcode uint16) {
     tmpLR := r[LR]
     r[LR] = utils.HalfAlign(r[PC] + 2) + 1
     r[PC] = utils.HalfAlign(uint32(int32(tmpLR) + offset))
-
-    //fmt.Printf("LR %08X PC %08X CURR %d\n", r[LR], r[PC], CURR_INST)
 }
 
 func (cpu *Cpu) thumbLSSP(opcode uint16) {

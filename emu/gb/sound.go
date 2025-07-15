@@ -2,11 +2,11 @@ package gameboy
 
 import (
 	"math"
-	"math/rand"
+	//"math/rand"
 
-	"github.com/gopxl/beep"
-	"github.com/gopxl/beep/effects"
-	"github.com/gopxl/beep/speaker"
+	//"github.com/gopxl/beep"
+	//"github.com/gopxl/beep/effects"
+	//"github.com/gopxl/beep/speaker"
 )
 
 const (
@@ -56,89 +56,91 @@ type APU struct {
 
     WavRam   [32]float64
 
-    Mixer      *beep.Mixer 
+    //Mixer      *beep.Mixer 
 }
 
 func (a *APU) Init() {
 
-	mixer := &beep.Mixer{}
+    return
 
-	a.Channel1 = Channel{
-		Enabled: false,
-		Apu:   a,
-		WavShaper: func(i int, samples *[][2]float64, c Channel) {
+	//mixer := &beep.Mixer{}
 
-			tickInCycle := c.SampleTick * 2 * math.Pi
-			if math.Sin(tickInCycle) <= c.duty {
-				(*samples)[i][0] = 1 * c.Volume
-				(*samples)[i][1] = 1 * c.Volume
-			} else {
-				(*samples)[i][0] = 0
-				(*samples)[i][1] = 0
-			}
+	//a.Channel1 = Channel{
+	//	Enabled: false,
+	//	Apu:   a,
+	//	WavShaper: func(i int, samples *[][2]float64, c Channel) {
 
-		},
-	}
-	a.Channel2 = Channel{
-		Enabled: false,
-		Apu:     a,
-		WavShaper: func(i int, samples *[][2]float64, c Channel) {
+	//		tickInCycle := c.SampleTick * 2 * math.Pi
+	//		if math.Sin(tickInCycle) <= c.duty {
+	//			(*samples)[i][0] = 1 * c.Volume
+	//			(*samples)[i][1] = 1 * c.Volume
+	//		} else {
+	//			(*samples)[i][0] = 0
+	//			(*samples)[i][1] = 0
+	//		}
 
-			tickInCycle := c.SampleTick * 2 * math.Pi
-			if math.Sin(tickInCycle) <= c.duty {
-				(*samples)[i][0] = 1 * c.Volume
-				(*samples)[i][1] = 1 * c.Volume
-			} else {
-				(*samples)[i][0] = 0
-				(*samples)[i][1] = 0
-			}
+	//	},
+	//}
+	//a.Channel2 = Channel{
+	//	Enabled: false,
+	//	Apu:     a,
+	//	WavShaper: func(i int, samples *[][2]float64, c Channel) {
 
-		},
-	}
-	a.Channel3 = Channel{
-		Enabled: false,
-		Apu:     a,
-		WavShaper: func(i int, samples *[][2]float64, c Channel) {
-            id := math.Floor(math.Mod(c.SampleTick, 1.0) * 32)
-            v := c.Apu.WavRam[int(id)] * c.Volume
+	//		tickInCycle := c.SampleTick * 2 * math.Pi
+	//		if math.Sin(tickInCycle) <= c.duty {
+	//			(*samples)[i][0] = 1 * c.Volume
+	//			(*samples)[i][1] = 1 * c.Volume
+	//		} else {
+	//			(*samples)[i][0] = 0
+	//			(*samples)[i][1] = 0
+	//		}
 
-			(*samples)[i][0] = v
-			(*samples)[i][1] = v
-		},
-	}
-	a.Channel4 = Channel{
-		Enabled: false,
-		Apu:     a,
-		WavShaper: func(i int, samples *[][2]float64, c Channel) {
+	//	},
+	//}
+	//a.Channel3 = Channel{
+	//	Enabled: false,
+	//	Apu:     a,
+	//	WavShaper: func(i int, samples *[][2]float64, c Channel) {
+    //        id := math.Floor(math.Mod(c.SampleTick, 1.0) * 32)
+    //        v := c.Apu.WavRam[int(id)] * c.Volume
 
-            tickDiff := c.SampleTick - c.SamplePrev
+	//		(*samples)[i][0] = v
+	//		(*samples)[i][1] = v
+	//	},
+	//}
+	//a.Channel4 = Channel{
+	//	Enabled: false,
+	//	Apu:     a,
+	//	WavShaper: func(i int, samples *[][2]float64, c Channel) {
 
-            if tickDiff > 1 || tickDiff < -1 {
-                sample := rand.Float64()*2 - 1
-				(*samples)[i][0] = sample * c.Volume
-				(*samples)[i][1] = sample * c.Volume
+    //        tickDiff := c.SampleTick - c.SamplePrev
 
-                c.Sample = sample
-                c.SamplePrev = c.SampleTick
-                return
-            }
-                
-			(*samples)[i][0] = c.Sample * c.Volume
-			(*samples)[i][1] = c.Sample * c.Volume
+    //        if tickDiff > 1 || tickDiff < -1 {
+    //            sample := rand.Float64()*2 - 1
+	//			(*samples)[i][0] = sample * c.Volume
+	//			(*samples)[i][1] = sample * c.Volume
 
-		},
-	}
+    //            c.Sample = sample
+    //            c.SamplePrev = c.SampleTick
+    //            return
+    //        }
+    //            
+	//		(*samples)[i][0] = c.Sample * c.Volume
+	//		(*samples)[i][1] = c.Sample * c.Volume
 
-    mixer.Add(&a.Channel1, &a.Channel2, &a.Channel3, &a.Channel4)
+	//	},
+	//}
 
-	amplifier := &effects.Volume{
-		Streamer: mixer,
-		Base:     2,
-		//Volume:   -10,
-		Volume:   -8,
-	}
+    //mixer.Add(&a.Channel1, &a.Channel2, &a.Channel3, &a.Channel4)
 
-	speaker.Play(amplifier)
+	//amplifier := &effects.Volume{
+	//	Streamer: mixer,
+	//	Base:     2,
+	//	//Volume:   -10,
+	//	Volume:   -8,
+	//}
+
+	//speaker.Play(amplifier)
 }
 
 func (a *APU) Close() {

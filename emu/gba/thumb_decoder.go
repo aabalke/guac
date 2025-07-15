@@ -6,6 +6,11 @@ func (cpu *Cpu) DecodeTHUMB(opcode uint16) int {
 
     r := &cpu.Reg.R
 
+    //if cached := cpu.Gba.Cache.runCache(cpu.Gba, r[PC], uint32(opcode)); cached {
+    //    return 2
+    //}
+
+
 	switch {
     case isthumbSWI(opcode):
         cpu.Gba.Mem.BIOS_MODE = BIOS_SWI

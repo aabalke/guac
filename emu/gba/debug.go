@@ -186,86 +186,86 @@ func (d *Debugger) dump(s, e uint32) {
     w.Flush()
 }
 
-func (gba *GBA) debugGraphics() {
+//func (gba *GBA) debugGraphics() {
+//
+//    const (
+//        DEBUG_WIDTH = 1080
+//        DEBUG_HEIGHT = 1080
+//        palette256 = true
+//        baseAddr = 0x600_0000
+//        count = 0x08
+//    )
+//
+//    tileSize := 0x20
+//    if palette256 {
+//        tileSize = 0x40
+//    }
+//
+//	// base addr usually inc of 0x4000 over 0x0600_0000
+//	// count is # of tiles to view
+//
+//	for offset := range count {
+//		tileOffset := offset * tileSize
+//		tileAddr := baseAddr + tileOffset
+//		debugTile(gba, uint(tileAddr), tileSize, offset, 0, false, palette256)
+//	}
+//
+//}
 
-    const (
-        DEBUG_WIDTH = 1080
-        DEBUG_HEIGHT = 1080
-        palette256 = true
-        baseAddr = 0x600_0000
-        count = 0x08
-    )
-
-    tileSize := 0x20
-    if palette256 {
-        tileSize = 0x40
-    }
-
-	// base addr usually inc of 0x4000 over 0x0600_0000
-	// count is # of tiles to view
-
-	for offset := range count {
-		tileOffset := offset * tileSize
-		tileAddr := baseAddr + tileOffset
-		debugTile(gba, uint(tileAddr), tileSize, offset, 0, false, palette256)
-	}
-
-}
-
-func debugTile(gba *GBA, tileAddr uint, tileSize, xOffset, yOffset int, obj, palette256 bool) {
-    const (
-        DEBUG_WIDTH = 120
-        DEBUG_HEIGHT = 600
-    )
-
-	xOffset *= tileSize
-	yOffset *= tileSize
-
-	indexOffset := xOffset + (yOffset * DEBUG_WIDTH)
-
-	mem := gba.Mem
-	index := 0
-	byteOffset := 0
-
-	for y := range 8 {
-
-		iY := DEBUG_WIDTH * y
-
-		for x := range 8 {
-
-			tileData := mem.Read16(uint32(tileAddr) + uint32(byteOffset))
-
-            //fmt.Printf("%08X %08X\n", tileAddr, mem.VRAM[0x20])
-
-            var palIdx uint32
-            if !palette256 {
-                bitDepth := 4
-                palIdx = (tileData >> uint32(bitDepth)) & 0b1111
-                if x%2 == 0 {
-                    palIdx = tileData & 0b1111
-                }
-            } else {
-                palIdx = tileData & 0b1111_1111
-            }
-
-
-			palData := gba.getPalette(uint32(palIdx), 0, obj)
-			index = (iY + x + indexOffset) * 4
-
-			gba.applyDebugColor(palData, uint32(index))
-
-            if !palette256 {
-
-                if x%2 == 1 {
-                    byteOffset += 1
-                }
-
-            } else {
-                byteOffset += 1
-            }
-		}
-	}
-}
+//func debugTile(gba *GBA, tileAddr uint, tileSize, xOffset, yOffset int, obj, palette256 bool) {
+//    const (
+//        DEBUG_WIDTH = 120
+//        DEBUG_HEIGHT = 600
+//    )
+//
+//	xOffset *= tileSize
+//	yOffset *= tileSize
+//
+//	indexOffset := xOffset + (yOffset * DEBUG_WIDTH)
+//
+//	mem := gba.Mem
+//	index := 0
+//	byteOffset := 0
+//
+//	for y := range 8 {
+//
+//		iY := DEBUG_WIDTH * y
+//
+//		for x := range 8 {
+//
+//			tileData := mem.Read16(uint32(tileAddr) + uint32(byteOffset))
+//
+//            //fmt.Printf("%08X %08X\n", tileAddr, mem.VRAM[0x20])
+//
+//            var palIdx uint32
+//            if !palette256 {
+//                bitDepth := 4
+//                palIdx = (tileData >> uint32(bitDepth)) & 0b1111
+//                if x%2 == 0 {
+//                    palIdx = tileData & 0b1111
+//                }
+//            } else {
+//                palIdx = tileData & 0b1111_1111
+//            }
+//
+//
+//			palData := gba.getPalette(uint32(palIdx), 0, obj)
+//			index = (iY + x + indexOffset) * 4
+//
+//			gba.applyDebugColor(palData, uint32(index))
+//
+//            if !palette256 {
+//
+//                if x%2 == 1 {
+//                    byteOffset += 1
+//                }
+//
+//            } else {
+//                byteOffset += 1
+//            }
+//		}
+//	}
+//}
 
 func (d *Debugger) debugIRQ() {
 
@@ -365,3 +365,43 @@ func (l *Logger) WriteLog() {
     }
 }
 
+var cpuDurations [100]int64
+
+var aveAverages []int64
+
+//st := time.Now()
+//durations[count % 10] = time.Since(st).Milliseconds()
+
+func getProfilerTimes(frame int) bool {
+    if frame % 100 == 0 {
+        //fmt.Printf("\rCPU %02dms GFX %02dms SND %02dms", average(cpuDurations), average(gfxDurations), average(sndDurations))
+
+        i := average(cpuDurations)
+
+        aveAverages = append(aveAverages, i)
+        fmt.Printf("\rCPU %02dms", i)
+    }
+
+    if frame == 1000 {
+        fmt.Printf("\rCPU %02dms", averageBetter(aveAverages))
+        //os.Exit(0)
+    }
+
+    return false
+}
+
+func average(xs[100]int64)int64 {
+	total := int64(0)
+	for _,v:=range xs {
+		total +=v
+	}
+	return total/int64(len(xs))
+}
+
+func averageBetter(xs[]int64)int64 {
+	total := int64(0)
+	for _, v :=range xs {
+		total +=v
+	}
+	return total/int64(len(xs))
+}

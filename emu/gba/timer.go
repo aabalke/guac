@@ -14,6 +14,11 @@ type Timer struct {
     SavedInitialValue uint32
     SavedCycles uint32
     Elapsed uint32
+
+    Enabled bool
+    OverflowIRQ bool
+    Cascade bool
+    Freq uint32
 }
 
 func (tt *Timers) Update(cycles uint32) {
@@ -21,30 +26,28 @@ func (tt *Timers) Update(cycles uint32) {
     overflow := false
 
     for i := range 4 {
-        t := tt[i]
+        t := &tt[i]
 
         overflow = t.Update(overflow, cycles)
-
-        tt[i] = t
     }
 }
 
 func (t *Timer) Update(overflow bool, cycles uint32) bool {
 
-    if !t.isEnabled() {
+    if !t.Enabled {
         return false
     }
 
     increment := uint32(0)
-    if t.isCascade() && overflow {
+    if t.Cascade && overflow {
         increment = 1
     }
 
-    if !t.isCascade() {
+    if !t.Cascade {
 
         t.Elapsed += cycles
 
-        if freq := t.getCycles(); t.Elapsed >= freq {
+        if freq := t.Freq; t.Elapsed >= freq {
             increment = t.Elapsed / freq
             t.Elapsed %= freq
         }
@@ -88,7 +91,7 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
         }
     }
 
-    if t.isOverflowIRQ() {
+    if t.OverflowIRQ {
         t.Gba.Irq.setIRQ(3 + uint32(t.Idx))
     }
 
@@ -110,6 +113,11 @@ func (t *Timer) WriteCnt(v uint8, hi bool) {
 
     oldValue := t.CNT & 0xC7
     t.CNT = uint32(v) & 0xC7
+	t.Cascade = utils.BitEnabled(t.CNT, 2)
+	t.OverflowIRQ = utils.BitEnabled(t.CNT, 6)
+	t.Enabled = utils.BitEnabled(t.CNT, 7)
+    t.Freq = t.getCycles()
+
 
     if setEnabled := utils.BitEnabled(uint32(v), 7) && !utils.BitEnabled(oldValue, 7); setEnabled {
     //if setEnabled := utils.BitEnabled(uint32(v), 7); setEnabled {
@@ -148,16 +156,4 @@ func (t *Timer) getCycles() uint32 {
 	}
 
     return 1
-}
-
-func (t *Timer) isCascade() bool {
-	return utils.BitEnabled(t.CNT, 2)
-}
-
-func (t *Timer) isOverflowIRQ() bool {
-    return utils.BitEnabled(t.CNT, 6)
-}
-
-func (t *Timer) isEnabled() bool {
-    return utils.BitEnabled(t.CNT, 7)
 }

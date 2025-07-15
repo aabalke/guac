@@ -22,9 +22,9 @@ type ToneChannel struct {
 
 func (ch *ToneChannel) GetSample() int8 {
 
-    //if disabled := !ApuInstance.isSoundChanEnable(uint8(ch.Idx)); disabled {
-    //    return 0
-    //}
+    if !ApuInstance.isSoundChanEnable(uint8(ch.Idx)) {
+        return 0
+    }
 
 	//toneAddr := uint32(ch.CntH)
 	freqHz := ch.CntX & 0b0111_1111_1111

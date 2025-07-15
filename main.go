@@ -2,9 +2,10 @@ package main
 
 import (
 	"flag"
-	"time"
-    "fmt"
+	//"time"
+    //"fmt"
 	"github.com/aabalke33/guac/sdl"
+
 )
 
 const (
@@ -19,7 +20,7 @@ func main() {
 	useSaveState := flag.Bool("s", false, "save state")
 	flag.Parse()
 
-	start := time.Now().UnixMilli()
+	//start := time.Now().UnixMilli()
 
     s := sdl.SDLStruct{}
     s.Init(*debug)
@@ -27,6 +28,6 @@ func main() {
 
     s.Update(*debug, *romPath, *useSaveState)
 
-	end := time.Now().UnixMilli()
-	fmt.Printf("\n\nRuntime: %d ms\n\n", end-start)
+	//end := time.Now().UnixMilli()
+	//fmt.Printf("\n\nRuntime: %d ms\n\n", end-start)
 }

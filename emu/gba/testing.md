@@ -31,14 +31,14 @@ https://emulation.gametechwiki.com/index.php/GBA_Tests
 
 ### Arm Wrestler
 
-https://github.com/destoer/armwrestler-gba-fixed/
+[Link](https://github.com/destoer/armwrestler-gba-fixed/)
 
-Preface: The Standard version of Arm Wrestler floating around is for NDS emulation.
-Accurate GBA emulators will fail on LDM--! instructions, since ARMv4 behavior differs.
+The standard version of arm wrestler is not for gba emulation.
+Accurate GBA Emulators will fail on Ldm--! instructions, because of differences
+in ARMv4 behavior.
+
 (LDM opcodes with writeback: if the base register is included in the register list, writeback never happens)
 Additionally, other ARMv5 instructions will fail.
-
-This emulator is tested against the destoer/armwrestler-gba-fixed version, which has fixed these problems.
 
 👍 ARM ALU
 👍 ARM LDR/STR
@@ -199,6 +199,7 @@ Mother 3
     - No known errors
 Pokémon Mystery Dungeon Red Rescue Team
     - Graphics Windows
+    - Wave Sound Channel does not envelope / length correctly
 Pokémon Firered / LeafGreen
     - No known errors
 Pokémon Emerald

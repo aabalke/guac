@@ -55,7 +55,6 @@ type GBA struct {
 	Muted  bool 
     Halted bool
     ExitHalt bool
-    Objects *[128]Object
     Cycles int
     Scanline int
     Timers Timers
@@ -70,22 +69,27 @@ type GBA struct {
     AccCycles uint32
     Keypad Keypad
 
+    PPU *PPU
+
+
+    Cache Cache
 }
 
 func (gba *GBA) SoftReset() {
     gba.exception(VEC_SWI, MODE_SWI)
 }
 
-func (gba *GBA) Update(exit *bool, instCount int) int {
+func (gba *GBA) Update(exit *bool, frame int) {
 
     r := &gba.Cpu.Reg.R
 
     gba.AccCycles = 0
 
     if gba.Paused {
-        return 0
+        return
     }
 
+    st := time.Now()
     DRAWN = false
     for {
 
@@ -117,10 +121,13 @@ func (gba *GBA) Update(exit *bool, instCount int) int {
         }
     }
 
+    cpuDurations[frame % 100] = time.Since(st).Milliseconds()
+    getProfilerTimes(frame)
+
     apu.ApuInstance.SoundBufferWrap()
     apu.ApuInstance.Play()
 
-    return instCount
+    return
 }
 
 func (gba *GBA) Tick(cycles uint32) {
@@ -142,17 +149,16 @@ func NewGBA() *GBA {
 	pixels := make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)
 	debugPixels := make([]byte, 1080*1080*4)
 
-    objs := &[128]Object{}
-
 	gba := GBA{
         Pixels: &pixels,
         DebugPixels: &debugPixels,
-        Objects: objs,
+
         Keypad: Keypad{
             KEYINPUT: 0x3FF,
         },
     }
 
+    gba.PPU = &PPU{ gba: &gba }
     gba.Irq = &Irq{ Gba: &gba }
 
     gba.Debugger = &Debugger{Gba: &gba, Version: 1}
@@ -186,6 +192,8 @@ func NewGBA() *GBA {
 
     apu.InitApuInstance()
     apu.InitAudio()
+
+    aveAverages = make([]int64, 0)
 
     gba.SoftReset()
 

@@ -96,9 +96,12 @@ func (a *Apu) Play() {
 
 	a.soundMix()
 
+
 	if a.Player == nil {
         return
 	}
+
+    //return
 
     go a.Player.Write(a.Stream)
 }
@@ -175,39 +178,49 @@ var (
 	rshLut = [4]int32{0xa, 0x9, 0x8, 0x7}
 )
 
-func (a *Apu) SoundClock(cycles uint32) {
+func (a *Apu) fifoFx(ch uint8, sample int16) (int16, int16) {
 
-	sndCycles += cycles
+    if sample == 0 {
+        return 0, 0
+    }
+
+    if ch != 0 && ch != 1 {
+        panic("INVALID FIFO CHANNEL")
+    }
+
+	if half := !utils.BitEnabled(uint32(a.SoundCntH), 2 + ch); half {
+		sample /= 2
+	}
+
+    sample = clip(int32(sample))
 
 	sampleLeft := int16(0)
 	sampleRight := int16(0)
 
+	if leftEnabled := utils.BitEnabled(uint32(a.SoundCntH), 9 + (ch * 4)); leftEnabled {
+		sampleLeft = sample
+	}
+
+	if rightEnabled := utils.BitEnabled(uint32(a.SoundCntH), 8 + (ch * 4)); rightEnabled {
+		sampleRight = sample
+    }
+
+    return sampleLeft, sampleRight
+
+}
+
+func (a *Apu) SoundClock(cycles uint32) {
+
+	sndCycles += cycles
+
 	sampleA := int16(a.FifoA.Sample) << 1
 	sampleB := int16(a.FifoB.Sample) << 1
 
-	if halfA := !utils.BitEnabled(uint32(a.SoundCntH), 2); halfA {
-		sampleA /= 2
-	}
+    sampleLeftA, sampleRightA := a.fifoFx(0, sampleA)
+    sampleLeftB, sampleRightB := a.fifoFx(1, sampleB)
 
-	if halfB := !utils.BitEnabled(uint32(a.SoundCntH), 3); halfB {
-		sampleB /= 2
-	}
-
-	if leftEnabledA := utils.BitEnabled(uint32(a.SoundCntH), 9); leftEnabledA {
-		sampleLeft = clip(int32(sampleA))
-	}
-
-	if leftEnabledB := utils.BitEnabled(uint32(a.SoundCntH), 13); leftEnabledB {
-		sampleLeft = clip(int32(sampleLeft) + int32(sampleB))
-	}
-
-	if rightEnabledA := utils.BitEnabled(uint32(a.SoundCntH), 8); rightEnabledA {
-		sampleRight = clip(int32(sampleA))
-	}
-
-	if rightEnabledB := utils.BitEnabled(uint32(a.SoundCntH), 12); rightEnabledB {
-		sampleRight = clip(int32(sampleRight) + int32(sampleB))
-	}
+    sampleLeft := clip(int32(sampleLeftA) + int32(sampleLeftB))
+    sampleRight := clip(int32(sampleRightA) + int32(sampleRightB))
 
 	for sndCycles >= SAMP_CYCLES {
 

@@ -26,45 +26,45 @@ const (
 )
 
 type Alu struct {
-    Opcode, Rd, Rn, Rm, RnValue, Cond, Op2, Inst uint32
+    Opcode, Rd, Rn, Rm, RnValue, Op2, Inst uint32
     Immediate, Set bool
     LogicalFlags, Test bool
     Carry bool
 }
 
+var aluData Alu
+
 func NewAluData(opcode uint32, cpu *Cpu) *Alu {
 
-    alu := &Alu{
-        Opcode: opcode,
-        Cond: utils.GetByte(opcode, 28),
-        Inst: utils.GetByte(opcode, 21),
-        Immediate: utils.BitEnabled(opcode, 25),
-        Set: utils.BitEnabled(opcode, 20),
-        Rd: utils.GetByte(opcode, 12),
-        Rn: utils.GetByte(opcode, 16),
-        Rm: utils.GetByte(opcode, 0),
-    }
+    aluData.Opcode = opcode
+    aluData.Inst = utils.GetByte(opcode, 21)
+    aluData.Immediate = utils.BitEnabled(opcode, 25)
+    aluData.Set = utils.BitEnabled(opcode, 20)
+    aluData.Rd = utils.GetByte(opcode, 12)
+    aluData.Rn = utils.GetByte(opcode, 16)
+    aluData.Rm = utils.GetByte(opcode, 0)
+    aluData.LogicalFlags = false
+    aluData.Test = false
+    
+    aluData.Op2, aluData.Carry = cpu.GetOp2(opcode)
 
-    alu.Op2, alu.Carry = cpu.GetOp2(opcode)
-
-    if alu.Rn != PC {
-        alu.RnValue = cpu.Reg.R[alu.Rn]
-        return alu
+    if aluData.Rn != PC {
+        aluData.RnValue = cpu.Reg.R[aluData.Rn]
+        return &aluData
     }
     
-    shiftImmediate := alu.Immediate || !utils.BitEnabled(opcode, 4)
+    shiftImmediate := aluData.Immediate || !utils.BitEnabled(opcode, 4)
     if shiftImmediate {
-        alu.RnValue = cpu.Reg.R[PC] + 8
-        return alu
+        aluData.RnValue = cpu.Reg.R[PC] + 8
+        return &aluData
     }
 
-    alu.RnValue = cpu.Reg.R[PC] + 12
+    aluData.RnValue = cpu.Reg.R[PC] + 12
 
-    return alu
+    return &aluData
 }
 
 func (cpu *Cpu) Alu(opcode uint32) {
-
 
     alu := NewAluData(opcode, cpu)
 
@@ -227,66 +227,51 @@ func (cpu *Cpu) test(alu *Alu) {
     }
 }
 
-func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) bool {
+func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
 
     if irqExit := alu.Rd == PC && alu.Rn == LR && alu.Set && alu.Inst == SUB; irqExit {
         cpu.Gba.ExitException(MODE_IRQ)
-        return false
+        return
     }
 
     if swiExit := alu.Rd == PC && alu.Rm == LR && alu.Inst == MOV && alu.Set; swiExit {
         cpu.Gba.ExitException(MODE_SWI)
-        return false
+        return
     }
 
-    switch {
+    if !alu.Set {
+        return
+    }
 
-    case alu.Rd == PC && alu.Set && !alu.Test:
-        if alu.Inst == CMN || alu.Inst == CMP {
-            return true
-        }
-
-        //cpu.Reg.restoreMode()
-        return true
-        // pipeline
-
-    case alu.Rd == PC && !alu.Test:
-        // pipelining
-        return true
-    case alu.Set:
-
-        if alu.LogicalFlags {
-            cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-            cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
-            return true
-        }
-
-        var v, c bool
-        rnSign := uint8(alu.RnValue >> 31) & 1
-        opSign := uint8(alu.Op2 >> 31) & 1
-        rSign  := uint8(res >> 31) & 1
-
-        switch alu.Inst {
-        case ADD, ADC, CMN:
-            v = (rnSign == opSign) && (rSign != rnSign)
-            c = res >= 0x1_0000_0000
-        case SUB, SBC, CMP:
-            v = (rnSign != opSign) && (rSign != rnSign)
-            c = res < 0x1_0000_0000
-
-        case RSB, RSC:
-            v = (rnSign != opSign) && (rSign != opSign)
-            c = res < 0x1_0000_0000
-        }
-
-        cpu.Reg.CPSR.SetFlag(FLAG_V, v)
-        cpu.Reg.CPSR.SetFlag(FLAG_C, c)
+    if alu.LogicalFlags {
         cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
         cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
-        return true
+        return
     }
 
-    return true
+    var v, c bool
+    rnSign := uint8(alu.RnValue >> 31) & 1
+    opSign := uint8(alu.Op2 >> 31) & 1
+    rSign  := uint8(res >> 31) & 1
+
+    switch alu.Inst {
+    case ADD, ADC, CMN:
+        v = (rnSign == opSign) && (rSign != rnSign)
+        c = res >= 0x1_0000_0000
+    case SUB, SBC, CMP:
+        v = (rnSign != opSign) && (rSign != rnSign)
+        c = res < 0x1_0000_0000
+
+    case RSB, RSC:
+        v = (rnSign != opSign) && (rSign != opSign)
+        c = res < 0x1_0000_0000
+    }
+
+    cpu.Reg.CPSR.SetFlag(FLAG_V, v)
+    cpu.Reg.CPSR.SetFlag(FLAG_C, c)
+    cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
+    cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+    return
 }
 
 
