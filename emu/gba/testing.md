@@ -167,7 +167,7 @@ Additionally, other ARMv5 instructions will fail.
 All games require Digital Sound
 
 Advance Wars
-    - No known errors (maybe menu)
+    - Menu Missing
 Fire Emblem
     - No known errors
 Fire Emblem Sacred Stones
@@ -207,7 +207,7 @@ Pokémon Emerald
 Pokémon Ruby / Sapphire
     - No known errors
 Sonic Advance
-    - No known errors
+    - Affine Disappearance
 Spyro Season of Ice
     - No known errors
 Superstar Saga

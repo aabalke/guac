@@ -1,19 +1,19 @@
 package sdl
 
 import (
-	"fmt"
 	"time"
 
 	gameboy "github.com/aabalke33/guac/emu/gb"
 	"github.com/aabalke33/guac/emu/gba"
+	"github.com/aabalke33/guac/oto"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
 
-	//"github.com/gopxl/beep"
-	//"github.com/gopxl/beep/speaker"
+	"os"
+	"runtime/pprof"
 
-    "os"
-    "runtime/pprof"
+	"github.com/gopxl/beep"
+	"github.com/gopxl/beep/speaker"
 )
 
 const (
@@ -30,8 +30,11 @@ var (
 	C_Transparent   = sdl.Color{R: 0, G: 0, B: 0, A: 0}
 	C_Transparent50 = sdl.Color{R: 0, G: 0, B: 0, A: 127}
 
-	Gb *gameboy.GameBoy
-	Gba *gba.GBA
+	gbConsole *gameboy.GameBoy
+	gbaConsole *gba.GBA
+
+    isGBA bool
+    isGB bool
 )
 
 type SDLStruct struct {
@@ -42,7 +45,11 @@ type SDLStruct struct {
 	DebugRenderer *sdl.Renderer
 }
 
-func (s *SDLStruct) Init(debugger bool) {
+func (s *SDLStruct) Init() {
+
+    oto.InitOto()
+    InitSound()
+
 	err := sdl.Init(sdl.INIT_EVERYTHING)
 	err = ttf.Init()
 
@@ -74,30 +81,6 @@ func (s *SDLStruct) Init(debugger bool) {
 	s.Window = window
 	s.Renderer = renderer
 
-    if debugger {
-
-        debugWindow, err := sdl.CreateWindow(
-            fmt.Sprintf("%s Debug\n", s.name),
-            0,
-            0,
-            1080,
-            1080,
-            sdl.WINDOW_SHOWN|sdl.WINDOW_RESIZABLE)
-
-        if err != nil {
-            panic(err)
-        }
-
-        debugRenderer, err := sdl.CreateRenderer(debugWindow, -1, sdl.RENDERER_ACCELERATED|sdl.RENDERER_PRESENTVSYNC)
-        if err != nil {
-            panic(err)
-        }
-
-        debugRenderer.SetDrawBlendMode(sdl.BLENDMODE_BLEND)
-
-        s.DebugWindow = debugWindow
-        s.DebugRenderer = debugRenderer
-    }
 }
 
 func (s *SDLStruct) initController() {
@@ -120,51 +103,23 @@ func (s *SDLStruct) initController() {
 	//println("Controller Attached")
 }
 
-func (s *SDLStruct) Close(debug bool) {
+func (s *SDLStruct) Close() {
 	sdl.Quit()
 	ttf.Quit()
 	s.Window.Destroy()
 	s.Renderer.Destroy()
-
-    if debug {
-        s.DebugWindow.Destroy()
-        s.DebugRenderer.Destroy()
-    }
 }
 
-
-func (s *SDLStruct) Update(debug bool, romPath string, useSaveState bool) {
-
-    InitSound()
-	//Gb = gameboy.NewGameBoy()
-    Gba = gba.NewGBA()
-	//defer Gb.Logger.Close()
+func (s *SDLStruct) Run(romPath string, profile bool) {
 
 	w, h := s.Window.GetSize()
 	scene := NewScene(s.Renderer, w, h, 10, C_Grey)
 
-    var debugScene *Scene
-    if debug {
-        debugW, debugH := s.DebugWindow.GetSize()
-        debugScene = NewScene(s.DebugRenderer, debugW, debugH, 10, C_Grey)
-    }
-
     if romPath == "" {
-        duration := 3 * time.Second
-        InitLoadingScreen(s.Renderer, scene, duration)
-        InitMainMenu(scene, 0)
+        s.Menu(scene)
     } else {
-        ActivateConsole(scene, debugScene, romPath, debug, useSaveState)
+        ActivateConsole(scene, romPath)
     }
-
-    Gba.Cache.BuildCache(Gba)
-
-	frameTime := time.Second / (FPS)
-	ticker := time.NewTicker(frameTime)
-
-    profile := false
-
-    var f *os.File
 
     if profile {
         f, err := os.Create("cpu.prof")
@@ -173,14 +128,25 @@ func (s *SDLStruct) Update(debug bool, romPath string, useSaveState bool) {
         }
 
         pprof.StartCPUProfile(f)
+
+        var count int
+        for range 1000 {
+            s.Update(scene, count)
+            count++
+        }
+
+        pprof.StopCPUProfile()
+        f.Close()
     }
 
     var count int
 
-	for i := range ticker.C {
-	//for range 1000 {
+	frameTime := time.Second / (FPS)
+	ticker := time.NewTicker(frameTime)
 
-		if !scene.Status.Active || (debug && !debugScene.Status.Active) {
+	for i := range ticker.C {
+
+		if !scene.Status.Active {
 			ticker.Stop()
 			break
 		}
@@ -194,44 +160,56 @@ func (s *SDLStruct) Update(debug bool, romPath string, useSaveState bool) {
             s.initController()
         }
 
-		//count = Gb.Update(&scene.Status.Active, count)
-        Gba.Update(&scene.Status.Active, count)
-
-		s.Renderer.SetDrawColor(0, 0, 0, 255)
-		s.Renderer.Clear()
-        if debug {
-            s.DebugRenderer.SetDrawColor(0, 0, 0, 255)
-            s.DebugRenderer.Clear()
-        }
-
-		scene.Update(nil)
-		scene.View()
-		s.Renderer.Present()
-
-        if debug {
-            debugScene.Update(nil)
-            debugScene.View()
-            s.DebugRenderer.Present()
-        }
+        s.Update(scene, count)
 
         count++
 	}
+}
 
-    if profile {
-        pprof.StopCPUProfile()
-        f.Close()
+func (s *SDLStruct) Menu(scene *Scene) {
+
+	frameTime := time.Second / (FPS)
+	ticker := time.NewTicker(frameTime)
+    duration := 3 * time.Second
+    InitLoadingScreen(s.Renderer, scene, duration)
+    InitMainMenu(scene, 0)
+
+    for range ticker.C {
+        s.Renderer.SetDrawColor(0, 0, 0, 255)
+        s.Renderer.Clear()
+        scene.Update(nil)
+        scene.View()
+        s.Renderer.Present()
+
+        if isGB || isGBA {
+            return
+        }
     }
 }
 
+func (s *SDLStruct) Update(scene *Scene, count int) {
+
+    if isGBA {
+        gbaConsole.Update(&scene.Status.Active, count)
+    }
+
+    if isGB {
+        gbConsole.Update(&scene.Status.Active, count)
+    }
+
+    s.Renderer.SetDrawColor(0, 0, 0, 255)
+    s.Renderer.Clear()
+    scene.Update(nil)
+    scene.View()
+    s.Renderer.Present()
+}
+
 func InitSound() {
+	sampleRate := beep.SampleRate(44100)
+	bufferSize := sampleRate.N(time.Second / 30)
+	err := speaker.Init(sampleRate, bufferSize)
+	if err != nil {
+        panic(err)
+	}
 
-    // DO NOT USE BEEP IT IS HOG
-
-
-	//sampleRate := beep.SampleRate(44100)
-	//bufferSize := sampleRate.N(time.Second / 30)
-	//err := speaker.Init(sampleRate, bufferSize)
-	//if err != nil {
-    //    panic(err)
-	//}
 }

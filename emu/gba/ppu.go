@@ -97,10 +97,10 @@ func (p *PPU) UpdatePPU(addr uint32, v uint32) {
         return
     }
 
-    if bgs := addr >= 0x08 && addr < 0x40; bgs {
-        p.UpdateBackgrounds(addr, v)
-        return
-    }
+    //if bgs := addr >= 0x08 && addr < 0x40; bgs {
+    //    p.UpdateBackgrounds(addr, v)
+    //    return
+    //}
 
     switch addr {
     case 0x0:
@@ -110,8 +110,6 @@ func (p *PPU) UpdatePPU(addr uint32, v uint32) {
         p.Dispcnt.HBlankIntervalFree = utils.BitEnabled(v, 5)
         p.Dispcnt.OneDimensional = utils.BitEnabled(v, 6)
         p.Dispcnt.ForcedBlank = utils.BitEnabled(v, 7)
-
-        updateBgs(p.gba)
 
     case 0x1:
         p.Dispcnt.DisplayBg0 = utils.BitEnabled(v, 0)
@@ -123,17 +121,16 @@ func (p *PPU) UpdatePPU(addr uint32, v uint32) {
         p.Dispcnt.DisplayWin1 = utils.BitEnabled(v, 6)
         p.Dispcnt.DisplayObjWin = utils.BitEnabled(v,7)
 
-        p.Backgrounds[0].Enabled = p.Dispcnt.DisplayBg0
-        p.Backgrounds[1].Enabled = p.Dispcnt.DisplayBg1
-        p.Backgrounds[2].Enabled = p.Dispcnt.DisplayBg2
-        p.Backgrounds[3].Enabled = p.Dispcnt.DisplayBg3
+        //p.Backgrounds[0].Enabled = p.Dispcnt.DisplayBg0
+        //p.Backgrounds[1].Enabled = p.Dispcnt.DisplayBg1
+        //p.Backgrounds[2].Enabled = p.Dispcnt.DisplayBg2
+        //p.Backgrounds[3].Enabled = p.Dispcnt.DisplayBg3
 
         wins := &p.Windows
         wins.Win0.Enabled = p.Dispcnt.DisplayWin0
         wins.Win1.Enabled = p.Dispcnt.DisplayWin1
         wins.WinObj.Enabled = p.Dispcnt.DisplayObjWin && p.Dispcnt.DisplayObj
         wins.Enabled = wins.Win0.Enabled || wins.Win1.Enabled || wins.WinObj.Enabled
-        updateBgs(p.gba)
 
     case 0x50:
         p.Blend.a[0] = utils.BitEnabled(v, 0)
@@ -272,7 +269,7 @@ func (p *PPU) UpdateAffine(relAddr uint32) {
             continue
         }
 
-        UpdateAffineParams(obj, p.gba.Mem)
+        UpdateAffineParams(obj, &p.gba.Mem)
     }
 }
 
@@ -280,7 +277,7 @@ func (p *PPU) UpdateOAM(relAddr uint32) {
 
     attrIdx := relAddr % 8
 
-    m := p.gba.Mem
+    m := &p.gba.Mem
 
     if affineParam := attrIdx == 6 || attrIdx == 7; affineParam {
         p.UpdateAffine(relAddr)
@@ -324,10 +321,9 @@ func (p *PPU) UpdateOAM(relAddr uint32) {
         if obj.RotScale {
             obj.RotParams = utils.GetVarData(attr, 1, 5)
             UpdateAffineParams(obj, m)
-        } else {
-            obj.HFlip = utils.BitEnabled(attr, 4)
-            obj.VFlip = utils.BitEnabled(attr, 5)
         }
+        obj.HFlip = utils.BitEnabled(attr, 4)
+        obj.VFlip = utils.BitEnabled(attr, 5)
     case 4:
         obj.CharName &^= 0xFF
         obj.CharName |= attr
@@ -349,6 +345,7 @@ func UpdateAffineParams(obj *Object, m *Memory) {
 
 func (p *PPU) UpdateBackgrounds(addr, v uint32) {
 
+    return
 
     switch addr {
     case 0x08:
@@ -356,48 +353,40 @@ func (p *PPU) UpdateBackgrounds(addr, v uint32) {
         p.Backgrounds[0].CharBaseBlock = utils.GetVarData(v, 2, 3)
         p.Backgrounds[0].Mosaic = utils.BitEnabled(v, 6)
         p.Backgrounds[0].Palette256 = utils.BitEnabled(v, 7)
-        updateBgs(p.gba)
     case 0x09:
         p.Backgrounds[0].ScreenBaseBlock = utils.GetVarData(v, 0, 4)
         p.Backgrounds[0].AffineWrap = utils.BitEnabled(v, 5)
         p.Backgrounds[0].Size = utils.GetVarData(v, 6, 7)
-        updateBgs(p.gba)
 
     case 0x0A:
         p.Backgrounds[1].Priority = utils.GetVarData(v, 0, 1)
         p.Backgrounds[1].CharBaseBlock = utils.GetVarData(v, 2, 3)
         p.Backgrounds[1].Mosaic = utils.BitEnabled(v, 6)
         p.Backgrounds[1].Palette256 = utils.BitEnabled(v, 7)
-        updateBgs(p.gba)
     case 0x0B:
         p.Backgrounds[1].ScreenBaseBlock = utils.GetVarData(v, 0, 4)
         p.Backgrounds[1].AffineWrap = utils.BitEnabled(v, 5)
         p.Backgrounds[1].Size = utils.GetVarData(v, 6, 7)
-        updateBgs(p.gba)
 
     case 0x0C:
         p.Backgrounds[2].Priority = utils.GetVarData(v, 0, 1)
         p.Backgrounds[2].CharBaseBlock = utils.GetVarData(v, 2, 3)
         p.Backgrounds[2].Mosaic = utils.BitEnabled(v, 6)
         p.Backgrounds[2].Palette256 = utils.BitEnabled(v, 7)
-        updateBgs(p.gba)
     case 0x0D:
         p.Backgrounds[2].ScreenBaseBlock = utils.GetVarData(v, 0, 4)
         p.Backgrounds[2].AffineWrap = utils.BitEnabled(v, 5)
         p.Backgrounds[2].Size = utils.GetVarData(v, 6, 7)
-        updateBgs(p.gba)
 
     case 0x0E:
         p.Backgrounds[3].Priority = utils.GetVarData(v, 0, 1)
         p.Backgrounds[3].CharBaseBlock = utils.GetVarData(v, 2, 3)
         p.Backgrounds[3].Mosaic = utils.BitEnabled(v, 6)
         p.Backgrounds[3].Palette256 = utils.BitEnabled(v, 7)
-        updateBgs(p.gba)
     case 0x0F:
         p.Backgrounds[3].ScreenBaseBlock = utils.GetVarData(v, 0, 4)
         p.Backgrounds[3].AffineWrap = utils.BitEnabled(v, 5)
         p.Backgrounds[3].Size = utils.GetVarData(v, 6, 7)
-        updateBgs(p.gba)
 
     case 0x10:
         p.Backgrounds[0].XOffset &^= 0xFF
@@ -575,43 +564,5 @@ func (bg *Background) setSize() {
     case 2: bg.W, bg.H = 32, 64
     case 3: bg.W, bg.H = 64, 64
     default: panic("PROHIBITTED BG SIZE")
-    }
-}
-
-func updateBgs(gba *GBA) {
-
-    dispcnt := &gba.PPU.Dispcnt
-
-    bgs := &gba.PPU.Backgrounds
-
-    for i := range 4 {
-        isAffine := (
-            (dispcnt.Mode == 1 && i == 2) ||
-            (dispcnt.Mode == 2 && (i == 2 || i == 3)))
-        isStandard := (
-            (dispcnt.Mode == 0) ||
-            (dispcnt.Mode == 1 && (i == 0 || i == 1 || i == 2)))
-
-        bgs[i].Affine = isAffine
-
-        bgs[i].Invalid = !isAffine && !isStandard
-
-        if bgs[i].Invalid {
-            continue
-        }
-
-        bgs[i].setSize()
-
-        if (dispcnt.Mode == 1 && i == 2) || dispcnt.Mode == 2 {
-            bgs[i].Palette256 = true
-        }
-
-        if bgs[i].Affine {
-            bgs[i].Palette256 = true
-        }
-
-        //if i == 2 {
-        //    fmt.Printf("SET BG 3 AFFINE %t, STD %t 256 %t\n", isAffine, isStandard, bgs[i].Palette256)
-        //}
     }
 }

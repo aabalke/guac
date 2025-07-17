@@ -154,7 +154,7 @@ func (dma *DMA) disable() {
 
 func (dma *DMA) transfer(_ bool) {
 
-    mem := dma.Gba.Mem
+    mem := &dma.Gba.Mem
     count := dma.WordCount
 
     switch {
@@ -171,7 +171,7 @@ func (dma *DMA) transfer(_ bool) {
     if dma.Mode == DMA_MODE_HBL {
         srcInLimited := dma.Src >= 0x600_0000 && dma.Src < 0x800_0000
         dstInLimited := dma.Dst >= 0x600_0000 && dma.Dst < 0x800_0000
-        allowed := utils.BitEnabled(dma.Gba.Mem.ReadIODirect(0, 1), 5)
+        allowed := utils.BitEnabled(uint32(dma.Gba.Mem.IO[0]), 5)
 
         if (srcInLimited || dstInLimited) && !allowed {
             return

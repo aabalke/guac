@@ -55,21 +55,23 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
 
     overflow = false
 
-    for range increment {
-        tmp := t.D + 1
-        if tmp > 0xFFFF {
-            t.D = t.SavedInitialValue
-            overflow = true
-            continue
-        }
-        t.D = tmp
-    }
+    //for range increment {
+    //    tmp := t.D + 1
+    //    if tmp > 0xFFFF {
+    //        t.D = t.SavedInitialValue
+    //        overflow = true
+    //        continue
+    //    }
+    //    t.D = tmp
+    //}
+
+    overflow = incrementTimer(t, increment)
 
     if !overflow {
         return false
     }
 
-    if aTick := int((t.Gba.Mem.ReadIODirect(0x82, 2) >> 10) & 1) == t.Idx; aTick {
+    if aTick := (t.Gba.Mem.IO[0x83] >> 2) & 1 == uint8(t.Idx); aTick{
 
         fifo := apu.ApuInstance.FifoA
 
@@ -80,7 +82,7 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
         }
     }
 
-    if bTick := int((t.Gba.Mem.ReadIODirect(0x82, 2) >> 14) & 1) == t.Idx; bTick {
+    if bTick := (t.Gba.Mem.IO[0x83] >> 6) & 1 == uint8(t.Idx); bTick {
 
         fifo := apu.ApuInstance.FifoB
 
@@ -96,6 +98,29 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
     }
 
     return true
+}
+
+func incrementTimer(t *Timer, increment uint32) bool {
+
+    overflow := false
+
+    if t.D + increment < 0xFFFF {
+        t.D += increment
+        return overflow
+    }
+
+
+    for range increment {
+        tmp := t.D + 1
+        if tmp > 0xFFFF {
+            t.D = t.SavedInitialValue
+            overflow = true
+            continue
+        }
+        t.D = tmp
+    }
+
+    return overflow
 }
 
 func (t *Timer) ReadCnt(hi bool) uint8 {

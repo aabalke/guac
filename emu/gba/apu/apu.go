@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/aabalke33/guac/emu/gba/utils"
-	"github.com/hajimehoshi/oto"
+	aOto "github.com/aabalke33/guac/oto"
 )
 
 // CURRENTLY USING OTO AND SDL
@@ -25,7 +25,8 @@ type Apu struct {
     SoundBuffer [BUFF_SIZE]int16
     ReadPointer, WritePointer uint32
 
-    IO[0x120]uint8
+    //IO[0x120]uint8
+    IO[0x1_0000]uint8
 
     ToneChannel1 *ToneChannel
     ToneChannel2 *ToneChannel
@@ -34,8 +35,6 @@ type Apu struct {
 
     // These Are used by oto version only
 	Stream []byte
-    Context *oto.Context
-    Player *oto.Player
 }
 
 func (a *Apu) isSoundChanEnable(ch uint8) bool {
@@ -63,22 +62,14 @@ func InitApuInstance() {
         Idx: 3,
     }
 
-
-    if OTO_VERSION {
-
-        context, err := oto.NewContext(SND_FREQUENCY, 2, 2, STREAM_LEN * 3)
-        if err != nil {
-            panic(err)
-        }
-
-        player := context.NewPlayer()
-
-        ApuInstance.Context = context
-        ApuInstance.Player = player
+    if aOto.OtoPlayer != nil {
+        aOto.OtoPlayer.Close()
     }
+
+    aOto.OtoPlayer = aOto.OtoContext.NewPlayer()
 }
 
-func (a *Apu) Play() {
+func (a *Apu) Play(muted bool) {
 
     if !OTO_VERSION {
         return
@@ -96,14 +87,23 @@ func (a *Apu) Play() {
 
 	a.soundMix()
 
-
-	if a.Player == nil {
+	if aOto.OtoPlayer == nil {
         return
 	}
 
-    //return
+    if muted {
+        return
+    }
 
-    go a.Player.Write(a.Stream)
+    go aOto.OtoPlayer.Write(a.Stream)
+}
+
+func (a *Apu) Close() {
+
+    if aOto.OtoPlayer != nil {
+        aOto.OtoPlayer.Close()
+        aOto.OtoPlayer = nil
+    }
 }
 
 func (a *Apu) soundMix() {
@@ -192,7 +192,7 @@ func (a *Apu) fifoFx(ch uint8, sample int16) (int16, int16) {
 		sample /= 2
 	}
 
-    sample = clip(int32(sample))
+    //sample = clip(int32(sample))
 
 	sampleLeft := int16(0)
 	sampleRight := int16(0)
@@ -219,8 +219,10 @@ func (a *Apu) SoundClock(cycles uint32) {
     sampleLeftA, sampleRightA := a.fifoFx(0, sampleA)
     sampleLeftB, sampleRightB := a.fifoFx(1, sampleB)
 
-    sampleLeft := clip(int32(sampleLeftA) + int32(sampleLeftB))
-    sampleRight := clip(int32(sampleRightA) + int32(sampleRightB))
+    //sampleLeft := clip(int32(sampleLeftA) + int32(sampleLeftB))
+    //sampleRight := clip(int32(sampleRightA) + int32(sampleRightB))
+    sampleLeft := int32(sampleLeftA) + int32(sampleLeftB)
+    sampleRight := int32(sampleRightA) + int32(sampleRightB)
 
 	for sndCycles >= SAMP_CYCLES {
 
@@ -229,41 +231,41 @@ func (a *Apu) SoundClock(cycles uint32) {
         ch1Sample := int32(a.ToneChannel1.GetSample())
 
         if leftEnabled := utils.BitEnabled(uint32(a.SoundCntL), 12); leftEnabled {
-            psgL = int32(clip(psgL + ch1Sample))
+            psgL = psgL + ch1Sample
         }
 
         if rightEnabled := utils.BitEnabled(uint32(a.SoundCntL), 8); rightEnabled {
-            psgR = int32(clip(psgR + ch1Sample))
+            psgR = psgR + ch1Sample
         }
 
         ch2Sample := int32(a.ToneChannel2.GetSample())
 
         if leftEnabled := utils.BitEnabled(uint32(a.SoundCntL), 13); leftEnabled {
-            psgL = int32(clip(psgL + ch2Sample))
+            psgL = psgL + ch2Sample
         }
 
         if rightEnabled := utils.BitEnabled(uint32(a.SoundCntL), 9); rightEnabled {
-            psgR = int32(clip(psgR + ch2Sample))
+            psgR = psgR + ch2Sample
         }
 
         ch3Sample := int32(a.WaveChannel.GetSample())
 
         if leftEnabled := utils.BitEnabled(uint32(a.SoundCntL), 14); leftEnabled {
-            psgL = int32(clip(psgL + ch3Sample))
+            psgL = psgL + ch3Sample
         }
 
         if rightEnabled := utils.BitEnabled(uint32(a.SoundCntL), 10); rightEnabled {
-            psgR = int32(clip(psgR + ch3Sample))
+            psgR = psgR + ch3Sample
         }
 
         ch4Sample := int32(a.NoiseChannel.GetSample())
 
         if leftEnabled := utils.BitEnabled(uint32(a.SoundCntL), 15); leftEnabled {
-            psgL = int32(clip(psgL + ch4Sample))
+            psgL = psgL + ch4Sample
         }
 
         if rightEnabled := utils.BitEnabled(uint32(a.SoundCntL), 11); rightEnabled {
-            psgR = int32(clip(psgR + ch4Sample))
+            psgR = psgR + ch4Sample
         }
 
         psgL *= volLut[(a.SoundCntL>>4)&7]
@@ -291,12 +293,12 @@ func (a *Apu) enableSoundChan(ch int, enable bool) {
     a.SoundCntX &^= (1 << ch)
 }
 
-func isResetSoundChan(addr uint32) bool {
+func IsResetSoundChan(addr uint32) bool {
 	_, ok := resetSoundChanMap[addr]
 	return ok
 }
 
-func (a *Apu) resetSoundChan(addr uint32, b byte) {
+func (a *Apu) ResetSoundChan(addr uint32, b byte) {
 	a._resetSoundChan(resetSoundChanMap[addr], utils.BitEnabled(uint32(b), 7))
 }
 

@@ -1,11 +1,11 @@
-package apu
+package gba
 
 import (
-
+	"github.com/aabalke33/guac/emu/gba/apu"
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
-func (a *Apu) Write(addr uint32, v uint8) {
+func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 
     if addr == 0x84 {
 
@@ -40,8 +40,8 @@ func (a *Apu) Write(addr uint32, v uint8) {
         return
     }
 
-    if isResetSoundChan(addr) {
-        a.resetSoundChan(addr, v)
+    if apu.IsResetSoundChan(addr) {
+        a.ResetSoundChan(addr, v)
     }
 
 	switch addr {
@@ -182,7 +182,7 @@ func (a *Apu) Write(addr uint32, v uint8) {
 	}
 }
 
-func (a *Apu) Read(addr uint32) uint8 {
+func ReadSound(addr uint32, a *apu.Apu) uint8 {
 
     switch addr {
     case 0x60: return uint8(a.ToneChannel1.CntL) &^ 0x80

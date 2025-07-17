@@ -95,16 +95,12 @@ func (b *GbaFrame) Update(event sdl.Event) bool {
 		switch e.Keysym.Sym {
 		case sdl.K_p: pause = true
 		case sdl.K_m: (*b.GBA).ToggleMute()
-        case sdl.K_i: (*b.GBA).ToggleSaveState()
 		}
 	}
 
     if pause {
         (*b.GBA).TogglePause()
-        //switch c := b.parent.(type) {
-        //case *Scene: InitPauseMenu(b.Renderer, c, b.GBA)
-        //default: panic("Parent of Gameboy Emulator Frame is not Scene")
-        //}
+        InitPauseMenu(b.Renderer, b.parent.(*Scene))
     }
 
 	(*b.GBA).InputHandler(event)

@@ -23,28 +23,28 @@ func (c *Cache) BuildCache(gba *GBA) {
     j := uint32(0)
     for i := uint32(0); i < 0x4000; i += 4 {
         opcode := gba.Mem.Read32(i)
-        c.CacheInstructionARM(j, gba.Cpu, opcode, true)
+        c.CacheInstructionARM(j, &gba.Cpu, opcode, true)
         j++
     }
 
     j = uint32(0)
     for i := uint32(0x800_0000); i < 0xA00_0000; i += 4 {
         opcode := gba.Mem.Read32(i)
-        c.CacheInstructionARM(j, gba.Cpu, opcode, false)
+        c.CacheInstructionARM(j, &gba.Cpu, opcode, false)
         j++
     }
 
     j = uint32(0)
     for i := uint32(0); i < 0x4000; i += 2 {
         opcode := uint16(gba.Mem.Read16(i))
-        c.CacheInstructionTHUMB(j, gba.Cpu, opcode, true)
+        c.CacheInstructionTHUMB(j, &gba.Cpu, opcode, true)
         j++
     }
 
     j = uint32(0)
     for i := uint32(0x800_0000); i < 0xA00_0000; i += 2 {
         opcode := uint16(gba.Mem.Read16(i))
-        c.CacheInstructionTHUMB(j, gba.Cpu, opcode, false)
+        c.CacheInstructionTHUMB(j, &gba.Cpu, opcode, false)
         j++
     }
 
@@ -165,7 +165,7 @@ func (c *Cache) runCache(gba *GBA, pc, opcode uint32) bool {
             return false
         }
 
-        v.Inst(gba.Cpu, uint16(opcode))
+        v.Inst(&gba.Cpu, uint16(opcode))
 
         return true
     }
@@ -186,7 +186,7 @@ func (c *Cache) runCache(gba *GBA, pc, opcode uint32) bool {
         return false
     }
 
-    v.Inst(gba.Cpu, opcode)
+    v.Inst(&gba.Cpu, opcode)
 
     return true
 }

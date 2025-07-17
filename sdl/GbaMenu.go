@@ -3,23 +3,24 @@ package sdl
 import (
 	"math"
 
-	gameboy "github.com/aabalke33/guac/emu/gb"
+	"github.com/aabalke33/guac/emu/gba"
+	"github.com/aabalke33/guac/oto"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-type GbMenu struct {
+type GbaMenu struct {
 	Renderer    *sdl.Renderer
 	parent      Component
 	children    []*Component
 	Layout      Layout
 	ratio       float64
 	Status      Status
-	Gb          *gameboy.GameBoy
+	Gba          *gba.GBA
 	color       sdl.Color
 	SelectedIdx int
 }
 
-func NewGbMenu(parent Component, layout Layout, gb *gameboy.GameBoy, color sdl.Color) *GbMenu {
+func NewGbaMenu(parent Component, layout Layout, gba *gba.GBA, color sdl.Color) *GbaMenu {
 
 	ratio := 1.0
 
@@ -30,10 +31,10 @@ func NewGbMenu(parent Component, layout Layout, gb *gameboy.GameBoy, color sdl.C
 		Selected: false,
 	}
 
-	b := GbMenu{
+	b := GbaMenu{
 		Renderer: parent.GetRenderer(),
 		color:    color,
-		Gb:       gb,
+		Gba:      gba,
 		parent:   parent,
 		ratio:    ratio,
 		Layout:   layout,
@@ -45,7 +46,7 @@ func NewGbMenu(parent Component, layout Layout, gb *gameboy.GameBoy, color sdl.C
 	return &b
 }
 
-func (b *GbMenu) Update(event sdl.Event) bool {
+func (b *GbaMenu) Update(event sdl.Event) bool {
 
 	if !b.Status.Active {
 		return false
@@ -121,7 +122,7 @@ func (b *GbMenu) Update(event sdl.Event) bool {
 	return false
 }
 
-func (b *GbMenu) View() {
+func (b *GbaMenu) View() {
 	if !b.Status.Active || !b.Status.Visible {
 		return
 	}
@@ -146,45 +147,45 @@ func (b *GbMenu) View() {
 	})
 }
 
-func (b *GbMenu) Add(c Component) {
+func (b *GbaMenu) Add(c Component) {
 	b.children = append(b.children, &c)
 }
 
-func (b *GbMenu) Resize() {
+func (b *GbaMenu) Resize() {
 	ChildFunc(b, func(child *Component) {
 		(*child).Resize()
 	})
 }
 
-func (b *GbMenu) GetChildren() []*Component {
+func (b *GbaMenu) GetChildren() []*Component {
 	return b.children
 }
 
-func (b *GbMenu) GetParent() *Component {
+func (b *GbaMenu) GetParent() *Component {
 	return &b.parent
 }
 
-func (b *GbMenu) GetLayout() *Layout {
+func (b *GbaMenu) GetLayout() *Layout {
 	return &b.Layout
 }
 
-func (b *GbMenu) GetStatus() Status {
+func (b *GbaMenu) GetStatus() Status {
 	return b.Status
 }
 
-func (b *GbMenu) SetChildren(c []*Component) {
+func (b *GbaMenu) SetChildren(c []*Component) {
 	b.children = c
 }
 
-func (b *GbMenu) SetStatus(s Status) {
+func (b *GbaMenu) SetStatus(s Status) {
 	b.Status = s
 }
 
-func (b *GbMenu) SetLayout(l Layout) {
+func (b *GbaMenu) SetLayout(l Layout) {
 	b.Layout = l
 }
 
-func (b *GbMenu) InitOptions() {
+func (b *GbaMenu) InitOptions() {
 
 	container := *(b.GetChildren()[0])
 	options := container.GetChildren()
@@ -199,7 +200,7 @@ func (b *GbMenu) InitOptions() {
 	(*options[0]).SetStatus(nStatus)
 }
 
-func (b *GbMenu) UpdateSelected(reverse bool) {
+func (b *GbaMenu) UpdateSelected(reverse bool) {
 
 	originalIdx := b.SelectedIdx
 
@@ -239,18 +240,18 @@ func (b *GbMenu) UpdateSelected(reverse bool) {
 	(*options[b.SelectedIdx]).SetStatus(nStatus)
 }
 
-func (b *GbMenu) HandleSelected() {
+func (b *GbaMenu) HandleSelected() {
 
 	switch b.SelectedIdx {
 	case 0:
-		b.Gb.TogglePause()
+		b.Gba.TogglePause()
 		b.Status.Active = false
 	case 1:
 
 		textComponent := (*(*b.children[0]).GetChildren()[1])
 		switch c := textComponent.(type) {
 		case *Text:
-			if muted := b.Gb.ToggleMute(); muted {
+			if muted := b.Gba.ToggleMute(); muted {
 				c.UpdateText("unmute")
 				break
 			}
@@ -260,29 +261,30 @@ func (b *GbMenu) HandleSelected() {
 
 	case 2:
 
-        switch p := b.parent.(type) {
-        case *Scene:
-            gbConsole.Close()
+        p := b.parent.(*Scene)
 
-            for _, child := range p.GetChildren() {
-                switch g := (*child).(type) {
-                case *GbFrame:
-                    g.SetStatus(Status{Active: false})
-                }
+        gbaConsole.Close()
+
+        for _, child := range p.GetChildren() {
+            switch g := (*child).(type) {
+            case *GbaFrame:
+                g.SetStatus(Status{Active: false})
             }
-
-            b.SetStatus(Status{Active: false})
-            gbConsole = gameboy.NewGameBoy()
-            InitMainMenu(p, 0)
-            return
         }
 
-        panic("Parent of Gb Menu is not a Scene")
+        if oto.OtoPlayer == nil {
+            println("GOOD NIL PLAYER")
+        }
+
+        b.SetStatus(Status{Active: false})
+        gbaConsole = gba.NewGBA()
+        InitMainMenu(p, 0)
+        return
 
 	default:
 		panic("Gb Menu Container has no children")
 	}
 }
-func (b *GbMenu) GetRenderer() *sdl.Renderer {
+func (b *GbaMenu) GetRenderer() *sdl.Renderer {
 	return b.Renderer
 }

@@ -2,32 +2,18 @@ package main
 
 import (
 	"flag"
-	//"time"
-    //"fmt"
 	"github.com/aabalke33/guac/sdl"
-
-)
-
-const (
-    MAX_INSTR = 0
-    FPS = 60
 )
 
 func main() {
 
 	romPath := flag.String("r", "", "rom path")
-	debug := flag.Bool("debug", false, "debug")
-	useSaveState := flag.Bool("s", false, "save state")
+    profile := flag.Bool("p", false, "use profiler")
 	flag.Parse()
 
-	//start := time.Now().UnixMilli()
-
     s := sdl.SDLStruct{}
-    s.Init(*debug)
-    defer s.Close(*debug)
+    s.Init()
+    defer s.Close()
 
-    s.Update(*debug, *romPath, *useSaveState)
-
-	//end := time.Now().UnixMilli()
-	//fmt.Printf("\n\nRuntime: %d ms\n\n", end-start)
+    s.Run(*romPath, *profile)
 }

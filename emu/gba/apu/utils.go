@@ -6,7 +6,7 @@ const (
 )
 
 func clip(v int32) int16 {
-    v = min(v, SAMP_MAX)
-    v = max(v, SAMP_MIN)
+    if v > SAMP_MAX { return SAMP_MAX }
+    if v < SAMP_MIN { return SAMP_MIN }
 	return int16(v)
 }

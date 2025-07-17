@@ -68,7 +68,7 @@ func (gba *GBA) ExitException(mode uint32) {
 		gba.Mem.BIOS_MODE = BIOS_IRQ_POST
 	}
 
-	cpu := gba.Cpu
+	cpu := &gba.Cpu
 	reg := &cpu.Reg
 	r := &cpu.Reg.R
 

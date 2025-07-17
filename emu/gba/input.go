@@ -6,16 +6,16 @@ import (
 
 func (gba *GBA) InputHandler(event sdl.Event) {
 
-    var tempJoypad uint16 = gba.Keypad.KEYINPUT
+    tempJoypad := &gba.Keypad.KEYINPUT
 
     switch e := event.(type) {
     case *sdl.KeyboardEvent:
-        gba.UpdateKeyboardInput(e, &tempJoypad)
+        gba.UpdateKeyboardInput(e, tempJoypad)
     case *sdl.ControllerButtonEvent:
-        gba.UpdateControllerInput(e, &tempJoypad)
+        gba.UpdateControllerInput(e, tempJoypad)
     }
 
-    gba.Keypad.KEYINPUT = tempJoypad
+    //gba.Keypad.KEYINPUT = tempJoypad
 
     if gba.Keypad.keyIRQ() {
         gba.Irq.setIRQ(12)

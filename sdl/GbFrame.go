@@ -102,10 +102,7 @@ func (b *GbFrame) Update(event sdl.Event) bool {
 
     if pause {
         (*b.Gb).TogglePause()
-        switch c := b.parent.(type) {
-        case *Scene: InitPauseMenu(b.Renderer, c, b.Gb)
-        default: panic("Parent of Gameboy Emulator Frame is not Scene")
-        }
+        InitPauseMenu(b.Renderer, b.parent.(*Scene))
     }
 
 	(*b.Gb).InputHandler(event)

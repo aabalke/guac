@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	gameboy "github.com/aabalke33/guac/emu/gb"
 	"github.com/aabalke33/guac/emu/gba"
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -42,14 +43,6 @@ func NewMainMenu(parent Component, layout Layout, color sdl.Color, duration time
 		Status:    s,
 		GameDatas: gameDatas,
 	}
-
-	//timer := time.NewTimer(duration)
-
-	//go func() {
-	//	<-timer.C
-	//	//b.Status.Active = false
-
-	//}()
 
 	b.Resize()
 
@@ -268,7 +261,7 @@ func (b *MainMenu) HandleSelected() {
 
     path := b.GameDatas[b.SelectedIdx].RomPath
 
-    ActivateConsole(scene, nil, path, false, false)
+    ActivateConsole(scene, path)
 
     b.Status.Active = false
 
@@ -277,32 +270,32 @@ func (b *MainMenu) HandleSelected() {
     WriteGameData(&b.GameDatas)
 }
 
-func ActivateConsole(scene *Scene, debugScene *Scene, path string, debug bool, useSaveState bool) {
+func ActivateConsole(scene *Scene, path string) {
 
-    isGb := strings.HasSuffix(path, "gb") || strings.HasSuffix(path, "gbc")
-    isGba := strings.HasSuffix(path, "gba")
+    isGB = false
+    isGBA = false
+
+    isGB = strings.HasSuffix(path, "gb")
+    isGB = isGB || strings.HasSuffix(path, "gbc")
+    isGBA = strings.HasSuffix(path, "gba")
 
     l := NewLayout(&scene.H, 0, 0, 0, 1)
 
     switch {
-    case isGb:
-        Gb.LoadGame(path)
-        scene.Add(NewGbFrame(scene, 160.0/144, l, Gb))
-        Gb.Paused = false
+    case isGB:
+        gbConsole = gameboy.NewGameBoy()
+        gbConsole.LoadGame(path)
+        ratio := 160.0/144
+        scene.Add(NewGbFrame(scene, ratio, l, gbConsole))
+        gbConsole.Paused = false
         return
-    case isGba:
-        Gba.LoadGame(path, useSaveState)
+
+    case isGBA:
+        gbaConsole = gba.NewGBA()
+        gbaConsole.LoadGame(path)
         ratio := float64(gba.SCREEN_WIDTH)/float64(gba.SCREEN_HEIGHT)
-        scene.Add(NewGbaFrame(scene, ratio, l, Gba))
-
-        if debug {
-            InitDebugMenu(debugScene)
-        }
-
-        if !useSaveState {
-            Gba.Paused = false
-        }
-
+        scene.Add(NewGbaFrame(scene, ratio, l, gbaConsole))
+        gbaConsole.Paused = false
         return
     }
 

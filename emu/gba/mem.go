@@ -27,8 +27,10 @@ type Memory struct {
 	Dispstat Dispstat
 }
 
-func NewMemory(gba *GBA) *Memory {
-	m := &Memory{GBA: gba}
+func NewMemory(gba *GBA) Memory {
+	m := Memory{GBA: gba}
+
+    //m.GBA = gba
 
 	m.Write32(0x4000000, 0x80)
 	m.Write32(0x4000134, 0x800F) // IR requires bit 3 on. I believe this is auth check (sonic adv)
@@ -68,18 +70,18 @@ func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
 	case addr < 0x0200_0000:
         return m.ReadOpenBus(addr)
 	case addr < 0x0300_0000:
-		return m.WRAM1[(addr-0x0200_0000)%0x4_0000]
+		return m.WRAM1[(addr-0x0200_0000) & (0x4_0000 - 1)]
 	case addr < 0x0400_0000:
-		return m.WRAM2[(addr-0x0300_0000)%0x8_000]
+		return m.WRAM2[(addr-0x0300_0000) & (0x8_000 - 1)]
 	case addr < 0x0400_0400:
 		return m.ReadIO(addr - 0x0400_0000)
 	case addr < 0x0500_0000:
         return m.ReadOpenBus(addr & 0b1)
 	case addr < 0x0600_0000:
-		return m.PRAM[(addr-0x0500_0000)%0x400]
+		return m.PRAM[(addr-0x0500_0000) & (0x400 - 1)]
     case addr < 0x700_0000:
 
-        mirrorAddr := (addr - 0x600_0000) % 0x2_0000
+        mirrorAddr := (addr - 0x600_0000) & (0x2_0000 - 1)
         if mirrorAddr >= 0x1_8000 {
             mirrorAddr -= 0x8000 // 32k internal mirror
         }
@@ -87,14 +89,14 @@ func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
 		return m.VRAM[mirrorAddr]
 
 	case addr < 0x0800_0000:
-		return m.OAM[(addr-0x0700_0000)%0x400]
+		return m.OAM[(addr-0x0700_0000) & (0x400 - 1)]
 
     case addr < 0xE00_0000:
-        offset := (addr - 0x0800_0000) % 0x200_0000
+        offset := (addr - 0x0800_0000) & (0x200_0000- 1)
         return m.GBA.Cartridge.Rom[offset]
 
 	case addr < 0x1000_0000:
-        relative := (addr - 0xE00_0000) % 0x1_0000
+        relative := (addr - 0xE00_0000) & (0x1_0000 - 1)
         return m.GBA.Cartridge.Read(relative)
 
 	default:
@@ -463,33 +465,33 @@ func (m *Memory) ReadBadRom(addr uint32, bytesRead uint8) (uint32, bool) {
         return 0, false
     }
 
-    offset := (addr - 0x800_0000) % 0x200_0000
+    //offset := (addr - 0x800_0000) % 0x200_0000
+    offset := (addr - 0x800_0000) & (0x200_0000 - 1)
 
-    if offset >= m.GBA.Cartridge.RomLength {
-
-        switch bytesRead {
-        case 1:
-            v := ((addr >> 1) >> ((addr & 1) * 8)) & 0xFF
-            return uint32(uint8(v)), true
-        case 2:
-
-            v := (addr >> 1) & 0xFFFF
-            if addr & 1 == 1 {
-                v = ((addr >> 1) >> ((addr & 1) * 8)) & 0xFF
-            }
-
-            return uint32(uint16(v)), true
-
-        case 4:
-            v := ((addr &^ 3) >> 1) & 0xFFFF
-            v |= (((addr &^ 3) + 2) >> 1) << 16
-            return uint32(v), true
-        default:
-            panic("BAD ROM READ USING BYTES READ NOT VALID (1, 2, 4)")
-        }
+    if offset <  m.GBA.Cartridge.RomLength {
+        return 0, false
     }
 
-    return 0, false
+    switch bytesRead {
+    case 1:
+        v := ((addr >> 1) >> ((addr & 1) * 8)) & 0xFF
+        return uint32(uint8(v)), true
+    case 2:
+
+        v := (addr >> 1) & 0xFFFF
+        if addr & 1 == 1 {
+            v = ((addr >> 1) >> ((addr & 1) * 8)) & 0xFF
+        }
+
+        return uint32(uint16(v)), true
+
+    case 4:
+        v := ((addr &^ 3) >> 1) & 0xFFFF
+        v |= (((addr &^ 3) + 2) >> 1) << 16
+        return uint32(v), true
+    default:
+        panic("BAD ROM READ USING BYTES READ NOT VALID (1, 2, 4)")
+    }
 }
 
 func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
@@ -500,10 +502,12 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
 	case addr < 0x0200_0000:
 		return
 	case addr < 0x0300_0000:
-		m.WRAM1[(addr-0x0200_0000)%0x4_0000] = v
+		//m.WRAM1[(addr-0x0200_0000)%0x4_0000] = v
+		m.WRAM1[(addr-0x0200_0000) & (0x4_0000 - 1)] = v
         return
 	case addr < 0x0400_0000:
-		m.WRAM2[(addr-0x0300_0000)%0x8_000] = v
+		//m.WRAM2[(addr-0x0300_0000)%0x8_000] = v
+		m.WRAM2[(addr-0x0300_0000) & (0x8_000 - 1)] = v
         return
 	case addr < 0x0400_0400:
 		m.WriteIO(addr-0x0400_0000, v)
@@ -512,7 +516,8 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
 		return
 	case addr < 0x0600_0000:
 
-        relative := (addr-0x0500_0000)%0x400
+        //relative := (addr-0x0500_0000)%0x400
+        relative := (addr-0x0500_0000) & (0x400 - 1)
 
         if byteWrite {
             m.PRAM[relative] = v
@@ -531,13 +536,14 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
              0x16000, 0x8000, 0x8000 | 24_000
             | 64k, 32k 32k (mirror) | mirror of block |
         */
-        mirrorAddr := (addr - 0x600_0000) % 0x2_0000
+        //mirrorAddr := (addr - 0x600_0000) % 0x2_0000
+        mirrorAddr := (addr - 0x600_0000) & (0x2_0000 - 1)
         if mirrorAddr >= 0x1_8000 {
             mirrorAddr -= 0x8000 // 32k internal mirror
         }
 
-        mode := m.ReadIODirect(0x0, 1) & 0b111
-        if bitmap := mode > 2; bitmap && byteWrite && mirrorAddr > 0x1_0000 {
+        mode := m.IO[0] & 0b111
+        if bitmap := mode > 2; bitmap && byteWrite && mirrorAddr >= 0x1_0000 {
             return
         }
 
@@ -565,7 +571,8 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
         if byteWrite {
             return
         }
-        rel := (addr-0x0700_0000)%0x400
+        //rel := (addr-0x0700_0000)%0x400
+        rel := (addr-0x0700_0000) & (0x400 - 1)
 		m.OAM[rel] = v
         m.GBA.PPU.UpdateOAM(rel)
         return
@@ -576,8 +583,9 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
 
         m.GBA.Save = true
 
-        cartridge := m.GBA.Cartridge
-        relative := (addr - 0xE00_0000) % 0x1_0000
+        cartridge := &m.GBA.Cartridge
+        //relative := (addr - 0xE00_0000) % 0x1_0000
+        relative := (addr - 0xE00_0000) & (0x1_0000 - 1)
         cartridge.Write(relative, v)
         return
 
@@ -592,7 +600,7 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 	// do not make bg control addrs special, unless you know what the f you are doing
 	// VCOUNT is not writable, no touchy
     if sound := addr >= 0x60 && addr < 0xB0; sound {
-        m.WriteSoundIO(addr, v)
+        WriteSound(addr, v, &apu.ApuInstance)
         return
     }
 
@@ -807,33 +815,7 @@ func CheckEeprom(gba *GBA, addr uint32) bool {
     return true
 }
 
-func (m *Memory) ReadIODirect(addr uint32, size uint32) uint32 {
-
-    switch size {
-    case 1:
-        return m.ReadIODirectByte(addr)
-    case 2:
-        return m.ReadIODirectByte(addr + 1) << 8 | m.ReadIODirectByte(addr)
-    case 4:
-        a := m.ReadIODirectByte(addr + 3) << 8 | m.ReadIODirectByte(addr + 2)
-        b := m.ReadIODirectByte(addr + 1) << 8 | m.ReadIODirectByte(addr)
-        return (a << 16) | b
-
-    default:
-        panic("UNKOWN READ IO DIRECT SIZE")
-    }
-}
-
-func (m *Memory) ReadIODirectByte(addr uint32) uint32 {
-    switch addr {
-    case 0x4: return uint32(m.Dispstat)
-	case 0x5: return uint32(m.Dispstat >> 8)
-    default: return uint32(m.IO[addr])
-    }
-}
-
 func (m *Memory) ReadSoundIO(addr uint32) uint8 {
-
 
     switch addr &^ 0b1 {
     case 0x8C: return m.ReadOpenBus(addr)
@@ -847,12 +829,32 @@ func (m *Memory) ReadSoundIO(addr uint32) uint8 {
     case 0xAC: return m.ReadOpenBus(addr)
     case 0xAE: return m.ReadOpenBus(addr - 2)
     default:
-        a := &apu.ApuInstance
-        return a.Read(addr)
+        return ReadSound(addr, &apu.ApuInstance)
+    }
+}
+func (m *Memory) ReadIODirect(addr uint32, size uint32) uint32 {
+
+    switch size {
+    case 1:
+        return m.ReadIODirectByte(addr)
+
+    case 2:
+        return m.ReadIODirectByte(addr + 1) << 8 | m.ReadIODirectByte(addr)
+    case 4:
+        a := m.ReadIODirectByte(addr + 3) << 8 | m.ReadIODirectByte(addr + 2)
+        b := m.ReadIODirectByte(addr + 1) << 8 | m.ReadIODirectByte(addr)
+
+        return (a << 16) | b
+
+    default:
+        panic("UNKOWN READ IO DIRECT SIZE")
     }
 }
 
-func (m *Memory) WriteSoundIO(addr uint32, v uint8) {
-    a := &apu.ApuInstance
-    a.Write(addr, v)
+func (m *Memory) ReadIODirectByte(addr uint32) uint32 {
+    switch addr {
+    case 0x4: return uint32(m.Dispstat)
+	case 0x5: return uint32(m.Dispstat >> 8)
+    default: return uint32(m.IO[addr])
+    }
 }

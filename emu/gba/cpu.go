@@ -3,7 +3,6 @@ package gba
 type Cpu struct {
 	Gba *GBA
 	Reg Reg
-	Loc uint32
 }
 
 const (
@@ -54,7 +53,6 @@ var BIOS_ADDR = map[uint32]uint32{
 func NewCpu(gba *GBA) *Cpu {
 
 	c := &Cpu{
-		Reg: Reg{},
 		Gba: gba,
 	}
 
@@ -87,7 +85,6 @@ func (c *Cpu) Execute(opcode uint32) int {
 }
 
 type Reg struct {
-	Cpu  *Cpu
 	R    [16]uint32
 	SP   [6]uint32
 	LR   [6]uint32

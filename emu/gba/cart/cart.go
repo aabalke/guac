@@ -19,10 +19,10 @@ type Cartridge struct {
     Device uint32
     FlashStage uint32
 
-	Rom                          [0x200_0000]uint8
-	SRAM                         [0x1_0000]uint8
-	Flash                        [0x2_0000]uint8 // multiple banks
-    Eeprom                       [0x2000]uint8
+	Rom    [0x200_0000]uint8
+	SRAM   [0x1_0000]uint8
+	Flash  [0x2_0000]uint8 // multiple banks
+    Eeprom [0x2000]uint8
 }
 
 const (
@@ -40,16 +40,16 @@ const (
     TYPE_MACRONIX128 = 5
 )
 
-func NewCartridge(rom, sav string) *Cartridge {
+func NewCartridge(rom, sav string) Cartridge {
 
-	c := &Cartridge{
+	c := Cartridge{
 		RomPath: rom,
 		SavPath: sav,
 	}
 
     c.load()
 
-	c.Header = NewHeader(c)
+	c.Header = NewHeader(&c)
 
     switch c.Id {
     case NONE:

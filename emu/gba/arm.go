@@ -370,6 +370,8 @@ const (
     LDR_PLD
 )
 
+var sdtInstance Sdt
+
 type Sdt struct {
     Opcode, Rd, Rn, RnValue, RdValue, Cond, Offset, Shift, ShiftType, Rm uint32
     Set, I, Load, WriteBack, MemoryMgmt, Pre, Up, Byte, Pld bool
@@ -381,7 +383,7 @@ func NewSdtData(opcode uint32, cpu *Cpu) *Sdt {
         panic("Malformed Sdt Instruction")
     }
 
-    sdt := Sdt{
+    sdtInstance = Sdt{
         Opcode: opcode,
         Cond: utils.GetByte(opcode, 28),
         I: utils.BitEnabled(opcode, 25),
@@ -392,6 +394,8 @@ func NewSdtData(opcode uint32, cpu *Cpu) *Sdt {
         Rn: utils.GetByte(opcode, 16),
         Rd: utils.GetByte(opcode, 12),
     }
+
+    sdt := &sdtInstance
 
     if sdt.Pre {
         sdt.WriteBack = utils.BitEnabled(opcode, 21)
@@ -422,7 +426,7 @@ func NewSdtData(opcode uint32, cpu *Cpu) *Sdt {
             sdt.Load == true &&
             sdt.Rd == 0b1111
 
-    return &sdt
+    return sdt
 }
 
 func (c *Cpu) Sdt(opcode uint32) uint32 {

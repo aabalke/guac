@@ -158,7 +158,7 @@ func InitLoadingScreen(renderer *sdl.Renderer, scene *Scene, duration time.Durat
 
 	l = NewLayout(50, 600, 0, 0, z+1)
 	container2 := NewContainer(container, l, C_Transparent, "evenlyVertical")
-	container2.Add(NewText(container2, NewLayout(0, 0, 0, 0, z+2), "alpha 0.0.1", 24, c, c, ""))
+	container2.Add(NewText(container2, NewLayout(0, 0, 0, 0, z+2), "alpha 1.0.0", 24, c, c, ""))
 	container2.Add(NewText(container2, NewLayout(0, 0, 0, 0, z+2), "developed by aaron balke", 24, c, c, ""))
 
 	container.Add(container2)
