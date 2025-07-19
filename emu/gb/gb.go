@@ -1,11 +1,11 @@
 package gameboy
 
 import (
-
 	"fmt"
 	"os"
 
 	"github.com/aabalke33/guac/emu/gb/cartridge"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 const (
@@ -41,6 +41,7 @@ type GameBoy struct {
 
 	Joypad uint8
 
+    Image *ebiten.Image
 	Screen [width][height]uint32
 	bgPriority [width][height]bool
 
@@ -59,9 +60,12 @@ type Timer struct {
     InterruptPending bool
 }
 
-func NewGameBoy() *GameBoy {
+func NewGameBoy(path string) *GameBoy {
 
-	gb := GameBoy{
+    img := ebiten.NewImage(width, height)
+
+    gb := GameBoy{
+        Image: img,
 		Cpu: *NewCpu(),
 		Apu: APU{
 			SampleRate: 44100,
@@ -76,7 +80,6 @@ func NewGameBoy() *GameBoy {
         Palette: palettes["greyscale"],
         bgPalette: NewColorPalette(),
         spPalette: NewColorPalette(),
-        Paused: true,
 	}
 
     pixels := make([]byte, width*height*4)
@@ -87,6 +90,8 @@ func NewGameBoy() *GameBoy {
 
 	gb.Apu.Init()
 
+    gb.LoadGame(path)
+
 	return &gb
 }
 
@@ -94,10 +99,10 @@ func (gb *GameBoy) GetSize() (int32, int32) {
     return height, width
 }
 
-func (gb *GameBoy) Update(exit *bool, instCount int) int {
+func (gb *GameBoy) Update() {
 
     if gb.Paused {
-        return 0
+        return
     }
 
     multiplier := 1
@@ -145,19 +150,13 @@ func (gb *GameBoy) Update(exit *bool, instCount int) int {
         gb.Cycles += interruptCycles
 
 		gb.UpdateTimers()
-
-		instCount++
 	}
 
     gb.UpdateDisplay()
-
-	return instCount
 }
 
 func (gb *GameBoy) ToggleMute() bool {
-
     gb.Muted = !gb.Muted
-
     return gb.Muted
 }
 

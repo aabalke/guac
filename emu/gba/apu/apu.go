@@ -95,7 +95,9 @@ func (a *Apu) Play(muted bool) {
         return
     }
 
-    go aOto.OtoPlayer.Write(a.Stream)
+    //return
+
+    aOto.OtoPlayer.Write(a.Stream)
 }
 
 func (a *Apu) Close() {

@@ -3,10 +3,10 @@ package apu
 // typedef unsigned char Uint8;
 // typedef signed char int16;
 // void Callback(void *userdata, Uint8 *stream, int len);
-import "C"
+//import "C"
 import (
-	"unsafe"
-	"github.com/veandco/go-sdl2/sdl"
+	//"unsafe"
+	//"github.com/veandco/go-sdl2/sdl"
 )
 
 const (
@@ -25,36 +25,36 @@ func InitAudio() {
         return
     }
 
-    InitApuInstance()
+    //InitApuInstance()
 
-    spec := sdl.AudioSpec{
-        Freq: SND_FREQUENCY,
-        Format: sdl.AUDIO_S16,
-        Channels: 2,
-        Samples: STREAM_LEN,
-        Callback: sdl.AudioCallback(C.Callback),
-    }
+    //spec := sdl.AudioSpec{
+    //    Freq: SND_FREQUENCY,
+    //    Format: sdl.AUDIO_S16,
+    //    Channels: 2,
+    //    Samples: STREAM_LEN,
+    //    Callback: sdl.AudioCallback(C.Callback),
+    //}
 
-    device, err := sdl.OpenAudioDevice("", false, &spec, nil, 0)
-    if err != nil || device == 0 {
-        panic(err)
-    }
+    //device, err := sdl.OpenAudioDevice("", false, &spec, nil, 0)
+    //if err != nil || device == 0 {
+    //    panic(err)
+    //}
 
-    sdl.PauseAudioDevice(device, false)
+    //sdl.PauseAudioDevice(device, false)
 
     return
 }
 
 //export Callback
-func Callback(userdata unsafe.Pointer, stream *C.Uint8, length C.int) {
-	n := int(length)
-    buf := unsafe.Slice((*int16)(unsafe.Pointer(stream)), n/2)
-
-	for i := 0; i < n / 2; i += 2 {
-        l, r := ApuInstance.GetSample()
-        buf[i] = l
-        buf[i+1] = r
-	}
-
-    ApuInstance.Sync()
-}
+//func Callback(userdata unsafe.Pointer, stream *C.Uint8, length C.int) {
+//	n := int(length)
+//    buf := unsafe.Slice((*int16)(unsafe.Pointer(stream)), n/2)
+//
+//	for i := 0; i < n / 2; i += 2 {
+//        l, r := ApuInstance.GetSample()
+//        buf[i] = l
+//        buf[i+1] = r
+//	}
+//
+//    ApuInstance.Sync()
+//}

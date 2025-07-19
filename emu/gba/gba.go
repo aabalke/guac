@@ -1,6 +1,5 @@
 package gba
 
-
 import (
 	"fmt"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"github.com/aabalke33/guac/emu/gba/apu"
 	"github.com/aabalke33/guac/emu/gba/cart"
 	"github.com/aabalke33/guac/emu/gba/utils"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 const (
@@ -50,6 +50,7 @@ type GBA struct {
     Cpu Cpu
     Mem Memory
 	Pixels []byte
+    Image *ebiten.Image
 	Paused, Muted bool
     Halted bool
     ExitHalt bool
@@ -75,7 +76,7 @@ func (gba *GBA) SoftReset() {
     gba.exception(VEC_SWI, MODE_SWI)
 }
 
-func (gba *GBA) Update(exit *bool, frame int) {
+func (gba *GBA) Update() {
 
     r := &gba.Cpu.Reg.R
 
@@ -139,13 +140,14 @@ func (gba *GBA) checkDmas(mode uint32) {
     }
 }
 
-func NewGBA() *GBA {
+func NewGBA(path string) *GBA {
+
+    img := ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT)
 
 	gba := GBA{
         Pixels: make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
-
+        Image: img,
         Keypad: Keypad{ KEYINPUT: 0x3FF },
-        Paused: true,
     }
 
     gba.PPU.gba = &gba
@@ -185,6 +187,7 @@ func NewGBA() *GBA {
     aveAverages = make([]int64, 0)
 
     gba.SoftReset()
+    gba.LoadGame(path)
 
     //gbaConsole.Cache.BuildCache(gbaConsole)
 
@@ -262,6 +265,7 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 
         if vcount := uint32(gba.Mem.IO[VCOUNT]); vcount < SCREEN_HEIGHT {
             go gba.scanlineGraphics(vcount)
+            //gba.scanlineGraphics(vcount)
             gba.checkDmas(DMA_MODE_HBL)
         }
     }

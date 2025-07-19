@@ -1,6 +1,11 @@
 package oto
 
-import "github.com/hajimehoshi/oto"
+import (
+    //"time"
+	//"github.com/gopxl/beep"
+	//"github.com/gopxl/beep/speaker"
+	"github.com/hajimehoshi/oto"
+)
 
 var OtoContext *oto.Context
 var OtoPlayer *oto.Player
@@ -15,4 +20,16 @@ func InitOto() {
 
 	OtoContext = c
     OtoPlayer = OtoContext.NewPlayer()
+}
+
+func InitSound() {
+
+    InitOto()
+
+	//sampleRate := beep.SampleRate(44100)
+	//bufferSize := sampleRate.N(time.Second / 30)
+	//err := speaker.Init(sampleRate, bufferSize)
+	//if err != nil {
+    //    panic(err)
+	//}
 }
