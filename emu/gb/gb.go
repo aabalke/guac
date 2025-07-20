@@ -50,7 +50,7 @@ type GameBoy struct {
     Paused bool
     Muted bool
 
-    Logger *Logger
+    //Logger *Logger
 }
 
 type Timer struct {
@@ -84,7 +84,7 @@ func NewGameBoy(path string) *GameBoy {
 
     pixels := make([]byte, width*height*4)
     gb.Pixels = &pixels
-    gb.Logger = NewLogger("./logging", &gb)
+    //gb.Logger = NewLogger("./logging", &gb)
 
     gb.Apu.GameBoy = &gb
 

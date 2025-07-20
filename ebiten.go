@@ -1,7 +1,7 @@
 package main
 
 import (
-	_"embed"
+	_ "embed"
 	"errors"
 	"image/color"
 	"log"
@@ -9,8 +9,10 @@ import (
 	gameboy "github.com/aabalke33/guac/emu/gb"
 	"github.com/aabalke33/guac/emu/gba"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
+	"github.com/aabalke33/guac/menu"
 )
 
 var (
@@ -20,11 +22,15 @@ var (
     exit = errors.New("Exit")
 )
 
+// 44100 is required for menu sounds
+//const sampleRate = 48000
+const sampleRate = 44100
+
 type Game struct {
     flags Flags
     gba *gba.GBA
     gb *gameboy.GameBoy
-    menu *Menu
+    menu *menu.Menu
     pause *Pause
     frame uint64
 
@@ -32,25 +38,25 @@ type Game struct {
 
     gamepad ebiten.GamepadID
     gamepadConnected bool
+
+    audioContext *audio.Context
+
 }
 
 func NewGame(flags Flags) *Game {
 
     g := &Game{
         flags: flags,
+        audioContext: audio.NewContext(sampleRate),
     }
 
     switch g.flags.Type {
     case NONE:
-        g.menu = &Menu{
-            data: LoadGameData(),
-        }
 
-        g.pause = &Pause{
-            overlay: ebiten.NewImage(1, 1),
-        }
+        //ebiten.SetFullscreen(true)
 
-        g.pause.overlay.Fill(color.Black)
+        g.menu = menu.NewMenu(g.audioContext)
+        g.pause = NewPause()
 
     case GBA:
         g.gba = gba.NewGBA(flags.RomPath)
@@ -100,50 +106,34 @@ func (g *Game) Update() error {
         case ebiten.KeyQ:
             return exit
         case ebiten.KeyP:
-
-            if !(g.flags.Type == NONE) {
-                g.paused = !g.paused
-            }
-
-            switch g.flags.Type {
-            case GBA: g.gba.TogglePause()
-            case GB:  g.gb.TogglePause()
-            }
+            g.TogglePause()
         case ebiten.KeyM:
-            switch g.flags.Type {
-            case GBA: g.gba.ToggleMute()
-            case GB:  g.gb.ToggleMute()
-            }
+            g.ToggleMute()
         }
     }
 
     for _, button := range justButtons {
         switch button {
         case ebiten.GamepadButton9:
+            g.TogglePause()
 
-            if !(g.flags.Type == NONE) {
-                g.paused = !g.paused
-            }
-
-            switch g.flags.Type {
-            case GBA: g.gba.TogglePause()
-            case GB:  g.gb.TogglePause()
-            }
         case ebiten.GamepadButton8:
-            switch g.flags.Type {
-            case GBA: g.gba.ToggleMute()
-            case GB:  g.gb.ToggleMute()
-            }
+            g.ToggleMute()
         }
     }
 
     if g.paused {
         g.pause.InputHandler(g, justKeys, justButtons)
+        return nil
     }
 
     switch g.flags.Type {
     case NONE:
-        g.menu.InputHandler(g, justKeys, justButtons)
+        selected := g.menu.InputHandler(justKeys, justButtons)
+        if selected {
+            g.SelectConsole()
+            g.menu = nil
+        }
     case GBA:
         g.gba.InputHandler(keys, buttons)
         g.gba.Update()
@@ -157,6 +147,46 @@ func (g *Game) Update() error {
     g.frame++
 
     return nil
+}
+
+func (g *Game) SelectConsole() {
+
+    m := g.menu
+
+    rom := m.Data[m.SelectedIdx]
+
+    switch rom.Type {
+    case GBA:
+        g.gba = gba.NewGBA(rom.RomPath)
+        g.flags.Type = GBA
+    case GB:
+        g.gb = gameboy.NewGameBoy(rom.RomPath)
+        g.flags.Type = GB
+    default:
+        panic("Selected Unknown Console")
+    }
+
+    m.Data = menu.ReorderGameData(&m.Data, m.SelectedIdx)
+    menu.WriteGameData(&m.Data)
+}
+
+func (g *Game) TogglePause() {
+
+    if !(g.flags.Type == NONE) && g.flags.ConsoleMode {
+        g.paused = !g.paused
+    }
+
+    switch g.flags.Type {
+        case GBA: g.gba.TogglePause()
+        case GB:  g.gb.TogglePause()
+    }
+}
+
+func (g *Game) ToggleMute() {
+    switch g.flags.Type {
+        case GBA: g.gba.ToggleMute()
+        case GB:  g.gb.ToggleMute()
+    }
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {

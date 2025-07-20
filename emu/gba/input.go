@@ -51,8 +51,6 @@ func (gba *GBA) InputHandler(keys []ebiten.Key, buttons []ebiten.GamepadButton) 
             *tempJoypad &^= 0b1000000
         case ebiten.GamepadButton17:
             *tempJoypad &^= 0b10000000
-
-
         case ebiten.GamepadButton5:
             *tempJoypad &^= 0b100000000
         case ebiten.GamepadButton4:
@@ -64,29 +62,3 @@ func (gba *GBA) InputHandler(keys []ebiten.Key, buttons []ebiten.GamepadButton) 
         gba.Irq.setIRQ(12)
     }
 }
-//
-//func (gba *GBA) UpdateControllerInput(controllerEvent *sdl.ControllerButtonEvent, tempJoypad *uint16) {
-//
-//    switch key := controllerEvent.Button; key {
-//    case sdl.CONTROLLER_BUTTON_A:
-//        handleButton(tempJoypad, 0b1, controllerEvent)
-//    case sdl.CONTROLLER_BUTTON_B:
-//        handleButton(tempJoypad, 0b10, controllerEvent)
-//    case sdl.CONTROLLER_BUTTON_X:
-//        handleButton(tempJoypad, 0b100, controllerEvent)
-//    case sdl.CONTROLLER_BUTTON_Y:
-//        handleButton(tempJoypad, 0b1000, controllerEvent)
-//    case sdl.CONTROLLER_BUTTON_DPAD_RIGHT:
-//        handleButton(tempJoypad, 0b1_0000, controllerEvent)
-//    case sdl.CONTROLLER_BUTTON_DPAD_LEFT:
-//        handleButton(tempJoypad, 0b10_0000, controllerEvent)
-//    case sdl.CONTROLLER_BUTTON_DPAD_UP:
-//        handleButton(tempJoypad, 0b100_0000, controllerEvent)
-//    case sdl.CONTROLLER_BUTTON_DPAD_DOWN:
-//        handleButton(tempJoypad, 0b1000_0000, controllerEvent)
-//    case sdl.CONTROLLER_BUTTON_RIGHTSHOULDER:
-//        handleButton(tempJoypad, 0b1_0000_0000, controllerEvent)
-//    case sdl.CONTROLLER_BUTTON_LEFTSHOULDER:
-//        handleButton(tempJoypad, 0b10_0000_0000, controllerEvent)
-//    } 
-//}

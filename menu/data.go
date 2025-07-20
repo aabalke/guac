@@ -1,13 +1,10 @@
-package main
+package menu
 
 import (
 	"encoding/json"
 	"io"
 	"os"
     "strings"
-
-    "image"
-    _"image/png"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -21,6 +18,12 @@ type GameData struct {
 }
 
 const path = "./roms.json"
+
+const (
+    NONE = iota
+    GB
+    GBA
+)
 
 func LoadGameData() []GameData {
 
@@ -66,21 +69,6 @@ func WriteGameData(gameData *[]GameData) {
     }
 }
 
-func loadImage(path string) (*ebiten.Image, error) {
-    f, err := os.Open(path)
-    if err != nil {
-        return nil, err
-    }
-    defer f.Close()
-
-    img, _, err := image.Decode(f)
-    if err != nil {
-        return nil, err
-    }
-
-    return ebiten.NewImageFromImage(img), nil
-}
-
 func getConsole(path string) int {
 
     switch {
@@ -93,4 +81,17 @@ func getConsole(path string) int {
     default:
         panic("Flag Parsing Error. RomPath in roms.json must end with gba, gbc, gb extension")
     }
+}
+
+func ReorderGameData(gameData *[]GameData, idx int) []GameData {
+
+    temp := []GameData{(*gameData)[idx]}
+
+    for i, v := range (*gameData) {
+        if i != idx {
+            temp = append(temp, v)
+        }
+    }
+
+    return temp
 }

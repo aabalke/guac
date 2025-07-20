@@ -1,17 +1,13 @@
 # folders
+archive
 sav
 rom
 .git
-res
 art
 .git
 
 # dev dependencies
-*.dll
 *.exe
 
-
 # other
-*.otf
 *.json
-*.ps1
