@@ -9,4 +9,5 @@ const (
 	BUFF_SAMPLES_MSK         = ((BUFF_SAMPLES) - 1)
 	SAMPLE_TIME      float64 = 1.0 / SND_FREQUENCY
 	STREAM_LEN               = (2 * 2 * SND_FREQUENCY / 60) - (2*2*SND_FREQUENCY/60)%4
+	BUFF_SIZE                = ((SND_SAMPLES) * 16 * 2)
 )

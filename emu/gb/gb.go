@@ -49,8 +49,6 @@ type GameBoy struct {
 
     Paused bool
     Muted bool
-
-    //Logger *Logger
 }
 
 type Timer struct {
@@ -84,7 +82,6 @@ func NewGameBoy(path string) *GameBoy {
 
     pixels := make([]byte, width*height*4)
     gb.Pixels = &pixels
-    //gb.Logger = NewLogger("./logging", &gb)
 
     gb.Apu.GameBoy = &gb
 
@@ -115,15 +112,6 @@ func (gb *GameBoy) Update() {
 		cycles := 4
 
 		opcode, err := gb.ReadByte(gb.Cpu.PC)
-
-        //if instCount > 16_971_850 {
-        //    gb.Logger.Close()
-        //    os.Exit(0)
-        //}
-
-        //if instCount > 16_971_830 {
-        //    gb.Logger.WriteLog(instCount, opcode)
-        //}
 
 		if err != nil {
 			panic(err)

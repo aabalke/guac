@@ -13,6 +13,7 @@ const (
 )
 
 type ToneChannel struct {
+    Apu *Apu
     Idx uint32
     CntL, CntH, CntX uint16
 
@@ -22,7 +23,7 @@ type ToneChannel struct {
 
 func (ch *ToneChannel) GetSample() int8 {
 
-    if !ApuInstance.isSoundChanEnable(uint8(ch.Idx)) {
+    if !ch.Apu.isSoundChanEnable(uint8(ch.Idx)) {
         return 0
     }
 
@@ -45,7 +46,7 @@ func (ch *ToneChannel) GetSample() int8 {
     if lenFlag := utils.BitEnabled(uint32(ch.CntX), 14); lenFlag {
 		ch.lengthTime += SAMPLE_TIME
 		if ch.lengthTime >= length {
-            ApuInstance.enableSoundChan(int(ch.Idx), false)
+            ch.Apu.enableSoundChan(int(ch.Idx), false)
 			return 0
 		}
 	}
@@ -77,7 +78,7 @@ func (ch *ToneChannel) GetSample() int8 {
                     ch.CntX = cntx
 
                 } else {
-                    ApuInstance.enableSoundChan(int(ch.Idx), false)
+                    ch.Apu.enableSoundChan(int(ch.Idx), false)
                 }
             }
         }

@@ -10,6 +10,7 @@ import (
 	"github.com/aabalke33/guac/emu/gba/cart"
 	"github.com/aabalke33/guac/emu/gba/utils"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/oto"
 )
 
 const (
@@ -70,6 +71,10 @@ type GBA struct {
     PPU PPU
 
     Cache Cache
+
+    Frame uint64
+
+    Apu *apu.Apu
 }
 
 func (gba *GBA) SoftReset() {
@@ -108,6 +113,7 @@ func (gba *GBA) Update() {
         // irq has to be at end (count up tests)
         gba.Irq.checkIRQ()
 
+
         if !gba.Halted {
             CURR_INST++
         }
@@ -120,15 +126,17 @@ func (gba *GBA) Update() {
     //cpuDurations[frame % 100] = time.Since(st).Milliseconds()
     //getProfilerTimes(frame)
 
-    apu.ApuInstance.SoundBufferWrap()
-    apu.ApuInstance.Play(gba.Muted)
+    //apu.ApuInstance.SoundBufferWrap()
+    gba.Apu.Play(gba.Muted, gba.Frame)
+
+    gba.Frame++
 
     return
 }
 
 func (gba *GBA) Tick(cycles uint32) {
     gba.VideoUpdate(uint32(cycles))
-    apu.ApuInstance.SoundClock(uint32(cycles))
+    gba.Apu.SoundClock(uint32(cycles))
     gba.Timers.Update(uint32(cycles))
 }
 
@@ -140,7 +148,7 @@ func (gba *GBA) checkDmas(mode uint32) {
     }
 }
 
-func NewGBA(path string) *GBA {
+func NewGBA(path string, ctx *oto.Context) *GBA {
 
     img := ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT)
 
@@ -181,8 +189,7 @@ func NewGBA(path string) *GBA {
 
     gba.LoadBios("./emu/gba/res/bios_magia.gba")
 
-    apu.InitApuInstance()
-    apu.InitAudio()
+    gba.Apu = apu.NewApu(ctx)
 
     aveAverages = make([]int64, 0)
 
@@ -219,7 +226,7 @@ func (gba *GBA) TogglePause() bool {
 func (gba *GBA) Close() {
 	gba.Muted = true
 	gba.Paused = true
-    apu.ApuInstance.Close()
+    gba.Apu.Close()
 }
 
 func (gba *GBA) LoadGame(path string) {

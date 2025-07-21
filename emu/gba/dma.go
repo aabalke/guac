@@ -1,7 +1,6 @@
 package gba
 
 import (
-	"github.com/aabalke33/guac/emu/gba/apu"
 	"github.com/aabalke33/guac/emu/gba/cart"
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
@@ -320,7 +319,7 @@ var fifoCount = 0
 
 func (dma *DMA) transferFifo() {
 
-    a := &apu.ApuInstance
+    a := dma.Gba.Apu
 
     switch {
     case !a.IsSoundEnabled():                   return

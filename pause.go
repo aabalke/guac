@@ -106,10 +106,13 @@ func (p *Pause) handleSelection(g *Game) {
     case IDX_EXIT:
 
         g.flags.Type = NONE
+
+        g.gba.Close()
+
         g.gb = nil
         g.gba = nil
 
-        g.menu = menu.NewMenu(g.audioContext)
+        g.menu = menu.NewMenu(g.menuCtx)
 
         g.paused = false
         g.pause = NewPause()

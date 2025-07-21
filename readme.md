@@ -26,8 +26,7 @@ Selection Screen.
 ### Setting up Console Mode
 
 In the same directory as ./guac, create a "roms.json" file. This file will hold
-the game metadata in the following format. At this time Art **MUST** be perfect
-square pngs.
+the game metadata in the following format. At this time Art **MUST** be pngs.
 
 ```
 [
@@ -45,7 +44,10 @@ square pngs.
 
 Please use the releases for precompiled binaries.
 
-Building requires SDL2, SDL2_ttf and SDL2_mixer.
+```
+go build -ldflags="-H=windowsgui"
+```
+
 
 # Keybindings / Controller Support
 

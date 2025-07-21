@@ -7,6 +7,7 @@ import (
 )
 
 type NoiseChannel struct {
+    Apu *Apu
     Idx uint32
     CntL, CntH uint16
 
@@ -16,7 +17,7 @@ type NoiseChannel struct {
 
 func (ch *NoiseChannel) GetSample() int8 {
 
-    if !ApuInstance.isSoundChanEnable(uint8(ch.Idx)) {
+    if !ch.Apu.isSoundChanEnable(uint8(ch.Idx)) {
         return 0
     }
 
@@ -26,7 +27,7 @@ func (ch *NoiseChannel) GetSample() int8 {
     if stopAtLength := utils.BitEnabled(uint32(ch.CntH), 14); stopAtLength {
 		ch.lengthTime += SAMPLE_TIME
         if stop := ch.lengthTime >= length; stop {
-            ApuInstance.enableSoundChan(int(ch.Idx), false)
+            ch.Apu.enableSoundChan(int(ch.Idx), false)
 			return 0
 		}
 	}

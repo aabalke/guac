@@ -5,7 +5,6 @@ import (
 	"log"
 	"strings"
 
-	"github.com/aabalke33/guac/oto"
 	"github.com/hajimehoshi/ebiten/v2"
 
 	"os"
@@ -20,7 +19,6 @@ const (
 
 func main() {
 
-    oto.InitSound()
 
     flags := getFlags()
 
@@ -35,7 +33,6 @@ func main() {
 
         pprof.StartCPUProfile(f)
         ebiten.SetTPS(360)
-
     }
 
     ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)

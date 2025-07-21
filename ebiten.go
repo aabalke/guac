@@ -11,6 +11,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
+	"github.com/hajimehoshi/oto"
 
 	"github.com/aabalke33/guac/menu"
 )
@@ -21,10 +22,6 @@ var (
     darkGrey = color.RGBA{R: 10, G: 10, B: 10, A: 255}
     exit = errors.New("Exit")
 )
-
-// 44100 is required for menu sounds
-//const sampleRate = 48000
-const sampleRate = 44100
 
 type Game struct {
     flags Flags
@@ -39,15 +36,17 @@ type Game struct {
     gamepad ebiten.GamepadID
     gamepadConnected bool
 
-    audioContext *audio.Context
+    menuCtx *audio.Context
 
+    emuCtx *oto.Context
 }
 
 func NewGame(flags Flags) *Game {
 
     g := &Game{
         flags: flags,
-        audioContext: audio.NewContext(sampleRate),
+        menuCtx: audio.NewContext(SND_FREQUENCY),
+        emuCtx: NewAudioContext(),
     }
 
     switch g.flags.Type {
@@ -55,11 +54,11 @@ func NewGame(flags Flags) *Game {
 
         //ebiten.SetFullscreen(true)
 
-        g.menu = menu.NewMenu(g.audioContext)
+        g.menu = menu.NewMenu(g.menuCtx)
         g.pause = NewPause()
 
     case GBA:
-        g.gba = gba.NewGBA(flags.RomPath)
+        g.gba = gba.NewGBA(flags.RomPath, g.emuCtx)
     case GB:
         g.gb = gameboy.NewGameBoy(flags.RomPath)
     }
@@ -125,23 +124,24 @@ func (g *Game) Update() error {
     if g.paused {
         g.pause.InputHandler(g, justKeys, justButtons)
         return nil
-    }
+    } else {
 
-    switch g.flags.Type {
-    case NONE:
-        selected := g.menu.InputHandler(justKeys, justButtons)
-        if selected {
-            g.SelectConsole()
-            g.menu = nil
+        switch g.flags.Type {
+        case NONE:
+            selected := g.menu.InputHandler(justKeys, justButtons)
+            if selected {
+                g.SelectConsole()
+                g.menu = nil
+            }
+        case GBA:
+            g.gba.InputHandler(keys, buttons)
+            g.gba.Update()
+            g.gba.Image.WritePixels(g.gba.Pixels)
+        case GB:
+            g.gb.InputHandler(keys, buttons)
+            g.gb.Update()
+            g.gb.Image.WritePixels(*g.gb.Pixels)
         }
-    case GBA:
-        g.gba.InputHandler(keys, buttons)
-        g.gba.Update()
-        g.gba.Image.WritePixels(g.gba.Pixels)
-    case GB:
-        g.gb.InputHandler(keys, buttons)
-        g.gb.Update()
-        g.gb.Image.WritePixels(*g.gb.Pixels)
     }
 
     g.frame++
@@ -157,7 +157,7 @@ func (g *Game) SelectConsole() {
 
     switch rom.Type {
     case GBA:
-        g.gba = gba.NewGBA(rom.RomPath)
+        g.gba = gba.NewGBA(rom.RomPath, g.emuCtx)
         g.flags.Type = GBA
     case GB:
         g.gb = gameboy.NewGameBoy(rom.RomPath)

@@ -3,18 +3,9 @@ package apu
 import (
 	"fmt"
 
+	//"github.com/aabalke33/guac/audio"
 	"github.com/aabalke33/guac/emu/gba/utils"
-	aOto "github.com/aabalke33/guac/oto"
-)
-
-// CURRENTLY USING OTO AND SDL
-// SDL HAS PROBLEMS WITH OVER AND UNDER RUNS, SO OTO IS MAIN NOW
-
-const OTO_VERSION = true
-
-var (
-    ApuInstance Apu
-	sndCycles = uint32(0)
+	"github.com/hajimehoshi/oto"
 )
 
 type Apu struct {
@@ -25,16 +16,18 @@ type Apu struct {
     SoundBuffer [BUFF_SIZE]int16
     ReadPointer, WritePointer uint32
 
-    //IO[0x120]uint8
-    IO[0x1_0000]uint8
+    IO[0x120]uint8
 
     ToneChannel1 *ToneChannel
     ToneChannel2 *ToneChannel
     WaveChannel *WaveChannel
     NoiseChannel *NoiseChannel
 
-    // These Are used by oto version only
 	Stream []byte
+
+    sndCycles uint32
+
+    player *oto.Player
 }
 
 func (a *Apu) isSoundChanEnable(ch uint8) bool {
@@ -42,38 +35,25 @@ func (a *Apu) isSoundChanEnable(ch uint8) bool {
 	return utils.BitEnabled(cntx, ch)
 }
 
-func InitApuInstance() {
-
-    ApuInstance.Stream = make([]byte, STREAM_LEN)
-    ApuInstance.WritePointer = 0x200
-    ApuInstance.FifoA = &Fifo{}
-    ApuInstance.FifoB = &Fifo{}
-
-    ApuInstance.ToneChannel1 = &ToneChannel{
-        Idx: 0,
-    }
-    ApuInstance.ToneChannel2 = &ToneChannel{
-        Idx: 1,
-    }
-    ApuInstance.WaveChannel = &WaveChannel{
-        Idx: 2,
-    }
-    ApuInstance.NoiseChannel = &NoiseChannel{
-        Idx: 3,
+func NewApu(audioContext *oto.Context) *Apu {
+    a := &Apu {
+        Stream: make([]byte, STREAM_LEN),
+        WritePointer: 0x200,
+        FifoA: &Fifo{},
+        FifoB: &Fifo{},
     }
 
-    if aOto.OtoPlayer != nil {
-        aOto.OtoPlayer.Close()
-    }
+    a.ToneChannel1 = &ToneChannel{Apu: a, Idx: 0}
+    a.ToneChannel2 = &ToneChannel{Apu: a, Idx: 1}
+    a.WaveChannel  = &WaveChannel{Apu: a, Idx: 2}
+    a.NoiseChannel = &NoiseChannel{Apu: a, Idx: 3}
 
-    aOto.OtoPlayer = aOto.OtoContext.NewPlayer()
+    a.player = audioContext.NewPlayer()
+
+    return a
 }
 
-func (a *Apu) Play(muted bool) {
-
-    if !OTO_VERSION {
-        return
-    }
+func (a *Apu) Play(muted bool, frame uint64) {
 
 	a.Enable = true
 
@@ -87,25 +67,21 @@ func (a *Apu) Play(muted bool) {
 
 	a.soundMix()
 
-	if aOto.OtoPlayer == nil {
-        return
-	}
-
     if muted {
         return
     }
 
-    //return
+    if a.player == nil {
+        return
+    }
 
-    aOto.OtoPlayer.Write(a.Stream)
+
+    a.player.Write(a.Stream)
+    //audio.WriteGBA(a.Stream)
 }
 
 func (a *Apu) Close() {
-
-    if aOto.OtoPlayer != nil {
-        aOto.OtoPlayer.Close()
-        aOto.OtoPlayer = nil
-    }
+    a.player.Close()
 }
 
 func (a *Apu) soundMix() {
@@ -135,10 +111,6 @@ func (a *Apu) IsSoundEnabled() bool {
 
 func (a *Apu) GetSample() (int16, int16) {
 
-    if OTO_VERSION {
-        return 0, 0
-    }
-
     if a.WritePointer == a.ReadPointer {
         fmt.Printf("WRITE AND READ OVERLAP\n")
     }
@@ -153,10 +125,6 @@ func (a *Apu) GetSample() (int16, int16) {
 }
 
 func (a *Apu) Sync() {
-
-    if OTO_VERSION {
-        return
-    }
 
 	delta := (int32(a.WritePointer-a.ReadPointer) >> 8) - (int32(a.WritePointer-a.ReadPointer)>>8)%4
     if delta > 0 {
@@ -213,7 +181,7 @@ func (a *Apu) fifoFx(ch uint8, sample int16) (int16, int16) {
 
 func (a *Apu) SoundClock(cycles uint32) {
 
-	sndCycles += cycles
+	a.sndCycles += cycles
 
 	sampleA := int16(a.FifoA.Sample) << 1
 	sampleB := int16(a.FifoB.Sample) << 1
@@ -226,7 +194,7 @@ func (a *Apu) SoundClock(cycles uint32) {
     sampleLeft := int32(sampleLeftA) + int32(sampleLeftB)
     sampleRight := int32(sampleRightA) + int32(sampleRightB)
 
-	for sndCycles >= SAMP_CYCLES {
+	for a.sndCycles >= SAMP_CYCLES {
 
         psgL, psgR := int32(0), int32(0)
 
@@ -281,7 +249,7 @@ func (a *Apu) SoundClock(cycles uint32) {
 		a.SoundBuffer[a.WritePointer&(BUFF_SIZE - 1)] = clip(int32(sampleRight) + psgR)
 		a.WritePointer++
 
-		sndCycles -= SAMP_CYCLES
+		a.sndCycles -= SAMP_CYCLES
 	}
 }
 

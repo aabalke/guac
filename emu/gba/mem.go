@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aabalke33/guac/emu/gba/apu"
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
@@ -600,7 +599,7 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 	// do not make bg control addrs special, unless you know what the f you are doing
 	// VCOUNT is not writable, no touchy
     if sound := addr >= 0x60 && addr < 0xB0; sound {
-        WriteSound(addr, v, &apu.ApuInstance)
+        WriteSound(addr, v, m.GBA.Apu)
         return
     }
 
@@ -829,7 +828,7 @@ func (m *Memory) ReadSoundIO(addr uint32) uint8 {
     case 0xAC: return m.ReadOpenBus(addr)
     case 0xAE: return m.ReadOpenBus(addr - 2)
     default:
-        return ReadSound(addr, &apu.ApuInstance)
+        return ReadSound(addr, m.GBA.Apu)
     }
 }
 func (m *Memory) ReadIODirect(addr uint32, size uint32) uint32 {

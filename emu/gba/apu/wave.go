@@ -3,6 +3,7 @@ package apu
 import "github.com/aabalke33/guac/emu/gba/utils"
 
 type WaveChannel struct {
+    Apu *Apu
 	Idx uint32
 
 	CntL, CntH, CntX uint16
@@ -15,7 +16,7 @@ type WaveChannel struct {
 
 func (ch *WaveChannel) GetSample() int8 {
 
-    if !ApuInstance.isSoundChanEnable(uint8(ch.Idx)) {
+    if !ch.Apu.isSoundChanEnable(uint8(ch.Idx)) {
         return 0
     }
 
@@ -29,7 +30,7 @@ func (ch *WaveChannel) GetSample() int8 {
     if stopAtLength := utils.BitEnabled(uint32(ch.CntX), 14); stopAtLength {
 		ch.lengthTime += SAMPLE_TIME
         if stop := ch.lengthTime >= length; stop {
-            ApuInstance.enableSoundChan(int(ch.Idx), false)
+            ch.Apu.enableSoundChan(int(ch.Idx), false)
 			return 0
 		}
 	}
