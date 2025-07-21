@@ -39,12 +39,12 @@ func (ch *ToneChannel) GetSample() int8 {
 	envStep := ch.CntH >> 8 & 0b111
 	envelopeInterval := float64(envStep) / 64
 
-	cycleSamples := SND_FREQUENCY / frequency // Numbers of samples that a single cycle (wave phase change 1 -> 0) takes at output sample rate
+	cycleSamples := float64(ch.Apu.sndFrequency) / frequency // Numbers of samples that a single cycle (wave phase change 1 -> 0) takes at output sample rate
 
 	// Length reached check (if so, just disable the channel and return silence)
 
     if lenFlag := utils.BitEnabled(uint32(ch.CntX), 14); lenFlag {
-		ch.lengthTime += SAMPLE_TIME
+		ch.lengthTime += ch.Apu.sampleTime
 		if ch.lengthTime >= length {
             ch.Apu.enableSoundChan(int(ch.Idx), false)
 			return 0
@@ -56,7 +56,7 @@ func (ch *ToneChannel) GetSample() int8 {
         sweepTime := (ch.CntL >> 4) & 0b111 // 0-7 (0=7.8ms, 7=54.7ms)
         sweepInterval := 0.0078 * float64(sweepTime+1)    // Frquency sweep change interval in seconds
 
-        ch.sweepTime += SAMPLE_TIME
+        ch.sweepTime += ch.Apu.sampleTime
         if ch.sweepTime >= sweepInterval {
             ch.sweepTime -= sweepInterval
 
@@ -87,7 +87,7 @@ func (ch *ToneChannel) GetSample() int8 {
 	// Envelope volume
 	envelope := (ch.CntH >> 12) & 0xf
 	if envStep > 0 {
-		ch.envTime += SAMPLE_TIME
+		ch.envTime += ch.Apu.sampleTime
 
 		if ch.envTime >= envelopeInterval {
 			ch.envTime -= envelopeInterval

@@ -1,6 +1,7 @@
 package gba
 
 import (
+
 	"github.com/aabalke33/guac/emu/gba/apu"
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
@@ -14,14 +15,7 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 		a.SoundCntX = uint16((uint8(a.SoundCntX) & 0x0F) | (v & 0x80))
 
 		if disabled := !utils.BitEnabled(uint32(v), 7); disabled {
-			// this will need to clear fifo and psg
-
-			for i := range 0x21 {
-				a.IO[0x60+i] = 0
-			}
-
-			//a.SoundCntH = 0
-			a.SoundCntX = 0
+            a.Disable()
 		}
 
         return
@@ -36,7 +30,6 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
         bank := (a.WaveChannel.CntL >> 2) & 0x10
         idx := (bank ^ 0x10) | uint16(addr) & 0xF
         a.WaveChannel.WaveRam[idx] = v
-		a.IO[addr] = v
         return
     }
 
@@ -177,12 +170,34 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 
 	case 0x85, 0x86, 0x87:
 		return
+
+    case 0x88:
+        a.SoundBias &^= 0x00FF
+        a.SoundBias |= uint16(v)
+
+    case 0x89:
+
+        a.SoundBias &= 0x00FF
+        a.SoundBias |= uint16(v) << 8
+
 	default:
-		a.IO[addr] = v
+
+        //fmt.Printf("SND WRITE AT ADDR %08X\n", addr)
+		//a.IO[addr] = v
 	}
 }
 
 func ReadSound(addr uint32, a *apu.Apu) uint8 {
+
+    if wave := addr >= 0x90 && addr < 0xA0; wave {
+        bank := (a.WaveChannel.CntL >> 2) & 0x10
+        idx := (bank ^ 0x10) | uint16(addr) & 0xF
+        return a.WaveChannel.WaveRam[idx]
+    }
+
+    if fifo := addr >= 0xA0 && addr < 0xB0; fifo {
+        return 0
+    }
 
     switch addr {
     case 0x60: return uint8(a.ToneChannel1.CntL) &^ 0x80
@@ -227,12 +242,17 @@ func ReadSound(addr uint32, a *apu.Apu) uint8 {
     case 0x83: return uint8(a.SoundCntH >> 8) & 0x77
     case 0x84: return uint8(a.SoundCntX) & 0x8F
     case 0x85: return 0
-    }
-
-    switch addr &^ 0b1 {
-    case 0x76: return 0
     case 0x86: return 0
+    case 0x87: return 0
+
+    case 0x88: return uint8(a.SoundBias) &^ 0x1
+    case 0x89: return uint8(a.SoundBias >> 8) &^ 0xC3
     case 0x8A: return 0
-    default: return a.IO[addr]
+    case 0x8B: return 0
+
+    default:
+        return 0
+        //fmt.Printf("SND READ AT ADDR %08X\n", addr)
+        //return a.IO[addr]
     }
 }

@@ -189,7 +189,14 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 
     gba.LoadBios("./emu/gba/res/bios_magia.gba")
 
-    gba.Apu = apu.NewApu(ctx)
+    const (
+	    CPU_FREQ_HZ              = 16777216
+	    SND_FREQUENCY            = 32768 // sample rate
+	    //SND_FREQUENCY            = 44100 // sample rate
+	    //SND_FREQUENCY            = 48000 // sample rate
+	    SND_SAMPLES              = 512
+    )
+    gba.Apu = apu.NewApu(ctx, CPU_FREQ_HZ, SND_FREQUENCY, SND_SAMPLES)
 
     aveAverages = make([]int64, 0)
 

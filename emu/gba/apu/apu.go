@@ -3,7 +3,6 @@ package apu
 import (
 	"fmt"
 
-	//"github.com/aabalke33/guac/audio"
 	"github.com/aabalke33/guac/emu/gba/utils"
 	"github.com/hajimehoshi/oto"
 )
@@ -13,10 +12,10 @@ type Apu struct {
 
     FifoA, FifoB *Fifo
     SoundCntL, SoundCntH, SoundCntX uint16
-    SoundBuffer [BUFF_SIZE]int16
-    ReadPointer, WritePointer uint32
+    SoundBias uint16
 
-    IO[0x120]uint8
+    SoundBuffer []int16
+    ReadPointer, WritePointer uint32
 
     ToneChannel1 *ToneChannel
     ToneChannel2 *ToneChannel
@@ -28,6 +27,30 @@ type Apu struct {
     sndCycles uint32
 
     player *oto.Player
+
+	cpuFreqHz      int
+	sndFrequency   int
+	sndSamples     int
+	sampCycles     int
+	buffSamples    int
+	sampleTime     float64
+	streamLen      int
+	buffSize       int
+}
+
+func (a *Apu) Disable() {
+
+    fmt.Printf("NEED TO DISABLED ALL CH, SET all registers to zero, and zero wave ram\n")
+
+    // ONLY FOR 0x60 -> 0x81 to zero, and CntX to 0
+			// this will need to clear fifo and psg
+			//for i := range 0x21 {
+			//	a.IO[0x60+i] = 0
+			//}
+
+			////a.SoundCntH = 0
+			//a.SoundCntX = 0
+
 }
 
 func (a *Apu) isSoundChanEnable(ch uint8) bool {
@@ -35,14 +58,23 @@ func (a *Apu) isSoundChanEnable(ch uint8) bool {
 	return utils.BitEnabled(cntx, ch)
 }
 
-func NewApu(audioContext *oto.Context) *Apu {
+func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu {
     a := &Apu {
-        Stream: make([]byte, STREAM_LEN),
         WritePointer: 0x200,
         FifoA: &Fifo{},
         FifoB: &Fifo{},
+        cpuFreqHz   : cpuFreq,
+        sndFrequency: sampleRate,
+        sndSamples  : sampleCnt,
+        sampCycles  : cpuFreq / sampleRate,
+        buffSamples : sampleCnt * 16 * 2,
+        sampleTime  : 1.0 / float64(sampleRate),
+        streamLen   : (2 * 2 * sampleRate / 60) - (2*2*sampleRate/60)%4,
+        buffSize    : ((sampleCnt) * 16 * 2),
     }
 
+    a.Stream = make([]byte, a.streamLen)
+    a.SoundBuffer = make([]int16, a.buffSize)
     a.ToneChannel1 = &ToneChannel{Apu: a, Idx: 0}
     a.ToneChannel2 = &ToneChannel{Apu: a, Idx: 1}
     a.WaveChannel  = &WaveChannel{Apu: a, Idx: 2}
@@ -86,9 +118,9 @@ func (a *Apu) Close() {
 
 func (a *Apu) soundMix() {
     
-	for i := 0; i < STREAM_LEN; i += 4 {
+	for i := 0; i < a.streamLen; i += 4 {
         for j := range 2 {
-            snd := a.SoundBuffer[a.ReadPointer&(BUFF_SIZE - 1)] << 6
+            snd := a.SoundBuffer[a.ReadPointer&uint32(a.buffSize - 1)] << 6
             idx := i + (2 * j)
             a.Stream[idx] = uint8(snd)
             a.Stream[idx + 1] = uint8(snd>>8)
@@ -115,10 +147,10 @@ func (a *Apu) GetSample() (int16, int16) {
         fmt.Printf("WRITE AND READ OVERLAP\n")
     }
 
-    l := a.SoundBuffer[a.ReadPointer&(BUFF_SIZE - 1)] << 6
+    l := a.SoundBuffer[a.ReadPointer&uint32(a.buffSize - 1)] << 6
     a.ReadPointer++
 
-    r := a.SoundBuffer[a.ReadPointer&(BUFF_SIZE - 1)] << 6
+    r := a.SoundBuffer[a.ReadPointer&uint32(a.buffSize - 1)] << 6
     a.ReadPointer++
 
     return l, r
@@ -135,11 +167,11 @@ func (a *Apu) Sync() {
 }
 
 func (a *Apu) SoundBufferWrap() {
-    l := a.ReadPointer / BUFF_SIZE
-    r := a.WritePointer / BUFF_SIZE
+    l := a.ReadPointer / uint32(a.buffSize)
+    r := a.WritePointer / uint32(a.buffSize)
 	if l == r {
-        a.ReadPointer &= (BUFF_SIZE - 1)
-        a.WritePointer &= (BUFF_SIZE - 1)
+        a.ReadPointer &= (uint32(a.buffSize) - 1)
+        a.WritePointer &= (uint32(a.buffSize) - 1)
 	}
 }
 
@@ -194,7 +226,7 @@ func (a *Apu) SoundClock(cycles uint32) {
     sampleLeft := int32(sampleLeftA) + int32(sampleLeftB)
     sampleRight := int32(sampleRightA) + int32(sampleRightB)
 
-	for a.sndCycles >= SAMP_CYCLES {
+	for a.sndCycles >= uint32(a.sampCycles) {
 
         psgL, psgR := int32(0), int32(0)
 
@@ -244,12 +276,12 @@ func (a *Apu) SoundClock(cycles uint32) {
 		psgL >>= rshLut[(a.SoundCntH)&3]
 		psgR >>= rshLut[(a.SoundCntH)&3]
 
-		a.SoundBuffer[a.WritePointer&(BUFF_SIZE - 1)] = clip(int32(sampleLeft) + psgL)
+		a.SoundBuffer[a.WritePointer&uint32(a.buffSize - 1)] = clip(int32(sampleLeft) + psgL)
 		a.WritePointer++
-		a.SoundBuffer[a.WritePointer&(BUFF_SIZE - 1)] = clip(int32(sampleRight) + psgR)
+		a.SoundBuffer[a.WritePointer&uint32(a.buffSize - 1)] = clip(int32(sampleRight) + psgR)
 		a.WritePointer++
 
-		a.sndCycles -= SAMP_CYCLES
+		a.sndCycles -= uint32(a.sampCycles)
 	}
 }
 

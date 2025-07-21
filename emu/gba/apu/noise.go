@@ -25,7 +25,7 @@ func (ch *NoiseChannel) GetSample() int8 {
 	length := (64 - float64(soundLength)) / 256
 
     if stopAtLength := utils.BitEnabled(uint32(ch.CntH), 14); stopAtLength {
-		ch.lengthTime += SAMPLE_TIME
+		ch.lengthTime += ch.Apu.sampleTime
         if stop := ch.lengthTime >= length; stop {
             ch.Apu.enableSoundChan(int(ch.Idx), false)
 			return 0
@@ -36,7 +36,7 @@ func (ch *NoiseChannel) GetSample() int8 {
     envelope := uint16(utils.GetVarData(uint32(ch.CntL), 12, 15))
 
 	if envStep != 0 {
-		ch.envTime += SAMPLE_TIME
+		ch.envTime += ch.Apu.sampleTime
         envelopeInterval := envStep / 64
 
 		if ch.envTime >= envelopeInterval {
@@ -65,7 +65,7 @@ func (ch *NoiseChannel) GetSample() int8 {
 	}
 
 	frequency := (524288 / r) / math.Pow(2, s+1)
-	cycleSamples := SND_FREQUENCY / frequency
+	cycleSamples := float64(ch.Apu.sndFrequency) / frequency
 
 	carry := byte(ch.lfsr & 0b1)
 	ch.samples++

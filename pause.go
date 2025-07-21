@@ -107,10 +107,15 @@ func (p *Pause) handleSelection(g *Game) {
 
         g.flags.Type = NONE
 
-        g.gba.Close()
+        if g.gba != nil {
+            g.gba.Close()
+            g.gba = nil
+        }
 
-        g.gb = nil
-        g.gba = nil
+        if g.gb != nil {
+            g.gb.Close()
+            g.gb = nil
+        }
 
         g.menu = menu.NewMenu(g.menuCtx)
 

@@ -28,7 +28,7 @@ func (ch *WaveChannel) GetSample() int8 {
 	length := (256 - float64(soundLength)) / 256
 
     if stopAtLength := utils.BitEnabled(uint32(ch.CntX), 14); stopAtLength {
-		ch.lengthTime += SAMPLE_TIME
+		ch.lengthTime += ch.Apu.sampleTime
         if stop := ch.lengthTime >= length; stop {
             ch.Apu.enableSoundChan(int(ch.Idx), false)
 			return 0
@@ -37,7 +37,7 @@ func (ch *WaveChannel) GetSample() int8 {
 
     rate := utils.GetVarData(uint32(ch.CntX), 0, 10)
 	freq := 2097152 / (2048 - float64(rate))
-	cycleSamples := SND_FREQUENCY / freq
+	cycleSamples := float64(ch.Apu.sndFrequency) / freq
 
 	ch.samples++
 	if ch.samples >= cycleSamples {
