@@ -17,8 +17,6 @@ import (
 )
 
 var (
-    green    = color.RGBA{R: 101, G: 163, B: 13, A: 255}
-    brown    = color.RGBA{R: 194, G: 138, B: 51, A: 255}
     darkGrey = color.RGBA{R: 10, G: 10, B: 10, A: 255}
     exit = errors.New("Exit")
 )
@@ -60,7 +58,7 @@ func NewGame(flags Flags) *Game {
     case GBA:
         g.gba = gba.NewGBA(flags.RomPath, g.emuCtx)
     case GB:
-        g.gb = gameboy.NewGameBoy(flags.RomPath)
+        g.gb = gameboy.NewGameBoy(flags.RomPath, g.emuCtx)
     }
 
     return g
@@ -160,7 +158,7 @@ func (g *Game) SelectConsole() {
         g.gba = gba.NewGBA(rom.RomPath, g.emuCtx)
         g.flags.Type = GBA
     case GB:
-        g.gb = gameboy.NewGameBoy(rom.RomPath)
+        g.gb = gameboy.NewGameBoy(rom.RomPath, g.emuCtx)
         g.flags.Type = GB
     default:
         panic("Selected Unknown Console")

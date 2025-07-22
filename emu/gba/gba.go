@@ -136,7 +136,7 @@ func (gba *GBA) Update() {
 
 func (gba *GBA) Tick(cycles uint32) {
     gba.VideoUpdate(uint32(cycles))
-    gba.Apu.SoundClock(uint32(cycles))
+    gba.Apu.SoundClock(uint32(cycles), false)
     gba.Timers.Update(uint32(cycles))
 }
 

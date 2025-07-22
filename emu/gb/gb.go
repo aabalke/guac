@@ -5,7 +5,9 @@ import (
 	"os"
 
 	"github.com/aabalke33/guac/emu/gb/cartridge"
+	"github.com/aabalke33/guac/emu/gba/apu"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/oto"
 )
 
 const (
@@ -30,7 +32,7 @@ type GameBoy struct {
 
 	Cartridge cartridge.Cartridge
 	Cpu       Cpu
-	Apu       APU
+	//Apu       APU
 	MemoryBus MemoryBus
 	FPS       int
 
@@ -49,6 +51,8 @@ type GameBoy struct {
 
     Paused bool
     Muted bool
+
+    Apu *apu.Apu
 }
 
 type Timer struct {
@@ -58,17 +62,17 @@ type Timer struct {
     InterruptPending bool
 }
 
-func NewGameBoy(path string) *GameBoy {
+func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 
     img := ebiten.NewImage(width, height)
 
     gb := GameBoy{
         Image: img,
 		Cpu: *NewCpu(),
-		Apu: APU{
-			SampleRate: 44100,
-			Enabled:    true,
-		},
+		//Apu: APU{
+		//	SampleRate: 44100,
+		//	Enabled:    true,
+		//},
 		FPS:    60,
 		Clock:  4194304,
 		Joypad: 0xFF,
@@ -83,9 +87,15 @@ func NewGameBoy(path string) *GameBoy {
     pixels := make([]byte, width*height*4)
     gb.Pixels = &pixels
 
-    gb.Apu.GameBoy = &gb
+    const (
+	    SND_FREQUENCY            = 32768 // sample rate
+	    SND_SAMPLES              = 512
+    )
+    gb.Apu = apu.NewApu(ctx, gb.Clock, SND_FREQUENCY, SND_SAMPLES)
 
-	gb.Apu.Init()
+    //gb.Apu.GameBoy = &gb
+
+	//gb.Apu.Init()
 
     gb.LoadGame(path)
 
@@ -107,8 +117,10 @@ func (gb *GameBoy) Update() {
         multiplier = 2
     }
 
+
     for updateCycles := 0; updateCycles < (gb.Clock / gb.FPS * multiplier); {
 
+        gb.Cycles = 0
 		cycles := 4
 
 		opcode, err := gb.ReadByte(gb.Cpu.PC)
@@ -136,11 +148,13 @@ func (gb *GameBoy) Update() {
         }
         updateCycles += interruptCycles
         gb.Cycles += interruptCycles
+        gb.Apu.SoundClock(uint32(gb.Cycles), gb.DoubleSpeed)
 
 		gb.UpdateTimers()
 	}
 
     gb.UpdateDisplay()
+    gb.Apu.Play(gb.Muted, 0)
 }
 
 func (gb *GameBoy) ToggleMute() bool {
@@ -171,7 +185,7 @@ func (gb *GameBoy) LoadGame(filepath string) {
 	gb.loadCartridge()
 
 	initMemory(gb)
-	gb.Apu.MemoryBus = &gb.MemoryBus
+	//gb.Apu.MemoryBus = &gb.MemoryBus
 }
 
 func (gb *GameBoy) loadCartridge() {
@@ -414,4 +428,5 @@ func (gb *GameBoy) toggleDoubleSpeed() {
 func (gb *GameBoy) Close() {
     gb.Muted = true
     gb.Paused = true
+    gb.Apu.Close()
 }

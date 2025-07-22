@@ -21,10 +21,15 @@ type ToneChannel struct {
     samples, lengthTime, sweepTime, envTime float64
 }
 
-func (ch *ToneChannel) GetSample() int8 {
+func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 
     if !ch.Apu.isSoundChanEnable(uint8(ch.Idx)) {
         return 0
+    }
+
+    multipler := uint16(1)
+    if doubleSpeed {
+        multipler = 2
     }
 
 	//toneAddr := uint32(ch.CntH)
@@ -33,11 +38,15 @@ func (ch *ToneChannel) GetSample() int8 {
 
 	// Full length of the generated wave (if enabled) in seconds
 	soundLen := ch.CntH & 0b0011_1111
-	length := float64(64-soundLen) / 256
+	//length := float64(64-soundLen) / 256
+    maxTimer := 64.0 * float64(multipler)
+    divApuRate := float64(multipler) / 256.0
+    length := (maxTimer - float64(soundLen)) * divApuRate
+	//length := float64((multipler * 64)-soundLen) / (256) * 2
 
 	// Envelope volume change interval in seconds
 	envStep := ch.CntH >> 8 & 0b111
-	envelopeInterval := float64(envStep) / 64
+	envelopeInterval := float64(envStep) / float64(64)
 
 	cycleSamples := float64(ch.Apu.sndFrequency) / frequency // Numbers of samples that a single cycle (wave phase change 1 -> 0) takes at output sample rate
 

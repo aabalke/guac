@@ -33,8 +33,8 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
         return
     }
 
-    if apu.IsResetSoundChan(addr) {
-        a.ResetSoundChan(addr, v)
+    if apu.IsResetSoundChan(addr, false) {
+        a.ResetSoundChan(addr, v, false)
     }
 
 	switch addr {

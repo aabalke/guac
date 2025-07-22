@@ -222,7 +222,8 @@ func (gb *GameBoy) WriteByte(addr uint16, byte uint8) error {
         // Only bit 7 of master volume is writeable
         bit := byte & 0x80
         v := (Memory[0xFF26] & 0x7F) | bit
-        gb.Apu.Update(addr, v, gb)
+        WriteSound(uint32(addr & 0xFF), v, gb.Apu)
+        //gb.Apu.Update(addr, v, gb)
 
 	case 0xFF44:
 		Memory[0xFF44] = 0
@@ -330,7 +331,8 @@ func (gb *GameBoy) WriteByte(addr uint16, byte uint8) error {
     case addr < 0xFF40:
         // Sound IO
 		Memory[addr] = byte
-        gb.Apu.Update(addr, byte, gb)
+        WriteSound(uint32(addr & 0xFF), byte, gb.Apu)
+        //gb.Apu.Update(addr, byte, gb)
 
 	default:
 		Memory[addr] = byte

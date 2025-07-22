@@ -107,7 +107,6 @@ func (a *Apu) Play(muted bool, frame uint64) {
         return
     }
 
-
     a.player.Write(a.Stream)
     //audio.WriteGBA(a.Stream)
 }
@@ -117,7 +116,7 @@ func (a *Apu) Close() {
 }
 
 func (a *Apu) soundMix() {
-    
+
 	for i := 0; i < a.streamLen; i += 4 {
         for j := range 2 {
             snd := a.SoundBuffer[a.ReadPointer&uint32(a.buffSize - 1)] << 6
@@ -211,7 +210,7 @@ func (a *Apu) fifoFx(ch uint8, sample int16) (int16, int16) {
 
 }
 
-func (a *Apu) SoundClock(cycles uint32) {
+func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 
 	a.sndCycles += cycles
 
@@ -226,11 +225,16 @@ func (a *Apu) SoundClock(cycles uint32) {
     sampleLeft := int32(sampleLeftA) + int32(sampleLeftB)
     sampleRight := int32(sampleRightA) + int32(sampleRightB)
 
-	for a.sndCycles >= uint32(a.sampCycles) {
+    multiplier := 1
+    if doubleSpeed {
+        multiplier = 2
+    }
+
+	for a.sndCycles >= uint32(a.sampCycles * multiplier) {
 
         psgL, psgR := int32(0), int32(0)
 
-        ch1Sample := int32(a.ToneChannel1.GetSample())
+        ch1Sample := int32(a.ToneChannel1.GetSample(doubleSpeed))
 
         if leftEnabled := utils.BitEnabled(uint32(a.SoundCntL), 12); leftEnabled {
             psgL = psgL + ch1Sample
@@ -240,7 +244,7 @@ func (a *Apu) SoundClock(cycles uint32) {
             psgR = psgR + ch1Sample
         }
 
-        ch2Sample := int32(a.ToneChannel2.GetSample())
+        ch2Sample := int32(a.ToneChannel2.GetSample(doubleSpeed))
 
         if leftEnabled := utils.BitEnabled(uint32(a.SoundCntL), 13); leftEnabled {
             psgL = psgL + ch2Sample
@@ -250,7 +254,7 @@ func (a *Apu) SoundClock(cycles uint32) {
             psgR = psgR + ch2Sample
         }
 
-        ch3Sample := int32(a.WaveChannel.GetSample())
+        ch3Sample := int32(a.WaveChannel.GetSample(doubleSpeed))
 
         if leftEnabled := utils.BitEnabled(uint32(a.SoundCntL), 14); leftEnabled {
             psgL = psgL + ch3Sample
@@ -260,7 +264,7 @@ func (a *Apu) SoundClock(cycles uint32) {
             psgR = psgR + ch3Sample
         }
 
-        ch4Sample := int32(a.NoiseChannel.GetSample())
+        ch4Sample := int32(a.NoiseChannel.GetSample(doubleSpeed))
 
         if leftEnabled := utils.BitEnabled(uint32(a.SoundCntL), 15); leftEnabled {
             psgL = psgL + ch4Sample
@@ -281,7 +285,7 @@ func (a *Apu) SoundClock(cycles uint32) {
 		a.SoundBuffer[a.WritePointer&uint32(a.buffSize - 1)] = clip(int32(sampleRight) + psgR)
 		a.WritePointer++
 
-		a.sndCycles -= uint32(a.sampCycles)
+		a.sndCycles -= uint32(a.sampCycles * multiplier)
 	}
 }
 
@@ -295,16 +299,26 @@ func (a *Apu) enableSoundChan(ch int, enable bool) {
     a.SoundCntX &^= (1 << ch)
 }
 
-func IsResetSoundChan(addr uint32) bool {
-	_, ok := resetSoundChanMap[addr]
+func IsResetSoundChan(addr uint32, isGB bool) bool {
+
+    if isGB {
+        _, ok := resetSoundChanMapGB[addr]
+        return ok
+    }
+	_, ok := resetSoundChanMapGBA[addr]
 	return ok
 }
 
-func (a *Apu) ResetSoundChan(addr uint32, b byte) {
-	a._resetSoundChan(resetSoundChanMap[addr], utils.BitEnabled(uint32(b), 7))
+func (a *Apu) ResetSoundChan(addr uint32, b byte, isGB bool) {
+    if isGB {
+        a._resetSoundChan(resetSoundChanMapGB[addr], utils.BitEnabled(uint32(b), 7))
+        return
+    }
+	a._resetSoundChan(resetSoundChanMapGBA[addr], utils.BitEnabled(uint32(b), 7))
 }
 
-var resetSoundChanMap = map[uint32]int{0x65: 0, 0x6d: 1, 0x75: 2, 0x7d: 3}
+var resetSoundChanMapGBA = map[uint32]int{0x65: 0, 0x6d: 1, 0x75: 2, 0x7d: 3}
+var resetSoundChanMapGB = map[uint32]int{0x14: 0, 0x19: 1, 0x1E: 2, 0x23: 3}
 
 func (a *Apu) _resetSoundChan(ch int, enable bool) {
 	if enable {

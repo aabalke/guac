@@ -14,7 +14,7 @@ type WaveChannel struct {
     WaveSamples, WavePosition uint8
 }
 
-func (ch *WaveChannel) GetSample() int8 {
+func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
 
     if !ch.Apu.isSoundChanEnable(uint8(ch.Idx)) {
         return 0
@@ -24,8 +24,15 @@ func (ch *WaveChannel) GetSample() int8 {
         return 0
     }
 
+    multipler := uint16(1)
+    if doubleSpeed {
+        multipler = 2
+    }
+    maxTimer := 256.0 * float64(multipler)
+    divApuRate := float64(multipler) / 256.0
+
     soundLength := utils.GetVarData(uint32(ch.CntH), 0, 7)
-	length := (256 - float64(soundLength)) / 256
+	length := (maxTimer - float64(soundLength)) / divApuRate
 
     if stopAtLength := utils.BitEnabled(uint32(ch.CntX), 14); stopAtLength {
 		ch.lengthTime += ch.Apu.sampleTime
