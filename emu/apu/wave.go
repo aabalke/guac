@@ -1,7 +1,5 @@
 package apu
 
-import "github.com/aabalke33/guac/emu/gba/utils"
-
 type WaveChannel struct {
     Apu *Apu
 	Idx uint32
@@ -20,7 +18,7 @@ func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
         return 0
     }
 
-    if !utils.BitEnabled(uint32(ch.CntL), 7) {
+    if !BitEnabled(uint32(ch.CntL), 7) {
         return 0
     }
 
@@ -31,10 +29,10 @@ func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
     maxTimer := 256.0 * float64(multipler)
     divApuRate := float64(multipler) / 256.0
 
-    soundLength := utils.GetVarData(uint32(ch.CntH), 0, 7)
-	length := (maxTimer - float64(soundLength)) / divApuRate
+    soundLength := GetVarData(uint32(ch.CntH), 0, 7)
+	length := (maxTimer - float64(soundLength)) * divApuRate
 
-    if stopAtLength := utils.BitEnabled(uint32(ch.CntX), 14); stopAtLength {
+    if stopAtLength := BitEnabled(uint32(ch.CntX), 14); stopAtLength {
 		ch.lengthTime += ch.Apu.sampleTime
         if stop := ch.lengthTime >= length; stop {
             ch.Apu.enableSoundChan(int(ch.Idx), false)
@@ -42,7 +40,7 @@ func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
 		}
 	}
 
-    rate := utils.GetVarData(uint32(ch.CntX), 0, 10)
+    rate := GetVarData(uint32(ch.CntX), 0, 10)
 	freq := 2097152 / (2048 - float64(rate))
 	cycleSamples := float64(ch.Apu.sndFrequency) / freq
 
@@ -61,10 +59,11 @@ func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
 	wavedata := ch.WaveRam[(uint32(ch.WavePosition)>>1)&0x1f]
 	sample := (float64((wavedata>>((ch.WavePosition&1)<<2))&0xf) - 0x8) / 8
 
-    if forceVolume := utils.BitEnabled(uint32(ch.CntH), 15); forceVolume {
+    if forceVolume := BitEnabled(uint32(ch.CntH), 15); forceVolume {
+
         sample *= 0.75
     } else {
-        switch vol := utils.GetVarData(uint32(ch.CntH), 13, 14); vol {
+        switch vol := GetVarData(uint32(ch.CntH), 13, 14); vol {
         case 0: sample = 0
         case 1:
         case 2: sample *= 0.5
@@ -73,14 +72,19 @@ func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
     }
 
 	if sample >= 0 {
-		return int8(sample / 7 * PSG_MAX)
+		return int8(sample / 5 * PSG_MAX)
 	}
-	return int8(sample / (-8) * PSG_MIN)
+	return int8(sample / (-6) * PSG_MIN)
+
+	//if sample >= 0 {
+	//	return int8(sample / 7 * PSG_MAX)
+	//}
+	//return int8(sample / (-8) * PSG_MIN)
 }
 
 func (ch *WaveChannel) Reset() {
 
-    if twoBanks := utils.BitEnabled(uint32(ch.CntL), 5); twoBanks {
+    if twoBanks := BitEnabled(uint32(ch.CntL), 5); twoBanks {
 		ch.WavePosition = 0
         ch.WaveSamples = 64
 		return

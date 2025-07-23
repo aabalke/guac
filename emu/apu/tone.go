@@ -1,9 +1,5 @@
 package apu
 
-import (
-	"github.com/aabalke33/guac/emu/gba/utils"
-)
-
 var dutyLookUp = [4]float64{0.125, 0.25, 0.5, 0.75}
 var dutyLookUpi = [4]float64{0.875, 0.75, 0.5, 0.25}
 
@@ -52,7 +48,7 @@ func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 
 	// Length reached check (if so, just disable the channel and return silence)
 
-    if lenFlag := utils.BitEnabled(uint32(ch.CntX), 14); lenFlag {
+    if lenFlag := BitEnabled(uint32(ch.CntX), 14); lenFlag {
 		ch.lengthTime += ch.Apu.sampleTime
 		if ch.lengthTime >= length {
             ch.Apu.enableSoundChan(int(ch.Idx), false)
@@ -75,7 +71,7 @@ func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
             if sweepShift != 0 {
                 // X(t) = X(t-1) ± X(t-1)/2^n
                 disp := freqHz >> sweepShift // X(t-1)/2^n
-                if decrease := utils.BitEnabled(uint32(ch.CntL), 3); decrease {
+                if decrease := BitEnabled(uint32(ch.CntL), 3); decrease {
                     freqHz -= disp
                 } else {
                     freqHz += disp
@@ -101,7 +97,7 @@ func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 		if ch.envTime >= envelopeInterval {
 			ch.envTime -= envelopeInterval
 
-            if increment := utils.BitEnabled(uint32(ch.CntH), 11); increment {
+            if increment := BitEnabled(uint32(ch.CntH), 11); increment {
 				if envelope < 0xf {
 					envelope++
 				}

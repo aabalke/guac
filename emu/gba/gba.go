@@ -2,11 +2,8 @@ package gba
 
 import (
 	"fmt"
-	"os"
 
-	"time"
-
-	"github.com/aabalke33/guac/emu/gba/apu"
+	"github.com/aabalke33/guac/emu/apu"
 	"github.com/aabalke33/guac/emu/gba/cart"
 	"github.com/aabalke33/guac/emu/gba/utils"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -14,34 +11,23 @@ import (
 )
 
 const (
+    VCOUNT = 0x6
+
 	SCREEN_WIDTH  = 240
 	SCREEN_HEIGHT = 160
-    VCOUNT = 0x6
-)
 
-var (
-    _ = fmt.Sprintln("")
-    _ = os.Args
-    CURR_INST = 0
-)
-
-
-var (
-    DRAWN = false
-
-    start time.Time
-    end time.Time
-)
-
-const (
     NUM_SCANLINES   = (SCREEN_HEIGHT + 68)
-
     CYCLES_HDRAW    = 1006
     CYCLES_HBLANK   = 226
     CYCLES_SCANLINE = (CYCLES_HDRAW + CYCLES_HBLANK)     // 1232
     CYCLES_VDRAW    = (CYCLES_SCANLINE * SCREEN_HEIGHT)  // 197120
     CYCLES_VBLANK   = (CYCLES_SCANLINE * 68)             // 83776
     CYCLES_FRAME    = (CYCLES_VDRAW + CYCLES_VBLANK)     // 280896
+)
+
+var (
+    DRAWN = false
+    CURR_INST = 0
 )
 
 type GBA struct {
@@ -91,7 +77,6 @@ func (gba *GBA) Update() {
         return
     }
 
-    //st := time.Now()
     DRAWN = false
     for {
 
@@ -113,7 +98,6 @@ func (gba *GBA) Update() {
         // irq has to be at end (count up tests)
         gba.Irq.checkIRQ()
 
-
         if !gba.Halted {
             CURR_INST++
         }
@@ -123,11 +107,7 @@ func (gba *GBA) Update() {
         }
     }
 
-    //cpuDurations[frame % 100] = time.Since(st).Milliseconds()
-    //getProfilerTimes(frame)
-
-    //apu.ApuInstance.SoundBufferWrap()
-    gba.Apu.Play(gba.Muted, gba.Frame)
+    gba.Apu.Play(gba.Muted)
 
     gba.Frame++
 
@@ -150,13 +130,21 @@ func (gba *GBA) checkDmas(mode uint32) {
 
 func NewGBA(path string, ctx *oto.Context) *GBA {
 
-    img := ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT)
+    const (
+	    CPU_FREQ_HZ              = 16777216
+	    //SND_FREQUENCY            = 32768 // sample rate
+	    //SND_FREQUENCY            = 44100 // sample rate
+	    SND_FREQUENCY            = 48000 // sample rate
+	    SND_SAMPLES              = 512
+    )
 
 	gba := GBA{
         Pixels: make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
-        Image: img,
+        Image: ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
         Keypad: Keypad{ KEYINPUT: 0x3FF },
+        Apu: apu.NewApu(ctx, CPU_FREQ_HZ, SND_FREQUENCY, SND_SAMPLES),
     }
+
 
     gba.PPU.gba = &gba
     gba.Irq.Gba = &gba
@@ -187,18 +175,7 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
     gba.Dma[2].Idx = 2
     gba.Dma[3].Idx = 3
 
-    gba.LoadBios("./emu/gba/res/bios_magia.gba")
-
-    const (
-	    CPU_FREQ_HZ              = 16777216
-	    SND_FREQUENCY            = 32768 // sample rate
-	    //SND_FREQUENCY            = 44100 // sample rate
-	    //SND_FREQUENCY            = 48000 // sample rate
-	    SND_SAMPLES              = 512
-    )
-    gba.Apu = apu.NewApu(ctx, CPU_FREQ_HZ, SND_FREQUENCY, SND_SAMPLES)
-
-    aveAverages = make([]int64, 0)
+    gba.LoadBios()
 
     gba.SoftReset()
     gba.LoadGame(path)
@@ -257,6 +234,7 @@ func (gba *GBA) toggleThumb() {
     reg.R[PC] &^= 3
 }
 
+// RidgeX/ygba BSD3
 func (gba *GBA) VideoUpdate(cycles uint32) {
 
     dispstat := &gba.Mem.Dispstat
@@ -279,7 +257,6 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 
         if vcount := uint32(gba.Mem.IO[VCOUNT]); vcount < SCREEN_HEIGHT {
             go gba.scanlineGraphics(vcount)
-            //gba.scanlineGraphics(vcount)
             gba.checkDmas(DMA_MODE_HBL)
         }
     }

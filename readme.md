@@ -31,11 +31,8 @@ the game metadata in the following format. At this time Art **MUST** be pngs.
 ```
 [
  {
-  "Name": "The Minish Cap",
   "RomPath": "./rom/gba/the_minish_cap.gba",
   "ArtPath": "./art/the_minish_cap.png",
-  "Year": 2005,
-  "Console": "Gameboy Advance"
  },
  ...]
  ```
@@ -47,7 +44,6 @@ Please use the releases for precompiled binaries.
 ```
 go build -ldflags="-H=windowsgui"
 ```
-
 
 # Keybindings / Controller Support
 

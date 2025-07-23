@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/aabalke33/guac/emu/gb/cartridge"
-	"github.com/aabalke33/guac/emu/gba/apu"
+	"github.com/aabalke33/guac/emu/apu"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
 )
@@ -88,7 +88,8 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
     gb.Pixels = &pixels
 
     const (
-	    SND_FREQUENCY            = 32768 // sample rate
+	    //SND_FREQUENCY            = 32768 // sample rate
+	    SND_FREQUENCY            = 48000 // sample rate
 	    SND_SAMPLES              = 512
     )
     gb.Apu = apu.NewApu(ctx, gb.Clock, SND_FREQUENCY, SND_SAMPLES)
@@ -154,7 +155,7 @@ func (gb *GameBoy) Update() {
 	}
 
     gb.UpdateDisplay()
-    gb.Apu.Play(gb.Muted, 0)
+    gb.Apu.Play(gb.Muted)
 }
 
 func (gb *GameBoy) ToggleMute() bool {
@@ -162,11 +163,8 @@ func (gb *GameBoy) ToggleMute() bool {
     return gb.Muted
 }
 
-
 func (gb *GameBoy) TogglePause() bool {
-
     gb.Paused = !gb.Paused
-
     return gb.Paused
 }
 
@@ -183,9 +181,7 @@ func (gb *GameBoy) LoadGame(filepath string) {
 
 	gb.Cartridge.ParseHeader()
 	gb.loadCartridge()
-
 	initMemory(gb)
-	//gb.Apu.MemoryBus = &gb.MemoryBus
 }
 
 func (gb *GameBoy) loadCartridge() {

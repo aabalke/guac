@@ -53,8 +53,8 @@ Additionally, other ARMv5 instructions will fail.
 
 ### MGBA Test Suite
 
-❌ Memory tests [1552/1552]
-❌ I/O read tests [129/130] (Final on is related to channel bits not being properly set off and on)
+❌ Memory tests [1486/1552]
+❌ I/O read tests [129/130] individual test is good
 ❌ Timing tests [228/2020]
 ❌ Timer count-up tests [186/936]
 ❌ Timer IRQ tests [1/90]
@@ -70,8 +70,8 @@ Additionally, other ARMv5 instructions will fail.
     ❌ Basic Mode 3
     ❌ Basic Mode 4
     👍 Degenerate OBJ transforms
-    👍 Layer toggle
-    👍 Layer toggle 2
+    ❌ Layer toggle
+    ❌ Layer toggle 2
     ❌ OAM Update Delay
     👍 Window offscreen reset (matches mgba)
 
@@ -154,7 +154,7 @@ Additionally, other ARMv5 instructions will fail.
 👍 snd1_demo
 👍 swi_demo
 👍 swi_vsync
-👍 tmr_demo (1.3 works) (uses faux cycle * 4)
+👍 tmr_demo (1.3 works)
 ❌ tte_demo
 ❌ txt_bm
 ❌ txt_obj

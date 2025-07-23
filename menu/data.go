@@ -11,7 +11,7 @@ import (
 
 type GameData struct {
 	RomPath string `json:"RomPath"`
-	SavPath string `json:"SavPath"`
+	SavPath string
 	ArtPath string `json:"ArtPath"`
     Image   *ebiten.Image
     Type int

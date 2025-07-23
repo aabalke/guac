@@ -1,12 +1,11 @@
 package gba
 
 import (
-	"fmt"
-	//"math"
-	"os"
-
-	//"github.com/aabalke33/guac/emu/gba/utils"
+	_ "embed"
 )
+
+//go:embed bios.bin
+var biosFile []byte
 
 const (
     INTRWAIT_NONE = 0
@@ -59,19 +58,10 @@ const (
 	SYS_SoundGetJumpList               = 0x2A
 )
 
-func (gba *GBA) LoadBios(path string) {
+func (gba *GBA) LoadBios() {
 
-	buf, err := os.ReadFile(path)
-	if err != nil {
-		panic(err)
-	}
-
-	if len(buf) > len(gba.Mem.BIOS) {
-		panic(fmt.Sprintf("GBA Bios of 0x%X > Allowed size 0x%X", len(buf), len(gba.Mem.BIOS)))
-	}
-
-	for i := range len(buf) {
-		gba.Mem.BIOS[i] = uint8(buf[i])
+	for i := range len(biosFile) {
+		gba.Mem.BIOS[i] = uint8(biosFile[i])
 	}
 }
 //

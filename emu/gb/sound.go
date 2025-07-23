@@ -1,9 +1,7 @@
 package gameboy
 
 import (
-
-	"github.com/aabalke33/guac/emu/gba/apu"
-	"github.com/aabalke33/guac/emu/gba/utils"
+	"github.com/aabalke33/guac/emu/apu"
 )
 
 func WriteSound(addr uint32, v uint8, a *apu.Apu) {
@@ -16,14 +14,14 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 
 		a.SoundCntX = uint16((uint8(a.SoundCntX) & 0x0F) | (v & 0x80))
 
-		if disabled := !utils.BitEnabled(uint32(v), 7); disabled {
-            a.Disable()
-		}
+        if disabled := !BitEnabled(uint32(a.SoundCntX), 7); disabled {
+            return
+        }
 
         return
     }
 
-	if disabled := !utils.BitEnabled(uint32(a.SoundCntX), 7); disabled {
+	if disabled := !BitEnabled(uint32(a.SoundCntX), 7); disabled {
 		return
 	}
 

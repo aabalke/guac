@@ -1,6 +1,6 @@
 package cart
 
-// Uses RidgeX / ygba heavily
+// RidgeX/ygba BSD3 License
 
 import "fmt"
 

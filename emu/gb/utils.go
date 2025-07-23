@@ -7,6 +7,10 @@ import (
 	"strconv"
 )
 
+func BitEnabled(v uint32, bit uint8) bool {
+    return v & (1 << bit) != 0
+}
+
 func LoadLine(gb *GameBoy, line int) {
 
     d, err := os.ReadFile(fmt.Sprintf("linedump_%d_01",line))

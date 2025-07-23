@@ -3,7 +3,6 @@ package apu
 import (
 	"math"
 
-	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
 type NoiseChannel struct {
@@ -28,20 +27,21 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
     maxTimer := 64.0 * float64(multipler)
     divApuRate := float64(multipler) / 256.0
 
-    soundLength := utils.GetVarData(uint32(ch.CntL), 0, 5)
-	//length := (64 - float64(soundLength)) / 256
-	length := (maxTimer - float64(soundLength)) / divApuRate
+    soundLength := GetVarData(uint32(ch.CntL), 0, 5)
+    length := (maxTimer - float64(soundLength)) * divApuRate
 
-    if stopAtLength := utils.BitEnabled(uint32(ch.CntH), 14); stopAtLength {
+    if stopAtLength := BitEnabled(uint32(ch.CntH), 14); stopAtLength {
+
 		ch.lengthTime += ch.Apu.sampleTime
+
         if stop := ch.lengthTime >= length; stop {
             ch.Apu.enableSoundChan(int(ch.Idx), false)
 			return 0
 		}
 	}
 
-    envStep := float64(utils.GetVarData(uint32(ch.CntL), 8, 10))
-    envelope := uint16(utils.GetVarData(uint32(ch.CntL), 12, 15))
+    envStep := float64(GetVarData(uint32(ch.CntL), 8, 10))
+    envelope := uint16(GetVarData(uint32(ch.CntL), 12, 15))
 
 	if envStep != 0 {
 		ch.envTime += ch.Apu.sampleTime
@@ -51,7 +51,7 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 			ch.envTime -= envelopeInterval
 
 
-			if utils.BitEnabled(uint32(ch.CntL), 11) {
+			if BitEnabled(uint32(ch.CntL), 11) {
 				if envelope < 0xf {
 					envelope++
 				}
@@ -65,8 +65,8 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 		}
 	}
 
-    r := float64(utils.GetVarData(uint32(ch.CntH), 0, 2))
-    s := float64(utils.GetVarData(uint32(ch.CntH), 4, 7))
+    r := float64(GetVarData(uint32(ch.CntH), 0, 2))
+    s := float64(GetVarData(uint32(ch.CntH), 4, 7))
 
 	if r == 0 {
 		r = 0.5
@@ -82,7 +82,7 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 		ch.lfsr >>= 1
 
 		if carry > 0 {
-			if utils.BitEnabled(uint32(ch.CntH), 3) { // R/W Counter Step/Width
+			if BitEnabled(uint32(ch.CntH), 3) { // R/W Counter Step/Width
 				ch.lfsr ^= 0x60 // 1: 7bits
 			} else {
 				ch.lfsr ^= 0x6000 // 0: 15bits

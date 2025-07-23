@@ -2,7 +2,7 @@ package gba
 
 import (
 
-	"github.com/aabalke33/guac/emu/gba/apu"
+	"github.com/aabalke33/guac/emu/apu"
 	"github.com/aabalke33/guac/emu/gba/utils"
 )
 
@@ -97,7 +97,8 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
     case 0x6F:
         return
 
-    case 0x70: a.WaveChannel.CntL = uint16(v)
+    case 0x70:
+        a.WaveChannel.CntL = uint16(v)
     case 0x71:
         return
     case 0x72:
