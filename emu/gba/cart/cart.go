@@ -3,6 +3,7 @@ package cart
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 )
 
@@ -53,15 +54,15 @@ func NewCartridge(rom, sav string) Cartridge {
 
     switch c.Id {
     case NONE:
-        fmt.Printf("CART TYPE NONE\n")
+        log.Printf("Cartridge Type NONE\n")
     case EEPROM:
-        fmt.Printf("CART TYPE EEPROM\n")
+        log.Printf("Cartridge Type EEPROM\n")
     case SRAM:
-        fmt.Printf("CART TYPE SRAM\n")
+        log.Printf("Cartridge Type SRAM\n")
     case FLASH:
-        fmt.Printf("CART TYPE FLASH64\n")
+        log.Printf("Cartridge Type FLASH64\n")
     case FLASH128:
-        fmt.Printf("CART TYPE FLASH128\n")
+        log.Printf("Cartridge Type FLASH128\n")
     }
 
 	return c
@@ -181,7 +182,7 @@ func (c *Cartridge) load() {
 
 func (c *Cartridge) Save() {
 
-    fmt.Printf("SAVING\n")
+    log.Printf("Saving Game Path: %s\n", c.SavPath)
 
     f, err := os.Create(c.SavPath)
     if err != nil {

@@ -79,6 +79,10 @@ func NewBackground(gba *GBA, dispcnt *Dispcnt, idx uint32, affine bool) *Backgro
         bg.Palette256 = true
     }
 
+    //if idx == 0 {
+    //    bg.Palette256 = true
+    //}
+
     return bg
 }
 
@@ -136,9 +140,13 @@ func (gba *GBA) scanlineTileMode(y uint32) {
     bgPriorities := gba.getBgPriority(0)
     objPriorities := gba.getObjPriority(y, &gba.PPU.Objects)
 
-    dispcnt := gba.PPU.Dispcnt
-    bgs := *NewBackgrounds(gba, &dispcnt)
+    dispcnt := &gba.PPU.Dispcnt
+    bgs := *NewBackgrounds(gba, dispcnt)
     wins := &gba.PPU.Windows
+
+    if dispcnt.Mode >= 3 {
+        return
+    }
 
     renderPixel := func(x uint32) {
 
@@ -181,7 +189,7 @@ func (gba *GBA) scanlineTileMode(y uint32) {
 
                 for j := range objCount {
                     objIdx := objPriorities[decIdx][j]
-                    palData, ok, palZero, obj := gba.object(x, y, &gba.PPU.Objects[objIdx], wins, &dispcnt)
+                    palData, ok, palZero, obj := gba.object(x, y, &gba.PPU.Objects[objIdx], wins, dispcnt)
 
                     if ok && !palZero {
                         if obj.Mode == 2 {
@@ -229,6 +237,10 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
     wg := sync.WaitGroup{}
 	mem := &gba.Mem
     dispcnt := &gba.PPU.Dispcnt
+
+    if dispcnt.Mode < 3 {
+        return
+    }
 
     renderPixel := func(x uint32) {
 
@@ -302,7 +314,8 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
             return
 
         default:
-            panic(fmt.Sprintf("INVALID BITMAP MODE GRAPHICS V %d", dispcnt.Mode))
+            //log.Printf("Invalid Bitmap Mode Graphics: %d \n", dispcnt.Mode)
+            return
         }
     }
 

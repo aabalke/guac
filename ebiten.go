@@ -92,6 +92,8 @@ func (g *Game) Update() error {
         return exit
     }
 
+    g.frame++
+
     justKeys := inpututil.AppendJustPressedKeys([]ebiten.Key{})
     keys := inpututil.AppendPressedKeys([]ebiten.Key{})
     justButtons, buttons := g.GetGamepadButtons()
@@ -142,7 +144,6 @@ func (g *Game) Update() error {
         }
     }
 
-    g.frame++
 
     return nil
 }

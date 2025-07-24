@@ -97,10 +97,10 @@ func (p *PPU) UpdatePPU(addr uint32, v uint32) {
         return
     }
 
-    //if bgs := addr >= 0x08 && addr < 0x40; bgs {
-    //    p.UpdateBackgrounds(addr, v)
-    //    return
-    //}
+    if bgs := addr >= 0x08 && addr < 0x40; bgs {
+        p.UpdateBackgrounds(addr, v)
+        return
+    }
 
     switch addr {
     case 0x0:

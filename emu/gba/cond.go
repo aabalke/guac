@@ -1,9 +1,5 @@
 package gba
 
-import (
-	"github.com/aabalke33/guac/emu/gba/utils"
-)
-
 //const (
 //    EQ = iota
 //    NE
@@ -23,7 +19,7 @@ import (
 //    NV
 //) 
 
-var masks = map[uint32]uint16{
+var masks = [16]uint16{
     0:  0xF0F0,
     1:  0x0F0F,
     2:  0xCCCC,
@@ -43,6 +39,5 @@ var masks = map[uint32]uint16{
 }
 
 func (cpu *Cpu) CheckCond(cond uint32) bool {
-    cpsrFlags := utils.GetByte(uint32(cpu.Reg.CPSR), 28)
-    return (masks[cond] & (1 << cpsrFlags)) != 0
+    return (masks[cond] & (1 << (cpu.Reg.CPSR >> 28))) != 0
 }

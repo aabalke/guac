@@ -238,6 +238,7 @@ func (gba *GBA) toggleThumb() {
 func (gba *GBA) VideoUpdate(cycles uint32) {
 
     dispstat := &gba.Mem.Dispstat
+    vcount := gba.Mem.IO[0x6]
 
     prevFrameCycles := gba.AccCycles
     gba.AccCycles = (gba.AccCycles + cycles) % CYCLES_FRAME
@@ -255,8 +256,8 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
             gba.Irq.setIRQ(1)
         }
 
-        if vcount := uint32(gba.Mem.IO[VCOUNT]); vcount < SCREEN_HEIGHT {
-            go gba.scanlineGraphics(vcount)
+        if vcount < SCREEN_HEIGHT {
+            gba.scanlineGraphics(uint32(vcount))
             gba.checkDmas(DMA_MODE_HBL)
         }
     }
@@ -265,10 +266,10 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 
         dispstat.SetHBlank(false)
 
-        vcount := &gba.Mem.IO[VCOUNT]
-        *vcount = (*vcount + 1) % NUM_SCANLINES
+        vcount = (vcount + 1) % NUM_SCANLINES
+        gba.Mem.IO[0x6] = vcount
 
-        switch *vcount {
+        switch vcount {
         case SCREEN_HEIGHT:
             dispstat.SetVBlank(true)
             gba.checkDmas(DMA_MODE_VBL)
@@ -280,7 +281,7 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
             dispstat.SetVBlank(false)
         }
 
-        match := gba.Mem.IO[0x5] == *vcount
+        match := dispstat.GetLYC() == vcount
         dispstat.SetVCFlag(match)
 
         if vcounterIRQ := utils.BitEnabled(uint32(*dispstat), 5); vcounterIRQ && match {

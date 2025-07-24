@@ -24,7 +24,7 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
     if doubleSpeed {
         multipler = 2
     }
-    maxTimer := 64.0 * float64(multipler)
+    maxTimer := float64(64 * multipler)
     divApuRate := float64(multipler) / 256.0
 
     soundLength := GetVarData(uint32(ch.CntL), 0, 5)

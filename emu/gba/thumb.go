@@ -365,37 +365,33 @@ const (
 
 func (cpu *Cpu) ThumbAddSub(opcode uint16) {
 
-    inst := uint16(utils.GetVarData(uint32(opcode), 9, 10))
-    rn := uint16(utils.GetVarData(uint32(opcode), 6, 8))
-    imm := uint16(utils.GetVarData(uint32(opcode), 6, 8))
-    rs := uint16(utils.GetVarData(uint32(opcode), 3, 5))
-    rd := uint16(utils.GetVarData(uint32(opcode), 0, 2))
+    inst := uint64(utils.GetVarData(uint32(opcode), 9, 10))
+    rnImm :=  uint64(utils.GetVarData(uint32(opcode), 6, 8))
+    rs := uint64(utils.GetVarData(uint32(opcode), 3, 5))
+    rd := uint64(utils.GetVarData(uint32(opcode), 0, 2))
 
     r := &cpu.Reg.R
     cpsr := &cpu.Reg.CPSR
 
-    var oper func (u1, u2, u3 uint64) uint64
+    rsValue := uint64(r[rs])
+    rnValue := uint64(r[rnImm])
+
+    var res uint64
 
     switch inst {
-    case THUMB_ADD: oper = func(u1, u2, _ uint64) uint64 {return u1 + u2}
-    case THUMB_SUB: oper = func(u1, u2, _ uint64) uint64 {return u1 - u2}
-    case THUMB_ADDMOV: oper = func(u1, _, u3 uint64) uint64 {return u1 + u3}
-    case THUMB_SUBImm: oper = func(u1, _, u3 uint64) uint64 {return u1 - u3}
+    case THUMB_ADD: res = rsValue + rnValue
+    case THUMB_SUB: res = rsValue - rnValue
+    case THUMB_ADDMOV: res = rsValue + rnImm
+    case THUMB_SUBImm: res = rsValue - rnImm
     }
-
-    rsValue := r[rs]
-    rnValue := r[rn]
-
-    res := oper(uint64(rsValue), uint64(r[rn]), uint64(imm))
 
     r[rd] = uint32(res)
 
     var v, c bool
-    rsSign := uint8(rsValue >> 31) & 1
-    rnSign := uint8(rnValue >> 31) & 1
-    imSign := uint8(uint32(imm) >> 31) & 1
-    rSign  := uint8(int32(uint32(res)) >> 31) & 1
-
+    rsSign := (rsValue >> 31) & 1
+    rnSign := (rnValue >> 31) & 1
+    imSign := uint64(uint32(rnImm) >> 31) & 1
+    rSign  := uint64(int32(uint32(res)) >> 31) & 1
 
     switch inst {
     case THUMB_ADD:
@@ -420,7 +416,6 @@ func (cpu *Cpu) ThumbAddSub(opcode uint16) {
     if PC == rd {
         return
     }
-
 
     r[PC] += 2
 }
@@ -500,13 +495,12 @@ func (cpu *Cpu) thumbLSHalf(opcode uint16) {
     addr := r[rb] + offset
 
     if ldr {
-        v := uint32(cpu.Gba.Mem.Read16(utils.HalfAlign(addr)))
-        is := (addr & 0b1) * 8
+        v := uint32(cpu.Gba.Mem.Read16(addr &^ 1))
+        is := (addr & 1) * 8
         v, _, _ = utils.Ror(v, is, false, false ,false)
         r[rd] = v
     } else {
         cpu.Gba.Mem.Write16(addr, uint16(r[rd]))
-
     }
 
     r[PC] += 2

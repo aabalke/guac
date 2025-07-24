@@ -24,18 +24,16 @@ func (tt *Timers) Update(cycles uint32) {
 
     overflow := false
 
-    for i := range 4 {
+    for i := range tt {
         t := &tt[i]
 
-        overflow = t.Update(overflow, cycles)
+        if t.Enabled {
+            overflow = t.Update(overflow, cycles)
+        }
     }
 }
 
 func (t *Timer) Update(overflow bool, cycles uint32) bool {
-
-    if !t.Enabled {
-        return false
-    }
 
     increment := uint32(0)
     if t.Cascade && overflow {
@@ -51,18 +49,6 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
             t.Elapsed %= freq
         }
     }
-
-    overflow = false
-
-    //for range increment {
-    //    tmp := t.D + 1
-    //    if tmp > 0xFFFF {
-    //        t.D = t.SavedInitialValue
-    //        overflow = true
-    //        continue
-    //    }
-    //    t.D = tmp
-    //}
 
     overflow = incrementTimer(t, increment)
 

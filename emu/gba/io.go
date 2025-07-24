@@ -53,3 +53,7 @@ func (d *Dispstat) SetVCFlag(v bool) {
 
     *d = Dispstat((uint16(*d) &^ 0b100))
 }
+
+func (d *Dispstat) GetLYC() uint8 {
+    return uint8(*d >> 8)
+}

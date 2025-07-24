@@ -119,6 +119,7 @@ func (a *Apu) Play(muted bool) {
     }
 
     a.player.Write(a.Stream)
+
 }
 
 func (a *Apu) Close() {
@@ -230,8 +231,6 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
     sampleLeftA, sampleRightA := a.fifoFx(0, sampleA)
     sampleLeftB, sampleRightB := a.fifoFx(1, sampleB)
 
-    //sampleLeft := clip(int32(sampleLeftA) + int32(sampleLeftB))
-    //sampleRight := clip(int32(sampleRightA) + int32(sampleRightB))
     sampleLeft := int32(sampleLeftA) + int32(sampleLeftB)
     sampleRight := int32(sampleRightA) + int32(sampleRightB)
 
