@@ -15,9 +15,9 @@ const (
     dx = SCREEN_WIDTH / WAIT_GROUPS
 )
 
-func NewBackgrounds(gba *GBA, dispcnt *Dispcnt) *[4]Background {
+func updateBackgrounds(gba *GBA, dispcnt *Dispcnt) *[4]Background {
 
-    bgs := &[4]Background{}
+    bgs := &gba.PPU.Backgrounds
 
     for i := range 4 {
         isAffine := (
@@ -27,63 +27,18 @@ func NewBackgrounds(gba *GBA, dispcnt *Dispcnt) *[4]Background {
             (dispcnt.Mode == 0) ||
             (dispcnt.Mode == 1 && (i == 0 || i == 1 || i == 2)))
 
-        if !isAffine && !isStandard {
-            bgs[i].Invalid = true
-            continue
+        bgs[i].Invalid = !isAffine && !isStandard
+        bgs[i].Affine = isAffine
+
+        bgs[i].setSize()
+
+        if (dispcnt.Mode == 1 && i == 2) || dispcnt.Mode == 2 {
+            bgs[i].Palette256 = true
         }
 
-        bgs[i] = *NewBackground(gba, dispcnt, uint32(i), isAffine)
     }
 
     return bgs
-}
-
-func NewBackground(gba *GBA, dispcnt *Dispcnt, idx uint32, affine bool) *Background {
-
-    mem := &gba.Mem
-
-    cnt := mem.ReadIODirect(uint32(0x08 + (idx * 0x2)), 2)
-    hof := mem.ReadIODirect(uint32(0x10 + (idx * 0x4)), 2)
-    vof := mem.ReadIODirect(uint32(0x12 + (idx * 0x4)), 2)
-
-    bg := &gba.PPU.Backgrounds[idx]
-    bg.Affine = affine
-    bg.Priority = utils.GetVarData(cnt, 0, 1)
-    bg.CharBaseBlock = (cnt >> 2) & 0b11
-    bg.Mosaic = utils.BitEnabled(cnt, 6)
-    bg.Palette256 = utils.BitEnabled(cnt, 7)
-    bg.ScreenBaseBlock = utils.GetVarData(cnt, 8, 12)
-    bg.AffineWrap = utils.BitEnabled(cnt, 13)
-    bg.Size = utils.GetVarData(cnt, 14, 15)
-    bg.XOffset = utils.GetVarData(hof, 0, 9)
-    bg.YOffset = utils.GetVarData(vof, 0, 9)
-    switch idx {
-        case 0: bg.Enabled = dispcnt.DisplayBg0
-        case 1: bg.Enabled = dispcnt.DisplayBg1
-        case 2: bg.Enabled = dispcnt.DisplayBg2
-        case 3: bg.Enabled = dispcnt.DisplayBg3
-    }
-    bg.setSize()
-
-    if bg.Affine {
-        paramsAddr := 0x20 * (idx - 1)
-        bg.Pa = mem.ReadIODirect(paramsAddr + 0x0, 2)
-        bg.Pb = mem.ReadIODirect(paramsAddr + 0x2, 2)
-        bg.Pc = mem.ReadIODirect(paramsAddr + 0x4, 2)
-        bg.Pd = mem.ReadIODirect(paramsAddr + 0x6, 2)
-        bg.aXOffset = mem.ReadIODirect(paramsAddr + 0x8, 4)
-        bg.aYOffset = mem.ReadIODirect(paramsAddr + 0xC, 4)
-    }
-
-    if (dispcnt.Mode == 1 && idx == 2) || dispcnt.Mode == 2 {
-        bg.Palette256 = true
-    }
-
-    //if idx == 0 {
-    //    bg.Palette256 = true
-    //}
-
-    return bg
 }
 
 func (obj *Object) setSize(shape, size uint32) {
@@ -141,7 +96,9 @@ func (gba *GBA) scanlineTileMode(y uint32) {
     objPriorities := gba.getObjPriority(y, &gba.PPU.Objects)
 
     dispcnt := &gba.PPU.Dispcnt
-    bgs := *NewBackgrounds(gba, dispcnt)
+    //bgs := *NewBackgrounds(gba, dispcnt)
+
+    bgs := updateBackgrounds(gba, dispcnt)
     wins := &gba.PPU.Windows
 
     if dispcnt.Mode >= 3 {

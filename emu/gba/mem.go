@@ -1,14 +1,9 @@
 package gba
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/aabalke33/guac/emu/gba/utils"
-)
-
-var (
-    _ = fmt.Sprintf("")
 )
 
 type Memory struct {
@@ -25,14 +20,12 @@ type Memory struct {
 	BIOS_MODE uint32
 	Dispstat Dispstat
 
-    readRegions [0xF]func(m *Memory, addr uint32) uint8
-    writeRegions [0xF]func(m *Memory, addr uint32, v uint8, byteWrite bool)
+    readRegions [0x100]func(m *Memory, addr uint32) uint8
+    writeRegions [0x100]func(m *Memory, addr uint32, v uint8, byteWrite bool)
 }
 
 func NewMemory(gba *GBA) Memory {
 	m := Memory{GBA: gba}
-
-    //m.GBA = gba
 
     m.initReadRegions()
     m.initWriteRegions()
@@ -160,6 +153,13 @@ func (m *Memory) initWriteRegions() {
 }
 
 func (m *Memory) initReadRegions() {
+
+    for i := range len(m.readRegions) {
+        m.readRegions[i] = func(m *Memory, addr uint32) uint8 {
+            return m.ReadOpenBus(addr)
+        }
+    }
+
     m.readRegions[0x0] = func(m *Memory, addr uint32) uint8 {
 
         if addr >= 0x4000 {
@@ -171,10 +171,6 @@ func (m *Memory) initReadRegions() {
             return m.ReadBios(addr)
         }
         return m.BIOS[addr]
-    }
-
-    m.readRegions[0x1] = func(m *Memory, addr uint32) uint8 {
-        return m.ReadOpenBus(addr)
     }
 
     m.readRegions[0x2] = func(m *Memory, addr uint32) uint8 {
@@ -220,14 +216,7 @@ func (m *Memory) initReadRegions() {
 }
 
 func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
-
-    r := addr >> 24
-
-    if r >= 0xF {
-        return m.ReadOpenBus(addr)
-    }
-
-    return m.readRegions[r](m, addr)
+    return m.readRegions[addr >> 24](m, addr)
 }
 
 func (m *Memory) ReadBios(addr uint32) uint8 {
@@ -590,14 +579,7 @@ func (m *Memory) ReadBadRom(addr uint32, bytesRead uint8) uint32 {
 }
 
 func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
-
-    r := addr >> 24
-
-    if r >= 0xF {
-        return
-    }
-
-    m.writeRegions[r](m, addr, v, byteWrite)
+    m.writeRegions[addr >> 24](m, addr, v, byteWrite)
 }
 
 func (m *Memory) WriteIO(addr uint32, v uint8) {

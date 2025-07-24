@@ -437,7 +437,7 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 
     pre, post, _ := generateSdtAddress(sdt, c)
 
-    addr := utils.WordAlign(pre)
+    addr := pre &^ 0b11
 
     if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
         addr = pre
@@ -581,6 +581,8 @@ const (
     LDRSH = 3
 )
 
+var halfData Half
+
 type Half struct {
     Cond, Rn, Rd, Imm, Inst, Rm, RdValue, RnValue, RmValue uint32
     Pre, Up, Immediate, WriteBack, Load, MemoryManagement bool
@@ -590,49 +592,47 @@ func NewHalf(opcode uint32, c *Cpu) *Half {
 
     r := &c.Reg.R
 
-    h := &Half{
-        Cond: utils.GetByte(opcode, 28),
-        Rn: utils.GetByte(opcode, 16),
-        Rd: utils.GetByte(opcode, 12),
-        Pre: utils.BitEnabled(opcode, 24),
-        Up: utils.BitEnabled(opcode, 23),
-        Immediate: utils.BitEnabled(opcode, 22),
-        Load: utils.BitEnabled(opcode, 20),
-        Inst: utils.GetVarData(opcode, 5, 6),
-    }
+    halfData.Cond = utils.GetByte(opcode, 28)
+    halfData.Rn = utils.GetByte(opcode, 16)
+    halfData.Rd = utils.GetByte(opcode, 12)
+    halfData.Pre = utils.BitEnabled(opcode, 24)
+    halfData.Up = utils.BitEnabled(opcode, 23)
+    halfData.Immediate = utils.BitEnabled(opcode, 22)
+    halfData.Load = utils.BitEnabled(opcode, 20)
+    halfData.Inst = utils.GetVarData(opcode, 5, 6)
 
-    if h.Pre {
-        h.WriteBack = utils.BitEnabled(opcode, 21)
+    if halfData.Pre {
+        halfData.WriteBack = utils.BitEnabled(opcode, 21)
     } else {
-        h.WriteBack = true
+        halfData.WriteBack = true
     }
 
     fails := []bool{
-        !h.Pre && utils.BitEnabled(opcode, 21),
+        !halfData.Pre && utils.BitEnabled(opcode, 21),
         !utils.BitEnabled(opcode, 7),
         !utils.BitEnabled(opcode, 4),
-        //h.Immediate && !(utils.GetByte(opcode, 8) == 0b0000),
+        //halfData.Immediate && !(utils.GetByte(opcode, 8) == 0b0000),
     }
 
     for i, fail := range fails {
         if fail { panic(fmt.Sprintf("Malformed Half Instruction %d %08X %d", i, opcode, CURR_INST)) }
     }
 
-    h.Rm = utils.GetByte(opcode, 0)
-    h.RmValue = r[h.Rm]
-    h.Imm = utils.GetByte(opcode, 8) << 4 | utils.GetByte(opcode, 0)
+    halfData.Rm = utils.GetByte(opcode, 0)
+    halfData.RmValue = r[halfData.Rm]
+    halfData.Imm = utils.GetByte(opcode, 8) << 4 | utils.GetByte(opcode, 0)
 
-    h.RnValue = r[h.Rn]
-    if h.Rn == PC {
-        h.RnValue += 8
+    halfData.RnValue = r[halfData.Rn]
+    if halfData.Rn == PC {
+        halfData.RnValue += 8
     }
 
-    h.RdValue = r[h.Rd]
-    if h.Rd == PC {
-        h.RdValue += 12
+    halfData.RdValue = r[halfData.Rd]
+    if halfData.Rd == PC {
+        halfData.RdValue += 12
     }
 
-    return h
+    return &halfData
 }
 
 func (c *Cpu) Half(opcode uint32) {
@@ -665,7 +665,7 @@ func signedByteStd(half *Half, cpu *Cpu) {
 
     r := &cpu.Reg.R
     pre, post := halfUnsignedAddress(half, cpu)
-    addr := utils.HalfAlign(pre)
+    addr := pre &^ 0b1
 
     if half.Load {
         // sign-expand byte value
@@ -713,7 +713,7 @@ func signedHalfStd(half *Half, cpu *Cpu) {
         } else {
 
             // sign-expand half value
-            unexpanded := int16(cpu.Gba.Mem.Read16(utils.HalfAlign(pre)))
+            unexpanded := int16(cpu.Gba.Mem.Read16(pre &^ 0b1))
             expanded := uint32(unexpanded)
 
             if unexpanded < 0 {
@@ -723,7 +723,7 @@ func signedHalfStd(half *Half, cpu *Cpu) {
             r[half.Rd] = expanded
         }
     } else {
-        addr := utils.HalfAlign(pre)
+        addr := pre &^ 0b1
         cpu.Gba.Mem.Write16(addr, uint16(int16(half.RdValue)))
     }
 
@@ -736,7 +736,7 @@ func signedHalfStd(half *Half, cpu *Cpu) {
 func unsignedHalfStd(half *Half, cpu *Cpu) {
     r := &cpu.Reg.R
     pre, post := halfUnsignedAddress(half, cpu)
-    addr := utils.HalfAlign(pre)
+    addr := pre &^ 0b1
 
     if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
         addr = pre
@@ -868,7 +868,7 @@ func (c *Cpu) ldm(block *Block) bool {
         block.Writeback = false
     }
 
-    addr := utils.WordAlign(r[block.Rn])
+    addr := r[block.Rn] &^ 0b11
 
     reg := uint32(0)
     for reg = range 16 {
@@ -966,7 +966,7 @@ func (c *Cpu) stm(block *Block) {
     matchingValue := uint32(0)
     matchingAddr := uint32(0) // rn during regs
 
-    addr := utils.WordAlign(r[block.Rn])
+    addr := r[block.Rn] &^ 0b11
 
     count := uint32(0)
     rnIdx := uint32(0)
@@ -1287,7 +1287,7 @@ func (cpu *Cpu) Swp(opcode uint32) {
         return
 
     } else {
-        aligned = utils.WordAlign(rnValue)
+        aligned = rnValue &^ 0b11
         rnMemValue = cpu.Gba.Mem.Read32(aligned)
         is := (rnValue & 0b11) * 8
         rnMemValue, _, _ = utils.Ror(rnMemValue, is, false, false ,false)

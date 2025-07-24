@@ -186,7 +186,7 @@ func (l *Logger) WriteLog() {
 
     fmt.Fprintf(l.bufWriter, "%s\n", s)
 
-    BUF_SIZE := 10_000
+    BUF_SIZE := uint64(10_000)
 
     if CURR_INST%BUF_SIZE == 0 {
         l.bufWriter.Flush()

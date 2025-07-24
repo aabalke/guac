@@ -204,8 +204,6 @@ func (a *Apu) fifoFx(ch uint8, sample int16) (int16, int16) {
 		sample /= 2
 	}
 
-    //sample = clip(int32(sample))
-
 	sampleLeft := int16(0)
 	sampleRight := int16(0)
 

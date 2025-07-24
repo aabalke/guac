@@ -69,10 +69,6 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
     gb := GameBoy{
         Image: img,
 		Cpu: *NewCpu(),
-		//Apu: APU{
-		//	SampleRate: 44100,
-		//	Enabled:    true,
-		//},
 		FPS:    60,
 		Clock:  4194304,
 		Joypad: 0xFF,
@@ -88,7 +84,6 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
     gb.Pixels = &pixels
 
     const (
-	    //SND_FREQUENCY            = 32768 // sample rate
 	    SND_FREQUENCY            = 48000 // sample rate
 	    SND_SAMPLES              = 512
     )

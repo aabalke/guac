@@ -11,7 +11,6 @@ import (
 )
 
 const (
-    VCOUNT = 0x6
 
 	SCREEN_WIDTH  = 240
 	SCREEN_HEIGHT = 160
@@ -25,42 +24,29 @@ const (
     CYCLES_FRAME    = (CYCLES_VDRAW + CYCLES_VBLANK)     // 280896
 )
 
-var (
-    DRAWN = false
-    CURR_INST = 0
-)
+var CURR_INST = uint64(0)
 
 type GBA struct {
-    GamePath string
-    Debugger Debugger
-    Cartridge cart.Cartridge
-    Cpu Cpu
-    Mem Memory
-	Pixels []byte
-    Image *ebiten.Image
-	Paused, Muted bool
-    Halted bool
-    ExitHalt bool
-    Cycles int
-    Scanline int
-    Timers Timers
-    Dma    [4]DMA
-    IntrWait uint32
-    Save bool
-    Irq Irq
-    GBA_LOCK bool
+
+    Debugger    Debugger
+    Cartridge   cart.Cartridge
+    Cpu         Cpu
+    Mem         Memory
+    PPU         PPU
+    Timers      Timers
+    Dma         [4]DMA
+    Irq         Irq
+    Apu         *apu.Apu
+
+	Paused, Muted, Save, Halted, Drawn bool
     OpenBusOpcode uint32
-    DmaOnRefresh bool
     AccCycles uint32
     Keypad Keypad
 
-    PPU PPU
-
-    Cache Cache
+	Pixels  []byte
+    Image   *ebiten.Image
 
     Frame uint64
-
-    Apu *apu.Apu
 }
 
 func (gba *GBA) SoftReset() {
@@ -77,7 +63,8 @@ func (gba *GBA) Update() {
         return
     }
 
-    DRAWN = false
+    gba.Drawn = false
+
     for {
 
         cycles := 4
@@ -102,7 +89,7 @@ func (gba *GBA) Update() {
             CURR_INST++
         }
 
-        if DRAWN {
+        if gba.Drawn {
             break
         }
     }
@@ -132,8 +119,6 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 
     const (
 	    CPU_FREQ_HZ              = 16777216
-	    //SND_FREQUENCY            = 32768 // sample rate
-	    //SND_FREQUENCY            = 44100 // sample rate
 	    SND_FREQUENCY            = 48000 // sample rate
 	    SND_SAMPLES              = 512
     )
@@ -144,7 +129,6 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
         Keypad: Keypad{ KEYINPUT: 0x3FF },
         Apu: apu.NewApu(ctx, CPU_FREQ_HZ, SND_FREQUENCY, SND_SAMPLES),
     }
-
 
     gba.PPU.gba = &gba
     gba.Irq.Gba = &gba
@@ -176,11 +160,8 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
     gba.Dma[3].Idx = 3
 
     gba.LoadBios()
-
     gba.SoftReset()
     gba.LoadGame(path)
-
-    //gbaConsole.Cache.BuildCache(gbaConsole)
 
 	return &gba
 }
@@ -214,7 +195,6 @@ func (gba *GBA) Close() {
 }
 
 func (gba *GBA) LoadGame(path string) {
-    gba.GamePath = path
     gba.Cartridge = cart.NewCartridge(path, path + ".save")
 }
 
@@ -290,6 +270,6 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
     }
 
     if currFrameCycles < prevFrameCycles {
-        DRAWN = true
+        gba.Drawn = true
     }
 }

@@ -19,7 +19,6 @@ const (
 
 func main() {
 
-
     flags := getFlags()
 
     var f *os.File

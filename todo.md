@@ -2,7 +2,6 @@
 
 # Before Release 1.0
 
-1. Fix Problem that causes Super Circuit Palette 256 on track selection
 2. Config file that allows for keybindings, controller maps, custom dmg colors etc
 
 Icons:

@@ -121,10 +121,10 @@ func (p *PPU) UpdatePPU(addr uint32, v uint32) {
         p.Dispcnt.DisplayWin1 = utils.BitEnabled(v, 6)
         p.Dispcnt.DisplayObjWin = utils.BitEnabled(v,7)
 
-        //p.Backgrounds[0].Enabled = p.Dispcnt.DisplayBg0
-        //p.Backgrounds[1].Enabled = p.Dispcnt.DisplayBg1
-        //p.Backgrounds[2].Enabled = p.Dispcnt.DisplayBg2
-        //p.Backgrounds[3].Enabled = p.Dispcnt.DisplayBg3
+        p.Backgrounds[0].Enabled = p.Dispcnt.DisplayBg0
+        p.Backgrounds[1].Enabled = p.Dispcnt.DisplayBg1
+        p.Backgrounds[2].Enabled = p.Dispcnt.DisplayBg2
+        p.Backgrounds[3].Enabled = p.Dispcnt.DisplayBg3
 
         wins := &p.Windows
         wins.Win0.Enabled = p.Dispcnt.DisplayWin0
@@ -344,8 +344,6 @@ func UpdateAffineParams(obj *Object, m *Memory) {
 }
 
 func (p *PPU) UpdateBackgrounds(addr, v uint32) {
-
-    return
 
     switch addr {
     case 0x08:

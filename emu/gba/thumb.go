@@ -1,13 +1,7 @@
 package gba
 
 import (
-	"fmt"
-
 	"github.com/aabalke33/guac/emu/gba/utils"
-)
-
-var (
-    _ = fmt.Sprintf("")
 )
 
 const (
@@ -267,7 +261,7 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
         res := rsValue + rdValue
 
         if rd == PC {
-            r[rd] = utils.WordAlign(uint32(res)) + 4
+            r[rd] = (uint32(res) &^ 0b11) + 4
         } else {
             r[rd] = uint32(res)
             r[PC] += 2
@@ -323,7 +317,7 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
         }
 
         if rd == PC {
-            r[rd] = utils.HalfAlign(uint32(rsValue))
+            r[rd] = uint32(rsValue) &^ 0b1
 
             return 4
         }
@@ -529,7 +523,7 @@ func (cpu *Cpu) thumbLSSigned(opcode uint16) {
 
     case THUMB_LDSB: r[rd] = uint32(int8(uint8(cpu.Gba.Mem.Read8(addr))))
     case THUMB_LDRH:
-        v := cpu.Gba.Mem.Read16(utils.HalfAlign(addr))
+        v := cpu.Gba.Mem.Read16(addr &^ 0b1)
         is := (addr & 0b1) * 8
         v, _, _ = utils.Ror(v, is, false, false ,false)
         r[rd] = v
@@ -553,7 +547,7 @@ func (cpu *Cpu) thumbLSSigned(opcode uint16) {
             r[rd] = expanded
         } else {
 
-            aligned := utils.HalfAlign(addr)
+            aligned := addr &^ 0b1
 
             // sign-expand half value
             unexpanded := int16(cpu.Gba.Mem.Read16(aligned))
@@ -576,7 +570,7 @@ func (cpu *Cpu) thumbLPC(opcode uint16) {
 
     rd := utils.GetVarData(uint32(opcode), 8, 10)
     nn := utils.GetVarData(uint32(opcode), 0, 7) << 2
-    addr := utils.WordAlign(r[PC] + 4 + nn)
+    addr := (r[PC] + 4 + nn) &^ 0b11
 
     r[rd] = cpu.Gba.Mem.Read32(addr)
     r[PC] += 2
@@ -606,7 +600,7 @@ func (cpu *Cpu) thumbLSR(opcode uint16) {
     case THUMB_STRB_REG:
         cpu.Gba.Mem.Write8(addr, uint8(r[rd]))
     case THUMB_LDR_REG:
-        v := cpu.Gba.Mem.Read32(utils.WordAlign(addr))
+        v := cpu.Gba.Mem.Read32(addr &^ 0b11)
         is := (addr & 0b11) * 8
         r[rd], _, _ = utils.Ror(v, is, false, false ,false)
     case THUMB_LDRB_REG:
@@ -638,7 +632,7 @@ func (cpu *Cpu) thumbLSImm(opcode uint16) {
         cpu.Gba.Mem.Write32(addr, r[rd])
     case THUMB_LDR_IMM:
         addr := r[rb] + (nn << 2)
-        v := cpu.Gba.Mem.Read32(utils.WordAlign(addr))
+        v := cpu.Gba.Mem.Read32(addr &^ 0b11)
         is := (addr & 0b11) * 8
         r[rd], _, _ = utils.Ror(v, is, false, false ,false)
 
@@ -671,7 +665,7 @@ func (cpu *Cpu) thumbPushPop(opcode uint16) {
 
         if pclr {
 
-            r[PC] = utils.HalfAlign(cpu.Gba.Mem.Read32(r[SP]))
+            r[PC] = cpu.Gba.Mem.Read32(r[SP]) &^ 0b1
             r[SP] += 4
             //piplining
             return
@@ -713,7 +707,7 @@ func (cpu *Cpu) thumbRelative(opcode uint16) {
     }
 
     //r[rd] = r[PC] + 4 + nn
-    r[rd] = utils.WordAlign(r[PC] + 4) + nn
+    r[rd] = ((r[PC] + 4) &^ 0b11) + nn
     r[PC] += 2
 }
 
@@ -834,7 +828,7 @@ func (cpu *Cpu) thumbLongBranch(opcode uint16) {
 
     offset := int32(nn)
 
-    r[LR] = utils.HalfAlign(r[PC] + 4) + 1
+    r[LR] = ((r[PC] + 4) &^ 0b1) + 1
     r[PC] = uint32(int32(r[PC]) + 4 + offset)
 }
 
@@ -859,8 +853,8 @@ func (cpu *Cpu) thumbShortLongBranch(opcode uint16) {
     offset := int32(nn)
 
     tmpLR := r[LR]
-    r[LR] = utils.HalfAlign(r[PC] + 2) + 1
-    r[PC] = utils.HalfAlign(uint32(int32(tmpLR) + offset))
+    r[LR] = ((r[PC] + 2) &^ 0b1) + 1
+    r[PC] = uint32(int32(tmpLR) + offset) &^ 0b1
 }
 
 func (cpu *Cpu) thumbLSSP(opcode uint16) {
@@ -874,7 +868,7 @@ func (cpu *Cpu) thumbLSSP(opcode uint16) {
     addr := r[SP] + nn
 
     if ldr {
-        v := cpu.Gba.Mem.Read32(utils.WordAlign(addr))
+        v := cpu.Gba.Mem.Read32(addr &^ 0b11)
         is := (addr & 0b11) * 8
         r[rd], _, _ = utils.Ror(v, is, false, false ,false)
     } else {
@@ -891,7 +885,7 @@ func (cpu *Cpu) thumbMulti(opcode uint16) {
     ldmia := utils.BitEnabled(uint32(opcode), 11)
     rb := utils.GetVarData(uint32(opcode), 8, 10)
     rlist := utils.GetVarData(uint32(opcode), 0, 7)
-    addr := utils.WordAlign(r[rb])
+    addr := r[rb] &^ 0b11
 
     if !ldmia {
 

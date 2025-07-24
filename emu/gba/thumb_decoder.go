@@ -4,13 +4,6 @@ import "fmt"
 
 func (cpu *Cpu) DecodeTHUMB(opcode uint16) int {
 
-    r := &cpu.Reg.R
-
-    //if cached := cpu.Gba.Cache.runCache(cpu.Gba, r[PC], uint32(opcode)); cached {
-    //    return 2
-    //}
-
-
 	switch {
     case isthumbSWI(opcode):
         cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
@@ -64,6 +57,7 @@ func (cpu *Cpu) DecodeTHUMB(opcode uint16) int {
     case isMulti(opcode):
         cpu.thumbMulti(opcode)
 	default:
+        r := &cpu.Reg.R
 		panic(fmt.Sprintf("Unable to Decode %X, at PC %X, INSTR %d", opcode, r[PC], CURR_INST))
 	}
 

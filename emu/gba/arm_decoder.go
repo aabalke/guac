@@ -13,10 +13,6 @@ func (cpu *Cpu) DecodeARM(opcode uint32) int {
 		return 4
 	}
 
-    //if cached := cpu.Gba.Cache.runCache(cpu.Gba, r[PC], opcode); cached {
-    //    return 4
-    //}
-
 	switch {
 	case isSWI(opcode):
         cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
