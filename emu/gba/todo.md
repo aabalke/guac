@@ -6,7 +6,7 @@
 
 3. Mosaic
 
-4.
+4. Affine Object cut out
 
 
 

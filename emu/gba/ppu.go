@@ -24,10 +24,7 @@ type Dispcnt struct {
     HBlankIntervalFree bool
     OneDimensional bool
     ForcedBlank bool
-    DisplayBg0 bool
-    DisplayBg1 bool
-    DisplayBg2 bool
-    DisplayBg3 bool
+    //DisplayBg [4]bool
     DisplayObj bool
     DisplayWin0 bool
     DisplayWin1 bool
@@ -44,14 +41,16 @@ type Blend struct {
 type Windows struct {
     Enabled bool
     Win0, Win1, WinObj Window
-    OutBg0, OutBg1, OutBg2, OutBg3, OutObj, OutBld bool
+    OutBg [4]bool
+    OutObj, OutBld bool
 }
 
 type Window struct {
     Enabled bool
     L, R, T, B uint32
     oL, oR, oT, oB uint32
-    InBg0, InBg1, InBg2, InBg3, InObj, InBld bool
+    InBg [4]bool
+    InObj, InBld bool
 }
 
 type Background struct {
@@ -112,19 +111,19 @@ func (p *PPU) UpdatePPU(addr uint32, v uint32) {
         p.Dispcnt.ForcedBlank = utils.BitEnabled(v, 7)
 
     case 0x1:
-        p.Dispcnt.DisplayBg0 = utils.BitEnabled(v, 0)
-        p.Dispcnt.DisplayBg1 = utils.BitEnabled(v, 1)
-        p.Dispcnt.DisplayBg2 = utils.BitEnabled(v, 2)
-        p.Dispcnt.DisplayBg3 = utils.BitEnabled(v, 3)
+        //p.Dispcnt.DisplayBg[0] = utils.BitEnabled(v, 0)
+        //p.Dispcnt.DisplayBg[1] = utils.BitEnabled(v, 1)
+        //p.Dispcnt.DisplayBg[2] = utils.BitEnabled(v, 2)
+        //p.Dispcnt.DisplayBg[3] = utils.BitEnabled(v, 3)
         p.Dispcnt.DisplayObj = utils.BitEnabled(v, 4)
         p.Dispcnt.DisplayWin0 = utils.BitEnabled(v, 5)
         p.Dispcnt.DisplayWin1 = utils.BitEnabled(v, 6)
         p.Dispcnt.DisplayObjWin = utils.BitEnabled(v,7)
 
-        p.Backgrounds[0].Enabled = p.Dispcnt.DisplayBg0
-        p.Backgrounds[1].Enabled = p.Dispcnt.DisplayBg1
-        p.Backgrounds[2].Enabled = p.Dispcnt.DisplayBg2
-        p.Backgrounds[3].Enabled = p.Dispcnt.DisplayBg3
+        p.Backgrounds[0].Enabled = utils.BitEnabled(v, 0)
+        p.Backgrounds[1].Enabled = utils.BitEnabled(v, 1)
+        p.Backgrounds[2].Enabled = utils.BitEnabled(v, 2)
+        p.Backgrounds[3].Enabled = utils.BitEnabled(v, 3)
 
         wins := &p.Windows
         wins.Win0.Enabled = p.Dispcnt.DisplayWin0
@@ -140,6 +139,7 @@ func (p *PPU) UpdatePPU(addr uint32, v uint32) {
         p.Blend.a[4] = utils.BitEnabled(v, 4)
         p.Blend.a[5] = utils.BitEnabled(v, 5)
         p.Blend.Mode = utils.GetVarData(v, 6, 7)
+
 
     case 0x51:
         p.Blend.b[0] = utils.BitEnabled(v, 0)
@@ -185,69 +185,97 @@ func (p *PPU) UpdateWin(addr uint32, v uint32) {
 
     switch addr {
     case WIN0Ha:
+        win0.oR = v
         win0.R = v
-    case WIN0Hb:
-        win0.L = v
-    case WIN1Ha:
-        win1.R = v
-        win1.oR = v
 
-        if win1.oR == 0 && win1.oL == 0 {
-            win1.R = 240
+        if win0.oR > SCREEN_WIDTH || win0.oL > win0.oR{
+            win0.R = SCREEN_WIDTH
+        }
+
+    case WIN0Hb:
+        win0.oL = v
+        win0.L = v
+
+        if win0.oR > SCREEN_WIDTH || win0.oL > win0.oR{
+            win0.R = SCREEN_WIDTH
+        }
+
+
+    case WIN1Ha:
+        win1.oR = v
+        win1.R = v
+
+        if win1.oR > SCREEN_WIDTH || win1.oL > win1.oR{
+            win1.R = SCREEN_WIDTH
         }
 
     case WIN1Hb:
-        win1.L = v
         win1.oL = v
+        win1.L = v
 
-        if win1.oR == 0 && win1.oL == 0 {
-            win1.R = 240
+        if win1.oR > SCREEN_WIDTH || win1.oL > win1.oR{
+            win1.R = SCREEN_WIDTH
         }
 
     case WIN0Va:
+        win0.oB = v
         win0.B = v
+
+        if win0.oB > SCREEN_HEIGHT || win0.oT > win0.oB {
+            win0.B = SCREEN_HEIGHT
+        }
+
     case WIN0Vb:
+        win0.oT = v
         win0.T = v
+
+        if win0.oB > SCREEN_HEIGHT || win0.oT > win0.oB {
+            win0.B = SCREEN_HEIGHT
+        }
+
+
     case WIN1Va:
-        win1.B = v
         win1.oB = v
-        if win1.T == 0 && win1.B == 0 {
-            win1.B = 160
+        win1.B = v
+
+        if win1.oB > SCREEN_HEIGHT || win1.oT > win1.oB {
+            win1.B = SCREEN_HEIGHT
         }
 
     case WIN1Vb:
-        win1.T = v
         win1.oT = v
-        if win1.T == 0 && win1.B == 0 {
-            win1.B = 160
+        win1.T = v
+
+        if win1.oB > SCREEN_HEIGHT || win1.oT > win1.oB {
+            win1.B = SCREEN_HEIGHT
         }
 
     case WININ0:
-        win0.InBg0 = utils.BitEnabled(v, 0)
-        win0.InBg1 = utils.BitEnabled(v, 1)
-        win0.InBg2 = utils.BitEnabled(v, 2)
-        win0.InBg3 = utils.BitEnabled(v, 3)
+        win0.InBg[0] = utils.BitEnabled(v, 0)
+        win0.InBg[1] = utils.BitEnabled(v, 1)
+        win0.InBg[2] = utils.BitEnabled(v, 2)
+        win0.InBg[3] = utils.BitEnabled(v, 3)
         win0.InObj = utils.BitEnabled(v, 4)
         win0.InBld = utils.BitEnabled(v, 5)
     case WININ1:
-        win1.InBg0 = utils.BitEnabled(v, 0)
-        win1.InBg1 = utils.BitEnabled(v, 1)
-        win1.InBg2 = utils.BitEnabled(v, 2)
-        win1.InBg3 = utils.BitEnabled(v, 3)
+        win1.InBg[0] = utils.BitEnabled(v, 0)
+        win1.InBg[1] = utils.BitEnabled(v, 1)
+        win1.InBg[2] = utils.BitEnabled(v, 2)
+        win1.InBg[3] = utils.BitEnabled(v, 3)
         win1.InObj = utils.BitEnabled(v, 4)
         win1.InBld = utils.BitEnabled(v, 5)
     case WINOUT:
-        wins.OutBg0 = utils.BitEnabled(v, 0)
-        wins.OutBg1 = utils.BitEnabled(v, 1)
-        wins.OutBg2 = utils.BitEnabled(v, 2)
-        wins.OutBg3 = utils.BitEnabled(v, 3)
+        wins.OutBg[0] = utils.BitEnabled(v, 0)
+        wins.OutBg[1] = utils.BitEnabled(v, 1)
+        wins.OutBg[2] = utils.BitEnabled(v, 2)
+        wins.OutBg[3] = utils.BitEnabled(v, 3)
         wins.OutObj = utils.BitEnabled(v, 4)
         wins.OutBld = utils.BitEnabled(v, 5)
     case WINOBJ:
-        winObj.InBg0 = utils.BitEnabled(v, 0)
-        winObj.InBg1 = utils.BitEnabled(v, 1)
-        winObj.InBg2 = utils.BitEnabled(v, 2)
-        winObj.InBg3 = utils.BitEnabled(v, 3)
+        winObj.InBg[0] = utils.BitEnabled(v, 0)
+        winObj.InBg[1] = utils.BitEnabled(v, 1)
+        winObj.InBg[2] = utils.BitEnabled(v, 2)
+        winObj.InBg[3] = utils.BitEnabled(v, 3)
         winObj.InObj = utils.BitEnabled(v, 4)
         winObj.InBld = utils.BitEnabled(v, 5)
     }
@@ -562,5 +590,38 @@ func (bg *Background) setSize() {
     case 2: bg.W, bg.H = 32, 64
     case 3: bg.W, bg.H = 64, 64
     default: panic("PROHIBITTED BG SIZE")
+    }
+}
+
+func (obj *Object) setSize(shape, size uint32) {
+
+    const (
+        SQUARE = 0
+        HORIZONTAL = 1
+        VERTICAL = 2
+    )
+
+    switch shape {
+    case SQUARE:
+        switch size {
+        case 0: obj.H, obj.W = 8, 8
+        case 1: obj.H, obj.W = 16, 16
+        case 2: obj.H, obj.W = 32, 32
+        case 3: obj.H, obj.W = 64, 64
+        }
+    case HORIZONTAL:
+        switch size {
+        case 0: obj.H, obj.W = 8, 16
+        case 1: obj.H, obj.W = 8, 32
+        case 2: obj.H, obj.W = 16, 32
+        case 3: obj.H, obj.W = 32, 64
+        }
+    case VERTICAL:
+        switch size {
+        case 0: obj.H, obj.W = 16, 8
+        case 1: obj.H, obj.W = 32, 8
+        case 2: obj.H, obj.W = 32, 16
+        case 3: obj.H, obj.W = 64, 32
+        }
     }
 }

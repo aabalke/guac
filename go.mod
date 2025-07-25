@@ -1,6 +1,6 @@
 module github.com/aabalke33/guac
 
-go 1.24.0
+go 1.24.5
 
 require (
 	github.com/hajimehoshi/ebiten/v2 v2.8.8

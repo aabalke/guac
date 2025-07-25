@@ -1,7 +1,12 @@
 package main
 
 import (
+	"bytes"
+	_ "embed"
 	"flag"
+	"image"
+	"image/png"
+	_ "image/png"
 	"log"
 	"strings"
 
@@ -16,6 +21,9 @@ const (
     GB
     GBA
 )
+
+//go:embed icons/icon.png
+var icon []byte
 
 func main() {
 
@@ -36,7 +44,9 @@ func main() {
     }
 
     ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
-    ebiten.SetWindowTitle("Guac Emulator")
+    ebiten.SetWindowTitle("guac emulator")
+    ebiten.SetWindowIcon([]image.Image{loadIcon()})
+    ebiten.SetWindowSize(240 * 3, 160 * 3)
 
     if err := ebiten.RunGame(NewGame(flags)); err != nil && err != exit {
         log.Fatal(err)
@@ -46,6 +56,16 @@ func main() {
         pprof.StopCPUProfile()
         f.Close()
     }
+}
+
+func loadIcon() image.Image {
+
+    img, err := png.Decode(bytes.NewReader(icon))
+    if err != nil {
+        panic(err)
+    }
+
+    return img
 }
 
 type Flags struct {

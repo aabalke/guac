@@ -13,6 +13,9 @@ var (
 const (
     WAIT_GROUPS = 8
     dx = SCREEN_WIDTH / WAIT_GROUPS
+
+    MAX_HEIGHT = 256
+    MAX_WIDTH = 512
 )
 
 func updateBackgrounds(gba *GBA, dispcnt *Dispcnt) *[4]Background {
@@ -32,47 +35,17 @@ func updateBackgrounds(gba *GBA, dispcnt *Dispcnt) *[4]Background {
 
         bgs[i].setSize()
 
+        // temp
+        //if i != 0 {
+        //    bgs[i].Invalid = true
+        //}
+
         if (dispcnt.Mode == 1 && i == 2) || dispcnt.Mode == 2 {
             bgs[i].Palette256 = true
         }
-
     }
 
     return bgs
-}
-
-func (obj *Object) setSize(shape, size uint32) {
-
-    const (
-        SQUARE = 0
-        HORIZONTAL = 1
-        VERTICAL = 2
-    )
-
-    switch shape {
-    case SQUARE:
-        switch size {
-        case 0: obj.H, obj.W = 8, 8
-        case 1: obj.H, obj.W = 16, 16
-        case 2: obj.H, obj.W = 32, 32
-        case 3: obj.H, obj.W = 64, 64
-        }
-    case HORIZONTAL:
-        switch size {
-        case 0: obj.H, obj.W = 8, 16
-        case 1: obj.H, obj.W = 8, 32
-        case 2: obj.H, obj.W = 16, 32
-        case 3: obj.H, obj.W = 32, 64
-        }
-    case VERTICAL:
-        switch size {
-        case 0: obj.H, obj.W = 16, 8
-        case 1: obj.H, obj.W = 32, 8
-        case 2: obj.H, obj.W = 32, 16
-        case 3: obj.H, obj.W = 64, 32
-        }
-    //default: panic("PROHIBITTED OBJ SHAPE")
-    }
 }
 
 func (gba *GBA) scanlineGraphics(y uint32) {
@@ -96,7 +69,6 @@ func (gba *GBA) scanlineTileMode(y uint32) {
     objPriorities := gba.getObjPriority(y, &gba.PPU.Objects)
 
     dispcnt := &gba.PPU.Dispcnt
-    //bgs := *NewBackgrounds(gba, dispcnt)
 
     bgs := updateBackgrounds(gba, dispcnt)
     wins := &gba.PPU.Windows
@@ -314,18 +286,6 @@ func (gba *GBA) object(x, y uint32, obj *Object, wins *Windows, dispcnt *Dispcnt
     return palData, ok, palZero, obj
 }
 
-func outObjectBoundScanline(obj *Object, y int) bool {
-    yIdx := int(y) - int(obj.Y)
-    if obj.Y > SCREEN_HEIGHT {
-        yIdx += 256 // i believe 256 is max
-    }
-
-    t := yIdx < 0
-    b := yIdx - int(obj.H) >= 0
-    return t || b
-
-}
-
 func outObjectBound(obj *Object, xIdx, yIdx int) bool {
     t := yIdx < 0
     b := yIdx - int(obj.H) >= 0
@@ -334,18 +294,7 @@ func outObjectBound(obj *Object, xIdx, yIdx int) bool {
     return t || b || l || r
 }
 
-func inScreenBounds(x, y int) bool {
-    if x < 0 || y < 0 || x > SCREEN_WIDTH || y > SCREEN_HEIGHT {return false}
-    return true
-}
-
 func (gba *GBA) setObjectAffinePixel(obj *Object, x, y uint32) (uint32, bool, bool) {
-
-    // will need to fix. Large Scaled sprites "pop" into place when wrapping on bottom and right
-
-    if !inScreenBounds(int(x), int(y)) {
-        return 0, false, false
-    }
 
     if gba.outBoundsAffine(obj, x, y) {
         return 0, false, false
@@ -369,7 +318,6 @@ func (gba *GBA) setObjectAffinePixel(obj *Object, x, y uint32) (uint32, bool, bo
     if objX > SCREEN_WIDTH {
         xIdx += 512 // i believe 512 is max
     }
-
 
     xOrigin := float32(xIdx - (int(obj.W) / 2))
     yOrigin := float32(yIdx - (int(obj.H) / 2))
@@ -449,10 +397,6 @@ func (gba *GBA) outBoundsAffine(obj *Object, x, y uint32) bool {
 
 func (gba *GBA) setObjectPixel(obj *Object, x, y uint32) (uint32, bool, bool) {
 
-    if !inScreenBounds(int(x), int(y)) {
-        return 0, false, false
-    }
-
 	mem := &gba.Mem
 
     yIdx := int(y) - int(obj.Y)
@@ -486,10 +430,10 @@ func (gba *GBA) setObjectPixel(obj *Object, x, y uint32) (uint32, bool, bool) {
 
 func getPositions(obj *Object, xIdx, yIdx uint32) (uint32, uint32, uint32, uint32) {
 
-    enTileY := yIdx / 8
-    enTileX := xIdx / 8
-    inTileY := yIdx % 8
-    inTileX := xIdx % 8
+    enTileY := yIdx >> 3 // / 8
+    enTileX := xIdx >> 3 // / 8
+    inTileY := yIdx & 0b111 // % 8
+    inTileX := xIdx & 0b111 // % 8
 
     if obj.RotScale {
         return enTileX, enTileY, inTileX, inTileY
@@ -509,7 +453,6 @@ func getPositions(obj *Object, xIdx, yIdx uint32) (uint32, uint32, uint32, uint3
 
 func getTileAddr(obj *Object, enTileX, enTileY, inTileX, inTileY uint32) uint32 {
 
-    VRAM_BASE := int(0x0601_0000)
     tileHeight := int(obj.W) * 4
     tileWidth := 0x20
 
@@ -526,9 +469,9 @@ func getTileAddr(obj *Object, enTileX, enTileY, inTileX, inTileY uint32) uint32 
     } else {
         tileIdx = int(enTileX) + (int(enTileY) * 32)
         tileIdx = (tileIdx + int(obj.CharName) % MAX_NUM_TILE) * tileWidth
-
     }
 
+    VRAM_BASE := int(0x0601_0000)
     tileAddr := uint32(VRAM_BASE + tileIdx)
 
     var inTileIdx uint32
@@ -545,7 +488,7 @@ func getPaletteData(gba *GBA, pal256 bool, pal uint32, tileData, inTileX uint32)
 
     var palIdx uint32
     if pal256 {
-        palIdx = tileData & 0b1111_1111
+        palIdx = tileData & 0xFF
         pal = 0
     } else {
         if inTileX % 2 == 0 {
@@ -590,16 +533,11 @@ func (gba *GBA) getObjPriority(y uint32, objects *[128]Object) [4][]uint32 {
 
         priority := obj.Priority
 
-        if disabled := obj.Disable && !obj.RotScale; disabled { // may need to make more effective
+        if disabled := obj.Disable && !obj.RotScale; disabled {
             continue
         }
 
-        outOfBoundsStandard := outObjectBoundScanline(obj, int(y)) && !obj.RotScale
-        //outOfBoundsAffine := !gba.inObjectBoundScanlineAffine(obj, y) && obj.RotScale
-        outOfBoundsAffine := (y < obj.Y || y > obj.Y + obj.H) && obj.RotScale && !obj.DoubleSize
-
-        //if outOfBoundsStandard || outOfBoundsAffine {
-        if outOfBoundsStandard || outOfBoundsAffine {
+        if objNotScanline(obj, y) {
             continue
         }
 
@@ -607,28 +545,36 @@ func (gba *GBA) getObjPriority(y uint32, objects *[128]Object) [4][]uint32 {
     }
 
     return priorities
-
 }
 
-func (gba *GBA) inObjectBoundScanlineAffine(obj *Object, y uint32) bool {
+func objNotScanline(obj *Object, y uint32) bool {
 
-    if obj.DoubleSize {
-        // need to setup check on double
-        return false
+    if obj.DoubleSize && obj.RotScale {
+
+        offset := obj.H / 2
+
+        localY := int(y) - int(obj.Y + offset)
+
+        if obj.Y + uint32(offset) > SCREEN_HEIGHT {
+            localY += MAX_HEIGHT
+        }
+
+        t := localY + int(offset) < 0
+        b := localY - int(obj.H + obj.H + offset) >= 0
+
+        return t || b
     }
 
-    if y >= obj.Y && y < obj.Y + obj.H {
-        return true
+    localY := int(y) - int(obj.Y)
+
+    if obj.Y > SCREEN_HEIGHT {
+        localY += MAX_HEIGHT
     }
 
-    //if obj.Y + obj.H > SCREEN_HEIGHT {
-    //    if y >= obj.Y || y < (obj.Y + obj.H) % SCREEN_HEIGHT {
-    //        return true
-    //    }
-    //}
+    t := localY < 0
+    b := localY - int(obj.H) >= 0
 
-
-    return false
+    return t || b
 }
 
 func (gba *GBA) background(x, y, idx uint32, bg *Background, wins *Windows) (uint32, bool, bool) {
@@ -642,13 +588,20 @@ func (gba *GBA) background(x, y, idx uint32, bg *Background, wins *Windows) (uin
         return palData, ok, palZero
     }
 
-    if !inScreenBounds(int(x), int(y)) {
-        return 0, false, false
-    }
-
     palData, ok, palZero := gba.setBackgroundPixel(bg, x, y)
 
     return palData, ok, palZero
+}
+
+func inRange(coord, start, end uint32) bool {
+    if end < start {
+        return coord >= start || coord < end
+    }
+    return coord >= start && coord < end
+}
+
+func inWindow(x, y, l, r, t, b uint32) bool {
+    return inRange(x, l, r) && inRange(y, t, b)
 }
 
 func windowPixelAllowed(idx, x, y uint32, wins *Windows) bool {
@@ -657,44 +610,13 @@ func windowPixelAllowed(idx, x, y uint32, wins *Windows) bool {
         return true
     }
 
-    inWindow := func(win Window) bool {
-
-        l := win.L
-        r := win.R
-        t := win.T
-        b := win.B
-
-        switch {
-        case r < l && b < t:
-            return (x >= l || x < r) && (y >= t || y < b)
-        case r < l:                                    
-            return (x >= l || x < r) && (y >= t && y < b)
-        case b < t:                                    
-            return (x >= l && x < r) && (y >= t || y < b)
-        default:                                       
-            return (x >= l && x < r) && (y >= t && y < b)
-        }
-    }
-
     for _, win := range []Window{wins.Win0, wins.Win1} {
-        if win.Enabled && inWindow(win) {
-            //return false
-            switch idx {
-            case 0: return win.InBg0
-            case 1: return win.InBg1
-            case 2: return win.InBg2
-            case 3: return win.InBg3
-            }
+        if win.Enabled && inWindow(x, y, win.L, win.R, win.T, win.B) {
+            return win.InBg[idx]
         }
     }
-    switch idx {
-    case 0: return wins.OutBg0
-    case 1: return wins.OutBg1
-    case 2: return wins.OutBg2
-    case 3: return wins.OutBg3
-    }
 
-    return true
+    return wins.OutBg[idx]
 }
 
 func windowObjPixelAllowed(x, y uint32, wins *Windows) bool {
@@ -703,12 +625,8 @@ func windowObjPixelAllowed(x, y uint32, wins *Windows) bool {
         return true
     }
 
-    inWindow := func(win Window) bool {
-        return (x >= win.L && x < win.R) && (y >= win.T && y < win.B)
-    }
-
     for _, win := range []Window{wins.Win0, wins.Win1} {
-        if win.Enabled && inWindow(win) {
+        if win.Enabled && inWindow(x, y, win.L, win.R, win.T, win.B) {
             return win.InObj
         }
     }
@@ -722,12 +640,8 @@ func windowBldPixelAllowed(x, y uint32, wins *Windows, inObjWindow bool) bool {
         return true
     }
 
-    inWindow := func(win Window) bool {
-        return (x >= win.L && x < win.R) && (y >= win.T && y < win.B)
-    }
-
     for _, win := range []Window{wins.Win0, wins.Win1} {
-        if win.Enabled && inWindow(win) {
+        if win.Enabled && inWindow(x, y, win.L, win.R, win.T, win.B) {
             return win.InBld
         }
     }
@@ -750,10 +664,6 @@ func convert28Float(v uint32) float32 {
 
 func (gba *GBA) setAffineBackgroundPixel(bg *Background, x, y uint32) (uint32, bool, bool) {
 
-    if !inScreenBounds(int(x), int(y)) {
-        return 0, false, false
-    }
-
     if !bg.Palette256 {
         panic(fmt.Sprintf("AFFINE WITHOUT PAL 256"))
     }
@@ -771,6 +681,8 @@ func (gba *GBA) setAffineBackgroundPixel(bg *Background, x, y uint32) (uint32, b
         xIdx %= int(bg.W * 8)
         yIdx %= int(bg.H * 8)
     } else {
+        //xIdx %= int(bg.W * 8)
+        //yIdx %= int(bg.H * 8)
 
         // this does NOT WORK
         //xBound := xIdx
@@ -919,8 +831,8 @@ func (gba *GBA) setBackgroundPixel(bg *Background, x, y uint32) (uint32, bool, b
 
 func getPositionsBg(screenData, xIdx, yIdx uint32) (uint32, uint32) {
 
-    inTileY := yIdx % 8
-    inTileX := xIdx % 8
+    inTileY := yIdx & 0b111 //% 8
+    inTileX := xIdx & 0b111 //% 8
 
     if hFlip := utils.BitEnabled(screenData, 10); hFlip {
         inTileX = 7 - inTileX

@@ -119,7 +119,6 @@ func (a *Apu) Play(muted bool) {
     }
 
     a.player.Write(a.Stream)
-
 }
 
 func (a *Apu) Close() {

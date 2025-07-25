@@ -164,8 +164,6 @@ Additionally, other ARMv5 instructions will fail.
 
 ### Games
 
-All games require Digital Sound
-
 Advance Wars
     - Menu Missing
 Fire Emblem
@@ -173,12 +171,11 @@ Fire Emblem
 Fire Emblem Sacred Stones
     - No known errors
 Golden Sun
-    - No known errors
     - crashes in game
 Drill Dozer
-    - Objects not appearing, is affine at top of screen
+    - No known errors
 Harvest Moon Friends of Mineral Town
-    - Blending of Green
+    - No known errors
 Hello Kitty Happy Party Pals
     - Some Mini games do not load
 Kirby Nightmare in Dream Land
@@ -198,7 +195,6 @@ Mother 12
 Mother 3
     - No known errors
 Pokémon Mystery Dungeon Red Rescue Team
-    - Graphics Windows
     - Wave Sound Channel does not envelope / length correctly
 Pokémon Firered / LeafGreen
     - No known errors
@@ -225,9 +221,9 @@ Ultimate Puzzle Games
 Warioware Twisted
     - I believe needs Mode 7
 Wolfenstein 3D
-    - Does not save (verify)
+    - No known errors
 Doom
-    - Does not save (verify)
+    - No known errors
 Doom II
     - Does not boot
     - prior to 8337911b76c6e7430ebd092ef7c72522c9dcf0c5: WIDTH 0 EEPROM

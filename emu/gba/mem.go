@@ -790,11 +790,11 @@ func (m *Memory) Write32(addr uint32, v uint32) {
 
 func CheckEeprom(gba *GBA, addr uint32) bool {
 
-    if addr < 0xD00_0000 || addr >= 0xE00_0000 {
+    if gba.Cartridge.Id != 1 {
         return false
     }
 
-    if gba.Cartridge.Id != 1 {
+    if addr < 0xD00_0000 || addr >= 0xE00_0000 {
         return false
     }
 
