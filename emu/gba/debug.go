@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 
-	"image/color"
 	_ "image/png"
 	"os"
 )
@@ -99,15 +98,6 @@ func (d *Debugger) print(i int) {
     //for i := start; i >= start - (count * 4); i -= 4 {
     //    p(fmt.Sprintf("IO %X", i), d.Gba.Mem.Read32(uint32(i)))
     //}
-}
-
-func convertTo24bit(r, g, b uint8) color.RGBA {
-    return color.RGBA{
-        R: (r << 3) | (r >> 2),
-        G: (g << 3) | (g >> 2),
-        B: (b << 3) | (b >> 2),
-        A: 0xFF,
-    }
 }
 
 func (d *Debugger) dump(s, e uint32) {

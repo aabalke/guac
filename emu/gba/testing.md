@@ -119,9 +119,9 @@ Additionally, other ARMv5 instructions will fail.
 👍 irq_demo
 👍 key_demo
 👍 m3_demo
-❌ m7_demo
-❌ m7_demo_mb
-❌ m7_ex
+👍 m7_demo
+👍 m7_demo_mb
+❌ m7_ex - skew (pb and pd) mess up perspective, not sure why pb / skew on perspective
 ❌ mos_demo
 👍 oacombo
 
@@ -148,7 +148,7 @@ Additionally, other ARMv5 instructions will fail.
 👍 octtest (blinks)
 👍 pageflip
 👍 prio_demo
-❌ sbb_aff (does not hide at edges)
+👍 sbb_aff
 👍 sbb_reg (has obj in top left, not sure if problem)
 👍 second
 👍 snd1_demo
@@ -203,7 +203,7 @@ Pokémon Emerald
 Pokémon Ruby / Sapphire
     - No known errors
 Sonic Advance
-    - Affine Disappearance
+    - No known errors
 Spyro Season of Ice
     - No known errors
 Superstar Saga

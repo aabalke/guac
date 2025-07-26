@@ -9,3 +9,6 @@ art
 
 # other
 *.json
+
+*.pprof
+*.syso

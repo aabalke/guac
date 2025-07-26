@@ -35,7 +35,7 @@ type Dispcnt struct {
 type Blend struct {
     Mode uint32
     a, b [6]bool
-    aEv, bEv, yEv uint32
+    aEv, bEv, yEv float32
 }
 
 type Windows struct {
@@ -68,6 +68,8 @@ type Background struct {
     XOffset, YOffset uint32
     aXOffset, aYOffset uint32
     Affine bool
+
+    PbCalc, PdCalc float64
 }
 
 type Object struct {
@@ -150,13 +152,13 @@ func (p *PPU) UpdatePPU(addr uint32, v uint32) {
         p.Blend.b[5] = utils.BitEnabled(v, 5)
 
     case 0x52:
-        p.Blend.aEv = min(16, utils.GetVarData(v, 0, 4))
+        p.Blend.aEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
 
     case 0x53:
-        p.Blend.bEv = min(16, utils.GetVarData(v, 0, 4))
+        p.Blend.bEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
 
     case 0x54:
-        p.Blend.yEv = min(16, utils.GetVarData(v, 0, 4))
+        p.Blend.yEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
 
     }
 }
@@ -376,41 +378,41 @@ func (p *PPU) UpdateBackgrounds(addr, v uint32) {
     switch addr {
     case 0x08:
         p.Backgrounds[0].Priority = utils.GetVarData(v, 0, 1)
-        p.Backgrounds[0].CharBaseBlock = utils.GetVarData(v, 2, 3)
+        p.Backgrounds[0].CharBaseBlock = utils.GetVarData(v, 2, 3) * 0x4000
         p.Backgrounds[0].Mosaic = utils.BitEnabled(v, 6)
         p.Backgrounds[0].Palette256 = utils.BitEnabled(v, 7)
     case 0x09:
-        p.Backgrounds[0].ScreenBaseBlock = utils.GetVarData(v, 0, 4)
+        p.Backgrounds[0].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
         p.Backgrounds[0].AffineWrap = utils.BitEnabled(v, 5)
         p.Backgrounds[0].Size = utils.GetVarData(v, 6, 7)
 
     case 0x0A:
         p.Backgrounds[1].Priority = utils.GetVarData(v, 0, 1)
-        p.Backgrounds[1].CharBaseBlock = utils.GetVarData(v, 2, 3)
+        p.Backgrounds[1].CharBaseBlock = utils.GetVarData(v, 2, 3) * 0x4000
         p.Backgrounds[1].Mosaic = utils.BitEnabled(v, 6)
         p.Backgrounds[1].Palette256 = utils.BitEnabled(v, 7)
     case 0x0B:
-        p.Backgrounds[1].ScreenBaseBlock = utils.GetVarData(v, 0, 4)
+        p.Backgrounds[1].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
         p.Backgrounds[1].AffineWrap = utils.BitEnabled(v, 5)
         p.Backgrounds[1].Size = utils.GetVarData(v, 6, 7)
 
     case 0x0C:
         p.Backgrounds[2].Priority = utils.GetVarData(v, 0, 1)
-        p.Backgrounds[2].CharBaseBlock = utils.GetVarData(v, 2, 3)
+        p.Backgrounds[2].CharBaseBlock = utils.GetVarData(v, 2, 3) * 0x4000
         p.Backgrounds[2].Mosaic = utils.BitEnabled(v, 6)
         p.Backgrounds[2].Palette256 = utils.BitEnabled(v, 7)
     case 0x0D:
-        p.Backgrounds[2].ScreenBaseBlock = utils.GetVarData(v, 0, 4)
+        p.Backgrounds[2].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
         p.Backgrounds[2].AffineWrap = utils.BitEnabled(v, 5)
         p.Backgrounds[2].Size = utils.GetVarData(v, 6, 7)
 
     case 0x0E:
         p.Backgrounds[3].Priority = utils.GetVarData(v, 0, 1)
-        p.Backgrounds[3].CharBaseBlock = utils.GetVarData(v, 2, 3)
+        p.Backgrounds[3].CharBaseBlock = utils.GetVarData(v, 2, 3) * 0x4000
         p.Backgrounds[3].Mosaic = utils.BitEnabled(v, 6)
         p.Backgrounds[3].Palette256 = utils.BitEnabled(v, 7)
     case 0x0F:
-        p.Backgrounds[3].ScreenBaseBlock = utils.GetVarData(v, 0, 4)
+        p.Backgrounds[3].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
         p.Backgrounds[3].AffineWrap = utils.BitEnabled(v, 5)
         p.Backgrounds[3].Size = utils.GetVarData(v, 6, 7)
 
