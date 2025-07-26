@@ -2,7 +2,6 @@ package gba
 
 import (
 	"fmt"
-	//"math"
 	"sync"
 
 	"github.com/aabalke33/guac/emu/gba/utils"
@@ -18,6 +17,16 @@ const (
     MAX_HEIGHT = 256
     MAX_WIDTH = 512
 )
+
+func (bg *Background) BgAffineReset() {
+    bg.OutX = convert20_8Float(int32(bg.aXOffset));
+    bg.OutY = convert20_8Float(int32(bg.aYOffset));
+}
+
+func (bg *Background) BgAffineUpdate() {
+    bg.OutX += convert8_8Float(int16(bg.Pb))
+    bg.OutY += convert8_8Float(int16(bg.Pd))
+}
 
 func updateBackgrounds(gba *GBA, dispcnt *Dispcnt, y uint32) *[4]Background {
 
@@ -728,9 +737,9 @@ func (gba *GBA) setAffineBackgroundPixel(bg *Background, x, y uint32) (uint32, b
     }
 
     pa := convert8_8Float(int16(bg.Pa))
-    pb := convert8_8Float(int16(bg.Pb))
+    //pb := convert8_8Float(int16(bg.Pb))
     pc := convert8_8Float(int16(bg.Pc))
-    pd := convert8_8Float(int16(bg.Pd))
+    //pd := convert8_8Float(int16(bg.Pd))
 
     //xAdd := pb * float64(y)
     //yAdd := pd * float64(y)
@@ -739,12 +748,14 @@ func (gba *GBA) setAffineBackgroundPixel(bg *Background, x, y uint32) (uint32, b
     //    fmt.Printf("PA %f, PB %f, PC %f, PD %f\n", pa, bg.PbCalc, pc ,bg.PdCalc)
     //}
 
-    xOffset := convert20_8Float(int32(bg.aXOffset))
-    yOffset := convert20_8Float(int32(bg.aYOffset))
-    xIdx := int(pa * float64(x) + pb * float64(y) + xOffset)
-    yIdx := int(pc * float64(x) + pd * float64(y) + yOffset)
+    //xOffset := convert20_8Float(int32(bg.aXOffset))
+    //yOffset := convert20_8Float(int32(bg.aYOffset))
+    //xIdx := int(pa * float64(x) + pb * float64(y) + xOffset)
+    //yIdx := int(pc * float64(x) + pd * float64(y) + yOffset)
     //xIdx := int(pa * float64(x) + xOffset)
     //yIdx := int(pc * float64(x) + yOffset)
+    xIdx := int(pa * float64(x) + bg.OutX)
+    yIdx := int(pc * float64(x) + bg.OutY)
 
     out :=xIdx < 0 || xIdx >= int(bg.W) * 8 || yIdx < 0 || yIdx >= int(bg.H) * 8
 

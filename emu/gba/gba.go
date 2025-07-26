@@ -238,6 +238,8 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 
         if vcount < SCREEN_HEIGHT {
             gba.scanlineGraphics(uint32(vcount))
+            gba.PPU.Backgrounds[2].BgAffineUpdate()
+            gba.PPU.Backgrounds[3].BgAffineUpdate()
             gba.checkDmas(DMA_MODE_HBL)
         }
     }
@@ -250,6 +252,9 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
         gba.Mem.IO[0x6] = vcount
 
         switch vcount {
+        case 0:
+            gba.PPU.Backgrounds[2].BgAffineReset()
+            gba.PPU.Backgrounds[3].BgAffineReset()
         case SCREEN_HEIGHT:
             dispstat.SetVBlank(true)
             gba.checkDmas(DMA_MODE_VBL)
