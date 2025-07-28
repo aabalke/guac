@@ -3,6 +3,7 @@
 1. Mode 7: Required for Mario Super Circuit and Sonic Adv 3
 
 2. Mode 4: Need objects
+- Doom II, Need for Speed Underground
 
 3. Mosaic
 

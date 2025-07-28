@@ -1,9 +1,14 @@
 package gba
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/aabalke33/guac/emu/gba/utils"
+)
+
+var (
+    _ = fmt.Sprintf("")
 )
 
 type Memory struct {
@@ -42,7 +47,7 @@ func NewMemory(gba *GBA) Memory {
 
 func (m *Memory) InitSaveLoop() {
 
-    return
+    //return
 
     saveTicker := time.Tick(time.Second)
 
@@ -147,6 +152,7 @@ func (m *Memory) initWriteRegions() {
         cartridge := &m.GBA.Cartridge
         //relative := (addr - 0xE00_0000) % 0x1_0000
         relative := (addr - 0xE00_0000) & (0x1_0000 - 1)
+
         cartridge.Write(relative, v)
         return
     }
@@ -579,6 +585,12 @@ func (m *Memory) ReadBadRom(addr uint32, bytesRead uint8) uint32 {
 }
 
 func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
+
+    //if addr < 0x1000 {
+    //    fmt.Printf("WRITE TO BIOS AT PC %08X and CURR %d ADDR %08X V %02X\n", m.GBA.Cpu.Reg.R[PC], CURR_INST, addr, v)
+    //}
+
+
     m.writeRegions[addr >> 24](m, addr, v, byteWrite)
 }
 

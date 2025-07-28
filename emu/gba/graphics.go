@@ -28,7 +28,7 @@ func (bg *Background) BgAffineUpdate() {
     bg.OutY += convert8_8Float(int16(bg.Pd))
 }
 
-func updateBackgrounds(gba *GBA, dispcnt *Dispcnt, y uint32) *[4]Background {
+func updateBackgrounds(gba *GBA, dispcnt *Dispcnt) *[4]Background {
 
     bgs := &gba.PPU.Backgrounds
 
@@ -48,11 +48,6 @@ func updateBackgrounds(gba *GBA, dispcnt *Dispcnt, y uint32) *[4]Background {
         if (dispcnt.Mode == 1 && i == 2) || dispcnt.Mode == 2 {
             bgs[i].Palette256 = true
         }
-
-        //if bgs[i].Affine {
-        //    bgs[i].PbCalc = math.Floor(convert8_8Float(int16(bgs[i].Pb)) * float64(y))
-        //    bgs[i].PdCalc = math.Floor(convert8_8Float(int16(bgs[i].Pd)) * float64(y))
-        //}
     }
 
     return bgs
@@ -64,9 +59,7 @@ func (gba *GBA) scanlineGraphics(y uint32) {
         return
     }
 
-
     if gba.PPU.Dispcnt.ForcedBlank {
-
         x := uint32(0)
         for x = range SCREEN_WIDTH {
             index := (x + (y*SCREEN_WIDTH)) * 4
@@ -93,7 +86,7 @@ func (gba *GBA) scanlineTileMode(y uint32) {
 
     dispcnt := &gba.PPU.Dispcnt
 
-    bgs := updateBackgrounds(gba, dispcnt, y)
+    bgs := updateBackgrounds(gba, dispcnt)
     wins := &gba.PPU.Windows
 
     if dispcnt.Mode >= 3 {
@@ -163,7 +156,6 @@ func (gba *GBA) scanlineTileMode(y uint32) {
         }
 
         finalPalData := bldPal.blend(objMode, x, y, wins, inObjWindow)
-
         gba.applyColor(finalPalData, uint32(index))
     }
 
@@ -190,13 +182,25 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 	mem := &gba.Mem
     dispcnt := &gba.PPU.Dispcnt
 
+    objPriorities := gba.getObjPriority(y, &gba.PPU.Objects)
+
+    wins := &gba.PPU.Windows
+
     if dispcnt.Mode < 3 {
         return
     }
 
     renderPixel := func(x uint32) {
 
+        bldPal := NewBlendPalette(x, &gba.PPU.Blend)
         index := (x + (y*SCREEN_WIDTH)) * 4
+        bldPal.reset(gba)
+
+        var objMode uint32
+        var inObjWindow bool
+
+        BG_IDX := uint32(2)
+        DEC_IDX := uint32(0) // this will have to be updated
 
         switch dispcnt.Mode {
         case 3:
@@ -209,8 +213,7 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 
             idx := BASE + ((x + (y * WIDTH)) * BYTE_PER_PIXEL)
             data := mem.Read16(idx)
-            gba.applyColor(data, uint32(index))
-            return
+            bldPal.setBlendPalettes(data, BG_IDX, false, false)
 
         case 4:
 
@@ -227,19 +230,10 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
             }
 
             palIdx := mem.Read8(idx)
-            //if palIdx != 0 {
-            ////    palData := gba.getPalette(uint32(palIdx), 0, false)
-            ////    gba.applyColor(palData, uint32(index))
-            ////}
-            //    palData := gba.getPalette(uint32(palIdx), 0, false)
-            //    gba.applyColor(palData, uint32(index))
-            //}
-            palData := gba.getPalette(uint32(palIdx), 0, false)
-            gba.applyColor(palData, uint32(index))
-
-            // need objs
-
-            return
+            if palIdx != 0 {
+                data := gba.getPalette(uint32(palIdx), 0, false)
+                bldPal.setBlendPalettes(data, BG_IDX, false, false)
+            }
 
         case 5:
 
@@ -262,13 +256,37 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
             }
 
             data := mem.Read16(idx)
-            gba.applyColor(data, uint32(index))
-            return
-
-        default:
-            //log.Printf("Invalid Bitmap Mode Graphics: %d \n", dispcnt.Mode)
-            return
+            bldPal.setBlendPalettes(data, BG_IDX, false, false)
         }
+        if objects := dispcnt.DisplayObj; objects {
+            objPal := uint32(0)
+            objExists := false
+            objCount := len(objPriorities[DEC_IDX])
+
+            for j := range objCount {
+                objIdx := objPriorities[DEC_IDX][j]
+                palData, ok, palZero, obj := gba.object(x, y, &gba.PPU.Objects[objIdx], wins, dispcnt)
+
+                if ok && !palZero {
+                    if obj.Mode == 2 {
+                        inObjWindow = true
+                        // break here too? idk
+                    } else {
+                        objMode = obj.Mode
+                        objExists = true
+                        objPal = palData
+                        break
+                    }
+                }
+            }
+
+            if objExists {
+                bldPal.setBlendPalettes(objPal, 0, true, objMode == 1)
+            }
+        }
+
+        finalPalData := bldPal.blend(objMode, x, y, wins, inObjWindow)
+        gba.applyColor(finalPalData, uint32(index))
     }
 
     for i := range WAIT_GROUPS {
@@ -602,14 +620,12 @@ func (gba *GBA) background(x, y, idx uint32, bg *Background, wins *Windows) (uin
         return 0, false, false
     }
 
-
     if bg.Affine {
-        palData, ok, palZero := gba.setAffineBackgroundPixel(bg, x, y)
+        palData, ok, palZero := gba.setAffineBackgroundPixel(bg, x)
         return palData, ok, palZero
     }
 
     palData, ok, palZero := gba.setBackgroundPixel(bg, x, y)
-
     return palData, ok, palZero
 }
 
@@ -688,72 +704,14 @@ func convert8_8Float(v int16) float64 {
     return float64(v >> 8) + (float64(v & 0xFF) / 256.0)
 }
 
-//func (gba *GBA) affineBgPixel(bg *Background, x, y uint32) (uint32, bool, bool) {
-//
-//    if !bg.Palette256 { panic("AFFINE WITHOUT PAL 256")}
-//
-//    i := int(math.Floor(affine_x))
-//    j := int(math.Floor(affine_y))
-//
-//    if bg.AffineWrap {
-//        i &= int(bg.W) - 1
-//        j &= int(bg.H) - 1
-//    }
-//
-//    map_x := (x / 8) % (bg.W / 8)
-//    map_y := (y / 8) % (bg.H / 8)
-//    mapIdx := map_y * (bg.W / 8) + map_x
-//    tileIdx := int(gba.Mem.Read8(0x600_0000 + bg.ScreenBaseBlock + mapIdx))
-//
-//    tileAddr := 0x600_0000 + bg.CharBaseBlock + uint32(tileIdx) * 64
-//
-//    if tileAddr >= 0x601_0000 {
-//        return 0, false, false
-//    }
-//
-//    palette := utils.GetVarData(screenData, 12, 15)
-//    inTileX, inTileY := getPositionsBg(screenData, uint32(xIdx), uint32(yIdx))
-//
-//    inTileIdx := uint32(inTileX) + uint32(inTileY * 8)
-//
-//    addr := tileAddr + inTileIdx
-//    tileData := gba.Mem.Read8(tileAddr)
-//
-//    palData := gba.getPalette(uint32(palIdx), 0, false)
-//
-//    if palIdx == 0 {
-//        return palData, true, true
-//    }
-//
-//    return palData, true, false
-//
-//
-//}
-
-func (gba *GBA) setAffineBackgroundPixel(bg *Background, x, y uint32) (uint32, bool, bool) {
+func (gba *GBA) setAffineBackgroundPixel(bg *Background, x uint32) (uint32, bool, bool) {
 
     if !bg.Palette256 {
         panic(fmt.Sprintf("AFFINE WITHOUT PAL 256"))
     }
 
     pa := convert8_8Float(int16(bg.Pa))
-    //pb := convert8_8Float(int16(bg.Pb))
     pc := convert8_8Float(int16(bg.Pc))
-    //pd := convert8_8Float(int16(bg.Pd))
-
-    //xAdd := pb * float64(y)
-    //yAdd := pd * float64(y)
-
-    //if y == 100 && x == 0 {
-    //    fmt.Printf("PA %f, PB %f, PC %f, PD %f\n", pa, bg.PbCalc, pc ,bg.PdCalc)
-    //}
-
-    //xOffset := convert20_8Float(int32(bg.aXOffset))
-    //yOffset := convert20_8Float(int32(bg.aYOffset))
-    //xIdx := int(pa * float64(x) + pb * float64(y) + xOffset)
-    //yIdx := int(pc * float64(x) + pd * float64(y) + yOffset)
-    //xIdx := int(pa * float64(x) + xOffset)
-    //yIdx := int(pc * float64(x) + yOffset)
     xIdx := int(pa * float64(x) + bg.OutX)
     yIdx := int(pc * float64(x) + bg.OutY)
 
@@ -801,30 +759,36 @@ func (gba *GBA) setAffineBackgroundPixel(bg *Background, x, y uint32) (uint32, b
 
 func (gba *GBA) setBackgroundPixel(bg *Background, x, y uint32) (uint32, bool, bool) {
 
-    xIdx := (x + bg.XOffset) % (bg.W * 8)
-    yIdx := (y + bg.YOffset) % (bg.H * 8)
+    xIdx := (x + bg.XOffset) & ((bg.W * 8) - 1)
+    yIdx := (y + bg.YOffset) & ((bg.H * 8) - 1)
 
-    tileX := xIdx / 8
-    tileY := yIdx / 8
+    //tileX := uint32(xIdx / 8) % (bg.W)
+    //tileY := uint32(yIdx / 8) % (bg.H)
 
-    VRAM_BASE := int(0x0600_0000)
 	mem := &gba.Mem
 
-    pitch := bg.W
-    sbb := (tileY/32) * (pitch/32) + (tileX/32)
-    mapIdx := (sbb * 1024 + (tileY %32) * 32 + (tileX %32)) * 2
+    //pitch := bg.W
+    //sbb := (tileY/32) * (pitch/32) + (tileX/32)
+    //mapIdx := (sbb * 1024 + (tileY %32) * 32 + (tileX %32)) * 2
 
-    mapAddr := uint32(VRAM_BASE) + bg.ScreenBaseBlock + mapIdx
+    map_x := int((xIdx / 8) % (bg.W))
+    map_y := int((yIdx / 8) % (bg.H))
+    quad_x := 32 * 32
+    quad_y := 32 * 32
+    if bg.Size == 3 {
+        quad_y *= 2
+    }
+    mapIdx := (map_y / 32) * quad_y + (map_x / 32) * quad_x + (map_y % 32) * 32 + (map_x % 32)
+
+    mapAddr := 0x600_0000 + bg.ScreenBaseBlock + uint32(mapIdx) * 2
 
     screenData := mem.Read16(mapAddr)
 
     tileIdx := utils.GetVarData(screenData, 0, 9)
 
-    var tileAddr uint32
+    tileAddr := 0x600_0000 + bg.CharBaseBlock + (tileIdx * 32)
     if bg.Palette256 {
-        tileAddr += uint32(VRAM_BASE) + bg.CharBaseBlock + (tileIdx * 0x40)
-    } else {
-        tileAddr += uint32(VRAM_BASE) + bg.CharBaseBlock + (tileIdx * 0x20)
+        tileAddr += (tileIdx * 32)
     }
 
     if inObjTiles := tileAddr >= 0x601_0000; inObjTiles {

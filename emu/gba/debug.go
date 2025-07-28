@@ -63,8 +63,8 @@ func (d *Debugger) print(i int) {
 
     s("--------  --------")
     //p(fmt.Sprintf("4744 %08X", i), d.Gba.Mem.Read32(0x802E7A4))
-    start := 0x3007FA0
-    count := 10
+    count := 0x10
+    start := 0x2032180 + count * 4
     for i := start; i >= start - (count * 4); i -= 4 {
         p(fmt.Sprintf("IO %X", i), d.Gba.Mem.Read32(uint32(i)))
     }

@@ -102,7 +102,6 @@ func (p *Pause) handleSelection(g *Game) {
         g.TogglePause()
     case IDX_VOLUME:
         g.ToggleMute()
-        p.muted = !p.muted
     case IDX_EXIT:
 
         g.flags.Type = NONE

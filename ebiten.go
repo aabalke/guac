@@ -144,7 +144,6 @@ func (g *Game) Update() error {
         }
     }
 
-
     return nil
 }
 
@@ -182,6 +181,10 @@ func (g *Game) TogglePause() {
 }
 
 func (g *Game) ToggleMute() {
+    if !(g.flags.Type == NONE) && g.flags.ConsoleMode {
+        g.pause.muted = !g.pause.muted
+    }
+
     switch g.flags.Type {
         case GBA: g.gba.ToggleMute()
         case GB:  g.gb.ToggleMute()

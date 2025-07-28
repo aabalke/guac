@@ -206,6 +206,7 @@ func (c *Cartridge) Save() {
 }
 
 func (c *Cartridge) Read(addr uint32) uint8 {
+
     switch c.Id {
     case SRAM: return c.SRAM[addr]
     case EEPROM: panic("EEPROM READ USING STD IMPLIMENTATION")

@@ -233,4 +233,8 @@ Zelda Link to the Past
 Iridion II
     - Odd Graphics Errors
 Iridion 3D
-    - Tiling Graphics Problem
+    - No known errors
+Mario Party
+    - Start Menu has graphical error - it is related to incorrect writes
+    to vram for some reason
+
