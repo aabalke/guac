@@ -2,6 +2,7 @@ package gameboy
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/aabalke33/guac/config"
@@ -75,6 +76,8 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 		Joypad: 0xFF,
 		Cartridge: cartridge.Cartridge{
 			Data: make([]uint8, 0),
+            RomPath: path,
+            SavPath: path + ".save",
 		},
         Palette: config.Conf.Gb.Palette,
         bgPalette: NewColorPalette(),
@@ -178,7 +181,7 @@ func (gb *GameBoy) LoadGame(filepath string) {
 
 func (gb *GameBoy) loadCartridge() {
 
-	fmt.Printf("Title: %s\n", gb.Cartridge.Title)
+	log.Printf("Title: %s\n", gb.Cartridge.Title)
 
     // Debug DMG mode
     //gb.Cartridge.ColorMode = false
@@ -189,12 +192,12 @@ func (gb *GameBoy) loadCartridge() {
 
     if gb.Color {
         gb.Cpu.Registers.a = 0x11
-        println("Color Mode: CMG")
+        log.Printf("Color mode: GBC")
     } else {
-        println("Color Mode: DMG")
+        log.Printf("Color mode: DMG")
     }
 
-	ramData, err := cartridge.ReadRam(gb.Cartridge.Path)
+	ramData, err := cartridge.ReadRam(gb.Cartridge.SavPath)
 
 	if err != nil {
 		ramData = make([]uint8, 0x8000)
@@ -240,6 +243,7 @@ func (gb *GameBoy) loadCartridge() {
 	default:
 		panic(fmt.Sprintf("UNSUPPORTED TYPE %X", gb.Cartridge.Type))
 	}
+
 }
 
 func (gb *GameBoy) UpdateInterrupt() (cycles int) {

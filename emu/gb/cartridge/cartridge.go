@@ -1,14 +1,13 @@
 package cartridge
 
 import (
-	"fmt"
 	"strings"
-    re "regexp"
 )
 
 type Cartridge struct {
     Title    string
-    Path     string
+    RomPath string
+    SavPath string
 	Data     []uint8
     RamData  []uint8
 	Type     uint8
@@ -40,7 +39,6 @@ func (c *Cartridge) ParseHeader() {
 	c.Type = c.Data[TYPE]
 
     c.setTitle()
-    c.setSavePath()
 	c.setRomSize()
 	c.setRamSize()
     c.setCGB()
@@ -50,20 +48,6 @@ func (c *Cartridge) ParseHeader() {
 
 func (c *Cartridge) setTitle() {
     c.Title = strings.Trim(string(c.Data[0x134:0x143]), string(byte(0b0)))
-}
-
-func (c *Cartridge) setSavePath() {
-    s := strings.ReplaceAll(strings.TrimSpace(strings.ToLower(c.Title)), " ", "_")
-
-    r, err := re.Compile("[^a-z_]")
-    if err != nil {
-        panic(err)
-    }
-
-    println(s)
-    s = r.ReplaceAllLiteralString(s, "")
-
-    c.Path = fmt.Sprintf("./sav/%s.sav", s)
 }
 
 func (c *Cartridge) setRomSize() {
