@@ -10,6 +10,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/aabalke33/guac/config"
 	"github.com/hajimehoshi/ebiten/v2"
 
 	"os"
@@ -26,6 +27,8 @@ const (
 var icon []byte
 
 func main() {
+
+    config.Conf.Decode()
 
     flags := getFlags()
 
@@ -46,7 +49,10 @@ func main() {
     ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
     ebiten.SetWindowTitle("guac emulator")
     ebiten.SetWindowIcon([]image.Image{loadIcon()})
-    ebiten.SetWindowSize(240 * 3, 160 * 3)
+    ebiten.SetWindowSize(240 * 4, 160 * 4)
+    if config.Conf.Fullscreen {
+        ebiten.SetFullscreen(true)
+    }
 
     if err := ebiten.RunGame(NewGame(flags)); err != nil && err != exit {
         log.Fatal(err)

@@ -1,4 +1,4 @@
-# 🥑 Guac GBA/GBA/DMG Emulator
+# 🥑 Guac GBA/GBC/DMG Emulator
 
 Guac is an Emulator written in golang for Gameboy, Gameboy Color and Gameboy
 Advance handheld consoles.
@@ -26,7 +26,7 @@ Selection Screen.
 ### Setting up Console Mode
 
 In the same directory as ./guac, create a "roms.json" file. This file will hold
-the game metadata in the following format. At this time Art **MUST** be pngs.
+the game metadata in the following format. At this time Art must be 1:1 pngs or jpgs.
 
 ```
 [
@@ -39,7 +39,7 @@ the game metadata in the following format. At this time Art **MUST** be pngs.
 
 # Installation / Building
 
-Please use the releases for precompiled binaries.
+Releases precompiled binaries are available. However, you can build using:
 
 ```
 go build -ldflags="-H=windowsgui"
@@ -47,31 +47,18 @@ go build -ldflags="-H=windowsgui"
 
 # Keybindings / Controller Support
 
-## Emulator
+# Configuration
 
-| Key   | DualSense | Binding           |
-|-------|-----------|-------------------|
-| Enter |           |                   |
-| P     |           |                   |
-| M     |           |                   |
-| F11   |           | Toggle Fullscreen |
+Emulator settings can be configured using the config.toml file at root.
+If you would like to return to the default config.toml file, delete any 
+present config.toml file.
 
-## Gameboy / Gameboy Color
+## Configurable Options
 
-| Key   | DualSense | Binding |
-|-------|-----------|---------|
-| Enter |           |         |
-| P     |           |         |
-| M     |           |         |
-
-## Gameboy Advance
-
-| Key   | DualSense | Binding |
-|-------|-----------|---------|
-| J     |           |         |
-| K     |           |         |
-| L     |           |         |
-| ;     |           |         |
+1. Keyboard / Controller Input
+2. Backdrop Color
+3. Original DMG Gameboy Palette
+4. Menu Game Density
 
 # Testing
 
@@ -81,3 +68,5 @@ Check the ./emu folder for individual consoles. These consoles will have
 # Developers
 
 If you are interested: [aaronbalke.com](some deep dives regarding emulation).
+
+A ./sav folder is required

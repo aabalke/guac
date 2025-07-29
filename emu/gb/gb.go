@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/aabalke33/guac/emu/gb/cartridge"
+	"github.com/aabalke33/guac/config"
 	"github.com/aabalke33/guac/emu/apu"
+	"github.com/aabalke33/guac/emu/gb/cartridge"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
 )
@@ -75,7 +76,7 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 		Cartridge: cartridge.Cartridge{
 			Data: make([]uint8, 0),
 		},
-        Palette: palettes["greyscale"],
+        Palette: config.Conf.Gb.Palette,
         bgPalette: NewColorPalette(),
         spPalette: NewColorPalette(),
 	}
@@ -88,10 +89,6 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 	    SND_SAMPLES              = 512
     )
     gb.Apu = apu.NewApu(ctx, gb.Clock, SND_FREQUENCY, SND_SAMPLES)
-
-    //gb.Apu.GameBoy = &gb
-
-	//gb.Apu.Init()
 
     gb.LoadGame(path)
 

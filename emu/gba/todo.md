@@ -1,16 +1,13 @@
 # Graphical
 
-1. Mode 7: Required for Mario Super Circuit and Sonic Adv 3
-
-2. Mode 4: Need objects
+1. Mode 4: fix objects, and blinking
 - Doom II, Need for Speed Underground
 
-3. Mosaic
+2. Mosaic
 
-4. Affine Object cut out
+3. Affine Object cut out
 
-
-
+4. NES Game Support
 
 # Audio
 
@@ -20,4 +17,3 @@ in a way, but I cannot get ebitengine to do the same.
 
 2. Need to fix pitch and volume of the analog channels, particularly volume of
 WAVE and pitch of NOISE.
-

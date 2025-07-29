@@ -1,60 +1,74 @@
 package gba
 
-import "github.com/hajimehoshi/ebiten/v2"
+import (
+	"slices"
+
+	"github.com/aabalke33/guac/config"
+	"github.com/hajimehoshi/ebiten/v2"
+)
 
 func (gba *GBA) InputHandler(keys []ebiten.Key, buttons []ebiten.GamepadButton) {
 
-    tempJoypad := &gba.Keypad.KEYINPUT
+    keyConfig := config.Conf.Gba.KeyboardConfig
+    buttonConfig := config.Conf.Gba.ControllerConfig
 
-    *tempJoypad = 0b11_1111_1111
+    jp := &gba.Keypad.KEYINPUT
+
+    *jp = 0b11_1111_1111
 
     for _, key := range keys {
-        switch key {
-        case ebiten.KeyJ:
-            *tempJoypad &^= 0b1
-        case ebiten.KeyK:
-            *tempJoypad &^= 0b10
-        case ebiten.KeyL:
-            *tempJoypad &^= 0b100
-        case ebiten.KeySemicolon:
-            *tempJoypad &^= 0b1000
-        case ebiten.KeyD:
-            *tempJoypad &^= 0b10000
-        case ebiten.KeyA:
-            *tempJoypad &^= 0b100000
-        case ebiten.KeyW:
-            *tempJoypad &^= 0b1000000
-        case ebiten.KeyS:
-            *tempJoypad &^= 0b10000000
-        case ebiten.KeyY:
-            *tempJoypad &^= 0b100000000
-        case ebiten.KeyT:
-            *tempJoypad &^= 0b1000000000
+
+        keyStr := key.String()
+
+        switch {
+        case slices.Contains(keyConfig.A, keyStr):
+            *jp &^= 0b1
+        case slices.Contains(keyConfig.B, keyStr):
+            *jp &^= 0b10
+        case slices.Contains(keyConfig.Select, keyStr):
+            *jp &^= 0b100
+        case slices.Contains(keyConfig.Start, keyStr):
+            *jp &^= 0b1000
+        case slices.Contains(keyConfig.Right, keyStr):
+            *jp &^= 0b10000
+        case slices.Contains(keyConfig.Left, keyStr):
+            *jp &^= 0b100000
+        case slices.Contains(keyConfig.Up, keyStr):
+            *jp &^= 0b1000000
+        case slices.Contains(keyConfig.Down, keyStr):
+            *jp &^= 0b10000000
+        case slices.Contains(keyConfig.R, keyStr):
+            *jp &^= 0b100000000
+        case slices.Contains(keyConfig.L, keyStr):
+            *jp &^= 0b1000000000
         }
     }
 
     for _, button := range buttons {
-        switch button {
-        case ebiten.GamepadButton2:
-            *tempJoypad &^= 0b1
-        case ebiten.GamepadButton1:
-            *tempJoypad &^= 0b10
-        case ebiten.GamepadButton0:
-            *tempJoypad &^= 0b100
-        case ebiten.GamepadButton3:
-            *tempJoypad &^= 0b1000
-        case ebiten.GamepadButton16:
-            *tempJoypad &^= 0b10000
-        case ebiten.GamepadButton18:
-            *tempJoypad &^= 0b100000
-        case ebiten.GamepadButton15:
-            *tempJoypad &^= 0b1000000
-        case ebiten.GamepadButton17:
-            *tempJoypad &^= 0b10000000
-        case ebiten.GamepadButton5:
-            *tempJoypad &^= 0b100000000
-        case ebiten.GamepadButton4:
-            *tempJoypad &^= 0b1000000000
+
+        buttonStr := int(button)
+
+        switch {
+        case slices.Contains(buttonConfig.A, buttonStr):
+            *jp &^= 0b1
+        case slices.Contains(buttonConfig.B, buttonStr):
+            *jp &^= 0b10
+        case slices.Contains(buttonConfig.Select, buttonStr):
+            *jp &^= 0b100
+        case slices.Contains(buttonConfig.Start, buttonStr):
+            *jp &^= 0b1000
+        case slices.Contains(buttonConfig.Left, buttonStr):
+            *jp &^= 0b10000
+        case slices.Contains(buttonConfig.Right, buttonStr):
+            *jp &^= 0b100000
+        case slices.Contains(buttonConfig.Up, buttonStr):
+            *jp &^= 0b1000000
+        case slices.Contains(buttonConfig.Down, buttonStr):
+            *jp &^= 0b10000000
+        case slices.Contains(buttonConfig.R, buttonStr):
+            *jp &^= 0b100000000
+        case slices.Contains(buttonConfig.L, buttonStr):
+            *jp &^= 0b1000000000
         }
     }
 

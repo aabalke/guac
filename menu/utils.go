@@ -5,6 +5,7 @@ import (
 
     "image"
     _"image/png"
+    _"image/jpeg"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )

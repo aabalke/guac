@@ -11,10 +11,9 @@ import (
 
 type GameData struct {
 	RomPath string `json:"RomPath"`
-	SavPath string
 	ArtPath string `json:"ArtPath"`
-    Image   *ebiten.Image
-    Type int
+    Image   *ebiten.Image `json:"-"`
+    Type int `json:"-"`
 }
 
 const path = "./roms.json"

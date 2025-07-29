@@ -13,7 +13,6 @@ const (
 
 func (gba *GBA) exception(addr uint32, mode uint32) {
 
-
 	if mode != MODE_IRQ && mode != MODE_SWI {
 		panic("UNKNOWN EXCEPTION MODE")
 	}
@@ -42,7 +41,6 @@ func (gba *GBA) exception(addr uint32, mode uint32) {
 	reg.LR[c] = r[LR]
 	r[SP] = reg.SP[i]
 	r[LR] = reg.LR[i]
-	//reg.CPSR = Cond((uint32(reg.CPSR) &^ 0b11111) | mode)
 	reg.SPSR[i] = reg.CPSR
 
 	switch {

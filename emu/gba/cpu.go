@@ -1,5 +1,6 @@
 package gba
 
+
 type Cpu struct {
 	Gba *GBA
 	Reg Reg

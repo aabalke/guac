@@ -52,7 +52,20 @@ func (gba *GBA) SoftReset() {
     gba.exception(VEC_SWI, MODE_SWI)
 }
 
+//var MASK_GOOD = 0b1
+//var MASK_FALSE = 0x3FF &^ 0b1
+
 func (gba *GBA) Update() {
+
+    // temp
+    //if gba.Keypad.KEYINPUT == uint16(MASK_GOOD){
+    //    gba.Keypad.KEYINPUT = uint16(MASK_FALSE)
+    //} else {
+    //    gba.Keypad.KEYINPUT = uint16(MASK_GOOD)
+    //    if gba.Keypad.keyIRQ() {
+    //        gba.Irq.setIRQ(12)
+    //    }
+    //}
 
     r := &gba.Cpu.Reg.R
 

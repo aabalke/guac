@@ -3,6 +3,7 @@ module github.com/aabalke33/guac
 go 1.24.5
 
 require (
+	github.com/BurntSushi/toml v1.5.0
 	github.com/hajimehoshi/ebiten/v2 v2.8.8
 	github.com/hajimehoshi/oto v1.0.1
 )

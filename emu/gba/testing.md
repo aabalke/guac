@@ -54,7 +54,7 @@ Additionally, other ARMv5 instructions will fail.
 ### MGBA Test Suite
 
 ❌ Memory tests [1486/1552]
-❌ I/O read tests [129/130] individual test is good
+❌ I/O read tests [129/130]
 ❌ Timing tests [228/2020]
 ❌ Timer count-up tests [186/936]
 ❌ Timer IRQ tests [1/90]
@@ -121,7 +121,7 @@ Additionally, other ARMv5 instructions will fail.
 👍 m3_demo
 👍 m7_demo
 👍 m7_demo_mb
-❌ m7_ex - skew (pb and pd) mess up perspective, not sure why pb / skew on perspective
+👍 m7_ex
 ❌ mos_demo
 👍 oacombo
 
@@ -154,7 +154,7 @@ Additionally, other ARMv5 instructions will fail.
 👍 snd1_demo
 👍 swi_demo
 👍 swi_vsync
-👍 tmr_demo (1.3 works)
+👍 tmr_demo
 ❌ tte_demo
 ❌ txt_bm
 ❌ txt_obj
@@ -177,7 +177,7 @@ Drill Dozer
 Harvest Moon Friends of Mineral Town
     - No known errors
 Hello Kitty Happy Party Pals
-    - Some Mini games do not load
+    - No known errors
 Kirby Nightmare in Dream Land
     - No known errors
 Lord of The Rings Fellowship
@@ -185,7 +185,7 @@ Lord of The Rings Fellowship
 Lord of The Rings Two Towers
     - No known errors
 Mario Kart Super Circuit
-    - Mode 7
+    - No known errors
 Mega Man Zero
     - Graphics
 Metroid Fusion
@@ -219,15 +219,13 @@ The Minish Cap
 Ultimate Puzzle Games
     - No known errors
 Warioware Twisted
-    - I believe needs Mode 7
+    - No known errors
 Wolfenstein 3D
     - No known errors
 Doom
     - No known errors
 Doom II
-    - Does not boot
-    - prior to 8337911b76c6e7430ebd092ef7c72522c9dcf0c5: WIDTH 0 EEPROM
-    - post: weird purple problem
+    - Need to fix Mode 4 flashing and object handling
 Zelda Link to the Past
     - No known errors
 Iridion II
@@ -236,5 +234,5 @@ Iridion 3D
     - No known errors
 Mario Party
     - Start Menu has graphical error - it is related to incorrect writes
-    to vram for some reason
+    to vram for some reason - an extra FastCpuSet
 

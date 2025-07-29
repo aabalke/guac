@@ -691,8 +691,6 @@ func (cpu *Cpu) thumbPushPop(opcode uint16) {
         return
     }
 
-    //if CURR_INST > 0xc000 && opcode == 0xB5F0 { fmt.Printf("CURR %08X PC %08X\n\n", CURR_INST, r[PC])}
-
     if pclr {
         r[SP] -= 4
         cpu.Gba.Mem.Write32(r[SP], r[14])
@@ -777,7 +775,6 @@ func (cpu *Cpu) thumbShifted(opcode uint16) {
     rs := utils.GetVarData(uint32(opcode), 3, 5)
     rd := utils.GetVarData(uint32(opcode), 0, 2)
 
-
     shiftArgs := utils.ShiftArgs{
         SType: inst, // ROR NOT POSSIBLE
         Val: r[rs],
@@ -785,7 +782,6 @@ func (cpu *Cpu) thumbShifted(opcode uint16) {
         IsCarry: true,
         Immediate: true,
     }
-
 
     res, setCarry, carry := utils.Shift(shiftArgs)
 
@@ -819,11 +815,9 @@ func (cpu *Cpu) thumbStack(opcode uint16) {
 
 func (cpu *Cpu) thumbLongBranch(opcode uint16) {
 
-
     r := &cpu.Reg.R
 
     op2 := cpu.Gba.Mem.Read16(r[PC] + 2)
-
 
     upper := utils.GetVarData(uint32(opcode), 0, 10)
     lower := utils.GetVarData(uint32(op2), 0, 10)
@@ -943,7 +937,8 @@ func (cpu *Cpu) thumbMulti(opcode uint16) {
         }
 
         if smallest {
-            v := cpu.Gba.Mem.Read32(addr)
+            //v := cpu.Gba.Mem.Read32(addr)
+            v := cpu.Gba.Mem.Read32(addr & 0b11 ) // maybe??
             cpu.Gba.Mem.Write32(r[rb], v - (regCount * 2))
             r[PC] += 2
             return
@@ -973,7 +968,7 @@ func (cpu *Cpu) thumbMulti(opcode uint16) {
             continue
         }
 
-        r[reg] = cpu.Gba.Mem.Read32(addr)
+        r[reg] = cpu.Gba.Mem.Read32(addr &^ 0b11)
 
         if reg == int(rb) {
             matchingRb = true

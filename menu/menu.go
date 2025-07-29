@@ -1,13 +1,11 @@
 package menu
 
 import (
+	"slices"
+
+	"github.com/aabalke33/guac/config"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
-)
-
-const (
-    WIDTH_COUNT = 6
-    //WIDTH_COUNT = 4
 )
 
 type Menu struct {
@@ -34,76 +32,85 @@ func NewMenu(context *audio.Context) *Menu {
 
 func (m *Menu) InputHandler(keys []ebiten.Key, buttons []ebiten.GamepadButton) bool {
 
+    gamesPerRow := config.Conf.GamesPerRow
+
     m.menuPlayer.handleChannels()
 
+    keyConfig := config.Conf.KeyboardConfig
+    buttonConfig := config.Conf.ControllerConfig
+
     for _, key := range keys {
-        switch key {
-        case ebiten.KeyUp, ebiten.KeyW:
-            if m.SelectedIdx - WIDTH_COUNT < 0 {
+        keyStr := key.String()
+
+        switch {
+        case slices.Contains(keyConfig.Up, keyStr):
+            if m.SelectedIdx - gamesPerRow < 0 {
                 m.menuPlayer.update(1)
             } else {
                 m.menuPlayer.update(0)
-                m.SelectedIdx = max(0, (m.SelectedIdx) - WIDTH_COUNT)
+                m.SelectedIdx = max(0, (m.SelectedIdx) - gamesPerRow)
             }
-        case ebiten.KeyDown, ebiten.KeyS:
-            if m.SelectedIdx + WIDTH_COUNT > len(m.Data) - 1 {
+        case slices.Contains(keyConfig.Down, keyStr):
+            if m.SelectedIdx + gamesPerRow > len(m.Data) - 1 {
                 m.menuPlayer.update(1)
             } else {
                 m.menuPlayer.update(0)
-                m.SelectedIdx = min(len(m.Data) - 1, (m.SelectedIdx) + WIDTH_COUNT)
+                m.SelectedIdx = min(len(m.Data) - 1, (m.SelectedIdx) + gamesPerRow)
             }
-        case ebiten.KeyRight, ebiten.KeyD:
+        case slices.Contains(keyConfig.Right, keyStr):
             if m.SelectedIdx + 1 > len(m.Data) - 1 {
                 m.menuPlayer.update(1)
             } else {
                 m.menuPlayer.update(0)
                 m.SelectedIdx = min(len(m.Data) - 1, (m.SelectedIdx) + 1)
             }
-        case ebiten.KeyLeft, ebiten.KeyA:
+        case slices.Contains(keyConfig.Left, keyStr):
             if m.SelectedIdx - 1 < 0 {
                 m.menuPlayer.update(1)
             } else {
                 m.menuPlayer.update(0)
                 m.SelectedIdx = max(0, (m.SelectedIdx) - 1)
             }
-        case ebiten.KeyEnter, ebiten.KeyJ:
+        case slices.Contains(keyConfig.Select, keyStr):
             m.menuPlayer.update(2)
             return true
         }
     }
     
     for _, button := range buttons {
-        switch button {
-        case ebiten.GamepadButton2:
+        buttonStr := int(button)
+
+        switch {
+        case slices.Contains(buttonConfig.Select, buttonStr):
             m.menuPlayer.update(2)
             return true
-        case ebiten.GamepadButton16:
+        case slices.Contains(buttonConfig.Right, buttonStr):
             if m.SelectedIdx + 1 > len(m.Data) - 1 {
                 m.menuPlayer.update(1)
             } else {
                 m.menuPlayer.update(0)
                 m.SelectedIdx = min(len(m.Data) - 1, (m.SelectedIdx) + 1)
             }
-        case ebiten.GamepadButton18:
+        case slices.Contains(buttonConfig.Left, buttonStr):
             if m.SelectedIdx - 1 < 0 {
                 m.menuPlayer.update(1)
             } else {
                 m.menuPlayer.update(0)
                 m.SelectedIdx = max(0, (m.SelectedIdx) - 1)
             }
-        case ebiten.GamepadButton15:
-            if m.SelectedIdx - WIDTH_COUNT < 0 {
+        case slices.Contains(buttonConfig.Up, buttonStr):
+            if m.SelectedIdx - gamesPerRow < 0 {
                 m.menuPlayer.update(1)
             } else {
                 m.menuPlayer.update(0)
-                m.SelectedIdx = max(0, (m.SelectedIdx) - WIDTH_COUNT)
+                m.SelectedIdx = max(0, (m.SelectedIdx) - gamesPerRow)
             }
-        case ebiten.GamepadButton17:
-            if m.SelectedIdx + WIDTH_COUNT > len(m.Data) - 1 {
+        case slices.Contains(buttonConfig.Down, buttonStr):
+            if m.SelectedIdx + gamesPerRow > len(m.Data) - 1 {
                 m.menuPlayer.update(1)
             } else {
                 m.menuPlayer.update(0)
-                m.SelectedIdx = min(len(m.Data) - 1, (m.SelectedIdx) + WIDTH_COUNT)
+                m.SelectedIdx = min(len(m.Data) - 1, (m.SelectedIdx) + gamesPerRow)
             }
         }
     }
@@ -114,10 +121,10 @@ func (m *Menu) InputHandler(keys []ebiten.Key, buttons []ebiten.GamepadButton) b
 func (m *Menu) DrawMenu(screen *ebiten.Image) {
 
     sw, _ := screen.Bounds().Dx(), screen.Bounds().Dy()
-    elementUnit := float64(sw / WIDTH_COUNT)
+    elementUnit := float64(sw / config.Conf.GamesPerRow)
 
-    row := float64(m.SelectedIdx / WIDTH_COUNT)
-    //maxRow := float64((len(m.Data) - 1) / WIDTH_COUNT)
+    row := float64(m.SelectedIdx / config.Conf.GamesPerRow)
+    //maxRow := float64((len(m.Data) - 1) / config.Conf.Menus.GamesPerRow)
 
     //var rowOffset float64
     //switch row {
@@ -141,8 +148,8 @@ func (m *Menu) DrawMenu(screen *ebiten.Image) {
 
 
     for i := range len(m.Data) {
-        x := float64(i % WIDTH_COUNT) * elementUnit
-        y := float64(i / WIDTH_COUNT) * elementUnit - rowOffset
+        x := float64(i % config.Conf.GamesPerRow) * elementUnit
+        y := float64(i / config.Conf.GamesPerRow) * elementUnit - rowOffset
         m.Image(screen, x, y, elementUnit, i)
     }
 }

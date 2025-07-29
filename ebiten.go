@@ -3,9 +3,10 @@ package main
 import (
 	_ "embed"
 	"errors"
-	"image/color"
 	"log"
+	"slices"
 
+	"github.com/aabalke33/guac/config"
 	gameboy "github.com/aabalke33/guac/emu/gb"
 	"github.com/aabalke33/guac/emu/gba"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -17,7 +18,6 @@ import (
 )
 
 var (
-    darkGrey = color.RGBA{R: 10, G: 10, B: 10, A: 255}
     exit = errors.New("Exit")
 )
 
@@ -49,8 +49,6 @@ func NewGame(flags Flags) *Game {
 
     switch g.flags.Type {
     case NONE:
-
-        //ebiten.SetFullscreen(true)
 
         g.menu = menu.NewMenu(g.menuCtx)
         g.pause = NewPause()
@@ -98,25 +96,34 @@ func (g *Game) Update() error {
     keys := inpututil.AppendPressedKeys([]ebiten.Key{})
     justButtons, buttons := g.GetGamepadButtons()
 
+    keyConfig := config.Conf.KeyboardConfig
+    buttonConfig := config.Conf.ControllerConfig
+
     for _, key := range justKeys {
-        switch key {
-        case ebiten.KeyF11:
+
+        keyStr := key.String()
+
+        switch {
+        case slices.Contains(keyConfig.Fullscreen, keyStr):
             ebiten.SetFullscreen(!ebiten.IsFullscreen())
-        case ebiten.KeyQ:
+        case slices.Contains(keyConfig.Quit, keyStr):
             return exit
-        case ebiten.KeyP:
+        case slices.Contains(keyConfig.Pause, keyStr):
             g.TogglePause()
-        case ebiten.KeyM:
+        case slices.Contains(keyConfig.Mute, keyStr):
             g.ToggleMute()
         }
     }
 
     for _, button := range justButtons {
-        switch button {
-        case ebiten.GamepadButton9:
+
+        buttonStr := int(button)
+
+        switch {
+        case slices.Contains(buttonConfig.Pause, buttonStr):
             g.TogglePause()
 
-        case ebiten.GamepadButton8:
+        case slices.Contains(buttonConfig.Mute, buttonStr):
             g.ToggleMute()
         }
     }
@@ -193,7 +200,7 @@ func (g *Game) ToggleMute() {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 
-    screen.Fill(darkGrey)
+    screen.Fill(config.Conf.Backdrop)
 
     switch g.flags.Type {
     case NONE:

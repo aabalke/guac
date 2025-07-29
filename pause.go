@@ -4,7 +4,9 @@ import (
 	"bytes"
 	_ "embed"
 	"image/color"
+	"slices"
 
+	"github.com/aabalke33/guac/config"
 	"github.com/aabalke33/guac/menu"
 	"github.com/hajimehoshi/ebiten/v2"
 
@@ -71,25 +73,30 @@ func (p *Pause) LoadIcons() {
 }
 
 func (p *Pause) InputHandler(g *Game, keys []ebiten.Key, buttons []ebiten.GamepadButton) {
+    
+    keyConfig := config.Conf.KeyboardConfig
+    buttonConfig := config.Conf.ControllerConfig
 
     for _, key := range keys {
-        switch key {
-        case ebiten.KeyRight, ebiten.KeyD:
+        keyStr := key.String()
+        switch {
+        case slices.Contains(keyConfig.Right, keyStr):
             p.SelectedIdx = min(ICON_COUNT - 1, (p.SelectedIdx) + 1)
-        case ebiten.KeyLeft, ebiten.KeyA:
+        case slices.Contains(keyConfig.Left, keyStr):
             p.SelectedIdx = max(0, (p.SelectedIdx) - 1)
-        case ebiten.KeyEnter, ebiten.KeyJ:
+        case slices.Contains(keyConfig.Select, keyStr):
             p.handleSelection(g)
         }
     }
 
     for _, button := range buttons {
-        switch button {
-        case ebiten.GamepadButton2:
+        buttonStr := int(button)
+        switch {
+        case slices.Contains(buttonConfig.Select, buttonStr):
             p.handleSelection(g)
-        case ebiten.GamepadButton16:
+        case slices.Contains(buttonConfig.Right, buttonStr):
             p.SelectedIdx = min(ICON_COUNT - 1, (p.SelectedIdx) + 1)
-        case ebiten.GamepadButton18:
+        case slices.Contains(buttonConfig.Left, buttonStr):
             p.SelectedIdx = max(0, (p.SelectedIdx) - 1)
         }
     }
