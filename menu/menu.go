@@ -3,170 +3,168 @@ package menu
 import (
 	"slices"
 
-	"github.com/aabalke33/guac/config"
+	"github.com/aabalke/guac/config"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 )
 
 type Menu struct {
-    SelectedIdx int
-    Data []GameData
+	SelectedIdx int
+	Data        []GameData
 
-    menuPlayer *MenuPlayer
+	menuPlayer *MenuPlayer
 }
 
 func NewMenu(context *audio.Context) *Menu {
-    m := &Menu{
-        Data: LoadGameData(),
-    }
+	m := &Menu{
+		Data: LoadGameData(),
+	}
 
-    p, err := NewMenuPlayer(context)
-    if err != nil {
-        panic(err)
-    }
+	p, err := NewMenuPlayer(context)
+	if err != nil {
+		panic(err)
+	}
 
-    m.menuPlayer = p
+	m.menuPlayer = p
 
-    return m
+	return m
 }
 
 func (m *Menu) InputHandler(keys []ebiten.Key, buttons []ebiten.GamepadButton) bool {
 
-    gamesPerRow := config.Conf.GamesPerRow
+	gamesPerRow := config.Conf.GamesPerRow
 
-    m.menuPlayer.handleChannels()
+	m.menuPlayer.handleChannels()
 
-    keyConfig := config.Conf.KeyboardConfig
-    buttonConfig := config.Conf.ControllerConfig
+	keyConfig := config.Conf.KeyboardConfig
+	buttonConfig := config.Conf.ControllerConfig
 
-    for _, key := range keys {
-        keyStr := key.String()
+	for _, key := range keys {
+		keyStr := key.String()
 
-        switch {
-        case slices.Contains(keyConfig.Up, keyStr):
-            if m.SelectedIdx - gamesPerRow < 0 {
-                m.menuPlayer.update(1)
-            } else {
-                m.menuPlayer.update(0)
-                m.SelectedIdx = max(0, (m.SelectedIdx) - gamesPerRow)
-            }
-        case slices.Contains(keyConfig.Down, keyStr):
-            if m.SelectedIdx + gamesPerRow > len(m.Data) - 1 {
-                m.menuPlayer.update(1)
-            } else {
-                m.menuPlayer.update(0)
-                m.SelectedIdx = min(len(m.Data) - 1, (m.SelectedIdx) + gamesPerRow)
-            }
-        case slices.Contains(keyConfig.Right, keyStr):
-            if m.SelectedIdx + 1 > len(m.Data) - 1 {
-                m.menuPlayer.update(1)
-            } else {
-                m.menuPlayer.update(0)
-                m.SelectedIdx = min(len(m.Data) - 1, (m.SelectedIdx) + 1)
-            }
-        case slices.Contains(keyConfig.Left, keyStr):
-            if m.SelectedIdx - 1 < 0 {
-                m.menuPlayer.update(1)
-            } else {
-                m.menuPlayer.update(0)
-                m.SelectedIdx = max(0, (m.SelectedIdx) - 1)
-            }
-        case slices.Contains(keyConfig.Select, keyStr):
-            m.menuPlayer.update(2)
-            return true
-        }
-    }
-    
-    for _, button := range buttons {
-        buttonStr := int(button)
+		switch {
+		case slices.Contains(keyConfig.Up, keyStr):
+			if m.SelectedIdx-gamesPerRow < 0 {
+				m.menuPlayer.update(1)
+			} else {
+				m.menuPlayer.update(0)
+				m.SelectedIdx = max(0, (m.SelectedIdx)-gamesPerRow)
+			}
+		case slices.Contains(keyConfig.Down, keyStr):
+			if m.SelectedIdx+gamesPerRow > len(m.Data)-1 {
+				m.menuPlayer.update(1)
+			} else {
+				m.menuPlayer.update(0)
+				m.SelectedIdx = min(len(m.Data)-1, (m.SelectedIdx)+gamesPerRow)
+			}
+		case slices.Contains(keyConfig.Right, keyStr):
+			if m.SelectedIdx+1 > len(m.Data)-1 {
+				m.menuPlayer.update(1)
+			} else {
+				m.menuPlayer.update(0)
+				m.SelectedIdx = min(len(m.Data)-1, (m.SelectedIdx)+1)
+			}
+		case slices.Contains(keyConfig.Left, keyStr):
+			if m.SelectedIdx-1 < 0 {
+				m.menuPlayer.update(1)
+			} else {
+				m.menuPlayer.update(0)
+				m.SelectedIdx = max(0, (m.SelectedIdx)-1)
+			}
+		case slices.Contains(keyConfig.Select, keyStr):
+			m.menuPlayer.update(2)
+			return true
+		}
+	}
 
-        switch {
-        case slices.Contains(buttonConfig.Select, buttonStr):
-            m.menuPlayer.update(2)
-            return true
-        case slices.Contains(buttonConfig.Right, buttonStr):
-            if m.SelectedIdx + 1 > len(m.Data) - 1 {
-                m.menuPlayer.update(1)
-            } else {
-                m.menuPlayer.update(0)
-                m.SelectedIdx = min(len(m.Data) - 1, (m.SelectedIdx) + 1)
-            }
-        case slices.Contains(buttonConfig.Left, buttonStr):
-            if m.SelectedIdx - 1 < 0 {
-                m.menuPlayer.update(1)
-            } else {
-                m.menuPlayer.update(0)
-                m.SelectedIdx = max(0, (m.SelectedIdx) - 1)
-            }
-        case slices.Contains(buttonConfig.Up, buttonStr):
-            if m.SelectedIdx - gamesPerRow < 0 {
-                m.menuPlayer.update(1)
-            } else {
-                m.menuPlayer.update(0)
-                m.SelectedIdx = max(0, (m.SelectedIdx) - gamesPerRow)
-            }
-        case slices.Contains(buttonConfig.Down, buttonStr):
-            if m.SelectedIdx + gamesPerRow > len(m.Data) - 1 {
-                m.menuPlayer.update(1)
-            } else {
-                m.menuPlayer.update(0)
-                m.SelectedIdx = min(len(m.Data) - 1, (m.SelectedIdx) + gamesPerRow)
-            }
-        }
-    }
+	for _, button := range buttons {
+		buttonStr := int(button)
 
-    return false
+		switch {
+		case slices.Contains(buttonConfig.Select, buttonStr):
+			m.menuPlayer.update(2)
+			return true
+		case slices.Contains(buttonConfig.Right, buttonStr):
+			if m.SelectedIdx+1 > len(m.Data)-1 {
+				m.menuPlayer.update(1)
+			} else {
+				m.menuPlayer.update(0)
+				m.SelectedIdx = min(len(m.Data)-1, (m.SelectedIdx)+1)
+			}
+		case slices.Contains(buttonConfig.Left, buttonStr):
+			if m.SelectedIdx-1 < 0 {
+				m.menuPlayer.update(1)
+			} else {
+				m.menuPlayer.update(0)
+				m.SelectedIdx = max(0, (m.SelectedIdx)-1)
+			}
+		case slices.Contains(buttonConfig.Up, buttonStr):
+			if m.SelectedIdx-gamesPerRow < 0 {
+				m.menuPlayer.update(1)
+			} else {
+				m.menuPlayer.update(0)
+				m.SelectedIdx = max(0, (m.SelectedIdx)-gamesPerRow)
+			}
+		case slices.Contains(buttonConfig.Down, buttonStr):
+			if m.SelectedIdx+gamesPerRow > len(m.Data)-1 {
+				m.menuPlayer.update(1)
+			} else {
+				m.menuPlayer.update(0)
+				m.SelectedIdx = min(len(m.Data)-1, (m.SelectedIdx)+gamesPerRow)
+			}
+		}
+	}
+
+	return false
 }
 
 func (m *Menu) DrawMenu(screen *ebiten.Image) {
 
-    sw, _ := screen.Bounds().Dx(), screen.Bounds().Dy()
-    elementUnit := float64(sw / config.Conf.GamesPerRow)
+	sw, _ := screen.Bounds().Dx(), screen.Bounds().Dy()
+	elementUnit := float64(sw / config.Conf.GamesPerRow)
 
-    row := float64(m.SelectedIdx / config.Conf.GamesPerRow)
-    //maxRow := float64((len(m.Data) - 1) / config.Conf.Menus.GamesPerRow)
+	row := float64(m.SelectedIdx / config.Conf.GamesPerRow)
+	//maxRow := float64((len(m.Data) - 1) / config.Conf.Menus.GamesPerRow)
 
-    //var rowOffset float64
-    //switch row {
-    //case 0: rowOffset = 0
-    //case maxRow:
+	//var rowOffset float64
+	//switch row {
+	//case 0: rowOffset = 0
+	//case maxRow:
 
-    //    // not sure how to handle currently
+	//    // not sure how to handle currently
 
-    //    if maxRow * elementUnit > float64(screen.Bounds().Dy()) {
-    //        rowOffset = (elementUnit * row) - float64(screen.Bounds().Dy())
-    //    } else {
-    //        rowOffset = elementUnit * row
-    //    }
+	//    if maxRow * elementUnit > float64(screen.Bounds().Dy()) {
+	//        rowOffset = (elementUnit * row) - float64(screen.Bounds().Dy())
+	//    } else {
+	//        rowOffset = elementUnit * row
+	//    }
 
+	//default:
+	//    rowOffset = elementUnit * row
+	//}
 
-    //default:
-    //    rowOffset = elementUnit * row
-    //}
+	rowOffset := elementUnit * row
 
-    rowOffset := elementUnit * row
-
-
-    for i := range len(m.Data) {
-        x := float64(i % config.Conf.GamesPerRow) * elementUnit
-        y := float64(i / config.Conf.GamesPerRow) * elementUnit - rowOffset
-        m.Image(screen, x, y, elementUnit, i)
-    }
+	for i := range len(m.Data) {
+		x := float64(i%config.Conf.GamesPerRow) * elementUnit
+		y := float64(i/config.Conf.GamesPerRow)*elementUnit - rowOffset
+		m.Image(screen, x, y, elementUnit, i)
+	}
 }
 
 func (m *Menu) Image(screen *ebiten.Image, x, y, elementUnit float64, i int) {
 
-    img := (m.Data)[i].Image
+	img := (m.Data)[i].Image
 
-    s := (elementUnit / float64(img.Bounds().Dx()))
+	s := (elementUnit / float64(img.Bounds().Dx()))
 
-    opts := &ebiten.DrawImageOptions{}
-    opts.GeoM.Scale(s, s)
-    opts.GeoM.Translate(x, y)
+	opts := &ebiten.DrawImageOptions{}
+	opts.GeoM.Scale(s, s)
+	opts.GeoM.Translate(x, y)
 
-    if shadeUnselected := i != m.SelectedIdx; shadeUnselected {
-        opts.ColorScale.ScaleAlpha(0.5)
-    }
+	if shadeUnselected := i != m.SelectedIdx; shadeUnselected {
+		opts.ColorScale.ScaleAlpha(0.5)
+	}
 
-    screen.DrawImage(img, opts)
+	screen.DrawImage(img, opts)
 }

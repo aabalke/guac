@@ -1,6 +1,5 @@
 package gba
 
-
 type Cpu struct {
 	Gba *GBA
 	Reg Reg
@@ -35,26 +34,26 @@ const (
 )
 
 var masks = [16]uint16{
-    0:  0xF0F0,
-    1:  0x0F0F,
-    2:  0xCCCC,
-    3:  0x3333,
-    4:  0xFF00,
-    5:  0x00FF,
-    6:  0xAAAA,
-    7:  0x5555,
-    8:  0x0C0C,
-    9:  0xF3F3,
-    10: 0xAA55,
-    11: 0x55AA,
-    12: 0x0A05,
-    13: 0xF5FA,
-    14: 0xFFFF,
-    15: 0x0000,
+	0:  0xF0F0,
+	1:  0x0F0F,
+	2:  0xCCCC,
+	3:  0x3333,
+	4:  0xFF00,
+	5:  0x00FF,
+	6:  0xAAAA,
+	7:  0x5555,
+	8:  0x0C0C,
+	9:  0xF3F3,
+	10: 0xAA55,
+	11: 0x55AA,
+	12: 0x0A05,
+	13: 0xF5FA,
+	14: 0xFFFF,
+	15: 0x0000,
 }
 
 func (cpu *Cpu) CheckCond(cond uint32) bool {
-    return (masks[cond] & (1 << (cpu.Reg.CPSR >> 28))) != 0
+	return (masks[cond] & (1 << (cpu.Reg.CPSR >> 28))) != 0
 }
 
 var BANK_ID = map[uint32]uint32{
@@ -82,20 +81,20 @@ func NewCpu(gba *GBA) *Cpu {
 
 	//c.Reg.R[PC] = 0x0800_0000
 	//c.Reg.CPSR = 0x0000_001F
-    //c.Reg.SPSR[BANK_ID[MODE_IRQ]] = 0x0000_0010
+	//c.Reg.SPSR[BANK_ID[MODE_IRQ]] = 0x0000_0010
 	//c.Reg.R[0] = 0x0000_0CA5
 
 	//c.Reg.R[LR] = 0x0800_0000
-    //c.Reg.LR[BANK_ID[MODE_SYS]] =   0x0800_0000
-    //c.Reg.LR[BANK_ID[MODE_USR]] =   0x0800_0000
-    //c.Reg.LR[BANK_ID[MODE_IRQ]] =   0x0800_0000
-    //c.Reg.LR[BANK_ID[MODE_SWI]] =   0x0800_0000
+	//c.Reg.LR[BANK_ID[MODE_SYS]] =   0x0800_0000
+	//c.Reg.LR[BANK_ID[MODE_USR]] =   0x0800_0000
+	//c.Reg.LR[BANK_ID[MODE_IRQ]] =   0x0800_0000
+	//c.Reg.LR[BANK_ID[MODE_SWI]] =   0x0800_0000
 
 	//c.Reg.R[SP] = 0x0300_7F00
-    //c.Reg.SP[BANK_ID[MODE_SYS]] =   0x0300_7F00
-    //c.Reg.SP[BANK_ID[MODE_USR]] =   0x0300_7F00
-    //c.Reg.SP[BANK_ID[MODE_IRQ]] =   0x0300_7FA0
-    //c.Reg.SP[BANK_ID[MODE_SWI]] =   0x0300_7FE0
+	//c.Reg.SP[BANK_ID[MODE_SYS]] =   0x0300_7F00
+	//c.Reg.SP[BANK_ID[MODE_USR]] =   0x0300_7F00
+	//c.Reg.SP[BANK_ID[MODE_IRQ]] =   0x0300_7FA0
+	//c.Reg.SP[BANK_ID[MODE_SWI]] =   0x0300_7FE0
 	return c
 }
 
@@ -105,7 +104,7 @@ func (c *Cpu) Execute(opcode uint32) int {
 		return c.DecodeTHUMB(uint16(opcode))
 	}
 
-    return c.DecodeARM(opcode)
+	return c.DecodeARM(opcode)
 }
 
 type Reg struct {
@@ -121,19 +120,19 @@ type Reg struct {
 type Cond uint32
 
 func (c *Cond) GetFlag(flag uint32) bool {
-    return (uint32(*c)>>flag)&0b1 == 0b1
+	return (uint32(*c)>>flag)&0b1 == 0b1
 }
 
 func (c *Cond) SetFlag(flag uint32, value bool) {
 
-    if value {
-        *c |= (0b1 << flag)
-        return
-    }
+	if value {
+		*c |= (0b1 << flag)
+		return
+	}
 
-    *c &^= (0b1 << flag)
+	*c &^= (0b1 << flag)
 
-    return
+	return
 }
 
 func (c *Cond) SetField(loBit uint32, value uint32) {
@@ -159,10 +158,10 @@ func (r *Reg) setMode(prev, curr uint32) {
 
 	r.CPSR.SetMode(curr)
 
-    //r._setMode(prev, curr)
-//}
-//
-//func (r *Reg) _setMode(prev, curr uint32) {
+	//r._setMode(prev, curr)
+	//}
+	//
+	//func (r *Reg) _setMode(prev, curr uint32) {
 
 	if BANK_ID[prev] == BANK_ID[curr] {
 		return
@@ -173,9 +172,9 @@ func (r *Reg) setMode(prev, curr uint32) {
 
 func (r *Reg) switchRegisterBanks(prev, curr uint32) {
 
-    //if BANK_ID[prev] == BANK_ID[curr] {
-    //    return
-    //}
+	//if BANK_ID[prev] == BANK_ID[curr] {
+	//    return
+	//}
 
 	if prev != MODE_FIQ {
 		for i := range 5 {

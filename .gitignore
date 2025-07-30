@@ -6,9 +6,11 @@ art
 
 # dev dependencies
 *.exe
+todo.md
 
 # other
 *.json
+config.toml
 
 *.pprof
 *.syso

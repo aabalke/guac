@@ -10,7 +10,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/aabalke33/guac/config"
+	"github.com/aabalke/guac/config"
 	"github.com/hajimehoshi/ebiten/v2"
 
 	"os"
@@ -18,9 +18,9 @@ import (
 )
 
 const (
-    NONE = iota
-    GB
-    GBA
+	NONE = iota
+	GB
+	GBA
 )
 
 //go:embed icons/icon.png
@@ -28,82 +28,82 @@ var icon []byte
 
 func main() {
 
-    config.Conf.Decode()
+	config.Conf.Decode()
 
-    flags := getFlags()
+	flags := getFlags()
 
-    var f *os.File
+	var f *os.File
 
-    if flags.Profile {
+	if flags.Profile {
 
-        f, err := os.Create("cpu.prof")
-        if err != nil {
-            panic(err)
-        }
+		f, err := os.Create("cpu.prof")
+		if err != nil {
+			panic(err)
+		}
 
-        pprof.StartCPUProfile(f)
+		pprof.StartCPUProfile(f)
 
-        ebiten.SetTPS(400)
-    }
+		ebiten.SetTPS(400)
+	}
 
-    ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
-    ebiten.SetWindowTitle("guac emulator")
-    ebiten.SetWindowIcon([]image.Image{loadIcon()})
-    ebiten.SetWindowSize(240 * 4, 160 * 4)
-    if config.Conf.Fullscreen {
-        ebiten.SetFullscreen(true)
-    }
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
+	ebiten.SetWindowTitle("guac emulator")
+	ebiten.SetWindowIcon([]image.Image{loadIcon()})
+	ebiten.SetWindowSize(240*4, 160*4)
+	if config.Conf.Fullscreen {
+		ebiten.SetFullscreen(true)
+	}
 
-    if err := ebiten.RunGame(NewGame(flags)); err != nil && err != exit {
-        log.Fatal(err)
-    }
+	if err := ebiten.RunGame(NewGame(flags)); err != nil && err != exit {
+		log.Fatal(err)
+	}
 
-    if flags.Profile {
-        pprof.StopCPUProfile()
-        f.Close()
-    }
+	if flags.Profile {
+		pprof.StopCPUProfile()
+		f.Close()
+	}
 }
 
 func loadIcon() image.Image {
 
-    img, err := png.Decode(bytes.NewReader(icon))
-    if err != nil {
-        panic(err)
-    }
+	img, err := png.Decode(bytes.NewReader(icon))
+	if err != nil {
+		panic(err)
+	}
 
-    return img
+	return img
 }
 
 type Flags struct {
-    ConsoleMode bool
-    Type int
-    RomPath string
-    Profile bool
+	ConsoleMode bool
+	Type        int
+	RomPath     string
+	Profile     bool
 }
 
 func getFlags() Flags {
-    romPath := flag.String("r", "", "rom path")
-    profile := flag.Bool("p", false, "use profiler")
-    flag.Parse()
+	romPath := flag.String("r", "", "rom path")
+	profile := flag.Bool("p", false, "use profiler")
+	flag.Parse()
 
-    f := Flags{
-        RomPath: *romPath,
-        Profile: *profile,
-    }
+	f := Flags{
+		RomPath: *romPath,
+		Profile: *profile,
+	}
 
-    switch {
-    case *romPath == "":
-        f.Type = NONE
-        f.ConsoleMode = true
-    case strings.HasSuffix(*romPath, ".gb"):
-        f.Type = GB
-    case strings.HasSuffix(*romPath, ".gbc"):
-        f.Type = GB
-    case strings.HasSuffix(*romPath, ".gba"):
-        f.Type = GBA
-    default:
-        panic("Flag Parsing Error. Rom Path must end with gba, gbc, gb extension")
-    }
+	switch {
+	case *romPath == "":
+		f.Type = NONE
+		f.ConsoleMode = true
+	case strings.HasSuffix(*romPath, ".gb"):
+		f.Type = GB
+	case strings.HasSuffix(*romPath, ".gbc"):
+		f.Type = GB
+	case strings.HasSuffix(*romPath, ".gba"):
+		f.Type = GBA
+	default:
+		panic("Flag Parsing Error. Rom Path must end with gba, gbc, gb extension")
+	}
 
-    return f
+	return f
 }

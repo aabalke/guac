@@ -6,8 +6,8 @@ import (
 	"log"
 	"os"
 
+	_ "embed"
 	"github.com/BurntSushi/toml"
-    _"embed"
 )
 
 //go:embed default.toml
@@ -18,25 +18,25 @@ const CONFIG_PATH = "./config.toml"
 var Conf Config
 
 type Config struct {
-	Fullscreen     bool `toml:"fullscreen"`
-	TomlBackdrop   int  `toml:"backdrop_color"`
-	GamesPerRow int `toml:"games_per_row"`
-	Backdrop       color.Color
-	Gb             GbConfig       `toml:"gb"`
-	Gba            GbaConfig      `toml:"gba"`
-	KeyboardConfig KeyboardConfig `toml:"keyboard"`
+	Fullscreen       bool `toml:"fullscreen"`
+	TomlBackdrop     int  `toml:"backdrop_color"`
+	GamesPerRow      int  `toml:"games_per_row"`
+	Backdrop         color.Color
+	Gb               GbConfig         `toml:"gb"`
+	Gba              GbaConfig        `toml:"gba"`
+	KeyboardConfig   KeyboardConfig   `toml:"keyboard"`
 	ControllerConfig ControllerConfig `toml:"controller"`
 }
 
 type GbConfig struct {
-	TomlPalette    []int `toml:"dmg_palette"`
-	Palette        [][]uint8
-	KeyboardConfig EmulatorKeyboardConfig `toml:"keyboard"`
+	TomlPalette      []int `toml:"dmg_palette"`
+	Palette          [][]uint8
+	KeyboardConfig   EmulatorKeyboardConfig   `toml:"keyboard"`
 	ControllerConfig EmulatorControllerConfig `toml:"controller"`
 }
 
 type GbaConfig struct {
-	KeyboardConfig EmulatorKeyboardConfig `toml:"keyboard"`
+	KeyboardConfig   EmulatorKeyboardConfig   `toml:"keyboard"`
 	ControllerConfig EmulatorControllerConfig `toml:"controller"`
 }
 
@@ -94,23 +94,23 @@ func (c *Config) Decode() {
 
 	b, err := os.ReadFile(CONFIG_PATH)
 	if err != nil {
-        if os.IsNotExist(err) {
+		if os.IsNotExist(err) {
 
-            f, err2 := os.Create(CONFIG_PATH)
-            if err2 != nil {
-                panic(err2)
-            }
+			f, err2 := os.Create(CONFIG_PATH)
+			if err2 != nil {
+				panic(err2)
+			}
 
-            _, err2 = f.Write(defaultConfig)
-            if err2 != nil {
-                panic(err2)
-            }
+			_, err2 = f.Write(defaultConfig)
+			if err2 != nil {
+				panic(err2)
+			}
 
-            b = defaultConfig
+			b = defaultConfig
 
-        } else {
-            panic(err)
-        }
+		} else {
+			panic(err)
+		}
 	}
 
 	_, err = toml.Decode(string(b), &c)
@@ -125,12 +125,12 @@ func (c *Config) Decode() {
 		A: 0xFF,
 	}
 
-    if c.GamesPerRow == 0 {
-        errMessageStart := "Invalid Config:"
-        errMessageEnd := "Using 6 games per row in menu."
+	if c.GamesPerRow == 0 {
+		errMessageStart := "Invalid Config:"
+		errMessageEnd := "Using 6 games per row in menu."
 		log.Printf("%s %s %s\n", errMessageStart, "GamesPerRow == 0.", errMessageEnd)
-        c.GamesPerRow = 6
-    }
+		c.GamesPerRow = 6
+	}
 
 	c.decodeGb()
 }

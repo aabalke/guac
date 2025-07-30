@@ -3,6 +3,14 @@
 Guac is an Emulator written in golang for Gameboy, Gameboy Color and Gameboy
 Advance handheld consoles.
 
+# Installation / Building
+
+Releases precompiled binaries are available. However, you can build using:
+
+```
+go build -ldflags="-H=windowsgui"
+```
+
 # Getting Started
 
 ## Command line
@@ -37,21 +45,11 @@ the game metadata in the following format. At this time Art must be 1:1 pngs or 
  ...]
  ```
 
-# Installation / Building
-
-Releases precompiled binaries are available. However, you can build using:
-
-```
-go build -ldflags="-H=windowsgui"
-```
-
-# Keybindings / Controller Support
-
 # Configuration
 
 Emulator settings can be configured using the config.toml file at root.
 If you would like to return to the default config.toml file, delete any 
-present config.toml file.
+present config.toml file and run the emulator.
 
 ## Configurable Options
 
@@ -68,5 +66,3 @@ Check the ./emu folder for individual consoles. These consoles will have
 # Developers
 
 If you are interested: [aaronbalke.com](some deep dives regarding emulation).
-
-A ./sav folder is required

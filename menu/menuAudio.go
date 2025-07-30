@@ -11,11 +11,10 @@ import (
 )
 
 const (
-    MENU_AUDIO_GOOD = 0
-    MENU_AUDIO_BAD  = 1
-    MENU_AUDIO_REALGOOD = 2
+	MENU_AUDIO_GOOD     = 0
+	MENU_AUDIO_BAD      = 1
+	MENU_AUDIO_REALGOOD = 2
 )
-
 
 //go:embed res/sfx_good.mp3
 var sfxGood []byte
@@ -27,9 +26,9 @@ var sfxBad []byte
 var sfxRealGood []byte
 
 type MenuPlayer struct {
-	audioContext *audio.Context
+	audioContext                       *audio.Context
 	bytesGood, bytesBad, bytesRealGood []byte
-	chGood, chBad, chRealGood chan []byte
+	chGood, chBad, chRealGood          chan []byte
 }
 
 func NewMenuPlayer(audioContext *audio.Context) (*MenuPlayer, error) {
@@ -78,17 +77,16 @@ func (p *MenuPlayer) handleChannels() {
 	}
 }
 
-
 func (p *MenuPlayer) update(idx int) error {
 
-    switch idx {
-    case 0:
+	switch idx {
+	case 0:
 		p.Play(p.bytesGood)
-    case 1:
+	case 1:
 		p.Play(p.bytesBad)
-    case 2:
+	case 2:
 		p.Play(p.bytesRealGood)
-    }
+	}
 
 	return nil
 }

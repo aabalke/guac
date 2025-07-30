@@ -9,24 +9,24 @@ const (
 )
 
 type ToneChannel struct {
-    Apu *Apu
-    Idx uint32
-    CntL, CntH, CntX uint16
+	Apu              *Apu
+	Idx              uint32
+	CntL, CntH, CntX uint16
 
-    phase bool
-    samples, lengthTime, sweepTime, envTime float64
+	phase                                   bool
+	samples, lengthTime, sweepTime, envTime float64
 }
 
 func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 
-    if !ch.Apu.isSoundChanEnable(uint8(ch.Idx)) {
-        return 0
-    }
+	if !ch.Apu.isSoundChanEnable(uint8(ch.Idx)) {
+		return 0
+	}
 
-    multipler := uint16(1)
-    if doubleSpeed {
-        multipler = 2
-    }
+	multipler := uint16(1)
+	if doubleSpeed {
+		multipler = 2
+	}
 
 	//toneAddr := uint32(ch.CntH)
 	freqHz := ch.CntX & 0b0111_1111_1111
@@ -35,9 +35,9 @@ func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 	// Full length of the generated wave (if enabled) in seconds
 	soundLen := ch.CntH & 0b0011_1111
 	//length := float64(64-soundLen) / 256
-    maxTimer := 64.0 * float64(multipler)
-    divApuRate := float64(multipler) / 256.0
-    length := (maxTimer - float64(soundLen)) * divApuRate
+	maxTimer := 64.0 * float64(multipler)
+	divApuRate := float64(multipler) / 256.0
+	length := (maxTimer - float64(soundLen)) * divApuRate
 	//length := float64((multipler * 64)-soundLen) / (256) * 2
 
 	// Envelope volume change interval in seconds
@@ -48,46 +48,46 @@ func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 
 	// Length reached check (if so, just disable the channel and return silence)
 
-    if lenFlag := BitEnabled(uint32(ch.CntX), 14); lenFlag {
+	if lenFlag := BitEnabled(uint32(ch.CntX), 14); lenFlag {
 		ch.lengthTime += ch.Apu.sampleTime
 		if ch.lengthTime >= length {
-            ch.Apu.enableSoundChan(int(ch.Idx), false)
+			ch.Apu.enableSoundChan(int(ch.Idx), false)
 			return 0
 		}
 	}
 
 	// Frequency sweep (Square 1 channel only)
-    if ch.Idx == 0 {
-        sweepTime := (ch.CntL >> 4) & 0b111 // 0-7 (0=7.8ms, 7=54.7ms)
-        sweepInterval := 0.0078 * float64(sweepTime+1)    // Frquency sweep change interval in seconds
+	if ch.Idx == 0 {
+		sweepTime := (ch.CntL >> 4) & 0b111            // 0-7 (0=7.8ms, 7=54.7ms)
+		sweepInterval := 0.0078 * float64(sweepTime+1) // Frquency sweep change interval in seconds
 
-        ch.sweepTime += ch.Apu.sampleTime
-        if ch.sweepTime >= sweepInterval {
-            ch.sweepTime -= sweepInterval
+		ch.sweepTime += ch.Apu.sampleTime
+		if ch.sweepTime >= sweepInterval {
+			ch.sweepTime -= sweepInterval
 
-            // A Sweep Shift of 0 means that Sweep is disabled
-            sweepShift := byte(ch.CntL & 0b111)
+			// A Sweep Shift of 0 means that Sweep is disabled
+			sweepShift := byte(ch.CntL & 0b111)
 
-            if sweepShift != 0 {
-                // X(t) = X(t-1) ± X(t-1)/2^n
-                disp := freqHz >> sweepShift // X(t-1)/2^n
-                if decrease := BitEnabled(uint32(ch.CntL), 3); decrease {
-                    freqHz -= disp
-                } else {
-                    freqHz += disp
-                }
+			if sweepShift != 0 {
+				// X(t) = X(t-1) ± X(t-1)/2^n
+				disp := freqHz >> sweepShift // X(t-1)/2^n
+				if decrease := BitEnabled(uint32(ch.CntL), 3); decrease {
+					freqHz -= disp
+				} else {
+					freqHz += disp
+				}
 
-                if freqHz < 0x7ff {
-                    // update frequency
-                    cntx := (ch.CntX & ^uint16(0x7ff)) | uint16(freqHz)
-                    ch.CntX = cntx
+				if freqHz < 0x7ff {
+					// update frequency
+					cntx := (ch.CntX & ^uint16(0x7ff)) | uint16(freqHz)
+					ch.CntX = cntx
 
-                } else {
-                    ch.Apu.enableSoundChan(int(ch.Idx), false)
-                }
-            }
-        }
-    }
+				} else {
+					ch.Apu.enableSoundChan(int(ch.Idx), false)
+				}
+			}
+		}
+	}
 
 	// Envelope volume
 	envelope := (ch.CntH >> 12) & 0xf
@@ -97,7 +97,7 @@ func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 		if ch.envTime >= envelopeInterval {
 			ch.envTime -= envelopeInterval
 
-            if increment := BitEnabled(uint32(ch.CntH), 11); increment {
+			if increment := BitEnabled(uint32(ch.CntH), 11); increment {
 				if envelope < 0xf {
 					envelope++
 				}
@@ -107,7 +107,7 @@ func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 				}
 			}
 
-            ch.CntH = (ch.CntH & ^uint16(0xf000)) | (envelope << 12)
+			ch.CntH = (ch.CntH & ^uint16(0xf000)) | (envelope << 12)
 		}
 	}
 

@@ -5,29 +5,29 @@ import "fmt"
 func (cpu *Cpu) DecodeTHUMB(opcode uint16) int {
 
 	switch {
-    case isthumbSWI(opcode):
-        cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
-        cpu.Gba.exception(VEC_SWI, MODE_SWI)
-        return 2
-        //cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
-        //cycles, incPc := cpu.Gba.SysCall(uint32(opcode) & 0xFF)
+	case isthumbSWI(opcode):
+		cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
+		cpu.Gba.exception(VEC_SWI, MODE_SWI)
+		return 2
+		//cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
+		//cycles, incPc := cpu.Gba.SysCall(uint32(opcode) & 0xFF)
 
-        //if incPc {
-        //    r[PC] += 2
-        //}
+		//if incPc {
+		//    r[PC] += 2
+		//}
 
-        //return cycles
+		//return cycles
 
 	case isThumbAddSub(opcode):
 		cpu.ThumbAddSub(opcode)
 	case isThumbShift(opcode):
-        cpu.thumbShifted(opcode)
+		cpu.thumbShifted(opcode)
 	case isThumbImm(opcode):
-        cpu.thumbImm(opcode)
+		cpu.thumbImm(opcode)
 	case isThumbAlu(opcode):
 		cpu.ThumbAlu(opcode)
 	case isThumbHiReg(opcode):
-        return cpu.HiRegBX(opcode)
+		return cpu.HiRegBX(opcode)
 	case isLSHalf(opcode):
 		cpu.thumbLSHalf(opcode)
 	case isLSSigned(opcode):
@@ -40,28 +40,28 @@ func (cpu *Cpu) DecodeTHUMB(opcode uint16) int {
 		cpu.thumbLSImm(opcode)
 	case isPushPop(opcode):
 		cpu.thumbPushPop(opcode)
-    case isRelative(opcode):
-        cpu.thumbRelative(opcode)
-    case isThumbB(opcode):
-        cpu.thumbB(opcode)
-    case isJumpCall(opcode):
-        cpu.thumbJumpCalls(opcode)
-    case isStack(opcode):
-        cpu.thumbStack(opcode)
-    case isLongBranch(opcode):
-        cpu.thumbLongBranch(opcode)
-    case isShortLongBranch(opcode):
-        cpu.thumbShortLongBranch(opcode)
-    case isLSSP(opcode):
-        cpu.thumbLSSP(opcode)
-    case isMulti(opcode):
-        cpu.thumbMulti(opcode)
+	case isRelative(opcode):
+		cpu.thumbRelative(opcode)
+	case isThumbB(opcode):
+		cpu.thumbB(opcode)
+	case isJumpCall(opcode):
+		cpu.thumbJumpCalls(opcode)
+	case isStack(opcode):
+		cpu.thumbStack(opcode)
+	case isLongBranch(opcode):
+		cpu.thumbLongBranch(opcode)
+	case isShortLongBranch(opcode):
+		cpu.thumbShortLongBranch(opcode)
+	case isLSSP(opcode):
+		cpu.thumbLSSP(opcode)
+	case isMulti(opcode):
+		cpu.thumbMulti(opcode)
 	default:
-        r := &cpu.Reg.R
+		r := &cpu.Reg.R
 		panic(fmt.Sprintf("Unable to Decode %X, at PC %X, INSTR %d", opcode, r[PC], CURR_INST))
 	}
 
-    return 2
+	return 2
 }
 
 func isThumbOpcodeFormat(opcode, mask, format uint16) bool {
@@ -140,70 +140,70 @@ func isLSImm(opcode uint16) bool {
 
 func isPushPop(opcode uint16) bool {
 	return isThumbOpcodeFormat(opcode,
-        0b1111_0110_0000_0000,
-        0b1011_0100_0000_0000,
+		0b1111_0110_0000_0000,
+		0b1011_0100_0000_0000,
 	)
 }
 
 func isRelative(opcode uint16) bool {
 	return isThumbOpcodeFormat(opcode,
-        0b1111_0000_0000_0000,
-        0b1010_0000_0000_0000,
+		0b1111_0000_0000_0000,
+		0b1010_0000_0000_0000,
 	)
 }
 
 func isJumpCall(opcode uint16) bool {
 	return isThumbOpcodeFormat(opcode,
-        0b1111_0000_0000_0000,
-        0b1101_0000_0000_0000,
+		0b1111_0000_0000_0000,
+		0b1101_0000_0000_0000,
 	)
 }
 
 func isThumbB(opcode uint16) bool {
 	return isThumbOpcodeFormat(opcode,
-        0b1111_1000_0000_0000,
-        0b1110_0000_0000_0000,
+		0b1111_1000_0000_0000,
+		0b1110_0000_0000_0000,
 	)
 }
 
 func isStack(opcode uint16) bool {
 	return isThumbOpcodeFormat(opcode,
-        0b1111_1111_0000_0000,
-        0b1011_0000_0000_0000,
+		0b1111_1111_0000_0000,
+		0b1011_0000_0000_0000,
 	)
 }
 
 func isLongBranch(opcode uint16) bool {
 	return isThumbOpcodeFormat(opcode,
-        0b1111_1000_0000_0000,
-        0b1111_0000_0000_0000,
+		0b1111_1000_0000_0000,
+		0b1111_0000_0000_0000,
 	)
 }
 
 func isShortLongBranch(opcode uint16) bool {
 	return isThumbOpcodeFormat(opcode,
-        0b1111_1000_0000_0000,
-        0b1111_1000_0000_0000,
+		0b1111_1000_0000_0000,
+		0b1111_1000_0000_0000,
 	)
 }
 
 func isLSSP(opcode uint16) bool {
 	return isThumbOpcodeFormat(opcode,
-        0b1111_0000_0000_0000,
-        0b1001_0000_0000_0000,
+		0b1111_0000_0000_0000,
+		0b1001_0000_0000_0000,
 	)
 }
 
 func isMulti(opcode uint16) bool {
 	return isThumbOpcodeFormat(opcode,
-        0b1111_0000_0000_0000,
-        0b1100_0000_0000_0000,
+		0b1111_0000_0000_0000,
+		0b1100_0000_0000_0000,
 	)
 }
 
 func isthumbSWI(opcode uint16) bool {
 	return isThumbOpcodeFormat(opcode,
-        0b1111_1111_0000_0000,
-        0b1101_1111_0000_0000,
+		0b1111_1111_0000_0000,
+		0b1101_1111_0000_0000,
 	)
 }

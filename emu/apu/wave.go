@@ -1,7 +1,7 @@
 package apu
 
 type WaveChannel struct {
-    Apu *Apu
+	Apu *Apu
 	Idx uint32
 
 	CntL, CntH, CntX uint16
@@ -9,38 +9,38 @@ type WaveChannel struct {
 
 	samples, lengthTime float64
 
-    WaveSamples, WavePosition uint8
+	WaveSamples, WavePosition uint8
 }
 
 func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
 
-    if !ch.Apu.isSoundChanEnable(uint8(ch.Idx)) {
-        return 0
-    }
+	if !ch.Apu.isSoundChanEnable(uint8(ch.Idx)) {
+		return 0
+	}
 
-    if !BitEnabled(uint32(ch.CntL), 7) {
-        return 0
-    }
+	if !BitEnabled(uint32(ch.CntL), 7) {
+		return 0
+	}
 
-    multipler := uint16(1)
-    if doubleSpeed {
-        multipler = 2
-    }
-    maxTimer := 256.0 * float64(multipler)
-    divApuRate := float64(multipler) / 256.0
+	multipler := uint16(1)
+	if doubleSpeed {
+		multipler = 2
+	}
+	maxTimer := 256.0 * float64(multipler)
+	divApuRate := float64(multipler) / 256.0
 
-    soundLength := GetVarData(uint32(ch.CntH), 0, 7)
+	soundLength := GetVarData(uint32(ch.CntH), 0, 7)
 	length := (maxTimer - float64(soundLength)) * divApuRate
 
-    if stopAtLength := BitEnabled(uint32(ch.CntX), 14); stopAtLength {
+	if stopAtLength := BitEnabled(uint32(ch.CntX), 14); stopAtLength {
 		ch.lengthTime += ch.Apu.sampleTime
-        if stop := ch.lengthTime >= length; stop {
-            ch.Apu.enableSoundChan(int(ch.Idx), false)
+		if stop := ch.lengthTime >= length; stop {
+			ch.Apu.enableSoundChan(int(ch.Idx), false)
 			return 0
 		}
 	}
 
-    rate := GetVarData(uint32(ch.CntX), 0, 10)
+	rate := GetVarData(uint32(ch.CntX), 0, 10)
 	freq := 2097152 / (2048 - float64(rate))
 	cycleSamples := float64(ch.Apu.sndFrequency) / freq
 
@@ -52,24 +52,27 @@ func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
 		if ch.WaveSamples != 0 {
 			ch.WavePosition = (ch.WavePosition + 1) & 0b0011_1111
 		} else {
-            ch.Reset()
+			ch.Reset()
 		}
 	}
 
 	wavedata := ch.WaveRam[(uint32(ch.WavePosition)>>1)&0x1f]
 	sample := (float64((wavedata>>((ch.WavePosition&1)<<2))&0xf) - 0x8) / 8
 
-    if forceVolume := BitEnabled(uint32(ch.CntH), 15); forceVolume {
+	if forceVolume := BitEnabled(uint32(ch.CntH), 15); forceVolume {
 
-        sample *= 0.75
-    } else {
-        switch vol := GetVarData(uint32(ch.CntH), 13, 14); vol {
-        case 0: sample = 0
-        case 1:
-        case 2: sample *= 0.5
-        case 3: sample *= 0.25
-        }
-    }
+		sample *= 0.75
+	} else {
+		switch vol := GetVarData(uint32(ch.CntH), 13, 14); vol {
+		case 0:
+			sample = 0
+		case 1:
+		case 2:
+			sample *= 0.5
+		case 3:
+			sample *= 0.25
+		}
+	}
 
 	if sample >= 0 {
 		return int8(sample / 5 * PSG_MAX)
@@ -84,13 +87,13 @@ func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
 
 func (ch *WaveChannel) Reset() {
 
-    if twoBanks := BitEnabled(uint32(ch.CntL), 5); twoBanks {
+	if twoBanks := BitEnabled(uint32(ch.CntL), 5); twoBanks {
 		ch.WavePosition = 0
-        ch.WaveSamples = 64
+		ch.WaveSamples = 64
 		return
 	}
 
-    bankIdx := (ch.CntL >> 6) & 0b1
-    ch.WavePosition = uint8(32 * bankIdx)
-    ch.WaveSamples = 32
+	bankIdx := (ch.CntL >> 6) & 0b1
+	ch.WavePosition = uint8(32 * bankIdx)
+	ch.WaveSamples = 32
 }

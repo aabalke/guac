@@ -43,9 +43,9 @@ func (gb *GameBoy) UpdateGraphics() {
 
 	gb.Timer.ScanlineCounter -= gb.Cycles
 
-    if gb.Timer.ScanlineCounter > 0 {
-        return
-    }
+	if gb.Timer.ScanlineCounter > 0 {
+		return
+	}
 
 	gb.MemoryBus.Memory[LY]++
 	currentLine := gb.MemoryBus.Memory[LY]
@@ -58,7 +58,7 @@ func (gb *GameBoy) UpdateGraphics() {
 	gb.Timer.ScanlineCounter += 456 * speedMultipler
 
 	if currentLine > 153 {
-        gb.bgPriority = [width][height]bool{}
+		gb.bgPriority = [width][height]bool{}
 		gb.MemoryBus.Memory[LY] = 0
 	}
 
@@ -89,7 +89,7 @@ func (gb *GameBoy) setLCDStatus() {
 	var newMode uint8 = 0
 	modeSelected := false
 
-	vBlank := currentLine >= height                      // mode 1
+	vBlank := currentLine >= height                   // mode 1
 	oam := gb.Timer.ScanlineCounter >= 456-80         // mode 2
 	drawing := gb.Timer.ScanlineCounter >= 456-80-172 // mode 3
 
@@ -110,9 +110,9 @@ func (gb *GameBoy) setLCDStatus() {
 		newMode = 3
 		stat = setStat(stat, newMode)
 
-        if newMode != currMode {
-            gb.drawScanline(int32(currentLine))
-        }
+		if newMode != currMode {
+			gb.drawScanline(int32(currentLine))
+		}
 
 	default:
 		newMode = 0
@@ -159,7 +159,7 @@ func (gb *GameBoy) drawScanline(scanline int32) {
 
 func (gb *GameBoy) renderTiles() {
 
-    //Mem := &gb.MemoryBus.Memory
+	//Mem := &gb.MemoryBus.Memory
 
 	scrollY := (gb.MemoryBus.Memory[0xFF42])
 	scrollX := (gb.MemoryBus.Memory[0xFF43])
@@ -189,10 +189,10 @@ func (gb *GameBoy) renderTiles() {
 	//	bgMemory = 0x9C00
 	//}
 
-    var winMemory uint16 = 0x9800
-    if winAddr {
+	var winMemory uint16 = 0x9800
+	if winAddr {
 		winMemory = 0x9C00
-    }
+	}
 
 	var bgMemory uint16 = 0x9800
 	if bgAddr {
@@ -210,7 +210,7 @@ func (gb *GameBoy) renderTiles() {
 	// which of the 8 vertical pixels of the current tile is the scanline on?
 	var tileRow = uint16(yPos/8) * 32
 
-    tileScanline = [width]uint8{}
+	tileScanline = [width]uint8{}
 	for pixel := range width {
 		xPos := (uint8(pixel) + scrollX)
 
@@ -224,11 +224,11 @@ func (gb *GameBoy) renderTiles() {
 
 		// Get the tile identity number
 
-        // PER PIXEL OF SCAN LINE, NEED TO CHECK IF PIXEL >= WX AS WELL TO CHOOSE TILE ADDR (BG VS WIN)
-        tileAddress := bgMemory + tileRow + tileCol
-        if useWindow && pixel >= windowX {
-            tileAddress = winMemory + tileRow + tileCol
-        }
+		// PER PIXEL OF SCAN LINE, NEED TO CHECK IF PIXEL >= WX AS WELL TO CHOOSE TILE ADDR (BG VS WIN)
+		tileAddress := bgMemory + tileRow + tileCol
+		if useWindow && pixel >= windowX {
+			tileAddress = winMemory + tileRow + tileCol
+		}
 
 		// Deduce where this tile id is in memory
 		tileLocation := tileData
@@ -293,21 +293,21 @@ func (gb *GameBoy) renderTiles() {
 			continue
 		}
 
-        if !gb.bgPriority[pixel][scanline] || tileScanline[scanline] == 0 {
-            gb.Screen[pixel][scanline] = color
-        }
+		if !gb.bgPriority[pixel][scanline] || tileScanline[scanline] == 0 {
+			gb.Screen[pixel][scanline] = color
+		}
 
-        if gb.Color {
-            gb.bgPriority[pixel][scanline] = priority
-        }
+		if gb.Color {
+			gb.bgPriority[pixel][scanline] = priority
+		}
 
-        tileScanline[pixel] = colorNum
+		tileScanline[pixel] = colorNum
 	}
 }
 
 func (gb *GameBoy) renderSprites(scanline int32) {
 
-    lcdControl, _ := gb.ReadByte(LCDC)
+	lcdControl, _ := gb.ReadByte(LCDC)
 
 	var ySize int32 = 8
 	if gb.flagEnabled(lcdControl, 2) {
@@ -319,8 +319,8 @@ func (gb *GameBoy) renderSprites(scanline int32) {
 	for sprite := uint16(0); sprite < 40; sprite++ {
 		index := sprite * 4
 
-		yP, _ := gb.ReadByte(0xFE00+index)
-        yPos := int32(yP) - 16
+		yP, _ := gb.ReadByte(0xFE00 + index)
+		yPos := int32(yP) - 16
 
 		if scanline < yPos || scanline >= (yPos+ySize) {
 			continue
@@ -332,8 +332,8 @@ func (gb *GameBoy) renderSprites(scanline int32) {
 		}
 		lineSprites++
 
-		xP, _ := gb.ReadByte(uint16(0xFE00+index+1))
-        xPos := int32(xP) - 8
+		xP, _ := gb.ReadByte(uint16(0xFE00 + index + 1))
+		xPos := int32(xP) - 8
 		tileLocation, _ := gb.ReadByte(uint16(0xFE00 + index + 2))
 		attributes, _ := gb.ReadByte(uint16(0xFE00 + index + 3))
 
@@ -353,13 +353,12 @@ func (gb *GameBoy) renderSprites(scanline int32) {
 			line = ySize - line - 1
 		}
 
-
 		dataAddress := (uint16(tileLocation) * 0x10) + uint16(line*2) + (bank * 0x2000)
 		data1 := gb.MemoryBus.VRAM[dataAddress]
 		data2 := gb.MemoryBus.VRAM[dataAddress+1]
 
 		for tilePixel := byte(0); tilePixel < 8; tilePixel++ {
-			pixel := int16(xPos) + 7-int16(tilePixel)
+			pixel := int16(xPos) + 7 - int16(tilePixel)
 			if pixel < 0 || pixel >= width {
 				continue
 			}
@@ -380,30 +379,30 @@ func (gb *GameBoy) renderSprites(scanline int32) {
 			colorNum |= getVal(data1, uint8(colorBit))
 
 			// Colour 0 is transparent for sprites
-            if colorNum == 0 {
-                continue
-            }
+			if colorNum == 0 {
+				continue
+			}
 
-            var color uint32
-            if gb.Color {
-                cgbPalette := attributes & 0x7
-                color = gb.spPalette.get(cgbPalette, colorNum)
+			var color uint32
+			if gb.Color {
+				cgbPalette := attributes & 0x7
+				color = gb.spPalette.get(cgbPalette, colorNum)
 
-            } else {
-                colorAddr := uint16(OBJ0PALETTE)
-                if gb.flagEnabled(attributes, 4) {
-                    colorAddr = OBJ1PALETTE
-                }
+			} else {
+				colorAddr := uint16(OBJ0PALETTE)
+				if gb.flagEnabled(attributes, 4) {
+					colorAddr = OBJ1PALETTE
+				}
 
-                color = uint32(gb.getColor(colorNum, colorAddr))
-            }
+				color = uint32(gb.getColor(colorNum, colorAddr))
+			}
 
-            drawPixel := (priority && !gb.bgPriority[pixel][scanline]) || tileScanline[pixel] == 0 
-            if drawPixel {
-                gb.Screen[pixel][scanline] = color
-            }
+			drawPixel := (priority && !gb.bgPriority[pixel][scanline]) || tileScanline[pixel] == 0
+			if drawPixel {
+				gb.Screen[pixel][scanline] = color
+			}
 
-            minx[pixel] = int32(xPos) + SpritePriorityOffset
+			minx[pixel] = int32(xPos) + SpritePriorityOffset
 		}
 	}
 }

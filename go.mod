@@ -1,4 +1,4 @@
-module github.com/aabalke33/guac
+module github.com/aabalke/guac
 
 go 1.24.5
 

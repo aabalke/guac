@@ -28,38 +28,38 @@ package gameboy
 //}
 
 type ColorPalette struct {
-    Palette []uint8
-    Idx uint8
-    Inc bool
+	Palette []uint8
+	Idx     uint8
+	Inc     bool
 }
 
 func NewColorPalette() *ColorPalette {
 
-    p := make([]uint8, 0x40)
+	p := make([]uint8, 0x40)
 
-    for i := range p {
-        p[i] = 0xFF
-    }
+	for i := range p {
+		p[i] = 0xFF
+	}
 
-    return &ColorPalette{
-        Palette: p,
-    }
+	return &ColorPalette{
+		Palette: p,
+	}
 }
 
 func (cp *ColorPalette) get(pal uint8, num uint8) uint32 {
 
-    idx := (pal * 8) + (num * 2)
-    color := uint16(cp.Palette[idx]) | uint16(cp.Palette[idx+1])<<8
+	idx := (pal * 8) + (num * 2)
+	color := uint16(cp.Palette[idx]) | uint16(cp.Palette[idx+1])<<8
 
-    r := colArr[uint8(color & 0x1F)]
-	g := colArr[uint8((color >> 5) & 0x1F)]
-	b := colArr[uint8((color >> 10) & 0x1F)]
+	r := colArr[uint8(color&0x1F)]
+	g := colArr[uint8((color>>5)&0x1F)]
+	b := colArr[uint8((color>>10)&0x1F)]
 
-    var output uint32 = b
-    output += g << 8
-    output += r << 16
+	var output uint32 = b
+	output += g << 8
+	output += r << 16
 
-    return output
+	return output
 }
 
 // Mapping of the 5 bit colour value to a 8 bit value.

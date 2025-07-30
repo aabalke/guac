@@ -8,8 +8,8 @@ import (
 var biosFile []byte
 
 const (
-    INTRWAIT_NONE = 0
-    INTRWAIT_VBLANK = 1
+	INTRWAIT_NONE   = 0
+	INTRWAIT_VBLANK = 1
 )
 
 const (
@@ -64,6 +64,7 @@ func (gba *GBA) LoadBios() {
 		gba.Mem.BIOS[i] = uint8(biosFile[i])
 	}
 }
+
 //
 //func (gba *GBA) SysCall(inst uint32) (int, bool) {
 //
