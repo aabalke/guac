@@ -89,6 +89,8 @@ func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu 
 	a.WaveChannel = &WaveChannel{Apu: a, Idx: 2}
 	a.NoiseChannel = &NoiseChannel{Apu: a, Idx: 3}
 
+    return a
+
 	a.player = audioContext.NewPlayer()
 
 	return a
@@ -118,7 +120,7 @@ func (a *Apu) Play(muted bool) {
 		return
 	}
 
-	a.player.Write(a.Stream)
+	//a.player.Write(a.Stream)
 }
 
 func (a *Apu) Close() {
@@ -195,27 +197,27 @@ func (a *Apu) fifoFx(ch uint8, sample int16) (int16, int16) {
 		return 0, 0
 	}
 
-	if ch != 0 && ch != 1 {
+	if ch > 1 {
 		panic("INVALID FIFO CHANNEL")
 	}
 
-	if half := !BitEnabled(uint32(a.SoundCntH), 2+ch); half {
-		sample /= 2
+    cntH := uint32(a.SoundCntH)
+
+	if half := !BitEnabled(cntH, 2+ch); half {
+		sample >>= 1
 	}
 
-	sampleLeft := int16(0)
-	sampleRight := int16(0)
+	var sampleLeft, sampleRight int16
 
-	if leftEnabled := BitEnabled(uint32(a.SoundCntH), 9+(ch*4)); leftEnabled {
+	if leftEnabled := BitEnabled(cntH, 9+(ch << 2)); leftEnabled {
 		sampleLeft = sample
 	}
 
-	if rightEnabled := BitEnabled(uint32(a.SoundCntH), 8+(ch*4)); rightEnabled {
+	if rightEnabled := BitEnabled(cntH, 8+(ch << 2)); rightEnabled {
 		sampleRight = sample
 	}
 
 	return sampleLeft, sampleRight
-
 }
 
 func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
@@ -236,52 +238,54 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 		multiplier = 2
 	}
 
+    cntL := uint32(a.SoundCntL)
+
 	for a.sndCycles >= uint32(a.sampCycles*multiplier) {
 
 		psgL, psgR := int32(0), int32(0)
 
 		ch1Sample := int32(a.ToneChannel1.GetSample(doubleSpeed))
 
-		if leftEnabled := BitEnabled(uint32(a.SoundCntL), 12); leftEnabled {
+		if leftEnabled := BitEnabled(uint32(cntL), 12); leftEnabled {
 			psgL = psgL + ch1Sample
 		}
 
-		if rightEnabled := BitEnabled(uint32(a.SoundCntL), 8); rightEnabled {
+		if rightEnabled := BitEnabled(uint32(cntL), 8); rightEnabled {
 			psgR = psgR + ch1Sample
 		}
 
 		ch2Sample := int32(a.ToneChannel2.GetSample(doubleSpeed))
 
-		if leftEnabled := BitEnabled(uint32(a.SoundCntL), 13); leftEnabled {
+		if leftEnabled := BitEnabled(uint32(cntL), 13); leftEnabled {
 			psgL = psgL + ch2Sample
 		}
 
-		if rightEnabled := BitEnabled(uint32(a.SoundCntL), 9); rightEnabled {
+		if rightEnabled := BitEnabled(uint32(cntL), 9); rightEnabled {
 			psgR = psgR + ch2Sample
 		}
 
 		ch3Sample := int32(a.WaveChannel.GetSample(doubleSpeed))
 
-		if leftEnabled := BitEnabled(uint32(a.SoundCntL), 14); leftEnabled {
+		if leftEnabled := BitEnabled(uint32(cntL), 14); leftEnabled {
 			psgL = psgL + ch3Sample
 		}
 
-		if rightEnabled := BitEnabled(uint32(a.SoundCntL), 10); rightEnabled {
+		if rightEnabled := BitEnabled(uint32(cntL), 10); rightEnabled {
 			psgR = psgR + ch3Sample
 		}
 
 		ch4Sample := int32(a.NoiseChannel.GetSample(doubleSpeed))
 
-		if leftEnabled := BitEnabled(uint32(a.SoundCntL), 15); leftEnabled {
+		if leftEnabled := BitEnabled(uint32(cntL), 15); leftEnabled {
 			psgL = psgL + ch4Sample
 		}
 
-		if rightEnabled := BitEnabled(uint32(a.SoundCntL), 11); rightEnabled {
+		if rightEnabled := BitEnabled(uint32(cntL), 11); rightEnabled {
 			psgR = psgR + ch4Sample
 		}
 
-		psgL *= volLut[(a.SoundCntL>>4)&7]
-		psgR *= volLut[(a.SoundCntL>>0)&7]
+		psgL *= volLut[(cntL>>4)&7]
+		psgR *= volLut[(cntL>>0)&7]
 
 		psgL >>= rshLut[(a.SoundCntH)&3]
 		psgR >>= rshLut[(a.SoundCntH)&3]

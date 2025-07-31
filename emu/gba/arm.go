@@ -150,24 +150,21 @@ func (cpu *Cpu) GetOp2(opcode uint32) (uint32, bool) {
 
 func (cpu *Cpu) logical(alu *Alu) {
 
-	var oper func(uint32, uint32) uint32
-
-	switch alu.Inst {
-	case AND:
-		oper = func(u1, u2 uint32) uint32 { return u1 & u2 }
-	case EOR:
-		oper = func(u1, u2 uint32) uint32 { return u1 ^ u2 }
-	case ORR:
-		oper = func(u1, u2 uint32) uint32 { return u1 | u2 }
-	case MOV:
-		oper = func(u1, u2 uint32) uint32 { return u2 }
-	case MVN:
-		oper = func(u1, u2 uint32) uint32 { return ^u2 }
-	case BIC:
-		oper = func(u1, u2 uint32) uint32 { return u1 &^ u2 }
-	}
-
-	res := oper(alu.RnValue, alu.Op2)
+    var res uint32
+    switch alu.Inst {
+    case AND:
+        res = alu.RnValue & alu.Op2
+    case EOR:
+        res = alu.RnValue ^ alu.Op2
+    case ORR:
+        res = alu.RnValue | alu.Op2
+    case MOV:
+        res = alu.Op2
+    case MVN:
+        res = ^alu.Op2
+    case BIC:
+        res = alu.RnValue &^ alu.Op2
+    }
 
 	cpu.Reg.R[alu.Rd] = res
 
@@ -176,31 +173,21 @@ func (cpu *Cpu) logical(alu *Alu) {
 
 func (cpu *Cpu) arithmetic(alu *Alu) {
 
-	var oper func(uint64, uint64, uint64) uint64
-
-	switch alu.Inst {
-	case ADD:
-		oper = func(u1, u2, u3 uint64) uint64 { return u1 + u2 }
-	case ADC:
-		oper = func(u1, u2, u3 uint64) uint64 { return u1 + u2 + u3 }
-	case SUB:
-		oper = func(u1, u2, u3 uint64) uint64 { return u1 - u2 }
-	case SBC:
-		oper = func(u1, u2, u3 uint64) uint64 { return u1 - u2 + u3 - 1 }
-	case RSB:
-		oper = func(u1, u2, u3 uint64) uint64 { return u2 - u1 }
-	case RSC:
-		oper = func(u1, u2, u3 uint64) uint64 { return u2 - u1 + u3 - 1 }
-	}
-
 	carry := uint64(0)
 	if alu.Carry {
 		carry = 1
 	}
 
-	var res uint64
+    var res uint64
 
-	res = oper(uint64(alu.RnValue), uint64(alu.Op2), carry)
+    switch alu.Inst {
+    case ADD: res = uint64(alu.RnValue) + uint64(alu.Op2)
+    case ADC: res = uint64(alu.RnValue) + uint64(alu.Op2) + carry
+    case SUB: res = uint64(alu.RnValue) - uint64(alu.Op2)
+    case SBC: res = uint64(alu.RnValue) - uint64(alu.Op2) + carry - 1
+    case RSB: res = uint64(alu.Op2) - uint64(alu.RnValue)
+    case RSC: res = uint64(alu.Op2) - uint64(alu.RnValue) + carry - 1
+    }
 
 	cpu.Reg.R[alu.Rd] = uint32(res)
 
@@ -209,20 +196,13 @@ func (cpu *Cpu) arithmetic(alu *Alu) {
 
 func (cpu *Cpu) test(alu *Alu) {
 
-	var oper func(uint64, uint64) uint64
-
-	switch alu.Inst {
-	case TST:
-		oper = func(u1, u2 uint64) uint64 { return u1 & u2 }
-	case TEQ:
-		oper = func(u1, u2 uint64) uint64 { return u1 ^ u2 }
-	case CMP:
-		oper = func(u1, u2 uint64) uint64 { return u1 - u2 }
-	case CMN:
-		oper = func(u1, u2 uint64) uint64 { return u1 + u2 }
-	}
-
-	res := oper(uint64(alu.RnValue), uint64(alu.Op2))
+    var res uint64
+    switch alu.Inst {
+    case TST: res = uint64(alu.RnValue) & uint64(alu.Op2)
+    case TEQ: res = uint64(alu.RnValue) ^ uint64(alu.Op2)
+    case CMP: res = uint64(alu.RnValue) - uint64(alu.Op2)
+    case CMN: res = uint64(alu.RnValue) + uint64(alu.Op2)
+    }
 
 	//incPc := true
 

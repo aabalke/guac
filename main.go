@@ -12,6 +12,7 @@ import (
 
 	"github.com/aabalke/guac/config"
 	"github.com/hajimehoshi/ebiten/v2"
+    //_ "github.com/silbinarywolf/preferdiscretegpu" no profiler change
 
 	"os"
 	"runtime/pprof"
@@ -43,7 +44,7 @@ func main() {
 
 		pprof.StartCPUProfile(f)
 
-		ebiten.SetTPS(400)
+		ebiten.SetTPS(480)
 	}
 
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)

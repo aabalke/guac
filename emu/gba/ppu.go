@@ -13,6 +13,9 @@ type PPU struct {
 	Backgrounds [4]Background
 	Windows     Windows
 	Blend       Blend
+
+    BackgroundPriorities [4][]uint32
+    ObjectPriorities [4][]uint32
 }
 
 type Dispcnt struct {
@@ -33,7 +36,9 @@ type Dispcnt struct {
 type Blend struct {
 	Mode          uint32
 	a, b          [6]bool
-	aEv, bEv, yEv float32
+	//aEv, bEv, yEv float32
+	aEv, bEv, yEv uint32
+    BlendPalettes [SCREEN_WIDTH]BlendPalettes
 }
 
 type Windows struct {
@@ -66,6 +71,7 @@ type Background struct {
 	XOffset, YOffset   uint32
 	aXOffset, aYOffset uint32
 	Affine             bool
+    QuadXShift, QuadYShift uint32
 
 	//PbCalc, PdCalc float64
 	OutX, OutY float64
@@ -111,6 +117,8 @@ func (p *PPU) UpdatePPU(addr uint32, v uint32) {
 		p.Dispcnt.OneDimensional = utils.BitEnabled(v, 6)
 		p.Dispcnt.ForcedBlank = utils.BitEnabled(v, 7)
 
+        p.updateBGPriorities()
+
 	case 0x1:
 		//p.Dispcnt.DisplayBg[0] = utils.BitEnabled(v, 0)
 		//p.Dispcnt.DisplayBg[1] = utils.BitEnabled(v, 1)
@@ -150,13 +158,16 @@ func (p *PPU) UpdatePPU(addr uint32, v uint32) {
 		p.Blend.b[5] = utils.BitEnabled(v, 5)
 
 	case 0x52:
-		p.Blend.aEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
+		//p.Blend.aEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
+		p.Blend.aEv = min(16, utils.GetVarData(v, 0, 4))
 
 	case 0x53:
-		p.Blend.bEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
+		p.Blend.bEv = min(16, utils.GetVarData(v, 0, 4))
+		//p.Blend.bEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
 
 	case 0x54:
-		p.Blend.yEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
+		p.Blend.yEv = min(16, utils.GetVarData(v, 0, 4))
+		//p.Blend.yEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
 
 	}
 }
@@ -359,6 +370,7 @@ func (p *PPU) UpdateOAM(relAddr uint32) {
 		obj.Priority = utils.GetVarData(attr, 2, 3)
 		obj.Palette = utils.GetVarData(attr, 4, 7)
 	}
+
 }
 
 func UpdateAffineParams(obj *Object, m *Memory) {
@@ -377,6 +389,7 @@ func (p *PPU) UpdateBackgrounds(addr, v uint32) {
 		p.Backgrounds[0].CharBaseBlock = utils.GetVarData(v, 2, 3) * 0x4000
 		p.Backgrounds[0].Mosaic = utils.BitEnabled(v, 6)
 		p.Backgrounds[0].Palette256 = utils.BitEnabled(v, 7)
+        p.updateBGPriorities()
 	case 0x09:
 		p.Backgrounds[0].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
 		p.Backgrounds[0].AffineWrap = utils.BitEnabled(v, 5)
@@ -387,6 +400,7 @@ func (p *PPU) UpdateBackgrounds(addr, v uint32) {
 		p.Backgrounds[1].CharBaseBlock = utils.GetVarData(v, 2, 3) * 0x4000
 		p.Backgrounds[1].Mosaic = utils.BitEnabled(v, 6)
 		p.Backgrounds[1].Palette256 = utils.BitEnabled(v, 7)
+        p.updateBGPriorities()
 	case 0x0B:
 		p.Backgrounds[1].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
 		p.Backgrounds[1].AffineWrap = utils.BitEnabled(v, 5)
@@ -397,6 +411,7 @@ func (p *PPU) UpdateBackgrounds(addr, v uint32) {
 		p.Backgrounds[2].CharBaseBlock = utils.GetVarData(v, 2, 3) * 0x4000
 		p.Backgrounds[2].Mosaic = utils.BitEnabled(v, 6)
 		p.Backgrounds[2].Palette256 = utils.BitEnabled(v, 7)
+        p.updateBGPriorities()
 	case 0x0D:
 		p.Backgrounds[2].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
 		p.Backgrounds[2].AffineWrap = utils.BitEnabled(v, 5)
@@ -407,6 +422,7 @@ func (p *PPU) UpdateBackgrounds(addr, v uint32) {
 		p.Backgrounds[3].CharBaseBlock = utils.GetVarData(v, 2, 3) * 0x4000
 		p.Backgrounds[3].Mosaic = utils.BitEnabled(v, 6)
 		p.Backgrounds[3].Palette256 = utils.BitEnabled(v, 7)
+        p.updateBGPriorities()
 	case 0x0F:
 		p.Backgrounds[3].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
 		p.Backgrounds[3].AffineWrap = utils.BitEnabled(v, 5)
@@ -600,18 +616,24 @@ func (bg *Background) setSize() {
 			panic("PROHIBITTED AFFINE BG SIZE")
 		}
 
+
 		return
 	}
+
+    bg.QuadXShift = 10 //- 5 // map_x / 32 (>> 5) * quadX (<< 10)
+    bg.QuadYShift = 10 //- 5// map_y / 32 (>> 5) * quadY (<< 10)
 
 	switch bg.Size {
 	case 0:
 		bg.W, bg.H = 32, 32
+        bg.QuadYShift = 10
 	case 1:
 		bg.W, bg.H = 64, 32
 	case 2:
 		bg.W, bg.H = 32, 64
 	case 3:
 		bg.W, bg.H = 64, 64
+        bg.QuadYShift += 1
 	default:
 		panic("PROHIBITTED BG SIZE")
 	}
@@ -660,4 +682,27 @@ func (obj *Object) setSize(shape, size uint32) {
 			obj.H, obj.W = 64, 32
 		}
 	}
+}
+
+func (p *PPU) updateBGPriorities() {
+
+	priorities := [4][]uint32{}
+	mode := p.gba.PPU.Dispcnt.Mode
+
+	for i := range 4 {
+
+		if mode == 1 && i > 2 {
+			continue
+		}
+		if mode == 2 && i < 2 {
+			continue
+		}
+
+		priority := p.Backgrounds[i].Priority
+
+		priorities[priority] = append(priorities[priority], uint32(i))
+	}
+
+    p.BackgroundPriorities = priorities
+
 }

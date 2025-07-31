@@ -83,7 +83,7 @@ func (gba *GBA) scanlineTileMode(y uint32) {
 
 	wg := sync.WaitGroup{}
 
-	bgPriorities := gba.getBgPriority(0)
+    bgPriorities := &gba.PPU.BackgroundPriorities
 	objPriorities := gba.getObjPriority(y, &gba.PPU.Objects)
 
 	dispcnt := &gba.PPU.Dispcnt
@@ -97,10 +97,7 @@ func (gba *GBA) scanlineTileMode(y uint32) {
 
 	renderPixel := func(x uint32) {
 
-		bldPal := NewBlendPalette(x, &gba.PPU.Blend)
-
-		index := (x + (y * SCREEN_WIDTH)) * 4
-
+        bldPal := &gba.PPU.Blend.BlendPalettes[x]
 		bldPal.reset(gba)
 
 		var objMode uint32
@@ -111,18 +108,19 @@ func (gba *GBA) scanlineTileMode(y uint32) {
 			// 0 is highest priority
 			decIdx := 3 - i
 
+
 			bgCount := len(bgPriorities[decIdx])
 			for j := range bgCount {
 
 				// need bgCount - 1 - j because of blends
 				bgIdx := bgPriorities[decIdx][bgCount-1-j]
 
-				bg := bgs[bgIdx]
+				bg := &bgs[bgIdx]
 				if bg.Invalid || !bg.Enabled {
 					continue
 				}
 
-				palData, ok, palZero := gba.background(x, y, bgIdx, &bg, wins)
+				palData, ok, palZero := gba.background(x, y, bgIdx, bg, wins)
 
 				if ok && !palZero {
 					bldPal.setBlendPalettes(palData, uint32(bgIdx), false, false)
@@ -158,7 +156,8 @@ func (gba *GBA) scanlineTileMode(y uint32) {
 		}
 
 		finalPalData := bldPal.blend(objMode, x, y, wins, inObjWindow)
-		gba.applyColor(finalPalData, uint32(index))
+		index := uint32(x + (y * SCREEN_WIDTH)) * 4
+		gba.applyColor(finalPalData, index)
 	}
 
 	for i := range WAIT_GROUPS {
@@ -194,7 +193,7 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 
 	renderPixel := func(x uint32) {
 
-		bldPal := NewBlendPalette(x, &gba.PPU.Blend)
+        bldPal := &gba.PPU.Blend.BlendPalettes[x]
 		index := (x + (y * SCREEN_WIDTH)) * 4
 		bldPal.reset(gba)
 
@@ -329,11 +328,11 @@ func (gba *GBA) object(x, y uint32, obj *Object, wins *Windows, dispcnt *Dispcnt
 	return palData, ok, palZero, obj
 }
 
-func outObjectBound(obj *Object, xIdx, yIdx int) bool {
+func outOfBound(h, w, xIdx, yIdx int) bool {
 	t := yIdx < 0
-	b := yIdx-int(obj.H) >= 0
+	b := yIdx-h >= 0
 	l := xIdx < 0
-	r := xIdx-int(obj.W) >= 0
+	r := xIdx-w >= 0
 	return t || b || l || r
 }
 
@@ -368,17 +367,17 @@ func (gba *GBA) setObjectAffinePixel(obj *Object, x, y uint32) (uint32, bool, bo
 	xIdx = int(obj.Pa*xOrigin+obj.Pb*yOrigin) + (int(obj.W) / 2)
 	yIdx = int(obj.Pc*xOrigin+obj.Pd*yOrigin) + (int(obj.H) / 2)
 
-	if outObjectBound(obj, xIdx, yIdx) {
+	if outOfBound(int(obj.H), int(obj.W), xIdx, yIdx) {
 		return 0, false, false
 	}
 
 	enTileX, enTileY, inTileX, inTileY := getPositions(obj, uint32(xIdx), uint32(yIdx))
 
+    readVRAM := mem.readRegions[0x6]
 	addr := getTileAddr(obj, enTileX, enTileY, inTileX, inTileY)
+    tileData := uint32(readVRAM(mem, addr))
 
-	tileData := mem.Read16(addr)
-
-	palIdx, palData := getPaletteData(gba, obj.Palette256, obj.Palette, tileData, uint32(inTileX))
+	palIdx, palData := getPaletteData(gba, obj.Palette256, true, obj.Palette, tileData, uint32(inTileX))
 
 	return palData, !(palIdx == 0), palIdx == 0
 }
@@ -386,56 +385,27 @@ func (gba *GBA) setObjectAffinePixel(obj *Object, x, y uint32) (uint32, bool, bo
 func (gba *GBA) outBoundsAffine(obj *Object, x, y uint32) bool {
 
 	const (
-		MAX_X = 512
-		MAX_Y = 256
+		MAX_X_MASK = 512 - 1
+		MAX_Y_MASK = 256 - 1
 	)
 
-	if !obj.DoubleSize {
+    dH := obj.H
+    dW := obj.W
 
-		t := obj.Y
-		b := (obj.Y + obj.H) % MAX_Y
-		l := obj.X
-		r := (obj.X + obj.W) % MAX_X
+    if obj.DoubleSize {
+        dH <<= 1
+        dW <<= 1
+    }
 
-		yWrapped := t > b
-		xWrapped := l > r
+    t := obj.Y
+    b := (obj.Y + dH) & MAX_Y_MASK
+    l := obj.X
+    r := (obj.X + dW) & MAX_X_MASK
 
-		yWrappedInBounds := !yWrapped && (y >= t && y < b)
-		yUnwrappedInBounds := yWrapped && (y >= t || y < b)
-		xWrappedInBounds := !xWrapped && (x >= l && x < r)
-		xUnwrappedInBounds := xWrapped && (x >= l || x < r)
-		if (yWrappedInBounds || yUnwrappedInBounds) && (xWrappedInBounds || xUnwrappedInBounds) {
-			return false
-		}
+    inY := (t <= b && y >= t && y < b) || (t > b && (y >= t || y < b))
+    inX := (l <= r && x >= l && x < r) || (l > r && (x >= l || x < r))
 
-		return true
-	}
-
-	// obj.Y is double Sized Y value already, have to adj because of
-
-	dY := (obj.Y)
-	dH := obj.H * 2
-	dX := (obj.X)
-	dW := obj.W * 2
-
-	t := dY
-	b := (dY + dH) % MAX_Y
-	l := dX
-	r := (dX + dW) % MAX_X
-
-	yWrapped := t > b
-	xWrapped := l > r
-
-	yWrappedInBounds := !yWrapped && (y >= t && y < b)
-	yUnwrappedInBounds := yWrapped && (y >= t || y < b)
-
-	xWrappedInBounds := !xWrapped && (x >= l && x < r)
-	xUnwrappedInBounds := xWrapped && (x >= l || x < r)
-	if (yWrappedInBounds || yUnwrappedInBounds) && (xWrappedInBounds || xUnwrappedInBounds) {
-		return false
-	}
-
-	return true
+    return !(inX && inY)
 }
 
 func (gba *GBA) setObjectPixel(obj *Object, x, y uint32) (uint32, bool, bool) {
@@ -453,7 +423,7 @@ func (gba *GBA) setObjectPixel(obj *Object, x, y uint32) (uint32, bool, bool) {
 		xIdx += 512 // i believe 512 is max
 	}
 
-	if outObjectBound(obj, xIdx, yIdx) {
+	if outOfBound(int(obj.H), int(obj.W), xIdx, yIdx) {
 		// blank color
 		//gba.applyColor(0, (x + (y * SCREEN_WIDTH))*4)
 		return 0, false, false
@@ -465,7 +435,7 @@ func (gba *GBA) setObjectPixel(obj *Object, x, y uint32) (uint32, bool, bool) {
 
 	tileData := mem.Read16(addr)
 
-	palIdx, palData := getPaletteData(gba, obj.Palette256, obj.Palette, tileData, uint32(inTileX))
+	palIdx, palData := getPaletteData(gba, obj.Palette256, true, obj.Palette, tileData, uint32(inTileX))
 
 	return palData, true, palIdx == 0
 
@@ -527,43 +497,24 @@ func getTileAddr(obj *Object, enTileX, enTileY, inTileX, inTileY uint32) uint32 
 	return uint32(tileAddr) + inTileIdx
 }
 
-func getPaletteData(gba *GBA, pal256 bool, pal, tileData, inTileX uint32) (uint32, uint32) {
+func getPaletteData(gba *GBA, pal256, obj bool, pal, tileData, inTileX uint32) (uint32, uint32) {
 
-	var palIdx uint32
 	if pal256 {
-		palIdx = tileData & 0xFF
-		pal = 0
-	} else {
-		// 4 is bit depth
-		palIdx = (tileData >> (4 * (inTileX & 1))) & 0b1111
-	}
+        palData := gba.getPalette(tileData, 0, obj)
+        return tileData, palData
+    }
 
-	palData := gba.getPalette(uint32(palIdx), pal, true)
+    // 4 is bit depth
 
+    if inTileX & 1 == 1 {
+        palIdx := (tileData >> 4) & 0b1111
+        palData := gba.getPalette(palIdx, pal, obj)
+        return palIdx, palData
+    }
+
+    palIdx := tileData & 0b1111
+	palData := gba.getPalette(palIdx, pal, obj)
 	return palIdx, palData
-}
-
-func (gba *GBA) getBgPriority(mode uint32) [4][]uint32 {
-
-	mem := &gba.Mem
-	priorities := [4][]uint32{}
-
-	for i := range 4 {
-
-		if mode == 1 && i > 2 {
-			continue
-		}
-		if mode == 2 && i < 2 {
-			continue
-		}
-
-		priority := mem.IO[0x8+(i*2)] & 0b11
-
-		//priority := mem.ReadIODirect(0x8 + uint32(i * 0x2), 2) & 0b11
-		priorities[priority] = append(priorities[priority], uint32(i))
-	}
-
-	return priorities
 }
 
 func (gba *GBA) getObjPriority(y uint32, objects *[128]Object) [4][]uint32 {
@@ -652,10 +603,12 @@ func windowPixelAllowed(idx, x, y uint32, wins *Windows) bool {
 		return true
 	}
 
-	for _, win := range []Window{wins.Win0, wins.Win1} {
-		if win.Enabled && inWindow(x, y, win.L, win.R, win.T, win.B) {
-			return win.InBg[idx]
-		}
+	if wins.Win0.Enabled && inWindow(x, y, wins.Win0.L, wins.Win0.R, wins.Win0.T, wins.Win0.B) {
+		return wins.Win0.InBg[idx]
+	}
+
+	if wins.Win1.Enabled && inWindow(x, y, wins.Win1.L, wins.Win1.R, wins.Win1.T, wins.Win1.B) {
+		return wins.Win1.InBg[idx]
 	}
 
 	return wins.OutBg[idx]
@@ -663,14 +616,20 @@ func windowPixelAllowed(idx, x, y uint32, wins *Windows) bool {
 
 func windowObjPixelAllowed(x, y uint32, wins *Windows) bool {
 
+    if !wins.Enabled {
+        return true
+    }
+
 	if !wins.Win0.Enabled && !wins.Win1.Enabled {
 		return true
 	}
 
-	for _, win := range []Window{wins.Win0, wins.Win1} {
-		if win.Enabled && inWindow(x, y, win.L, win.R, win.T, win.B) {
-			return win.InObj
-		}
+	if wins.Win0.Enabled && inWindow(x, y, wins.Win0.L, wins.Win0.R, wins.Win0.T, wins.Win0.B) {
+		return wins.Win0.InObj
+	}
+
+	if wins.Win1.Enabled && inWindow(x, y, wins.Win1.L, wins.Win1.R, wins.Win1.T, wins.Win1.B) {
+		return wins.Win1.InObj
 	}
 
 	return wins.OutObj
@@ -678,14 +637,20 @@ func windowObjPixelAllowed(x, y uint32, wins *Windows) bool {
 
 func windowBldPixelAllowed(x, y uint32, wins *Windows, inObjWindow bool) bool {
 
+    if !wins.Enabled {
+        return true
+    }
+
 	if !wins.Win0.Enabled && !wins.Win1.Enabled && !wins.WinObj.Enabled {
 		return true
 	}
 
-	for _, win := range []Window{wins.Win0, wins.Win1} {
-		if win.Enabled && inWindow(x, y, win.L, win.R, win.T, win.B) {
-			return win.InBld
-		}
+	if wins.Win0.Enabled && inWindow(x, y, wins.Win0.L, wins.Win0.R, wins.Win0.T, wins.Win0.B) {
+		return wins.Win0.InBld
+	}
+
+	if wins.Win1.Enabled && inWindow(x, y, wins.Win1.L, wins.Win1.R, wins.Win1.T, wins.Win1.B) {
+		return wins.Win1.InBld
 	}
 
 	if wins.WinObj.Enabled && inObjWindow {
@@ -768,27 +733,22 @@ func (gba *GBA) setBackgroundPixel(bg *Background, x, y uint32) (uint32, bool, b
 	xIdx := (x + bg.XOffset) & ((bg.W * 8) - 1)
 	yIdx := (y + bg.YOffset) & ((bg.H * 8) - 1)
 
-	//tileX := uint32(xIdx / 8) % (bg.W)
-	//tileY := uint32(yIdx / 8) % (bg.H)
-
 	mem := &gba.Mem
+    readVRAM := mem.readRegions[0x6]
 
-	//pitch := bg.W
-	//sbb := (tileY/32) * (pitch/32) + (tileX/32)
-	//mapIdx := (sbb * 1024 + (tileY %32) * 32 + (tileX %32)) * 2
-
-	map_x := int((xIdx / 8) % (bg.W))
-	map_y := int((yIdx / 8) % (bg.H))
-	quad_x := 32 * 32
-	quad_y := 32 * 32
+	map_x := (xIdx / 8) & (bg.W - 1)//% (bg.W) all w and h values are multi of 2
+	map_y := (yIdx / 8) & (bg.H - 1)//% (bg.H)
+	quad_x := uint32(1024) //32 * 32
+	quad_y := uint32(1024) //32 * 32
 	if bg.Size == 3 {
-		quad_y *= 2
+		quad_y = 2048
 	}
-	mapIdx := (map_y/32)*quad_y + (map_x/32)*quad_x + (map_y%32)*32 + (map_x % 32)
+	mapIdx := (map_y/32)*quad_y + (map_x/32)*quad_x + (map_y & 31)*32 + (map_x & 31)
+    // & 31 == % 32
 
-	mapAddr := 0x600_0000 + bg.ScreenBaseBlock + uint32(mapIdx)*2
+	mapAddr := 0x600_0000 + bg.ScreenBaseBlock + mapIdx * 2
 
-	screenData := mem.Read16(mapAddr)
+    screenData := uint32(readVRAM(mem, mapAddr + 1)) << 8 | uint32(readVRAM(mem, mapAddr))
 
 	tileIdx := utils.GetVarData(screenData, 0, 9)
 
@@ -801,7 +761,6 @@ func (gba *GBA) setBackgroundPixel(bg *Background, x, y uint32) (uint32, bool, b
 		return 0, false, false
 	}
 
-	palette := utils.GetVarData(screenData, 12, 15)
 	inTileX, inTileY := getPositionsBg(screenData, xIdx, yIdx)
 
 	var inTileIdx uint32
@@ -812,23 +771,10 @@ func (gba *GBA) setBackgroundPixel(bg *Background, x, y uint32) (uint32, bool, b
 	}
 
 	addr := tileAddr + inTileIdx
+    tileData := uint32(readVRAM(mem, addr))
 
-	tileData := mem.Read8(addr)
-
-	var palIdx uint32
-	if bg.Palette256 {
-		palIdx = tileData & 0xFF
-		palette = 0
-	} else {
-		if inTileX%2 == 0 {
-			palIdx = tileData & 0b1111
-		} else {
-			bitDepth := uint32(4)
-			palIdx = (tileData >> uint32(bitDepth)) & 0b1111
-		}
-	}
-
-	palData := gba.getPalette(uint32(palIdx), palette, false)
+	palette := utils.GetVarData(screenData, 12, 15)
+	palIdx, palData := getPaletteData(gba, bg.Palette256, false, palette, tileData, uint32(inTileX))
 
 	return palData, true, palIdx == 0
 }
@@ -849,7 +795,6 @@ func getPositionsBg(screenData, xIdx, yIdx uint32) (uint32, uint32) {
 }
 
 func (gba *GBA) getPalette(palIdx uint32, paletteNum uint32, obj bool) uint32 {
-	pram := &gba.Mem.PRAM
 
 	addr := (paletteNum << 5) + palIdx<<1
 
@@ -857,7 +802,7 @@ func (gba *GBA) getPalette(palIdx uint32, paletteNum uint32, obj bool) uint32 {
 		addr += 0x200
 	}
 
-	return uint32(pram[addr]) | uint32(pram[addr+1])<<8
+    return uint32(gba.Mem.PRAM[addr >> 1])
 }
 
 func (gba *GBA) applyColor(data, i uint32) {
@@ -888,19 +833,11 @@ type BlendPalettes struct {
 	APalette       uint32
 	BPalette       uint32
 	hasA, hasB     bool
-
 	targetATop bool
-
-	inObjWin      bool
-	objOutPalette uint32
-	objInPalette  uint32
-}
-
-func NewBlendPalette(i uint32, bld *Blend) *BlendPalettes {
-	return &BlendPalettes{Bld: bld}
 }
 
 func (bp *BlendPalettes) reset(gba *GBA) {
+    bp.Bld = &gba.PPU.Blend
 	bp.NoBlendPalette = 0
 	bp.APalette = 0
 	bp.BPalette = 0
@@ -996,16 +933,16 @@ func (bp *BlendPalettes) alphaBlend() uint32 {
 		return bp.NoBlendPalette
 	}
 
-	rA := float32((bp.APalette) & 0x1F)
-	gA := float32((bp.APalette >> 5) & 0x1F)
-	bA := float32((bp.APalette >> 10) & 0x1F)
-	rB := float32((bp.BPalette) & 0x1F)
-	gB := float32((bp.BPalette >> 5) & 0x1F)
-	bB := float32((bp.BPalette >> 10) & 0x1F)
+	rA := (bp.APalette) & 0x1F
+	gA := (bp.APalette >> 5) & 0x1F
+	bA := (bp.APalette >> 10) & 0x1F
+	rB := (bp.BPalette) & 0x1F
+	gB := (bp.BPalette >> 5) & 0x1F
+	bB := (bp.BPalette >> 10) & 0x1F
 
-	blend := func(a, b float32) uint32 {
+	blend := func(a, b uint32) uint32 {
 		val := a*bp.Bld.aEv + b*bp.Bld.bEv
-		return uint32(min(31, val))
+		return min(31, val >> 4)
 	}
 	r := blend(rA, rB)
 	g := blend(gA, gB)
@@ -1020,19 +957,19 @@ func (bp *BlendPalettes) grayscaleBlend(white bool) uint32 {
 		return bp.NoBlendPalette
 	}
 
-	rA := float32((bp.APalette) & 0x1F)
-	gA := float32((bp.APalette >> 5) & 0x1F)
-	bA := float32((bp.APalette >> 10) & 0x1F)
+	rA := (bp.APalette) & 0x1F
+	gA := (bp.APalette >> 5) & 0x1F
+	bA := (bp.APalette >> 10) & 0x1F
 
-	blend := func(v float32) uint32 {
+	blend := func(v uint32) uint32 {
 
 		if white {
-			v += (31 - v) * bp.Bld.yEv
+			v += ((31 << 4) - v) * bp.Bld.yEv
 		} else {
 			v -= v * bp.Bld.yEv
 		}
 
-		return uint32(min(31, v))
+		return min(31, v >> 4)
 	}
 
 	r := blend(rA)

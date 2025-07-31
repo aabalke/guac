@@ -43,8 +43,8 @@ func NewGame(flags Flags) *Game {
 
 	g := &Game{
 		flags:   flags,
-		menuCtx: audio.NewContext(SND_FREQUENCY),
-		emuCtx:  NewAudioContext(),
+		//menuCtx: audio.NewContext(SND_FREQUENCY),
+		//emuCtx:  NewAudioContext(),
 	}
 
 	switch g.flags.Type {

@@ -41,6 +41,8 @@ type GBA struct {
 	AccCycles                          uint32
 	Keypad                             Keypad
 
+    vsyncAddr uint32
+
 	Pixels []byte
 	Image  *ebiten.Image
 
@@ -92,6 +94,17 @@ func (gba *GBA) Update() {
 		}
 
 		gba.Tick(uint32(cycles))
+
+
+        if gba.vsyncAddr != 0 && r[PC] == gba.vsyncAddr {
+            vblRaised := gba.Irq.IdleIrq & 1 == 1
+            vblHandled := gba.Irq.IF & 1 != 1
+            if (!(vblRaised && vblHandled)) {
+                gba.Halted = true
+            }
+
+            gba.Irq.IdleIrq = gba.Irq.IF
+        }
 
 		// irq has to be at end (count up tests)
 		gba.Irq.checkIRQ()
@@ -173,20 +186,9 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba.LoadBios()
 	gba.SoftReset()
 	gba.LoadGame(path)
+    gba.SetIdleAddr()
 
 	return &gba
-}
-
-func (gba *GBA) GetSize() (int32, int32) {
-	return SCREEN_HEIGHT, SCREEN_WIDTH
-}
-
-func (gba *GBA) GetPixels() []byte {
-	return gba.Pixels
-}
-
-func (gba *GBA) GetDebugPixels() []byte {
-	return []byte{}
 }
 
 func (gba *GBA) ToggleMute() bool {

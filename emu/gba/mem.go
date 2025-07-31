@@ -17,7 +17,8 @@ type Memory struct {
 	WRAM1 [0x40000]uint8
 	WRAM2 [0x8000]uint8
 
-	PRAM [0x400]uint8
+	//PRAM [0x400]uint8
+	PRAM [0x400 / 2]uint16
 	VRAM [0x18000]uint8
 	OAM  [0x400]uint8
 	IO   [0x400]uint8
@@ -84,18 +85,27 @@ func (m *Memory) initWriteRegions() {
 	}
 
 	m.writeRegions[0x5] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
+
 		relative := (addr - 0x0500_0000) & (0x400 - 1)
 
-		if byteWrite {
-			m.PRAM[relative] = v
-			if relative+1 >= uint32(len(m.PRAM)) {
-				return
-			}
+        if relative & 1 == 1 {
+            m.PRAM[relative >> 1] &= 0xFF
+            m.PRAM[relative >> 1] |= uint16(v) << 8
+            return
+        }
 
-			m.PRAM[relative+1] = v
-			return
-		}
-		m.PRAM[relative] = v
+		//if byteWrite {
+		//	m.PRAM[relative] = v
+		//	if relative+1 >= uint32(len(m.PRAM)) {
+		//		return
+		//	}
+
+		//	m.PRAM[relative+1] = v
+		//	return
+		//}
+
+        m.PRAM[relative >> 1] &^= 0xFF
+        m.PRAM[relative >> 1] |= uint16(v)
 	}
 
 	m.writeRegions[0x6] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
@@ -194,7 +204,12 @@ func (m *Memory) initReadRegions() {
 	}
 
 	m.readRegions[0x5] = func(m *Memory, addr uint32) uint8 {
-		return m.PRAM[addr&0x3FF]
+
+        if addr & 1 == 1 {
+            return uint8(m.PRAM[addr & 0x3FF >> 1] >> 8)
+        }
+
+		return uint8(m.PRAM[addr&0x3FF >> 1])
 	}
 
 	m.readRegions[0x6] = func(m *Memory, addr uint32) uint8 {

@@ -202,42 +202,25 @@ func (dma *DMA) transfer(_ bool) {
 		dma.SrcAdj = DMA_ADJ_INC
 	}
 
-	switch {
-	case dma.isWord && dma.DstAdj == DMA_ADJ_INC:
-		dstOffset = 4
-	case !dma.isWord && dma.DstAdj == DMA_ADJ_INC:
-		dstOffset = 2
-	case dma.isWord && dma.DstAdj == DMA_ADJ_DEC:
-		dstOffset = -4
-	case !dma.isWord && dma.DstAdj == DMA_ADJ_DEC:
-		dstOffset = -2
-	case dma.isWord && dma.DstAdj == DMA_ADJ_RES:
-		dstOffset = 4
-	case !dma.isWord && dma.DstAdj == DMA_ADJ_RES:
-		dstOffset = 2
-	}
+    ofs := int64(2)
+    if dma.isWord {
+        ofs = 4
+    }
 
-	switch {
-	case dma.isWord && dma.SrcAdj == DMA_ADJ_INC:
-		srcOffset = 4
-	case !dma.isWord && dma.SrcAdj == DMA_ADJ_INC:
-		srcOffset = 2
-	case dma.isWord && dma.SrcAdj == DMA_ADJ_DEC:
-		srcOffset = -4
-	case !dma.isWord && dma.SrcAdj == DMA_ADJ_DEC:
-		srcOffset = -2
-	case dma.SrcAdj == DMA_ADJ_RES:
-		panic("DMA SRC SET TO PROHIBITTED")
-	}
+    switch dma.DstAdj {
+    case DMA_ADJ_INC, DMA_ADJ_RES: dstOffset = ofs
+    case DMA_ADJ_DEC: dstOffset = -ofs
+    }
+
+    switch dma.SrcAdj {
+    case DMA_ADJ_INC: srcOffset = ofs
+    case DMA_ADJ_DEC: srcOffset = -ofs
+    case DMA_ADJ_RES: panic("DMA SRC SET TO PROHIBITTED")
+    }
 
 	if fifo := (dma.Idx == 1 || dma.Idx == 2) && dma.Mode == DMA_MODE_REF; fifo {
-		panic("AH")
 		return
 	}
-
-	//prevActive := DMA_ACTIVE
-	//DMA_ACTIVE = dma.Idx
-	//DMA_PC = dma.Gba.Cpu.Reg.R[PC]
 
 	for i := uint32(0); i < count; i++ {
 

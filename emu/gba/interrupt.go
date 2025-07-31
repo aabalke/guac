@@ -4,6 +4,9 @@ type Irq struct {
 	Gba    *GBA
 	IF, IE uint16
 	IME    bool
+
+    IdleIrq uint16
+
 }
 
 func (s *Irq) WriteIME(v uint8) {

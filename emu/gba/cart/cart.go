@@ -2,7 +2,6 @@ package cart
 
 import (
 	"bufio"
-	"fmt"
 	"log"
 	"os"
 )
@@ -148,7 +147,6 @@ func (c *Cartridge) load() {
 	}
 
 	c.RomLength = uint32(len(buf))
-	fmt.Printf("LENGTH OF ROM IS %08X\n", len(buf))
 
 	for i := range len(buf) {
 		c.Rom[i] = uint8(buf[i])
