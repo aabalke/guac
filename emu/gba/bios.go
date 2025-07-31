@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gba/utils"
 )
-
-const SKIP_HLE = false
 
 //go:embed bios.bin
 var biosFile []byte
@@ -73,7 +72,7 @@ func (gba *GBA) LoadBios() {
 
 func (gba *GBA) SysCall(inst uint32) (int, bool) {
 
-    if SKIP_HLE {
+    if config.Conf.Gba.SkipHle {
         gba.exception(VEC_SWI, MODE_SWI)
         return 0, false
     }
@@ -178,96 +177,93 @@ func BGAffineSet(gba *GBA) int {
 	mem := &gba.Mem
 
 	i := r[2]
-	var ox, oy float64
-	var cx, cy float64
-	var sx, sy float64
-	var theta float64
 	offset, destination := r[0], r[1]
-	var a, b, c, d float64
-	var rx, ry float64
-	for ; i > 0; i-- {
-		// [ sx   0  0 ]   [ cos(theta)  -sin(theta)  0 ]   [ 1  0  cx - ox ]   [ A B rx ]
-		// [  0  sy  0 ] * [ sin(theta)   cos(theta)  0 ] * [ 0  1  cy - oy ] = [ C D ry ]
-		// [  0   0  1 ]   [     0            0       1 ]   [ 0  0     1    ]   [ 0 0  1 ]
+    for ; i > 0; i-- {
+        ox := int32(mem.Read32(offset))       // 24.8 fixed-point
+        oy := int32(mem.Read32(offset + 4))   // 24.8 fixed-point
+        cx := int32(uint16(mem.Read16(offset + 8))) << 8 // 8.8
+        cy := int32(uint16(mem.Read16(offset + 10))) << 8
+        sx := int32(uint16(mem.Read16(offset + 12)))     // 8.8
+        sy := int32(uint16(mem.Read16(offset + 14)))     // 8.8
+        angle := uint8(mem.Read16(offset + 16) >> 8)     // top byte only
+        offset += 20
 
-		ox = float64(mem.Read32(offset)) / 256
-		oy = float64(mem.Read32(offset+4)) / 256
-		cx = float64(uint16(mem.Read16(offset + 8)))
-		cy = float64(uint16(mem.Read16(offset + 10)))
-		sx = float64(uint16(mem.Read16(offset+12))) / 256
-		sy = float64(uint16(mem.Read16(offset+14))) / 256
-		theta = (float64(mem.Read16(offset+16)>>8) / 128) * math.Pi
-		offset += 20
+        cos := int32(cosTable[angle]) // 1.7 fixed
+        sin := int32(sinTable[angle]) // 1.7 fixed
 
-		// Rotation
-		a = math.Cos(theta)
-		d = a
-		b = math.Sin(theta)
-		c = b
+        // a = cos * sx >> 7 (1.7 * 8.8 = 9.15 >> 7 = 8.8)
+        a := (cos * int32(int16(sx))) >> 7
+        b := (-sin * int32(int16(sx))) >> 7
+        c := (sin * int32(int16(sy))) >> 7
+        d := (cos * int32(int16(sy))) >> 7
 
-		// Scale
-		a *= sx
-		b *= -sx
-		c *= sy
-		d *= sy
+        // rx = ox - (a*cx + b*cy) >> 8
+        // a, b are 8.8, cx, cy are 8.8 -> product is 16.16
+        acx := a * cx    // 16.16
+        bcy := b * cy
+        rx := ox - ((acx + bcy) >> 8)
 
-		// Translate
-		rx = ox - (a*cx + b*cy)
-		ry = oy - (c*cx + d*cy)
+        ccx := c * cx
+        dcy := d * cy
+        ry := oy - ((ccx + dcy) >> 8)
 
-		mem.Write16(destination, uint16(a*256))
-		mem.Write16(destination+2, uint16(b*256))
-		mem.Write16(destination+4, uint16(c*256))
-		mem.Write16(destination+6, uint16(d*256))
-		mem.Write32(destination+8, uint32(rx*256))
-		mem.Write32(destination+12, uint32(ry*256))
-		destination += 16
-	}
+        mem.Write16(destination,     uint16(a))             // a 8.8
+        mem.Write16(destination+2,   uint16(b))             // b 8.8
+        mem.Write16(destination+4,   uint16(c))             // c 8.8
+        mem.Write16(destination+6,   uint16(d))             // d 8.8
+        mem.Write32(destination+8,   uint32(rx))            // rx 24.8
+        mem.Write32(destination+12,  uint32(ry))            // ry 24.8
+        destination += 16
+    }
 
     return 36 + (int(i) * 19)
 }
 
-func ObjAffineSet(gba *GBA) int {
+var sinTable [256]int32 // 1.7 fixed-point: sin(x) * 128
+var cosTable [256]int32
 
+func InitTrig() {
+	for i := range 256 {
+		angle := float64(i) * 2 * math.Pi / 256
+		sinTable[i] = int32(math.Round(math.Sin(angle) * 128))
+		cosTable[i] = int32(math.Round(math.Cos(angle) * 128))
+	}
+}
+
+func ObjAffineSet(gba *GBA) int {
 
 	r := &gba.Cpu.Reg.R
 	mem := &gba.Mem
 
 	i := r[2]
-	var sx, sy float64
-	var theta float64
 	offset := r[0]
 	destination := r[1]
 	diff := r[3]
-	var a, b, c, d float64
-	for ; i > 0; i-- {
-		// [ sx   0 ]   [ cos(theta)  -sin(theta) ]   [ A B ]
-		// [  0  sy ] * [ sin(theta)   cos(theta) ] = [ C D ]
-		sx = float64(uint16(mem.Read16(offset))) / 256
-		sy = float64(uint16(mem.Read16(offset+2))) / 256
-		theta = (float64(uint16(mem.Read16(offset+4))>>8) / 128) * math.Pi
-		offset += 6
+    for ; i > 0; i-- {
+        sx := mem.Read16(offset)     // 8.8 fixed
+        sy := mem.Read16(offset+2)   // 8.8 fixed
+        angle := uint8(mem.Read16(offset+4) >> 8) // 0–255
+        offset += 6
 
-		// Rotation
-		a = math.Cos(theta)
-		d = a
-		b = math.Sin(theta)
-		c = b
+        cos := cosTable[angle] // 1.7 fixed-point
+        sin := sinTable[angle] // 1.7 fixed-point
 
-		// Scale
-		a *= sx
-		b *= -sx
-		c *= sy
-		d *= sy
+        // Multiply scale (8.8) with sin/cos (1.7) = 9.15 intermediate
+        // Shift back down to 8.8 (>>7) to write final 8.8 fixed-point
+        a := int32(int16(sx)) * cos >> 7
+        b := -int32(int16(sx)) * sin >> 7
+        c := int32(int16(sy)) * sin >> 7
+        d := int32(int16(sy)) * cos >> 7
 
-		mem.Write16(destination, uint16(a*256))
-		mem.Write16(destination+diff, uint16(b*256))
-		mem.Write16(destination+diff*2, uint16(c*256))
-		mem.Write16(destination+diff*3, uint16(d*256))
-		destination += diff * 4
-	}
+        mem.Write16(destination,     uint16(a))
+        mem.Write16(destination+diff,  uint16(b))
+        mem.Write16(destination+diff*2, uint16(c))
+        mem.Write16(destination+diff*3, uint16(d))
+        destination += diff * 4
+    }
 
     return 13 + (int(i) * 18)
+
 }
 
 //var IntrWaitReg Reg

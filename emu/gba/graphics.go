@@ -4,17 +4,11 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gba/utils"
 )
 
-var (
-	_ = fmt.Sprintf("")
-)
-
 const (
-	WAIT_GROUPS = 8
-	dx          = SCREEN_WIDTH / WAIT_GROUPS
-
 	MAX_HEIGHT = 256
 	MAX_WIDTH  = 512
 )
@@ -160,7 +154,16 @@ func (gba *GBA) scanlineTileMode(y uint32) {
 		gba.applyColor(finalPalData, index)
 	}
 
-	for i := range WAIT_GROUPS {
+    if config.Conf.Gba.Threads == 0 {
+        for j := range SCREEN_WIDTH {
+            renderPixel(uint32(j))
+        }
+        return
+    }
+
+    dx := SCREEN_WIDTH / config.Conf.Gba.Threads
+
+	for i := range config.Conf.Gba.Threads {
 
 		wg.Add(1)
 
@@ -290,7 +293,16 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 		gba.applyColor(finalPalData, uint32(index))
 	}
 
-	for i := range WAIT_GROUPS {
+    if config.Conf.Gba.Threads == 0 {
+        for j := range SCREEN_WIDTH {
+            renderPixel(uint32(j))
+        }
+        return
+    }
+
+    dx := SCREEN_WIDTH / config.Conf.Gba.Threads
+
+	for i := range config.Conf.Gba.Threads {
 
 		wg.Add(1)
 
@@ -500,8 +512,8 @@ func getTileAddr(obj *Object, enTileX, enTileY, inTileX, inTileY uint32) uint32 
 func getPaletteData(gba *GBA, pal256, obj bool, pal, tileData, inTileX uint32) (uint32, uint32) {
 
 	if pal256 {
-        palData := gba.getPalette(tileData, 0, obj)
-        return tileData, palData
+        palData := gba.getPalette(tileData & 0xFF, 0, obj)
+        return tileData & 0xFF, palData
     }
 
     // 4 is bit depth
@@ -801,6 +813,8 @@ func (gba *GBA) getPalette(palIdx uint32, paletteNum uint32, obj bool) uint32 {
 	if obj {
 		addr += 0x200
 	}
+
+    // error
 
     return uint32(gba.Mem.PRAM[addr >> 1])
 }

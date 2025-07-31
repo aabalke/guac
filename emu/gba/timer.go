@@ -45,8 +45,8 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
 		t.Elapsed += cycles
 
 		if freq := t.Freq; t.Elapsed >= freq {
-			increment = t.Elapsed / freq
-			t.Elapsed %= freq
+            increment = t.Elapsed / freq
+            t.Elapsed = t.Elapsed - increment * freq // %= freq
 		}
 	}
 

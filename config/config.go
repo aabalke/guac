@@ -38,6 +38,9 @@ type GbConfig struct {
 type GbaConfig struct {
 	KeyboardConfig   EmulatorKeyboardConfig   `toml:"keyboard"`
 	ControllerConfig EmulatorControllerConfig `toml:"controller"`
+
+    SkipHle bool `toml:"skip_hle"`
+    Threads int  `toml:"threads"`
 }
 
 type KeyboardConfig struct {

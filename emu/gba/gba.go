@@ -187,6 +187,7 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba.SoftReset()
 	gba.LoadGame(path)
     gba.SetIdleAddr()
+    InitTrig()
 
 	return &gba
 }
@@ -234,7 +235,10 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 	vcount := gba.Mem.IO[0x6]
 
 	prevFrameCycles := gba.AccCycles
-	gba.AccCycles = (gba.AccCycles + cycles) % CYCLES_FRAME
+	gba.AccCycles += cycles //% CYCLES_FRAME
+    if gba.AccCycles >= CYCLES_FRAME {
+        gba.AccCycles -=CYCLES_FRAME
+    }
 	currFrameCycles := gba.AccCycles
 
 	prevScanlineCycles := prevFrameCycles % CYCLES_SCANLINE
@@ -261,7 +265,14 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 
 		dispstat.SetHBlank(false)
 
-		vcount = (vcount + 1) % NUM_SCANLINES
+		//vcount = (vcount + 1) % NUM_SCANLINES
+
+        vcount++
+        if vcount == NUM_SCANLINES {
+            vcount = 0
+        }
+
+
 		gba.Mem.IO[0x6] = vcount
 
 		switch vcount {

@@ -59,6 +59,13 @@ down = [17]
 # GBA Configuration
 
 [gba]
+
+skip_hle = false
+
+# usually multiple of 2
+threads = 8
+
+
 [gba.keyboard]
 a = ["J"]
 b = ["K"]

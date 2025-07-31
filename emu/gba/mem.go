@@ -1,14 +1,9 @@
 package gba
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/aabalke/guac/emu/gba/utils"
-)
-
-var (
-	_ = fmt.Sprintf("")
 )
 
 type Memory struct {
@@ -727,36 +722,40 @@ func (m *Memory) Read8(addr uint32) uint32 {
 // Reading retrieves 8bit value from specified address, multiplied by 0101h (LDRH) or by 01010101h (LDR). Writing changes the 8bit value at the specified address only, being set to LSB of (source_data ROR (address*8)).
 func (m *Memory) Read16(addr uint32) uint32 {
 
-	if ok := CheckEeprom(m.GBA, addr); ok {
-		return uint32(m.GBA.Cartridge.EepromRead())
-	}
-
-	if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
+    switch {
+    case addr >= 0xE00_0000:
 		return uint32(m.Read(addr, false)) * 0x0101
-	}
+    case addr >= 0xD00_0000:
+        if ok := CheckEeprom(m.GBA, addr); ok {
+            return uint32(m.GBA.Cartridge.EepromRead())
+        }
 
-	if badRom := addr >= 0x800_0000 && addr < 0xE00_0000; badRom {
 		offset := (addr - 0x800_0000) & (0x200_0000 - 1)
 		if offset >= m.GBA.Cartridge.RomLength {
 			return m.ReadBadRom(addr, 2)
 		}
-	}
+
+    case addr >= 0x800_0000:
+		offset := (addr - 0x800_0000) & (0x200_0000 - 1)
+		if offset >= m.GBA.Cartridge.RomLength {
+			return m.ReadBadRom(addr, 2)
+		}
+    }
 
 	return uint32(m.Read(addr+1, false))<<8 | uint32(m.Read(addr, false))
 }
 
 func (m *Memory) Read32(addr uint32) uint32 {
 
-	if badRom := addr >= 0x800_0000 && addr < 0xE00_0000; badRom {
+    switch {
+    case addr >= 0xE00_0000:
+		return uint32(m.Read(addr, false)) * 0x01010101
+    case addr >= 0x800_0000:
 		offset := (addr - 0x800_0000) & (0x200_0000 - 1)
 		if offset >= m.GBA.Cartridge.RomLength {
 			return m.ReadBadRom(addr, 4)
 		}
-	}
-
-	if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
-		return uint32(m.Read(addr, false)) * 0x01010101
-	}
+    }
 
 	a := uint32(m.Read(addr+3, false))<<8 | uint32(m.Read(addr+2, false))
 	b := uint32(m.Read(addr+1, false))<<8 | uint32(m.Read(addr, false))
@@ -1046,20 +1045,21 @@ func (m *Memory) Write8(addr uint32, v uint8) {
 
 func (m *Memory) Write16(addr uint32, v uint16) {
 
-	if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
+    switch {
+    case addr >= 0xE00_0000:
 		if addr&1 == 1 {
 			v >>= 8
 		}
 
 		m.Write(addr, uint8(v), true)
 		return
-	}
-
-	if ok := CheckEeprom(m.GBA, addr); ok {
-		m.GBA.Save = true
-		m.GBA.Cartridge.EepromWrite(v)
-		return
-	}
+    case addr >= 0xD00_0000:
+        if ok := CheckEeprom(m.GBA, addr); ok {
+            m.GBA.Save = true
+            m.GBA.Cartridge.EepromWrite(v)
+            return
+        }
+    }
 
 	m.Write(addr, uint8(v), false)
 	m.Write(addr+1, uint8(v>>8), false)
@@ -1067,7 +1067,7 @@ func (m *Memory) Write16(addr uint32, v uint16) {
 
 func (m *Memory) Write32(addr uint32, v uint32) {
 
-	if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
+	if sram := addr >= 0xE00_0000; sram {
 		is := addr * 8
 		v, _, _ = utils.Ror(v, is, false, false, false)
 		m.Write(addr, uint8(v), false)

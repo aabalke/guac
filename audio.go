@@ -9,12 +9,12 @@ const (
 
 func NewAudioContext() *oto.Context {
 
-    return nil
+    //return nil
 
-	//c, err := oto.NewContext(SND_FREQUENCY, 2, 2, STREAM_LEN*3)
-	//if err != nil {
-	//	panic(err)
-	//}
+	c, err := oto.NewContext(SND_FREQUENCY, 2, 2, STREAM_LEN*3)
+	if err != nil {
+		panic(err)
+	}
 
-	//return c
+	return c
 }
