@@ -22,7 +22,7 @@ func (d *Debugger) print(i int) {
 	fmt.Printf("inst dec %d\n", uint32(i))
 	p("inst", uint32(i))
 
-	if d.Gba.Cpu.Reg.CPSR.GetFlag(FLAG_T) {
+	if d.Gba.Cpu.Reg.isThumb {
 		p("opcode", d.Gba.Mem.Read16(reg.R[15]))
 	} else {
 		p("opcode", d.Gba.Mem.Read32(reg.R[15]))

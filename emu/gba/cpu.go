@@ -98,13 +98,12 @@ func NewCpu(gba *GBA) *Cpu {
 	return c
 }
 
-func (c *Cpu) Execute(opcode uint32) int {
-
-	if c.Reg.CPSR.GetFlag(FLAG_T) {
-		return c.DecodeTHUMB(uint16(opcode))
+func (c *Cpu) Execute() int {
+	if c.Reg.isThumb {
+		return c.DecodeTHUMB()
 	}
 
-	return c.DecodeARM(opcode)
+	return c.DecodeARM()
 }
 
 type Reg struct {
@@ -115,12 +114,25 @@ type Reg struct {
 	USR  [5]uint32 // r8 - r12 // tmp to restore after FIQ
 	CPSR Cond
 	SPSR [6]Cond
+
+    isThumb bool
+    isIRQEnabled bool
 }
 
 type Cond uint32
 
 func (c *Cond) GetFlag(flag uint32) bool {
 	return (uint32(*c)>>flag)&0b1 == 0b1
+}
+
+func (c *Cond) SetThumb(value bool, cpu *Cpu) {
+    cpu.Reg.isThumb = value
+    c.SetFlag(FLAG_T, value)
+}
+
+func (c *Cond) SetInterrupt(value bool, cpu *Cpu) {
+    cpu.Reg.isIRQEnabled = value
+    c.SetFlag(FLAG_I, value)
 }
 
 func (c *Cond) SetFlag(flag uint32, value bool) {

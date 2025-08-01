@@ -137,7 +137,7 @@ func (dma *DMA) WriteControl(v uint8, hi bool) {
 		}
 
 		if isImmediate := wasDisabled && dma.checkMode(DMA_MODE_IMM); isImmediate {
-			dma.transfer(false)
+			dma.transfer()
 		}
 
 		return
@@ -154,7 +154,7 @@ func (dma *DMA) disable() {
 	dma.Control &^= 0b1000_0000_0000_0000
 }
 
-func (dma *DMA) transfer(_ bool) {
+func (dma *DMA) transfer() {
 
 	mem := &dma.Gba.Mem
 	count := dma.WordCount
@@ -312,8 +312,6 @@ func (dma *DMA) transfer(_ bool) {
 //    }
 //}
 
-var fifoCount = 0
-
 func (dma *DMA) transferFifo() {
 
 	a := dma.Gba.Apu
@@ -333,14 +331,10 @@ func (dma *DMA) transferFifo() {
 		return
 	case dma.Idx == 2 && dma.Dst != 0x400_00A4:
 		return
-	case dma.Idx == 1 && dma.Dst == 0x400_00A0 && !(a.FifoA.Length <= 0x10):
-		return
-	case dma.Idx == 2 && dma.Dst == 0x400_00AA && !(a.FifoB.Length <= 0x10):
-		return
-	}
-
-	if dma.Idx == 1 && dma.Gba.Mem.Read32(dma.Src) != 0x0 {
-		fifoCount++
+	//case dma.Idx == 1 && dma.Dst == 0x400_00A0 && !(a.FifoA.Length <= 0x10):
+	//	return
+	//case dma.Idx == 2 && dma.Dst == 0x400_00AA && !(a.FifoB.Length <= 0x10):
+	//	return
 	}
 
 	if rom := dma.Src >= 0x800_0000 && dma.Src < 0xE00_0000; rom {
@@ -349,19 +343,15 @@ func (dma *DMA) transferFifo() {
 
 	srcOffset := 4
 	switch dma.SrcAdj {
-	case DMA_ADJ_INC:
-		srcOffset = 4
 	case DMA_ADJ_DEC:
 		srcOffset = -4
 	case DMA_ADJ_NON:
 		srcOffset = 0
-	case DMA_ADJ_RES:
-		srcOffset = 4
 	}
 
 	for range 4 {
 		v := dma.Gba.Mem.Read32(dma.Src)
-		dma.Gba.Mem.Write32(dma.Dst, v) //make sure this and fifoA / fifoB are not same
+		//dma.Gba.Mem.Write32(dma.Dst, v) //make sure this and fifoA / fifoB are not same
 		switch dma.Idx {
 		case 1:
 			a.FifoA.Copy(v)

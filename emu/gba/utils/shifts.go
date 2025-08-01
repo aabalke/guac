@@ -12,7 +12,7 @@ type ShiftArgs struct {
 	IsCarry, Immediate, CurrCarry bool
 }
 
-func Shift(s ShiftArgs) (shift uint32, setCarry, carry bool) {
+func Shift(s *ShiftArgs) (shift uint32, setCarry, carry bool) {
 	switch s.SType {
 	case LSL:
 		return Lsl(s.Val, s.Is, s.IsCarry, s.Immediate)
@@ -73,7 +73,7 @@ func Asr(val, is uint32, isCarry, immediate bool) (shift uint32, setCarry, carry
 func Ror(val, is uint32, isCarry, immediate bool, currCarry bool) (shift uint32, setCarry, carry bool) {
 
 	getValue := func(v, shift uint32) uint32 {
-		shift %= 32
+		shift &= 31
 		tmp0 := v >> shift
 		tmp1 := v << (32 - shift)
 		return tmp0 | tmp1
@@ -88,7 +88,7 @@ func Ror(val, is uint32, isCarry, immediate bool, currCarry bool) (shift uint32,
 		return getValue((val&^1)|c, 1), true, BitEnabled(val, 0)
 	}
 
-	carry = (val>>((is-1)%32))&0b1 > 0
+	carry = (val>>((is-1)&31))&0b1 > 0
 	setCarry = is > 0 && isCarry
 
 	return getValue(val, is), setCarry, carry

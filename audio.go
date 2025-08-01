@@ -1,6 +1,9 @@
 package main
 
-import "github.com/hajimehoshi/oto"
+import (
+	"github.com/aabalke/guac/config"
+	"github.com/hajimehoshi/oto"
+)
 
 const (
 	SND_FREQUENCY = 48000 // sample rate
@@ -8,6 +11,10 @@ const (
 )
 
 func NewAudioContext() *oto.Context {
+
+    if config.Conf.CancelAudioInit {
+        return nil
+    }
 
     //return nil
 

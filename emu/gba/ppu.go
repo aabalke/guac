@@ -36,8 +36,8 @@ type Dispcnt struct {
 type Blend struct {
 	Mode          uint32
 	a, b          [6]bool
-	//aEv, bEv, yEv float32
-	aEv, bEv, yEv uint32
+	aEv, bEv, yEv float32
+	//aEv, bEv, yEv uint32
     BlendPalettes [SCREEN_WIDTH]BlendPalettes
 }
 
@@ -158,16 +158,16 @@ func (p *PPU) UpdatePPU(addr uint32, v uint32) {
 		p.Blend.b[5] = utils.BitEnabled(v, 5)
 
 	case 0x52:
-		//p.Blend.aEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
-		p.Blend.aEv = min(16, utils.GetVarData(v, 0, 4))
+		p.Blend.aEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
+		//p.Blend.aEv = min(16, utils.GetVarData(v, 0, 4))
 
 	case 0x53:
-		p.Blend.bEv = min(16, utils.GetVarData(v, 0, 4))
-		//p.Blend.bEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
+		//p.Blend.bEv = min(16, utils.GetVarData(v, 0, 4))
+		p.Blend.bEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
 
 	case 0x54:
-		p.Blend.yEv = min(16, utils.GetVarData(v, 0, 4))
-		//p.Blend.yEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
+		//p.Blend.yEv = min(16, utils.GetVarData(v, 0, 4))
+		p.Blend.yEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
 
 	}
 }

@@ -3,6 +3,7 @@ package apu
 import (
 	"fmt"
 
+	"github.com/aabalke/guac/config"
 	"github.com/hajimehoshi/oto"
 )
 
@@ -11,17 +12,17 @@ import (
 type Apu struct {
 	Enable bool
 
-	FifoA, FifoB                    *Fifo
+	FifoA, FifoB                    Fifo
 	SoundCntL, SoundCntH, SoundCntX uint16
 	SoundBias                       uint16
 
 	SoundBuffer               []int16
 	ReadPointer, WritePointer uint32
 
-	ToneChannel1 *ToneChannel
-	ToneChannel2 *ToneChannel
-	WaveChannel  *WaveChannel
-	NoiseChannel *NoiseChannel
+	ToneChannel1 ToneChannel
+	ToneChannel2 ToneChannel
+	WaveChannel  WaveChannel
+	NoiseChannel NoiseChannel
 
 	Stream []byte
 
@@ -36,7 +37,7 @@ type Apu struct {
 	buffSamples  int
 	sampleTime   float64
 	streamLen    int
-	buffSize     int
+	buffSize     uint32
 }
 
 func (a *Apu) Disable() {
@@ -70,8 +71,8 @@ func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu 
 
 	a := &Apu{
 		WritePointer: 0x200,
-		FifoA:        &Fifo{},
-		FifoB:        &Fifo{},
+		FifoA:        Fifo{},
+		FifoB:        Fifo{},
 		cpuFreqHz:    cpuFreq,
 		sndFrequency: sampleRate,
 		sndSamples:   sampleCnt,
@@ -79,16 +80,19 @@ func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu 
 		buffSamples:  sampleCnt * 16 * 2,
 		sampleTime:   1.0 / float64(sampleRate),
 		streamLen:    (2 * 2 * sampleRate / 60) - (2*2*sampleRate/60)%4,
-		buffSize:     ((sampleCnt) * 16 * 2),
+		buffSize:     uint32((sampleCnt) * 16 * 2),
 	}
 
 	a.Stream = make([]byte, a.streamLen)
 	a.SoundBuffer = make([]int16, a.buffSize)
-	a.ToneChannel1 = &ToneChannel{Apu: a, Idx: 0}
-	a.ToneChannel2 = &ToneChannel{Apu: a, Idx: 1}
-	a.WaveChannel = &WaveChannel{Apu: a, Idx: 2}
-	a.NoiseChannel = &NoiseChannel{Apu: a, Idx: 3}
-	a.player = audioContext.NewPlayer()
+	a.ToneChannel1 = ToneChannel{Apu: a, Idx: 0}
+	a.ToneChannel2 = ToneChannel{Apu: a, Idx: 1}
+	a.WaveChannel = WaveChannel{Apu: a, Idx: 2}
+	a.NoiseChannel = NoiseChannel{Apu: a, Idx: 3}
+
+    if !config.Conf.CancelAudioInit {
+        a.player = audioContext.NewPlayer()
+    }
 
 	return a
 }
@@ -192,18 +196,18 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 
 	a.sndCycles += cycles
 
-    shift0 := (a.SoundCntH >> 2) & 1
-    shift1 := (a.SoundCntH >> 3) & 1
-    lpan0 := (a.SoundCntH >> 9) & 1
-    rpan0 := (a.SoundCntH >> 8) & 1
-    lpan1 := (a.SoundCntH >> 13) & 1
-    rpan1 := (a.SoundCntH >> 12) & 1
+    shift0 := int32(a.SoundCntH >> 2) & 1
+    shift1 := int32(a.SoundCntH >> 3) & 1
+    lpan0 := int32(a.SoundCntH >> 9) & 1
+    rpan0 := int32(a.SoundCntH >> 8) & 1
+    lpan1 := int32(a.SoundCntH >> 13) & 1
+    rpan1 := int32(a.SoundCntH >> 12) & 1
 
-	sampleA := int16(a.FifoA.Sample) << (1 - shift0)
-	sampleB := int16(a.FifoB.Sample) << (1 - shift1)
+	sampleA := int32(a.FifoA.Sample) << (1 - shift0)
+	sampleB := int32(a.FifoB.Sample) << (1 - shift1)
 
-    sampleLeft := int32(sampleA)*int32(lpan0) + int32(sampleB)*int32(lpan1)
-    sampleRight := int32(sampleA)*int32(rpan0) + int32(sampleB)*int32(rpan1)
+    sampleLeft := sampleA*lpan0 + sampleB*lpan1
+    sampleRight := sampleA*rpan0 + sampleB*rpan1
 
     cntL := uint32(a.SoundCntL)
     volL := volLut[(cntL>>4) & 0b111]
@@ -235,10 +239,10 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
         psgL = (psgL * volL) >> shift
         psgR = (psgR * volR) >> shift
 
-		a.SoundBuffer[a.WritePointer&uint32(a.buffSize-1)] = clip(sampleLeft + psgL)
-		a.WritePointer++
-		a.SoundBuffer[a.WritePointer&uint32(a.buffSize-1)] = clip(sampleRight + psgR)
-		a.WritePointer++
+        a.SoundBuffer[a.WritePointer & (a.buffSize - 1)] = clip(sampleLeft + psgL)
+        a.WritePointer++
+        a.SoundBuffer[a.WritePointer & (a.buffSize - 1)] = clip(sampleRight + psgR)
+        a.WritePointer++
 
 		a.sndCycles -= clockCycles
 	}

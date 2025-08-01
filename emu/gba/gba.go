@@ -8,6 +8,7 @@ import (
 	"github.com/aabalke/guac/emu/gba/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
+
 )
 
 const (
@@ -25,13 +26,17 @@ const (
 
 var CURR_INST = uint64(0)
 
+var (
+    _ = fmt.Sprintf("")
+)
+
 type GBA struct {
 	Debugger  Debugger
 	Cartridge cart.Cartridge
 	Cpu       Cpu
 	Mem       Memory
 	PPU       PPU
-	Timers    Timers
+	Timers    [4]Timer
 	Dma       [4]DMA
 	Irq       Irq
 	Apu       *apu.Apu
@@ -68,7 +73,6 @@ func (gba *GBA) Update() {
 	//    }
 	//}
 
-	r := &gba.Cpu.Reg.R
 
 	gba.AccCycles = 0
 
@@ -76,25 +80,22 @@ func (gba *GBA) Update() {
 		return
 	}
 
+	r := &gba.Cpu.Reg.R
 	gba.Drawn = false
 
-	for {
+	for !gba.Drawn {
 
 		cycles := 4
 
-		if (r[PC] >= 0x400_0000 && r[PC] < 0x800_0000) || r[PC]%2 != 0 || r[PC] >= 0xE00_0000 {
-			panic(fmt.Sprintf("INVALID PC CURR %d PC %08X OPCODE %08X", CURR_INST, r[PC], gba.Mem.Read32(r[PC])))
-		}
-
-		opcode := gba.Mem.Read32(r[PC])
-		gba.OpenBusOpcode = gba.Mem.Read32((r[PC] &^ 0b11) + 8)
+		//if (r[PC] >= 0x400_0000 && r[PC] < 0x800_0000) || r[PC]%2 != 0 || r[PC] >= 0xE00_0000 {
+		//	panic(fmt.Sprintf("INVALID PC CURR %d PC %08X OPCODE %08X", CURR_INST, r[PC], gba.Mem.Read32(r[PC])))
+		//}
 
 		if !gba.Halted {
-			cycles = gba.Cpu.Execute(opcode)
+			cycles = gba.Cpu.Execute()
 		}
 
 		gba.Tick(uint32(cycles))
-
 
         if gba.vsyncAddr != 0 && r[PC] == gba.vsyncAddr {
             vblRaised := gba.Irq.IdleIrq & 1 == 1
@@ -109,13 +110,9 @@ func (gba *GBA) Update() {
 		// irq has to be at end (count up tests)
 		gba.Irq.checkIRQ()
 
-		if !gba.Halted {
-			CURR_INST++
-		}
-
-		if gba.Drawn {
-			break
-		}
+		//if !gba.Halted {
+		//	CURR_INST++
+		//}
 	}
 
 	gba.Apu.Play(gba.Muted)
@@ -127,16 +124,27 @@ func (gba *GBA) Update() {
 
 func (gba *GBA) Tick(cycles uint32) {
 	gba.VideoUpdate(uint32(cycles))
-	gba.Apu.SoundClock(uint32(cycles), false)
-	gba.Timers.Update(uint32(cycles))
+	//gba.Apu.SoundClock(uint32(cycles), false)
+	gba.UpdateTimers(uint32(cycles))
 }
 
 func (gba *GBA) checkDmas(mode uint32) {
-	for i := range gba.Dma {
-		if gba.Dma[i].checkMode(mode) {
-			gba.Dma[i].transfer(false)
-		}
-	}
+
+	if mode == gba.Dma[0].Mode && gba.Dma[0].Enabled {
+        gba.Dma[0].transfer()
+    }
+
+	if mode == gba.Dma[1].Mode && gba.Dma[1].Enabled {
+        gba.Dma[1].transfer()
+    }
+
+	if mode == gba.Dma[2].Mode && gba.Dma[2].Enabled {
+        gba.Dma[2].transfer()
+    }
+
+	if mode == gba.Dma[3].Mode && gba.Dma[3].Enabled {
+        gba.Dma[3].transfer()
+    }
 }
 
 func NewGBA(path string, ctx *oto.Context) *GBA {
@@ -160,8 +168,6 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 
 	gba.Mem = NewMemory(&gba)
 	gba.Cpu.Gba = &gba
-
-	gba.Cpu.Reg.CPSR.SetFlag(FLAG_I, false)
 
 	gba.Timers[0].Gba = &gba
 	gba.Timers[1].Gba = &gba
@@ -218,7 +224,7 @@ func (gba *GBA) toggleThumb() {
 
 	newFlag := reg.R[PC]&1 > 0
 
-	reg.CPSR.SetFlag(FLAG_T, newFlag)
+	reg.CPSR.SetThumb(newFlag, &gba.Cpu)
 
 	if newFlag {
 		reg.R[PC] &^= 1
@@ -263,15 +269,14 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 
 	if newScanline := currScanlineCycles < prevScanlineCycles; newScanline {
 
-		dispstat.SetHBlank(false)
+        gba.Apu.SoundClock(1232, false)
 
-		//vcount = (vcount + 1) % NUM_SCANLINES
+		dispstat.SetHBlank(false)
 
         vcount++
         if vcount == NUM_SCANLINES {
             vcount = 0
         }
-
 
 		gba.Mem.IO[0x6] = vcount
 

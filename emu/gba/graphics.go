@@ -814,8 +814,6 @@ func (gba *GBA) getPalette(palIdx uint32, paletteNum uint32, obj bool) uint32 {
 		addr += 0x200
 	}
 
-    // error
-
     return uint32(gba.Mem.PRAM[addr >> 1])
 }
 
@@ -912,83 +910,79 @@ func (bp *BlendPalettes) setBlendPalettes(palData uint32, bgIdx uint32, obj bool
 	}
 }
 
-func (bp *BlendPalettes) blend(objMode uint32, x, y uint32, wins *Windows, inObjWindow bool) uint32 {
+func (bp *BlendPalettes) blend(objMode uint32, x ,y uint32, wins *Windows, inObjWindow bool) uint32 {
 
-	objTransparent := objMode == 1
+    objTransparent := objMode == 1
 
-	if !windowBldPixelAllowed(x, y, wins, inObjWindow) {
-		return bp.noBlend(objTransparent)
-	}
+    if !windowBldPixelAllowed(x, y, wins, inObjWindow) {
+        return bp.noBlend(objTransparent)
+    }
 
-	switch bp.Bld.Mode {
-	case BLD_MODE_OFF:
-		return bp.noBlend(objTransparent)
-	case BLD_MODE_STD:
-		return bp.alphaBlend()
-	case BLD_MODE_WHITE:
-		return bp.grayscaleBlend(true)
-	case BLD_MODE_BLACK:
-		return bp.grayscaleBlend(false)
-	}
+    switch bp.Bld.Mode {
+    case BLD_MODE_OFF: return bp.noBlend(objTransparent)
+    case BLD_MODE_STD: return bp.alphaBlend()
+    case BLD_MODE_WHITE: return bp.grayscaleBlend(true)
+    case BLD_MODE_BLACK: return bp.grayscaleBlend(false)
+    }
 
-	return bp.noBlend(objTransparent)
+    return bp.noBlend(objTransparent)
 }
 
 func (bp *BlendPalettes) noBlend(objTransparent bool) uint32 {
-	if objTransparent {
-		return bp.alphaBlend()
-	}
-	return bp.NoBlendPalette
+    if objTransparent {
+        return bp.alphaBlend()
+    }
+    return bp.NoBlendPalette
 }
 
 func (bp *BlendPalettes) alphaBlend() uint32 {
 
-	if !bp.hasA || !bp.hasB || !bp.targetATop {
-		return bp.NoBlendPalette
-	}
+    if !bp.hasA || !bp.hasB || !bp.targetATop {
+        return bp.NoBlendPalette
+    }
 
-	rA := (bp.APalette) & 0x1F
-	gA := (bp.APalette >> 5) & 0x1F
-	bA := (bp.APalette >> 10) & 0x1F
-	rB := (bp.BPalette) & 0x1F
-	gB := (bp.BPalette >> 5) & 0x1F
-	bB := (bp.BPalette >> 10) & 0x1F
+    rA := float32((bp.APalette) & 0x1F)
+    gA := float32((bp.APalette >> 5) & 0x1F)
+    bA := float32((bp.APalette >> 10) & 0x1F)
+    rB := float32((bp.BPalette) & 0x1F)
+    gB := float32((bp.BPalette >> 5) & 0x1F)
+    bB := float32((bp.BPalette >> 10) & 0x1F)
 
-	blend := func(a, b uint32) uint32 {
-		val := a*bp.Bld.aEv + b*bp.Bld.bEv
-		return min(31, val >> 4)
-	}
-	r := blend(rA, rB)
-	g := blend(gA, gB)
-	b := blend(bA, bB)
+    blend := func(a, b float32) uint32 {
+        val := a*bp.Bld.aEv + b*bp.Bld.bEv
+        return uint32(min(31, val))
+    }
+    r := blend(rA, rB)
+    g := blend(gA, gB)
+    b := blend(bA, bB)
 
-	return r | (g << 5) | (b << 10)
+    return r | (g << 5) | (b << 10)
 }
 
 func (bp *BlendPalettes) grayscaleBlend(white bool) uint32 {
 
-	if !bp.hasA || !bp.targetATop {
-		return bp.NoBlendPalette
-	}
+    if !bp.hasA || !bp.targetATop {
+        return bp.NoBlendPalette
+    }
 
-	rA := (bp.APalette) & 0x1F
-	gA := (bp.APalette >> 5) & 0x1F
-	bA := (bp.APalette >> 10) & 0x1F
+    rA := float32((bp.APalette) & 0x1F)
+    gA := float32((bp.APalette >> 5) & 0x1F)
+    bA := float32((bp.APalette >> 10) & 0x1F)
 
-	blend := func(v uint32) uint32 {
+    blend := func(v float32) uint32 {
 
-		if white {
-			v += ((31 << 4) - v) * bp.Bld.yEv
-		} else {
-			v -= v * bp.Bld.yEv
-		}
+        if white {
+            v += (31 - v)*bp.Bld.yEv
+        } else {
+            v -= v*bp.Bld.yEv
+        }
+        
+        return uint32(min(31, v))
+    }
 
-		return min(31, v >> 4)
-	}
+    r := blend(rA)
+    g := blend(gA)
+    b := blend(bA)
 
-	r := blend(rA)
-	g := blend(gA)
-	b := blend(bA)
-
-	return r | (g << 5) | (b << 10)
+    return r | (g << 5) | (b << 10)
 }

@@ -43,7 +43,7 @@ func NewMemory(gba *GBA) Memory {
 
 func (m *Memory) InitSaveLoop() {
 
-	//return
+	return
 
 	saveTicker := time.Tick(time.Second)
 
@@ -66,11 +66,11 @@ func (m *Memory) initWriteRegions() {
 	}
 
 	m.writeRegions[0x2] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
-		m.WRAM1[(addr-0x0200_0000)&(0x4_0000-1)] = v
+		m.WRAM1[addr&(0x4_0000-1)] = v
 	}
 
 	m.writeRegions[0x3] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
-		m.WRAM2[(addr-0x0300_0000)&(0x8_000-1)] = v
+		m.WRAM2[addr&(0x8_000-1)] = v
 	}
 
 	m.writeRegions[0x4] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
@@ -81,7 +81,7 @@ func (m *Memory) initWriteRegions() {
 
 	m.writeRegions[0x5] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
 
-		relative := (addr - 0x0500_0000) & (0x400 - 1)
+		relative := addr & (0x400 - 1)
 
         if relative & 1 == 1 {
             m.PRAM[relative >> 1] &= 0xFF
@@ -90,12 +90,17 @@ func (m *Memory) initWriteRegions() {
         }
 
 		//if byteWrite {
-		//	m.PRAM[relative] = v
-		//	if relative+1 >= uint32(len(m.PRAM)) {
+		//	//m.PRAM[relative] = v
+        //    m.PRAM[relative >> 1] &^= 0xFF
+        //    m.PRAM[relative >> 1] |= uint16(v)
+
+		//	if relative+1 >= uint32(len(m.PRAM) / 2) {
 		//		return
 		//	}
 
-		//	m.PRAM[relative+1] = v
+		//	//m.PRAM[relative+1] = v
+        //    m.PRAM[relative + 1 >> 1] &= 0xFF
+        //    m.PRAM[relative + 1 >> 1] |= uint16(v) << 8
 		//	return
 		//}
 
@@ -108,8 +113,8 @@ func (m *Memory) initWriteRegions() {
 		    0x16000, 0x8000, 0x8000 | 24_000
 		   | 64k, 32k 32k (mirror) | mirror of block |
 		*/
-		//mirrorAddr := (addr - 0x600_0000) % 0x2_0000
-		mirrorAddr := (addr - 0x600_0000) & (0x2_0000 - 1)
+
+		mirrorAddr := addr & (0x2_0000 - 1)
 		if mirrorAddr >= 0x1_8000 {
 			mirrorAddr -= 0x8000 // 32k internal mirror
 		}
@@ -144,7 +149,7 @@ func (m *Memory) initWriteRegions() {
 		if byteWrite {
 			return
 		}
-		rel := (addr - 0x0700_0000) & (0x400 - 1)
+		rel := addr & (0x400 - 1)
 		m.OAM[rel] = v
 		m.GBA.PPU.UpdateOAM(rel)
 		return
@@ -155,8 +160,7 @@ func (m *Memory) initWriteRegions() {
 		m.GBA.Save = true
 
 		cartridge := &m.GBA.Cartridge
-		//relative := (addr - 0xE00_0000) % 0x1_0000
-		relative := (addr - 0xE00_0000) & (0x1_0000 - 1)
+		relative := addr & (0x1_0000 - 1)
 
 		cartridge.Write(relative, v)
 		return
@@ -230,7 +234,7 @@ func (m *Memory) initReadRegions() {
 	}
 }
 
-func (m *Memory) Read(addr uint32, byteRead bool) uint8 {
+func (m *Memory) Read(addr uint32) uint8 {
 	return m.readRegions[addr>>24](m, addr)
 }
 
@@ -256,7 +260,7 @@ func (m *Memory) ReadBios(addr uint32) uint8 {
 }
 
 func (m *Memory) ReadOpenBus(addr uint32) uint8 {
-	return uint8(m.GBA.OpenBusOpcode >> ((addr & 0b11) * 8))
+    return uint8(m.Read32((m.GBA.Cpu.Reg.R[PC] &^ 0b11) + 8) >> ((addr & 0b11) << 3))
 }
 
 func (m *Memory) ReadIO(addr uint32) uint8 {
@@ -715,7 +719,7 @@ func (m *Memory) Read8(addr uint32) uint32 {
 		}
 	}
 
-	return uint32(m.Read(addr, true))
+	return uint32(m.Read(addr))
 }
 
 // Accessing SRAM Area by 16bit/32bit
@@ -724,7 +728,7 @@ func (m *Memory) Read16(addr uint32) uint32 {
 
     switch {
     case addr >= 0xE00_0000:
-		return uint32(m.Read(addr, false)) * 0x0101
+		return uint32(m.Read(addr)) * 0x0101
     case addr >= 0xD00_0000:
         if ok := CheckEeprom(m.GBA, addr); ok {
             return uint32(m.GBA.Cartridge.EepromRead())
@@ -742,14 +746,14 @@ func (m *Memory) Read16(addr uint32) uint32 {
 		}
     }
 
-	return uint32(m.Read(addr+1, false))<<8 | uint32(m.Read(addr, false))
+	return uint32(m.Read(addr+1))<<8 | uint32(m.Read(addr))
 }
 
 func (m *Memory) Read32(addr uint32) uint32 {
 
     switch {
     case addr >= 0xE00_0000:
-		return uint32(m.Read(addr, false)) * 0x01010101
+		return uint32(m.Read(addr)) * 0x01010101
     case addr >= 0x800_0000:
 		offset := (addr - 0x800_0000) & (0x200_0000 - 1)
 		if offset >= m.GBA.Cartridge.RomLength {
@@ -757,8 +761,8 @@ func (m *Memory) Read32(addr uint32) uint32 {
 		}
     }
 
-	a := uint32(m.Read(addr+3, false))<<8 | uint32(m.Read(addr+2, false))
-	b := uint32(m.Read(addr+1, false))<<8 | uint32(m.Read(addr, false))
+	a := uint32(m.Read(addr+3))<<8 | uint32(m.Read(addr+2))
+	b := uint32(m.Read(addr+1))<<8 | uint32(m.Read(addr))
 	return (a << 16) + b
 }
 

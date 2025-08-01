@@ -1,6 +1,8 @@
 # keyboard and Gamepad Inputs use the ebitengine key and gamepad string values.
+
 # gamepad / controller is setup for dualsense and may not work on others
 
+#cancel_audio_init = true
 #fullscreen = true
 backdrop_color = 0x0A0A0A
 

@@ -4,8 +4,6 @@ import (
 	"github.com/aabalke/guac/emu/gba/utils"
 )
 
-type Timers [4]Timer
-
 type Timer struct {
 	Gba               *GBA
 	Idx               int
@@ -20,45 +18,53 @@ type Timer struct {
 	Freq        uint32
 }
 
-func (tt *Timers) Update(cycles uint32) {
+func (gba *GBA) UpdateTimers(cycles uint32) {
 
 	overflow := false
 
-	for i := range tt {
-		t := &tt[i]
-
-		if t.Enabled {
-			overflow = t.Update(overflow, cycles)
-		}
-	}
+    if gba.Timers[0].Enabled {
+        overflow = gba.Timers[0].Update(overflow, cycles)
+    }
+    if gba.Timers[1].Enabled {
+        overflow = gba.Timers[1].Update(overflow, cycles)
+    }
+    if gba.Timers[2].Enabled {
+        overflow = gba.Timers[2].Update(overflow, cycles)
+    }
+    if gba.Timers[3].Enabled {
+        overflow = gba.Timers[3].Update(overflow, cycles)
+    }
 }
 
 func (t *Timer) Update(overflow bool, cycles uint32) bool {
 
 	increment := uint32(0)
-	if t.Cascade && overflow {
-		increment = 1
-	}
-
-	if !t.Cascade {
+	if t.Cascade {
+        if overflow {
+            increment = 1
+        }
+    } else {
 
 		t.Elapsed += cycles
 
-		if freq := t.Freq; t.Elapsed >= freq {
-            increment = t.Elapsed / freq
-            t.Elapsed = t.Elapsed - increment * freq // %= freq
+		if t.Elapsed >= t.Freq {
+            increment = t.Elapsed / t.Freq
+            t.Elapsed -= increment * t.Freq // %= freq
 		}
 	}
 
-	overflow = incrementTimer(t, increment)
+	total := t.D + increment
 
-	if !overflow {
-		return false
-	}
+    if notOverflow := !(total > 0xFFFF); notOverflow {
+        t.D = total
+        return false
+    }
+
+    t.D = t.SavedInitialValue + (total & 0xFFFF)
 
 	if aTick := (t.Gba.Mem.IO[0x83]>>2)&1 == uint8(t.Idx); aTick {
 
-		fifo := t.Gba.Apu.FifoA
+		fifo := &t.Gba.Apu.FifoA
 
 		fifo.Load()
 
@@ -69,7 +75,7 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
 
 	if bTick := (t.Gba.Mem.IO[0x83]>>6)&1 == uint8(t.Idx); bTick {
 
-		fifo := t.Gba.Apu.FifoB
+		fifo := &t.Gba.Apu.FifoB
 
 		fifo.Load()
 
@@ -83,28 +89,6 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
 	}
 
 	return true
-}
-
-func incrementTimer(t *Timer, increment uint32) bool {
-
-	overflow := false
-
-	if t.D+increment < 0xFFFF {
-		t.D += increment
-		return overflow
-	}
-
-	for range increment {
-		tmp := t.D + 1
-		if tmp > 0xFFFF {
-			t.D = t.SavedInitialValue
-			overflow = true
-			continue
-		}
-		t.D = tmp
-	}
-
-	return overflow
 }
 
 func (t *Timer) ReadCnt(hi bool) uint8 {

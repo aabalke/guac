@@ -354,7 +354,7 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
 	case inst == 3:
 
 		if rs == PC {
-			cpsr.SetFlag(FLAG_T, false)
+			cpsr.SetThumb(false, cpu)
 			//R15: CPU switches to ARM state, and PC is auto-aligned as (($+4) AND NOT 2).
 			r[PC] = (r[PC] + 4) &^ 2
 
@@ -362,7 +362,7 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
 		}
 
 		if setThumb := !utils.BitEnabled(r[rs], 0); setThumb {
-			cpsr.SetFlag(FLAG_T, false)
+			cpsr.SetThumb(false, cpu)
 			r[PC] = r[rs] &^ 0b11
 		} else {
 			r[PC] = r[rs] &^ 0b1
@@ -679,10 +679,10 @@ func (cpu *Cpu) thumbLSImm(opcode uint16) {
 
 	case THUMB_STRB_IMM:
 		addr := r[rb] + nn
-		cpu.Gba.Mem.Write8(addr, uint8(r[rd]))
+		cpu.Gba.Mem.Write(addr, uint8(r[rd]), true)
 	case THUMB_LDRB_IMM:
 		addr := r[rb] + nn
-		r[rd] = cpu.Gba.Mem.Read8(addr)
+		r[rd] = uint32(cpu.Gba.Mem.Read(addr))
 	}
 
 	r[PC] += 2
@@ -808,7 +808,7 @@ func (cpu *Cpu) thumbShifted(opcode uint16) {
 		Immediate: true,
 	}
 
-	res, setCarry, carry := utils.Shift(shiftArgs)
+	res, setCarry, carry := utils.Shift(&shiftArgs)
 
 	if setCarry {
 		reg.CPSR.SetFlag(FLAG_C, carry)

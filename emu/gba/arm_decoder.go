@@ -2,32 +2,89 @@ package gba
 
 import (
 	"fmt"
-	"github.com/aabalke/guac/emu/gba/utils"
+	//"github.com/aabalke/guac/emu/gba/utils"
 )
 
-func (cpu *Cpu) DecodeARM(opcode uint32) int {
+func (cpu *Cpu) DecodeARM() int {
 
 	r := &cpu.Reg.R
-	if !cpu.CheckCond(utils.GetByte(opcode, 28)) {
+
+    opcode := uint32(cpu.Gba.Mem.Read(r[PC] + 3)) << 24
+    opcode |= uint32(cpu.Gba.Mem.Read(r[PC] + 2)) << 16
+    opcode |= uint32(cpu.Gba.Mem.Read(r[PC] + 1)) << 8
+    opcode |= uint32(cpu.Gba.Mem.Read(r[PC] + 0))
+
+	if !cpu.CheckCond(opcode >> 28) {
 		r[PC] += 4
 		return 4
 	}
 
-	switch {
-	case isSWI(opcode):
+    if swi := (opcode >> 24) & 0xF == 0xF; swi {
 		//cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
 		//cpu.Gba.exception(VEC_SWI, MODE_SWI)
 		//return 4
-		cycles, incPc := cpu.Gba.SysCall(utils.GetVarData(opcode, 16, 23))
+		cycles, incPc := cpu.Gba.SysCall((opcode >> 16) & 0xFF)
 
 		if incPc {
 		    r[PC] += 4
 		}
 
 		return cycles
+    }
 
-	case isB(opcode):
+    switch (opcode >> 25) & 0b111 {
+    case 0b000:
+        switch {
+        case isBX(opcode):
+            cpu.BX(opcode)
+        case isSDT(opcode):
+            cycles := cpu.Sdt(opcode)
+            return int(cycles)
+        case isHalf(opcode):
+            cpu.Half(opcode)
+        case isPSR(opcode):
+            cpu.Psr(opcode)
+        case isSWP(opcode):
+            cpu.Swp(opcode)
+        case isM(opcode):
+            cpu.Mul(opcode)
+        case isALU(opcode):
+            cpu.Alu(opcode)
+        default:
+            panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X, INSTR %d", opcode, r[PC], CURR_INST))
+        }
+
+        return 4
+    case 0b001:
+
+        switch {
+        case isSDT(opcode):
+            cycles := cpu.Sdt(opcode)
+            return int(cycles)
+        case isHalf(opcode):
+            cpu.Half(opcode)
+        case isPSR(opcode):
+            cpu.Psr(opcode)
+        case isSWP(opcode):
+            cpu.Swp(opcode)
+        case isALU(opcode):
+            cpu.Alu(opcode)
+        default:
+            panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X, INSTR %d", opcode, r[PC], CURR_INST))
+        }
+
+        return 4
+    case 0b010:
+    case 0b011:
+    case 0b100:
+		cpu.Block(opcode)
+        return 4
+    case 0b101:
 		cpu.B(opcode)
+        return 4
+    }
+
+	switch {
 	case isBX(opcode):
 		cpu.BX(opcode)
 	case isSDT(opcode):

@@ -35,7 +35,6 @@ type Game struct {
 	gamepadConnected bool
 
 	menuCtx *audio.Context
-
 	emuCtx *oto.Context
 }
 
@@ -43,9 +42,12 @@ func NewGame(flags Flags) *Game {
 
 	g := &Game{
 		flags:   flags,
-		menuCtx: audio.NewContext(SND_FREQUENCY),
 		emuCtx:  NewAudioContext(),
 	}
+
+    if !config.Conf.CancelAudioInit {
+		g.menuCtx = audio.NewContext(SND_FREQUENCY)
+    }
 
 	switch g.flags.Type {
 	case NONE:
@@ -86,6 +88,7 @@ func (g *Game) GetGamepadButtons() ([]ebiten.GamepadButton, []ebiten.GamepadButt
 func (g *Game) Update() error {
 
 	if g.flags.Profile && g.frame >= 1000 {
+	//if g.flags.Profile && g.frame >= 2000 {
 		return exit
 	}
 

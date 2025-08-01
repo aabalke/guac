@@ -359,7 +359,7 @@ func SoftReset(gba *GBA) {
 		ZERO_FILL   = 0x0300_7E00
 	)
 
-	flag := gba.Mem.Read(RETURN_ADDR, false)
+	flag := gba.Mem.Read(RETURN_ADDR)
 
 	i := uint32(0)
 	for i = range 0x200 {
@@ -378,7 +378,7 @@ func SoftReset(gba *GBA) {
 		reg.R[LR] = 0x0800_0000
 	}
 
-	reg.CPSR.SetFlag(FLAG_T, false)
+	reg.CPSR.SetThumb(false, &gba.Cpu)
 
 	reg.R[PC] = reg.R[LR]
 

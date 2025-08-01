@@ -2,7 +2,8 @@ package gba
 
 import "fmt"
 
-func (cpu *Cpu) DecodeTHUMB(opcode uint16) int {
+func (cpu *Cpu) DecodeTHUMB() int {
+    opcode := uint16(cpu.Gba.Mem.Read(cpu.Reg.R[PC]+1))<<8 | uint16(cpu.Gba.Mem.Read(cpu.Reg.R[PC]))
 
 	switch {
 	case isthumbSWI(opcode):

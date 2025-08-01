@@ -45,7 +45,7 @@ func main() {
 		pprof.StartCPUProfile(f)
 
 		//ebiten.SetTPS(480)
-		ebiten.SetTPS(600)
+		ebiten.SetTPS(2000)
 	}
 
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)

@@ -121,7 +121,6 @@ func (cpu *Cpu) GetOp2(opcode uint32) (uint32, bool) {
 
 	shiftRegister := utils.BitEnabled(opcode, 4)
 	if shiftRegister {
-		// timer increase 1
 		is = reg.R[(opcode>>8)&0b1111] & 0b1111_1111
 
 		if rm == PC {
@@ -139,7 +138,7 @@ func (cpu *Cpu) GetOp2(opcode uint32) (uint32, bool) {
 		CurrCarry: currCarry,
 	}
 
-	op2, setCarry, carry := utils.Shift(shiftArgs)
+	op2, setCarry, carry := utils.Shift(&shiftArgs)
 
 	if setCarry {
 		reg.CPSR.SetFlag(FLAG_C, carry)
@@ -507,7 +506,7 @@ func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack 
 			CurrCarry: cpu.Reg.CPSR.GetFlag(FLAG_C),
 		}
 
-		offset, _, _ = utils.Shift(shiftArgs)
+		offset, _, _ = utils.Shift(&shiftArgs)
 	}
 
 	addr := r[sdt.Rn]
@@ -1244,6 +1243,8 @@ func (cpu *Cpu) msr(psr *PSR) {
 	cpsr |= v & mask
 
 	reg.CPSR = Cond(cpsr)
+    reg.isThumb = reg.CPSR.GetFlag(FLAG_T)
+    reg.isIRQEnabled = reg.CPSR.GetFlag(FLAG_I)
 
 	if skip := BANK_ID[curr] == BANK_ID[next]; skip {
 		return

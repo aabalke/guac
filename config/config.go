@@ -22,6 +22,7 @@ type Config struct {
 	TomlBackdrop     int  `toml:"backdrop_color"`
 	GamesPerRow      int  `toml:"games_per_row"`
 	Backdrop         color.Color
+    CancelAudioInit  bool `toml:"cancel_audio_init"`
 	Gb               GbConfig         `toml:"gb"`
 	Gba              GbaConfig        `toml:"gba"`
 	KeyboardConfig   KeyboardConfig   `toml:"keyboard"`
