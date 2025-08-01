@@ -1244,7 +1244,6 @@ func (cpu *Cpu) msr(psr *PSR) {
 
 	reg.CPSR = Cond(cpsr)
     reg.isThumb = reg.CPSR.GetFlag(FLAG_T)
-    reg.isIRQEnabled = reg.CPSR.GetFlag(FLAG_I)
 
 	if skip := BANK_ID[curr] == BANK_ID[next]; skip {
 		return

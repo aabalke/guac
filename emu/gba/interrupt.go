@@ -48,14 +48,14 @@ func (s *Irq) setIRQ(irq uint32) {
 
 func (s *Irq) checkIRQ() {
 
-	//interruptEnabled := !s.Gba.Cpu.Reg.CPSR.GetFlag(FLAG_I)
+	interruptEnabled := !s.Gba.Cpu.Reg.CPSR.GetFlag(FLAG_I)
 	interrupts := s.IF&s.IE != 0
 
 	if interrupts {
 		s.Gba.Halted = false
 	}
 
-	if s.Gba.Cpu.Reg.isIRQEnabled && s.IME && interrupts {
+	if interruptEnabled && s.IME && interrupts {
 		s.Gba.exception(VEC_IRQ, MODE_IRQ)
 	}
 }

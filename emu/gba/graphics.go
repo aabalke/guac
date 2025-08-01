@@ -511,23 +511,35 @@ func getTileAddr(obj *Object, enTileX, enTileY, inTileX, inTileY uint32) uint32 
 
 func getPaletteData(gba *GBA, pal256, obj bool, pal, tileData, inTileX uint32) (uint32, uint32) {
 
-	if pal256 {
-        palData := gba.getPalette(tileData & 0xFF, 0, obj)
-        return tileData & 0xFF, palData
-    }
+    if !pal256 {
+        // 4 is bit depth
 
-    // 4 is bit depth
+        if inTileX & 1 == 1 {
+            palIdx := (tileData >> 4) & 0b1111
+            palData := gba.getPalette(palIdx, pal, obj)
+            return palIdx, palData
+        }
 
-    if inTileX & 1 == 1 {
-        palIdx := (tileData >> 4) & 0b1111
+        palIdx := tileData & 0b1111
         palData := gba.getPalette(palIdx, pal, obj)
         return palIdx, palData
     }
 
-    palIdx := tileData & 0b1111
-	palData := gba.getPalette(palIdx, pal, obj)
-	return palIdx, palData
+    palData := gba.getPalette(tileData & 0xFF, 0, obj)
+    return tileData & 0xFF, palData
 }
+
+func (gba *GBA) getPalette(palIdx uint32, paletteNum uint32, obj bool) uint32 {
+
+	addr := (paletteNum << 5) + palIdx<<1
+
+	if obj {
+		addr += 0x200
+	}
+
+    return uint32(gba.Mem.PRAM[addr >> 1])
+}
+
 
 func (gba *GBA) getObjPriority(y uint32, objects *[128]Object) [4][]uint32 {
 
@@ -742,79 +754,90 @@ func (gba *GBA) setAffineBackgroundPixel(bg *Background, x uint32) (uint32, bool
 
 func (gba *GBA) setBackgroundPixel(bg *Background, x, y uint32) (uint32, bool, bool) {
 
-	xIdx := (x + bg.XOffset) & ((bg.W * 8) - 1)
-	yIdx := (y + bg.YOffset) & ((bg.H * 8) - 1)
+	xIdx := (x + bg.XOffset) & ((bg.W << 3) - 1)
+	yIdx := (y + bg.YOffset) & ((bg.H << 3) - 1)
+
+	map_x := (xIdx >> 3) & (bg.W - 1)
+	map_y := (yIdx >> 3) & (bg.H - 1)
+	mapIdx := (map_y >> 5) << bg.QuadYShift
+    mapIdx += (map_x >> 5) << bg.QuadXShift
+    mapIdx += (map_y & 31) << 5
+    mapIdx += (map_x & 31)
+
+	mapAddr := bg.ScreenBaseBlock + mapIdx << 1
 
 	mem := &gba.Mem
     readVRAM := mem.readRegions[0x6]
 
-	map_x := (xIdx / 8) & (bg.W - 1)//% (bg.W) all w and h values are multi of 2
-	map_y := (yIdx / 8) & (bg.H - 1)//% (bg.H)
-	quad_x := uint32(1024) //32 * 32
-	quad_y := uint32(1024) //32 * 32
-	if bg.Size == 3 {
-		quad_y = 2048
-	}
-	mapIdx := (map_y/32)*quad_y + (map_x/32)*quad_x + (map_y & 31)*32 + (map_x & 31)
-    // & 31 == % 32
+    screenData := uint32(readVRAM(mem, mapAddr + 1)) << 8
+    screenData |= uint32(readVRAM(mem, mapAddr))
 
-	mapAddr := 0x600_0000 + bg.ScreenBaseBlock + mapIdx * 2
+	tileIdx := utils.GetVarData(screenData, 0, 9) << 5
+    if bg.Palette256 {
+        tileIdx <<= 1
+    }
 
-    screenData := uint32(readVRAM(mem, mapAddr + 1)) << 8 | uint32(readVRAM(mem, mapAddr))
+	tileAddr := bg.CharBaseBlock + tileIdx
 
-	tileIdx := utils.GetVarData(screenData, 0, 9)
-
-	tileAddr := 0x600_0000 + bg.CharBaseBlock + (tileIdx * 32)
-	if bg.Palette256 {
-		tileAddr += (tileIdx * 32)
-	}
-
-	if inObjTiles := tileAddr >= 0x601_0000; inObjTiles {
+	if inObjTiles := tileAddr >= 0x1_0000; inObjTiles {
 		return 0, false, false
 	}
 
-	inTileX, inTileY := getPositionsBg(screenData, xIdx, yIdx)
+	inTileY := yIdx & 0b111 //% 8
+	inTileX := xIdx & 0b111 //% 8
 
-	var inTileIdx uint32
-	if bg.Palette256 {
-		inTileIdx = uint32(inTileX) + uint32(inTileY*8)
-	} else {
-		inTileIdx = uint32(inTileX/2) + uint32(inTileY*4)
-	}
+    if hFlip := screenData >> 10 & 1 == 1; hFlip {
+		inTileX = 7 - inTileX
+    }
 
-	addr := tileAddr + inTileIdx
-    tileData := uint32(readVRAM(mem, addr))
+    if vFlip := screenData >> 11 & 1 == 1; vFlip {
+		inTileY = 7 - inTileY
+    }
+
+    if bg.Palette256 {
+        return gba.getBg256(tileAddr, inTileX, inTileY)
+    }
+
+    return gba.getBg16(screenData, tileAddr, inTileX, inTileY)
+}
+
+func (gba *GBA) getBg256(tileAddr, inTileX, inTileY uint32) (uint32, bool, bool) {
+
+    addr := tileAddr + inTileX + inTileY << 3
+    tileData := uint32(gba.Mem.readRegions[6](&gba.Mem, addr))
+    palIdx := tileData & 0xFF
+    palData := gba.getPalette(palIdx, 0, false)
+    return palData, true, palIdx == 0
+}
+
+func (gba *GBA) getBg16(screenData, tileAddr, inTileX, inTileY uint32) (uint32, bool, bool) {
+
+    addr := tileAddr + (inTileX >> 1) + inTileY << 2
+    tileData := uint32(gba.Mem.readRegions[6](&gba.Mem, addr))
 
 	palette := utils.GetVarData(screenData, 12, 15)
-	palIdx, palData := getPaletteData(gba, bg.Palette256, false, palette, tileData, uint32(inTileX))
 
-	return palData, true, palIdx == 0
+    // 4 is bit depth
+    palIdx := (tileData >> ((inTileX & 1) << 2)) & 0b1111
+    palData := gba.getPalette(palIdx, palette, false)
+    return palData, true, palIdx == 0
 }
+
 
 func getPositionsBg(screenData, xIdx, yIdx uint32) (uint32, uint32) {
 
 	inTileY := yIdx & 0b111 //% 8
 	inTileX := xIdx & 0b111 //% 8
 
-	if hFlip := utils.BitEnabled(screenData, 10); hFlip {
+    if hFlip := screenData >> 10 & 1 == 1; hFlip {
 		inTileX = 7 - inTileX
-	}
-	if vFlip := utils.BitEnabled(screenData, 11); vFlip {
+    }
+
+    if vFlip := screenData >> 11 & 1 == 1; vFlip {
 		inTileY = 7 - inTileY
-	}
+    }
 
 	return inTileX, inTileY
-}
-
-func (gba *GBA) getPalette(palIdx uint32, paletteNum uint32, obj bool) uint32 {
-
-	addr := (paletteNum << 5) + palIdx<<1
-
-	if obj {
-		addr += 0x200
-	}
-
-    return uint32(gba.Mem.PRAM[addr >> 1])
 }
 
 func (gba *GBA) applyColor(data, i uint32) {

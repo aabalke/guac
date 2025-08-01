@@ -73,7 +73,6 @@ func (gba *GBA) Update() {
 	//    }
 	//}
 
-
 	gba.AccCycles = 0
 
 	if gba.Paused {
@@ -84,6 +83,7 @@ func (gba *GBA) Update() {
 	gba.Drawn = false
 
 	for !gba.Drawn {
+
 
 		cycles := 4
 
@@ -260,7 +260,7 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 		}
 
 		if vcount < SCREEN_HEIGHT {
-			gba.scanlineGraphics(uint32(vcount))
+            gba.scanlineGraphics(uint32(vcount))
 			gba.PPU.Backgrounds[2].BgAffineUpdate()
 			gba.PPU.Backgrounds[3].BgAffineUpdate()
 			gba.checkDmas(DMA_MODE_HBL)

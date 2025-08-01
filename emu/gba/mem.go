@@ -14,6 +14,7 @@ type Memory struct {
 
 	//PRAM [0x400]uint8
 	PRAM [0x400 / 2]uint16
+	//VRAM [0x18000]uint8
 	VRAM [0x18000]uint8
 	OAM  [0x400]uint8
 	IO   [0x400]uint8
@@ -109,41 +110,29 @@ func (m *Memory) initWriteRegions() {
 	}
 
 	m.writeRegions[0x6] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
-		/*
-		    0x16000, 0x8000, 0x8000 | 24_000
-		   | 64k, 32k 32k (mirror) | mirror of block |
-		*/
+        addr &= 0x1FFFF
+        if addr >= 0x1_8000 {
+            addr -= 0x8000 // 32k internal mirror
+        }
 
-		mirrorAddr := addr & (0x2_0000 - 1)
-		if mirrorAddr >= 0x1_8000 {
-			mirrorAddr -= 0x8000 // 32k internal mirror
-		}
+        if !byteWrite {
+            m.VRAM[addr] = v
+            return
+        }
 
-		mode := m.IO[0] & 0b111
-		if bitmap := mode > 2; bitmap && byteWrite && mirrorAddr >= 0x1_0000 {
-			return
-		}
+        if bgVRAM := addr < 0x1_0000; bgVRAM {
 
-		if bgVRAM := mirrorAddr < 0x1_0000; byteWrite && bgVRAM {
+            m.VRAM[addr] = v
 
-			m.VRAM[mirrorAddr] = v
+            if addr+1 >= uint32(len(m.VRAM)) {
+                return
+            }
 
-			if mirrorAddr+1 >= uint32(len(m.VRAM)) {
-				return
-			}
+            m.VRAM[addr+1] = v
 
-			m.VRAM[mirrorAddr+1] = v
-
-			return
-		}
-
-		if objVRAM := mirrorAddr >= 0x1_0000; byteWrite && objVRAM {
-			return
-		}
-
-		m.VRAM[mirrorAddr] = v
-		return
-	}
+            return
+        }
+    }
 
 	m.writeRegions[0x7] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
 		if byteWrite {
@@ -212,11 +201,11 @@ func (m *Memory) initReadRegions() {
 	}
 
 	m.readRegions[0x6] = func(m *Memory, addr uint32) uint8 {
-		mirror := addr & 0x1FFFF
-		if mirror >= 0x18000 {
-			mirror -= 0x8000
+		addr &= 0x1FFFF
+		if addr >= 0x18000 {
+			addr -= 0x8000
 		}
-		return m.VRAM[mirror]
+		return m.VRAM[addr]
 	}
 
 	m.readRegions[0x7] = func(m *Memory, addr uint32) uint8 {
@@ -800,6 +789,7 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
 }
 
 func (m *Memory) WriteIO(addr uint32, v uint8) {
+
 
 	// this addr should be relative. - 0x400000
 	// do not make bg control addrs special, unless you know what the f you are doing

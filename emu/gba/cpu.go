@@ -116,7 +116,6 @@ type Reg struct {
 	SPSR [6]Cond
 
     isThumb bool
-    isIRQEnabled bool
 }
 
 type Cond uint32
@@ -128,11 +127,6 @@ func (c *Cond) GetFlag(flag uint32) bool {
 func (c *Cond) SetThumb(value bool, cpu *Cpu) {
     cpu.Reg.isThumb = value
     c.SetFlag(FLAG_T, value)
-}
-
-func (c *Cond) SetInterrupt(value bool, cpu *Cpu) {
-    cpu.Reg.isIRQEnabled = value
-    c.SetFlag(FLAG_I, value)
 }
 
 func (c *Cond) SetFlag(flag uint32, value bool) {

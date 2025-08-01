@@ -98,6 +98,7 @@ type Object struct {
 
 func (p *PPU) UpdatePPU(addr uint32, v uint32) {
 
+
 	if win := addr >= 0x40 && addr < 0x4C; win {
 		p.UpdateWin(addr, v)
 		return
