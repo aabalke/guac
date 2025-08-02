@@ -12,9 +12,7 @@ type Memory struct {
 	WRAM1 [0x40000]uint8
 	WRAM2 [0x8000]uint8
 
-	//PRAM [0x400]uint8
-	PRAM [0x400 / 2]uint16
-	//VRAM [0x18000]uint8
+	PRAM [0x200]uint16
 	VRAM [0x18000]uint8
 	OAM  [0x400]uint8
 	IO   [0x400]uint8
@@ -87,6 +85,7 @@ func (m *Memory) initWriteRegions() {
         if relative & 1 == 1 {
             m.PRAM[relative >> 1] &= 0xFF
             m.PRAM[relative >> 1] |= uint16(v) << 8
+
             return
         }
 
