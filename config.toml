@@ -1,0 +1,93 @@
+# keyboard and Gamepad Inputs use the ebitengine key and gamepad string values.
+
+# gamepad / controller is setup for dualsense and may not work on others
+
+cancel_audio_init = true
+#fullscreen = true
+backdrop_color = 0x0A0A0A
+
+# Define how many games appear per row on game select screen
+games_per_row = 6
+
+[keyboard]
+select = ["J", "Enter"]
+mute = ["M"]
+pause = ["P"]
+quit = ["Q"]
+fullscreen = ["F11"]
+left = ["A", "ArrowLeft"]
+right = ["D", "ArrowRight"]
+up = ["W", "ArrowUp"]
+down = ["S", "ArrowDown"]
+
+[controller]
+select = [2]
+mute = [8]
+pause = [9]
+left = [18]
+right = [16]
+up = [15]
+down = [17]
+
+# GB Configuration
+
+[gb]
+# Define a 4 color palette to replace greyscale using hex values
+# From lightest -> darkest
+# if invalid input, will fall back to greyscale
+# dmg_palette = [ 0xE0F8D0, 0x88C070, 0x346856, 0x081820 ]
+
+[gb.keyboard]
+
+a = ["J"]
+b = ["K"]
+select = ["L"]
+start = ["Semicolon"]
+left = ["A"]
+right = ["D"]
+up = ["W"]
+down = ["S"]
+
+[gb.controller]
+a = [2]
+b = [1]
+select = [0]
+start = [3]
+left = [16]
+right = [18]
+up = [15]
+down = [17]
+
+# GBA Configuration
+
+[gba]
+
+# HLE BIOS is not accurate on timings and will cause graphical glitches
+skip_hle = true 
+
+# usually multiple of 2
+threads = 8
+
+[gba.keyboard]
+a = ["J"]
+b = ["K"]
+select = ["L"]
+start = ["Semicolon"]
+left = ["A"]
+right = ["D"]
+up = ["W"]
+down = ["S"]
+r = ["Y"]
+l = ["T"]
+
+[gba.controller]
+a = [2]
+b = [1]
+select = [0]
+start = [3]
+left = [16]
+right = [18]
+up = [15]
+down = [17]
+r = [5]
+l = [4]

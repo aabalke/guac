@@ -411,7 +411,7 @@ func RegisterRamReset(gba *GBA) {
 	}
 
 	if clearVRAM := utils.BitEnabled(flags, 3); clearVRAM {
-		mem.VRAM = [0x18000]uint8{}
+		mem.VRAM = [0x18001]uint8{}
 	}
 
 	if clearOAM := utils.BitEnabled(flags, 4); clearOAM {

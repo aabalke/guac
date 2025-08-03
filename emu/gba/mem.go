@@ -13,7 +13,7 @@ type Memory struct {
 	WRAM2 [0x8000]uint8
 
 	PRAM [0x200]uint16
-	VRAM [0x18000]uint8
+	VRAM [0x18001]uint8
 	OAM  [0x400]uint8
 	IO   [0x400]uint8
 

@@ -10,7 +10,7 @@ todo.md
 
 # other
 *.json
-config.toml
+#config.toml
 
 *.pprof
 *.syso
