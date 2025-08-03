@@ -79,11 +79,11 @@ func (g *Game) GetGamepadButtons() ([]ebiten.StandardGamepadButton, []ebiten.Sta
 		g.gamepadConnected = false
 	}
 
-    if !ebiten.IsStandardGamepadLayoutAvailable(g.gamepad) {
-		log.Printf("Gamepad is not standard. Not using.\n")
-        g.gamepad = 0
-		g.gamepadConnected = false
-    }
+    //if !ebiten.IsStandardGamepadLayoutAvailable(g.gamepad) {
+	//	log.Printf("Gamepad is not standard. Not using.\n")
+    //    g.gamepad = 0
+	//	g.gamepadConnected = false
+    //}
 
     justButtons := inpututil.AppendJustPressedStandardGamepadButtons(g.gamepad, []ebiten.StandardGamepadButton{})
     buttons := inpututil.AppendPressedStandardGamepadButtons(g.gamepad, []ebiten.StandardGamepadButton{})
