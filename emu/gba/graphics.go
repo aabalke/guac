@@ -122,7 +122,19 @@ func (gba *GBA) renderTilePixel(x, y uint32) {
 
             bgIdx := bgPriorities[i][j]
             bg := &bgs[bgIdx]
-            palData, ok := gba.background(x, y, bgIdx, bg, wins)
+
+            if !windowPixelAllowed(bgIdx, x, y, wins) {
+                continue
+            }
+
+            var palData uint32
+            var ok bool
+
+            if bg.Affine {
+                palData, ok = gba.setAffineBackgroundPixel(bg, x)
+            } else {
+                palData, ok = gba.setBackgroundPixel(bg, x, y)
+            }
 
             if ok {
                 bldPal.setBlendPalettes(palData, uint32(bgIdx), false, false)
@@ -137,7 +149,20 @@ func (gba *GBA) renderTilePixel(x, y uint32) {
             objIdx := objPriorities[i][j]
             obj := &gba.PPU.Objects[objIdx]
             obj.OneDimensional = dispcnt.OneDimensional
-            palData, ok := gba.object(x, y, obj, wins)
+
+            if !windowObjPixelAllowed(x, y, wins) {
+                continue
+            }
+
+            var palData uint32
+            var ok bool
+
+            if obj.RotScale {
+                palData, ok = gba.setObjectAffinePixel(obj, x, y)
+            } else {
+                palData, ok = gba.setObjectPixel(obj, x, y)
+            }
+
 
             switch {
             case ok && obj.Mode == 2:
@@ -251,7 +276,18 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 
                 obj.OneDimensional = dispcnt.OneDimensional
 
-                palData, ok := gba.object(x, y, obj, wins)
+                if !windowObjPixelAllowed(x, y, wins) {
+                    continue
+                }
+
+                var palData uint32
+                var ok bool
+
+                if obj.RotScale {
+                    palData, ok = gba.setObjectAffinePixel(obj, x, y)
+                } else {
+                    palData, ok = gba.setObjectPixel(obj, x, y)
+                }
 
                 switch {
                 case ok && obj.Mode == 2:
@@ -298,20 +334,6 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 	}
 
 	wg.Wait()
-}
-
-func (gba *GBA) object(x, y uint32, obj *Object, wins *Windows) (uint32, bool) {
-
-
-	if !windowObjPixelAllowed(x, y, wins) {
-		return 0, false
-	}
-
-	if obj.RotScale {
-		return gba.setObjectAffinePixel(obj, x, y)
-	}
-
-	return gba.setObjectPixel(obj, x, y)
 }
 
 func outObjectBound(obj *Object, xIdx, yIdx int) bool {
@@ -636,19 +658,6 @@ func objNotScanline(obj *Object, y uint32) bool {
 	b := localY-int(obj.H) >= 0
 
 	return t || b
-}
-
-func (gba *GBA) background(x, y, idx uint32, bg *Background, wins *Windows) (uint32, bool) {
-
-	if !windowPixelAllowed(idx, x, y, wins) {
-		return 0, false
-	}
-
-	if bg.Affine {
-		return gba.setAffineBackgroundPixel(bg, x)
-	}
-
-    return gba.setBackgroundPixel(bg, x, y)
 }
 
 func inRange(coord, start, end uint32) bool {

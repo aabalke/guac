@@ -58,20 +58,7 @@ func (gba *GBA) SoftReset() {
 	gba.exception(VEC_SWI, MODE_SWI)
 }
 
-//var MASK_GOOD = 0b1
-//var MASK_FALSE = 0x3FF &^ 0b1
-
 func (gba *GBA) Update() {
-
-	// temp
-	//if gba.Keypad.KEYINPUT == uint16(MASK_GOOD){
-	//    gba.Keypad.KEYINPUT = uint16(MASK_FALSE)
-	//} else {
-	//    gba.Keypad.KEYINPUT = uint16(MASK_GOOD)
-	//    if gba.Keypad.keyIRQ() {
-	//        gba.Irq.setIRQ(12)
-	//    }
-	//}
 
 	gba.AccCycles = 0
 
@@ -86,10 +73,6 @@ func (gba *GBA) Update() {
 
 
 		cycles := 4
-
-		//if (r[PC] >= 0x400_0000 && r[PC] < 0x800_0000) || r[PC]%2 != 0 || r[PC] >= 0xE00_0000 {
-		//	panic(fmt.Sprintf("INVALID PC CURR %d PC %08X OPCODE %08X", CURR_INST, r[PC], gba.Mem.Read32(r[PC])))
-		//}
 
 		if !gba.Halted {
 			cycles = gba.Cpu.Execute()
@@ -124,27 +107,7 @@ func (gba *GBA) Update() {
 
 func (gba *GBA) Tick(cycles uint32) {
 	gba.VideoUpdate(uint32(cycles))
-	//gba.Apu.SoundClock(uint32(cycles), false)
 	gba.UpdateTimers(uint32(cycles))
-}
-
-func (gba *GBA) checkDmas(mode uint32) {
-
-	if mode == gba.Dma[0].Mode && gba.Dma[0].Enabled {
-        gba.Dma[0].transfer()
-    }
-
-	if mode == gba.Dma[1].Mode && gba.Dma[1].Enabled {
-        gba.Dma[1].transfer()
-    }
-
-	if mode == gba.Dma[2].Mode && gba.Dma[2].Enabled {
-        gba.Dma[2].transfer()
-    }
-
-	if mode == gba.Dma[3].Mode && gba.Dma[3].Enabled {
-        gba.Dma[3].transfer()
-    }
 }
 
 func NewGBA(path string, ctx *oto.Context) *GBA {
@@ -272,6 +235,7 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 
 	if newScanline := currScanlineCycles < prevScanlineCycles; newScanline {
 
+        // this 1232 cycle count is estimate, should replace with actual
         gba.Apu.SoundClock(1232, false)
 
 		dispstat.SetHBlank(false)

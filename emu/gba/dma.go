@@ -370,3 +370,19 @@ func (dma *DMA) transferFifo() {
 func (dma *DMA) checkMode(mode uint32) bool {
 	return mode == dma.Mode && dma.Enabled
 }
+
+func (gba *GBA) checkDmas(mode uint32) {
+
+    if ok := gba.Dma[0].checkMode(mode); ok {
+        gba.Dma[0].transfer()
+    }
+    if ok := gba.Dma[1].checkMode(mode); ok {
+        gba.Dma[1].transfer()
+    }
+    if ok := gba.Dma[2].checkMode(mode); ok {
+        gba.Dma[2].transfer()
+    }
+    if ok := gba.Dma[3].checkMode(mode); ok {
+        gba.Dma[3].transfer()
+    }
+}

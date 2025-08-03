@@ -65,22 +65,22 @@ func (m *Memory) initWriteRegions() {
 	}
 
 	m.writeRegions[0x2] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
-		m.WRAM1[addr&(0x4_0000-1)] = v
+		m.WRAM1[addr&0x3_FFFF] = v
 	}
 
 	m.writeRegions[0x3] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
-		m.WRAM2[addr&(0x8_000-1)] = v
+		m.WRAM2[addr&0x7FFF] = v
 	}
 
 	m.writeRegions[0x4] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
 		if addr < 0x0400_0400 {
-			m.WriteIO(addr-0x0400_0000, v)
+			m.WriteIO(addr & 0x3FF, v)
 		}
 	}
 
 	m.writeRegions[0x5] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
 
-		relative := addr & (0x400 - 1)
+		relative := addr & (0x3FF)
 
         if relative & 1 == 1 {
             m.PRAM[relative >> 1] &= 0xFF
@@ -89,20 +89,14 @@ func (m *Memory) initWriteRegions() {
             return
         }
 
-		//if byteWrite {
-		//	//m.PRAM[relative] = v
-        //    m.PRAM[relative >> 1] &^= 0xFF
-        //    m.PRAM[relative >> 1] |= uint16(v)
+		if byteWrite {
+            m.PRAM[relative >> 1] &^= 0xFF
+            m.PRAM[relative >> 1] |= uint16(v)
 
-		//	if relative+1 >= uint32(len(m.PRAM) / 2) {
-		//		return
-		//	}
-
-		//	//m.PRAM[relative+1] = v
-        //    m.PRAM[relative + 1 >> 1] &= 0xFF
-        //    m.PRAM[relative + 1 >> 1] |= uint16(v) << 8
-		//	return
-		//}
+            m.PRAM[relative >> 1] &= 0xFF
+            m.PRAM[relative >> 1] |= uint16(v) << 8
+			return
+		}
 
         m.PRAM[relative >> 1] &^= 0xFF
         m.PRAM[relative >> 1] |= uint16(v)
@@ -137,7 +131,7 @@ func (m *Memory) initWriteRegions() {
 		if byteWrite {
 			return
 		}
-		rel := addr & (0x400 - 1)
+		rel := addr & (0x3FF)
 		m.OAM[rel] = v
 		m.GBA.PPU.UpdateOAM(rel)
 		return
@@ -148,7 +142,7 @@ func (m *Memory) initWriteRegions() {
 		m.GBA.Save = true
 
 		cartridge := &m.GBA.Cartridge
-		relative := addr & (0x1_0000 - 1)
+		relative := addr & (0xFFFF)
 
 		cartridge.Write(relative, v)
 		return
@@ -185,7 +179,7 @@ func (m *Memory) initReadRegions() {
 
 	m.readRegions[0x4] = func(m *Memory, addr uint32) uint8 {
 		if addr < 0x0400_0400 {
-			return m.ReadIO(addr - 0x0400_0000)
+			return m.ReadIO(addr & 0x3FF)
 		}
 		return m.ReadOpenBus(addr & 1)
 	}
@@ -788,7 +782,6 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
 }
 
 func (m *Memory) WriteIO(addr uint32, v uint8) {
-
 
 	// this addr should be relative. - 0x400000
 	// do not make bg control addrs special, unless you know what the f you are doing

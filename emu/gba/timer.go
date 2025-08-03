@@ -16,6 +16,7 @@ type Timer struct {
 	OverflowIRQ bool
 	Cascade     bool
 	Freq        uint32
+    FreqShift   uint32
 }
 
 func (gba *GBA) UpdateTimers(cycles uint32) {
@@ -48,8 +49,9 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
 		t.Elapsed += cycles
 
 		if t.Elapsed >= t.Freq {
-            increment = t.Elapsed / t.Freq
-            t.Elapsed -= increment * t.Freq // %= freq
+            increment = t.Elapsed >> t.FreqShift
+            t.Elapsed -= increment << t.FreqShift
+            //t.Elapsed -= increment * t.Freq // %= freq
 		}
 	}
 
@@ -111,7 +113,8 @@ func (t *Timer) WriteCnt(v uint8, hi bool) {
 	t.Cascade = utils.BitEnabled(t.CNT, 2)
 	t.OverflowIRQ = utils.BitEnabled(t.CNT, 6)
 	t.Enabled = utils.BitEnabled(t.CNT, 7)
-	t.Freq = t.getCycles()
+	t.Freq = t.getFreq()
+    t.FreqShift = t.getFreqShift()
 
 	if setEnabled := utils.BitEnabled(uint32(v), 7) && !utils.BitEnabled(oldValue, 7); setEnabled {
 		//if setEnabled := utils.BitEnabled(uint32(v), 7); setEnabled {
@@ -139,7 +142,7 @@ func (t *Timer) WriteD(v uint8, hi bool) {
 	t.SavedInitialValue = (t.SavedInitialValue & 0xFF00) | uint32(v)
 }
 
-func (t *Timer) getCycles() uint32 {
+func (t *Timer) getFreq() uint32 {
 
 	freq := utils.GetVarData(t.CNT, 0, 1)
 	switch freq {
@@ -154,4 +157,21 @@ func (t *Timer) getCycles() uint32 {
 	}
 
 	return 1
+}
+
+func (t *Timer) getFreqShift() uint32 {
+
+	freq := utils.GetVarData(t.CNT, 0, 1)
+	switch freq {
+	case 0:
+		return 0
+	case 1:
+		return 6
+	case 2:
+		return 8
+	case 3:
+		return 10
+	}
+
+	return 0
 }
