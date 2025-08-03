@@ -1061,8 +1061,9 @@ func (m *Memory) Write16(addr uint32, v uint16) {
 func (m *Memory) Write32(addr uint32, v uint32) {
 
 	if sram := addr >= 0xE00_0000; sram {
-		is := addr * 8
-		v, _, _ = utils.Ror(v, is, false, false, false)
+		is := addr << 3
+        v = utils.RorSimple(v, is)
+		//v, _, _ = utils.Ror(v, is, false, false, false)
 		m.Write(addr, uint8(v), false)
 		return
 	}

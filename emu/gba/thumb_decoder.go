@@ -1,9 +1,26 @@
 package gba
 
-import "fmt"
+import (
+	"encoding/binary"
+	"fmt"
+	//"github.com/aabalke/guac/emu/gba/utils"
+)
 
 func (cpu *Cpu) DecodeTHUMB() int {
-    opcode := uint16(cpu.Gba.Mem.Read(cpu.Reg.R[PC]+1))<<8 | uint16(cpu.Gba.Mem.Read(cpu.Reg.R[PC]))
+
+	r := &cpu.Reg.R
+
+    var opcode uint16
+    switch r[PC] >> 24 {
+    case 0x0: opcode = binary.LittleEndian.Uint16(cpu.Gba.Mem.BIOS[r[PC]:])
+    case 0x2: opcode = binary.LittleEndian.Uint16(cpu.Gba.Mem.WRAM1[r[PC]&0x3FFF:])
+    case 0x3: opcode = binary.LittleEndian.Uint16(cpu.Gba.Mem.WRAM2[r[PC]&0x7FFF:])
+    case 0x8: opcode = binary.LittleEndian.Uint16(cpu.Gba.Cartridge.Rom[r[PC]&0x1FFFFFF:])
+    default:
+        panic(fmt.Sprintf("INVALID PC AT %08X\n", r[PC]))
+
+    }
+    //opcode := uint16(cpu.Gba.Mem.Read(cpu.Reg.R[PC]+1))<<8 | uint16(cpu.Gba.Mem.Read(cpu.Reg.R[PC]))
 
 	switch {
 	case isthumbSWI(opcode):

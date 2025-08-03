@@ -39,7 +39,7 @@ func Lsl(val, is uint32, isCarry, immediate bool) (shift uint32, setCarry, carry
 
 	setCarry = is > 0 && isCarry
 	carry = val&(1<<(32-is)) > 0
-	return val << uint(is), setCarry, carry
+	return val << is, setCarry, carry
 }
 
 func Lsr(val, is uint32, isCarry, immediate bool) (shift uint32, setCarry, carry bool) {
@@ -50,7 +50,7 @@ func Lsr(val, is uint32, isCarry, immediate bool) (shift uint32, setCarry, carry
 
 	setCarry = is > 0 && isCarry
 	carry = val&(1<<(is-1)) > 0
-	return val >> uint(is), setCarry, carry
+	return val >> is, setCarry, carry
 }
 
 func Asr(val, is uint32, isCarry, immediate bool) (shift uint32, setCarry, carry bool) {
@@ -63,7 +63,7 @@ func Asr(val, is uint32, isCarry, immediate bool) (shift uint32, setCarry, carry
 	carry = val&(1<<(is-1)) > 0
 
 	msb := val & 0x8000_0000
-	for range uint(is) {
+	for range is {
 		val = (val >> 1) | msb
 	}
 
@@ -85,11 +85,16 @@ func Ror(val, is uint32, isCarry, immediate bool, currCarry bool) (shift uint32,
 			c = 1
 		}
 
-		return getValue((val&^1)|c, 1), true, BitEnabled(val, 0)
+		return getValue((val&^1)|c, 1), true, val & 1 == 1
 	}
 
 	carry = (val>>((is-1)&31))&0b1 > 0
 	setCarry = is > 0 && isCarry
 
 	return getValue(val, is), setCarry, carry
+}
+
+func RorSimple(v, shift uint32) uint32 {
+    shift &= 31
+    return (v >> shift) | (v << (32 - shift))
 }

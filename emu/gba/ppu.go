@@ -15,6 +15,9 @@ type PPU struct {
 	Backgrounds [4]Background
 	Windows     Windows
 	Blend       Blend
+
+    bgPriorities [4][]uint32
+    objPriorities [4][]uint32
 }
 
 type Dispcnt struct {

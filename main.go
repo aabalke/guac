@@ -47,7 +47,7 @@ func main() {
 		//ebiten.SetTPS(480)
 		ebiten.SetTPS(2000)
 	}
-		ebiten.SetTPS(2000)
+		//ebiten.SetTPS(2000)
 
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	ebiten.SetWindowTitle("guac emulator")

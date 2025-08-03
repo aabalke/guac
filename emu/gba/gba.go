@@ -260,6 +260,9 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 		}
 
 		if vcount < SCREEN_HEIGHT {
+            updateBackgrounds(gba, &gba.PPU.Dispcnt)
+            gba.PPU.bgPriorities = gba.getBgPriority(uint32(vcount), gba.PPU.Dispcnt.Mode, &gba.PPU.Backgrounds)
+            gba.PPU.objPriorities = gba.getObjPriority(uint32(vcount), &gba.PPU.Objects)
             gba.scanlineGraphics(uint32(vcount))
 			gba.PPU.Backgrounds[2].BgAffineUpdate()
 			gba.PPU.Backgrounds[3].BgAffineUpdate()

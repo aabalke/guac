@@ -368,7 +368,7 @@ const (
 var sdtInstance Sdt
 
 type Sdt struct {
-	Opcode, Rd, Rn, RnValue, RdValue, Cond, Offset, Shift, ShiftType, Rm uint32
+	Opcode, Rd, Rn, RnValue, RdValue, Offset, Shift, ShiftType, Rm uint32
 	Set, I, Load, WriteBack, MemoryMgmt, Pre, Up, Byte, Pld              bool
 }
 
@@ -380,7 +380,6 @@ func NewSdtData(opcode uint32, cpu *Cpu) *Sdt {
 
 	sdtInstance = Sdt{
 		Opcode: opcode,
-		Cond:   utils.GetByte(opcode, 28),
 		I:      utils.BitEnabled(opcode, 25),
 		Pre:    utils.BitEnabled(opcode, 24),
 		Up:     utils.BitEnabled(opcode, 23),
@@ -414,7 +413,7 @@ func NewSdtData(opcode uint32, cpu *Cpu) *Sdt {
 	sdt.RdValue = cpu.Reg.R[sdt.Rd]
 	sdt.RnValue = cpu.Reg.R[sdt.Rn]
 
-	sdt.Pld = sdt.Cond == 0b1111 &&
+	sdt.Pld = (opcode >> 28) == 0b1111 &&
 		sdt.Pre == true &&
 		sdt.Byte == true &&
 		sdt.WriteBack == false &&
@@ -446,13 +445,14 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 	case sdt.Load && sdt.Byte:
 
 		// DO NOT WORD ALIGN
-		r[sdt.Rd] = uint32(c.Gba.Mem.Read8(pre))
+		r[sdt.Rd] = uint32(c.Gba.Mem.Read(pre))
 
 	case sdt.Load && !sdt.Byte:
 
 		v := c.Gba.Mem.Read32(addr)
-		is := (pre & 0b11) * 8
-		v, _, _ = utils.Ror(v, is, false, false, false)
+		is := (pre & 0b11) << 3
+        v = utils.RorSimple(v, is)
+		//v, _, _ = utils.Ror(v, is, false, false, false)
 
 		if sdt.Rd == PC { // not sure if this is right
 			v -= 4
@@ -462,7 +462,7 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 
 	case !sdt.Load && sdt.Byte:
 
-		c.Gba.Mem.Write8(pre, uint8(r[sdt.Rd]))
+		c.Gba.Mem.Write(pre, uint8(r[sdt.Rd]), true)
 
 	case !sdt.Load && !sdt.Byte:
 
@@ -581,7 +581,7 @@ const (
 var halfData Half
 
 type Half struct {
-	Cond, Rn, Rd, Imm, Inst, Rm, RdValue, RnValue, RmValue uint32
+	Rn, Rd, Imm, Inst, Rm, RdValue, RnValue, RmValue uint32
 	Pre, Up, Immediate, WriteBack, Load, MemoryManagement  bool
 }
 
@@ -589,7 +589,6 @@ func NewHalf(opcode uint32, c *Cpu) *Half {
 
 	r := &c.Reg.R
 
-	halfData.Cond = utils.GetByte(opcode, 28)
 	halfData.Rn = utils.GetByte(opcode, 16)
 	halfData.Rd = utils.GetByte(opcode, 12)
 	halfData.Pre = utils.BitEnabled(opcode, 24)
@@ -751,8 +750,9 @@ func unsignedHalfStd(half *Half, cpu *Cpu) {
 
 	if half.Load {
 		v := uint32(cpu.Gba.Mem.Read16(addr))
-		is := (pre & 0b1) * 8
-		v, _, _ = utils.Ror(v, is, false, false, false)
+		is := (pre & 0b1) << 3
+        v = utils.RorSimple(v, is)
+		//v, _, _ = utils.Ror(v, is, false, false, false)
 		r[half.Rd] = v
 	} else {
 		cpu.Gba.Mem.Write16(addr, uint16(half.RdValue))
@@ -791,7 +791,7 @@ func halfUnsignedAddress(half *Half, cpu *Cpu) (uint32, uint32) {
 }
 
 type Block struct {
-	Opcode, Cond, Rn, RnValue, Rlist uint32
+	Opcode, Rn, RnValue, Rlist uint32
 	Pre, Up, PSR, Writeback, Load    bool
 }
 
@@ -801,7 +801,6 @@ func (c *Cpu) Block(opcode uint32) {
 
 	block := &Block{
 		Opcode:    opcode,
-		Cond:      utils.GetByte(opcode, 28),
 		Pre:       utils.BitEnabled(opcode, 24),
 		Up:        utils.BitEnabled(opcode, 23),
 		PSR:       utils.BitEnabled(opcode, 22),
@@ -1108,7 +1107,7 @@ func (c *Cpu) stm(block *Block) {
 }
 
 type PSR struct {
-	Opcode, Cond, Rd, Rm, Shift, Imm uint32
+	Opcode, Rd, Rm, Shift, Imm uint32
 	SPSR, MSR, Immediate, F, S, X, C bool
 }
 
@@ -1116,7 +1115,6 @@ func NewPSR(opcode uint32, cpu *Cpu) *PSR {
 
 	psr := &PSR{
 		Opcode:    opcode,
-		Cond:      utils.GetByte(opcode, 28),
 		Immediate: utils.BitEnabled(opcode, 25),
 		SPSR:      utils.BitEnabled(opcode, 22),
 		MSR:       utils.BitEnabled(opcode, 21),
@@ -1190,7 +1188,8 @@ func (cpu *Cpu) msr(psr *PSR) {
 
 	var v uint32
 	if psr.Immediate {
-		v, _, _ = utils.Ror(psr.Imm, psr.Shift, false, false, false)
+        v = utils.RorSimple(psr.Imm, psr.Shift)
+		//v, _, _ = utils.Ror(psr.Imm, psr.Shift, false, false, false)
 	} else {
 		v = r[psr.Rm]
 	}
@@ -1309,8 +1308,9 @@ func (cpu *Cpu) Swp(opcode uint32) {
 	} else {
 		aligned = rnValue &^ 0b11
 		rnMemValue = cpu.Gba.Mem.Read32(aligned)
-		is := (rnValue & 0b11) * 8
-		rnMemValue, _, _ = utils.Ror(rnMemValue, is, false, false, false)
+		is := (rnValue & 0b11) << 3
+		//rnMemValue, _, _ = utils.Ror(rnMemValue, is, false, false, false)
+        rnMemValue = utils.RorSimple(rnMemValue, is)
 	}
 
 	r[rd] = rnMemValue
