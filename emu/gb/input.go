@@ -7,7 +7,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-func (gb *GameBoy) InputHandler(keys []ebiten.Key, buttons []ebiten.GamepadButton) {
+func (gb *GameBoy) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadButton) {
 
 	keyConfig := config.Conf.Gb.KeyboardConfig
 	buttonConfig := config.Conf.Gba.ControllerConfig
@@ -66,10 +66,10 @@ func (gb *GameBoy) InputHandler(keys []ebiten.Key, buttons []ebiten.GamepadButto
 		case slices.Contains(buttonConfig.Start, buttonStr):
 			*tempJoypad &^= 0b10000000
 			reqInterrupt = true
-		case slices.Contains(buttonConfig.Left, buttonStr):
+		case slices.Contains(buttonConfig.Right, buttonStr):
 			*tempJoypad &^= 0b1
 			reqInterrupt = true
-		case slices.Contains(buttonConfig.Right, buttonStr):
+		case slices.Contains(buttonConfig.Left, buttonStr):
 			*tempJoypad &^= 0b10
 			reqInterrupt = true
 		case slices.Contains(buttonConfig.Up, buttonStr):

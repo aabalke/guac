@@ -72,7 +72,7 @@ func (p *Pause) LoadIcons() {
 	}
 }
 
-func (p *Pause) InputHandler(g *Game, keys []ebiten.Key, buttons []ebiten.GamepadButton) {
+func (p *Pause) InputHandler(g *Game, keys []ebiten.Key, buttons []ebiten.StandardGamepadButton) {
 
 	keyConfig := config.Conf.KeyboardConfig
 	buttonConfig := config.Conf.ControllerConfig

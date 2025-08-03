@@ -1,8 +1,10 @@
-# keyboard and Gamepad Inputs use the ebitengine key and gamepad string values.
+# keyboard ids come from ebitengine string values.
 
-# gamepad / controller is setup for dualsense and may not work on others
+# gamepad / controller ids: https://www.w3.org/TR/gamepad/#remapping
 
+# only cancel audio init for profiling / benchmarking
 #cancel_audio_init = true
+
 #fullscreen = true
 backdrop_color = 0x0A0A0A
 
@@ -21,13 +23,13 @@ up = ["W", "ArrowUp"]
 down = ["S", "ArrowDown"]
 
 [controller]
-select = [2]
+select = [1]
 mute = [8]
 pause = [9]
-left = [18]
-right = [16]
-up = [15]
-down = [17]
+left = [14]
+right = [15]
+up = [12]
+down = [13]
 
 # GB Configuration
 
@@ -49,24 +51,24 @@ up = ["W"]
 down = ["S"]
 
 [gb.controller]
-a = [2]
-b = [1]
-select = [0]
+a = [1]
+b = [0]
+select = [2]
 start = [3]
-left = [16]
-right = [18]
-up = [15]
-down = [17]
+left = [14]
+right = [15]
+up = [12]
+down = [13]
 
 # GBA Configuration
 
 [gba]
 
-skip_hle = false
+# HLE BIOS is not accurate on timings and will cause graphical glitches
+skip_hle = true 
 
-# usually multiple of 2
-threads = 8
-
+# usually multiple of 2, in testing it slows down things
+#threads = 8
 
 [gba.keyboard]
 a = ["J"]
@@ -81,13 +83,13 @@ r = ["Y"]
 l = ["T"]
 
 [gba.controller]
-a = [2]
-b = [1]
-select = [0]
+a = [1]
+b = [0]
+select = [2]
 start = [3]
-left = [16]
-right = [18]
-up = [15]
-down = [17]
+left = [14]
+right = [15]
+up = [12]
+down = [13]
 r = [5]
 l = [4]

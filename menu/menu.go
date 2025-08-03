@@ -30,7 +30,7 @@ func NewMenu(context *audio.Context) *Menu {
 	return m
 }
 
-func (m *Menu) InputHandler(keys []ebiten.Key, buttons []ebiten.GamepadButton) bool {
+func (m *Menu) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadButton) bool {
 
 	gamesPerRow := config.Conf.GamesPerRow
 
