@@ -223,21 +223,101 @@ func (cpu *Cpu) test(alu *Alu) {
 	}
 }
 
+func (cpu *Cpu) psrSwitch() {
+
+	reg := &cpu.Reg
+	r := &cpu.Reg.R
+
+	// PC is updated in final bios inst
+
+    curr := cpu.Reg.getMode()
+
+	i := BANK_ID[curr]
+	reg.CPSR = reg.SPSR[i]
+    reg.isThumb = reg.CPSR.GetFlag(FLAG_T)
+
+    next := cpu.Reg.getMode()
+	c := BANK_ID[next]
+
+	// if you set this up for fiq, get the special registers
+	reg.LR[i] = r[LR]
+	reg.SP[i] = r[SP]
+	r[SP] = reg.SP[c]
+	r[LR] = reg.LR[c]
+
+	if curr != MODE_FIQ {
+		for i := range 5 {
+			reg.USR[i] = r[8+i]
+		}
+	}
+
+	reg.SP[BANK_ID[curr]] = r[SP]
+	reg.LR[BANK_ID[curr]] = r[LR]
+
+	if curr == MODE_FIQ {
+		for i := range 5 {
+			reg.FIQ[i] = r[8+i]
+		}
+	}
+
+	if next != MODE_FIQ {
+		for i := range 5 {
+			r[8+i] = reg.USR[i]
+		}
+	}
+
+	r[SP] = reg.SP[BANK_ID[next]]
+	r[LR] = reg.LR[BANK_ID[next]]
+
+	if next == MODE_FIQ {
+		for i := range 5 {
+			r[8+i] = reg.FIQ[i]
+		}
+	}
+}
+
 func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
 
-	if irqExit := alu.Rd == PC && alu.Rn == LR && alu.Set && alu.Inst == SUB; irqExit {
-		cpu.Gba.ExitException(MODE_IRQ)
-		return
-	}
-
-	if swiExit := alu.Rd == PC && alu.Rm == LR && alu.Inst == MOV && alu.Set; swiExit {
-		cpu.Gba.ExitException(MODE_SWI)
-		return
-	}
+    //    Returned CPSR Flags
+    //If S=1, Rd<>R15, logical operations (AND,EOR,TST,TEQ,ORR,MOV,BIC,MVN):
+    //  V=not affected
+    //  C=carryflag of shift operation (not affected if LSL#0 or Rs=00h)
+    //  Z=zeroflag of result
+    //  N=signflag of result (result bit 31)
+    //If S=1, Rd<>R15, arithmetic operations (SUB,RSB,ADD,ADC,SBC,RSC,CMP,CMN):
+    //  V=overflowflag of result
+    //  C=carryflag of result
+    //  Z=zeroflag of result
+    //  N=signflag of result (result bit 31)
+    //IF S=1, with unused Rd bits=1111b, {P} opcodes (CMPP/CMNP/TSTP/TEQP):
+    //  R15=result  ;modify PSR bits in R15, ARMv2 and below only.
+    //  In user mode only N,Z,C,V bits of R15 can be changed.
+    //  In other modes additionally I,F,M1,M0 can be changed.
+    //  The PC bits in R15 are left unchanged in all modes.
+    //If S=1, Rd=R15; should not be used in user mode:
+    //  CPSR = SPSR_<current mode>
+    //  PC = result
+    //  For example: MOVS PC,R14  ;return from SWI (PC=R14_svc, CPSR=SPSR_svc).
+    //If S=0: Flags are not affected (not allowed for CMP,CMN,TEQ,TST).
 
 	if !alu.Set {
 		return
 	}
+
+	if irqExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB; irqExit {
+		cpu.Gba.ExitException(MODE_IRQ)
+		return
+	}
+
+	if swiExit := alu.Rd == PC && alu.Rm == LR && alu.Inst == MOV; swiExit {
+		cpu.Gba.ExitException(MODE_SWI)
+		return
+	}
+
+    if forceExit := alu.Rd == PC; forceExit {
+        cpu.psrSwitch()
+        return
+    }
 
 	if alu.LogicalFlags {
 		cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
@@ -445,7 +525,7 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 	case sdt.Load && sdt.Byte:
 
 		// DO NOT WORD ALIGN
-		r[sdt.Rd] = uint32(c.Gba.Mem.Read(pre))
+		r[sdt.Rd] = uint32(c.Gba.Mem.Read8(pre))
 
 	case sdt.Load && !sdt.Byte:
 
@@ -462,7 +542,7 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 
 	case !sdt.Load && sdt.Byte:
 
-		c.Gba.Mem.Write(pre, uint8(r[sdt.Rd]), true)
+		c.Gba.Mem.Write8(pre, uint8(r[sdt.Rd]))
 
 	case !sdt.Load && !sdt.Byte:
 

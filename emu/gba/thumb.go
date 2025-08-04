@@ -284,7 +284,8 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
 		res := rsValue + rdValue
 
 		if rd == PC {
-			r[rd] = (uint32(res)) + 4
+            // has to be word aligned for thumb/thumb.gba
+			r[rd] = (uint32(res) &^ 0b11) + 4
 		} else {
 			r[rd] = uint32(res)
 			r[PC] += 2
@@ -520,8 +521,7 @@ func (cpu *Cpu) thumbLSHalf(opcode uint16) {
 		v := uint32(cpu.Gba.Mem.Read16(addr &^ 1))
 		is := (addr & 1) << 3
 		//v, _, _ = utils.Ror(v, is, false, false, false)
-        v = utils.RorSimple(v, is)
-		r[rd] = v
+        r[rd] = utils.RorSimple(v, is)
 	} else {
 		cpu.Gba.Mem.Write16(addr&^1, uint16(r[rd]))
 	}
@@ -567,8 +567,7 @@ func (cpu *Cpu) thumbLSSigned(opcode uint16) {
 		v := cpu.Gba.Mem.Read16(addr &^ 0b1)
 		is := (addr & 0b1) << 3
 		//v, _, _ = utils.Ror(v, is, false, false, false)
-        v = utils.RorSimple(v, is)
-		r[rd] = v
+        r[rd] = utils.RorSimple(v, is)
 
 	case THUMB_LDSH:
 
@@ -683,7 +682,8 @@ func (cpu *Cpu) thumbLSImm(opcode uint16) {
 
 	case THUMB_STRB_IMM:
 		addr := r[rb] + nn
-		cpu.Gba.Mem.Write(addr, uint8(r[rd]), true)
+		//cpu.Gba.Mem.Write(addr, uint8(r[rd]), true)
+		cpu.Gba.Mem.Write8(addr, uint8(r[rd]))
 	case THUMB_LDRB_IMM:
 		addr := r[rb] + nn
 		r[rd] = uint32(cpu.Gba.Mem.Read(addr))

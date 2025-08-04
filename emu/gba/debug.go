@@ -57,19 +57,19 @@ func (d *Debugger) print(i int) {
 
 	s("--------  --------")
 
-	for i := range len(reg.LR) {
-		p(fmt.Sprintf("LR %02d", i), uint32(reg.LR[uint32(i)]))
-	}
+	//for i := range len(reg.LR) {
+	//	p(fmt.Sprintf("LR %02d", i), uint32(reg.LR[uint32(i)]))
+	//}
 
-	s("--------  --------")
-	//p(fmt.Sprintf("4744 %08X", i), d.Gba.Mem.Read32(0x802E7A4))
-	count := 0x20
-	start := 0x6003800 + count*4
-	for i := start; i >= start-(count*4); i -= 4 {
-		p(fmt.Sprintf("IO %X", i), d.Gba.Mem.Read32(uint32(i)))
-	}
+	//s("--------  --------")
+	////p(fmt.Sprintf("4744 %08X", i), d.Gba.Mem.Read32(0x802E7A4))
+	//count := 0x20
+	//start := 0x6003800 + count*4
+	//for i := start; i >= start-(count*4); i -= 4 {
+	//	p(fmt.Sprintf("IO %X", i), d.Gba.Mem.Read32(uint32(i)))
+	//}
 
-	s("--------  --------")
+	//s("--------  --------")
 
 	//j := uint32(0x4000208)
 	//p(fmt.Sprintf("IME %04X", j), d.Gba.Mem.Read16(uint32(j)))

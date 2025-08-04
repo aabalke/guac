@@ -55,6 +55,7 @@ func (gba *GBA) exception(addr uint32, mode uint32) {
 
 	reg.CPSR.SetMode(mode)
 	reg.CPSR.SetThumb(false, &gba.Cpu)
+    reg.CPSR.SetFlag(FLAG_I, true)
 
 	r[PC] = addr
 	return

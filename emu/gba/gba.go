@@ -2,13 +2,13 @@ package gba
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/aabalke/guac/emu/apu"
 	"github.com/aabalke/guac/emu/gba/cart"
 	"github.com/aabalke/guac/emu/gba/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
-
 )
 
 const (
@@ -27,6 +27,7 @@ const (
 var CURR_INST = uint64(0)
 
 var (
+    _ = os.Args
     _ = fmt.Sprintf("")
 )
 
@@ -93,9 +94,14 @@ func (gba *GBA) Update() {
 		// irq has to be at end (count up tests)
 		gba.Irq.checkIRQ()
 
-		//if !gba.Halted {
-		//	CURR_INST++
-		//}
+		if !gba.Halted {
+			CURR_INST++
+		}
+
+        //if CURR_INST == 887 {
+        //    gba.Debugger.print(int(CURR_INST))
+        //    os.Exit(0)
+        //}
 	}
 
 	gba.Apu.Play(gba.Muted)

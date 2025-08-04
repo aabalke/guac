@@ -14,7 +14,7 @@ https://emulation.gametechwiki.com/index.php/GBA_Tests
 
 👍 arm
 👍 thumb
-👍 bios
+❌ bios
 👍 memory
 ❌ nes
 
@@ -26,7 +26,7 @@ https://emulation.gametechwiki.com/index.php/GBA_Tests
    save
 ❌ flash64 (matches mgba)
 ❌ flash128 (matches mgba)
-👍 none
+❌ none
 👍 sram (matches mgba)
 
 ### Arm Wrestler
