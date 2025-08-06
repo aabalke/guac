@@ -44,8 +44,29 @@ func (c *Cartridge) WriteFlash(addr uint32, v uint8) {
 			c.Flash[bankAddr] = v
 		}
 
-	case FL_ERASE:
-		c.EraseFlash(addr, v)
+    case FL_ERASE_ALL:
+
+        for i := range len(c.Flash) {
+            c.Flash[i] = 0xFF
+        }
+
+        c.FlashMode = FL_READ
+        c.FlashStage = 0
+        return
+
+    case FL_ERASE_SECTOR:
+
+        if addr & 0xFFF != 0 {
+            return
+        }
+
+		i := uint32(0)
+		for i = range 0x1000 {
+			c.Flash[(c.FlashBank*0x1_0000)+addr+i] = 0xFF
+		}
+
+		c.FlashMode = FL_READ
+		c.FlashStage = 0
 
 	case FL_BANKSWITCH:
 		if addr == 0x0000 && c.FlashType == FLASH128 && (v == 0 || v == 1) {
@@ -54,7 +75,6 @@ func (c *Cartridge) WriteFlash(addr uint32, v uint8) {
 	}
 
 	c.FlashMode = FL_READ
-
 }
 
 func (c *Cartridge) SetMode(addr uint32, v uint8) bool {
@@ -75,13 +95,13 @@ func (c *Cartridge) SetMode(addr uint32, v uint8) bool {
 		if c.FlashMode == FL_ERASE && v == 0x10 {
 			c.FlashMode = FL_ERASE_ALL
 			c.FlashStage = 0
-			return true
+			return false
 		}
 
 		if c.FlashMode == FL_ERASE && v == 0x30 {
 			c.FlashMode = FL_ERASE_SECTOR
 			c.FlashStage = 0
-			return true
+			return false
 		}
 
 		switch v {
@@ -104,33 +124,4 @@ func (c *Cartridge) SetMode(addr uint32, v uint8) bool {
 	}
 
 	return false
-}
-
-func (c *Cartridge) EraseFlash(addr uint32, v uint8) {
-
-	if c.FlashMode == FL_ERASE_ALL {
-		for i := range len(c.Flash) {
-			c.Flash[i] = 0xFF
-		}
-
-		c.FlashMode = FL_READ
-		c.FlashStage = 0
-		return
-
-	}
-
-	if c.FlashMode == FL_ERASE_SECTOR {
-
-		if addr%0x1000 != 0 {
-			return
-		}
-
-		i := uint32(0)
-		for i = range 0x1000 {
-			c.Flash[(c.FlashBank*0x1_0000)+addr+i] = 0xFF
-		}
-
-		c.FlashMode = FL_READ
-		c.FlashStage = 0
-	}
 }

@@ -6,6 +6,10 @@ import (
 	"github.com/aabalke/guac/emu/gba/utils"
 )
 
+var (
+    _ = utils.ROR
+)
+
 type Memory struct {
 	GBA   *GBA
 	BIOS  [0x4000]uint8
@@ -147,26 +151,41 @@ func (m *Memory) initWriteRegions() {
 		cartridge.Write(relative, v)
 		return
 	}
+
+	m.writeRegions[0xF] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
+
+		m.GBA.Save = true
+
+		cartridge := &m.GBA.Cartridge
+		relative := addr & (0xFFFF)
+
+		cartridge.Write(relative, v)
+		return
+	}
 }
 
 func (m *Memory) initReadRegions() {
 
 	for i := range len(m.readRegions) {
 		m.readRegions[i] = func(m *Memory, addr uint32) uint8 {
+
+            if m.GBA.Cpu.Reg.R[PC] < 0x4000 {
+                return 0
+            }
 			return m.ReadOpenBus(addr)
 		}
 	}
 
 	m.readRegions[0x0] = func(m *Memory, addr uint32) uint8 {
 
-		if addr >= 0x4000 {
-			return m.ReadOpenBus(addr)
-		}
+        if addr < 0x4000 {
+            if m.GBA.Cpu.Reg.R[PC] >= 0x4000 {
+                return m.ReadBios(addr)
+            }
+            return m.BIOS[addr]
+        }
 
-		if m.GBA.Cpu.Reg.R[PC] >= 0x4000 {
-			return m.ReadBios(addr)
-		}
-		return m.BIOS[addr]
+        return m.ReadOpenBus(addr)
 	}
 
 	m.readRegions[0x2] = func(m *Memory, addr uint32) uint8 {
@@ -212,6 +231,10 @@ func (m *Memory) initReadRegions() {
 	}
 
 	m.readRegions[0xE] = func(m *Memory, addr uint32) uint8 {
+		return m.GBA.Cartridge.Read(addr & 0xFFFF)
+	}
+
+	m.readRegions[0xF] = func(m *Memory, addr uint32) uint8 {
 		return m.GBA.Cartridge.Read(addr & 0xFFFF)
 	}
 }
@@ -695,8 +718,7 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 
 func (m *Memory) Read8(addr uint32) uint32 {
 	if badRom := addr >= 0x800_0000 && addr < 0xE00_0000; badRom {
-		offset := (addr - 0x800_0000) & (0x200_0000 - 1)
-		if offset >= m.GBA.Cartridge.RomLength {
+        if addr & 0x1FF_FFFF >= m.GBA.Cartridge.RomLength {
 			return m.ReadBadRom(addr, 1)
 		}
 	}
@@ -710,7 +732,13 @@ func (m *Memory) Read16(addr uint32) uint32 {
 
     switch {
     case addr >= 0xE00_0000:
+
+        //if m.GBA.Cpu.Reg.R[PC] < 0x4000 {
+        //    return uint32(m.Read(addr &^ 1)) * 0x0101
+        //}
+
 		return uint32(m.Read(addr)) * 0x0101
+
     case addr >= 0xD00_0000:
         if ok := CheckEeprom(m.GBA, addr); ok {
             return uint32(m.GBA.Cartridge.EepromRead())
@@ -722,8 +750,7 @@ func (m *Memory) Read16(addr uint32) uint32 {
 		}
 
     case addr >= 0x800_0000:
-		offset := (addr - 0x800_0000) & (0x200_0000 - 1)
-		if offset >= m.GBA.Cartridge.RomLength {
+        if addr & 0x1FF_FFFF >= m.GBA.Cartridge.RomLength {
 			return m.ReadBadRom(addr, 2)
 		}
     }
@@ -735,10 +762,15 @@ func (m *Memory) Read32(addr uint32) uint32 {
 
     switch {
     case addr >= 0xE00_0000:
+
+        //if m.GBA.Cpu.Reg.R[PC] < 0x4000 {
+
+        //    return uint32(m.Read(addr &^ 3)) * 0x01010101
+        //}
+
 		return uint32(m.Read(addr)) * 0x01010101
     case addr >= 0x800_0000:
-		offset := (addr - 0x800_0000) & (0x200_0000 - 1)
-		if offset >= m.GBA.Cartridge.RomLength {
+        if addr & 0x1FF_FFFF >= m.GBA.Cartridge.RomLength {
 			return m.ReadBadRom(addr, 4)
 		}
     }
@@ -1054,6 +1086,7 @@ func (m *Memory) Write16(addr uint32, v uint16) {
 func (m *Memory) Write32(addr uint32, v uint32) {
 
 	if sram := addr >= 0xE00_0000; sram {
+
 		is := addr << 3
         v = utils.RorSimple(v, is)
 		//v, _, _ = utils.Ror(v, is, false, false, false)

@@ -51,9 +51,12 @@ func (d *Debugger) print(i int) {
 	p("MODE", BANK_ID[mode])
 	//p("0x3007FFC", d.Gba.Mem.Read32(0x3007FFC))
 	//p("0x4000004", d.Gba.Mem.Read16(0x4000004))
-	//p("0x4000208", d.Gba.Mem.Read16(0x4000208))
-	//p("0x4000200", d.Gba.Mem.Read16(0x4000200))
-	//p("0x4000202", d.Gba.Mem.Read16(0x4000202))
+	p("4000208", d.Gba.Mem.Read16(0x4000208))
+	p("4000200", d.Gba.Mem.Read16(0x4000200))
+	p("4000004", d.Gba.Mem.Read32(0x4000004))
+	p("4000000", d.Gba.Mem.Read32(0x4000000))
+	p("3000000", d.Gba.Mem.Read32(0x3000000))
+	p("3008000", d.Gba.Mem.Read32(0x3008000))
 
 	s("--------  --------")
 

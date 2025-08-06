@@ -1,6 +1,7 @@
 package menu
 
 import (
+	"bytes"
 	"os"
 
 	"image"
@@ -18,6 +19,16 @@ func loadImage(path string) (*ebiten.Image, error) {
 	defer f.Close()
 
 	img, _, err := image.Decode(f)
+	if err != nil {
+		return nil, err
+	}
+
+	return ebiten.NewImageFromImage(img), nil
+}
+
+func loadImageEmbed(b []byte) (*ebiten.Image, error) {
+
+	img, _, err := image.Decode(bytes.NewReader(b))
 	if err != nil {
 		return nil, err
 	}

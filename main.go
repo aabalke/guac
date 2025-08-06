@@ -52,7 +52,9 @@ func main() {
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	ebiten.SetWindowTitle("guac emulator")
 	ebiten.SetWindowIcon([]image.Image{loadIcon()})
+    //ebiten.SetWindowPosition(100, 100)
 	ebiten.SetWindowSize(240*4, 160*4)
+	//ebiten.SetWindowSize(1280, 720)
 	if config.Conf.Fullscreen {
 		ebiten.SetFullscreen(true)
 	}

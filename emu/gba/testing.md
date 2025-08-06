@@ -14,7 +14,7 @@ https://emulation.gametechwiki.com/index.php/GBA_Tests
 
 👍 arm
 👍 thumb
-❌ bios
+👍 bios
 👍 memory
 ❌ nes
 
@@ -24,10 +24,10 @@ https://emulation.gametechwiki.com/index.php/GBA_Tests
 👍 stripes
 
    save
-❌ flash64 (matches mgba)
-❌ flash128 (matches mgba)
-❌ none
-👍 sram (matches mgba)
+👍 flash64
+👍 flash128
+👍 none
+👍 sram
 
 ### Arm Wrestler
 
@@ -53,22 +53,22 @@ Additionally, other ARMv5 instructions will fail.
 
 ### MGBA Test Suite
 
-❌ Memory tests [1486/1552]
+❌ Memory tests [1542/1552] (with hle bios)
 ❌ I/O read tests [129/130]
 ❌ Timing tests [228/2020]
 ❌ Timer count-up tests [186/936]
-❌ Timer IRQ tests [1/90]
+❌ Timer IRQ tests [0/90]
 👍 Shifter tests [140/140]
 👍 Carry tests [93/93]
 👍 Multiply long tests [52/72] (matches mgba)
-👍 BIOS math tests [615/615]
+👍 BIOS math tests [615/615] (with hle bios)
 ❌ DMA tests [1240/1256]
 ❌ SIO register R/W tests [25/90]
 ❌ SIO timing tests [0/4]
 ❌ Misc. edge case tests [3/10]
 ❌ Video tests
-    ❌ Basic Mode 3
-    ❌ Basic Mode 4
+    👍 Basic Mode 3
+    👍 Basic Mode 4
     👍 Degenerate OBJ transforms
     ❌ Layer toggle
     ❌ Layer toggle 2
@@ -78,16 +78,16 @@ Additionally, other ARMv5 instructions will fail.
 ### NBA-EMU Test Suite
 
 ❌ bus: 128kb Boundary
-❌ dma: burst into tears[0/3]
-❌ dma: force nseq access
-❌ dma: latch
-❌ dma: start delay
-❌ halt: halt cnt[0/6]
-❌ irq: irq delay
+❌ dma: burst into tears [0/3]
+❌ dma: force nseq access [0/2]
+❌ dma: latch [2/3]
+❌ dma: start delay [0/1]
+❌ halt: halt cnt [0/6]
+❌ irq: irq delay [0/3]
 ❌ ppu: bgpd
 ❌ ppu: bgx
 ❌ ppu: dispcnt-latch
-❌ ppu: greenswap
+👍 ppu: greenswap
 ❌ ppu: ram-access-timing
 ❌ ppu: sprite-hmosaic
 ❌ ppu: status-irq-dma
@@ -165,7 +165,9 @@ Additionally, other ARMv5 instructions will fail.
 ### Games
 
 Advance Wars
-    - Menu Missing
+    - intro bg does not move
+Advance Wars 2
+    - No known errors
 Fire Emblem
     - No known errors
 Fire Emblem Sacred Stones

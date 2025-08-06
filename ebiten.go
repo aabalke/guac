@@ -79,12 +79,6 @@ func (g *Game) GetGamepadButtons() ([]ebiten.StandardGamepadButton, []ebiten.Sta
 		g.gamepadConnected = false
 	}
 
-    //if !ebiten.IsStandardGamepadLayoutAvailable(g.gamepad) {
-	//	log.Printf("Gamepad is not standard. Not using.\n")
-    //    g.gamepad = 0
-	//	g.gamepadConnected = false
-    //}
-
     justButtons := inpututil.AppendJustPressedStandardGamepadButtons(g.gamepad, []ebiten.StandardGamepadButton{})
     buttons := inpututil.AppendPressedStandardGamepadButtons(g.gamepad, []ebiten.StandardGamepadButton{})
 
@@ -143,7 +137,7 @@ func (g *Game) Update() error {
 
 		switch g.flags.Type {
 		case NONE:
-			selected := g.menu.InputHandler(justKeys, justButtons)
+			selected := g.menu.InputHandler(justKeys, justButtons, g.frame)
 			if selected {
 				g.SelectConsole()
 				g.menu = nil
@@ -216,7 +210,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	switch g.flags.Type {
 	case NONE:
-		g.menu.DrawMenu(screen)
+		g.menu.DrawMenu(screen, g.frame)
 		return
 	case GBA:
 		ImageFillScreen(screen, g.gba.Image)

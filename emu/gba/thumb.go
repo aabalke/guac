@@ -284,8 +284,10 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
 		res := rsValue + rdValue
 
 		if rd == PC {
-            // has to be word aligned for thumb/thumb.gba
-			r[rd] = (uint32(res) &^ 0b11) + 4
+            // has to be half/word aligned for thumb/thumb.gba
+            // has to be half/none aligned for doom ii
+            //r[rd] = (uint32(res) &^ 0b11) + 4
+			r[rd] = (uint32(res &^ 1)) + 4
 		} else {
 			r[rd] = uint32(res)
 			r[PC] += 2

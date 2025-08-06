@@ -103,9 +103,9 @@ func (gba *GBA) SysCall(inst uint32) (int, bool) {
 	//	IntrWait(gba)
 	//case SYS_VBlankIntrWait:
 	//	VBlankIntrWait(gba)
-	case SYS_Div:
-		Div(gba, false)
-		cycles += 370 // approx
+	//case SYS_Div: // div causes graphical errors in mario kart, may be timing
+	//	Div(gba, false)
+	//	cycles += 370 // approx
 	case SYS_DivArm:
 		Div(gba, true)
 		cycles += 130 // approx
@@ -481,6 +481,85 @@ func RegisterRamReset(gba *GBA) {
 }
 
 func Div(gba *GBA, arm bool) {
+
+    panic("DIV IN HLE IS IMPROPER, MARIO KART")
+
+	const MAX = 0x8000_0000
+
+	r := &gba.Cpu.Reg.R
+
+	nu := int32(r[0])
+	de := int32(r[1])
+
+	if arm {
+		tmp := nu
+		nu = de
+		de = tmp
+	}
+
+    switch {
+    case de == 0 && nu < 0:
+        r[0] = 0xFFFF_FFFF
+        r[1] = uint32(nu)
+        r[3] = 1
+        return
+    case de == 0:
+        r[0] = 1
+        r[1] = uint32(nu)
+        r[3] = 1
+        return
+    case de == -1 && nu == math.MinInt32:
+		r[0] = MAX
+		r[1] = 0
+		r[3] = MAX
+        return
+    }
+
+
+
+	res := float32(nu) / float32(de)
+    mod := uint32(float32(nu) - (res * float32(de)))
+	//mod := uint32(nu % de)
+
+	abs := uint32(math.Abs(float64(res)))
+
+	r[0] = uint32(res)
+	r[1] = mod
+	r[3] = abs
+
+
+
+	//if (de == 0) {
+	//	if (num == 0 || num == -1 || num == 1) {
+	//		mLOG(GBA_BIOS, GAME_ERROR, "Attempting to divide %i by zero!", num);
+	//	} else {
+	//		mLOG(GBA_BIOS, FATAL, "Attempting to divide %i by zero!", num);
+	//	}
+	//	// If abs(num) > 1, this should hang, but that would be painful to
+	//	// emulate in HLE, and no game will get into a state under normal
+	//	// operation where it hangs...
+	//	cpu->gprs[0] = (num < 0) ? -1 : 1;
+	//	cpu->gprs[1] = num;
+	//	cpu->gprs[3] = 1;
+	//} else if (denom == -1 && num == INT32_MIN) {
+	//	mLOG(GBA_BIOS, GAME_ERROR, "Attempting to divide INT_MIN by -1!");
+	//	cpu->gprs[0] = INT32_MIN;
+	//	cpu->gprs[1] = 0;
+	//	cpu->gprs[3] = INT32_MIN;
+	//} else {
+	//	div_t result = div(num, denom);
+	//	cpu->gprs[0] = result.quot;
+	//	cpu->gprs[1] = result.rem;
+	//	cpu->gprs[3] = abs(result.quot);
+	//}
+	//int loops = clz32(denom) - clz32(num);
+	//if (loops < 1) {
+	//	loops = 1;
+	//}
+	//gba->biosStall = 4 /* prologue */ + 13 * loops + 7 /* epilogue */;
+}
+
+func DivOld(gba *GBA, arm bool) {
 
 	const MAX = 0x8000_0000
     const I32_MIN = -2147483647 - 1

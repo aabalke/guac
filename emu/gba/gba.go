@@ -68,6 +68,7 @@ func (gba *GBA) Update() {
 	}
 
 	r := &gba.Cpu.Reg.R
+    _ = r[PC]
 	gba.Drawn = false
 
 	for !gba.Drawn {
@@ -81,15 +82,15 @@ func (gba *GBA) Update() {
 
 		gba.Tick(uint32(cycles))
 
-        if gba.vsyncAddr != 0 && r[PC] == gba.vsyncAddr {
-            vblRaised := gba.Irq.IdleIrq & 1 == 1
-            vblHandled := gba.Irq.IF & 1 != 1
-            if (!(vblRaised && vblHandled)) {
-                gba.Halted = true
-            }
+        //if gba.vsyncAddr != 0 && r[PC] == gba.vsyncAddr {
+        //    vblRaised := gba.Irq.IdleIrq & 1 == 1
+        //    vblHandled := gba.Irq.IF & 1 != 1
+        //    if (!(vblRaised && vblHandled)) {
+        //        gba.Halted = true
+        //    }
 
-            gba.Irq.IdleIrq = gba.Irq.IF
-        }
+        //    gba.Irq.IdleIrq = gba.Irq.IF
+        //}
 
 		// irq has to be at end (count up tests)
 		gba.Irq.checkIRQ()
@@ -98,7 +99,7 @@ func (gba *GBA) Update() {
 			CURR_INST++
 		}
 
-        //if CURR_INST == 887 {
+        ////if r[PC] == 0x800_01FC {
         //    gba.Debugger.print(int(CURR_INST))
         //    os.Exit(0)
         //}
@@ -163,6 +164,10 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba.LoadGame(path)
     gba.SetIdleAddr()
     InitTrig()
+
+	gba.Mem.BIOS_MODE = BIOS_STARTUP
+    gba.Mem.IO[0x6] = 126
+    gba.AccCycles = CYCLES_SCANLINE * 126 + 859
 
 	return &gba
 }
@@ -260,7 +265,7 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 		case SCREEN_HEIGHT:
 			dispstat.SetVBlank(true)
 			gba.checkDmas(DMA_MODE_VBL)
-		case SCREEN_HEIGHT + 1:
+		//case SCREEN_HEIGHT + 1:
 			if utils.BitEnabled(uint32(*dispstat), 3) {
 				gba.Irq.setIRQ(0)
 			}

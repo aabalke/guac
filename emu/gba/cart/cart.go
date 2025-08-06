@@ -183,7 +183,7 @@ func (c *Cartridge) load() {
 			c.SRAM[i] = uint8(sBuf[i])
 		case EEPROM:
 			c.Eeprom[i] = uint8(sBuf[i])
-		default:
+		case FLASH, FLASH128:
 			c.Flash[i] = uint8(sBuf[i])
 		}
 	}
@@ -224,8 +224,10 @@ func (c *Cartridge) Read(addr uint32) uint8 {
 		return c.SRAM[addr]
 	case EEPROM:
 		panic("EEPROM READ USING STD IMPLIMENTATION")
-	default:
+	case FLASH, FLASH128:
 		return c.ReadFlash(addr)
+    default:
+        return 0xFF
 	}
 }
 
@@ -235,7 +237,7 @@ func (c *Cartridge) Write(addr uint32, v uint8) {
 		c.SRAM[addr] = v
 	case EEPROM:
 		panic("EEPROM WRITE USING STD IMPLIMENTATION")
-	default:
+	case FLASH, FLASH128:
 		c.WriteFlash(addr, v)
 	}
 }
