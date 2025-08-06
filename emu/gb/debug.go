@@ -1,6 +1,6 @@
 package gameboy
 
-func (gb *GameBoy) GetOAMTile() [] byte {
+func (gb *GameBoy) GetOAMTile() []byte {
 
 	pixels := make([][]byte, 8)
 
@@ -8,8 +8,8 @@ func (gb *GameBoy) GetOAMTile() [] byte {
 		pixels[i] = make([]byte, 8)
 	}
 
-    o := 0x0
-    mem := gb.MemoryBus.VRAM[(0x10*o):]
+	o := 0x0
+	mem := gb.MemoryBus.VRAM[(0x10 * o):]
 	xOffset, yOffset := 0, 0
 
 	//for i := 0; i < len(mem); i += 0x10 {
@@ -46,8 +46,8 @@ func (gb *GameBoy) GetBgTiles() []byte {
 		pixels[i] = make([]byte, 8)
 	}
 
-    o := 0x31
-    mem := gb.MemoryBus.VRAM[(0x10*o):]
+	o := 0x31
+	mem := gb.MemoryBus.VRAM[(0x10 * o):]
 	xOffset, yOffset := 0, 0
 
 	//for i := 0; i < len(mem); i += 0x10 {

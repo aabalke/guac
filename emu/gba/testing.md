@@ -24,10 +24,10 @@ https://emulation.gametechwiki.com/index.php/GBA_Tests
 👍 stripes
 
    save
-❌ flash64 (matches mgba)
-❌ flash128 (matches mgba)
+👍 flash64
+👍 flash128
 👍 none
-👍 sram (matches mgba)
+👍 sram
 
 ### Arm Wrestler
 
@@ -53,41 +53,41 @@ Additionally, other ARMv5 instructions will fail.
 
 ### MGBA Test Suite
 
-❌ Memory tests [1552/1552]
-❌ I/O read tests [129/130] (Final on is related to channel bits not being properly set off and on)
+❌ Memory tests [1542/1552] (with hle bios)
+❌ I/O read tests [129/130]
 ❌ Timing tests [228/2020]
 ❌ Timer count-up tests [186/936]
-❌ Timer IRQ tests [1/90]
+❌ Timer IRQ tests [0/90]
 👍 Shifter tests [140/140]
 👍 Carry tests [93/93]
 👍 Multiply long tests [52/72] (matches mgba)
-👍 BIOS math tests [615/615]
+👍 BIOS math tests [615/615] (with hle bios)
 ❌ DMA tests [1240/1256]
 ❌ SIO register R/W tests [25/90]
 ❌ SIO timing tests [0/4]
 ❌ Misc. edge case tests [3/10]
 ❌ Video tests
-    ❌ Basic Mode 3
-    ❌ Basic Mode 4
+    👍 Basic Mode 3
+    👍 Basic Mode 4
     👍 Degenerate OBJ transforms
-    👍 Layer toggle
-    👍 Layer toggle 2
+    ❌ Layer toggle
+    ❌ Layer toggle 2
     ❌ OAM Update Delay
     👍 Window offscreen reset (matches mgba)
 
 ### NBA-EMU Test Suite
 
 ❌ bus: 128kb Boundary
-❌ dma: burst into tears[0/3]
-❌ dma: force nseq access
-❌ dma: latch
-❌ dma: start delay
-❌ halt: halt cnt[0/6]
-❌ irq: irq delay
+❌ dma: burst into tears [0/3]
+❌ dma: force nseq access [0/2]
+❌ dma: latch [2/3]
+❌ dma: start delay [0/1]
+❌ halt: halt cnt [0/6]
+❌ irq: irq delay [0/3]
 ❌ ppu: bgpd
 ❌ ppu: bgx
 ❌ ppu: dispcnt-latch
-❌ ppu: greenswap
+👍 ppu: greenswap
 ❌ ppu: ram-access-timing
 ❌ ppu: sprite-hmosaic
 ❌ ppu: status-irq-dma
@@ -119,9 +119,9 @@ Additionally, other ARMv5 instructions will fail.
 👍 irq_demo
 👍 key_demo
 👍 m3_demo
-❌ m7_demo
-❌ m7_demo_mb
-❌ m7_ex
+👍 m7_demo
+👍 m7_demo_mb
+👍 m7_ex
 ❌ mos_demo
 👍 oacombo
 
@@ -148,13 +148,13 @@ Additionally, other ARMv5 instructions will fail.
 👍 octtest (blinks)
 👍 pageflip
 👍 prio_demo
-❌ sbb_aff (does not hide at edges)
+👍 sbb_aff
 👍 sbb_reg (has obj in top left, not sure if problem)
 👍 second
 👍 snd1_demo
 👍 swi_demo
 👍 swi_vsync
-👍 tmr_demo (1.3 works) (uses faux cycle * 4)
+👍 tmr_demo
 ❌ tte_demo
 ❌ txt_bm
 ❌ txt_obj
@@ -164,23 +164,22 @@ Additionally, other ARMv5 instructions will fail.
 
 ### Games
 
-All games require Digital Sound
-
 Advance Wars
-    - Menu Missing
+    - intro bg does not move
+Advance Wars 2
+    - No known errors
 Fire Emblem
     - No known errors
 Fire Emblem Sacred Stones
     - No known errors
 Golden Sun
-    - No known errors
     - crashes in game
 Drill Dozer
-    - Objects not appearing, is affine at top of screen
+    - No known errors
 Harvest Moon Friends of Mineral Town
-    - Blending of Green
+    - No known errors
 Hello Kitty Happy Party Pals
-    - Some Mini games do not load
+    - No known errors
 Kirby Nightmare in Dream Land
     - No known errors
 Lord of The Rings Fellowship
@@ -188,7 +187,7 @@ Lord of The Rings Fellowship
 Lord of The Rings Two Towers
     - No known errors
 Mario Kart Super Circuit
-    - Mode 7
+    - No known errors
 Mega Man Zero
     - Graphics
 Metroid Fusion
@@ -198,7 +197,6 @@ Mother 12
 Mother 3
     - No known errors
 Pokémon Mystery Dungeon Red Rescue Team
-    - Graphics Windows
     - Wave Sound Channel does not envelope / length correctly
 Pokémon Firered / LeafGreen
     - No known errors
@@ -207,7 +205,7 @@ Pokémon Emerald
 Pokémon Ruby / Sapphire
     - No known errors
 Sonic Advance
-    - Affine Disappearance
+    - No known errors
 Spyro Season of Ice
     - No known errors
 Superstar Saga
@@ -223,18 +221,20 @@ The Minish Cap
 Ultimate Puzzle Games
     - No known errors
 Warioware Twisted
-    - I believe needs Mode 7
+    - No known errors
 Wolfenstein 3D
-    - Does not save (verify)
+    - No known errors
 Doom
-    - Does not save (verify)
+    - No known errors
 Doom II
-    - Does not boot
-    - prior to 8337911b76c6e7430ebd092ef7c72522c9dcf0c5: WIDTH 0 EEPROM
-    - post: weird purple problem
+    - Need to fix Mode 4 flashing and object handling
 Zelda Link to the Past
     - No known errors
 Iridion II
     - Odd Graphics Errors
 Iridion 3D
-    - Tiling Graphics Problem
+    - No known errors
+Mario Party
+    - Start Menu has graphical error - it is related to incorrect writes
+    to vram for some reason - an extra FastCpuSet
+

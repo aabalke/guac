@@ -1,9 +1,22 @@
-# 🥑 Guac GBA/GBA/DMG Emulator
+# 🥑 guac: GBA, GBC, DMG Emulator
 
 Guac is an Emulator written in golang for Gameboy, Gameboy Color and Gameboy
 Advance handheld consoles.
 
+# Installation / Building
+
+See Releases for Windows and Linux precompiled binaries.
+
+Building from source is possible with golang > 1.24.5, using:
+
+```
+go build .
+```
+
 # Getting Started
+
+In both command line and console mode, save files are placed in the same directory
+as the rom file (ex. "harvest_moon.gba", "harvest_moon.gba.save")
 
 ## Command line
 
@@ -25,60 +38,42 @@ Selection Screen.
 
 ### Setting up Console Mode
 
-In the same directory as ./guac, create a "roms.json" file. This file will hold
-the game metadata in the following format. At this time Art **MUST** be perfect
-square pngs.
+At root, create a "roms.json" file. This file will hold the game metadata in the
+following format. At this time Art must be 1:1 pngs or jpgs.
 
 ```
 [
  {
-  "Name": "The Minish Cap",
   "RomPath": "./rom/gba/the_minish_cap.gba",
   "ArtPath": "./art/the_minish_cap.png",
-  "Year": 2005,
-  "Console": "Gameboy Advance"
  },
  ...]
  ```
 
-# Installation / Building
+# Configuration
 
-Please use the releases for precompiled binaries.
+Emulator settings can be configured using the config.toml file at root.
+If you would like to return to the default config.toml file, delete any 
+present config.toml file and run the emulator.
 
-Building requires SDL2, SDL2_ttf and SDL2_mixer.
+## Configurable Options
 
-# Keybindings / Controller Support
-
-## Emulator
-
-| Key   | DualSense | Binding           |
-|-------|-----------|-------------------|
-| Enter |           |                   |
-| P     |           |                   |
-| M     |           |                   |
-| F11   |           | Toggle Fullscreen |
-
-## Gameboy / Gameboy Color
-
-| Key   | DualSense | Binding |
-|-------|-----------|---------|
-| Enter |           |         |
-| P     |           |         |
-| M     |           |         |
-
-## Gameboy Advance
-
-| Key   | DualSense | Binding |
-|-------|-----------|---------|
-| J     |           |         |
-| K     |           |         |
-| L     |           |         |
-| ;     |           |         |
+1. Keyboard / Controller Input
+2. Backdrop Color
+3. Original DMG Gameboy Palette
+4. Menu Game Density
+5. Experimental Performance Improvements (HLE Bios, Multithreading etc)
 
 # Testing
 
 Check the ./emu folder for individual consoles. These consoles will have
 "testing.md" files showing currently passing tests and tested games.
+
+# Contributing
+
+Please contribute! At this time I am mostly interested in getting game errors
+fleshed out. Cycle accuracy, and serial communication are not a priority at this
+time. At this time, AI contributions will be rejected.
 
 # Developers
 

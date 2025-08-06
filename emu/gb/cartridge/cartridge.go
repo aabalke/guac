@@ -1,26 +1,25 @@
 package cartridge
 
 import (
-	"fmt"
 	"strings"
-    re "regexp"
 )
 
 type Cartridge struct {
-    Title    string
-    Path     string
-	Data     []uint8
-    RamData  []uint8
-	Type     uint8
-	RomSize  int
-	RamSize  int
-	Checksum bool
-	Valid    bool
-	Mbc      Mbc
-    ColorMode   bool
+	Title     string
+	RomPath   string
+	SavPath   string
+	Data      []uint8
+	RamData   []uint8
+	Type      uint8
+	RomSize   int
+	RamSize   int
+	Checksum  bool
+	Valid     bool
+	Mbc       Mbc
+	ColorMode bool
 
-    RomBank  uint8
-    RamBank  uint8
+	RomBank uint8
+	RamBank uint8
 }
 
 const (
@@ -39,31 +38,16 @@ func (c *Cartridge) ParseHeader() {
 
 	c.Type = c.Data[TYPE]
 
-    c.setTitle()
-    c.setSavePath()
+	c.setTitle()
 	c.setRomSize()
 	c.setRamSize()
-    c.setCGB()
+	c.setCGB()
 	// may need to validate size here
 	c.validateChecksum()
 }
 
 func (c *Cartridge) setTitle() {
-    c.Title = strings.Trim(string(c.Data[0x134:0x143]), string(byte(0b0)))
-}
-
-func (c *Cartridge) setSavePath() {
-    s := strings.ReplaceAll(strings.TrimSpace(strings.ToLower(c.Title)), " ", "_")
-
-    r, err := re.Compile("[^a-z_]")
-    if err != nil {
-        panic(err)
-    }
-
-    println(s)
-    s = r.ReplaceAllLiteralString(s, "")
-
-    c.Path = fmt.Sprintf("./sav/%s.sav", s)
+	c.Title = strings.Trim(string(c.Data[0x134:0x143]), string(byte(0b0)))
 }
 
 func (c *Cartridge) setRomSize() {
@@ -132,9 +116,9 @@ func (c *Cartridge) validateChecksum() {
 
 func (c *Cartridge) setCGB() {
 
-    flag := c.Data[0x143]
+	flag := c.Data[0x143]
 
-    if flag == 0x80 || flag == 0xC0 {
-        c.ColorMode = true
-    }
+	if flag == 0x80 || flag == 0xC0 {
+		c.ColorMode = true
+	}
 }

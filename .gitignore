@@ -2,16 +2,15 @@
 sav
 rom
 .git
-res
 art
-.git
 
 # dev dependencies
-*.dll
 *.exe
-
+todo.md
 
 # other
-*.otf
 *.json
-*.ps1
+#config.toml
+
+*.pprof
+*.syso

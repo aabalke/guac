@@ -1,42 +1,103 @@
 package gba
 
 import (
-	"github.com/aabalke33/guac/emu/gba/utils"
-    "fmt"
+	"encoding/binary"
+	"fmt"
+	"log"
 )
 
-func (cpu *Cpu) DecodeARM(opcode uint32) int {
+func (cpu *Cpu) DecodeARM() int {
 
-    r := &cpu.Reg.R
-	if !cpu.CheckCond(utils.GetByte(opcode, 28)) {
+	r := &cpu.Reg.R
+    mem := &cpu.Gba.Mem
+
+    var opcode uint32
+    switch r[PC] >> 24 {
+    case 0x0: opcode = binary.LittleEndian.Uint32(mem.BIOS[r[PC]:])
+    case 0x2: opcode = binary.LittleEndian.Uint32(mem.WRAM1[r[PC]&0x3FFF:])
+    case 0x3: opcode = binary.LittleEndian.Uint32(mem.WRAM2[r[PC]&0x7FFF:])
+    case 0x8: opcode = binary.LittleEndian.Uint32(cpu.Gba.Cartridge.Rom[r[PC]&0x1FFFFFF:])
+    default:
+        log.Printf("Unexpected Arm PC at %08X CURR %d\n", r[PC], CURR_INST)
+        opcode = cpu.Gba.Mem.Read32(r[PC])
+    }
+
+	if !cpu.CheckCond(opcode >> 28) {
 		r[PC] += 4
 		return 4
 	}
 
-    //if cached := cpu.Gba.Cache.runCache(cpu.Gba, r[PC], opcode); cached {
-    //    return 4
-    //}
+    if swi := (opcode >> 24) & 0xF == 0xF; swi {
+		//cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
+		//cpu.Gba.exception(VEC_SWI, MODE_SWI)
+		//return 4
+		cycles, incPc := cpu.Gba.SysCall((opcode >> 16) & 0xFF)
+
+		if incPc {
+		    r[PC] += 4
+		}
+
+		return cycles
+    }
+
+    switch (opcode >> 25) & 0b111 {
+    case 0b000:
+        switch {
+        case isBX(opcode):
+            cpu.BX(opcode)
+        case isSDT(opcode):
+            cycles := cpu.Sdt(opcode)
+            return int(cycles)
+        case isHalf(opcode):
+            cpu.Half(opcode)
+        case isPSR(opcode):
+            cpu.Psr(opcode)
+        case isSWP(opcode):
+            cpu.Swp(opcode)
+        case isM(opcode):
+            cpu.Mul(opcode)
+        case isALU(opcode):
+            cpu.Alu(opcode)
+        default:
+            panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X, INSTR %d", opcode, r[PC], CURR_INST))
+        }
+
+        return 4
+    case 0b001:
+
+        switch {
+        case isSDT(opcode):
+            cycles := cpu.Sdt(opcode)
+            return int(cycles)
+        case isHalf(opcode):
+            cpu.Half(opcode)
+        case isPSR(opcode):
+            cpu.Psr(opcode)
+        case isSWP(opcode):
+            cpu.Swp(opcode)
+        case isALU(opcode):
+            cpu.Alu(opcode)
+        default:
+            panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X, INSTR %d", opcode, r[PC], CURR_INST))
+        }
+
+        return 4
+    case 0b010:
+    case 0b011:
+    case 0b100:
+		cpu.Block(opcode)
+        return 4
+    case 0b101:
+		cpu.B(opcode)
+        return 4
+    }
 
 	switch {
-	case isSWI(opcode):
-        cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
-        cpu.Gba.exception(VEC_SWI, MODE_SWI)
-        return 4
-        //cycles, incPc := cpu.Gba.SysCall(utils.GetVarData(opcode, 16, 23))
-
-        //if incPc {
-        //    r[PC] += 4
-        //}
-
-        //return cycles
-
-	case isB(opcode):
-		cpu.B(opcode)
 	case isBX(opcode):
 		cpu.BX(opcode)
 	case isSDT(opcode):
-        cycles := cpu.Sdt(opcode)
-        return int(cycles)
+		cycles := cpu.Sdt(opcode)
+		return int(cycles)
 	case isBlock(opcode):
 		cpu.Block(opcode)
 	case isHalf(opcode):
@@ -47,15 +108,15 @@ func (cpu *Cpu) DecodeARM(opcode uint32) int {
 		cpu.Psr(opcode)
 	case isSWP(opcode):
 		cpu.Swp(opcode)
-    case isM(opcode):
-        cpu.Mul(opcode)
+	case isM(opcode):
+		cpu.Mul(opcode)
 	case isALU(opcode):
 		cpu.Alu(opcode)
 	default:
 		panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X, INSTR %d", opcode, r[PC], CURR_INST))
 	}
 
-    return 4
+	return 4
 }
 
 func isOpcodeFormat(opcode, mask, format uint32) bool {
@@ -141,7 +202,7 @@ func isB(opcode uint32) bool {
 
 func isM(opcode uint32) bool {
 
-    is := false
+	is := false
 
 	is = is || isOpcodeFormat(opcode,
 		0b0000_1110_1000_0000_0000_0000_1111_0000,
@@ -152,7 +213,7 @@ func isM(opcode uint32) bool {
 		0b0000_0000_1000_0000_0000_0000_1001_0000,
 	)
 
-    return is
+	return is
 }
 
 func isSWI(opcode uint32) bool {
@@ -175,13 +236,13 @@ func isSDT(opcode uint32) bool {
 	is := false
 	is = is || isOpcodeFormat(
 		opcode,
-        0b0000_1100_0001_0000_0000_0000_0000_0000,
-        0b0000_0100_0001_0000_0000_0000_0000_0000,
+		0b0000_1100_0001_0000_0000_0000_0000_0000,
+		0b0000_0100_0001_0000_0000_0000_0000_0000,
 	)
 	is = is || isOpcodeFormat(
 		opcode,
-        0b0000_1100_0001_0000_0000_0000_0000_0000,
-        0b0000_0100_0000_0000_0000_0000_0000_0000,
+		0b0000_1100_0001_0000_0000_0000_0000_0000,
+		0b0000_0100_0000_0000_0000_0000_0000_0000,
 	)
 
 	return is

@@ -1,65 +1,65 @@
 package gameboy
 
-var palettes = map[string][][]uint8{
-    "greyscale": 	{
-		{0xFF, 0xFF, 0xFF},
-		{0xCC, 0xCC, 0xCC},
-		{0x77, 0x77, 0x77},
-		{0x00, 0x00, 0x00},
-	},
-    "original": 	{
-		{0x9B, 0xBC, 0x0F},
-		{0x8B, 0xAC, 0x0F},
-		{0x30, 0x62, 0x30},
-		{0x0F, 0x38, 0x0F},
-	},
-    "bgb": 	{
-		{0xE0, 0xF8, 0xD0},
-		{0x88, 0xC0, 0x70},
-		{0x34, 0x68, 0x56},
-		{0x08, 0x18, 0x20},
-	},
-    "custom": {
-        {192, 193, 185},
-        {147, 150, 146},
-        {118, 121, 120},
-        {71, 79, 81},
-    },
-}
+//var palettes = map[string][][]uint8{
+//    "greyscale": 	{
+//		{0xFF, 0xFF, 0xFF},
+//		{0xCC, 0xCC, 0xCC},
+//		{0x77, 0x77, 0x77},
+//		{0x00, 0x00, 0x00},
+//	},
+//    "original": 	{
+//		{0x9B, 0xBC, 0x0F},
+//		{0x8B, 0xAC, 0x0F},
+//		{0x30, 0x62, 0x30},
+//		{0x0F, 0x38, 0x0F},
+//	},
+//    "bgb": 	{
+//		{0xE0, 0xF8, 0xD0},
+//		{0x88, 0xC0, 0x70},
+//		{0x34, 0x68, 0x56},
+//		{0x08, 0x18, 0x20},
+//	},
+//    "custom": {
+//        {192, 193, 185},
+//        {147, 150, 146},
+//        {118, 121, 120},
+//        {71, 79, 81},
+//    },
+//}
 
 type ColorPalette struct {
-    Palette []uint8
-    Idx uint8
-    Inc bool
+	Palette []uint8
+	Idx     uint8
+	Inc     bool
 }
 
 func NewColorPalette() *ColorPalette {
 
-    p := make([]uint8, 0x40)
+	p := make([]uint8, 0x40)
 
-    for i := range p {
-        p[i] = 0xFF
-    }
+	for i := range p {
+		p[i] = 0xFF
+	}
 
-    return &ColorPalette{
-        Palette: p,
-    }
+	return &ColorPalette{
+		Palette: p,
+	}
 }
 
 func (cp *ColorPalette) get(pal uint8, num uint8) uint32 {
 
-    idx := (pal * 8) + (num * 2)
-    color := uint16(cp.Palette[idx]) | uint16(cp.Palette[idx+1])<<8
+	idx := (pal * 8) + (num * 2)
+	color := uint16(cp.Palette[idx]) | uint16(cp.Palette[idx+1])<<8
 
-    r := colArr[uint8(color & 0x1F)]
-	g := colArr[uint8((color >> 5) & 0x1F)]
-	b := colArr[uint8((color >> 10) & 0x1F)]
+	r := colArr[uint8(color&0x1F)]
+	g := colArr[uint8((color>>5)&0x1F)]
+	b := colArr[uint8((color>>10)&0x1F)]
 
-    var output uint32 = b
-    output += g << 8
-    output += r << 16
+	var output uint32 = b
+	output += g << 8
+	output += r << 16
 
-    return output
+	return output
 }
 
 // Mapping of the 5 bit colour value to a 8 bit value.

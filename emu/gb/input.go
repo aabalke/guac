@@ -1,107 +1,89 @@
 package gameboy
 
 import (
-	"github.com/veandco/go-sdl2/sdl"
+	"slices"
+
+	"github.com/aabalke/guac/config"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
-func (gb *GameBoy) InputHandler(event sdl.Event) {
+func (gb *GameBoy) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadButton) {
 
-    var tempJoypad uint8 = gb.Joypad
-    reqInterrupt := false
+	keyConfig := config.Conf.Gb.KeyboardConfig
+	buttonConfig := config.Conf.Gba.ControllerConfig
 
-    switch e := event.(type) {
-    case *sdl.KeyboardEvent:
-        gb.UpdateKeyboardInput(e, &tempJoypad, &reqInterrupt)
-    case *sdl.ControllerButtonEvent:
-        gb.UpdateControllerInput(e, &tempJoypad, &reqInterrupt)
-    }
+	tempJoypad := &gb.Joypad
 
-    if reqInterrupt {
-        const JOYPAD uint8 = 0b10000
-        gb.RequestInterrupt(JOYPAD)
-    }
+	reqInterrupt := false
 
-    gb.Joypad = tempJoypad
-    return
-}
+	*tempJoypad = 0b1111_1111
 
-func (gb *GameBoy) UpdateKeyboardInput(keyEvent *sdl.KeyboardEvent, tempJoypad *uint8, reqInterrupt *bool) {
+	for _, key := range keys {
 
-    switch key := keyEvent.Keysym.Sym; key {
-    case sdl.K_j: // A
-        handleKey(tempJoypad, 0b10000, reqInterrupt, keyEvent)
-    case sdl.K_k: // B
-        handleKey(tempJoypad, 0b100000, reqInterrupt, keyEvent)
-    case sdl.K_l: // SELECT
-        handleKey(tempJoypad, 0b1000000, reqInterrupt, keyEvent)
-    case sdl.K_SEMICOLON: // START
-        handleKey(tempJoypad, 0b10000000, reqInterrupt, keyEvent)
-    case sdl.K_d: //
-        handleKey(tempJoypad, 0b1, reqInterrupt, keyEvent)
-    case sdl.K_a: //
-        handleKey(tempJoypad, 0b10, reqInterrupt, keyEvent)
-    case sdl.K_w: //
-        handleKey(tempJoypad, 0b100, reqInterrupt, keyEvent)
-    case sdl.K_s: //
-        handleKey(tempJoypad, 0b1000, reqInterrupt, keyEvent)
-    } 
+		keyStr := key.String()
+		switch {
+		case slices.Contains(keyConfig.A, keyStr):
+			*tempJoypad &^= 0b10000
+			reqInterrupt = true
+		case slices.Contains(keyConfig.B, keyStr):
+			*tempJoypad &^= 0b100000
+			reqInterrupt = true
+		case slices.Contains(keyConfig.Select, keyStr):
+			*tempJoypad &^= 0b1000000
+			reqInterrupt = true
+		case slices.Contains(keyConfig.Start, keyStr):
+			*tempJoypad &^= 0b10000000
+			reqInterrupt = true
+		case slices.Contains(keyConfig.Right, keyStr):
+			*tempJoypad &^= 0b1
+			reqInterrupt = true
+		case slices.Contains(keyConfig.Left, keyStr):
+			*tempJoypad &^= 0b10
+			reqInterrupt = true
+		case slices.Contains(keyConfig.Up, keyStr):
+			*tempJoypad &^= 0b100
+			reqInterrupt = true
+		case slices.Contains(keyConfig.Down, keyStr):
+			*tempJoypad &^= 0b1000
+			reqInterrupt = true
+		}
+	}
 
-}
+	for _, button := range buttons {
 
-func (gb *GameBoy) UpdateControllerInput(controllerEvent *sdl.ControllerButtonEvent, tempJoypad *uint8, reqInterrupt *bool) {
+		buttonStr := int(button)
 
-    switch key := controllerEvent.Button; key {
-    case sdl.CONTROLLER_BUTTON_A: // A //ps x
-        handleButton(tempJoypad, 0b10000, reqInterrupt, controllerEvent)
-    case sdl.CONTROLLER_BUTTON_B: // B
-        handleButton(tempJoypad, 0b100000, reqInterrupt, controllerEvent)
-    case sdl.CONTROLLER_BUTTON_X: // SELECT
-        handleButton(tempJoypad, 0b1000000, reqInterrupt, controllerEvent)
-    case sdl.CONTROLLER_BUTTON_Y: // START
-        handleButton(tempJoypad, 0b10000000, reqInterrupt, controllerEvent)
-    case sdl.CONTROLLER_BUTTON_DPAD_RIGHT:
-        handleButton(tempJoypad, 0b1, reqInterrupt, controllerEvent)
-    case sdl.CONTROLLER_BUTTON_DPAD_LEFT:
-        handleButton(tempJoypad, 0b10, reqInterrupt, controllerEvent)
-    case sdl.CONTROLLER_BUTTON_DPAD_UP:
-        handleButton(tempJoypad, 0b100, reqInterrupt, controllerEvent)
-    case sdl.CONTROLLER_BUTTON_DPAD_DOWN:
-        handleButton(tempJoypad, 0b1000, reqInterrupt, controllerEvent)
-    } 
-}
+		switch {
+		case slices.Contains(buttonConfig.A, buttonStr):
+			*tempJoypad &^= 0b10000
+			reqInterrupt = true
+		case slices.Contains(buttonConfig.B, buttonStr):
+			*tempJoypad &^= 0b100000
+			reqInterrupt = true
+		case slices.Contains(buttonConfig.Select, buttonStr):
+			*tempJoypad &^= 0b1000000
+			reqInterrupt = true
+		case slices.Contains(buttonConfig.Start, buttonStr):
+			*tempJoypad &^= 0b10000000
+			reqInterrupt = true
+		case slices.Contains(buttonConfig.Right, buttonStr):
+			*tempJoypad &^= 0b1
+			reqInterrupt = true
+		case slices.Contains(buttonConfig.Left, buttonStr):
+			*tempJoypad &^= 0b10
+			reqInterrupt = true
+		case slices.Contains(buttonConfig.Up, buttonStr):
+			*tempJoypad &^= 0b100
+			reqInterrupt = true
+		case slices.Contains(buttonConfig.Down, buttonStr):
+			*tempJoypad &^= 0b1000
+			reqInterrupt = true
+		}
 
-func handleKey(tempJoypad *uint8, mask uint8, reqInterrupt *bool, keyEvent *sdl.KeyboardEvent) {
+	}
 
-    if keyEvent.State == sdl.PRESSED {
-    //if keyEvent.Type == sdl.KEYDOWN || keyEvent.State == sdl.PRESSED {
-        *tempJoypad &^= mask
-
-        if !*reqInterrupt {
-            *reqInterrupt = true
-        }
-
-        return
-    }
-
-    if keyEvent.State == sdl.RELEASED {
-    //if keyEvent.Type == sdl.KEYUP || keyEvent.State == sdl.RELEASED{
-        *tempJoypad |= mask
-    }
-
-}
-
-func handleButton(tempJoypad *uint8, mask uint8, reqInterrupt *bool, controllerEvent *sdl.ControllerButtonEvent) {
-
-    if controllerEvent.Type == sdl.CONTROLLERBUTTONDOWN {
-
-        *tempJoypad &^= mask
-
-        if !*reqInterrupt {
-            *reqInterrupt = true
-        }
-    }
-
-    if controllerEvent.Type == sdl.CONTROLLERBUTTONUP {
-        *tempJoypad |= mask
-    }
+	if reqInterrupt {
+		const JOYPAD uint8 = 0b10000
+		gb.RequestInterrupt(JOYPAD)
+	}
 }

@@ -13,7 +13,6 @@ const (
 
 func (gba *GBA) exception(addr uint32, mode uint32) {
 
-
 	if mode != MODE_IRQ && mode != MODE_SWI {
 		panic("UNKNOWN EXCEPTION MODE")
 	}
@@ -34,7 +33,8 @@ func (gba *GBA) exception(addr uint32, mode uint32) {
 		gba.Mem.BIOS_MODE = BIOS_SWI
 	}
 
-	thumb := reg.CPSR.GetFlag(FLAG_T)
+	//thumb := reg.CPSR.GetFlag(FLAG_T)
+	thumb := reg.isThumb
 
 	c := BANK_ID[reg.getMode()]
 	i := BANK_ID[mode]
@@ -42,7 +42,6 @@ func (gba *GBA) exception(addr uint32, mode uint32) {
 	reg.LR[c] = r[LR]
 	r[SP] = reg.SP[i]
 	r[LR] = reg.LR[i]
-	//reg.CPSR = Cond((uint32(reg.CPSR) &^ 0b11111) | mode)
 	reg.SPSR[i] = reg.CPSR
 
 	switch {
@@ -55,8 +54,8 @@ func (gba *GBA) exception(addr uint32, mode uint32) {
 	}
 
 	reg.CPSR.SetMode(mode)
-	reg.CPSR.SetFlag(FLAG_T, false)
-	reg.CPSR.SetFlag(FLAG_I, true)
+	reg.CPSR.SetThumb(false, &gba.Cpu)
+    reg.CPSR.SetFlag(FLAG_I, true)
 
 	r[PC] = addr
 	return
@@ -76,6 +75,7 @@ func (gba *GBA) ExitException(mode uint32) {
 
 	i := BANK_ID[mode]
 	reg.CPSR = reg.SPSR[i]
+    reg.isThumb = reg.CPSR.GetFlag(FLAG_T)
 	c := BANK_ID[cpu.Reg.getMode()]
 
 	// if you set this up for fiq, get the special registers
