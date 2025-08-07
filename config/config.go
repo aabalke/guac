@@ -42,6 +42,8 @@ type GbaConfig struct {
 
     SkipHle bool `toml:"skip_hle"`
     Threads int  `toml:"threads"`
+    IdleOptimize bool `toml:"idle_optimize"`
+    SoundClockUpdateCycles int `toml:"sound_clock_update_cycles"`
 }
 
 type KeyboardConfig struct {

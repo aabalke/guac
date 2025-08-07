@@ -13,10 +13,14 @@ func (cpu *Cpu) DecodeARM() int {
 
     var opcode uint32
     switch r[PC] >> 24 {
-    case 0x0: opcode = binary.LittleEndian.Uint32(mem.BIOS[r[PC]:])
-    case 0x2: opcode = binary.LittleEndian.Uint32(mem.WRAM1[r[PC]&0x3FFF:])
-    case 0x3: opcode = binary.LittleEndian.Uint32(mem.WRAM2[r[PC]&0x7FFF:])
-    case 0x8: opcode = binary.LittleEndian.Uint32(cpu.Gba.Cartridge.Rom[r[PC]&0x1FFFFFF:])
+    case 0x0:
+        opcode = binary.LittleEndian.Uint32(mem.BIOS[r[PC]:])
+    case 0x2:
+        opcode = binary.LittleEndian.Uint32(mem.WRAM1[r[PC]&0x3FFFF:])
+    case 0x3:
+        opcode = binary.LittleEndian.Uint32(mem.WRAM2[r[PC]&0x7FFF:])
+    case 0x8, 0x9, 0xA, 0xB, 0xC, 0xD:
+        opcode = binary.LittleEndian.Uint32(cpu.Gba.Cartridge.Rom[r[PC]&0x1FFFFFF:])
     default:
         log.Printf("Unexpected Arm PC at %08X CURR %d\n", r[PC], CURR_INST)
         opcode = cpu.Gba.Mem.Read32(r[PC])

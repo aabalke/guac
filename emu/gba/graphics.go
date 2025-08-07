@@ -8,11 +8,7 @@ import (
 	"github.com/aabalke/guac/config"
 )
 
-var (
-	_ = fmt.Sprintf("")
-
-    wg = sync.WaitGroup{}
-)
+var wg = sync.WaitGroup{}
 
 const (
 	MAX_HEIGHT = 256
@@ -369,6 +365,14 @@ func (gba *GBA) setObjectAffinePixel(obj *Object, x, y uint32) (uint32, bool) {
 		xIdx += 512 // i believe 512 is max
 	}
 
+    if obj.Mosaic && gba.PPU.Mosaic.ObjH != 0 {
+        xIdx -= xIdx % int(gba.PPU.Mosaic.ObjH + 1)
+    }
+
+    if obj.Mosaic && gba.PPU.Mosaic.ObjV != 0 {
+        yIdx -= yIdx % int(gba.PPU.Mosaic.ObjV + 1)
+    }
+
 	xOrigin := float32(xIdx - (int(obj.W) / 2))
 	yOrigin := float32(yIdx - (int(obj.H) / 2))
 
@@ -467,6 +471,14 @@ func (gba *GBA) setObjectPixel(obj *Object, x, y uint32) (uint32, bool) {
 	if outObjectBound(obj, xIdx, yIdx) {
 		return 0, false
 	}
+
+    if obj.Mosaic && gba.PPU.Mosaic.ObjH != 0 {
+        xIdx -= xIdx % int(gba.PPU.Mosaic.ObjH + 1)
+    }
+
+    if obj.Mosaic && gba.PPU.Mosaic.ObjV != 0 {
+        yIdx -= yIdx % int(gba.PPU.Mosaic.ObjV + 1)
+    }
 
 	enTileX, enTileY, inTileX, inTileY := getPositions(obj, uint32(xIdx), uint32(yIdx))
 	addr := getTileAddr(obj, enTileX, enTileY, inTileX, inTileY)
@@ -766,6 +778,14 @@ func (gba *GBA) setAffineBackgroundPixel(bg *Background, x uint32) (uint32, bool
 	xIdx := int(pa*float64(x) + bg.OutX)
 	yIdx := int(pc*float64(x) + bg.OutY)
 
+    if bg.Mosaic && gba.PPU.Mosaic.BgH != 0 {
+        xIdx -= xIdx % int(gba.PPU.Mosaic.BgH + 1)
+    }
+
+    if bg.Mosaic && gba.PPU.Mosaic.BgV != 0 {
+        yIdx -= yIdx % int(gba.PPU.Mosaic.BgV + 1)
+    }
+
 	out := xIdx < 0 || xIdx >= int(bg.W) || yIdx < 0 || yIdx >= int(bg.H)
 
 	switch {
@@ -813,6 +833,15 @@ func (gba *GBA) setBackgroundPixel(bg *Background, x, y uint32) (uint32, bool) {
 
 	xIdx := (x + bg.XOffset) & ((bg.W) - 1)
 	yIdx := (y + bg.YOffset) & ((bg.H) - 1)
+
+    if bg.Mosaic && gba.PPU.Mosaic.BgH != 0 {
+        xIdx -= xIdx % (gba.PPU.Mosaic.BgH + 1)
+    }
+
+    if bg.Mosaic && gba.PPU.Mosaic.BgV != 0 {
+        yIdx -= yIdx % (gba.PPU.Mosaic.BgV + 1)
+    }
+
 	map_x := xIdx >> 3
 	map_y := yIdx >> 3
 	quad_x := uint32(10)//32 * 32

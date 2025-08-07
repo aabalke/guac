@@ -15,6 +15,7 @@ type PPU struct {
 	Backgrounds [4]Background
 	Windows     Windows
 	Blend       Blend
+    Mosaic Mosaic
 
     bgPriorities [4][]uint32
     objPriorities [4][]uint32
@@ -54,6 +55,10 @@ type Window struct {
 	oL, oR, oT, oB uint32
 	InBg           [4]bool
 	InObj, InBld   bool
+}
+
+type Mosaic struct {
+    BgH, BgV, ObjH, ObjV uint32
 }
 
 type Background struct {
@@ -136,6 +141,17 @@ func (p *PPU) UpdatePPU(addr uint32, v uint32) {
 		wins.Win1.Enabled = p.Dispcnt.DisplayWin1
 		wins.WinObj.Enabled = p.Dispcnt.DisplayObjWin && p.Dispcnt.DisplayObj
 		wins.Enabled = wins.Win0.Enabled || wins.Win1.Enabled || wins.WinObj.Enabled
+
+    case 0x4C:
+
+        p.Mosaic.BgH = utils.GetVarData(v, 0, 3)
+        p.Mosaic.BgV = utils.GetVarData(v, 4, 7)
+
+    case 0x4D:
+
+        p.Mosaic.ObjH = utils.GetVarData(v, 0, 3)
+        p.Mosaic.ObjV = utils.GetVarData(v, 4, 7)
+
 
 	case 0x50:
 		p.Blend.a[0] = utils.BitEnabled(v, 0)

@@ -64,11 +64,15 @@ down = [13]
 
 [gba]
 
-# HLE BIOS is not accurate on timings and will cause graphical glitches
-skip_hle = true 
-
-# usually multiple of 2, in testing it slows down things
+# Experimental options which may cause crashes or glitches
+# skip_hle = true 
 #threads = 8
+idle_optimize = true
+
+# set between 1 - 1232 to set how often the sound clock is updated
+# lower is more often, which is great for quality
+# higher is better for lower end systems that cannot render sound fast enough
+sound_clock_update_cycles = 0x200
 
 [gba.keyboard]
 a = ["J"]

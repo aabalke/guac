@@ -6,10 +6,6 @@ import (
 	"github.com/aabalke/guac/emu/gba/utils"
 )
 
-var (
-    _ = utils.ROR
-)
-
 type Memory struct {
 	GBA   *GBA
 	BIOS  [0x4000]uint8
@@ -1048,11 +1044,7 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 		m.IO[addr] = v
 	}
 
-	if addr == 0x0 || addr == 0x1 || addr >= 0x50 && addr < 0x55 {
-		m.GBA.PPU.UpdatePPU(addr, uint32(v))
-	}
-
-	if window := addr >= 0x8 && addr < 0x4C; window {
+	if addr == 0x0 || addr == 0x1 || (addr >= 0x8 && addr < 0x55) {
 		m.GBA.PPU.UpdatePPU(addr, uint32(v))
 	}
 }

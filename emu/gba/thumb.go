@@ -688,7 +688,7 @@ func (cpu *Cpu) thumbLSImm(opcode uint16) {
 		cpu.Gba.Mem.Write8(addr, uint8(r[rd]))
 	case THUMB_LDRB_IMM:
 		addr := r[rb] + nn
-		r[rd] = uint32(cpu.Gba.Mem.Read(addr))
+		r[rd] = uint32(cpu.Gba.Mem.Read8(addr))
 	}
 
 	r[PC] += 2

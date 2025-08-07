@@ -1,9 +1,7 @@
 package gba
 
 import (
-	"fmt"
-	"os"
-
+	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/apu"
 	"github.com/aabalke/guac/emu/gba/cart"
 	"github.com/aabalke/guac/emu/gba/utils"
@@ -26,11 +24,6 @@ const (
 
 var CURR_INST = uint64(0)
 
-var (
-    _ = os.Args
-    _ = fmt.Sprintf("")
-)
-
 type GBA struct {
 	Debugger  Debugger
 	Cartridge cart.Cartridge
@@ -46,6 +39,9 @@ type GBA struct {
 	OpenBusOpcode                      uint32
 	AccCycles                          uint32
 	Keypad                             Keypad
+
+    SoundCycles uint32
+    SoundCyclesMask uint32
 
     vsyncAddr uint32
 
@@ -68,7 +64,6 @@ func (gba *GBA) Update() {
 	}
 
 	r := &gba.Cpu.Reg.R
-    _ = r[PC]
 	gba.Drawn = false
 
 	for !gba.Drawn {
@@ -82,15 +77,18 @@ func (gba *GBA) Update() {
 
 		gba.Tick(uint32(cycles))
 
-        //if gba.vsyncAddr != 0 && r[PC] == gba.vsyncAddr {
-        //    vblRaised := gba.Irq.IdleIrq & 1 == 1
-        //    vblHandled := gba.Irq.IF & 1 != 1
-        //    if (!(vblRaised && vblHandled)) {
-        //        gba.Halted = true
-        //    }
 
-        //    gba.Irq.IdleIrq = gba.Irq.IF
-        //}
+        if config.Conf.Gba.IdleOptimize {
+            if gba.vsyncAddr != 0 && r[PC] == gba.vsyncAddr {
+                vblRaised := gba.Irq.IdleIrq & 1 == 1
+                vblHandled := gba.Irq.IF & 1 != 1
+                if (!(vblRaised && vblHandled)) {
+                    gba.Halted = true
+                }
+
+                gba.Irq.IdleIrq = gba.Irq.IF
+            }
+        }
 
 		// irq has to be at end (count up tests)
 		gba.Irq.checkIRQ()
@@ -98,11 +96,6 @@ func (gba *GBA) Update() {
 		if !gba.Halted {
 			CURR_INST++
 		}
-
-        ////if r[PC] == 0x800_01FC {
-        //    gba.Debugger.print(int(CURR_INST))
-        //    os.Exit(0)
-        //}
 	}
 
 	gba.Apu.Play(gba.Muted)
@@ -113,6 +106,14 @@ func (gba *GBA) Update() {
 }
 
 func (gba *GBA) Tick(cycles uint32) {
+
+    gba.SoundCycles += cycles
+
+    if gba.SoundCycles >= gba.SoundCyclesMask {
+        gba.Apu.SoundClock(gba.SoundCycles, false)
+        gba.SoundCycles &= (gba.SoundCyclesMask - 1)
+    }
+
 	gba.VideoUpdate(uint32(cycles))
 	gba.UpdateTimers(uint32(cycles))
 }
@@ -130,6 +131,7 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 		Image:  ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 		Keypad: Keypad{KEYINPUT: 0x3FF},
 		Apu:    apu.NewApu(ctx, CPU_FREQ_HZ, SND_FREQUENCY, SND_SAMPLES),
+        SoundCyclesMask: max(0x80, uint32(config.Conf.Gba.SoundClockUpdateCycles)), 
 	}
 
 	gba.PPU.gba = &gba
@@ -165,9 +167,13 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
     gba.SetIdleAddr()
     InitTrig()
 
+    startScanline := uint32(0)
+
 	gba.Mem.BIOS_MODE = BIOS_STARTUP
-    gba.Mem.IO[0x6] = 126
-    gba.AccCycles = CYCLES_SCANLINE * 126 + 859
+    gba.Mem.IO[0x6] = uint8(startScanline)
+    gba.AccCycles = CYCLES_SCANLINE * startScanline + 859
+
+    gba.Cpu.Reg.CPSR.SetFlag(FLAG_I, false)
 
 	return &gba
 }
@@ -247,7 +253,7 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 	if newScanline := currScanlineCycles < prevScanlineCycles; newScanline {
 
         // this 1232 cycle count is estimate, should replace with actual
-        gba.Apu.SoundClock(1232, false)
+        //gba.Apu.SoundClock(1232, false)
 
 		dispstat.SetHBlank(false)
 
@@ -265,7 +271,9 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 		case SCREEN_HEIGHT:
 			dispstat.SetVBlank(true)
 			gba.checkDmas(DMA_MODE_VBL)
-		//case SCREEN_HEIGHT + 1:
+        // bios/bios.gba needs irq set on screen_height, iridion 3d needs screen_height + 1
+        // I believe this is cycle related
+		case SCREEN_HEIGHT + 1:
 			if utils.BitEnabled(uint32(*dispstat), 3) {
 				gba.Irq.setIRQ(0)
 			}

@@ -14,7 +14,7 @@ https://emulation.gametechwiki.com/index.php/GBA_Tests
 
 👍 arm
 👍 thumb
-👍 bios
+❌ bios (cycle problem)
 👍 memory
 ❌ nes
 
@@ -123,6 +123,11 @@ Additionally, other ARMv5 instructions will fail.
 👍 m7_demo_mb
 👍 m7_ex
 ❌ mos_demo
+    👍 ObjH
+    ❌ ObjV - final height is different, minor difference
+    👍 BgH
+    👍 BgV
+
 👍 oacombo
 
 ❌ obj_aff
@@ -164,6 +169,8 @@ Additionally, other ARMv5 instructions will fail.
 
 ### Games
 
+Many games have problems with the Channel 3 sound volume
+
 Advance Wars
     - intro bg does not move
 Advance Wars 2
@@ -189,7 +196,7 @@ Lord of The Rings Two Towers
 Mario Kart Super Circuit
     - No known errors
 Mega Man Zero
-    - Graphics
+    - Crashes
 Metroid Fusion
     - No known errors
 Mother 12
@@ -231,9 +238,9 @@ Doom II
 Zelda Link to the Past
     - No known errors
 Iridion II
-    - Odd Graphics Errors
-Iridion 3D
     - No known errors
+Iridion 3D
+    - crashes after menus
 Mario Party
     - Start Menu has graphical error - it is related to incorrect writes
     to vram for some reason - an extra FastCpuSet
