@@ -223,7 +223,7 @@ func (c *Cartridge) Read(addr uint32) uint8 {
 	case SRAM:
 		return c.SRAM[addr]
 	case EEPROM:
-		panic("EEPROM READ USING STD IMPLIMENTATION")
+		panic("EEPROM READ USING STD IMPLIMENTATION OR GGPIO")
 	case FLASH, FLASH128:
 		return c.ReadFlash(addr)
     default:

@@ -78,16 +78,14 @@ func (gba *GBA) Update() {
 		gba.Tick(uint32(cycles))
 
 
-        if config.Conf.Gba.IdleOptimize {
-            if gba.vsyncAddr != 0 && r[PC] == gba.vsyncAddr {
-                vblRaised := gba.Irq.IdleIrq & 1 == 1
-                vblHandled := gba.Irq.IF & 1 != 1
-                if (!(vblRaised && vblHandled)) {
-                    gba.Halted = true
-                }
-
-                gba.Irq.IdleIrq = gba.Irq.IF
+        if gba.vsyncAddr != 0 && r[PC] == gba.vsyncAddr {
+            vblRaised := gba.Irq.IdleIrq & 1 == 1
+            vblHandled := gba.Irq.IF & 1 != 1
+            if (!(vblRaised && vblHandled)) {
+                gba.Halted = true
             }
+
+            gba.Irq.IdleIrq = gba.Irq.IF
         }
 
 		// irq has to be at end (count up tests)

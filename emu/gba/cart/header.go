@@ -14,9 +14,9 @@ type Header struct {
 func NewHeader(c *Cartridge) *Header {
 
 	h := &Header{
-		Title:     string(c.Rom[0xA0 : 0xA0+12]),
-		GameCode:  string(c.Rom[0xAC : 0xAC+4]),
-        Version: uint8(c.Rom[0xBC]),
+		Title:    strings.ToUpper(strings.ReplaceAll(string(c.Rom[0xA0 : 0xA0+12]), "\x00", " ")),
+		GameCode: strings.ToUpper(string(c.Rom[0xAC : 0xAC+4])),
+        Version:  uint8(c.Rom[0xBC]),
 	}
 
 	if strings.HasPrefix(h.GameCode, "F") {
