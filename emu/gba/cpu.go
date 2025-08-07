@@ -115,7 +115,7 @@ type Reg struct {
 	CPSR Cond
 	SPSR [6]Cond
 
-    isThumb bool
+	isThumb bool
 }
 
 type Cond uint32
@@ -125,8 +125,8 @@ func (c *Cond) GetFlag(flag uint32) bool {
 }
 
 func (c *Cond) SetThumb(value bool, cpu *Cpu) {
-    cpu.Reg.isThumb = value
-    c.SetFlag(FLAG_T, value)
+	cpu.Reg.isThumb = value
+	c.SetFlag(FLAG_T, value)
 }
 
 func (c *Cond) SetFlag(flag uint32, value bool) {

@@ -15,10 +15,10 @@ type PPU struct {
 	Backgrounds [4]Background
 	Windows     Windows
 	Blend       Blend
-    Mosaic Mosaic
+	Mosaic      Mosaic
 
-    bgPriorities [4][]uint32
-    objPriorities [4][]uint32
+	bgPriorities  [4][]uint32
+	objPriorities [4][]uint32
 }
 
 type Dispcnt struct {
@@ -58,7 +58,7 @@ type Window struct {
 }
 
 type Mosaic struct {
-    BgH, BgV, ObjH, ObjV uint32
+	BgH, BgV, ObjH, ObjV uint32
 }
 
 type Background struct {
@@ -142,16 +142,15 @@ func (p *PPU) UpdatePPU(addr uint32, v uint32) {
 		wins.WinObj.Enabled = p.Dispcnt.DisplayObjWin && p.Dispcnt.DisplayObj
 		wins.Enabled = wins.Win0.Enabled || wins.Win1.Enabled || wins.WinObj.Enabled
 
-    case 0x4C:
+	case 0x4C:
 
-        p.Mosaic.BgH = utils.GetVarData(v, 0, 3)
-        p.Mosaic.BgV = utils.GetVarData(v, 4, 7)
+		p.Mosaic.BgH = utils.GetVarData(v, 0, 3)
+		p.Mosaic.BgV = utils.GetVarData(v, 4, 7)
 
-    case 0x4D:
+	case 0x4D:
 
-        p.Mosaic.ObjH = utils.GetVarData(v, 0, 3)
-        p.Mosaic.ObjV = utils.GetVarData(v, 4, 7)
-
+		p.Mosaic.ObjH = utils.GetVarData(v, 0, 3)
+		p.Mosaic.ObjV = utils.GetVarData(v, 4, 7)
 
 	case 0x50:
 		p.Blend.a[0] = utils.BitEnabled(v, 0)
@@ -384,8 +383,8 @@ func (p *PPU) UpdateOAM(relAddr uint32) {
 
 func UpdateAffineParams(obj *Object, m *Memory) {
 	paramsAddr := obj.RotParams * 0x20
-    obj.Pa = float32(int16(binary.LittleEndian.Uint16(m.OAM[paramsAddr+0x06:]))) / 256
-    obj.Pb = float32(int16(binary.LittleEndian.Uint16(m.OAM[paramsAddr+0x0E:]))) / 256
+	obj.Pa = float32(int16(binary.LittleEndian.Uint16(m.OAM[paramsAddr+0x06:]))) / 256
+	obj.Pb = float32(int16(binary.LittleEndian.Uint16(m.OAM[paramsAddr+0x0E:]))) / 256
 	obj.Pc = float32(int16(binary.LittleEndian.Uint16(m.OAM[paramsAddr+0x16:]))) / 256
 	obj.Pd = float32(int16(binary.LittleEndian.Uint16(m.OAM[paramsAddr+0x1E:]))) / 256
 }

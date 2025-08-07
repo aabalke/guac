@@ -3,11 +3,11 @@
 1. Mode 4: fix objects, and blinking
 - Doom II, Need for Speed Underground
 
-2. Mosaic
+2. Affine Object cut out
 
-3. Affine Object cut out
+3. NES Game Support
 
-4. NES Game Support
+4. RTC
 
 # Audio
 
@@ -17,3 +17,8 @@ in a way, but I cannot get ebitengine to do the same.
 
 2. Need to fix pitch and volume of the analog channels, particularly volume of
 WAVE and pitch of NOISE.
+
+# Things that are not planned
+
+- Serial Comms
+- Other peripherals

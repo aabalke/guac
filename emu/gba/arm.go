@@ -149,21 +149,21 @@ func (cpu *Cpu) GetOp2(opcode uint32) (uint32, bool) {
 
 func (cpu *Cpu) logical(alu *Alu) {
 
-    var res uint32
-    switch alu.Inst {
-    case AND:
-        res = alu.RnValue & alu.Op2
-    case EOR:
-        res = alu.RnValue ^ alu.Op2
-    case ORR:
-        res = alu.RnValue | alu.Op2
-    case MOV:
-        res = alu.Op2
-    case MVN:
-        res = ^alu.Op2
-    case BIC:
-        res = alu.RnValue &^ alu.Op2
-    }
+	var res uint32
+	switch alu.Inst {
+	case AND:
+		res = alu.RnValue & alu.Op2
+	case EOR:
+		res = alu.RnValue ^ alu.Op2
+	case ORR:
+		res = alu.RnValue | alu.Op2
+	case MOV:
+		res = alu.Op2
+	case MVN:
+		res = ^alu.Op2
+	case BIC:
+		res = alu.RnValue &^ alu.Op2
+	}
 
 	cpu.Reg.R[alu.Rd] = res
 
@@ -177,16 +177,22 @@ func (cpu *Cpu) arithmetic(alu *Alu) {
 		carry = 1
 	}
 
-    var res uint64
+	var res uint64
 
-    switch alu.Inst {
-    case ADD: res = uint64(alu.RnValue) + uint64(alu.Op2)
-    case ADC: res = uint64(alu.RnValue) + uint64(alu.Op2) + carry
-    case SUB: res = uint64(alu.RnValue) - uint64(alu.Op2)
-    case SBC: res = uint64(alu.RnValue) - uint64(alu.Op2) + carry - 1
-    case RSB: res = uint64(alu.Op2) - uint64(alu.RnValue)
-    case RSC: res = uint64(alu.Op2) - uint64(alu.RnValue) + carry - 1
-    }
+	switch alu.Inst {
+	case ADD:
+		res = uint64(alu.RnValue) + uint64(alu.Op2)
+	case ADC:
+		res = uint64(alu.RnValue) + uint64(alu.Op2) + carry
+	case SUB:
+		res = uint64(alu.RnValue) - uint64(alu.Op2)
+	case SBC:
+		res = uint64(alu.RnValue) - uint64(alu.Op2) + carry - 1
+	case RSB:
+		res = uint64(alu.Op2) - uint64(alu.RnValue)
+	case RSC:
+		res = uint64(alu.Op2) - uint64(alu.RnValue) + carry - 1
+	}
 
 	cpu.Reg.R[alu.Rd] = uint32(res)
 
@@ -195,13 +201,17 @@ func (cpu *Cpu) arithmetic(alu *Alu) {
 
 func (cpu *Cpu) test(alu *Alu) {
 
-    var res uint64
-    switch alu.Inst {
-    case TST: res = uint64(alu.RnValue) & uint64(alu.Op2)
-    case TEQ: res = uint64(alu.RnValue) ^ uint64(alu.Op2)
-    case CMP: res = uint64(alu.RnValue) - uint64(alu.Op2)
-    case CMN: res = uint64(alu.RnValue) + uint64(alu.Op2)
-    }
+	var res uint64
+	switch alu.Inst {
+	case TST:
+		res = uint64(alu.RnValue) & uint64(alu.Op2)
+	case TEQ:
+		res = uint64(alu.RnValue) ^ uint64(alu.Op2)
+	case CMP:
+		res = uint64(alu.RnValue) - uint64(alu.Op2)
+	case CMN:
+		res = uint64(alu.RnValue) + uint64(alu.Op2)
+	}
 
 	//incPc := true
 
@@ -230,13 +240,13 @@ func (cpu *Cpu) psrSwitch() {
 
 	// PC is updated in final bios inst
 
-    curr := cpu.Reg.getMode()
+	curr := cpu.Reg.getMode()
 
 	i := BANK_ID[curr]
 	reg.CPSR = reg.SPSR[i]
-    reg.isThumb = reg.CPSR.GetFlag(FLAG_T)
+	reg.isThumb = reg.CPSR.GetFlag(FLAG_T)
 
-    next := cpu.Reg.getMode()
+	next := cpu.Reg.getMode()
 	c := BANK_ID[next]
 
 	// if you set this up for fiq, get the special registers
@@ -278,27 +288,27 @@ func (cpu *Cpu) psrSwitch() {
 
 func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
 
-    //    Returned CPSR Flags
-    //If S=1, Rd<>R15, logical operations (AND,EOR,TST,TEQ,ORR,MOV,BIC,MVN):
-    //  V=not affected
-    //  C=carryflag of shift operation (not affected if LSL#0 or Rs=00h)
-    //  Z=zeroflag of result
-    //  N=signflag of result (result bit 31)
-    //If S=1, Rd<>R15, arithmetic operations (SUB,RSB,ADD,ADC,SBC,RSC,CMP,CMN):
-    //  V=overflowflag of result
-    //  C=carryflag of result
-    //  Z=zeroflag of result
-    //  N=signflag of result (result bit 31)
-    //IF S=1, with unused Rd bits=1111b, {P} opcodes (CMPP/CMNP/TSTP/TEQP):
-    //  R15=result  ;modify PSR bits in R15, ARMv2 and below only.
-    //  In user mode only N,Z,C,V bits of R15 can be changed.
-    //  In other modes additionally I,F,M1,M0 can be changed.
-    //  The PC bits in R15 are left unchanged in all modes.
-    //If S=1, Rd=R15; should not be used in user mode:
-    //  CPSR = SPSR_<current mode>
-    //  PC = result
-    //  For example: MOVS PC,R14  ;return from SWI (PC=R14_svc, CPSR=SPSR_svc).
-    //If S=0: Flags are not affected (not allowed for CMP,CMN,TEQ,TST).
+	//    Returned CPSR Flags
+	//If S=1, Rd<>R15, logical operations (AND,EOR,TST,TEQ,ORR,MOV,BIC,MVN):
+	//  V=not affected
+	//  C=carryflag of shift operation (not affected if LSL#0 or Rs=00h)
+	//  Z=zeroflag of result
+	//  N=signflag of result (result bit 31)
+	//If S=1, Rd<>R15, arithmetic operations (SUB,RSB,ADD,ADC,SBC,RSC,CMP,CMN):
+	//  V=overflowflag of result
+	//  C=carryflag of result
+	//  Z=zeroflag of result
+	//  N=signflag of result (result bit 31)
+	//IF S=1, with unused Rd bits=1111b, {P} opcodes (CMPP/CMNP/TSTP/TEQP):
+	//  R15=result  ;modify PSR bits in R15, ARMv2 and below only.
+	//  In user mode only N,Z,C,V bits of R15 can be changed.
+	//  In other modes additionally I,F,M1,M0 can be changed.
+	//  The PC bits in R15 are left unchanged in all modes.
+	//If S=1, Rd=R15; should not be used in user mode:
+	//  CPSR = SPSR_<current mode>
+	//  PC = result
+	//  For example: MOVS PC,R14  ;return from SWI (PC=R14_svc, CPSR=SPSR_svc).
+	//If S=0: Flags are not affected (not allowed for CMP,CMN,TEQ,TST).
 
 	if !alu.Set {
 		return
@@ -314,10 +324,10 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
 		return
 	}
 
-    if forceExit := alu.Rd == PC; forceExit {
-        cpu.psrSwitch()
-        return
-    }
+	if forceExit := alu.Rd == PC; forceExit {
+		cpu.psrSwitch()
+		return
+	}
 
 	if alu.LogicalFlags {
 		cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
@@ -449,7 +459,7 @@ var sdtInstance Sdt
 
 type Sdt struct {
 	Opcode, Rd, Rn, RnValue, RdValue, Offset, Shift, ShiftType, Rm uint32
-	Set, I, Load, WriteBack, MemoryMgmt, Pre, Up, Byte, Pld              bool
+	Set, I, Load, WriteBack, MemoryMgmt, Pre, Up, Byte, Pld        bool
 }
 
 func NewSdtData(opcode uint32, cpu *Cpu) *Sdt {
@@ -493,7 +503,7 @@ func NewSdtData(opcode uint32, cpu *Cpu) *Sdt {
 	sdt.RdValue = cpu.Reg.R[sdt.Rd]
 	sdt.RnValue = cpu.Reg.R[sdt.Rn]
 
-	sdt.Pld = (opcode >> 28) == 0b1111 &&
+	sdt.Pld = (opcode>>28) == 0b1111 &&
 		sdt.Pre == true &&
 		sdt.Byte == true &&
 		sdt.WriteBack == false &&
@@ -531,7 +541,7 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 
 		v := c.Gba.Mem.Read32(addr)
 		is := (pre & 0b11) << 3
-        v = utils.RorSimple(v, is)
+		v = utils.RorSimple(v, is)
 		//v, _, _ = utils.Ror(v, is, false, false, false)
 
 		if sdt.Rd == PC { // not sure if this is right
@@ -661,8 +671,8 @@ const (
 var halfData Half
 
 type Half struct {
-	Rn, Rd, Imm, Inst, Rm, RdValue, RnValue, RmValue uint32
-	Pre, Up, Immediate, WriteBack, Load, MemoryManagement  bool
+	Rn, Rd, Imm, Inst, Rm, RdValue, RnValue, RmValue      uint32
+	Pre, Up, Immediate, WriteBack, Load, MemoryManagement bool
 }
 
 func NewHalf(opcode uint32, c *Cpu) *Half {
@@ -831,7 +841,7 @@ func unsignedHalfStd(half *Half, cpu *Cpu) {
 	if half.Load {
 		v := uint32(cpu.Gba.Mem.Read16(addr))
 		is := (pre & 0b1) << 3
-        v = utils.RorSimple(v, is)
+		v = utils.RorSimple(v, is)
 		//v, _, _ = utils.Ror(v, is, false, false, false)
 		r[half.Rd] = v
 	} else {
@@ -871,8 +881,8 @@ func halfUnsignedAddress(half *Half, cpu *Cpu) (uint32, uint32) {
 }
 
 type Block struct {
-	Opcode, Rn, RnValue, Rlist uint32
-	Pre, Up, PSR, Writeback, Load    bool
+	Opcode, Rn, RnValue, Rlist    uint32
+	Pre, Up, PSR, Writeback, Load bool
 }
 
 func (c *Cpu) Block(opcode uint32) {
@@ -1187,7 +1197,7 @@ func (c *Cpu) stm(block *Block) {
 }
 
 type PSR struct {
-	Opcode, Rd, Rm, Shift, Imm uint32
+	Opcode, Rd, Rm, Shift, Imm       uint32
 	SPSR, MSR, Immediate, F, S, X, C bool
 }
 
@@ -1268,7 +1278,7 @@ func (cpu *Cpu) msr(psr *PSR) {
 
 	var v uint32
 	if psr.Immediate {
-        v = utils.RorSimple(psr.Imm, psr.Shift)
+		v = utils.RorSimple(psr.Imm, psr.Shift)
 		//v, _, _ = utils.Ror(psr.Imm, psr.Shift, false, false, false)
 	} else {
 		v = r[psr.Rm]
@@ -1322,7 +1332,7 @@ func (cpu *Cpu) msr(psr *PSR) {
 	cpsr |= v & mask
 
 	reg.CPSR = Cond(cpsr)
-    reg.isThumb = reg.CPSR.GetFlag(FLAG_T)
+	reg.isThumb = reg.CPSR.GetFlag(FLAG_T)
 
 	if skip := BANK_ID[curr] == BANK_ID[next]; skip {
 		return
@@ -1390,7 +1400,7 @@ func (cpu *Cpu) Swp(opcode uint32) {
 		rnMemValue = cpu.Gba.Mem.Read32(aligned)
 		is := (rnValue & 0b11) << 3
 		//rnMemValue, _, _ = utils.Ror(rnMemValue, is, false, false, false)
-        rnMemValue = utils.RorSimple(rnMemValue, is)
+		rnMemValue = utils.RorSimple(rnMemValue, is)
 	}
 
 	r[rd] = rnMemValue

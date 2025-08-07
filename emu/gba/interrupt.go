@@ -5,8 +5,7 @@ type Irq struct {
 	IF, IE uint16
 	IME    bool
 
-    IdleIrq uint16
-
+	IdleIrq uint16
 }
 
 func (s *Irq) WriteIME(v uint8) {

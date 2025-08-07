@@ -17,20 +17,20 @@ type Menu struct {
 
 	menuPlayer *MenuPlayer
 
-    Splash *ebiten.Image
+	Splash *ebiten.Image
 }
 
 //go:embed res/splash.jpg
 var splashBytes []byte
 
 func NewMenu(context *audio.Context) *Menu {
-    splash, err := loadImageEmbed(splashBytes)
-    if err != nil {
-        panic(err)
-    }
+	splash, err := loadImageEmbed(splashBytes)
+	if err != nil {
+		panic(err)
+	}
 	m := &Menu{
-		Data: LoadGameData(),
-        Splash: splash,
+		Data:   LoadGameData(),
+		Splash: splash,
 	}
 
 	p, err := NewMenuPlayer(context)
@@ -45,9 +45,9 @@ func NewMenu(context *audio.Context) *Menu {
 
 func (m *Menu) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadButton, frame uint64) bool {
 
-    if frame < 120 {
-        return false
-    }
+	if frame < 120 {
+		return false
+	}
 
 	gamesPerRow := config.Conf.GamesPerRow
 
@@ -137,11 +137,11 @@ func (m *Menu) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadB
 
 func (m *Menu) DrawMenu(screen *ebiten.Image, frame uint64) {
 
-    if frame < 120 {
-        screen.Fill(color.White)
-        m.SplashImage(screen)
-        return
-    }
+	if frame < 120 {
+		screen.Fill(color.White)
+		m.SplashImage(screen)
+		return
+	}
 
 	sw, _ := screen.Bounds().Dx(), screen.Bounds().Dy()
 	elementUnit := float64(sw / config.Conf.GamesPerRow)
@@ -192,7 +192,7 @@ func (m *Menu) Image(screen *ebiten.Image, x, y, elementUnit float64, i int) {
 	screen.DrawImage(img, opts)
 }
 
-func (m *Menu) SplashImage(screen *ebiten.Image) {//, x, y, elementUnit float64, i int) {
+func (m *Menu) SplashImage(screen *ebiten.Image) { //, x, y, elementUnit float64, i int) {
 
 	img := m.Splash
 

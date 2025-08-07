@@ -85,7 +85,7 @@ func Ror(val, is uint32, isCarry, immediate bool, currCarry bool) (shift uint32,
 			c = 1
 		}
 
-		return getValue((val&^1)|c, 1), true, val & 1 == 1
+		return getValue((val&^1)|c, 1), true, val&1 == 1
 	}
 
 	carry = (val>>((is-1)&31))&0b1 > 0
@@ -95,6 +95,6 @@ func Ror(val, is uint32, isCarry, immediate bool, currCarry bool) (shift uint32,
 }
 
 func RorSimple(v, shift uint32) uint32 {
-    shift &= 31
-    return (v >> shift) | (v << (32 - shift))
+	shift &= 31
+	return (v >> shift) | (v << (32 - shift))
 }

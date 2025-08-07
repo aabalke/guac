@@ -74,7 +74,7 @@ func (m *Memory) initWriteRegions() {
 
 	m.writeRegions[0x4] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
 		if addr < 0x0400_0400 {
-			m.WriteIO(addr & 0x3FF, v)
+			m.WriteIO(addr&0x3FF, v)
 		}
 	}
 
@@ -82,50 +82,50 @@ func (m *Memory) initWriteRegions() {
 
 		relative := addr & (0x3FF)
 
-        if relative & 1 == 1 {
-            m.PRAM[relative >> 1] &= 0xFF
-            m.PRAM[relative >> 1] |= uint16(v) << 8
+		if relative&1 == 1 {
+			m.PRAM[relative>>1] &= 0xFF
+			m.PRAM[relative>>1] |= uint16(v) << 8
 
-            return
-        }
-
-		if byteWrite {
-            m.PRAM[relative >> 1] &^= 0xFF
-            m.PRAM[relative >> 1] |= uint16(v)
-
-            m.PRAM[relative >> 1] &= 0xFF
-            m.PRAM[relative >> 1] |= uint16(v) << 8
 			return
 		}
 
-        m.PRAM[relative >> 1] &^= 0xFF
-        m.PRAM[relative >> 1] |= uint16(v)
+		if byteWrite {
+			m.PRAM[relative>>1] &^= 0xFF
+			m.PRAM[relative>>1] |= uint16(v)
+
+			m.PRAM[relative>>1] &= 0xFF
+			m.PRAM[relative>>1] |= uint16(v) << 8
+			return
+		}
+
+		m.PRAM[relative>>1] &^= 0xFF
+		m.PRAM[relative>>1] |= uint16(v)
 	}
 
 	m.writeRegions[0x6] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
-        addr &= 0x1FFFF
-        if addr >= 0x1_8000 {
-            addr -= 0x8000 // 32k internal mirror
-        }
+		addr &= 0x1FFFF
+		if addr >= 0x1_8000 {
+			addr -= 0x8000 // 32k internal mirror
+		}
 
-        if !byteWrite {
-            m.VRAM[addr] = v
-            return
-        }
+		if !byteWrite {
+			m.VRAM[addr] = v
+			return
+		}
 
-        if bgVRAM := addr < 0x1_0000; bgVRAM {
+		if bgVRAM := addr < 0x1_0000; bgVRAM {
 
-            m.VRAM[addr] = v
+			m.VRAM[addr] = v
 
-            if addr+1 >= uint32(len(m.VRAM)) {
-                return
-            }
+			if addr+1 >= uint32(len(m.VRAM)) {
+				return
+			}
 
-            m.VRAM[addr+1] = v
+			m.VRAM[addr+1] = v
 
-            return
-        }
-    }
+			return
+		}
+	}
 
 	m.writeRegions[0x7] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
 		if byteWrite {
@@ -165,23 +165,23 @@ func (m *Memory) initReadRegions() {
 	for i := range len(m.readRegions) {
 		m.readRegions[i] = func(m *Memory, addr uint32) uint8 {
 
-            if m.GBA.Cpu.Reg.R[PC] < 0x4000 {
-                return 0
-            }
+			if m.GBA.Cpu.Reg.R[PC] < 0x4000 {
+				return 0
+			}
 			return m.ReadOpenBus(addr)
 		}
 	}
 
 	m.readRegions[0x0] = func(m *Memory, addr uint32) uint8 {
 
-        if addr < 0x4000 {
-            if m.GBA.Cpu.Reg.R[PC] >= 0x4000 {
-                return m.ReadBios(addr)
-            }
-            return m.BIOS[addr]
-        }
+		if addr < 0x4000 {
+			if m.GBA.Cpu.Reg.R[PC] >= 0x4000 {
+				return m.ReadBios(addr)
+			}
+			return m.BIOS[addr]
+		}
 
-        return m.ReadOpenBus(addr)
+		return m.ReadOpenBus(addr)
 	}
 
 	m.readRegions[0x2] = func(m *Memory, addr uint32) uint8 {
@@ -201,11 +201,11 @@ func (m *Memory) initReadRegions() {
 
 	m.readRegions[0x5] = func(m *Memory, addr uint32) uint8 {
 
-        if addr & 1 == 1 {
-            return uint8(m.PRAM[addr & 0x3FF >> 1] >> 8)
-        }
+		if addr&1 == 1 {
+			return uint8(m.PRAM[addr&0x3FF>>1] >> 8)
+		}
 
-		return uint8(m.PRAM[addr&0x3FF >> 1])
+		return uint8(m.PRAM[addr&0x3FF>>1])
 	}
 
 	m.readRegions[0x6] = func(m *Memory, addr uint32) uint8 {
@@ -261,7 +261,7 @@ func (m *Memory) ReadBios(addr uint32) uint8 {
 }
 
 func (m *Memory) ReadOpenBus(addr uint32) uint8 {
-    return uint8(m.Read32((m.GBA.Cpu.Reg.R[PC] &^ 0b11) + 8) >> ((addr & 0b11) << 3))
+	return uint8(m.Read32((m.GBA.Cpu.Reg.R[PC]&^0b11)+8) >> ((addr & 0b11) << 3))
 }
 
 func (m *Memory) ReadIO(addr uint32) uint8 {
@@ -714,7 +714,7 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 
 func (m *Memory) Read8(addr uint32) uint32 {
 	if badRom := addr >= 0x800_0000 && addr < 0xE00_0000; badRom {
-        if addr & 0x1FF_FFFF >= m.GBA.Cartridge.RomLength {
+		if addr&0x1FF_FFFF >= m.GBA.Cartridge.RomLength {
 			return m.ReadBadRom(addr, 1)
 		}
 	}
@@ -726,50 +726,50 @@ func (m *Memory) Read8(addr uint32) uint32 {
 // Reading retrieves 8bit value from specified address, multiplied by 0101h (LDRH) or by 01010101h (LDR). Writing changes the 8bit value at the specified address only, being set to LSB of (source_data ROR (address*8)).
 func (m *Memory) Read16(addr uint32) uint32 {
 
-    switch {
-    case addr >= 0xE00_0000:
+	switch {
+	case addr >= 0xE00_0000:
 
-        //if m.GBA.Cpu.Reg.R[PC] < 0x4000 {
-        //    return uint32(m.Read(addr &^ 1)) * 0x0101
-        //}
+		//if m.GBA.Cpu.Reg.R[PC] < 0x4000 {
+		//    return uint32(m.Read(addr &^ 1)) * 0x0101
+		//}
 
 		return uint32(m.Read(addr)) * 0x0101
 
-    case addr >= 0xD00_0000:
-        if ok := CheckEeprom(m.GBA, addr); ok {
-            return uint32(m.GBA.Cartridge.EepromRead())
-        }
+	case addr >= 0xD00_0000:
+		if ok := CheckEeprom(m.GBA, addr); ok {
+			return uint32(m.GBA.Cartridge.EepromRead())
+		}
 
 		offset := (addr - 0x800_0000) & (0x200_0000 - 1)
 		if offset >= m.GBA.Cartridge.RomLength {
 			return m.ReadBadRom(addr, 2)
 		}
 
-    case addr >= 0x800_0000:
-        if addr & 0x1FF_FFFF >= m.GBA.Cartridge.RomLength {
+	case addr >= 0x800_0000:
+		if addr&0x1FF_FFFF >= m.GBA.Cartridge.RomLength {
 			return m.ReadBadRom(addr, 2)
 		}
-    }
+	}
 
 	return uint32(m.Read(addr+1))<<8 | uint32(m.Read(addr))
 }
 
 func (m *Memory) Read32(addr uint32) uint32 {
 
-    switch {
-    case addr >= 0xE00_0000:
+	switch {
+	case addr >= 0xE00_0000:
 
-        //if m.GBA.Cpu.Reg.R[PC] < 0x4000 {
+		//if m.GBA.Cpu.Reg.R[PC] < 0x4000 {
 
-        //    return uint32(m.Read(addr &^ 3)) * 0x01010101
-        //}
+		//    return uint32(m.Read(addr &^ 3)) * 0x01010101
+		//}
 
 		return uint32(m.Read(addr)) * 0x01010101
-    case addr >= 0x800_0000:
-        if addr & 0x1FF_FFFF >= m.GBA.Cartridge.RomLength {
+	case addr >= 0x800_0000:
+		if addr&0x1FF_FFFF >= m.GBA.Cartridge.RomLength {
 			return m.ReadBadRom(addr, 4)
 		}
-    }
+	}
 
 	a := uint32(m.Read(addr+3))<<8 | uint32(m.Read(addr+2))
 	b := uint32(m.Read(addr+1))<<8 | uint32(m.Read(addr))
@@ -1055,21 +1055,21 @@ func (m *Memory) Write8(addr uint32, v uint8) {
 
 func (m *Memory) Write16(addr uint32, v uint16) {
 
-    switch {
-    case addr >= 0xE00_0000:
+	switch {
+	case addr >= 0xE00_0000:
 		if addr&1 == 1 {
 			v >>= 8
 		}
 
 		m.Write(addr, uint8(v), true)
 		return
-    case addr >= 0xD00_0000:
-        if ok := CheckEeprom(m.GBA, addr); ok {
-            m.GBA.Save = true
-            m.GBA.Cartridge.EepromWrite(v)
-            return
-        }
-    }
+	case addr >= 0xD00_0000:
+		if ok := CheckEeprom(m.GBA, addr); ok {
+			m.GBA.Save = true
+			m.GBA.Cartridge.EepromWrite(v)
+			return
+		}
+	}
 
 	m.Write(addr, uint8(v), false)
 	m.Write(addr+1, uint8(v>>8), false)
@@ -1080,7 +1080,7 @@ func (m *Memory) Write32(addr uint32, v uint32) {
 	if sram := addr >= 0xE00_0000; sram {
 
 		is := addr << 3
-        v = utils.RorSimple(v, is)
+		v = utils.RorSimple(v, is)
 		//v, _, _ = utils.Ror(v, is, false, false, false)
 		m.Write(addr, uint8(v), false)
 		return

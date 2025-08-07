@@ -74,7 +74,6 @@ func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
 		}
 	}
 
-
 	//if sample >= 0 {
 	//	return int8(sample / 5 * PSG_MAX)
 	//}

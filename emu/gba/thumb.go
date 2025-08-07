@@ -284,9 +284,9 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
 		res := rsValue + rdValue
 
 		if rd == PC {
-            // has to be half/word aligned for thumb/thumb.gba
-            // has to be half/none aligned for doom ii
-            //r[rd] = (uint32(res) &^ 0b11) + 4
+			// has to be half/word aligned for thumb/thumb.gba
+			// has to be half/none aligned for doom ii
+			//r[rd] = (uint32(res) &^ 0b11) + 4
 			r[rd] = (uint32(res &^ 1)) + 4
 		} else {
 			r[rd] = uint32(res)
@@ -523,7 +523,7 @@ func (cpu *Cpu) thumbLSHalf(opcode uint16) {
 		v := uint32(cpu.Gba.Mem.Read16(addr &^ 1))
 		is := (addr & 1) << 3
 		//v, _, _ = utils.Ror(v, is, false, false, false)
-        r[rd] = utils.RorSimple(v, is)
+		r[rd] = utils.RorSimple(v, is)
 	} else {
 		cpu.Gba.Mem.Write16(addr&^1, uint16(r[rd]))
 	}
@@ -569,7 +569,7 @@ func (cpu *Cpu) thumbLSSigned(opcode uint16) {
 		v := cpu.Gba.Mem.Read16(addr &^ 0b1)
 		is := (addr & 0b1) << 3
 		//v, _, _ = utils.Ror(v, is, false, false, false)
-        r[rd] = utils.RorSimple(v, is)
+		r[rd] = utils.RorSimple(v, is)
 
 	case THUMB_LDSH:
 
@@ -647,7 +647,7 @@ func (cpu *Cpu) thumbLSR(opcode uint16) {
 		v := cpu.Gba.Mem.Read32(addr &^ 0b11)
 		is := (addr & 0b11) << 3
 		//r[rd], _, _ = utils.Ror(v, is, false, false, false)
-        r[rd] = utils.RorSimple(v, is)
+		r[rd] = utils.RorSimple(v, is)
 	case THUMB_LDRB_REG:
 		r[rd] = cpu.Gba.Mem.Read8(addr)
 	}
@@ -680,7 +680,7 @@ func (cpu *Cpu) thumbLSImm(opcode uint16) {
 		v := cpu.Gba.Mem.Read32(addr &^ 0b11)
 		is := (addr & 0b11) << 3
 		//r[rd], _, _ = utils.Ror(v, is, false, false, false)
-        r[rd] = utils.RorSimple(v, is)
+		r[rd] = utils.RorSimple(v, is)
 
 	case THUMB_STRB_IMM:
 		addr := r[rb] + nn
@@ -912,7 +912,7 @@ func (cpu *Cpu) thumbLSSP(opcode uint16) {
 		v := cpu.Gba.Mem.Read32(addr &^ 0b11)
 		is := (addr & 0b11) << 3
 		//r[rd], _, _ = utils.Ror(v, is, false, false, false)
-        r[rd] = utils.RorSimple(v, is)
+		r[rd] = utils.RorSimple(v, is)
 	} else {
 		cpu.Gba.Mem.Write32(addr, r[rd])
 	}

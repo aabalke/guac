@@ -202,21 +202,26 @@ func (dma *DMA) transfer() {
 		dma.SrcAdj = DMA_ADJ_INC
 	}
 
-    ofs := int64(2)
-    if dma.isWord {
-        ofs = 4
-    }
+	ofs := int64(2)
+	if dma.isWord {
+		ofs = 4
+	}
 
-    switch dma.DstAdj {
-    case DMA_ADJ_INC, DMA_ADJ_RES: dstOffset = ofs
-    case DMA_ADJ_DEC: dstOffset = -ofs
-    }
+	switch dma.DstAdj {
+	case DMA_ADJ_INC, DMA_ADJ_RES:
+		dstOffset = ofs
+	case DMA_ADJ_DEC:
+		dstOffset = -ofs
+	}
 
-    switch dma.SrcAdj {
-    case DMA_ADJ_INC: srcOffset = ofs
-    case DMA_ADJ_DEC: srcOffset = -ofs
-    case DMA_ADJ_RES: panic("DMA SRC SET TO PROHIBITTED")
-    }
+	switch dma.SrcAdj {
+	case DMA_ADJ_INC:
+		srcOffset = ofs
+	case DMA_ADJ_DEC:
+		srcOffset = -ofs
+	case DMA_ADJ_RES:
+		panic("DMA SRC SET TO PROHIBITTED")
+	}
 
 	if fifo := (dma.Idx == 1 || dma.Idx == 2) && dma.Mode == DMA_MODE_REF; fifo {
 		return
@@ -331,10 +336,10 @@ func (dma *DMA) transferFifo() {
 		return
 	case dma.Idx == 2 && dma.Dst != 0x400_00A4:
 		return
-	//case dma.Idx == 1 && dma.Dst == 0x400_00A0 && !(a.FifoA.Length <= 0x10):
-	//	return
-	//case dma.Idx == 2 && dma.Dst == 0x400_00AA && !(a.FifoB.Length <= 0x10):
-	//	return
+		//case dma.Idx == 1 && dma.Dst == 0x400_00A0 && !(a.FifoA.Length <= 0x10):
+		//	return
+		//case dma.Idx == 2 && dma.Dst == 0x400_00AA && !(a.FifoB.Length <= 0x10):
+		//	return
 	}
 
 	if rom := dma.Src >= 0x800_0000 && dma.Src < 0xE00_0000; rom {
@@ -373,16 +378,16 @@ func (dma *DMA) checkMode(mode uint32) bool {
 
 func (gba *GBA) checkDmas(mode uint32) {
 
-    if ok := gba.Dma[0].checkMode(mode); ok {
-        gba.Dma[0].transfer()
-    }
-    if ok := gba.Dma[1].checkMode(mode); ok {
-        gba.Dma[1].transfer()
-    }
-    if ok := gba.Dma[2].checkMode(mode); ok {
-        gba.Dma[2].transfer()
-    }
-    if ok := gba.Dma[3].checkMode(mode); ok {
-        gba.Dma[3].transfer()
-    }
+	if ok := gba.Dma[0].checkMode(mode); ok {
+		gba.Dma[0].transfer()
+	}
+	if ok := gba.Dma[1].checkMode(mode); ok {
+		gba.Dma[1].transfer()
+	}
+	if ok := gba.Dma[2].checkMode(mode); ok {
+		gba.Dma[2].transfer()
+	}
+	if ok := gba.Dma[3].checkMode(mode); ok {
+		gba.Dma[3].transfer()
+	}
 }

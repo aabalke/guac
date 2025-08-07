@@ -6,17 +6,17 @@ import (
 )
 
 type Header struct {
-	Title     string
-	GameCode  string
-    Version uint8
+	Title    string
+	GameCode string
+	Version  uint8
 }
 
 func NewHeader(c *Cartridge) *Header {
 
 	h := &Header{
-		Title:    strings.ToUpper(strings.ReplaceAll(string(c.Rom[0xA0 : 0xA0+12]), "\x00", " ")),
+		Title:    strings.ToUpper(strings.ReplaceAll(string(c.Rom[0xA0:0xA0+12]), "\x00", " ")),
 		GameCode: strings.ToUpper(string(c.Rom[0xAC : 0xAC+4])),
-        Version:  uint8(c.Rom[0xBC]),
+		Version:  uint8(c.Rom[0xBC]),
 	}
 
 	if strings.HasPrefix(h.GameCode, "F") {
@@ -46,5 +46,5 @@ func (h *Header) valid(c *Cartridge) bool {
 }
 
 func (h *Header) print() {
-    log.Printf("GBA ROM %12s C %4s V %d\n", h.Title, h.GameCode, h.Version )
+	log.Printf("GBA ROM %12s C %4s V %d\n", h.Title, h.GameCode, h.Version)
 }

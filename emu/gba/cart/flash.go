@@ -44,21 +44,21 @@ func (c *Cartridge) WriteFlash(addr uint32, v uint8) {
 			c.Flash[bankAddr] = v
 		}
 
-    case FL_ERASE_ALL:
+	case FL_ERASE_ALL:
 
-        for i := range len(c.Flash) {
-            c.Flash[i] = 0xFF
-        }
+		for i := range len(c.Flash) {
+			c.Flash[i] = 0xFF
+		}
 
-        c.FlashMode = FL_READ
-        c.FlashStage = 0
-        return
+		c.FlashMode = FL_READ
+		c.FlashStage = 0
+		return
 
-    case FL_ERASE_SECTOR:
+	case FL_ERASE_SECTOR:
 
-        if addr & 0xFFF != 0 {
-            return
-        }
+		if addr&0xFFF != 0 {
+			return
+		}
 
 		i := uint32(0)
 		for i = range 0x1000 {

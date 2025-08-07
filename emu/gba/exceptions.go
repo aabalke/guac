@@ -55,7 +55,7 @@ func (gba *GBA) exception(addr uint32, mode uint32) {
 
 	reg.CPSR.SetMode(mode)
 	reg.CPSR.SetThumb(false, &gba.Cpu)
-    reg.CPSR.SetFlag(FLAG_I, true)
+	reg.CPSR.SetFlag(FLAG_I, true)
 
 	r[PC] = addr
 	return
@@ -75,7 +75,7 @@ func (gba *GBA) ExitException(mode uint32) {
 
 	i := BANK_ID[mode]
 	reg.CPSR = reg.SPSR[i]
-    reg.isThumb = reg.CPSR.GetFlag(FLAG_T)
+	reg.isThumb = reg.CPSR.GetFlag(FLAG_T)
 	c := BANK_ID[cpu.Reg.getMode()]
 
 	// if you set this up for fiq, get the special registers

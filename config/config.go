@@ -22,7 +22,7 @@ type Config struct {
 	TomlBackdrop     int  `toml:"backdrop_color"`
 	GamesPerRow      int  `toml:"games_per_row"`
 	Backdrop         color.Color
-    CancelAudioInit  bool `toml:"cancel_audio_init"`
+	CancelAudioInit  bool             `toml:"cancel_audio_init"`
 	Gb               GbConfig         `toml:"gb"`
 	Gba              GbaConfig        `toml:"gba"`
 	KeyboardConfig   KeyboardConfig   `toml:"keyboard"`
@@ -40,10 +40,10 @@ type GbaConfig struct {
 	KeyboardConfig   EmulatorKeyboardConfig   `toml:"keyboard"`
 	ControllerConfig EmulatorControllerConfig `toml:"controller"`
 
-    SkipHle bool `toml:"skip_hle"`
-    Threads int  `toml:"threads"`
-    IdleOptimize bool `toml:"idle_optimize"`
-    SoundClockUpdateCycles int `toml:"sound_clock_update_cycles"`
+	SkipHle                bool `toml:"skip_hle"`
+	Threads                int  `toml:"threads"`
+	IdleOptimize           bool `toml:"idle_optimize"`
+	SoundClockUpdateCycles int  `toml:"sound_clock_update_cycles"`
 }
 
 type KeyboardConfig struct {

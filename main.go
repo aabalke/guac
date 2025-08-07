@@ -12,7 +12,7 @@ import (
 
 	"github.com/aabalke/guac/config"
 	"github.com/hajimehoshi/ebiten/v2"
-    //_ "github.com/silbinarywolf/preferdiscretegpu" //no profiler change
+	//_ "github.com/silbinarywolf/preferdiscretegpu" //no profiler change
 
 	"os"
 	"runtime/pprof"
@@ -47,12 +47,12 @@ func main() {
 		//ebiten.SetTPS(480)
 		ebiten.SetTPS(2000)
 	}
-		//ebiten.SetTPS(2000)
+	//ebiten.SetTPS(2000)
 
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	ebiten.SetWindowTitle("guac emulator")
 	ebiten.SetWindowIcon([]image.Image{loadIcon()})
-    //ebiten.SetWindowPosition(100, 100)
+	//ebiten.SetWindowPosition(100, 100)
 	ebiten.SetWindowSize(240*4, 160*4)
 	//ebiten.SetWindowSize(1280, 720)
 	if config.Conf.Fullscreen {

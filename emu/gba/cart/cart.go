@@ -226,8 +226,8 @@ func (c *Cartridge) Read(addr uint32) uint8 {
 		panic("EEPROM READ USING STD IMPLIMENTATION OR GGPIO")
 	case FLASH, FLASH128:
 		return c.ReadFlash(addr)
-    default:
-        return 0xFF
+	default:
+		return 0xFF
 	}
 }
 

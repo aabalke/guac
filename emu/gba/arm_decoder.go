@@ -9,92 +9,92 @@ import (
 func (cpu *Cpu) DecodeARM() int {
 
 	r := &cpu.Reg.R
-    mem := &cpu.Gba.Mem
+	mem := &cpu.Gba.Mem
 
-    var opcode uint32
-    switch r[PC] >> 24 {
-    case 0x0:
-        opcode = binary.LittleEndian.Uint32(mem.BIOS[r[PC]:])
-    case 0x2:
-        opcode = binary.LittleEndian.Uint32(mem.WRAM1[r[PC]&0x3FFFF:])
-    case 0x3:
-        opcode = binary.LittleEndian.Uint32(mem.WRAM2[r[PC]&0x7FFF:])
-    case 0x8, 0x9, 0xA, 0xB, 0xC, 0xD:
-        opcode = binary.LittleEndian.Uint32(cpu.Gba.Cartridge.Rom[r[PC]&0x1FFFFFF:])
-    default:
-        log.Printf("Unexpected Arm PC at %08X CURR %d\n", r[PC], CURR_INST)
-        opcode = cpu.Gba.Mem.Read32(r[PC])
-    }
+	var opcode uint32
+	switch r[PC] >> 24 {
+	case 0x0:
+		opcode = binary.LittleEndian.Uint32(mem.BIOS[r[PC]:])
+	case 0x2:
+		opcode = binary.LittleEndian.Uint32(mem.WRAM1[r[PC]&0x3FFFF:])
+	case 0x3:
+		opcode = binary.LittleEndian.Uint32(mem.WRAM2[r[PC]&0x7FFF:])
+	case 0x8, 0x9, 0xA, 0xB, 0xC, 0xD:
+		opcode = binary.LittleEndian.Uint32(cpu.Gba.Cartridge.Rom[r[PC]&0x1FFFFFF:])
+	default:
+		log.Printf("Unexpected Arm PC at %08X CURR %d\n", r[PC], CURR_INST)
+		opcode = cpu.Gba.Mem.Read32(r[PC])
+	}
 
 	if !cpu.CheckCond(opcode >> 28) {
 		r[PC] += 4
 		return 4
 	}
 
-    if swi := (opcode >> 24) & 0xF == 0xF; swi {
+	if swi := (opcode>>24)&0xF == 0xF; swi {
 		//cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
 		//cpu.Gba.exception(VEC_SWI, MODE_SWI)
 		//return 4
 		cycles, incPc := cpu.Gba.SysCall((opcode >> 16) & 0xFF)
 
 		if incPc {
-		    r[PC] += 4
+			r[PC] += 4
 		}
 
 		return cycles
-    }
+	}
 
-    switch (opcode >> 25) & 0b111 {
-    case 0b000:
-        switch {
-        case isBX(opcode):
-            cpu.BX(opcode)
-        case isSDT(opcode):
-            cycles := cpu.Sdt(opcode)
-            return int(cycles)
-        case isHalf(opcode):
-            cpu.Half(opcode)
-        case isPSR(opcode):
-            cpu.Psr(opcode)
-        case isSWP(opcode):
-            cpu.Swp(opcode)
-        case isM(opcode):
-            cpu.Mul(opcode)
-        case isALU(opcode):
-            cpu.Alu(opcode)
-        default:
-            panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X, INSTR %d", opcode, r[PC], CURR_INST))
-        }
+	switch (opcode >> 25) & 0b111 {
+	case 0b000:
+		switch {
+		case isBX(opcode):
+			cpu.BX(opcode)
+		case isSDT(opcode):
+			cycles := cpu.Sdt(opcode)
+			return int(cycles)
+		case isHalf(opcode):
+			cpu.Half(opcode)
+		case isPSR(opcode):
+			cpu.Psr(opcode)
+		case isSWP(opcode):
+			cpu.Swp(opcode)
+		case isM(opcode):
+			cpu.Mul(opcode)
+		case isALU(opcode):
+			cpu.Alu(opcode)
+		default:
+			panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X, INSTR %d", opcode, r[PC], CURR_INST))
+		}
 
-        return 4
-    case 0b001:
+		return 4
+	case 0b001:
 
-        switch {
-        case isSDT(opcode):
-            cycles := cpu.Sdt(opcode)
-            return int(cycles)
-        case isHalf(opcode):
-            cpu.Half(opcode)
-        case isPSR(opcode):
-            cpu.Psr(opcode)
-        case isSWP(opcode):
-            cpu.Swp(opcode)
-        case isALU(opcode):
-            cpu.Alu(opcode)
-        default:
-            panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X, INSTR %d", opcode, r[PC], CURR_INST))
-        }
+		switch {
+		case isSDT(opcode):
+			cycles := cpu.Sdt(opcode)
+			return int(cycles)
+		case isHalf(opcode):
+			cpu.Half(opcode)
+		case isPSR(opcode):
+			cpu.Psr(opcode)
+		case isSWP(opcode):
+			cpu.Swp(opcode)
+		case isALU(opcode):
+			cpu.Alu(opcode)
+		default:
+			panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X, INSTR %d", opcode, r[PC], CURR_INST))
+		}
 
-        return 4
-    case 0b010:
-    case 0b011:
-    case 0b100:
+		return 4
+	case 0b010:
+	case 0b011:
+	case 0b100:
 		cpu.Block(opcode)
-        return 4
-    case 0b101:
+		return 4
+	case 0b101:
 		cpu.B(opcode)
-        return 4
-    }
+		return 4
+	}
 
 	switch {
 	case isBX(opcode):

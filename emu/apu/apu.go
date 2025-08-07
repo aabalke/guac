@@ -90,9 +90,9 @@ func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu 
 	a.WaveChannel = WaveChannel{Apu: a, Idx: 2}
 	a.NoiseChannel = NoiseChannel{Apu: a, Idx: 3}
 
-    if !config.Conf.CancelAudioInit {
-        a.player = audioContext.NewPlayer()
-    }
+	if !config.Conf.CancelAudioInit {
+		a.player = audioContext.NewPlayer()
+	}
 
 	return a
 }
@@ -196,28 +196,28 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 
 	a.sndCycles += cycles
 
-    shift0 := int32(a.SoundCntH >> 2) & 1
-    shift1 := int32(a.SoundCntH >> 3) & 1
-    lpan0 := int32(a.SoundCntH >> 9) & 1
-    rpan0 := int32(a.SoundCntH >> 8) & 1
-    lpan1 := int32(a.SoundCntH >> 13) & 1
-    rpan1 := int32(a.SoundCntH >> 12) & 1
+	shift0 := int32(a.SoundCntH>>2) & 1
+	shift1 := int32(a.SoundCntH>>3) & 1
+	lpan0 := int32(a.SoundCntH>>9) & 1
+	rpan0 := int32(a.SoundCntH>>8) & 1
+	lpan1 := int32(a.SoundCntH>>13) & 1
+	rpan1 := int32(a.SoundCntH>>12) & 1
 
 	sampleA := int32(a.FifoA.Sample) << (1 - shift0)
 	sampleB := int32(a.FifoB.Sample) << (1 - shift1)
 
-    sampleLeft := sampleA*lpan0 + sampleB*lpan1
-    sampleRight := sampleA*rpan0 + sampleB*rpan1
+	sampleLeft := sampleA*lpan0 + sampleB*lpan1
+	sampleRight := sampleA*rpan0 + sampleB*rpan1
 
-    cntL := uint32(a.SoundCntL)
-    volL := volLut[(cntL>>4) & 0b111]
-    volR := volLut[(cntL>>0) & 0b111]
-    shift := rshLut[(a.SoundCntH) & 0b11]
+	cntL := uint32(a.SoundCntL)
+	volL := volLut[(cntL>>4)&0b111]
+	volR := volLut[(cntL>>0)&0b111]
+	shift := rshLut[(a.SoundCntH)&0b11]
 
-    clockCycles := uint32(a.sampCycles)
-    if doubleSpeed {
-        clockCycles <<= 1
-    }
+	clockCycles := uint32(a.sampCycles)
+	if doubleSpeed {
+		clockCycles <<= 1
+	}
 
 	for a.sndCycles >= clockCycles {
 
@@ -226,23 +226,23 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 		ch3 := int32(a.WaveChannel.GetSample(doubleSpeed))
 		ch4 := int32(a.NoiseChannel.GetSample(doubleSpeed))
 
-        psgL := ch1 * int32((cntL>>12)&1) +
-                ch2 * int32((cntL>>13)&1) +
-                ch3 * int32((cntL>>14)&1) +
-                ch4 * int32((cntL>>15)&1)
+		psgL := ch1*int32((cntL>>12)&1) +
+			ch2*int32((cntL>>13)&1) +
+			ch3*int32((cntL>>14)&1) +
+			ch4*int32((cntL>>15)&1)
 
-        psgR := ch1 * int32((cntL>> 8)&1) +
-                ch2 * int32((cntL>> 9)&1) +
-                ch3 * int32((cntL>>10)&1) +
-                ch4 * int32((cntL>>11)&1)
+		psgR := ch1*int32((cntL>>8)&1) +
+			ch2*int32((cntL>>9)&1) +
+			ch3*int32((cntL>>10)&1) +
+			ch4*int32((cntL>>11)&1)
 
-        psgL = (psgL * volL) >> shift
-        psgR = (psgR * volR) >> shift
+		psgL = (psgL * volL) >> shift
+		psgR = (psgR * volR) >> shift
 
-        a.SoundBuffer[a.WritePointer & (a.buffSize - 1)] = clip(sampleLeft + psgL)
-        a.WritePointer++
-        a.SoundBuffer[a.WritePointer & (a.buffSize - 1)] = clip(sampleRight + psgR)
-        a.WritePointer++
+		a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(sampleLeft + psgL)
+		a.WritePointer++
+		a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(sampleRight + psgR)
+		a.WritePointer++
 
 		a.sndCycles -= clockCycles
 	}

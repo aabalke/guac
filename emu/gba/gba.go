@@ -40,10 +40,10 @@ type GBA struct {
 	AccCycles                          uint32
 	Keypad                             Keypad
 
-    SoundCycles uint32
-    SoundCyclesMask uint32
+	SoundCycles     uint32
+	SoundCyclesMask uint32
 
-    vsyncAddr uint32
+	vsyncAddr uint32
 
 	Pixels []byte
 	Image  *ebiten.Image
@@ -68,7 +68,6 @@ func (gba *GBA) Update() {
 
 	for !gba.Drawn {
 
-
 		cycles := 4
 
 		if !gba.Halted {
@@ -77,16 +76,15 @@ func (gba *GBA) Update() {
 
 		gba.Tick(uint32(cycles))
 
+		if gba.vsyncAddr != 0 && r[PC] == gba.vsyncAddr {
+			vblRaised := gba.Irq.IdleIrq&1 == 1
+			vblHandled := gba.Irq.IF&1 != 1
+			if !(vblRaised && vblHandled) {
+				gba.Halted = true
+			}
 
-        if gba.vsyncAddr != 0 && r[PC] == gba.vsyncAddr {
-            vblRaised := gba.Irq.IdleIrq & 1 == 1
-            vblHandled := gba.Irq.IF & 1 != 1
-            if (!(vblRaised && vblHandled)) {
-                gba.Halted = true
-            }
-
-            gba.Irq.IdleIrq = gba.Irq.IF
-        }
+			gba.Irq.IdleIrq = gba.Irq.IF
+		}
 
 		// irq has to be at end (count up tests)
 		gba.Irq.checkIRQ()
@@ -105,12 +103,12 @@ func (gba *GBA) Update() {
 
 func (gba *GBA) Tick(cycles uint32) {
 
-    gba.SoundCycles += cycles
+	gba.SoundCycles += cycles
 
-    if gba.SoundCycles >= gba.SoundCyclesMask {
-        gba.Apu.SoundClock(gba.SoundCycles, false)
-        gba.SoundCycles &= (gba.SoundCyclesMask - 1)
-    }
+	if gba.SoundCycles >= gba.SoundCyclesMask {
+		gba.Apu.SoundClock(gba.SoundCycles, false)
+		gba.SoundCycles &= (gba.SoundCyclesMask - 1)
+	}
 
 	gba.VideoUpdate(uint32(cycles))
 	gba.UpdateTimers(uint32(cycles))
@@ -125,11 +123,11 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	)
 
 	gba := GBA{
-		Pixels: make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
-		Image:  ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
-		Keypad: Keypad{KEYINPUT: 0x3FF},
-		Apu:    apu.NewApu(ctx, CPU_FREQ_HZ, SND_FREQUENCY, SND_SAMPLES),
-        SoundCyclesMask: max(0x80, uint32(config.Conf.Gba.SoundClockUpdateCycles)), 
+		Pixels:          make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
+		Image:           ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
+		Keypad:          Keypad{KEYINPUT: 0x3FF},
+		Apu:             apu.NewApu(ctx, CPU_FREQ_HZ, SND_FREQUENCY, SND_SAMPLES),
+		SoundCyclesMask: max(0x80, uint32(config.Conf.Gba.SoundClockUpdateCycles)),
 	}
 
 	gba.PPU.gba = &gba
@@ -162,16 +160,16 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba.LoadBios()
 	gba.SoftReset()
 	gba.LoadGame(path)
-    gba.SetIdleAddr()
-    InitTrig()
+	gba.SetIdleAddr()
+	InitTrig()
 
-    startScanline := uint32(0)
+	startScanline := uint32(0)
 
 	gba.Mem.BIOS_MODE = BIOS_STARTUP
-    gba.Mem.IO[0x6] = uint8(startScanline)
-    gba.AccCycles = CYCLES_SCANLINE * startScanline + 859
+	gba.Mem.IO[0x6] = uint8(startScanline)
+	gba.AccCycles = CYCLES_SCANLINE*startScanline + 859
 
-    gba.Cpu.Reg.CPSR.SetFlag(FLAG_I, false)
+	gba.Cpu.Reg.CPSR.SetFlag(FLAG_I, false)
 
 	return &gba
 }
@@ -220,9 +218,9 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 
 	prevFrameCycles := gba.AccCycles
 	gba.AccCycles += cycles //% CYCLES_FRAME
-    if gba.AccCycles >= CYCLES_FRAME {
-        gba.AccCycles -=CYCLES_FRAME
-    }
+	if gba.AccCycles >= CYCLES_FRAME {
+		gba.AccCycles -= CYCLES_FRAME
+	}
 	currFrameCycles := gba.AccCycles
 
 	prevScanlineCycles := prevFrameCycles % CYCLES_SCANLINE
@@ -238,10 +236,10 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 		}
 
 		if vcount < SCREEN_HEIGHT {
-            updateBackgrounds(gba, &gba.PPU.Dispcnt)
-            gba.PPU.bgPriorities = gba.getBgPriority(uint32(vcount), gba.PPU.Dispcnt.Mode, &gba.PPU.Backgrounds)
-            gba.PPU.objPriorities = gba.getObjPriority(uint32(vcount), &gba.PPU.Objects)
-            gba.scanlineGraphics(uint32(vcount))
+			updateBackgrounds(gba, &gba.PPU.Dispcnt)
+			gba.PPU.bgPriorities = gba.getBgPriority(uint32(vcount), gba.PPU.Dispcnt.Mode, &gba.PPU.Backgrounds)
+			gba.PPU.objPriorities = gba.getObjPriority(uint32(vcount), &gba.PPU.Objects)
+			gba.scanlineGraphics(uint32(vcount))
 			gba.PPU.Backgrounds[2].BgAffineUpdate()
 			gba.PPU.Backgrounds[3].BgAffineUpdate()
 			gba.checkDmas(DMA_MODE_HBL)
@@ -250,15 +248,15 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 
 	if newScanline := currScanlineCycles < prevScanlineCycles; newScanline {
 
-        // this 1232 cycle count is estimate, should replace with actual
-        //gba.Apu.SoundClock(1232, false)
+		// this 1232 cycle count is estimate, should replace with actual
+		//gba.Apu.SoundClock(1232, false)
 
 		dispstat.SetHBlank(false)
 
-        vcount++
-        if vcount == NUM_SCANLINES {
-            vcount = 0
-        }
+		vcount++
+		if vcount == NUM_SCANLINES {
+			vcount = 0
+		}
 
 		gba.Mem.IO[0x6] = vcount
 
@@ -269,8 +267,8 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 		case SCREEN_HEIGHT:
 			dispstat.SetVBlank(true)
 			gba.checkDmas(DMA_MODE_VBL)
-        // bios/bios.gba needs irq set on screen_height, iridion 3d needs screen_height + 1
-        // I believe this is cycle related
+			// bios/bios.gba needs irq set on screen_height, iridion 3d needs screen_height + 1
+			// I believe this is cycle related
 		case SCREEN_HEIGHT + 1:
 			if utils.BitEnabled(uint32(*dispstat), 3) {
 				gba.Irq.setIRQ(0)
