@@ -15,7 +15,6 @@ require (
 	github.com/ebitengine/purego v0.8.0 // indirect
 	github.com/hajimehoshi/go-mp3 v0.3.4 // indirect
 	github.com/jezek/xgb v1.1.1 // indirect
-	github.com/silbinarywolf/preferdiscretegpu v1.0.0 // indirect
 	golang.org/x/exp v0.0.0-20190306152737-a1d7652674e8 // indirect
 	golang.org/x/image v0.29.0 // indirect
 	golang.org/x/mobile v0.0.0-20190415191353-3e0bab5405d6 // indirect

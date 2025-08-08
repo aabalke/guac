@@ -208,7 +208,7 @@ Lord of The Rings Two Towers
 Mario Kart Super Circuit
     - No known errors
 Mega Man Zero
-    - Crashes
+    - No known errors
 Metroid Fusion
     - No known errors
 Mother 12

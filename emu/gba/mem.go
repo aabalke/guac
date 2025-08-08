@@ -1,6 +1,7 @@
 package gba
 
 import (
+	//"log"
 	"time"
 
 	"github.com/aabalke/guac/emu/gba/utils"
@@ -196,7 +197,7 @@ func (m *Memory) initReadRegions() {
 		if addr < 0x0400_0400 {
 			return m.ReadIO(addr & 0x3FF)
 		}
-		return m.ReadOpenBus(addr & 1)
+		return m.ReadOpenBus(addr)
 	}
 
 	m.readRegions[0x5] = func(m *Memory, addr uint32) uint8 {
@@ -261,209 +262,63 @@ func (m *Memory) ReadBios(addr uint32) uint8 {
 }
 
 func (m *Memory) ReadOpenBus(addr uint32) uint8 {
-	return uint8(m.Read32((m.GBA.Cpu.Reg.R[PC]&^0b11)+8) >> ((addr & 0b11) << 3))
+
+    pc := m.GBA.Cpu.Reg.R[PC]
+
+    if m.GBA.Cpu.Reg.isThumb {
+
+        // region based thumb openbus behavior has not been implimented
+
+        //For THUMB code in Main RAM, Palette Memory, VRAM, and Cartridge ROM this is:
+        //LSW = [$+4], MSW = [$+4]
+
+        //For THUMB code in BIOS or OAM
+        //LSW = [$+4], MSW = [$+6]   ;for opcodes at 4-byte aligned locations
+        //LSW = [$+2], MSW = [$+4]   ;for opcodes at non-4-byte aligned locations
+
+        //For THUMB code in 32K-WRAM
+        //LSW = [$+4], MSW = OldHI   ;for opcodes at 4-byte aligned locations
+        //LSW = OldLO, MSW = [$+4]   ;for opcodes at non-4-byte aligned locations
+        //Whereas OldLO/OldHI are usually:
+        //OldLO=[$+2], OldHI=[$+2]
+        //Unless the previous opcode's prefetch was overwritten;
+        //that can happen if the previous opcode was itself an LDR opcode, ie.
+        //if it was itself reading data:
+
+        //OldLO=LSW(data), OldHI=MSW(data)
+        //Theoretically, this might also change if a DMA transfer occurs.
+
+        return uint8(m.Read32((pc &^ 1) + 4) >> ((addr & 1) << 3))
+    }
+
+	return uint8(m.Read32((pc &^ 3) + 8) >> ((addr & 3) << 3))
 }
 
 func (m *Memory) ReadIO(addr uint32) uint8 {
 
-	// this addr should be relative. - 0x400000
+	// this addr is relative. - 0x400000
 
-	// do not touch the damn bg control regs
-	if addr >= 0x60 && addr < 0xB0 {
+    switch {
+    case addr >= 0x10 && addr < 0x48,
+         addr >= 0x4C && addr < 0x50,
+         addr >= 0x54 && addr < 0x60,
+         addr >= 0xB0 && addr < 0xB8,
+         addr >= 0xBC && addr < 0xC4,
+         addr >= 0xC8 && addr < 0xD0,
+         addr >= 0xD4 && addr < 0xDC,
+         addr >= 0xE0 && addr < 0x100:
+		return m.ReadOpenBus(addr)
+    case addr >= 0x60 && addr < 0xB0:
 		return m.ReadSoundIO(addr)
-	}
+    }
 
 	switch addr {
 	case 0x0004:
 		return uint8(m.Dispstat)
 	case 0x0005:
 		return uint8(m.Dispstat >> 8)
-	case 0x0006:
-		return m.IO[addr]
 	case 0x0007:
-		return 0x0
-
-	case 0x0010:
-		return m.ReadOpenBus(addr)
-	case 0x0011:
-		return m.ReadOpenBus(addr)
-	case 0x0012:
-		return m.ReadOpenBus(addr - 2)
-	case 0x0013:
-		return m.ReadOpenBus(addr - 2)
-	case 0x0014:
-		return m.ReadOpenBus(addr)
-	case 0x0015:
-		return m.ReadOpenBus(addr)
-	case 0x0016:
-		return m.ReadOpenBus(addr - 2)
-	case 0x0017:
-		return m.ReadOpenBus(addr - 2)
-	case 0x0018:
-		return m.ReadOpenBus(addr)
-	case 0x0019:
-		return m.ReadOpenBus(addr)
-	case 0x001A:
-		return m.ReadOpenBus(addr - 2)
-	case 0x001B:
-		return m.ReadOpenBus(addr - 2)
-	case 0x001C:
-		return m.ReadOpenBus(addr)
-	case 0x001D:
-		return m.ReadOpenBus(addr)
-	case 0x001E:
-		return m.ReadOpenBus(addr - 2)
-	case 0x001F:
-		return m.ReadOpenBus(addr - 2)
-
-	case 0x0020:
-		return m.ReadOpenBus(addr)
-	case 0x0021:
-		return m.ReadOpenBus(addr)
-	case 0x0022:
-		return m.ReadOpenBus(addr - 2)
-	case 0x0023:
-		return m.ReadOpenBus(addr - 2)
-	case 0x0024:
-		return m.ReadOpenBus(addr)
-	case 0x0025:
-		return m.ReadOpenBus(addr)
-	case 0x0026:
-		return m.ReadOpenBus(addr - 2)
-	case 0x0027:
-		return m.ReadOpenBus(addr - 2)
-	case 0x0028:
-		return m.ReadOpenBus(addr)
-	case 0x0029:
-		return m.ReadOpenBus(addr)
-	case 0x002A:
-		return m.ReadOpenBus(addr - 2)
-	case 0x002B:
-		return m.ReadOpenBus(addr - 2)
-	case 0x002C:
-		return m.ReadOpenBus(addr)
-	case 0x002D:
-		return m.ReadOpenBus(addr)
-	case 0x002E:
-		return m.ReadOpenBus(addr - 2)
-	case 0x002F:
-		return m.ReadOpenBus(addr - 2)
-
-	case 0x0030:
-		return m.ReadOpenBus(addr)
-	case 0x0031:
-		return m.ReadOpenBus(addr)
-	case 0x0032:
-		return m.ReadOpenBus(addr - 2)
-	case 0x0033:
-		return m.ReadOpenBus(addr - 2)
-	case 0x0034:
-		return m.ReadOpenBus(addr)
-	case 0x0035:
-		return m.ReadOpenBus(addr)
-	case 0x0036:
-		return m.ReadOpenBus(addr - 2)
-	case 0x0037:
-		return m.ReadOpenBus(addr - 2)
-	case 0x0038:
-		return m.ReadOpenBus(addr)
-	case 0x0039:
-		return m.ReadOpenBus(addr)
-	case 0x003A:
-		return m.ReadOpenBus(addr - 2)
-	case 0x003B:
-		return m.ReadOpenBus(addr - 2)
-	case 0x003C:
-		return m.ReadOpenBus(addr)
-	case 0x003D:
-		return m.ReadOpenBus(addr)
-	case 0x003E:
-		return m.ReadOpenBus(addr - 2)
-	case 0x003F:
-		return m.ReadOpenBus(addr - 2)
-
-	case 0x0040:
-		return m.ReadOpenBus(addr)
-	case 0x0041:
-		return m.ReadOpenBus(addr)
-	case 0x0042:
-		return m.ReadOpenBus(addr - 2)
-	case 0x0043:
-		return m.ReadOpenBus(addr - 2)
-	case 0x0044:
-		return m.ReadOpenBus(addr)
-	case 0x0045:
-		return m.ReadOpenBus(addr)
-	case 0x0046:
-		return m.ReadOpenBus(addr - 2)
-	case 0x0047:
-		return m.ReadOpenBus(addr - 2)
-	case 0x0048:
-		return m.IO[addr]
-	case 0x0049:
-		return m.IO[addr]
-	case 0x004A:
-		return m.IO[addr]
-	case 0x004B:
-		return m.IO[addr]
-	case 0x004C:
-		return m.ReadOpenBus(addr)
-	case 0x004D:
-		return m.ReadOpenBus(addr)
-	case 0x004E:
-		return m.ReadOpenBus(addr - 2)
-	case 0x004F:
-		return m.ReadOpenBus(addr - 2)
-
-	case 0x0050:
-		return m.IO[addr]
-	case 0x0051:
-		return m.IO[addr]
-	case 0x0052:
-		return m.IO[addr]
-	case 0x0053:
-		return m.IO[addr]
-	case 0x0054:
-		return m.ReadOpenBus(addr)
-	case 0x0055:
-		return m.ReadOpenBus(addr)
-	case 0x0056:
-		return m.ReadOpenBus(addr - 2)
-	case 0x0057:
-		return m.ReadOpenBus(addr - 2)
-	case 0x0058:
-		return m.ReadOpenBus(addr)
-	case 0x0059:
-		return m.ReadOpenBus(addr)
-	case 0x005A:
-		return m.ReadOpenBus(addr - 2)
-	case 0x005B:
-		return m.ReadOpenBus(addr - 2)
-	case 0x005C:
-		return m.ReadOpenBus(addr)
-	case 0x005D:
-		return m.ReadOpenBus(addr)
-	case 0x005E:
-		return m.ReadOpenBus(addr - 2)
-	case 0x005F:
-		return m.ReadOpenBus(addr - 2)
-
-	case 0x00B0:
-		return m.ReadOpenBus(addr)
-	case 0x00B1:
-		return m.ReadOpenBus(addr)
-	case 0x00B2:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00B3:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00B4:
-		return m.ReadOpenBus(addr)
-	case 0x00B5:
-		return m.ReadOpenBus(addr)
-	case 0x00B6:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00B7:
-		return m.ReadOpenBus(addr - 2)
+		return 0
 	case 0x00B8:
 		return 0
 	case 0x00B9:
@@ -472,22 +327,6 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 		return m.GBA.Dma[0].ReadControl(false)
 	case 0x00BB:
 		return m.GBA.Dma[0].ReadControl(true)
-	case 0x00BC:
-		return m.ReadOpenBus(addr)
-	case 0x00BD:
-		return m.ReadOpenBus(addr)
-	case 0x00BE:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00BF:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00C0:
-		return m.ReadOpenBus(addr)
-	case 0x00C1:
-		return m.ReadOpenBus(addr)
-	case 0x00C2:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00C3:
-		return m.ReadOpenBus(addr - 2)
 	case 0x00C4:
 		return 0
 	case 0x00C5:
@@ -496,22 +335,6 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 		return m.GBA.Dma[1].ReadControl(false)
 	case 0x00C7:
 		return m.GBA.Dma[1].ReadControl(true)
-	case 0x00C8:
-		return m.ReadOpenBus(addr)
-	case 0x00C9:
-		return m.ReadOpenBus(addr)
-	case 0x00CA:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00CB:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00CC:
-		return m.ReadOpenBus(addr)
-	case 0x00CD:
-		return m.ReadOpenBus(addr)
-	case 0x00CE:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00CF:
-		return m.ReadOpenBus(addr - 2)
 	case 0x00D0:
 		return 0
 	case 0x00D1:
@@ -520,22 +343,6 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 		return m.GBA.Dma[2].ReadControl(false)
 	case 0x00D3:
 		return m.GBA.Dma[2].ReadControl(true)
-	case 0x00D4:
-		return m.ReadOpenBus(addr)
-	case 0x00D5:
-		return m.ReadOpenBus(addr)
-	case 0x00D6:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00D7:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00D8:
-		return m.ReadOpenBus(addr)
-	case 0x00D9:
-		return m.ReadOpenBus(addr)
-	case 0x00DA:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00DB:
-		return m.ReadOpenBus(addr - 2)
 	case 0x00DC:
 		return 0
 	case 0x00DD:
@@ -544,72 +351,6 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 		return m.GBA.Dma[3].ReadControl(false)
 	case 0x00DF:
 		return m.GBA.Dma[3].ReadControl(true)
-
-	case 0x00E0:
-		return m.ReadOpenBus(addr)
-	case 0x00E1:
-		return m.ReadOpenBus(addr)
-	case 0x00E2:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00E3:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00E4:
-		return m.ReadOpenBus(addr)
-	case 0x00E5:
-		return m.ReadOpenBus(addr)
-	case 0x00E6:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00E7:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00E8:
-		return m.ReadOpenBus(addr)
-	case 0x00E9:
-		return m.ReadOpenBus(addr)
-	case 0x00EA:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00EB:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00EC:
-		return m.ReadOpenBus(addr)
-	case 0x00ED:
-		return m.ReadOpenBus(addr)
-	case 0x00EE:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00EF:
-		return m.ReadOpenBus(addr - 2)
-
-	case 0x00F0:
-		return m.ReadOpenBus(addr)
-	case 0x00F1:
-		return m.ReadOpenBus(addr)
-	case 0x00F2:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00F3:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00F4:
-		return m.ReadOpenBus(addr)
-	case 0x00F5:
-		return m.ReadOpenBus(addr)
-	case 0x00F6:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00F7:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00F8:
-		return m.ReadOpenBus(addr)
-	case 0x00F9:
-		return m.ReadOpenBus(addr)
-	case 0x00FA:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00FB:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00FC:
-		return m.ReadOpenBus(addr)
-	case 0x00FD:
-		return m.ReadOpenBus(addr)
-	case 0x00FE:
-		return m.ReadOpenBus(addr - 2)
-	case 0x00FF:
-		return m.ReadOpenBus(addr - 2)
 
 	case 0x100:
 		return m.GBA.Timers[0].ReadD(false)
@@ -681,10 +422,6 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 	case 0x203:
 		return uint8(m.GBA.Irq.IF >> 8)
 
-	case 0x204:
-		return m.IO[addr]
-	case 0x205:
-		return m.IO[addr]
 	case 0x206:
 		return 0
 	case 0x207:
@@ -870,12 +607,16 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 
 	case 0x00B0:
 		m.GBA.Dma[0].WriteSrc(v, 0)
+        m.IO[addr] = v
 	case 0x00B1:
 		m.GBA.Dma[0].WriteSrc(v, 1)
+        m.IO[addr] = v
 	case 0x00B2:
 		m.GBA.Dma[0].WriteSrc(v, 2)
+        m.IO[addr] = v
 	case 0x00B3:
 		m.GBA.Dma[0].WriteSrc(v, 3)
+        m.IO[addr] = v
 	case 0x00B4:
 		m.GBA.Dma[0].WriteDst(v, 0)
 	case 0x00B5:
@@ -1115,23 +856,23 @@ func (m *Memory) ReadSoundIO(addr uint32) uint8 {
 	case 0x8C:
 		return m.ReadOpenBus(addr)
 	case 0x8E:
-		return m.ReadOpenBus(addr - 2)
+		return m.ReadOpenBus(addr)
 	case 0xA0:
 		return m.ReadOpenBus(addr)
 	case 0xA2:
-		return m.ReadOpenBus(addr - 2)
+		return m.ReadOpenBus(addr)
 	case 0xA4:
 		return m.ReadOpenBus(addr)
 	case 0xA6:
-		return m.ReadOpenBus(addr - 2)
+		return m.ReadOpenBus(addr)
 	case 0xA8:
 		return m.ReadOpenBus(addr)
 	case 0xAA:
-		return m.ReadOpenBus(addr - 2)
+		return m.ReadOpenBus(addr)
 	case 0xAC:
 		return m.ReadOpenBus(addr)
 	case 0xAE:
-		return m.ReadOpenBus(addr - 2)
+		return m.ReadOpenBus(addr)
 	default:
 		return ReadSound(addr, m.GBA.Apu)
 	}

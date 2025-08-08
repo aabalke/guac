@@ -17,8 +17,6 @@ github.com/hajimehoshi/oto v1.0.1/go.mod h1:wovJ8WWMfFKvP587mhHgot/MBr4DnNy9m6Ee
 github.com/hajimehoshi/oto/v2 v2.3.1/go.mod h1:seWLbgHH7AyUMYKfKYT9pg7PhUu9/SisyJvNTT+ASQo=
 github.com/jezek/xgb v1.1.1 h1:bE/r8ZZtSv7l9gk6nU0mYx51aXrvnyb44892TwSaqS4=
 github.com/jezek/xgb v1.1.1/go.mod h1:nrhwO0FX/enq75I7Y7G8iN1ubpSGZEiA3v9e9GyRFlk=
-github.com/silbinarywolf/preferdiscretegpu v1.0.0 h1:tuvXLRCnoFMFyk74/8PFvO0B5rjDmXm0JgNTaOYAHT0=
-github.com/silbinarywolf/preferdiscretegpu v1.0.0/go.mod h1:h3s2GkfAP2sWqoS7v/PxAlFOQ1azMRsZxUJNw47QhLc=
 golang.org/x/exp v0.0.0-20190306152737-a1d7652674e8 h1:idBdZTd9UioThJp8KpM/rTSinK/ChZFBE43/WtIy8zg=
 golang.org/x/exp v0.0.0-20190306152737-a1d7652674e8/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
 golang.org/x/image v0.0.0-20190227222117-0694c2d4d067/go.mod h1:kZ7UVZpmo3dzQBMxlp+ypCbDeSB+sBbTgSJuh5dn5js=
