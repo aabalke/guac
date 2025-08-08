@@ -75,9 +75,6 @@ Check the ./emu folder for individual consoles. These consoles will have
 # Contributing
 
 Please contribute! At this time I am mostly interested in getting game errors
-fleshed out. Cycle accuracy, and serial communication are not a priority at this
-time. At this time, AI contributions will be rejected.
-
-# Developers
-
-If you are interested: [aaronbalke.com](some deep dives regarding emulation).
+fixed. Cycle accuracy, and serial communication are not a priority at this
+time. At this time, AI contributions will be rejected. For what needs work see
+"todo.md" pages for each console.

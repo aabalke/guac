@@ -1,5 +1,7 @@
 # Graphical
 
+0. Bitmap modes need to be treated as Background 2, for effects, object priority etc
+
 1. Mode 4: fix objects, and blinking
 - Doom II, Need for Speed Underground
 

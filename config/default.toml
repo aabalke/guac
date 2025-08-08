@@ -1,9 +1,8 @@
 # keyboard ids come from ebitengine string values.
-
 # gamepad / controller ids: https://www.w3.org/TR/gamepad/#remapping
 
 # only cancel audio init for profiling / benchmarking
-#cancel_audio_init = true
+# cancel_audio_init = true
 
 #fullscreen = true
 backdrop_color = 0x0A0A0A
@@ -12,24 +11,24 @@ backdrop_color = 0x0A0A0A
 games_per_row = 6
 
 [keyboard]
-select = ["J", "Enter"]
-mute = ["M"]
-pause = ["P"]
-quit = ["Q"]
+select     = ["J", "Enter"]
+mute       = ["M"]
+pause      = ["P"]
+quit       = ["Q"]
 fullscreen = ["F11"]
-left = ["A", "ArrowLeft"]
-right = ["D", "ArrowRight"]
-up = ["W", "ArrowUp"]
-down = ["S", "ArrowDown"]
+left       = ["A", "ArrowLeft"]
+right      = ["D", "ArrowRight"]
+up         = ["W", "ArrowUp"]
+down       = ["S", "ArrowDown"]
 
 [controller]
 select = [1]
-mute = [8]
-pause = [9]
-left = [14]
-right = [15]
-up = [12]
-down = [13]
+mute   = [8]
+pause  = [9]
+left   = [14]
+right  = [15]
+up     = [12]
+down   = [13]
 
 # GB Configuration
 
@@ -65,14 +64,16 @@ down = [13]
 [gba]
 
 # Experimental options which may cause crashes or glitches
-# skip_hle = true 
+#skip_hle = true 
 #threads = 8
 idle_optimize = true
 
-# set between 1 - 1232 to set how often the sound clock is updated
+# set between 0x100 - 0x400 to set how often the sound clock is updated
 # lower is more often, which is great for quality
 # higher is better for lower end systems that cannot render sound fast enough
-sound_clock_update_cycles = 0x200
+sound_clock_update_cycles = 0x100
+
+#disable_saves = true
 
 [gba.keyboard]
 a = ["J"]

@@ -47,9 +47,8 @@ func main() {
 		ebiten.SetTPS(2000)
 
 	} else if flags.Unlimited {
-	    ebiten.SetTPS(2000)
-    }
-
+		ebiten.SetTPS(2000)
+	}
 
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	ebiten.SetWindowTitle("guac emulator")
@@ -86,7 +85,7 @@ type Flags struct {
 	Type        int
 	RomPath     string
 	Profile     bool
-    Unlimited   bool
+	Unlimited   bool
 }
 
 func getFlags() Flags {
@@ -97,9 +96,9 @@ func getFlags() Flags {
 	flag.Parse()
 
 	f := Flags{
-		RomPath: *romPath,
-		Profile: *profile,
-        Unlimited: *unlimited,
+		RomPath:   *romPath,
+		Profile:   *profile,
+		Unlimited: *unlimited,
 	}
 
 	switch {

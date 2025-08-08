@@ -29,7 +29,8 @@ type Game struct {
 	pause *Pause
 	frame uint64
 
-	paused bool
+	paused        bool
+	pauseEndFrame uint64
 
 	gamepad          ebiten.GamepadID
 	gamepadConnected bool
@@ -133,24 +134,30 @@ func (g *Game) Update() error {
 	if g.paused {
 		g.pause.InputHandler(g, justKeys, justButtons)
 		return nil
-	} else {
+	}
 
-		switch g.flags.Type {
-		case NONE:
-			selected := g.menu.InputHandler(justKeys, justButtons, g.frame)
-			if selected {
-				g.SelectConsole()
-				g.menu = nil
-			}
-		case GBA:
-			g.gba.InputHandler(keys, buttons)
-			g.gba.Update()
-			g.gba.Image.WritePixels(g.gba.Pixels)
-		case GB:
-			g.gb.InputHandler(keys, buttons)
-			g.gb.Update()
-			g.gb.Image.WritePixels(*g.gb.Pixels)
+	if g.frame-g.pauseEndFrame < 10 {
+		// pressing select on pause can sometimes input into emulator,
+		// this gives time from the pause and emulator starting again
+		return nil
+	}
+
+	switch g.flags.Type {
+	case NONE:
+		selected := g.menu.InputHandler(justKeys, justButtons, g.frame)
+		if selected {
+			g.SelectConsole()
+			g.menu = nil
 		}
+	case GBA:
+		g.gba.InputHandler(keys, buttons)
+
+		g.gba.Update()
+		g.gba.Image.WritePixels(g.gba.Pixels)
+	case GB:
+		g.gb.InputHandler(keys, buttons)
+		g.gb.Update()
+		g.gb.Image.WritePixels(*g.gb.Pixels)
 	}
 
 	return nil

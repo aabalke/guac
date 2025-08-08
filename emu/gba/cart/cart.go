@@ -223,7 +223,8 @@ func (c *Cartridge) Read(addr uint32) uint8 {
 	case SRAM:
 		return c.SRAM[addr]
 	case EEPROM:
-		panic("EEPROM READ USING STD IMPLIMENTATION OR GGPIO")
+		log.Printf("Attempted GPIO Read with EEPROM. Not supported.\n")
+		return 0
 	case FLASH, FLASH128:
 		return c.ReadFlash(addr)
 	default:
@@ -232,11 +233,12 @@ func (c *Cartridge) Read(addr uint32) uint8 {
 }
 
 func (c *Cartridge) Write(addr uint32, v uint8) {
+
 	switch c.Id {
 	case SRAM:
 		c.SRAM[addr] = v
 	case EEPROM:
-		panic("EEPROM WRITE USING STD IMPLIMENTATION")
+		log.Printf("Attempted GPIO Write with EEPROM. Not supported.\n")
 	case FLASH, FLASH128:
 		c.WriteFlash(addr, v)
 	}

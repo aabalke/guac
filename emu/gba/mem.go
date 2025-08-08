@@ -4,6 +4,7 @@ import (
 	//"log"
 	"time"
 
+	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gba/utils"
 )
 
@@ -43,7 +44,9 @@ func NewMemory(gba *GBA) Memory {
 
 func (m *Memory) InitSaveLoop() {
 
-	return
+	if config.Conf.Gba.DisableSaves {
+		return
+	}
 
 	saveTicker := time.Tick(time.Second)
 
@@ -263,54 +266,54 @@ func (m *Memory) ReadBios(addr uint32) uint8 {
 
 func (m *Memory) ReadOpenBus(addr uint32) uint8 {
 
-    pc := m.GBA.Cpu.Reg.R[PC]
+	pc := m.GBA.Cpu.Reg.R[PC]
 
-    if m.GBA.Cpu.Reg.isThumb {
+	if m.GBA.Cpu.Reg.isThumb {
 
-        // region based thumb openbus behavior has not been implimented
+		// region based thumb openbus behavior has not been implimented
 
-        //For THUMB code in Main RAM, Palette Memory, VRAM, and Cartridge ROM this is:
-        //LSW = [$+4], MSW = [$+4]
+		//For THUMB code in Main RAM, Palette Memory, VRAM, and Cartridge ROM this is:
+		//LSW = [$+4], MSW = [$+4]
 
-        //For THUMB code in BIOS or OAM
-        //LSW = [$+4], MSW = [$+6]   ;for opcodes at 4-byte aligned locations
-        //LSW = [$+2], MSW = [$+4]   ;for opcodes at non-4-byte aligned locations
+		//For THUMB code in BIOS or OAM
+		//LSW = [$+4], MSW = [$+6]   ;for opcodes at 4-byte aligned locations
+		//LSW = [$+2], MSW = [$+4]   ;for opcodes at non-4-byte aligned locations
 
-        //For THUMB code in 32K-WRAM
-        //LSW = [$+4], MSW = OldHI   ;for opcodes at 4-byte aligned locations
-        //LSW = OldLO, MSW = [$+4]   ;for opcodes at non-4-byte aligned locations
-        //Whereas OldLO/OldHI are usually:
-        //OldLO=[$+2], OldHI=[$+2]
-        //Unless the previous opcode's prefetch was overwritten;
-        //that can happen if the previous opcode was itself an LDR opcode, ie.
-        //if it was itself reading data:
+		//For THUMB code in 32K-WRAM
+		//LSW = [$+4], MSW = OldHI   ;for opcodes at 4-byte aligned locations
+		//LSW = OldLO, MSW = [$+4]   ;for opcodes at non-4-byte aligned locations
+		//Whereas OldLO/OldHI are usually:
+		//OldLO=[$+2], OldHI=[$+2]
+		//Unless the previous opcode's prefetch was overwritten;
+		//that can happen if the previous opcode was itself an LDR opcode, ie.
+		//if it was itself reading data:
 
-        //OldLO=LSW(data), OldHI=MSW(data)
-        //Theoretically, this might also change if a DMA transfer occurs.
+		//OldLO=LSW(data), OldHI=MSW(data)
+		//Theoretically, this might also change if a DMA transfer occurs.
 
-        return uint8(m.Read32((pc &^ 1) + 4) >> ((addr & 1) << 3))
-    }
+		return uint8(m.Read32((pc&^1)+4) >> ((addr & 1) << 3))
+	}
 
-	return uint8(m.Read32((pc &^ 3) + 8) >> ((addr & 3) << 3))
+	return uint8(m.Read32((pc&^3)+8) >> ((addr & 3) << 3))
 }
 
 func (m *Memory) ReadIO(addr uint32) uint8 {
 
 	// this addr is relative. - 0x400000
 
-    switch {
-    case addr >= 0x10 && addr < 0x48,
-         addr >= 0x4C && addr < 0x50,
-         addr >= 0x54 && addr < 0x60,
-         addr >= 0xB0 && addr < 0xB8,
-         addr >= 0xBC && addr < 0xC4,
-         addr >= 0xC8 && addr < 0xD0,
-         addr >= 0xD4 && addr < 0xDC,
-         addr >= 0xE0 && addr < 0x100:
+	switch {
+	case addr >= 0x10 && addr < 0x48,
+		addr >= 0x4C && addr < 0x50,
+		addr >= 0x54 && addr < 0x60,
+		addr >= 0xB0 && addr < 0xB8,
+		addr >= 0xBC && addr < 0xC4,
+		addr >= 0xC8 && addr < 0xD0,
+		addr >= 0xD4 && addr < 0xDC,
+		addr >= 0xE0 && addr < 0x100:
 		return m.ReadOpenBus(addr)
-    case addr >= 0x60 && addr < 0xB0:
+	case addr >= 0x60 && addr < 0xB0:
 		return m.ReadSoundIO(addr)
-    }
+	}
 
 	switch addr {
 	case 0x0004:
@@ -607,16 +610,16 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 
 	case 0x00B0:
 		m.GBA.Dma[0].WriteSrc(v, 0)
-        m.IO[addr] = v
+		m.IO[addr] = v
 	case 0x00B1:
 		m.GBA.Dma[0].WriteSrc(v, 1)
-        m.IO[addr] = v
+		m.IO[addr] = v
 	case 0x00B2:
 		m.GBA.Dma[0].WriteSrc(v, 2)
-        m.IO[addr] = v
+		m.IO[addr] = v
 	case 0x00B3:
 		m.GBA.Dma[0].WriteSrc(v, 3)
-        m.IO[addr] = v
+		m.IO[addr] = v
 	case 0x00B4:
 		m.GBA.Dma[0].WriteDst(v, 0)
 	case 0x00B5:

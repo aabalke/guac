@@ -208,7 +208,20 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 				WIDTH          = SCREEN_WIDTH
 			)
 
-			idx := (x + (y * WIDTH)) * BYTE_PER_PIXEL
+			xIdx := x
+			yIdx := y
+
+			bg := gba.PPU.Backgrounds[2]
+
+			if bg.Mosaic && gba.PPU.Mosaic.BgH != 0 {
+				xIdx -= (xIdx % (gba.PPU.Mosaic.BgH + 1))
+			}
+
+			if bg.Mosaic && gba.PPU.Mosaic.BgV != 0 {
+				yIdx -= (yIdx % (gba.PPU.Mosaic.BgV + 1))
+			}
+
+			idx := (xIdx + (yIdx * WIDTH)) * BYTE_PER_PIXEL
 
 			data := uint32(mem.VRAM[idx])
 			data |= uint32(mem.VRAM[idx+1]) << 8
@@ -222,7 +235,20 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 				WIDTH          = SCREEN_WIDTH
 			)
 
-			idx := (x + (y * WIDTH)) * BYTE_PER_PIXEL
+			xIdx := x
+			yIdx := y
+
+			bg := gba.PPU.Backgrounds[2]
+
+			if bg.Mosaic && gba.PPU.Mosaic.BgH != 0 {
+				xIdx -= (xIdx % (gba.PPU.Mosaic.BgH + 1))
+			}
+
+			if bg.Mosaic && gba.PPU.Mosaic.BgV != 0 {
+				yIdx -= (yIdx % (gba.PPU.Mosaic.BgV + 1))
+			}
+
+			idx := (xIdx + (yIdx * WIDTH)) * BYTE_PER_PIXEL
 
 			if dispcnt.DisplayFrame1 {
 				idx += 0xA000

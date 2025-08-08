@@ -11,6 +11,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/audio"
 )
 
+const splashScreenFrames = 60
+
 type Menu struct {
 	SelectedIdx int
 	Data        []GameData
@@ -45,7 +47,7 @@ func NewMenu(context *audio.Context) *Menu {
 
 func (m *Menu) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadButton, frame uint64) bool {
 
-	if frame < 120 {
+	if frame < splashScreenFrames {
 		return false
 	}
 
@@ -137,7 +139,7 @@ func (m *Menu) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadB
 
 func (m *Menu) DrawMenu(screen *ebiten.Image, frame uint64) {
 
-	if frame < 120 {
+	if frame < splashScreenFrames {
 		screen.Fill(color.White)
 		m.SplashImage(screen)
 		return

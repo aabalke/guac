@@ -44,6 +44,7 @@ type GbaConfig struct {
 	Threads                int  `toml:"threads"`
 	IdleOptimize           bool `toml:"idle_optimize"`
 	SoundClockUpdateCycles int  `toml:"sound_clock_update_cycles"`
+	DisableSaves           bool `toml:"disable_saves"`
 }
 
 type KeyboardConfig struct {

@@ -107,6 +107,7 @@ func (p *Pause) handleSelection(g *Game) {
 	switch p.SelectedIdx {
 	case IDX_PAUSE:
 		g.TogglePause()
+		g.pauseEndFrame = g.frame
 	case IDX_VOLUME:
 		g.ToggleMute()
 	case IDX_EXIT:

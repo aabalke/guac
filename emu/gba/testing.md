@@ -216,7 +216,7 @@ Mother 12
 Mother 3
     - No known errors
 Pokémon Mystery Dungeon Red Rescue Team
-    - Wave Sound Channel does not envelope / length correctly
+    - No known errors
 Pokémon Firered / LeafGreen
     - No known errors
 Pokémon Emerald
@@ -250,8 +250,9 @@ Doom II
 Zelda Link to the Past
     - No known errors
 Iridion II
-    - No known errors
+    - No audio
 Iridion 3D
+    - No audio
     - crashes after menus
 Mario Party
     - Start Menu has graphical error - it is related to incorrect writes

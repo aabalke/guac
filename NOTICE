@@ -1,0 +1,16 @@
+This project includes code adapted from third party code under the following licenses:
+
+- APU and HLE Bios from akatsuki105/magia 005c616 (MIT License)
+- Cartridge and VideoUpdate from RidgeX/ygba a30c442 (BSD-3 Clause License)
+
+All other code is @ 2025 Aaron Balke, licensed under a BSD-3 Clause License
+
+The Guac Emulator Logo / Icon, splash screen, sound effects and other branded works are copyrighted and not
+licensed.
+
+Pause Menu icons are sourced from Google Material Symbols, licensed under 
+Apache License Version 2.0
+
+https://fonts.google.com/icons?selected=Material+Symbols+Outlined:resume:FILL@1;wght@700;GRAD@0;opsz@48&icon.size=1000&icon.color=%23FFFFFF&icon.platform=web
+
+The packaged bios file does not include copyrighted logos.

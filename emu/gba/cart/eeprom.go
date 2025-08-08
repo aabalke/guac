@@ -26,8 +26,6 @@ var (
 
 func (c *Cartridge) EepromRead() uint16 {
 
-	//println("READING EEPROM")
-
 	switch {
 	case eepromReadBitsCount > 64:
 		eepromReadBitsCount--
