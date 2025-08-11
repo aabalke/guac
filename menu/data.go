@@ -22,6 +22,7 @@ const (
 	NONE = iota
 	GB
 	GBA
+    NDS
 )
 
 func LoadGameData() []GameData {
@@ -77,6 +78,8 @@ func getConsole(path string) int {
 		return GB
 	case strings.HasSuffix(path, ".gba"):
 		return GBA
+	case strings.HasSuffix(path, ".nds"):
+		return NDS
 	default:
 		panic("Flag Parsing Error. RomPath in roms.json must end with gba, gbc, gb extension")
 	}

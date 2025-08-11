@@ -22,6 +22,7 @@ const (
 	NONE = iota
 	GB
 	GBA
+	NDS
 )
 
 //go:embed icons/icon.png
@@ -54,7 +55,7 @@ func main() {
 	ebiten.SetWindowTitle("guac emulator")
 	ebiten.SetWindowIcon([]image.Image{loadIcon()})
 	//ebiten.SetWindowPosition(100, 100)
-	ebiten.SetWindowSize(240*4, 160*4)
+	ebiten.SetWindowSize(256*4, 192*4)
 	//ebiten.SetWindowSize(1280, 720)
 	if config.Conf.Fullscreen {
 		ebiten.SetFullscreen(true)
@@ -111,6 +112,8 @@ func getFlags() Flags {
 		f.Type = GB
 	case strings.HasSuffix(*romPath, ".gba"):
 		f.Type = GBA
+	case strings.HasSuffix(*romPath, ".nds"):
+		f.Type = NDS
 	default:
 		panic("Flag Parsing Error. Rom Path must end with gba, gbc, gb extension")
 	}

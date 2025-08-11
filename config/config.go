@@ -25,6 +25,7 @@ type Config struct {
 	CancelAudioInit  bool             `toml:"cancel_audio_init"`
 	Gb               GbConfig         `toml:"gb"`
 	Gba              GbaConfig        `toml:"gba"`
+	Nds              NdsConfig        `toml:"nds"`
 	KeyboardConfig   KeyboardConfig   `toml:"keyboard"`
 	ControllerConfig ControllerConfig `toml:"controller"`
 }
@@ -45,6 +46,17 @@ type GbaConfig struct {
 	IdleOptimize           bool `toml:"idle_optimize"`
 	SoundClockUpdateCycles int  `toml:"sound_clock_update_cycles"`
 	DisableSaves           bool `toml:"disable_saves"`
+}
+
+type NdsConfig struct {
+	KeyboardConfig   EmulatorKeyboardConfig   `toml:"keyboard"`
+	ControllerConfig EmulatorControllerConfig `toml:"controller"`
+
+	//SkipHle                bool `toml:"skip_hle"`
+	//Threads                int  `toml:"threads"`
+	//IdleOptimize           bool `toml:"idle_optimize"`
+	//SoundClockUpdateCycles int  `toml:"sound_clock_update_cycles"`
+	//DisableSaves           bool `toml:"disable_saves"`
 }
 
 type KeyboardConfig struct {

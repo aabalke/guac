@@ -9,6 +9,7 @@ import (
 	"github.com/aabalke/guac/config"
 	gameboy "github.com/aabalke/guac/emu/gb"
 	"github.com/aabalke/guac/emu/gba"
+	"github.com/aabalke/guac/emu/nds"
 	"github.com/aabalke/guac/menu"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -23,6 +24,7 @@ var (
 
 type Game struct {
 	flags Flags
+	nds   *nds.Nds
 	gba   *gba.GBA
 	gb    *gameboy.GameBoy
 	menu  *menu.Menu
@@ -60,6 +62,8 @@ func NewGame(flags Flags) *Game {
 		g.gba = gba.NewGBA(flags.RomPath, g.emuCtx)
 	case GB:
 		g.gb = gameboy.NewGameBoy(flags.RomPath, g.emuCtx)
+	case NDS:
+		g.nds = nds.NewNds(flags.RomPath, g.emuCtx)
 	}
 
 	return g
@@ -149,9 +153,13 @@ func (g *Game) Update() error {
 			g.SelectConsole()
 			g.menu = nil
 		}
+	case NDS:
+		g.nds.InputHandler(keys, buttons)
+		g.nds.Update()
+		g.nds.ImageTop.WritePixels(g.nds.PixelsTop)
+		g.nds.ImageBottom.WritePixels(g.nds.PixelsBottom)
 	case GBA:
 		g.gba.InputHandler(keys, buttons)
-
 		g.gba.Update()
 		g.gba.Image.WritePixels(g.gba.Pixels)
 	case GB:
@@ -176,6 +184,9 @@ func (g *Game) SelectConsole() {
 	case GB:
 		g.gb = gameboy.NewGameBoy(rom.RomPath, g.emuCtx)
 		g.flags.Type = GB
+	case NDS:
+		g.nds = nds.NewNds(rom.RomPath, g.emuCtx)
+		g.flags.Type = NDS
 	default:
 		panic("Selected Unknown Console")
 	}
@@ -191,6 +202,8 @@ func (g *Game) TogglePause() {
 	}
 
 	switch g.flags.Type {
+	case NDS:
+		g.nds.TogglePause()
 	case GBA:
 		g.gba.TogglePause()
 	case GB:
@@ -204,6 +217,8 @@ func (g *Game) ToggleMute() {
 	}
 
 	switch g.flags.Type {
+	case NDS:
+		g.nds.ToggleMute()
 	case GBA:
 		g.gba.ToggleMute()
 	case GB:
@@ -223,6 +238,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		ImageFillScreen(screen, g.gba.Image)
 	case GB:
 		ImageFillScreen(screen, g.gb.Image)
+	case NDS:
+		ImageFillScreen(screen, g.nds.ImageTop)
+		//ImageFillScreenMulti(screen, g.nds.ImageTop, g.nds.ImageBottom, false)
 	}
 
 	if g.paused {
@@ -246,6 +264,51 @@ func ImageFillScreen(screen *ebiten.Image, image *ebiten.Image) {
 	op.GeoM.Scale(scale, scale)
 	op.GeoM.Translate(offsetX, offsetY)
 	screen.DrawImage(image, op)
+}
+
+func ImageFillScreenMulti(screen *ebiten.Image, imageTop, imageBottom *ebiten.Image, setHorizontal bool) {
+
+	sw, sh := float64(screen.Bounds().Dx()), float64(screen.Bounds().Dy())
+	itw, ith := float64(imageTop.Bounds().Dx()), float64(imageTop.Bounds().Dy())
+
+	if setHorizontal {
+
+		scaleX := (sw / 2) / itw
+		scaleY := sh / ith
+		scale := min(scaleX, scaleY)
+
+		offsetX := (sw - (itw * scale))
+		offsetY := (sh - (ith * scale)) / 2
+
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Scale(scale, scale)
+		op.GeoM.Translate(0, offsetY)
+		screen.DrawImage(imageTop, op)
+
+		op = &ebiten.DrawImageOptions{}
+		op.GeoM.Scale(scale, scale)
+		op.GeoM.Translate(offsetX, offsetY)
+		screen.DrawImage(imageBottom, op)
+
+		return
+	}
+
+	scaleX := sw / itw
+	scaleY := (sh / 2) / ith
+	scale := min(scaleX, scaleY)
+
+	offsetX := (sw - (itw * scale)) / 2
+	offsetY := (sh - (ith * scale))
+
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(scale, scale)
+	op.GeoM.Translate(offsetX, 0)
+	screen.DrawImage(imageTop, op)
+
+	op = &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(scale, scale)
+	op.GeoM.Translate(offsetX, offsetY)
+	screen.DrawImage(imageBottom, op)
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
