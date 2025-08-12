@@ -1,10 +1,15 @@
 package arm9
 
 import (
+    "os"
 	"fmt"
+	"math"
+	"math/bits"
 
-	"github.com/aabalke/guac/emu/gba/utils"
+	"github.com/aabalke/guac/emu/nds/utils"
 )
+
+var _ = os.Args
 
 const (
 	AND = iota
@@ -166,6 +171,10 @@ func (cpu *Cpu) logical(alu *Alu) {
 	}
 
 	cpu.Reg.R[alu.Rd] = res
+
+    if alu.Rd == PC {
+        cpu.Reg.R[alu.Rd] &^= 0b11
+    }
 
 	cpu.setAluFlags(alu, uint64(res))
 }
@@ -368,6 +377,11 @@ const (
 	UMLAL = 0b101
 	SMULL = 0b110
 	SMLAL = 0b111
+
+    SMLAxy = 0b1000
+    SMLAWySMLALWy = 0b1001
+    SMLALxy =0b1010
+    SMULxy = 0b1011
 )
 
 func (cpu *Cpu) Mul(opcode uint32) {
@@ -380,7 +394,8 @@ func (cpu *Cpu) Mul(opcode uint32) {
 	rm := utils.GetByte(opcode, 0)
 	r := &cpu.Reg.R
 
-	if mulHalf := inst == MUL || inst == MLA; mulHalf {
+    switch inst {
+    case MUL, MLA:
 
 		res := r[rm] * r[rs]
 
@@ -399,13 +414,10 @@ func (cpu *Cpu) Mul(opcode uint32) {
 
 		r[PC] += 4
 		return
-	}
-
-	if inst == UMAAL {
-		panic("UMAAL is UNSUPPORTED")
-	}
-
-	if mulUnsignedWord := inst == UMULL || inst == UMLAL; mulUnsignedWord {
+    case UMAAL:
+	    panic("UMAAL is UNSUPPORTED")
+    
+    case UMULL, UMLAL:
 		res := uint64(r[rm]) * uint64(r[rs])
 
 		if inst == UMLAL {
@@ -429,25 +441,96 @@ func (cpu *Cpu) Mul(opcode uint32) {
 
 		r[PC] += 4
 		return
+
+    case SMULL, SMLAL:
+
+        res := int64(int32(r[rm])) * int64(int32(r[rs]))
+        if inst == SMLAL {
+            res += int64(r[rd])<<32 | int64(r[rn])
+        }
+
+        r[rd] = uint32(res >> 32)
+        r[rn] = uint32(res)
+
+        if set {
+            cpu.Reg.CPSR.SetFlag(FLAG_N, (res>>63&1) == 1)
+            cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
+            // FLAG_C "destroyed" ARM <5, ignored ARM >=5
+            cpu.Reg.CPSR.SetFlag(FLAG_C, false)
+            // FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
+        }
+
+        r[PC] += 4
 	}
 
-	res := int64(int32(r[rm])) * int64(int32(r[rs]))
-	if inst == SMLAL {
-		res += int64(r[rd])<<32 | int64(r[rn])
-	}
+    // arm9 muliplies
 
-	r[rd] = uint32(res >> 32)
-	r[rn] = uint32(res)
+    x := (opcode >> 5) & 1
+    y := (opcode >> 6) & 1
 
-	if set {
-		cpu.Reg.CPSR.SetFlag(FLAG_N, (res>>63&1) == 1)
-		cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
-		// FLAG_C "destroyed" ARM <5, ignored ARM >=5
-		cpu.Reg.CPSR.SetFlag(FLAG_C, false)
-		// FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
-	}
+    switch inst {
+    case SMLAxy :
 
-	r[PC] += 4
+        rmV := int64(int16((r[rm] >> (16 * x)) & 0xFFFF))
+        rsV := int64(int16((r[rs] >> (16 * y)) & 0xFFFF))
+        rnV := int64(int32(r[rn]))
+
+        res := rmV * rsV
+
+        if res + rnV > math.MaxInt32 || res + rnV < math.MinInt32 {
+            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+        }
+
+        res += rnV
+
+        r[rd] = uint32(res)
+
+        if (res > math.MaxInt32 || res < math.MinInt32) {
+            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+        }
+
+
+    case SMLAWySMLALWy:
+
+        rmV := int64(int32(r[rm]))
+        rsV := int64(int16((r[rs] >> (16 * y) & 0xFFFF)))
+        res := (rmV * rsV) >> 16
+
+        if smulwa := x == 0; smulwa {
+            add := int64(int32(r[rn]))
+
+            if res + add > math.MaxInt32 || res + add < math.MinInt32 {
+                cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            }
+
+            res += add
+        }
+
+        r[rd] = uint32(res)
+
+    case SMLALxy:
+
+        rsV := int64(int16((r[rs] >> (16 * y) & 0xFFFF)))
+        rmV := int64(int16((r[rm] >> (16 * x) & 0xFFFF)))
+
+        res := rsV * rmV
+        add := int64(int32(r[rd]))<<32 | int64(int32(r[rn]))
+        res += add
+
+        r[rd] = uint32(res >> 32)
+        r[rn] = uint32(res)
+
+    case SMULxy:
+
+        rmV := int64(int16((r[rm] >> (16 * x)) & 0xFFFF))
+        rsV := int64(int16((r[rs] >> (16 * y)) & 0xFFFF))
+
+        res := rmV * rsV
+
+        r[rd] = uint32(res)
+    }
+
+    r[PC] += 4
 }
 
 const (
@@ -533,7 +616,6 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 
 	switch {
 	case sdt.Load && sdt.Byte:
-
 		// DO NOT WORD ALIGN
 		r[sdt.Rd] = uint32(c.mem.Read8(pre, true))
 
@@ -542,13 +624,15 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 		v := c.mem.Read32(addr, true)
 		is := (pre & 0b11) << 3
 		v = utils.RorSimple(v, is)
-		//v, _, _ = utils.Ror(v, is, false, false, false)
 
-		if sdt.Rd == PC { // not sure if this is right
-			v -= 4
-		}
+        r[sdt.Rd] = v
 
-		r[sdt.Rd] = v
+        if sdt.Rd == PC {
+            c.toggleThumb()
+            r[sdt.Rd] -= 4
+            r[sdt.Rd] &^= 0b11
+        }
+
 
 	case !sdt.Load && sdt.Byte:
 
@@ -890,13 +974,14 @@ func halfUnsignedAddress(half *Half, cpu *Cpu) (uint32, uint32) {
 }
 
 type Block struct {
-	Opcode, Rn, RnValue, Rlist    uint32
+	Opcode, Rn, Rlist    uint32
 	Pre, Up, PSR, Writeback, Load bool
+    incrementPc bool
 }
 
-func (c *Cpu) Block(opcode uint32) {
+var here bool
 
-	r := &c.Reg.R
+func (c *Cpu) Block(opcode uint32) {
 
 	block := &Block{
 		Opcode:    opcode,
@@ -905,47 +990,165 @@ func (c *Cpu) Block(opcode uint32) {
 		PSR:       utils.BitEnabled(opcode, 22),
 		Writeback: utils.BitEnabled(opcode, 21),
 		Load:      utils.BitEnabled(opcode, 20),
-		Rn:        utils.GetByte(opcode, 16),
+        Rn:        utils.GetVarData(opcode, 16, 19),
 		Rlist:     utils.GetVarData(opcode, 0, 15),
+        incrementPc: true,
 	}
 
-	block.RnValue = c.Reg.R[block.Rn]
-
-	incPc := true
-
-	mode := c.Reg.getMode()
-
-	if forceUser := block.PSR; forceUser && mode != MODE_USR {
-		c.Reg.setMode(mode, MODE_USR)
-	}
 
 	if block.Load {
-		incPc = c.ldm(block)
+		c.ldm(block)
 	} else {
 		c.stm(block)
 	}
 
-	if !block.Writeback {
-		r[block.Rn] = block.RnValue
-	}
-
-	if forceUser := block.PSR; forceUser && mode != MODE_USR {
-		c.Reg.setMode(MODE_USR, mode)
-	}
+    //if here {
+    //    fmt.Printf("B CPSR %08X R0 %08X R1 %08X R2 %08X R3 %08X R4 %08X SP %08X LR %08X PC %08X RN %02d RLIST %16b WB %t SP IRQ %08X SP USR %08X | LR IRQ %08X LR USR %08X\n", c.Reg.CPSR, r[0], r[1], r[2], r[3], r[4], r[13], r[14], r[PC], block.Rn, block.Rlist, block.Writeback, c.Reg.SP[BANK_ID[MODE_IRQ]], c.Reg.SP[BANK_ID[MODE_USR]], c.Reg.LR[BANK_ID[MODE_IRQ]], c.Reg.LR[BANK_ID[MODE_USR]])
+    //    fmt.Printf("---\n")
+    //}
 
 	if utils.BitEnabled(block.Opcode, 15) && block.PSR {
 		panic("LDM WITH R15 AND SET USED")
 	}
 
-	if incPc {
+    //if r[PC] == 0x2007B44 {
+    //    os.Exit(0)
+    //}
+
+
+	if block.incrementPc {
 		c.Reg.R[PC] += 4
-	}
+	} else if !block.incrementPc && block.Load {
+        //panic("MAKE SURE TOGGLE THUMB IN LDM")
+        c.toggleThumb()
+    }
 }
 
-func (c *Cpu) ldm(block *Block) bool {
+//func (c *Cpu) ldm(block *Block) bool {
+//
+//	incPC := true
+//	r := &c.Reg.R
+//
+//	ib := block.Pre && block.Up
+//	ia := !block.Pre && block.Up
+//	db := block.Pre && !block.Up
+//	da := !block.Pre && !block.Up
+//
+//	if block.Rlist == 0 {
+//
+//		c.Reg.R[PC] += 16 // i believe this is short cut for {} => {r15} behavior
+//
+//		if block.Up {
+//			r[block.Rn] += 0x40
+//			return false
+//		}
+//
+//		r[block.Rn] -= 0x40
+//		return false
+//	}
+//
+//	regCount := utils.CountBits(block.Rlist)
+//
+//	if (block.Rlist>>block.Rn)&1 == 1 {
+//		regCount--
+//		block.Writeback = false
+//	}
+//
+//	addr := r[block.Rn] &^ 0b11
+//    wbValue := r[block.Rn]
+//    mode := c.Reg.getMode()
+//    if forceUser := block.PSR; forceUser && mode != MODE_USR {
+//        c.Reg.setMode(mode, MODE_USR)
+//    }
+//
+//	reg := uint32(0)
+//	for reg = range 16 {
+//
+//		regBitEnabled := utils.BitEnabled(block.Rlist, uint8(reg))
+//		decRegBitEnabled := utils.BitEnabled(block.Rlist, uint8(15-reg))
+//
+//		switch {
+//		case ib && regBitEnabled:
+//
+//			addr += 4
+//			r[reg] = c.mem.Read32(addr, true)
+//
+//			if reg == PC {
+//				incPC = incPC && false
+//			}
+//			if reg == block.Rn {
+//				wbValue = r[block.Rn]
+//			}
+//
+//		case ia && regBitEnabled:
+//
+//			r[reg] = c.mem.Read32(addr, true)
+//
+//			if reg == PC {
+//				incPC = incPC && false
+//			}
+//			if reg == block.Rn {
+//				wbValue = r[block.Rn]
+//			}
+//
+//			addr += 4
+//
+//		case db && decRegBitEnabled: // pop
+//
+//			addr -= 4
+//			r[15-reg] = c.mem.Read32(addr, true)
+//
+//			if 15-reg == PC {
+//				incPC = incPC && false
+//			}
+//			if 15-reg == block.Rn {
+//				wbValue = r[block.Rn]
+//			}
+//
+//		case da && decRegBitEnabled:
+//
+//			r[15-reg] = c.mem.Read32(addr, true)
+//			addr -= 4
+//
+//			if 15-reg == PC {
+//				incPC = incPC && false
+//			}
+//			if 15-reg == block.Rn {
+//				wbValue = r[block.Rn]
+//			}
+//		}
+//	}
+//
+//	if block.Up {
+//		r[block.Rn] += (regCount * 4)
+//	} else {
+//		r[block.Rn] -= (regCount * 4)
+//	}
+//
+//    if forceUser := block.PSR; forceUser && mode != MODE_USR {
+//        curr := c.Reg.getMode()
+//        c.Reg.setMode(curr, mode)
+//    }
+//
+//    if !block.Writeback {
+//        r[block.Rn] = wbValue
+//    }
+//
+//	return incPC
+//}
+
+func (c *Cpu) ldm(block *Block) {
 
 	incPC := true
 	r := &c.Reg.R
+
+	addr := r[block.Rn] &^ 0b11
+    wbValue := r[block.Rn]
+
+    mode := c.Reg.getMode()
+    if forceUser := block.PSR; forceUser && mode != MODE_USR {
+        c.Reg.setMode(mode, MODE_USR)
+    }
 
 	ib := block.Pre && block.Up
 	ia := !block.Pre && block.Up
@@ -954,95 +1157,111 @@ func (c *Cpu) ldm(block *Block) bool {
 
 	if block.Rlist == 0 {
 
-		c.Reg.R[PC] += 16 // i believe this is short cut for {} => {r15} behavior
+		c.Reg.R[PC] += 4
 
 		if block.Up {
 			r[block.Rn] += 0x40
-			return false
+			return
 		}
 
 		r[block.Rn] -= 0x40
-		return false
+		return
 	}
 
 	regCount := utils.CountBits(block.Rlist)
 
-	if (block.Rlist>>block.Rn)&1 == 1 {
-		regCount--
-		block.Writeback = false
-	}
+    rnIncluded :=(block.Rlist>>block.Rn)&1 == 1
+    isLast := (block.Rlist < (1 << (block.Rn + 1)))
+    isOnly := regCount == 1 && rnIncluded
+    block.Writeback = !isLast || isOnly
 
-	addr := r[block.Rn] &^ 0b11
+    if (rnIncluded && (!block.Writeback || block.PSR)) {
+        regCount--
+    }
 
-	reg := uint32(0)
-	for reg = range 16 {
+    switch {
+    case ib:
 
-		regBitEnabled := utils.BitEnabled(block.Rlist, uint8(reg))
-		decRegBitEnabled := utils.BitEnabled(block.Rlist, uint8(15-reg))
+        for reg := uint32(0); reg < 16; reg++ {
+		    if disabled := !utils.BitEnabled(block.Rlist, uint8(reg)); disabled {
+                continue
+            }
 
-		switch {
-		case ib && regBitEnabled:
+            addr += 4
 
-			addr += 4
-			r[reg] = c.mem.Read32(addr, true)
+            r[reg] = c.mem.Read32(addr, true)
+
+            if reg == PC {
+                incPC = incPC && false
+            }
+        }
+
+    case ia:
+        for reg := uint32(0); reg < 16; reg++ {
+		    if disabled := !utils.BitEnabled(block.Rlist, uint8(reg)); disabled {
+                continue
+            }
+
+            r[reg] = c.mem.Read32(addr, true)
 
 			if reg == PC {
 				incPC = incPC && false
 			}
-			if reg == block.Rn {
-				block.RnValue = r[block.Rn]
-			}
 
-		case ia && regBitEnabled:
+			addr += 4
+        }
+    case db:
 
-			r[reg] = c.mem.Read32(addr, true)
+        for reg := 15; reg >= 0; reg-- {
+		    if disabled := !utils.BitEnabled(block.Rlist, uint8(reg)); disabled {
+                continue
+            }
+
+			addr -= 4
+
+            r[reg] = c.mem.Read32(addr, true)
 
 			if reg == PC {
 				incPC = incPC && false
 			}
-			if reg == block.Rn {
-				block.RnValue = r[block.Rn]
-			}
+        }
 
-			addr += 4
+    case da:
+        for reg := 15; reg >= 0; reg-- {
+		    if disabled := !utils.BitEnabled(block.Rlist, uint8(reg)); disabled {
+                continue
+            }
 
-		case db && decRegBitEnabled: // pop
-
+            r[reg] = c.mem.Read32(addr, true)
 			addr -= 4
 
-			r[15-reg] = c.mem.Read32(addr, true)
-
-			if 15-reg == PC {
+			if reg == PC {
 				incPC = incPC && false
 			}
-			if 15-reg == block.Rn {
-				block.RnValue = r[block.Rn]
-			}
-
-		case da && decRegBitEnabled:
-
-			r[15-reg] = c.mem.Read32(addr, true)
-			addr -= 4
-
-			if 15-reg == PC {
-				incPC = incPC && false
-			}
-			if 15-reg == block.Rn {
-				block.RnValue = r[block.Rn]
-			}
-		}
-	}
+        }
+    }
 
 	if block.Up {
-		r[block.Rn] += (regCount * 4)
+        wbValue += regCount * 4
+
 	} else {
-		r[block.Rn] -= (regCount * 4)
+        wbValue -= regCount * 4
 	}
 
-	return incPC
+    if forceUser := block.PSR; forceUser && mode != MODE_USR {
+        curr := c.Reg.getMode()
+        c.Reg.setMode(curr, mode)
+    }
+
+    if block.Writeback {
+        r[block.Rn] = wbValue
+    }
+
+    block.incrementPc = incPC
+	return
 }
 
-func (c *Cpu) stm(block *Block) {
+func (c *Cpu) stmOLD(block *Block) {
 
 	r := &c.Reg.R
 
@@ -1055,18 +1274,13 @@ func (c *Cpu) stm(block *Block) {
 		// stm {} => {PC}
 		switch {
 		case ib:
-			addr := r[block.Rn] + 4
 			r[block.Rn] += 0x40
-			c.mem.Write32(addr, r[PC]+12, true)
 		case ia:
-			c.mem.Write32(r[block.Rn], r[PC]+12, true)
 			r[block.Rn] += 0x40
 		case db:
 			r[block.Rn] -= 0x40
-			c.mem.Write32(r[block.Rn], r[PC]+12, true)
 		case da:
 			r[block.Rn] -= 0x40
-			c.mem.Write32(r[block.Rn]+4, r[PC]+12, true)
 		}
 
 		return
@@ -1182,6 +1396,192 @@ func (c *Cpu) stm(block *Block) {
 		}
 	}
 
+	if block.Writeback && smallest {
+
+		v := c.mem.Read32(addr, true)
+
+		if block.Up {
+			c.mem.Write32(r[block.Rn], v-(regCount*4),true)
+			return
+		}
+		c.mem.Write32(r[block.Rn], v+(regCount*4), true)
+		return
+	}
+
+	if block.Writeback && matchingRn {
+		if block.Up {
+			c.mem.Write32(matchingAddr, matchingValue+(rnIdx*4), true)
+			return
+		}
+
+		c.mem.Write32(matchingAddr, matchingValue-(rnIdx*4), true)
+		return
+	}
+}
+
+func (c *Cpu) stm(block *Block) {
+
+	r := &c.Reg.R
+
+	addr := r[block.Rn] &^ 0b11
+    wbValue := r[block.Rn]
+
+    mode := c.Reg.getMode()
+    if forceUser := block.PSR; forceUser && mode != MODE_USR {
+        c.Reg.setMode(mode, MODE_USR)
+    }
+
+	ib := block.Pre && block.Up
+	ia := !block.Pre && block.Up
+	db := block.Pre && !block.Up
+	da := !block.Pre && !block.Up
+
+	if block.Rlist == 0 {
+		switch {
+		case block.Up:
+			r[block.Rn] += 0x40
+		case !block.Up:
+			r[block.Rn] -= 0x40
+		}
+
+		return
+	}
+
+	regCount := utils.CountBits(block.Rlist)
+
+	smallest := (block.Rlist & -block.Rlist) == 1<<block.Rn
+	matchingRn := (block.Rlist>>block.Rn)&1 == 1
+	matchingValue := uint32(0)
+	matchingAddr := uint32(0) // rn during regs
+
+	count := uint32(0)
+	rnIdx := uint32(0)
+
+    switch {
+    case ib:
+
+        for reg := uint32(0); reg < 16; reg++ {
+		    if disabled := !utils.BitEnabled(block.Rlist, uint8(reg)); disabled {
+                continue
+            }
+
+			count++
+
+			r[block.Rn] += 4
+			addr += 4
+
+			if reg == block.Rn {
+				c.mem.Write32(addr, r[reg]-4, true)
+				matchingValue = r[reg]
+				matchingAddr = addr
+				rnIdx = regCount - count
+				continue
+			}
+
+			if reg == PC {
+				c.mem.Write32(addr, r[reg]+12, true)
+				continue
+			}
+
+			c.mem.Write32(addr, r[reg], true)
+
+        }
+
+    case ia:
+        for reg := uint32(0); reg < 16; reg++ {
+		    if disabled := !utils.BitEnabled(block.Rlist, uint8(reg)); disabled {
+                continue
+            }
+			count++
+
+			if reg == block.Rn {
+
+				c.mem.Write32(addr, r[reg], true)
+				matchingValue = r[reg] + 4
+				matchingAddr = addr
+				rnIdx = regCount - count
+				r[block.Rn] += 4
+				addr += 4
+				continue
+			}
+
+			if reg == PC {
+				c.mem.Write32(addr, r[reg]+12, true)
+				continue
+			}
+
+			c.mem.Write32(addr, r[reg], true)
+
+			r[block.Rn] += 4
+			addr += 4
+
+        }
+    case db:
+
+        for reg := 15; reg >= 0; reg-- {
+
+		    if disabled := !utils.BitEnabled(block.Rlist, uint8(reg)); disabled {
+                continue
+            }
+			count++
+
+			r[block.Rn] -= 4
+			addr -= 4
+
+			if uint32(reg) == block.Rn {
+				matchingValue = r[reg]
+				matchingAddr = addr
+				rnIdx = regCount - count // regCount only for 15 - reg
+			}
+			if reg == PC {
+				c.mem.Write32(addr, r[reg]+12, true)
+				continue
+			}
+
+			c.mem.Write32(addr, r[reg], true)
+
+        }
+
+    case da:
+        for reg := 15; reg >= 0; reg-- {
+		    if disabled := !utils.BitEnabled(block.Rlist, uint8(reg)); disabled {
+                continue
+            }
+			count++
+
+			if uint32(reg) == block.Rn {
+				c.mem.Write32(addr, r[reg]+(count-1)*4, true)
+				matchingValue = r[reg] - 4 // -4 offsets above +4 when matching Value (not first smallest)
+				matchingAddr = addr
+				rnIdx = regCount - count
+				r[block.Rn] -= 4
+				addr -= 4
+				continue
+			}
+
+			if reg == PC {
+				c.mem.Write32(addr, r[reg]+12, true)
+				continue
+			}
+
+			c.mem.Write32(addr, r[reg], true)
+
+			r[block.Rn] -= 4
+			addr -= 4
+        }
+    }
+
+    if forceUser := block.PSR; forceUser && mode != MODE_USR {
+        curr := c.Reg.getMode()
+        c.Reg.setMode(curr, mode)
+    }
+
+    if !block.Writeback {
+        r[block.Rn] = wbValue
+    }
+
+    // in v5 store old base always, v4 stored new if first entry in rlist, fails armwrestler though
+	//if block.Writeback && smallest {
 	if block.Writeback && smallest {
 
 		v := c.mem.Read32(addr, true)
@@ -1415,4 +1815,102 @@ func (cpu *Cpu) Swp(opcode uint32) {
 	r[rd] = rnMemValue
 	cpu.mem.Write32(aligned, rmValue, true)
 	r[PC] += 4
+}
+
+const (
+    QADD = 0
+    QSUB = 2
+    QDADD = 4
+    QDSUB = 6
+
+    MIN_INT32 = 0x8000_0000
+)
+
+func (cpu *Cpu) Qalu(opcode uint32) {
+
+    r := &cpu.Reg.R
+
+    inst := utils.GetVarData(opcode, 20, 23)
+    rn := utils.GetVarData(opcode, 16, 19)
+    rd := utils.GetVarData(opcode, 12, 15)
+    rm := utils.GetVarData(opcode, 0, 3)
+
+    rnV := int64(int32(r[rn]))
+    rmV := int64(int32(r[rm]))
+
+    switch inst {
+    case QADD:
+
+        switch {
+        case rmV + rnV > math.MaxInt32:
+            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            r[rd] = math.MaxInt32
+
+        case rmV + rnV < math.MinInt32:
+            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            r[rd] = 0x8000_0000
+        default:
+            r[rd] = uint32(int32(rmV + rnV))
+        }
+
+
+    case QSUB:
+        switch {
+        case rmV - rnV < math.MinInt32:
+            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            r[rd] = 0x8000_0000
+        case rmV - rnV > math.MaxInt32:
+            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            r[rd] = math.MaxInt32
+        default:
+            r[rd] = uint32(int32(rmV - rnV))
+        }
+    case QDADD:
+
+        if rnV * 2 > math.MaxInt32 || rnV * 2 < math.MinInt32 {
+            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+        }
+
+        switch {
+        case rmV + min(rnV * 2, math.MaxInt32) > math.MaxInt32:
+            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            r[rd] = math.MaxInt32
+        case rmV + min(rnV * 2, math.MaxInt32) < math.MinInt32:
+            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            r[rd] = 0x8000_0000
+        default:
+            r[rd] = uint32(int32(rmV + max(min(rnV * 2, math.MaxInt32), math.MinInt32)))
+        }
+
+    case QDSUB:
+
+        if rnV * 2 > math.MaxInt32 || rnV * 2 < math.MinInt32 {
+            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+        }
+
+        switch {
+        case rmV - min(rnV * 2, math.MaxInt32) > math.MaxInt32:
+            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            r[rd] = math.MaxInt32
+        case rmV - min(rnV * 2, math.MaxInt32) < math.MinInt32:
+            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            r[rd] = 0x8000_0000
+        default:
+            r[rd] = uint32(int32(rmV - max(min(rnV * 2, math.MaxInt32), math.MinInt32)))
+        }
+    }
+
+    r[PC] += 4
+}
+
+func (cpu *Cpu) Clz(opcode uint32) {
+
+    r := &cpu.Reg.R
+
+    rd := utils.GetVarData(opcode, 12, 15)
+    rm := opcode & 0b1111
+
+    r[rd] = uint32(bits.LeadingZeros32(r[rm]))
+
+    r[PC] += 4
 }

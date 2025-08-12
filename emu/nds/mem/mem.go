@@ -40,6 +40,7 @@ type Mem struct {
 
     exmem ExMem
     auxspi AuxSPI
+    div Div
 
 	ITCM [0x8000]uint8
 	DTCM [0x4000]uint8
@@ -195,6 +196,10 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 	//	fmt.Printf("READ ADDR %08X\n", addr)
 	//}
 
+    if addr >= 0x280 && addr < 0x2B0 {
+        return mem.div.Read(addr)
+    }
+
 	switch addr {
 	case 0x4:
 		return uint8(mem.Dispstat)
@@ -257,6 +262,11 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 
     if addr < 0x4 {
         mem.ppu.Update(addr, uint32(v))
+    }
+
+    if addr >= 0x280 && addr < 0x2B0 {
+        mem.div.Write(addr, v)
+        return
     }
 
 	switch addr {

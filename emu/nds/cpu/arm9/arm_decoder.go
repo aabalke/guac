@@ -28,64 +28,14 @@ func (cpu *Cpu) DecodeARM() int {
 		//return cycles
 	}
 
-	switch (opcode >> 25) & 0b111 {
-	case 0b000:
-		switch {
-		case isBX(opcode):
-			cpu.BX(opcode)
-		case isSDT(opcode):
-			cycles := cpu.Sdt(opcode)
-			return int(cycles)
-		case isHalf(opcode):
-			cpu.Half(opcode)
-		case isPSR(opcode):
-			cpu.Psr(opcode)
-		case isSWP(opcode):
-			cpu.Swp(opcode)
-		case isM(opcode):
-			cpu.Mul(opcode)
-		case isALU(opcode):
-			cpu.Alu(opcode)
-		default:
-			panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X", opcode, r[PC]))
-		}
-
-		return 4
-	case 0b001:
-
-		switch {
-		case isSDT(opcode):
-			cycles := cpu.Sdt(opcode)
-			return int(cycles)
-		case isHalf(opcode):
-			cpu.Half(opcode)
-		case isPSR(opcode):
-			cpu.Psr(opcode)
-		case isSWP(opcode):
-			cpu.Swp(opcode)
-		case isALU(opcode):
-			cpu.Alu(opcode)
-		default:
-			panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X", opcode, r[PC]))
-		}
-
-		return 4
-	case 0b010:
-	case 0b011:
-	case 0b100:
-		cpu.Block(opcode)
-		return 4
-	case 0b101:
+    switch {
+	case isB(opcode):
 		cpu.B(opcode)
-		return 4
-	}
-
-	switch {
 	case isBX(opcode):
 		cpu.BX(opcode)
 	case isSDT(opcode):
-		cycles := cpu.Sdt(opcode)
-		return int(cycles)
+        cycles := cpu.Sdt(opcode)
+        return int(cycles)
 	case isBlock(opcode):
 		cpu.Block(opcode)
 	case isHalf(opcode):
@@ -96,14 +46,18 @@ func (cpu *Cpu) DecodeARM() int {
 		cpu.Psr(opcode)
 	case isSWP(opcode):
 		cpu.Swp(opcode)
-	case isM(opcode):
-		cpu.Mul(opcode)
+    case isM(opcode):
+        cpu.Mul(opcode)
+    case isCLZ(opcode):
+        cpu.Clz(opcode)
+    case isQAlu(opcode):
+        cpu.Qalu(opcode)
 	case isALU(opcode):
 		cpu.Alu(opcode)
-	case isCoDataReg(opcode):
-		cpu.Reg.R[15] += 4
-	case isCoDataTrans(opcode):
-		cpu.Reg.R[15] += 4
+    case isCoDataReg(opcode):
+        cpu.Reg.R[15] += 4
+    case isCoDataTrans(opcode):
+        cpu.Reg.R[15] += 4
 	default:
 		panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X", opcode, r[PC]))
 	}
@@ -113,6 +67,20 @@ func (cpu *Cpu) DecodeARM() int {
 
 func isOpcodeFormat(opcode, mask, format uint32) bool {
 	return opcode&mask == format
+}
+
+func isCLZ(opcode uint32) bool {
+	return isOpcodeFormat(opcode,
+		0b0000_1111_1111_1111_0000_1111_1111_0000,
+		0b0000_0001_0110_1111_0000_1111_0001_0000,
+	)
+}
+
+func isQAlu(opcode uint32) bool {
+	return isOpcodeFormat(opcode,
+		0b0000_1111_1001_0000_0000_1111_1111_0000,
+		0b0000_0001_0000_0000_0000_0000_0101_0000,
+	)
 }
 
 func isCoDataTrans(opcode uint32) bool {
@@ -217,6 +185,11 @@ func isM(opcode uint32) bool {
 	is = is || isOpcodeFormat(opcode,
 		0b0000_1110_1000_0000_0000_0000_1111_0000,
 		0b0000_0000_1000_0000_0000_0000_1001_0000,
+	)
+
+	is = is || isOpcodeFormat(opcode,
+		0b0000_1111_1001_0000_0000_0000_1001_0000,
+		0b0000_0001_0000_0000_0000_0000_1000_0000,
 	)
 
 	return is

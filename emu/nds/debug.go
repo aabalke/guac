@@ -48,38 +48,38 @@ func (d *Debugger) PrintLine(arm9 bool) {
 	//LDRH R0,[27E57FEh]
 	//STRH 6000h,[4000204h]    ;EXMEMCNT, enable RAM, normal mode
 
-	if CURR_INST >= 1_028_615 && false {
+	//if CURR_INST >= 1_028_615 && false {
 		fmt.Printf("CURR %5d ARM9: PC %08X %12s %-12s R0 %08X R1 %08X R4 %08X R12 %08X SP %08X LR %08X CPSR %08X 0x400_0180 %08X\n", CURR_INST, pc, op, desc, r[0], r[1], r[4], r[12], r[13], r[14], cpsr, mem.Read32(0x400_0180, true))
-	}
-
-	// talk to arm7
-	if CURR_INST == 1_000_000 {
-		mem.WriteArm9IO(0x180, 0x1)
-	}
-
-	// talk to arm7
-	if CURR_INST == 1_028_594 {
-		mem.WriteArm9IO(0x180, 0x3)
-	}
-
-	// pointer to starting address in cartridge copy
-
-	if CURR_INST == 1_029_042 {
-		mem.Write32(0x027FF800+0x20, 0x2004804, true)
-	}
-
-	//if pc == 0xFFFF_03E4 {
-	//    panic("HERE")
 	//}
 
-	//if CURR_INST == 1_001_000 {
-	//    os.Exit(0)
+	//// talk to arm7
+	//if CURR_INST == 1_000_000 {
+	//	mem.WriteArm9IO(0x180, 0x1)
 	//}
 
-	//if CURR_INST >= 1028618 {
-	if CURR_INST >= 1_029_050 {
-		os.Exit(0)
-	}
+	//// talk to arm7
+	//if CURR_INST == 1_028_594 {
+	//	mem.WriteArm9IO(0x180, 0x3)
+	//}
+
+	//// pointer to starting address in cartridge copy
+
+	//if CURR_INST == 1_029_042 {
+	//	mem.Write32(0x027FF800+0x20, 0x2004804, true)
+	//}
+
+	////if pc == 0xFFFF_03E4 {
+	////    panic("HERE")
+	////}
+
+	////if CURR_INST == 1_001_000 {
+	////    os.Exit(0)
+	////}
+
+	////if CURR_INST >= 1028618 {
+	//if CURR_INST >= 1_029_050 {
+	//	os.Exit(0)
+	//}
 
 	//if CURR_INST >= 1_000_030 && pc < 0xFFFF_0000 {
 	//    panic(fmt.Sprintf("PC %08X", pc))
@@ -121,6 +121,9 @@ func (d *Debugger) print(i int) {
 	p("pc/r15", reg.R[15])
 	s("--------  --------")
 	p("cpsr", uint32(reg.CPSR))
+	p("79C4", d.nds.mem.Read32(0x20079C4, true))
+	p("79C0", d.nds.mem.Read32(0x20079C0, true))
+	p("79BC", d.nds.mem.Read32(0x20079BC, true))
 	//p("spsr", uint32(reg.SPSR[BANK_ID[mode]]))
 	//p("MODE", BANK_ID[mode])
 

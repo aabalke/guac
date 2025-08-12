@@ -77,6 +77,9 @@ func NewNds(path string, _ *oto.Context) *Nds {
 	return &nds
 }
 
+var previousPc uint32
+var printem bool
+
 func (nds *Nds) Update() {
 
 	if nds.Paused {
@@ -85,13 +88,48 @@ func (nds *Nds) Update() {
 
 	nds.Drawn = false
 
+
+    // 02002CDD
+
+
 	for !nds.Drawn {
 
-		//nds.Debugger.PrintLine(true)
-        //if CURR_INST >= 100000 {
+        //if nds.arm9.Reg.R[15] == 0x02002CDD || nds.arm9.Reg.R[15] % 2 == 1{
+        //    fmt.Printf("OLD PC %08X\n", previousPc)
+        //    panic("PC WAS SET TO CRAZY")
+        //}
+
+        //if previousPc == 0x020078E4 {
+        //    nds.Debugger.print(int(CURR_INST))
+        //}
+
+        //if nds.arm9.Reg.R[15] == 0x2002CD8 {
+        //    printem = true
+        //}
+
+		//if printem{
+        //    nds.Debugger.PrintLine(true)
+        //}
+
+
+        //addr := uint32(0x200_07CC)
+        //addr := uint32(0x200_2CCC)
+        ////addr := uint32(0x200_788C)
+        ////addr := uint32(0x20063E0)
+        ////addr := uint32(0x2006240)
+
+		//////nds.Debugger.PrintLine(true)
+        //////if CURR_INST >= 100000 {
+        //if nds.arm9.Reg.R[15] == addr {
+        //    nds.Debugger.print(int(CURR_INST))
+        //}
+
+        //if nds.arm9.Reg.R[15] == addr + 4 {
         //    nds.Debugger.print(int(CURR_INST))
         //    os.Exit(0)
         //}
+
+        previousPc = nds.arm9.Reg.R[15]
 
 		cycles := 4
 
@@ -107,6 +145,7 @@ func (nds *Nds) Update() {
 		if !nds.arm9.Halted {
 			CURR_INST++
 		}
+
 	}
 }
 
@@ -141,7 +180,9 @@ func (nds *Nds) DirtyInit() {
     nds.arm9.Reg.R[13] = 0x3002F7C
     nds.arm9.Reg.R[14] = nds.Cartridge.Header.Arm9EntryAddr
     nds.arm9.Reg.R[15] = nds.Cartridge.Header.Arm9EntryAddr
-    nds.arm9.Reg.CPSR = 0x800_00DF
+    //nds.arm9.Reg.CPSR = 0x800_00DF
+    nds.arm9.Reg.CPSR = 0x000_00DF
+    // do not init with FLAG Q
 }
 
 // RidgeX/ygba BSD3

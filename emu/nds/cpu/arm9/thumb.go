@@ -353,6 +353,46 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
 		return 4
 
 	case inst == 3 && mSBd:
+
+        // BLX
+
+        if rs == LR {
+
+            panic("MAKE SURE BLX LR LR IS SETUP")
+
+            tmp := r[LR]
+            r[LR] = r[PC] + 2
+
+            if setThumb := !utils.BitEnabled(tmp, 0); setThumb {
+                cpsr.SetThumb(false, cpu)
+                r[PC] = tmp &^ 0b11
+            } else {
+                r[PC] = tmp &^ 0b1
+            }
+
+            return 4
+        }
+
+        r[LR] = r[PC] + 2
+
+		if rs == PC {
+			cpsr.SetThumb(false, cpu)
+			//R15: CPU switches to ARM state, and PC is auto-aligned as (($+4) AND NOT 2).
+			r[PC] = (r[PC] + 4) &^ 2
+
+			return 4
+		}
+
+		if setThumb := !utils.BitEnabled(r[rs], 0); setThumb {
+			cpsr.SetThumb(false, cpu)
+			r[PC] = r[rs] &^ 0b11
+		} else {
+			r[PC] = r[rs] &^ 0b1
+		}
+
+		return 4
+
+
 		panic("UNSUPPORTED HI BLX")
 	case inst == 3:
 
