@@ -18,10 +18,10 @@ func (nds *Nds) bitmap(y uint32) {
             BYTE_PER_PIXEL = 2
         )
 
-        idx := (x+(y*SCREEN_WIDTH))*BYTE_PER_PIXEL + offset
+        idx := (x+(y*SCREEN_WIDTH))*BYTE_PER_PIXEL + offset // no region
 
-        data := uint32(nds.mem.VRAM[idx])
-        data |= uint32(nds.mem.VRAM[idx+1]) << 8
+        data := uint32(nds.mem.Vram.Read(idx, true))
+        data |= uint32(nds.mem.Vram.Read(idx+1, true)) << 8
 
         r := uint8((data) & 0b11111)
         g := uint8((data >> 5) & 0b11111)

@@ -1,20 +1,14 @@
 package mem
 
-import (
-	"fmt"
-
-	"github.com/aabalke/guac/emu/nds/utils"
-)
-
 type Div struct {
 	CNT, NUM, DEN, RES, REM uint64
 }
 
 func (d *Div) Write(addr uint32, v uint8) {
 
-    if addr >= 0x283 && addr < 0x290 {
-        return
-    }
+	if addr >= 0x283 && addr < 0x290 {
+		return
+	}
 
 	w := func(dst uint64, v uint8, b uint32) uint64 {
 		dst &^= (0xFF << (8 * b))
@@ -66,7 +60,7 @@ func (d *Div) Write(addr uint32, v uint8) {
 		d.DEN = w(d.DEN, v, 7)
 	}
 
-    d.Calc()
+	d.Calc()
 }
 
 func (d *Div) Read(addr uint32) uint8 {
@@ -141,12 +135,7 @@ func (d *Div) Read(addr uint32) uint8 {
 		return r(d.DEN, 6)
 	case 0x29F:
 		return r(d.DEN, 7)
-
 	case 0x2A0:
-        fmt.Printf("READING\n")
-        fmt.Printf("DIV NU %d %d, DE %d %d, RES %d %d, REM %d %d DIV0 %t\n",
-        uint32(d.NUM), uint32(d.NUM >> 32), uint32(d.DEN), uint32(d.DEN >> 32),
-        uint32(d.RES), uint32(d.RES >> 32), uint32(d.REM), uint32(d.REM >> 32), utils.BitEnabled(uint32(d.CNT), 14))
 		return r(d.RES, 0)
 	case 0x2A1:
 		return r(d.RES, 1)
@@ -185,35 +174,227 @@ func (d *Div) Read(addr uint32) uint8 {
 
 func (d *Div) Calc() {
 
-    if d.DEN == 0 {
-        d.REM = d.NUM
-        // is this supposed to change to int32 in int32 version?
-        if d.NUM & (0x8000_0000_0000_0000) == 0 {
-            d.RES = uint64(0xFFFF_FFFF_FFFF_FFFF)
-        } else {
-            d.RES = 1
-        }
+	d.CNT &^= 1 << 14
 
-        d.CNT |= 1 << 14
-        return
-    }
-
-    d.CNT &^= 1 << 14
+	if d.DEN == 0 {
+		d.CNT |= 1 << 14
+	}
 
 	switch mode := d.CNT & 0b11; mode {
 	case 1:
+
+		if uint32(d.DEN) == 0 {
+			d.REM = d.NUM
+			if d.NUM&(0x8000_0000_0000_0000) == 0 {
+				d.RES = uint64(0xFFFF_FFFF_FFFF_FFFF)
+			} else {
+				d.RES = 1
+			}
+
+			return
+		}
+
+		numerator := int64(d.NUM)
+		denominator := int32(d.DEN)
+
+		res := numerator / int64(denominator)
+		rem := numerator % int64(denominator)
+
+		d.RES = uint64(res)
+		d.REM = uint64((int32(rem)))
+
 	case 2:
 
-        res := int64(d.NUM) / int64(d.DEN)
-        rem := int64(d.NUM) % int64(d.DEN)
+		if d.DEN == 0 {
+			d.REM = d.NUM
+			if d.NUM&(0x8000_0000_0000_0000) == 0 {
+				d.RES = uint64(0xFFFF_FFFF_FFFF_FFFF)
+			} else {
+				d.RES = 1
+			}
+
+			return
+		}
+
+		res := int64(d.NUM) / int64(d.DEN)
+		rem := int64(d.NUM) % int64(d.DEN)
 
 		d.RES = uint64(res)
 		d.REM = uint64(rem)
 
 	default:
+
+		if uint32(d.DEN) == 0 {
+			d.REM = d.NUM
+			if d.NUM&(0x0000_0000_8000_0000) == 0 {
+				d.RES = uint64(0xFFFF_FFFF_FFFF_FFFF)
+			} else {
+				d.RES = 1
+				d.REM |= 0xFFFF_FFFF_0000_0000
+			}
+
+			d.RES ^= 0xFFFF_FFFF_0000_0000
+			return
+		}
+
+		numerator := int32(d.NUM)
+		denominator := int32(d.DEN)
+
+		quotient := numerator / int32(denominator)
+		remainder := numerator % int32(denominator)
+
+		d.RES = uint64(int32(quotient))
+		d.REM = uint64(int32(remainder))
+
+		if uint32(d.NUM) == 0x8000_0000 && int32(d.DEN) == -1 {
+			d.RES ^= 0xFFFF_FFFF_0000_0000
+		}
 	}
-    //u32 numLo, numHi, denomLo, denomHi, resLo, resHi, remLo, remHi;
+}
 
+type Sqrt struct {
+	is64  bool
+	PARAM uint64
+	RES   uint32
+}
 
-	//fmt.Printf("DIV 64 64 CNT %d NUM %d, DEN %d, RES %d, REM %d\n", int64(d.CNT), int64(d.DEN), int64(d.NUM), int64(d.RES), int64(d.REM))
+func (s *Sqrt) Write(addr uint32, v uint8) {
+
+	w := func(dst uint64, v uint8, b uint32) uint64 {
+		dst &^= (0xFF << (8 * b))
+		dst |= uint64(v) << (8 * b)
+		return dst
+	}
+
+	// ignoring busy bit since instant
+
+	switch addr {
+	case 0x2B0:
+		s.is64 = v&1 == 1
+	case 0x2B8:
+		s.PARAM = w(s.PARAM, v, 0)
+	case 0x2B9:
+		s.PARAM = w(s.PARAM, v, 1)
+	case 0x2BA:
+		s.PARAM = w(s.PARAM, v, 2)
+	case 0x2BB:
+		s.PARAM = w(s.PARAM, v, 3)
+	case 0x2BC:
+		s.PARAM = w(s.PARAM, v, 4)
+	case 0x2BD:
+		s.PARAM = w(s.PARAM, v, 5)
+	case 0x2BE:
+		s.PARAM = w(s.PARAM, v, 6)
+	case 0x2BF:
+		s.PARAM = w(s.PARAM, v, 7)
+	}
+
+	if !(addr >= 0x2B4 && addr < 0x2B8) {
+		s.Calc()
+	}
+}
+
+func (s *Sqrt) Read(addr uint32) uint8 {
+
+	r := func(dst, b uint64) uint8 {
+		return uint8(dst >> (8 * b))
+	}
+
+	switch addr {
+	case 0x2B0:
+
+		if s.is64 {
+			return 1
+		}
+
+		return 0
+
+	case 0x2B4:
+		return r(uint64(s.RES), 0)
+	case 0x2B5:
+		return r(uint64(s.RES), 1)
+	case 0x2B6:
+		return r(uint64(s.RES), 2)
+	case 0x2B7:
+		return r(uint64(s.RES), 3)
+	case 0x2B8:
+		return r(s.PARAM, 0)
+	case 0x2B9:
+		return r(s.PARAM, 1)
+	case 0x2BA:
+		return r(s.PARAM, 2)
+	case 0x2BB:
+		return r(s.PARAM, 3)
+	case 0x2BC:
+		return r(s.PARAM, 4)
+	case 0x2BD:
+		return r(s.PARAM, 5)
+	case 0x2BE:
+		return r(s.PARAM, 6)
+	case 0x2BF:
+		return r(s.PARAM, 7)
+	}
+
+	return 0
+}
+
+func (s *Sqrt) Calc() {
+
+	if s.is64 {
+        s.RES = uint32(sqrt(s.PARAM))
+        return
+	}
+    s.RES = uint32(sqrt(s.PARAM & 0xFFFF_FFFF))
+}
+
+func sqrt(input uint64) uint64 {
+
+    if input == 0 {
+        return 0
+    }
+
+    lo, hi, bound := uint64(0), input, uint64(1)
+
+    for bound < hi {
+        hi >>= 1
+        bound <<= 1
+    }
+
+    for {
+        hi = input
+        acc := uint64(0)
+        lo = bound
+
+        for {
+            oldLower := lo
+            if lo <= hi>>1 {
+                lo <<= 1
+            }
+            if oldLower >= hi>>1 {
+                break
+            }
+        }
+
+        for {
+            acc <<= 1
+            if hi >= lo {
+                acc++
+                hi -= lo
+            }
+            if lo == bound {
+                break
+            }
+            lo >>= 1
+        }
+
+        oldBound := bound
+        bound += acc
+        bound >>= 1
+        if bound >= oldBound {
+            bound = oldBound
+            break
+        }
+    }
+
+    return bound
 }

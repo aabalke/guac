@@ -5,30 +5,26 @@ import (
 )
 
 type Cartridge struct {
-    RomPath string
-    SavPath string
-    RomLength uint32
-    Header Header
+	RomPath   string
+	SavPath   string
+	RomLength uint32
+	Header    Header
 
-
-    Rom [0x200_0000]uint8
+	Rom [0x200_0000]uint8
 }
 
 func NewCartridge(rom, sav string) Cartridge {
 
-    c := Cartridge{
-        RomPath: rom,
-        SavPath: sav,
-    }
+	c := Cartridge{
+		RomPath: rom,
+		SavPath: sav,
+	}
 
-    c.load()
+	c.load()
 
-    c.Header = NewHeader(&c)
+	c.Header = NewHeader(&c)
 
-
-
-
-    return c
+	return c
 }
 
 func (c *Cartridge) load() {

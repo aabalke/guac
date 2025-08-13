@@ -14,7 +14,31 @@ type Debugger struct {
 func (d *Debugger) PrintLine(arm9 bool) {
 
 	if !arm9 {
-		panic("NEED TO SETUP ARM7 DEBUG LINE")
+
+        pc := d.nds.arm7.Reg.R[15]
+        r := &d.nds.arm7.Reg.R
+        cpsr := d.nds.arm7.Reg.CPSR
+        opcode := d.nds.mem.Read32(pc, false)
+        mem := &d.nds.mem
+
+        _ = r[15]
+        _ = mem.Read(0, true)
+        _ = cpsr
+
+        var desc, op string
+
+        if d.nds.arm7.Reg.IsThumb {
+            opcode &= 0xFFFF
+            desc = d.DecodeThumb(uint16(opcode))
+            op = fmt.Sprintf("OP     %04X", opcode)
+        } else {
+            desc = d.DecodeArm(opcode)
+            op = fmt.Sprintf("OP %08X", opcode)
+        }
+
+        fmt.Printf("CURR %5d ARM7: PC %08X %12s %-12s R0 %08X R1 %08X R4 %08X R12 %08X SP %08X LR %08X CPSR %08X\n", CURR_INST, pc, op, desc, r[0], r[1], r[4], r[12], r[13], r[14], cpsr)
+
+        return
 	}
 
 	pc := d.nds.arm9.Reg.R[15]
@@ -37,53 +61,8 @@ func (d *Debugger) PrintLine(arm9 bool) {
 		desc = d.DecodeArm(opcode)
 		op = fmt.Sprintf("OP %08X", opcode)
 	}
-	//NDS9 BIOS
-	//The NDS9 BIOS contains the following Main Memory initialization code, that method doesn't match up with any ST (nor Fujitsu) data sheets that I've seen. At its best, it looks like a strange (and presumably non-functional) mix-up of different ST control methods.
-	//STRH 2000h,[4000204h]    ;EXMEMCNT, enable RAM, async mode
-	//LDRH R0,[27FFFFEh]
-	//STRH R0,[27FFFFEh]
-	//STRH R0,[27FFFFEh]
-	//STRH FFDFh,[27FFFFEh]
-	//STRH E732h,[27FFFFEh]
-	//LDRH R0,[27E57FEh]
-	//STRH 6000h,[4000204h]    ;EXMEMCNT, enable RAM, normal mode
 
-	//if CURR_INST >= 1_028_615 && false {
-		fmt.Printf("CURR %5d ARM9: PC %08X %12s %-12s R0 %08X R1 %08X R4 %08X R12 %08X SP %08X LR %08X CPSR %08X 0x400_0180 %08X\n", CURR_INST, pc, op, desc, r[0], r[1], r[4], r[12], r[13], r[14], cpsr, mem.Read32(0x400_0180, true))
-	//}
-
-	//// talk to arm7
-	//if CURR_INST == 1_000_000 {
-	//	mem.WriteArm9IO(0x180, 0x1)
-	//}
-
-	//// talk to arm7
-	//if CURR_INST == 1_028_594 {
-	//	mem.WriteArm9IO(0x180, 0x3)
-	//}
-
-	//// pointer to starting address in cartridge copy
-
-	//if CURR_INST == 1_029_042 {
-	//	mem.Write32(0x027FF800+0x20, 0x2004804, true)
-	//}
-
-	////if pc == 0xFFFF_03E4 {
-	////    panic("HERE")
-	////}
-
-	////if CURR_INST == 1_001_000 {
-	////    os.Exit(0)
-	////}
-
-	////if CURR_INST >= 1028618 {
-	//if CURR_INST >= 1_029_050 {
-	//	os.Exit(0)
-	//}
-
-	//if CURR_INST >= 1_000_030 && pc < 0xFFFF_0000 {
-	//    panic(fmt.Sprintf("PC %08X", pc))
-	//}
+    fmt.Printf("CURR %5d ARM9: PC %08X %12s %-12s R0 %08X R1 %08X R4 %08X R12 %08X SP %08X LR %08X CPSR %08X 0x400_0180 %08X\n", CURR_INST, pc, op, desc, r[0], r[1], r[4], r[12], r[13], r[14], cpsr, mem.Read32(0x400_0180, true))
 }
 
 

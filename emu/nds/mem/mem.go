@@ -2,14 +2,11 @@ package mem
 
 import (
 	_ "embed"
-	"fmt"
 
 	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/ppu"
 )
-
-// 1 KiB == 0x400 uint8 == 1024
 
 //go:embed res/bios7.bin
 var arm7Bios []byte
@@ -19,15 +16,14 @@ var arm9Bios []byte
 
 type Mem struct {
 	MainRam       [0x40_0000]uint8
-	WRAM          [0x1_8000]uint8
+	WRAM          WRAM
 	TCMCache      [0xF000]uint8
-	//VRAM          [0xA_4000]uint8
-	VRAM          [0x100_0000]uint8
+    Vram VRAM
 	OAMPal        [0x1000]uint8
-	ThreeMemory   [0x3_E000]uint8
-	WifiRam       [0x2000]uint8
-	FirmwareFlash [0x4_0000]uint8
-	BiosRom       [0x9000]uint8
+	//ThreeMemory   [0x3_E000]uint8
+	//WifiRam       [0x2000]uint8
+	//FirmwareFlash [0x4_0000]uint8
+	//BiosRom       [0x9000]uint8
 
 	Arm7Bios [0x4000]uint8
 	Arm9Bios [0x1000]uint8
@@ -41,6 +37,7 @@ type Mem struct {
     exmem ExMem
     auxspi AuxSPI
     div Div
+    sqrt Sqrt
 
 	ITCM [0x8000]uint8
 	DTCM [0x4000]uint8
@@ -52,6 +49,8 @@ type Mem struct {
     Vcount uint32
     Dispstat Dispstat
     Keypad Keypad
+
+    WramArm7 [0x1_0000]uint8
 }
 
 //  4096KB Main RAM (8192KB in debug version)
@@ -114,13 +113,13 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 		case 0x2:
 			return mem.MainRam[addr&0x3F_FFFF]
 		case 0x3:
-			return mem.WRAM[addr&0x1_7FFF]
+            return mem.WRAM.Read(addr, true)
 		case 0x4:
 			return mem.ReadArm9IO(addr - 0x400_0000)
 		case 0x5:
 			return 0 // pal std
 		case 0x6:
-			return mem.VRAM[addr - 0x600_0000] // vram
+            return mem.Vram.Read(addr, true)
 		case 0x7:
 			return 0 // oam
 		case 0x8, 0x9:
@@ -128,9 +127,31 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 		case 0xA, 0xB, 0xC, 0xD, 0xE:
 			return 0 // gba ram
 		}
-	}
 
-	panic(fmt.Sprintf("ARM7 MEM HIT READ ADDR %08X", addr))
+        return 0
+	}
+    switch addr >> 24 {
+    case 0x0, 0x1:
+        if addr < uint32(len(mem.Arm7Bios)) {
+            return mem.Arm7Bios[addr]
+        }
+
+        return 0
+
+    case 0x2:
+			return mem.MainRam[addr&0x3F_FFFF]
+    case 0x3:
+        if addr < 0x380_0000 {
+            return mem.WRAM.Read(addr, false)
+        } else {
+            return mem.WramArm7[(addr - 0x380_0000) % 0x1_0000]
+        }
+    case 0x4:
+        //mem.WriteArm9IO(addr-0x400_0000, v) //io
+    case 0x5: // pal std
+    case 0x6:
+        //mem.Vram.Write(addr, v, true)
+    }
 
 	return 0
 }
@@ -161,17 +182,36 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 		case 0x2:
 			mem.MainRam[addr&0x3F_FFFF] = v
 		case 0x3:
-			mem.WRAM[addr&0x1_7FFF] = v
+            mem.WRAM.Write(addr, v, true)
 		case 0x4:
 			mem.WriteArm9IO(addr-0x400_0000, v) //io
 		case 0x5: // pal std
-		case 0x6: mem.VRAM[addr - 0x600_0000] = v
+		case 0x6:
+            mem.Vram.Write(addr, v, true)
 		case 0x7: // oam
 		case 0x8, 0x9: // gba rom
 		case 0xA, 0xB, 0xC, 0xD, 0xE: // gba ram
 		case 0xF:
 		}
+
+        return
 	}
+
+    switch addr >> 24 {
+    case 0x2:
+        mem.MainRam[addr&0x3F_FFFF] = v
+    case 0x3:
+        if addr < 0x380_0000 {
+            mem.WRAM.Write(addr, v, false)
+        } else {
+            mem.WramArm7[(addr - 0x380_0000) % 0x1_0000] = v
+        }
+    case 0x4:
+        mem.WriteArm9IO(addr-0x400_0000, v) //io
+    case 0x5: // pal std
+    case 0x6:
+        mem.Vram.Write(addr, v, true)
+    }
 }
 
 func (mem *Mem) Write8(addr uint32, v uint8, arm9 bool) {
@@ -198,6 +238,8 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 
     if addr >= 0x280 && addr < 0x2B0 {
         return mem.div.Read(addr)
+    } else if addr >= 0x2B0 && addr < 0x2C0 {
+        return mem.sqrt.Read(addr)
     }
 
 	switch addr {
@@ -249,6 +291,8 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 		return mem.arm9Irq.ReadIF(2)
 	case 0x217:
 		return mem.arm9Irq.ReadIF(3)
+    case 0x247:
+        return mem.WRAM.ReadCNT()
 	default:
 		return mem.IO[addr]
 	}
@@ -264,8 +308,14 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
         mem.ppu.Update(addr, uint32(v))
     }
 
-    if addr >= 0x280 && addr < 0x2B0 {
+    if addr >= 0x240 && addr < 0x250 {
+        //mem.Vram.WriteCNT(addr, v)
+        //return
+    } else if addr >= 0x280 && addr < 0x2B0 {
         mem.div.Write(addr, v)
+        return
+    } else if addr >= 0x2B0 && addr < 0x2C0 {
+        mem.sqrt.Write(addr, v)
         return
     }
 
@@ -321,6 +371,8 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 		mem.arm9Irq.WriteIF(v, 2)
 	case 0x217:
 		mem.arm9Irq.WriteIF(v, 3)
+    case 0x247:
+        mem.WRAM.WriteCNT(v)
 	default:
 		mem.IO[addr] = v
 	}
@@ -332,9 +384,12 @@ func (mem *Mem) DirtyTransfer() {
     h := &mem.Cartridge.Header
 
     for i := range h.Arm9Size {
-
         v := mem.Cartridge.Rom[h.Arm9Offset + i]
-
         mem.Write(h.Arm9RamAddr + i, v, true)
+    }
+
+    for i := range h.Arm7Size {
+        v := mem.Cartridge.Rom[h.Arm7Offset + i]
+        mem.Write(h.Arm7RamAddr + i, v, false)
     }
 }

@@ -34,7 +34,7 @@ func (cpu *Cpu) exception(addr uint32, mode uint32) {
 	//}
 
 	//thumb := reg.CPSR.GetFlag(FLAG_T)
-	thumb := reg.isThumb
+	thumb := reg.IsThumb
 
 	c := BANK_ID[reg.getMode()]
 	i := BANK_ID[mode]
@@ -74,7 +74,7 @@ func (cpu *Cpu) ExitException(mode uint32) {
 
 	i := BANK_ID[mode]
 	reg.CPSR = reg.SPSR[i]
-	reg.isThumb = reg.CPSR.GetFlag(FLAG_T)
+	reg.IsThumb = reg.CPSR.GetFlag(FLAG_T)
 	c := BANK_ID[cpu.Reg.getMode()]
 
 	// if you set this up for fiq, get the special registers

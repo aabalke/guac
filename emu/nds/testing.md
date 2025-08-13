@@ -40,9 +40,24 @@ test crashes from ldm currently
     👍 PC SPEC
     ❌ LDM / STM
 
-❌ Ds math
-    ❌ Sqrt 32
-    ❌ Sqrt 64
-    ❌ Div 32/32
-    ❌ Div 64/32
+❌ Ipc
+    ❌ Ipcsync
+    ❌ Ipcfifo
+    ❌ Ipcfifo irq
+
+👍 Ds math
+    👍 Sqrt 32
+    👍 Sqrt 64
+    👍 Div 32/32
+    👍 Div 64/32
     👍 Div 64/64
+
+❌ Memory
+    ❌ Wram Cnt
+    ❌ Vram Cnt
+    ❌ Tcm
+
+❌ Initial State
+    ❌ Ipc/Irq/Cpsr
+    ❌ Cp15
+

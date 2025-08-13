@@ -543,12 +543,19 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 		is := (pre & 0b11) << 3
 		v = utils.RorSimple(v, is)
 		//v, _, _ = utils.Ror(v, is, false, false, false)
-
-		if sdt.Rd == PC { // not sure if this is right
-			v -= 4
-		}
-
 		r[sdt.Rd] = v
+
+        if sdt.Rd == PC {
+            //c.toggleThumb()
+            r[sdt.Rd] -= 4
+            r[sdt.Rd] &^= 0b11
+        }
+
+
+		//if sdt.Rd == PC { // not sure if this is right
+		//	v -= 4
+		//}
+
 
 	case !sdt.Load && sdt.Byte:
 

@@ -1,10 +1,15 @@
 package arm7
 
-import "github.com/aabalke/guac/emu/nds/mem"
+import (
+    "github.com/aabalke/guac/emu/nds/mem"
+	"github.com/aabalke/guac/emu/nds/cpu"
+)
 
 type Cpu struct {
 	mem *mem.Mem
+	Irq    *cpu.Irq
 	Reg Reg
+    Halted bool
 }
 
 const (
@@ -75,17 +80,18 @@ var BIOS_ADDR = map[uint32]uint32{
 	BIOS_IRQ_POST: 0xE55EC002,
 }
 
-func NewCpu(mem *mem.Mem) *Cpu {
+func NewCpu(mem *mem.Mem, irq *cpu.Irq) *Cpu {
 
 	c := &Cpu{
 		mem: mem,
+		Irq: irq,
 	}
 
 	return c
 }
 
 func (c *Cpu) Execute() int {
-	if c.Reg.isThumb {
+	if c.Reg.IsThumb {
 		return c.DecodeTHUMB()
 	}
 
@@ -101,7 +107,7 @@ type Reg struct {
 	CPSR Cond
 	SPSR [6]Cond
 
-	isThumb bool
+	IsThumb bool
 }
 
 type Cond uint32
@@ -111,7 +117,7 @@ func (c *Cond) GetFlag(flag uint32) bool {
 }
 
 func (c *Cond) SetThumb(value bool, cpu *Cpu) {
-	cpu.Reg.isThumb = value
+	cpu.Reg.IsThumb = value
 	c.SetFlag(FLAG_T, value)
 }
 
@@ -213,4 +219,18 @@ func (cpu *Cpu) toggleThumb() {
 	}
 
 	reg.R[PC] &^= 3
+}
+
+func (cpu *Cpu) CheckIrq() {
+
+	interruptEnabled := !cpu.Reg.CPSR.GetFlag(FLAG_I)
+	interrupts := cpu.Irq.IE&cpu.Irq.IF != 0
+
+	if interrupts {
+		cpu.Halted = false
+	}
+
+	if interruptEnabled && interrupts && cpu.Irq.IME {
+		cpu.exception(VEC_IRQ, MODE_IRQ)
+	}
 }

@@ -244,7 +244,7 @@ func (cpu *Cpu) psrSwitch() {
 
 	i := BANK_ID[curr]
 	reg.CPSR = reg.SPSR[i]
-	reg.isThumb = reg.CPSR.GetFlag(FLAG_T)
+	reg.IsThumb = reg.CPSR.GetFlag(FLAG_T)
 
 	next := cpu.Reg.getMode()
 	c := BANK_ID[next]
@@ -1331,7 +1331,7 @@ func (cpu *Cpu) msr(psr *PSR) {
 	cpsr |= v & mask
 
 	reg.CPSR = Cond(cpsr)
-	reg.isThumb = reg.CPSR.GetFlag(FLAG_T)
+	reg.IsThumb = reg.CPSR.GetFlag(FLAG_T)
 
 	if skip := BANK_ID[curr] == BANK_ID[next]; skip {
 		return

@@ -11,7 +11,6 @@ import (
 	"github.com/aabalke/guac/emu/nds/ppu"
 	"github.com/aabalke/guac/emu/nds/utils"
 
-	//"github.com/aabalke/guac/emu/nds/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
 )
@@ -62,9 +61,10 @@ func NewNds(path string, _ *oto.Context) *Nds {
 	}
 
 	arm9Irq := cpu.Irq{}
+	arm7Irq := cpu.Irq{}
 
 	nds.Debugger = Debugger{&nds}
-	nds.arm7 = *arm7.NewCpu(&nds.mem)
+	nds.arm7 = *arm7.NewCpu(&nds.mem, &arm7Irq)
 	nds.arm9 = *arm9.NewCpu(&nds.mem, &arm9Irq)
 	nds.mem = mem.NewMemory(&arm9Irq, &nds.Cartridge, &nds.ppu)
 
@@ -77,9 +77,6 @@ func NewNds(path string, _ *oto.Context) *Nds {
 	return &nds
 }
 
-var previousPc uint32
-var printem bool
-
 func (nds *Nds) Update() {
 
 	if nds.Paused {
@@ -89,47 +86,8 @@ func (nds *Nds) Update() {
 	nds.Drawn = false
 
 
-    // 02002CDD
-
-
+    cycleArm7 := false
 	for !nds.Drawn {
-
-        //if nds.arm9.Reg.R[15] == 0x02002CDD || nds.arm9.Reg.R[15] % 2 == 1{
-        //    fmt.Printf("OLD PC %08X\n", previousPc)
-        //    panic("PC WAS SET TO CRAZY")
-        //}
-
-        //if previousPc == 0x020078E4 {
-        //    nds.Debugger.print(int(CURR_INST))
-        //}
-
-        //if nds.arm9.Reg.R[15] == 0x2002CD8 {
-        //    printem = true
-        //}
-
-		//if printem{
-        //    nds.Debugger.PrintLine(true)
-        //}
-
-
-        //addr := uint32(0x200_07CC)
-        //addr := uint32(0x200_2CCC)
-        ////addr := uint32(0x200_788C)
-        ////addr := uint32(0x20063E0)
-        ////addr := uint32(0x2006240)
-
-		//////nds.Debugger.PrintLine(true)
-        //////if CURR_INST >= 100000 {
-        //if nds.arm9.Reg.R[15] == addr {
-        //    nds.Debugger.print(int(CURR_INST))
-        //}
-
-        //if nds.arm9.Reg.R[15] == addr + 4 {
-        //    nds.Debugger.print(int(CURR_INST))
-        //    os.Exit(0)
-        //}
-
-        previousPc = nds.arm9.Reg.R[15]
 
 		cycles := 4
 
@@ -137,15 +95,19 @@ func (nds *Nds) Update() {
 			nds.arm9.Execute()
 		}
 
+        if cycleArm7 && !nds.arm7.Halted {
+			nds.arm7.Execute()
+        }
+
         nds.Tick(uint32(cycles))
 
 		//// irq has to be at end (count up tests)
 		nds.arm9.CheckIrq()
+		nds.arm7.CheckIrq()
 
-		if !nds.arm9.Halted {
-			CURR_INST++
-		}
+        cycleArm7 = !cycleArm7
 
+        CURR_INST++
 	}
 }
 
@@ -180,9 +142,15 @@ func (nds *Nds) DirtyInit() {
     nds.arm9.Reg.R[13] = 0x3002F7C
     nds.arm9.Reg.R[14] = nds.Cartridge.Header.Arm9EntryAddr
     nds.arm9.Reg.R[15] = nds.Cartridge.Header.Arm9EntryAddr
-    //nds.arm9.Reg.CPSR = 0x800_00DF
-    nds.arm9.Reg.CPSR = 0x000_00DF
-    // do not init with FLAG Q
+    nds.arm9.Reg.CPSR = 0x000_001F
+
+    nds.arm7.Reg.R[12] = nds.Cartridge.Header.Arm7EntryAddr
+    //nds.arm7.Reg.R[13] = 0x3002F7C
+    nds.arm7.Reg.R[14] = nds.Cartridge.Header.Arm7EntryAddr
+    nds.arm7.Reg.R[15] = nds.Cartridge.Header.Arm7EntryAddr
+    nds.arm7.Reg.CPSR = 0x000_001F
+
+    nds.arm7.Halted = false
 }
 
 // RidgeX/ygba BSD3
@@ -208,6 +176,7 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 		dispstat.SetHBlank(true)
 		if utils.BitEnabled(uint32(*dispstat), 4) {
 			nds.arm9.Irq.SetIRQ(1)
+			nds.arm7.Irq.SetIRQ(1)
 		}
 
 		if vcount < SCREEN_HEIGHT {
@@ -247,6 +216,7 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 		//case SCREEN_HEIGHT + 1:
 			if utils.BitEnabled(uint32(*dispstat), 3) {
                 nds.arm9.Irq.SetIRQ(0)
+                nds.arm7.Irq.SetIRQ(0)
 			}
 		case NUM_SCANLINES - 1:
 			dispstat.SetVBlank(false)
@@ -257,6 +227,7 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 
 		if vcounterIRQ := utils.BitEnabled(uint32(*dispstat), 5); vcounterIRQ && match {
 			nds.arm9.Irq.SetIRQ(2)
+			nds.arm7.Irq.SetIRQ(2)
 		}
 	}
 
