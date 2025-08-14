@@ -15,8 +15,15 @@ type Cp15 struct {
 }
 
 var (
-    CTRL = CpRegister{op: 0, cn: 1, cm: 0, cp: 0, pn: 15}
+
+    // id codes
+    MAIN = CpRegister{op: 0, cn: 0, cm: 0, cp: 0, pn: 15}
+    CACH = CpRegister{op: 0, cn: 0, cm: 0, cp: 1, pn: 15}
     TCMP = CpRegister{op: 0, cn: 0, cm: 0, cp: 2, pn: 15}
+
+    CTRL = CpRegister{op: 0, cn: 1, cm: 0, cp: 0, pn: 15}
+
+    // tcm
     DTCM = CpRegister{op: 0, cn: 9, cm: 1, cp: 0, pn: 15}
     ITCM = CpRegister{op: 0, cn: 9, cm: 1, cp: 1, pn: 15}
 
@@ -46,6 +53,8 @@ func (c *Cp15) Init(mem *mem.Mem) {
 	c.R[CpRegister{op: 0, cn: 6, cm: 6, cp: 0, pn: 15}] = 0xFFFF001D
 	c.R[CpRegister{op: 0, cn: 6, cm: 7, cp: 0, pn: 15}] = 0x027FF017
 
+    c.R[MAIN] = 0x41059461
+    c.R[CACH] = 0x0F0D2112
     c.R[TCMP] = 0x00140180
 	c.R[DTCM] = 0x0300000A
 	c.R[ITCM] = 0x00000020
@@ -58,6 +67,8 @@ func (c *Cp15) Read(reg CpRegister) uint32 {
 func (c *Cp15) Write(v uint32, reg CpRegister) {
 
     switch reg {
+    case TCMP, MAIN, CACH:
+        return
     case CTRL:
 
         mask := uint32(0b11111111000010000101)
@@ -71,10 +82,6 @@ func (c *Cp15) Write(v uint32, reg CpRegister) {
         c.mem.Tcm.ItcmLoadMode = utils.BitEnabled(v, 19)
 
         if v & 1 == 1 { panic("PU MODE")}
-
-    case TCMP:
-
-        return
 
     case DTCM:
         v &^= 0b1111_1100_0001

@@ -8,10 +8,10 @@ import (
 	"github.com/aabalke/guac/emu/nds/ppu"
 )
 
-//go:embed res/bios7.bin
+//go:embed res_/bios7.bin
 var arm7Bios []byte
 
-//go:embed res/bios9.bin
+//go:embed res_/bios9.bin
 var arm9Bios []byte
 
 type Mem struct {

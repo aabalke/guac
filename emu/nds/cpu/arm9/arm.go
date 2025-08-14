@@ -769,7 +769,7 @@ const (
 var halfData Half
 
 type Half struct {
-	Rn, Rd, Imm, Inst, Rm, RdValue, RnValue, RmValue      uint32
+	Rn, Rd, Imm, Inst, Rm, RdValue, RnValue, RdValue2, RmValue      uint32
 	Pre, Up, Immediate, WriteBack, Load, MemoryManagement bool
 }
 
@@ -818,6 +818,13 @@ func NewHalf(opcode uint32, c *Cpu) *Half {
 		halfData.RdValue += 12
 	}
 
+    if double := !halfData.Load && halfData.Inst != 1; double {
+        halfData.RdValue2 = r[halfData.Rd + 1]
+        if halfData.Rd + 1 == PC {
+            halfData.RdValue2 += 12
+        }
+    }
+
 	return &halfData
 }
 
@@ -832,9 +839,9 @@ func (c *Cpu) Half(opcode uint32) {
 		case STRH:
 			unsignedHalfStd(half, c)
 		case LDRD:
-			panic("LDRD NOT SUPPORTED")
+            doubleStd(half, c, true)
 		case STRD:
-			panic("STRD NOT SUPPORTED")
+            doubleStd(half, c, false)
 		}
 
 		c.Reg.R[15] += 4
@@ -853,6 +860,31 @@ func (c *Cpu) Half(opcode uint32) {
 	}
 
 	c.Reg.R[15] += 4
+}
+
+func doubleStd(half *Half, cpu *Cpu, load bool) {
+
+    //STRD/LDRD: base writeback: Rn should not be same as R(d) or R(d+1).
+    //STRD: index register: Rm should not be same as R(d) or R(d+1).
+    //STRD/LDRD: Rd must be an even numbered register (R0,R2,R4,R6,R8,R10,R12).
+    //STRD/LDRD: Address must be double-word aligned (multiple of eight).
+
+	r := &cpu.Reg.R
+	pre, post := halfUnsignedAddress(half, cpu)
+	addr := pre &^ 0b111
+
+	if load {
+		r[half.Rd] = cpu.mem.Read32(addr, true)
+		r[half.Rd + 1] = cpu.mem.Read32(addr + 4, true)
+	} else {
+		cpu.mem.Write32(addr, half.RdValue, true)
+		cpu.mem.Write32(addr + 4, half.RdValue2, true)
+	}
+
+	skipLoadWriteBack := half.Load && (half.Rn == half.Rd)
+	if (half.WriteBack || !half.Pre) && !skipLoadWriteBack {
+		r[half.Rn] = post
+	}
 }
 
 func signedByteStd(half *Half, cpu *Cpu) {
@@ -1302,7 +1334,7 @@ func (cpu *Cpu) CoDataReg(opcode uint32) {
         panic("MRC2/MCR2")
     }
 
-    if rd == 15 { panic("SETUP PIPELINE OFFSET")}
+    if rd == 15 { panic("SETUP PIPELINE OFFSET CO DATA REG")}
 
     if mrc := (opcode >> 20) & 1 == 1; mrc {
         r[rd] = cpu.Cp15.Read(reg)
@@ -1311,7 +1343,5 @@ func (cpu *Cpu) CoDataReg(opcode uint32) {
     }
 
     cpu.Cp15.Write(r[rd], reg)
-
     cpu.Reg.R[15] += 4
-
 }

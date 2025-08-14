@@ -10,10 +10,10 @@
 👍 Thumb Ldr/Str
 👍 Thumb Lsm/Stm
 
-❌ Arm v5TE
+👍 Arm v5TE
     👍 CLZ
-    ❌ LDRD
-    ❌ MRC
+    👍 LDRD
+    👍 MRC
     👍 QADD
     👍 SMLABB
     👍 SMLABT
@@ -75,3 +75,8 @@ WRAM
 
 VRAM
 - Need checking of all MST/OFS combinations per bank, overlap testing
+
+STRD
+- rockwrestler and armwrestler have no test for STRD
+
+DMA, Timer, Cartridge Tests?
