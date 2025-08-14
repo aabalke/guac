@@ -100,9 +100,9 @@ func (d *Debugger) print(i int) {
 	p("pc/r15", reg.R[15])
 	s("--------  --------")
 	p("cpsr", uint32(reg.CPSR))
-	p("79C4", d.nds.mem.Read32(0x20079C4, true))
-	p("79C0", d.nds.mem.Read32(0x20079C0, true))
-	p("79BC", d.nds.mem.Read32(0x20079BC, true))
+	p("8FF8", d.nds.mem.Read32(0x0, true))
+	p("8FFC", d.nds.mem.Read32(0x4, true))
+	p("9000", d.nds.mem.Read32(0x8, true))
 	//p("spsr", uint32(reg.SPSR[BANK_ID[mode]]))
 	//p("MODE", BANK_ID[mode])
 
@@ -114,7 +114,6 @@ func (d *Debugger) print(i int) {
 	//}
 	//s("------")
 }
-
 
 func (d *Debugger) DecodeArm(opcode uint32) string {
 	switch {

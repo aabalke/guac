@@ -10,6 +10,8 @@ type Cpu struct {
 	Irq    *cpu.Irq
 	Reg    Reg
 	Halted bool
+
+    Cp15 Cp15
 }
 
 const (
@@ -86,6 +88,8 @@ func NewCpu(mem *mem.Mem, irq *cpu.Irq) *Cpu {
 		mem: mem,
 		Irq: irq,
 	}
+
+    c.Cp15.Init(mem)
 
 	return c
 }

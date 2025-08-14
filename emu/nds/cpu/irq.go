@@ -31,6 +31,8 @@ type Irq struct {
 	IF, IE  uint32
 	IME     bool
 	IdleIrq uint32
+
+    IsArm9 bool
 }
 
 func (s *Irq) WriteIME(v uint8) {
@@ -60,7 +62,7 @@ func (s *Irq) WriteIE(v uint8, byte uint8) {
 }
 
 func (s *Irq) WriteIF(v uint8, byte uint8) {
-	s.IE &^= uint32(v) << (8 * byte)
+	s.IF &^= uint32(v) << (8 * byte)
 }
 
 func (s *Irq) SetIRQ(irq uint32) {

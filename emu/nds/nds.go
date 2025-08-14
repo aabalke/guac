@@ -60,13 +60,13 @@ func NewNds(path string, _ *oto.Context) *Nds {
 		ImageBottom:  ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 	}
 
-	arm9Irq := cpu.Irq{}
+    arm9Irq := cpu.Irq{IsArm9: true}
 	arm7Irq := cpu.Irq{}
 
 	nds.Debugger = Debugger{&nds}
 	nds.arm7 = *arm7.NewCpu(&nds.mem, &arm7Irq)
 	nds.arm9 = *arm9.NewCpu(&nds.mem, &arm9Irq)
-	nds.mem = mem.NewMemory(&arm9Irq, &nds.Cartridge, &nds.ppu)
+	nds.mem = mem.NewMemory(&arm7Irq, &arm9Irq, &nds.Cartridge, &nds.ppu)
 
 	nds.mem.LoadBios()
     nds.LoadGame(path)
@@ -76,6 +76,9 @@ func NewNds(path string, _ *oto.Context) *Nds {
 
 	return &nds
 }
+
+//var addr = uint32(0xFFFF0018)
+//var printem = false
 
 func (nds *Nds) Update() {
 
@@ -90,6 +93,20 @@ func (nds *Nds) Update() {
 	for !nds.Drawn {
 
 		cycles := 4
+
+        //if nds.arm9.Reg.R[15] == addr {
+        //    printem = true
+        //}
+
+        //if printem {
+        //    nds.Debugger.PrintLine(true)
+        //}
+
+        //if nds.arm9.Reg.R[15] == 0xFFFF0288 {
+        //    nds.Debugger.print(0)
+        //    os.Exit(0)
+        //}
+
 
 		if !nds.arm9.Halted {
 			nds.arm9.Execute()

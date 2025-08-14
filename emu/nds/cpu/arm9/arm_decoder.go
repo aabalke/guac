@@ -55,9 +55,9 @@ func (cpu *Cpu) DecodeARM() int {
 	case isALU(opcode):
 		cpu.Alu(opcode)
     case isCoDataReg(opcode):
-        cpu.Reg.R[15] += 4
-    case isCoDataTrans(opcode):
-        cpu.Reg.R[15] += 4
+        cpu.CoDataReg(opcode)
+    //case isCoDataTrans(opcode):
+    //    cpu.Reg.R[15] += 4
 	default:
 		panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X", opcode, r[PC]))
 	}

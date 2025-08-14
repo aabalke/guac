@@ -600,15 +600,17 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 
 	r := &c.Reg.R
 
+
 	sdt := NewSdtData(opcode, c)
+
 
 	pre, post, _ := generateSdtAddress(sdt, c)
 
 	addr := pre &^ 0b11
 
-	if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
-		addr = pre
-	}
+	//if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
+	//	addr = pre
+	//}
 
 	if sdt.Pld {
 		panic("Need to handle PLD Inst")
@@ -632,7 +634,6 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
             r[sdt.Rd] -= 4
             r[sdt.Rd] &^= 0b11
         }
-
 
 	case !sdt.Load && sdt.Byte:
 
@@ -1913,4 +1914,36 @@ func (cpu *Cpu) Clz(opcode uint32) {
     r[rd] = uint32(bits.LeadingZeros32(r[rm]))
 
     r[PC] += 4
+}
+
+func (cpu *Cpu) CoDataReg(opcode uint32) {
+
+    reg := CpRegister{
+        op: uint8(utils.GetVarData(opcode, 21, 23)),
+        cn: uint8(utils.GetVarData(opcode, 16, 19)),
+        pn: uint8(utils.GetVarData(opcode, 8, 11)),
+        cp: uint8(utils.GetVarData(opcode, 5, 7)),
+        cm: uint8(utils.GetVarData(opcode, 0, 3)),
+    }
+
+    r := &cpu.Reg.R
+
+    rd := (opcode >> 12) & 0b11
+
+    if (opcode >> 28) == 0xF {
+        panic("MRC2/MCR2")
+    }
+
+    if rd == 15 { panic("SETUP PIPELINE OFFSET")}
+
+    if mrc := (opcode >> 20) & 1 == 1; mrc {
+        r[rd] = cpu.Cp15.Read(reg)
+        cpu.Reg.R[15] += 4
+        return
+    }
+
+    cpu.Cp15.Write(r[rd], reg)
+
+    cpu.Reg.R[15] += 4
+
 }

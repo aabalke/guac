@@ -40,10 +40,10 @@ test crashes from ldm currently
     👍 PC SPEC
     ❌ LDM / STM
 
-❌ Ipc
-    ❌ Ipcsync
-    ❌ Ipcfifo
-    ❌ Ipcfifo irq
+👍 Ipc
+    👍 Ipcsync
+    👍 Ipcfifo
+    👍 Ipcfifo irq
 
 👍 Ds math
     👍 Sqrt 32
@@ -52,12 +52,29 @@ test crashes from ldm currently
     👍 Div 64/32
     👍 Div 64/64
 
-❌ Memory
-    ❌ Wram Cnt
-    ❌ Vram Cnt
-    ❌ Tcm
+👍 Memory
+    👍 Wram Cnt
+    👍 Vram Cnt
+    👍 Tcm
 
-❌ Initial State
-    ❌ Ipc/Irq/Cpsr
-    ❌ Cp15
+👍 Initial State
+    👍 Ipc/Irq/Cpsr (Some emulators have Q FLAG, others do not)
+    👍 Cp15
+
+### Personal Test to Build
+
+IPC
+- Need to test clearing bits of fifo
+- Need more tests of irq, seems like more are needed
+
+TCM
+- Need to test disable and enabled bits
+- ITCM load mode, let ITCM and DTCM overlap, let ITCM and other memory section overlap
+- Out of bounds?
+
+WRAM
+- Does mode 3 clear?
+
+VRAM
+- Need checking of all MST/OFS combinations per bank, overlap testing
 
