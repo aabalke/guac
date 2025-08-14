@@ -77,9 +77,6 @@ func NewNds(path string, _ *oto.Context) *Nds {
 	return &nds
 }
 
-//var addr = uint32(0xFFFF0018)
-//var printem = false
-
 func (nds *Nds) Update() {
 
 	if nds.Paused {
@@ -88,25 +85,10 @@ func (nds *Nds) Update() {
 
 	nds.Drawn = false
 
-
     cycleArm7 := false
 	for !nds.Drawn {
 
 		cycles := 4
-
-        //if nds.arm9.Reg.R[15] == addr {
-        //    printem = true
-        //}
-
-        //if printem {
-        //    nds.Debugger.PrintLine(true)
-        //}
-
-        //if nds.arm9.Reg.R[15] == 0xFFFF0288 {
-        //    nds.Debugger.print(0)
-        //    os.Exit(0)
-        //}
-
 
 		if !nds.arm9.Halted {
 			nds.arm9.Execute()

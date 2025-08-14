@@ -3,8 +3,6 @@
 
 ### Atem2069/armwrestler-fixed
 
-test crashes from ldm currently
-
 👍 Arm Alu
 👍 Arm Ldr/Str
 👍 Arm Lsm/Stm
@@ -27,7 +25,7 @@ test crashes from ldm currently
 👍 Armv4
     👍 Condition Codes
 
-❌ Armv5
+👍 Armv5
     👍 CLZ
     👍 QADD, QSUB
     👍 QDADD, QDSUB
@@ -38,7 +36,7 @@ test crashes from ldm currently
     👍 SMLALxy
     👍 BLX
     👍 PC SPEC
-    ❌ LDM / STM
+    👍 LDM / STM (16)
 
 👍 Ipc
     👍 Ipcsync
@@ -77,4 +75,3 @@ WRAM
 
 VRAM
 - Need checking of all MST/OFS combinations per bank, overlap testing
-
