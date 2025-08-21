@@ -20,7 +20,10 @@
     👍 SMLATB
     👍 SMLATT
 
-### RockPolish/rockwrestler
+### RockPolish/rockwrestler - custom build
+
+included:
+
 
 👍 Armv4
     👍 Condition Codes
@@ -52,6 +55,9 @@
 
 👍 Memory
     👍 Wram Cnt
+        Includes: Check to make sure mode 3 does not clear arm9, just hides
+        Includes: Check to make sure mode 3 does not clear arm7, mirror accessible
+
     👍 Vram Cnt
     👍 Tcm
 
@@ -59,19 +65,30 @@
     👍 Ipc/Irq/Cpsr (Some emulators have Q FLAG, others do not)
     👍 Cp15
 
+### Imran Nazar & LiraNuna / TinyFB
+👍 TinyFB (removes all fluff)
+
+### shonumi / hello world
+👍 hello world (identical outcome to TinyFB but with additional init functionality)
+
+### Devkitpro examples
+
+Hello World:
+Arm7 ok, arm9 irq handler 0x0 0x18 mismatch
+
+
 ### Personal Test to Build
 
 IPC
-- Need to test clearing bits of fifo
+- Need to test clearing bits of sync
 - Need more tests of irq, seems like more are needed
+- Need test to check that bools are for correct fifos, and not reversed (irqnotempty, full, empty, irq empty etc etc etc)
 
 TCM
 - Need to test disable and enabled bits
 - ITCM load mode, let ITCM and DTCM overlap, let ITCM and other memory section overlap
+- need to test dtcm and main memory overlap
 - Out of bounds?
-
-WRAM
-- Does mode 3 clear?
 
 VRAM
 - Need checking of all MST/OFS combinations per bank, overlap testing
@@ -80,3 +97,5 @@ STRD
 - rockwrestler and armwrestler have no test for STRD
 
 DMA, Timer, Cartridge Tests?
+
+SDT PLD (Cache Prepare for Load opcode)

@@ -1,5 +1,6 @@
 package cpu
 
+
 const (
     IRQ_VBL  = 0
     IRQ_HBL  = 1

@@ -12,6 +12,8 @@ type Cpu struct {
 	Halted bool
 
     Cp15 Cp15
+
+    Dma [4]mem.DMA
 }
 
 const (

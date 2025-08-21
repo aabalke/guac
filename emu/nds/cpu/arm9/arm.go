@@ -1328,7 +1328,7 @@ func (cpu *Cpu) CoDataReg(opcode uint32) {
 
     r := &cpu.Reg.R
 
-    rd := (opcode >> 12) & 0b11
+    rd := utils.GetVarData(opcode, 12, 15)
 
     if (opcode >> 28) == 0xF {
         panic("MRC2/MCR2")

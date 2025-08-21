@@ -99,10 +99,8 @@ func (a *AuxSPI) Write(v uint8, b uint8) {
 func (a *AuxSPI) WriteData(_ uint8, b uint8) {
 
     // start transfer with write but value does not matter
-
     a.Busy = true
 
     // spi stuff
-
     a.Busy = false
 }

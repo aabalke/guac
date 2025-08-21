@@ -26,7 +26,6 @@ var (
     // tcm
     DTCM = CpRegister{op: 0, cn: 9, cm: 1, cp: 0, pn: 15}
     ITCM = CpRegister{op: 0, cn: 9, cm: 1, cp: 1, pn: 15}
-
 )
 
 func (c *Cp15) Init(mem *mem.Mem) {
@@ -71,17 +70,18 @@ func (c *Cp15) Write(v uint32, reg CpRegister) {
         return
     case CTRL:
 
-        mask := uint32(0b11111111000010000101)
+        mask := uint32(0b1111_1111_0000_1000_0101)
         v &= mask
+
         c.R[reg] &^= mask
         c.R[reg] |= v
 
-        c.mem.Tcm.DtcmEnabled = utils.BitEnabled(v, 16)
-        c.mem.Tcm.DtcmLoadMode = utils.BitEnabled(v, 17)
-        c.mem.Tcm.ItcmEnabled = utils.BitEnabled(v, 18)
-        c.mem.Tcm.ItcmLoadMode = utils.BitEnabled(v, 19)
+        c.mem.Tcm.DtcmEnabled = utils.BitEnabled(c.R[reg], 16)
+        c.mem.Tcm.DtcmLoadMode = utils.BitEnabled(c.R[reg], 17)
+        c.mem.Tcm.ItcmEnabled = utils.BitEnabled(c.R[reg], 18)
+        c.mem.Tcm.ItcmLoadMode = utils.BitEnabled(c.R[reg], 19)
 
-        if v & 1 == 1 { panic("PU MODE")}
+        //if v & 1 == 1 { panic("PU MODE")}
 
     case DTCM:
         v &^= 0b1111_1100_0001

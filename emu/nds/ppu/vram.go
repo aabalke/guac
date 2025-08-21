@@ -1,4 +1,4 @@
-package mem
+package ppu
 
 import (
 
@@ -42,6 +42,9 @@ func (vc *VramCnt) Write(v uint8) {
 }
 
 func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
+
+    //fmt.Printf("WRITE VRAM CNT %08X %02X\n", addr, v)
+
 	switch addr {
 	case 0x240: vm.CNT_A.Write(v)
 	case 0x241: vm.CNT_B.Write(v)

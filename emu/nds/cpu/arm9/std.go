@@ -1,7 +1,6 @@
 package arm9
 
 import (
-
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
@@ -51,10 +50,6 @@ func (c *Cpu) Block(opcode uint32) {
 }
 
 func (cpu *Cpu) ldm(block *Block) {
-
-	if utils.BitEnabled(block.Opcode, 15) && block.PSR {
-		panic("LDM WITH R15 AND SET USED")
-	}
 
 	r := &cpu.Reg.R
 
@@ -124,6 +119,69 @@ func (cpu *Cpu) ldm(block *Block) {
 		cpu.Reg.R[PC] += 4
         return
     }
+
+	if utils.BitEnabled(block.Opcode, 15) && block.PSR {
+
+        curr := cpu.Reg.getMode()
+        spsr := cpu.Reg.SPSR[BANK_ID[curr]]
+
+        reg := &cpu.Reg
+
+        //cpu.Reg.setMode(cpu.Reg.getMode(), uint32(cpu.Reg.SPSR[BANK_ID[cpu.Reg.getMode()]]) & 0x1F)
+
+        next := uint32(spsr) & 0b11111
+        //cpsr := uint32(reg.CPSR)
+
+        reg.CPSR = Cond(spsr)
+        reg.IsThumb = reg.CPSR.GetFlag(FLAG_T)
+
+        //if curr == MODE_USR {
+        //    panic("USER MODE LDM PC CHANGE")
+        //}
+
+        //if curr != MODE_FIQ {
+        //    for i := range 5 {
+        //        reg.USR[i] = r[8+i]
+        //    }
+        //}
+
+        reg.SP[BANK_ID[curr]] = r[SP]
+        reg.LR[BANK_ID[curr]] = r[LR]
+
+        //if curr == MODE_FIQ {
+        //    for i := range 5 {
+        //        reg.FIQ[i] = r[8+i]
+        //    }
+        //}
+
+        //if next != MODE_FIQ {
+        //    for i := range 5 {
+        //        r[8+i] = reg.USR[i]
+        //    }
+        //}
+
+        r[SP] = reg.SP[BANK_ID[next]]
+        r[LR] = reg.LR[BANK_ID[next]]
+
+        //if next == MODE_FIQ {
+        //    for i := range 5 {
+        //        r[8+i] = reg.FIQ[i]
+        //    }
+        //}
+
+        // I think this is necessary for irq exits
+
+        if irqExit := r[15] >= 0xFFFF_0000; irqExit {
+
+            r[PC] = r[LR]
+
+
+            r[PC] += 4
+        }
+
+        return
+	}
+
 
     cpu.toggleThumb()
 }
@@ -205,7 +263,6 @@ func ldmDA(cpu *Cpu, addr, rlist uint32) bool {
             continue
         }
 
-
         r[reg] = cpu.mem.Read32(addr, true)
         addr -= 4
 
@@ -264,7 +321,7 @@ func (cpu *Cpu) stm(block *Block) {
 
 	if !block.Writeback {
 		r[block.Rn] = wbValue
-	}
+    }
 
     r[PC] += 4
 }
@@ -314,6 +371,8 @@ func stmIA(cpu *Cpu, addr, rlist, rn uint32) {
 
         case PC:
             cpu.mem.Write32(addr, r[reg]+12, true)
+            r[rn] += 4
+            addr += 4
 
         default:
             cpu.mem.Write32(addr, r[reg], true)
@@ -343,6 +402,7 @@ func stmDB(cpu *Cpu, addr, rlist, rn uint32) {
             cpu.mem.Write32(addr, r[reg]+12, true)
 
         default:
+
             cpu.mem.Write32(addr, r[reg], true)
         }
     }
@@ -366,6 +426,8 @@ func stmDA(cpu *Cpu, addr, rlist, rn uint32) {
 
         case PC:
             cpu.mem.Write32(addr, r[reg]+12, true)
+            r[rn] -= 4
+            addr -= 4
 
         default:
             cpu.mem.Write32(addr, r[reg], true)

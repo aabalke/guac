@@ -8,13 +8,8 @@ type Keypad struct {
 	KEYCNT   uint16
 }
 
-func (k *Keypad) readINPUT2(hi bool) uint8 {
-
-	if hi {
-		return uint8(k.KEYINPUT >> 8)
-	}
-
-	return uint8(k.KEYINPUT)
+func (k *Keypad) readINPUT2() uint8 {
+	return uint8(k.KEYINPUT2)
 }
 
 func (k *Keypad) readINPUT(hi bool) uint8 {
