@@ -36,7 +36,8 @@ func (d *Debugger) PrintLine(arm9 bool) {
             op = fmt.Sprintf("OP %08X", opcode)
         }
 
-        fmt.Printf("CURR %5d ARM7: PC %08X %12s %-12s R0 %08X R1 %08X R4 %08X R12 %08X SP %08X LR %08X CPSR %08X\n", CURR_INST, pc, op, desc, r[0], r[1], r[4], r[12], r[13], r[14], cpsr)
+    //fmt.Printf("CURR %5d ARM7: PC %08X %12s %-12s R0 %08X R1 %08X R2 %08X R3 %08X R4 %08X R5 %08X R6 %08X R7 %08X R8 %08X R9 %08X R10 %08X R11 %08X R12 %08X SP %08X LR %08X 0x180 %08X 0x184 %08X FIFO %08X CPSR %08X\n", CURR_INST, pc, op, desc, r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14], d.nds.mem.Read32(0x400_0180, false), d.nds.mem.Read32(0x400_0184, false), d.nds.mem.Ipc.Fifo9.Value, cpsr)
+        fmt.Printf("CURR %5d ARM7: PC %08X %12s %-12s R0 %08X R1 %08X R2 %08X R3 %08X R4 %08X R7 %08X R11 %08X R12 %08X SP %08X LR %08X CPSR %08X\n", CURR_INST, pc, op, desc, r[0], r[1], r[2], r[3], r[4], r[7], r[11], r[12], r[13], r[14], cpsr)
 
         return
 	}
@@ -61,8 +62,9 @@ func (d *Debugger) PrintLine(arm9 bool) {
 		desc = d.DecodeArm(opcode)
 		op = fmt.Sprintf("OP %08X", opcode)
 	}
+    
+    fmt.Printf("CURR %5d ARM9: PC %08X %12s %-12s R0 %08X R1 %08X R2 %08X R3 %08X R4 %08X R11 %08X R12 %08X SP %08X LR %08X CPSR %08X\n", CURR_INST, pc, op, desc, r[0], r[1], r[2], r[3], r[4], r[11], r[12], r[13], r[14], cpsr)
 
-    fmt.Printf("CURR %5d ARM9: PC %08X %12s %-12s R0 %08X R1 %08X R4 %08X R12 %08X SP %08X LR %08X CPSR %08X 0x400_0180 %08X\n", CURR_INST, pc, op, desc, r[0], r[1], r[4], r[12], r[13], r[14], cpsr, mem.Read32(0x400_0180, true))
 }
 
 
@@ -100,19 +102,25 @@ func (d *Debugger) print(i int) {
 	p("pc/r15", reg.R[15])
 	s("--------  --------")
 	p("cpsr", uint32(reg.CPSR))
-	p("8FF8", d.nds.mem.Read32(0x0, true))
-	p("8FFC", d.nds.mem.Read32(0x4, true))
-	p("9000", d.nds.mem.Read32(0x8, true))
+	//p("8FF8", d.nds.mem.Read32(0x0, true))
+	//p("8FFC", d.nds.mem.Read32(0x4, true))
+	//p("9000", d.nds.mem.Read32(0x8, true))
 	//p("spsr", uint32(reg.SPSR[BANK_ID[mode]]))
 	//p("MODE", BANK_ID[mode])
 
 	//s("--------  --------")
-	//start := 0x2008A00
-	//count := 0x30
-	//for i := start; i >= start - (count * 4); i -= 4 {
+	//start := 0x380_FE38
+	//count := 0x20
+	//for i := start; i < start + (count * 4); i += 4 {
+	//    p(fmt.Sprintf("ADDR %X", i), d.nds.mem.Read32(uint32(i), false))
+	//}
+
+	//start = 0x400_00EC
+	//count = 2
+	//for i := start; i < start + (count * 4); i += 4 {
 	//    p(fmt.Sprintf("ADDR %X", i), d.nds.mem.Read32(uint32(i), true))
 	//}
-	//s("------")
+	s("------")
 }
 
 func (d *Debugger) DecodeArm(opcode uint32) string {

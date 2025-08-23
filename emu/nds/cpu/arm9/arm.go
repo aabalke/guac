@@ -173,7 +173,12 @@ func (cpu *Cpu) logical(alu *Alu) {
 	cpu.Reg.R[alu.Rd] = res
 
     if alu.Rd == PC {
-        cpu.Reg.R[alu.Rd] &^= 0b11
+        //cpu.toggleThumb()
+
+        // this may be a problem still
+        cpu.Reg.R[alu.Rd] &^= 0b1
+
+        //fmt.Printf("LOGICAL RD PC, NEED TO Exchange?\n")
     }
 
 	cpu.setAluFlags(alu, uint64(res))

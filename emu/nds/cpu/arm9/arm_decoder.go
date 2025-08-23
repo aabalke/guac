@@ -59,7 +59,7 @@ func (cpu *Cpu) DecodeARM() int {
     //case isCoDataTrans(opcode):
     //    cpu.Reg.R[15] += 4
 	default:
-		panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X", opcode, r[PC]))
+		panic(fmt.Sprintf("Unable to Decode ARM 9 %08X, at PC %08X", opcode, r[PC]))
 	}
 
 	return 4

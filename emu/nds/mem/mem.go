@@ -2,6 +2,7 @@ package mem
 
 import (
 	_ "embed"
+	"fmt"
 
 	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/cpu"
@@ -85,6 +86,12 @@ func NewMemory(dma9 *[4]DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PP
 	m.LoadBios()
 
     m.Tcm.Dtcm[0x3FFC] = 0x18
+
+    m.Rtc.RegStatus1 = 0x02
+    m.Rtc.RegStatus2 = 0x41
+
+
+    fmt.Printf("ST REG 1 %02X REG 2 %02X\n", m.Rtc.RegStatus1, m.Rtc.RegStatus2)
 
     //m.Tcm.Dtcm[0x3FFC] = 0x18
     //m.Tcm.Dtcm[0x3FFD] = 0x80
@@ -422,8 +429,10 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 	case 0x133:
 		mem.Keypad.writeCNT(v, true)
 
+    case 0x180:
+        mem.Ipc.WriteSync(v, 0, true)
     case 0x181:
-        mem.Ipc.WriteSync(v, true)
+        mem.Ipc.WriteSync(v, 1, true)
 
     case 0x1A0:
         mem.auxspi.Write(v, 0)
@@ -732,9 +741,10 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
     case 0x13B:
         return
 
-
+    case 0x180:
+        mem.Ipc.WriteSync(v, 0, false)
     case 0x181:
-        mem.Ipc.WriteSync(v, false)
+        mem.Ipc.WriteSync(v, 1, false)
 
     case 0x184:
         mem.Ipc.WriteCnt(v, 0, false)

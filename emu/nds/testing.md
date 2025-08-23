@@ -99,3 +99,6 @@ STRD
 DMA, Timer, Cartridge Tests?
 
 SDT PLD (Cache Prepare for Load opcode)
+
+Need tests for 
+NOT ALIGNING PC (movs 15, 14 etc)

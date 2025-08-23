@@ -66,7 +66,7 @@ func (cpu *Cpu) DecodeTHUMB() int {
 		cpu.thumbMulti(opcode)
 	default:
 		r := &cpu.Reg.R
-		panic(fmt.Sprintf("Unable to Decode Thumb %X, at PC %X", opcode, r[PC]))
+		panic(fmt.Sprintf("Unable to Decode Thumb 9 %X, at PC %X", opcode, r[PC]))
 	}
 
 	return 2

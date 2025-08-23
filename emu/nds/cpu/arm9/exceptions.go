@@ -70,7 +70,6 @@ func (cpu *Cpu) exception(addr uint32, mode uint32) {
 	reg.CPSR.SetFlag(FLAG_I, true)
 
 	r[PC] = addr
-	return
 }
 
 func (cpu *Cpu) ExitException(mode uint32) {

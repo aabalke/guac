@@ -1,7 +1,6 @@
 package mem
 
 import (
-	//"fmt"
 
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/utils"
@@ -75,7 +74,7 @@ func (f *Fifo) Read() (v uint32, ok bool) {
     return f.Value, true
 }
 
-func (i *IPC) WriteSync(v uint8, isArm9 bool) {
+func (i *IPC) WriteSync(v, b uint8, isArm9 bool) {
 
     local := &i.SYNC9
     remote := &i.SYNC7
@@ -85,24 +84,21 @@ func (i *IPC) WriteSync(v uint8, isArm9 bool) {
         remote = &i.SYNC9
 	}
 
-    // old, with bit 14 setting local not remote
+    if b == 0 {
+
+        *local &^= 0xF0
+        *local |= uint16(v & 0xF0)
+
+        return
+    }
+
+
     *local &^= 0b100_1111 << 8
     *local |= uint16(v & 0b100_1111) << 8
     *remote &^= 0xF
     *remote |= uint16(v & 0xF)
 
-    //*local &^= 0xF << 8
-    //*local |= uint16(v & 0xF) << 8
-    //*remote &^= 0xF
-    //*remote |= uint16(v & 0xF)
 
-    //if v & 0x40 == 0x40 {
-    //    *remote |= 1 << 14
-    //} else {
-    //    *remote &^= 1 << 14
-    //}
-
-    //fmt.Printf("WRITE SYNC %02X00 IS ARM %t AFTER SYNC7 %04X SNYC9 %04X\n", v, isArm9, i.SYNC7, i.SYNC9)
 
     if irq := utils.BitEnabled(uint32(v), 5) && utils.BitEnabled(uint32(*remote), 14); irq {
         if isArm9 {

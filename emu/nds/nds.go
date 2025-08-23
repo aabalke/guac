@@ -1,6 +1,7 @@
 package nds
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/aabalke/guac/emu/nds/cart"
@@ -51,6 +52,8 @@ type Nds struct {
     AccCycles uint32
 }
 
+var logger *Logger
+
 func NewNds(path string, _ *oto.Context) *Nds {
 
 	nds := Nds{
@@ -60,28 +63,71 @@ func NewNds(path string, _ *oto.Context) *Nds {
 		ImageBottom:  ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 	}
 
+
     arm9Irq := cpu.Irq{IsArm9: true}
 	arm7Irq := cpu.Irq{}
+    arm9Dma := [4]mem.DMA{}
 
 	nds.Debugger = Debugger{&nds}
 	nds.arm7 = *arm7.NewCpu(&nds.mem, &arm7Irq)
 	nds.arm9 = *arm9.NewCpu(&nds.mem, &arm9Irq)
-	nds.mem = mem.NewMemory(&arm7Irq, &arm9Irq, &nds.Cartridge, &nds.ppu)
+	nds.mem = mem.NewMemory(&arm9Dma, &arm7Irq, &arm9Irq, &nds.Cartridge, &nds.ppu)
 
-	nds.mem.LoadBios()
+    arm9Dma[0].Init(0, &nds.mem, &arm9Irq)
+    arm9Dma[1].Init(1, &nds.mem, &arm9Irq)
+    arm9Dma[2].Init(2, &nds.mem, &arm9Irq)
+    arm9Dma[3].Init(3, &nds.mem, &arm9Irq)
+
     nds.LoadGame(path)
 	//nds.arm9.Reset()
 
     nds.DirtyInit()
 
+    logger = NewLogger("./log.csv", &nds)
+
+    //nds.arm7.Halted = true
+
+    // this is init for hello world
+
+    nds.arm7.Reg.R[2] =  0x4003EC8
+    nds.arm7.Reg.R[4] =  0x27FFFF0
+    nds.arm7.Reg.R[6] =  0x8000000
+    nds.arm7.Reg.R[7] =  0x37F8000
+    nds.arm7.Reg.R[12] = 0x80000C0
+    nds.arm7.Reg.R[13] = 0x380FD80
+    nds.arm7.Reg.R[14] = 0x80000FB
+
+    // needs 0xFF returned from arm7 0x1c2 (spi bus data)
+
 	return &nds
+}
+
+func (nds *Nds) checkBadPc() {
+    r := &nds.arm9.Reg.R
+    r7 := &nds.arm7.Reg.R
+
+    if r[15] % 2 == 1 || (nds.mem.Read32(r[15], true) == 0x0 && nds.mem.Read32(r[15] + 4, true) == 0x0) {
+        panic(fmt.Sprintf("BAD PC ARM9 @ PC %08X OP %08X CURR %d\n", r[15], nds.mem.Read32(r[15], true), CURR_INST))
+    }
+
+    if r7[15] % 2 == 1 || (nds.mem.Read32(r7[15], true) == 0x0 && nds.mem.Read32(r7[15] + 4, true) == 0x0) {
+        panic(fmt.Sprintf("BAD PC ARM7 @ PC %08X OP %08X CURR %d\n", r7[15], nds.mem.Read32(r7[15], false), CURR_INST))
+    }
+
 }
 
 func (nds *Nds) Update() {
 
+    r := &nds.arm9.Reg.R
+    r7 := &nds.arm7.Reg.R
+
 	if nds.Paused {
 		return
 	}
+
+    _ = r
+    _ = r7
+    _ = fmt.Sprintf("")
 
 	nds.Drawn = false
 
@@ -89,6 +135,8 @@ func (nds *Nds) Update() {
 	for !nds.Drawn {
 
 		cycles := 4
+
+        //logger.Update(0,0,CURR_INST)
 
 		if !nds.arm9.Halted {
 			nds.arm9.Execute()
@@ -127,6 +175,9 @@ func (nds *Nds) TogglePause() bool {
 func (nds *Nds) Close() {
 	nds.Muted = true
 	nds.Paused = true
+
+    logger.Close()
+    logger = nil
 }
 
 func (nds *Nds) LoadGame(path string) {
@@ -185,7 +236,7 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 			nds.graphics(uint32(vcount))
 			//gba.PPU.Backgrounds[2].BgAffineUpdate()
 			//gba.PPU.Backgrounds[3].BgAffineUpdate()
-			//gba.checkDmas(DMA_MODE_HBL)
+			//nds.CheckDmas(DMA_MODE_HBL)
 		}
 	}
 
@@ -233,4 +284,18 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 	if currFrameCycles < prevFrameCycles {
 		nds.Drawn = true
 	}
+}
+
+func (nds *Nds) checkDmas(mode uint32) {
+
+    for i := range 4 {
+
+        //if ok := nds.arm7.Dma[i].CheckMode(mode); ok {
+        //    nds.arm7.Dma[i].Transfer()
+        //}
+
+        if ok := nds.arm9.Dma[i].CheckMode(mode); ok {
+            nds.arm9.Dma[i].Transfer()
+        }
+    }
 }

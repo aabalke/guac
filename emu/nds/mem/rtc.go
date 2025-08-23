@@ -1,8 +1,8 @@
 package mem
 
 import (
-	"fmt"
 	"log"
+	"time"
 
 	"github.com/aabalke/guac/emu/nds/utils"
 )
@@ -58,6 +58,24 @@ type Rtc struct {
 
     Cmd uint8
     ParamRead bool
+
+    Outbit uint8
+
+
+    Elapsed time.Time
+}
+
+func (r *Rtc) InitRtc() {
+
+    r.Elapsed = time.Now()
+
+    t := time.Tick(time.Second)
+
+    go func() {
+        for range t {
+            r.Elapsed.Add(time.Second)
+        }
+    }()
 }
 
 func (r *Rtc) Write(v uint8) {
@@ -106,6 +124,10 @@ func (r *Rtc) Write(v uint8) {
     case STATE_PARAM:
 
         if read := v & 0b10 != 0b10; read {
+
+            r.UpdateOutBit()
+
+
             return
         }
 
@@ -115,33 +137,50 @@ func (r *Rtc) Write(v uint8) {
 
             switch r.Cmd {
             case CMD_STATUS1:
-                r.RegStatus1 &^= 1 << r.Idx
-                r.RegStatus1 |= (v & 1) << r.Idx
-            case CMD_STATUS2:
-                r.RegStatus2 &^= 1 << r.Idx
-                r.RegStatus2 |= (v & 1) << r.Idx
 
-
-            case CMD_TIME:
-                if r.Idx < 8 {
-                    r.RegHour &^= 1 << r.Idx
-                    r.RegHour |= (v & 1) << r.Idx
-                } else if r.Idx < 16 {
-                    r.RegMin &^= 1 << (r.Idx - 8)
-                    r.RegMin |= (v & 1) << (r.Idx - 8)
-                } else {
-                    r.RegSec &^= 1 << (r.Idx - 16)
-                    r.RegSec |= (v & 1) << (r.Idx - 16)
+                switch r.Idx {
+                case 0: // reset
+                    if reset := v & 1 == 1; reset {
+                        panic("UNIMPLIMENTED RTC RESET")
+                        // does this reset clock?
+                        r.RegStatus1 = 0x0
+                        r.RegStatus2 = 0x0
+                    }
+                case 1, 2, 3:
+                    //r.RegStatus1 &^= 1 << r.Idx
+                    //r.RegStatus1 |= (v & 1) << r.Idx
                 }
+
+                //fmt.Printf("NEW REG 1 %02X\n", r.RegStatus1)
+
+            case CMD_STATUS2:
+                //r.RegStatus2 &^= 1 << r.Idx
+                //r.RegStatus2 |= (v & 1) << r.Idx
+
+                //fmt.Printf("NEW REG 2 %02X\n", r.RegStatus2)
+
+            //case CMD_TIME:
+            //    panic("WRITING TIME")
+            //    if r.Idx < 8 {
+            //        r.RegHour &^= 1 << r.Idx
+            //        r.RegHour |= (v & 1) << r.Idx
+            //    } else if r.Idx < 16 {
+            //        r.RegMin &^= 1 << (r.Idx - 8)
+            //        r.RegMin |= (v & 1) << (r.Idx - 8)
+            //    } else {
+            //        r.RegSec &^= 1 << (r.Idx - 16)
+            //        r.RegSec |= (v & 1) << (r.Idx - 16)
+            //    }
 
             case CMD_INT2:
 
-                r.RegAlarm2 &^= 1 << r.Idx
-                r.RegAlarm2 |= (uint32(v) & 1) << r.Idx
-
+                if !(r.Idx >= 3 && r.Idx < 7) {
+                    r.RegAlarm2 &^= 1 << r.Idx
+                    r.RegAlarm2 |= (uint32(v) & 1) << r.Idx
+                }
 
             default:
-                panic(fmt.Sprintf("Unimplimented RTC Registers %d", r.Cmd))
+                //panic(fmt.Sprintf("Unimplimented RTC Registers %d", r.Cmd))
             }
 
             r.Idx++
@@ -150,12 +189,10 @@ func (r *Rtc) Write(v uint8) {
 
         r.Idx = 0
         r.State = STATE_NONE
-
     }
-
 }
 
-func (r *Rtc) Read() uint8 {
+func (r *Rtc) UpdateOutBit() {
 
     var outBit uint8 = 0
 
@@ -167,18 +204,22 @@ func (r *Rtc) Read() uint8 {
             outBit = (r.RegStatus1 >> r.Idx) & 1
         case CMD_STATUS2:
             outBit = (r.RegStatus2 >> r.Idx) & 1
-        case CMD_TIME:
-            if r.Idx < 8 {
-                outBit = (r.RegHour >> r.Idx) & 1
-            } else if r.Idx < 16 {
-                outBit = (r.RegMin >> (r.Idx - 8)) & 1
-            } else {
-                outBit = (r.RegSec >> (r.Idx - 16)) & 1
-            }
-        case CMD_INT2:
-            outBit = uint8(r.RegAlarm2 >> r.Idx) & 1
+        //case CMD_TIME:
+
+        //    panic("TIME READ")
+        //    if r.Idx < 8 {
+
+        //        outBit = (r.RegHour >> r.Idx) & 1
+        //    } else if r.Idx < 16 {
+        //        outBit = (r.RegMin >> (r.Idx - 8)) & 1
+        //    } else {
+        //        outBit = (r.RegSec >> (r.Idx - 16)) & 1
+        //    }
+        //case CMD_INT2:
+        //    panic("CMD INT2 READ")
+        //    outBit = uint8(r.RegAlarm2 >> r.Idx) & 1
         default:
-            panic(fmt.Sprintf("Unimplemented RTC read for %d", r.Cmd))
+            //panic(fmt.Sprintf("Unimplemented RTC read for %d", r.Cmd))
         }
 
         r.Idx++
@@ -188,6 +229,10 @@ func (r *Rtc) Read() uint8 {
         }
     }
 
-    // Build return: the "CNT" latch with SO bit in position 0
-    return (r.CNT &^ 1) | outBit | 0b110_0000
+    r.Outbit = outBit
+}
+
+func (r *Rtc) Read() uint8 {
+    return (r.CNT &^ 1) | (r.Outbit & 1) | 0b110_0000
+
 }

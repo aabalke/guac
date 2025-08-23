@@ -40,8 +40,3 @@ func (c *Cartridge) load() {
 		c.Rom[i] = uint8(buf[i])
 	}
 }
-
-// this is temp while I get gamecard transfers and spi figured out
-func (c *Cartridge) DirtyTransfer() {
-
-}
