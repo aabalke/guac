@@ -373,7 +373,7 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
             return 4
         }
 
-        r[LR] = r[PC] + 2
+        r[LR] = r[PC] + 3
 
 		if rs == PC {
 			cpsr.SetThumb(false, cpu)

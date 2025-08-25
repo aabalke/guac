@@ -1,7 +1,6 @@
 package arm9
 
 import (
-	"fmt"
 
 	"github.com/aabalke/guac/emu/nds/utils"
 )
@@ -54,11 +53,6 @@ func (c *Cpu) Block(opcode uint32) {
 func (cpu *Cpu) ldm(block *Block) {
 
 	r := &cpu.Reg.R
-
-	if utils.BitEnabled(block.Opcode, 15) && block.PSR {
-        fmt.Printf("ON ENTRY PC %08X\n", r[15])
-    }
-
 
 	addr := r[block.Rn] &^ 0b11
 	wbValue := r[block.Rn]
@@ -138,8 +132,6 @@ func (cpu *Cpu) ldm(block *Block) {
 
         if irqExit := curr == MODE_IRQ; irqExit {
 
-            fmt.Printf("CALLED LDM^ R15 %08X -> %08X\n", r[PC], r[LR])
-
             r[PC] = r[LR]
 
             //r[PC] += 4
@@ -147,47 +139,45 @@ func (cpu *Cpu) ldm(block *Block) {
 
         //cpu.Reg.setMode(cpu.Reg.getMode(), uint32(cpu.Reg.SPSR[BANK_ID[cpu.Reg.getMode()]]) & 0x1F)
 
-        fmt.Printf("PC %08X\n", r[15])
-
         next := uint32(spsr) & 0b11111
         //cpsr := uint32(reg.CPSR)
 
         reg.CPSR = Cond(spsr)
         reg.IsThumb = reg.CPSR.GetFlag(FLAG_T)
 
-        //if curr == MODE_USR {
-        //    panic("USER MODE LDM PC CHANGE")
-        //}
+        if curr == MODE_USR {
+            panic("USER MODE LDM PC CHANGE")
+        }
 
-        //if curr != MODE_FIQ {
-        //    for i := range 5 {
-        //        reg.USR[i] = r[8+i]
-        //    }
-        //}
+        if curr != MODE_FIQ {
+            for i := range 5 {
+                reg.USR[i] = r[8+i]
+            }
+        }
 
         reg.SP[BANK_ID[curr]] = r[SP]
         reg.LR[BANK_ID[curr]] = r[LR]
 
-        //if curr == MODE_FIQ {
-        //    for i := range 5 {
-        //        reg.FIQ[i] = r[8+i]
-        //    }
-        //}
+        if curr == MODE_FIQ {
+            for i := range 5 {
+                reg.FIQ[i] = r[8+i]
+            }
+        }
 
-        //if next != MODE_FIQ {
-        //    for i := range 5 {
-        //        r[8+i] = reg.USR[i]
-        //    }
-        //}
+        if next != MODE_FIQ {
+            for i := range 5 {
+                r[8+i] = reg.USR[i]
+            }
+        }
 
         r[SP] = reg.SP[BANK_ID[next]]
         r[LR] = reg.LR[BANK_ID[next]]
 
-        //if next == MODE_FIQ {
-        //    for i := range 5 {
-        //        r[8+i] = reg.FIQ[i]
-        //    }
-        //}
+        if next == MODE_FIQ {
+            for i := range 5 {
+                r[8+i] = reg.FIQ[i]
+            }
+        }
 
         return
 	}

@@ -19,6 +19,7 @@ import (
 var (
 	CURR_INST = uint64(0)
     _ = os.Args
+    _ = fmt.Sprintf("")
 )
 
 const (
@@ -65,6 +66,7 @@ func NewNds(path string, _ *oto.Context) *Nds {
 
     nds.ppu.EngineA.Pixels = &nds.PixelsBottom
     nds.ppu.EngineB.Pixels = &nds.PixelsTop
+    nds.ppu.EngineB.IsB = true
 
     arm9Irq := cpu.Irq{IsArm9: true}
 	arm7Irq := cpu.Irq{}
@@ -116,7 +118,6 @@ func (nds *Nds) Update() {
 
     _ = r
     _ = r7
-    _ = fmt.Sprintf("")
 
 	nds.Drawn = false
 
@@ -125,7 +126,11 @@ func (nds *Nds) Update() {
 
 		cycles := 4
 
-        //logger.Update(0, 109772, CURR_INST, true)
+        //logger.Update(389750, 389790, CURR_INST, true)
+
+        // 389756
+
+        //fmt.Printf("PC %08X CURR %d\n", r[15], CURR_INST)
 
 		if !nds.arm9.Halted {
 			nds.arm9.Execute()
@@ -219,8 +224,14 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 		}
 
 		if vcount < SCREEN_HEIGHT {
-			//updateBackgrounds(gba, &gba.PPU.Dispcnt)
-			//gba.PPU.bgPriorities = gba.getBgPriority(uint32(vcount), gba.PPU.Dispcnt.Mode, &gba.PPU.Backgrounds)
+
+            a := &nds.ppu.EngineA
+            b := &nds.ppu.EngineB
+			updateBackgrounds(a)
+			updateBackgrounds(b)
+			a.BgPriorities = nds.getBgPriority(uint32(vcount), a.Dispcnt.Mode, &a.Backgrounds)
+			b.BgPriorities = nds.getBgPriority(uint32(vcount), b.Dispcnt.Mode, &b.Backgrounds)
+
 			//gba.PPU.objPriorities = gba.getObjPriority(uint32(vcount), &gba.PPU.Objects)
 			nds.graphics(uint32(vcount))
 			//gba.PPU.Backgrounds[2].BgAffineUpdate()
@@ -250,8 +261,6 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 		case SCREEN_HEIGHT:
 			dispstat.SetVBlank(true)
 			//gba.checkDmas(DMA_MODE_VBL)
-			// bios/bios.gba needs irq set on screen_height, iridion 3d needs screen_height + 1
-			// I believe this is cycle related
 		//case SCREEN_HEIGHT + 1:
 			if utils.BitEnabled(uint32(*dispstat), 3) {
                 nds.arm9.Irq.SetIRQ(0)

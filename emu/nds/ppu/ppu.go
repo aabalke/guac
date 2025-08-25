@@ -1,6 +1,7 @@
 package ppu
 
 import (
+
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
@@ -13,6 +14,7 @@ type PPU struct {
 type Engine struct {
 
     Pixels *[]byte
+    IsB bool
 
 	Dispcnt Dispcnt
 
@@ -22,14 +24,14 @@ type Engine struct {
 	Blend       Blend
 	Mosaic      Mosaic
 
-	bgPriorities  [4][]uint32
-	objPriorities [4][]uint32
+	BgPriorities  [4][]uint32
+	ObjPriorities [4][]uint32
 
 }
 
 type Dispcnt struct {
 	Mode               uint32
-	is3D               bool
+	Is3D               bool
 	DisplayFrame1      bool
 	HBlankIntervalFree bool
 	OneDimensional     bool
@@ -42,6 +44,11 @@ type Dispcnt struct {
 
     DisplayMode uint32
     VramBlock uint32
+
+    CharBase uint32
+    ScreenBase uint32
+    BgExtPal bool
+    ObjExtPal bool
 }
 
 // blends are [6]... because Bg0, Bg1, Bg2, Bg3, Obj, Bd
@@ -88,7 +95,19 @@ type Background struct {
 
 	//PbCalc, PdCalc float64
 	OutX, OutY float64
+
+    Type uint8
 }
+
+const (
+    BG_TYPE_TEX = 0
+    BG_TYPE_AFF = 1
+    BG_TYPE_LAR = 2
+    BG_TYPE_3D  = 3
+    BG_TYPE_BGM = 4
+    BG_TYPE_256 = 5
+    BG_TYPE_DIR = 6
+)
 
 type Object struct {
 	X, Y, W, H     uint32
@@ -160,6 +179,7 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
     switch addr {
 	case 0x0:
 	    e.Dispcnt.Mode = utils.GetVarData(v, 0, 2)
+        e.Dispcnt.Is3D = utils.BitEnabled(v, 3)
 
 	case 0x1:
 		e.Backgrounds[0].Enabled = utils.BitEnabled(v, 0)
@@ -171,6 +191,11 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
         e.Dispcnt.VramBlock = utils.GetVarData(v, 2, 3)
 
 	case 0x3:
+
+        e.Dispcnt.CharBase = utils.GetVarData(v, 0, 2) * 0x1_0000
+        e.Dispcnt.ScreenBase = utils.GetVarData(v, 3, 5) * 0x1_0000
+        e.Dispcnt.BgExtPal = utils.BitEnabled(v, 6)
+        e.Dispcnt.ObjExtPal = utils.BitEnabled(v, 7)
     }
 }
 
@@ -212,6 +237,7 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 		p.Backgrounds[3].CharBaseBlock = utils.GetVarData(v, 2, 5) * 0x4000
 		p.Backgrounds[3].Mosaic = utils.BitEnabled(v, 6)
 		p.Backgrounds[3].Palette256 = utils.BitEnabled(v, 7)
+
 	case 0x0F:
 		p.Backgrounds[3].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
 		p.Backgrounds[3].AffineWrap = utils.BitEnabled(v, 5)

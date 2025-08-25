@@ -71,11 +71,35 @@ included:
 ### shonumi / hello world
 👍 hello world (identical outcome to TinyFB but with additional init functionality)
 
+### gbe-plus
+
+These tests do not work on any emulator - as far as I can tell. Mostly due to changes in devkitPro.
+(Tested on gbe+, desmume, melon, nocash)
+
+❌ Dma
+    ❌ Transfer Test
+    👍 Dma Fill Test
+❌ Irq (Timers only)
+👍 Math
+❌ Memory
+    ❌ Reading (Just 16bit read)
+    👍 Writing
+    ❌ Shared Wram Check (Fails)
+    ❌ Mirror Check (Just Main Memory)
+    ❌ Bios Ram Usage
+👍 Thumb
+❌ Timer
+
 ### Devkitpro examples
 
-Hello World:
-Arm7 ok, arm9 irq handler 0x0 0x18 mismatch
+Graphics
 
+Backgrounds
+    👍 16 bit color bmp
+    👍 256 bit color bmp
+    ❌ all in one
+    👍 double buffer
+    ❌ rotation
 
 ### Personal Test to Build
 
@@ -102,3 +126,4 @@ SDT PLD (Cache Prepare for Load opcode)
 
 Need tests for 
 NOT ALIGNING PC (movs 15, 14 etc)
+BLX r15, r14 (MUST BE + 3, for return thumb setting .BLX, .... BX back will need thumb setting)

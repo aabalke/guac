@@ -23,7 +23,7 @@ type Mem struct {
 	WRAM          WRAM
     Pram ppu.PRAM
     Vram ppu.VRAM
-	OAMPal        [0x1000]uint8
+    Oam [0x800]uint8
 
 	Arm7Bios [0x4000]uint8
 	Arm9Bios [0x1000]uint8
@@ -119,7 +119,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
             //panic("VRAM READ 9 YAY")
             return mem.Vram.Read(addr, true)
 		case 0x7:
-			return 0 // oam
+            return mem.Oam[addr & 0x7FF]
 		case 0x8, 0x9:
 			return 0 // gba rom
 		case 0xA, 0xB, 0xC, 0xD, 0xE:
@@ -197,6 +197,7 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
             //panic("VRAM WRITE YAY")
             mem.Vram.Write(addr, v, true)
 		case 0x7: // oam
+            mem.Oam[addr & 0x7FF] = v
 		case 0x8, 0x9: // gba rom
 		case 0xA, 0xB, 0xC, 0xD, 0xE: // gba ram
 		case 0xF:

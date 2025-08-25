@@ -1,7 +1,5 @@
 package mem
 
-import "fmt"
-
 type WRAM struct {
 	Wram [0x8000]uint8
 	CNT  uint8
@@ -11,7 +9,6 @@ type WRAM struct {
 
 func (w *WRAM) WriteCNT(v uint8) {
 	w.CNT = v & 0b11
-    fmt.Printf("WRITE Cnt %d\n", v)
 }
 
 func (w *WRAM) ReadCNT() uint8 {
@@ -38,7 +35,6 @@ func (w *WRAM) Write(addr uint32, v uint8, arm9 bool) {
 		w.WRAM7[(addr & 0xFFFF)] = v
 		return
 	}
-
 
 	switch w.CNT {
 	case 0:
