@@ -365,14 +365,15 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 	//}
     if addr >= 0x188 && addr < 0x190 { panic("WRITE IPC FIFO FROM BYTE OR HALF")}
 
-    if addr < 0x4 {
+    switch {
+    case addr < 0x60:
         mem.ppu.Update(addr, uint32(v))
-    }
-
-    if addr >= 0x280 && addr < 0x2B0 {
+    case addr >= 0x1000 && addr < 0x1070:
+        mem.ppu.Update(addr, uint32(v))
+    case addr >= 0x280 && addr < 0x2B0:
         mem.div.Write(addr, v)
         return
-    } else if addr >= 0x2B0 && addr < 0x2C0 {
+    case addr >= 0x2B0 && addr < 0x2C0:
         mem.sqrt.Write(addr, v)
         return
     }

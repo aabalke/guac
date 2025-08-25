@@ -63,6 +63,9 @@ func NewNds(path string, _ *oto.Context) *Nds {
 		ImageBottom:  ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 	}
 
+    nds.ppu.EngineA.Pixels = &nds.PixelsBottom
+    nds.ppu.EngineB.Pixels = &nds.PixelsTop
+
     arm9Irq := cpu.Irq{IsArm9: true}
 	arm7Irq := cpu.Irq{}
     arm9Dma := [4]mem.DMA{}
