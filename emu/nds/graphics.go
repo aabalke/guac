@@ -5,6 +5,10 @@ func (nds *Nds) graphics(y uint32) {
     //nds.DebugPalette(y)
     //return
 
+    nds.bitmap(y)
+
+    return
+
     switch nds.ppu.Dispcnt.DisplayMode {
     case 0:
     case 2: nds.bitmap(y)
@@ -14,7 +18,8 @@ func (nds *Nds) graphics(y uint32) {
 func (nds *Nds) bitmap(y uint32) {
 
     // temp offset for vram banking
-    offset := uint32(0x80_0000)
+    //offset := uint32(0x80_0000)
+    offset := uint32(0)
 
     x := uint32(0)
     for x = range SCREEN_WIDTH {

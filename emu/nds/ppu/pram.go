@@ -17,6 +17,7 @@ func (p *PRAM) Read(addr uint32) uint8 {
 
 func (p *PRAM) Write(addr uint32, v uint8) {
 
+
 	hi := addr&1 == 1
 	addr &= 0x7FF
 	addr >>= 1

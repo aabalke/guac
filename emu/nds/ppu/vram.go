@@ -80,8 +80,6 @@ func (vm *VRAM) Write(addr uint32, v uint8, arm9 bool) {
 
     addr &= 0xFF_FFFF
 
-    // currently assuming lcdc mode
-
     if arm9 {
 
         base := uint32(0x100_0000) // make sure 0 does not grab everything

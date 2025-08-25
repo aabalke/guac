@@ -29,6 +29,9 @@ func (cpu *Cpu) DecodeARM() int {
 	}
 
     switch {
+    case isBkpt(opcode):
+		cpu.exception(VEC_PREFETCHABORT, MODE_ABT)
+		return 4
 	case isB(opcode):
 		cpu.B(opcode)
 	case isBX(opcode):
@@ -38,6 +41,7 @@ func (cpu *Cpu) DecodeARM() int {
         return int(cycles)
 	case isBlock(opcode):
 		cpu.Block(opcode)
+
 	case isHalf(opcode):
 		cpu.Half(opcode)
 	case isUD(opcode):
@@ -67,6 +71,13 @@ func (cpu *Cpu) DecodeARM() int {
 
 func isOpcodeFormat(opcode, mask, format uint32) bool {
 	return opcode&mask == format
+}
+
+func isBkpt(opcode uint32) bool {
+	return isOpcodeFormat(opcode,
+		0b1111_1111_1111_0000_0000_0000_1111_0000,
+		0b1110_0001_0010_0000_0000_0000_0111_0000,
+	)
 }
 
 func isCLZ(opcode uint32) bool {

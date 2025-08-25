@@ -327,6 +327,14 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
 	if !alu.Set {
 		return
 	}
+	if abtExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB && cpu.Reg.getMode() == MODE_ABT; abtExit {
+
+        cpu.Reg.R[15] += 4
+
+		cpu.ExitException(MODE_ABT)
+		return
+	}
+
 
 	if irqExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB; irqExit {
 		cpu.ExitException(MODE_IRQ)
@@ -1186,6 +1194,7 @@ func (cpu *Cpu) msr(psr *PSR) {
 			r[8+i] = reg.FIQ[i]
 		}
 	}
+
 }
 
 func (cpu *Cpu) Swp(opcode uint32) {

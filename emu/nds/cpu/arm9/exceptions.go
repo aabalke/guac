@@ -25,9 +25,9 @@ func (cpu *Cpu) IRQException() {
 
 func (cpu *Cpu) exception(addr uint32, mode uint32) {
 
-	if mode != MODE_IRQ && mode != MODE_SWI {
-		panic("UNKNOWN EXCEPTION MODE")
-	}
+	//if mode != MODE_IRQ && mode != MODE_SWI {
+	//	panic("UNKNOWN EXCEPTION MODE")
+	//}
 
 	reg := &cpu.Reg
 	r := &cpu.Reg.R
@@ -56,20 +56,24 @@ func (cpu *Cpu) exception(addr uint32, mode uint32) {
 	r[LR] = reg.LR[i]
 	reg.SPSR[i] = reg.CPSR
 
-	switch {
-	case mode == MODE_SWI && thumb:
+    if thumb && (mode == MODE_SWI || mode == MODE_ABT) {
 		r[LR] = r[PC] + 2
 		reg.LR[i] = r[PC] + 2
-	default:
+    } else {
 		r[LR] = r[PC] + 4
 		reg.LR[i] = r[PC] + 4
-	}
+    }
 
 	reg.CPSR.SetMode(mode)
 	reg.CPSR.SetThumb(false, cpu)
 	reg.CPSR.SetFlag(FLAG_I, true)
 
-	r[PC] = addr
+    if cpu.mem.LowVector {
+        r[PC] = addr & 0xFFFF
+        return
+    }
+
+    r[PC] = addr
 }
 
 func (cpu *Cpu) ExitException(mode uint32) {

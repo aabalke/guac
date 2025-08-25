@@ -63,7 +63,6 @@ func NewNds(path string, _ *oto.Context) *Nds {
 		ImageBottom:  ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 	}
 
-
     arm9Irq := cpu.Irq{IsArm9: true}
 	arm7Irq := cpu.Irq{}
     arm9Dma := [4]mem.DMA{}
@@ -87,18 +86,6 @@ func NewNds(path string, _ *oto.Context) *Nds {
 
     //nds.arm7.Halted = true
 
-    // this is init for hello world
-
-    nds.arm7.Reg.R[2] =  0x4003EC8
-    nds.arm7.Reg.R[4] =  0x27FFFF0
-    nds.arm7.Reg.R[6] =  0x8000000
-    nds.arm7.Reg.R[7] =  0x37F8000
-    nds.arm7.Reg.R[12] = 0x80000C0
-    nds.arm7.Reg.R[13] = 0x380FD80
-    nds.arm7.Reg.R[14] = 0x80000FB
-
-    // needs 0xFF returned from arm7 0x1c2 (spi bus data)
-
 	return &nds
 }
 
@@ -113,7 +100,6 @@ func (nds *Nds) checkBadPc() {
     if r7[15] % 2 == 1 || (nds.mem.Read32(r7[15], true) == 0x0 && nds.mem.Read32(r7[15] + 4, true) == 0x0) {
         panic(fmt.Sprintf("BAD PC ARM7 @ PC %08X OP %08X CURR %d\n", r7[15], nds.mem.Read32(r7[15], false), CURR_INST))
     }
-
 }
 
 func (nds *Nds) Update() {
@@ -136,7 +122,7 @@ func (nds *Nds) Update() {
 
 		cycles := 4
 
-        //logger.Update(0,0,CURR_INST)
+        //logger.Update(0, 109772, CURR_INST, true)
 
 		if !nds.arm9.Halted {
 			nds.arm9.Execute()

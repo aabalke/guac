@@ -1,6 +1,8 @@
 package arm9
 
 import (
+	"fmt"
+
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
@@ -52,6 +54,11 @@ func (c *Cpu) Block(opcode uint32) {
 func (cpu *Cpu) ldm(block *Block) {
 
 	r := &cpu.Reg.R
+
+	if utils.BitEnabled(block.Opcode, 15) && block.PSR {
+        fmt.Printf("ON ENTRY PC %08X\n", r[15])
+    }
+
 
 	addr := r[block.Rn] &^ 0b11
 	wbValue := r[block.Rn]
@@ -127,7 +134,20 @@ func (cpu *Cpu) ldm(block *Block) {
 
         reg := &cpu.Reg
 
+        // I think this is necessary for irq exits
+
+        if irqExit := curr == MODE_IRQ; irqExit {
+
+            fmt.Printf("CALLED LDM^ R15 %08X -> %08X\n", r[PC], r[LR])
+
+            r[PC] = r[LR]
+
+            //r[PC] += 4
+        }
+
         //cpu.Reg.setMode(cpu.Reg.getMode(), uint32(cpu.Reg.SPSR[BANK_ID[cpu.Reg.getMode()]]) & 0x1F)
+
+        fmt.Printf("PC %08X\n", r[15])
 
         next := uint32(spsr) & 0b11111
         //cpsr := uint32(reg.CPSR)
@@ -168,16 +188,6 @@ func (cpu *Cpu) ldm(block *Block) {
         //        r[8+i] = reg.FIQ[i]
         //    }
         //}
-
-        // I think this is necessary for irq exits
-
-        if irqExit := r[15] >= 0xFFFF_0000; irqExit {
-
-            r[PC] = r[LR]
-
-
-            r[PC] += 4
-        }
 
         return
 	}

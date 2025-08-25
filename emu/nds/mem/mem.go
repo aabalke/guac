@@ -2,7 +2,6 @@ package mem
 
 import (
 	_ "embed"
-	"fmt"
 
 	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/cpu"
@@ -36,6 +35,8 @@ type Mem struct {
 
     arm9Dma *[4]DMA
 
+    LowVector bool
+
     ppu *ppu.PPU
 
     exmem ExMem
@@ -54,17 +55,6 @@ type Mem struct {
     Rtc Rtc
 }
 
-//  4096KB Main RAM (8192KB in debug version)
-//  96KB   WRAM (64K mapped to NDS7, plus 32K mappable to NDS7 or NDS9)
-//  60KB   TCM/Cache (TCM: 16K Data, 32K Code) (Cache: 4K Data, 8K Code)
-//  656KB  VRAM (allocateable as BG/OBJ/2D/3D/Palette/Texture/WRAM memory)
-//  4KB    OAM/PAL (2K OBJ Attribute Memory, 2K Standard Palette RAM)
-//  248KB  Internal 3D Memory (104K Polygon RAM, 144K Vertex RAM)
-//  ?KB    Matrix Stack, 48 scanline cache
-//  8KB    Wifi RAM
-//  256KB  Firmware FLASH (512KB in iQue variant, with chinese charset)
-//  36KB   BIOS ROM (4K NDS9, 16K NDS7, 16K GBA)
-
 func NewMemory(dma9 *[4]DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PPU) Mem {
 	m := Mem{
         arm9Dma: dma9,
@@ -74,10 +64,9 @@ func NewMemory(dma9 *[4]DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PP
         ppu: ppu,
     }
 
-    // temp for hello world - I believe bios decides this
+    // i believe this is default
     m.WRAM.WriteCNT(3)
 
-    //m.Ipc.SYNC7 = 0b100_0000
     m.Keypad.KEYINPUT = 0x3FF
     m.Keypad.KEYINPUT2 = 0b100_0011
 
@@ -85,18 +74,8 @@ func NewMemory(dma9 *[4]DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PP
 
 	m.LoadBios()
 
-    m.Tcm.Dtcm[0x3FFC] = 0x18
-
     m.Rtc.RegStatus1 = 0x02
     m.Rtc.RegStatus2 = 0x41
-
-
-    fmt.Printf("ST REG 1 %02X REG 2 %02X\n", m.Rtc.RegStatus1, m.Rtc.RegStatus2)
-
-    //m.Tcm.Dtcm[0x3FFC] = 0x18
-    //m.Tcm.Dtcm[0x3FFD] = 0x80
-    //m.Tcm.Dtcm[0x3FFE] = 0xFF
-    //m.Tcm.Dtcm[0x3FFF] = 0x01
 
 	return m
 }

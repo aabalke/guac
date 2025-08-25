@@ -1,6 +1,8 @@
 package arm9
 
 import (
+	"fmt"
+
 	"github.com/aabalke/guac/emu/nds/mem"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
@@ -76,10 +78,14 @@ func (c *Cp15) Write(v uint32, reg CpRegister) {
         c.R[reg] &^= mask
         c.R[reg] |= v
 
+        c.mem.LowVector = !utils.BitEnabled(c.R[reg], 13)
         c.mem.Tcm.DtcmEnabled = utils.BitEnabled(c.R[reg], 16)
         c.mem.Tcm.DtcmLoadMode = utils.BitEnabled(c.R[reg], 17)
         c.mem.Tcm.ItcmEnabled = utils.BitEnabled(c.R[reg], 18)
         c.mem.Tcm.ItcmLoadMode = utils.BitEnabled(c.R[reg], 19)
+
+        fmt.Printf("Low VECTOR SET %t\n", c.mem.LowVector)
+
 
         //if v & 1 == 1 { panic("PU MODE")}
 
