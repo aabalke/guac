@@ -720,19 +720,27 @@ func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack 
 	return r[sdt.Rn], addr, false
 }
 
+func (cpu *Cpu) BLX(opcode uint32) {
+    r := &cpu.Reg.R
+
+    r[14] = r[15] + 4
+
+    r[PC] += uint32((int32(opcode)<<8)>>6) + 8
+
+    if halfOffset := utils.BitEnabled(opcode, 24); halfOffset {
+        r[PC] += 2
+    }
+
+    cpu.Reg.CPSR.SetThumb(true, cpu)
+}
+
 func (cpu *Cpu) B(opcode uint32) {
 
-	if blx := opcode>>28&0xF == 0xF; blx {
-		panic("ARM9 BLX IMM not setup")
-	}
+    r := &cpu.Reg.R
 
-	isLink := utils.BitEnabled(opcode, 24)
-
-	r := &cpu.Reg.R
-
-	if isLink {
+	if isLink := utils.BitEnabled(opcode, 24);isLink {
 		r[14] = r[15] + 4
-	}
+    }
 
 	r[PC] += uint32((int32(opcode)<<8)>>6) + 8
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/nds/ppu"
+	"github.com/aabalke/guac/emu/nds/utils"
 )
 var wg = sync.WaitGroup{}
 
@@ -138,8 +139,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
             case ppu.BG_TYPE_TEX:
                 palData, ok = nds.setBackgroundPixel(engine, bg, x, y)
             case ppu.BG_TYPE_AFF:
-			//	palData, ok = gba.setAffineBackgroundPixel(bg, x)
-                palData, ok = 0b11111 << 5, true // green
+				palData, ok = nds.setAffineBackgroundPixel(engine, bg, x)
             case ppu.BG_TYPE_LAR:
                 palData, ok = 0b11111 << 10, true // blue
             case ppu.BG_TYPE_3D :
@@ -223,7 +223,6 @@ func (nds *Nds) largeBitmap(x, y uint32) (uint32, bool) {
 func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {
 
     bgs := &engine.Backgrounds
-    //dispcnt := &engine.Dispcnt
 
     getExtended := func(bg *ppu.Background) uint8 {
 
@@ -277,15 +276,6 @@ func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {
             }
         }
 
-
-		//isAffine := ((dispcnt.Mode == 1 && i == 2) ||
-		//	(dispcnt.Mode == 2 && (i == 2 || i == 3)))
-		//isStandard := ((dispcnt.Mode == 0) ||
-		//	(dispcnt.Mode == 1 && (i == 0 || i == 1 || i == 2)))
-
-		//bgs[i].Invalid = !isAffine && !isStandard
-		//bgs[i].Affine = isAffine
-
 		bgs[i].SetSize()
 
 		//if (dispcnt.Mode == 1 && i == 2) || dispcnt.Mode == 2 {
@@ -297,7 +287,6 @@ func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {
 }
 
 func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, bool) {
-
 
     vramOffset := uint32(0)
     pramOffset := uint32(0)
@@ -381,6 +370,74 @@ func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x, y 
 	addr := ((palette << 5) + palIdx<<1) + pramOffset
 
 	return uint32(nds.mem.Pram[addr >> 1]), true
+}
+
+func (nds *Nds) setAffineBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x uint32) (uint32, bool) {
+
+	//if !bg.Palette256 {
+	//	panic(fmt.Sprintf("AFFINE WITHOUT PAL 256"))
+	//}
+
+    vramOffset := uint32(0)
+    //pramOffset := uint32(0)
+
+    if engine.IsB {
+        vramOffset = uint32(0x20_0000)
+        //pramOffset = uint32(0x400)
+    }
+
+	pa := utils.Convert8_8Float(int16(bg.Pa))
+	pc := utils.Convert8_8Float(int16(bg.Pc))
+	xIdx := int(pa*float64(x) + bg.OutX)
+	yIdx := int(pc*float64(x) + bg.OutY)
+
+	if bg.Mosaic && engine.Mosaic.BgH != 0 {
+		xIdx -= xIdx % int(engine.Mosaic.BgH+1)
+	}
+
+	if bg.Mosaic && engine.Mosaic.BgV != 0 {
+		yIdx -= yIdx % int(engine.Mosaic.BgV+1)
+	}
+
+	out := xIdx < 0 || xIdx >= int(bg.W) || yIdx < 0 || yIdx >= int(bg.H)
+
+	switch {
+	case bg.AffineWrap:
+		xIdx &= int(bg.W) - 1
+		yIdx &= int(bg.H) - 1
+	case !bg.AffineWrap && out:
+		return 0, false
+	}
+
+	map_x := (uint32(xIdx)) & (bg.W - 1) >> 3
+	map_y := ((uint32(yIdx)) & (bg.H - 1)) >> 3
+	map_y *= bg.W >> 3
+	mapIdx := map_y + map_x
+
+	mapAddr := bg.ScreenBaseBlock + mapIdx
+
+    if !engine.IsB {
+        mapAddr += engine.Dispcnt.ScreenBase
+    }
+
+    tileIdx := uint32(nds.mem.Vram.Read(vramOffset + mapAddr, true))
+
+	tileAddr := bg.CharBaseBlock + (tileIdx << 6)
+
+	inTileX, inTileY := getPositionsBg(tileIdx, uint32(xIdx), uint32(yIdx))
+
+	inTileIdx := uint32(inTileX) + uint32(inTileY<<3)
+
+	addr := vramOffset + tileAddr + inTileIdx
+    palIdx := uint32(nds.mem.Vram.Read(addr, true))
+
+	if palIdx == 0 {
+		return 0, false
+	}
+
+	palData := nds.getPalette(palIdx, 0, false)
+
+	return palData, true
 }
 
 func getPositionsBg(screenData, xIdx, yIdx uint32) (uint32, uint32) {

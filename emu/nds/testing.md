@@ -79,7 +79,7 @@ These tests do not work on any emulator - as far as I can tell. Mostly due to ch
 ❌ Dma
     ❌ Transfer Test
     👍 Dma Fill Test
-❌ Irq (Timers only)
+👍 Irq
 👍 Math
 ❌ Memory
     ❌ Reading (Just 16bit read)
@@ -98,6 +98,11 @@ Backgrounds
     👍 16 bit color bmp
     👍 256 bit color bmp
     ❌ all in one
+        ❌ Basic
+            👍 1, 2, 3, 4, 5
+            ❌ 6, 7, 8, 9
+            ❌ 10, 11, 12, 13
+
     👍 double buffer
     ❌ rotation
 
@@ -127,3 +132,4 @@ SDT PLD (Cache Prepare for Load opcode)
 Need tests for 
 NOT ALIGNING PC (movs 15, 14 etc)
 BLX r15, r14 (MUST BE + 3, for return thumb setting .BLX, .... BX back will need thumb setting)
+BLX ARM needs to occur before Cond

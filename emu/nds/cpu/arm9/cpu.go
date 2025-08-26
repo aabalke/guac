@@ -135,8 +135,6 @@ func (c *Cond) SetFlag(flag uint32, value bool) {
 	}
 
 	*c &^= (0b1 << flag)
-
-	return
 }
 
 func (c *Cond) SetField(loBit uint32, value uint32) {

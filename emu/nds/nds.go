@@ -42,6 +42,7 @@ type Nds struct {
 	arm9 arm9.Cpu
     ppu ppu.PPU
 
+
     Cartridge cart.Cartridge
 
 	Debugger Debugger
@@ -71,6 +72,14 @@ func NewNds(path string, _ *oto.Context) *Nds {
     arm9Irq := cpu.Irq{IsArm9: true}
 	arm7Irq := cpu.Irq{}
     arm9Dma := [4]mem.DMA{}
+
+    for i := range 8 {
+        if i < 4 {
+            nds.mem.Timers[i].IsArm9 = true
+        }
+
+        nds.mem.Timers[i].Idx = i % 4
+    }
 
 	nds.Debugger = Debugger{&nds}
 	nds.arm7 = *arm7.NewCpu(&nds.mem, &arm7Irq)
@@ -128,6 +137,8 @@ func (nds *Nds) Update() {
         // will need half time cycles for thumb
 		cycles := 2
 
+        //logger.Update(109779, 150_000, CURR_INST, true)
+
 		if !nds.arm9.Halted {
 			nds.arm9.Execute()
 		}
@@ -150,6 +161,7 @@ func (nds *Nds) Update() {
 
 func (nds *Nds) Tick(cycles uint32) {
     nds.VideoUpdate(cycles)
+    nds.UpdateTimers(cycles)
 }
 
 func (nds *Nds) ToggleMute() bool {
@@ -230,8 +242,10 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 
 			//gba.PPU.objPriorities = gba.getObjPriority(uint32(vcount), &gba.PPU.Objects)
 			nds.graphics(uint32(vcount))
-			//gba.PPU.Backgrounds[2].BgAffineUpdate()
-			//gba.PPU.Backgrounds[3].BgAffineUpdate()
+			nds.ppu.EngineA.Backgrounds[2].BgAffineUpdate()
+			nds.ppu.EngineA.Backgrounds[3].BgAffineUpdate()
+			nds.ppu.EngineB.Backgrounds[2].BgAffineUpdate()
+			nds.ppu.EngineB.Backgrounds[3].BgAffineUpdate()
 			//nds.CheckDmas(DMA_MODE_HBL)
 		}
 	}
@@ -290,6 +304,28 @@ func (nds *Nds) checkDmas(mode uint32) {
 
         if ok := nds.arm9.Dma[i].CheckMode(mode); ok {
             nds.arm9.Dma[i].Transfer()
+        }
+    }
+}
+
+func (nds *Nds) UpdateTimers(cycles uint32) {
+
+	overflow, setIrq := false, false
+
+    for i := range 8 {
+        if nds.mem.Timers[i].Enabled {
+            overflow, setIrq = nds.mem.Timers[i].Update(overflow, cycles)
+
+            if !setIrq {
+                continue
+            }
+
+            if i < 4 {
+                nds.arm9.Irq.SetIRQ(3 + uint32(i))
+                continue
+            }
+
+            nds.arm7.Irq.SetIRQ(3 + uint32(i - 4))
         }
     }
 }

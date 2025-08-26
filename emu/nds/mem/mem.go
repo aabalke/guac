@@ -53,6 +53,8 @@ type Mem struct {
     Ipc IPC
     Spi spi.Spi
     Rtc Rtc
+
+    Timers [8]Timer
 }
 
 func NewMemory(dma9 *[4]DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PPU) Mem {
@@ -298,6 +300,41 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 	case 0x00DF:
 		return mem.arm9Dma[3].ReadControl(true)
 
+	case 0x100:
+		return mem.Timers[0].ReadD(false)
+	case 0x101:
+		return mem.Timers[0].ReadD(true)
+	case 0x102:
+		return mem.Timers[0].ReadCnt(false)
+	case 0x103:
+		return mem.Timers[0].ReadCnt(true)
+	case 0x104:
+		return mem.Timers[1].ReadD(false)
+	case 0x105:
+		return mem.Timers[1].ReadD(true)
+	case 0x106:
+		return mem.Timers[1].ReadCnt(false)
+	case 0x107:
+		return mem.Timers[1].ReadCnt(true)
+	case 0x108:
+		return mem.Timers[2].ReadD(false)
+	case 0x109:
+		return mem.Timers[2].ReadD(true)
+	case 0x10A:
+		return mem.Timers[2].ReadCnt(false)
+	case 0x10B:
+		return mem.Timers[2].ReadCnt(true)
+	case 0x10C:
+		return mem.Timers[3].ReadD(false)
+	case 0x10D:
+		return mem.Timers[3].ReadD(true)
+	case 0x10E:
+		return mem.Timers[3].ReadCnt(false)
+	case 0x10F:
+		return mem.Timers[3].ReadCnt(true)
+
+
+
 	case 0x130:
 		return mem.Keypad.readINPUT(false)
 	case 0x131:
@@ -521,6 +558,39 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 	case 0x00DF:
 		mem.arm9Dma[3].WriteControl(v, true)
 
+	case 0x100:
+		mem.Timers[0].WriteD(v, false)
+	case 0x101:
+		mem.Timers[0].WriteD(v, true)
+	case 0x102:
+		mem.Timers[0].WriteCnt(v, false)
+	case 0x103:
+		mem.Timers[0].WriteCnt(v, true)
+	case 0x104:
+		mem.Timers[1].WriteD(v, false)
+	case 0x105:
+		mem.Timers[1].WriteD(v, true)
+	case 0x106:
+		mem.Timers[1].WriteCnt(v, false)
+	case 0x107:
+		mem.Timers[1].WriteCnt(v, true)
+	case 0x108:
+		mem.Timers[2].WriteD(v, false)
+	case 0x109:
+		mem.Timers[2].WriteD(v, true)
+	case 0x10A:
+		mem.Timers[2].WriteCnt(v, false)
+	case 0x10B:
+		mem.Timers[2].WriteCnt(v, true)
+	case 0x10C:
+		mem.Timers[3].WriteD(v, false)
+	case 0x10D:
+		mem.Timers[3].WriteD(v, true)
+	case 0x10E:
+		mem.Timers[3].WriteCnt(v, false)
+	case 0x10F:
+		mem.Timers[3].WriteCnt(v, true)
+
     case 0x204:
         mem.exmem.Write(v, 0)
     case 0x205:
@@ -590,6 +660,40 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
         return uint8(mem.Vcount)
     case 0x7:
         return uint8(mem.Vcount >> 8)
+
+
+	case 0x100:
+		return mem.Timers[4].ReadD(false)
+	case 0x101:
+		return mem.Timers[4].ReadD(true)
+	case 0x102:
+		return mem.Timers[4].ReadCnt(false)
+	case 0x103:
+		return mem.Timers[4].ReadCnt(true)
+	case 0x104:
+		return mem.Timers[5].ReadD(false)
+	case 0x105:
+		return mem.Timers[5].ReadD(true)
+	case 0x106:
+		return mem.Timers[5].ReadCnt(false)
+	case 0x107:
+		return mem.Timers[5].ReadCnt(true)
+	case 0x108:
+		return mem.Timers[6].ReadD(false)
+	case 0x109:
+		return mem.Timers[6].ReadD(true)
+	case 0x10A:
+		return mem.Timers[6].ReadCnt(false)
+	case 0x10B:
+		return mem.Timers[6].ReadCnt(true)
+	case 0x10C:
+		return mem.Timers[7].ReadD(false)
+	case 0x10D:
+		return mem.Timers[7].ReadD(true)
+	case 0x10E:
+		return mem.Timers[7].ReadCnt(false)
+	case 0x10F:
+		return mem.Timers[7].ReadCnt(true)
 
 	case 0x130:
 		return mem.Keypad.readINPUT(false)
@@ -703,6 +807,40 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
     case 0x7:
         mem.Vcount &= 0xFF
         mem.Vcount |= uint32(v) << 8
+
+	case 0x100:
+		mem.Timers[4].WriteD(v, false)
+	case 0x101:
+		mem.Timers[4].WriteD(v, true)
+	case 0x102:
+		mem.Timers[4].WriteCnt(v, false)
+	case 0x103:
+		mem.Timers[4].WriteCnt(v, true)
+	case 0x104:
+		mem.Timers[5].WriteD(v, false)
+	case 0x105:
+		mem.Timers[5].WriteD(v, true)
+	case 0x106:
+		mem.Timers[5].WriteCnt(v, false)
+	case 0x107:
+		mem.Timers[5].WriteCnt(v, true)
+	case 0x108:
+		mem.Timers[6].WriteD(v, false)
+	case 0x109:
+		mem.Timers[6].WriteD(v, true)
+	case 0x10A:
+		mem.Timers[6].WriteCnt(v, false)
+	case 0x10B:
+		mem.Timers[6].WriteCnt(v, true)
+	case 0x10C:
+		mem.Timers[7].WriteD(v, false)
+	case 0x10D:
+		mem.Timers[7].WriteD(v, true)
+	case 0x10E:
+		mem.Timers[7].WriteCnt(v, false)
+	case 0x10F:
+		mem.Timers[7].WriteCnt(v, true)
+
 
 	case 0x130:
 		return

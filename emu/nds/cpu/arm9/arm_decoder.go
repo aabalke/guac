@@ -10,10 +10,20 @@ func (cpu *Cpu) DecodeARM() int {
 
 	opcode := cpu.mem.Read32(r[PC], true)
 
-	if !cpu.CheckCond(opcode >> 28) {
+    switch {
+    case isBLX(opcode):
+        cpu.BLX(opcode)
+        return 4
+
+    case isPLD(opcode):
+        panic("PLD")
+        return 4
+
+    case !cpu.CheckCond(opcode >> 28):
 		r[PC] += 4
 		return 4
-	}
+    }
+
 
 	if swi := (opcode>>24)&0xF == 0xF; swi {
 		//cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
@@ -71,6 +81,13 @@ func (cpu *Cpu) DecodeARM() int {
 
 func isOpcodeFormat(opcode, mask, format uint32) bool {
 	return opcode&mask == format
+}
+
+func isBLX(opcode uint32) bool {
+	return isOpcodeFormat(opcode,
+		0b1111_1110_0000_0000_0000_0000_0000_0000,
+		0b1111_1010_0000_0000_0000_0000_0000_0000,
+	)
 }
 
 func isBkpt(opcode uint32) bool {
@@ -222,6 +239,14 @@ func isSDT(opcode uint32) bool {
 	)
 
 	return is
+}
+
+func isPLD(opcode uint32) bool {
+	return isOpcodeFormat(
+		opcode,
+		0b1111_1100_0001_0000_0000_0000_0000_0000,
+		0b1111_0100_0001_0000_0000_0000_0000_0000,
+	)
 }
 
 func isPSR(opcode uint32) bool {

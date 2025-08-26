@@ -358,36 +358,36 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 	case 0x28:
 		p.Backgrounds[2].aXOffset &^= 0xFF
 		p.Backgrounds[2].aXOffset |= v
-		//p.Backgrounds[2].BgAffineReset()
+		p.Backgrounds[2].BgAffineReset()
 	case 0x29:
 		p.Backgrounds[2].aXOffset &^= 0xFF00
 		p.Backgrounds[2].aXOffset |= v << 8
-		//p.Backgrounds[2].BgAffineReset()
+		p.Backgrounds[2].BgAffineReset()
 	case 0x2A:
 		p.Backgrounds[2].aXOffset &^= 0xFF0000
 		p.Backgrounds[2].aXOffset |= v << 16
-		//p.Backgrounds[2].BgAffineReset()
+		p.Backgrounds[2].BgAffineReset()
 	case 0x2B:
 		p.Backgrounds[2].aXOffset &^= 0xFF000000
 		p.Backgrounds[2].aXOffset |= v << 24
-		//p.Backgrounds[2].BgAffineReset()
+		p.Backgrounds[2].BgAffineReset()
 
 	case 0x2C:
 		p.Backgrounds[2].aYOffset &^= 0xFF
 		p.Backgrounds[2].aYOffset |= v
-		//p.Backgrounds[2].BgAffineReset()
+		p.Backgrounds[2].BgAffineReset()
 	case 0x2D:
 		p.Backgrounds[2].aYOffset &^= 0xFF00
 		p.Backgrounds[2].aYOffset |= v << 8
-		//p.Backgrounds[2].BgAffineReset()
+		p.Backgrounds[2].BgAffineReset()
 	case 0x2E:
 		p.Backgrounds[2].aYOffset &^= 0xFF0000
 		p.Backgrounds[2].aYOffset |= v << 16
-		//p.Backgrounds[2].BgAffineReset()
+		p.Backgrounds[2].BgAffineReset()
 	case 0x2F:
 		p.Backgrounds[2].aYOffset &^= 0xFF000000
 		p.Backgrounds[2].aYOffset |= v << 24
-		//p.Backgrounds[2].BgAffineReset()
+		p.Backgrounds[2].BgAffineReset()
 
 	case 0x30:
 		p.Backgrounds[3].Pa &^= 0xFF
@@ -417,36 +417,36 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 	case 0x38:
 		p.Backgrounds[3].aXOffset &^= 0xFF
 		p.Backgrounds[3].aXOffset |= v
-		//p.Backgrounds[3].BgAffineReset()
+		p.Backgrounds[3].BgAffineReset()
 	case 0x39:
 		p.Backgrounds[3].aXOffset &^= 0xFF00
 		p.Backgrounds[3].aXOffset |= v << 8
-		//p.Backgrounds[3].BgAffineReset()
+		p.Backgrounds[3].BgAffineReset()
 	case 0x3A:
 		p.Backgrounds[3].aXOffset &^= 0xFF0000
 		p.Backgrounds[3].aXOffset |= v << 16
-		//p.Backgrounds[3].BgAffineReset()
+		p.Backgrounds[3].BgAffineReset()
 	case 0x3B:
 		p.Backgrounds[3].aXOffset &^= 0xFF000000
 		p.Backgrounds[3].aXOffset |= v << 24
-		//p.Backgrounds[3].BgAffineReset()
+		p.Backgrounds[3].BgAffineReset()
 
 	case 0x3C:
 		p.Backgrounds[3].aYOffset &^= 0xFF
 		p.Backgrounds[3].aYOffset |= v
-		//p.Backgrounds[3].BgAffineReset()
+		p.Backgrounds[3].BgAffineReset()
 	case 0x3D:
 		p.Backgrounds[3].aYOffset &^= 0xFF00
 		p.Backgrounds[3].aYOffset |= v << 8
-		//p.Backgrounds[3].BgAffineReset()
+		p.Backgrounds[3].BgAffineReset()
 	case 0x3E:
 		p.Backgrounds[3].aYOffset &^= 0xFF0000
 		p.Backgrounds[3].aYOffset |= v << 16
-		//p.Backgrounds[3].BgAffineReset()
+		p.Backgrounds[3].BgAffineReset()
 	case 0x3F:
 		p.Backgrounds[3].aYOffset &^= 0xFF000000
 		p.Backgrounds[3].aYOffset |= v << 24
-		//p.Backgrounds[3].BgAffineReset()
+		p.Backgrounds[3].BgAffineReset()
 	}
 }
 
@@ -502,7 +502,6 @@ func (bg *Background) SetSize() {
             panic("PROHIBITTED AFFINE BG SIZE")
         }
     }
-
 }
 
 func (obj *Object) SetSize(shape, size uint32) {
@@ -548,4 +547,14 @@ func (obj *Object) SetSize(shape, size uint32) {
 			obj.H, obj.W = 64, 32
 		}
 	}
+}
+
+func (bg *Background) BgAffineReset() {
+	bg.OutX = utils.Convert20_8Float(int32(bg.aXOffset))
+	bg.OutY = utils.Convert20_8Float(int32(bg.aYOffset))
+}
+
+func (bg *Background) BgAffineUpdate() {
+	bg.OutX += utils.Convert8_8Float(int16(bg.Pb))
+	bg.OutY += utils.Convert8_8Float(int16(bg.Pd))
 }
