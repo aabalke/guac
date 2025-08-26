@@ -10,7 +10,7 @@ type Cartridge struct {
 	RomLength uint32
 	Header    Header
 
-	Rom [0x200_0000]uint8
+	Rom [0x400_0000]uint8
 }
 
 func NewCartridge(rom, sav string) Cartridge {

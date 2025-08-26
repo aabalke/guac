@@ -44,5 +44,5 @@ func (d *Dispstat) SetVCFlag(v bool) {
 }
 
 func (d *Dispstat) GetLYC() uint32 {
-	return uint32(*d >> 8)
+	return uint32(*d >> 8) + ((uint32(*d >> 7) & 1) << 8)
 }

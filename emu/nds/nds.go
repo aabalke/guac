@@ -29,7 +29,7 @@ const (
 	NUM_SCANLINES   = SCREEN_HEIGHT + 70 // or 71 ???
 
 	CYCLES_HDRAW    = 1606
-	CYCLES_HBLANK   = 524 // need t overify
+	CYCLES_HBLANK   = 524 // need to verify
 	CYCLES_SCANLINE = CYCLES_HDRAW + CYCLES_HBLANK
 	CYCLES_VDRAW    = CYCLES_SCANLINE * SCREEN_HEIGHT
 	CYCLES_VBLANK   = CYCLES_SCANLINE * 70 // or 71???
@@ -122,15 +122,11 @@ func (nds *Nds) Update() {
 	nds.Drawn = false
 
     cycleArm7 := false
+
 	for !nds.Drawn {
 
-		cycles := 4
-
-        //logger.Update(389750, 389790, CURR_INST, true)
-
-        // 389756
-
-        //fmt.Printf("PC %08X CURR %d\n", r[15], CURR_INST)
+        // will need half time cycles for thumb
+		cycles := 2
 
 		if !nds.arm9.Halted {
 			nds.arm9.Execute()

@@ -81,7 +81,7 @@ func (cpu *Cpu) ldm(block *Block) {
 	if rnIncluded := (block.Rlist>>block.Rn)&1 == 1; rnIncluded {
         isLast := (block.Rlist < (1 << (block.Rn + 1)))
         isOnly := regCount == 1 && rnIncluded
-        block.Writeback = !isLast || isOnly
+        block.Writeback = (!isLast || isOnly) && block.Writeback
 
         if !block.Writeback || block.PSR {
             regCount--

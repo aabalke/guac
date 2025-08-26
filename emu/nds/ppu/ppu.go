@@ -1,7 +1,6 @@
 package ppu
 
 import (
-
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
@@ -196,6 +195,42 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
         e.Dispcnt.ScreenBase = utils.GetVarData(v, 3, 5) * 0x1_0000
         e.Dispcnt.BgExtPal = utils.BitEnabled(v, 6)
         e.Dispcnt.ObjExtPal = utils.BitEnabled(v, 7)
+
+	case 0x4C:
+
+		e.Mosaic.BgH = utils.GetVarData(v, 0, 3)
+		e.Mosaic.BgV = utils.GetVarData(v, 4, 7)
+
+	case 0x4D:
+
+		e.Mosaic.ObjH = utils.GetVarData(v, 0, 3)
+		e.Mosaic.ObjV = utils.GetVarData(v, 4, 7)
+
+	case 0x50:
+		e.Blend.a[0] = utils.BitEnabled(v, 0)
+		e.Blend.a[1] = utils.BitEnabled(v, 1)
+		e.Blend.a[2] = utils.BitEnabled(v, 2)
+		e.Blend.a[3] = utils.BitEnabled(v, 3)
+		e.Blend.a[4] = utils.BitEnabled(v, 4)
+		e.Blend.a[5] = utils.BitEnabled(v, 5)
+		e.Blend.Mode = utils.GetVarData(v, 6, 7)
+
+	case 0x51:
+		e.Blend.b[0] = utils.BitEnabled(v, 0)
+		e.Blend.b[1] = utils.BitEnabled(v, 1)
+		e.Blend.b[2] = utils.BitEnabled(v, 2)
+		e.Blend.b[3] = utils.BitEnabled(v, 3)
+		e.Blend.b[4] = utils.BitEnabled(v, 4)
+		e.Blend.b[5] = utils.BitEnabled(v, 5)
+
+	case 0x52:
+		e.Blend.aEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
+
+	case 0x53:
+		e.Blend.bEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
+
+	case 0x54:
+		e.Blend.yEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
     }
 }
 
@@ -417,43 +452,57 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 
 func (bg *Background) SetSize() {
 
-	if bg.Affine {
-		switch bg.Size {
-		case 0:
-			//bg.W, bg.H = 16, 16
-			bg.W, bg.H = 128, 128
-		case 1:
-			//bg.W, bg.H = 32, 32
-			bg.W, bg.H = 256, 256
-		case 2:
-			//bg.W, bg.H = 64, 64
-			bg.W, bg.H = 512, 512
-		case 3:
-			//bg.W, bg.H = 128, 128
-			bg.W, bg.H = 1024, 1024
-		default:
-			panic("PROHIBITTED AFFINE BG SIZE")
-		}
+    switch bg.Type {
+    case BG_TYPE_TEX:
+        switch bg.Size {
+        case 0:
+            bg.W, bg.H = 256, 256
+        case 1:
+            bg.W, bg.H = 512, 256
+        case 2:
+            bg.W, bg.H = 256, 512
+        case 3:
+            bg.W, bg.H = 512, 512
+        default:
+            panic("PROHIBITTED BG SIZE")
+        }
+    case BG_TYPE_AFF:
+        switch bg.Size {
+        case 0:
+            bg.W, bg.H = 128, 128
+        case 1:
+            bg.W, bg.H = 256, 256
+        case 2:
+            bg.W, bg.H = 512, 512
+        case 3:
+            bg.W, bg.H = 1024, 1024
+        default:
+            panic("PROHIBITTED AFFINE BG SIZE")
+        }
+    case BG_TYPE_LAR:
+        switch bg.Size {
+        case 0:
+            bg.W, bg.H = 512, 1024
+        case 1:
+            bg.W, bg.H = 1024, 512
+        default:
+            panic("PROHIBITTED LARGE BITMAP BG SIZE")
+        }
+    default:
+        switch bg.Size {
+        case 0:
+            bg.W, bg.H = 128, 128
+        case 1:
+            bg.W, bg.H = 256, 256
+        case 2:
+            bg.W, bg.H = 512, 256
+        case 3:
+            bg.W, bg.H = 512, 512
+        default:
+            panic("PROHIBITTED AFFINE BG SIZE")
+        }
+    }
 
-		return
-	}
-
-	switch bg.Size {
-	case 0:
-		//bg.W, bg.H = 32, 32
-		bg.W, bg.H = 256, 256
-	case 1:
-		//bg.W, bg.H = 64, 32
-		bg.W, bg.H = 512, 256
-	case 2:
-		//bg.W, bg.H = 32, 64
-		bg.W, bg.H = 256, 512
-	case 3:
-		//bg.W, bg.H = 64, 64
-		bg.W, bg.H = 512, 512
-	default:
-		panic("PROHIBITTED BG SIZE")
-	}
 }
 
 func (obj *Object) SetSize(shape, size uint32) {

@@ -10,6 +10,7 @@ var wg = sync.WaitGroup{}
 
 func (nds *Nds) graphics(y uint32) {
 
+
     a := &nds.ppu.EngineA
     b := &nds.ppu.EngineB
 
@@ -23,7 +24,6 @@ func (nds *Nds) graphics(y uint32) {
 	case 3:
 		panic("UNSETUP MAIN MEMORY DISPLAY")
 	}
-
 
     switch b.Dispcnt.DisplayMode {
     case 0:
@@ -108,15 +108,15 @@ func (nds *Nds) standard(y uint32, engine *ppu.Engine) {
 
 func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 	dispcnt := &engine.Dispcnt
-	//wins := &engine.Windows
+	wins := &engine.Windows
 	bgs := &engine.Backgrounds
 	//objPriorities := &engine.ObjPriorities
 	bgPriorities := &engine.BgPriorities
 
-	//bldPal := NewBlendPalette(x, &engine.Blend, gba)
+	bldPal := ppu.NewBlendPalette(x, &engine.Blend, nds.getPalette(0, 0, false))
 
-	//var objMode uint32
-	//var inObjWindow bool
+	var objMode uint32
+	var inObjWindow bool
 
 	// work backwards for proper priorities
 	for i := 3; i >= 0; i-- {
@@ -159,9 +159,8 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
             }
 
 			if ok {
-				//bldPal.setBlendPalettes(palData, uint32(bgIdx), false, false)
-                index := (x + (y * SCREEN_WIDTH)) << 2
-                nds.applyColor(palData, uint32(index), engine.Pixels)
+
+				bldPal.SetBlendPalettes(palData, uint32(bgIdx), false, false)
 			}
 		}
 
@@ -199,12 +198,9 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 		//}
 	}
 
-	//finalPalData := bldPal.blend(objMode == 1, x, y, wins, inObjWindow)
-	//index := (x + (y * SCREEN_WIDTH)) << 2
-	//nds.applyColor(finalPalData, uint32(index), engine.Pixels)
-
-
-
+	finalPalData := bldPal.Blend(objMode == 1, x, y, wins, inObjWindow)
+	index := (x + (y * SCREEN_WIDTH)) << 2
+	nds.applyColor(finalPalData, uint32(index), engine.Pixels)
 }
 
 func (nds *Nds) largeBitmap(x, y uint32) (uint32, bool) {
@@ -222,23 +218,6 @@ func (nds *Nds) largeBitmap(x, y uint32) (uint32, bool) {
     data := uint32(nds.mem.Pram[palIdx])
 
     return data, true
-}
-
-func (nds *Nds) tileBg0(y uint32, engine *ppu.Engine) {
-
-    if !engine.Backgrounds[0].Enabled {
-        return
-    }
-
-    x := uint32(0)
-    for x = range SCREEN_WIDTH {
-        palData, ok := nds.setBackgroundPixel(engine, &engine.Backgrounds[0], x, y)
-
-        if ok {
-            index := (x + (y * SCREEN_WIDTH)) << 2
-            nds.applyColor(palData, index, engine.Pixels)
-        }
-    }
 }
 
 func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {
@@ -282,7 +261,6 @@ func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {
                 bgs[i].Type = ppu.BG_TYPE_AFF
             case 5:
                 bgs[i].Type = getExtended(&bgs[i])
-                // // // //
             case 6:
                 bgs[i].Type = ppu.BG_TYPE_LAR
             }
@@ -296,8 +274,6 @@ func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {
                 bgs[i].Type = ppu.BG_TYPE_AFF
             case 3, 4, 5:
                 bgs[i].Type = getExtended(&bgs[i])
-
-                // // // //
             }
         }
 
@@ -361,17 +337,10 @@ func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x, y 
         mapAddr += engine.Dispcnt.ScreenBase
     }
 
-	//mapAddr &= 0x1FFFF
-
-	//if mapAddr >= 0x18000 {
-	//    mapAddr -= 0x8000
-	//}
-
     screenData := uint32(nds.mem.Vram.Read(vramOffset + mapAddr, true))
     screenData |= uint32(nds.mem.Vram.Read(vramOffset + mapAddr + 1, true)) << 8
 
 	tileIdx := (screenData & 0b11_1111_1111) << 5
-
 
 	tileAddr := bg.CharBaseBlock + tileIdx
 	if bg.Palette256 {
@@ -382,10 +351,6 @@ func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x, y 
         tileAddr += engine.Dispcnt.CharBase
     }
 
-	//if inObjTiles := tileAddr >= 0x1_0000; inObjTiles {
-	//	return 0, false
-	//}
-
 	inTileX, inTileY := getPositionsBg(screenData, xIdx, yIdx)
 
 	var inTileIdx uint32
@@ -395,23 +360,22 @@ func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x, y 
 		inTileIdx = (inTileX >> 1) + (inTileY << 2)
 	}
 
-
     tileData := uint32(nds.mem.Vram.Read(vramOffset + tileAddr + inTileIdx, true))
 
 	if bg.Palette256 {
 		palIdx := tileData
-		//if palIdx == 0 {
-		//	return 0, false
-		//}
+		if palIdx == 0 {
+			return 0, false
+		}
 
         return uint32(nds.mem.Pram[palIdx]), true
 	}
 
 	palIdx := (tileData >> ((inTileX & 1) << 2)) & 0xF
 
-	//if palIdx == 0 {
-	//	return 0, false
-	//}
+	if palIdx == 0 {
+		return 0, false
+	}
 
 	palette := screenData >> 12
 	addr := ((palette << 5) + palIdx<<1) + pramOffset
@@ -464,16 +428,16 @@ func (nds *Nds) directbitmap(x, y, offset uint32, bank *[0x20000]uint8) (uint32,
     return data, true
 }
 
-func (nds *Nds) DebugPalette(y uint32) {
+func (nds *Nds) DebugPalette(y, addr uint32, pixels *[]byte) {
 
 	x := uint32(0)
 	for x = range SCREEN_WIDTH {
 
 		index := (x + (y * SCREEN_WIDTH)) * 4
 
-		data := uint32(nds.mem.Pram[0x5FE >> 1])
+		data := uint32(nds.mem.Pram[addr >> 1])
 
-		nds.applyColor(data, index, &nds.PixelsTop)
+		nds.applyColor(data, index, pixels)
 	}
 }
 
@@ -502,9 +466,9 @@ func (nds *Nds) getBgPriority(y uint32, mode uint32, bgs *[4]ppu.Background) [4]
 			continue
 		}
 
-		//if bgNotScanline(&bgs[i], y) {
-		//	continue
-		//}
+		if bgNotScanline(&bgs[i], y) {
+			continue
+		}
 
         priority := bgs[i].Priority
 
@@ -526,4 +490,15 @@ func bgNotScanline(bg *ppu.Background, y uint32) bool {
 	b := localY-int(bg.H) >= 0
 
 	return t || b
+}
+
+func (nds *Nds) getPalette(palIdx uint32, paletteNum uint32, obj bool) uint32 {
+
+	addr := (paletteNum << 5) + palIdx<<1
+
+	if obj {
+		addr += 0x200
+	}
+
+	return uint32(nds.mem.Pram[addr>>1])
 }
