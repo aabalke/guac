@@ -34,6 +34,7 @@ func (f *Firmware) Write(v uint8) {
 
     case INST_READ:
 
+
         f.Params = append(f.Params, uint32(v))
 
         if len(f.Params) == 3 {
@@ -62,6 +63,8 @@ func (f *Firmware) Read() uint8 {
         //fmt.Printf("INST %02X ADDR %02X V %02X\n", f.Inst, addr, firmware[addr])
 
         return firmware[addr]
+    default:
+        panic("READ FIRMWARE")
     }
 
     return 0

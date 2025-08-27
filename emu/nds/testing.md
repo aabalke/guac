@@ -88,7 +88,7 @@ These tests do not work on any emulator - as far as I can tell. Mostly due to ch
     ❌ Mirror Check (Just Main Memory)
     ❌ Bios Ram Usage
 👍 Thumb
-❌ Timer
+❌ Timer (Will not build)
 
 ### Devkitpro examples
 

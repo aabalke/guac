@@ -7,14 +7,14 @@ import (
 )
 
 const (
-	DMA_MODE_IMM = 0
-	DMA_MODE_VBL = 1
-	DMA_MODE_HBL = 2
-	DMA_MODE_STA = 3
-	DMA_MODE_MAI = 4
-	DMA_MODE_DSC = 5
-	DMA_MODE_GBA = 6
-	DMA_MODE_GEO = 7
+	ARM9_DMA_MODE_IMM = 0
+	ARM9_DMA_MODE_VBL = 1
+	ARM9_DMA_MODE_HBL = 2
+	ARM9_DMA_MODE_STA = 3
+	ARM9_DMA_MODE_MAI = 4
+	ARM9_DMA_MODE_DSC = 5
+	ARM9_DMA_MODE_GBA = 6
+	ARM9_DMA_MODE_GEO = 7
 
 	DMA_ADJ_INC = 0
 	DMA_ADJ_DEC = 1
@@ -111,7 +111,7 @@ func (dma *DMA) WriteControl(v uint8, hi bool) {
 			dma.Dst = dma.InitDst
 		}
 
-		if isImmediate := wasDisabled && dma.CheckMode(DMA_MODE_IMM); isImmediate {
+		if isImmediate := wasDisabled && dma.CheckMode(ARM9_DMA_MODE_IMM); isImmediate {
 			dma.Transfer()
 		}
 		return

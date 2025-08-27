@@ -86,7 +86,6 @@ func (s *Spi) WriteData(v uint8) {
         s.Data = s.Firmware.Read()
         s.Firmware.Write(v)
 
-
     default: panic(fmt.Sprintf("UNSETUP SPI IN WRITE DATA %d", s.Device))
     }
 }
@@ -94,7 +93,6 @@ func (s *Spi) WriteData(v uint8) {
 func (s *Spi) ReadData() uint8 {
 
     //fmt.Printf("READING DATA\n")
-
 
     return s.Data
 }

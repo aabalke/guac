@@ -7,15 +7,17 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// need to add additional button support
 func (nds *Nds) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadButton) {
 
 	keyConfig := config.Conf.Nds.KeyboardConfig
 	buttonConfig := config.Conf.Nds.ControllerConfig
 
 	k := &nds.mem.Keypad.KEYINPUT
+	k2 := &nds.mem.Keypad.KEYINPUT2
 
 	*k = 0b11_1111_1111
+	*k2 |=  0b0100_0011
+	*k2 &^= 0b1000_0000
 
 	for _, key := range keys {
 
@@ -42,6 +44,16 @@ func (nds *Nds) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 			*k &^= 0b100000000
 		case slices.Contains(keyConfig.L, keyStr):
 			*k &^= 0b1000000000
+		case slices.Contains(keyConfig.X, keyStr):
+			*k2 &^= 0b1
+		case slices.Contains(keyConfig.Y, keyStr):
+			*k2 &^= 0b10
+		case slices.Contains(keyConfig.Y, keyStr):
+			*k2 &^= 0b10
+		case slices.Contains(keyConfig.Hinge, keyStr):
+			*k2 |= 0b1000_0000
+		//case slices.Contains([]string{"B"}, keyStr):
+		//	*k2 &^= 0b0100_0000
 		}
 	}
 
@@ -70,6 +82,12 @@ func (nds *Nds) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 			*k &^= 0b100000000
 		case slices.Contains(buttonConfig.L, buttonStr):
 			*k &^= 0b1000000000
+		case slices.Contains(buttonConfig.X, buttonStr):
+			*k2 &^= 0b1
+		case slices.Contains(buttonConfig.Y, buttonStr):
+			*k2 &^= 0b10
+		case slices.Contains(buttonConfig.Hinge, buttonStr):
+			*k2 |= 0b1000_0000
 		}
 	}
 

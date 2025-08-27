@@ -94,19 +94,25 @@ type EmulatorKeyboardConfig struct {
 	Down   []string `toml:"down"`
 	R      []string `toml:"r"`
 	L      []string `toml:"l"`
+	X      []string `toml:"x"`
+	Y      []string `toml:"y"`
+	Hinge  []string `toml:"hinge"`
 }
 
 type EmulatorControllerConfig struct {
-	A      []int `toml:"a"`
-	B      []int `toml:"b"`
-	Select []int `toml:"select"`
-	Start  []int `toml:"start"`
-	Left   []int `toml:"left"`
-	Right  []int `toml:"right"`
-	Up     []int `toml:"up"`
-	Down   []int `toml:"down"`
-	R      []int `toml:"r"`
-	L      []int `toml:"l"`
+	A           []int `toml:"a"`
+	B           []int `toml:"b"`
+	Select      []int `toml:"select"`
+	Start       []int `toml:"start"`
+	Left        []int `toml:"left"`
+	Right       []int `toml:"right"`
+	Up          []int `toml:"up"`
+	Down        []int `toml:"down"`
+	R           []int `toml:"r"`
+	L           []int `toml:"l"`
+	X           []int `toml:"x"`
+	Y           []int `toml:"y"`
+	Hinge       []int `toml:"hinge"`
 }
 
 func (c *Config) Decode() {

@@ -135,9 +135,13 @@ func (nds *Nds) Update() {
 	for !nds.Drawn {
 
         // will need half time cycles for thumb
-		cycles := 2
+		cycles := 1
 
-        //logger.Update(109779, 150_000, CURR_INST, true)
+        //if CURR_INST > 231140 {
+        //    //fmt.Printf("PC %08X OP %08X CPSR %08X CURR %d\n", r[15], nds.mem.Read32(r[15], true), nds.arm9.Reg.CPSR, CURR_INST)
+        //}
+
+        //logger.Update(0, 231143, CURR_INST, true)
 
 		if !nds.arm9.Halted {
 			nds.arm9.Execute()
@@ -246,7 +250,7 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 			nds.ppu.EngineA.Backgrounds[3].BgAffineUpdate()
 			nds.ppu.EngineB.Backgrounds[2].BgAffineUpdate()
 			nds.ppu.EngineB.Backgrounds[3].BgAffineUpdate()
-			//nds.CheckDmas(DMA_MODE_HBL)
+			nds.CheckDmas(mem.ARM9_DMA_MODE_HBL, true)
 		}
 	}
 
@@ -266,11 +270,13 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 
 		switch vcount {
 		case 0:
-			//gba.PPU.Backgrounds[2].BgAffineReset()
-			//gba.PPU.Backgrounds[3].BgAffineReset()
+			nds.ppu.EngineA.Backgrounds[2].BgAffineReset()
+			nds.ppu.EngineA.Backgrounds[3].BgAffineReset()
+			nds.ppu.EngineB.Backgrounds[2].BgAffineReset()
+			nds.ppu.EngineB.Backgrounds[3].BgAffineReset()
 		case SCREEN_HEIGHT:
 			dispstat.SetVBlank(true)
-			//gba.checkDmas(DMA_MODE_VBL)
+			nds.CheckDmas(mem.ARM9_DMA_MODE_VBL, true)
 		//case SCREEN_HEIGHT + 1:
 			if utils.BitEnabled(uint32(*dispstat), 3) {
                 nds.arm9.Irq.SetIRQ(0)
@@ -294,18 +300,25 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 	}
 }
 
-func (nds *Nds) checkDmas(mode uint32) {
+func (nds *Nds) CheckDmas(mode uint32, arm9 bool) {
 
-    for i := range 4 {
-
-        //if ok := nds.arm7.Dma[i].CheckMode(mode); ok {
-        //    nds.arm7.Dma[i].Transfer()
-        //}
-
-        if ok := nds.arm9.Dma[i].CheckMode(mode); ok {
-            nds.arm9.Dma[i].Transfer()
+    if arm9 {
+        for i := range 4 {
+            if ok := nds.arm9.Dma[i].CheckMode(mode); ok {
+                nds.arm9.Dma[i].Transfer()
+            }
         }
+        return
     }
+
+    panic("ARM7 DMA")
+
+    //for i := range 4 {
+
+    //    //if ok := nds.arm7.Dma[i].CheckMode(mode); ok {
+    //    //    nds.arm7.Dma[i].Transfer()
+    //    //}
+    //}
 }
 
 func (nds *Nds) UpdateTimers(cycles uint32) {

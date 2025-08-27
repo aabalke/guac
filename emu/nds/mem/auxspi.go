@@ -42,6 +42,7 @@ type AuxSPI struct {
 
 func (a *AuxSPI) Read(b uint8) uint8 {
 
+
     switch b {
     case 0:
 
