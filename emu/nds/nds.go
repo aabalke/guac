@@ -51,6 +51,8 @@ type Nds struct {
 	PixelsTop, PixelsBottom []byte
 	ImageTop, ImageBottom   *ebiten.Image
 
+    BtmAbs struct{T, B, L, R, W, H int} 
+
     AccCycles uint32
 }
 
@@ -135,7 +137,11 @@ func (nds *Nds) Update() {
 	for !nds.Drawn {
 
         // will need half time cycles for thumb
-		cycles := 1
+
+		cycles := 2
+        if nds.arm9.Reg.IsThumb {
+            cycles = 1
+        }
 
         //if CURR_INST > 231140 {
         //    //fmt.Printf("PC %08X OP %08X CPSR %08X CURR %d\n", r[15], nds.mem.Read32(r[15], true), nds.arm9.Reg.CPSR, CURR_INST)

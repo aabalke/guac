@@ -10,6 +10,7 @@ import (
 	gameboy "github.com/aabalke/guac/emu/gb"
 	"github.com/aabalke/guac/emu/gba"
 	"github.com/aabalke/guac/emu/nds"
+	"github.com/aabalke/guac/input"
 	"github.com/aabalke/guac/menu"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -31,6 +32,8 @@ type Game struct {
 	pause *Pause
 	frame uint64
 
+    mouse *input.Mouse
+
 	paused        bool
 	pauseEndFrame uint64
 
@@ -46,6 +49,7 @@ func NewGame(flags Flags) *Game {
 	g := &Game{
 		flags:  flags,
 		emuCtx: NewAudioContext(),
+        mouse: input.NewMouse(),
 	}
 
 	if !config.Conf.CancelAudioInit {
@@ -98,6 +102,8 @@ func (g *Game) Update() error {
 	}
 
 	g.frame++
+
+    g.mouse.Update()
 
 	justKeys := inpututil.AppendJustPressedKeys([]ebiten.Key{})
 	keys := inpututil.AppendPressedKeys([]ebiten.Key{})
@@ -154,7 +160,7 @@ func (g *Game) Update() error {
 			g.menu = nil
 		}
 	case NDS:
-		g.nds.InputHandler(keys, buttons)
+		g.nds.InputHandler(keys, buttons, g.mouse)
 		g.nds.Update()
 		g.nds.ImageTop.WritePixels(g.nds.PixelsTop)
 		g.nds.ImageBottom.WritePixels(g.nds.PixelsBottom)
@@ -230,6 +236,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	screen.Fill(config.Conf.Backdrop)
 
+    defer g.mouse.Draw(screen)
+
 	switch g.flags.Type {
 	case NONE:
 		g.menu.DrawMenu(screen, g.frame)
@@ -239,13 +247,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	case GB:
 		ImageFillScreen(screen, g.gb.Image)
 	case NDS:
-		ImageFillScreen(screen, g.nds.ImageTop)
-		//ImageFillScreenMulti(screen, g.nds.ImageTop, g.nds.ImageBottom, false)
+		//ImageFillScreen(screen, g.nds.ImageTop)
+		g.ImageFillScreenMulti(screen, g.nds.ImageTop, g.nds.ImageBottom, false)
 	}
 
 	if g.paused {
 		g.pause.DrawPause(screen)
 	}
+
 }
 
 func ImageFillScreen(screen *ebiten.Image, image *ebiten.Image) {
@@ -266,7 +275,7 @@ func ImageFillScreen(screen *ebiten.Image, image *ebiten.Image) {
 	screen.DrawImage(image, op)
 }
 
-func ImageFillScreenMulti(screen *ebiten.Image, imageTop, imageBottom *ebiten.Image, setHorizontal bool) {
+func (g *Game) ImageFillScreenMulti(screen *ebiten.Image,  imageTop, imageBottom *ebiten.Image, setHorizontal bool) {
 
 	sw, sh := float64(screen.Bounds().Dx()), float64(screen.Bounds().Dy())
 	itw, ith := float64(imageTop.Bounds().Dx()), float64(imageTop.Bounds().Dy())
@@ -290,6 +299,15 @@ func ImageFillScreenMulti(screen *ebiten.Image, imageTop, imageBottom *ebiten.Im
 		op.GeoM.Translate(offsetX, offsetY)
 		screen.DrawImage(imageBottom, op)
 
+        g.nds.BtmAbs = struct{T int; B int; L int; R int; W int; H int}{
+            T: int(offsetY),
+            B: int(offsetY + (scale * ith)),
+            L: int(offsetX),
+            R: int(offsetX + (scale * itw)),
+            W: int(scale * itw),
+            H: int(scale * ith),
+        }
+
 		return
 	}
 
@@ -309,6 +327,15 @@ func ImageFillScreenMulti(screen *ebiten.Image, imageTop, imageBottom *ebiten.Im
 	op.GeoM.Scale(scale, scale)
 	op.GeoM.Translate(offsetX, offsetY)
 	screen.DrawImage(imageBottom, op)
+
+    g.nds.BtmAbs = struct{T int; B int; L int; R int; W int; H int}{
+        T: int(offsetY),
+        B: int(offsetY + (scale * ith)),
+        L: int(offsetX),
+        R: int(offsetX + (scale * itw)),
+        W: int(scale * itw),
+        H: int(scale * ith),
+    }
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {

@@ -57,6 +57,8 @@ func main() {
 	//ebiten.SetWindowPosition(100, 100)
 	ebiten.SetWindowSize(256*4, 192*4)
 	//ebiten.SetWindowSize(1280, 720)
+
+    ebiten.SetCursorMode(ebiten.CursorModeHidden)
 	if config.Conf.Fullscreen {
 		ebiten.SetFullscreen(true)
 	}

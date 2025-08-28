@@ -23,11 +23,24 @@ type Config struct {
 	GamesPerRow      int  `toml:"games_per_row"`
 	Backdrop         color.Color
 	CancelAudioInit  bool             `toml:"cancel_audio_init"`
+	Mouse            MouseConfig      `toml:"mouse"`
 	Gb               GbConfig         `toml:"gb"`
 	Gba              GbaConfig        `toml:"gba"`
 	Nds              NdsConfig        `toml:"nds"`
 	KeyboardConfig   KeyboardConfig   `toml:"keyboard"`
 	ControllerConfig ControllerConfig `toml:"controller"`
+}
+
+type MouseConfig struct {
+    Fill   bool `toml:"fill"`
+    Stroke bool `toml:"stroke"`
+    UnSelectedAlpha float32 `toml:"unselected_alpha"`
+    CursorSize int `toml:"cursor_diameter"`
+    StrokeSize int `toml:"stroke_width"`
+    TomlFillColor   int `toml:"fill_color"`
+    TomlStrokeColor int `toml:"stroke_color"`
+    FillColor []uint8
+    StrokeColor []uint8
 }
 
 type GbConfig struct {
@@ -158,6 +171,7 @@ func (c *Config) Decode() {
 	}
 
 	c.decodeGb()
+    c.decodeMouse()
 }
 
 func (c *Config) decodeGb() {
@@ -203,6 +217,59 @@ func (c *Config) decodeGb() {
 			{uint8(pal[1] >> 16), uint8(pal[1] >> 8), uint8(pal[1])},
 			{uint8(pal[2] >> 16), uint8(pal[2] >> 8), uint8(pal[2])},
 			{uint8(pal[3] >> 16), uint8(pal[3] >> 8), uint8(pal[3])},
+		}
+	}
+}
+
+func (c *Config) decodeMouse() {
+
+	pal := c.Mouse.TomlFillColor
+
+	invalid := false
+
+	errMessageStart := "Invalid Mouse Config:"
+	errMessageEnd := "Using default fill color."
+
+    if pal < 0 || pal > 0xFFFFFF {
+        s := fmt.Sprintf("mouse fill palette value has invalid 8 bit value.")
+
+        log.Printf("%s %s %s\n", errMessageStart, s, errMessageEnd)
+        invalid = true
+    }
+
+	if invalid {
+		// greyscale palette
+		c.Mouse.FillColor = []uint8{
+			0xFF, 0xFF, 0xFF,
+		}
+	} else {
+		c.Mouse.FillColor = []uint8{
+			uint8(pal >> 16), uint8(pal >> 8), uint8(pal),
+		}
+	}
+
+	pal = c.Mouse.TomlStrokeColor
+
+	invalid = false
+
+	errMessageStart = "Invalid Mouse Config:"
+	errMessageEnd = "Using default stroke color."
+
+    if pal < 0 || pal > 0xFFFFFF {
+        s := fmt.Sprintf("mouse stroke palette value has invalid 8 bit value.")
+
+        log.Printf("%s %s %s\n", errMessageStart, s, errMessageEnd)
+        invalid = true
+    }
+
+	if invalid {
+		// greyscale palette
+		c.Mouse.StrokeColor = []uint8{
+			0xFF, 0xFF, 0xFF,
+		}
+	} else {
+		c.Mouse.StrokeColor = []uint8{
+			uint8(pal >> 16), uint8(pal >> 8), uint8(pal),
 		}
 	}
 }
