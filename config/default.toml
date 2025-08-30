@@ -15,10 +15,10 @@ games_per_row = 6
 fill = true
 stroke = false
 unselected_alpha = 0.5
-cursor_diameter = 16
-stroke_width = 2
+cursor_diameter = 8
+#stroke_width = 8
 fill_color = 0xFFFFFF
-stroke_color = 0xFFFFFF
+#stroke_color = 0xFF0000
 
 [keyboard]
 select     = ["J", "Enter"]

@@ -133,3 +133,6 @@ Need tests for
 NOT ALIGNING PC (movs 15, 14 etc)
 BLX r15, r14 (MUST BE + 3, for return thumb setting .BLX, .... BX back will need thumb setting)
 BLX ARM needs to occur before Cond
+
+# Todo
+IPC Syncing arm9 and arm7 needed. Causes problem with CRC16 verifying on homebrew.

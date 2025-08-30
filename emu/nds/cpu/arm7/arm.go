@@ -658,7 +658,13 @@ func (cpu *Cpu) BX(opcode uint32) {
 	switch inst {
 	case INST_BX:
 		cpu.Reg.R[PC] = cpu.Reg.R[rn]
+
+        if rn == PC {
+            cpu.Reg.R[PC] += 8
+        }
+
 		cpu.toggleThumb()
+
 	case INST_BXJ:
 		panic("Unsupported BXJ Instruction")
 	case INST_BLX:

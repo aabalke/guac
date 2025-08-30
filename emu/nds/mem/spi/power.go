@@ -1,6 +1,8 @@
 package spi
 
-import "github.com/aabalke/guac/emu/nds/utils"
+import (
+	"github.com/aabalke/guac/emu/nds/utils"
+)
 
 const (
     REG_POWERMG = 0
@@ -11,10 +13,6 @@ const (
 )
 
 type Pmd struct {
-	isIdxSet bool
-	RegIdx   uint8
-	isRead   bool
-
     RegPowermg uint8
     RegBattery uint8
     RegMicctrl uint8
@@ -22,47 +20,39 @@ type Pmd struct {
     RegBacklit uint8
 }
 
-func (p *Pmd) Write(v uint8)  {
+func (p *Pmd) Transfer(data []uint8) (reply []uint8, stat uint8)  {
 
-	if !p.isIdxSet {
-		p.isRead = utils.BitEnabled(uint32(v), 7)
-        p.RegIdx &= 0b111_1111
-        p.isIdxSet = true
-		return
-	}
+    idx := data[0]
 
-    p.isIdxSet = false
+    if read := utils.BitEnabled(uint32(idx), 7); read {
 
-    switch p.RegIdx {
-    case REG_POWERMG:
-        p.RegPowermg = v & 0b111_1111
-    case REG_BATTERY:
-        return
-    case REG_MICCTRL:
-        p.RegMicctrl = v & 0b1
-    case REG_MICGAIN:
-        p.RegMicgain = v & 0b11
-    default: panic("UNKNOWN SPI POWER MANAGEMENT REG IDX")
+        if len(data) < 2 {
+            return nil, STAT_CONT
+        }
+
+        v := data[1]
+
+        switch idx & 0x7F {
+        case REG_POWERMG:
+            p.RegPowermg = v
+        case REG_MICCTRL:
+            p.RegMicctrl = v & 1
+        case REG_MICGAIN:
+            p.RegMicgain = v & 3
+        }
+
+        return nil, STAT_DONE
     }
-}
 
-func(p *Pmd) Read() uint8 {
-
-	if !p.isIdxSet {
-        panic("IDX IS NOT SET FOR READ")
-	}
-
-    p.isIdxSet = false
-
-    switch p.RegIdx {
+    switch idx & 0x7F {
     case REG_POWERMG:
-        return p.RegPowermg
+        return []uint8{p.RegPowermg}, STAT_DONE
     case REG_BATTERY:
-        return p.RegBattery
+        return []uint8{0}, STAT_DONE
     case REG_MICCTRL:
-        return p.RegMicctrl
-    case REG_MICGAIN:
-        return p.RegMicgain
-    default: panic("UNKNOWN SPI POWER MANAGEMENT REG IDX")
+        return []uint8{p.RegMicctrl}, STAT_DONE
+
+    default:
+        return nil, STAT_DONE
     }
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-func (nds *Nds) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadButton, mouse *input.Mouse) {
+func (nds *Nds) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadButton, mouse *input.Mouse, frame uint64) {
 
 	keyConfig := config.Conf.Nds.KeyboardConfig
 	buttonConfig := config.Conf.Nds.ControllerConfig
@@ -17,7 +17,7 @@ func (nds *Nds) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 	k2 := &nds.mem.Keypad.KEYINPUT2
 
 	*k = 0b11_1111_1111
-	*k2 |=  0b0100_0011
+	*k2 |=  0b0100_1011
 	*k2 &^= 0b1000_0000
 
     mouseInput(nds, mouse, k2)
@@ -53,8 +53,8 @@ func (nds *Nds) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 			*k2 &^= 0b10
 		case slices.Contains(keyConfig.Y, keyStr):
 			*k2 &^= 0b10
-		case slices.Contains(keyConfig.Hinge, keyStr):
-			*k2 |= 0b1000_0000
+		//case slices.Contains(keyConfig.Hinge, keyStr):
+		//	*k2 |= 0b1000_0000
 		}
 	}
 
@@ -87,8 +87,8 @@ func (nds *Nds) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 			*k2 &^= 0b1
 		case slices.Contains(buttonConfig.Y, buttonStr):
 			*k2 &^= 0b10
-		case slices.Contains(buttonConfig.Hinge, buttonStr):
-			*k2 |= 0b1000_0000
+		//case slices.Contains(buttonConfig.Hinge, buttonStr):
+		//	*k2 |= 0b1000_0000
 		}
 	}
 
@@ -100,16 +100,20 @@ func (nds *Nds) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 
 func mouseInput(nds *Nds, mouse *input.Mouse, k2 *uint16) {
 
+
     tsc := &nds.mem.Spi.Tsc
 
     if inBounds := (
         mouse.X >= nds.BtmAbs.L && mouse.X < nds.BtmAbs.R &&
         mouse.Y >= nds.BtmAbs.T && mouse.Y < nds.BtmAbs.B);
         !inBounds || !mouse.DraggedLeft {
-            tsc.TouchX = 0x000
-            tsc.TouchY = 0xFFF
+
+            tsc.TouchActive = false
+
             return
     }
+
+    tsc.TouchActive = true
 
     s := float32(SCREEN_WIDTH) / float32(nds.BtmAbs.W)
 

@@ -101,20 +101,25 @@ func NewNds(path string, _ *oto.Context) *Nds {
     logger = NewLogger("./log.csv", &nds)
 
     //nds.arm7.Halted = true
+    //nds.mem.Write32(0x23FFC80, 0xDEADBEEF, false)
 
 	return &nds
 }
 
 func (nds *Nds) checkBadPc() {
-    r := &nds.arm9.Reg.R
-    r7 := &nds.arm7.Reg.R
 
-    if r[15] % 2 == 1 || (nds.mem.Read32(r[15], true) == 0x0 && nds.mem.Read32(r[15] + 4, true) == 0x0) {
-        panic(fmt.Sprintf("BAD PC ARM9 @ PC %08X OP %08X CURR %d\n", r[15], nds.mem.Read32(r[15], true), CURR_INST))
-    }
+    reg9 := &nds.arm9.Reg
+    reg7 := &nds.arm7.Reg
 
-    if r7[15] % 2 == 1 || (nds.mem.Read32(r7[15], true) == 0x0 && nds.mem.Read32(r7[15] + 4, true) == 0x0) {
-        panic(fmt.Sprintf("BAD PC ARM7 @ PC %08X OP %08X CURR %d\n", r7[15], nds.mem.Read32(r7[15], false), CURR_INST))
+    switch {
+    case reg9.IsThumb && reg9.R[15] & 0b1 != 0:
+        panic(fmt.Sprintf("BAD ARM9 THUMB PC %08X CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
+    case !reg9.IsThumb && reg9.R[15] & 0b11 != 0:
+        panic(fmt.Sprintf("BAD ARM9 ARM   PC %08X CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
+    case reg7.IsThumb && reg7.R[15] & 0b1 != 0:
+        panic(fmt.Sprintf("BAD ARM7 THUMB PC %08X CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
+    case !reg7.IsThumb && reg7.R[15] & 0b11 != 0:
+        panic(fmt.Sprintf("BAD ARM7 ARM   PC %08X CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
     }
 }
 
@@ -131,23 +136,20 @@ func (nds *Nds) Update() {
     _ = r7
 
 	nds.Drawn = false
-
     cycleArm7 := false
 
 	for !nds.Drawn {
 
         // will need half time cycles for thumb
 
-		cycles := 2
-        if nds.arm9.Reg.IsThumb {
-            cycles = 1
-        }
+        nds.checkBadPc()
 
-        //if CURR_INST > 231140 {
-        //    //fmt.Printf("PC %08X OP %08X CPSR %08X CURR %d\n", r[15], nds.mem.Read32(r[15], true), nds.arm9.Reg.CPSR, CURR_INST)
+		cycles := 2
+        //if nds.arm9.Reg.IsThumb {
+        //    cycles = 1
         //}
 
-        //logger.Update(0, 231143, CURR_INST, true)
+        //logger.Update(0, 100_000, CURR_INST, false)
 
 		if !nds.arm9.Halted {
 			nds.arm9.Execute()
@@ -161,7 +163,10 @@ func (nds *Nds) Update() {
 
 		//// irq has to be at end (count up tests)
 		nds.arm9.CheckIrq()
-		nds.arm7.CheckIrq()
+
+        if cycleArm7 {
+            nds.arm7.CheckIrq()
+        }
 
         cycleArm7 = !cycleArm7
 
@@ -198,6 +203,7 @@ func (nds *Nds) LoadGame(path string) {
 
 //temp 
 func (nds *Nds) DirtyInit() {
+
     nds.mem.DirtyTransfer()
 
     nds.arm9.Reg.R[12] = nds.Cartridge.Header.Arm9EntryAddr

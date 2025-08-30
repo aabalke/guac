@@ -28,24 +28,26 @@ func NewMouse() *Mouse {
 
     x, y := ebiten.CursorPosition()
 
+    mouse := config.Conf.Mouse
+
     m := &Mouse{
         X: x,
         Y: y,
-        clr: color.White,
-        clrStroke: color.White,
-    }
-
-    mouse := config.Conf.Mouse
-
-    m.fill = mouse.Fill
-    m.stroke = mouse.Stroke
-    m.alpha = mouse.UnSelectedAlpha
-    m.size = mouse.CursorSize
-    m.strokeWidth = mouse.StrokeSize
-    m.clr = color.RGBA{
-        R: mouse.FillColor[0],
-        G: mouse.FillColor[1],
-        B: mouse.FillColor[2],
+        fill: mouse.Fill,
+        stroke: mouse.Stroke,
+        alpha: mouse.UnSelectedAlpha,
+        size: mouse.CursorSize,
+        strokeWidth: mouse.StrokeSize,
+        clr: color.RGBA{
+            R: mouse.FillColor[0],
+            G: mouse.FillColor[1],
+            B: mouse.FillColor[2],
+        },
+        clrStroke: color.RGBA{
+            R: mouse.StrokeColor[0],
+            G: mouse.StrokeColor[1],
+            B: mouse.StrokeColor[2],
+        },
     }
 
     r := m.size >> 1

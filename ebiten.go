@@ -160,7 +160,7 @@ func (g *Game) Update() error {
 			g.menu = nil
 		}
 	case NDS:
-		g.nds.InputHandler(keys, buttons, g.mouse)
+		g.nds.InputHandler(keys, buttons, g.mouse, g.frame)
 		g.nds.Update()
 		g.nds.ImageTop.WritePixels(g.nds.PixelsTop)
 		g.nds.ImageBottom.WritePixels(g.nds.PixelsBottom)

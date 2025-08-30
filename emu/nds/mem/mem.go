@@ -2,7 +2,6 @@ package mem
 
 import (
 	_ "embed"
-
 	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/mem/spi"
@@ -78,6 +77,8 @@ func NewMemory(dma9 *[4]DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PP
 
     m.Rtc.RegStatus1 = 0x02
     m.Rtc.RegStatus2 = 0x41
+
+    m.Spi.Init()
 
 	return m
 }
@@ -173,6 +174,18 @@ func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
 
 func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 
+    // this is temp for homebrew programs - related to ipc writing incorrect values, which is used in CRC
+    // also needed to pass memory mirror test in gbe+
+    if addr >= 0x2FFFC80 && addr < 0x2FFFCF0 && lockWrites {
+        //fmt.Printf("WRITE TO ADDR %08X V %02X arm9 %t\n", addr, v, arm9)
+        //os.Exit(0)
+        return
+    }
+    //if addr == 0x0380FCD2 {
+    //    fmt.Printf("WRITING TO ADDR %08X ARM9 %t, v %02X\n", addr, arm9, v)
+    //    os.Exit(0)
+    //}
+
 	if arm9 {
 
         if addr >= mem.Tcm.DtcmBase && addr < mem.Tcm.DtcmBase + mem.Tcm.DtcmSize {
@@ -207,6 +220,8 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 
         return
 	}
+
+
 
     switch addr >> 24 {
     case 0x2:
@@ -920,6 +935,8 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 	}
 }
 
+var lockWrites bool
+
 // this is temp while I get gamecard transfers and spi figured out
 func (mem *Mem) DirtyTransfer() {
 
@@ -935,6 +952,23 @@ func (mem *Mem) DirtyTransfer() {
 
         mem.Write(h.Arm7RamAddr + i, v, false)
     }
+
+    // bios ram usage
+
+    const (
+        USER_SETTING_RAM = 0x27FFC80
+        USER_SETTING_0   = 0x3FE00
+    )
+
+    mem.Write32(0x27FF800, 0xDEADBEEF, true)
+
+    for i := range uint32(0x100) {
+        v := spi.FirmwareData[USER_SETTING_0 + i]
+        mem.Write(USER_SETTING_RAM + i, v, true)
+    }
+
+    lockWrites = true
+
 
     // temp attempt
     //mem.Write32(0x803FFC, 0x20057F4, true)

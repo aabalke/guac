@@ -1,8 +1,6 @@
 package spi
 
 import (
-	"fmt"
-
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
@@ -10,6 +8,9 @@ const (
 	DEV_POWER = 0
 	DEV_FIRMW = 1
 	DEV_TOUCH = 2
+
+    STAT_CONT = 1
+    STAT_DONE = 2
 )
 
 type Spi struct {
@@ -17,10 +18,18 @@ type Spi struct {
 	Device             uint8
 	Hold, Irq, Enabled bool
 
-    Data uint8
-
     Pmd Pmd
     Firmware Firmware
+    Tsc Tsc
+
+
+    Value uint8
+    Req, Res []uint8
+}
+
+func (s *Spi) Init() {
+    s.Pmd.RegPowermg = 0b1101
+    s.Pmd.RegMicgain = 0b1
 }
 
 func (s *Spi) WriteCNT(b, v uint8) {
@@ -40,19 +49,28 @@ func (s *Spi) WriteCNT(b, v uint8) {
 		s.CNT &= 0xFF
 		s.CNT |= uint16(v) << 8
 
+        prevDevice := s.Device
 		s.Device = v & 0b11
-        hold := utils.BitEnabled(uint32(v), 3)
 
-        if s.Hold && !hold {
-            s.Firmware.Reset()
+        if prevDevice != s.Device {
+            if s.Device == DEV_FIRMW {
+                s.Firmware.Addr = 0
+                // wbuf = nil
+            }
+
+            if s.Req == nil {
+                s.Req = make([]uint8, 16)
+            }
+            s.Req = s.Req[:0]
+            s.Res = nil
         }
 
-        s.Hold = hold
-
-
+        s.Hold = utils.BitEnabled(uint32(v), 3)
         s.Irq = utils.BitEnabled(uint32(v), 6)
         s.Enabled = utils.BitEnabled(uint32(v), 7)
 	}
+
+    //fmt.Printf("WRITING CNT %04X DEV %02d DATA %02X\n", s.CNT, s.Device, s.Data)
 }
 
 func (s *Spi) ReadCNT(b uint8) uint8 {
@@ -61,38 +79,40 @@ func (s *Spi) ReadCNT(b uint8) uint8 {
 
 func (s *Spi) WriteData(v uint8) {
 
-    // need to get data from spi device
+    if len(s.Res) == 0 {
+        s.Value = 0
+    } else {
+        s.Value = s.Res[0]
+        s.Res = s.Res[1:]
+    }
 
-    switch s.Device {
-    case DEV_POWER:
-        if !s.Pmd.isIdxSet {
-            s.Pmd.Write(v)
-            return
+    if len(s.Res) == 0 {
+        var stat uint8
+        s.Req = append(s.Req, v)
+
+        switch s.Device {
+        case DEV_POWER:
+            s.Res, stat = s.Pmd.Transfer(s.Req)
+        case DEV_FIRMW:
+            s.Res, stat = s.Firmware.Transfer(s.Req)
+        case DEV_TOUCH:
+            s.Res, stat = s.Tsc.Transfer(s.Req)
         }
 
-        if s.Pmd.isRead {
-            s.Data = s.Pmd.Read()
-            return
+        if stat == STAT_DONE {
+            s.Req = s.Req[:0]
         }
+    }
 
-        s.Pmd.Write(v)
 
-    case DEV_FIRMW:
-
-        // temp
-
-        //fmt.Printf("WRITING TO FIRM %02X CNT %04X\n", v, s.CNT)
-
-        s.Data = s.Firmware.Read()
-        s.Firmware.Write(v)
-
-    default: panic(fmt.Sprintf("UNSETUP SPI IN WRITE DATA %d", s.Device))
+    if !s.Hold {
+        if s.Device == DEV_FIRMW {
+            // write to firmware file
+            // wbuf = nil
+        }
     }
 }
 
 func (s *Spi) ReadData() uint8 {
-
-    //fmt.Printf("READING DATA\n")
-
-    return s.Data
+    return s.Value
 }
