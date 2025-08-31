@@ -75,6 +75,10 @@ func (t *Tsc) Transfer(data []uint8) (reply []uint8, stat uint8) {
             out = 0x0
         }
 
+    case CH_TOUCHZ1, CH_TOUCHZ2:
+
+        out = 0x0
+
     default:
         //out = 0
         fmt.Printf("UNSETUP TOUCH SPI CHANNEL %d\n", ch)

@@ -1,6 +1,7 @@
 package nds
 
 import (
+	"encoding/binary"
 	"sync"
 
 	"github.com/aabalke/guac/config"
@@ -10,7 +11,6 @@ import (
 var wg = sync.WaitGroup{}
 
 func (nds *Nds) graphics(y uint32) {
-
 
     a := &nds.ppu.EngineA
     b := &nds.ppu.EngineB
@@ -57,10 +57,10 @@ func (nds *Nds) vramDisplay(y uint32, engine *ppu.Engine) {
         var bank *[0x20000]uint8
 
         switch bankIdx {
-            case 0: bank = &nds.mem.Vram.A
-            case 1: bank = &nds.mem.Vram.B
-            case 2: bank = &nds.mem.Vram.C
-            case 3: bank = &nds.mem.Vram.D
+        case 0: bank = &nds.mem.Vram.A
+        case 1: bank = &nds.mem.Vram.B
+        case 2: bank = &nds.mem.Vram.C
+        case 3: bank = &nds.mem.Vram.D
         }
 
         offset := uint32(0)
@@ -111,10 +111,10 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 	dispcnt := &engine.Dispcnt
 	wins := &engine.Windows
 	bgs := &engine.Backgrounds
-	//objPriorities := &engine.ObjPriorities
+	objPriorities := &engine.ObjPriorities
 	bgPriorities := &engine.BgPriorities
 
-	bldPal := ppu.NewBlendPalette(x, &engine.Blend, nds.getPalette(0, 0, false))
+	bldPal := ppu.NewBlendPalette(x, &engine.Blend, nds.getPalette(0, 0, false, engine.IsB))
 
 	var objMode uint32
 	var inObjWindow bool
@@ -127,7 +127,6 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 
 			bgIdx := bgPriorities[i][j]
 			bg := &bgs[bgIdx]
-
 
 			//if !windowPixelAllowed(bgIdx, x, y, wins) {
 			//	continue
@@ -168,34 +167,38 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 			continue
 		}
 
-		//for j := len(objPriorities[i]) - 1; j >= 0; j-- {
-		//	objIdx := objPriorities[i][j]
-		//	obj := &gba.PPU.Objects[objIdx]
-		//	obj.OneDimensional = dispcnt.OneDimensional
+        ObjectLoop:
+		for j := len(objPriorities[i]) - 1; j >= 0; j-- {
+			objIdx := objPriorities[i][j]
+	        obj := &engine.Objects[objIdx]
 
-		//	if !windowObjPixelAllowed(x, y, wins) {
-		//		continue
-		//	}
+            obj.OneDimensional = dispcnt.TileObj1D
+			//if !windowObjPixelAllowed(x, y, wins) {
+			//	continue
+			//}
 
-		//	var palData uint32
-		//	var ok bool
+			var palData uint32
+			var ok bool
 
-		//	if obj.RotScale {
-		//		palData, ok = gba.setObjectAffinePixel(obj, x, y)
-		//	} else {
-		//		palData, ok = gba.setObjectPixel(obj, x, y)
-		//	}
+            switch {
+            case obj.Mode == 3:
+                panic("BITMAP OBJ")
+            case obj.RotScale:
+                palData, ok = nds.setObjectAffinePixel(engine, obj, x, y)
+            default:
+                palData, ok = nds.setObjectPixel(engine, obj, x, y)
+            }
 
-		//	switch {
-		//	case ok && obj.Mode == 2:
-		//		inObjWindow = true
-		//		break
-		//	case ok:
-		//		objMode = obj.Mode
-		//		bldPal.setBlendPalettes(palData, 0, true, objMode == 1)
-		//		break
-		//	}
-		//}
+			switch {
+			case ok && obj.Mode == 2:
+				inObjWindow = true
+				break ObjectLoop
+			case ok:
+				objMode = obj.Mode
+				bldPal.SetBlendPalettes(palData, 0, true, objMode == 1)
+				break ObjectLoop
+			}
+		}
 	}
 
 	finalPalData := bldPal.Blend(objMode == 1, x, y, wins, inObjWindow)
@@ -286,6 +289,8 @@ func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {
 	return bgs
 }
 
+
+
 func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, bool) {
 
     vramOffset := uint32(0)
@@ -357,7 +362,9 @@ func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x, y 
 			return 0, false
 		}
 
-        return uint32(nds.mem.Pram[palIdx]), true
+        addr := (palIdx << 1) + pramOffset
+
+        return uint32(nds.mem.Pram[addr >> 1]), true
 	}
 
 	palIdx := (tileData >> ((inTileX & 1) << 2)) & 0xF
@@ -435,7 +442,7 @@ func (nds *Nds) setAffineBackgroundPixel(engine *ppu.Engine, bg *ppu.Background,
 		return 0, false
 	}
 
-	palData := nds.getPalette(palIdx, 0, false)
+	palData := nds.getPalette(palIdx, 0, false, engine.IsB)
 
 	return palData, true
 }
@@ -455,7 +462,6 @@ func getPositionsBg(screenData, xIdx, yIdx uint32) (uint32, uint32) {
 
 	return inTileX, inTileY
 }
-
 
 func (nds *Nds) directbitmap(x, y, offset uint32, bank *[0x20000]uint8) (uint32, bool) {
 
@@ -535,6 +541,39 @@ func (nds *Nds) getBgPriority(y uint32, mode uint32, bgs *[4]ppu.Background) [4]
 	return priorities
 }
 
+func (nds *Nds) getObjPriority(y uint32, objects *[128]ppu.Object) [4][]uint32 {
+
+	priorities := [4][]uint32{}
+
+	//added := false
+	//highestPriority := uint32(5)
+
+	for i := range 128 {
+
+		obj := &objects[i]
+
+		if disabled := (obj.Disable && !obj.RotScale) || (obj.RotScale && obj.RotParams >= 32); disabled {
+			continue
+		}
+
+		//if objNotScanline(obj, y) {
+		//	continue
+		//}
+
+		priority := obj.Priority
+
+		//if gba.PPU.Blend.Mode != BLD_MODE_STD && added && priority >= highestPriority {
+		//	continue
+		//}
+
+		//added = true
+
+		priorities[priority] = append(priorities[priority], uint32(i))
+	}
+
+	return priorities
+}
+
 func bgNotScanline(bg *ppu.Background, y uint32) bool {
 
 	//if bg.Affine {
@@ -549,7 +588,32 @@ func bgNotScanline(bg *ppu.Background, y uint32) bool {
 	return t || b
 }
 
-func (nds *Nds) getPalette(palIdx uint32, paletteNum uint32, obj bool) uint32 {
+func (nds *Nds) getExtendedPalette(engine *ppu.Engine, obj bool, palIdx, paletteNum uint32) uint32 {
+
+    //16 colors x 16 palettes --> standard palette memory (=256 colors)
+    //256 colors x 16 palettes --> extended palette memory (=4096 colors)
+
+	addr := ((paletteNum << 5) + palIdx<<1)
+
+    //addr &= 0x1FFF
+
+    vram := &nds.mem.Vram
+
+    switch {
+    case !obj && !engine.IsB:
+        return uint32(binary.LittleEndian.Uint16(vram.ExtAPalBg[addr:]))
+    case !obj && engine.IsB:
+        return uint32(binary.LittleEndian.Uint16(vram.ExtBPalBg[addr:]))
+    case obj && !engine.IsB:
+        return uint32(binary.LittleEndian.Uint16(vram.ExtAPalObj[addr:]))
+    case obj && engine.IsB:
+        return uint32(binary.LittleEndian.Uint16(vram.ExtBPalObj[addr:]))
+    }
+
+    return 0
+}
+
+func (nds *Nds) getPalette(palIdx uint32, paletteNum uint32, obj, engineB bool) uint32 {
 
 	addr := (paletteNum << 5) + palIdx<<1
 
@@ -557,5 +621,336 @@ func (nds *Nds) getPalette(palIdx uint32, paletteNum uint32, obj bool) uint32 {
 		addr += 0x200
 	}
 
+    if engineB {
+		addr += 0x400
+    }
+
 	return uint32(nds.mem.Pram[addr>>1])
+}
+
+//func (nds *Nds) setObjectBitmapPixel(engine *ppu.Engine, obj *ppu.Object, x, y uint32) (uint32, bool) {
+//
+//    //vramOffset := uint32(0)
+//    //pramOffset := uint32(0)
+//
+//	//mem := &nds.mem
+//
+//	yIdx := int(y) - int(obj.Y)
+//	xIdx := int(x) - int(obj.X)
+//
+//	if obj.Y > SCREEN_HEIGHT {
+//		yIdx += 256 // i believe 256 is max
+//	}
+//
+//	if obj.X > SCREEN_WIDTH {
+//		xIdx += 512 // i believe 512 is max
+//	}
+//
+//	if outObjectBound(obj, xIdx, yIdx) {
+//		return 0, false
+//	}
+//
+//	if obj.Mosaic && engine.Mosaic.ObjH != 0 {
+//		xIdx -= xIdx % int(engine.Mosaic.ObjH+1)
+//	}
+//
+//	if obj.Mosaic && engine.Mosaic.ObjV != 0 {
+//		yIdx -= yIdx % int(engine.Mosaic.ObjV+1)
+//	}
+//
+//	//_, _, inTileX, inTileY := getPositions(obj, uint32(xIdx), uint32(yIdx))
+//
+//    offset := uint32(0x40_0000)
+//
+//    if engine.IsB {
+//        offset = uint32(0x60_0000)
+//    }
+//
+//    // this needs "in tile" offset"
+//    idx := ((uint32(xIdx)+(uint32(yIdx)*obj.W))) + offset
+//
+//    //idx := uint32(0x40_0000)
+//
+//    pal := uint32(nds.mem.Vram.Read(idx, true))
+//    //pal |= uint32(nds.mem.Vram.Read(idx + 1, true)) << 8
+//    //pal &^= 0x8000
+//
+//    //fmt.Printf("ADDR %08X PAL %02X\n", idx, pal)
+//    //os.Exit(0)
+//
+//    //pal &= 0x1
+//
+//    data := nds.getPalette(pal, 0, true, engine.IsB)
+//
+//    //a := data >> 16
+//
+//    return data, true
+//
+//
+//
+//	//addr := getTileAddr(obj, enTileX, enTileY, inTileX, inTileY)
+//    //tileData := uint32(nds.mem.Vram.Read(vramOffset + addr, true))
+//    //tileData |= uint32(nds.mem.Vram.Read(vramOffset + addr + 1, true)) << 8
+//
+//	//return getPaletteData(nds, obj.Palette256, obj.Palette, tileData, uint32(inTileX))
+//
+//}
+
+func (nds *Nds) setObjectPixel(engine *ppu.Engine, obj *ppu.Object, x, y uint32) (uint32, bool) {
+
+    vramOffset := uint32(0x40_0000)
+    if engine.IsB {
+        vramOffset = uint32(0x60_0000)
+    }
+    //pramOffset := uint32(0)
+
+	//mem := &nds.mem
+
+	yIdx := int(y) - int(obj.Y)
+	xIdx := int(x) - int(obj.X)
+
+	if obj.Y > SCREEN_HEIGHT {
+		yIdx += 256 // i believe 256 is max
+	}
+
+	if obj.X > SCREEN_WIDTH {
+		xIdx += 512 // i believe 512 is max
+	}
+
+	if outObjectBound(obj, xIdx, yIdx) {
+		return 0, false
+	}
+
+	if obj.Mosaic && engine.Mosaic.ObjH != 0 {
+		xIdx -= xIdx % int(engine.Mosaic.ObjH+1)
+	}
+
+	if obj.Mosaic && engine.Mosaic.ObjV != 0 {
+		yIdx -= yIdx % int(engine.Mosaic.ObjV+1)
+	}
+
+	enTileX, enTileY, inTileX, inTileY := getPositions(obj, uint32(xIdx), uint32(yIdx))
+
+	addr := getObjTileAddr(obj, enTileX, enTileY, inTileX, inTileY)
+
+    tileData := uint32(nds.mem.Vram.Read(vramOffset + addr, true))
+    tileData |= uint32(nds.mem.Vram.Read(vramOffset + addr + 1, true)) << 8
+
+	return getPaletteData(nds, engine, obj.Palette256, obj.Palette, tileData, uint32(inTileX))
+
+}
+
+func getPositions(obj *ppu.Object, xIdx, yIdx uint32) (uint32, uint32, uint32, uint32) {
+
+	enTileY := yIdx >> 3    // / 8
+	enTileX := xIdx >> 3    // / 8
+	inTileY := yIdx & 0b111 // % 8
+	inTileX := xIdx & 0b111 // % 8
+
+	if obj.RotScale {
+		return enTileX, enTileY, inTileX, inTileY
+	}
+
+	if obj.HFlip {
+		enTileX = (obj.W / 8) - 1 - enTileX
+		inTileX = 7 - inTileX
+	}
+	if obj.VFlip {
+		enTileY = (obj.H / 8) - 1 - enTileY
+		inTileY = 7 - inTileY
+	}
+
+	return enTileX, enTileY, inTileX, inTileY
+}
+
+func getObjTileAddr(obj *ppu.Object, enTileX, enTileY, inTileX, inTileY uint32) uint32 {
+
+    const BYTES_PER_PIXEL = 2
+	w := obj.W << BYTES_PER_PIXEL
+
+	if obj.Palette256 {
+		enTileX <<= 1
+		w <<= 1
+	}
+
+	//const MAX_NUM_TILE = 1024
+	//const MAX_TILE_MASK = MAX_NUM_TILE - 1 
+	var tileIdx uint32
+	if obj.OneDimensional {
+		//tileIdx = (enTileX << 5) + (enTileY * w)
+		//tileIdx = (tileIdx + obj.CharName << 5) & MAX_TILE_MASK
+		tileIdx = (enTileX << 5) + (enTileY * w)
+		tileIdx = (tileIdx + obj.CharName << obj.TileBoundaryShift) //& MAX_TILE_MASK
+	} else {
+		tileIdx = enTileX + (enTileY << w)
+		//tileIdx = (tileIdx + obj.CharName & MAX_TILE_MASK) << 5
+		tileIdx = (tileIdx + obj.CharName) << obj.TileBoundaryShift
+	}
+
+	tileAddr := uint32(tileIdx)
+
+	var inTileIdx uint32
+	if obj.Palette256 {
+		inTileIdx = inTileX + (inTileY << 3)
+	} else {
+		inTileIdx = (inTileX >> 1) + (inTileY << 2)
+	}
+
+	return tileAddr + inTileIdx
+}
+
+func getPaletteData(nds *Nds, engine *ppu.Engine, pal256 bool, pal, tileData, inTileX uint32) (uint32, bool) {
+
+	var palIdx uint32
+	if pal256 {
+		palIdx = tileData & 0xFF
+	} else {
+		palIdx = (tileData >> ((inTileX & 1) << 2)) & 0xF
+	}
+
+	if palIdx == 0 {
+		return 0, false
+	}
+
+    if engine.Dispcnt.ObjExtPal {
+        // palette is 256 each
+        pal <<= 4
+        palData := nds.getExtendedPalette(engine, true, palIdx, pal)
+        return palData, true
+    }
+
+    // this is from gba, does not work with ext palettes, but assume it still
+    // is needed for std
+    if pal256 {
+        pal = 0
+    }
+
+	palData := nds.getPalette(uint32(palIdx), pal, true, engine.IsB)
+
+	return palData, true
+}
+
+func outObjectBound(obj *ppu.Object, xIdx, yIdx int) bool {
+	t := yIdx < 0
+	b := yIdx-int(obj.H) >= 0
+	l := xIdx < 0
+	r := xIdx-int(obj.W) >= 0
+	return t || b || l || r
+}
+
+func (nds *Nds) setObjectAffinePixel(engine *ppu.Engine, obj *ppu.Object, x, y uint32) (uint32, bool) {
+
+	if nds.outBoundsAffine(obj, x, y) {
+		return 0, false
+	}
+
+	objX := obj.X
+	objY := obj.Y
+	if obj.DoubleSize {
+		objX += obj.W / 2
+		objY += obj.H / 2
+	}
+
+	xIdx := int(float32(x) - float32(objX))
+	yIdx := int(float32(y)-float32(objY)) % 256
+
+	if objY > SCREEN_HEIGHT {
+		yIdx += 256 // i believe 256 is max
+	}
+	if objX > SCREEN_WIDTH {
+		xIdx += 512 // i believe 512 is max
+	}
+
+	if obj.Mosaic && engine.Mosaic.ObjH != 0 {
+		xIdx -= xIdx % int(engine.Mosaic.ObjH+1)
+	}
+
+	if obj.Mosaic && engine.Mosaic.ObjV != 0 {
+		yIdx -= yIdx % int(engine.Mosaic.ObjV+1)
+	}
+
+	xOrigin := float32(xIdx - (int(obj.W) / 2))
+	yOrigin := float32(yIdx - (int(obj.H) / 2))
+
+	xIdx = int(obj.Pa*xOrigin+obj.Pb*yOrigin) + (int(obj.W) / 2)
+	yIdx = int(obj.Pc*xOrigin+obj.Pd*yOrigin) + (int(obj.H) / 2)
+
+	if outObjectBound(obj, xIdx, yIdx) {
+		return 0, false
+	}
+
+	enTileX, enTileY, inTileX, inTileY := getPositions(obj, uint32(xIdx), uint32(yIdx))
+
+	addr := getObjTileAddr(obj, enTileX, enTileY, inTileX, inTileY)
+
+	//addr &= 0x1FFFF
+
+	//if addr >= 0x18000 {
+	//    addr -= 0x8000
+	//}
+
+    vramOffset := uint32(0x40_0000)
+    if engine.IsB {
+        vramOffset = uint32(0x60_0000)
+    }
+
+    tileData := uint32(nds.mem.Vram.Read(vramOffset + addr, true))
+    tileData |= uint32(nds.mem.Vram.Read(vramOffset + addr + 1, true)) << 8
+
+	return getPaletteData(nds, engine, obj.Palette256, obj.Palette, tileData, uint32(inTileX))
+}
+
+func (nds *Nds) outBoundsAffine(obj *ppu.Object, x, y uint32) bool {
+
+	const (
+		MAX_X_MASK = 511
+		MAX_Y_MASK = 255
+	)
+
+	if !obj.DoubleSize {
+
+		t := obj.Y
+		b := (obj.Y + obj.H) & MAX_Y_MASK
+		l := obj.X
+		r := (obj.X + obj.W) & MAX_X_MASK
+
+		yWrapped := t > b
+		xWrapped := l > r
+
+		yWrappedInBounds := !yWrapped && (y >= t && y < b)
+		yUnwrappedInBounds := yWrapped && (y >= t || y < b)
+		xWrappedInBounds := !xWrapped && (x >= l && x < r)
+		xUnwrappedInBounds := xWrapped && (x >= l || x < r)
+		if (yWrappedInBounds || yUnwrappedInBounds) && (xWrappedInBounds || xUnwrappedInBounds) {
+			return false
+		}
+
+		return true
+	}
+
+	// obj.Y is double Sized Y value already, have to adj because of
+
+	dY := (obj.Y)
+	dH := obj.H * 2
+	dX := (obj.X)
+	dW := obj.W * 2
+
+	t := dY
+	b := (dY + dH) & MAX_Y_MASK
+	l := dX
+	r := (dX + dW) & MAX_X_MASK
+
+	yWrapped := t > b
+	xWrapped := l > r
+
+	yWrappedInBounds := !yWrapped && (y >= t && y < b)
+	yUnwrappedInBounds := yWrapped && (y >= t || y < b)
+
+	xWrappedInBounds := !xWrapped && (x >= l && x < r)
+	xUnwrappedInBounds := xWrapped && (x >= l || x < r)
+	if (yWrappedInBounds || yUnwrappedInBounds) && (xWrappedInBounds || xUnwrappedInBounds) {
+		return false
+	}
+
+	return true
 }

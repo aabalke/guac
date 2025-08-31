@@ -149,7 +149,7 @@ func (nds *Nds) Update() {
         //    cycles = 1
         //}
 
-        //logger.Update(0, 100_000, CURR_INST, false)
+        //logger.Update(0, 200_000, CURR_INST,true)
 
 		if !nds.arm9.Halted {
 			nds.arm9.Execute()
@@ -256,7 +256,8 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 			a.BgPriorities = nds.getBgPriority(uint32(vcount), a.Dispcnt.Mode, &a.Backgrounds)
 			b.BgPriorities = nds.getBgPriority(uint32(vcount), b.Dispcnt.Mode, &b.Backgrounds)
 
-			//gba.PPU.objPriorities = gba.getObjPriority(uint32(vcount), &gba.PPU.Objects)
+			a.ObjPriorities = nds.getObjPriority(uint32(vcount), &a.Objects)
+			b.ObjPriorities = nds.getObjPriority(uint32(vcount), &b.Objects)
 			nds.graphics(uint32(vcount))
 			nds.ppu.EngineA.Backgrounds[2].BgAffineUpdate()
 			nds.ppu.EngineA.Backgrounds[3].BgAffineUpdate()

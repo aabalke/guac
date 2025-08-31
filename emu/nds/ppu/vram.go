@@ -28,6 +28,12 @@ type VRAM struct {
 
     CNT_7 uint8
     isCArm7, isDArm7 bool
+
+    ExtAPalBg  *[0x0]uint8
+    ExtBPalBg  *[0x0]uint8
+
+    ExtAPalObj *[0x4000]uint8
+    ExtBPalObj *[0x4000]uint8
 }
 
 type VramCnt struct {
@@ -69,10 +75,15 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         }
 	case 0x244: vm.CNT_E.Write(v)
 	case 0x245: vm.CNT_F.Write(v)
+        if vm.CNT_F.Mst == 5 { vm.ExtAPalObj = &vm.F }
 	case 0x246: vm.CNT_G.Write(v)
+        if vm.CNT_G.Mst == 5 { vm.ExtAPalObj = &vm.G }
     // 0x247 is WRAMCNT
 	case 0x248: vm.CNT_H.Write(v)
-	case 0x249: vm.CNT_I.Write(v)
+	case 0x249:
+        vm.CNT_I.Write(v)
+
+        if vm.CNT_I.Mst == 3 { vm.ExtBPalObj = &vm.I }
 	}
 }
 

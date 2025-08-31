@@ -172,8 +172,6 @@ func (i *IPC) WriteCnt(v, b uint8, isArm9 bool) {
 
         local.Enabled = utils.BitEnabled(uint32(v), 7)
     }
-
-    return
 }
 
 func (i *IPC) ReadCnt(b uint8, isArm9 bool) uint8 {

@@ -92,19 +92,48 @@ These tests do not work on any emulator - as far as I can tell. Mostly due to ch
 
 ### Devkitpro examples
 
+Audio
+
+Card
+
+Debugging
+
+Wifi
+
+FileSystem
+
 Graphics
 
-Backgrounds
-    👍 16 bit color bmp
-    👍 256 bit color bmp
-    ❌ all in one
-        ❌ Basic
-            👍 1, 2, 3, 4, 5
-            ❌ 6, 7, 8, 9
-            ❌ 10, 11, 12, 13
+    ❌ Backgrounds
+        👍 16 bit color bmp
+        👍 256 bit color bmp
+        ❌ all in one
+            ❌ Basic
+                👍 1, 2, 3, 4, 5
+                ❌ 6, 7, 8, 9
+                ❌ 10, 11, 12, 13
+    
+        👍 double buffer
+        ❌ rotation
 
-    👍 double buffer
-    ❌ rotation
+    ❌ Sprites
+        👍 allocation test
+        👍 animate simple
+        ❌ bitmap sprites
+        👍 fire and sprites
+        👍 simple
+        👍 sprite extended palettes
+        👍 sprite rotate
+
+👍 hello_world
+
+input
+
+👍 pxi
+
+templates
+
+time
 
 ### Personal Test to Build
 

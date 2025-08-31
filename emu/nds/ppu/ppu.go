@@ -2,6 +2,7 @@ package ppu
 
 import (
 	"github.com/aabalke/guac/emu/nds/utils"
+    "encoding/binary"
 )
 
 type PPU struct {
@@ -31,19 +32,19 @@ type Engine struct {
 type Dispcnt struct {
 	Mode               uint32
 	Is3D               bool
-	DisplayFrame1      bool
-	HBlankIntervalFree bool
-	OneDimensional     bool
+    TileObj1D bool
+    BitmapObj256 bool
+    BitmapObj1D bool
 	ForcedBlank        bool
-	//DisplayBg [4]bool
 	DisplayObj    bool
 	DisplayWin0   bool
 	DisplayWin1   bool
 	DisplayObjWin bool
-
     DisplayMode uint32
     VramBlock uint32
-
+    TileObjBoundary uint32
+    BitmapObjBoundary bool
+	HBlankIntervalFree bool
     CharBase uint32
     ScreenBase uint32
     BgExtPal bool
@@ -125,6 +126,12 @@ type Object struct {
 	Priority       uint32
 	Palette        uint32
 	OneDimensional bool
+
+    ObjTileMapping uint8
+    ObjBmpMapping uint8
+
+    TileBoundaryShift uint32
+    BmpBoundaryShift uint32
 }
 
 type PowCnt1 struct {
@@ -179,15 +186,39 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
 	case 0x0:
 	    e.Dispcnt.Mode = utils.GetVarData(v, 0, 2)
         e.Dispcnt.Is3D = utils.BitEnabled(v, 3)
+        e.Dispcnt.TileObj1D = utils.BitEnabled(v, 4)
+        e.Dispcnt.BitmapObj256 = utils.BitEnabled(v, 5)
+        e.Dispcnt.BitmapObj1D = utils.BitEnabled(v, 6)
+        e.Dispcnt.ForcedBlank = utils.BitEnabled(v, 7)
+
+        e.UpdateObjMapping(&e.Dispcnt)
 
 	case 0x1:
+		e.Dispcnt.DisplayObj = utils.BitEnabled(v, 4)
+		e.Dispcnt.DisplayWin0 = utils.BitEnabled(v, 5)
+		e.Dispcnt.DisplayWin1 = utils.BitEnabled(v, 6)
+		e.Dispcnt.DisplayObjWin = utils.BitEnabled(v, 7)
+
 		e.Backgrounds[0].Enabled = utils.BitEnabled(v, 0)
 		e.Backgrounds[1].Enabled = utils.BitEnabled(v, 1)
 		e.Backgrounds[2].Enabled = utils.BitEnabled(v, 2)
 		e.Backgrounds[3].Enabled = utils.BitEnabled(v, 3)
+
+		wins := &e.Windows
+		wins.Win0.Enabled = e.Dispcnt.DisplayWin0
+		wins.Win1.Enabled = e.Dispcnt.DisplayWin1
+		wins.WinObj.Enabled = e.Dispcnt.DisplayObjWin && e.Dispcnt.DisplayObj
+		wins.Enabled = wins.Win0.Enabled || wins.Win1.Enabled || wins.WinObj.Enabled
+        e.UpdateObjMapping(&e.Dispcnt)
+
 	case 0x2:
+
         e.Dispcnt.DisplayMode = utils.GetVarData(v, 0, 1)
         e.Dispcnt.VramBlock = utils.GetVarData(v, 2, 3)
+        e.Dispcnt.TileObjBoundary = utils.GetVarData(v, 4, 5)
+		e.Dispcnt.BitmapObjBoundary = utils.BitEnabled(v, 6)
+		e.Dispcnt.HBlankIntervalFree = utils.BitEnabled(v, 7)
+        e.UpdateObjMapping(&e.Dispcnt)
 
 	case 0x3:
 
@@ -195,6 +226,7 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
         e.Dispcnt.ScreenBase = utils.GetVarData(v, 3, 5) * 0x1_0000
         e.Dispcnt.BgExtPal = utils.BitEnabled(v, 6)
         e.Dispcnt.ObjExtPal = utils.BitEnabled(v, 7)
+        e.UpdateObjMapping(&e.Dispcnt)
 
 	case 0x4C:
 
@@ -557,4 +589,197 @@ func (bg *Background) BgAffineReset() {
 func (bg *Background) BgAffineUpdate() {
 	bg.OutX += utils.Convert8_8Float(int16(bg.Pb))
 	bg.OutY += utils.Convert8_8Float(int16(bg.Pd))
+}
+
+func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
+
+    relAddr &= 0x7FF
+
+    engine := &p.EngineA
+    if relAddr >= 0x400 {
+        engine = &p.EngineB
+        //relAddr -= 0x400
+    }
+
+	attrIdx := relAddr % 8
+
+	if affineParam := attrIdx == 6 || attrIdx == 7; affineParam {
+		p.UpdateAffine(relAddr, engine, oam)
+		return
+	}
+
+	objIdx := (relAddr & 0x3FF) / 8
+
+	obj := &engine.Objects[objIdx]
+
+	attr := uint32(oam[relAddr])
+
+	switch attrIdx {
+	case 0:
+		obj.Y = attr & 0b1111_1111
+	case 1:
+
+		obj.RotScale = utils.BitEnabled(attr, 0)
+		obj.Mode = utils.GetVarData(attr, 2, 3)
+		obj.Mosaic = utils.BitEnabled(attr, 4)
+		obj.Palette256 = utils.BitEnabled(attr, 5)
+		obj.Shape = utils.GetVarData(attr, 6, 7)
+		obj.setSize(obj.Shape, obj.Size)
+
+		if obj.RotScale {
+			obj.DoubleSize = utils.BitEnabled(attr, 1)
+			UpdateAffineParams(obj, oam)
+		} else {
+			obj.Disable = utils.BitEnabled(attr, 1)
+		}
+
+	case 2:
+		obj.X &^= 0xFF
+		obj.X |= attr
+	case 3:
+		obj.X &= 0xFF
+		obj.X |= (attr & 0b1) << 8
+		obj.Size = utils.GetVarData(attr, 6, 7)
+		obj.setSize(obj.Shape, obj.Size)
+
+		if obj.RotScale {
+			obj.RotParams = utils.GetVarData(attr, 1, 5)
+			UpdateAffineParams(obj, oam)
+		}
+		obj.HFlip = utils.BitEnabled(attr, 4)
+		obj.VFlip = utils.BitEnabled(attr, 5)
+	case 4:
+		obj.CharName &^= 0xFF
+		obj.CharName |= attr
+	case 5:
+		obj.CharName &= 0xFF
+		obj.CharName |= (attr & 0b11) << 8
+		obj.Priority = utils.GetVarData(attr, 2, 3)
+		obj.Palette = utils.GetVarData(attr, 4, 7)
+	}
+}
+
+func UpdateAffineParams(obj *Object, oam *[0x800]uint8) {
+	paramsAddr := obj.RotParams * 0x20
+	obj.Pa = float32(int16(binary.LittleEndian.Uint16(oam[paramsAddr+0x06:]))) / 256
+	obj.Pb = float32(int16(binary.LittleEndian.Uint16(oam[paramsAddr+0x0E:]))) / 256
+	obj.Pc = float32(int16(binary.LittleEndian.Uint16(oam[paramsAddr+0x16:]))) / 256
+	obj.Pd = float32(int16(binary.LittleEndian.Uint16(oam[paramsAddr+0x1E:]))) / 256
+}
+
+func (p *PPU) UpdateAffine(relAddr uint32, engine *Engine, oam *[0x800]uint8) {
+
+	paramIdx := (relAddr &^ 0b1) / 0x20
+
+	for i := range 128 {
+
+		obj := &engine.Objects[i]
+
+		if !obj.RotScale {
+			continue
+		}
+
+		if obj.RotParams != paramIdx {
+			continue
+		}
+
+		UpdateAffineParams(obj, oam)
+	}
+}
+
+func (obj *Object) setSize(shape, size uint32) {
+
+	const (
+		SQUARE     = 0
+		HORIZONTAL = 1
+		VERTICAL   = 2
+	)
+
+	switch shape {
+	case SQUARE:
+		switch size {
+		case 0:
+			obj.H, obj.W = 8, 8
+		case 1:
+			obj.H, obj.W = 16, 16
+		case 2:
+			obj.H, obj.W = 32, 32
+		case 3:
+			obj.H, obj.W = 64, 64
+		}
+	case HORIZONTAL:
+		switch size {
+		case 0:
+			obj.H, obj.W = 8, 16
+		case 1:
+			obj.H, obj.W = 8, 32
+		case 2:
+			obj.H, obj.W = 16, 32
+		case 3:
+			obj.H, obj.W = 32, 64
+		}
+	case VERTICAL:
+		switch size {
+		case 0:
+			obj.H, obj.W = 16, 8
+		case 1:
+			obj.H, obj.W = 32, 8
+		case 2:
+			obj.H, obj.W = 32, 16
+		case 3:
+			obj.H, obj.W = 64, 32
+		}
+	}
+}
+
+const (
+    OBJ_TIL_STD_2D = 0
+    OBJ_TIL_STD_1D = 1
+    OBJ_TIL_064_1D = 2
+    OBJ_TIL_128_1D = 3
+    OBJ_TIL_256_1D = 4
+
+    OBJ_BMP_128_2D = 0
+    OBJ_BMP_256_2D = 1
+    OBJ_BMP_128_1D = 2
+    OBJ_BMP_256_1D = 3
+)
+
+func (e *Engine) UpdateObjMapping(d *Dispcnt) {
+
+    for i := range e.Objects {
+
+        obj := &e.Objects[i]
+
+        switch {
+        case !d.TileObj1D:
+            obj.ObjTileMapping = OBJ_TIL_STD_2D
+            obj.TileBoundaryShift = 5 // 32
+        case d.TileObj1D && d.TileObjBoundary == 0:
+            obj.ObjTileMapping = OBJ_TIL_STD_1D
+            obj.TileBoundaryShift = 5
+        case d.TileObj1D && d.TileObjBoundary == 1:
+            obj.ObjTileMapping = OBJ_TIL_064_1D
+            obj.TileBoundaryShift = 6 // 64
+        case d.TileObj1D && d.TileObjBoundary == 2:
+            obj.ObjTileMapping = OBJ_TIL_128_1D
+            obj.TileBoundaryShift = 7 // 128
+        case d.TileObj1D && d.TileObjBoundary == 3:
+            obj.ObjTileMapping = OBJ_TIL_256_1D
+            obj.TileBoundaryShift = 8 // 256
+        }
+
+        switch {
+        case !d.BitmapObj1D && !d.BitmapObj256:
+            obj.ObjBmpMapping = OBJ_BMP_128_2D
+        case !d.BitmapObj1D && d.BitmapObj256:
+            obj.ObjBmpMapping = OBJ_BMP_256_2D
+        case d.BitmapObj1D && !d.BitmapObj256 && !d.BitmapObjBoundary:
+            obj.ObjBmpMapping = OBJ_BMP_128_1D
+        case d.BitmapObj1D && !d.BitmapObj256 && d.BitmapObjBoundary:
+            obj.ObjBmpMapping = OBJ_BMP_256_1D
+        case d.BitmapObj1D && d.BitmapObj256:
+            panic("DISPCNT HAS BOTH BITMAP 1D AND 256 SET")
+        }
+    }
 }

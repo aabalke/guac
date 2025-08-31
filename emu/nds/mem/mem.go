@@ -213,6 +213,7 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
             mem.Vram.Write(addr, v, true)
 		case 0x7: // oam
             mem.Oam[addr & 0x7FF] = v
+            mem.ppu.UpdateOAM(addr, v, &mem.Oam)
 		case 0x8, 0x9: // gba rom
 		case 0xA, 0xB, 0xC, 0xD, 0xE: // gba ram
 		case 0xF:
