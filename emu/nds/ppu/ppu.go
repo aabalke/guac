@@ -628,7 +628,7 @@ func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
 
 		if obj.RotScale {
 			obj.DoubleSize = utils.BitEnabled(attr, 1)
-			UpdateAffineParams(obj, oam)
+			UpdateAffineParams(obj, oam, engine.IsB)
 		} else {
 			obj.Disable = utils.BitEnabled(attr, 1)
 		}
@@ -644,7 +644,7 @@ func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
 
 		if obj.RotScale {
 			obj.RotParams = utils.GetVarData(attr, 1, 5)
-			UpdateAffineParams(obj, oam)
+			UpdateAffineParams(obj, oam, engine.IsB)
 		}
 		obj.HFlip = utils.BitEnabled(attr, 4)
 		obj.VFlip = utils.BitEnabled(attr, 5)
@@ -659,8 +659,13 @@ func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
 	}
 }
 
-func UpdateAffineParams(obj *Object, oam *[0x800]uint8) {
+func UpdateAffineParams(obj *Object, oam *[0x800]uint8, isB bool) {
 	paramsAddr := obj.RotParams * 0x20
+
+    if isB {
+        paramsAddr += 0x400
+    }
+
 	obj.Pa = float32(int16(binary.LittleEndian.Uint16(oam[paramsAddr+0x06:]))) / 256
 	obj.Pb = float32(int16(binary.LittleEndian.Uint16(oam[paramsAddr+0x0E:]))) / 256
 	obj.Pc = float32(int16(binary.LittleEndian.Uint16(oam[paramsAddr+0x16:]))) / 256
@@ -683,7 +688,7 @@ func (p *PPU) UpdateAffine(relAddr uint32, engine *Engine, oam *[0x800]uint8) {
 			continue
 		}
 
-		UpdateAffineParams(obj, oam)
+		UpdateAffineParams(obj, oam, engine.IsB)
 	}
 }
 
@@ -772,12 +777,16 @@ func (e *Engine) UpdateObjMapping(d *Dispcnt) {
         switch {
         case !d.BitmapObj1D && !d.BitmapObj256:
             obj.ObjBmpMapping = OBJ_BMP_128_2D
+            //panic("NEED TO SET UP 2D BITMAP OBJ")
         case !d.BitmapObj1D && d.BitmapObj256:
             obj.ObjBmpMapping = OBJ_BMP_256_2D
+            //panic("NEED TO SET UP 2D BITMAP OBJ")
         case d.BitmapObj1D && !d.BitmapObj256 && !d.BitmapObjBoundary:
             obj.ObjBmpMapping = OBJ_BMP_128_1D
+            obj.TileBoundaryShift = 7 // 256
         case d.BitmapObj1D && !d.BitmapObj256 && d.BitmapObjBoundary:
             obj.ObjBmpMapping = OBJ_BMP_256_1D
+            obj.TileBoundaryShift = 8 // 256
         case d.BitmapObj1D && d.BitmapObj256:
             panic("DISPCNT HAS BOTH BITMAP 1D AND 256 SET")
         }

@@ -16,6 +16,7 @@ func (cpu *Cpu) DecodeARM() int {
         return 4
 
     case isPLD(opcode):
+        fmt.Printf("PC %08X OPCODE %08X CPSR %08X\n", r[PC], opcode, cpu.Reg.CPSR)
         panic("PLD")
         return 4
 

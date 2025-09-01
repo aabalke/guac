@@ -319,7 +319,20 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
 	//  For example: MOVS PC,R14  ;return from SWI (PC=R14_svc, CPSR=SPSR_svc).
 	//If S=0: Flags are not affected (not allowed for CMP,CMN,TEQ,TST).
 
+
 	if !alu.Set {
+		return
+	}
+	if abtExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB && cpu.Reg.getMode() == MODE_ABT; abtExit {
+
+        cpu.Reg.R[15] += 4
+
+		cpu.ExitException(MODE_ABT)
+		return
+	}
+
+	if swiExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB && cpu.Reg.getMode() == MODE_SWI; swiExit {
+		cpu.ExitException(MODE_SWI)
 		return
 	}
 
@@ -337,6 +350,7 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
 		cpu.psrSwitch()
 		return
 	}
+
 
 	if alu.LogicalFlags {
 		cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
@@ -366,7 +380,6 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
 	cpu.Reg.CPSR.SetFlag(FLAG_C, c)
 	cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
 	cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
-	return
 }
 
 const (
@@ -620,12 +633,7 @@ func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack 
 	}
 
 	if sdt.Pre {
-		if offset == 0 {
-			// this may be a problem, post addr was a problem on ldm
-			return addr, 0, false
-			//return addr, addr, false
-		}
-		return addr, addr, true
+        return addr, addr, !(offset == 0)
 	}
 
 	return r[sdt.Rn], addr, false

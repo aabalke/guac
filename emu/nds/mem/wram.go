@@ -19,6 +19,7 @@ func (w *WRAM) Write(addr uint32, v uint8, arm9 bool) {
 
 	if arm9 {
 
+
 		switch w.CNT {
 		case 0:
 			w.Wram[addr%0x8000] = v

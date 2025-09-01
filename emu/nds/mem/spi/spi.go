@@ -55,7 +55,7 @@ func (s *Spi) WriteCNT(b, v uint8) {
         if prevDevice != s.Device {
             if s.Device == DEV_FIRMW {
                 s.Firmware.Addr = 0
-                // wbuf = nil
+                s.Firmware.WriteBuffer = nil
             }
 
             if s.Req == nil {
@@ -65,7 +65,16 @@ func (s *Spi) WriteCNT(b, v uint8) {
             s.Res = nil
         }
 
+        //prevHold := s.Hold
         s.Hold = utils.BitEnabled(uint32(v), 3)
+
+        //if prevHold && !s.Hold {
+        if !s.Hold {
+            if s.Device == DEV_FIRMW {
+                s.Firmware.Write()
+            }
+        }
+
         s.Irq = utils.BitEnabled(uint32(v), 6)
         s.Enabled = utils.BitEnabled(uint32(v), 7)
 	}
@@ -105,12 +114,11 @@ func (s *Spi) WriteData(v uint8) {
     }
 
 
-    if !s.Hold {
-        if s.Device == DEV_FIRMW {
-            // write to firmware file
-            // wbuf = nil
-        }
-    }
+    //if !s.Hold {
+    //    if s.Device == DEV_FIRMW {
+    //        s.Firmware.Write()
+    //    }
+    //}
 }
 
 func (s *Spi) ReadData() uint8 {

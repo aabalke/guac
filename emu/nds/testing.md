@@ -73,20 +73,16 @@ included:
 
 ### gbe-plus
 
-These tests do not work on any emulator - as far as I can tell. Mostly due to changes in devkitPro.
-(Tested on gbe+, desmume, melon, nocash)
-
 ❌ Dma
     ❌ Transfer Test
     👍 Dma Fill Test
 👍 Irq
 👍 Math
 ❌ Memory
-    ❌ Reading (Just 16bit read)
+    👍 Reading
     👍 Writing
-    ❌ Shared Wram Check (Fails)
-    ❌ Mirror Check (Just Main Memory)
-    ❌ Bios Ram Usage
+    👍 Mirror Check
+    👍 Bios Ram Usage (CRC16 failure causes problem)
 👍 Thumb
 ❌ Timer (Will not build)
 
@@ -116,10 +112,10 @@ Graphics
         👍 double buffer
         ❌ rotation
 
-    ❌ Sprites
+    👍 Sprites
         👍 allocation test
         👍 animate simple
-        ❌ bitmap sprites
+        👍 bitmap sprites
         👍 fire and sprites
         👍 simple
         👍 sprite extended palettes

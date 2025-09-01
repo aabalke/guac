@@ -111,6 +111,13 @@ func (nds *Nds) checkBadPc() {
     reg9 := &nds.arm9.Reg
     reg7 := &nds.arm7.Reg
 
+    if reg9.R[15] > 0x400_0000 && reg9.R[15] < 0xFFFF_0000 {
+        panic(fmt.Sprintf("BAD ARM9 PC %08X CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
+    }
+    if reg7.R[15] > 0x400_0000 && reg7.R[15] < 0xFFFF_0000 {
+        panic(fmt.Sprintf("BAD ARM7 PC %08X CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
+    }
+
     switch {
     case reg9.IsThumb && reg9.R[15] & 0b1 != 0:
         panic(fmt.Sprintf("BAD ARM9 THUMB PC %08X CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
@@ -120,6 +127,39 @@ func (nds *Nds) checkBadPc() {
         panic(fmt.Sprintf("BAD ARM7 THUMB PC %08X CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
     case !reg7.IsThumb && reg7.R[15] & 0b11 != 0:
         panic(fmt.Sprintf("BAD ARM7 ARM   PC %08X CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
+    }
+
+    if (
+        nds.mem.Read32(reg9.R[15], true) == 0x0 &&
+        nds.mem.Read32(reg9.R[15] + 1, true) == 0x0 &&
+        nds.mem.Read32(reg9.R[15] + 2, true) == 0x0 &&
+        nds.mem.Read32(reg9.R[15] + 3, true) == 0x0) {
+            panic(fmt.Sprintf("BAD ARM9 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
+
+        }
+    if (
+        nds.mem.Read32(reg7.R[15], false) == 0x0 &&
+        nds.mem.Read32(reg7.R[15] + 1, false) == 0x0 &&
+        nds.mem.Read32(reg7.R[15] + 2, false) == 0x0 &&
+        nds.mem.Read32(reg7.R[15] + 3, false) == 0x0) {
+            panic(fmt.Sprintf("BAD ARM7 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
+
+        }
+}
+
+func (nds *Nds) checkMode() {
+
+
+    m9 := uint32(nds.arm9.Reg.CPSR) & 0x1F
+    m7 := uint32(nds.arm7.Reg.CPSR) & 0x1F
+
+    switch m9 {
+    case 0b10000, 0b10001, 0b10010, 0b10011, 0b10111, 0b11011, 0b11111: 
+    default: panic(fmt.Sprintf("ARM9 MODE INVALID %02X CURR %d\n", m9, CURR_INST))
+    }
+    switch m7 {
+    case 0b10000, 0b10001, 0b10010, 0b10011, 0b10111, 0b11011, 0b11111: 
+    default: panic(fmt.Sprintf("ARM7 MODE INVALID %02X CURR %d\n", m7, CURR_INST))
     }
 }
 
@@ -142,14 +182,12 @@ func (nds *Nds) Update() {
 
         // will need half time cycles for thumb
 
+		cycles := 1
+
+        //logger.Update(6_700_000, 6_720_000, CURR_INST,true)
+
         nds.checkBadPc()
-
-		cycles := 2
-        //if nds.arm9.Reg.IsThumb {
-        //    cycles = 1
-        //}
-
-        //logger.Update(0, 200_000, CURR_INST,true)
+        nds.checkMode()
 
 		if !nds.arm9.Halted {
 			nds.arm9.Execute()

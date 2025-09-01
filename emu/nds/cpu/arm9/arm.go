@@ -335,6 +335,10 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
 		return
 	}
 
+	if swiExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB && cpu.Reg.getMode() == MODE_SWI; swiExit {
+		cpu.ExitException(MODE_SWI)
+		return
+	}
 
 	if irqExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB; irqExit {
 		cpu.ExitException(MODE_IRQ)
@@ -379,7 +383,6 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
 	cpu.Reg.CPSR.SetFlag(FLAG_C, c)
 	cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
 	cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
-	return
 }
 
 const (
@@ -663,8 +666,8 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 	}
 
 	skipLoadWriteBack := sdt.Load && (sdt.Rn == sdt.Rd)
-
 	if (sdt.WriteBack || !sdt.Pre) && !skipLoadWriteBack {
+
 		r[sdt.Rn] = post
 	}
 
@@ -709,12 +712,7 @@ func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack 
 	}
 
 	if sdt.Pre {
-		if offset == 0 {
-			// this may be a problem, post addr was a problem on ldm
-			return addr, 0, false
-			//return addr, addr, false
-		}
-		return addr, addr, true
+        return addr, addr, !(offset == 0)
 	}
 
 	return r[sdt.Rn], addr, false
@@ -940,35 +938,8 @@ func signedHalfStd(half *Half, cpu *Cpu) {
 	pre, post := halfUnsignedAddress(half, cpu)
 
 	if half.Load {
-		// On ARM7 aka ARMv4 aka NDS7/GBA:
-		// LDRSH Rd,[odd]  -->  LDRSB Rd,[odd]         ;sign-expand BYTE value
-		// On ARM9 aka ARMv5 aka NDS9:
-		// LDRSH Rd,[odd]  -->  LDRSH Rd,[odd-1]       ;forced align
-
-		if misaligned := pre&1 == 1; misaligned {
-			// sign-expand BYTE value
-			unexpanded := int16(cpu.mem.Read16(pre, true))
-			expanded := uint32(unexpanded)
-
-			if int8(unexpanded) < 0 {
-				expanded |= (0xFFFFFF << 8)
-			} else {
-				expanded &= 0xFF
-			}
-
-			r[half.Rd] = expanded
-		} else {
-
-			// sign-expand half value
-			unexpanded := int16(cpu.mem.Read16(pre&^0b1, true))
-			expanded := uint32(unexpanded)
-
-			if unexpanded < 0 {
-				expanded |= (0xFFFF << 16)
-			}
-
-			r[half.Rd] = expanded
-		}
+        v := uint32(uint16(int16(cpu.mem.Read16(pre&^0b1, true))))
+        r[half.Rd] = v
 	} else {
 		addr := pre &^ 0b1
 		cpu.mem.Write16(addr, uint16(int16(half.RdValue)), true)
@@ -985,12 +956,11 @@ func unsignedHalfStd(half *Half, cpu *Cpu) {
 	pre, post := halfUnsignedAddress(half, cpu)
 	addr := pre &^ 0b1
 
+
 	if half.Load {
 		v := uint32(cpu.mem.Read16(addr, true))
-		is := (pre & 0b1) << 3
-		v = utils.RorSimple(v, is)
-		//v, _, _ = utils.Ror(v, is, false, false, false)
 		r[half.Rd] = v
+
 	} else {
 		cpu.mem.Write16(addr, uint16(half.RdValue), true)
 	}

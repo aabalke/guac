@@ -2,6 +2,7 @@ package mem
 
 import (
 	_ "embed"
+
 	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/mem/spi"

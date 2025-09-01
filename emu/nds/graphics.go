@@ -182,7 +182,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 
             switch {
             case obj.Mode == 3:
-                panic("BITMAP OBJ")
+                palData, ok = nds.setBmpObjectAffinePixel(engine, obj, x, y)
             case obj.RotScale:
                 palData, ok = nds.setObjectAffinePixel(engine, obj, x, y)
             default:
@@ -288,8 +288,6 @@ func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {
 
 	return bgs
 }
-
-
 
 func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, bool) {
 
@@ -576,9 +574,9 @@ func (nds *Nds) getObjPriority(y uint32, objects *[128]ppu.Object) [4][]uint32 {
 
 func bgNotScanline(bg *ppu.Background, y uint32) bool {
 
-	//if bg.Affine {
-	//	return false
-	//}
+	if bg.Affine {
+		return false
+	}
 
 	localY := (int(y) - int(bg.YOffset)) & int((bg.H)-1)
 
@@ -627,74 +625,6 @@ func (nds *Nds) getPalette(palIdx uint32, paletteNum uint32, obj, engineB bool) 
 
 	return uint32(nds.mem.Pram[addr>>1])
 }
-
-//func (nds *Nds) setObjectBitmapPixel(engine *ppu.Engine, obj *ppu.Object, x, y uint32) (uint32, bool) {
-//
-//    //vramOffset := uint32(0)
-//    //pramOffset := uint32(0)
-//
-//	//mem := &nds.mem
-//
-//	yIdx := int(y) - int(obj.Y)
-//	xIdx := int(x) - int(obj.X)
-//
-//	if obj.Y > SCREEN_HEIGHT {
-//		yIdx += 256 // i believe 256 is max
-//	}
-//
-//	if obj.X > SCREEN_WIDTH {
-//		xIdx += 512 // i believe 512 is max
-//	}
-//
-//	if outObjectBound(obj, xIdx, yIdx) {
-//		return 0, false
-//	}
-//
-//	if obj.Mosaic && engine.Mosaic.ObjH != 0 {
-//		xIdx -= xIdx % int(engine.Mosaic.ObjH+1)
-//	}
-//
-//	if obj.Mosaic && engine.Mosaic.ObjV != 0 {
-//		yIdx -= yIdx % int(engine.Mosaic.ObjV+1)
-//	}
-//
-//	//_, _, inTileX, inTileY := getPositions(obj, uint32(xIdx), uint32(yIdx))
-//
-//    offset := uint32(0x40_0000)
-//
-//    if engine.IsB {
-//        offset = uint32(0x60_0000)
-//    }
-//
-//    // this needs "in tile" offset"
-//    idx := ((uint32(xIdx)+(uint32(yIdx)*obj.W))) + offset
-//
-//    //idx := uint32(0x40_0000)
-//
-//    pal := uint32(nds.mem.Vram.Read(idx, true))
-//    //pal |= uint32(nds.mem.Vram.Read(idx + 1, true)) << 8
-//    //pal &^= 0x8000
-//
-//    //fmt.Printf("ADDR %08X PAL %02X\n", idx, pal)
-//    //os.Exit(0)
-//
-//    //pal &= 0x1
-//
-//    data := nds.getPalette(pal, 0, true, engine.IsB)
-//
-//    //a := data >> 16
-//
-//    return data, true
-//
-//
-//
-//	//addr := getTileAddr(obj, enTileX, enTileY, inTileX, inTileY)
-//    //tileData := uint32(nds.mem.Vram.Read(vramOffset + addr, true))
-//    //tileData |= uint32(nds.mem.Vram.Read(vramOffset + addr + 1, true)) << 8
-//
-//	//return getPaletteData(nds, obj.Palette256, obj.Palette, tileData, uint32(inTileX))
-//
-//}
 
 func (nds *Nds) setObjectPixel(engine *ppu.Engine, obj *ppu.Object, x, y uint32) (uint32, bool) {
 
@@ -799,6 +729,19 @@ func getObjTileAddr(obj *ppu.Object, enTileX, enTileY, inTileX, inTileY uint32) 
 	return tileAddr + inTileIdx
 }
 
+func getBmpTileAddr(obj *ppu.Object, xIdx, yIdx int) uint32 {
+
+    const BYTES_PER_PIXEL = 2
+
+	if obj.OneDimensional {
+        return uint32((xIdx+(yIdx << int(obj.BmpBoundaryShift))) * BYTES_PER_PIXEL)
+	}
+
+    panic("OBJ BMP 2D, make sure addr calc accurate")
+
+    return uint32((xIdx+(yIdx << int(obj.BmpBoundaryShift))) * BYTES_PER_PIXEL)
+}
+
 func getPaletteData(nds *Nds, engine *ppu.Engine, pal256 bool, pal, tileData, inTileX uint32) (uint32, bool) {
 
 	var palIdx uint32
@@ -814,6 +757,7 @@ func getPaletteData(nds *Nds, engine *ppu.Engine, pal256 bool, pal, tileData, in
 
     if engine.Dispcnt.ObjExtPal {
         // palette is 256 each
+
         pal <<= 4
         palData := nds.getExtendedPalette(engine, true, palIdx, pal)
         return palData, true
@@ -843,6 +787,29 @@ func (nds *Nds) setObjectAffinePixel(engine *ppu.Engine, obj *ppu.Object, x, y u
 	if nds.outBoundsAffine(obj, x, y) {
 		return 0, false
 	}
+
+    xIdx, yIdx := nds.getAffineCoordinates(engine, obj, x, y)
+
+	if outObjectBound(obj, xIdx, yIdx) {
+		return 0, false
+	}
+
+	enTileX, enTileY, inTileX, inTileY := getPositions(obj, uint32(xIdx), uint32(yIdx))
+
+	addr := getObjTileAddr(obj, enTileX, enTileY, inTileX, inTileY)
+
+    vramOffset := uint32(0x40_0000)
+    if engine.IsB {
+        vramOffset = uint32(0x60_0000)
+    }
+
+    tileData := uint32(nds.mem.Vram.Read(vramOffset + addr, true))
+    tileData |= uint32(nds.mem.Vram.Read(vramOffset + addr + 1, true)) << 8
+
+	return getPaletteData(nds, engine, obj.Palette256, obj.Palette, tileData, uint32(inTileX))
+}
+
+func (nds *Nds) getAffineCoordinates(engine *ppu.Engine, obj *ppu.Object, x, y uint32) (int, int) {
 
 	objX := obj.X
 	objY := obj.Y
@@ -875,29 +842,8 @@ func (nds *Nds) setObjectAffinePixel(engine *ppu.Engine, obj *ppu.Object, x, y u
 	xIdx = int(obj.Pa*xOrigin+obj.Pb*yOrigin) + (int(obj.W) / 2)
 	yIdx = int(obj.Pc*xOrigin+obj.Pd*yOrigin) + (int(obj.H) / 2)
 
-	if outObjectBound(obj, xIdx, yIdx) {
-		return 0, false
-	}
+    return xIdx, yIdx
 
-	enTileX, enTileY, inTileX, inTileY := getPositions(obj, uint32(xIdx), uint32(yIdx))
-
-	addr := getObjTileAddr(obj, enTileX, enTileY, inTileX, inTileY)
-
-	//addr &= 0x1FFFF
-
-	//if addr >= 0x18000 {
-	//    addr -= 0x8000
-	//}
-
-    vramOffset := uint32(0x40_0000)
-    if engine.IsB {
-        vramOffset = uint32(0x60_0000)
-    }
-
-    tileData := uint32(nds.mem.Vram.Read(vramOffset + addr, true))
-    tileData |= uint32(nds.mem.Vram.Read(vramOffset + addr + 1, true)) << 8
-
-	return getPaletteData(nds, engine, obj.Palette256, obj.Palette, tileData, uint32(inTileX))
 }
 
 func (nds *Nds) outBoundsAffine(obj *ppu.Object, x, y uint32) bool {
@@ -953,4 +899,35 @@ func (nds *Nds) outBoundsAffine(obj *ppu.Object, x, y uint32) bool {
 	}
 
 	return true
+}
+
+func (nds *Nds) setBmpObjectAffinePixel(engine *ppu.Engine, obj *ppu.Object, x, y uint32) (uint32, bool) {
+
+    if obj.Palette256 {
+        panic("BITMAP AND PAL 256")
+    }
+
+    xIdx, yIdx := nds.getAffineCoordinates(engine, obj, x, y)
+
+	if outObjectBound(obj, xIdx, yIdx) {
+		return 0, false
+	}
+
+	addr := getBmpTileAddr(obj, xIdx, yIdx)
+
+    vramOffset := uint32(0x40_0000)
+    if engine.IsB {
+        vramOffset = uint32(0x60_0000)
+    }
+
+    data := uint32(nds.mem.Vram.Read(vramOffset + addr, true))
+    data |= uint32(nds.mem.Vram.Read(vramOffset + addr + 1, true)) << 8
+
+    if alpha := (data & 0x8000) == 0; alpha {
+        return 0, false
+    }
+
+    data &^= 0x8000
+
+    return data, true
 }

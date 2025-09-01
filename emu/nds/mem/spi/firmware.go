@@ -10,11 +10,14 @@ var FirmwareData []byte
 
 const (
     INST_NONE = 0x00
+
+    INST_RDID = 0x9F
     INST_READ = 0x03
     INST_RDSR = 0x05
 
-
-    INST_RDID = 0x9F
+    INST_WREN = 0x06
+    INST_WRDI = 0x04
+    INST_PW   = 0x0A
 
 )
 
@@ -25,6 +28,8 @@ type Firmware struct {
 
     Addr uint32
     WriteEnabled bool
+
+    WriteBuffer []uint8
 }
 
 func (f *Firmware) Transfer(data []uint8) (reply []uint8, stat uint8){
@@ -86,9 +91,54 @@ func (f *Firmware) Transfer(data []uint8) (reply []uint8, stat uint8){
 
         return buffer, STAT_CONT
 
+    case INST_WREN:
+
+        f.WriteEnabled = true
+
+        return nil, STAT_DONE
+
+    case INST_WRDI:
+
+        f.WriteEnabled = false
+
+        return nil, STAT_DONE
+
+    case INST_PW:
+
+        switch len(data) {
+        case 0, 1, 2, 3:
+            return nil, STAT_CONT
+        case 4:
+            f.Addr =  uint32(data[1]) << 16
+            f.Addr |= uint32(data[2]) << 8
+            f.Addr |= uint32(data[3])
+        }
+
+        f.WriteBuffer = data[4:]
+
+        return nil, STAT_CONT
 
     default:
         panic(fmt.Sprintf("UNKNOWN OR UN SETUP FIRMWARE INST CODE %02X", inst))
-        // this will be the same as INST_NONE but not yet
+        return nil, STAT_DONE
     }
+}
+
+func (f *Firmware) Write() {
+
+    if f.WriteBuffer == nil {
+        return
+    }
+
+    //log.Printf("Firmware Write, will need to be stored at some point ADDR %08X V %v\n", f.Addr, f.WriteBuffer)
+
+    //for i, v := range f.WriteBuffer {
+    //    FirmwareData[f.Addr + uint32(i)] = v
+    //}
+
+    f.WriteBuffer = nil
+
+
+
+
 }
