@@ -100,6 +100,16 @@ FileSystem
 
 Graphics
 
+    3D
+
+    capture
+
+    Effects
+    Ext_palettes
+    gl2d
+    grit
+    Printing
+
     ❌ Backgrounds
         👍 16 bit color bmp
         👍 256 bit color bmp
@@ -110,7 +120,7 @@ Graphics
                 ❌ 10, 11, 12, 13
     
         👍 double buffer
-        ❌ rotation
+        👍 rotation
 
     👍 Sprites
         👍 allocation test

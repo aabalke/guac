@@ -116,21 +116,21 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 
 	bldPal := ppu.NewBlendPalette(x, &engine.Blend, nds.getPalette(0, 0, false, engine.IsB))
 
+
 	var objMode uint32
 	var inObjWindow bool
 
 	// work backwards for proper priorities
 	for i := 3; i >= 0; i-- {
 
-
 		for j := len(bgPriorities[i]) - 1; j >= 0; j-- {
 
 			bgIdx := bgPriorities[i][j]
 			bg := &bgs[bgIdx]
 
-			//if !windowPixelAllowed(bgIdx, x, y, wins) {
-			//	continue
-			//}
+			if !ppu.WindowPixelAllowed(bgIdx, x, y, wins) {
+				continue
+			}
 
             palData, ok := uint32(0), false
 
@@ -146,7 +146,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
             case ppu.BG_TYPE_BGM:
                 palData, ok = 0b1111111111, true // yellow
             case ppu.BG_TYPE_256:
-                palData, ok = nds.largeBitmap(x, y)
+				palData, ok = nds.setBmpBackgroundPixel(engine, bg, x)
             case ppu.BG_TYPE_DIR:
 
                 offset := bg.ScreenBaseBlock * 8
@@ -173,9 +173,10 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 	        obj := &engine.Objects[objIdx]
 
             obj.OneDimensional = dispcnt.TileObj1D
-			//if !windowObjPixelAllowed(x, y, wins) {
-			//	continue
-			//}
+
+			if !ppu.WindowObjPixelAllowed(x, y, wins) {
+				continue
+			}
 
 			var palData uint32
 			var ok bool
@@ -443,6 +444,54 @@ func (nds *Nds) setAffineBackgroundPixel(engine *ppu.Engine, bg *ppu.Background,
 	palData := nds.getPalette(palIdx, 0, false, engine.IsB)
 
 	return palData, true
+}
+
+func (nds *Nds) setBmpBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x uint32) (uint32, bool) {
+
+	//if !bg.Palette256 {
+	//	panic(fmt.Sprintf("AFFINE WITHOUT PAL 256"))
+	//}
+
+	pa := utils.Convert8_8Float(int16(bg.Pa))
+	pc := utils.Convert8_8Float(int16(bg.Pc))
+	xIdx := int(pa*float64(x) + bg.OutX)
+	yIdx := int(pc*float64(x) + bg.OutY)
+
+	if bg.Mosaic && engine.Mosaic.BgH != 0 {
+		xIdx -= xIdx % int(engine.Mosaic.BgH+1)
+	}
+
+	if bg.Mosaic && engine.Mosaic.BgV != 0 {
+		yIdx -= yIdx % int(engine.Mosaic.BgV+1)
+	}
+
+	out := xIdx < 0 || xIdx >= int(bg.W) || yIdx < 0 || yIdx >= int(bg.H)
+
+	switch {
+	case bg.AffineWrap:
+		xIdx &= int(bg.W) - 1
+		yIdx &= int(bg.H) - 1
+	case !bg.AffineWrap && out:
+		return 0, false
+	}
+
+    addr := uint32(xIdx+(yIdx * int(bg.W)))
+
+    if engine.IsB {
+        addr += 0x20_0000
+    }
+
+    palIdx := uint32(nds.mem.Vram.Read(addr, true))
+
+    if engine.IsB {
+        palIdx += 0x200
+    }
+
+	data := nds.getPalette(palIdx, 0, false, engine.IsB)
+
+    // transparent???
+
+    return data, true
 }
 
 func getPositionsBg(screenData, xIdx, yIdx uint32) (uint32, uint32) {

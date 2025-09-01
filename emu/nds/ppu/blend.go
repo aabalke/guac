@@ -74,9 +74,9 @@ func (bp *BlendPalettes) SetBlendPalettes(palData uint32, bgIdx uint32, obj bool
 
 func (bp *BlendPalettes) Blend(objTransparent bool, x, y uint32, wins *Windows, inObjWindow bool) uint32 {
 
-	//if !windowBldPixelAllowed(x, y, wins, inObjWindow) {
-	//	return bp.noBlend(objTransparent)
-	//}
+	if !windowBldPixelAllowed(x, y, wins, inObjWindow) {
+		return bp.noBlend(objTransparent)
+	}
 
 	switch bp.Bld.Mode {
 	case BLD_MODE_OFF:

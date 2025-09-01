@@ -177,6 +177,12 @@ func (p *PPU) Update(addr, v uint32) {
 
 func (e *Engine) UpdateEngine(addr, v uint32) {
 
+	if win := addr >= 0x40 && addr < 0x4C; win {
+		e.UpdateWin(addr, v)
+		return
+	}
+
+
 	if bgs := addr >= 0x08 && addr < 0x40; bgs {
 		e.UpdateBackgrounds(addr, v)
 		return
@@ -264,6 +270,127 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
 	case 0x54:
 		e.Blend.yEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
     }
+}
+
+func (engine *Engine) UpdateWin(addr uint32, v uint32) {
+
+	wins := &engine.Windows
+	win0 := &engine.Windows.Win0
+	win1 := &engine.Windows.Win1
+	winObj := &engine.Windows.WinObj
+
+	const (
+		WIN0Ha = 0x40
+		WIN0Hb = 0x41
+		WIN1Ha = 0x42
+		WIN1Hb = 0x43
+		WIN0Va = 0x44
+		WIN0Vb = 0x45
+		WIN1Va = 0x46
+		WIN1Vb = 0x47
+		WININ0 = 0x48
+		WININ1 = 0x49
+		WINOUT = 0x4A
+		WINOBJ = 0x4B
+
+        SCREEN_WIDTH = 256
+        SCREEN_HEIGHT = 192
+	)
+
+	switch addr {
+	case WIN0Ha:
+		win0.oR = v
+		win0.R = v
+
+		if win0.oR > SCREEN_WIDTH || win0.oL > win0.oR {
+			win0.R = SCREEN_WIDTH
+		}
+
+	case WIN0Hb:
+		win0.oL = v
+		win0.L = v
+
+		if win0.oR > SCREEN_WIDTH || win0.oL > win0.oR {
+			win0.R = SCREEN_WIDTH
+		}
+
+	case WIN1Ha:
+		win1.oR = v
+		win1.R = v
+
+		if win1.oR > SCREEN_WIDTH || win1.oL > win1.oR {
+			win1.R = SCREEN_WIDTH
+		}
+
+	case WIN1Hb:
+		win1.oL = v
+		win1.L = v
+
+		if win1.oR > SCREEN_WIDTH || win1.oL > win1.oR {
+			win1.R = SCREEN_WIDTH
+		}
+
+	case WIN0Va:
+		win0.oB = v
+		win0.B = v
+
+		if win0.oB > SCREEN_HEIGHT || win0.oT > win0.oB {
+			win0.B = SCREEN_HEIGHT
+		}
+
+	case WIN0Vb:
+		win0.oT = v
+		win0.T = v
+
+		if win0.oB > SCREEN_HEIGHT || win0.oT > win0.oB {
+			win0.B = SCREEN_HEIGHT
+		}
+
+	case WIN1Va:
+		win1.oB = v
+		win1.B = v
+
+		if win1.oB > SCREEN_HEIGHT || win1.oT > win1.oB {
+			win1.B = SCREEN_HEIGHT
+		}
+
+	case WIN1Vb:
+		win1.oT = v
+		win1.T = v
+
+		if win1.oB > SCREEN_HEIGHT || win1.oT > win1.oB {
+			win1.B = SCREEN_HEIGHT
+		}
+
+	case WININ0:
+		win0.InBg[0] = utils.BitEnabled(v, 0)
+		win0.InBg[1] = utils.BitEnabled(v, 1)
+		win0.InBg[2] = utils.BitEnabled(v, 2)
+		win0.InBg[3] = utils.BitEnabled(v, 3)
+		win0.InObj = utils.BitEnabled(v, 4)
+		win0.InBld = utils.BitEnabled(v, 5)
+	case WININ1:
+		win1.InBg[0] = utils.BitEnabled(v, 0)
+		win1.InBg[1] = utils.BitEnabled(v, 1)
+		win1.InBg[2] = utils.BitEnabled(v, 2)
+		win1.InBg[3] = utils.BitEnabled(v, 3)
+		win1.InObj = utils.BitEnabled(v, 4)
+		win1.InBld = utils.BitEnabled(v, 5)
+	case WINOUT:
+		wins.OutBg[0] = utils.BitEnabled(v, 0)
+		wins.OutBg[1] = utils.BitEnabled(v, 1)
+		wins.OutBg[2] = utils.BitEnabled(v, 2)
+		wins.OutBg[3] = utils.BitEnabled(v, 3)
+		wins.OutObj = utils.BitEnabled(v, 4)
+		wins.OutBld = utils.BitEnabled(v, 5)
+	case WINOBJ:
+		winObj.InBg[0] = utils.BitEnabled(v, 0)
+		winObj.InBg[1] = utils.BitEnabled(v, 1)
+		winObj.InBg[2] = utils.BitEnabled(v, 2)
+		winObj.InBg[3] = utils.BitEnabled(v, 3)
+		winObj.InObj = utils.BitEnabled(v, 4)
+		winObj.InBld = utils.BitEnabled(v, 5)
+	}
 }
 
 func (p *Engine) UpdateBackgrounds(addr, v uint32) {
