@@ -1,6 +1,7 @@
 package ppu
 
 import (
+	"unsafe"
 
 	"github.com/aabalke/guac/emu/nds/utils"
 )
@@ -29,8 +30,15 @@ type VRAM struct {
     CNT_7 uint8
     isCArm7, isDArm7 bool
 
-    ExtAPalBg  *[0x0]uint8
-    ExtBPalBg  *[0x0]uint8
+    ExtABgSlot0 unsafe.Pointer
+    ExtABgSlot1 unsafe.Pointer
+    ExtABgSlot2 unsafe.Pointer
+    ExtABgSlot3 unsafe.Pointer
+
+    ExtBBgSlot0 unsafe.Pointer
+    ExtBBgSlot1 unsafe.Pointer
+    ExtBBgSlot2 unsafe.Pointer
+    ExtBBgSlot3 unsafe.Pointer
 
     ExtAPalObj *[0x4000]uint8
     ExtBPalObj *[0x4000]uint8
@@ -73,13 +81,63 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         if vm.isDArm7 {
             vm.CNT_7 |= 0b10
         }
-	case 0x244: vm.CNT_E.Write(v)
-	case 0x245: vm.CNT_F.Write(v)
-        if vm.CNT_F.Mst == 5 { vm.ExtAPalObj = &vm.F }
-	case 0x246: vm.CNT_G.Write(v)
-        if vm.CNT_G.Mst == 5 { vm.ExtAPalObj = &vm.G }
+	case 0x244:
+        vm.CNT_E.Write(v)
+
+        if vm.CNT_E.Mst == 4 {
+            vm.ExtABgSlot0 = unsafe.Pointer(&vm.E)
+            vm.ExtABgSlot1 = unsafe.Add(unsafe.Pointer(&vm.E), 0x2000)
+            vm.ExtABgSlot2 = unsafe.Add(unsafe.Pointer(&vm.E), 0x4000)
+            vm.ExtABgSlot3 = unsafe.Add(unsafe.Pointer(&vm.E), 0x6000)
+        }
+
+	case 0x245:
+        vm.CNT_F.Write(v)
+
+        switch vm.CNT_F.Mst {
+        case 4:
+
+            if vm.CNT_F.Ofs == 0 {
+                vm.ExtABgSlot0 = unsafe.Pointer(&vm.F)
+                vm.ExtABgSlot1 = unsafe.Add(unsafe.Pointer(&vm.F), 0x2000)
+            } else {
+                vm.ExtABgSlot2 = unsafe.Pointer(&vm.F)
+                vm.ExtABgSlot3 = unsafe.Add(unsafe.Pointer(&vm.F), 0x2000)
+            }
+
+        case 5:
+            vm.ExtAPalObj = &vm.F
+        }
+
+	case 0x246:
+        vm.CNT_G.Write(v)
+
+        switch vm.CNT_G.Mst {
+        case 4:
+
+            if vm.CNT_G.Ofs == 0 {
+                vm.ExtABgSlot0 = unsafe.Pointer(&vm.G)
+                vm.ExtABgSlot1 = unsafe.Add(unsafe.Pointer(&vm.G), 0x2000)
+            } else {
+                vm.ExtABgSlot2 = unsafe.Pointer(&vm.G)
+                vm.ExtABgSlot3 = unsafe.Add(unsafe.Pointer(&vm.G), 0x2000)
+            }
+
+        case 5:
+            vm.ExtAPalObj = &vm.G
+        }
+
     // 0x247 is WRAMCNT
-	case 0x248: vm.CNT_H.Write(v)
+	case 0x248:
+        vm.CNT_H.Write(v)
+
+        if vm.CNT_H.Mst == 2 {
+            vm.ExtBBgSlot0 = unsafe.Pointer(&vm.H)
+            vm.ExtBBgSlot1 = unsafe.Add(unsafe.Pointer(&vm.H), 0x2000)
+            vm.ExtBBgSlot2 = unsafe.Add(unsafe.Pointer(&vm.H), 0x4000)
+            vm.ExtBBgSlot3 = unsafe.Add(unsafe.Pointer(&vm.H), 0x6000)
+        }
+
 	case 0x249:
         vm.CNT_I.Write(v)
 

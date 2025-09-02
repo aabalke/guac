@@ -136,9 +136,9 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 
             switch bg.Type {
             case ppu.BG_TYPE_TEX:
-                palData, ok = nds.setBackgroundPixel(engine, bg, x, y)
+                palData, ok = nds.setBackgroundPixel(engine, bg, bgIdx, x, y)
             case ppu.BG_TYPE_AFF:
-				palData, ok = nds.setAffineBackgroundPixel(engine, bg, x)
+				palData, ok = nds.setAffineBackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_LAR:
                 palData, ok = 0b11111 << 10, true // blue
             case ppu.BG_TYPE_3D :
@@ -290,14 +290,12 @@ func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {
 	return bgs
 }
 
-func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, bool) {
+func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, bool) {
 
     vramOffset := uint32(0)
-    pramOffset := uint32(0)
 
     if engine.IsB {
         vramOffset = uint32(0x20_0000)
-        pramOffset = uint32(0x400)
     }
 
 	xIdx := (x + bg.XOffset) & ((bg.W) - 1)
@@ -353,32 +351,12 @@ func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x, y 
 		inTileIdx = (inTileX >> 1) + (inTileY << 2)
 	}
 
-    tileData := uint32(nds.mem.Vram.Read(vramOffset + tileAddr + inTileIdx, true))
-
-	if bg.Palette256 {
-		palIdx := tileData
-		if palIdx == 0 {
-			return 0, false
-		}
-
-        addr := (palIdx << 1) + pramOffset
-
-        return uint32(nds.mem.Pram[addr >> 1]), true
-	}
-
-	palIdx := (tileData >> ((inTileX & 1) << 2)) & 0xF
-
-	if palIdx == 0 {
-		return 0, false
-	}
-
-	palette := screenData >> 12
-	addr := ((palette << 5) + palIdx<<1) + pramOffset
-
-	return uint32(nds.mem.Pram[addr >> 1]), true
+    palIdx := uint32(nds.mem.Vram.Read(vramOffset + tileAddr + inTileIdx, true))
+    palNum := screenData >> 12
+    return getBgPaletteData(nds, engine, bgIdx, bg.Palette256, palNum, palIdx, inTileX)
 }
 
-func (nds *Nds) setAffineBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x uint32) (uint32, bool) {
+func (nds *Nds) setAffineBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx, x uint32) (uint32, bool) {
 
 	//if !bg.Palette256 {
 	//	panic(fmt.Sprintf("AFFINE WITHOUT PAL 256"))
@@ -437,13 +415,18 @@ func (nds *Nds) setAffineBackgroundPixel(engine *ppu.Engine, bg *ppu.Background,
 	addr := vramOffset + tileAddr + inTileIdx
     palIdx := uint32(nds.mem.Vram.Read(addr, true))
 
-	if palIdx == 0 {
-		return 0, false
-	}
+    // is this correct?
+    pal := uint32(0)
 
-	palData := nds.getPalette(palIdx, 0, false, engine.IsB)
+    return getBgPaletteData(nds, engine, bgIdx, bg.Palette256, pal, palIdx, inTileX)
 
-	return palData, true
+	//if palIdx == 0 {
+	//	return 0, false
+	//}
+
+	//palData := nds.getPalette(palIdx, 0, false, engine.IsB)
+
+	//return palData, true
 }
 
 func (nds *Nds) setBmpBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x uint32) (uint32, bool) {
@@ -635,22 +618,41 @@ func bgNotScanline(bg *ppu.Background, y uint32) bool {
 	return t || b
 }
 
-func (nds *Nds) getExtendedPalette(engine *ppu.Engine, obj bool, palIdx, paletteNum uint32) uint32 {
+func (nds *Nds) getExtendedPalette(engine *ppu.Engine, bgIdx uint32, obj bool, palIdx, paletteNum uint32) uint32 {
 
     //16 colors x 16 palettes --> standard palette memory (=256 colors)
     //256 colors x 16 palettes --> extended palette memory (=4096 colors)
 
 	addr := ((paletteNum << 5) + palIdx<<1)
-
-    //addr &= 0x1FFF
-
     vram := &nds.mem.Vram
+
+    // this can probably be replaced in the ppu.
+    // ex. vram.ExtABgSlot (unsafe) -> Background[bgIdx].BgSlot (*0x2000uint8)
+    // removes un necessary palette slot switches
 
     switch {
     case !obj && !engine.IsB:
-        return uint32(binary.LittleEndian.Uint16(vram.ExtAPalBg[addr:]))
+
+        var slot *[0x2000]uint8
+        switch bgIdx {
+        case 0: slot = (*[0x2000]uint8)(vram.ExtABgSlot0)
+        case 1: slot = (*[0x2000]uint8)(vram.ExtABgSlot1)
+        case 2: slot = (*[0x2000]uint8)(vram.ExtABgSlot2)
+        case 3: slot = (*[0x2000]uint8)(vram.ExtABgSlot3)
+        }
+
+        return uint32(binary.LittleEndian.Uint16(slot[addr:]))
     case !obj && engine.IsB:
-        return uint32(binary.LittleEndian.Uint16(vram.ExtBPalBg[addr:]))
+
+        var slot *[0x2000]uint8
+        switch bgIdx {
+        case 0: slot = (*[0x2000]uint8)(vram.ExtBBgSlot0)
+        case 1: slot = (*[0x2000]uint8)(vram.ExtBBgSlot1)
+        case 2: slot = (*[0x2000]uint8)(vram.ExtBBgSlot2)
+        case 3: slot = (*[0x2000]uint8)(vram.ExtBBgSlot3)
+        }
+
+        return uint32(binary.LittleEndian.Uint16(slot[addr:]))
     case obj && !engine.IsB:
         return uint32(binary.LittleEndian.Uint16(vram.ExtAPalObj[addr:]))
     case obj && engine.IsB:
@@ -791,6 +793,42 @@ func getBmpTileAddr(obj *ppu.Object, xIdx, yIdx int) uint32 {
     return uint32((xIdx+(yIdx << int(obj.BmpBoundaryShift))) * BYTES_PER_PIXEL)
 }
 
+func getBgPaletteData(nds *Nds, engine *ppu.Engine, bgIdx uint32, pal256 bool, palNum, tileData, inTileX uint32) (uint32, bool) {
+
+	var palIdx uint32
+	if pal256 {
+		palIdx = tileData & 0xFF
+	} else {
+		palIdx = (tileData >> ((inTileX & 1) << 2)) & 0xF
+	}
+
+    if engine.Dispcnt.BgExtPal {
+        // palette is 256 each
+
+        if palIdx == 0 && palNum == 0 {
+            return 0, false
+        }
+
+        palNum <<= 4
+        palData := nds.getExtendedPalette(engine, bgIdx, false, palIdx, palNum)
+        return palData, true
+    }
+
+	if palIdx == 0 {
+		return 0, false
+	}
+
+    // this is from gba, does not work with ext palettes, but assume it still
+    // is needed for std
+    if pal256 {
+        palNum = 0
+    }
+
+	palData := nds.getPalette(uint32(palIdx), palNum, false, engine.IsB)
+
+	return palData, true
+}
+
 func getPaletteData(nds *Nds, engine *ppu.Engine, pal256 bool, pal, tileData, inTileX uint32) (uint32, bool) {
 
 	var palIdx uint32
@@ -808,7 +846,8 @@ func getPaletteData(nds *Nds, engine *ppu.Engine, pal256 bool, pal, tileData, in
         // palette is 256 each
 
         pal <<= 4
-        palData := nds.getExtendedPalette(engine, true, palIdx, pal)
+
+        palData := nds.getExtendedPalette(engine, 0, true, palIdx, pal)
         return palData, true
     }
 

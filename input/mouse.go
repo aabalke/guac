@@ -42,11 +42,13 @@ func NewMouse() *Mouse {
             R: mouse.FillColor[0],
             G: mouse.FillColor[1],
             B: mouse.FillColor[2],
+            A: 0xFF,
         },
         clrStroke: color.RGBA{
             R: mouse.StrokeColor[0],
             G: mouse.StrokeColor[1],
             B: mouse.StrokeColor[2],
+            A: 0xFF,
         },
     }
 

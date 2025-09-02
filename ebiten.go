@@ -254,7 +254,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.paused {
 		g.pause.DrawPause(screen)
 	}
-
 }
 
 func ImageFillScreen(screen *ebiten.Image, image *ebiten.Image) {

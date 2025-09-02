@@ -97,6 +97,9 @@ type Background struct {
 	OutX, OutY float64
 
     Type uint8
+
+    AltExtPalSlot bool
+
 }
 
 const (
@@ -403,7 +406,7 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 		p.Backgrounds[0].Palette256 = utils.BitEnabled(v, 7)
 	case 0x09:
 		p.Backgrounds[0].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
-		p.Backgrounds[0].AffineWrap = utils.BitEnabled(v, 5)
+        p.Backgrounds[0].AltExtPalSlot = utils.BitEnabled(v, 5)
 		p.Backgrounds[0].Size = utils.GetVarData(v, 6, 7)
 
 	case 0x0A:
@@ -413,7 +416,7 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 		p.Backgrounds[1].Palette256 = utils.BitEnabled(v, 7)
 	case 0x0B:
 		p.Backgrounds[1].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
-		p.Backgrounds[1].AffineWrap = utils.BitEnabled(v, 5)
+        p.Backgrounds[1].AltExtPalSlot = utils.BitEnabled(v, 5)
 		p.Backgrounds[1].Size = utils.GetVarData(v, 6, 7)
 
 	case 0x0C:
@@ -423,7 +426,7 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 		p.Backgrounds[2].Palette256 = utils.BitEnabled(v, 7)
 	case 0x0D:
 		p.Backgrounds[2].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
-		p.Backgrounds[2].AffineWrap = utils.BitEnabled(v, 5)
+        p.Backgrounds[2].AffineWrap = utils.BitEnabled(v, 5)
 		p.Backgrounds[2].Size = utils.GetVarData(v, 6, 7)
 
 	case 0x0E:
@@ -434,7 +437,7 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 
 	case 0x0F:
 		p.Backgrounds[3].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
-		p.Backgrounds[3].AffineWrap = utils.BitEnabled(v, 5)
+        p.Backgrounds[3].AffineWrap = utils.BitEnabled(v, 5)
 		p.Backgrounds[3].Size = utils.GetVarData(v, 6, 7)
 
 	case 0x10:

@@ -104,8 +104,8 @@ Graphics
 
     capture
 
-    Effects
-    Ext_palettes
+    Effects (windows match nocash but not melon, not sure on correct)
+    👍 Ext_palettes
     gl2d
     grit
     Printing
@@ -118,6 +118,15 @@ Graphics
                 👍 1, 2, 3, 4, 5
                 ❌ 6, 7, 8, 9
                 ❌ 10, 11, 12, 13
+
+            ❌ Bitmap
+            ❌ Scrolling
+            ❌ Advanced
+                👍 Mosaic
+                ❌ Rotation
+                ❌ Scaling
+                👍 Extended Palette
+                ❌ Multiple Text Layer
     
         👍 double buffer
         👍 rotation
@@ -134,6 +143,9 @@ Graphics
 👍 hello_world
 
 input
+    addon
+    keyboard
+    touch_pad
 
 👍 pxi
 
