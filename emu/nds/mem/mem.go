@@ -34,6 +34,7 @@ type Mem struct {
 	arm7Irq *cpu.Irq
 
     arm9Dma *[4]DMA
+    arm7Dma *[4]DMA
 
     LowVector bool
 
@@ -57,7 +58,7 @@ type Mem struct {
     Timers [8]Timer
 }
 
-func NewMemory(dma9 *[4]DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PPU) Mem {
+func NewMemory(dma7, dma9 *[4]DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PPU) Mem {
 	m := Mem{
         arm9Dma: dma9,
         arm9Irq: irq9,

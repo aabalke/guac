@@ -73,7 +73,6 @@ func NewNds(path string, _ *oto.Context) *Nds {
 
     arm9Irq := cpu.Irq{IsArm9: true}
 	arm7Irq := cpu.Irq{}
-    arm9Dma := [4]mem.DMA{}
 
     for i := range 8 {
         if i < 4 {
@@ -86,12 +85,17 @@ func NewNds(path string, _ *oto.Context) *Nds {
 	nds.Debugger = Debugger{&nds}
 	nds.arm7 = *arm7.NewCpu(&nds.mem, &arm7Irq)
 	nds.arm9 = *arm9.NewCpu(&nds.mem, &arm9Irq)
-	nds.mem = mem.NewMemory(&arm9Dma, &arm7Irq, &arm9Irq, &nds.Cartridge, &nds.ppu)
+	nds.mem = mem.NewMemory(&nds.arm7.Dma, &nds.arm9.Dma, &arm7Irq, &arm9Irq, &nds.Cartridge, &nds.ppu)
 
-    arm9Dma[0].Init(0, &nds.mem, &arm9Irq)
-    arm9Dma[1].Init(1, &nds.mem, &arm9Irq)
-    arm9Dma[2].Init(2, &nds.mem, &arm9Irq)
-    arm9Dma[3].Init(3, &nds.mem, &arm9Irq)
+    nds.arm9.Dma[0].Init(0, &nds.mem, &arm9Irq)
+    nds.arm9.Dma[1].Init(1, &nds.mem, &arm9Irq)
+    nds.arm9.Dma[2].Init(2, &nds.mem, &arm9Irq)
+    nds.arm9.Dma[3].Init(3, &nds.mem, &arm9Irq)
+
+    nds.arm7.Dma[0].Init(0, &nds.mem, &arm7Irq)
+    nds.arm7.Dma[1].Init(1, &nds.mem, &arm7Irq)
+    nds.arm7.Dma[2].Init(2, &nds.mem, &arm7Irq)
+    nds.arm7.Dma[3].Init(3, &nds.mem, &arm7Irq)
 
     nds.LoadGame(path)
 	//nds.arm9.Reset()
@@ -321,6 +325,7 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 
 		switch vcount {
 		case 0:
+			nds.CheckDmas(mem.ARM9_DMA_MODE_STA, true)
 			nds.ppu.EngineA.Backgrounds[2].BgAffineReset()
 			nds.ppu.EngineA.Backgrounds[3].BgAffineReset()
 			nds.ppu.EngineB.Backgrounds[2].BgAffineReset()
@@ -328,6 +333,7 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 		case SCREEN_HEIGHT:
 			dispstat.SetVBlank(true)
 			nds.CheckDmas(mem.ARM9_DMA_MODE_VBL, true)
+			nds.CheckDmas(mem.ARM7_DMA_MODE_VBL, true)
 		//case SCREEN_HEIGHT + 1:
 			if utils.BitEnabled(uint32(*dispstat), 3) {
                 nds.arm9.Irq.SetIRQ(0)
@@ -362,21 +368,19 @@ func (nds *Nds) CheckDmas(mode uint32, arm9 bool) {
         return
     }
 
-    panic("ARM7 DMA")
+    for i := range 4 {
 
-    //for i := range 4 {
-
-    //    //if ok := nds.arm7.Dma[i].CheckMode(mode); ok {
-    //    //    nds.arm7.Dma[i].Transfer()
-    //    //}
-    //}
+        if ok := nds.arm7.Dma[i].CheckMode(mode); ok {
+            nds.arm7.Dma[i].Transfer()
+        }
+    }
 }
 
 func (nds *Nds) UpdateTimers(cycles uint32) {
 
 	overflow, setIrq := false, false
 
-    for i := range 8 {
+    for i := range 4 {
         if nds.mem.Timers[i].Enabled {
             overflow, setIrq = nds.mem.Timers[i].Update(overflow, cycles)
 
@@ -384,8 +388,18 @@ func (nds *Nds) UpdateTimers(cycles uint32) {
                 continue
             }
 
-            if i < 4 {
-                nds.arm9.Irq.SetIRQ(3 + uint32(i))
+            nds.arm9.Irq.SetIRQ(3 + uint32(i))
+        }
+    }
+
+	overflow, setIrq = false, false
+
+    for i := 4; i < 8; i++ {
+
+        if nds.mem.Timers[i].Enabled {
+            overflow, setIrq = nds.mem.Timers[i].Update(overflow, cycles)
+
+            if !setIrq {
                 continue
             }
 

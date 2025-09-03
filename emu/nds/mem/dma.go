@@ -1,7 +1,6 @@
 package mem
 
 import (
-
 	"github.com/aabalke/guac/emu/gba/utils"
 	"github.com/aabalke/guac/emu/nds/cpu"
 )
@@ -11,10 +10,20 @@ const (
 	ARM9_DMA_MODE_VBL = 1
 	ARM9_DMA_MODE_HBL = 2
 	ARM9_DMA_MODE_STA = 3
+
+    //unsetup
 	ARM9_DMA_MODE_MAI = 4
 	ARM9_DMA_MODE_DSC = 5
 	ARM9_DMA_MODE_GBA = 6
 	ARM9_DMA_MODE_GEO = 7
+
+	ARM7_DMA_MODE_IMM = 0
+	ARM7_DMA_MODE_VBL = 1
+
+    // unsetup
+	ARM7_DMA_MODE_DCS = 2
+	ARM7_DMA_MODE_WIF = 3
+	ARM7_DMA_MODE_GBA = 3
 
 	DMA_ADJ_INC = 0
 	DMA_ADJ_DEC = 1
@@ -103,8 +112,6 @@ func (dma *DMA) WriteControl(v uint8, hi bool) {
 		dma.Mode = utils.GetVarData(a, 3, 5)
 		dma.IRQ = utils.BitEnabled(a, 6)
 		dma.Enabled = utils.BitEnabled(a, 7)
-
-		// immediate should be 2 cycles after enabling
 
 		if wasDisabled && dma.Enabled {
 			dma.Src = dma.InitSrc
@@ -265,8 +272,6 @@ func (dma *DMA) Transfer() {
 
 	dma.Src = dma.MaskAddr(tmpSrc, true)
 	dma.Dst = dma.MaskAddr(tmpDst, false)
-
-	return
 }
 func (dma *DMA) CheckMode(mode uint32) bool {
 	return mode == dma.Mode && dma.Enabled

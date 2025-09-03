@@ -10,6 +10,8 @@ type Cpu struct {
 	Irq    *cpu.Irq
 	Reg Reg
     Halted bool
+
+    Dma [4]mem.DMA
 }
 
 const (

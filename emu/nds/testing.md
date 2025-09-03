@@ -24,7 +24,6 @@
 
 included:
 
-
 👍 Armv4
     👍 Condition Codes
 
@@ -73,9 +72,7 @@ included:
 
 ### gbe-plus
 
-❌ Dma
-    ❌ Transfer Test
-    👍 Dma Fill Test
+👍 Dma
 👍 Irq
 👍 Math
 ❌ Memory
