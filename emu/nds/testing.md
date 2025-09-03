@@ -121,12 +121,7 @@ Graphics
 
             ❌ Bitmap
             ❌ Scrolling
-            ❌ Advanced
-                👍 Mosaic
-                ❌ Rotation
-                ❌ Scaling
-                👍 Extended Palette
-                ❌ Multiple Text Layer
+            👍 Advanced
     
         👍 double buffer
         👍 rotation

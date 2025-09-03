@@ -2,12 +2,17 @@ package nds
 
 import (
 	"encoding/binary"
+	"fmt"
 	"sync"
 
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/nds/ppu"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
+
+var _ = fmt.Sprintf("")
+
+
 var wg = sync.WaitGroup{}
 
 func (nds *Nds) graphics(y uint32) {
@@ -144,7 +149,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
             case ppu.BG_TYPE_3D :
                 palData, ok = 0b11111, true // red
             case ppu.BG_TYPE_BGM:
-                palData, ok = 0b1111111111, true // yellow
+				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_256:
 				palData, ok = nds.setBmpBackgroundPixel(engine, bg, x)
             case ppu.BG_TYPE_DIR:
@@ -158,7 +163,6 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
             }
 
 			if ok {
-
 				bldPal.SetBlendPalettes(palData, uint32(bgIdx), false, false)
 			}
 		}
@@ -356,18 +360,85 @@ func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx
     return getBgPaletteData(nds, engine, bgIdx, bg.Palette256, palNum, palIdx, inTileX)
 }
 
-func (nds *Nds) setAffineBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx, x uint32) (uint32, bool) {
+func (nds *Nds) setAffine16BackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx, x uint32) (uint32, bool) {
 
 	//if !bg.Palette256 {
 	//	panic(fmt.Sprintf("AFFINE WITHOUT PAL 256"))
 	//}
 
     vramOffset := uint32(0)
-    //pramOffset := uint32(0)
 
     if engine.IsB {
         vramOffset = uint32(0x20_0000)
-        //pramOffset = uint32(0x400)
+    }
+
+	pa := utils.Convert8_8Float(int16(bg.Pa))
+	pc := utils.Convert8_8Float(int16(bg.Pc))
+	xIdx := int(pa*float64(x) + bg.OutX)
+	yIdx := int(pc*float64(x) + bg.OutY)
+
+	if bg.Mosaic && engine.Mosaic.BgH != 0 {
+		xIdx -= xIdx % int(engine.Mosaic.BgH+1)
+	}
+
+	if bg.Mosaic && engine.Mosaic.BgV != 0 {
+		yIdx -= yIdx % int(engine.Mosaic.BgV+1)
+	}
+
+	out := xIdx < 0 || xIdx >= int(bg.W) || yIdx < 0 || yIdx >= int(bg.H)
+
+	switch {
+	case bg.AffineWrap:
+		xIdx &= int(bg.W) - 1
+		yIdx &= int(bg.H) - 1
+	case !bg.AffineWrap && out:
+		return 0, false
+	}
+
+    const BYTE_SHIFT = 1
+
+	map_x := (uint32(xIdx)) & (bg.W - 1) >> 3
+	map_y := ((uint32(yIdx)) & (bg.H - 1)) >> 3
+	map_y *= bg.W >> 3
+	mapIdx := map_y + map_x
+
+    mapIdx <<= BYTE_SHIFT
+
+	mapAddr := bg.ScreenBaseBlock + mapIdx
+
+    if !engine.IsB {
+        mapAddr += engine.Dispcnt.ScreenBase
+    }
+
+    screenData := uint32(nds.mem.Vram.Read(vramOffset + mapAddr, true))
+    screenData |= uint32(nds.mem.Vram.Read(vramOffset + mapAddr + 1, true)) << 8
+
+	tileIdx := (screenData & 0b11_1111_1111) << 5
+
+	tileAddr := bg.CharBaseBlock + tileIdx
+    tileAddr += tileIdx
+
+    if !engine.IsB {
+        tileAddr += engine.Dispcnt.CharBase
+    }
+
+	inTileX, inTileY := getPositionsBg(screenData, uint32(xIdx), uint32(yIdx))
+
+	inTileIdx := uint32(inTileX) + uint32(inTileY<<3)
+
+	addr := vramOffset + tileAddr + inTileIdx
+    palIdx := uint32(nds.mem.Vram.Read(addr, true))
+    palNum := screenData >> 12
+
+    return getBgPaletteData(nds, engine, bgIdx, true, palNum, palIdx, inTileX)
+}
+
+func (nds *Nds) setAffineBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx, x uint32) (uint32, bool) {
+
+    vramOffset := uint32(0)
+
+    if engine.IsB {
+        vramOffset = uint32(0x20_0000)
     }
 
 	pa := utils.Convert8_8Float(int16(bg.Pa))
@@ -415,18 +486,9 @@ func (nds *Nds) setAffineBackgroundPixel(engine *ppu.Engine, bg *ppu.Background,
 	addr := vramOffset + tileAddr + inTileIdx
     palIdx := uint32(nds.mem.Vram.Read(addr, true))
 
-    // is this correct?
     pal := uint32(0)
 
-    return getBgPaletteData(nds, engine, bgIdx, bg.Palette256, pal, palIdx, inTileX)
-
-	//if palIdx == 0 {
-	//	return 0, false
-	//}
-
-	//palData := nds.getPalette(palIdx, 0, false, engine.IsB)
-
-	//return palData, true
+    return getBgPaletteData(nds, engine, bgIdx, true, pal, palIdx, inTileX)
 }
 
 func (nds *Nds) setBmpBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x uint32) (uint32, bool) {
