@@ -81,7 +81,7 @@ included:
     👍 Mirror Check
     👍 Bios Ram Usage (CRC16 failure causes problem)
 👍 Thumb
-❌ Timer (Will not build)
+👍 Timer (prescaler values are roughly correct)
 
 ### Devkitpro examples
 
