@@ -66,6 +66,8 @@ func (c *Cp15) Read(reg CpRegister) uint32 {
 
 func (c *Cp15) Write(v uint32, reg CpRegister) {
 
+    if reg.cn == 6 {return }
+
     switch reg {
     case TCMP, MAIN, CACH:
         return

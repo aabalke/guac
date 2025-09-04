@@ -328,9 +328,7 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
 		return
 	}
 	if abtExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB && cpu.Reg.getMode() == MODE_ABT; abtExit {
-
         cpu.Reg.R[15] += 4
-
 		cpu.ExitException(MODE_ABT)
 		return
 	}

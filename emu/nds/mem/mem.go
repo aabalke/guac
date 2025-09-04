@@ -85,6 +85,13 @@ func NewMemory(dma7, dma9 *[4]DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *
 	return m
 }
 
+var lockWrites bool
+
+func (mem *Mem) DirtyTransfer() {
+    setBiosRam(mem)
+    lockWrites = true
+}
+
 func (mem *Mem) LoadBios() {
 
 	for i := range len(arm7Bios) {
@@ -178,11 +185,11 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 
     // this is temp for homebrew programs - related to ipc writing incorrect values, which is used in CRC
     // also needed to pass memory mirror test in gbe+
-    if addr >= 0x2FFFC80 && addr < 0x2FFFCF0 && lockWrites {
-        //fmt.Printf("WRITE TO ADDR %08X V %02X arm9 %t\n", addr, v, arm9)
-        //os.Exit(0)
-        return
-    }
+    //if addr >= 0x2FFFC80 && addr < 0x2FFFCF0 && lockWrites {
+    //    //fmt.Printf("WRITE TO ADDR %08X V %02X arm9 %t\n", addr, v, arm9)
+    //    //os.Exit(0)
+    //    return
+    //}
     //if addr == 0x0380FCD2 {
     //    fmt.Printf("WRITING TO ADDR %08X ARM9 %t, v %02X\n", addr, arm9, v)
     //    os.Exit(0)
@@ -199,6 +206,7 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 		case 0x0, 0x1:
             mem.Tcm.Write(addr, v)
 		case 0x2:
+
 			mem.MainRam[addr&0x3F_FFFF] = v
 		case 0x3:
             mem.WRAM.Write(addr, v, true)
@@ -224,6 +232,10 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
         return
 	}
 
+    // temp for brain age arm7 will overwrite user settings otherwise
+    if v == 0 && addr >= 0x27FF000 && addr < 0x2FFFFFF && lockWrites {
+        return
+    }
 
 
     switch addr >> 24 {
@@ -936,43 +948,4 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 	default:
 		mem.IO[addr] = v
 	}
-}
-
-var lockWrites bool
-
-// this is temp while I get gamecard transfers and spi figured out
-func (mem *Mem) DirtyTransfer() {
-
-    h := &mem.Cartridge.Header
-
-    for i := range h.Arm9Size {
-        v := mem.Cartridge.Rom[h.Arm9Offset + i]
-        mem.Write(h.Arm9RamAddr + i, v, true)
-    }
-
-    for i := range h.Arm7Size {
-        v := mem.Cartridge.Rom[h.Arm7Offset + i]
-
-        mem.Write(h.Arm7RamAddr + i, v, false)
-    }
-
-    // bios ram usage
-
-    const (
-        USER_SETTING_RAM = 0x27FFC80
-        USER_SETTING_0   = 0x3FE00
-    )
-
-    mem.Write32(0x27FF800, 0xDEADBEEF, true)
-
-    for i := range uint32(0x100) {
-        v := spi.FirmwareData[USER_SETTING_0 + i]
-        mem.Write(USER_SETTING_RAM + i, v, true)
-    }
-
-    lockWrites = true
-
-
-    // temp attempt
-    //mem.Write32(0x803FFC, 0x20057F4, true)
 }

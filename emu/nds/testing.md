@@ -1,6 +1,5 @@
 # Testing
 
-
 ### Atem2069/armwrestler-fixed
 
 👍 Arm Alu
@@ -117,7 +116,7 @@ Graphics
                 ❌ 10, 11, 12, 13
 
             ❌ Bitmap
-            ❌ Scrolling
+            👍 Scrolling
             👍 Advanced
     
         👍 double buffer

@@ -42,7 +42,6 @@ type Nds struct {
 	arm9 arm9.Cpu
     ppu ppu.PPU
 
-
     Cartridge cart.Cartridge
 
 	Debugger Debugger
@@ -149,6 +148,10 @@ func (nds *Nds) checkBadPc() {
             panic(fmt.Sprintf("BAD ARM7 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
 
         }
+
+    if reg9.R[15] < 0x30 && !nds.mem.LowVector {
+            panic(fmt.Sprintf("BAD ARM9 PC %08X (LOW WHEN HIGH) CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
+    }
 }
 
 func (nds *Nds) checkMode() {
@@ -172,12 +175,12 @@ func (nds *Nds) Update() {
     r := &nds.arm9.Reg.R
     r7 := &nds.arm7.Reg.R
 
+    _ = r
+    _ = r7
+
 	if nds.Paused {
 		return
 	}
-
-    _ = r
-    _ = r7
 
 	nds.Drawn = false
     cycleArm7 := false
@@ -188,7 +191,11 @@ func (nds *Nds) Update() {
 
 		cycles := 1
 
-        //logger.Update(6_700_000, 6_720_000, CURR_INST,true)
+        //if CURR_INST == 654774 && r[1] != 0x2009394 {
+        //    panic("INCORRECT R1")
+        //}
+
+        //logger.Update(654038, 1_000_000, CURR_INST, true)
 
         nds.checkBadPc()
         nds.checkMode()
@@ -203,7 +210,7 @@ func (nds *Nds) Update() {
 
         nds.Tick(uint32(cycles))
 
-		//// irq has to be at end (count up tests)
+		// irq has to be at end (count up tests)
 		nds.arm9.CheckIrq()
 
         if cycleArm7 {
@@ -381,29 +388,33 @@ func (nds *Nds) UpdateTimers(cycles uint32) {
 	overflow, setIrq := false, false
 
     for i := range 4 {
-        if nds.mem.Timers[i].Enabled {
-            overflow, setIrq = nds.mem.Timers[i].Update(overflow, cycles)
-
-            if !setIrq {
-                continue
-            }
-
-            nds.arm9.Irq.SetIRQ(3 + uint32(i))
+        if !nds.mem.Timers[i].Enabled {
+            continue
         }
+
+        overflow, setIrq = nds.mem.Timers[i].Update(overflow, cycles)
+
+        if !setIrq {
+            continue
+        }
+
+        nds.arm9.Irq.SetIRQ(3 + uint32(i))
     }
 
 	overflow, setIrq = false, false
 
     for i := 4; i < 8; i++ {
 
-        if nds.mem.Timers[i].Enabled {
-            overflow, setIrq = nds.mem.Timers[i].Update(overflow, cycles)
-
-            if !setIrq {
-                continue
-            }
-
-            nds.arm7.Irq.SetIRQ(3 + uint32(i - 4))
+        if !nds.mem.Timers[i].Enabled {
+            continue
         }
+
+        overflow, setIrq = nds.mem.Timers[i].Update(overflow, cycles)
+
+        if !setIrq {
+            continue
+        }
+
+        nds.arm7.Irq.SetIRQ(3 + uint32(i - 4))
     }
 }
