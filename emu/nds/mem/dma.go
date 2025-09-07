@@ -10,18 +10,17 @@ const (
 	ARM9_DMA_MODE_VBL = 1
 	ARM9_DMA_MODE_HBL = 2
 	ARM9_DMA_MODE_STA = 3
+	ARM9_DMA_MODE_DSC = 5
 
     //unsetup
 	ARM9_DMA_MODE_MAI = 4
-	ARM9_DMA_MODE_DSC = 5
 	ARM9_DMA_MODE_GBA = 6
 	ARM9_DMA_MODE_GEO = 7
 
 	ARM7_DMA_MODE_IMM = 0
 	ARM7_DMA_MODE_VBL = 1
+	ARM7_DMA_MODE_DSC = 2
 
-    // unsetup
-	ARM7_DMA_MODE_DCS = 2
 	ARM7_DMA_MODE_WIF = 3
 	ARM7_DMA_MODE_GBA = 3
 
@@ -51,6 +50,8 @@ type DMA struct {
 	Control   uint32
 	WordCount uint32
 
+    DefaultCount uint32
+
 	DstAdj  uint32
 	SrcAdj  uint32
 	Repeat  bool
@@ -63,10 +64,19 @@ type DMA struct {
 	Value uint32
 }
 
-func (dma *DMA) Init(idx int, mem *Mem, irq *cpu.Irq) {
+func (dma *DMA) Init(idx int, mem *Mem, irq *cpu.Irq, arm9 bool) {
     dma.Idx = idx
     dma.mem = mem
     dma.irq = irq
+
+    switch {
+    case arm9:
+        dma.DefaultCount = 0x200000
+    case idx == 3:
+        dma.DefaultCount = 0x10000
+    default:
+        dma.DefaultCount = 0x4000
+    }
 }
 
 func (dma *DMA) ReadControl(hi bool) uint8 {
@@ -141,7 +151,7 @@ func (dma *DMA) Transfer() {
 	count := dma.WordCount
 
     if count == 0 {
-        count = 0x200000
+        count = dma.DefaultCount
     }
 
 	//if dma.Mode == DMA_MODE_HBL {
@@ -273,6 +283,25 @@ func (dma *DMA) Transfer() {
 	dma.Src = dma.MaskAddr(tmpSrc, true)
 	dma.Dst = dma.MaskAddr(tmpDst, false)
 }
+
 func (dma *DMA) CheckMode(mode uint32) bool {
 	return mode == dma.Mode && dma.Enabled
+}
+
+func (dma *DMA) CheckGamecart(arm9 bool) {
+
+    //After sending a command, data can be read from this register manually (when the DRQ bit is set), or by DMA (with DMASAD=4100010h, Fixed Source Address, Length=1, Size=32bit, Repeat=On, Mode=DS Gamecard)
+
+    if !(dma.Src == 0x4100010 && dma.SrcAdj == DMA_ADJ_NON && dma.WordCount == 1 && dma.isWord && dma.Repeat) {
+        return
+    }
+
+    if !(arm9 && dma.Mode == ARM9_DMA_MODE_DSC) {
+        return
+    }
+    if !(!arm9 && dma.Mode == ARM7_DMA_MODE_DSC) {
+        return
+    }
+
+    dma.Transfer()
 }

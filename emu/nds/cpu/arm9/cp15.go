@@ -27,6 +27,11 @@ var (
     // tcm
     DTCM = CpRegister{op: 0, cn: 9, cm: 1, cp: 0, pn: 15}
     ITCM = CpRegister{op: 0, cn: 9, cm: 1, cp: 1, pn: 15}
+
+    // Cache Control
+    HALT =  CpRegister{op: 0, cn: 7, cm: 0, cp: 4, pn: 15}
+    HALT2 = CpRegister{op: 0, cn: 7, cm: 8, cp: 2, pn: 15}
+
 )
 
 func (c *Cp15) Init(mem *mem.Mem) {
@@ -99,6 +104,7 @@ func (c *Cp15) Write(v uint32, reg CpRegister) {
         v &= 0b111110
 
         c.mem.Tcm.ItcmSize = 512 << utils.GetVarData(v, 1, 6)
+
     }
 
 	c.R[reg] = v

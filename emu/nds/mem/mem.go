@@ -2,6 +2,7 @@ package mem
 
 import (
 	_ "embed"
+	"fmt"
 
 	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/cpu"
@@ -30,6 +31,8 @@ type Mem struct {
 
 	IO [0x100_0000]uint8
 
+    halted7, halted9 *bool
+
 	arm9Irq *cpu.Irq
 	arm7Irq *cpu.Irq
 
@@ -40,8 +43,8 @@ type Mem struct {
 
     ppu *ppu.PPU
 
-    exmem ExMem
-    auxspi AuxSPI
+    Gamecard Gamecard
+
     div Div
     sqrt Sqrt
 
@@ -58,8 +61,10 @@ type Mem struct {
     Timers [8]Timer
 }
 
-func NewMemory(dma7, dma9 *[4]DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PPU) Mem {
+func NewMemory(halted7, halted9 *bool, dma7, dma9 *[4]DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PPU) Mem {
 	m := Mem{
+        halted7: halted7,
+        halted9: halted9,
         arm9Dma: dma9,
         arm9Irq: irq9,
         arm7Irq: irq7,
@@ -81,6 +86,17 @@ func NewMemory(dma7, dma9 *[4]DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *
     m.Rtc.RegStatus2 = 0x41
 
     m.Spi.Init()
+    m.Gamecard.Init(irq7, irq9, dma7, dma9, c)
+
+    m.Vram.CNT_A.Write(0x80)
+    m.Vram.CNT_B.Write(0x80)
+    m.Vram.CNT_C.Write(0x80)
+    m.Vram.CNT_D.Write(0x80)
+    m.Vram.CNT_E.Write(0x80)
+    m.Vram.CNT_F.Write(0x80)
+    m.Vram.CNT_G.Write(0x80)
+    m.Vram.CNT_H.Write(0x80)
+    m.Vram.CNT_I.Write(0x80)
 
 	return m
 }
@@ -125,20 +141,14 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 		case 0x4:
 			return mem.ReadArm9IO(addr - 0x400_0000)
 		case 0x5:
-            //panic("PRAM READ YAY")
             return mem.Pram.Read(addr)
 		case 0x6:
-            //panic("VRAM READ 9 YAY")
             return mem.Vram.Read(addr, true)
 		case 0x7:
             return mem.Oam[addr & 0x7FF]
-		case 0x8, 0x9:
-			return 0 // gba rom
-		case 0xA, 0xB, 0xC, 0xD, 0xE:
-			return 0 // gba ram
+        default:
+            return 0
 		}
-
-        return 0
 	}
     switch addr >> 24 {
     case 0x0, 0x1:
@@ -153,15 +163,12 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
     case 0x3:
         return mem.WRAM.Read(addr, false)
     case 0x4:
-        return mem.ReadArm7IO(addr-0x400_0000) //io
-    case 0x5: // pal std
-        return 0
+        return mem.ReadArm7IO(addr-0x400_0000)
     case 0x6:
-        //panic("VRAM READ 7 YAY")
         return mem.Vram.Read(addr, false)
+    default:
+        return 0
     }
-
-	return 0
 }
 
 func (mem *Mem) Read8(addr uint32, arm9 bool) uint32 {
@@ -174,6 +181,8 @@ func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
     switch addr {
     case 0x410_0000:
         return mem.Ipc.ReadFifo(arm9)
+    case 0x410_0010:
+        return mem.Gamecard.RomCtrl.ReadCmdIn()
     default:
         a := uint32(mem.Read(addr+2, arm9)) | (uint32(mem.Read(addr+3, arm9)) << 8)
         b := uint32(mem.Read(addr, arm9)) | (uint32(mem.Read(addr+1, arm9)) << 8)
@@ -183,17 +192,9 @@ func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
 
 func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 
-    // this is temp for homebrew programs - related to ipc writing incorrect values, which is used in CRC
-    // also needed to pass memory mirror test in gbe+
-    //if addr >= 0x2FFFC80 && addr < 0x2FFFCF0 && lockWrites {
-    //    //fmt.Printf("WRITE TO ADDR %08X V %02X arm9 %t\n", addr, v, arm9)
-    //    //os.Exit(0)
-    //    return
-    //}
-    //if addr == 0x0380FCD2 {
-    //    fmt.Printf("WRITING TO ADDR %08X ARM9 %t, v %02X\n", addr, arm9, v)
-    //    os.Exit(0)
-    //}
+    if addr == 0x2023F60 {
+        fmt.Printf("WRITING TO ADDR %02X ARM9 %t\n", v, arm9)
+    }
 
 	if arm9 {
 
@@ -206,37 +207,30 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 		case 0x0, 0x1:
             mem.Tcm.Write(addr, v)
 		case 0x2:
-
 			mem.MainRam[addr&0x3F_FFFF] = v
 		case 0x3:
             mem.WRAM.Write(addr, v, true)
 		case 0x4:
-
-            //fmt.Printf("WRITE IO %08X %02X\n", addr, v)
-
-			mem.WriteArm9IO(addr-0x400_0000, v) //io
+			mem.WriteArm9IO(addr-0x400_0000, v)
         case 0x5:
-            //panic("PRAM WRITE YAY")
             mem.Pram.Write(addr, v)
 		case 0x6:
-            //panic("VRAM WRITE YAY")
             mem.Vram.Write(addr, v, true)
-		case 0x7: // oam
+		case 0x7:
             mem.Oam[addr & 0x7FF] = v
             mem.ppu.UpdateOAM(addr, v, &mem.Oam)
-		case 0x8, 0x9: // gba rom
-		case 0xA, 0xB, 0xC, 0xD, 0xE: // gba ram
-		case 0xF:
 		}
 
         return
 	}
 
+    // this is temp for homebrew programs - related to ipc writing incorrect values, which is used in CRC
     // temp for brain age arm7 will overwrite user settings otherwise
-    if v == 0 && addr >= 0x27FF000 && addr < 0x2FFFFFF && lockWrites {
-        return
+    //if v == 0 && addr >= 0x27FF000 && addr < 0x2FFFFFF && lockWrites {
+    if v == 0 && addr >= 0x2FFFC80 && addr < 0x2FFFC84 && lockWrites {
+        fmt.Printf("LOCK WRITE %08X arm9 %t\n", addr, arm9)
+        //return
     }
-
 
     switch addr >> 24 {
     case 0x2:
@@ -244,10 +238,8 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
     case 0x3:
         mem.WRAM.Write(addr, v, false)
     case 0x4:
-        mem.WriteArm7IO(addr-0x400_0000, v) //io
-    case 0x5: // pal std
+        mem.WriteArm7IO(addr-0x400_0000, v)
     case 0x6:
-        //panic("VRAM WRITE YAY")
         mem.Vram.Write(addr, v, true)
     }
 }
@@ -389,18 +381,27 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
         return mem.Ipc.ReadCnt(3, true)
 
     case 0x1A0:
-        return mem.auxspi.Read(0)
+        return mem.Gamecard.AuxSpi.Read(0)
     case 0x1A1:
-        return mem.auxspi.Read(1)
+        return mem.Gamecard.AuxSpi.Read(1)
     case 0x1A2:
-        return mem.auxspi.Read(2)
+        return mem.Gamecard.AuxSpi.Read(2)
     case 0x1A3:
-        return mem.auxspi.Read(3)
+        return mem.Gamecard.AuxSpi.Read(3)
+    case 0x1A4: return mem.Gamecard.RomCtrl.Read(0)
+    case 0x1A5: return mem.Gamecard.RomCtrl.Read(1)
+    case 0x1A6: return mem.Gamecard.RomCtrl.Read(2)
+    case 0x1A7: return mem.Gamecard.RomCtrl.Read(3)
+
+    case 0x100010: panic("READING GAMECARD READ IN FROM READ16 OR READ8")
+    case 0x100011: panic("READING GAMECARD READ IN FROM READ16 OR READ8")
+    case 0x100012: panic("READING GAMECARD READ IN FROM READ16 OR READ8")
+    case 0x100013: panic("READING GAMECARD READ IN FROM READ16 OR READ8")
 
     case 0x204:
-        return mem.exmem.Read(0)
+        return mem.Gamecard.ExMem.Read(0)
     case 0x205:
-        return mem.exmem.Read(1)
+        return mem.Gamecard.ExMem.Read(1)
 	case 0x208:
 		return mem.arm9Irq.ReadIME()
 	case 0x210:
@@ -421,6 +422,8 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 		return mem.arm9Irq.ReadIF(3)
     case 0x247:
         return mem.WRAM.ReadCNT()
+    case 0x300:
+        return 0x1
 	default:
 		return mem.IO[addr]
 	}
@@ -482,14 +485,40 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
     case 0x181:
         mem.Ipc.WriteSync(v, 1, true)
 
-    case 0x1A0:
-        mem.auxspi.Write(v, 0)
-    case 0x1A1:
-        mem.auxspi.Write(v, 1)
-    case 0x1A2:
-        mem.auxspi.WriteData(v, 0)
-    case 0x1A3:
-        mem.auxspi.WriteData(v, 1)
+    case 0x1A0: mem.Gamecard.AuxSpi.Write(v, 0)
+    case 0x1A1: mem.Gamecard.AuxSpi.Write(v, 1)
+    case 0x1A2: mem.Gamecard.AuxSpi.Write(v, 2)
+    case 0x1A3: mem.Gamecard.AuxSpi.Write(v, 3)
+    case 0x1A4: mem.Gamecard.RomCtrl.Write(v, 0)
+    case 0x1A5: mem.Gamecard.RomCtrl.Write(v, 1)
+    case 0x1A6: mem.Gamecard.RomCtrl.Write(v, 2)
+    case 0x1A7: mem.Gamecard.RomCtrl.Write(v, 3)
+
+    case 0x1A8: mem.Gamecard.RomCtrl.WriteCmdOut(v, 0)
+    case 0x1A9: mem.Gamecard.RomCtrl.WriteCmdOut(v, 1)
+    case 0x1AA: mem.Gamecard.RomCtrl.WriteCmdOut(v, 2)
+    case 0x1AB: mem.Gamecard.RomCtrl.WriteCmdOut(v, 3)
+    case 0x1AC: mem.Gamecard.RomCtrl.WriteCmdOut(v, 4)
+    case 0x1AD: mem.Gamecard.RomCtrl.WriteCmdOut(v, 5)
+    case 0x1AE: mem.Gamecard.RomCtrl.WriteCmdOut(v, 6)
+    case 0x1AF: mem.Gamecard.RomCtrl.WriteCmdOut(v, 7)
+    case 0x1B0: mem.Gamecard.RomCtrl.WriteSeed(v, 0, 0)
+    case 0x1B1: mem.Gamecard.RomCtrl.WriteSeed(v, 1, 0)
+    case 0x1B2: mem.Gamecard.RomCtrl.WriteSeed(v, 2, 0)
+    case 0x1B3: mem.Gamecard.RomCtrl.WriteSeed(v, 3, 0)
+    case 0x1B4: mem.Gamecard.RomCtrl.WriteSeed(v, 0, 1)
+    case 0x1B5: mem.Gamecard.RomCtrl.WriteSeed(v, 1, 1)
+    case 0x1B6: mem.Gamecard.RomCtrl.WriteSeed(v, 2, 1)
+    case 0x1B7: mem.Gamecard.RomCtrl.WriteSeed(v, 3, 1)
+    case 0x1B8: mem.Gamecard.RomCtrl.WriteSeed(v, 4, 0)
+    case 0x1B9: mem.Gamecard.RomCtrl.WriteSeed(v, 5, 0)
+    case 0x1BA: mem.Gamecard.RomCtrl.WriteSeed(v, 4, 1)
+    case 0x1BB: mem.Gamecard.RomCtrl.WriteSeed(v, 5, 1)
+
+    case 0x100010: mem.Gamecard.RomCtrl.WriteCmdIn(v, 0)
+    case 0x100011: mem.Gamecard.RomCtrl.WriteCmdIn(v, 1)
+    case 0x100012: mem.Gamecard.RomCtrl.WriteCmdIn(v, 2)
+    case 0x100013: mem.Gamecard.RomCtrl.WriteCmdIn(v, 3)
 
 	case 0x00B0:
 		mem.arm9Dma[0].WriteSrc(v, 0)
@@ -621,10 +650,8 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 	case 0x10F:
 		mem.Timers[3].WriteCnt(v, true)
 
-    case 0x204:
-        mem.exmem.Write(v, 0)
-    case 0x205:
-        mem.exmem.Write(v, 1)
+    case 0x204: mem.Gamecard.ExMem.Write(v, 0)
+    case 0x205: mem.Gamecard.ExMem.Write(v, 1)
 	case 0x208:
 		mem.arm9Irq.WriteIME(v)
 	case 0x210:
@@ -758,14 +785,19 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
     case 0x187:
         return mem.Ipc.ReadCnt(3, false)
 
-    case 0x1A0:
-        return mem.auxspi.Read(0)
-    case 0x1A1:
-        return mem.auxspi.Read(1)
-    case 0x1A2:
-        return mem.auxspi.Read(2)
-    case 0x1A3:
-        return mem.auxspi.Read(3)
+    case 0x1A0: return mem.Gamecard.AuxSpi.Read(0)
+    case 0x1A1: return mem.Gamecard.AuxSpi.Read(1)
+    case 0x1A2: return mem.Gamecard.AuxSpi.Read(2)
+    case 0x1A3: return mem.Gamecard.AuxSpi.Read(3)
+    case 0x1A4: return mem.Gamecard.RomCtrl.Read(0)
+    case 0x1A5: return mem.Gamecard.RomCtrl.Read(1)
+    case 0x1A6: return mem.Gamecard.RomCtrl.Read(2)
+    case 0x1A7: return mem.Gamecard.RomCtrl.Read(3)
+
+    case 0x100010: panic("READING GAMECARD READ IN FROM READ16 OR READ8")
+    case 0x100011: panic("READING GAMECARD READ IN FROM READ16 OR READ8")
+    case 0x100012: panic("READING GAMECARD READ IN FROM READ16 OR READ8")
+    case 0x100013: panic("READING GAMECARD READ IN FROM READ16 OR READ8")
 
     case 0x1C0:
         return mem.Spi.ReadCNT(0)
@@ -776,10 +808,8 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
     case 0x1C3:
         return 0
 
-    case 0x204:
-        return mem.exmem.Read(0)
-    case 0x205:
-        return mem.exmem.Read(1)
+    case 0x204: return mem.Gamecard.ExMem.Read(0)
+    case 0x205: return mem.Gamecard.ExMem.Read(1)
 	case 0x208:
 		return mem.arm7Irq.ReadIME()
 	case 0x210:
@@ -803,6 +833,17 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 
     case 0x241:
         return mem.WRAM.ReadCNT()
+    //case 0x300: // this crashes some homebrew
+    //    return 0x1
+
+    case 0x301:
+
+        if *mem.halted7 {
+            return 0b1000_0000
+        } else {
+            return 0b0000_0000
+        }
+
 	default:
 		return mem.IO[addr]
 	}
@@ -904,14 +945,41 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
     case 0x187:
         mem.Ipc.WriteCnt(v, 3, false)
 
-    case 0x1A0:
-        mem.auxspi.Write(v, 0)
-    case 0x1A1:
-        mem.auxspi.Write(v, 1)
-    case 0x1A2:
-        mem.auxspi.WriteData(v, 0)
-    case 0x1A3:
-        mem.auxspi.WriteData(v, 1)
+    case 0x1A0: mem.Gamecard.AuxSpi.Write(v, 0)
+    case 0x1A1: mem.Gamecard.AuxSpi.Write(v, 1)
+    case 0x1A2: mem.Gamecard.AuxSpi.Write(v, 2)
+    case 0x1A3: mem.Gamecard.AuxSpi.Write(v, 3)
+    case 0x1A4: mem.Gamecard.RomCtrl.Write(v, 0)
+    case 0x1A5: mem.Gamecard.RomCtrl.Write(v, 1)
+    case 0x1A6: mem.Gamecard.RomCtrl.Write(v, 2)
+    case 0x1A7: mem.Gamecard.RomCtrl.Write(v, 3)
+
+    case 0x1A8: mem.Gamecard.RomCtrl.WriteCmdOut(v, 0)
+    case 0x1A9: mem.Gamecard.RomCtrl.WriteCmdOut(v, 1)
+    case 0x1AA: mem.Gamecard.RomCtrl.WriteCmdOut(v, 2)
+    case 0x1AB: mem.Gamecard.RomCtrl.WriteCmdOut(v, 3)
+    case 0x1AC: mem.Gamecard.RomCtrl.WriteCmdOut(v, 4)
+    case 0x1AD: mem.Gamecard.RomCtrl.WriteCmdOut(v, 5)
+    case 0x1AE: mem.Gamecard.RomCtrl.WriteCmdOut(v, 6)
+    case 0x1AF: mem.Gamecard.RomCtrl.WriteCmdOut(v, 7)
+    case 0x1B0: mem.Gamecard.RomCtrl.WriteSeed(v, 0, 0)
+    case 0x1B1: mem.Gamecard.RomCtrl.WriteSeed(v, 1, 0)
+    case 0x1B2: mem.Gamecard.RomCtrl.WriteSeed(v, 2, 0)
+    case 0x1B3: mem.Gamecard.RomCtrl.WriteSeed(v, 3, 0)
+    case 0x1B4: mem.Gamecard.RomCtrl.WriteSeed(v, 0, 1)
+    case 0x1B5: mem.Gamecard.RomCtrl.WriteSeed(v, 1, 1)
+    case 0x1B6: mem.Gamecard.RomCtrl.WriteSeed(v, 2, 1)
+    case 0x1B7: mem.Gamecard.RomCtrl.WriteSeed(v, 3, 1)
+    case 0x1B8: mem.Gamecard.RomCtrl.WriteSeed(v, 4, 0)
+    case 0x1B9: mem.Gamecard.RomCtrl.WriteSeed(v, 5, 0)
+    case 0x1BA: mem.Gamecard.RomCtrl.WriteSeed(v, 4, 1)
+    case 0x1BB: mem.Gamecard.RomCtrl.WriteSeed(v, 5, 1)
+
+    case 0x100010: mem.Gamecard.RomCtrl.WriteCmdIn(v, 0)
+    case 0x100011: mem.Gamecard.RomCtrl.WriteCmdIn(v, 1)
+    case 0x100012: mem.Gamecard.RomCtrl.WriteCmdIn(v, 2)
+    case 0x100013: mem.Gamecard.RomCtrl.WriteCmdIn(v, 3)
+
     case 0x1C0:
         mem.Spi.WriteCNT(0, v) 
     case 0x1C1:
@@ -921,10 +989,7 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
     case 0x1C3:
         return
 
-    case 0x204:
-        mem.exmem.Write(v, 0)
-    case 0x205:
-        mem.exmem.Write(v, 1)
+    case 0x204: mem.Gamecard.ExMem.Write(v, 0)
 	case 0x208:
 		mem.arm7Irq.WriteIME(v)
 	case 0x210:
@@ -945,6 +1010,19 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 		mem.arm7Irq.WriteIF(v, 3)
     case 0x247:
         mem.WRAM.WriteCNT(v)
+
+    case 0x301:
+
+        v >>= 6
+
+        switch v {
+        case 0:
+            (*mem.halted7) = false
+        case 2:
+            (*mem.halted7) = true
+        default:
+            panic(fmt.Sprintf("UNKNOWN HALTCNT VALUE ARM7 %d", v))
+        }
 	default:
 		mem.IO[addr] = v
 	}

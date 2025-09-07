@@ -10,6 +10,7 @@ type Cpu struct {
 	Irq    *cpu.Irq
 	Reg Reg
     Halted bool
+    Sleeped bool
 
     Dma [4]mem.DMA
 }
@@ -88,6 +89,14 @@ func NewCpu(mem *mem.Mem, irq *cpu.Irq) *Cpu {
 		mem: mem,
 		Irq: irq,
 	}
+
+    // skip bios
+
+    c.Irq.IME = true
+    // IrqIpcRecvFifo, IrqTimers, IrqVBlank
+    c.Irq.IE |= 1 << 0
+    c.Irq.IE |= 1 << 3
+    c.Irq.IE |= 1 << 17
 
 	return c
 }

@@ -93,6 +93,13 @@ func NewCpu(mem *mem.Mem, irq *cpu.Irq) *Cpu {
 
     c.Cp15.Init(mem)
 
+    // skip bios
+    c.Irq.IME = true
+    // IrqIpcRecvFifo, IrqTimers, IrqVBlank
+    c.Irq.IE |= 1 << 0
+    c.Irq.IE |= 1 << 3
+    c.Irq.IE |= 1 << 17
+
 	return c
 }
 

@@ -84,17 +84,20 @@ func NewNds(path string, _ *oto.Context) *Nds {
 	nds.Debugger = Debugger{&nds}
 	nds.arm7 = *arm7.NewCpu(&nds.mem, &arm7Irq)
 	nds.arm9 = *arm9.NewCpu(&nds.mem, &arm9Irq)
-	nds.mem = mem.NewMemory(&nds.arm7.Dma, &nds.arm9.Dma, &arm7Irq, &arm9Irq, &nds.Cartridge, &nds.ppu)
+	nds.mem = mem.NewMemory(
+        &nds.arm7.Halted, &nds.arm9.Halted,
+        &nds.arm7.Dma, &nds.arm9.Dma,
+        &arm7Irq, &arm9Irq, &nds.Cartridge, &nds.ppu)
 
-    nds.arm9.Dma[0].Init(0, &nds.mem, &arm9Irq)
-    nds.arm9.Dma[1].Init(1, &nds.mem, &arm9Irq)
-    nds.arm9.Dma[2].Init(2, &nds.mem, &arm9Irq)
-    nds.arm9.Dma[3].Init(3, &nds.mem, &arm9Irq)
+    nds.arm9.Dma[0].Init(0, &nds.mem, &arm9Irq, true)
+    nds.arm9.Dma[1].Init(1, &nds.mem, &arm9Irq, true)
+    nds.arm9.Dma[2].Init(2, &nds.mem, &arm9Irq, true)
+    nds.arm9.Dma[3].Init(3, &nds.mem, &arm9Irq, true)
 
-    nds.arm7.Dma[0].Init(0, &nds.mem, &arm7Irq)
-    nds.arm7.Dma[1].Init(1, &nds.mem, &arm7Irq)
-    nds.arm7.Dma[2].Init(2, &nds.mem, &arm7Irq)
-    nds.arm7.Dma[3].Init(3, &nds.mem, &arm7Irq)
+    nds.arm7.Dma[0].Init(0, &nds.mem, &arm7Irq, false)
+    nds.arm7.Dma[1].Init(1, &nds.mem, &arm7Irq, false)
+    nds.arm7.Dma[2].Init(2, &nds.mem, &arm7Irq, false)
+    nds.arm7.Dma[3].Init(3, &nds.mem, &arm7Irq, false)
 
     nds.LoadGame(path)
 	//nds.arm9.Reset()
@@ -102,9 +105,6 @@ func NewNds(path string, _ *oto.Context) *Nds {
     nds.DirtyInit()
 
     logger = NewLogger("./log.csv", &nds)
-
-    //nds.arm7.Halted = true
-    //nds.mem.Write32(0x23FFC80, 0xDEADBEEF, false)
 
 	return &nds
 }
@@ -132,22 +132,22 @@ func (nds *Nds) checkBadPc() {
         panic(fmt.Sprintf("BAD ARM7 ARM   PC %08X CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
     }
 
-    if (
-        nds.mem.Read32(reg9.R[15], true) == 0x0 &&
-        nds.mem.Read32(reg9.R[15] + 1, true) == 0x0 &&
-        nds.mem.Read32(reg9.R[15] + 2, true) == 0x0 &&
-        nds.mem.Read32(reg9.R[15] + 3, true) == 0x0) {
-            panic(fmt.Sprintf("BAD ARM9 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
+    //if (
+    //    nds.mem.Read32(reg9.R[15], true) == 0x0 &&
+    //    nds.mem.Read32(reg9.R[15] + 1, true) == 0x0 &&
+    //    nds.mem.Read32(reg9.R[15] + 2, true) == 0x0 &&
+    //    nds.mem.Read32(reg9.R[15] + 3, true) == 0x0) {
+    //        panic(fmt.Sprintf("BAD ARM9 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
 
-        }
-    if (
-        nds.mem.Read32(reg7.R[15], false) == 0x0 &&
-        nds.mem.Read32(reg7.R[15] + 1, false) == 0x0 &&
-        nds.mem.Read32(reg7.R[15] + 2, false) == 0x0 &&
-        nds.mem.Read32(reg7.R[15] + 3, false) == 0x0) {
-            panic(fmt.Sprintf("BAD ARM7 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
+    //    }
+    //if (
+    //    nds.mem.Read32(reg7.R[15], false) == 0x0 &&
+    //    nds.mem.Read32(reg7.R[15] + 1, false) == 0x0 &&
+    //    nds.mem.Read32(reg7.R[15] + 2, false) == 0x0 &&
+    //    nds.mem.Read32(reg7.R[15] + 3, false) == 0x0) {
+    //        panic(fmt.Sprintf("BAD ARM7 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
 
-        }
+    //    }
 
     if reg9.R[15] < 0x30 && !nds.mem.LowVector {
             panic(fmt.Sprintf("BAD ARM9 PC %08X (LOW WHEN HIGH) CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
@@ -182,42 +182,56 @@ func (nds *Nds) Update() {
 		return
 	}
 
-	nds.Drawn = false
-    cycleArm7 := false
-
-	for !nds.Drawn {
-
-        // will need half time cycles for thumb
-
-		cycles := 1
+	for nds.Drawn = false; !nds.Drawn; {
 
         //if CURR_INST == 654774 && r[1] != 0x2009394 {
         //    panic("INCORRECT R1")
         //}
 
-        //logger.Update(654038, 1_000_000, CURR_INST, true)
+        //if r[15] == 0x0200B1C8 && r[0] == 0x2023F60 {
+        //    nds.Debugger.PrintLine(true)
+        //    //fmt.Printf("R15 CURR %d\n", CURR_INST)
+        //    os.Exit(0)
+        //}
+
+        //if r[15] == 0x0200B35C {
+        //    fmt.Printf("R15 CURR %d\n", CURR_INST)
+        //    os.Exit(0)
+        //}
+
+        //logger.Update(10_000_000, 10_100_000, CURR_INST, true)
+        //logger.Update(0, 400_380, CURR_INST, true)
 
         nds.checkBadPc()
         nds.checkMode()
 
+        // arm9 thumb ~1 cycles, arm ~2 cycles
+        // arm7 thumb ~2 cycles, arm ~4 cycles
+
 		if !nds.arm9.Halted {
-			nds.arm9.Execute()
+
+            thumbExec :=  nds.arm9.Reg.IsThumb
+            armExec := !nds.arm9.Reg.IsThumb && nds.AccCycles & 0b1 == 0
+
+            if thumbExec || armExec  {
+                nds.arm9.Execute()
+            }
 		}
 
-        if cycleArm7 && !nds.arm7.Halted {
-			nds.arm7.Execute()
+        if !nds.arm7.Halted {
+            thumbExec :=  nds.arm7.Reg.IsThumb && nds.AccCycles & 0b1 == 0
+            armExec := !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b11 == 0
+
+            if thumbExec || armExec  {
+                nds.arm7.Execute()
+            }
         }
 
-        nds.Tick(uint32(cycles))
+        nds.Tick(1)
 
 		// irq has to be at end (count up tests)
 		nds.arm9.CheckIrq()
-
-        if cycleArm7 {
-            nds.arm7.CheckIrq()
-        }
-
-        cycleArm7 = !cycleArm7
+        nds.arm7.CheckIrq()
 
         CURR_INST++
 	}
@@ -268,6 +282,7 @@ func (nds *Nds) DirtyInit() {
     nds.arm7.Reg.CPSR = 0x000_001F
 
     nds.arm7.Halted = false
+    nds.arm9.Halted = false
 }
 
 // RidgeX/ygba BSD3

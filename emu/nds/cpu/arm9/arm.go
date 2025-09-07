@@ -1332,6 +1332,16 @@ func (cpu *Cpu) CoDataReg(opcode uint32) {
         return
     }
 
-    cpu.Cp15.Write(r[rd], reg)
+    if rd == 0 && (reg == HALT || reg == HALT2) {
+
+        if !cpu.Irq.IME {
+            panic("ARM9 CPU HALTED WITHOUT IME ENABLED")
+        }
+
+        cpu.Halted = true
+    } else {
+        cpu.Cp15.Write(r[rd], reg)
+    }
+
     cpu.Reg.R[15] += 4
 }

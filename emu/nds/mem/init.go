@@ -132,19 +132,19 @@ func setBiosRam(mem *Mem) {
 
 
     // temp adc calibration to match nocash
-    mem.Write(USER_SETTING_RAM + 0x58, 0xDF, true)
-    mem.Write(USER_SETTING_RAM + 0x59, 0x02, true)
-    mem.Write(USER_SETTING_RAM + 0x5A, 0x2C, true)
-    mem.Write(USER_SETTING_RAM + 0x5B, 0x03, true)
-    mem.Write(USER_SETTING_RAM + 0x5C, 0x20, true)
-    mem.Write(USER_SETTING_RAM + 0x5D, 0x20, true)
+    //mem.Write(USER_SETTING_RAM + 0x58, 0xDF, true)
+    //mem.Write(USER_SETTING_RAM + 0x59, 0x02, true)
+    //mem.Write(USER_SETTING_RAM + 0x5A, 0x2C, true)
+    //mem.Write(USER_SETTING_RAM + 0x5B, 0x03, true)
+    //mem.Write(USER_SETTING_RAM + 0x5C, 0x20, true)
+    //mem.Write(USER_SETTING_RAM + 0x5D, 0x20, true)
 
-    mem.Write(USER_SETTING_RAM + 0x5E, 0x3B, true)
-    mem.Write(USER_SETTING_RAM + 0x5F, 0x0D, true)
-    mem.Write(USER_SETTING_RAM + 0x60, 0xE7, true)
-    mem.Write(USER_SETTING_RAM + 0x61, 0x0C, true)
-    mem.Write(USER_SETTING_RAM + 0x62, 0xE0, true)
-    mem.Write(USER_SETTING_RAM + 0x63, 0xA0, true)
+    //mem.Write(USER_SETTING_RAM + 0x5E, 0x3B, true)
+    //mem.Write(USER_SETTING_RAM + 0x5F, 0x0D, true)
+    //mem.Write(USER_SETTING_RAM + 0x60, 0xE7, true)
+    //mem.Write(USER_SETTING_RAM + 0x61, 0x0C, true)
+    //mem.Write(USER_SETTING_RAM + 0x62, 0xE0, true)
+    //mem.Write(USER_SETTING_RAM + 0x63, 0xA0, true)
 }
 
 
