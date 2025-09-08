@@ -192,10 +192,6 @@ func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
 
 func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 
-    if addr == 0x2023F60 {
-        fmt.Printf("WRITING TO ADDR %02X ARM9 %t\n", v, arm9)
-    }
-
 	if arm9 {
 
         if addr >= mem.Tcm.DtcmBase && addr < mem.Tcm.DtcmBase + mem.Tcm.DtcmSize {
@@ -224,14 +220,6 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
         return
 	}
 
-    // this is temp for homebrew programs - related to ipc writing incorrect values, which is used in CRC
-    // temp for brain age arm7 will overwrite user settings otherwise
-    //if v == 0 && addr >= 0x27FF000 && addr < 0x2FFFFFF && lockWrites {
-    if v == 0 && addr >= 0x2FFFC80 && addr < 0x2FFFC84 && lockWrites {
-        fmt.Printf("LOCK WRITE %08X arm9 %t\n", addr, arm9)
-        //return
-    }
-
     switch addr >> 24 {
     case 0x2:
         mem.MainRam[addr&0x3F_FFFF] = v
@@ -248,9 +236,12 @@ func (mem *Mem) Write8(addr uint32, v uint8, arm9 bool) {
 	mem.Write(addr, v, arm9)
 }
 func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
-	mem.Write(addr, uint8(v), arm9)
-	mem.Write(addr+1, uint8(v>>8), arm9)
 
+    switch addr {
+    default:
+        mem.Write(addr, uint8(v), arm9)
+        mem.Write(addr+1, uint8(v>>8), arm9)
+    }
 }
 func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
 

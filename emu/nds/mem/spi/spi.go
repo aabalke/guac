@@ -1,6 +1,7 @@
 package spi
 
 import (
+
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
@@ -11,6 +12,10 @@ const (
 
     STAT_CONT = 1
     STAT_DONE = 2
+
+
+
+    UNDEFINIED_DEV = 10
 )
 
 type Spi struct {
@@ -22,6 +27,8 @@ type Spi struct {
     Firmware Firmware
     Tsc Tsc
 
+    TransferDevice uint8
+
 
     Value uint8
     Req, Res []uint8
@@ -30,6 +37,8 @@ type Spi struct {
 func (s *Spi) Init() {
     s.Pmd.RegPowermg = 0b1101
     s.Pmd.RegMicgain = 0b1
+
+    s.TransferDevice = UNDEFINIED_DEV
 }
 
 func (s *Spi) WriteCNT(b, v uint8) {
@@ -49,10 +58,25 @@ func (s *Spi) WriteCNT(b, v uint8) {
 		s.CNT &= 0xFF
 		s.CNT |= uint16(v) << 8
 
-        prevDevice := s.Device
 		s.Device = v & 0b11
 
-        if prevDevice != s.Device {
+        s.Hold = utils.BitEnabled(uint32(v), 3)
+
+        s.Irq = utils.BitEnabled(uint32(v), 6)
+        s.Enabled = utils.BitEnabled(uint32(v), 7)
+
+	}
+}
+
+func (s *Spi) ReadCNT(b uint8) uint8 {
+	return uint8(s.CNT >> (8 * b))
+}
+
+func (s *Spi) WriteData(v uint8) {
+
+    if s.Enabled {
+
+        if s.TransferDevice != s.Device {
             if s.Device == DEV_FIRMW {
                 s.Firmware.Addr = 0
                 s.Firmware.WriteBuffer = nil
@@ -65,33 +89,13 @@ func (s *Spi) WriteCNT(b, v uint8) {
             s.Res = nil
         }
 
-        //prevHold := s.Hold
-        s.Hold = utils.BitEnabled(uint32(v), 3)
+        s.TransferDevice = s.Device
+    }
 
-        //if prevHold && !s.Hold {
-        if !s.Hold {
-            if s.Device == DEV_FIRMW {
-                s.Firmware.Write()
-            }
-        }
+    var value uint8
 
-        s.Irq = utils.BitEnabled(uint32(v), 6)
-        s.Enabled = utils.BitEnabled(uint32(v), 7)
-	}
-
-    //fmt.Printf("WRITING CNT %04X DEV %02d DATA %02X\n", s.CNT, s.Device, s.Data)
-}
-
-func (s *Spi) ReadCNT(b uint8) uint8 {
-	return uint8(s.CNT >> (8 * b))
-}
-
-func (s *Spi) WriteData(v uint8) {
-
-    if len(s.Res) == 0 {
-        s.Value = 0
-    } else {
-        s.Value = s.Res[0]
+    if len(s.Res) > 0 {
+        value = s.Res[0]
         s.Res = s.Res[1:]
     }
 
@@ -113,12 +117,15 @@ func (s *Spi) WriteData(v uint8) {
         }
     }
 
+    s.Value = value
 
-    //if !s.Hold {
-    //    if s.Device == DEV_FIRMW {
-    //        s.Firmware.Write()
-    //    }
-    //}
+    if !s.Hold {
+        if s.Device == DEV_FIRMW {
+            s.Firmware.Write()
+        }
+
+        s.TransferDevice = UNDEFINIED_DEV
+    }
 }
 
 func (s *Spi) ReadData() uint8 {

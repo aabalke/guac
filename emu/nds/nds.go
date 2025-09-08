@@ -170,6 +170,8 @@ func (nds *Nds) checkMode() {
     }
 }
 
+var prevValue uint32
+
 func (nds *Nds) Update() {
 
     r := &nds.arm9.Reg.R
@@ -184,21 +186,6 @@ func (nds *Nds) Update() {
 
 	for nds.Drawn = false; !nds.Drawn; {
 
-        //if CURR_INST == 654774 && r[1] != 0x2009394 {
-        //    panic("INCORRECT R1")
-        //}
-
-        //if r[15] == 0x0200B1C8 && r[0] == 0x2023F60 {
-        //    nds.Debugger.PrintLine(true)
-        //    //fmt.Printf("R15 CURR %d\n", CURR_INST)
-        //    os.Exit(0)
-        //}
-
-        //if r[15] == 0x0200B35C {
-        //    fmt.Printf("R15 CURR %d\n", CURR_INST)
-        //    os.Exit(0)
-        //}
-
         //logger.Update(10_000_000, 10_100_000, CURR_INST, true)
         //logger.Update(0, 400_380, CURR_INST, true)
 
@@ -209,7 +196,6 @@ func (nds *Nds) Update() {
         // arm7 thumb ~2 cycles, arm ~4 cycles
 
 		if !nds.arm9.Halted {
-
             thumbExec :=  nds.arm9.Reg.IsThumb
             armExec := !nds.arm9.Reg.IsThumb && nds.AccCycles & 0b1 == 0
 
@@ -223,6 +209,7 @@ func (nds *Nds) Update() {
             armExec := !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b11 == 0
 
             if thumbExec || armExec  {
+                //logger.Update(0, 1_000_000, CURR_INST, false)
                 nds.arm7.Execute()
             }
         }

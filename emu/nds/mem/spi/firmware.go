@@ -71,6 +71,7 @@ func (f *Firmware) Transfer(data []uint8) (reply []uint8, stat uint8){
         case 0, 1, 2, 3:
             return nil, STAT_CONT
         case 4:
+
             f.Addr =  uint32(data[1]) << 16
             f.Addr |= uint32(data[2]) << 8
             f.Addr |= uint32(data[3])
@@ -84,6 +85,12 @@ func (f *Firmware) Transfer(data []uint8) (reply []uint8, stat uint8){
         )
 
         for i = range BUF_SIZE {
+
+            if f.Addr + i >= uint32(len(FirmwareData)) {
+                buffer = append(buffer, 0)
+                continue
+            }
+
             buffer = append(buffer, FirmwareData[f.Addr + i])
         }
 

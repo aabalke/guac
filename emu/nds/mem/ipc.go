@@ -85,20 +85,15 @@ func (i *IPC) WriteSync(v, b uint8, isArm9 bool) {
 	}
 
     if b == 0 {
-
         *local &^= 0xF0
         *local |= uint16(v & 0xF0)
-
         return
     }
-
 
     *local &^= 0b100_1111 << 8
     *local |= uint16(v & 0b100_1111) << 8
     *remote &^= 0xF
     *remote |= uint16(v & 0xF)
-
-
 
     if irq := utils.BitEnabled(uint32(v), 5) && utils.BitEnabled(uint32(*remote), 14); irq {
         if isArm9 {
@@ -114,11 +109,11 @@ func (i *IPC) ReadSync(b uint8, arm9 bool) uint8 {
 
 	if arm9 {
         v := uint8(i.SYNC9 >> (b * 8))
-        //fmt.Printf("READ SYNC B %02X IS ARM %t %02X SYNC9 %04X SYNC7 %04X\n", b, arm9, v, i.SYNC9, i.SYNC7)
+        //fmt.Printf("READ SYNC B %02X IS ARM %t V %02X SYNC9 %04X SYNC7 %04X\n", b, arm9, v, i.SYNC9, i.SYNC7)
         return v
 	}
     v := uint8(i.SYNC7 >> (b * 8))
-    //fmt.Printf("READ SYNC B %02X IS ARM %t %02X SYNC9 %04X SYNC7 %04X\n", b, arm9, v, i.SYNC9, i.SYNC7)
+    //fmt.Printf("READ SYNC B %02X IS ARM %t V %02X SYNC9 %04X SYNC7 %04X\n", b, arm9, v, i.SYNC9, i.SYNC7)
     return v
 }
 
@@ -172,6 +167,7 @@ func (i *IPC) WriteCnt(v, b uint8, isArm9 bool) {
 
         local.Enabled = utils.BitEnabled(uint32(v), 7)
     }
+    i.UpdateIRQ()
 }
 
 func (i *IPC) ReadCnt(b uint8, isArm9 bool) uint8 {
@@ -224,13 +220,14 @@ func (i *IPC) WriteFifo(v uint32, isArm9 bool) {
     //    i.Fifo7.Error = true
     //}
 
-    if local.IrqNotEmpty && !local.Empty {
-        if isArm9 {
-            i.Irq7.SetIRQ(cpu.IRQ_IPC_RECV_FIFO)
-        } else {
-            i.Irq9.SetIRQ(cpu.IRQ_IPC_RECV_FIFO)
-        }
-    }
+    i.UpdateIRQ()
+    //if local.IrqNotEmpty && !local.Empty {
+    //    if isArm9 {
+    //        i.Irq7.SetIRQ(cpu.IRQ_IPC_RECV_FIFO)
+    //    } else {
+    //        i.Irq9.SetIRQ(cpu.IRQ_IPC_RECV_FIFO)
+    //    }
+    //}
 }
 
 func (i *IPC) ReadFifo(isArm9 bool) uint32 {
@@ -253,13 +250,45 @@ func (i *IPC) ReadFifo(isArm9 bool) uint32 {
         local.Error = true
     }
 
-    if remote.IrqEmpty && remote.Empty {
-        if isArm9 {
-            i.Irq7.SetIRQ(cpu.IRQ_IPC_SEND_FIFO)
-        } else {
-            i.Irq9.SetIRQ(cpu.IRQ_IPC_SEND_FIFO)
-        }
-    }
+    i.UpdateIRQ()
+
+    //if remote.IrqEmpty && remote.Empty {
+    //    if isArm9 {
+    //        i.Irq7.SetIRQ(cpu.IRQ_IPC_SEND_FIFO)
+    //    } else {
+    //        i.Irq9.SetIRQ(cpu.IRQ_IPC_SEND_FIFO)
+    //    }
+    //}
+
+    //fmt.Printf("FIFO READ %08X ARM9 %t\n", v, isArm9)
 
     return v
+}
+
+var prevValues[4]bool
+
+func (i *IPC) UpdateIRQ() {
+
+    if v := i.Fifo9to7.Empty && i.Fifo9to7.IrqEmpty; v && !prevValues[0] {
+        prevValues[0] = v
+        i.Irq9.SetIRQ(cpu.IRQ_IPC_SEND_FIFO)
+    }
+
+    if v := !i.Fifo7to9.Empty && i.Fifo7to9.IrqNotEmpty; v && !prevValues[1] {
+        prevValues[1] = v
+        i.Irq9.SetIRQ(cpu.IRQ_IPC_RECV_FIFO)
+    }
+
+    if v := i.Fifo7to9.Empty && i.Fifo7to9.IrqEmpty; v && !prevValues[2]{
+        prevValues[2] = v
+        i.Irq7.SetIRQ(cpu.IRQ_IPC_SEND_FIFO)
+    }
+
+    if v := !i.Fifo9to7.Empty && i.Fifo9to7.IrqNotEmpty; v && !prevValues[3] {
+        prevValues[3] = v
+        i.Irq7.SetIRQ(cpu.IRQ_IPC_RECV_FIFO)
+    }
+
+
+
 }

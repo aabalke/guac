@@ -128,9 +128,6 @@ func setBiosRam(mem *Mem) {
         mem.Write(CART_HEADER_RAM + i, v, true)
     }
 
-
-
-
     // temp adc calibration to match nocash
     //mem.Write(USER_SETTING_RAM + 0x58, 0xDF, true)
     //mem.Write(USER_SETTING_RAM + 0x59, 0x02, true)
