@@ -93,6 +93,10 @@ Debugging
 Wifi
 
 FileSystem
+    ❌ libfatdir
+    👍 nitrodir
+    ❌ overlays (matches nocash, libfat fails)
+
 
 Graphics
 

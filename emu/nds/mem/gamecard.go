@@ -64,7 +64,6 @@ func (g *Gamecard) Init(irq7, irq9 *cpu.Irq, dma7, dma9 *[4]dma.DMA, cart *cart.
     g.ExMem.v |= 1 << 13
 
     g.RomCtrl.isReady = true
-    g.RomCtrl.v |= 1 << 23
     g.RomCtrl.Key1Gap2Length = 0x18
 
     g.Key2 = NewDefaultKey2()
@@ -163,13 +162,13 @@ func (a *AuxSPI) Write(v uint8, b uint8) {
 
     switch b {
     case 0:
-        fmt.Printf("W AUXSPI V %02X B %02d\n", v, b)
+        //fmt.Printf("W AUXSPI V %02X B %02d\n", v, b)
         a.Baudrate = v & 0b11
         a.Hold = utils.BitEnabled(uint32(v), 6)
         a.Busy = utils.BitEnabled(uint32(v), 7)
         return
     case 1:
-        fmt.Printf("W AUXSPI V %02X B %02d\n", v, b)
+        //fmt.Printf("W AUXSPI V %02X B %02d\n", v, b)
         // top bits can only be written by arm9
         a.IsBackup = utils.BitEnabled(uint32(v), 5)
         a.Gamecard.RomTransferIrq = utils.BitEnabled(uint32(v), 6)
@@ -222,8 +221,6 @@ type RomCtrl struct {
 
 func (r *RomCtrl) Read(b uint8) uint8 {
 
-    r.v |= 1 << 23
-
     //fmt.Println("READ  ROM CTRL")
 
     switch b {
@@ -231,6 +228,15 @@ func (r *RomCtrl) Read(b uint8) uint8 {
     case 1:
         return uint8((r.v &^ (1 << 7)) >> (b * 8))
     case 2:
+        v :=  uint8((r.v) >> (b * 8))
+
+        if r.isReady {
+            v |= 0b1000_0000
+        } else {
+            v &^= 0b1000_0000
+        }
+
+        return v
 
     case 3:
     }
@@ -266,7 +272,7 @@ func (r *RomCtrl) Write(v uint8, b uint8) {
 
     case 2:
         r.v &^= (0b0111_1111 << (b * 8))
-        r.v |= (uint32(v) << (b * 8))
+        r.v |= (uint32(v & 0b0111_1111) << (b * 8))
 
         r.Key1Gap2Length = max(0x18, uint32(v & 0x1F))
         r.Key2EncryptCmds = utils.BitEnabled(uint32(v), 6)
@@ -288,28 +294,34 @@ func (r *RomCtrl) Write(v uint8, b uint8) {
         r.Active = utils.BitEnabled(uint32(v), 7)
     }
 
-    log.Printf("RomCtrl Write of V %02X at B %02X. Output %08X. Ready %t\n", v, b, r.v, r.isReady)
+    //log.Printf("RomCtrl Write of V %02X at B %02X. Output %08X. Ready %t\n", v, b, r.v, r.isReady)
     if r.Active {
         r.Run()
     }
 }
 
 func (r *RomCtrl) WriteCmdOut(v, b uint8) {
-    log.Printf("W CMD OUT V %02X, B %02X\n", v, b)
+    //log.Printf("W CMD OUT V %02X, B %02X\n", v, b)
     r.Command[b] = v
 }
 func (r *RomCtrl) WriteCmdIn(v, b uint8) {
-    log.Printf("W CMD IN  V %02X, B %02X\n", v, b)
+    //log.Printf("W CMD IN  V %02X, B %02X\n", v, b)
 }
 func (r *RomCtrl) ReadCmdIn() uint32 {
-    //log.Printf("R CMD IN B %08X\n", r.DataOut)
+
+    v := r.DataOut
 
     if r.isReady {
-        r.v |= (1 << 23)
         r.isReady = false
 
         r.Gamecard.Transfer(false)
+    } else {
+        fmt.Printf("WARNING GAMECARD ROM READ WITHOUT PENDING DATA\n")
     }
+
+    //log.Printf("R CMD IN B %08X CTRL %08X\n", v, r.v)
+
+    return v
 
     return r.DataOut
 }
@@ -396,7 +408,6 @@ func (g *Gamecard) Transfer(initial bool) {
     if len(g.Buffer) == 0 {
 
         g.RomCtrl.v &^= (1 << 31)
-        g.RomCtrl.v &^= (1 << 23)
 
         g.RomCtrl.Active = false
         g.RomCtrl.isReady = false
@@ -406,7 +417,7 @@ func (g *Gamecard) Transfer(initial bool) {
             g.irq9.SetIRQ(cpu.IRQ_CARD_TRANS_COMPLETE)
         }
 
-        log.Println("FINISHED")
+        log.Printf("FINISHED GAMECARD %08X\n", g.RomCtrl.v)
 
         return
     }
@@ -416,7 +427,6 @@ func (g *Gamecard) Transfer(initial bool) {
     g.RomCtrl.DataOut = binary.LittleEndian.Uint32(g.Buffer[0:4])
     g.Buffer = g.Buffer[4:]
 
-    g.RomCtrl.v |= (1 << 23)
     g.RomCtrl.isReady = true
 
     for i := range 4 {

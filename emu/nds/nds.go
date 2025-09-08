@@ -161,21 +161,35 @@ func (nds *Nds) checkBadPc() {
 
 func (nds *Nds) checkMode() {
 
+    validModes := []uint32 {
+        0b10000,
+        0b10001,
+        0b10010,
+        0b10011,
+        0b10111,
+        0b11011,
+        0b11111,
+    }
 
     m9 := uint32(nds.arm9.Reg.CPSR) & 0x1F
     m7 := uint32(nds.arm7.Reg.CPSR) & 0x1F
 
-    switch m9 {
-    case 0b10000, 0b10001, 0b10010, 0b10011, 0b10111, 0b11011, 0b11111: 
-    default: panic(fmt.Sprintf("ARM9 MODE INVALID %02X CURR %d\n", m9, CURR_INST))
+    validM9 := false
+    validM7 := false
+
+    for _, v := range validModes {
+        if v == m9 { validM9 = true }
+        if v == m7 { validM7 = true }
     }
-    switch m7 {
-    case 0b10000, 0b10001, 0b10010, 0b10011, 0b10111, 0b11011, 0b11111: 
-    default: panic(fmt.Sprintf("ARM7 MODE INVALID %02X CURR %d\n", m7, CURR_INST))
+
+    if !validM9 {
+        panic(fmt.Sprintf("ARM9 MODE INVALID %02X CURR %d\n", m9, CURR_INST))
+    }
+
+    if !validM7 {
+        panic(fmt.Sprintf("ARM7 MODE INVALID %02X CURR %d\n", m7, CURR_INST))
     }
 }
-
-var prevValue uint32
 
 func (nds *Nds) Update() {
 
@@ -191,9 +205,6 @@ func (nds *Nds) Update() {
 
 	for nds.Drawn = false; !nds.Drawn; {
 
-        //logger.Update(10_000_000, 10_100_000, CURR_INST, true)
-        //logger.Update(0, 400_380, CURR_INST, true)
-
         nds.checkBadPc()
         nds.checkMode()
 
@@ -205,6 +216,7 @@ func (nds *Nds) Update() {
             armExec := !nds.arm9.Reg.IsThumb && nds.AccCycles & 0b1 == 0
 
             if thumbExec || armExec  {
+                //logger.Update(0, 2_000_000, CURR_INST, true)
                 nds.arm9.Execute()
             }
 		}
@@ -214,7 +226,7 @@ func (nds *Nds) Update() {
             armExec := !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b11 == 0
 
             if thumbExec || armExec  {
-                //logger.Update(0, 1_000_000, CURR_INST, false)
+                //logger.Update(0, 2_000_000, CURR_INST, false)
                 nds.arm7.Execute()
             }
         }
