@@ -3,6 +3,7 @@ package spi
 import (
 	_ "embed"
 	"fmt"
+	"log"
 )
 
 //go:embed res/firmware.bin
@@ -137,15 +138,11 @@ func (f *Firmware) Write() {
         return
     }
 
-    //log.Printf("Firmware Write, will need to be stored at some point ADDR %08X V %v\n", f.Addr, f.WriteBuffer)
+    log.Printf("Firmware Write, will need to be stored at some point ADDR %08X V %v\n", f.Addr, f.WriteBuffer)
 
     //for i, v := range f.WriteBuffer {
     //    FirmwareData[f.Addr + uint32(i)] = v
     //}
 
     f.WriteBuffer = nil
-
-
-
-
 }

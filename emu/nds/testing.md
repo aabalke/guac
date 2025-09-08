@@ -136,7 +136,11 @@ Graphics
 input
     addon
     keyboard
+        async
+        👍 stdin
     touch_pad
+        touch_look
+        👍 touch_test
 
 👍 pxi
 

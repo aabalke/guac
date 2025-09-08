@@ -12,10 +12,6 @@ const (
 
     STAT_CONT = 1
     STAT_DONE = 2
-
-
-
-    UNDEFINIED_DEV = 10
 )
 
 type Spi struct {
@@ -27,8 +23,8 @@ type Spi struct {
     Firmware Firmware
     Tsc Tsc
 
-    TransferDevice uint8
-
+    // pointer in order to nil when not used, not sure if better method
+    TransferDevice *uint8
 
     Value uint8
     Req, Res []uint8
@@ -38,7 +34,7 @@ func (s *Spi) Init() {
     s.Pmd.RegPowermg = 0b1101
     s.Pmd.RegMicgain = 0b1
 
-    s.TransferDevice = UNDEFINIED_DEV
+    s.TransferDevice = nil
 }
 
 func (s *Spi) WriteCNT(b, v uint8) {
@@ -64,7 +60,6 @@ func (s *Spi) WriteCNT(b, v uint8) {
 
         s.Irq = utils.BitEnabled(uint32(v), 6)
         s.Enabled = utils.BitEnabled(uint32(v), 7)
-
 	}
 }
 
@@ -76,7 +71,7 @@ func (s *Spi) WriteData(v uint8) {
 
     if s.Enabled {
 
-        if s.TransferDevice != s.Device {
+        if s.TransferDevice == nil || *s.TransferDevice != s.Device {
             if s.Device == DEV_FIRMW {
                 s.Firmware.Addr = 0
                 s.Firmware.WriteBuffer = nil
@@ -89,7 +84,9 @@ func (s *Spi) WriteData(v uint8) {
             s.Res = nil
         }
 
-        s.TransferDevice = s.Device
+        d := s.Device
+
+        s.TransferDevice = &d
     }
 
     var value uint8
@@ -124,7 +121,7 @@ func (s *Spi) WriteData(v uint8) {
             s.Firmware.Write()
         }
 
-        s.TransferDevice = UNDEFINIED_DEV
+        s.TransferDevice = nil
     }
 }
 

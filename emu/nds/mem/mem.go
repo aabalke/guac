@@ -20,24 +20,22 @@ type Mem struct {
 
     Tcm Tcm
 
-	MainRam       [0x40_0000]uint8
-	WRAM          WRAM
-    Pram ppu.PRAM
-    Vram ppu.VRAM
-    Oam [0x800]uint8
+	MainRam         [0x40_0000]uint8
+	WRAM            WRAM
+    Pram            ppu.PRAM
+    Vram            ppu.VRAM
+    Oam             [0x800]uint8
 
 	Arm7Bios [0x4000]uint8
 	Arm9Bios [0x1000]uint8
 
-	IO [0x100_0000]uint8
+    // this size is temp
+	//IO [0x100_0000]uint8
+	IO [0x10_0000]uint8
 
     halted7, halted9 *bool
-
-	arm9Irq *cpu.Irq
-	arm7Irq *cpu.Irq
-
-    arm9Dma *[4]DMA
-    arm7Dma *[4]DMA
+	irq7, irq9 *cpu.Irq
+    dma7, dma9 *[4]DMA
 
     LowVector bool
 
@@ -65,9 +63,10 @@ func NewMemory(halted7, halted9 *bool, dma7, dma9 *[4]DMA, irq7, irq9 *cpu.Irq, 
 	m := Mem{
         halted7: halted7,
         halted9: halted9,
-        arm9Dma: dma9,
-        arm9Irq: irq9,
-        arm7Irq: irq7,
+        dma7: dma7,
+        dma9: dma9,
+        irq9: irq9,
+        irq7: irq7,
         Cartridge: c,
         ppu: ppu,
     }
@@ -268,6 +267,8 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
         return mem.div.Read(addr)
     } else if addr >= 0x2B0 && addr < 0x2C0 {
         return mem.sqrt.Read(addr)
+    } else if addr >= 0xB0 && addr < 0x100 {
+        return mem.ReadDma(mem.dma9, addr)
     }
 
 	switch addr {
@@ -279,39 +280,6 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
         return uint8(mem.Vcount)
     case 0x7:
         return uint8(mem.Vcount >> 8)
-
-	case 0x00B8:
-		return 0
-	case 0x00B9:
-		return 0
-	case 0x00BA:
-		return mem.arm9Dma[0].ReadControl(false)
-	case 0x00BB:
-		return mem.arm9Dma[0].ReadControl(true)
-	case 0x00C4:
-		return 0
-	case 0x00C5:
-		return 0
-	case 0x00C6:
-		return mem.arm9Dma[1].ReadControl(false)
-	case 0x00C7:
-		return mem.arm9Dma[1].ReadControl(true)
-	case 0x00D0:
-		return 0
-	case 0x00D1:
-		return 0
-	case 0x00D2:
-		return mem.arm9Dma[2].ReadControl(false)
-	case 0x00D3:
-		return mem.arm9Dma[2].ReadControl(true)
-	case 0x00DC:
-		return 0
-	case 0x00DD:
-		return 0
-	case 0x00DE:
-		return mem.arm9Dma[3].ReadControl(false)
-	case 0x00DF:
-		return mem.arm9Dma[3].ReadControl(true)
 
 	case 0x100:
 		return mem.Timers[0].ReadD(false)
@@ -345,8 +313,6 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 		return mem.Timers[3].ReadCnt(false)
 	case 0x10F:
 		return mem.Timers[3].ReadCnt(true)
-
-
 
 	case 0x130:
 		return mem.Keypad.readINPUT(false)
@@ -394,28 +360,29 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
     case 0x205:
         return mem.Gamecard.ExMem.Read(1)
 	case 0x208:
-		return mem.arm9Irq.ReadIME()
+		return mem.irq9.ReadIME()
 	case 0x210:
-		return mem.arm9Irq.ReadIE(0)
+		return mem.irq9.ReadIE(0)
 	case 0x211:
-		return mem.arm9Irq.ReadIE(1)
+		return mem.irq9.ReadIE(1)
 	case 0x212:
-		return mem.arm9Irq.ReadIE(2)
+		return mem.irq9.ReadIE(2)
 	case 0x213:
-		return mem.arm9Irq.ReadIE(3)
+		return mem.irq9.ReadIE(3)
 	case 0x214:
-		return mem.arm9Irq.ReadIF(0)
+		return mem.irq9.ReadIF(0)
 	case 0x215:
-		return mem.arm9Irq.ReadIF(1)
+		return mem.irq9.ReadIF(1)
 	case 0x216:
-		return mem.arm9Irq.ReadIF(2)
+		return mem.irq9.ReadIF(2)
 	case 0x217:
-		return mem.arm9Irq.ReadIF(3)
+		return mem.irq9.ReadIF(3)
     case 0x247:
         return mem.WRAM.ReadCNT()
     case 0x300:
         return 0x1
 	default:
+        //panic(fmt.Sprintf("READ UNKNOWN ARM9 IO ADDR %08X", addr))
 		return mem.IO[addr]
 	}
 }
@@ -437,6 +404,11 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
         return
     case addr >= 0x2B0 && addr < 0x2C0:
         mem.sqrt.Write(addr, v)
+        return
+    }
+
+    if addr >= 0xB0 && addr < 0x100 {
+        mem.WriteDma(mem.dma9, addr, v)
         return
     }
 
@@ -511,103 +483,6 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
     case 0x100012: mem.Gamecard.RomCtrl.WriteCmdIn(v, 2)
     case 0x100013: mem.Gamecard.RomCtrl.WriteCmdIn(v, 3)
 
-	case 0x00B0:
-		mem.arm9Dma[0].WriteSrc(v, 0)
-	case 0x00B1:
-		mem.arm9Dma[0].WriteSrc(v, 1)
-	case 0x00B2:
-		mem.arm9Dma[0].WriteSrc(v, 2)
-	case 0x00B3:
-		mem.arm9Dma[0].WriteSrc(v, 3)
-	case 0x00B4:
-		mem.arm9Dma[0].WriteDst(v, 0)
-	case 0x00B5:
-		mem.arm9Dma[0].WriteDst(v, 1)
-	case 0x00B6:
-		mem.arm9Dma[0].WriteDst(v, 2)
-	case 0x00B7:
-		mem.arm9Dma[0].WriteDst(v, 3)
-	case 0x00B8:
-		mem.arm9Dma[0].WriteCount(v, false)
-	case 0x00B9:
-		mem.arm9Dma[0].WriteCount(v, true)
-	case 0x00BA:
-		mem.arm9Dma[0].WriteControl(v, false)
-	case 0x00BB:
-		mem.arm9Dma[0].WriteControl(v, true)
-	case 0x00BC:
-		mem.arm9Dma[1].WriteSrc(v, 0)
-	case 0x00BD:
-		mem.arm9Dma[1].WriteSrc(v, 1)
-	case 0x00BE:
-		mem.arm9Dma[1].WriteSrc(v, 2)
-	case 0x00BF:
-		mem.arm9Dma[1].WriteSrc(v, 3)
-	case 0x00C0:
-		mem.arm9Dma[1].WriteDst(v, 0)
-	case 0x00C1:
-		mem.arm9Dma[1].WriteDst(v, 1)
-	case 0x00C2:
-		mem.arm9Dma[1].WriteDst(v, 2)
-	case 0x00C3:
-		mem.arm9Dma[1].WriteDst(v, 3)
-	case 0x00C4:
-		mem.arm9Dma[1].WriteCount(v, false)
-	case 0x00C5:
-		mem.arm9Dma[1].WriteCount(v, true)
-	case 0x00C6:
-		mem.arm9Dma[1].WriteControl(v, false)
-	case 0x00C7:
-		mem.arm9Dma[1].WriteControl(v, true)
-	case 0x00C8:
-		mem.arm9Dma[2].WriteSrc(v, 0)
-	case 0x00C9:
-		mem.arm9Dma[2].WriteSrc(v, 1)
-	case 0x00CA:
-		mem.arm9Dma[2].WriteSrc(v, 2)
-	case 0x00CB:
-		mem.arm9Dma[2].WriteSrc(v, 3)
-	case 0x00CC:
-		mem.arm9Dma[2].WriteDst(v, 0)
-	case 0x00CD:
-		mem.arm9Dma[2].WriteDst(v, 1)
-	case 0x00CE:
-		mem.arm9Dma[2].WriteDst(v, 2)
-	case 0x00CF:
-		mem.arm9Dma[2].WriteDst(v, 3)
-	case 0x00D0:
-		mem.arm9Dma[2].WriteCount(v, false)
-	case 0x00D1:
-		mem.arm9Dma[2].WriteCount(v, true)
-	case 0x00D2:
-		mem.arm9Dma[2].WriteControl(v, false)
-	case 0x00D3:
-		mem.arm9Dma[2].WriteControl(v, true)
-	case 0x00D4:
-		mem.arm9Dma[3].WriteSrc(v, 0)
-	case 0x00D5:
-		mem.arm9Dma[3].WriteSrc(v, 1)
-	case 0x00D6:
-		mem.arm9Dma[3].WriteSrc(v, 2)
-	case 0x00D7:
-		mem.arm9Dma[3].WriteSrc(v, 3)
-	case 0x00D8:
-		mem.arm9Dma[3].WriteDst(v, 0)
-	case 0x00D9:
-		mem.arm9Dma[3].WriteDst(v, 1)
-	case 0x00DA:
-		mem.arm9Dma[3].WriteDst(v, 2)
-	case 0x00DB:
-		mem.arm9Dma[3].WriteDst(v, 3)
-	case 0x00DC:
-		mem.arm9Dma[3].WriteCount(v, false)
-	case 0x00DD:
-		mem.arm9Dma[3].WriteCount(v, true)
-	case 0x00DE:
-		mem.arm9Dma[3].WriteControl(v, false)
-	case 0x00DF:
-		mem.arm9Dma[3].WriteControl(v, true)
-
 	case 0x100:
 		mem.Timers[0].WriteD(v, false)
 	case 0x101:
@@ -644,23 +519,23 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
     case 0x204: mem.Gamecard.ExMem.Write(v, 0)
     case 0x205: mem.Gamecard.ExMem.Write(v, 1)
 	case 0x208:
-		mem.arm9Irq.WriteIME(v)
+		mem.irq9.WriteIME(v)
 	case 0x210:
-		mem.arm9Irq.WriteIE(v, 0)
+		mem.irq9.WriteIE(v, 0)
 	case 0x211:
-		mem.arm9Irq.WriteIE(v, 1)
+		mem.irq9.WriteIE(v, 1)
 	case 0x212:
-		mem.arm9Irq.WriteIE(v, 2)
+		mem.irq9.WriteIE(v, 2)
 	case 0x213:
-		mem.arm9Irq.WriteIE(v, 3)
+		mem.irq9.WriteIE(v, 3)
 	case 0x214:
-		mem.arm9Irq.WriteIF(v, 0)
+		mem.irq9.WriteIF(v, 0)
 	case 0x215:
-		mem.arm9Irq.WriteIF(v, 1)
+		mem.irq9.WriteIF(v, 1)
 	case 0x216:
-		mem.arm9Irq.WriteIF(v, 2)
+		mem.irq9.WriteIF(v, 2)
 	case 0x217:
-		mem.arm9Irq.WriteIF(v, 3)
+		mem.irq9.WriteIF(v, 3)
     case 0x240: mem.Vram.WriteCNT(addr, v)
     case 0x241: mem.Vram.WriteCNT(addr, v)
     case 0x242: mem.Vram.WriteCNT(addr, v)
@@ -688,6 +563,7 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
         mem.ppu.PowCnt1.V |= uint16(v) << 8
         mem.ppu.Update(addr, uint32(v))
 	default:
+        //panic(fmt.Sprintf("WRTE UNKNOWN ARM9 IO ADDR %08X", addr))
 		mem.IO[addr] = v
 	}
 }
@@ -698,6 +574,10 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 	//	fmt.Printf("READ ADDR %08X\n", addr)
 	//}
     if addr >= 0x188 && addr < 0x190 { panic("READ IPC FIFO FROM BYTE OR HALF")}
+
+    if addr >= 0xB0 && addr < 0x100 {
+        return mem.ReadDma(mem.dma7, addr)
+    }
 
 	switch addr {
 	case 0x4:
@@ -802,23 +682,23 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
     case 0x204: return mem.Gamecard.ExMem.Read(0)
     case 0x205: return mem.Gamecard.ExMem.Read(1)
 	case 0x208:
-		return mem.arm7Irq.ReadIME()
+		return mem.irq7.ReadIME()
 	case 0x210:
-		return mem.arm7Irq.ReadIE(0)
+		return mem.irq7.ReadIE(0)
 	case 0x211:
-		return mem.arm7Irq.ReadIE(1)
+		return mem.irq7.ReadIE(1)
 	case 0x212:
-		return mem.arm7Irq.ReadIE(2)
+		return mem.irq7.ReadIE(2)
 	case 0x213:
-		return mem.arm7Irq.ReadIE(3)
+		return mem.irq7.ReadIE(3)
 	case 0x214:
-		return mem.arm7Irq.ReadIF(0)
+		return mem.irq7.ReadIF(0)
 	case 0x215:
-		return mem.arm7Irq.ReadIF(1)
+		return mem.irq7.ReadIF(1)
 	case 0x216:
-		return mem.arm7Irq.ReadIF(2)
+		return mem.irq7.ReadIF(2)
 	case 0x217:
-		return mem.arm7Irq.ReadIF(3)
+		return mem.irq7.ReadIF(3)
     case 0x240:
         return mem.Vram.CNT_7
 
@@ -836,6 +716,7 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
         }
 
 	default:
+        //panic(fmt.Sprintf("READ UNKNOWN ARM7 IO ADDR %08X", addr))
 		return mem.IO[addr]
 	}
 }
@@ -855,6 +736,11 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
     if addr >= 0x240 && addr < 0x250 {
         //mem.Vram.WriteCNT(addr, v)
         //return
+    }
+
+    if addr >= 0xB0 && addr < 0x100 {
+        mem.WriteDma(mem.dma7, addr, v)
+        return
     }
 
 	switch addr {
@@ -982,23 +868,23 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 
     case 0x204: mem.Gamecard.ExMem.Write(v, 0)
 	case 0x208:
-		mem.arm7Irq.WriteIME(v)
+		mem.irq7.WriteIME(v)
 	case 0x210:
-		mem.arm7Irq.WriteIE(v, 0)
+		mem.irq7.WriteIE(v, 0)
 	case 0x211:
-		mem.arm7Irq.WriteIE(v, 1)
+		mem.irq7.WriteIE(v, 1)
 	case 0x212:
-		mem.arm7Irq.WriteIE(v, 2)
+		mem.irq7.WriteIE(v, 2)
 	case 0x213:
-		mem.arm7Irq.WriteIE(v, 3)
+		mem.irq7.WriteIE(v, 3)
 	case 0x214:
-		mem.arm7Irq.WriteIF(v, 0)
+		mem.irq7.WriteIF(v, 0)
 	case 0x215:
-		mem.arm7Irq.WriteIF(v, 1)
+		mem.irq7.WriteIF(v, 1)
 	case 0x216:
-		mem.arm7Irq.WriteIF(v, 2)
+		mem.irq7.WriteIF(v, 2)
 	case 0x217:
-		mem.arm7Irq.WriteIF(v, 3)
+		mem.irq7.WriteIF(v, 3)
     case 0x247:
         mem.WRAM.WriteCNT(v)
 
@@ -1015,6 +901,148 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
             panic(fmt.Sprintf("UNKNOWN HALTCNT VALUE ARM7 %d", v))
         }
 	default:
+        //panic(fmt.Sprintf("WRTE UNKNOWN ARM7 IO ADDR %08X", addr))
 		mem.IO[addr] = v
 	}
+}
+
+func (m *Mem) ReadDma(dmas *[4]DMA, addr uint32) uint8 {
+
+    switch addr {
+	case 0x00B8:
+		return 0
+	case 0x00B9:
+		return 0
+	case 0x00BA:
+		return dmas[0].ReadControl(false)
+	case 0x00BB:
+		return dmas[0].ReadControl(true)
+	case 0x00C4:
+		return 0
+	case 0x00C5:
+		return 0
+	case 0x00C6:
+		return dmas[1].ReadControl(false)
+	case 0x00C7:
+		return dmas[1].ReadControl(true)
+	case 0x00D0:
+		return 0
+	case 0x00D1:
+		return 0
+	case 0x00D2:
+		return dmas[2].ReadControl(false)
+	case 0x00D3:
+		return dmas[2].ReadControl(true)
+	case 0x00DC:
+		return 0
+	case 0x00DD:
+		return 0
+	case 0x00DE:
+		return dmas[3].ReadControl(false)
+	case 0x00DF:
+		return dmas[3].ReadControl(true)
+    }
+
+    return m.IO[addr]
+}
+
+func (m *Mem) WriteDma(dmas *[4]DMA, addr uint32, v uint8) {
+    switch addr {
+	case 0x00B0:
+		dmas[0].WriteSrc(v, 0)
+	case 0x00B1:
+		dmas[0].WriteSrc(v, 1)
+	case 0x00B2:
+		dmas[0].WriteSrc(v, 2)
+	case 0x00B3:
+		dmas[0].WriteSrc(v, 3)
+	case 0x00B4:
+		dmas[0].WriteDst(v, 0)
+	case 0x00B5:
+		dmas[0].WriteDst(v, 1)
+	case 0x00B6:
+		dmas[0].WriteDst(v, 2)
+	case 0x00B7:
+		dmas[0].WriteDst(v, 3)
+	case 0x00B8:
+		dmas[0].WriteCount(v, false)
+	case 0x00B9:
+		dmas[0].WriteCount(v, true)
+	case 0x00BA:
+		dmas[0].WriteControl(v, false)
+	case 0x00BB:
+		dmas[0].WriteControl(v, true)
+	case 0x00BC:
+		dmas[1].WriteSrc(v, 0)
+	case 0x00BD:
+		dmas[1].WriteSrc(v, 1)
+	case 0x00BE:
+		dmas[1].WriteSrc(v, 2)
+	case 0x00BF:
+		dmas[1].WriteSrc(v, 3)
+	case 0x00C0:
+		dmas[1].WriteDst(v, 0)
+	case 0x00C1:
+		dmas[1].WriteDst(v, 1)
+	case 0x00C2:
+		dmas[1].WriteDst(v, 2)
+	case 0x00C3:
+		dmas[1].WriteDst(v, 3)
+	case 0x00C4:
+		dmas[1].WriteCount(v, false)
+	case 0x00C5:
+		dmas[1].WriteCount(v, true)
+	case 0x00C6:
+		dmas[1].WriteControl(v, false)
+	case 0x00C7:
+		dmas[1].WriteControl(v, true)
+	case 0x00C8:
+		dmas[2].WriteSrc(v, 0)
+	case 0x00C9:
+		dmas[2].WriteSrc(v, 1)
+	case 0x00CA:
+		dmas[2].WriteSrc(v, 2)
+	case 0x00CB:
+		dmas[2].WriteSrc(v, 3)
+	case 0x00CC:
+		dmas[2].WriteDst(v, 0)
+	case 0x00CD:
+		dmas[2].WriteDst(v, 1)
+	case 0x00CE:
+		dmas[2].WriteDst(v, 2)
+	case 0x00CF:
+		dmas[2].WriteDst(v, 3)
+	case 0x00D0:
+		dmas[2].WriteCount(v, false)
+	case 0x00D1:
+		dmas[2].WriteCount(v, true)
+	case 0x00D2:
+		dmas[2].WriteControl(v, false)
+	case 0x00D3:
+		dmas[2].WriteControl(v, true)
+	case 0x00D4:
+		dmas[3].WriteSrc(v, 0)
+	case 0x00D5:
+		dmas[3].WriteSrc(v, 1)
+	case 0x00D6:
+		dmas[3].WriteSrc(v, 2)
+	case 0x00D7:
+		dmas[3].WriteSrc(v, 3)
+	case 0x00D8:
+		dmas[3].WriteDst(v, 0)
+	case 0x00D9:
+		dmas[3].WriteDst(v, 1)
+	case 0x00DA:
+		dmas[3].WriteDst(v, 2)
+	case 0x00DB:
+		dmas[3].WriteDst(v, 3)
+	case 0x00DC:
+		dmas[3].WriteCount(v, false)
+	case 0x00DD:
+		dmas[3].WriteCount(v, true)
+	case 0x00DE:
+		dmas[3].WriteControl(v, false)
+	case 0x00DF:
+		dmas[3].WriteControl(v, true)
+    }
 }
