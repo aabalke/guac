@@ -2,18 +2,21 @@ package arm9
 
 import (
 	"github.com/aabalke/guac/emu/nds/cpu"
-	"github.com/aabalke/guac/emu/nds/mem"
+	"github.com/aabalke/guac/emu/nds/cpu/cp15"
+	"github.com/aabalke/guac/emu/nds/mem/dma"
 )
 
 type Cpu struct {
-	mem    *mem.Mem
+	mem    cpu.MemoryInterface
 	Irq    *cpu.Irq
 	Reg    Reg
 	Halted bool
 
-    Cp15 Cp15
+    LowVector bool
 
-    Dma [4]mem.DMA
+    Cp15 *cp15.Cp15
+
+    Dma [4]dma.DMA
 }
 
 const (
@@ -84,14 +87,13 @@ var BIOS_ADDR = map[uint32]uint32{
 	BIOS_IRQ_POST: 0xE55EC002,
 }
 
-func NewCpu(mem *mem.Mem, irq *cpu.Irq) *Cpu {
+func NewCpu(m cpu.MemoryInterface, irq *cpu.Irq, cp15 *cp15.Cp15) *Cpu {
 
 	c := &Cpu{
-		mem: mem,
+		mem: m,
 		Irq: irq,
+        Cp15: cp15,
 	}
-
-    c.Cp15.Init(mem)
 
     // skip bios
     c.Irq.IME = true

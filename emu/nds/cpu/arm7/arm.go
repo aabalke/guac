@@ -2,7 +2,6 @@ package arm7
 
 import (
 	"fmt"
-
 	"github.com/aabalke/guac/emu/gba/utils"
 )
 

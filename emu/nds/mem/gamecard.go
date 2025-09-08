@@ -7,6 +7,7 @@ import (
 
 	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/cpu"
+	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
@@ -34,12 +35,12 @@ type Gamecard struct {
     Cartridge *cart.Cartridge
 
     irq7, irq9 *cpu.Irq
-    dma7, dma9 *[4]DMA
+    dma7, dma9 *[4]dma.DMA
 
     ChipId [4]uint8
 }
 
-func (g *Gamecard) Init(irq7, irq9 *cpu.Irq, dma7, dma9 *[4]DMA, cart *cart.Cartridge) {
+func (g *Gamecard) Init(irq7, irq9 *cpu.Irq, dma7, dma9 *[4]dma.DMA, cart *cart.Cartridge) {
 
     g.irq7 = irq7
     g.irq9 = irq9

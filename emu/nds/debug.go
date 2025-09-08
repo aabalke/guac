@@ -83,37 +83,43 @@ func (d *Debugger) print(i int) {
 		p("opcode", d.nds.mem.Read32(reg.R[15], true))
 	}
 	//mode := d.Gba.Cpu.Reg.getMode()
-	s("--------  --------")
-	p("r00", reg.R[0])
-	p("r01", reg.R[1])
-	p("r02", reg.R[2])
-	p("r03", reg.R[3])
-	p("r04", reg.R[4])
-	p("r05", reg.R[5])
-	p("r06", reg.R[6])
-	p("r07", reg.R[7])
-	p("r08", reg.R[8])
-	p("r09", reg.R[9])
-	p("r10", reg.R[10])
-	p("r11", reg.R[11])
-	p("r12", reg.R[12])
-	p("sp/r13", reg.R[13])
-	p("lr/r14", reg.R[14])
-	p("pc/r15", reg.R[15])
-	s("--------  --------")
-	p("cpsr", uint32(reg.CPSR))
+	//s("--------  --------")
+	//p("r00", reg.R[0])
+	//p("r01", reg.R[1])
+	//p("r02", reg.R[2])
+	//p("r03", reg.R[3])
+	//p("r04", reg.R[4])
+	//p("r05", reg.R[5])
+	//p("r06", reg.R[6])
+	//p("r07", reg.R[7])
+	//p("r08", reg.R[8])
+	//p("r09", reg.R[9])
+	//p("r10", reg.R[10])
+	//p("r11", reg.R[11])
+	//p("r12", reg.R[12])
+	//p("sp/r13", reg.R[13])
+	//p("lr/r14", reg.R[14])
+	//p("pc/r15", reg.R[15])
+	//s("--------  --------")
+	//p("cpsr", uint32(reg.CPSR))
 	//p("8FF8", d.nds.mem.Read32(0x0, true))
 	//p("8FFC", d.nds.mem.Read32(0x4, true))
 	//p("9000", d.nds.mem.Read32(0x8, true))
 	//p("spsr", uint32(reg.SPSR[BANK_ID[mode]]))
 	//p("MODE", BANK_ID[mode])
 
-	//s("--------  --------")
-	//start := 0x380_FE38
-	//count := 0x20
-	//for i := start; i < start + (count * 4); i += 4 {
-	//    p(fmt.Sprintf("ADDR %X", i), d.nds.mem.Read32(uint32(i), false))
-	//}
+	s("--------  --------")
+	start := 0x380_FC60
+	count := 0x70
+	for i := start; i < start + (count * 4); i += 16 {
+
+        s := fmt.Sprintf("%08X: ", i)
+
+        for j := range 16 {
+            s += fmt.Sprintf("%02X ", d.nds.mem.Read(uint32(i + j), false))
+        }
+        fmt.Printf("%s\n", s)
+	}
 
 	//start = 0x400_00EC
 	//count = 2

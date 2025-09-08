@@ -1,18 +1,18 @@
 package arm7
 
 import (
-    "github.com/aabalke/guac/emu/nds/mem"
 	"github.com/aabalke/guac/emu/nds/cpu"
+	"github.com/aabalke/guac/emu/nds/mem/dma"
 )
 
 type Cpu struct {
-	mem *mem.Mem
+	mem cpu.MemoryInterface
 	Irq    *cpu.Irq
 	Reg Reg
     Halted bool
     Sleeped bool
 
-    Dma [4]mem.DMA
+    Dma [4]dma.DMA
 }
 
 const (
@@ -83,7 +83,7 @@ var BIOS_ADDR = map[uint32]uint32{
 	BIOS_IRQ_POST: 0xE55EC002,
 }
 
-func NewCpu(mem *mem.Mem, irq *cpu.Irq) *Cpu {
+func NewCpu(mem cpu.MemoryInterface, irq *cpu.Irq) *Cpu {
 
 	c := &Cpu{
 		mem: mem,
@@ -140,8 +140,6 @@ func (c *Cond) SetFlag(flag uint32, value bool) {
 	}
 
 	*c &^= (0b1 << flag)
-
-	return
 }
 
 func (c *Cond) SetField(loBit uint32, value uint32) {

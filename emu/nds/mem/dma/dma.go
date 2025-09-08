@@ -1,4 +1,4 @@
-package mem
+package dma
 
 import (
 	"github.com/aabalke/guac/emu/gba/utils"
@@ -39,7 +39,7 @@ type DMA struct {
 	Idx int
 
     //Cpu *arm9.Cpu
-    mem *Mem
+    mem MemoryInterface
     irq *cpu.Irq
 
 	Src     uint32
@@ -64,7 +64,7 @@ type DMA struct {
 	Value uint32
 }
 
-func (dma *DMA) Init(idx int, mem *Mem, irq *cpu.Irq, arm9 bool) {
+func (dma *DMA) Init(idx int, mem MemoryInterface, irq *cpu.Irq, arm9 bool) {
     dma.Idx = idx
     dma.mem = mem
     dma.irq = irq
@@ -304,4 +304,14 @@ func (dma *DMA) CheckGamecart(arm9 bool) {
     }
 
     dma.Transfer()
+}
+
+type MemoryInterface interface {
+    Write8(addr uint32, v uint8, arm9 bool)
+    Write16(addr uint32, v uint16, arm9 bool)
+    Write32(addr uint32, v uint32, arm9 bool)
+
+    Read8(addr uint32, arm9 bool) uint32
+    Read16(addr uint32, arm9 bool) uint32
+    Read32(addr uint32, arm9 bool) uint32
 }

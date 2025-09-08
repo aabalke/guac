@@ -1,9 +1,7 @@
 package arm9
 
 import (
-	//"encoding/binary"
 	"fmt"
-	//"log"
 )
 
 func (cpu *Cpu) DecodeTHUMB() int {

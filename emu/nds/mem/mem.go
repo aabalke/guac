@@ -7,6 +7,7 @@ import (
 	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/mem/spi"
+	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/nds/ppu"
 )
 
@@ -35,9 +36,9 @@ type Mem struct {
 
     halted7, halted9 *bool
 	irq7, irq9 *cpu.Irq
-    dma7, dma9 *[4]DMA
+    dma7, dma9 *[4]dma.DMA
 
-    LowVector bool
+    //LowVector bool
 
     ppu *ppu.PPU
 
@@ -59,7 +60,7 @@ type Mem struct {
     Timers [8]Timer
 }
 
-func NewMemory(halted7, halted9 *bool, dma7, dma9 *[4]DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PPU) Mem {
+func NewMemory(halted7, halted9 *bool, dma7, dma9 *[4]dma.DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PPU) Mem {
 	m := Mem{
         halted7: halted7,
         halted9: halted9,
@@ -906,7 +907,7 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 	}
 }
 
-func (m *Mem) ReadDma(dmas *[4]DMA, addr uint32) uint8 {
+func (m *Mem) ReadDma(dmas *[4]dma.DMA, addr uint32) uint8 {
 
     switch addr {
 	case 0x00B8:
@@ -946,7 +947,7 @@ func (m *Mem) ReadDma(dmas *[4]DMA, addr uint32) uint8 {
     return m.IO[addr]
 }
 
-func (m *Mem) WriteDma(dmas *[4]DMA, addr uint32, v uint8) {
+func (m *Mem) WriteDma(dmas *[4]dma.DMA, addr uint32, v uint8) {
     switch addr {
 	case 0x00B0:
 		dmas[0].WriteSrc(v, 0)

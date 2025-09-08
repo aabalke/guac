@@ -68,7 +68,8 @@ func (cpu *Cpu) exception(addr uint32, mode uint32) {
 	reg.CPSR.SetThumb(false, cpu)
 	reg.CPSR.SetFlag(FLAG_I, true)
 
-    if cpu.mem.LowVector {
+    //if cpu.mem.LowVector {
+    if cpu.LowVector {
         r[PC] = addr & 0xFFFF
         return
     }

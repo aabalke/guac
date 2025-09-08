@@ -1,11 +1,12 @@
 package arm9
 
 import (
-    "os"
 	"fmt"
 	"math"
 	"math/bits"
+	"os"
 
+	"github.com/aabalke/guac/emu/nds/cpu/cp15"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
@@ -1308,12 +1309,12 @@ func (cpu *Cpu) Clz(opcode uint32) {
 
 func (cpu *Cpu) CoDataReg(opcode uint32) {
 
-    reg := CpRegister{
-        op: uint8(utils.GetVarData(opcode, 21, 23)),
-        cn: uint8(utils.GetVarData(opcode, 16, 19)),
-        pn: uint8(utils.GetVarData(opcode, 8, 11)),
-        cp: uint8(utils.GetVarData(opcode, 5, 7)),
-        cm: uint8(utils.GetVarData(opcode, 0, 3)),
+    reg := cp15.CpRegister{
+        Op: uint8(utils.GetVarData(opcode, 21, 23)),
+        Cn: uint8(utils.GetVarData(opcode, 16, 19)),
+        Pn: uint8(utils.GetVarData(opcode, 8, 11)),
+        Cp: uint8(utils.GetVarData(opcode, 5, 7)),
+        Cm: uint8(utils.GetVarData(opcode, 0, 3)),
     }
 
     r := &cpu.Reg.R
@@ -1332,7 +1333,7 @@ func (cpu *Cpu) CoDataReg(opcode uint32) {
         return
     }
 
-    if rd == 0 && (reg == HALT || reg == HALT2) {
+    if rd == 0 && (reg == cp15.HALT || reg == cp15.HALT2) {
 
         if !cpu.Irq.IME {
             panic("ARM9 CPU HALTED WITHOUT IME ENABLED")
@@ -1340,7 +1341,7 @@ func (cpu *Cpu) CoDataReg(opcode uint32) {
 
         cpu.Halted = true
     } else {
-        cpu.Cp15.Write(r[rd], reg)
+        cpu.Cp15.Write(r[rd], reg, &cpu.LowVector)
     }
 
     cpu.Reg.R[15] += 4

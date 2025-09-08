@@ -8,7 +8,9 @@ import (
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/cpu/arm7"
 	"github.com/aabalke/guac/emu/nds/cpu/arm9"
+	"github.com/aabalke/guac/emu/nds/cpu/cp15"
 	"github.com/aabalke/guac/emu/nds/mem"
+	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/nds/ppu"
 	"github.com/aabalke/guac/emu/nds/utils"
 
@@ -70,8 +72,8 @@ func NewNds(path string, _ *oto.Context) *Nds {
     nds.ppu.EngineB.Pixels = &nds.PixelsTop
     nds.ppu.EngineB.IsB = true
 
-    arm9Irq := cpu.Irq{IsArm9: true}
-	arm7Irq := cpu.Irq{}
+    irq9 := cpu.Irq{IsArm9: true}
+	irq7 := cpu.Irq{}
 
     for i := range 8 {
         if i < 4 {
@@ -81,23 +83,26 @@ func NewNds(path string, _ *oto.Context) *Nds {
         nds.mem.Timers[i].Idx = i % 4
     }
 
+    cp15 := &cp15.Cp15{}
+    cp15.Init(&nds.mem)
+
 	nds.Debugger = Debugger{&nds}
-	nds.arm7 = *arm7.NewCpu(&nds.mem, &arm7Irq)
-	nds.arm9 = *arm9.NewCpu(&nds.mem, &arm9Irq)
+	nds.arm7 = *arm7.NewCpu(&nds.mem, &irq7)
+	nds.arm9 = *arm9.NewCpu(&nds.mem, &irq9, cp15)
 	nds.mem = mem.NewMemory(
         &nds.arm7.Halted, &nds.arm9.Halted,
         &nds.arm7.Dma, &nds.arm9.Dma,
-        &arm7Irq, &arm9Irq, &nds.Cartridge, &nds.ppu)
+        &irq7, &irq9, &nds.Cartridge, &nds.ppu)
 
-    nds.arm9.Dma[0].Init(0, &nds.mem, &arm9Irq, true)
-    nds.arm9.Dma[1].Init(1, &nds.mem, &arm9Irq, true)
-    nds.arm9.Dma[2].Init(2, &nds.mem, &arm9Irq, true)
-    nds.arm9.Dma[3].Init(3, &nds.mem, &arm9Irq, true)
+    nds.arm9.Dma[0].Init(0, &nds.mem, &irq9, true)
+    nds.arm9.Dma[1].Init(1, &nds.mem, &irq9, true)
+    nds.arm9.Dma[2].Init(2, &nds.mem, &irq9, true)
+    nds.arm9.Dma[3].Init(3, &nds.mem, &irq9, true)
 
-    nds.arm7.Dma[0].Init(0, &nds.mem, &arm7Irq, false)
-    nds.arm7.Dma[1].Init(1, &nds.mem, &arm7Irq, false)
-    nds.arm7.Dma[2].Init(2, &nds.mem, &arm7Irq, false)
-    nds.arm7.Dma[3].Init(3, &nds.mem, &arm7Irq, false)
+    nds.arm7.Dma[0].Init(0, &nds.mem, &irq7, false)
+    nds.arm7.Dma[1].Init(1, &nds.mem, &irq7, false)
+    nds.arm7.Dma[2].Init(2, &nds.mem, &irq7, false)
+    nds.arm7.Dma[3].Init(3, &nds.mem, &irq7, false)
 
     nds.LoadGame(path)
 	//nds.arm9.Reset()
@@ -149,7 +154,7 @@ func (nds *Nds) checkBadPc() {
 
     //    }
 
-    if reg9.R[15] < 0x30 && !nds.mem.LowVector {
+    if reg9.R[15] < 0x30 && !nds.arm9.LowVector {
             panic(fmt.Sprintf("BAD ARM9 PC %08X (LOW WHEN HIGH) CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
     }
 }
@@ -314,7 +319,7 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 			nds.ppu.EngineA.Backgrounds[3].BgAffineUpdate()
 			nds.ppu.EngineB.Backgrounds[2].BgAffineUpdate()
 			nds.ppu.EngineB.Backgrounds[3].BgAffineUpdate()
-			nds.CheckDmas(mem.ARM9_DMA_MODE_HBL, true)
+			nds.CheckDmas(dma.ARM9_DMA_MODE_HBL, true)
 		}
 	}
 
@@ -334,15 +339,15 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 
 		switch vcount {
 		case 0:
-			nds.CheckDmas(mem.ARM9_DMA_MODE_STA, true)
+			nds.CheckDmas(dma.ARM9_DMA_MODE_STA, true)
 			nds.ppu.EngineA.Backgrounds[2].BgAffineReset()
 			nds.ppu.EngineA.Backgrounds[3].BgAffineReset()
 			nds.ppu.EngineB.Backgrounds[2].BgAffineReset()
 			nds.ppu.EngineB.Backgrounds[3].BgAffineReset()
 		case SCREEN_HEIGHT:
 			dispstat.SetVBlank(true)
-			nds.CheckDmas(mem.ARM9_DMA_MODE_VBL, true)
-			nds.CheckDmas(mem.ARM7_DMA_MODE_VBL, true)
+			nds.CheckDmas(dma.ARM9_DMA_MODE_VBL, true)
+			nds.CheckDmas(dma.ARM7_DMA_MODE_VBL, true)
 		//case SCREEN_HEIGHT + 1:
 			if utils.BitEnabled(uint32(*dispstat), 3) {
                 nds.arm9.Irq.SetIRQ(0)

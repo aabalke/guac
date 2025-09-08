@@ -1,7 +1,6 @@
 package mem
 
 import (
-
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/utils"
 )

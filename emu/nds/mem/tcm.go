@@ -1,6 +1,5 @@
 package mem
 
-
 type Tcm struct {
 	Itcm [0x8000]uint8
 	Dtcm [0x4000]uint8
