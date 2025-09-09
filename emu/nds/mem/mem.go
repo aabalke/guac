@@ -230,7 +230,7 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
     case 0x4:
         mem.WriteArm7IO(addr-0x400_0000, v)
     case 0x6:
-        mem.Vram.Write(addr, v, true)
+        mem.Vram.Write(addr, v, false)
     }
 }
 

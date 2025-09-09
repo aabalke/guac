@@ -122,9 +122,11 @@ func (nds *Nds) checkBadPc() {
     if reg9.R[15] > 0x400_0000 && reg9.R[15] < 0xFFFF_0000 {
         panic(fmt.Sprintf("BAD ARM9 PC %08X CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
     }
-    if reg7.R[15] > 0x400_0000 && reg7.R[15] < 0xFFFF_0000 {
+    if (reg7.R[15] > 0x400_0000 && reg7.R[15] < 0x600_0000) || reg7.R[15] >= 0x700_0000 {
         panic(fmt.Sprintf("BAD ARM7 PC %08X CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
     }
+
+    // should probably check proper vramwram for arm7
 
     switch {
     case reg9.IsThumb && reg9.R[15] & 0b1 != 0:
@@ -211,13 +213,21 @@ func (nds *Nds) Update() {
         // arm9 thumb ~1 cycles, arm ~2 cycles
         // arm7 thumb ~2 cycles, arm ~4 cycles
 
+        //if CURR_INST >= 915_776 {
+        //    os.Exit(0)
+        //}
+
+        //if r7[15] >= 0x600_0000 && r7[15] < 0x700_0000 {
+        //    fmt.Printf("PC %08X OPCODE %08X\n", r7[15], nds.mem.Read32(r7[15], false))
+        //}
+
 		if !nds.arm9.Halted {
             thumbExec :=  nds.arm9.Reg.IsThumb
             armExec := !nds.arm9.Reg.IsThumb && nds.AccCycles & 0b1 == 0
 
             if thumbExec || armExec  {
 
-                //logger.Update(0, 2_000_000, CURR_INST, true)
+                //logger.Update(0, 915776, CURR_INST, true)
                 nds.arm9.Execute()
             }
 		}
@@ -227,7 +237,7 @@ func (nds *Nds) Update() {
             armExec := !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b11 == 0
 
             if thumbExec || armExec  {
-                //logger.Update(0, 5_000_000, CURR_INST, false)
+                //logger.Update(25_000_000, 25_088_708, CURR_INST, false)
                 nds.arm7.Execute()
             }
         }
