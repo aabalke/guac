@@ -1,6 +1,8 @@
 package mem
 
 import (
+	"fmt"
+
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
@@ -39,7 +41,6 @@ type Fifo struct {
 
 func (f *Fifo) Write(v uint32) (ok bool) {
 
-
     if f.Full {
         return false
     }
@@ -51,6 +52,8 @@ func (f *Fifo) Write(v uint32) (ok bool) {
 
     f.Empty = f.Length == 0
     f.Full = f.Length >= 0x10
+
+    //fmt.Printf("FIFO WRIT % X %d\n", f.Buffer, f.Length)
 
     return true
 }
@@ -70,6 +73,8 @@ func (f *Fifo) Read() (v uint32, ok bool) {
     f.Empty = f.Length == 0
     f.Full = f.Length >= 0x10
 
+    //fmt.Printf("FIFO READ % X %d\n", f.Buffer, f.Length)
+
     return f.Value, true
 }
 
@@ -84,15 +89,20 @@ func (i *IPC) WriteSync(v, b uint8, isArm9 bool) {
 	}
 
     if b == 0 {
+
         *local &^= 0xF0
         *local |= uint16(v & 0xF0)
+
         return
     }
+
 
     *local &^= 0b100_1111 << 8
     *local |= uint16(v & 0b100_1111) << 8
     *remote &^= 0xF
     *remote |= uint16(v & 0xF)
+
+
 
     if irq := utils.BitEnabled(uint32(v), 5) && utils.BitEnabled(uint32(*remote), 14); irq {
         if isArm9 {
@@ -108,11 +118,11 @@ func (i *IPC) ReadSync(b uint8, arm9 bool) uint8 {
 
 	if arm9 {
         v := uint8(i.SYNC9 >> (b * 8))
-        //fmt.Printf("READ SYNC B %02X IS ARM %t V %02X SYNC9 %04X SYNC7 %04X\n", b, arm9, v, i.SYNC9, i.SYNC7)
+        //fmt.Printf("READ SYNC B %02X IS ARM %t %02X SYNC9 %04X SYNC7 %04X\n", b, arm9, v, i.SYNC9, i.SYNC7)
         return v
 	}
     v := uint8(i.SYNC7 >> (b * 8))
-    //fmt.Printf("READ SYNC B %02X IS ARM %t V %02X SYNC9 %04X SYNC7 %04X\n", b, arm9, v, i.SYNC9, i.SYNC7)
+    //fmt.Printf("READ SYNC B %02X IS ARM %t %02X SYNC9 %04X SYNC7 %04X\n", b, arm9, v, i.SYNC9, i.SYNC7)
     return v
 }
 
@@ -137,6 +147,7 @@ func (i *IPC) WriteCnt(v, b uint8, isArm9 bool) {
 
             if isArm9 {
                 i.Fifo9to7 = Fifo{
+                    Value: 0,
                     Buffer: [0x10]uint32{},
                     Empty: true,
                     IrqEmpty: local.IrqEmpty,
@@ -146,6 +157,7 @@ func (i *IPC) WriteCnt(v, b uint8, isArm9 bool) {
                 }
             } else {
                 i.Fifo7to9 = Fifo{
+                    Value: 0,
                     Buffer: [0x10]uint32{},
                     Empty: true,
                     IrqEmpty: local.IrqEmpty,
@@ -155,18 +167,18 @@ func (i *IPC) WriteCnt(v, b uint8, isArm9 bool) {
                 }
             }
 
-            //fmt.Printf("FLUSHED FIFO\n")
+            fmt.Printf("FLUSHED FIFO\n")
         }
     case 1:
         remote.IrqNotEmpty = utils.BitEnabled(uint32(v), 2)
 
-        if ackErr := local.Error && utils.BitEnabled(uint32(v), 6); ackErr {
+        if ackErr := utils.BitEnabled(uint32(v), 6); ackErr {
             local.Error = false
         }
 
         local.Enabled = utils.BitEnabled(uint32(v), 7)
     }
-    i.UpdateIRQ()
+    i.updateIRQs()
 }
 
 func (i *IPC) ReadCnt(b uint8, isArm9 bool) uint8 {
@@ -208,18 +220,16 @@ func (i *IPC) WriteFifo(v uint32, isArm9 bool) {
         local = &i.Fifo7to9
     }
 
-    if !local.Enabled {
-        return
+    if local.Enabled {
+        ok := local.Write(v)
+        if !ok {
+            local.Error = true
+        }
     }
 
     //fmt.Printf("WRITING TO FIFO %08X ARM9 %t\n", v, isArm9)
+    i.updateIRQs()
 
-    local.Write(v)
-    //if !ok {
-    //    i.Fifo7.Error = true
-    //}
-
-    i.UpdateIRQ()
     //if local.IrqNotEmpty && !local.Empty {
     //    if isArm9 {
     //        i.Irq7.SetIRQ(cpu.IRQ_IPC_RECV_FIFO)
@@ -247,9 +257,8 @@ func (i *IPC) ReadFifo(isArm9 bool) uint32 {
     v, ok := remote.Read()
     if !ok {
         local.Error = true
+        return remote.Value
     }
-
-    i.UpdateIRQ()
 
     //if remote.IrqEmpty && remote.Empty {
     //    if isArm9 {
@@ -259,35 +268,52 @@ func (i *IPC) ReadFifo(isArm9 bool) uint32 {
     //    }
     //}
 
-    //fmt.Printf("FIFO READ %08X ARM9 %t\n", v, isArm9)
+    i.updateIRQs()
 
     return v
 }
 
-var prevValues[4]bool
+var irqEmptyFlag [2]bool
+var irqNotEmptyFlag [2]bool
 
-func (i *IPC) UpdateIRQ() {
-
-    if v := i.Fifo9to7.Empty && i.Fifo9to7.IrqEmpty; v && !prevValues[0] {
-        prevValues[0] = v
-        i.Irq9.SetIRQ(cpu.IRQ_IPC_SEND_FIFO)
-    }
-
-    if v := !i.Fifo7to9.Empty && i.Fifo7to9.IrqNotEmpty; v && !prevValues[1] {
-        prevValues[1] = v
-        i.Irq9.SetIRQ(cpu.IRQ_IPC_RECV_FIFO)
-    }
-
-    if v := i.Fifo7to9.Empty && i.Fifo7to9.IrqEmpty; v && !prevValues[2]{
-        prevValues[2] = v
-        i.Irq7.SetIRQ(cpu.IRQ_IPC_SEND_FIFO)
-    }
-
-    if v := !i.Fifo9to7.Empty && i.Fifo9to7.IrqNotEmpty; v && !prevValues[3] {
-        prevValues[3] = v
-        i.Irq7.SetIRQ(cpu.IRQ_IPC_RECV_FIFO)
-    }
-
-
-
+func (i *IPC) updateIRQs() {
+    i.updateIrqFlagsCpu(true)
+    i.updateIrqFlagsCpu(false)
 }
+
+func (i *IPC) updateIrqFlagsCpu(isArm9 bool) {
+
+    local := &i.Fifo9to7
+    remote := &i.Fifo7to9
+
+    idx := 0
+
+    if !isArm9 {
+        local = &i.Fifo7to9
+        remote = &i.Fifo9to7
+        idx = 1
+    }
+
+	newEmptyFlag := local.Empty && local.IrqEmpty
+	newDataFlag := !remote.Empty && remote.IrqNotEmpty
+
+	if !irqEmptyFlag[idx] && newEmptyFlag {
+        if isArm9 {
+            i.Irq9.SetIRQ(cpu.IRQ_IPC_SEND_FIFO)
+        } else {
+            i.Irq7.SetIRQ(cpu.IRQ_IPC_SEND_FIFO)
+        }
+	}
+
+	if !irqNotEmptyFlag[idx] && newDataFlag {
+        if isArm9 {
+            i.Irq9.SetIRQ(cpu.IRQ_IPC_RECV_FIFO)
+        } else {
+            i.Irq7.SetIRQ(cpu.IRQ_IPC_RECV_FIFO)
+        }
+	}
+
+    irqEmptyFlag[idx] = newEmptyFlag
+    irqNotEmptyFlag[idx] = newDataFlag
+}
+

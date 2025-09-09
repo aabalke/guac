@@ -31,8 +31,7 @@ type Mem struct {
 	Arm9Bios [0x1000]uint8
 
     // this size is temp
-	//IO [0x100_0000]uint8
-	IO [0x10_0000]uint8
+	IO [0x100_0000]uint8
 
     halted7, halted9 *bool
 	irq7, irq9 *cpu.Irq
@@ -56,6 +55,7 @@ type Mem struct {
     Ipc IPC
     Spi spi.Spi
     Rtc Rtc
+    PostFlg PostFlg
 
     Timers [8]Timer
 }
@@ -166,6 +166,8 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
         return mem.ReadArm7IO(addr-0x400_0000)
     case 0x6:
         return mem.Vram.Read(addr, false)
+    case 0x8, 0x9, 0xA:
+        return 0xFF
     default:
         return 0
     }
@@ -381,7 +383,7 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
     case 0x247:
         return mem.WRAM.ReadCNT()
     case 0x300:
-        return 0x1
+        return mem.PostFlg.Read(true)
 	default:
         //panic(fmt.Sprintf("READ UNKNOWN ARM9 IO ADDR %08X", addr))
 		return mem.IO[addr]
@@ -555,6 +557,9 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
     case 0x24E: mem.Vram.WriteCNT(addr, v)
     case 0x24F: mem.Vram.WriteCNT(addr, v)
 
+    case 0x300:
+        mem.PostFlg.Write(v, true)
+
     case 0x304:
         mem.ppu.PowCnt1.V &^= 0xFF
         mem.ppu.PowCnt1.V |= uint16(v)
@@ -705,8 +710,8 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 
     case 0x241:
         return mem.WRAM.ReadCNT()
-    //case 0x300: // this crashes some homebrew
-    //    return 0x1
+    case 0x300: // this crashes some homebrew
+        return mem.PostFlg.Read(false)
 
     case 0x301:
 
@@ -888,6 +893,9 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 		mem.irq7.WriteIF(v, 3)
     case 0x247:
         mem.WRAM.WriteCNT(v)
+
+    case 0x300:
+        mem.PostFlg.Write(v, false)
 
     case 0x301:
 

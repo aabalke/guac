@@ -181,7 +181,7 @@ func (a *AuxSPI) Write(v uint8, b uint8) {
             return
         }
 
-        fmt.Printf("W AUXDATA B %02d\n", b)
+        //fmt.Printf("W AUXDATA B %02d\n", b)
         panic("AUXSPI DATA WRITE")
 
         // start transfer with write but value does not matter
@@ -340,13 +340,13 @@ func (r *RomCtrl) WriteSeed(v, b, seed uint8) {
 }
 
 func (r *RomCtrl) UpdateEncryption() {
-    log.Printf("Updating Encyption Key2\n")
+    //log.Printf("Updating Encyption Key2\n")
     r.Gamecard.Key2 = NewKey2(r.seed0, r.seed1)
 }
 
 func (r *RomCtrl) Run() {
 
-    log.Printf("RUNNING COMMAND %X\n", r.Command)
+    //log.Printf("RUNNING COMMAND %X\n", r.Command)
 
     // Data Block size   (0=None, 1..6=100h SHL (1..6) bytes, 7=4 bytes)
     switch r.BlockSizeBits {
@@ -375,6 +375,11 @@ func (r *RomCtrl) Run() {
 
             addr := binary.BigEndian.Uint32(r.Command[1:5])
 
+            // Addresses that do exceed the ROM size do mirror to the valid address range (that includes mirroring non-loadable regions like 0..7FFFh to "8000h+(addr AND 1FFh)"; some newer games are using this behaviour for some kind of anti-piracy checks).
+            if addr >= uint32(r.Gamecard.Cartridge.RomLength) {
+                addr %= r.Gamecard.Cartridge.RomLength
+            }
+
             if addr < 0x8000 {
                 addr &= 0x01FF
                 addr += 0x8000
@@ -385,7 +390,6 @@ func (r *RomCtrl) Run() {
             }
 
             // todo 
-            // Addresses that do exceed the ROM size do mirror to the valid address range (that includes mirroring non-loadable regions like 0..7FFFh to "8000h+(addr AND 1FFh)"; some newer games are using this behaviour for some kind of anti-piracy checks).
             // the datastream wraps to the begin of the current 4K block when address+length crosses a 4K boundary (1000h bytes)
 
             r.Gamecard.Buffer = buffer
@@ -417,7 +421,7 @@ func (g *Gamecard) Transfer(initial bool) {
             g.irq9.SetIRQ(cpu.IRQ_CARD_TRANS_COMPLETE)
         }
 
-        log.Printf("FINISHED GAMECARD %08X\n", g.RomCtrl.v)
+        //log.Printf("FINISHED GAMECARD %08X\n", g.RomCtrl.v)
 
         return
     }

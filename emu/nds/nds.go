@@ -216,6 +216,7 @@ func (nds *Nds) Update() {
             armExec := !nds.arm9.Reg.IsThumb && nds.AccCycles & 0b1 == 0
 
             if thumbExec || armExec  {
+
                 //logger.Update(0, 2_000_000, CURR_INST, true)
                 nds.arm9.Execute()
             }
@@ -226,7 +227,7 @@ func (nds *Nds) Update() {
             armExec := !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b11 == 0
 
             if thumbExec || armExec  {
-                //logger.Update(0, 2_000_000, CURR_INST, false)
+                //logger.Update(0, 5_000_000, CURR_INST, false)
                 nds.arm7.Execute()
             }
         }
