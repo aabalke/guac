@@ -211,6 +211,8 @@ func initTempUnimplimented() {
     clearTempUnimplimented(0x27FFC35)
     clearTempUnimplimented(0x27FFC10)
     clearTempUnimplimented(0x27FFC11)
+    clearTempUnimplimented(0x27FFC14)
+    clearTempUnimplimented(0x27FFC15)
 }
 
 func clearTempUnimplimented(addr uint32) {

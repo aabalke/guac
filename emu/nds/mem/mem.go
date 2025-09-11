@@ -151,7 +151,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 		case 0x7:
             return mem.Oam[addr & 0x7FF]
         case 0x8, 0x9, 0xA:
-            return mem.ReadGbaSlot(addr)
+            return mem.ReadGbaSlot(addr, arm9)
         default:
             return 0
 		}
@@ -176,7 +176,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
     case 0x6:
         return mem.Vram.Read(addr, false)
     case 0x8, 0x9, 0xA:
-        return mem.ReadGbaSlot(addr)
+        return mem.ReadGbaSlot(addr, arm9)
     default:
         return 0
     }

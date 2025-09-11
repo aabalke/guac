@@ -82,6 +82,7 @@ func (g *Gamecard) Init(irq7, irq9 *cpu.Irq, dma7, dma9 *[4]dma.DMA, c *cart.Car
 
 type ExMem struct {
     Gamecard *Gamecard
+	isGBAAccessArm7         bool
 	isCartAccessArm7         bool
 	isMainMemorySync         bool
 	isMainMemoryPriorityArm7 bool
@@ -105,7 +106,10 @@ func (e *ExMem) Write(v uint8, b uint8) {
 
     //fmt.Printf("W EXMEM %04X V %02X B %02d\n", e.v, v, b)
 
-	if b == 1 {
+    switch b {
+    case 0:
+		e.isGBAAccessArm7 = utils.BitEnabled(uint32(v), 7)
+    case 1:
 		e.isCartAccessArm7 = utils.BitEnabled(uint32(v), 3)
 		e.isMainMemorySync = utils.BitEnabled(uint32(v), 6)
 		e.isMainMemoryPriorityArm7 = utils.BitEnabled(uint32(v), 7)
@@ -190,7 +194,7 @@ func (a *AuxSPI) Write(v uint8, b uint8) {
 
         if a.IsBackup && !wasBackup {
 
-            fmt.Println("BEGIN TFX")
+            //fmt.Println("BEGIN TFX")
 
             if a.Req == nil {
                 a.Req = make([]uint8, 16)
@@ -244,7 +248,7 @@ func (a *AuxSPI) WriteData(v uint8) {
     a.Value = value
 
     if !a.Hold {
-        fmt.Println("FINISH TFX")
+        //fmt.Println("FINISH TFX")
         //a.Gamecard.Backup.Write()
         a.Active = false
     }
