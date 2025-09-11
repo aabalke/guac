@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-func (cpu *Cpu) DecodeARM() int {
+func (cpu *Cpu) DecodeARM() (int, bool) {
 
 	r := &cpu.Reg.R
 
@@ -12,13 +12,13 @@ func (cpu *Cpu) DecodeARM() int {
 
 	if !cpu.CheckCond(opcode >> 28) {
 		r[PC] += 4
-		return 4
+		return 4, true
 	}
 
 	if swi := (opcode>>24)&0xF == 0xF; swi {
 		//cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
 		cpu.exception(VEC_SWI, MODE_SWI)
-		return 4
+		return 4, true
 		//cycles, incPc := cpu.Gba.SysCall((opcode >> 16) & 0xFF)
 
 		//if incPc {
@@ -35,7 +35,7 @@ func (cpu *Cpu) DecodeARM() int {
 			cpu.BX(opcode)
 		case isSDT(opcode):
 			cycles := cpu.Sdt(opcode)
-			return int(cycles)
+			return int(cycles), true
 		case isHalf(opcode):
 			cpu.Half(opcode)
 		case isPSR(opcode):
@@ -50,13 +50,13 @@ func (cpu *Cpu) DecodeARM() int {
 			panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X", opcode, r[PC]))
 		}
 
-		return 4
+		return 4, true
 	case 0b001:
 
 		switch {
 		case isSDT(opcode):
 			cycles := cpu.Sdt(opcode)
-			return int(cycles)
+			return int(cycles), true
 		case isHalf(opcode):
 			cpu.Half(opcode)
 		case isPSR(opcode):
@@ -69,15 +69,15 @@ func (cpu *Cpu) DecodeARM() int {
 			panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X", opcode, r[PC]))
 		}
 
-		return 4
+		return 4, true
 	case 0b010:
 	case 0b011:
 	case 0b100:
 		cpu.Block(opcode)
-		return 4
+		return 4, true
 	case 0b101:
 		cpu.B(opcode)
-		return 4
+		return 4, true
 	}
 
 	switch {
@@ -85,7 +85,7 @@ func (cpu *Cpu) DecodeARM() int {
 		cpu.BX(opcode)
 	case isSDT(opcode):
 		cycles := cpu.Sdt(opcode)
-		return int(cycles)
+		return int(cycles), true
 	case isBlock(opcode):
 		cpu.Block(opcode)
 	case isHalf(opcode):
@@ -101,10 +101,12 @@ func (cpu *Cpu) DecodeARM() int {
 	case isALU(opcode):
 		cpu.Alu(opcode)
 	default:
-		panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X", opcode, r[PC]))
+		//panic(fmt.Sprintf("Unable to Decode ARM 7 %08X, at PC %08X", opcode, r[PC]))
+		fmt.Printf("Unable to Decode ARM 7 %08X, at PC %08X\n", opcode, r[PC])
+        return 0, false
 	}
 
-	return 4
+	return 4, true
 }
 
 func isOpcodeFormat(opcode, mask, format uint32) bool {

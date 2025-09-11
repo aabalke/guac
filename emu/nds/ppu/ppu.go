@@ -1,8 +1,9 @@
 package ppu
 
 import (
+	"encoding/binary"
+
 	"github.com/aabalke/guac/emu/nds/utils"
-    "encoding/binary"
 )
 
 type PPU struct {

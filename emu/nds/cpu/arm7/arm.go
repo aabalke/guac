@@ -326,27 +326,52 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
 
         cpu.Reg.R[15] += 4
 
+        //cpu.toggleThumb()
 		cpu.ExitException(MODE_ABT)
+        if cpu.Reg.R[15] & 1 == 1 {
+            cpu.toggleThumb()
+        }
+
 		return
 	}
 
 	if swiExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB && cpu.Reg.getMode() == MODE_SWI; swiExit {
+        // toggle after causes errors. maybe after should just be based on bit 0?
+        // ie [pc] & 1 toggle thumb
+        //cpu.toggleThumb()
 		cpu.ExitException(MODE_SWI)
+        if cpu.Reg.R[15] & 1 == 1 {
+            cpu.toggleThumb()
+        }
+
+
 		return
 	}
 
 	if irqExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB; irqExit {
 		cpu.ExitException(MODE_IRQ)
+        if cpu.Reg.R[15] & 1 == 1 {
+            cpu.toggleThumb()
+        }
+
 		return
 	}
 
 	if swiExit := alu.Rd == PC && alu.Rm == LR && alu.Inst == MOV; swiExit {
 		cpu.ExitException(MODE_SWI)
+        if cpu.Reg.R[15] & 1 == 1 {
+            cpu.toggleThumb()
+        }
+
 		return
 	}
 
 	if forceExit := alu.Rd == PC; forceExit {
 		cpu.psrSwitch()
+        if cpu.Reg.R[15] & 1 == 1 {
+            cpu.toggleThumb()
+        }
+
 		return
 	}
 

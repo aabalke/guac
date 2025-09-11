@@ -1,6 +1,7 @@
 package ppu
 
 import (
+	"fmt"
 	"unsafe"
 
 	"github.com/aabalke/guac/emu/nds/utils"
@@ -57,8 +58,6 @@ func (vc *VramCnt) Write(v uint8) {
 
 func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
 
-    //fmt.Printf("WRITE VRAM CNT %08X %02X\n", addr, v)
-
 	switch addr {
 	case 0x240: vm.CNT_A.Write(v)
 	case 0x241: vm.CNT_B.Write(v)
@@ -85,6 +84,7 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         vm.isDArm7 = v & 0b10000011 == 0b10000010
         vm.CNT_7 &^= 0b10
         if vm.isDArm7 {
+            fmt.Printf("")
             vm.CNT_7 |= 0b10
         }
 
@@ -425,7 +425,7 @@ func (vm *VRAM) Read(addr uint32, arm9 bool) uint8 {
             case 2: base = 0x600000 // not sure
             case 3: // slot
             }
-            if addr >= base && addr < base + 0x8000 {
+            if addr >= base && addr < base + 0x4000 {
                 return vm.I[addr - base]
             }
         }

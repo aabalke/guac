@@ -19,17 +19,14 @@ const (
     INST_WREN = 0x06
     INST_WRDI = 0x04
     INST_PW   = 0x0A
-
 )
 
 type Firmware struct {
-    Transmitting bool
     Data []uint8
     Idx uint32
 
     Addr uint32
     WriteEnabled bool
-
     WriteBuffer []uint8
 }
 

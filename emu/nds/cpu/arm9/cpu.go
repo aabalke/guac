@@ -105,9 +105,9 @@ func NewCpu(m cpu.MemoryInterface, irq *cpu.Irq, cp15 *cp15.Cp15) *Cpu {
 	return c
 }
 
-func (c *Cpu) Execute() int {
+func (c *Cpu) Execute() (int, bool) {
 	if c.Reg.IsThumb {
-		return c.DecodeTHUMB()
+		return c.DecodeTHUMB(), true
 	}
 
 	return c.DecodeARM()

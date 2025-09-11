@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-func (cpu *Cpu) DecodeARM() int {
+func (cpu *Cpu) DecodeARM() (int, bool) {
 
 	r := &cpu.Reg.R
 
@@ -13,23 +13,23 @@ func (cpu *Cpu) DecodeARM() int {
     switch {
     case isBLX(opcode):
         cpu.BLX(opcode)
-        return 4
+        return 4, true
 
     case isPLD(opcode):
         fmt.Printf("PC %08X OPCODE %08X CPSR %08X\n", r[PC], opcode, cpu.Reg.CPSR)
         panic("PLD")
-        return 4
+        return 4, true
 
     case !cpu.CheckCond(opcode >> 28):
 		r[PC] += 4
-		return 4
+		return 4, true
     }
 
 
 	if swi := (opcode>>24)&0xF == 0xF; swi {
 		//cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
 		cpu.exception(VEC_SWI, MODE_SWI)
-		return 4
+		return 4, true
 		//cycles, incPc := cpu.Gba.SysCall((opcode >> 16) & 0xFF)
 
 		//if incPc {
@@ -42,14 +42,14 @@ func (cpu *Cpu) DecodeARM() int {
     switch {
     case isBkpt(opcode):
 		cpu.exception(VEC_PREFETCHABORT, MODE_ABT)
-		return 4
+		return 4, true
 	case isB(opcode):
 		cpu.B(opcode)
 	case isBX(opcode):
 		cpu.BX(opcode)
 	case isSDT(opcode):
         cycles := cpu.Sdt(opcode)
-        return int(cycles)
+        return int(cycles), true
 	case isBlock(opcode):
 		cpu.Block(opcode)
 
@@ -74,10 +74,12 @@ func (cpu *Cpu) DecodeARM() int {
     //case isCoDataTrans(opcode):
     //    cpu.Reg.R[15] += 4
 	default:
-		panic(fmt.Sprintf("Unable to Decode ARM 9 %08X, at PC %08X", opcode, r[PC]))
+		//panic(fmt.Sprintf("Unable to Decode ARM 9 %08X, at PC %08X", opcode, r[PC]))
+		fmt.Printf("Unable to Decode ARM 9 %08X, at PC %08X\n", opcode, r[PC])
+        return 0, false
 	}
 
-	return 4
+	return 4, true
 }
 
 func isOpcodeFormat(opcode, mask, format uint32) bool {

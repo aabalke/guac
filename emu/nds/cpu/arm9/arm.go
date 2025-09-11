@@ -331,26 +331,48 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
 	if abtExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB && cpu.Reg.getMode() == MODE_ABT; abtExit {
         cpu.Reg.R[15] += 4
 		cpu.ExitException(MODE_ABT)
+
+        if cpu.Reg.R[15] & 1 == 1 {
+            cpu.toggleThumb()
+        }
+
 		return
 	}
 
 	if swiExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB && cpu.Reg.getMode() == MODE_SWI; swiExit {
+        //cpu.toggleThumb()
 		cpu.ExitException(MODE_SWI)
+        if cpu.Reg.R[15] & 1 == 1 {
+            cpu.toggleThumb()
+        }
+
 		return
 	}
 
 	if irqExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB; irqExit {
 		cpu.ExitException(MODE_IRQ)
+        if cpu.Reg.R[15] & 1 == 1 {
+            cpu.toggleThumb()
+        }
+
 		return
 	}
 
 	if swiExit := alu.Rd == PC && alu.Rm == LR && alu.Inst == MOV; swiExit {
 		cpu.ExitException(MODE_SWI)
+        if cpu.Reg.R[15] & 1 == 1 {
+            cpu.toggleThumb()
+        }
+
 		return
 	}
 
 	if forceExit := alu.Rd == PC; forceExit {
 		cpu.psrSwitch()
+        if cpu.Reg.R[15] & 1 == 1 {
+            cpu.toggleThumb()
+        }
+
 		return
 	}
 
@@ -1337,6 +1359,7 @@ func (cpu *Cpu) CoDataReg(opcode uint32) {
 
         if !cpu.Irq.IME {
             panic("ARM9 CPU HALTED WITHOUT IME ENABLED")
+            //cpu.Irq.IME = true
         }
 
         cpu.Halted = true

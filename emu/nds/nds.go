@@ -213,22 +213,19 @@ func (nds *Nds) Update() {
         // arm9 thumb ~1 cycles, arm ~2 cycles
         // arm7 thumb ~2 cycles, arm ~4 cycles
 
-        //if CURR_INST >= 915_776 {
-        //    os.Exit(0)
-        //}
-
-        //if r7[15] >= 0x600_0000 && r7[15] < 0x700_0000 {
-        //    fmt.Printf("PC %08X OPCODE %08X\n", r7[15], nds.mem.Read32(r7[15], false))
-        //}
+        //fmt.Printf("PC %08X CURR %d\n", r[15], CURR_INST)
 
 		if !nds.arm9.Halted {
             thumbExec :=  nds.arm9.Reg.IsThumb
             armExec := !nds.arm9.Reg.IsThumb && nds.AccCycles & 0b1 == 0
 
             if thumbExec || armExec  {
-
-                //logger.Update(0, 915776, CURR_INST, true)
-                nds.arm9.Execute()
+                //logger.Update(0, 915774, CURR_INST, true)
+                _, ok := nds.arm9.Execute()
+                if !ok {
+                    fmt.Printf("ARM9 Decode Error: PC %08X CURR %d\n", r[15], CURR_INST)
+                    os.Exit(0)
+                }
             }
 		}
 
@@ -237,8 +234,13 @@ func (nds *Nds) Update() {
             armExec := !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b11 == 0
 
             if thumbExec || armExec  {
-                //logger.Update(25_000_000, 25_088_708, CURR_INST, false)
-                nds.arm7.Execute()
+                //logger.Update(0, 915772, CURR_INST, false)
+                //logger.Update(0, 4_000_000, CURR_INST, false)
+                _, ok := nds.arm7.Execute()
+                if !ok {
+                    fmt.Printf("ARM7 Decode Error: PC %08X CURR %d\n", r7[15], CURR_INST)
+                    os.Exit(0)
+                }
             }
         }
 

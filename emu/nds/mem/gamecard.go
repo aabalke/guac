@@ -23,6 +23,7 @@ type Gamecard struct {
     AuxSpi  *AuxSPI
     RomCtrl *RomCtrl
 
+
     Key2 Key2
 
     IsArm7 bool
@@ -33,6 +34,7 @@ type Gamecard struct {
     Buffer []uint8
 
     Cartridge *cart.Cartridge
+    Backup *cart.Backup
 
     irq7, irq9 *cpu.Irq
     dma7, dma9 *[4]dma.DMA
@@ -40,13 +42,16 @@ type Gamecard struct {
     ChipId [4]uint8
 }
 
-func (g *Gamecard) Init(irq7, irq9 *cpu.Irq, dma7, dma9 *[4]dma.DMA, cart *cart.Cartridge) {
+func (g *Gamecard) Init(irq7, irq9 *cpu.Irq, dma7, dma9 *[4]dma.DMA, c *cart.Cartridge) {
 
     g.irq7 = irq7
     g.irq9 = irq9
     g.dma7 = dma7
     g.dma9 = dma9
-    g.Cartridge = cart
+    g.Cartridge = c
+
+    g.Backup = &cart.Backup{}
+    g.Backup.Init()
 
     g.ExMem = &ExMem{Gamecard: g}
     g.AuxSpi = &AuxSPI{Gamecard: g}
@@ -71,6 +76,7 @@ func (g *Gamecard) Init(irq7, irq9 *cpu.Irq, dma7, dma9 *[4]dma.DMA, cart *cart.
     // if skipping bios start in Key2
     g.Status = GAMECARD_STAT_KY2
 
+    // if this gets changed, fix on init
     g.ChipId = [4]uint8{0xFF, 0xFF, 0xFF, 0xFF}
 }
 
@@ -115,7 +121,11 @@ type AuxSPI struct {
     Irq bool
     Enabled bool
 
-    Data uint8
+
+    Value uint8
+    Req, Res []uint8
+
+    Active bool
 }
 
 func (a *AuxSPI) Read(b uint8) uint8 {
@@ -152,7 +162,7 @@ func (a *AuxSPI) Read(b uint8) uint8 {
         return v
 
     case 2:
-        return a.Data
+        return a.Value
     default:
         return 0
     }
@@ -166,13 +176,33 @@ func (a *AuxSPI) Write(v uint8, b uint8) {
         a.Baudrate = v & 0b11
         a.Hold = utils.BitEnabled(uint32(v), 6)
         a.Busy = utils.BitEnabled(uint32(v), 7)
+
+        a.Gamecard.Backup.WrittenCnt = true
         return
     case 1:
         //fmt.Printf("W AUXSPI V %02X B %02d\n", v, b)
         // top bits can only be written by arm9
+
+        wasBackup := a.IsBackup
         a.IsBackup = utils.BitEnabled(uint32(v), 5)
         a.Gamecard.RomTransferIrq = utils.BitEnabled(uint32(v), 6)
         a.Gamecard.NDSSlotEnabled = utils.BitEnabled(uint32(v), 7)
+
+        if a.IsBackup && !wasBackup {
+
+            fmt.Println("BEGIN TFX")
+
+            if a.Req == nil {
+                a.Req = make([]uint8, 16)
+            }
+            a.Req = a.Req[:0]
+            a.Res = nil
+
+            a.Active = true
+        }
+
+
+        a.Gamecard.Backup.WrittenCnt = true
         return
     case 2:
 
@@ -182,16 +212,41 @@ func (a *AuxSPI) Write(v uint8, b uint8) {
         }
 
         //fmt.Printf("W AUXDATA B %02d\n", b)
-        panic("AUXSPI DATA WRITE")
+        //panic("AUXSPI DATA WRITE")
 
-        // start transfer with write but value does not matter
-        a.Busy = true
-
-        // spi stuff
-        a.Busy = false
+        a.WriteData(v)
         return
     case 3:
+        // do writes here transfer?
+    }
+}
 
+func (a *AuxSPI) WriteData(v uint8) {
+
+    var value uint8
+
+    if len(a.Res) > 0 {
+        value = a.Res[0]
+        a.Res = a.Res[1:]
+    }
+
+    if len(a.Res) == 0 {
+        var stat uint8
+        a.Req = append(a.Req, v)
+
+        a.Res, stat = a.Gamecard.Backup.Transfer(a.Req)
+
+        if stat == cart.STAT_DONE {
+            a.Req = a.Req[:0]
+        }
+    }
+
+    a.Value = value
+
+    if !a.Hold {
+        fmt.Println("FINISH TFX")
+        //a.Gamecard.Backup.Write()
+        a.Active = false
     }
 }
 
@@ -364,7 +419,6 @@ func (r *RomCtrl) Run() {
     //case GAMECARD_STAT_K1B:
     case GAMECARD_STAT_KY2:
 
-
         const(
             DATA_READ = 0xB7
             GET_CHIP_ID3 = 0xB8
@@ -398,6 +452,7 @@ func (r *RomCtrl) Run() {
         case GET_CHIP_ID3:
 
             r.Gamecard.Buffer = r.Gamecard.ChipId[:]
+            //fmt.Printf("CHIP ID = % X\n", r.Gamecard.Buffer)
             r.Gamecard.Transfer(true)
 
         default:

@@ -173,6 +173,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 
         ObjectLoop:
 		for j := len(objPriorities[i]) - 1; j >= 0; j-- {
+
 			objIdx := objPriorities[i][j]
 	        obj := &engine.Objects[objIdx]
 
@@ -563,11 +564,11 @@ func (nds *Nds) directbitmap(x, y, offset uint32, bank *[0x20000]uint8) (uint32,
         BYTE_PER_PIXEL = 2
     )
 
-
     var data uint32
 
     if bank == nil {
         idx := ((x+(y*SCREEN_WIDTH)) * BYTE_PER_PIXEL) + offset
+
         data = uint32(nds.mem.Vram.Read(idx, true))
         data |= uint32(nds.mem.Vram.Read(idx + 1, true)) << 8
     } else {
@@ -576,6 +577,7 @@ func (nds *Nds) directbitmap(x, y, offset uint32, bank *[0x20000]uint8) (uint32,
         data |= uint32(bank[idx + 1]) << 8
     }
 
+    // if on transparent???
     if transparent := (data >> 16) & 1 == 1; transparent {
         return 0, false
     }

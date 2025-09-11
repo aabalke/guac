@@ -1,6 +1,8 @@
 package mem
 
 import (
+	"fmt"
+
 	"github.com/aabalke/guac/emu/nds/mem/spi"
 )
 
@@ -48,12 +50,14 @@ func setBiosRam(mem *Mem) {
 
     for i := range h.Arm7Size {
         v := mem.Cartridge.Rom[h.Arm7Offset + i]
-
         mem.Write(h.Arm7RamAddr + i, v, false)
     }
 
+    // if these are updated, update gamecard version
     //27FF800h 4     NDS Gamecart Chip ID 1
+    mem.Write32(0x27FF800, 0xFFFFFFFF, true)
     //27FF804h 4     NDS Gamecart Chip ID 2
+    mem.Write32(0x27FF804, 0xFFFFFFFF, true)
 
     //27FF808h 2     NDS Cart Header CRC (verified)            ;hdr[15Eh]
     mem.Write(RAM_CART_HDR_CRC, c[0x15E], true)
@@ -74,6 +78,7 @@ func setBiosRam(mem *Mem) {
     //}
 
     //27FF850h 2     NDS7 BIOS CRC (5835h)
+    mem.Write16(0x27FF850, 0x5835, true)
 
     //27FF868h 4     Wifi FLASH User Settings FLASH Address (fmw[20h]*8)
     v := uint32((*f)[0x20]) * 8
@@ -91,15 +96,27 @@ func setBiosRam(mem *Mem) {
     //27FF884h 4     NDS7 Boot Task (also checked by NDS9) (=6 at cart boot time)
     mem.Write(RAM_BOOT_TASK, 6, true)
 
+    // if these are updated, update gamecard version
     //27FFC00h 4     NDS Gamecart Chip ID 1   (copy of 27FF800h)
+    mem.Write32(0x27FFC00, 0xFFFFFFFF, true)
     //27FFC04h 4     NDS Gamecart Chip ID 2   (copy of 27FF804h)
+    mem.Write32(0x27FFC04, 0xFFFFFFFF, true)
+
     //27FFC08h 2     NDS Cart Header CRC      (copy of 27FF808h)
+    mem.Write(0x027FFC08, c[0x15E], true)
+    mem.Write(0x027FFC08 + 1, c[0x15F], true)
+
     //27FFC0Ah 2     NDS Cart Secure Area CRC (copy of 27FF80Ah)
+    mem.Write(0x27FFC0A, c[0x6C], true)
+    mem.Write(0x27FFC0A + 1, c[0x6D], true)
+
     //27FFC0Ch 2     NDS Cart Missing/Bad CRC (copy of 27FF80Ch)
     //27FFC0Eh 2     NDS Cart Secure Area Bad (copy of 27FF80Eh)
-    //27FFC10h 2     NDS7 BIOS CRC (5835h)    (copy of <27FF850h>)
-    //27FFC12h 2     Secure Disable           (copy of 27FF812h)
 
+    //27FFC10h 2     NDS7 BIOS CRC (5835h)    (copy of <27FF850h>)
+    mem.Write16(0x27FFC10, 0x5835, true)
+
+    //27FFC12h 2     Secure Disable           (copy of 27FF812h)
 
     //27FFC3Ch 4     Frame Counter (eg. 00000332h in no$gba with original firmware)
     mem.Write32(RAM_FRAME_CNT, 0x332, true)
@@ -142,6 +159,9 @@ func setBiosRam(mem *Mem) {
     //mem.Write(USER_SETTING_RAM + 0x61, 0x0C, true)
     //mem.Write(USER_SETTING_RAM + 0x62, 0xE0, true)
     //mem.Write(USER_SETTING_RAM + 0x63, 0xA0, true)
+
+
+    initTempUnimplimented()
 }
 
 
@@ -153,3 +173,50 @@ func setBiosRam(mem *Mem) {
 //37F8000h FE00h ARM7 bootcode can be loaded here (37F8000h..3807DFFh)
 //380FFF8h 4     NDS7 IRQ IF Check Bits (hardcoded RAM address)
 //380FFFCh 4     NDS7 IRQ Handler (hardcoded RAM address)
+
+// this is to check if cartridge reads unimplimented ramusage
+func ramUsageUnimplimented(addr uint32) {
+
+    _, in := tempUnimplimented[addr]
+
+    if !in {
+        return
+    }
+
+    panic(fmt.Sprintf("READ FROM UNIMPLIMENTED RAM ADDR %08X\n", addr))
+}
+
+var tempUnimplimented map[uint32]bool
+
+func initTempUnimplimented() {
+    tempUnimplimented = make(map[uint32]bool)
+
+    t := &tempUnimplimented
+
+    (*t)[0x27FF812] = true
+    (*t)[0x27FF813] = true
+
+    for i := uint32(0x27FFC0C); i < 0x27FFC17; i ++ {
+        (*t)[i] = true
+    }
+
+    for i := uint32(0x27FFC30); i < 0x27FFC3C; i ++ {
+        (*t)[i] = true
+    }
+
+    for i := uint32(0x27FFC80); i < 0x27FFC80 + 0x70; i ++ {
+        (*t)[i] = true
+    }
+
+    clearTempUnimplimented(0x27FFC35)
+    clearTempUnimplimented(0x27FFC10)
+    clearTempUnimplimented(0x27FFC11)
+}
+
+func clearTempUnimplimented(addr uint32) {
+    _, in := tempUnimplimented[addr]
+
+    if in {
+        delete(tempUnimplimented, addr)
+    }
+}

@@ -179,3 +179,36 @@ Need tests for
 NOT ALIGNING PC (movs 15, 14 etc)
 BLX r15, r14 (MUST BE + 3, for return thumb setting .BLX, .... BX back will need thumb setting)
 BLX ARM needs to occur before Cond
+
+# Games (Decrypted)
+
+### Backup Codes
+Animal Crossing Wild World
+Brain Age
+Big Brain Academy
+New Super Mario Bros
+Tetris Ds
+Cooking Mama
+
+### Gamecard
+Housemd
+Sonic Colors
+
+### Bad PC
+Mario And Luigi Bowsers Inside Story
+Mario Kart Ds
+Brain Age 2
+Metroid Prime Hunters
+
+### Nonpanic Crash
+Mario Party
+Nintendogs Best Friends
+Yoshis Island
+Pokemon Ranger
+Zelda Spirit Tracks
+Sonic Chronicles The Dark Brotherhood
+Super Mario 64 - Boots, does not enter 3D for "star"
+
+### What
+Pokemon Diamond
+Pokemon Heartgold
