@@ -14,53 +14,73 @@ type Tcm struct {
 	DtcmLoadMode bool
 }
 
-func (t *Tcm) ReadDtcm(addr uint32) uint8 {
+func (t *Tcm) ReadDtcm(addr uint32) (uint8, bool) {
 
 	if t.DtcmLoadMode || !t.DtcmEnabled {
-		return 0
+		return 0, false
 	}
 
-	return t.Dtcm[(addr-t.DtcmBase)&0x3FFF]
+	return t.Dtcm[(addr-t.DtcmBase)&0x3FFF], true
 }
 
-func (t *Tcm) Read(addr uint32) uint8 {
+func (t *Tcm) Read(addr uint32) (uint8, bool) {
 
 	if addr < t.ItcmSize {
 
 		if t.ItcmLoadMode || !t.ItcmEnabled {
-			return 0
+			return 0, false
 		}
 
-		return t.Itcm[addr&0x7FFF]
+		return t.Itcm[addr&0x7FFF], true
 
 	} else if addr >= t.DtcmBase && addr < t.DtcmBase+t.DtcmSize {
 		return t.ReadDtcm(addr)
 	}
 
-	return 0
+	return 0, false
 }
 
-func (t *Tcm) WriteDtcm(addr uint32, v uint8) {
+func (t *Tcm) ReadTcmWindow(addr uint32) (uint8, bool) {
+    if notDtcm := !(addr >= t.DtcmBase && addr < t.DtcmBase + t.DtcmSize); notDtcm {
+        return 0, false
+    }
+
+    return t.Read(addr)
+}
+
+func (t *Tcm) WriteDtcm(addr uint32, v uint8) bool {
 
 	if !t.DtcmEnabled {
-		return
+		return false
 	}
 
 	t.Dtcm[(addr-t.DtcmBase)&0x3FFF] = v
+    return true
 }
 
-func (t *Tcm) Write(addr uint32, v uint8) {
+func (t *Tcm) Write(addr uint32, v uint8) bool {
 
 	if addr < t.ItcmSize {
 
 		if !t.ItcmEnabled {
-			return
+			return false
 		}
 
 		t.Itcm[addr&0x7FFF] = v
-		return
+		return true
+    }
 
-	} else if addr >= t.DtcmBase && addr < t.DtcmBase+t.DtcmSize {
-		t.WriteDtcm(addr, v)
+	if addr >= t.DtcmBase && addr < t.DtcmBase+t.DtcmSize {
+		return t.WriteDtcm(addr, v)
 	}
+
+    return false
+}
+
+func (t *Tcm) WriteTcmWindow(addr uint32, v uint8) bool {
+    if notDtcm := !(addr >= t.DtcmBase && addr < t.DtcmBase + t.DtcmSize); notDtcm {
+        return false
+    }
+
+    return t.Write(addr, v)
 }

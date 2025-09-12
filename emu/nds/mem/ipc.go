@@ -1,8 +1,6 @@
 package mem
 
 import (
-	"fmt"
-
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
@@ -167,7 +165,7 @@ func (i *IPC) WriteCnt(v, b uint8, isArm9 bool) {
                 }
             }
 
-            fmt.Printf("FLUSHED FIFO\n")
+            //fmt.Printf("FLUSHED FIFO\n")
         }
     case 1:
         remote.IrqNotEmpty = utils.BitEnabled(uint32(v), 2)

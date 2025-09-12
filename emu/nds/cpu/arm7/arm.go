@@ -327,9 +327,16 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
         cpu.Reg.R[15] += 4
 
         //cpu.toggleThumb()
-		cpu.ExitException(MODE_ABT)
-        if cpu.Reg.R[15] & 1 == 1 {
-            cpu.toggleThumb()
+		//cpu.ExitException(MODE_ABT)
+        //if cpu.Reg.R[15] & 1 == 1 {
+        //    cpu.toggleThumb()
+        //}
+
+        if !cpu.Reg.IsThumb {
+            cpu.Reg.R[15] &^= 0b11
+        } else {
+            // or should this toggle thumb?
+            cpu.Reg.R[15] &^= 0b1
         }
 
 		return
@@ -340,18 +347,33 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
         // ie [pc] & 1 toggle thumb
         //cpu.toggleThumb()
 		cpu.ExitException(MODE_SWI)
-        if cpu.Reg.R[15] & 1 == 1 {
-            cpu.toggleThumb()
-        }
+        //if cpu.Reg.R[15] & 1 == 1 {
+        //    cpu.toggleThumb()
+        //}
 
+
+        if !cpu.Reg.IsThumb {
+            // Required. Do not remove. check against gbe+ test
+            cpu.Reg.R[15] &^= 0b11
+        } else {
+            // or should this toggle thumb?
+            cpu.Reg.R[15] &^= 0b1
+        }
 
 		return
 	}
 
 	if irqExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB; irqExit {
 		cpu.ExitException(MODE_IRQ)
-        if cpu.Reg.R[15] & 1 == 1 {
-            cpu.toggleThumb()
+        //if cpu.Reg.R[15] & 1 == 1 {
+        //    cpu.toggleThumb()
+        //}
+
+        if !cpu.Reg.IsThumb {
+            cpu.Reg.R[15] &^= 0b11
+        } else {
+            // or should this toggle thumb?
+            cpu.Reg.R[15] &^= 0b1
         }
 
 		return
@@ -359,8 +381,15 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
 
 	if swiExit := alu.Rd == PC && alu.Rm == LR && alu.Inst == MOV; swiExit {
 		cpu.ExitException(MODE_SWI)
-        if cpu.Reg.R[15] & 1 == 1 {
-            cpu.toggleThumb()
+        //if cpu.Reg.R[15] & 1 == 1 {
+        //    cpu.toggleThumb()
+        //}
+
+        if !cpu.Reg.IsThumb {
+            cpu.Reg.R[15] &^= 0b11
+        } else {
+            // or should this toggle thumb?
+            cpu.Reg.R[15] &^= 0b1
         }
 
 		return
@@ -368,8 +397,15 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
 
 	if forceExit := alu.Rd == PC; forceExit {
 		cpu.psrSwitch()
-        if cpu.Reg.R[15] & 1 == 1 {
-            cpu.toggleThumb()
+        //if cpu.Reg.R[15] & 1 == 1 {
+        //    cpu.toggleThumb()
+        //}
+
+        if !cpu.Reg.IsThumb {
+            cpu.Reg.R[15] &^= 0b11
+        } else {
+            // or should this toggle thumb?
+            cpu.Reg.R[15] &^= 0b1
         }
 
 		return

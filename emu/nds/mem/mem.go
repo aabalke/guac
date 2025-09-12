@@ -137,13 +137,14 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 			return mem.Arm9Bios[addr&0x0FFF]
 		}
 
-        if addr >= mem.Tcm.DtcmBase && addr < mem.Tcm.DtcmBase + mem.Tcm.DtcmSize {
-            return mem.Tcm.Read(addr)
+        if v, ok := mem.Tcm.ReadTcmWindow(addr); ok {
+            return v
         }
 
 		switch addr >> 24 {
 		case 0x0, 0x1:
-            return mem.Tcm.Read(addr)
+            v, _ := mem.Tcm.Read(addr)
+            return v
 		case 0x2:
             ramUsageUnimplimented(addr)
 			return mem.MainRam[addr & 0x3F_FFFF]
@@ -215,8 +216,7 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 
 	if arm9 {
 
-        if addr >= mem.Tcm.DtcmBase && addr < mem.Tcm.DtcmBase + mem.Tcm.DtcmSize {
-            mem.Tcm.Write(addr, v)
+        if ok := mem.Tcm.WriteTcmWindow(addr, v); ok {
             return
         }
 

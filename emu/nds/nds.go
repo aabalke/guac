@@ -140,37 +140,40 @@ func (nds *Nds) checkBadPc() {
         panic(fmt.Sprintf("BAD ARM7 ARM   PC %08X CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
     }
 
-    if nds.mem.Read32(reg9.R[15], true) == 0x0 {
 
-        zeros := true
+    //zeroWordcnt := 0x4000
 
-        for i := uint32(0); i < 0x20; i += 4 {
-            if nds.mem.Read32(reg9.R[15] + i, true) != 0x0 {
-                zeros = false
-                break
-            }
-        }
+    //if nds.mem.Read32(reg9.R[15], true) == 0x0 {
 
-        if zeros {
-            panic(fmt.Sprintf("BAD ARM9 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
-        }
-    }
+    //    zeros := true
 
-    if nds.mem.Read32(reg7.R[15], false) == 0x0 {
+    //    for i := uint32(0); i < uint32(zeroWordcnt); i += 4 {
+    //        if nds.mem.Read32(reg9.R[15] + i, true) != 0x0 {
+    //            zeros = false
+    //            break
+    //        }
+    //    }
 
-        zeros := true
+    //    if zeros {
+    //        panic(fmt.Sprintf("BAD ARM9 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
+    //    }
+    //}
 
-        for i := uint32(0); i < 0x20; i += 4 {
-            if nds.mem.Read32(reg7.R[15] + i, false) != 0x0 {
-                zeros = false
-                break
-            }
-        }
+    //if nds.mem.Read32(reg7.R[15], false) == 0x0 {
 
-        if zeros {
-            panic(fmt.Sprintf("BAD ARM7 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
-        }
-    }
+    //    zeros := true
+
+    //    for i := uint32(0); i < uint32(zeroWordcnt); i += 4 {
+    //        if nds.mem.Read32(reg7.R[15] + i, false) != 0x0 {
+    //            zeros = false
+    //            break
+    //        }
+    //    }
+
+    //    if zeros {
+    //        panic(fmt.Sprintf("BAD ARM7 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
+    //    }
+    //}
 
 
     if reg9.R[15] < 0x30 && !nds.arm9.LowVector {
@@ -249,7 +252,9 @@ func (nds *Nds) Update() {
             armExec := !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b11 == 0
 
             if thumbExec || armExec  {
-                //logger.Update(9_000_000, 10_000_000, CURR_INST, false)
+                //fmt.Printf("PC %08X CURR %d\n", r7[15] , CURR_INST)
+
+                //logger.Update(503480, 503562, CURR_INST, false)
                 _, ok := nds.arm7.Execute()
                 if !ok {
                     fmt.Printf("ARM7 Decode Error: PC %08X CURR %d\n", r7[15], CURR_INST)
