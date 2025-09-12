@@ -146,10 +146,21 @@ type Object struct {
 
 func (p *PPU) Update(addr, v uint32) {
 
-    if engineA := addr < 0x60; engineA {
+    if engineA := addr < 0x60; engineA && p.EngineA2D {
+
         p.EngineA.UpdateEngine(addr, v)
         return
-    } else if engineB := addr >= 0x1000 && addr < 0x1070; engineB {
+    }
+
+    if engineRender := addr >= 0x320 && addr < 0x400; engineRender && p.RenderingEngine {
+        return
+    }
+
+    if engineGeo := addr >= 0x400 && addr < 0x700; engineGeo && p.GeometryEngine {
+        return
+    }
+
+    if engineB := addr >= 0x1000 && addr < 0x1060; engineB && p.EngineB2D {
         p.EngineB.UpdateEngine(addr & 0xFF, v)
         return
     }

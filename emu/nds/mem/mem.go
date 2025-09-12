@@ -20,7 +20,6 @@ var arm9Bios []byte
 type Mem struct {
 
     Tcm Tcm
-
 	MainRam         [0x40_0000]uint8
 	WRAM            WRAM
     Pram            ppu.PRAM
@@ -37,32 +36,32 @@ type Mem struct {
 	irq7, irq9 *cpu.Irq
     dma7, dma9 *[4]dma.DMA
 
+    arm7Pc *uint32
+
     //LowVector bool
 
     ppu *ppu.PPU
-
-    Gamecard Gamecard
-
-    div Div
-    sqrt Sqrt
-
     Cartridge *cart.Cartridge
+
 
     Vcount uint32
     Dispstat Dispstat
     Keypad Keypad
-
+    Gamecard Gamecard
+    div Div
+    sqrt Sqrt
     Ipc IPC
     Spi spi.Spi
     Rtc Rtc
     PostFlg PostFlg
     PowCnt PowCnt
-
+    BiosProt BiosProt
     Timers [8]Timer
-
 }
 
-func NewMemory(halted7, halted9 *bool, dma7, dma9 *[4]dma.DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PPU) Mem {
+type BiosProt uint16
+
+func NewMemory(arm7Pc *uint32, halted7, halted9 *bool, dma7, dma9 *[4]dma.DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PPU) Mem {
 	m := Mem{
         halted7: halted7,
         halted9: halted9,
@@ -72,6 +71,7 @@ func NewMemory(halted7, halted9 *bool, dma7, dma9 *[4]dma.DMA, irq7, irq9 *cpu.I
         irq7: irq7,
         Cartridge: c,
         ppu: ppu,
+        arm7Pc: arm7Pc,
     }
 
     // i believe this is default
@@ -79,6 +79,8 @@ func NewMemory(halted7, halted9 *bool, dma7, dma9 *[4]dma.DMA, irq7, irq9 *cpu.I
 
     m.WriteArm9IO(0x304, 0x0F)
     m.WriteArm9IO(0x305, 0x82)
+
+    m.BiosProt = 0x1204
 
     m.Keypad.KEYINPUT = 0x3FF
     m.Keypad.KEYINPUT2 = 0b100_0011
@@ -148,7 +150,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
             //fmt.Printf("IO READ ARM9 %08X arm9 %t\n", addr, arm9)
 			return mem.ReadArm9IO(addr - 0x400_0000)
 		case 0x5:
-            return mem.Pram.Read(addr)
+            return mem.Pram.Read(addr, mem.ppu)
 		case 0x6:
             return mem.Vram.Read(addr, true)
 		case 0x7:
@@ -162,13 +164,12 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 	}
     switch addr >> 24 {
     case 0x0, 0x1:
-        if addr < uint32(len(mem.Arm7Bios)) {
+
+        if addr < 0x4000 && (*mem.arm7Pc) < 0x4000 {
             return mem.Arm7Bios[addr]
         }
 
-        panic(fmt.Sprintf("ARM7 ADDR %08X INVALID READ\n", addr))
-
-        return 0
+        return 0xFF
 
     case 0x2:
         ramUsageUnimplimented(addr)
@@ -227,7 +228,7 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 		case 0x4:
 			mem.WriteArm9IO(addr-0x400_0000, v)
         case 0x5:
-            mem.Pram.Write(addr, v)
+            mem.Pram.Write(addr, v, mem.ppu)
 		case 0x6:
             mem.Vram.Write(addr, v, true)
 		case 0x7:
@@ -283,11 +284,12 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 
     if addr >= 0x188 && addr < 0x190 { panic("READ IPC FIFO FROM BYTE OR HALF")}
 
-    if addr >= 0x280 && addr < 0x2B0 {
+    switch {
+    case addr >= 0x280 && addr < 0x2B0:
         return mem.div.Read(addr)
-    } else if addr >= 0x2B0 && addr < 0x2C0 {
+    case addr >= 0x2B0 && addr < 0x2C0:
         return mem.sqrt.Read(addr)
-    } else if addr >= 0xB0 && addr < 0x100 {
+    case addr >= 0xB0 && addr < 0x100:
         return mem.ReadDma(mem.dma9, addr)
     }
 
@@ -415,25 +417,20 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 
 func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 
-	//if addr >= 0xB0 && addr < 0xE0 {
-	//	fmt.Printf("WRITE ADDR %08X V %02X\n", addr, v)
-	//}
     if addr >= 0x188 && addr < 0x190 { panic("WRITE IPC FIFO FROM BYTE OR HALF")}
 
+    if ppu := addr < 0x70 || (addr >= 0x1000 && addr < 0x1070); ppu {
+        mem.ppu.Update(addr, uint32(v))
+    }
+
     switch {
-    case addr < 0x60:
-        mem.ppu.Update(addr, uint32(v))
-    case addr >= 0x1000 && addr < 0x1070:
-        mem.ppu.Update(addr, uint32(v))
     case addr >= 0x280 && addr < 0x2B0:
         mem.div.Write(addr, v)
         return
     case addr >= 0x2B0 && addr < 0x2C0:
         mem.sqrt.Write(addr, v)
         return
-    }
-
-    if addr >= 0xB0 && addr < 0x100 {
+    case addr >= 0xB0 && addr < 0x100:
         mem.WriteDma(mem.dma9, addr, v)
         return
     }
@@ -443,14 +440,12 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 		mem.Dispstat.Write(v, false)
     case 0x5:
 		mem.Dispstat.Write(v, true)
-
     case 0x6:
         mem.Vcount &^= 0xFF
         mem.Vcount |= uint32(v)
     case 0x7:
         mem.Vcount &= 0xFF
         mem.Vcount |= uint32(v) << 8
-
     case 0x184:
         mem.Ipc.WriteCnt(v, 0, true)
     case 0x185:
@@ -724,12 +719,13 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 		return mem.irq7.ReadIF(2)
 	case 0x217:
 		return mem.irq7.ReadIF(3)
+
     case 0x240:
         return mem.Vram.CNT_7
-
     case 0x241:
         return mem.WRAM.ReadCNT()
-    case 0x300: // this crashes some homebrew
+
+    case 0x300:
         return mem.PostFlg.Read(false)
 
     case 0x301:
@@ -743,6 +739,11 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
     case 0x304:
         return mem.PowCnt.V2
 
+    case 0x308:
+        return uint8(mem.BiosProt)
+    case 0x309:
+        return uint8(mem.BiosProt >> 8)
+
 	default:
         //panic(fmt.Sprintf("READ UNKNOWN ARM7 IO ADDR %08X", addr))
 		return mem.IO[addr]
@@ -751,24 +752,16 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 
 func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 
-	//if addr != 0x180 && addr != 0x181 && addr < 0x3000 {
-	//	fmt.Printf("WRITE ADDR %08X V %02X\n", addr, v)
-	//}
-
     if addr >= 0x188 && addr < 0x190 { panic("WRITE IPC FIFO FROM BYTE OR HALF")}
 
-    if addr < 0x4 {
+    switch {
+    case addr < 0x4:
         mem.ppu.Update(addr, uint32(v))
-    }
 
-    if addr >= 0x240 && addr < 0x250 {
-        //mem.Vram.WriteCNT(addr, v)
-        //return
-    }
-
-    if addr >= 0xB0 && addr < 0x100 {
+    case addr >= 0xB0 && addr < 0x100:
         mem.WriteDma(mem.dma7, addr, v)
         return
+
     }
 
 	switch addr {
@@ -913,8 +906,6 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 		mem.irq7.WriteIF(v, 2)
 	case 0x217:
 		mem.irq7.WriteIF(v, 3)
-    case 0x247:
-        mem.WRAM.WriteCNT(v)
 
     case 0x300:
         mem.PostFlg.Write(v, false)
@@ -933,6 +924,9 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
         }
     case 0x304:
         mem.PowCnt.WriteCNT2(v)
+
+    case 0x308:
+        return
 
 	default:
         //panic(fmt.Sprintf("WRTE UNKNOWN ARM7 IO ADDR %08X", addr))

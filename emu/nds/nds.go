@@ -90,6 +90,7 @@ func NewNds(path string, _ *oto.Context) *Nds {
 	nds.arm7 = *arm7.NewCpu(&nds.mem, &irq7)
 	nds.arm9 = *arm9.NewCpu(&nds.mem, &irq9, cp15)
 	nds.mem = mem.NewMemory(
+        &nds.arm7.Reg.R[15],
         &nds.arm7.Halted, &nds.arm9.Halted,
         &nds.arm7.Dma, &nds.arm9.Dma,
         &irq7, &irq9, &nds.Cartridge, &nds.ppu)
