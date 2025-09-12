@@ -859,6 +859,11 @@ func NewHalf(opcode uint32, c *Cpu) *Half {
 	}
 
     if double := !halfData.Load && halfData.Inst != 1; double {
+
+        if odd := halfData.Rd & 1 == 1; odd {
+            panic(fmt.Sprintf("DOUBLE INST WITH ODD RD REG %02X OPCODE %08X\n", r[halfData.Rd], opcode))
+        }
+
         halfData.RdValue2 = r[halfData.Rd + 1]
         if halfData.Rd + 1 == PC {
             halfData.RdValue2 += 12
@@ -959,8 +964,17 @@ func signedHalfStd(half *Half, cpu *Cpu) {
 	pre, post := halfUnsignedAddress(half, cpu)
 
 	if half.Load {
-        v := uint32(uint16(int16(cpu.mem.Read16(pre&^0b1, true))))
-        r[half.Rd] = v
+			// sign-expand half value
+            unexpanded := int16(cpu.mem.Read16(pre &^ 0b1, true))
+            expanded := uint32(unexpanded)
+
+            if unexpanded < 0 {
+                expanded |= (0xFFFF << 16)
+            }
+
+            r[half.Rd] = expanded
+        //v := uint32(uint16(int16(cpu.mem.Read16(pre&^0b1, true))))
+        //r[half.Rd] = v
 	} else {
 		addr := pre &^ 0b1
 		cpu.mem.Write16(addr, uint16(int16(half.RdValue)), true)

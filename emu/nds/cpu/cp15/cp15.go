@@ -1,6 +1,7 @@
 package cp15
 
 import (
+
 	"github.com/aabalke/guac/emu/nds/mem"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
@@ -95,6 +96,7 @@ func (c *Cp15) Write(v uint32, reg CpRegister, lowVector *bool) {
 
         c.mem.Tcm.DtcmSize = 512 << utils.GetVarData(v, 1, 6)
         c.mem.Tcm.DtcmBase = utils.GetVarData(v, 12, 31) << 12
+
 
         // base must be size aligned
 

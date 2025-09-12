@@ -135,14 +135,12 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 		case 0x0, 0x1:
             return mem.Tcm.Read(addr)
 		case 0x2:
-
             ramUsageUnimplimented(addr)
-
 			return mem.MainRam[addr & 0x3F_FFFF]
 		case 0x3:
             return mem.WRAM.Read(addr, true)
 		case 0x4:
-            //fmt.Printf("IO READ ARM9 %08X\n", addr)
+            //fmt.Printf("IO READ ARM9 %08X arm9 %t\n", addr, arm9)
 			return mem.ReadArm9IO(addr - 0x400_0000)
 		case 0x5:
             return mem.Pram.Read(addr)
@@ -153,6 +151,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
         case 0x8, 0x9, 0xA:
             return mem.ReadGbaSlot(addr, arm9)
         default:
+            panic(fmt.Sprintf("ARM9 ADDR %08X INVALID READ\n", addr))
             return 0
 		}
 	}
@@ -162,22 +161,24 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
             return mem.Arm7Bios[addr]
         }
 
+        panic(fmt.Sprintf("ARM7 ADDR %08X INVALID READ\n", addr))
+
         return 0
 
     case 0x2:
-
         ramUsageUnimplimented(addr)
-
         return mem.MainRam[addr&0x3F_FFFF]
     case 0x3:
         return mem.WRAM.Read(addr, false)
     case 0x4:
+        //fmt.Printf("IO READ ARM9 %08X arm9 %t\n", addr, arm9)
         return mem.ReadArm7IO(addr-0x400_0000)
     case 0x6:
         return mem.Vram.Read(addr, false)
     case 0x8, 0x9, 0xA:
         return mem.ReadGbaSlot(addr, arm9)
     default:
+        panic(fmt.Sprintf("ARM7 ADDR %08X INVALID READ\n", addr))
         return 0
     }
 }
@@ -214,10 +215,7 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 		case 0x0, 0x1:
             mem.Tcm.Write(addr, v)
 		case 0x2:
-
             clearTempUnimplimented(addr)
-
-
 			mem.MainRam[addr&0x3F_FFFF] = v
 		case 0x3:
             mem.WRAM.Write(addr, v, true)
@@ -237,7 +235,7 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 
     switch addr >> 24 {
     case 0x2:
-            clearTempUnimplimented(addr)
+        clearTempUnimplimented(addr)
         mem.MainRam[addr&0x3F_FFFF] = v
     case 0x3:
         mem.WRAM.Write(addr, v, false)

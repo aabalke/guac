@@ -205,7 +205,6 @@ func (a *AuxSPI) Write(v uint8, b uint8) {
             a.Active = true
         }
 
-
         a.Gamecard.Backup.WrittenCnt = true
         return
     case 2:
@@ -220,7 +219,7 @@ func (a *AuxSPI) Write(v uint8, b uint8) {
 
         a.WriteData(v)
         return
-    case 3:
+    //case 3:
         // do writes here transfer?
     }
 }
@@ -283,7 +282,6 @@ func (r *RomCtrl) Read(b uint8) uint8 {
     //fmt.Println("READ  ROM CTRL")
 
     switch b {
-    case 0:
     case 1:
         return uint8((r.v &^ (1 << 7)) >> (b * 8))
     case 2:
@@ -296,8 +294,6 @@ func (r *RomCtrl) Read(b uint8) uint8 {
         }
 
         return v
-
-    case 3:
     }
 
     return uint8(r.v >> (b * 8))
@@ -372,8 +368,8 @@ func (r *RomCtrl) ReadCmdIn() uint32 {
 
     if r.isReady {
         r.isReady = false
-
         r.Gamecard.Transfer(false)
+
     } else {
         fmt.Printf("WARNING GAMECARD ROM READ WITHOUT PENDING DATA\n")
     }
@@ -426,6 +422,8 @@ func (r *RomCtrl) Run() {
         const(
             DATA_READ = 0xB7
             GET_CHIP_ID3 = 0xB8
+
+            NAND_STAT = 0xD6
         )
 
         switch r.Command[0] {
@@ -459,8 +457,27 @@ func (r *RomCtrl) Run() {
             //fmt.Printf("CHIP ID = % X\n", r.Gamecard.Buffer)
             r.Gamecard.Transfer(true)
 
+        case NAND_STAT, 0x94:
+
+            //fmt.Printf("READING NAND STATUS ON Gamecard Key2\n")
+
+            // 0x20 is value on startup
+
+            // this is temp (0xFF) to force next
+            //r.Gamecard.Buffer = []uint8{0x20, 0x20, 0x20, 0x20}
+            //r.Gamecard.Buffer = []uint8{0x0, 0x0, 0x0, 0x0}
+            r.Gamecard.Buffer = r.Gamecard.ChipId[:]
+            r.Gamecard.Transfer(true)
+
+        //case 0xB5:
+        //    fmt.Printf("READING NAND HIGHZ ON Gamecard Key2\n")
+        //    r.Gamecard.Buffer = nil //[]uint8{0,0,0,0}
+        //    r.Gamecard.Transfer(true)
+
         default:
-            panic("UNSUPPORTED KEY2 COMMAND")
+            //panic(fmt.Sprintf("Unsupported Gamecard Key2 Cmd %02X", r.Command[0]))
+            r.Gamecard.Buffer = nil //[]uint8{0,0,0,0}
+            r.Gamecard.Transfer(true)
         }
     default: panic("BAD GAMECARD STATUS")
     }
@@ -488,6 +505,7 @@ func (g *Gamecard) Transfer(initial bool) {
     // calc accurate clkrate
 
     g.RomCtrl.DataOut = binary.LittleEndian.Uint32(g.Buffer[0:4])
+
     g.Buffer = g.Buffer[4:]
 
     g.RomCtrl.isReady = true
