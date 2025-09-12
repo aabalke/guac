@@ -56,10 +56,12 @@ type Mem struct {
     PostFlg PostFlg
     PowCnt PowCnt
     BiosProt BiosProt
+    WifiWaitCnt WifiWaitCnt
     Timers [8]Timer
 }
 
 type BiosProt uint16
+type WifiWaitCnt uint8
 
 func NewMemory(arm7Pc *uint32, halted7, halted9 *bool, dma7, dma9 *[4]dma.DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PPU) Mem {
 	m := Mem{
@@ -81,6 +83,7 @@ func NewMemory(arm7Pc *uint32, halted7, halted9 *bool, dma7, dma9 *[4]dma.DMA, i
     m.WriteArm9IO(0x305, 0x82)
 
     m.BiosProt = 0x1204
+    m.WifiWaitCnt = 0x30
 
     m.Keypad.KEYINPUT = 0x3FF
     m.Keypad.KEYINPUT2 = 0b100_0011
@@ -289,7 +292,7 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
         return mem.div.Read(addr)
     case addr >= 0x2B0 && addr < 0x2C0:
         return mem.sqrt.Read(addr)
-    case addr >= 0xB0 && addr < 0x100:
+    case addr >= 0xB0 && addr < 0xE0:
         return mem.ReadDma(mem.dma9, addr)
     }
 
@@ -430,7 +433,7 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
     case addr >= 0x2B0 && addr < 0x2C0:
         mem.sqrt.Write(addr, v)
         return
-    case addr >= 0xB0 && addr < 0x100:
+    case addr >= 0xB0 && addr < 0xE0:
         mem.WriteDma(mem.dma9, addr, v)
         return
     }
@@ -539,6 +542,7 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 
     case 0x204: mem.Gamecard.ExMem.Write(v, 0)
     case 0x205: mem.Gamecard.ExMem.Write(v, 1)
+
 	case 0x208:
 		mem.irq9.WriteIME(v)
 	case 0x210:
@@ -595,7 +599,7 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 	//}
     if addr >= 0x188 && addr < 0x190 { panic("READ IPC FIFO FROM BYTE OR HALF")}
 
-    if addr >= 0xB0 && addr < 0x100 {
+    if addr >= 0xB0 && addr < 0xE0 {
         return mem.ReadDma(mem.dma7, addr)
     }
 
@@ -701,6 +705,11 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 
     case 0x204: return mem.Gamecard.ExMem.Read(0)
     case 0x205: return mem.Gamecard.ExMem.Read(1)
+
+    case 0x206: return uint8(mem.WifiWaitCnt)
+    case 0x207: return 0
+
+
 	case 0x208:
 		return mem.irq7.ReadIME()
 	case 0x210:
@@ -758,7 +767,7 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
     case addr < 0x4:
         mem.ppu.Update(addr, uint32(v))
 
-    case addr >= 0xB0 && addr < 0x100:
+    case addr >= 0xB0 && addr < 0xE0:
         mem.WriteDma(mem.dma7, addr, v)
         return
 
@@ -888,6 +897,8 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
         return
 
     case 0x204: mem.Gamecard.ExMem.Write(v, 0)
+
+
 	case 0x208:
 		mem.irq7.WriteIME(v)
 	case 0x210:
@@ -971,7 +982,7 @@ func (m *Mem) ReadDma(dmas *[4]dma.DMA, addr uint32) uint8 {
 		return dmas[3].ReadControl(true)
     }
 
-    return m.IO[addr]
+    return 0
 }
 
 func (m *Mem) WriteDma(dmas *[4]dma.DMA, addr uint32, v uint8) {

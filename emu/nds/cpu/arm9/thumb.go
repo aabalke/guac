@@ -445,6 +445,7 @@ func (cpu *Cpu) ThumbAddSub(opcode uint16) {
 	case THUMB_SUB:
 		res = rsValue - rnValue
 	case THUMB_ADDMOV:
+        //
 		res = rsValue + rnImm
 	case THUMB_SUBImm:
 		res = rsValue - rnImm

@@ -1,7 +1,6 @@
 package ppu
 
 import (
-	"fmt"
 	"unsafe"
 
 	"github.com/aabalke/guac/emu/nds/utils"
@@ -64,37 +63,37 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
 	case 0x242:
         vm.CNT_C.Write(v)
 
-        vm.isCArm7 = v & 0b10000011 == 0b10000010
-        vm.CNT_7 &^= 1
-        if vm.isCArm7 {
-            vm.CNT_7 |= 1
-        }
-
-        //if arm7 := vm.CNT_C.Enabled && vm.CNT_C.Mst == 2 && vm.CNT_C.Ofs < 2; arm7 {
-        //    vm.isCArm7 = true
+        //vm.isCArm7 = v & 0b10000011 == 0b10000010
+        //vm.CNT_7 &^= 1
+        //if vm.isCArm7 {
         //    vm.CNT_7 |= 1
-        //} else {
-        //    vm.isCArm7 = false
-        //    vm.CNT_7 &^= 1
         //}
+
+        if arm7 := vm.CNT_C.Enabled && vm.CNT_C.Mst == 2 && vm.CNT_C.Ofs < 2; arm7 {
+            vm.isCArm7 = true
+            vm.CNT_7 |= 1
+        } else {
+            vm.isCArm7 = false
+            vm.CNT_7 &^= 1
+        }
 
 	case 0x243:
         vm.CNT_D.Write(v)
 
-        vm.isDArm7 = v & 0b10000011 == 0b10000010
-        vm.CNT_7 &^= 0b10
-        if vm.isDArm7 {
-            fmt.Printf("")
-            vm.CNT_7 |= 0b10
-        }
-
-        //if arm7 := vm.CNT_D.Enabled && vm.CNT_D.Mst == 2 && vm.CNT_D.Ofs < 2; arm7 {
-        //    vm.isDArm7 = true
+        //vm.isDArm7 = v & 0b10000011 == 0b10000010
+        //vm.CNT_7 &^= 0b10
+        //if vm.isDArm7 {
+        //    fmt.Printf("")
         //    vm.CNT_7 |= 0b10
-        //} else {
-        //    vm.isDArm7 = false
-        //    vm.CNT_7 &^= 0b10
         //}
+
+        if arm7 := vm.CNT_D.Enabled && vm.CNT_D.Mst == 2 && vm.CNT_D.Ofs < 2; arm7 {
+            vm.isDArm7 = true
+            vm.CNT_7 |= 0b10
+        } else {
+            vm.isDArm7 = false
+            vm.CNT_7 &^= 0b10
+        }
 
 	case 0x244:
         vm.CNT_E.Write(v)
@@ -284,7 +283,7 @@ func (vm *VRAM) Write(addr uint32, v uint8, arm9 bool) {
             case 2: base = 0x600000 // not sure
             case 3: // slot
             }
-            if addr >= base && addr < base + 0x8000 {
+            if addr >= base && addr < base + 0x4000 {
                 vm.I[addr - base] = v
             }
         }

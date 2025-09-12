@@ -210,8 +210,6 @@ func (nds *Nds) checkMode() {
     }
 }
 
-
-
 func (nds *Nds) Update() {
 
     r := &nds.arm9.Reg.R
