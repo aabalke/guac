@@ -56,8 +56,10 @@ type Mem struct {
     Spi spi.Spi
     Rtc Rtc
     PostFlg PostFlg
+    PowCnt PowCnt
 
     Timers [8]Timer
+
 }
 
 func NewMemory(halted7, halted9 *bool, dma7, dma9 *[4]dma.DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PPU) Mem {
@@ -74,6 +76,9 @@ func NewMemory(halted7, halted9 *bool, dma7, dma9 *[4]dma.DMA, irq7, irq9 *cpu.I
 
     // i believe this is default
     m.WRAM.WriteCNT(3)
+
+    m.WriteArm9IO(0x304, 0x0F)
+    m.WriteArm9IO(0x305, 0x82)
 
     m.Keypad.KEYINPUT = 0x3FF
     m.Keypad.KEYINPUT2 = 0b100_0011
@@ -396,6 +401,12 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
         return mem.WRAM.ReadCNT()
     case 0x300:
         return mem.PostFlg.Read(true)
+
+    case 0x304:
+        return uint8(mem.PowCnt.V)
+    case 0x305:
+        return uint8(mem.PowCnt.V >> 8)
+
 	default:
         //panic(fmt.Sprintf("READ UNKNOWN ARM9 IO ADDR %08X", addr))
 		return mem.IO[addr]
@@ -573,13 +584,9 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
         mem.PostFlg.Write(v, true)
 
     case 0x304:
-        mem.ppu.PowCnt1.V &^= 0xFF
-        mem.ppu.PowCnt1.V |= uint16(v)
-        mem.ppu.Update(addr, uint32(v))
+        mem.PowCnt.WriteCNT1(0, uint32(v), mem.ppu)
     case 0x305:
-        mem.ppu.PowCnt1.V &= 0xFF
-        mem.ppu.PowCnt1.V |= uint16(v) << 8
-        mem.ppu.Update(addr, uint32(v))
+        mem.PowCnt.WriteCNT1(1, uint32(v), mem.ppu)
 	default:
         //panic(fmt.Sprintf("WRTE UNKNOWN ARM9 IO ADDR %08X", addr))
 		mem.IO[addr] = v
@@ -732,6 +739,9 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
         } else {
             return 0b0000_0000
         }
+
+    case 0x304:
+        return mem.PowCnt.V2
 
 	default:
         //panic(fmt.Sprintf("READ UNKNOWN ARM7 IO ADDR %08X", addr))
@@ -921,6 +931,9 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
         default:
             panic(fmt.Sprintf("UNKNOWN HALTCNT VALUE ARM7 %d", v))
         }
+    case 0x304:
+        mem.PowCnt.WriteCNT2(v)
+
 	default:
         //panic(fmt.Sprintf("WRTE UNKNOWN ARM7 IO ADDR %08X", addr))
 		mem.IO[addr] = v

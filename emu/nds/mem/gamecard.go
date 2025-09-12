@@ -341,18 +341,19 @@ func (r *RomCtrl) Write(v uint8, b uint8) {
         r.Key1GapCLK = utils.BitEnabled(uint32(v), 4)
 
         if !r.RESBRelease {
-            r.v |= 1 << 13
+            r.v |= 1 << 29
             r.RESBRelease = utils.BitEnabled(uint32(v), 5)
         }
 
         r.isWrite = utils.BitEnabled(uint32(v), 6)
         r.Active = utils.BitEnabled(uint32(v), 7)
+
+        //log.Printf("RomCtrl Write of V %02X at B %02X. Output %08X. Ready %t\n", v, b, r.v, r.isReady)
+        if r.Active {
+            r.Run()
+        }
     }
 
-    //log.Printf("RomCtrl Write of V %02X at B %02X. Output %08X. Ready %t\n", v, b, r.v, r.isReady)
-    if r.Active {
-        r.Run()
-    }
 }
 
 func (r *RomCtrl) WriteCmdOut(v, b uint8) {
@@ -405,6 +406,8 @@ func (r *RomCtrl) Run() {
 
     // Data Block size   (0=None, 1..6=100h SHL (1..6) bytes, 7=4 bytes)
     switch r.BlockSizeBits {
+    case 0b0:
+        r.BlockSize = 0
     case 0b111:
         r.BlockSize = 4
     default:
@@ -505,7 +508,6 @@ func (g *Gamecard) Transfer(initial bool) {
     // calc accurate clkrate
 
     g.RomCtrl.DataOut = binary.LittleEndian.Uint32(g.Buffer[0:4])
-
     g.Buffer = g.Buffer[4:]
 
     g.RomCtrl.isReady = true

@@ -9,7 +9,14 @@ import (
 type PPU struct {
     EngineA Engine
     EngineB Engine
-    PowCnt1 PowCnt1
+
+    // these values are updated in PowCnt1
+
+    // need to impliment port disabling
+	LcdEnabled                      bool
+	EngineA2D, EngineB2D            bool
+	RenderingEngine, GeometryEngine bool
+	TopA                            bool
 }
 
 type Engine struct {
@@ -27,7 +34,6 @@ type Engine struct {
 
 	BgPriorities  [4][]uint32
 	ObjPriorities [4][]uint32
-
 }
 
 type Dispcnt struct {
@@ -138,14 +144,6 @@ type Object struct {
     BmpBoundaryShift uint32
 }
 
-type PowCnt1 struct {
-    V uint16
-    LcdEnabled bool
-    EngineA2D, EngineB2D bool
-    RenderingEngine, GeometryEngine bool
-    TopA bool
-}
-
 func (p *PPU) Update(addr, v uint32) {
 
     if engineA := addr < 0x60; engineA {
@@ -154,28 +152,6 @@ func (p *PPU) Update(addr, v uint32) {
     } else if engineB := addr >= 0x1000 && addr < 0x1070; engineB {
         p.EngineB.UpdateEngine(addr & 0xFF, v)
         return
-    }
-
-    switch addr {
-    case 0x304:
-
-        p.PowCnt1.LcdEnabled      = utils.BitEnabled(v, 0)
-        p.PowCnt1.EngineA2D       = utils.BitEnabled(v, 1)
-        p.PowCnt1.RenderingEngine = utils.BitEnabled(v, 2)
-        p.PowCnt1.GeometryEngine  = utils.BitEnabled(v, 3)
-
-    case 0x305:
-        p.PowCnt1.EngineB2D = utils.BitEnabled(v, 1)
-
-        prevTopA := p.PowCnt1.TopA
-        p.PowCnt1.TopA = utils.BitEnabled(v, 7)
-
-        if prevTopA != p.PowCnt1.TopA {
-            a := p.EngineA.Pixels
-            b := p.EngineB.Pixels
-            p.EngineA.Pixels = b
-            p.EngineB.Pixels = a
-        }
     }
 }
 

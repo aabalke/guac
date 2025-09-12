@@ -231,26 +231,12 @@ func (nds *Nds) Update() {
         // arm9 thumb ~1 cycles, arm ~2 cycles
         // arm7 thumb ~2 cycles, arm ~4 cycles
 
-        //if r[15] == 0x020B5404 {
-        //    fmt.Printf("PC %08X R8 %08X CURR %d\n", r[15], r[8], CURR_INST)
-        //    //os.Exit(0)
-        //}
-
-        //if CURR_INST % 10_000_000 == 0 {
-        //    fmt.Printf("CURR %d\n", CURR_INST)
-        //}
-
-        //if r[15] == 0x200FF94 {
-        //    nds.Debugger.PrintLine(true)
-        //}
-
 		if !nds.arm9.Halted {
             thumbExec :=  nds.arm9.Reg.IsThumb
             armExec := !nds.arm9.Reg.IsThumb && nds.AccCycles & 0b1 == 0
 
             if thumbExec || armExec  {
-
-                //logger.Update(140_000_000, 140_010_000, CURR_INST, true)
+                //logger.Update(11_600_000, 11_670_812, CURR_INST, true)
                 _, ok := nds.arm9.Execute()
                 if !ok {
                     fmt.Printf("ARM9 Decode Error: PC %08X CURR %d\n", r[15], CURR_INST)

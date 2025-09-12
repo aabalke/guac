@@ -292,6 +292,10 @@ func (dma *DMA) CheckGamecart(arm9 bool) {
 
     //After sending a command, data can be read from this register manually (when the DRQ bit is set), or by DMA (with DMASAD=4100010h, Fixed Source Address, Length=1, Size=32bit, Repeat=On, Mode=DS Gamecard)
 
+    if !dma.Enabled {
+        return
+    }
+
     if !(dma.Src == 0x4100010 && dma.SrcAdj == DMA_ADJ_NON && dma.WordCount == 1 && dma.isWord && dma.Repeat) {
         return
     }
