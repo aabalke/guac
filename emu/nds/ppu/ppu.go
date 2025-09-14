@@ -616,7 +616,7 @@ func (bg *Background) SetSize() {
         default:
             panic("PROHIBITTED BG SIZE")
         }
-    case BG_TYPE_AFF:
+    case BG_TYPE_AFF, BG_TYPE_BGM:
         switch bg.Size {
         case 0:
             bg.W, bg.H = 128, 128
@@ -638,7 +638,7 @@ func (bg *Background) SetSize() {
         default:
             panic("PROHIBITTED LARGE BITMAP BG SIZE")
         }
-    default:
+    case BG_TYPE_256, BG_TYPE_DIR:
         switch bg.Size {
         case 0:
             bg.W, bg.H = 128, 128

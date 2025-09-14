@@ -115,10 +115,10 @@ Graphics
     ❌ Backgrounds
         👍 16 bit color bmp
         👍 256 bit color bmp
-        ❌ all in one
-            ❌ Basic
+        👍 all in one
+            👍 Basic
                 👍 1, 2, 3, 4, 5
-                ❌ 6, 7, 8, 9
+                👍 6, 7, 8, 9
                 👍 10, 11, 12, 13
 
             👍 Bitmap
