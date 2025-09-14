@@ -43,7 +43,6 @@ type Nds struct {
 	arm7 arm7.Cpu
 	arm9 arm9.Cpu
     ppu ppu.PPU
-
     Cartridge cart.Cartridge
 
 	Debugger Debugger
@@ -141,39 +140,39 @@ func (nds *Nds) checkBadPc() {
     }
 
 
-    //zeroWordcnt := 0x4000
+    zeroWordcnt := 0x20
 
-    //if nds.mem.Read32(reg9.R[15], true) == 0x0 {
+    if nds.mem.Read32(reg9.R[15], true) == 0x0 {
 
-    //    zeros := true
+        zeros := true
 
-    //    for i := uint32(0); i < uint32(zeroWordcnt); i += 4 {
-    //        if nds.mem.Read32(reg9.R[15] + i, true) != 0x0 {
-    //            zeros = false
-    //            break
-    //        }
-    //    }
+        for i := uint32(0); i < uint32(zeroWordcnt); i += 4 {
+            if nds.mem.Read32(reg9.R[15] + i, true) != 0x0 {
+                zeros = false
+                break
+            }
+        }
 
-    //    if zeros {
-    //        panic(fmt.Sprintf("BAD ARM9 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
-    //    }
-    //}
+        if zeros {
+            panic(fmt.Sprintf("BAD ARM9 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
+        }
+    }
 
-    //if nds.mem.Read32(reg7.R[15], false) == 0x0 {
+    if nds.mem.Read32(reg7.R[15], false) == 0x0 {
 
-    //    zeros := true
+        zeros := true
 
-    //    for i := uint32(0); i < uint32(zeroWordcnt); i += 4 {
-    //        if nds.mem.Read32(reg7.R[15] + i, false) != 0x0 {
-    //            zeros = false
-    //            break
-    //        }
-    //    }
+        for i := uint32(0); i < uint32(zeroWordcnt); i += 4 {
+            if nds.mem.Read32(reg7.R[15] + i, false) != 0x0 {
+                zeros = false
+                break
+            }
+        }
 
-    //    if zeros {
-    //        panic(fmt.Sprintf("BAD ARM7 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
-    //    }
-    //}
+        if zeros {
+            panic(fmt.Sprintf("BAD ARM7 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
+        }
+    }
 
 
     if reg9.R[15] < 0x30 && !nds.arm9.LowVector {
@@ -238,8 +237,15 @@ func (nds *Nds) Update() {
             armExec := !nds.arm9.Reg.IsThumb && nds.AccCycles & 0b1 == 0
 
             if thumbExec || armExec  {
-                //logger.Update(11_600_000, 11_670_812, CURR_INST, true)
+
+                // scribblenauts breaks before 4_888_627 addr 0x20564BA should only be hit 4-5 times before showing something
+
+                // logger.Update(8_221_899, 20_000_000, CURR_INST, true)
+
+                // fmt.Printf("PC %08X CURR %d\n", r[15], CURR_INST)
+
                 _, ok := nds.arm9.Execute()
+
                 if !ok {
                     fmt.Printf("ARM9 Decode Error: PC %08X CURR %d\n", r[15], CURR_INST)
                     os.Exit(0)
@@ -254,7 +260,9 @@ func (nds *Nds) Update() {
             if thumbExec || armExec  {
                 //fmt.Printf("PC %08X CURR %d\n", r7[15] , CURR_INST)
 
+                //logger.Update(100_000_000, 101_000_000, CURR_INST, false)
                 //logger.Update(503480, 503562, CURR_INST, false)
+                //logger.Update(4_000_000, 4_888_627, CURR_INST, false)
                 _, ok := nds.arm7.Execute()
                 if !ok {
                     fmt.Printf("ARM7 Decode Error: PC %08X CURR %d\n", r7[15], CURR_INST)

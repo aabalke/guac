@@ -71,6 +71,8 @@ included:
 
 ### gbe-plus
 
+Make sure zeros pc check is off
+
 👍 Dma
 👍 Irq
 👍 Math
@@ -117,9 +119,13 @@ Graphics
             ❌ Basic
                 👍 1, 2, 3, 4, 5
                 ❌ 6, 7, 8, 9
-                ❌ 10, 11, 12, 13
+                👍 10, 11, 12, 13
 
-            ❌ Bitmap
+            👍 Bitmap
+                👍 1, 2, 3, 4
+                👍 5, 6
+                👍 7, 8, 9, 10
+
             👍 Scrolling
             👍 Advanced
     

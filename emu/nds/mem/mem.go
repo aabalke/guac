@@ -152,6 +152,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
             return mem.WRAM.Read(addr, true)
 		case 0x4:
             //fmt.Printf("IO READ ARM9 %08X arm9 %t\n", addr, arm9)
+            printIO(addr, arm9, false)
 			return mem.ReadArm9IO(addr - 0x400_0000)
 		case 0x5:
             return mem.Pram.Read(addr, mem.ppu)
@@ -182,6 +183,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
         return mem.WRAM.Read(addr, false)
     case 0x4:
         //fmt.Printf("IO READ ARM9 %08X arm9 %t\n", addr, arm9)
+        printIO(addr, arm9, false)
         return mem.ReadArm7IO(addr-0x400_0000)
     case 0x6:
         return mem.Vram.Read(addr, false)
@@ -229,6 +231,7 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 		case 0x3:
             mem.WRAM.Write(addr, v, true)
 		case 0x4:
+            printIO(addr, arm9, true)
 			mem.WriteArm9IO(addr-0x400_0000, v)
         case 0x5:
             mem.Pram.Write(addr, v, mem.ppu)
@@ -249,6 +252,7 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
     case 0x3:
         mem.WRAM.Write(addr, v, false)
     case 0x4:
+        printIO(addr, arm9, true)
         mem.WriteArm7IO(addr-0x400_0000, v)
     case 0x6:
         mem.Vram.Write(addr, v, false)
@@ -386,6 +390,8 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
         return mem.Gamecard.ExMem.Read(1)
 	case 0x208:
 		return mem.irq9.ReadIME()
+    case 0x209:
+        return 0
 	case 0x210:
 		return mem.irq9.ReadIE(0)
 	case 0x211:
@@ -545,6 +551,8 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 
 	case 0x208:
 		mem.irq9.WriteIME(v)
+    case 0x209:
+        return
 	case 0x210:
 		mem.irq9.WriteIE(v, 0)
 	case 0x211:
@@ -712,6 +720,8 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 
 	case 0x208:
 		return mem.irq7.ReadIME()
+    case 0x209:
+        return 0
 	case 0x210:
 		return mem.irq7.ReadIE(0)
 	case 0x211:
@@ -760,6 +770,7 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 }
 
 func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
+
 
     if addr >= 0x188 && addr < 0x190 { panic("WRITE IPC FIFO FROM BYTE OR HALF")}
 
@@ -901,6 +912,8 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 
 	case 0x208:
 		mem.irq7.WriteIME(v)
+    case 0x209:
+        return
 	case 0x210:
 		mem.irq7.WriteIE(v, 0)
 	case 0x211:
@@ -1084,4 +1097,36 @@ func (m *Mem) WriteDma(dmas *[4]dma.DMA, addr uint32, v uint8) {
 	case 0x00DF:
 		dmas[3].WriteControl(v, true)
     }
+}
+
+func printIO(addr uint32, arm9, write bool) {
+
+    return
+
+    if irq := addr >= 0x400_0208 && addr < 0x400_0218; irq {
+        return
+    }
+
+    if cart := addr >= 0x400_0180 && addr < 0x400_01BC; cart {
+        return
+    }
+
+    if spi := addr >= 0x400_01A0 && addr < 0x400_01C4; spi && !arm9 {
+        return
+    }
+
+    if three := addr >= 0x400_0320 && addr < 0x400_06A5; three && arm9 {
+        return
+    }
+
+    if sound := addr >= 0x400_0400 && addr < 0x400051C; sound && !arm9 {
+        return
+    }
+
+    if math := addr >= 0x400_0280 && addr < 0x40002C0; math && arm9 {
+        return
+    }
+
+    //fmt.Printf("IO %08X ARM9 %t WRITE %t\n", addr, arm9, write)
+
 }

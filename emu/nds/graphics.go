@@ -3,6 +3,7 @@ package nds
 import (
 	"encoding/binary"
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/aabalke/guac/config"
@@ -53,6 +54,8 @@ func (nds *Nds) screenoff(y uint32, colorByte uint8, engine *ppu.Engine) {
 }
 
 func (nds *Nds) vramDisplay(y uint32, engine *ppu.Engine) {
+
+    log.Println("VRAM DISPLAY MAY NEED AFFINE")
 
 	x := uint32(0)
 	for x = range SCREEN_WIDTH {
@@ -121,7 +124,6 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 
 	bldPal := ppu.NewBlendPalette(x, &engine.Blend, nds.getPalette(0, 0, false, engine.IsB))
 
-
 	var objMode uint32
 	var inObjWindow bool
 
@@ -145,7 +147,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
             case ppu.BG_TYPE_AFF:
 				palData, ok = nds.setAffineBackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_LAR:
-                palData, ok = 0b11111 << 10, true // blue
+				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_3D :
                 palData, ok = 0b11111, true // red
             case ppu.BG_TYPE_BGM:
@@ -153,13 +155,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
             case ppu.BG_TYPE_256:
 				palData, ok = nds.setBmpBackgroundPixel(engine, bg, x)
             case ppu.BG_TYPE_DIR:
-
-                offset := bg.ScreenBaseBlock * 8
-                if engine.IsB {
-                    offset += 0x20_0000
-                }
-
-                palData, ok = nds.directbitmap(x, y, offset, nil)
+				palData, ok = nds.setDirectBitmap(engine, bg, x)
             }
 
 			if ok {
@@ -172,9 +168,10 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 		}
 
         ObjectLoop:
-		for j := len(objPriorities[i]) - 1; j >= 0; j-- {
+		//for j := len((*objPriorities)[i]) - 1; j >= 0; j-- {
+		for j := 0; j < len((*objPriorities)[i]); j++ {
 
-			objIdx := objPriorities[i][j]
+			objIdx := (*objPriorities)[i][j]
 	        obj := &engine.Objects[objIdx]
 
             obj.OneDimensional = dispcnt.TileObj1D
@@ -188,6 +185,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 
             switch {
             case obj.Mode == 3:
+
                 palData, ok = nds.setBmpObjectAffinePixel(engine, obj, x, y)
             case obj.RotScale:
                 palData, ok = nds.setObjectAffinePixel(engine, obj, x, y)
@@ -210,23 +208,6 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 	finalPalData := bldPal.Blend(objMode == 1, x, y, wins, inObjWindow)
 	index := (x + (y * SCREEN_WIDTH)) << 2
 	nds.applyColor(finalPalData, uint32(index), engine.Pixels)
-}
-
-func (nds *Nds) largeBitmap(x, y uint32) (uint32, bool) {
-
-    // this will need affine support
-
-    const (
-        BYTE_PER_PIXEL = 1
-    )
-
-    idx := (x+(y*SCREEN_WIDTH))*BYTE_PER_PIXEL
-
-    palIdx := uint32(nds.mem.Vram.Read(idx, true))
-
-    data := uint32(nds.mem.Pram[palIdx])
-
-    return data, true
 }
 
 func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {
@@ -357,7 +338,9 @@ func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx
 	}
 
     palIdx := uint32(nds.mem.Vram.Read(vramOffset + tileAddr + inTileIdx, true))
+    palIdx |= uint32(nds.mem.Vram.Read(vramOffset + tileAddr + inTileIdx + 1, true)) << 8
     palNum := screenData >> 12
+
     return getBgPaletteData(nds, engine, bgIdx, bg.Palette256, palNum, palIdx, inTileX)
 }
 
@@ -556,6 +539,52 @@ func getPositionsBg(screenData, xIdx, yIdx uint32) (uint32, uint32) {
 	return inTileX, inTileY
 }
 
+func (nds *Nds) setDirectBitmap(engine *ppu.Engine, bg *ppu.Background, x uint32) (uint32, bool) {
+
+
+	pa := utils.Convert8_8Float(int16(bg.Pa))
+	pc := utils.Convert8_8Float(int16(bg.Pc))
+	xIdx := int(pa*float64(x) + bg.OutX)
+	yIdx := int(pc*float64(x) + bg.OutY)
+
+	if bg.Mosaic && engine.Mosaic.BgH != 0 {
+		xIdx -= xIdx % int(engine.Mosaic.BgH+1)
+	}
+
+	if bg.Mosaic && engine.Mosaic.BgV != 0 {
+		yIdx -= yIdx % int(engine.Mosaic.BgV+1)
+	}
+
+	out := xIdx < 0 || xIdx >= int(bg.W) || yIdx < 0 || yIdx >= int(bg.H)
+
+	switch {
+	case bg.AffineWrap:
+		xIdx &= int(bg.W) - 1
+		yIdx &= int(bg.H) - 1
+	case !bg.AffineWrap && out:
+		return 0, false
+	}
+
+    addr := uint32(xIdx+(yIdx * int(bg.W) * 2))
+
+    addr += bg.ScreenBaseBlock * 8
+
+    if engine.IsB {
+        addr += 0x20_0000
+    }
+
+    //palIdx := uint32(nds.mem.Vram.Read(addr, true))
+    data := uint32(nds.mem.Vram.Read(addr, true))
+    data |= uint32(nds.mem.Vram.Read(addr + 1, true)) << 8
+
+    // if on transparent???
+    if transparent := (data >> 15) & 1 == 0; transparent {
+        return 0, false
+    }
+
+    return data, true
+
+}
 func (nds *Nds) directbitmap(x, y, offset uint32, bank *[0x20000]uint8) (uint32, bool) {
 
     // will need affine support
@@ -568,7 +597,6 @@ func (nds *Nds) directbitmap(x, y, offset uint32, bank *[0x20000]uint8) (uint32,
 
     if bank == nil {
         idx := ((x+(y*SCREEN_WIDTH)) * BYTE_PER_PIXEL) + offset
-
         data = uint32(nds.mem.Vram.Read(idx, true))
         data |= uint32(nds.mem.Vram.Read(idx + 1, true)) << 8
     } else {
@@ -578,7 +606,7 @@ func (nds *Nds) directbitmap(x, y, offset uint32, bank *[0x20000]uint8) (uint32,
     }
 
     // if on transparent???
-    if transparent := (data >> 16) & 1 == 1; transparent {
+    if transparent := (data >> 15) & 1 == 1; transparent {
         return 0, false
     }
 
@@ -705,6 +733,10 @@ func (nds *Nds) getExtendedPalette(engine *ppu.Engine, bgIdx uint32, obj bool, p
         case 3: slot = (*[0x2000]uint8)(vram.ExtABgSlot3)
         }
 
+        //if slot == nil {
+        //    return 0
+        //}
+
         return uint32(binary.LittleEndian.Uint16(slot[addr:]))
     case !obj && engine.IsB:
 
@@ -715,6 +747,10 @@ func (nds *Nds) getExtendedPalette(engine *ppu.Engine, bgIdx uint32, obj bool, p
         case 2: slot = (*[0x2000]uint8)(vram.ExtBBgSlot2)
         case 3: slot = (*[0x2000]uint8)(vram.ExtBBgSlot3)
         }
+
+        //if slot == nil {
+        //    return 0
+        //}
 
         return uint32(binary.LittleEndian.Uint16(slot[addr:]))
     case obj && !engine.IsB:
@@ -866,21 +902,15 @@ func getBgPaletteData(nds *Nds, engine *ppu.Engine, bgIdx uint32, pal256 bool, p
 		palIdx = (tileData >> ((inTileX & 1) << 2)) & 0xF
 	}
 
-    if engine.Dispcnt.BgExtPal {
-        // palette is 256 each
+	if palIdx == 0 {
+		return 0, false
+	}
 
-        if palIdx == 0 && palNum == 0 {
-            return 0, false
-        }
-
+    if engine.Dispcnt.BgExtPal && pal256 {
         palNum <<= 4
         palData := nds.getExtendedPalette(engine, bgIdx, false, palIdx, palNum)
         return palData, true
     }
-
-	if palIdx == 0 {
-		return 0, false
-	}
 
     // this is from gba, does not work with ext palettes, but assume it still
     // is needed for std
@@ -902,18 +932,19 @@ func getPaletteData(nds *Nds, engine *ppu.Engine, pal256 bool, pal, tileData, in
 		palIdx = (tileData >> ((inTileX & 1) << 2)) & 0xF
 	}
 
+    if palIdx == 0 {
+        return 0, false
+    }
+
+    if engine.Dispcnt.ObjExtPal && pal256 {
+        pal <<= 4
+        palData := nds.getExtendedPalette(engine, 0, true, palIdx, pal)
+        return palData, true
+    }
 	if palIdx == 0 {
 		return 0, false
 	}
 
-    if engine.Dispcnt.ObjExtPal {
-        // palette is 256 each
-
-        pal <<= 4
-
-        palData := nds.getExtendedPalette(engine, 0, true, palIdx, pal)
-        return palData, true
-    }
 
     // this is from gba, does not work with ext palettes, but assume it still
     // is needed for std
@@ -1080,6 +1111,7 @@ func (nds *Nds) setBmpObjectAffinePixel(engine *ppu.Engine, obj *ppu.Object, x, 
     }
 
     data &^= 0x8000
+
 
     return data, true
 }

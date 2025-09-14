@@ -742,7 +742,7 @@ func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
 		obj.Mosaic = utils.BitEnabled(attr, 4)
 		obj.Palette256 = utils.BitEnabled(attr, 5)
 		obj.Shape = utils.GetVarData(attr, 6, 7)
-		obj.setSize(obj.Shape, obj.Size)
+		obj.SetSize(obj.Shape, obj.Size)
 
 		if obj.RotScale {
 			obj.DoubleSize = utils.BitEnabled(attr, 1)
@@ -758,7 +758,7 @@ func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
 		obj.X &= 0xFF
 		obj.X |= (attr & 0b1) << 8
 		obj.Size = utils.GetVarData(attr, 6, 7)
-		obj.setSize(obj.Shape, obj.Size)
+		obj.SetSize(obj.Shape, obj.Size)
 
 		if obj.RotScale {
 			obj.RotParams = utils.GetVarData(attr, 1, 5)
@@ -807,51 +807,6 @@ func (p *PPU) UpdateAffine(relAddr uint32, engine *Engine, oam *[0x800]uint8) {
 		}
 
 		UpdateAffineParams(obj, oam, engine.IsB)
-	}
-}
-
-func (obj *Object) setSize(shape, size uint32) {
-
-	const (
-		SQUARE     = 0
-		HORIZONTAL = 1
-		VERTICAL   = 2
-	)
-
-	switch shape {
-	case SQUARE:
-		switch size {
-		case 0:
-			obj.H, obj.W = 8, 8
-		case 1:
-			obj.H, obj.W = 16, 16
-		case 2:
-			obj.H, obj.W = 32, 32
-		case 3:
-			obj.H, obj.W = 64, 64
-		}
-	case HORIZONTAL:
-		switch size {
-		case 0:
-			obj.H, obj.W = 8, 16
-		case 1:
-			obj.H, obj.W = 8, 32
-		case 2:
-			obj.H, obj.W = 16, 32
-		case 3:
-			obj.H, obj.W = 32, 64
-		}
-	case VERTICAL:
-		switch size {
-		case 0:
-			obj.H, obj.W = 16, 8
-		case 1:
-			obj.H, obj.W = 32, 8
-		case 2:
-			obj.H, obj.W = 32, 16
-		case 3:
-			obj.H, obj.W = 64, 32
-		}
 	}
 }
 

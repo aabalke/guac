@@ -41,6 +41,7 @@ func (t *Tsc) Transfer(data []uint8) (reply []uint8, stat uint8) {
 	inst := data[0]
 
     if invalidStart := !utils.BitEnabled(uint32(inst), 7); invalidStart {
+        //panic("INVALID START TO TOUCH TRANSFER")
         return nil, STAT_DONE
     }
 

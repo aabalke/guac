@@ -1,7 +1,6 @@
 package spi
 
 import (
-
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
