@@ -498,6 +498,7 @@ func (cpu *Cpu) Mul(opcode uint32) {
         }
 
         r[PC] += 4
+		return
 	}
 
     // arm9 muliplies
