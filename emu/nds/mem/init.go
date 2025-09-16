@@ -1,6 +1,7 @@
 package mem
 
 import (
+	"encoding/binary"
 	"fmt"
 
 	"github.com/aabalke/guac/emu/nds/mem/spi"
@@ -34,6 +35,9 @@ const (
     RAM_FRAME_CNT = 0x27FFC3C
     RAM_BOOT_IND  = 0x27FFC40
     RAM_WIFI_USER = 0x27FFC80
+
+    CHIP_ID = 0x80007FC2
+    //CHIP_ID = 0x03020100
 )
 
 func setBiosRam(mem *Mem) {
@@ -55,9 +59,9 @@ func setBiosRam(mem *Mem) {
 
     // if these are updated, update gamecard version
     //27FF800h 4     NDS Gamecart Chip ID 1
-    mem.Write32(0x27FF800, 0xFFFFFFFF, true)
+    mem.Write32(0x27FF800, CHIP_ID, true)
     //27FF804h 4     NDS Gamecart Chip ID 2
-    mem.Write32(0x27FF804, 0xFFFFFFFF, true)
+    mem.Write32(0x27FF804, CHIP_ID, true)
 
     //27FF808h 2     NDS Cart Header CRC (verified)            ;hdr[15Eh]
     mem.Write(RAM_CART_HDR_CRC, c[0x15E], true)
@@ -98,9 +102,9 @@ func setBiosRam(mem *Mem) {
 
     // if these are updated, update gamecard version
     //27FFC00h 4     NDS Gamecart Chip ID 1   (copy of 27FF800h)
-    mem.Write32(0x27FFC00, 0xFFFFFFFF, true)
+    mem.Write32(0x27FFC00, CHIP_ID, true)
     //27FFC04h 4     NDS Gamecart Chip ID 2   (copy of 27FF804h)
-    mem.Write32(0x27FFC04, 0xFFFFFFFF, true)
+    mem.Write32(0x27FFC04, CHIP_ID, true)
 
     //27FFC08h 2     NDS Cart Header CRC      (copy of 27FF808h)
     mem.Write(0x027FFC08, c[0x15E], true)
@@ -160,6 +164,32 @@ func setBiosRam(mem *Mem) {
     //mem.Write(USER_SETTING_RAM + 0x62, 0xE0, true)
     //mem.Write(USER_SETTING_RAM + 0x63, 0xA0, true)
 
+
+    // wifi init
+
+    mem.Write(0x4808018, (*f)[0x36], false)
+    mem.Write(0x4808019, (*f)[0x37], false)
+    mem.Write(0x480801A, (*f)[0x38], false)
+    mem.Write(0x480801B, (*f)[0x39], false)
+    mem.Write(0x480801C, (*f)[0x3A], false)
+    mem.Write(0x480801D, (*f)[0x3B], false)
+
+    mem.Write16(0x4808146, binary.LittleEndian.Uint16((*f)[0x44:]), false)
+    mem.Write16(0x4808148, binary.LittleEndian.Uint16((*f)[0x46:]), false)
+    mem.Write16(0x480814A, binary.LittleEndian.Uint16((*f)[0x48:]), false)
+    mem.Write16(0x480814C, binary.LittleEndian.Uint16((*f)[0x4A:]), false)
+    mem.Write16(0x4808120, binary.LittleEndian.Uint16((*f)[0x4C:]), false)
+    mem.Write16(0x4808122, binary.LittleEndian.Uint16((*f)[0x4E:]), false)
+    mem.Write16(0x4808154, binary.LittleEndian.Uint16((*f)[0x50:]), false)
+    mem.Write16(0x4808144, binary.LittleEndian.Uint16((*f)[0x52:]), false)
+    mem.Write16(0x4808130, binary.LittleEndian.Uint16((*f)[0x54:]), false)
+    mem.Write16(0x4808132, binary.LittleEndian.Uint16((*f)[0x56:]), false)
+    mem.Write16(0x4808140, binary.LittleEndian.Uint16((*f)[0x58:]), false)
+    mem.Write16(0x4808142, binary.LittleEndian.Uint16((*f)[0x5A:]), false)
+    mem.Write16(0x4808038, binary.LittleEndian.Uint16((*f)[0x5C:]), false)
+    mem.Write16(0x4808124, binary.LittleEndian.Uint16((*f)[0x5E:]), false)
+    mem.Write16(0x4808128, binary.LittleEndian.Uint16((*f)[0x60:]), false)
+    mem.Write16(0x4808150, binary.LittleEndian.Uint16((*f)[0x62:]), false)
 
     initTempUnimplimented()
 }

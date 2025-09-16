@@ -1,9 +1,13 @@
 package dma
 
 import (
+	"fmt"
+
 	"github.com/aabalke/guac/emu/gba/utils"
 	"github.com/aabalke/guac/emu/nds/cpu"
 )
+
+var _ = fmt.Sprintf("")
 
 const (
 	ARM9_DMA_MODE_IMM = 0
@@ -37,6 +41,8 @@ const (
 
 type DMA struct {
 	Idx int
+    arm9 bool
+
 
     //Cpu *arm9.Cpu
     mem MemoryInterface
@@ -68,6 +74,7 @@ func (dma *DMA) Init(idx int, mem MemoryInterface, irq *cpu.Irq, arm9 bool) {
     dma.Idx = idx
     dma.mem = mem
     dma.irq = irq
+    dma.arm9 = arm9
 
     switch {
     case arm9:
@@ -147,6 +154,8 @@ func (dma *DMA) disable() {
 
 func (dma *DMA) Transfer() {
 
+    //fmt.Printf("DMA%d: %08X %08X %04X%04X\n", dma.Idx, dma.Src, dma.Dst, dma.Control, dma.WordCount)
+
 	mem := dma.mem
 	count := dma.WordCount
 
@@ -209,52 +218,15 @@ func (dma *DMA) Transfer() {
 
 	for i := uint32(0); i < count; i++ {
 
-		//if eeprom := CheckEeprom(dma.Gba, tmpDst); eeprom {
-		//	dstRom := tmpDst >= 0x800_0000 && tmpDst < 0xE00_0000
-		//	srcRom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
-
-		//	if count == 9 || count == 73 {
-		//		cart.EepromWidth = 6
-		//	} else if count == 17 || count == 81 {
-		//		cart.EepromWidth = 14
-		//	}
-
-		//	if srcRom && dstRom {
-		//		panic("EEPROM HAS BOTH SRC AND DST ROM ADDR")
-		//	}
-
-		//	// do not continue this., do not put this outside loop
-		//}
-
-		//badAddr := tmpSrc < 0x200_0000
-		//sram := tmpSrc >= 0xE00_0000 && tmpSrc < 0x1000_0000
-
 		if dma.isWord {
-			switch {
-			//case badAddr:
-			//	mem.Write32(tmpDst&^3, dma.Value, true)
-			//case sram && dma.Idx == 0:
-			//	dma.Value = 0
-			//	mem.Write32(tmpDst&^3, dma.Value, true)
-			default:
-				dma.Value = mem.Read32(tmpSrc &^ 3, true)
-				mem.Write32(tmpDst&^3, dma.Value, true)
-			}
+            dma.Value = mem.Read32(tmpSrc &^ 3, dma.arm9)
+            mem.Write32(tmpDst&^3, dma.Value, dma.arm9)
 
 		} else {
-
-			switch {
-			//case badAddr:
-			//	mem.Write16(tmpDst&^1, uint16(dma.Value), true)
-			//case sram && dma.Idx == 0:
-			//	dma.Value = 0
-			//	mem.Write16(tmpDst&^1, uint16(dma.Value), true)
-			default:
-				dma.Value = mem.Read16(tmpSrc &^ 1, true)
-				dma.Value |= (dma.Value << 16)
-				mem.Write16(tmpDst&^1, uint16(dma.Value), true)
-			}
-		}
+            dma.Value = mem.Read16(tmpSrc &^ 1, dma.arm9)
+            dma.Value |= (dma.Value << 16)
+            mem.Write16(tmpDst&^1, uint16(dma.Value), dma.arm9)
+        }
 
 		tmpDst = uint32(int64(tmpDst) + dstOffset)
 		tmpSrc = uint32(int64(tmpSrc) + srcOffset)

@@ -6,9 +6,10 @@ import (
 
 	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/cpu"
-	"github.com/aabalke/guac/emu/nds/mem/spi"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
+	"github.com/aabalke/guac/emu/nds/mem/spi"
 	"github.com/aabalke/guac/emu/nds/ppu"
+	"github.com/aabalke/guac/emu/nds/rast"
 )
 
 //go:embed res_/bios7.bin
@@ -58,6 +59,9 @@ type Mem struct {
     BiosProt BiosProt
     WifiWaitCnt WifiWaitCnt
     Timers [8]Timer
+
+    gxstat rast.GXSTAT
+
 }
 
 type BiosProt uint16
@@ -206,7 +210,7 @@ func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
     case 0x410_0000:
         return mem.Ipc.ReadFifo(arm9)
     case 0x410_0010:
-        return mem.Gamecard.RomCtrl.ReadCmdIn()
+        return mem.Gamecard.RomCtrl.ReadCmdIn(arm9)
     default:
         a := uint32(mem.Read(addr+2, arm9)) | (uint32(mem.Read(addr+3, arm9)) << 8)
         b := uint32(mem.Read(addr, arm9)) | (uint32(mem.Read(addr+1, arm9)) << 8)
@@ -418,6 +422,11 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
     case 0x305:
         return uint8(mem.PowCnt.V >> 8)
 
+    case 0x600: return mem.gxstat.Read(0)
+    case 0x601: return mem.gxstat.Read(1)
+    case 0x602: return mem.gxstat.Read(2)
+    case 0x603: return mem.gxstat.Read(3)
+
 	default:
         //panic(fmt.Sprintf("READ UNKNOWN ARM9 IO ADDR %08X", addr))
 		return mem.IO[addr]
@@ -455,6 +464,7 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
     case 0x7:
         mem.Vcount &= 0xFF
         mem.Vcount |= uint32(v) << 8
+
     case 0x184:
         mem.Ipc.WriteCnt(v, 0, true)
     case 0x185:
@@ -478,40 +488,40 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
     case 0x181:
         mem.Ipc.WriteSync(v, 1, true)
 
-    case 0x1A0: mem.Gamecard.AuxSpi.Write(v, 0)
-    case 0x1A1: mem.Gamecard.AuxSpi.Write(v, 1)
-    case 0x1A2: mem.Gamecard.AuxSpi.Write(v, 2)
-    case 0x1A3: mem.Gamecard.AuxSpi.Write(v, 3)
-    case 0x1A4: mem.Gamecard.RomCtrl.Write(v, 0)
-    case 0x1A5: mem.Gamecard.RomCtrl.Write(v, 1)
-    case 0x1A6: mem.Gamecard.RomCtrl.Write(v, 2)
-    case 0x1A7: mem.Gamecard.RomCtrl.Write(v, 3)
+    case 0x1A0: mem.Gamecard.AuxSpi.Write(v, 0, true)
+    case 0x1A1: mem.Gamecard.AuxSpi.Write(v, 1, true)
+    case 0x1A2: mem.Gamecard.AuxSpi.Write(v, 2, true)
+    case 0x1A3: mem.Gamecard.AuxSpi.Write(v, 3, true)
+    case 0x1A4: mem.Gamecard.RomCtrl.Write(v, 0, true)
+    case 0x1A5: mem.Gamecard.RomCtrl.Write(v, 1, true)
+    case 0x1A6: mem.Gamecard.RomCtrl.Write(v, 2, true)
+    case 0x1A7: mem.Gamecard.RomCtrl.Write(v, 3, true)
 
-    case 0x1A8: mem.Gamecard.RomCtrl.WriteCmdOut(v, 0)
-    case 0x1A9: mem.Gamecard.RomCtrl.WriteCmdOut(v, 1)
-    case 0x1AA: mem.Gamecard.RomCtrl.WriteCmdOut(v, 2)
-    case 0x1AB: mem.Gamecard.RomCtrl.WriteCmdOut(v, 3)
-    case 0x1AC: mem.Gamecard.RomCtrl.WriteCmdOut(v, 4)
-    case 0x1AD: mem.Gamecard.RomCtrl.WriteCmdOut(v, 5)
-    case 0x1AE: mem.Gamecard.RomCtrl.WriteCmdOut(v, 6)
-    case 0x1AF: mem.Gamecard.RomCtrl.WriteCmdOut(v, 7)
-    case 0x1B0: mem.Gamecard.RomCtrl.WriteSeed(v, 0, 0)
-    case 0x1B1: mem.Gamecard.RomCtrl.WriteSeed(v, 1, 0)
-    case 0x1B2: mem.Gamecard.RomCtrl.WriteSeed(v, 2, 0)
-    case 0x1B3: mem.Gamecard.RomCtrl.WriteSeed(v, 3, 0)
-    case 0x1B4: mem.Gamecard.RomCtrl.WriteSeed(v, 0, 1)
-    case 0x1B5: mem.Gamecard.RomCtrl.WriteSeed(v, 1, 1)
-    case 0x1B6: mem.Gamecard.RomCtrl.WriteSeed(v, 2, 1)
-    case 0x1B7: mem.Gamecard.RomCtrl.WriteSeed(v, 3, 1)
-    case 0x1B8: mem.Gamecard.RomCtrl.WriteSeed(v, 4, 0)
-    case 0x1B9: mem.Gamecard.RomCtrl.WriteSeed(v, 5, 0)
-    case 0x1BA: mem.Gamecard.RomCtrl.WriteSeed(v, 4, 1)
-    case 0x1BB: mem.Gamecard.RomCtrl.WriteSeed(v, 5, 1)
+    case 0x1A8: mem.Gamecard.RomCtrl.WriteCmdOut(v, 0, true)
+    case 0x1A9: mem.Gamecard.RomCtrl.WriteCmdOut(v, 1, true)
+    case 0x1AA: mem.Gamecard.RomCtrl.WriteCmdOut(v, 2, true)
+    case 0x1AB: mem.Gamecard.RomCtrl.WriteCmdOut(v, 3, true)
+    case 0x1AC: mem.Gamecard.RomCtrl.WriteCmdOut(v, 4, true)
+    case 0x1AD: mem.Gamecard.RomCtrl.WriteCmdOut(v, 5, true)
+    case 0x1AE: mem.Gamecard.RomCtrl.WriteCmdOut(v, 6, true)
+    case 0x1AF: mem.Gamecard.RomCtrl.WriteCmdOut(v, 7, true)
+    case 0x1B0: mem.Gamecard.RomCtrl.WriteSeed(v, 0, 0, true)
+    case 0x1B1: mem.Gamecard.RomCtrl.WriteSeed(v, 1, 0, true)
+    case 0x1B2: mem.Gamecard.RomCtrl.WriteSeed(v, 2, 0, true)
+    case 0x1B3: mem.Gamecard.RomCtrl.WriteSeed(v, 3, 0, true)
+    case 0x1B4: mem.Gamecard.RomCtrl.WriteSeed(v, 0, 1, true)
+    case 0x1B5: mem.Gamecard.RomCtrl.WriteSeed(v, 1, 1, true)
+    case 0x1B6: mem.Gamecard.RomCtrl.WriteSeed(v, 2, 1, true)
+    case 0x1B7: mem.Gamecard.RomCtrl.WriteSeed(v, 3, 1, true)
+    case 0x1B8: mem.Gamecard.RomCtrl.WriteSeed(v, 4, 0, true)
+    case 0x1B9: mem.Gamecard.RomCtrl.WriteSeed(v, 5, 0, true)
+    case 0x1BA: mem.Gamecard.RomCtrl.WriteSeed(v, 4, 1, true)
+    case 0x1BB: mem.Gamecard.RomCtrl.WriteSeed(v, 5, 1, true)
 
-    case 0x100010: mem.Gamecard.RomCtrl.WriteCmdIn(v, 0)
-    case 0x100011: mem.Gamecard.RomCtrl.WriteCmdIn(v, 1)
-    case 0x100012: mem.Gamecard.RomCtrl.WriteCmdIn(v, 2)
-    case 0x100013: mem.Gamecard.RomCtrl.WriteCmdIn(v, 3)
+    case 0x100010: mem.Gamecard.RomCtrl.WriteCmdIn(v, 0, true)
+    case 0x100011: mem.Gamecard.RomCtrl.WriteCmdIn(v, 1, true)
+    case 0x100012: mem.Gamecard.RomCtrl.WriteCmdIn(v, 2, true)
+    case 0x100013: mem.Gamecard.RomCtrl.WriteCmdIn(v, 3, true)
 
 	case 0x100:
 		mem.Timers[0].WriteD(v, false)
@@ -594,10 +604,19 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
         mem.PowCnt.WriteCNT1(0, uint32(v), mem.ppu)
     case 0x305:
         mem.PowCnt.WriteCNT1(1, uint32(v), mem.ppu)
+
+    case 0x600: mem.gxstat.Write(v, 0)
+    case 0x601: mem.gxstat.Write(v, 1)
+    case 0x602: mem.gxstat.Write(v, 2)
+    case 0x603: mem.gxstat.Write(v, 3)
 	default:
         //panic(fmt.Sprintf("WRTE UNKNOWN ARM9 IO ADDR %08X", addr))
 		mem.IO[addr] = v
 	}
+
+    //if addr >= 0x1000 && addr <= 0x1004 {
+    //    fmt.Printf("DISPSTAT %08X\n", binary.LittleEndian.Uint32(mem.IO[0x1000:]))
+    //}
 }
 
 func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
@@ -763,6 +782,12 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
     case 0x309:
         return uint8(mem.BiosProt >> 8)
 
+
+    case 808000:
+        return 0x40
+    case 808001:
+        return 0xC3
+
 	default:
         //panic(fmt.Sprintf("READ UNKNOWN ARM7 IO ADDR %08X", addr))
 		return mem.IO[addr]
@@ -830,7 +855,6 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 	case 0x10F:
 		mem.Timers[7].WriteCnt(v, true)
 
-
 	case 0x130:
 		return
 	case 0x131:
@@ -863,40 +887,40 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
     case 0x187:
         mem.Ipc.WriteCnt(v, 3, false)
 
-    case 0x1A0: mem.Gamecard.AuxSpi.Write(v, 0)
-    case 0x1A1: mem.Gamecard.AuxSpi.Write(v, 1)
-    case 0x1A2: mem.Gamecard.AuxSpi.Write(v, 2)
-    case 0x1A3: mem.Gamecard.AuxSpi.Write(v, 3)
-    case 0x1A4: mem.Gamecard.RomCtrl.Write(v, 0)
-    case 0x1A5: mem.Gamecard.RomCtrl.Write(v, 1)
-    case 0x1A6: mem.Gamecard.RomCtrl.Write(v, 2)
-    case 0x1A7: mem.Gamecard.RomCtrl.Write(v, 3)
+    case 0x1A0: mem.Gamecard.AuxSpi.Write(v, 0, false)
+    case 0x1A1: mem.Gamecard.AuxSpi.Write(v, 1, false)
+    case 0x1A2: mem.Gamecard.AuxSpi.Write(v, 2, false)
+    case 0x1A3: mem.Gamecard.AuxSpi.Write(v, 3, false)
+    case 0x1A4: mem.Gamecard.RomCtrl.Write(v, 0, false)
+    case 0x1A5: mem.Gamecard.RomCtrl.Write(v, 1, false)
+    case 0x1A6: mem.Gamecard.RomCtrl.Write(v, 2, false)
+    case 0x1A7: mem.Gamecard.RomCtrl.Write(v, 3, false)
 
-    case 0x1A8: mem.Gamecard.RomCtrl.WriteCmdOut(v, 0)
-    case 0x1A9: mem.Gamecard.RomCtrl.WriteCmdOut(v, 1)
-    case 0x1AA: mem.Gamecard.RomCtrl.WriteCmdOut(v, 2)
-    case 0x1AB: mem.Gamecard.RomCtrl.WriteCmdOut(v, 3)
-    case 0x1AC: mem.Gamecard.RomCtrl.WriteCmdOut(v, 4)
-    case 0x1AD: mem.Gamecard.RomCtrl.WriteCmdOut(v, 5)
-    case 0x1AE: mem.Gamecard.RomCtrl.WriteCmdOut(v, 6)
-    case 0x1AF: mem.Gamecard.RomCtrl.WriteCmdOut(v, 7)
-    case 0x1B0: mem.Gamecard.RomCtrl.WriteSeed(v, 0, 0)
-    case 0x1B1: mem.Gamecard.RomCtrl.WriteSeed(v, 1, 0)
-    case 0x1B2: mem.Gamecard.RomCtrl.WriteSeed(v, 2, 0)
-    case 0x1B3: mem.Gamecard.RomCtrl.WriteSeed(v, 3, 0)
-    case 0x1B4: mem.Gamecard.RomCtrl.WriteSeed(v, 0, 1)
-    case 0x1B5: mem.Gamecard.RomCtrl.WriteSeed(v, 1, 1)
-    case 0x1B6: mem.Gamecard.RomCtrl.WriteSeed(v, 2, 1)
-    case 0x1B7: mem.Gamecard.RomCtrl.WriteSeed(v, 3, 1)
-    case 0x1B8: mem.Gamecard.RomCtrl.WriteSeed(v, 4, 0)
-    case 0x1B9: mem.Gamecard.RomCtrl.WriteSeed(v, 5, 0)
-    case 0x1BA: mem.Gamecard.RomCtrl.WriteSeed(v, 4, 1)
-    case 0x1BB: mem.Gamecard.RomCtrl.WriteSeed(v, 5, 1)
+    case 0x1A8: mem.Gamecard.RomCtrl.WriteCmdOut(v, 0, false)
+    case 0x1A9: mem.Gamecard.RomCtrl.WriteCmdOut(v, 1, false)
+    case 0x1AA: mem.Gamecard.RomCtrl.WriteCmdOut(v, 2, false)
+    case 0x1AB: mem.Gamecard.RomCtrl.WriteCmdOut(v, 3, false)
+    case 0x1AC: mem.Gamecard.RomCtrl.WriteCmdOut(v, 4, false)
+    case 0x1AD: mem.Gamecard.RomCtrl.WriteCmdOut(v, 5, false)
+    case 0x1AE: mem.Gamecard.RomCtrl.WriteCmdOut(v, 6, false)
+    case 0x1AF: mem.Gamecard.RomCtrl.WriteCmdOut(v, 7, false)
+    case 0x1B0: mem.Gamecard.RomCtrl.WriteSeed(v, 0, 0, false)
+    case 0x1B1: mem.Gamecard.RomCtrl.WriteSeed(v, 1, 0, false)
+    case 0x1B2: mem.Gamecard.RomCtrl.WriteSeed(v, 2, 0, false)
+    case 0x1B3: mem.Gamecard.RomCtrl.WriteSeed(v, 3, 0, false)
+    case 0x1B4: mem.Gamecard.RomCtrl.WriteSeed(v, 0, 1, false)
+    case 0x1B5: mem.Gamecard.RomCtrl.WriteSeed(v, 1, 1, false)
+    case 0x1B6: mem.Gamecard.RomCtrl.WriteSeed(v, 2, 1, false)
+    case 0x1B7: mem.Gamecard.RomCtrl.WriteSeed(v, 3, 1, false)
+    case 0x1B8: mem.Gamecard.RomCtrl.WriteSeed(v, 4, 0, false)
+    case 0x1B9: mem.Gamecard.RomCtrl.WriteSeed(v, 5, 0, false)
+    case 0x1BA: mem.Gamecard.RomCtrl.WriteSeed(v, 4, 1, false)
+    case 0x1BB: mem.Gamecard.RomCtrl.WriteSeed(v, 5, 1, false)
 
-    case 0x100010: mem.Gamecard.RomCtrl.WriteCmdIn(v, 0)
-    case 0x100011: mem.Gamecard.RomCtrl.WriteCmdIn(v, 1)
-    case 0x100012: mem.Gamecard.RomCtrl.WriteCmdIn(v, 2)
-    case 0x100013: mem.Gamecard.RomCtrl.WriteCmdIn(v, 3)
+    case 0x100010: mem.Gamecard.RomCtrl.WriteCmdIn(v, 0, false)
+    case 0x100011: mem.Gamecard.RomCtrl.WriteCmdIn(v, 1, false)
+    case 0x100012: mem.Gamecard.RomCtrl.WriteCmdIn(v, 2, false)
+    case 0x100013: mem.Gamecard.RomCtrl.WriteCmdIn(v, 3, false)
 
     case 0x1C0:
         mem.Spi.WriteCNT(0, v) 
@@ -908,7 +932,6 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
         return
 
     case 0x204: mem.Gamecard.ExMem.Write(v, 0)
-
 
 	case 0x208:
 		mem.irq7.WriteIME(v)
@@ -1101,7 +1124,16 @@ func (m *Mem) WriteDma(dmas *[4]dma.DMA, addr uint32, v uint8) {
 
 func printIO(addr uint32, arm9, write bool) {
 
-    return
+    //if three := addr >= 0x400_0320 && addr < 0x400_06A5; three && arm9 {
+    //if three := addr >= 0x400_0600 && addr < 0x400_0601; three && arm9 {
+    //    fmt.Printf("IO %08X ARM9 %t WRITE %t\n", addr, arm9, write)
+    //    return
+    //}
+
+    if wifi := addr >= 0x480_0000 && addr < 0x490_0000; wifi && !write {
+        //fmt.Printf("WIFI READ %08X\n", addr)
+    }
+
 
     if irq := addr >= 0x400_0208 && addr < 0x400_0218; irq {
         return

@@ -41,16 +41,13 @@ func (l *Logger) Update(start, end, curr uint64, arm9 bool) {
         return
     }
 
-    if CURR_INST > end {
+    if CURR_INST < end {
+        logger.Write(CURR_INST, arm9)
         return
     }
 
-    logger.Write(CURR_INST, arm9)
-
-    if CURR_INST == end {
-        logger.Close()
-        os.Exit(0)
-    }
+    logger.Close()
+    os.Exit(0)
 }
 
 func (l *Logger) Close() {
@@ -72,10 +69,6 @@ func (l *Logger) Close() {
 
 func (l *Logger) Write(i uint64, arm9 bool) {
 
-    if !arm9 && i & 1 == 1 {
-        return
-    }
-
     nds := l.nds
 
     var s string
@@ -89,8 +82,8 @@ func (l *Logger) Write(i uint64, arm9 bool) {
         if cpu.Reg.IsThumb {
             op = fmt.Sprintf("%04X", opcode)
         }
-        s = fmt.Sprintf("%08X,%s,R0 %08X R1 %08X R2 %08X R3 %08X R4 %08X R5 %08X R6 %08X R7 %08X R8 %08X R9 %08X R10 %08X R11 %08X R12 %08X SP %08X LR %08X CPSR %08X CURR %d",
-        r[15], op, r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14], cpsr, CURR_INST)
+        s = fmt.Sprintf("%08X,%s,R0 %08X R1 %08X R2 %08X R3 %08X R4 %08X R5 %08X R6 %08X R7 %08X R8 %08X R9 %08X R10 %08X R11 %08X R12 %08X SP %08X LR %08X CPSR %08X IME %t IE %08X CURR %d",
+        r[15], op, r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14], cpsr, cpu.Irq.IME, cpu.Irq.IE, CURR_INST)
     } else {
         cpu := nds.arm7
         r := &cpu.Reg.R
@@ -100,8 +93,8 @@ func (l *Logger) Write(i uint64, arm9 bool) {
         if cpu.Reg.IsThumb {
             op = fmt.Sprintf("%04X", opcode)
         }
-        s = fmt.Sprintf("%08X,%s,R0 %08X R1 %08X R2 %08X R3 %08X R4 %08X R5 %08X R6 %08X R7 %08X R8 %08X R9 %08X R10 %08X R11 %08X R12 %08X SP %08X LR %08X CPSR %08X CURR %d",
-        r[15], op, r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14], cpsr, CURR_INST)
+        s = fmt.Sprintf("%08X,%s,R0 %08X R1 %08X R2 %08X R3 %08X R4 %08X R5 %08X R6 %08X R7 %08X R8 %08X R9 %08X R10 %08X R11 %08X R12 %08X SP %08X LR %08X CPSR %08X IME %t IE %08X CURR %d",
+        r[15], op, r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14], cpsr, cpu.Irq.IME, cpu.Irq.IE, CURR_INST)
     }
 
     fmt.Fprintf(l.bufWriter, "%s\n", s)

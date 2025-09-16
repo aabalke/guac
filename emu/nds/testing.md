@@ -188,41 +188,30 @@ BLX ARM needs to occur before Cond
 
 # Games (Decrypted)
 
-### Backup Codes (I think good now)
-Brain Age
-Tetris Ds
-
-### Gamecard NAND
-Housemd
-Sonic Colors
-
-### Bad PC
-Mario And Luigi Bowsers Inside Story
-Big Brain Academy
-
 ### Nonpanic Crash
+Housemd
 Nintendogs Best Friends
-Yoshis Island
 Zelda Spirit Tracks
+Zelda Phantom Hourglass
 Sonic Chronicles The Dark Brotherhood
-Cooking Mama
-
-### What
+Mario And Luigi Bowsers Inside Story
 Pokemon Heartgold
 Animal Crossing Wild World
-
-### Interrupt BX R0
-Pokemon Diamond
-Brain Age 2
-
-### Invalid Read
 Metroid Prime Hunters
 
-### Buggy n' Good
+### Booting (Buggyie)
+Brain Age
+Sonic Colors
+Big Brain Academy
+Tetris Ds
+Yoshis Island
+Cooking Mama
+Brain Age 2
+Pokemon Diamond
 Pokemon Ranger
 Pokemon Blue Rescue Team
 Mario Party
 Mario and Luigi Partners in Time
 Mario Kart Ds
-Super Mario 64 - Boots, does not enter 3D for "star"
+Super Mario 64
 New Super Mario Bros

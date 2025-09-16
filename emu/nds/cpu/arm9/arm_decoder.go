@@ -21,6 +21,8 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
         return 4, true
 
     case !cpu.CheckCond(opcode >> 28):
+
+
 		r[PC] += 4
 		return 4, true
     }

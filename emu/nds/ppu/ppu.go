@@ -2,13 +2,16 @@ package ppu
 
 import (
 	"encoding/binary"
+	"fmt"
 
+	"github.com/aabalke/guac/emu/nds/rast"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
 type PPU struct {
     EngineA Engine
     EngineB Engine
+    Rasterizer rast.Rasterizer
 
     // these values are updated in PowCnt1
 
@@ -152,6 +155,11 @@ func (p *PPU) Update(addr, v uint32) {
         return
     }
 
+    if capture := addr >= 0x60 && addr < 0x68; capture {
+        fmt.Printf("CAPTURE %08X %02X\n", addr, v)
+
+    }
+
     if engineRender := addr >= 0x320 && addr < 0x400; engineRender && p.RenderingEngine {
         return
     }
@@ -181,8 +189,12 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
 
     switch addr {
 	case 0x0:
+
 	    e.Dispcnt.Mode = utils.GetVarData(v, 0, 2)
         e.Dispcnt.Is3D = utils.BitEnabled(v, 3)
+
+
+
         e.Dispcnt.TileObj1D = utils.BitEnabled(v, 4)
         e.Dispcnt.BitmapObj256 = utils.BitEnabled(v, 5)
         e.Dispcnt.BitmapObj1D = utils.BitEnabled(v, 6)
@@ -211,6 +223,13 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
 	case 0x2:
 
         e.Dispcnt.DisplayMode = utils.GetVarData(v, 0, 1)
+
+        // housemd when displaymode == 1, crash
+
+        //if !e.IsB && e.Dispcnt.Is3D {
+        //    fmt.Printf("MODE SET %02d 3D %t\n", e.Dispcnt.DisplayMode, e.Dispcnt.Is3D)
+        //}
+
         e.Dispcnt.VramBlock = utils.GetVarData(v, 2, 3)
         e.Dispcnt.TileObjBoundary = utils.GetVarData(v, 4, 5)
 		e.Dispcnt.BitmapObjBoundary = utils.BitEnabled(v, 6)
@@ -224,6 +243,10 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
         e.Dispcnt.BgExtPal = utils.BitEnabled(v, 6)
         e.Dispcnt.ObjExtPal = utils.BitEnabled(v, 7)
         e.UpdateObjMapping(&e.Dispcnt)
+
+        //if !e.IsB && e.Dispcnt.Is3D {
+        //    fmt.Printf("MODE SET %02d 3D %t\n", e.Dispcnt.DisplayMode, e.Dispcnt.Is3D)
+        //}
 
 	case 0x4C:
 
@@ -261,6 +284,7 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
 	case 0x54:
 		e.Blend.yEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
     }
+
 }
 
 func (engine *Engine) UpdateWin(addr uint32, v uint32) {
@@ -850,9 +874,12 @@ func (e *Engine) UpdateObjMapping(d *Dispcnt) {
         switch {
         case !d.BitmapObj1D && !d.BitmapObj256:
             obj.ObjBmpMapping = OBJ_BMP_128_2D
+            // this calc needs to be fixed
+            //obj.BmpBoundaryShift = 8
             //panic("NEED TO SET UP 2D BITMAP OBJ")
         case !d.BitmapObj1D && d.BitmapObj256:
             obj.ObjBmpMapping = OBJ_BMP_256_2D
+            //obj.BmpBoundaryShift = 8
             //panic("NEED TO SET UP 2D BITMAP OBJ")
         case d.BitmapObj1D && !d.BitmapObj256 && !d.BitmapObjBoundary:
             obj.ObjBmpMapping = OBJ_BMP_128_1D

@@ -28,10 +28,8 @@ const (
     DATA_SIZE = 0x80_0000
 )
 
-var backupData [DATA_SIZE]uint8 // this size may not be necessary
-
 type Backup struct {
-    Data *[DATA_SIZE]uint8
+    Data [DATA_SIZE]uint8
 	Idx  uint32
 
 	Addr         uint32
@@ -40,17 +38,15 @@ type Backup struct {
     AutoDetect bool
     WrittenCnt bool
     AddrSize uint32
+
+    WriteProtection uint8
 }
 
 func (b *Backup) Init() {
 
-	for i := range len(backupData) {
-		backupData[i] = 0xFF
+	for i := range len(b.Data) {
+		b.Data[i] = 0xFF
 	}
-
-
-    b.Data = &backupData
-
 
     b.AutoDetect = true
 }
@@ -96,6 +92,8 @@ func (b *Backup) Transfer(data []uint8) (reply []uint8, stat uint8) {
 
     //fmt.Printf("BACKUP SPI % 2X\n", data)
 
+    //if data[0] == 0x06 { panic("WHAT")}
+
 	switch inst := data[0]; inst {
 	case INST_NONE:
 
@@ -103,22 +101,24 @@ func (b *Backup) Transfer(data []uint8) (reply []uint8, stat uint8) {
 
 	case INST_RDSR:
 
-		//05h  RDSR Read Status Register (Read Status Register, endless repeated)
-		//Bit7-2  Not used (zero)
-		//Bit1    WEL Write Enable Latch             (0=No, 1=Enable)
-		//Bit0    WIP Write/Program/Erase in Progess (0=No, 1=Busy)
+        v := uint8(0xF0)
+        //v := uint8(0x0)
 
 		if b.WriteEnabled {
-			return []uint8{2}, STAT_DONE
+            v |= 2
 		}
 
-		return []uint8{0}, STAT_DONE
+        v |= b.WriteProtection << 2
+
+		return []uint8{v}, STAT_CONT
 
 	case INST_READ, INST_RDHI:
 
         if b.AutoDetect && !b.Detect(data) {
             return nil, STAT_CONT
         }
+
+        //b.AddrSize = 256
 
         if uint32(len(data)) < b.AddrSize + 1 {
             return nil, STAT_CONT
@@ -173,6 +173,8 @@ func (b *Backup) Transfer(data []uint8) (reply []uint8, stat uint8) {
         if len(data) < 2 {
             return nil, STAT_CONT
         }
+
+        b.WriteProtection = (data[1] >> 2) & 0b11
 
         return nil, STAT_DONE
 

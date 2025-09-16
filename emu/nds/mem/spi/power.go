@@ -1,6 +1,7 @@
 package spi
 
 import (
+
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
@@ -20,20 +21,27 @@ type Pmd struct {
     RegBacklit uint8
 }
 
+func (p *Pmd) Init() {
+    p.RegPowermg = 0xD
+    p.RegMicgain = 0x1
+}
+
 func (p *Pmd) Transfer(data []uint8) (reply []uint8, stat uint8)  {
 
     idx := data[0]
 
-    if read := utils.BitEnabled(uint32(idx), 7); read {
+    if write := !utils.BitEnabled(uint32(idx), 7); write {
 
         if len(data) < 2 {
             return nil, STAT_CONT
         }
 
         v := data[1]
+        //fmt.Printf("SPI Powerman WRITE % 02X\n", data)
 
         switch idx & 0x7F {
         case REG_POWERMG:
+            //fmt.Printf("OVERWRITTING\n")
             p.RegPowermg = v
         case REG_MICCTRL:
             p.RegMicctrl = v & 1
@@ -44,8 +52,17 @@ func (p *Pmd) Transfer(data []uint8) (reply []uint8, stat uint8)  {
         return nil, STAT_DONE
     }
 
+    if len(data) < 2 {
+        return nil, STAT_CONT
+    }
+    //fmt.Printf("SPI Powerman READ  % 02X\n", data)
+
     switch idx & 0x7F {
     case REG_POWERMG:
+
+        //fmt.Printf("READING %02X\n", p.RegPowermg)
+
+
         return []uint8{p.RegPowermg}, STAT_DONE
     case REG_BATTERY:
         return []uint8{0}, STAT_DONE

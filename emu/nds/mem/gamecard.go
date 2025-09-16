@@ -77,7 +77,9 @@ func (g *Gamecard) Init(irq7, irq9 *cpu.Irq, dma7, dma9 *[4]dma.DMA, c *cart.Car
     g.Status = GAMECARD_STAT_KY2
 
     // if this gets changed, fix on init
-    g.ChipId = [4]uint8{0xFF, 0xFF, 0xFF, 0xFF}
+    //g.ChipId = [4]uint8{0xFF, 0xFF, 0xFF, 0xFF}
+    //g.ChipId = [4]uint8{0x00, 0x01, 0x02, 0x03}
+    g.ChipId = [4]uint8{0xC2, 0x7F, 0x00, 0x80}
 }
 
 type ExMem struct {
@@ -120,16 +122,10 @@ type AuxSPI struct {
     Gamecard *Gamecard
     Baudrate uint8
     Hold bool
-    Busy bool
     IsBackup bool
-    Irq bool
-    Enabled bool
-
 
     Value uint8
     Req, Res []uint8
-
-    Active bool
 }
 
 func (a *AuxSPI) Read(b uint8) uint8 {
@@ -141,10 +137,6 @@ func (a *AuxSPI) Read(b uint8) uint8 {
 
         if a.Hold {
             v |= 0b100_0000
-        }
-
-        if a.Busy {
-            v |= 0b1000_0000
         }
 
         return v
@@ -172,14 +164,22 @@ func (a *AuxSPI) Read(b uint8) uint8 {
     }
 }
 
-func (a *AuxSPI) Write(v uint8, b uint8) {
+func (a *AuxSPI) Write(v uint8, b uint8, arm9 bool) {
+
+    if arm9 && a.Gamecard.ExMem.isCartAccessArm7 {
+        return
+    }
+
+    if !arm9 && !a.Gamecard.ExMem.isCartAccessArm7 {
+        return
+    }
+
 
     switch b {
     case 0:
         //fmt.Printf("W AUXSPI V %02X B %02d\n", v, b)
         a.Baudrate = v & 0b11
         a.Hold = utils.BitEnabled(uint32(v), 6)
-        a.Busy = utils.BitEnabled(uint32(v), 7)
 
         a.Gamecard.Backup.WrittenCnt = true
         return
@@ -201,8 +201,6 @@ func (a *AuxSPI) Write(v uint8, b uint8) {
             }
             a.Req = a.Req[:0]
             a.Res = nil
-
-            a.Active = true
         }
 
         a.Gamecard.Backup.WrittenCnt = true
@@ -248,8 +246,6 @@ func (a *AuxSPI) WriteData(v uint8) {
 
     if !a.Hold {
         //fmt.Println("FINISH TFX")
-        //a.Gamecard.Backup.Write()
-        a.Active = false
     }
 }
 
@@ -299,7 +295,15 @@ func (r *RomCtrl) Read(b uint8) uint8 {
     return uint8(r.v >> (b * 8))
 }
 
-func (r *RomCtrl) Write(v uint8, b uint8) {
+func (r *RomCtrl) Write(v uint8, b uint8, arm9 bool) {
+
+    if arm9 && r.Gamecard.ExMem.isCartAccessArm7 {
+        return
+    }
+
+    if !arm9 && !r.Gamecard.ExMem.isCartAccessArm7 {
+        return
+    }
 
     // defaults in bios / etc key1 vs normal?
 
@@ -350,26 +354,42 @@ func (r *RomCtrl) Write(v uint8, b uint8) {
 
         //log.Printf("RomCtrl Write of V %02X at B %02X. Output %08X. Ready %t\n", v, b, r.v, r.isReady)
         if r.Active {
-            r.Run()
+            r.Run(arm9)
         }
     }
 
 }
 
-func (r *RomCtrl) WriteCmdOut(v, b uint8) {
+func (r *RomCtrl) WriteCmdOut(v, b uint8, arm9 bool) {
+
+    if arm9 && r.Gamecard.ExMem.isCartAccessArm7 {
+        return
+    }
+
+    if !arm9 && !r.Gamecard.ExMem.isCartAccessArm7 {
+        return
+    }
     //log.Printf("W CMD OUT V %02X, B %02X\n", v, b)
     r.Command[b] = v
 }
-func (r *RomCtrl) WriteCmdIn(v, b uint8) {
+func (r *RomCtrl) WriteCmdIn(v, b uint8, arm9 bool) {
+
+    if arm9 && r.Gamecard.ExMem.isCartAccessArm7 {
+        return
+    }
+
+    if !arm9 && !r.Gamecard.ExMem.isCartAccessArm7 {
+        return
+    }
     //log.Printf("W CMD IN  V %02X, B %02X\n", v, b)
 }
-func (r *RomCtrl) ReadCmdIn() uint32 {
+func (r *RomCtrl) ReadCmdIn(arm9 bool) uint32 {
 
     v := r.DataOut
 
     if r.isReady {
         r.isReady = false
-        r.Gamecard.Transfer(false)
+        r.Gamecard.Transfer(false, arm9)
 
     } else {
         fmt.Printf("WARNING GAMECARD ROM READ WITHOUT PENDING DATA\n")
@@ -382,7 +402,15 @@ func (r *RomCtrl) ReadCmdIn() uint32 {
     return r.DataOut
 }
 
-func (r *RomCtrl) WriteSeed(v, b, seed uint8) {
+func (r *RomCtrl) WriteSeed(v, b, seed uint8, arm9 bool) {
+
+    if arm9 && r.Gamecard.ExMem.isCartAccessArm7 {
+        return
+    }
+
+    if !arm9 && !r.Gamecard.ExMem.isCartAccessArm7 {
+        return
+    }
     log.Printf("W SEED    V %02X, B %02X\n", v, b)
 
     s := &r.seed0
@@ -400,7 +428,7 @@ func (r *RomCtrl) UpdateEncryption() {
     r.Gamecard.Key2 = NewKey2(r.seed0, r.seed1)
 }
 
-func (r *RomCtrl) Run() {
+func (r *RomCtrl) Run(arm9 bool) {
 
     //log.Printf("RUNNING COMMAND %X\n", r.Command)
 
@@ -451,14 +479,10 @@ func (r *RomCtrl) Run() {
             // todo 
             // the datastream wraps to the begin of the current 4K block when address+length crosses a 4K boundary (1000h bytes)
 
-            r.Gamecard.Buffer = buffer
-            r.Gamecard.Transfer(true)
-
         case GET_CHIP_ID3:
 
-            r.Gamecard.Buffer = r.Gamecard.ChipId[:]
+            buffer = r.Gamecard.ChipId[:]
             //fmt.Printf("CHIP ID = % X\n", r.Gamecard.Buffer)
-            r.Gamecard.Transfer(true)
 
         case NAND_STAT, 0x94:
 
@@ -469,8 +493,7 @@ func (r *RomCtrl) Run() {
             // this is temp (0xFF) to force next
             //r.Gamecard.Buffer = []uint8{0x20, 0x20, 0x20, 0x20}
             //r.Gamecard.Buffer = []uint8{0x0, 0x0, 0x0, 0x0}
-            r.Gamecard.Buffer = r.Gamecard.ChipId[:]
-            r.Gamecard.Transfer(true)
+            buffer = r.Gamecard.ChipId[:]
 
         //case 0xB5:
         //    fmt.Printf("READING NAND HIGHZ ON Gamecard Key2\n")
@@ -479,14 +502,15 @@ func (r *RomCtrl) Run() {
 
         default:
             //panic(fmt.Sprintf("Unsupported Gamecard Key2 Cmd %02X", r.Command[0]))
-            r.Gamecard.Buffer = nil //[]uint8{0,0,0,0}
-            r.Gamecard.Transfer(true)
+            buffer = nil //[]uint8{0,0,0,0}
         }
+        r.Gamecard.Buffer = buffer
+        r.Gamecard.Transfer(true, arm9)
     default: panic("BAD GAMECARD STATUS")
     }
 }
 
-func (g *Gamecard) Transfer(initial bool) {
+func (g *Gamecard) Transfer(initial bool, arm9 bool) {
 
     if len(g.Buffer) == 0 {
 
@@ -496,8 +520,12 @@ func (g *Gamecard) Transfer(initial bool) {
         g.RomCtrl.isReady = false
 
         if g.RomTransferIrq {
-            g.irq7.SetIRQ(cpu.IRQ_CARD_TRANS_COMPLETE)
-            g.irq9.SetIRQ(cpu.IRQ_CARD_TRANS_COMPLETE)
+
+            if arm9 {
+                g.irq9.SetIRQ(cpu.IRQ_CARD_TRANS_COMPLETE)
+            } else {
+                g.irq7.SetIRQ(cpu.IRQ_CARD_TRANS_COMPLETE)
+            }
         }
 
         //log.Printf("FINISHED GAMECARD %08X\n", g.RomCtrl.v)

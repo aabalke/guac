@@ -1,6 +1,7 @@
 package spi
 
 import (
+
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
@@ -18,7 +19,7 @@ type Spi struct {
 	Device             uint8
 	Hold, Irq, Enabled bool
 
-    Pmd Pmd
+    Pmd *Pmd
     Firmware Firmware
     Tsc Tsc
 
@@ -30,8 +31,9 @@ type Spi struct {
 }
 
 func (s *Spi) Init() {
-    s.Pmd.RegPowermg = 0b1101
-    s.Pmd.RegMicgain = 0b1
+
+    s.Pmd = &Pmd{}
+    s.Pmd.Init()
 
     s.TransferDevice = nil
 }
@@ -90,6 +92,7 @@ func (s *Spi) WriteData(v uint8) {
 
     var value uint8
 
+    // is this is the right place?
     if len(s.Res) > 0 {
         value = s.Res[0]
         s.Res = s.Res[1:]
@@ -125,5 +128,6 @@ func (s *Spi) WriteData(v uint8) {
 }
 
 func (s *Spi) ReadData() uint8 {
+    //fmt.Printf("READING SPI %02X\n", s.Value)
     return s.Value
 }

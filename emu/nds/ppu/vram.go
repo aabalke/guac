@@ -80,6 +80,7 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
 	case 0x243:
         vm.CNT_D.Write(v)
 
+
         //vm.isDArm7 = v & 0b10000011 == 0b10000010
         //vm.CNT_7 &^= 0b10
         //if vm.isDArm7 {
@@ -265,7 +266,7 @@ func (vm *VRAM) Write(addr uint32, v uint8, arm9 bool) {
         if vm.CNT_H.Enabled {
             switch vm.CNT_H.Mst {
             case 0: base = uint32(0x89_8000)
-            case 1: base = 0 // not sure
+            case 1: base = 0x20_0000 // not sure
             case 2: base = 0 // not sure
             case 3: // slot
             case 4: // slot
@@ -338,7 +339,7 @@ func (vm *VRAM) Read(addr uint32, arm9 bool) uint8 {
             case 0: base = uint32(0x84_0000)
             case 1: base = 0x20000 * uint32(vm.CNT_C.Ofs)
             case 2: // given to arm7
-            case 3: // slot
+            case 3: // slot 
             case 4: base = 0x20_0000
             }
             if addr >= base && addr < base + 0x2_0000 {
@@ -406,7 +407,7 @@ func (vm *VRAM) Read(addr uint32, arm9 bool) uint8 {
         if vm.CNT_H.Enabled {
             switch vm.CNT_H.Mst {
             case 0: base = uint32(0x89_8000)
-            case 1: base = 0 // not sure
+            case 1: base = 0x20_0000 // not sure
             case 2: base = 0 // not sure
             case 3: // slot
             case 4: // slot

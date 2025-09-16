@@ -28,15 +28,16 @@ const (
 	SCREEN_WIDTH  = 256
 	SCREEN_HEIGHT = 192
 
+	//NUM_SCANLINES   = SCREEN_HEIGHT + 70 // or 71 ???
 	NUM_SCANLINES   = SCREEN_HEIGHT + 70 // or 71 ???
 
 	CYCLES_HDRAW    = 1606
-	CYCLES_HBLANK   = 524 // need to verify
+	//CYCLES_HBLANK   = 524 // need to verify
+	CYCLES_HBLANK   = 526 // need to verify
 	CYCLES_SCANLINE = CYCLES_HDRAW + CYCLES_HBLANK
 	CYCLES_VDRAW    = CYCLES_SCANLINE * SCREEN_HEIGHT
 	CYCLES_VBLANK   = CYCLES_SCANLINE * 70 // or 71???
-	CYCLES_FRAME    = CYCLES_VDRAW + CYCLES_VBLANK
-)
+	CYCLES_FRAME    = CYCLES_VDRAW + CYCLES_VBLANK)
 
 type Nds struct {
 	mem  mem.Mem
@@ -140,39 +141,39 @@ func (nds *Nds) checkBadPc() {
     }
 
 
-    zeroWordcnt := 0x20
+    //zeroWordcnt := 0x20
 
-    if nds.mem.Read32(reg9.R[15], true) == 0x0 {
+    //if nds.mem.Read32(reg9.R[15], true) == 0x0 {
 
-        zeros := true
+    //    zeros := true
 
-        for i := uint32(0); i < uint32(zeroWordcnt); i += 4 {
-            if nds.mem.Read32(reg9.R[15] + i, true) != 0x0 {
-                zeros = false
-                break
-            }
-        }
+    //    for i := uint32(0); i < uint32(zeroWordcnt); i += 4 {
+    //        if nds.mem.Read32(reg9.R[15] + i, true) != 0x0 {
+    //            zeros = false
+    //            break
+    //        }
+    //    }
 
-        if zeros {
-            panic(fmt.Sprintf("BAD ARM9 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
-        }
-    }
+    //    if zeros {
+    //        panic(fmt.Sprintf("BAD ARM9 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
+    //    }
+    //}
 
-    if nds.mem.Read32(reg7.R[15], false) == 0x0 {
+    //if nds.mem.Read32(reg7.R[15], false) == 0x0 {
 
-        zeros := true
+    //    zeros := true
 
-        for i := uint32(0); i < uint32(zeroWordcnt); i += 4 {
-            if nds.mem.Read32(reg7.R[15] + i, false) != 0x0 {
-                zeros = false
-                break
-            }
-        }
+    //    for i := uint32(0); i < uint32(zeroWordcnt); i += 4 {
+    //        if nds.mem.Read32(reg7.R[15] + i, false) != 0x0 {
+    //            zeros = false
+    //            break
+    //        }
+    //    }
 
-        if zeros {
-            panic(fmt.Sprintf("BAD ARM7 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
-        }
-    }
+    //    if zeros {
+    //        panic(fmt.Sprintf("BAD ARM7 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
+    //    }
+    //}
 
 
     if reg9.R[15] < 0x30 && !nds.arm9.LowVector {
@@ -212,6 +213,8 @@ func (nds *Nds) checkMode() {
     }
 }
 
+var prev uint32
+
 func (nds *Nds) Update() {
 
     r := &nds.arm9.Reg.R
@@ -232,20 +235,37 @@ func (nds *Nds) Update() {
         // arm9 thumb ~1 cycles, arm ~2 cycles
         // arm7 thumb ~2 cycles, arm ~4 cycles
 
+        //if r[15] == 0x020D9980 {
+        //    panic(fmt.Sprintf("PC %08X CURR %d", r[15], CURR_INST))
+        //}
+
+        //if v := nds.mem.Read32(0x03807564, false); v != prev {
+        //    fmt.Printf("UPDATING VALUE V %08X\n", v)
+        //    prev = v
+        //}
+
+        //if r7[15] == 0x037F847C {
+        //    fmt.Printf("HIT IE \n")
+        //}
+
+        //if r7[15] == 0x037FB4D8 && CURR_INST >= 8_223_888 && r7[0] == 0x12 {
+        //    fmt.Printf("R0 %08X IF %08X IE %08X CURR %d\n", r7[0], nds.arm7.Irq.IF, nds.arm9.Irq.IE, CURR_INST)
+        //}
+
+        //if CURR_INST >= 50_000_000 {
+        //    nds.Debugger.print(int(CURR_INST))
+        //    os.Exit(0)
+        //}
+
+
 		if !nds.arm9.Halted {
             thumbExec :=  nds.arm9.Reg.IsThumb
             armExec := !nds.arm9.Reg.IsThumb && nds.AccCycles & 0b1 == 0
 
             if thumbExec || armExec  {
-
-                // scribblenauts breaks before 4_888_627 addr 0x20564BA should only be hit 4-5 times before showing something
-
-                // logger.Update(8_221_899, 20_000_000, CURR_INST, true)
-
-                // fmt.Printf("PC %08X CURR %d\n", r[15], CURR_INST)
+                //logger.Update(4_000_000, 8_000_000, CURR_INST, true)
 
                 _, ok := nds.arm9.Execute()
-
                 if !ok {
                     fmt.Printf("ARM9 Decode Error: PC %08X CURR %d\n", r[15], CURR_INST)
                     os.Exit(0)
@@ -258,11 +278,13 @@ func (nds *Nds) Update() {
             armExec := !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b11 == 0
 
             if thumbExec || armExec  {
-                //fmt.Printf("PC %08X CURR %d\n", r7[15] , CURR_INST)
+                // fmt.Printf("PC %08X CURR %d\n", r7[15] , CURR_INST)
+                //logger.Update(8_912_144, 20_000_000, CURR_INST, false)
+                // fmt.Printf("PC %08X CURR %d\n", r7[15] , CURR_INST)
 
-                //logger.Update(100_000_000, 101_000_000, CURR_INST, false)
-                //logger.Update(503480, 503562, CURR_INST, false)
-                //logger.Update(4_000_000, 4_888_627, CURR_INST, false)
+                // logger.Update(8937080, 8984200, CURR_INST, false)
+                // logger.Update(8223890,10223890, CURR_INST, false)
+                // fmt.Printf("PC %08X CURR %d\n", r7[15], CURR_INST)
                 _, ok := nds.arm7.Execute()
                 if !ok {
                     fmt.Printf("ARM7 Decode Error: PC %08X CURR %d\n", r7[15], CURR_INST)
@@ -377,13 +399,12 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 
 	if newScanline := currScanlineCycles < prevScanlineCycles; newScanline {
 
-		// this 1232 cycle count is estimate, should replace with actual
 		//gba.Apu.SoundClock(1232, false)
 
 		dispstat.SetHBlank(false)
 
 		vcount++
-		if vcount == NUM_SCANLINES {
+		if vcount >= NUM_SCANLINES {
 			vcount = 0
 		}
 
@@ -400,7 +421,7 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 			dispstat.SetVBlank(true)
 			nds.CheckDmas(dma.ARM9_DMA_MODE_VBL, true)
 			nds.CheckDmas(dma.ARM7_DMA_MODE_VBL, true)
-		//case SCREEN_HEIGHT + 1:
+		case SCREEN_HEIGHT + 1:
 			if utils.BitEnabled(uint32(*dispstat), 3) {
                 nds.arm9.Irq.SetIRQ(0)
                 nds.arm7.Irq.SetIRQ(0)

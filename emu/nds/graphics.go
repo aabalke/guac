@@ -3,7 +3,6 @@ package nds
 import (
 	"encoding/binary"
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/aabalke/guac/config"
@@ -12,7 +11,6 @@ import (
 )
 
 var _ = fmt.Sprintf("")
-
 
 var wg = sync.WaitGroup{}
 
@@ -55,30 +53,11 @@ func (nds *Nds) screenoff(y uint32, colorByte uint8, engine *ppu.Engine) {
 
 func (nds *Nds) vramDisplay(y uint32, engine *ppu.Engine) {
 
-    log.Println("VRAM DISPLAY MAY NEED AFFINE")
-
 	x := uint32(0)
 	for x = range SCREEN_WIDTH {
-
-        bankIdx := engine.Dispcnt.VramBlock
-
-        var bank *[0x20000]uint8
-
-        switch bankIdx {
-        case 0: bank = &nds.mem.Vram.A
-        case 1: bank = &nds.mem.Vram.B
-        case 2: bank = &nds.mem.Vram.C
-        case 3: bank = &nds.mem.Vram.D
-        }
-
-        offset := uint32(0)
-
-        palData, ok := nds.directbitmap(x, y, offset, bank)
-
-        if ok {
-            index := (x + (y * SCREEN_WIDTH)) * 4
-            nds.applyColor(palData, index, engine.Pixels)
-        }
+        palData, _ := nds.setRawBitmap(engine, x, y)
+        index := (x + (y * SCREEN_WIDTH)) * 4
+        nds.applyColor(palData, index, engine.Pixels)
     }
 }
 
@@ -149,7 +128,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
             case ppu.BG_TYPE_LAR:
 				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_3D :
-                palData, ok = 0b11111, true // red
+                //palData, ok = 0b11111, true // red
             case ppu.BG_TYPE_BGM:
 				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_256:
@@ -385,7 +364,6 @@ func (nds *Nds) setAffine16BackgroundPixel(engine *ppu.Engine, bg *ppu.Backgroun
 	map_y := ((uint32(yIdx)) & (bg.H - 1)) >> 3
 	map_y *= bg.W >> 3
 	mapIdx := map_y + map_x
-
     mapIdx <<= BYTE_SHIFT
 
 	mapAddr := bg.ScreenBaseBlock + mapIdx
@@ -481,6 +459,8 @@ func (nds *Nds) setBmpBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x 
 	//	panic(fmt.Sprintf("AFFINE WITHOUT PAL 256"))
 	//}
 
+
+
 	pa := utils.Convert8_8Float(int16(bg.Pa))
 	pc := utils.Convert8_8Float(int16(bg.Pc))
 	xIdx := int(pa*float64(x) + bg.OutX)
@@ -542,6 +522,7 @@ func getPositionsBg(screenData, xIdx, yIdx uint32) (uint32, uint32) {
 func (nds *Nds) setDirectBitmap(engine *ppu.Engine, bg *ppu.Background, x uint32) (uint32, bool) {
 
 
+
 	pa := utils.Convert8_8Float(int16(bg.Pa))
 	pc := utils.Convert8_8Float(int16(bg.Pc))
 	xIdx := int(pa*float64(x) + bg.OutX)
@@ -585,32 +566,28 @@ func (nds *Nds) setDirectBitmap(engine *ppu.Engine, bg *ppu.Background, x uint32
     return data, true
 
 }
-func (nds *Nds) directbitmap(x, y, offset uint32, bank *[0x20000]uint8) (uint32, bool) {
 
-    // will need affine support
+func (nds *Nds) setRawBitmap(engine *ppu.Engine, x, y uint32) (uint32, bool) {
 
-    const (
-        BYTE_PER_PIXEL = 2
-    )
+    addr := uint32(x+(y * SCREEN_WIDTH) * 2)
 
-    var data uint32
+    bankIdx := engine.Dispcnt.VramBlock
 
-    if bank == nil {
-        idx := ((x+(y*SCREEN_WIDTH)) * BYTE_PER_PIXEL) + offset
-        data = uint32(nds.mem.Vram.Read(idx, true))
-        data |= uint32(nds.mem.Vram.Read(idx + 1, true)) << 8
-    } else {
-        idx := ((x+(y*SCREEN_WIDTH)) * BYTE_PER_PIXEL)
-        data = uint32(bank[idx])
-        data |= uint32(bank[idx + 1]) << 8
+    var bank *[0x20000]uint8
+
+    switch bankIdx {
+    case 0: bank = &nds.mem.Vram.A
+    case 1: bank = &nds.mem.Vram.B
+    case 2: bank = &nds.mem.Vram.C
+    case 3: bank = &nds.mem.Vram.D
     }
 
-    // if on transparent???
-    if transparent := (data >> 15) & 1 == 1; transparent {
-        return 0, false
-    }
+    bank = &nds.mem.Vram.A
+
+    data := uint32(binary.LittleEndian.Uint16(bank[addr:]) &^ 0x80)
 
     return data, true
+
 }
 
 func (nds *Nds) DebugPalette(y, addr uint32, pixels *[]byte) {
@@ -733,9 +710,9 @@ func (nds *Nds) getExtendedPalette(engine *ppu.Engine, bgIdx uint32, obj bool, p
         case 3: slot = (*[0x2000]uint8)(vram.ExtABgSlot3)
         }
 
-        //if slot == nil {
-        //    return 0
-        //}
+        if slot == nil {
+            return 0
+        }
 
         return uint32(binary.LittleEndian.Uint16(slot[addr:]))
     case !obj && engine.IsB:
@@ -748,9 +725,9 @@ func (nds *Nds) getExtendedPalette(engine *ppu.Engine, bgIdx uint32, obj bool, p
         case 3: slot = (*[0x2000]uint8)(vram.ExtBBgSlot3)
         }
 
-        //if slot == nil {
-        //    return 0
-        //}
+        if slot == nil {
+            return 0
+        }
 
         return uint32(binary.LittleEndian.Uint16(slot[addr:]))
     case obj && !engine.IsB:
@@ -888,7 +865,7 @@ func getBmpTileAddr(obj *ppu.Object, xIdx, yIdx int) uint32 {
         return uint32((xIdx+(yIdx << int(obj.BmpBoundaryShift))) * BYTES_PER_PIXEL)
 	}
 
-    panic("OBJ BMP 2D, make sure addr calc accurate")
+    //panic("OBJ BMP 2D, make sure addr calc accurate")
 
     return uint32((xIdx+(yIdx << int(obj.BmpBoundaryShift))) * BYTES_PER_PIXEL)
 }
