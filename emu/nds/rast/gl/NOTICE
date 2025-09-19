@@ -1,0 +1,5 @@
+This project includes code adapted from third party code under the following licenses:
+
+- Rasterizer from fogleman/fauxgl abf826a (MIT License)
+
+All other code is @ 2025 Aaron Balke, licensed under a BSD-3 Clause License

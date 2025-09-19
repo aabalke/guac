@@ -22,7 +22,6 @@ const (
 )
 
 type Firmware struct {
-    Data []uint8
     Idx uint32
 
     Addr uint32

@@ -129,6 +129,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_3D :
                 //palData, ok = 0b11111, true // red
+                palData, ok = nds.set3d(x, y)
             case ppu.BG_TYPE_BGM:
 				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_256:
@@ -253,6 +254,11 @@ func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {
 	}
 
 	return bgs
+}
+
+func (nds *Nds) set3d(x, y uint32) (uint32, bool) {
+	index := (x + (y * SCREEN_WIDTH))
+    return uint32(nds.ppu.Rasterizer.Render.PixelPalettes[index]), true
 }
 
 func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, bool) {

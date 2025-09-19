@@ -43,7 +43,7 @@ type Nds struct {
 	mem  mem.Mem
 	arm7 arm7.Cpu
 	arm9 arm9.Cpu
-    ppu ppu.PPU
+    ppu *ppu.PPU
     Cartridge cart.Cartridge
 
 	Debugger Debugger
@@ -66,6 +66,7 @@ func NewNds(path string, _ *oto.Context) *Nds {
 		PixelsBottom: make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
 		ImageTop:     ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 		ImageBottom:  ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
+        ppu: ppu.NewPPU(),
 	}
 
     nds.ppu.EngineA.Pixels = &nds.PixelsBottom
@@ -93,7 +94,7 @@ func NewNds(path string, _ *oto.Context) *Nds {
         &nds.arm7.Reg.R[15],
         &nds.arm7.Halted, &nds.arm9.Halted,
         &nds.arm7.Dma, &nds.arm9.Dma,
-        &irq7, &irq9, &nds.Cartridge, &nds.ppu)
+        &irq7, &irq9, &nds.Cartridge, nds.ppu)
 
     nds.arm9.Dma[0].Init(0, &nds.mem, &irq9, true)
     nds.arm9.Dma[1].Init(1, &nds.mem, &irq9, true)
@@ -441,6 +442,7 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 
 	if currFrameCycles < prevFrameCycles {
 		nds.Drawn = true
+        nds.ppu.Rasterizer.Render.UpdateRender()
 	}
 }
 

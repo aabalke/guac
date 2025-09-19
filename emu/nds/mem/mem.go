@@ -9,7 +9,6 @@ import (
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/nds/mem/spi"
 	"github.com/aabalke/guac/emu/nds/ppu"
-	"github.com/aabalke/guac/emu/nds/rast"
 )
 
 //go:embed res_/bios7.bin
@@ -59,9 +58,6 @@ type Mem struct {
     BiosProt BiosProt
     WifiWaitCnt WifiWaitCnt
     Timers [8]Timer
-
-    gxstat rast.GXSTAT
-
 }
 
 type BiosProt uint16
@@ -206,6 +202,7 @@ func (mem *Mem) Read16(addr uint32, arm9 bool) uint32 {
 	return uint32(mem.Read(addr, arm9)) | (uint32(mem.Read(addr+1, arm9)) << 8)
 }
 func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
+
     switch addr {
     case 0x410_0000:
         return mem.Ipc.ReadFifo(arm9)
@@ -276,6 +273,18 @@ func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
 }
 func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
 
+    if arm9 {
+        if geoFifo := addr >= 0x4000440 && addr < 0x4000600; geoFifo {
+            mem.ppu.Rasterizer.GeoCmd(addr, v)
+            return
+        }
+
+        if addr == 0x400_0400 {
+            mem.ppu.Rasterizer.GeoCmdFifo(v)
+            return
+        }
+    }
+
     switch addr {
     case 0x400_0188: 
         mem.Ipc.WriteFifo(v, arm9)
@@ -302,6 +311,12 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
         return mem.sqrt.Read(addr)
     case addr >= 0xB0 && addr < 0xE0:
         return mem.ReadDma(mem.dma9, addr)
+    case (addr >= 0x320 && addr < 0x6A3) || (addr &^ 1 == 0x60):
+        if addr >= 0x440 && addr < 0x600 {
+            panic(fmt.Sprintf("READ HALF or BYTE TO 3D %08X\n", addr))
+        }
+
+        return mem.ppu.Rasterizer.Read(addr)
     }
 
 	switch addr {
@@ -422,10 +437,6 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
     case 0x305:
         return uint8(mem.PowCnt.V >> 8)
 
-    case 0x600: return mem.gxstat.Read(0)
-    case 0x601: return mem.gxstat.Read(1)
-    case 0x602: return mem.gxstat.Read(2)
-    case 0x603: return mem.gxstat.Read(3)
 
 	default:
         //panic(fmt.Sprintf("READ UNKNOWN ARM9 IO ADDR %08X", addr))
@@ -450,6 +461,13 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
         return
     case addr >= 0xB0 && addr < 0xE0:
         mem.WriteDma(mem.dma9, addr, v)
+        return
+    case (addr >= 0x320 && addr < 0x6A3) || (addr &^ 1 == 0x60):
+        if addr >= 0x440 && addr < 0x600 {
+            panic(fmt.Sprintf("WRITE HALF or BYTE TO 3D %08X\n", addr))
+        }
+
+        mem.ppu.Rasterizer.Write(addr, v)
         return
     }
 
@@ -605,10 +623,6 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
     case 0x305:
         mem.PowCnt.WriteCNT1(1, uint32(v), mem.ppu)
 
-    case 0x600: mem.gxstat.Write(v, 0)
-    case 0x601: mem.gxstat.Write(v, 1)
-    case 0x602: mem.gxstat.Write(v, 2)
-    case 0x603: mem.gxstat.Write(v, 3)
 	default:
         //panic(fmt.Sprintf("WRTE UNKNOWN ARM9 IO ADDR %08X", addr))
 		mem.IO[addr] = v
@@ -626,7 +640,8 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 	//}
     if addr >= 0x188 && addr < 0x190 { panic("READ IPC FIFO FROM BYTE OR HALF")}
 
-    if addr >= 0xB0 && addr < 0xE0 {
+    switch {
+    case addr >= 0xB0 && addr < 0xE0:
         return mem.ReadDma(mem.dma7, addr)
     }
 

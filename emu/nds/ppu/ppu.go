@@ -2,7 +2,6 @@ package ppu
 
 import (
 	"encoding/binary"
-	"fmt"
 
 	"github.com/aabalke/guac/emu/nds/rast"
 	"github.com/aabalke/guac/emu/nds/utils"
@@ -11,7 +10,7 @@ import (
 type PPU struct {
     EngineA Engine
     EngineB Engine
-    Rasterizer rast.Rasterizer
+    Rasterizer *rast.Rasterizer
 
     // these values are updated in PowCnt1
 
@@ -147,6 +146,16 @@ type Object struct {
     BmpBoundaryShift uint32
 }
 
+func NewPPU() *PPU {
+
+    p := &PPU{}
+
+    p.Rasterizer = rast.NewRasterizer()
+
+    return p
+
+}
+
 func (p *PPU) Update(addr, v uint32) {
 
     if engineA := addr < 0x60; engineA && p.EngineA2D {
@@ -156,11 +165,12 @@ func (p *PPU) Update(addr, v uint32) {
     }
 
     if capture := addr >= 0x60 && addr < 0x68; capture {
-        fmt.Printf("CAPTURE %08X %02X\n", addr, v)
+        //fmt.Printf("CAPTURE %08X %02X\n", addr, v)
 
     }
 
     if engineRender := addr >= 0x320 && addr < 0x400; engineRender && p.RenderingEngine {
+
         return
     }
 

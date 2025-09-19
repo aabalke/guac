@@ -14,3 +14,11 @@ func Convert20_8Float(v int32) float64 {
 func Convert8_8Float(v int16) float64 {
 	return float64(v>>8) + (float64(v&0xFF) / 256.0)
 }
+
+func ConvertToFloat(v uint32, bitFractional uint8) float64 {
+    return float64(int32(v)) / float64(int(1) << bitFractional)
+}
+
+func Convert16ToFloat(v uint16, bitFractional uint8) float64 {
+    return float64(int16(v)) / float64(int(1) << bitFractional)
+}
