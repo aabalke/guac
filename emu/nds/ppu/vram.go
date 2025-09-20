@@ -1,6 +1,7 @@
 package ppu
 
 import (
+	"fmt"
 	"unsafe"
 
 	"github.com/aabalke/guac/emu/nds/utils"
@@ -45,11 +46,13 @@ type VRAM struct {
 }
 
 type VramCnt struct {
+    V uint8
 	Mst, Ofs uint8
 	Enabled  bool
 }
 
 func (vc *VramCnt) Write(v uint8) {
+    vc.V = v & 0b1001_1111
 	vc.Mst = v & 0b111
     vc.Ofs = uint8(utils.GetVarData(uint32(v), 3, 4))
 	vc.Enabled = utils.BitEnabled(uint32(v), 7)
@@ -58,7 +61,9 @@ func (vc *VramCnt) Write(v uint8) {
 func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
 
 	switch addr {
-	case 0x240: vm.CNT_A.Write(v)
+	case 0x240:
+        vm.CNT_A.Write(v)
+
 	case 0x241: vm.CNT_B.Write(v)
 	case 0x242:
         vm.CNT_C.Write(v)
@@ -442,4 +447,42 @@ func (vm *VRAM) Read(addr uint32, arm9 bool) uint8 {
     }
 
     return 0
+}
+
+func (vm *VRAM) ReadTexture(addr uint32) uint8 {
+
+    switch {
+    case addr < 0x2_0000: return vm.A[addr]
+    case addr < 0x4_0000: return vm.B[addr]
+    case addr < 0x6_0000: return vm.C[addr]
+    case addr < 0x8_0000: return vm.D[addr]
+    }
+
+    panic(fmt.Sprintf("BAD TEXTURE READ ADDR %08X", addr))
+}
+
+func (vm *VRAM) ReadPalTexture(addr uint32) uint8 {
+
+    panic("READ PaL TEXTURE UNIMPLIMENTED")
+
+    if vm.CNT_E.Enabled && vm.CNT_E.Mst == 3 && addr < 0x1_0000 {
+        return vm.E[addr]
+    }
+
+    if vm.CNT_F.Enabled && vm.CNT_F.Mst == 3 {
+
+        panic("F TEXTURE PALETTE USED, NOT SET UP")
+
+        //base := vm.CNT_F.Ofs
+
+        //if addr >= base && addr < base + 0x4000 {
+        //    return vm.F[addr - base]
+        //}
+    }
+
+    if vm.CNT_G.Enabled && vm.CNT_G.Mst == 3 {
+        panic("G TEXTURE PALETTE USED, NOT SET UP")
+    }
+
+    panic(fmt.Sprintf("BAD TEXTURE PAL READ ADDR %08X", addr))
 }

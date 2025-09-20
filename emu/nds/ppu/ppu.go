@@ -19,6 +19,9 @@ type PPU struct {
 	EngineA2D, EngineB2D            bool
 	RenderingEngine, GeometryEngine bool
 	TopA                            bool
+
+    Pram PRAM
+    Vram VRAM
 }
 
 type Engine struct {
@@ -146,11 +149,16 @@ type Object struct {
     BmpBoundaryShift uint32
 }
 
-func NewPPU() *PPU {
+func NewPPU(top, bottom *[]byte) *PPU {
 
-    p := &PPU{}
+    p := &PPU{
 
-    p.Rasterizer = rast.NewRasterizer()
+    }
+
+    p.EngineA.Pixels = bottom
+    p.EngineB.Pixels = top
+    p.EngineB.IsB = true
+    p.Rasterizer = rast.NewRasterizer(&p.Vram)
 
     return p
 

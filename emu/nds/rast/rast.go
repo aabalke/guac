@@ -14,29 +14,34 @@ const (
 
 type Rasterizer struct {
 
-    Pixels []uint8
-
-
 	Disp3dCnt Disp3dCnt
     Viewport Viewport
 
     GeoEngine *GeoEngine
     Buffers Buffers
 
-    Render Render
+    Render *Render
     ClearColor gl.Color
     RearPlane RearPlane
+    VRAM VRAM
 }
 
-func NewRasterizer() *Rasterizer {
+type VRAM interface {
+    ReadTexture(uint32) uint8
+    ReadPalTexture(uint32) uint8
+}
+
+func NewRasterizer(vram VRAM) *Rasterizer {
     r := &Rasterizer{}
+
+    r.VRAM = vram
 
     r.GeoEngine = NewGeoEngine(&r.Buffers)
 
     //projectionMatrix := &r.GeoEngine.MtxStacks.Stacks[0].Mtxs[0]
     projectionMatrix := &r.GeoEngine.MtxStacks.Stacks[0].CurrMtx
 
-    r.Render = NewRender(&r.Buffers, projectionMatrix)
+    r.Render = NewRender(r, &r.Buffers, projectionMatrix, &r.RearPlane)
 
     return r
 }
@@ -196,6 +201,7 @@ func (g *GXSTAT) Read(b uint32) uint8 {
 }
 
 type RearPlane struct {
+    R, G, B uint8
     ClearColor gl.Color
     FogEnabled bool
     Alpha uint32
@@ -208,7 +214,18 @@ func (r *RearPlane) Write(addr uint32, v uint8) {
     switch addr {
     case 0x350:
 
+        r.R = v & 0b11111
+        r.G &^= 0b111
+        r.G = (v >> 5) & 0b111
+
+        r.CalcClearColor(r.R, r.G, r.B)
+
     case 0x351:
+
+        r.G &= 0b111
+        r.G |= (v & 0b11) << 3
+        r.B = (v >> 3) & 0b11111
+        r.CalcClearColor(r.R, r.G, r.B)
 
         r.FogEnabled = utils.BitEnabled(uint32(v), 7)
     case 0x352:
@@ -229,5 +246,19 @@ func (r *RearPlane) Write(addr uint32, v uint8) {
 
     case 0x357:
         r.OffsetY = uint32(v)
+    }
+}
+
+func (ra *RearPlane) CalcClearColor(r, g, b uint8) {
+
+	r = (r << 3) | (r >> 2)
+	g = (g << 3) | (g >> 2)
+	b = (b << 3) | (b >> 2)
+
+    ra.ClearColor = gl.Color{
+        R: float64(r) / 0xFF,
+        G: float64(g) / 0xFF,
+        B: float64(b) / 0xFF,
+        A: float64(0xFF) / 0xFF,
     }
 }

@@ -24,6 +24,8 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
 		return r.GeoEngine.GxStat.Read(3)
 	}
 
+    return 0
+
     panic(fmt.Sprintf("READ UNSETUP 3D IO %08X\n", addr))
 }
 
@@ -55,9 +57,8 @@ func (r *Rasterizer) Write(addr uint32, v uint8) {
 	case 0x603:
 		r.GeoEngine.GxStat.Write(v, 3)
     default:
-        panic(fmt.Sprintf("WRITES UNSETUP 3D IO %08X %02X\n", addr, v))
+        //panic(fmt.Sprintf("WRITES UNSETUP 3D IO %08X %02X\n", addr, v))
 	}
-
 }
 
 func (r *Rasterizer) GeoCmdFifo(v uint32) {

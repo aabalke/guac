@@ -1,10 +1,18 @@
 package rast
 
 import (
+	"image"
 	"image/color"
 
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 	"github.com/aabalke/guac/emu/nds/utils"
+)
+
+const(
+    PRIM_SEP_TRI  = 0
+    PRIM_SEP_QUAD = 1
+    PRIM_TRI_STRIP = 2
+    PRIM_QUAD_STRIP = 3
 )
 
 type Polygon struct {
@@ -22,7 +30,8 @@ type Polygon struct {
 
 	PrimitiveType uint8
 	Vertices      []gl.Vertex
-    Color gl.Color
+
+    Texture Texture
 }
 
 func (p *Polygon) WriteAttrs(v uint32) {
@@ -42,26 +51,7 @@ func (p *Polygon) WriteAttrs(v uint32) {
     p.Id = utils.GetVarData(v, 24, 29)
 }
 
-func (p *Polygon) WriteColor(v uint32) {
-
-	r := uint8((v) & 0b11111)
-	g := uint8((v >> 5) & 0b11111)
-	b := uint8((v >> 10) & 0b11111)
-
-	r = (r << 3) | (r >> 2)
-	g = (g << 3) | (g >> 2)
-	b = (b << 3) | (b >> 2)
-
-    c := color.RGBA{
-        R: r,
-        G: g,
-        B: b,
-    }
-
-    p.Color = gl.MakeColor(c)
-}
-
-func (p *Polygon) WriteVtx16(data []uint32, transfromMatrix *gl.Matrix) {
+func (p *Polygon) WriteVtx16(data []uint32, transfromMatrix *gl.Matrix, color gl.Color, S, T float64) {
 
     x := utils.Convert16ToFloat(uint16(data[1]), 12)
     y := utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
@@ -71,14 +61,51 @@ func (p *Polygon) WriteVtx16(data []uint32, transfromMatrix *gl.Matrix) {
     // clip mask is posMtx * perMtx
     // we just apply posMtx here since perMtx is applied in shader
 
+    //fmt.Printf("S %.2f T %.2f\n", S, T)
+
     vw := transfromMatrix.MulVectorW(gl.VectorW{X: x, Y: y, Z: z, W: w})
 
     v := gl.Vertex{
         Position: gl.Vector{ X: vw.X, Y: vw.Y, Z: vw.Z },
-        Color: p.Color,
+        Color: color,
         W: vw.W,
+        S: S,
+        T: T,
     }
 
     p.Vertices = append(p.Vertices, v)
 }
 
+// this is temp using imagetexture, would be best to get texture more effectently
+func (p *Polygon) GetTexture(vram VRAM) *gl.ImageTexture {
+
+    t := p.Texture
+
+    img := image.NewRGBA(image.Rect(0,0,int(t.SizeS), int(t.SizeT)))
+    switch t.Format {
+    case 7: 
+        for i := uint32(0); i < t.SizeS * t.SizeT * 2; i += 2 {  
+
+            data := uint32(vram.ReadTexture(i+0))
+            data |= uint32(vram.ReadTexture(i+1)) << 8
+
+            x := int((i >> 1) % t.SizeS)
+            y := int((i >> 1) / t.SizeS)
+
+            r, g, b := RGB15ToRGB24(
+                uint8(data & 0b11111),
+                uint8(data >> 5) & 0b11111,
+                uint8(data >> 10) & 0b11111,
+            )
+
+            img.Set(x, y, color.RGBA{r, g, b, 0xFF})
+        }
+
+    }
+
+    return &gl.ImageTexture{
+        Width: int(t.SizeS),
+        Height: int(t.SizeT),
+        Image: img,
+    }
+}

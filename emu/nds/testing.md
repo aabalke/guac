@@ -103,6 +103,27 @@ FileSystem
 Graphics
 
     3D
+        👍 Simple Quad
+        👍 Simple Tri
+        Textured Cube - Needs Capture
+        👍 Textured Quad
+        Ortho (I think needs light and toon, but no visible effect)
+        nehe
+            👍 Lesson 01
+            👍 Lesson 02
+            👍 Lesson 03
+            👍 Lesson 04
+            👍 Lesson 05
+            Lesson 06
+            Lesson 07
+            Lesson 08
+            Lesson 09
+            Lesson 10
+            Lesson 10b
+            Lesson 11
+        👍 Mixed Text 3D
+
+
 
     capture
 
@@ -112,7 +133,7 @@ Graphics
     grit
     Printing
 
-    ❌ Backgrounds
+    👍 Backgrounds
         👍 16 bit color bmp
         👍 256 bit color bmp
         👍 all in one

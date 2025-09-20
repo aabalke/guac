@@ -22,8 +22,8 @@ type Mem struct {
     Tcm Tcm
 	MainRam         [0x40_0000]uint8
 	WRAM            WRAM
-    Pram            ppu.PRAM
-    Vram            ppu.VRAM
+    //Pram            ppu.PRAM
+    //Vram            ppu.VRAM
     Oam             [0x800]uint8
 
 	Arm7Bios [0x4000]uint8
@@ -98,15 +98,15 @@ func NewMemory(arm7Pc *uint32, halted7, halted9 *bool, dma7, dma9 *[4]dma.DMA, i
     m.Spi.Init()
     m.Gamecard.Init(irq7, irq9, dma7, dma9, c)
 
-    m.Vram.CNT_A.Write(0x80)
-    m.Vram.CNT_B.Write(0x80)
-    m.Vram.CNT_C.Write(0x80)
-    m.Vram.CNT_D.Write(0x80)
-    m.Vram.CNT_E.Write(0x80)
-    m.Vram.CNT_F.Write(0x80)
-    m.Vram.CNT_G.Write(0x80)
-    m.Vram.CNT_H.Write(0x80)
-    m.Vram.CNT_I.Write(0x80)
+    m.ppu.Vram.CNT_A.Write(0x80)
+    m.ppu.Vram.CNT_B.Write(0x80)
+    m.ppu.Vram.CNT_C.Write(0x80)
+    m.ppu.Vram.CNT_D.Write(0x80)
+    m.ppu.Vram.CNT_E.Write(0x80)
+    m.ppu.Vram.CNT_F.Write(0x80)
+    m.ppu.Vram.CNT_G.Write(0x80)
+    m.ppu.Vram.CNT_H.Write(0x80)
+    m.ppu.Vram.CNT_I.Write(0x80)
 
 	return m
 }
@@ -155,9 +155,9 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
             printIO(addr, arm9, false)
 			return mem.ReadArm9IO(addr - 0x400_0000)
 		case 0x5:
-            return mem.Pram.Read(addr, mem.ppu)
+            return mem.ppu.Pram.Read(addr, mem.ppu)
 		case 0x6:
-            return mem.Vram.Read(addr, true)
+            return mem.ppu.Vram.Read(addr, true)
 		case 0x7:
             return mem.Oam[addr & 0x7FF]
         case 0x8, 0x9, 0xA:
@@ -186,7 +186,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
         printIO(addr, arm9, false)
         return mem.ReadArm7IO(addr-0x400_0000)
     case 0x6:
-        return mem.Vram.Read(addr, false)
+        return mem.ppu.Vram.Read(addr, false)
     case 0x8, 0x9, 0xA:
         return mem.ReadGbaSlot(addr, arm9)
     default:
@@ -235,9 +235,9 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
             printIO(addr, arm9, true)
 			mem.WriteArm9IO(addr-0x400_0000, v)
         case 0x5:
-            mem.Pram.Write(addr, v, mem.ppu)
+            mem.ppu.Pram.Write(addr, v, mem.ppu)
 		case 0x6:
-            mem.Vram.Write(addr, v, true)
+            mem.ppu.Vram.Write(addr, v, true)
 		case 0x7:
             mem.Oam[addr & 0x7FF] = v
             mem.ppu.UpdateOAM(addr, v, &mem.Oam)
@@ -256,7 +256,7 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
         printIO(addr, arm9, true)
         mem.WriteArm7IO(addr-0x400_0000, v)
     case 0x6:
-        mem.Vram.Write(addr, v, false)
+        mem.ppu.Vram.Write(addr, v, false)
     }
 }
 
@@ -274,12 +274,12 @@ func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
 func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
 
     if arm9 {
-        if geoFifo := addr >= 0x4000440 && addr < 0x4000600; geoFifo {
+        if geo := addr >= 0x4000440 && addr < 0x4000600; geo {
             mem.ppu.Rasterizer.GeoCmd(addr, v)
             return
         }
 
-        if addr == 0x400_0400 {
+        if gxfifo := addr >= 0x400_0400 && addr < 0x4000440; gxfifo {
             mem.ppu.Rasterizer.GeoCmdFifo(v)
             return
         }
@@ -427,6 +427,16 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 		return mem.irq9.ReadIF(2)
 	case 0x217:
 		return mem.irq9.ReadIF(3)
+    case 0x240: return mem.ppu.Vram.CNT_A.V
+    case 0x241: return mem.ppu.Vram.CNT_B.V
+    case 0x242: return mem.ppu.Vram.CNT_C.V
+    case 0x243: return mem.ppu.Vram.CNT_D.V
+    case 0x244: return mem.ppu.Vram.CNT_E.V
+    case 0x245: return mem.ppu.Vram.CNT_F.V
+    case 0x246: return mem.ppu.Vram.CNT_G.V
+    case 0x248: return mem.ppu.Vram.CNT_H.V
+    case 0x249: return mem.ppu.Vram.CNT_I.V
+
     case 0x247:
         return mem.WRAM.ReadCNT()
     case 0x300:
@@ -597,23 +607,19 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 		mem.irq9.WriteIF(v, 2)
 	case 0x217:
 		mem.irq9.WriteIF(v, 3)
-    case 0x240: mem.Vram.WriteCNT(addr, v)
-    case 0x241: mem.Vram.WriteCNT(addr, v)
-    case 0x242: mem.Vram.WriteCNT(addr, v)
-    case 0x243: mem.Vram.WriteCNT(addr, v)
-    case 0x244: mem.Vram.WriteCNT(addr, v)
-    case 0x245: mem.Vram.WriteCNT(addr, v)
-    case 0x246: mem.Vram.WriteCNT(addr, v)
+
+    // vram reads - gbatek says read only, needed to match no$gba
+    case 0x240: mem.ppu.Vram.WriteCNT(addr, v)
+    case 0x241: mem.ppu.Vram.WriteCNT(addr, v)
+    case 0x242: mem.ppu.Vram.WriteCNT(addr, v)
+    case 0x243: mem.ppu.Vram.WriteCNT(addr, v)
+    case 0x244: mem.ppu.Vram.WriteCNT(addr, v)
+    case 0x245: mem.ppu.Vram.WriteCNT(addr, v)
+    case 0x246: mem.ppu.Vram.WriteCNT(addr, v)
     case 0x247:
         mem.WRAM.WriteCNT(v)
-    case 0x248: mem.Vram.WriteCNT(addr, v)
-    case 0x249: mem.Vram.WriteCNT(addr, v)
-    case 0x24A: mem.Vram.WriteCNT(addr, v)
-    case 0x24B: mem.Vram.WriteCNT(addr, v)
-    case 0x24C: mem.Vram.WriteCNT(addr, v)
-    case 0x24D: mem.Vram.WriteCNT(addr, v)
-    case 0x24E: mem.Vram.WriteCNT(addr, v)
-    case 0x24F: mem.Vram.WriteCNT(addr, v)
+    case 0x248: mem.ppu.Vram.WriteCNT(addr, v)
+    case 0x249: mem.ppu.Vram.WriteCNT(addr, v)
 
     case 0x300:
         mem.PostFlg.Write(v, true)
@@ -774,7 +780,7 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 		return mem.irq7.ReadIF(3)
 
     case 0x240:
-        return mem.Vram.CNT_7
+        return mem.ppu.Vram.CNT_7
     case 0x241:
         return mem.WRAM.ReadCNT()
 

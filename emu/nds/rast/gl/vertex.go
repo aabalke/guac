@@ -10,10 +10,18 @@ type Vertex struct {
 	// Colors   []Color
 	// Floats   []float64
     W float64
+
+    S, T float64
 }
 
 func (a Vertex) Outside() bool {
 	return a.Output.Outside()
+}
+
+func (vert *Vertex) CalcTextureVector(w, h int) {
+    u := vert.S / float64(w)
+    v := vert.T / float64(h)
+    vert.Texture = Vector{X: u, Y: v, Z: 0}
 }
 
 func InterpolateVertexes(v1, v2, v3 Vertex, b VectorW) Vertex {

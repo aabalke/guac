@@ -14,7 +14,6 @@ const (
 type MtxStacks struct {
     Mode uint32
     Stacks [4]MtxStack
-    ClipMatrix gl.Matrix
 }
 
 func NewMtxStacks() *MtxStacks {

@@ -1,6 +1,7 @@
 package rast
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 
@@ -10,72 +11,158 @@ import (
 const (
     WIDTH = 256
     HEIGHT = 192
-
-	scale  = 1    // optional supersampling
-	//fovy   = 30   // vertical field of view in degrees
-	//near   = 0.5    // near clipping plane
-	//far    = 1000   // far clipping plane
-)
-
-var (
-    //eye = gl.V(0,0,0)
-    //center = gl.V(0,0,0)
-    //up = gl.V(0,0,1)
-    //light = gl.V(-1, 1, 0.5).Normalize()
-
-	//aspect = float64(WIDTH) / float64(HEIGHT)
 )
 
 type Render struct {
+    Rasterizer *Rasterizer
     PixelPalettes []uint32
 	Context *gl.Context
 	ProjectionMatrix  *gl.Matrix
     Buffers *Buffers
+    RearPlane *RearPlane
 }
 
-func NewRender(buffers *Buffers, projectMatrix *gl.Matrix) Render {
+func NewRender(rast *Rasterizer, buffers *Buffers, projectMatrix *gl.Matrix, rp *RearPlane) *Render {
 
-    r := Render{
+    r := &Render{
+        Rasterizer: rast,
         Buffers: buffers,
         ProjectionMatrix: projectMatrix,
+        Context: gl.NewContext(WIDTH, HEIGHT),
+        PixelPalettes: make([]uint32, WIDTH*HEIGHT),
+        RearPlane: rp,
+
     }
 
-	context := gl.NewContext(WIDTH*scale, HEIGHT*scale)
-    //context.ClearColor = gl.HexColor("#FF0000") //White
-    context.ClearColor = gl.Gray(0.5)
-
-	context.ClearColorBuffer()
-
-    r.PixelPalettes = make([]uint32, WIDTH*HEIGHT)
-    r.Context = context
-    //r.Matrix = matrix
+    r.Context.Cull = gl.CullNone
 
     return r
 }
 
 func (r *Render) UpdateRender() {
 
-	r.Context.ClearColorBuffer()
+    //r.Rasterizer.DebugTexture(7)
+    //return
+
+    r.Context.ClearColor = r.RearPlane.ClearColor
+    r.Context.ClearColorBuffer()
     r.Context.ClearDepthBuffer()
 
-    for _, v := range r.Buffers.GetPolygons() {
+    r.Context.Shader = gl.NewNdsShader(*r.ProjectionMatrix)
 
-        //fmt.Printf("MATRIX % f\n", v.Vertices[0].Output.W)
-        tri := gl.NewTriangle(v.Vertices[0], v.Vertices[1], v.Vertices[2])
-
-        shader := gl.NewSolidColorShader(*r.ProjectionMatrix, gl.HexColorLiteral(0xFF0000))
-
-        //shader := gl.NewPhongShader(*r.ProjectionMatrix, light, eye)
-        //shader.Texture = *v.Texture
-        //shader.ObjectColor = gl.HexColor("#468966")
-        r.Context.Shader = shader
-
-        r.Context.DrawTriangle(tri)
+    for _, p := range r.Buffers.GetPolygons() {
+        //r.Context.Shader.SetTexture(*r.Texture)
+        r.Context.Shader.SetTexture(p.GetTexture(r.Rasterizer.VRAM))
+        r.RenderPolygon(&p)
     }
 
 	image := r.Context.Image()
 
     r.ImageToPixels(image)
+}
+
+func (r *Render) RenderPolygon(p *Polygon) {
+
+
+    tW := int(p.Texture.SizeS)
+    tH := int(p.Texture.SizeT)
+
+    switch p.PrimitiveType {
+    case PRIM_SEP_TRI:
+
+        if invalidCnt := len(p.Vertices) % 3 != 0; invalidCnt {
+            fmt.Printf("Separate Tri Polygon has invalid vert count.\n")
+        }
+
+        for i := 0; i < len(p.Vertices); i += 3 {
+
+            //if i + 2 > len(p.Vertices) {
+            //    continue
+            //}
+
+            p.Vertices[i+0].CalcTextureVector(tW, tH)
+            p.Vertices[i+1].CalcTextureVector(tW, tH)
+            p.Vertices[i+2].CalcTextureVector(tW, tH)
+
+            tri := gl.NewTriangle(
+                p.Vertices[i+0],
+                p.Vertices[i+1],
+                p.Vertices[i+2])
+
+            r.Context.DrawTriangle(tri)
+        }
+
+    case PRIM_SEP_QUAD:
+
+        if invalidCnt := len(p.Vertices) % 4 != 0; invalidCnt {
+            fmt.Printf("Separate Quad Polygon has invalid vert count.\n")
+        }
+
+        for i := 0; i < len(p.Vertices); i += 4 {
+
+            //if i + 3 > len(p.Vertices) {
+            //    continue
+            //}
+
+            p.Vertices[i+0].CalcTextureVector(tW, tH)
+            p.Vertices[i+1].CalcTextureVector(tW, tH)
+            p.Vertices[i+2].CalcTextureVector(tW, tH)
+            p.Vertices[i+3].CalcTextureVector(tW, tH)
+
+            quad := gl.NewQuad(
+                p.Vertices[i+0],
+                p.Vertices[i+1],
+                p.Vertices[i+2],
+                p.Vertices[i+3])
+
+            r.Context.DrawQuad(quad)
+        }
+
+    case PRIM_TRI_STRIP:
+
+        //if invalidCnt := len(p.Vertices) % 4 != 0; invalidCnt {
+        //    fmt.Printf("Separate Quad Polygon has invalid vert count.\n")
+        //}
+
+        for i := 0; i < len(p.Vertices); i++ {
+
+            p.Vertices[i+0].CalcTextureVector(tW, tH)
+            p.Vertices[i+1].CalcTextureVector(tW, tH)
+            p.Vertices[i+2].CalcTextureVector(tW, tH)
+
+            tri := gl.NewTriangle(
+                p.Vertices[i+0],
+                p.Vertices[i+1],
+                p.Vertices[i+2])
+
+            r.Context.DrawTriangle(tri)
+        }
+
+    case PRIM_QUAD_STRIP:
+
+        //if invalidCnt := len(p.Vertices) % 4 != 0; invalidCnt {
+        //    fmt.Printf("Separate Quad Polygon has invalid vert count.\n")
+        //}
+
+        for i := 0; i < len(p.Vertices); i += 2 {
+
+            //if i + 3 > len(p.Vertices) {
+            //    continue
+            //}
+            p.Vertices[i+0].CalcTextureVector(tW, tH)
+            p.Vertices[i+1].CalcTextureVector(tW, tH)
+            p.Vertices[i+2].CalcTextureVector(tW, tH)
+            p.Vertices[i+3].CalcTextureVector(tW, tH)
+
+            quad := gl.NewQuad(
+                p.Vertices[i+0],
+                p.Vertices[i+1],
+                p.Vertices[i+2],
+                p.Vertices[i+3])
+
+            r.Context.DrawQuad(quad)
+        }
+    }
 }
 
 func (r *Render) ImageToPixels(img image.Image) {
@@ -97,3 +184,9 @@ func RGB24ToRGB15(r, g, b uint8) uint16 {
     return (b5 << 10) | (g5 << 5) | r5
 }
 
+func RGB15ToRGB24(r, g, b uint8) (uint8, uint8, uint8){
+	r = (r << 3) | (r >> 2)
+	g = (g << 3) | (g >> 2)
+	b = (b << 3) | (b >> 2)
+    return r, g, b
+}

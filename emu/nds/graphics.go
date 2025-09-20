@@ -299,8 +299,8 @@ func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx
         mapAddr += engine.Dispcnt.ScreenBase
     }
 
-    screenData := uint32(nds.mem.Vram.Read(vramOffset + mapAddr, true))
-    screenData |= uint32(nds.mem.Vram.Read(vramOffset + mapAddr + 1, true)) << 8
+    screenData := uint32(nds.ppu.Vram.Read(vramOffset + mapAddr, true))
+    screenData |= uint32(nds.ppu.Vram.Read(vramOffset + mapAddr + 1, true)) << 8
 
 	tileIdx := (screenData & 0b11_1111_1111) << 5
 
@@ -322,8 +322,8 @@ func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx
 		inTileIdx = (inTileX >> 1) + (inTileY << 2)
 	}
 
-    palIdx := uint32(nds.mem.Vram.Read(vramOffset + tileAddr + inTileIdx, true))
-    palIdx |= uint32(nds.mem.Vram.Read(vramOffset + tileAddr + inTileIdx + 1, true)) << 8
+    palIdx := uint32(nds.ppu.Vram.Read(vramOffset + tileAddr + inTileIdx, true))
+    palIdx |= uint32(nds.ppu.Vram.Read(vramOffset + tileAddr + inTileIdx + 1, true)) << 8
     palNum := screenData >> 12
 
     return getBgPaletteData(nds, engine, bgIdx, bg.Palette256, palNum, palIdx, inTileX)
@@ -378,8 +378,8 @@ func (nds *Nds) setAffine16BackgroundPixel(engine *ppu.Engine, bg *ppu.Backgroun
         mapAddr += engine.Dispcnt.ScreenBase
     }
 
-    screenData := uint32(nds.mem.Vram.Read(vramOffset + mapAddr, true))
-    screenData |= uint32(nds.mem.Vram.Read(vramOffset + mapAddr + 1, true)) << 8
+    screenData := uint32(nds.ppu.Vram.Read(vramOffset + mapAddr, true))
+    screenData |= uint32(nds.ppu.Vram.Read(vramOffset + mapAddr + 1, true)) << 8
 
 	tileIdx := (screenData & 0b11_1111_1111) << 5
 
@@ -395,7 +395,7 @@ func (nds *Nds) setAffine16BackgroundPixel(engine *ppu.Engine, bg *ppu.Backgroun
 	inTileIdx := uint32(inTileX) + uint32(inTileY<<3)
 
 	addr := vramOffset + tileAddr + inTileIdx
-    palIdx := uint32(nds.mem.Vram.Read(addr, true))
+    palIdx := uint32(nds.ppu.Vram.Read(addr, true))
     palNum := screenData >> 12
 
     return getBgPaletteData(nds, engine, bgIdx, true, palNum, palIdx, inTileX)
@@ -443,7 +443,7 @@ func (nds *Nds) setAffineBackgroundPixel(engine *ppu.Engine, bg *ppu.Background,
         mapAddr += engine.Dispcnt.ScreenBase
     }
 
-    tileIdx := uint32(nds.mem.Vram.Read(vramOffset + mapAddr, true))
+    tileIdx := uint32(nds.ppu.Vram.Read(vramOffset + mapAddr, true))
 
 	tileAddr := bg.CharBaseBlock + (tileIdx << 6)
 
@@ -452,7 +452,7 @@ func (nds *Nds) setAffineBackgroundPixel(engine *ppu.Engine, bg *ppu.Background,
 	inTileIdx := uint32(inTileX) + uint32(inTileY<<3)
 
 	addr := vramOffset + tileAddr + inTileIdx
-    palIdx := uint32(nds.mem.Vram.Read(addr, true))
+    palIdx := uint32(nds.ppu.Vram.Read(addr, true))
 
     pal := uint32(0)
 
@@ -496,7 +496,7 @@ func (nds *Nds) setBmpBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x 
         addr += 0x20_0000
     }
 
-    palIdx := uint32(nds.mem.Vram.Read(addr, true))
+    palIdx := uint32(nds.ppu.Vram.Read(addr, true))
 
     if engine.IsB {
         palIdx += 0x200
@@ -560,9 +560,9 @@ func (nds *Nds) setDirectBitmap(engine *ppu.Engine, bg *ppu.Background, x uint32
         addr += 0x20_0000
     }
 
-    //palIdx := uint32(nds.mem.Vram.Read(addr, true))
-    data := uint32(nds.mem.Vram.Read(addr, true))
-    data |= uint32(nds.mem.Vram.Read(addr + 1, true)) << 8
+    //palIdx := uint32(nds.ppu.Vram.Read(addr, true))
+    data := uint32(nds.ppu.Vram.Read(addr, true))
+    data |= uint32(nds.ppu.Vram.Read(addr + 1, true)) << 8
 
     // if on transparent???
     if transparent := (data >> 15) & 1 == 0; transparent {
@@ -582,13 +582,13 @@ func (nds *Nds) setRawBitmap(engine *ppu.Engine, x, y uint32) (uint32, bool) {
     var bank *[0x20000]uint8
 
     switch bankIdx {
-    case 0: bank = &nds.mem.Vram.A
-    case 1: bank = &nds.mem.Vram.B
-    case 2: bank = &nds.mem.Vram.C
-    case 3: bank = &nds.mem.Vram.D
+    case 0: bank = &nds.ppu.Vram.A
+    case 1: bank = &nds.ppu.Vram.B
+    case 2: bank = &nds.ppu.Vram.C
+    case 3: bank = &nds.ppu.Vram.D
     }
 
-    bank = &nds.mem.Vram.A
+    bank = &nds.ppu.Vram.A
 
     data := uint32(binary.LittleEndian.Uint16(bank[addr:]) &^ 0x80)
 
@@ -603,7 +603,7 @@ func (nds *Nds) DebugPalette(y, addr uint32, pixels *[]byte) {
 
 		index := (x + (y * SCREEN_WIDTH)) * 4
 
-		data := uint32(nds.mem.Pram[addr >> 1])
+		data := uint32(nds.ppu.Pram[addr >> 1])
 
 		nds.applyColor(data, index, pixels)
 	}
@@ -699,7 +699,7 @@ func (nds *Nds) getExtendedPalette(engine *ppu.Engine, bgIdx uint32, obj bool, p
     //256 colors x 16 palettes --> extended palette memory (=4096 colors)
 
 	addr := ((paletteNum << 5) + palIdx<<1)
-    vram := &nds.mem.Vram
+    vram := &nds.ppu.Vram
 
     // this can probably be replaced in the ppu.
     // ex. vram.ExtABgSlot (unsafe) -> Background[bgIdx].BgSlot (*0x2000uint8)
@@ -757,7 +757,7 @@ func (nds *Nds) getPalette(palIdx uint32, paletteNum uint32, obj, engineB bool) 
 		addr += 0x400
     }
 
-	return uint32(nds.mem.Pram[addr>>1])
+	return uint32(nds.ppu.Pram[addr>>1])
 }
 
 func (nds *Nds) setObjectPixel(engine *ppu.Engine, obj *ppu.Object, x, y uint32) (uint32, bool) {
@@ -797,8 +797,8 @@ func (nds *Nds) setObjectPixel(engine *ppu.Engine, obj *ppu.Object, x, y uint32)
 
 	addr := getObjTileAddr(obj, enTileX, enTileY, inTileX, inTileY)
 
-    tileData := uint32(nds.mem.Vram.Read(vramOffset + addr, true))
-    tileData |= uint32(nds.mem.Vram.Read(vramOffset + addr + 1, true)) << 8
+    tileData := uint32(nds.ppu.Vram.Read(vramOffset + addr, true))
+    tileData |= uint32(nds.ppu.Vram.Read(vramOffset + addr + 1, true)) << 8
 
 	return getPaletteData(nds, engine, obj.Palette256, obj.Palette, tileData, uint32(inTileX))
 
@@ -969,8 +969,8 @@ func (nds *Nds) setObjectAffinePixel(engine *ppu.Engine, obj *ppu.Object, x, y u
         vramOffset = uint32(0x60_0000)
     }
 
-    tileData := uint32(nds.mem.Vram.Read(vramOffset + addr, true))
-    tileData |= uint32(nds.mem.Vram.Read(vramOffset + addr + 1, true)) << 8
+    tileData := uint32(nds.ppu.Vram.Read(vramOffset + addr, true))
+    tileData |= uint32(nds.ppu.Vram.Read(vramOffset + addr + 1, true)) << 8
 
 	return getPaletteData(nds, engine, obj.Palette256, obj.Palette, tileData, uint32(inTileX))
 }
@@ -1086,8 +1086,8 @@ func (nds *Nds) setBmpObjectAffinePixel(engine *ppu.Engine, obj *ppu.Object, x, 
         vramOffset = uint32(0x60_0000)
     }
 
-    data := uint32(nds.mem.Vram.Read(vramOffset + addr, true))
-    data |= uint32(nds.mem.Vram.Read(vramOffset + addr + 1, true)) << 8
+    data := uint32(nds.ppu.Vram.Read(vramOffset + addr, true))
+    data |= uint32(nds.ppu.Vram.Read(vramOffset + addr + 1, true)) << 8
 
     if alpha := (data & 0x8000) == 0; alpha {
         return 0, false

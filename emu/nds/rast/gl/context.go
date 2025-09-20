@@ -389,14 +389,47 @@ func (dc *Context) DrawTriangle(t *Triangle) RasterizeInfo {
 	}
 }
 
-func Divide(v Vertex) Vertex {
+func (dc *Context) DrawQuad(q *Quad) RasterizeInfo {
+	// invoke vertex shader
+	v1 := dc.Shader.Vertex(q.V1)
+	v2 := dc.Shader.Vertex(q.V2)
+	v3 := dc.Shader.Vertex(q.V3)
+	v4 := dc.Shader.Vertex(q.V4)
 
-    v.Position.X /= v.W
-    v.Position.Y /= v.W
-    v.Position.Z /= v.W
+    var result RasterizeInfo
 
-    return v
+    if v1.Outside() || v2.Outside() || v3.Outside() {
+
+        // clip to viewing volume
+        triangles := ClipTriangle(NewTriangle(v1, v2, v3))
+        for _, t := range triangles {
+            info := dc.drawClippedTriangle(t.V1, t.V2, t.V3)
+            result = result.Add(info)
+        }
+
+    } else {
+        // no need to clip
+        result = result.Add(dc.drawClippedTriangle(v1, v2, v3))
+    }
+
+    if v1.Outside() || v3.Outside() || v4.Outside() {
+
+        // clip to viewing volume
+        triangles := ClipTriangle(NewTriangle(v1, v3, v4))
+        var result RasterizeInfo
+        for _, t := range triangles {
+            info := dc.drawClippedTriangle(t.V1, t.V2, t.V3)
+            result = result.Add(info)
+        }
+    } else {
+        // no need to clip
+        result = result.Add(dc.drawClippedTriangle(v1, v3, v4))
+    }
+
+    return result
+
 }
+
 //
 //func (dc *Context) DrawLines(lines []*Line) RasterizeInfo {
 //	wn := runtime.NumCPU()

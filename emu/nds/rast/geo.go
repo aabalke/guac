@@ -2,6 +2,7 @@ package rast
 
 import (
 	"fmt"
+	"image/color"
 
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 	"github.com/aabalke/guac/emu/nds/utils"
@@ -17,6 +18,10 @@ type GeoEngine struct {
 
     PrepPoly Polygon
     ActivePoly Polygon
+
+    Color gl.Color
+
+    Texture Texture
 }
 
 func NewGeoEngine(buffers *Buffers) *GeoEngine {
@@ -89,24 +94,6 @@ func (g *GeoEngine) Cmd(data []uint32) {
             X23: utils.ConvertToFloat(data[15], 12),
             X33: utils.ConvertToFloat(data[16], 12),
         }
-        //m := gl.Matrix{
-        //    X00: utils.ConvertToFloat(data[1], 12),
-        //    X01: utils.ConvertToFloat(data[2], 12),
-        //    X02: utils.ConvertToFloat(data[3], 12),
-        //    X03: utils.ConvertToFloat(data[4], 12),
-        //    X10: utils.ConvertToFloat(data[5], 12),
-        //    X11: utils.ConvertToFloat(data[6], 12),
-        //    X12: utils.ConvertToFloat(data[7], 12),
-        //    X13: utils.ConvertToFloat(data[8], 12),
-        //    X20: utils.ConvertToFloat(data[9], 12),
-        //    X21: utils.ConvertToFloat(data[10], 12),
-        //    X22: utils.ConvertToFloat(data[11], 12),
-        //    X23: utils.ConvertToFloat(data[12], 12),
-        //    X30: utils.ConvertToFloat(data[13], 12),
-        //    X31: utils.ConvertToFloat(data[14], 12),
-        //    X32: utils.ConvertToFloat(data[15], 12),
-        //    X33: utils.ConvertToFloat(data[16], 12),
-        //}
 
         s.CurrMtx = s.CurrMtx.Mul(m)
         if sMode == 2 {
@@ -136,7 +123,6 @@ func (g *GeoEngine) Cmd(data []uint32) {
             s1.CurrMtx = s1.CurrMtx.Mul(m)
         }
 
-
     case 0x1A:
 
         m := gl.Matrix{
@@ -157,7 +143,6 @@ func (g *GeoEngine) Cmd(data []uint32) {
             s1.CurrMtx = s1.CurrMtx.Mul(m)
         }
 
-
     case 0x1C:
 
         v := gl.Vector{
@@ -173,36 +158,51 @@ func (g *GeoEngine) Cmd(data []uint32) {
 
     case 0x20:
 
-        g.ActivePoly.WriteColor(data[1])
+        g.WriteColor(data[1])
+
+    case 0x22:
+
+        g.Texture.WriteCoord(data[1])
 
     case 0x23:
 
         transformationMtx := &g.MtxStacks.Stacks[1].CurrMtx
-        g.ActivePoly.WriteVtx16(data, transformationMtx)
+        g.ActivePoly.WriteVtx16(
+            data,
+            transformationMtx,
+            g.Color,
+            g.Texture.S,
+            g.Texture.T)
 
     case 0x29:
-
 
         g.PrepPoly.WriteAttrs(data[1])
 
     case 0x2A:
 
-        if data[1] != 0 {
-            panic("TEXTURE SET, NEED TO IMPLIMENT")
-        }
+        g.Texture.WriteParam(data[1])
+
+    case 0x2B:
+
+        g.Texture.WritePalBase(data[1])
 
     case 0x40:
 
         if len(g.ActivePoly.Vertices) != 0 {
             fmt.Printf("BAD ACTIVE POLYGON HAS VERTICIES WHEN SETTING NEW BEGIN. WAS END_VTXS NOT CALLED? VERTS LEN %d\n", len(g.ActivePoly.Vertices))
+            g.ActivePoly.Texture = g.Texture
             g.Buffers.Append(g.ActivePoly)
+            g.ActivePoly.Vertices = []gl.Vertex{}
         }
 
         g.ActivePoly = g.PrepPoly
         g.PrepPoly = Polygon{}
 
+        g.ActivePoly.PrimitiveType = uint8(data[1] & 0b11)
+
     case 0x41:
 
+        g.ActivePoly.Texture = g.Texture
         g.Buffers.Append(g.ActivePoly)
         g.ActivePoly.Vertices = []gl.Vertex{}
 
@@ -221,16 +221,22 @@ func (g *GeoEngine) Cmd(data []uint32) {
         g.Viewport.Y1 = uint8(data[1] >> 8)
         g.Viewport.X2 = uint8(data[1] >> 16)
         g.Viewport.Y2 = uint8(data[1] >> 24)
+
+    //case 0x70:
+
+    //    fmt.Printf("CMD 70 - Box Test Unimplimented. Returns true always\n")
+
+    //    //g.GxStat.TestInView = true
+
+
+
+
     default:
-        panic(fmt.Sprintf("UNSETUP GX CMD %02X\n", cmd))
+        //panic(fmt.Sprintf("UNSETUP GX CMD %02X\n", cmd))
+        fmt.Printf("UNSETUP GX CMD %02X\n", cmd)
     }
 
     g.Data = []uint32{}
-
-    g.MtxStacks.ClipMatrix = CalcClipMatrix(
-        g.MtxStacks.Stacks[0].CurrMtx,
-        g.MtxStacks.Stacks[1].CurrMtx,
-    )
 
     //fmt.Printf("STATUS %v\n", g.MtxStacks.ClipMatrix)
 }
@@ -284,6 +290,22 @@ func (g *GeoEngine) ValidParamCount() bool {
     panic(fmt.Sprintf("UNKNOWN CMD GXFIFO % 2X", g.Data))
 }
 
-func CalcClipMatrix(proj ,pos gl.Matrix) gl.Matrix {
-    return pos.Mul(proj)
+func (geo *GeoEngine) WriteColor(v uint32) {
+
+	r := uint8((v) & 0b11111)
+	g := uint8((v >> 5) & 0b11111)
+	b := uint8((v >> 10) & 0b11111)
+
+	r = (r << 3) | (r >> 2)
+	g = (g << 3) | (g >> 2)
+	b = (b << 3) | (b >> 2)
+
+    c := color.RGBA{
+        R: r,
+        G: g,
+        B: b,
+        A: 0xFF,
+    }
+
+    geo.Color = gl.MakeColor(c)
 }
