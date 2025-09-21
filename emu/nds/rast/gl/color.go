@@ -28,6 +28,17 @@ func MakeColor(c color.Color) Color {
 	return Color{float64(r) / d, float64(g) / d, float64(b) / d, float64(a) / d}
 }
 
+func MakeColorFrom15Bit(r, g, b uint8) Color {
+
+	r = (r << 3) | (r >> 2)
+	g = (g << 3) | (g >> 2)
+	b = (b << 3) | (b >> 2)
+
+	const d = 0xff
+	return Color{float64(r) / d, float64(g) / d, float64(b) / d, float64(d) / d}
+
+}
+
 func HexColorLiteral( x uint32) Color {
 
     if x >= 0x1000000 {

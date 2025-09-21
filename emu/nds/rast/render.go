@@ -71,6 +71,7 @@ func (r *Render) RenderPolygon(p *Polygon) {
     case PRIM_SEP_TRI:
 
         if invalidCnt := len(p.Vertices) % 3 != 0; invalidCnt {
+            return
             fmt.Printf("Separate Tri Polygon has invalid vert count.\n")
         }
 

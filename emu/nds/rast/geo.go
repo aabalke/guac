@@ -11,6 +11,9 @@ import (
 type GeoEngine struct {
     Buffers *Buffers
     Data []uint32
+    NextData uint32
+    NextDataIdx uint8
+
     GxStat GXSTAT
 
     MtxStacks *MtxStacks
@@ -22,12 +25,75 @@ type GeoEngine struct {
     Color gl.Color
 
     Texture Texture
+
+    Vertex *gl.Vertex
+
+    Packed bool
+    PackedCmds [4]uint32
+    PackedIdx uint8
+
+
 }
 
 func NewGeoEngine(buffers *Buffers) *GeoEngine {
     return &GeoEngine{
         Buffers: buffers,
         MtxStacks: NewMtxStacks(),
+    }
+}
+
+func (g *GeoEngine) Fifo(v uint32) {
+
+    // this will be buggy, need to handle if packed cmd sets data to 0 ( add cmd???)
+    if cmd := len(g.Data) == 0; cmd {
+
+        if packed := v &^ 0xFF != 0; packed {
+
+            g.Packed = true
+
+            g.PackedCmds[0] = v & 0xFF
+            g.PackedCmds[1] = (v >> 8)  & 0xFF
+            g.PackedCmds[2] = (v >> 16) & 0xFF
+            g.PackedCmds[3] = (v >> 24) & 0xFF
+
+            v &= 0xFF
+            g.Data = append(g.Data, v)
+            g.NextDataIdx = 0
+            return
+        }
+
+        g.Packed = false
+
+        g.Data = append(g.Data, v)
+        g.NextDataIdx = 0
+        return
+    }
+
+    if g.Packed {
+        g.PackedFifo(v)
+        return
+    }
+
+
+    g.NextData &^= 0xFF << (8 * g.NextDataIdx)
+    g.NextData |= (v & 0xFF) << (8 * g.NextDataIdx)
+
+    g.NextDataIdx = (g.NextDataIdx + 1) & 0b11
+
+    if fullParam := g.NextDataIdx == 0; fullParam {
+        g.Data = append(g.Data, g.NextData)
+        g.Cmd(g.Data)
+    }
+}
+
+func (g *GeoEngine) PackedFifo(v uint32) {
+
+    g.Data = append(g.Data, v)
+    g.Cmd(g.Data)
+
+    if len(g.Data) == 0 {
+        g.PackedIdx = (g.PackedIdx + 1) & 0b11
+        g.Data = append(g.Data, g.PackedCmds[g.PackedIdx])
     }
 }
 
@@ -43,6 +109,11 @@ func (g *GeoEngine) Cmd(data []uint32) {
     s1 := &g.MtxStacks.Stacks[1]
     sMode := g.MtxStacks.Mode
 
+    if sMode == 0 {
+        fmt.Printf("CMD %02X\n", data[0])
+    }
+
+
     switch cmd := data[0]; cmd {
     case 0x10:
         g.MtxStacks.Mode = data[1] & 0b11
@@ -54,18 +125,10 @@ func (g *GeoEngine) Cmd(data []uint32) {
         g.MtxStacks.Pop(data[1])
 
     case 0x13:
-        s.Store(s.CurrMtx, data[1])
-
-        if sMode == 2 {
-            s1.Store(s1.CurrMtx, data[1])
-        }
+        g.MtxStacks.Store(data[1])
 
     case 0x14:
-        s.CurrMtx = s.Restore(data[1])
-
-        if sMode == 2 {
-            s1.CurrMtx = s1.Restore(data[1])
-        }
+        g.MtxStacks.Restore(data[1])
 
     case 0x15:
 
@@ -73,6 +136,57 @@ func (g *GeoEngine) Cmd(data []uint32) {
 
         if sMode == 2 {
             s1.CurrMtx = gl.Identity()
+        }
+
+    case 0x16:
+
+        // assume this is right order
+        m := gl.Matrix{
+            X00: utils.ConvertToFloat(data[1], 12),
+            X10: utils.ConvertToFloat(data[2], 12),
+            X20: utils.ConvertToFloat(data[3], 12),
+            X30: utils.ConvertToFloat(data[4], 12),
+            X01: utils.ConvertToFloat(data[5], 12),
+            X11: utils.ConvertToFloat(data[6], 12),
+            X21: utils.ConvertToFloat(data[7], 12),
+            X31: utils.ConvertToFloat(data[8], 12),
+            X02: utils.ConvertToFloat(data[9], 12),
+            X12: utils.ConvertToFloat(data[10], 12),
+            X22: utils.ConvertToFloat(data[11], 12),
+            X32: utils.ConvertToFloat(data[12], 12),
+            X03: utils.ConvertToFloat(data[13], 12),
+            X13: utils.ConvertToFloat(data[14], 12),
+            X23: utils.ConvertToFloat(data[15], 12),
+            X33: utils.ConvertToFloat(data[16], 12),
+        }
+
+        s.CurrMtx = m
+        if sMode == 2 {
+            s1.CurrMtx = m
+        }
+
+    case 0x17:
+
+        // assume this is right order
+        m := gl.Matrix{
+            X00: utils.ConvertToFloat(data[1], 12),
+            X10: utils.ConvertToFloat(data[2], 12),
+            X20: utils.ConvertToFloat(data[3], 12),
+            X01: utils.ConvertToFloat(data[4], 12),
+            X11: utils.ConvertToFloat(data[5], 12),
+            X21: utils.ConvertToFloat(data[6], 12),
+            X02: utils.ConvertToFloat(data[7], 12),
+            X12: utils.ConvertToFloat(data[8], 12),
+            X22: utils.ConvertToFloat(data[9], 12),
+            X03: utils.ConvertToFloat(data[10], 12),
+            X13: utils.ConvertToFloat(data[11], 12),
+            X23: utils.ConvertToFloat(data[12], 12),
+            X33: 1.0,
+        }
+
+        s.CurrMtx = m
+        if sMode == 2 {
+            s1.CurrMtx = m
         }
 
     case 0x18:
@@ -143,6 +257,21 @@ func (g *GeoEngine) Cmd(data []uint32) {
             s1.CurrMtx = s1.CurrMtx.Mul(m)
         }
 
+    case 0x1B:
+
+        v := gl.Vector{
+            X: utils.ConvertToFloat(data[1], 12),
+            Y: utils.ConvertToFloat(data[2], 12),
+            Z: utils.ConvertToFloat(data[3], 12),
+        }
+
+        // no effect on vector matrix - keeps light vector length intact
+        if sMode != 2 {
+            s.CurrMtx = s.CurrMtx.Scale(v)
+        } else {
+            s1.CurrMtx = s1.CurrMtx.Scale(v)
+        }
+
     case 0x1C:
 
         v := gl.Vector{
@@ -167,12 +296,61 @@ func (g *GeoEngine) Cmd(data []uint32) {
     case 0x23:
 
         transformationMtx := &g.MtxStacks.Stacks[1].CurrMtx
-        g.ActivePoly.WriteVtx16(
+        g.Vertex = g.ActivePoly.WriteVtx16(
             data,
             transformationMtx,
             g.Color,
             g.Texture.S,
             g.Texture.T)
+
+    case 0x24:
+
+        transformationMtx := &g.MtxStacks.Stacks[1].CurrMtx
+        g.Vertex = g.ActivePoly.WriteVtx10(
+            data,
+            transformationMtx,
+            g.Color,
+            g.Texture.S,
+            g.Texture.T)
+
+    case 0x25:
+
+        transformationMtx := &g.MtxStacks.Stacks[1].CurrMtx
+        g.Vertex = g.ActivePoly.WriteVtxRelative(
+            data,
+            transformationMtx,
+            g.Color,
+            g.Texture.S,
+            g.Texture.T,
+            g.Vertex,
+            REL_XY,
+        )
+
+    case 0x26:
+
+        transformationMtx := &g.MtxStacks.Stacks[1].CurrMtx
+        g.Vertex = g.ActivePoly.WriteVtxRelative(
+            data,
+            transformationMtx,
+            g.Color,
+            g.Texture.S,
+            g.Texture.T,
+            g.Vertex,
+            REL_XZ,
+        )
+
+    case 0x27:
+
+        transformationMtx := &g.MtxStacks.Stacks[1].CurrMtx
+        g.Vertex = g.ActivePoly.WriteVtxRelative(
+            data,
+            transformationMtx,
+            g.Color,
+            g.Texture.S,
+            g.Texture.T,
+            g.Vertex,
+            REL_YZ,
+        )
 
     case 0x29:
 
@@ -222,13 +400,9 @@ func (g *GeoEngine) Cmd(data []uint32) {
         g.Viewport.X2 = uint8(data[1] >> 16)
         g.Viewport.Y2 = uint8(data[1] >> 24)
 
-    //case 0x70:
+    case 0x70:
 
-    //    fmt.Printf("CMD 70 - Box Test Unimplimented. Returns true always\n")
-
-    //    //g.GxStat.TestInView = true
-
-
+        g.BoxTest(data)
 
 
     default:

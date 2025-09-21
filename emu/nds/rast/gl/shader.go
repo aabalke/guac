@@ -48,6 +48,7 @@ func (shader *NdsShader) Fragment(v Vertex) Color {
         return v.Color
     }
 
+    //return shader.Texture.NearestNeightborSample(v.Texture.X, v.Texture.Y)
     return shader.Texture.BilinearSample(v.Texture.X, v.Texture.Y)
 
     //diffuse := math.Max(v.Normal.Dot(shader.LightDirection), 0)
@@ -62,8 +63,6 @@ func (shader *NdsShader) Fragment(v Vertex) Color {
 	//	}
 	//}
 	//return color.Mul(light).Min(White).Alpha(color.A)
-
-
 
 	//return shader.Color
 }

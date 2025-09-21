@@ -127,14 +127,11 @@ func (cpu *Cpu) ldm(block *Block) {
 
         reg := &cpu.Reg
 
-        // I think this is necessary for irq exits
-
-        if irqExit := curr == MODE_IRQ; irqExit {
-
-            r[PC] = r[LR]
-
-            //r[PC] += 4
-        }
+        // I think this is necessary for irq exits - BoxTest FAILS, otherwise I dont think this matters
+        //if irqExit := curr == MODE_IRQ; irqExit {
+        //    r[PC] = r[LR]
+        //    //r[PC] += 4
+        //}
 
         //cpu.Reg.setMode(cpu.Reg.getMode(), uint32(cpu.Reg.SPSR[BANK_ID[cpu.Reg.getMode()]]) & 0x1F)
 

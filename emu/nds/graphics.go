@@ -465,8 +465,6 @@ func (nds *Nds) setBmpBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x 
 	//	panic(fmt.Sprintf("AFFINE WITHOUT PAL 256"))
 	//}
 
-
-
 	pa := utils.Convert8_8Float(int16(bg.Pa))
 	pc := utils.Convert8_8Float(int16(bg.Pc))
 	xIdx := int(pa*float64(x) + bg.OutX)
@@ -575,7 +573,7 @@ func (nds *Nds) setDirectBitmap(engine *ppu.Engine, bg *ppu.Background, x uint32
 
 func (nds *Nds) setRawBitmap(engine *ppu.Engine, x, y uint32) (uint32, bool) {
 
-    addr := uint32(x+(y * SCREEN_WIDTH) * 2)
+    addr := uint32(x+(y * SCREEN_WIDTH)) * 2
 
     bankIdx := engine.Dispcnt.VramBlock
 
@@ -590,7 +588,8 @@ func (nds *Nds) setRawBitmap(engine *ppu.Engine, x, y uint32) (uint32, bool) {
 
     bank = &nds.ppu.Vram.A
 
-    data := uint32(binary.LittleEndian.Uint16(bank[addr:]) &^ 0x80)
+    //data := uint32(binary.LittleEndian.Uint16(bank[addr:]) &^ 0x80)
+    data := uint32(binary.LittleEndian.Uint16(bank[addr:]))
 
     return data, true
 
@@ -757,7 +756,9 @@ func (nds *Nds) getPalette(palIdx uint32, paletteNum uint32, obj, engineB bool) 
 		addr += 0x400
     }
 
-	return uint32(nds.ppu.Pram[addr>>1])
+    addr >>= 1
+
+	return uint32(nds.ppu.Pram[addr])
 }
 
 func (nds *Nds) setObjectPixel(engine *ppu.Engine, obj *ppu.Object, x, y uint32) (uint32, bool) {

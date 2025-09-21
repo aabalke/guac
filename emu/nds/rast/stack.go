@@ -73,6 +73,50 @@ func (m *MtxStacks) Pop(param uint32) {
     }
 }
 
+func (m *MtxStacks) Store(param uint32) {
+
+    s := &m.Stacks[m.Mode]
+    s1 := &m.Stacks[1]
+
+    idx := param & 0b1_1111
+
+    if m.Mode == 0 {
+        idx = 0
+    }
+
+    if idx == 31 {
+        panic("NEED TO SETUP STACK OVERFLOW GX")
+    }
+
+    s.Mtxs[idx] = s.CurrMtx
+
+    if m.Mode == 2 {
+        s1.Mtxs[idx] = s1.CurrMtx
+    }
+}
+
+func (m *MtxStacks) Restore(param uint32) {
+
+    s := &m.Stacks[m.Mode]
+    s1 := &m.Stacks[1]
+
+    idx := param & 0b1_1111
+
+    if m.Mode == 0 {
+        idx = 0
+    }
+
+    if idx == 31 {
+        panic("NEED TO SETUP STACK OVERFLOW GX")
+    }
+
+    s.CurrMtx = s.Mtxs[idx]
+
+    if m.Mode == 2 {
+        s1.CurrMtx = s1.Mtxs[idx]
+    }
+}
+
 type MtxStack struct {
     CurrMtx gl.Matrix
 	Mtxs []gl.Matrix

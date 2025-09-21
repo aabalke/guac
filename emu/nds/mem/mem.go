@@ -275,6 +275,7 @@ func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
 
     if arm9 {
         if geo := addr >= 0x4000440 && addr < 0x4000600; geo {
+
             mem.ppu.Rasterizer.GeoCmd(addr, v)
             return
         }

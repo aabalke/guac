@@ -4,7 +4,7 @@ import "fmt"
 
 func (r *Rasterizer) Read(addr uint32) uint8 {
 
-    if addr & 0b11 == 0 { fmt.Printf("R ADDR %08X\n", addr) }
+    //if addr & 0b11 == 0 { fmt.Printf("R ADDR %08X\n", addr) }
 	switch addr {
 	case 0x60:
 		return r.Disp3dCnt.Read(0)
@@ -22,7 +22,57 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
 		return r.GeoEngine.GxStat.Read(2)
 	case 0x603:
 		return r.GeoEngine.GxStat.Read(3)
+    case 0x604:
+
+        if r.GeoEngine.Buffers.BisRendering {
+            return uint8(min(2048, len(r.GeoEngine.Buffers.A)))
+        } 
+
+        return uint8(min(2048, len(r.GeoEngine.Buffers.B)))
+
+    case 0x605:
+
+        if r.GeoEngine.Buffers.BisRendering {
+            return uint8(min(2048, len(r.GeoEngine.Buffers.A)) >> 8)
+        } 
+
+        return uint8(min(2048, len(r.GeoEngine.Buffers.B)) >> 8)
+
+    case 0x606:
+
+        polys := &r.GeoEngine.Buffers.B
+
+        if r.GeoEngine.Buffers.BisRendering {
+            polys = &r.GeoEngine.Buffers.A
+        } 
+
+        vertCnt := 0
+
+        for _, v := range *polys {
+            vertCnt += len(v.Vertices)
+        }
+
+        return uint8(min(6144, vertCnt))
+
+    case 0x607:
+
+        polys := &r.GeoEngine.Buffers.B
+
+        if r.GeoEngine.Buffers.BisRendering {
+            polys = &r.GeoEngine.Buffers.A
+        } 
+
+        vertCnt := 0
+
+        for _, v := range *polys {
+            vertCnt += len(v.Vertices)
+        }
+
+        return uint8(min(6144, vertCnt) >> 8)
+
 	}
+
+    fmt.Printf("READ UNSETUP 3D IO %08X\n", addr)
 
     return 0
 
@@ -31,7 +81,11 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
 
 func (r *Rasterizer) Write(addr uint32, v uint8) {
 
-    if addr & 0b11 == 0 { fmt.Printf("W ADDR %08X V %02X\n" ,addr ,v) }
+    if addr >= 0x330 && addr < 0x400 {
+        return
+    }
+
+    //if addr & 0b11 == 0 { fmt.Printf("W ADDR %08X V %02X\n" ,addr ,v) }
 
     switch {
     case addr >= 0x350 && addr < 0x358:
@@ -56,13 +110,15 @@ func (r *Rasterizer) Write(addr uint32, v uint8) {
 		r.GeoEngine.GxStat.Write(v, 2)
 	case 0x603:
 		r.GeoEngine.GxStat.Write(v, 3)
+
     default:
+        fmt.Printf("WRITE UNSETUP 3D IO %08X\n", addr)
         //panic(fmt.Sprintf("WRITES UNSETUP 3D IO %08X %02X\n", addr, v))
 	}
 }
 
 func (r *Rasterizer) GeoCmdFifo(v uint32) {
-    fmt.Printf("GeoCmdFifo %08X\n", v)
+    r.GeoEngine.Fifo(v)
 }
 
 func (r *Rasterizer) GeoCmd(addr, v uint32) {

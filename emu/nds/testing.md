@@ -122,6 +122,15 @@ Graphics
             Lesson 10b
             Lesson 11
         👍 Mixed Text 3D
+        Palette Cube
+            
+            ❌ A3I5 Translucent Texture (alpha not setup)
+            👍 4-Color Palette Texture     
+            👍 16-Color Palette Texture    
+            👍 256-Color Palette Texture   
+            ❌ 4x4-Texel Compressed Texture
+            ❌ A5I3 Translucent Texture (alpha not setup)
+            👍 Direct Texture              
 
 
 

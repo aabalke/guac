@@ -1,9 +1,19 @@
 package rast
 
 import (
-	"fmt"
 
 	"github.com/aabalke/guac/emu/nds/utils"
+)
+
+const (
+    TEX_FMT_NONE = 0
+    TEX_FMT_A3I5 = 1
+    TEX_FMT_4_PAL = 2
+    TEX_FMT_16_PAL = 3
+    TEX_FMT_256_PAL = 4
+    TEX_FMT_4X4 = 5
+    TEX_FMT_A5I3 = 6
+    TEX_FMT_DIRECT = 7
 )
 
 type Texture struct {
@@ -49,7 +59,7 @@ func (tex *Texture) WriteParam(v uint32) {
     tex.TransparentZero = utils.BitEnabled(v, 29)
     tex.PaletteBaseAddr = utils.GetVarData(v, 30, 31)
 
-    if tex.Format != 0 && tex.Format != 7 {panic(fmt.Sprintf("Unsetup texture format %d", tex.Format))}
+    //if tex.Format != 0 && tex.Format != 7 && tex.Format != 2 {panic(fmt.Sprintf("Unsetup texture format %d", tex.Format))}
 
 }
 

@@ -451,11 +451,29 @@ func (vm *VRAM) Read(addr uint32, arm9 bool) uint8 {
 
 func (vm *VRAM) ReadTexture(addr uint32) uint8 {
 
+    var slot [4]*[0x2_0000]uint8
+
+    if vm.CNT_D.Enabled && vm.CNT_D.Mst == 3 {
+        slot[vm.CNT_D.Ofs] = &vm.D
+    }
+
+    if vm.CNT_C.Enabled && vm.CNT_C.Mst == 3 {
+        slot[vm.CNT_C.Ofs] = &vm.C
+    }
+
+    if vm.CNT_B.Enabled && vm.CNT_B.Mst == 3 {
+        slot[vm.CNT_B.Ofs] = &vm.B
+    }
+
+    if vm.CNT_A.Enabled && vm.CNT_A.Mst == 3 {
+        slot[vm.CNT_A.Ofs] = &vm.A
+    }
+
     switch {
-    case addr < 0x2_0000: return vm.A[addr]
-    case addr < 0x4_0000: return vm.B[addr]
-    case addr < 0x6_0000: return vm.C[addr]
-    case addr < 0x8_0000: return vm.D[addr]
+    case addr < 0x2_0000: return slot[0][addr]
+    case addr < 0x4_0000: return slot[1][addr - 0x2_0000]
+    case addr < 0x6_0000: return slot[2][addr - 0x4_0000]
+    case addr < 0x8_0000: return slot[3][addr - 0x6_0000]
     }
 
     panic(fmt.Sprintf("BAD TEXTURE READ ADDR %08X", addr))
@@ -463,26 +481,33 @@ func (vm *VRAM) ReadTexture(addr uint32) uint8 {
 
 func (vm *VRAM) ReadPalTexture(addr uint32) uint8 {
 
-    panic("READ PaL TEXTURE UNIMPLIMENTED")
+    var slot [6]unsafe.Pointer
 
-    if vm.CNT_E.Enabled && vm.CNT_E.Mst == 3 && addr < 0x1_0000 {
-        return vm.E[addr]
+    if vm.CNT_G.Enabled && vm.CNT_G.Mst == 3 {
+        idx := (vm.CNT_G.Ofs & 1) + (vm.CNT_G.Ofs >> 1) * 4
+        slot[idx] = unsafe.Pointer(&vm.G)
     }
 
     if vm.CNT_F.Enabled && vm.CNT_F.Mst == 3 {
-
-        panic("F TEXTURE PALETTE USED, NOT SET UP")
-
-        //base := vm.CNT_F.Ofs
-
-        //if addr >= base && addr < base + 0x4000 {
-        //    return vm.F[addr - base]
-        //}
+        idx := (vm.CNT_F.Ofs & 1) + (vm.CNT_F.Ofs >> 1) * 4
+        slot[idx] = unsafe.Pointer(&vm.F)
     }
 
-    if vm.CNT_G.Enabled && vm.CNT_G.Mst == 3 {
-        panic("G TEXTURE PALETTE USED, NOT SET UP")
+    if vm.CNT_E.Enabled && vm.CNT_E.Mst == 3 {
+        slot[0] = unsafe.Pointer(&vm.E)
+        slot[1] = unsafe.Add(unsafe.Pointer(&vm.E), 0x4000)
+        slot[2] = unsafe.Add(unsafe.Pointer(&vm.E), 0x8000)
+        slot[3] = unsafe.Add(unsafe.Pointer(&vm.E), 0xC000)
     }
 
-    panic(fmt.Sprintf("BAD TEXTURE PAL READ ADDR %08X", addr))
+    switch {
+    case addr < 0x04000: return (*[0x4000]uint8)(slot[0])[addr]
+    case addr < 0x08000: return (*[0x4000]uint8)(slot[1])[addr - 0x04000]
+    case addr < 0x0C000: return (*[0x4000]uint8)(slot[2])[addr - 0x08000]
+    case addr < 0x14000: return (*[0x4000]uint8)(slot[3])[addr - 0x0C000]
+    case addr < 0x18000: return (*[0x4000]uint8)(slot[4])[addr - 0x14000]
+    case addr < 0x1C000: return (*[0x4000]uint8)(slot[5])[addr - 0x18000]
+    }
+
+    panic(fmt.Sprintf("Invalid Palette Texture Read %08X\n", addr))
 }
