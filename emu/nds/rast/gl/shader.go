@@ -38,7 +38,7 @@ func NewNdsShader(matrix Matrix) *NdsShader {
 }
 
 func (shader *NdsShader) Vertex(v Vertex) Vertex {
-	v.Output = shader.Matrix.MulPositionW(v.Position)
+	//v.Output = shader.Matrix.MulPositionW(v.Position)
 	return v
 }
 

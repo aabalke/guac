@@ -2,7 +2,7 @@ package gl
 
 import (
 	"fmt"
-	"math"
+	//"math"
 )
 
 type Matrix struct {
@@ -21,11 +21,14 @@ func Identity() Matrix {
 }
 
 func Translate(v Vector) Matrix {
-	return Matrix{
-		1, 0, 0, v.X,
-		0, 1, 0, v.Y,
-		0, 0, 1, v.Z,
-		0, 0, 0, 1}
+    // col based
+	//return Matrix{
+	//	1, 0, 0, v.X,
+	//	0, 1, 0, v.Y,
+	//	0, 0, 1, v.Z,
+	//	0, 0, 0, 1}
+
+    // row based
 	return Matrix{
 		1, 0, 0, 0,
 		0, 1, 0, 0,
@@ -41,89 +44,89 @@ func Scale(v Vector) Matrix {
 		0, 0, 0, 1}
 }
 
-func Rotate(v Vector, a float64) Matrix {
-	v = v.Normalize()
-	s := math.Sin(a)
-	c := math.Cos(a)
-	m := 1 - c
-	return Matrix{
-		m*v.X*v.X + c, m*v.X*v.Y + v.Z*s, m*v.Z*v.X - v.Y*s, 0,
-		m*v.X*v.Y - v.Z*s, m*v.Y*v.Y + c, m*v.Y*v.Z + v.X*s, 0,
-		m*v.Z*v.X + v.Y*s, m*v.Y*v.Z - v.X*s, m*v.Z*v.Z + c, 0,
-		0, 0, 0, 1}
-}
-
-func RotateTo(a, b Vector) Matrix {
-	dot := b.Dot(a)
-	if dot == 1 {
-		return Identity()
-	} else if dot == -1 {
-		return Rotate(a.Perpendicular(), math.Pi)
-	} else {
-		angle := math.Acos(dot)
-		v := b.Cross(a).Normalize()
-		return Rotate(v, angle)
-	}
-}
-
-func Orient(position, size, up Vector, rotation float64) Matrix {
-	m := Rotate(Vector{0, 0, 1}, rotation)
-	m = m.Scale(size)
-	m = m.RotateTo(Vector{0, 0, 1}, up)
-	m = m.Translate(position)
-	return m
-}
-
-func Frustum(l, r, b, t, n, f float64) Matrix {
-	t1 := 2 * n
-	t2 := r - l
-	t3 := t - b
-	t4 := f - n
-	return Matrix{
-		t1 / t2, 0, (r + l) / t2, 0,
-		0, t1 / t3, (t + b) / t3, 0,
-		0, 0, (-f - n) / t4, (-t1 * f) / t4,
-		0, 0, -1, 0}
-}
-
-func Orthographic(l, r, b, t, n, f float64) Matrix {
-	return Matrix{
-		2 / (r - l), 0, 0, -(r + l) / (r - l),
-		0, 2 / (t - b), 0, -(t + b) / (t - b),
-		0, 0, -2 / (f - n), -(f + n) / (f - n),
-		0, 0, 0, 1}
-}
-
-func Perspective(fovy, aspect, near, far float64) Matrix {
-	ymax := near * math.Tan(fovy*math.Pi/360)
-	xmax := ymax * aspect
-	return Frustum(-xmax, xmax, -ymax, ymax, near, far)
-}
-
-func LookAt(eye, center, up Vector) Matrix {
-	z := eye.Sub(center).Normalize()
-	x := up.Cross(z).Normalize()
-	y := z.Cross(x)
-	return Matrix{
-		x.X, x.Y, x.Z, -x.Dot(eye),
-		y.X, y.Y, y.Z, -y.Dot(eye),
-		z.X, z.Y, z.Z, -z.Dot(eye),
-		0, 0, 0, 1,
-	}
-}
-
-func LookAtDirection(forward, up Vector) Matrix {
-	z := forward.Normalize()
-	x := up.Cross(z).Normalize()
-	y := z.Cross(x)
-	return Matrix{
-		x.X, x.Y, x.Z, 0,
-		y.X, y.Y, y.Z, 0,
-		z.X, z.Y, z.Z, 0,
-		0, 0, 0, 1,
-	}
-}
-
+//func Rotate(v Vector, a float64) Matrix {
+//	v = v.Normalize()
+//	s := math.Sin(a)
+//	c := math.Cos(a)
+//	m := 1 - c
+//	return Matrix{
+//		m*v.X*v.X + c, m*v.X*v.Y + v.Z*s, m*v.Z*v.X - v.Y*s, 0,
+//		m*v.X*v.Y - v.Z*s, m*v.Y*v.Y + c, m*v.Y*v.Z + v.X*s, 0,
+//		m*v.Z*v.X + v.Y*s, m*v.Y*v.Z - v.X*s, m*v.Z*v.Z + c, 0,
+//		0, 0, 0, 1}
+//}
+//
+//func RotateTo(a, b Vector) Matrix {
+//	dot := b.Dot(a)
+//	if dot == 1 {
+//		return Identity()
+//	} else if dot == -1 {
+//		return Rotate(a.Perpendicular(), math.Pi)
+//	} else {
+//		angle := math.Acos(dot)
+//		v := b.Cross(a).Normalize()
+//		return Rotate(v, angle)
+//	}
+//}
+//
+//func Orient(position, size, up Vector, rotation float64) Matrix {
+//	m := Rotate(Vector{0, 0, 1}, rotation)
+//	m = m.Scale(size)
+//	m = m.RotateTo(Vector{0, 0, 1}, up)
+//	m = m.Translate(position)
+//	return m
+//}
+//
+//func Frustum(l, r, b, t, n, f float64) Matrix {
+//	t1 := 2 * n
+//	t2 := r - l
+//	t3 := t - b
+//	t4 := f - n
+//	return Matrix{
+//		t1 / t2, 0, (r + l) / t2, 0,
+//		0, t1 / t3, (t + b) / t3, 0,
+//		0, 0, (-f - n) / t4, (-t1 * f) / t4,
+//		0, 0, -1, 0}
+//}
+//
+//func Orthographic(l, r, b, t, n, f float64) Matrix {
+//	return Matrix{
+//		2 / (r - l), 0, 0, -(r + l) / (r - l),
+//		0, 2 / (t - b), 0, -(t + b) / (t - b),
+//		0, 0, -2 / (f - n), -(f + n) / (f - n),
+//		0, 0, 0, 1}
+//}
+//
+//func Perspective(fovy, aspect, near, far float64) Matrix {
+//	ymax := near * math.Tan(fovy*math.Pi/360)
+//	xmax := ymax * aspect
+//	return Frustum(-xmax, xmax, -ymax, ymax, near, far)
+//}
+//
+//func LookAt(eye, center, up Vector) Matrix {
+//	z := eye.Sub(center).Normalize()
+//	x := up.Cross(z).Normalize()
+//	y := z.Cross(x)
+//	return Matrix{
+//		x.X, x.Y, x.Z, -x.Dot(eye),
+//		y.X, y.Y, y.Z, -y.Dot(eye),
+//		z.X, z.Y, z.Z, -z.Dot(eye),
+//		0, 0, 0, 1,
+//	}
+//}
+//
+//func LookAtDirection(forward, up Vector) Matrix {
+//	z := forward.Normalize()
+//	x := up.Cross(z).Normalize()
+//	y := z.Cross(x)
+//	return Matrix{
+//		x.X, x.Y, x.Z, 0,
+//		y.X, y.Y, y.Z, 0,
+//		z.X, z.Y, z.Z, 0,
+//		0, 0, 0, 1,
+//	}
+//}
+//
 func Screen(w, h int) Matrix {
 	w2 := float64(w) / 2
 	h2 := float64(h) / 2
@@ -134,19 +137,19 @@ func Screen(w, h int) Matrix {
 		0, 0, 0, 1,
 	}
 }
-
-func Viewport(x, y, w, h float64) Matrix {
-	l := x
-	b := y
-	r := x + w
-	t := y + h
-	return Matrix{
-		(r - l) / 2, 0, 0, (r + l) / 2,
-		0, (t - b) / 2, 0, (t + b) / 2,
-		0, 0, 0.5, 0.5,
-		0, 0, 0, 1,
-	}
-}
+//
+//func Viewport(x, y, w, h float64) Matrix {
+//	l := x
+//	b := y
+//	r := x + w
+//	t := y + h
+//	return Matrix{
+//		(r - l) / 2, 0, 0, (r + l) / 2,
+//		0, (t - b) / 2, 0, (t + b) / 2,
+//		0, 0, 0.5, 0.5,
+//		0, 0, 0, 1,
+//	}
+//}
 
 func (m Matrix) Translate(v Vector) Matrix {
 	return Translate(v).Mul(m)
@@ -156,42 +159,42 @@ func (m Matrix) Scale(v Vector) Matrix {
 	return Scale(v).Mul(m)
 }
 
-func (m Matrix) Rotate(v Vector, a float64) Matrix {
-	return Rotate(v, a).Mul(m)
-}
+//func (m Matrix) Rotate(v Vector, a float64) Matrix {
+//	return Rotate(v, a).Mul(m)
+//}
+//
+//func (m Matrix) RotateTo(a, b Vector) Matrix {
+//	return RotateTo(a, b).Mul(m)
+//}
+//
+//func (m Matrix) Frustum(l, r, b, t, n, f float64) Matrix {
+//	return Frustum(l, r, b, t, n, f).Mul(m)
+//}
+//
+//func (m Matrix) Orthographic(l, r, b, t, n, f float64) Matrix {
+//	return Orthographic(l, r, b, t, n, f).Mul(m)
+//}
+//
+//func (m Matrix) Perspective(fovy, aspect, near, far float64) Matrix {
+//	return Perspective(fovy, aspect, near, far).Mul(m)
+//}
+//
+//func (m Matrix) LookAt(eye, center, up Vector) Matrix {
+//	return LookAt(eye, center, up).Mul(m)
+//}
+//
+//func (m Matrix) Viewport(x, y, w, h float64) Matrix {
+//	return Viewport(x, y, w, h).Mul(m)
+//}
 
-func (m Matrix) RotateTo(a, b Vector) Matrix {
-	return RotateTo(a, b).Mul(m)
-}
-
-func (m Matrix) Frustum(l, r, b, t, n, f float64) Matrix {
-	return Frustum(l, r, b, t, n, f).Mul(m)
-}
-
-func (m Matrix) Orthographic(l, r, b, t, n, f float64) Matrix {
-	return Orthographic(l, r, b, t, n, f).Mul(m)
-}
-
-func (m Matrix) Perspective(fovy, aspect, near, far float64) Matrix {
-	return Perspective(fovy, aspect, near, far).Mul(m)
-}
-
-func (m Matrix) LookAt(eye, center, up Vector) Matrix {
-	return LookAt(eye, center, up).Mul(m)
-}
-
-func (m Matrix) Viewport(x, y, w, h float64) Matrix {
-	return Viewport(x, y, w, h).Mul(m)
-}
-
-func (a Matrix) MulScalar(b float64) Matrix {
-	return Matrix{
-		a.X00 * b, a.X01 * b, a.X02 * b, a.X03 * b,
-		a.X10 * b, a.X11 * b, a.X12 * b, a.X13 * b,
-		a.X20 * b, a.X21 * b, a.X22 * b, a.X23 * b,
-		a.X30 * b, a.X31 * b, a.X32 * b, a.X33 * b,
-	}
-}
+//func (a Matrix) MulScalar(b float64) Matrix {
+//	return Matrix{
+//		a.X00 * b, a.X01 * b, a.X02 * b, a.X03 * b,
+//		a.X10 * b, a.X11 * b, a.X12 * b, a.X13 * b,
+//		a.X20 * b, a.X21 * b, a.X22 * b, a.X23 * b,
+//		a.X30 * b, a.X31 * b, a.X32 * b, a.X33 * b,
+//	}
+//}
 
 func (a Matrix) Mul(b Matrix) Matrix {
 	m := Matrix{}
@@ -231,10 +234,18 @@ func (a Matrix) MulPositionW(b Vector) VectorW {
 }
 
 func (a Matrix) MulVectorW(b VectorW) VectorW {
-	x := a.X00*b.X + a.X01*b.Y + a.X02*b.Z + a.X03*b.W
-	y := a.X10*b.X + a.X11*b.Y + a.X12*b.Z + a.X13*b.W
-	z := a.X20*b.X + a.X21*b.Y + a.X22*b.Z + a.X23*b.W
-	w := a.X30*b.X + a.X31*b.Y + a.X32*b.Z + a.X33*b.W
+
+    // row based
+    x := b.X*a.X00 + b.Y*a.X10 + b.Z*a.X20 + b.W*a.X30
+    y := b.X*a.X01 + b.Y*a.X11 + b.Z*a.X21 + b.W*a.X31
+    z := b.X*a.X02 + b.Y*a.X12 + b.Z*a.X22 + b.W*a.X32
+    w := b.X*a.X03 + b.Y*a.X13 + b.Z*a.X23 + b.W*a.X33
+
+    // col based
+	//x := a.X00*b.X + a.X01*b.Y + a.X02*b.Z + a.X03*b.W
+	//y := a.X10*b.X + a.X11*b.Y + a.X12*b.Z + a.X13*b.W
+	//z := a.X20*b.X + a.X21*b.Y + a.X22*b.Z + a.X23*b.W
+	//w := a.X30*b.X + a.X31*b.Y + a.X32*b.Z + a.X33*b.W
 
     //w = 4
 

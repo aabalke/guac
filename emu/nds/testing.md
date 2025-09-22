@@ -131,6 +131,7 @@ Graphics
             ❌ 4x4-Texel Compressed Texture
             ❌ A5I3 Translucent Texture (alpha not setup)
             👍 Direct Texture              
+        👍 BoxTest
 
 
 

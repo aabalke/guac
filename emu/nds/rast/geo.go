@@ -33,6 +33,8 @@ type GeoEngine struct {
     PackedIdx uint8
 
 
+    ClipMatrix gl.Matrix
+
 }
 
 func NewGeoEngine(buffers *Buffers) *GeoEngine {
@@ -74,7 +76,6 @@ func (g *GeoEngine) Fifo(v uint32) {
         return
     }
 
-
     g.NextData &^= 0xFF << (8 * g.NextDataIdx)
     g.NextData |= (v & 0xFF) << (8 * g.NextDataIdx)
 
@@ -109,11 +110,6 @@ func (g *GeoEngine) Cmd(data []uint32) {
     s1 := &g.MtxStacks.Stacks[1]
     sMode := g.MtxStacks.Mode
 
-    if sMode == 0 {
-        fmt.Printf("CMD %02X\n", data[0])
-    }
-
-
     switch cmd := data[0]; cmd {
     case 0x10:
         g.MtxStacks.Mode = data[1] & 0b11
@@ -138,25 +134,26 @@ func (g *GeoEngine) Cmd(data []uint32) {
             s1.CurrMtx = gl.Identity()
         }
 
+        g.UpdateClipMtx()
+
     case 0x16:
 
-        // assume this is right order
         m := gl.Matrix{
             X00: utils.ConvertToFloat(data[1], 12),
-            X10: utils.ConvertToFloat(data[2], 12),
-            X20: utils.ConvertToFloat(data[3], 12),
-            X30: utils.ConvertToFloat(data[4], 12),
-            X01: utils.ConvertToFloat(data[5], 12),
+            X01: utils.ConvertToFloat(data[2], 12),
+            X02: utils.ConvertToFloat(data[3], 12),
+            X03: utils.ConvertToFloat(data[4], 12),
+            X10: utils.ConvertToFloat(data[5], 12),
             X11: utils.ConvertToFloat(data[6], 12),
-            X21: utils.ConvertToFloat(data[7], 12),
-            X31: utils.ConvertToFloat(data[8], 12),
-            X02: utils.ConvertToFloat(data[9], 12),
-            X12: utils.ConvertToFloat(data[10], 12),
+            X12: utils.ConvertToFloat(data[7], 12),
+            X13: utils.ConvertToFloat(data[8], 12),
+            X20: utils.ConvertToFloat(data[9], 12),
+            X21: utils.ConvertToFloat(data[10], 12),
             X22: utils.ConvertToFloat(data[11], 12),
-            X32: utils.ConvertToFloat(data[12], 12),
-            X03: utils.ConvertToFloat(data[13], 12),
-            X13: utils.ConvertToFloat(data[14], 12),
-            X23: utils.ConvertToFloat(data[15], 12),
+            X23: utils.ConvertToFloat(data[12], 12),
+            X30: utils.ConvertToFloat(data[13], 12),
+            X31: utils.ConvertToFloat(data[14], 12),
+            X32: utils.ConvertToFloat(data[15], 12),
             X33: utils.ConvertToFloat(data[16], 12),
         }
 
@@ -165,22 +162,23 @@ func (g *GeoEngine) Cmd(data []uint32) {
             s1.CurrMtx = m
         }
 
+        g.UpdateClipMtx()
+
     case 0x17:
 
-        // assume this is right order
         m := gl.Matrix{
             X00: utils.ConvertToFloat(data[1], 12),
-            X10: utils.ConvertToFloat(data[2], 12),
-            X20: utils.ConvertToFloat(data[3], 12),
-            X01: utils.ConvertToFloat(data[4], 12),
+            X01: utils.ConvertToFloat(data[2], 12),
+            X02: utils.ConvertToFloat(data[3], 12),
+            X10: utils.ConvertToFloat(data[4], 12),
             X11: utils.ConvertToFloat(data[5], 12),
-            X21: utils.ConvertToFloat(data[6], 12),
-            X02: utils.ConvertToFloat(data[7], 12),
-            X12: utils.ConvertToFloat(data[8], 12),
+            X12: utils.ConvertToFloat(data[6], 12),
+            X20: utils.ConvertToFloat(data[7], 12),
+            X21: utils.ConvertToFloat(data[8], 12),
             X22: utils.ConvertToFloat(data[9], 12),
-            X03: utils.ConvertToFloat(data[10], 12),
-            X13: utils.ConvertToFloat(data[11], 12),
-            X23: utils.ConvertToFloat(data[12], 12),
+            X30: utils.ConvertToFloat(data[10], 12),
+            X31: utils.ConvertToFloat(data[11], 12),
+            X32: utils.ConvertToFloat(data[12], 12),
             X33: 1.0,
         }
 
@@ -189,73 +187,82 @@ func (g *GeoEngine) Cmd(data []uint32) {
             s1.CurrMtx = m
         }
 
+        g.UpdateClipMtx()
+
     case 0x18:
+
         m := gl.Matrix{
             X00: utils.ConvertToFloat(data[1], 12),
-            X10: utils.ConvertToFloat(data[2], 12),
-            X20: utils.ConvertToFloat(data[3], 12),
-            X30: utils.ConvertToFloat(data[4], 12),
-            X01: utils.ConvertToFloat(data[5], 12),
+            X01: utils.ConvertToFloat(data[2], 12),
+            X02: utils.ConvertToFloat(data[3], 12),
+            X03: utils.ConvertToFloat(data[4], 12),
+            X10: utils.ConvertToFloat(data[5], 12),
             X11: utils.ConvertToFloat(data[6], 12),
-            X21: utils.ConvertToFloat(data[7], 12),
-            X31: utils.ConvertToFloat(data[8], 12),
-            X02: utils.ConvertToFloat(data[9], 12),
-            X12: utils.ConvertToFloat(data[10], 12),
+            X12: utils.ConvertToFloat(data[7], 12),
+            X13: utils.ConvertToFloat(data[8], 12),
+            X20: utils.ConvertToFloat(data[9], 12),
+            X21: utils.ConvertToFloat(data[10], 12),
             X22: utils.ConvertToFloat(data[11], 12),
-            X32: utils.ConvertToFloat(data[12], 12),
-            X03: utils.ConvertToFloat(data[13], 12),
-            X13: utils.ConvertToFloat(data[14], 12),
-            X23: utils.ConvertToFloat(data[15], 12),
+            X23: utils.ConvertToFloat(data[12], 12),
+            X30: utils.ConvertToFloat(data[13], 12),
+            X31: utils.ConvertToFloat(data[14], 12),
+            X32: utils.ConvertToFloat(data[15], 12),
             X33: utils.ConvertToFloat(data[16], 12),
         }
 
-        s.CurrMtx = s.CurrMtx.Mul(m)
+        s.CurrMtx = m.Mul(s.CurrMtx)
         if sMode == 2 {
-            s1.CurrMtx = s1.CurrMtx.Mul(m)
+            s1.CurrMtx = m.Mul(s1.CurrMtx)
         }
+
+        g.UpdateClipMtx()
 
     case 0x19:
 
         m := gl.Matrix{
             X00: utils.ConvertToFloat(data[1], 12),
-            X10: utils.ConvertToFloat(data[2], 12),
-            X20: utils.ConvertToFloat(data[3], 12),
-            X01: utils.ConvertToFloat(data[4], 12),
+            X01: utils.ConvertToFloat(data[2], 12),
+            X02: utils.ConvertToFloat(data[3], 12),
+            X10: utils.ConvertToFloat(data[4], 12),
             X11: utils.ConvertToFloat(data[5], 12),
-            X21: utils.ConvertToFloat(data[6], 12),
-            X02: utils.ConvertToFloat(data[7], 12),
-            X12: utils.ConvertToFloat(data[8], 12),
+            X12: utils.ConvertToFloat(data[6], 12),
+            X20: utils.ConvertToFloat(data[7], 12),
+            X21: utils.ConvertToFloat(data[8], 12),
             X22: utils.ConvertToFloat(data[9], 12),
-            X03: utils.ConvertToFloat(data[10], 12),
-            X13: utils.ConvertToFloat(data[11], 12),
-            X23: utils.ConvertToFloat(data[12], 12),
+            X30: utils.ConvertToFloat(data[10], 12),
+            X31: utils.ConvertToFloat(data[11], 12),
+            X32: utils.ConvertToFloat(data[12], 12),
             X33: 1.0,
         }
 
-        s.CurrMtx = s.CurrMtx.Mul(m)
+        s.CurrMtx = m.Mul(s.CurrMtx)
         if sMode == 2 {
-            s1.CurrMtx = s1.CurrMtx.Mul(m)
+            s1.CurrMtx = m.Mul(s1.CurrMtx)
         }
+
+        g.UpdateClipMtx()
 
     case 0x1A:
 
         m := gl.Matrix{
             X00: utils.ConvertToFloat(data[1], 12),
-            X10: utils.ConvertToFloat(data[2], 12),
-            X20: utils.ConvertToFloat(data[3], 12),
-            X01: utils.ConvertToFloat(data[4], 12),
+            X01: utils.ConvertToFloat(data[2], 12),
+            X02: utils.ConvertToFloat(data[3], 12),
+            X10: utils.ConvertToFloat(data[4], 12),
             X11: utils.ConvertToFloat(data[5], 12),
-            X21: utils.ConvertToFloat(data[6], 12),
-            X02: utils.ConvertToFloat(data[7], 12),
-            X12: utils.ConvertToFloat(data[8], 12),
+            X12: utils.ConvertToFloat(data[6], 12),
+            X20: utils.ConvertToFloat(data[7], 12),
+            X21: utils.ConvertToFloat(data[8], 12),
             X22: utils.ConvertToFloat(data[9], 12),
             X33: 1.0,
         }
 
-        s.CurrMtx = s.CurrMtx.Mul(m)
+        s.CurrMtx = m.Mul(s.CurrMtx)
         if sMode == 2 {
-            s1.CurrMtx = s1.CurrMtx.Mul(m)
+            s1.CurrMtx = m.Mul(s1.CurrMtx)
         }
+
+        g.UpdateClipMtx()
 
     case 0x1B:
 
@@ -272,6 +279,8 @@ func (g *GeoEngine) Cmd(data []uint32) {
             s1.CurrMtx = s1.CurrMtx.Scale(v)
         }
 
+        g.UpdateClipMtx()
+
     case 0x1C:
 
         v := gl.Vector{
@@ -285,6 +294,8 @@ func (g *GeoEngine) Cmd(data []uint32) {
             s1.CurrMtx = s1.CurrMtx.Translate(v)
         }
 
+        g.UpdateClipMtx()
+
     case 0x20:
 
         g.WriteColor(data[1])
@@ -295,30 +306,27 @@ func (g *GeoEngine) Cmd(data []uint32) {
 
     case 0x23:
 
-        transformationMtx := &g.MtxStacks.Stacks[1].CurrMtx
         g.Vertex = g.ActivePoly.WriteVtx16(
             data,
-            transformationMtx,
+            &g.ClipMatrix,
             g.Color,
             g.Texture.S,
             g.Texture.T)
 
     case 0x24:
 
-        transformationMtx := &g.MtxStacks.Stacks[1].CurrMtx
         g.Vertex = g.ActivePoly.WriteVtx10(
             data,
-            transformationMtx,
+            &g.ClipMatrix,
             g.Color,
             g.Texture.S,
             g.Texture.T)
 
     case 0x25:
 
-        transformationMtx := &g.MtxStacks.Stacks[1].CurrMtx
         g.Vertex = g.ActivePoly.WriteVtxRelative(
             data,
-            transformationMtx,
+            &g.ClipMatrix,
             g.Color,
             g.Texture.S,
             g.Texture.T,
@@ -328,10 +336,9 @@ func (g *GeoEngine) Cmd(data []uint32) {
 
     case 0x26:
 
-        transformationMtx := &g.MtxStacks.Stacks[1].CurrMtx
         g.Vertex = g.ActivePoly.WriteVtxRelative(
             data,
-            transformationMtx,
+            &g.ClipMatrix,
             g.Color,
             g.Texture.S,
             g.Texture.T,
@@ -341,10 +348,9 @@ func (g *GeoEngine) Cmd(data []uint32) {
 
     case 0x27:
 
-        transformationMtx := &g.MtxStacks.Stacks[1].CurrMtx
         g.Vertex = g.ActivePoly.WriteVtxRelative(
             data,
-            transformationMtx,
+            &g.ClipMatrix,
             g.Color,
             g.Texture.S,
             g.Texture.T,
@@ -402,7 +408,7 @@ func (g *GeoEngine) Cmd(data []uint32) {
 
     case 0x70:
 
-        g.BoxTest(data)
+        g.BoxTest(data, &g.ClipMatrix)
 
 
     default:
@@ -413,6 +419,12 @@ func (g *GeoEngine) Cmd(data []uint32) {
     g.Data = []uint32{}
 
     //fmt.Printf("STATUS %v\n", g.MtxStacks.ClipMatrix)
+}
+
+func (g *GeoEngine) UpdateClipMtx() {
+    pos := g.MtxStacks.Stacks[1].CurrMtx
+    per := g.MtxStacks.Stacks[0].CurrMtx
+    g.ClipMatrix = pos.Mul(per)
 }
 
 func (g *GeoEngine) ValidParamCount() bool {

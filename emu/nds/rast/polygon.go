@@ -51,57 +51,42 @@ func (p *Polygon) WriteAttrs(v uint32) {
     p.Id = utils.GetVarData(v, 24, 29)
 }
 
-func (p *Polygon) WriteVtx16(data []uint32, transfromMatrix *gl.Matrix, color gl.Color, S, T float64) *gl.Vertex {
+func (p *Polygon) GetVertex(x, y, z float64, clipMtx *gl.Matrix, color gl.Color, S, T float64) gl.Vertex {
+
+    vert := gl.VectorW{X: x,Y: y,Z: z,W: 1.0}
+    output := clipMtx.MulVectorW(vert)
+
+    v := gl.Vertex{
+        Position: gl.Vector{ X: x, Y: y, Z: z },
+        Color: color,
+        W: 1.0,
+        S: S,
+        T: T,
+        Output: output,
+    }
+
+    return v
+}
+
+func (p *Polygon) WriteVtx16(data []uint32, clipMtx *gl.Matrix, color gl.Color, S, T float64) *gl.Vertex {
 
     x := utils.Convert16ToFloat(uint16(data[1]), 12)
     y := utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
     z := utils.Convert16ToFloat(uint16(data[2]), 12)
-    w := float64(1.0)
 
-    // clip mask is posMtx * perMtx
-    // we just apply posMtx here since perMtx is applied in shader
-
-    //fmt.Printf("S %.2f T %.2f\n", S, T)
-
-    vw := transfromMatrix.MulVectorW(gl.VectorW{X: x, Y: y, Z: z, W: w})
-
-    v := gl.Vertex{
-        Position: gl.Vector{ X: vw.X, Y: vw.Y, Z: vw.Z },
-        Color: color,
-        W: vw.W,
-        S: S,
-        T: T,
-    }
-
+    v := p.GetVertex(x, y, z, clipMtx, color, S, T)
     p.Vertices = append(p.Vertices, v)
-
     return &v
 }
 
-func (p *Polygon) WriteVtx10(data []uint32, transfromMatrix *gl.Matrix, color gl.Color, S, T float64) *gl.Vertex {
+func (p *Polygon) WriteVtx10(data []uint32, clipMtx *gl.Matrix, color gl.Color, S, T float64) *gl.Vertex {
 
     x := utils.Convert10ToFloat(uint16(data[1] & 0b11_1111_1111), 4)
     y := utils.Convert10ToFloat(uint16(data[1] >> 10) & 0b11_1111_1111, 4)
     z := utils.Convert10ToFloat(uint16(data[1] >> 20) & 0b11_1111_1111, 4)
-    w := float64(1.0)
 
-    // clip mask is posMtx * perMtx
-    // we just apply posMtx here since perMtx is applied in shader
-
-    //fmt.Printf("S %.2f T %.2f\n", S, T)
-
-    vw := transfromMatrix.MulVectorW(gl.VectorW{X: x, Y: y, Z: z, W: w})
-
-    v := gl.Vertex{
-        Position: gl.Vector{ X: vw.X, Y: vw.Y, Z: vw.Z },
-        Color: color,
-        W: vw.W,
-        S: S,
-        T: T,
-    }
-
+    v := p.GetVertex(x, y, z, clipMtx, color, S, T)
     p.Vertices = append(p.Vertices, v)
-
     return &v
 }
 
@@ -111,7 +96,7 @@ const (
     REL_YZ = 2
 )
 
-func (p *Polygon) WriteVtxRelative(data []uint32, transfromMatrix *gl.Matrix, color gl.Color, S, T float64, prev *gl.Vertex, set uint8) *gl.Vertex {
+func (p *Polygon) WriteVtxRelative(data []uint32, clipMtx *gl.Matrix, color gl.Color, S, T float64, prev *gl.Vertex, set uint8) *gl.Vertex {
 
     var x, y, z float64
     switch set {
@@ -129,25 +114,8 @@ func (p *Polygon) WriteVtxRelative(data []uint32, transfromMatrix *gl.Matrix, co
         z = utils.Convert16ToFloat(uint16(data[1] >> 10), 12)
     }
 
-    w := float64(1.0)
-
-    // clip mask is posMtx * perMtx
-    // we just apply posMtx here since perMtx is applied in shader
-
-    //fmt.Printf("S %.2f T %.2f\n", S, T)
-
-    vw := transfromMatrix.MulVectorW(gl.VectorW{X: x, Y: y, Z: z, W: w})
-
-    v := gl.Vertex{
-        Position: gl.Vector{ X: vw.X, Y: vw.Y, Z: vw.Z },
-        Color: color,
-        W: vw.W,
-        S: S,
-        T: T,
-    }
-
+    v := p.GetVertex(x, y, z, clipMtx, color, S, T)
     p.Vertices = append(p.Vertices, v)
-
     return &v
 }
 
