@@ -1,6 +1,7 @@
 package rast
 
 import (
+
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 )
 
@@ -34,10 +35,12 @@ func NewMtxStacks() *MtxStacks {
 
 func (m *MtxStacks) Push() {
 
+
     s := &m.Stacks[m.Mode]
     s1 := &m.Stacks[1]
 
     idx := int(*s.Pointer) % len(s.Mtxs)
+
     s.Mtxs[idx] = s.CurrMtx
     if m.Mode == 2 {
         s1.Mtxs[idx] = s1.CurrMtx
@@ -53,7 +56,6 @@ func (m *MtxStacks) Pop(param uint32) {
     s := &m.Stacks[m.Mode]
     s1 := &m.Stacks[1]
 
-
     offset := int(param & 0b1_1111)
 
     if neg := param & 0b10_0000 != 0; neg {
@@ -65,6 +67,7 @@ func (m *MtxStacks) Pop(param uint32) {
     }
 
     idx := int(*s.Pointer) % len(s.Mtxs)
+    //fmt.Printf("POP Mode %d %02d\n", m.Mode, idx)
 
     s.CurrMtx = s.Mtxs[idx]
 

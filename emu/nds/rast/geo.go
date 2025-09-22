@@ -32,9 +32,7 @@ type GeoEngine struct {
     PackedCmds [4]uint32
     PackedIdx uint8
 
-
     ClipMatrix gl.Matrix
-
 }
 
 func NewGeoEngine(buffers *Buffers) *GeoEngine {
@@ -46,12 +44,18 @@ func NewGeoEngine(buffers *Buffers) *GeoEngine {
 
 func (g *GeoEngine) Fifo(v uint32) {
 
+    //fmt.Printf("FIFO %08X\n", v)
+
     // this will be buggy, need to handle if packed cmd sets data to 0 ( add cmd???)
     if cmd := len(g.Data) == 0; cmd {
 
         if packed := v &^ 0xFF != 0; packed {
 
+            g.PackedCmds = [4]uint32{}
+            g.PackedIdx = 0
             g.Packed = true
+
+            //fmt.Printf("Starting New Packed Command %08X\n", v)
 
             g.PackedCmds[0] = v & 0xFF
             g.PackedCmds[1] = (v >> 8)  & 0xFF
@@ -61,13 +65,14 @@ func (g *GeoEngine) Fifo(v uint32) {
             v &= 0xFF
             g.Data = append(g.Data, v)
             g.NextDataIdx = 0
+            g.NextData = 0
             return
         }
 
         g.Packed = false
-
         g.Data = append(g.Data, v)
         g.NextDataIdx = 0
+        g.NextData = 0
         return
     }
 
@@ -76,6 +81,8 @@ func (g *GeoEngine) Fifo(v uint32) {
         return
     }
 
+    // untested
+
     g.NextData &^= 0xFF << (8 * g.NextDataIdx)
     g.NextData |= (v & 0xFF) << (8 * g.NextDataIdx)
 
@@ -83,28 +90,53 @@ func (g *GeoEngine) Fifo(v uint32) {
 
     if fullParam := g.NextDataIdx == 0; fullParam {
         g.Data = append(g.Data, g.NextData)
-        g.Cmd(g.Data)
+        g.Cmd(true, g.Data)
     }
 }
 
 func (g *GeoEngine) PackedFifo(v uint32) {
 
     g.Data = append(g.Data, v)
-    g.Cmd(g.Data)
+    g.Cmd(true, g.Data)
 
-    if len(g.Data) == 0 {
-        g.PackedIdx = (g.PackedIdx + 1) & 0b11
-        g.Data = append(g.Data, g.PackedCmds[g.PackedIdx])
+    if incomplete := len(g.Data) != 0; incomplete {
+        //fmt.Printf("Send Param %08X\n", v)
+        return
     }
+
+    g.PackedIdx = (g.PackedIdx + 1) & 0b11
+
+    if finishedPacked := g.PackedIdx == 0; finishedPacked {
+
+        g.Data = []uint32{}
+        //fmt.Printf("Finished 4 Packed Commands\n")
+
+        //g.Packed = false
+        return
+    }
+
+    //fmt.Printf("Moving to Next Packed Command. Last Param %08X\n", v)
+
+    g.Data = append(g.Data, g.PackedCmds[g.PackedIdx])
+
+    // try next packed command in case needs no params
+    g.Cmd(true, g.Data)
 }
 
 // packed cmds not implimented yet
 
-func (g *GeoEngine) Cmd(data []uint32) {
+var cnt uint32
 
-    if !g.ValidParamCount() {
+func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
+
+    //fmt.Printf("DATA % X\n", data)
+
+    if !g.ValidParamCount(fifo) {
         return
     }
+
+    //fmt.Printf("Valid Command %02d % 8X\n", cnt, data)
+    //cnt++
 
     s := &g.MtxStacks.Stacks[g.MtxStacks.Mode]
     s1 := &g.MtxStacks.Stacks[1]
@@ -272,6 +304,7 @@ func (g *GeoEngine) Cmd(data []uint32) {
             Z: utils.ConvertToFloat(data[3], 12),
         }
 
+
         // no effect on vector matrix - keeps light vector length intact
         if sMode != 2 {
             s.CurrMtx = s.CurrMtx.Scale(v)
@@ -407,9 +440,7 @@ func (g *GeoEngine) Cmd(data []uint32) {
         g.Viewport.Y2 = uint8(data[1] >> 24)
 
     case 0x70:
-
         g.BoxTest(data, &g.ClipMatrix)
-
 
     default:
         //panic(fmt.Sprintf("UNSETUP GX CMD %02X\n", cmd))
@@ -424,22 +455,27 @@ func (g *GeoEngine) Cmd(data []uint32) {
 func (g *GeoEngine) UpdateClipMtx() {
     pos := g.MtxStacks.Stacks[1].CurrMtx
     per := g.MtxStacks.Stacks[0].CurrMtx
+
     g.ClipMatrix = pos.Mul(per)
+
 }
 
-func (g *GeoEngine) ValidParamCount() bool {
+func (g *GeoEngine) ValidParamCount(fifo bool) bool {
 
     cmd := g.Data[0]
     params := len(g.Data) - 1
 
+    // when using fifo, sometimes no param provided, but when using io
+    // dummy param is provided.
+
     switch cmd {
-    case 0x00: return params == 1 
+    case 0x00: return params == 1 || (fifo && params == 0) 
     case 0x10: return params == 1 
-    case 0x11: return params == 1 
+    case 0x11: return params == 1 || (fifo && params == 0)
     case 0x12: return params == 1 
     case 0x13: return params == 1 
     case 0x14: return params == 1 
-    case 0x15: return params == 1 
+    case 0x15: return params == 1 || (fifo && params == 0)
     case 0x16: return params == 16
     case 0x17: return params == 12
     case 0x18: return params == 16
@@ -465,7 +501,7 @@ func (g *GeoEngine) ValidParamCount() bool {
     case 0x33: return params == 1 
     case 0x34: return params == 32
     case 0x40: return params == 1 
-    case 0x41: return params == 1 
+    case 0x41: return params == 1 || (fifo && params == 0)
     case 0x50: return params == 1 
     case 0x60: return params == 1 
     case 0x70: return params == 3 

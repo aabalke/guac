@@ -24,7 +24,6 @@ func Convert16ToFloat(v uint16, bitFractional uint8) float64 {
 }
 
 func Convert10ToFloat(v uint16, bitFractional uint8) float64 {
-    // not sure if this is accurate
 	v &= 0x3FF
 	s := int16(v<<6) >> 6
 	return float64(s) / float64(int(1)<<bitFractional)

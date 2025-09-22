@@ -8,16 +8,14 @@ type Shader interface {
 
 // SolidColorShader renders with a single, solid color.
 type SolidColorShader struct {
-	Matrix Matrix
 	Color  Color
 }
 
 func NewSolidColorShader(matrix Matrix, color Color) *SolidColorShader {
-	return &SolidColorShader{matrix, color}
+	return &SolidColorShader{color}
 }
 
 func (shader *SolidColorShader) Vertex(v Vertex) Vertex {
-	v.Output = shader.Matrix.MulPositionW(v.Position)
 	return v
 }
 
@@ -29,12 +27,11 @@ func (shader *SolidColorShader) SetTexture(texture Texture) {
 }
 
 type NdsShader struct {
-	Matrix Matrix
     Texture Texture
 }
 
-func NewNdsShader(matrix Matrix) *NdsShader {
-	return &NdsShader{Matrix: matrix}
+func NewNdsShader() *NdsShader {
+	return &NdsShader{}
 }
 
 func (shader *NdsShader) Vertex(v Vertex) Vertex {
@@ -43,6 +40,8 @@ func (shader *NdsShader) Vertex(v Vertex) Vertex {
 }
 
 func (shader *NdsShader) Fragment(v Vertex) Color {
+
+    //return White
 
     if shader.Texture == nil {
         return v.Color

@@ -173,5 +173,5 @@ func (r *Rasterizer) GeoCmd(addr, v uint32) {
 
     (*d) = append(*d, v)
 
-    r.GeoEngine.Cmd(*d)
+    r.GeoEngine.Cmd(false, *d)
 }

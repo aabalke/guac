@@ -17,17 +17,15 @@ type Render struct {
     Rasterizer *Rasterizer
     PixelPalettes []uint32
 	Context *gl.Context
-	ProjectionMatrix  *gl.Matrix
     Buffers *Buffers
     RearPlane *RearPlane
 }
 
-func NewRender(rast *Rasterizer, buffers *Buffers, projectMatrix *gl.Matrix, rp *RearPlane) *Render {
+func NewRender(rast *Rasterizer, buffers *Buffers, rp *RearPlane) *Render {
 
     r := &Render{
         Rasterizer: rast,
         Buffers: buffers,
-        ProjectionMatrix: projectMatrix,
         Context: gl.NewContext(WIDTH, HEIGHT),
         PixelPalettes: make([]uint32, WIDTH*HEIGHT),
         RearPlane: rp,
@@ -48,7 +46,7 @@ func (r *Render) UpdateRender() {
     r.Context.ClearColorBuffer()
     r.Context.ClearDepthBuffer()
 
-    r.Context.Shader = gl.NewNdsShader(*r.ProjectionMatrix)
+    r.Context.Shader = gl.NewNdsShader()
 
     for _, p := range r.Buffers.GetPolygons() {
         //r.Context.Shader.SetTexture(*r.Texture)

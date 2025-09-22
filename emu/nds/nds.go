@@ -233,18 +233,32 @@ func (nds *Nds) Update() {
 
         // arm9 thumb ~1 cycles, arm ~2 cycles
         // arm7 thumb ~2 cycles, arm ~4 cycles
+        //logger.Update(4_600_000, 4_674_605, CURR_INST, true)
+
+        //if CURR_INST >= 4_674_600 {
+        //    nds.Debugger.PrintLine(true)
+        //}
+
+        //if r[15] == 0x020017A2 {
+        //    nds.Debugger.PrintLine(true)
+        //}
+
+        //if r[15] == 0x20017B2 {
+        //    nds.Debugger.PrintLine(true)
+        //}
 
 		if !nds.arm9.Halted {
             thumbExec :=  nds.arm9.Reg.IsThumb
             armExec := !nds.arm9.Reg.IsThumb && nds.AccCycles & 0b1 == 0
 
             if thumbExec || armExec  {
-                //logger.Update(4_000_000, 8_000_000, CURR_INST, true)
                 _, ok := nds.arm9.Execute()
                 if !ok {
                     fmt.Printf("ARM9 Decode Error: PC %08X CURR %d\n", r[15], CURR_INST)
                     os.Exit(0)
                 }
+
+                nds.CheckGeoDmas()
             }
 		}
 
@@ -415,7 +429,6 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 }
 
 func (nds *Nds) CheckDmas(mode uint32, arm9 bool) {
-
     if arm9 {
         for i := range 4 {
             if ok := nds.arm9.Dma[i].CheckMode(mode); ok {
@@ -426,10 +439,23 @@ func (nds *Nds) CheckDmas(mode uint32, arm9 bool) {
     }
 
     for i := range 4 {
-
         if ok := nds.arm7.Dma[i].CheckMode(mode); ok {
             nds.arm7.Dma[i].Transfer()
         }
+    }
+}
+
+func (nds *Nds) CheckGeoDmas() {
+    for i := range 4 {
+        if ok := nds.arm9.Dma[i].CheckMode(dma.ARM9_DMA_MODE_GEO); !ok {
+            continue
+        }
+
+        if overHalf := !(nds.ppu.Rasterizer.GeoEngine.GxStat.FifoEntries <= 128); overHalf {
+            continue
+        }
+
+        nds.arm9.Dma[i].Transfer()
     }
 }
 

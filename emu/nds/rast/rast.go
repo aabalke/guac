@@ -38,11 +38,7 @@ func NewRasterizer(vram VRAM) *Rasterizer {
 
     r.GeoEngine = NewGeoEngine(&r.Buffers)
 
-    //projectionMatrix := &r.GeoEngine.MtxStacks.Stacks[0].Mtxs[0]
-    projectionMatrix := &r.GeoEngine.MtxStacks.Stacks[0].CurrMtx
-    //projectionMatrix := &r.GeoEngine.ClipMatrix
-
-    r.Render = NewRender(r, &r.Buffers, projectionMatrix, &r.RearPlane)
+    r.Render = NewRender(r, &r.Buffers, &r.RearPlane)
 
     return r
 }

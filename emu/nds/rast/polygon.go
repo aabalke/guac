@@ -81,11 +81,13 @@ func (p *Polygon) WriteVtx16(data []uint32, clipMtx *gl.Matrix, color gl.Color, 
 
 func (p *Polygon) WriteVtx10(data []uint32, clipMtx *gl.Matrix, color gl.Color, S, T float64) *gl.Vertex {
 
-    x := utils.Convert10ToFloat(uint16(data[1] & 0b11_1111_1111), 4)
-    y := utils.Convert10ToFloat(uint16(data[1] >> 10) & 0b11_1111_1111, 4)
-    z := utils.Convert10ToFloat(uint16(data[1] >> 20) & 0b11_1111_1111, 4)
+    x := utils.Convert10ToFloat(uint16(data[1]), 6)
+    y := utils.Convert10ToFloat(uint16(data[1] >> 10), 6)
+    z := utils.Convert10ToFloat(uint16(data[1] >> 20), 6)
 
     v := p.GetVertex(x, y, z, clipMtx, color, S, T)
+
+
     p.Vertices = append(p.Vertices, v)
     return &v
 }
@@ -228,5 +230,4 @@ func (p *Polygon) GetTexture(vram VRAM) gl.Texture {
     }
 
     panic("UNKNOWN TEXTURE TYPE")
-
 }
