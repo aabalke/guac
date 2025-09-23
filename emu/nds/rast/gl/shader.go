@@ -41,7 +41,7 @@ func (shader *NdsShader) Vertex(v Vertex) Vertex {
 
 func (shader *NdsShader) Fragment(v Vertex) Color {
 
-    //return White
+    return White
 
     if shader.Texture == nil {
         return v.Color

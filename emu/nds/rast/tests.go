@@ -33,3 +33,19 @@ func (g *GeoEngine) BoxTest(data []uint32, clipMtx *gl.Matrix) {
         vw6.Outside() && 
         vw7.Outside())
 }
+
+func (g *GeoEngine) PosTest(data []uint32, clipMtx *gl.Matrix) [4]uint32 {
+
+	x := utils.Convert16ToFloat(uint16(data[1]), 12)
+	y := utils.Convert16ToFloat(uint16(data[1]>>16), 12)
+	z := utils.Convert16ToFloat(uint16(data[2]), 12)
+
+    vw := clipMtx.MulVectorW(gl.VectorW{X: x, Y: y, Z: z, W: 1.0})
+
+    return [4]uint32{
+        utils.ConvertS19_12FloatToUint32(vw.X),
+        utils.ConvertS19_12FloatToUint32(vw.Y),
+        utils.ConvertS19_12FloatToUint32(vw.Z),
+        utils.ConvertS19_12FloatToUint32(vw.W),
+    }
+}

@@ -11,8 +11,6 @@ import (
 type GeoEngine struct {
     Buffers *Buffers
     Data []uint32
-    NextData uint32
-    NextDataIdx uint8
 
     GxStat GXSTAT
 
@@ -33,6 +31,7 @@ type GeoEngine struct {
     PackedIdx uint8
 
     ClipMatrix gl.Matrix
+    PosTestData [4]uint32
 }
 
 func NewGeoEngine(buffers *Buffers) *GeoEngine {
@@ -64,15 +63,16 @@ func (g *GeoEngine) Fifo(v uint32) {
 
             v &= 0xFF
             g.Data = append(g.Data, v)
-            g.NextDataIdx = 0
-            g.NextData = 0
+            // check if packed cmd has no params
+            g.Cmd(true, g.Data)
             return
         }
 
         g.Packed = false
         g.Data = append(g.Data, v)
-        g.NextDataIdx = 0
-        g.NextData = 0
+
+        // check if packed cmd has no params
+        g.Cmd(true, g.Data)
         return
     }
 
@@ -81,17 +81,8 @@ func (g *GeoEngine) Fifo(v uint32) {
         return
     }
 
-    // untested
-
-    g.NextData &^= 0xFF << (8 * g.NextDataIdx)
-    g.NextData |= (v & 0xFF) << (8 * g.NextDataIdx)
-
-    g.NextDataIdx = (g.NextDataIdx + 1) & 0b11
-
-    if fullParam := g.NextDataIdx == 0; fullParam {
-        g.Data = append(g.Data, g.NextData)
-        g.Cmd(true, g.Data)
-    }
+    g.Data = append(g.Data, v)
+    g.Cmd(true, g.Data)
 }
 
 func (g *GeoEngine) PackedFifo(v uint32) {
@@ -135,8 +126,13 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         return
     }
 
-    //fmt.Printf("Valid Command %02d % 8X\n", cnt, data)
-    //cnt++
+    //fmt.Printf("C %t % 9X\n", fifo, data)
+    cnt++
+
+    if cmd := data[0]; cmd == 0x21 || (cmd >= 0x30 && cmd < 0x35) {
+        g.Data = []uint32{}
+        return
+    }
 
     s := &g.MtxStacks.Stacks[g.MtxStacks.Mode]
     s1 := &g.MtxStacks.Stacks[1]
@@ -333,6 +329,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
         g.WriteColor(data[1])
 
+
     case 0x22:
 
         g.Texture.WriteCoord(data[1])
@@ -442,9 +439,17 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
     case 0x70:
         g.BoxTest(data, &g.ClipMatrix)
 
+    case 0x71:
+
+        g.PosTestData = g.PosTest(data, &g.ClipMatrix)
+
+    case 0x0:
+        //fmt.Printf("UNSETUP GX CMD %02X\n", cmd)
+
     default:
-        //panic(fmt.Sprintf("UNSETUP GX CMD %02X\n", cmd))
+        panic(fmt.Sprintf("UNSETUP GX CMD %02X\n", cmd))
         fmt.Printf("UNSETUP GX CMD %02X\n", cmd)
+
     }
 
     g.Data = []uint32{}

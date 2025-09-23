@@ -70,6 +70,23 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
 
         return uint8(min(6144, vertCnt) >> 8)
 
+    case 0x620: return uint8(r.GeoEngine.PosTestData[0] >> 0)
+    case 0x621: return uint8(r.GeoEngine.PosTestData[0] >> 8)
+    case 0x622: return uint8(r.GeoEngine.PosTestData[0] >> 16)
+    case 0x623: return uint8(r.GeoEngine.PosTestData[0] >> 24)
+    case 0x624: return uint8(r.GeoEngine.PosTestData[1] >> 0)
+    case 0x625: return uint8(r.GeoEngine.PosTestData[1] >> 8)
+    case 0x626: return uint8(r.GeoEngine.PosTestData[1] >> 16)
+    case 0x627: return uint8(r.GeoEngine.PosTestData[1] >> 24)
+    case 0x628: return uint8(r.GeoEngine.PosTestData[2] >> 0)
+    case 0x629: return uint8(r.GeoEngine.PosTestData[2] >> 8)
+    case 0x62A: return uint8(r.GeoEngine.PosTestData[2] >> 16)
+    case 0x62B: return uint8(r.GeoEngine.PosTestData[2] >> 24)
+    case 0x62C: return uint8(r.GeoEngine.PosTestData[3] >> 0)
+    case 0x62D: return uint8(r.GeoEngine.PosTestData[3] >> 8)
+    case 0x62E: return uint8(r.GeoEngine.PosTestData[3] >> 16)
+    case 0x62F: return uint8(r.GeoEngine.PosTestData[3] >> 24)
+
 	}
 
     fmt.Printf("READ UNSETUP 3D IO %08X\n", addr)

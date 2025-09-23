@@ -28,3 +28,17 @@ func Convert10ToFloat(v uint16, bitFractional uint8) float64 {
 	s := int16(v<<6) >> 6
 	return float64(s) / float64(int(1)<<bitFractional)
 }
+
+func ConvertS19_12FloatToUint32(v float64) uint32 {
+    // scale by 2^12
+    scaled := int64(v * 4096.0)
+
+    // valid range: -2^31 .. 2^31-1 (since it's stored in 32 bits signed)
+    if scaled > 0x7FFFFFFF {
+        scaled = 0x7FFFFFFF
+    } else if scaled < -0x80000000 {
+        scaled = -0x80000000
+    }
+
+    return uint32(int32(scaled))
+}
