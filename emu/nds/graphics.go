@@ -728,31 +728,41 @@ func (nds *Nds) getExtendedPalette(engine *ppu.Engine, bgIdx uint32, obj bool, p
     switch {
     case !obj && !engine.IsB:
 
+        slotIdx := bgIdx
+
+        if altSlot := engine.Backgrounds[bgIdx].AltExtPalSlot; altSlot {
+            switch bgIdx {
+            case 0: slotIdx = 2
+            case 1: slotIdx = 3
+            }
+        }
+
         var slot *[0x2000]uint8
-        switch bgIdx {
+        switch slotIdx {
         case 0: slot = (*[0x2000]uint8)(vram.ExtABgSlot0)
         case 1: slot = (*[0x2000]uint8)(vram.ExtABgSlot1)
         case 2: slot = (*[0x2000]uint8)(vram.ExtABgSlot2)
         case 3: slot = (*[0x2000]uint8)(vram.ExtABgSlot3)
         }
 
-        if slot == nil {
-            return 0
-        }
-
         return uint32(binary.LittleEndian.Uint16(slot[addr:]))
     case !obj && engine.IsB:
 
+        slotIdx := bgIdx
+
+        if altSlot := engine.Backgrounds[bgIdx].AltExtPalSlot; altSlot {
+            switch bgIdx {
+            case 0: slotIdx = 2
+            case 1: slotIdx = 3
+            }
+        }
+
         var slot *[0x2000]uint8
-        switch bgIdx {
+        switch slotIdx {
         case 0: slot = (*[0x2000]uint8)(vram.ExtBBgSlot0)
         case 1: slot = (*[0x2000]uint8)(vram.ExtBBgSlot1)
         case 2: slot = (*[0x2000]uint8)(vram.ExtBBgSlot2)
         case 3: slot = (*[0x2000]uint8)(vram.ExtBBgSlot3)
-        }
-
-        if slot == nil {
-            return 0
         }
 
         return uint32(binary.LittleEndian.Uint16(slot[addr:]))
@@ -899,6 +909,10 @@ func getBmpTileAddr(obj *ppu.Object, xIdx, yIdx int) uint32 {
 }
 
 func getBgPaletteData(nds *Nds, engine *ppu.Engine, bgIdx uint32, pal256 bool, palNum, tileData, inTileX uint32) (uint32, bool) {
+    //if !engine.IsB && x == y && x == 0 {
+    //    fmt.Printf("PAL IDX %0X PAL NUM %08X\n", palIdx, palNum)
+    //}
+
 
 	var palIdx uint32
 	if pal256 {
@@ -912,6 +926,7 @@ func getBgPaletteData(nds *Nds, engine *ppu.Engine, bgIdx uint32, pal256 bool, p
 	}
 
     if engine.Dispcnt.BgExtPal && pal256 {
+
         palNum <<= 4
         palData := nds.getExtendedPalette(engine, bgIdx, false, palIdx, palNum)
         return palData, true

@@ -85,7 +85,6 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
 	case 0x243:
         vm.CNT_D.Write(v)
 
-
         //vm.isDArm7 = v & 0b10000011 == 0b10000010
         //vm.CNT_7 &^= 0b10
         //if vm.isDArm7 {
@@ -131,6 +130,7 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
 
 	case 0x246:
         vm.CNT_G.Write(v)
+
 
         switch vm.CNT_G.Mst {
         case 4:
