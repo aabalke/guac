@@ -3,6 +3,7 @@ package ppu
 import (
 	"encoding/binary"
 
+	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/rast"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
@@ -149,16 +150,14 @@ type Object struct {
     BmpBoundaryShift uint32
 }
 
-func NewPPU(top, bottom *[]byte) *PPU {
+func NewPPU(top, bottom *[]byte, irq *cpu.Irq) *PPU {
 
-    p := &PPU{
-
-    }
+    p := &PPU{}
 
     p.EngineA.Pixels = bottom
     p.EngineB.Pixels = top
     p.EngineB.IsB = true
-    p.Rasterizer = rast.NewRasterizer(&p.Vram)
+    p.Rasterizer = rast.NewRasterizer(&p.Vram, irq)
 
     return p
 

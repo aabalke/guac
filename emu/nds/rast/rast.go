@@ -1,6 +1,7 @@
 package rast
 
 import (
+	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
@@ -31,12 +32,12 @@ type VRAM interface {
     ReadPalTexture(uint32) uint8
 }
 
-func NewRasterizer(vram VRAM) *Rasterizer {
+func NewRasterizer(vram VRAM, irq *cpu.Irq) *Rasterizer {
     r := &Rasterizer{}
 
     r.VRAM = vram
 
-    r.GeoEngine = NewGeoEngine(&r.Buffers)
+    r.GeoEngine = NewGeoEngine(&r.Buffers, irq)
 
     r.Render = NewRender(r, &r.Buffers, &r.RearPlane)
 

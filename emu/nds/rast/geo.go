@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"image/color"
 
+	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
 type GeoEngine struct {
+    Irq *cpu.Irq
     Buffers *Buffers
     Data []uint32
 
@@ -37,8 +39,9 @@ type GeoEngine struct {
     Lights [4]gl.Light
 }
 
-func NewGeoEngine(buffers *Buffers) *GeoEngine {
+func NewGeoEngine(buffers *Buffers, irq *cpu.Irq) *GeoEngine {
     return &GeoEngine{
+        Irq: irq,
         Buffers: buffers,
         MtxStacks: NewMtxStacks(),
     }
@@ -509,7 +512,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         //fmt.Printf("UNSETUP GX CMD %02X\n", cmd)
 
     default:
-        panic(fmt.Sprintf("UNSETUP GX CMD %02X\n", cmd))
+        //panic(fmt.Sprintf("UNSETUP GX CMD %02X\n", cmd))
         fmt.Printf("UNSETUP GX CMD %02X\n", cmd)
 
     }

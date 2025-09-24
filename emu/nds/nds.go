@@ -68,11 +68,11 @@ func NewNds(path string, _ *oto.Context) *Nds {
 		ImageBottom:  ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 	}
 
-
-    nds.ppu = ppu.NewPPU(&nds.PixelsTop, &nds.PixelsBottom)
-
     irq9 := cpu.Irq{IsArm9: true}
 	irq7 := cpu.Irq{}
+
+    nds.ppu = ppu.NewPPU(&nds.PixelsTop, &nds.PixelsBottom, &irq9)
+
 
     for i := range 8 {
         if i < 4 {
@@ -212,15 +212,15 @@ func (nds *Nds) checkMode() {
     }
 }
 
-var prev uint32
-
 func (nds *Nds) Update() {
 
     r := &nds.arm9.Reg.R
     r7 := &nds.arm7.Reg.R
+    read := nds.mem.Read32
 
     _ = r
     _ = r7
+    _ = read
 
 	if nds.Paused {
 		return
@@ -233,25 +233,13 @@ func (nds *Nds) Update() {
 
         // arm9 thumb ~1 cycles, arm ~2 cycles
         // arm7 thumb ~2 cycles, arm ~4 cycles
-        //logger.Update(4_600_000, 4_674_605, CURR_INST, true)
-
-        //if CURR_INST >= 4_674_600 {
-        //    nds.Debugger.PrintLine(true)
-        //}
-
-        //if r[15] == 0x020017A2 {
-        //    nds.Debugger.PrintLine(true)
-        //}
-
-        //if r[15] == 0x20017B2 {
-        //    nds.Debugger.PrintLine(true)
-        //}
 
 		if !nds.arm9.Halted {
             thumbExec :=  nds.arm9.Reg.IsThumb
             armExec := !nds.arm9.Reg.IsThumb && nds.AccCycles & 0b1 == 0
 
             if thumbExec || armExec  {
+                //logger.Update(405_492_000, 405_700_000, CURR_INST, true)
                 _, ok := nds.arm9.Execute()
                 if !ok {
                     fmt.Printf("ARM9 Decode Error: PC %08X CURR %d\n", r[15], CURR_INST)
@@ -259,6 +247,10 @@ func (nds *Nds) Update() {
                 }
 
                 nds.CheckGeoDmas()
+
+                if nds.ppu.Rasterizer.GeoEngine.GxStat.FifoIrq != 0 {
+                    nds.arm9.Irq.SetIRQ(21)
+                }
             }
 		}
 
@@ -267,7 +259,7 @@ func (nds *Nds) Update() {
             armExec := !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b11 == 0
 
             if thumbExec || armExec  {
-                //logger.Update(8_912_144, 20_000_000, CURR_INST, false)
+                //logger.Update(405_492_000, 405_700_000, CURR_INST, true)
                 _, ok := nds.arm7.Execute()
                 if !ok {
                     fmt.Printf("ARM7 Decode Error: PC %08X CURR %d\n", r7[15], CURR_INST)
