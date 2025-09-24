@@ -63,7 +63,7 @@ func NewContext(width, height int) *Context {
 	dc.ColorBuffer = image.NewNRGBA(image.Rect(0, 0, width, height))
 	dc.DepthBuffer = make([]float64, width*height)
 	dc.ClearColor = Transparent
-	dc.Shader = NewSolidColorShader(Identity(), Color{1, 0, 1, 1})
+	//dc.Shader = NewSolidColorShader(Identity(), Color{1, 0, 1, 1})
 	dc.ReadDepth = true
 	dc.WriteDepth = true
 	dc.WriteColor = true
@@ -418,6 +418,7 @@ func (dc *Context) DrawQuad(q *Quad) RasterizeInfo {
         triangles := ClipTriangle(NewTriangle(v1, v3, v4))
         var result RasterizeInfo
         for _, t := range triangles {
+            //info := dc.drawClippedTriangle(t.V1, t.V2, t.V3)
             info := dc.drawClippedTriangle(t.V1, t.V2, t.V3)
             result = result.Add(info)
         }

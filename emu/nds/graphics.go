@@ -129,7 +129,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_3D :
                 //palData, ok = 0b11111, true // red
-                palData, ok = nds.set3d(x, y)
+                palData, ok = nds.set3d(engine, bg, x, y)
             case ppu.BG_TYPE_BGM:
 				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_256:
@@ -256,9 +256,32 @@ func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {
 	return bgs
 }
 
-func (nds *Nds) set3d(x, y uint32) (uint32, bool) {
+func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, bool) {
 	index := (x + (y * SCREEN_WIDTH))
-    return uint32(nds.ppu.Rasterizer.Render.PixelPalettes[index]), true
+    pal, ok:= uint32(nds.ppu.Rasterizer.Render.PixelPalettes[index]), true
+
+    if nds.ppu.Rasterizer.Disp3dCnt.RearPlaneBitmapEnabled == true {
+        panic("Has Rear Plane")
+        //return nds.setRearBitmap(engine, bg, x, y)
+    }
+
+    return pal, ok
+}
+
+func (nds *Nds) setRearBitmap(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, bool) {
+
+    xIdx := x + bg.XOffset
+    yIdx := y + bg.YOffset
+
+    addr := uint32(xIdx+(yIdx * SCREEN_WIDTH)) * 2
+
+    data := uint32(nds.ppu.Vram.ReadTexture(addr))
+    data |= uint32(nds.ppu.Vram.ReadTexture(addr + 1)) << 8
+
+    data &^= 0x80
+
+    return data, true
+
 }
 
 func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, bool) {
@@ -524,8 +547,6 @@ func getPositionsBg(screenData, xIdx, yIdx uint32) (uint32, uint32) {
 }
 
 func (nds *Nds) setDirectBitmap(engine *ppu.Engine, bg *ppu.Background, x uint32) (uint32, bool) {
-
-
 
 	pa := utils.Convert8_8Float(int16(bg.Pa))
 	pc := utils.Convert8_8Float(int16(bg.Pc))

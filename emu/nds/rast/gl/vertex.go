@@ -12,6 +12,10 @@ type Vertex struct {
     W float64
 
     S, T float64
+
+    DiffuseColor Color
+    EmissionColor Color
+
 }
 
 func (a Vertex) Outside() bool {

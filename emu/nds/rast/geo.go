@@ -25,6 +25,7 @@ type GeoEngine struct {
     Texture Texture
 
     Vertex *gl.Vertex
+    StoredNormal gl.Vector
 
     Packed bool
     PackedCmds [4]uint32
@@ -32,6 +33,8 @@ type GeoEngine struct {
 
     ClipMatrix gl.Matrix
     PosTestData [4]uint32
+
+    Lights [4]gl.Light
 }
 
 func NewGeoEngine(buffers *Buffers) *GeoEngine {
@@ -64,7 +67,7 @@ func (g *GeoEngine) Fifo(v uint32) {
             v &= 0xFF
             g.Data = append(g.Data, v)
             // check if packed cmd has no params
-            g.Cmd(true, g.Data)
+            g.PackedFifo()
             return
         }
 
@@ -77,7 +80,8 @@ func (g *GeoEngine) Fifo(v uint32) {
     }
 
     if g.Packed {
-        g.PackedFifo(v)
+        g.Data = append(g.Data, v)
+        g.PackedFifo()
         return
     }
 
@@ -85,20 +89,19 @@ func (g *GeoEngine) Fifo(v uint32) {
     g.Cmd(true, g.Data)
 }
 
-func (g *GeoEngine) PackedFifo(v uint32) {
+func (g *GeoEngine) PackedFifo() {
 
-    g.Data = append(g.Data, v)
     g.Cmd(true, g.Data)
 
-    if incomplete := len(g.Data) != 0; incomplete {
-        //fmt.Printf("Send Param %08X\n", v)
+    if len(g.Data) != 0 {
         return
     }
 
     g.PackedIdx = (g.PackedIdx + 1) & 0b11
 
-    if finishedPacked := g.PackedIdx == 0; finishedPacked {
+    //fmt.Printf("Updating PackedIdx %02d\n", g.PackedIdx)
 
+    if finishedPacked := g.PackedIdx == 0; finishedPacked {
         g.Data = []uint32{}
         //fmt.Printf("Finished 4 Packed Commands\n")
 
@@ -106,12 +109,11 @@ func (g *GeoEngine) PackedFifo(v uint32) {
         return
     }
 
-    //fmt.Printf("Moving to Next Packed Command. Last Param %08X\n", v)
+    //fmt.Printf("Moving to Next Packed Command.\n")
 
     g.Data = append(g.Data, g.PackedCmds[g.PackedIdx])
 
-    // try next packed command in case needs no params
-    g.Cmd(true, g.Data)
+    g.PackedFifo()
 }
 
 // packed cmds not implimented yet
@@ -126,10 +128,10 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         return
     }
 
-    //fmt.Printf("C %t % 9X\n", fifo, data)
+    //fmt.Printf("C %05d %t PACKED %08X IDX %02d % 9X\n", cnt, fifo, g.PackedCmds, g.PackedIdx, data)
     cnt++
 
-    if cmd := data[0]; cmd == 0x21 || (cmd >= 0x30 && cmd < 0x35) {
+    if cmd := data[0]; cmd == 0x30 || cmd == 0x31 || cmd == 0x34 {
         g.Data = []uint32{}
         return
     }
@@ -327,8 +329,26 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
     case 0x20:
 
-        g.WriteColor(data[1])
+        g.Color = Write15BitColor(data[1])
 
+    case 0x21:
+
+        convert := func(v uint16) float64 {
+            v &= 0x3FF
+            val := int16(v << 6) >> 6
+            return float64(val) / 512
+        }
+
+        x := convert(uint16(data[1]))
+        y := convert(uint16(data[1]>>10))
+        z := convert(uint16(data[1]>>20))
+        v := gl.Vector{X: x, Y: y, Z: z}
+
+        directionalMtx := g.MtxStacks.Stacks[2].CurrMtx
+        g.StoredNormal = directionalMtx.MulPosition(v)
+        g.StoredNormal = g.StoredNormal.Normalize()
+
+        g.StoredNormal = g.StoredNormal.MulScalar(-1)
 
     case 0x22:
 
@@ -341,7 +361,9 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             &g.ClipMatrix,
             g.Color,
             g.Texture.S,
-            g.Texture.T)
+            g.Texture.T,
+            &g.StoredNormal,
+        )
 
     case 0x24:
 
@@ -350,7 +372,9 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             &g.ClipMatrix,
             g.Color,
             g.Texture.S,
-            g.Texture.T)
+            g.Texture.T,
+            &g.StoredNormal,
+        )
 
     case 0x25:
 
@@ -362,6 +386,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             g.Texture.T,
             g.Vertex,
             REL_XY,
+            &g.StoredNormal,
         )
 
     case 0x26:
@@ -374,6 +399,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             g.Texture.T,
             g.Vertex,
             REL_XZ,
+            &g.StoredNormal,
         )
 
     case 0x27:
@@ -386,6 +412,22 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             g.Texture.T,
             g.Vertex,
             REL_YZ,
+            &g.StoredNormal,
+        )
+
+    case 0x28:
+
+        // not sure if accurate
+
+        g.Vertex = g.ActivePoly.WriteVtxDiff(
+            data,
+            &g.ClipMatrix,
+            g.Color,
+            g.Texture.S,
+            g.Texture.T,
+            g.Vertex,
+            REL_YZ,
+            &g.StoredNormal,
         )
 
     case 0x29:
@@ -399,6 +441,26 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
     case 0x2B:
 
         g.Texture.WritePalBase(data[1])
+
+    case 0x32:
+
+        x := utils.Convert10ToFloat(uint16(data[1]), 9)
+        y := utils.Convert10ToFloat(uint16(data[1] >> 10), 9)
+        z := utils.Convert10ToFloat(uint16(data[1] >> 20), 9)
+        // not sure if need to use VectorW
+        v := gl.Vector{X: x, Y: y, Z: z}
+        idx := data[1] >> 30
+
+        directionalMtx := g.MtxStacks.Stacks[2].CurrMtx
+        g.Lights[idx].Direction = directionalMtx.MulPosition(v)
+        g.Lights[idx].Direction = g.Lights[idx].Direction.Normalize()
+
+        //fmt.Printf("UPDATING % .2f\n", g.Lights[idx].Direction)
+
+    case 0x33:
+
+        idx := data[1] >> 30
+        g.Lights[idx].Color = Write15BitColor(data[1])
 
     case 0x40:
 
@@ -517,7 +579,7 @@ func (g *GeoEngine) ValidParamCount(fifo bool) bool {
     panic(fmt.Sprintf("UNKNOWN CMD GXFIFO % 2X", g.Data))
 }
 
-func (geo *GeoEngine) WriteColor(v uint32) {
+func Write15BitColor(v uint32) gl.Color {
 
 	r := uint8((v) & 0b11111)
 	g := uint8((v >> 5) & 0b11111)
@@ -534,5 +596,5 @@ func (geo *GeoEngine) WriteColor(v uint32) {
         A: 0xFF,
     }
 
-    geo.Color = gl.MakeColor(c)
+    return gl.MakeColor(c)
 }

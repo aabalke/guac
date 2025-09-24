@@ -46,11 +46,13 @@ func (r *Render) UpdateRender() {
     r.Context.ClearColorBuffer()
     r.Context.ClearDepthBuffer()
 
-    r.Context.Shader = gl.NewNdsShader()
+
+    r.Context.Shader = gl.NewNdsShader(r.Rasterizer.GeoEngine.Lights)
 
     for _, p := range r.Buffers.GetPolygons() {
         //r.Context.Shader.SetTexture(*r.Texture)
         r.Context.Shader.SetTexture(p.GetTexture(r.Rasterizer.VRAM))
+        r.Context.Shader.(*gl.NdsShader).LightEnabled = p.LightsEnabled
         r.RenderPolygon(&p)
     }
 
@@ -61,32 +63,26 @@ func (r *Render) UpdateRender() {
 
 func (r *Render) RenderPolygon(p *Polygon) {
 
-
     tW := int(p.Texture.SizeS)
     tH := int(p.Texture.SizeT)
+
+    for i := range len(p.Vertices) {
+        p.Vertices[i].CalcTextureVector(tW, tH)
+    }
 
     switch p.PrimitiveType {
     case PRIM_SEP_TRI:
 
         if invalidCnt := len(p.Vertices) % 3 != 0; invalidCnt {
-            return
             fmt.Printf("Separate Tri Polygon has invalid vert count.\n")
         }
 
         for i := 0; i < len(p.Vertices); i += 3 {
 
-            //if i + 2 > len(p.Vertices) {
-            //    continue
-            //}
-
-            p.Vertices[i+0].CalcTextureVector(tW, tH)
-            p.Vertices[i+1].CalcTextureVector(tW, tH)
-            p.Vertices[i+2].CalcTextureVector(tW, tH)
-
             tri := gl.NewTriangle(
-                p.Vertices[i+0],
+                p.Vertices[i+2],
                 p.Vertices[i+1],
-                p.Vertices[i+2])
+                p.Vertices[i+0])
 
             r.Context.DrawTriangle(tri)
         }
@@ -103,61 +99,46 @@ func (r *Render) RenderPolygon(p *Polygon) {
             //    continue
             //}
 
-            p.Vertices[i+0].CalcTextureVector(tW, tH)
-            p.Vertices[i+1].CalcTextureVector(tW, tH)
-            p.Vertices[i+2].CalcTextureVector(tW, tH)
-            p.Vertices[i+3].CalcTextureVector(tW, tH)
-
             quad := gl.NewQuad(
-                p.Vertices[i+0],
-                p.Vertices[i+1],
+                p.Vertices[i+3],
                 p.Vertices[i+2],
-                p.Vertices[i+3])
+                p.Vertices[i+1],
+                p.Vertices[i+0])
 
             r.Context.DrawQuad(quad)
         }
 
     case PRIM_TRI_STRIP:
 
-        //if invalidCnt := len(p.Vertices) % 4 != 0; invalidCnt {
-        //    fmt.Printf("Separate Quad Polygon has invalid vert count.\n")
-        //}
+        for i := 2; i < len(p.Vertices); i++ {
 
-        for i := 0; i < len(p.Vertices); i++ {
+            if clockwise := i & 1 == 1; clockwise {
+                tri := gl.NewTriangle(
+                    p.Vertices[i-2],
+                    p.Vertices[i-1],
+                    p.Vertices[i-0])
 
-            p.Vertices[i+0].CalcTextureVector(tW, tH)
-            p.Vertices[i+1].CalcTextureVector(tW, tH)
-            p.Vertices[i+2].CalcTextureVector(tW, tH)
+                r.Context.DrawTriangle(tri)
+                continue
+            }
 
             tri := gl.NewTriangle(
-                p.Vertices[i+0],
-                p.Vertices[i+1],
-                p.Vertices[i+2])
+                p.Vertices[i-0],
+                p.Vertices[i-1],
+                p.Vertices[i-2])
 
             r.Context.DrawTriangle(tri)
         }
 
     case PRIM_QUAD_STRIP:
 
-        //if invalidCnt := len(p.Vertices) % 4 != 0; invalidCnt {
-        //    fmt.Printf("Separate Quad Polygon has invalid vert count.\n")
-        //}
-
-        for i := 0; i < len(p.Vertices); i += 2 {
-
-            //if i + 3 > len(p.Vertices) {
-            //    continue
-            //}
-            p.Vertices[i+0].CalcTextureVector(tW, tH)
-            p.Vertices[i+1].CalcTextureVector(tW, tH)
-            p.Vertices[i+2].CalcTextureVector(tW, tH)
-            p.Vertices[i+3].CalcTextureVector(tW, tH)
+        for i := 3; i < len(p.Vertices); i += 2 {
 
             quad := gl.NewQuad(
-                p.Vertices[i+0],
-                p.Vertices[i+1],
-                p.Vertices[i+2],
-                p.Vertices[i+3])
+                p.Vertices[i-3],
+                p.Vertices[i-2],
+                p.Vertices[i-1],
+                p.Vertices[i-0])
 
             r.Context.DrawQuad(quad)
         }

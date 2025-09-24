@@ -16,7 +16,7 @@ const(
 )
 
 type Polygon struct {
-	Lights                 [4]bool
+	LightsEnabled          [4]bool
 	Mode                   uint8
 	RenderBack             bool
 	RenderFront            bool
@@ -35,10 +35,10 @@ type Polygon struct {
 }
 
 func (p *Polygon) WriteAttrs(v uint32) {
-    p.Lights[0] = utils.BitEnabled(v, 0)
-    p.Lights[1] = utils.BitEnabled(v, 1)
-    p.Lights[2] = utils.BitEnabled(v, 2)
-    p.Lights[3] = utils.BitEnabled(v, 3)
+    p.LightsEnabled[0] = utils.BitEnabled(v, 0)
+    p.LightsEnabled[1] = utils.BitEnabled(v, 1)
+    p.LightsEnabled[2] = utils.BitEnabled(v, 2)
+    p.LightsEnabled[3] = utils.BitEnabled(v, 3)
     p.Mode = uint8(utils.GetVarData(v, 4, 5))
     p.RenderBack = utils.BitEnabled(v, 6)
     p.RenderFront = utils.BitEnabled(v, 7)
@@ -49,14 +49,17 @@ func (p *Polygon) WriteAttrs(v uint32) {
     p.FogEnabled = utils.BitEnabled(v, 15)
     p.Alpha = utils.GetVarData(v, 16, 20)
     p.Id = utils.GetVarData(v, 24, 29)
+
+    //fmt.Printf("LIGHTS % v\n", p.LightsEnabled)
 }
 
-func (p *Polygon) GetVertex(x, y, z float64, clipMtx *gl.Matrix, color gl.Color, S, T float64) gl.Vertex {
+func (p *Polygon) GetVertex(x, y, z float64, clipMtx *gl.Matrix, color gl.Color, S, T float64, normal *gl.Vector) gl.Vertex {
 
     vert := gl.VectorW{X: x,Y: y,Z: z,W: 1.0}
     output := clipMtx.MulVectorW(vert)
 
     v := gl.Vertex{
+        Normal: *normal,
         Position: gl.Vector{ X: x, Y: y, Z: z },
         Color: color,
         W: 1.0,
@@ -68,24 +71,24 @@ func (p *Polygon) GetVertex(x, y, z float64, clipMtx *gl.Matrix, color gl.Color,
     return v
 }
 
-func (p *Polygon) WriteVtx16(data []uint32, clipMtx *gl.Matrix, color gl.Color, S, T float64) *gl.Vertex {
+func (p *Polygon) WriteVtx16(data []uint32, clipMtx *gl.Matrix, color gl.Color, S, T float64, normal *gl.Vector) *gl.Vertex {
 
     x := utils.Convert16ToFloat(uint16(data[1]), 12)
     y := utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
     z := utils.Convert16ToFloat(uint16(data[2]), 12)
 
-    v := p.GetVertex(x, y, z, clipMtx, color, S, T)
+    v := p.GetVertex(x, y, z, clipMtx, color, S, T, normal)
     p.Vertices = append(p.Vertices, v)
     return &v
 }
 
-func (p *Polygon) WriteVtx10(data []uint32, clipMtx *gl.Matrix, color gl.Color, S, T float64) *gl.Vertex {
+func (p *Polygon) WriteVtx10(data []uint32, clipMtx *gl.Matrix, color gl.Color, S, T float64, normal *gl.Vector) *gl.Vertex {
 
     x := utils.Convert10ToFloat(uint16(data[1]), 6)
     y := utils.Convert10ToFloat(uint16(data[1] >> 10), 6)
     z := utils.Convert10ToFloat(uint16(data[1] >> 20), 6)
 
-    v := p.GetVertex(x, y, z, clipMtx, color, S, T)
+    v := p.GetVertex(x, y, z, clipMtx, color, S, T, normal)
 
 
     p.Vertices = append(p.Vertices, v)
@@ -98,25 +101,62 @@ const (
     REL_YZ = 2
 )
 
-func (p *Polygon) WriteVtxRelative(data []uint32, clipMtx *gl.Matrix, color gl.Color, S, T float64, prev *gl.Vertex, set uint8) *gl.Vertex {
+func (p *Polygon) WriteVtxRelative(data []uint32, clipMtx *gl.Matrix, color gl.Color, S, T float64, prev *gl.Vertex, set uint8, normal *gl.Vector) *gl.Vertex {
 
     var x, y, z float64
     switch set {
     case REL_XY:
         x = utils.Convert16ToFloat(uint16(data[1]), 12)
-        y = utils.Convert16ToFloat(uint16(data[1] >> 10), 12)
+        y = utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
         z = prev.Position.Z
     case REL_XZ:
         x = utils.Convert16ToFloat(uint16(data[1]), 12)
         y = prev.Position.Y
-        z = utils.Convert16ToFloat(uint16(data[1] >> 10), 12)
+        z = utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
     case REL_YZ:
         x = prev.Position.X
         y = utils.Convert16ToFloat(uint16(data[1]), 12)
-        z = utils.Convert16ToFloat(uint16(data[1] >> 10), 12)
+        z = utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
     }
 
-    v := p.GetVertex(x, y, z, clipMtx, color, S, T)
+    v := p.GetVertex(x, y, z, clipMtx, color, S, T, normal)
+    p.Vertices = append(p.Vertices, v)
+    return &v
+}
+
+func (p *Polygon) WriteVtxDiff(data []uint32, clipMtx *gl.Matrix, color gl.Color, S, T float64, prev *gl.Vertex, set uint8, normal *gl.Vector) *gl.Vertex {
+
+
+    // mine
+    //convert := func(v uint16) float64 {
+    //    v &= 0x3FF
+    //    v <<= 6
+    //    a := float64(int16(v) >> 6)
+    //    a /= 8
+    //    return a
+    //}
+
+    convert := func(v uint16) float64 {
+    // 10-bit signed value
+    raw := int32(v & 0x3FF)
+    if raw&0x200 != 0 { // if sign bit set
+        raw |= ^0x3FF   // sign extend
+    }
+
+    // raw is now signed 10-bit integer
+
+    // Convert to float with 9 fractional bits
+    f := float64(raw) / (1 << 9) // divide by 512
+
+    // Expand to 12-bit fraction by dividing by 8
+    return f / 8.0
+}
+
+    x := convert(uint16(data[1]))     + prev.Position.X
+    y := convert(uint16(data[1]>>10)) + prev.Position.Y
+    z := convert(uint16(data[1]>>20)) + prev.Position.Z
+
+    v := p.GetVertex(x, y, z, clipMtx, color, S, T, normal)
     p.Vertices = append(p.Vertices, v)
     return &v
 }
