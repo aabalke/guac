@@ -128,7 +128,6 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
             case ppu.BG_TYPE_LAR:
 				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_3D :
-                //palData, ok = 0b11111, true // red
                 palData, ok = nds.set3d(engine, bg, x, y)
             case ppu.BG_TYPE_BGM:
 				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
@@ -861,7 +860,12 @@ func getPositions(obj *ppu.Object, xIdx, yIdx uint32) (uint32, uint32, uint32, u
 
 func getObjTileAddr(obj *ppu.Object, enTileX, enTileY, inTileX, inTileY uint32) uint32 {
 
-    const BYTES_PER_PIXEL = 2
+    const (
+        BYTES_PER_PIXEL = 2
+	    //MAX_NUM_TILE = 1024
+	    //MAX_TILE_MASK = MAX_NUM_TILE - 1 
+    )
+
 	w := obj.W << BYTES_PER_PIXEL
 
 	if obj.Palette256 {
@@ -869,18 +873,13 @@ func getObjTileAddr(obj *ppu.Object, enTileX, enTileY, inTileX, inTileY uint32) 
 		w <<= 1
 	}
 
-	//const MAX_NUM_TILE = 1024
-	//const MAX_TILE_MASK = MAX_NUM_TILE - 1 
 	var tileIdx uint32
 	if obj.OneDimensional {
-		//tileIdx = (enTileX << 5) + (enTileY * w)
-		//tileIdx = (tileIdx + obj.CharName << 5) & MAX_TILE_MASK
 		tileIdx = (enTileX << 5) + (enTileY * w)
 		tileIdx = (tileIdx + obj.CharName << obj.TileBoundaryShift) //& MAX_TILE_MASK
 	} else {
-		tileIdx = enTileX + (enTileY << w)
-		//tileIdx = (tileIdx + obj.CharName & MAX_TILE_MASK) << 5
-		tileIdx = (tileIdx + obj.CharName) << obj.TileBoundaryShift
+        tileIdx = enTileX + (enTileY << 5)
+		tileIdx = (tileIdx + obj.CharName/*& MAX_TILE_MASK*/) << 5
 	}
 
 	tileAddr := uint32(tileIdx)
@@ -903,7 +902,7 @@ func getBmpTileAddr(obj *ppu.Object, xIdx, yIdx int) uint32 {
         return uint32((xIdx+(yIdx << int(obj.BmpBoundaryShift))) * BYTES_PER_PIXEL)
 	}
 
-    //panic("OBJ BMP 2D, make sure addr calc accurate")
+    panic("OBJ BMP 2D, make sure addr calc accurate")
 
     return uint32((xIdx+(yIdx << int(obj.BmpBoundaryShift))) * BYTES_PER_PIXEL)
 }
