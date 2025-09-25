@@ -60,7 +60,6 @@ func (tex *Texture) WriteParam(v uint32) {
     tex.PaletteBaseAddr = utils.GetVarData(v, 30, 31)
 
     //if tex.Format != 0 && tex.Format != 7 && tex.Format != 2 {panic(fmt.Sprintf("Unsetup texture format %d", tex.Format))}
-
 }
 
 func (text *Texture) WritePalBase(v uint32) {

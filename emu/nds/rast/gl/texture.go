@@ -5,7 +5,6 @@ import (
 	"image/color"
 	_ "image/jpeg"
 	_ "image/png"
-	"log"
 	"math"
 	"os"
 )
@@ -179,6 +178,7 @@ type PalColorTexture struct {
     PalBase uint32
     BitsPerTexel uint32
     BitsPerTexelShift uint32
+    TransparentZero bool
 }
 
 func (t *PalColorTexture) Sample(u, v float64) Color {
@@ -227,6 +227,10 @@ func (t *PalColorTexture) getColor(x, y int) Color {
     case 2: palIdx = (palIdx >> ((i & 0b11) * t.BitsPerTexel)) & 0b11
     case 4: palIdx = (palIdx >> ((i & 0b1) * t.BitsPerTexel)) & 0b1111
     case 8: palIdx = (palIdx >> ((i & 0b0) * t.BitsPerTexel)) & 0b1111_1111
+    }
+
+    if palIdx == 0 && t.TransparentZero {
+        return MakeColor(color.Transparent)
     }
 
     // palettes take up 2 bytes each
@@ -302,18 +306,28 @@ func (t *TranslucentTexture) getColor(x, y int) Color {
         colorIdx = palIdx & 0b11111
     }
 
-    log.Printf("TRANSLUCENT TEXTURE. NEED ALPHA SETUP")
+    //log.Printf("TRANSLUCENT TEXTURE. NEED ALPHA SETUP")
 
     colorIdx *= 2
 
     data := uint32(t.Vram.ReadPalTexture(t.PalBase + colorIdx))
     data |= uint32(t.Vram.ReadPalTexture(t.PalBase + colorIdx + 1)) << 8
 
-    return MakeColorFrom15Bit(
+    c := MakeColorFrom15Bit(
         uint8(data & 0b11111),
         uint8(data >> 5) & 0b11111,
         uint8(data >> 10) & 0b11111,
     )
+
+    switch t.ColorIdxBits {
+    case 3:
+        c.A = float64(palIdx >> 3) / 31
+    case 5:
+        c.A = float64(palIdx >> 5) / 7
+    }
+
+
+    return c
 }
 
 type CompressedTexture struct {
@@ -380,8 +394,6 @@ func (t *CompressedTexture) getColor(x, y int) Color {
     color3 := uint16(t.Vram.ReadPalTexture(palBase + palOffset + 6))
     color3 |= uint16(t.Vram.ReadPalTexture(palBase + palOffset + 7)) << 8
 
-    var colors [4]uint16
-
     blendMode1 := func (a, b uint16) uint16 {
 
         aR := uint16(a) & 0b11111
@@ -416,68 +428,40 @@ func (t *CompressedTexture) getColor(x, y int) Color {
         return oR | oG | oB
     }
 
-    transparent := uint16(0b11111) // red
 
-    switch mode {
-    case 0:
-        colors[0] = color0
-        colors[1] = color1
-        colors[2] = color2
-        colors[3] = transparent
-
-    case 1:
-        colors[0] = color0
-        colors[1] = color1
-        colors[3] = blendMode1(color0, color1)
-        colors[3] = transparent
-
-    case 2:
-        colors[0] = color0
-        colors[1] = color1
-        colors[2] = color2
-        colors[3] = color3
-    case 3:
-        colors[0] = color0
-        colors[1] = color1
-        colors[2] = blendMode3(color0, color1)
-        colors[3] = blendMode3(color1, color0)
-    default:
+    convert := func(v uint16) Color {
         return MakeColorFrom15Bit(
-            0b11111,
-            0,
-            0,
+            uint8(v & 0b11111),
+            uint8(v >> 5) & 0b11111,
+            uint8(v >> 10) & 0b11111,
         )
     }
 
-    return MakeColorFrom15Bit(
-        uint8(colors[texelVal] & 0b11111),
-        uint8(colors[texelVal] >> 5) & 0b11111,
-        uint8(colors[texelVal] >> 10) & 0b11111,
-    )
+    switch texelVal {
+    case 0:
+        return convert(color0)
+    case 1:
+        return convert(color1)
+    case 2:
+        switch mode {
+        case 1:
+            return convert(blendMode1(color0, color1))
+        case 3:
+            return convert(blendMode3(color0, color1))
+        default:
+            return convert(color2)
+        }
 
-    //var colors [4]uint16
-    //switch mode {
-    //case 0:
-    //    colors[0] = color0
-    //    colors[1] = color1
-    //    colors[2] = ReadPalColor(palBase + palOffset + 4)
-    //    colors[3] = Transparent
-    //case 1:
-    //    colors[0] = color0
-    //    colors[1] = color1
-    //    colors[2] = Blend(color0, color1, 0.5)
-    //    colors[3] = Transparent
-    //case 2:
-    //    colors[0] = color0
-    //    colors[1] = color1
-    //    colors[2] = ReadPalColor(palBase + palOffset + 4)
-    //    colors[3] = ReadPalColor(palBase + palOffset + 6)
-    //case 3:
-    //    colors[0] = color0
-    //    colors[1] = color1
-    //    //colors[2] = Blend(color0, color1, 5.0/8.0)
-    //    //colors[3] = Blend(color0, color1, 3.0/8.0)
-    //}
+    case 3:
+        switch mode {
+        case 2:
+            return convert(color3)
+        case 3:
+            return convert(blendMode3(color1, color0))
+        default:
+            return MakeColor(color.Transparent)
+        }
+    }
 
-    //return colors[texelVal]
+    panic("UNKNOWN TEXEL VALUE OR MODE")
 }

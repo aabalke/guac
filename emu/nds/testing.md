@@ -222,28 +222,30 @@ BLX ARM needs to occur before Cond
 
 ### Nonpanic Crash
 Housemd
-Nintendogs Best Friends
 Zelda Spirit Tracks
 Zelda Phantom Hourglass
 Sonic Chronicles The Dark Brotherhood
 Mario And Luigi Bowsers Inside Story
 Pokemon Heartgold
-Animal Crossing Wild World
 Metroid Prime Hunters
 
 ### Booting (Buggyie)
+Nintendogs Best Friends
+Animal Crossing Wild World
 Brain Age
 Sonic Colors
 Big Brain Academy
 Tetris Ds
-Yoshis Island
 Cooking Mama
 Brain Age 2
 Pokemon Diamond
 Pokemon Ranger
-Pokemon Blue Rescue Team
 Mario Party
 Mario and Luigi Partners in Time
 Mario Kart Ds
 Super Mario 64
 New Super Mario Bros
+
+### No Known errors
+Yoshis Island
+Pokemon Blue Rescue Team

@@ -181,6 +181,7 @@ func (p *Polygon) GetTexture(vram VRAM) gl.Texture {
             PalBase: t.PaletteBaseAddr * 0x08,
             BitsPerTexel: 2,
             BitsPerTexelShift: 2,
+            TransparentZero: t.TransparentZero,
         }
 
     case TEX_FMT_16_PAL:
@@ -193,6 +194,7 @@ func (p *Polygon) GetTexture(vram VRAM) gl.Texture {
             PalBase: t.PaletteBaseAddr * 0x10,
             BitsPerTexel: 4,
             BitsPerTexelShift: 1,
+            TransparentZero: t.TransparentZero,
         }
 
     case TEX_FMT_256_PAL:
@@ -205,6 +207,7 @@ func (p *Polygon) GetTexture(vram VRAM) gl.Texture {
             PalBase: t.PaletteBaseAddr * 0x10,
             BitsPerTexel: 8,
             BitsPerTexelShift: 0,
+            TransparentZero: t.TransparentZero,
         }
 
     case TEX_FMT_DIRECT: 
