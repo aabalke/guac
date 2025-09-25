@@ -128,14 +128,13 @@ func (r *Render) RenderPolygon(p *Polygon) {
 
     case PRIM_QUAD_STRIP:
 
-        for i := 3; i < len(p.Vertices); i += 2 {
-
+        for i := 2; i+1 < len(p.Vertices); i += 2 {
             quad := gl.NewQuad(
-                p.Vertices[i-3],
                 p.Vertices[i-2],
                 p.Vertices[i-1],
-                p.Vertices[i-0])
-
+                p.Vertices[i+1],
+                p.Vertices[i+0],
+            )
             r.Context.DrawQuad(quad)
         }
     }

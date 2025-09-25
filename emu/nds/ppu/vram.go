@@ -156,6 +156,11 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
             vm.ExtBBgSlot1 = unsafe.Add(unsafe.Pointer(&vm.H), 0x2000)
             vm.ExtBBgSlot2 = unsafe.Add(unsafe.Pointer(&vm.H), 0x4000)
             vm.ExtBBgSlot3 = unsafe.Add(unsafe.Pointer(&vm.H), 0x6000)
+        } else {
+            vm.ExtBBgSlot0 = nil
+            vm.ExtBBgSlot1 = nil
+            vm.ExtBBgSlot2 = nil
+            vm.ExtBBgSlot3 = nil
         }
 
 	case 0x249:
@@ -177,33 +182,30 @@ func (vm *VRAM) Write(addr uint32, v uint8, arm9 bool) {
             case 0: base = uint32(0x80_0000)
             case 1: base = 0x20000 * uint32(vm.CNT_A.Ofs)
             case 2: base = 0x400000 + 0x20000 * uint32(vm.CNT_A.Ofs)
-            case 3: // slot
             }
             if addr >= base && addr < base + 0x2_0000 {
                 vm.A[addr - base] = v
             }
         }
 
-        base = uint32(0x100_0000) // make sure 0 does not grab everything
+        base = uint32(0x100_0000)
         if vm.CNT_B.Enabled {
             switch vm.CNT_B.Mst {
             case 0: base = uint32(0x82_0000)
             case 1: base = 0x20000 * uint32(vm.CNT_B.Ofs)
             case 2: base = 0x400000 + 0x20000 * uint32(vm.CNT_B.Ofs)
-            case 3: // slot
             }
             if addr >= base && addr < base + 0x2_0000 {
                 vm.B[addr - base] = v
             }
         }
 
-        base = uint32(0x100_0000) // make sure 0 does not grab everything
+        base = uint32(0x100_0000)
         if vm.CNT_C.Enabled {
             switch vm.CNT_C.Mst {
             case 0: base = uint32(0x84_0000)
             case 1: base = 0x20000 * uint32(vm.CNT_C.Ofs)
-            case 2: // given to arm7
-            case 3: // slot
+            case 2: // given to arm7, can arm9 access?
             case 4: base = 0x20_0000
             }
             if addr >= base && addr < base + 0x2_0000 {
@@ -211,13 +213,12 @@ func (vm *VRAM) Write(addr uint32, v uint8, arm9 bool) {
             }
         }
 
-        base = uint32(0x100_0000) // make sure 0 does not grab everything
+        base = uint32(0x100_0000)
         if vm.CNT_D.Enabled {
             switch vm.CNT_D.Mst {
             case 0: base = uint32(0x86_0000)
             case 1: base = 0x20000 * uint32(vm.CNT_D.Ofs)
-            case 2: // given to arm7
-            case 3: // slot
+            case 2: // given to arm7, can arm9 access?
             case 4: base = 0x60_0000
             }
             if addr >= base && addr < base + 0x2_0000 {
@@ -225,69 +226,59 @@ func (vm *VRAM) Write(addr uint32, v uint8, arm9 bool) {
             }
         }
 
-        base = uint32(0x100_0000) // make sure 0 does not grab everything
+        base = uint32(0x100_0000)
         if vm.CNT_E.Enabled {
             switch vm.CNT_E.Mst {
             case 0: base = uint32(0x88_0000)
             case 1: base = 0
             case 2: base = 0x40_0000
-            case 3: // slot
-            case 4: // slot
             }
             if addr >= base && addr < base + 0x1_0000 {
                 vm.E[addr - base] = v
             }
         }
 
-        base = uint32(0x100_0000) // make sure 0 does not grab everything
+        base = uint32(0x100_0000)
         if vm.CNT_F.Enabled {
             switch vm.CNT_F.Mst {
             case 0: base = uint32(0x89_0000)
-            case 1: base = 0 // not sure
-            case 2: base = 0 // not sure
-            case 3: // slot
-            case 4: // slot
+            case 1: base = (0x4000 * uint32(vm.CNT_G.Ofs & 1)) + (0x10000 * uint32(vm.CNT_G.Ofs >> 1))
+            case 2: base = 0x40_0000 + (0x4000 * uint32(vm.CNT_G.Ofs & 1)) + (0x10000 * uint32(vm.CNT_G.Ofs >> 1))
             }
             if addr >= base && addr < base + 0x4000 {
                 vm.F[addr - base] = v
             }
         }
 
-        base = uint32(0x100_0000) // make sure 0 does not grab everything
+        base = uint32(0x100_0000)
         if vm.CNT_G.Enabled {
             switch vm.CNT_G.Mst {
             case 0: base = uint32(0x89_4000)
-            case 1: base = 0 // not sure
-            case 2: base = 0 // not sure
-            case 3: // slot
-            case 4: // slot
+            case 1: base = (0x4000 * uint32(vm.CNT_G.Ofs & 1)) + (0x10000 * uint32(vm.CNT_G.Ofs >> 1))
+            case 2: base = 0x40_0000 + (0x4000 * uint32(vm.CNT_G.Ofs & 1)) + (0x10000 * uint32(vm.CNT_G.Ofs >> 1))
             }
             if addr >= base && addr < base + 0x4000 {
                 vm.G[addr - base] = v
             }
         }
 
-        base = uint32(0x100_0000) // make sure 0 does not grab everything
+        base = uint32(0x100_0000)
         if vm.CNT_H.Enabled {
             switch vm.CNT_H.Mst {
-            case 0: base = uint32(0x89_8000)
-            case 1: base = 0x20_0000 // not sure
-            case 2: base = 0 // not sure
-            case 3: // slot
-            case 4: // slot
+            case 0: base = 0x89_8000
+            case 1: base = 0x20_0000
             }
             if addr >= base && addr < base + 0x8000 {
                 vm.H[addr - base] = v
             }
         }
 
-        base = uint32(0x100_0000) // make sure 0 does not grab everything
+        base = uint32(0x100_0000)
         if vm.CNT_I.Enabled {
             switch vm.CNT_I.Mst {
             case 0: base = uint32(0x8A_0000)
-            case 1: base = 0x208000 // not sure
-            case 2: base = 0x600000 // not sure
-            case 3: // slot
+            case 1: base = 0x20_8000
+            case 2: base = 0x60_0000
             }
             if addr >= base && addr < base + 0x4000 {
                 vm.I[addr - base] = v
