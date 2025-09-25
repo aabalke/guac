@@ -35,7 +35,7 @@ func MakeColorFrom15Bit(r, g, b uint8) Color {
 	b = (b << 3) | (b >> 2)
 
 	const d = 0xff
-	return Color{float64(r) / d, float64(g) / d, float64(b) / d, float64(d) / d}
+	return Color{float64(r) / d, float64(g) / d, float64(b) / d, d / d}
 
 }
 

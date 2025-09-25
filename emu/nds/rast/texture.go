@@ -30,21 +30,10 @@ type Texture struct {
 
 func (tex *Texture) WriteCoord(v uint32) {
 
-	negS := v&0x80 != 0
-	s := utils.ConvertToFloat((v & 0xFFFF) &^ 0x80, 4)
-    if negS {
-        s *= -1
-    }
+    // not sure why T has to be flipped, maybe sets to top left instead of bottom left?
 
-    tex.S = s
-
-	negT := (v>>16)&0x80 != 0
-	t := utils.ConvertToFloat((v >> 16) &^ 0x80, 4)
-    if negT {
-        t *= -1
-    }
-
-    tex.T = t
+    tex.S = utils.Convert16ToFloat(uint16(v), 4)
+    tex.T = -utils.Convert16ToFloat(uint16(v >> 16), 4)
 }
 
 func (tex *Texture) WriteParam(v uint32) {

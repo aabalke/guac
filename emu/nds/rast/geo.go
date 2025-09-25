@@ -2,7 +2,6 @@ package rast
 
 import (
 	"fmt"
-	"image/color"
 
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/rast/gl"
@@ -44,6 +43,7 @@ func NewGeoEngine(buffers *Buffers, irq *cpu.Irq) *GeoEngine {
         Irq: irq,
         Buffers: buffers,
         MtxStacks: NewMtxStacks(),
+        //Color: gl.Black,
     }
 }
 
@@ -132,7 +132,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
     }
 
     //fmt.Printf("C %05d %t PACKED %08X IDX %02d % 9X\n", cnt, fifo, g.PackedCmds, g.PackedIdx, data)
-    cnt++
+    //cnt++
 
     if cmd := data[0]; cmd == 0x30 || cmd == 0x31 || cmd == 0x34 {
         g.Data = []uint32{}
@@ -304,7 +304,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             Y: utils.ConvertToFloat(data[2], 12),
             Z: utils.ConvertToFloat(data[3], 12),
         }
-
 
         // no effect on vector matrix - keeps light vector length intact
         if sMode != 2 {
@@ -513,7 +512,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
     default:
         //panic(fmt.Sprintf("UNSETUP GX CMD %02X\n", cmd))
-        fmt.Printf("UNSETUP GX CMD %02X\n", cmd)
+        //fmt.Printf("UNSETUP GX CMD %02X\n", cmd)
 
     }
 
@@ -584,20 +583,22 @@ func (g *GeoEngine) ValidParamCount(fifo bool) bool {
 
 func Write15BitColor(v uint32) gl.Color {
 
-	r := uint8((v) & 0b11111)
-	g := uint8((v >> 5) & 0b11111)
-	b := uint8((v >> 10) & 0b11111)
+    return gl.MakeColorFrom15Bit(
+	uint8((v) & 0b11111),
+	uint8((v >> 5) & 0b11111),
+	uint8((v >> 10) & 0b11111),
+    )
 
-	r = (r << 3) | (r >> 2)
-	g = (g << 3) | (g >> 2)
-	b = (b << 3) | (b >> 2)
+	//r = (r << 3) | (r >> 2)
+	//g = (g << 3) | (g >> 2)
+	//b = (b << 3) | (b >> 2)
 
-    c := color.RGBA{
-        R: r,
-        G: g,
-        B: b,
-        A: 0xFF,
-    }
+    //c := color.RGBA{
+    //    R: r,
+    //    G: g,
+    //    B: b,
+    //    A: 0xFF,
+    //}
 
-    return gl.MakeColor(c)
+    //return gl.MakeColor(c)
 }

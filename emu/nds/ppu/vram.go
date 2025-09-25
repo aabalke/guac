@@ -1,7 +1,6 @@
 package ppu
 
 import (
-	"fmt"
 	"unsafe"
 
 	"github.com/aabalke/guac/emu/nds/utils"
@@ -43,6 +42,9 @@ type VRAM struct {
 
     ExtAPalObj *[0x4000]uint8
     ExtBPalObj *[0x4000]uint8
+
+    TextureSlots [4]*[0x2_0000]uint8
+    TexPalSlots  [6]unsafe.Pointer
 }
 
 type VramCnt struct {
@@ -64,7 +66,17 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
 	case 0x240:
         vm.CNT_A.Write(v)
 
-	case 0x241: vm.CNT_B.Write(v)
+        if vm.CNT_A.Mst == 0 {
+            vm.TextureSlots[0] = &vm.A
+        }
+
+	case 0x241:
+        vm.CNT_B.Write(v)
+
+        if vm.CNT_B.Mst == 1 {
+            vm.TextureSlots[1] = &vm.B
+        }
+
 	case 0x242:
         vm.CNT_C.Write(v)
 
@@ -81,6 +93,11 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
             vm.isCArm7 = false
             vm.CNT_7 &^= 1
         }
+
+        if vm.CNT_C.Mst == 2 {
+            vm.TextureSlots[2] = &vm.C
+        }
+
 
 	case 0x243:
         vm.CNT_D.Write(v)
@@ -100,10 +117,21 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
             vm.CNT_7 &^= 0b10
         }
 
+        if vm.CNT_D.Mst == 3 {
+            vm.TextureSlots[3] = &vm.D
+        }
+
 	case 0x244:
         vm.CNT_E.Write(v)
 
-        if vm.CNT_E.Mst == 4 {
+        switch vm.CNT_E.Mst {
+        case 3:
+            vm.TexPalSlots[0] = unsafe.Pointer(&vm.E)
+            vm.TexPalSlots[1] = unsafe.Add(unsafe.Pointer(&vm.E), 0x4000)
+            vm.TexPalSlots[2] = unsafe.Add(unsafe.Pointer(&vm.E), 0x8000)
+            vm.TexPalSlots[3] = unsafe.Add(unsafe.Pointer(&vm.E), 0xC000)
+
+        case 4:
             vm.ExtABgSlot0 = unsafe.Pointer(&vm.E)
             vm.ExtABgSlot1 = unsafe.Add(unsafe.Pointer(&vm.E), 0x2000)
             vm.ExtABgSlot2 = unsafe.Add(unsafe.Pointer(&vm.E), 0x4000)
@@ -114,6 +142,10 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         vm.CNT_F.Write(v)
 
         switch vm.CNT_F.Mst {
+        case 3:
+            // should these be incre of +0x4000?
+            idx := (vm.CNT_F.Ofs & 1) + (vm.CNT_F.Ofs >> 1) * 4
+            vm.TexPalSlots[idx] = unsafe.Pointer(&vm.F)
         case 4:
 
             if vm.CNT_F.Ofs == 0 {
@@ -133,6 +165,10 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
 
 
         switch vm.CNT_G.Mst {
+        case 3:
+            // should these be incre of +0x4000?
+            idx := (vm.CNT_G.Ofs & 1) + (vm.CNT_G.Ofs >> 1) * 4
+            vm.TexPalSlots[idx] = unsafe.Pointer(&vm.G)
         case 4:
 
             if vm.CNT_G.Ofs == 0 {
@@ -441,64 +477,10 @@ func (vm *VRAM) Read(addr uint32, arm9 bool) uint8 {
 }
 
 func (vm *VRAM) ReadTexture(addr uint32) uint8 {
-
-    var slot [4]*[0x2_0000]uint8
-
-    if vm.CNT_D.Enabled && vm.CNT_D.Mst == 3 {
-        slot[vm.CNT_D.Ofs] = &vm.D
-    }
-
-    if vm.CNT_C.Enabled && vm.CNT_C.Mst == 3 {
-        slot[vm.CNT_C.Ofs] = &vm.C
-    }
-
-    if vm.CNT_B.Enabled && vm.CNT_B.Mst == 3 {
-        slot[vm.CNT_B.Ofs] = &vm.B
-    }
-
-    if vm.CNT_A.Enabled && vm.CNT_A.Mst == 3 {
-        slot[vm.CNT_A.Ofs] = &vm.A
-    }
-
-    switch {
-    case addr < 0x2_0000: return slot[0][addr]
-    case addr < 0x4_0000: return slot[1][addr - 0x2_0000]
-    case addr < 0x6_0000: return slot[2][addr - 0x4_0000]
-    case addr < 0x8_0000: return slot[3][addr - 0x6_0000]
-    }
-
-    panic(fmt.Sprintf("BAD TEXTURE READ ADDR %08X", addr))
+    return vm.TextureSlots[addr>>17][addr&0x1FFFF]
 }
 
 func (vm *VRAM) ReadPalTexture(addr uint32) uint8 {
-
-    var slot [6]unsafe.Pointer
-
-    if vm.CNT_G.Enabled && vm.CNT_G.Mst == 3 {
-        idx := (vm.CNT_G.Ofs & 1) + (vm.CNT_G.Ofs >> 1) * 4
-        slot[idx] = unsafe.Pointer(&vm.G)
-    }
-
-    if vm.CNT_F.Enabled && vm.CNT_F.Mst == 3 {
-        idx := (vm.CNT_F.Ofs & 1) + (vm.CNT_F.Ofs >> 1) * 4
-        slot[idx] = unsafe.Pointer(&vm.F)
-    }
-
-    if vm.CNT_E.Enabled && vm.CNT_E.Mst == 3 {
-        slot[0] = unsafe.Pointer(&vm.E)
-        slot[1] = unsafe.Add(unsafe.Pointer(&vm.E), 0x4000)
-        slot[2] = unsafe.Add(unsafe.Pointer(&vm.E), 0x8000)
-        slot[3] = unsafe.Add(unsafe.Pointer(&vm.E), 0xC000)
-    }
-
-    switch {
-    case addr < 0x04000: return (*[0x4000]uint8)(slot[0])[addr]
-    case addr < 0x08000: return (*[0x4000]uint8)(slot[1])[addr - 0x04000]
-    case addr < 0x0C000: return (*[0x4000]uint8)(slot[2])[addr - 0x08000]
-    case addr < 0x14000: return (*[0x4000]uint8)(slot[3])[addr - 0x0C000]
-    case addr < 0x18000: return (*[0x4000]uint8)(slot[4])[addr - 0x14000]
-    case addr < 0x1C000: return (*[0x4000]uint8)(slot[5])[addr - 0x18000]
-    }
-
-    panic(fmt.Sprintf("Invalid Palette Texture Read %08X\n", addr))
+    slot := (*[0x4000]uint8)(vm.TexPalSlots[addr >> 14])
+    return (*slot)[addr&0x3FFF]
 }

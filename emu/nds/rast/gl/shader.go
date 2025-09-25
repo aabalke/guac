@@ -52,34 +52,16 @@ const (
 
 func (shader *NdsShader) Fragment(v Vertex) Color {
 
-    //IF TexCoordTransformMode=2 THEN TexCoord=NormalVector*Matrix (see TexCoord)
-    //NormalVector=NormalVector*DirectionalMatrix
-    //VertexColor = EmissionColor
-    //FOR i=0 to 3
-    //  IF PolygonAttrLight[i]=enabled THEN
-    //    DiffuseLevel = max(0,-(LightVector[i]*NormalVector))
-    //    ShininessLevel = max(0,(-HalfVector[i])*(NormalVector))^2
-    //    IF TableEnabled THEN ShininessLevel = ShininessTable[ShininessLevel]
-    //    ;note: below processed separately for the R,G,B color components...
-    //    VertexColor = VertexColor + SpecularColor*LightColor[i]*ShininessLevel
-    //    VertexColor = VertexColor + DiffuseColor*LightColor[i]*DiffuseLevel
-    //    VertexColor = VertexColor + AmbientColor*LightColor[i]
-    //  ENDIF
-    //NEXT i
-
-    // When building normal and light vectors, will need to normalize.
-
-    vertexColor := White
-
-    v.Color.A = 0xFF
-    vertexColor = v.Color
+    vertexColor := v.Color
 
     if shader.Texture != nil {
         //vertexColor = shader.Texture.NearestNeightborSample(v.Texture.X, v.Texture.Y)
         vertexColor = shader.Texture.BilinearSample(v.Texture.X, v.Texture.Y)
     }
 
-    //return vertexColor
+    //vertexColor.A = 0xFF
+
+    return vertexColor
 
     for i := range 4 {
 
