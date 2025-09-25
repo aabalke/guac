@@ -66,14 +66,14 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
 	case 0x240:
         vm.CNT_A.Write(v)
 
-        if vm.CNT_A.Mst == 0 {
+        if vm.CNT_A.Mst == 3 {
             vm.TextureSlots[0] = &vm.A
         }
 
 	case 0x241:
         vm.CNT_B.Write(v)
 
-        if vm.CNT_B.Mst == 1 {
+        if vm.CNT_B.Mst == 3 {
             vm.TextureSlots[1] = &vm.B
         }
 
@@ -94,7 +94,7 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
             vm.CNT_7 &^= 1
         }
 
-        if vm.CNT_C.Mst == 2 {
+        if vm.CNT_C.Mst == 3 {
             vm.TextureSlots[2] = &vm.C
         }
 
@@ -345,7 +345,6 @@ func (vm *VRAM) Read(addr uint32, arm9 bool) uint8 {
             case 0: base = uint32(0x80_0000)
             case 1: base = 0x20000 * uint32(vm.CNT_A.Ofs)
             case 2: base = 0x400000 + 0x20000 * uint32(vm.CNT_A.Ofs)
-            case 3: // slot
             }
             if addr >= base && addr < base + 0x2_0000 {
                 return vm.A[addr - base]
@@ -358,7 +357,6 @@ func (vm *VRAM) Read(addr uint32, arm9 bool) uint8 {
             case 0: base = uint32(0x82_0000)
             case 1: base = 0x20000 * uint32(vm.CNT_B.Ofs)
             case 2: base = 0x400000 + 0x20000 * uint32(vm.CNT_B.Ofs)
-            case 3: // slot
             }
             if addr >= base && addr < base + 0x2_0000 {
                 return vm.B[addr - base]
@@ -371,7 +369,6 @@ func (vm *VRAM) Read(addr uint32, arm9 bool) uint8 {
             case 0: base = uint32(0x84_0000)
             case 1: base = 0x20000 * uint32(vm.CNT_C.Ofs)
             case 2: // given to arm7
-            case 3: // slot 
             case 4: base = 0x20_0000
             }
             if addr >= base && addr < base + 0x2_0000 {
@@ -385,7 +382,6 @@ func (vm *VRAM) Read(addr uint32, arm9 bool) uint8 {
             case 0: base = uint32(0x86_0000)
             case 1: base = 0x20000 * uint32(vm.CNT_D.Ofs)
             case 2: // given to arm7
-            case 3: // slot
             case 4: base = 0x60_0000
             }
             if addr >= base && addr < base + 0x2_0000 {
@@ -399,8 +395,6 @@ func (vm *VRAM) Read(addr uint32, arm9 bool) uint8 {
             case 0: base = uint32(0x88_0000)
             case 1: base = 0
             case 2: base = 0x40_0000
-            case 3: // slot
-            case 4: // slot
             }
             if addr >= base && addr < base + 0x1_0000 {
                 return vm.E[addr - base]
@@ -411,10 +405,8 @@ func (vm *VRAM) Read(addr uint32, arm9 bool) uint8 {
         if vm.CNT_F.Enabled {
             switch vm.CNT_F.Mst {
             case 0: base = uint32(0x89_0000)
-            case 1: base = 0 // not sure
-            case 2: base = 0 // not sure
-            case 3: // slot
-            case 4: // slot
+            case 1: base = (0x4000 * uint32(vm.CNT_F.Ofs & 1)) + (0x10000 * uint32(vm.CNT_F.Ofs >> 1))
+            case 2: base = 0x40_0000 + (0x4000 * uint32(vm.CNT_F.Ofs & 1)) + (0x10000 * uint32(vm.CNT_F.Ofs >> 1))
             }
             if addr >= base && addr < base + 0x4000 {
                 return vm.F[addr - base]
@@ -425,10 +417,8 @@ func (vm *VRAM) Read(addr uint32, arm9 bool) uint8 {
         if vm.CNT_G.Enabled {
             switch vm.CNT_G.Mst {
             case 0: base = uint32(0x89_4000)
-            case 1: base = 0 // not sure
-            case 2: base = 0 // not sure
-            case 3: // slot
-            case 4: // slot
+            case 1: base = (0x4000 * uint32(vm.CNT_G.Ofs & 1)) + (0x10000 * uint32(vm.CNT_G.Ofs >> 1))
+            case 2: base = 0x40_0000 + (0x4000 * uint32(vm.CNT_G.Ofs & 1)) + (0x10000 * uint32(vm.CNT_G.Ofs >> 1))
             }
             if addr >= base && addr < base + 0x4000 {
                 return vm.G[addr - base]
@@ -438,11 +428,8 @@ func (vm *VRAM) Read(addr uint32, arm9 bool) uint8 {
         base = uint32(0x100_0000) // make sure 0 does not grab everything
         if vm.CNT_H.Enabled {
             switch vm.CNT_H.Mst {
-            case 0: base = uint32(0x89_8000)
-            case 1: base = 0x20_0000 // not sure
-            case 2: base = 0 // not sure
-            case 3: // slot
-            case 4: // slot
+            case 0: base = 0x89_8000
+            case 1: base = 0x20_0000
             }
             if addr >= base && addr < base + 0x8000 {
                 return vm.H[addr - base]
@@ -453,9 +440,8 @@ func (vm *VRAM) Read(addr uint32, arm9 bool) uint8 {
         if vm.CNT_I.Enabled {
             switch vm.CNT_I.Mst {
             case 0: base = uint32(0x8A_0000)
-            case 1: base = 0x208000 // not sure
-            case 2: base = 0x600000 // not sure
-            case 3: // slot
+            case 1: base = 0x20_8000
+            case 2: base = 0x60_0000
             }
             if addr >= base && addr < base + 0x4000 {
                 return vm.I[addr - base]
