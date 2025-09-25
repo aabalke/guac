@@ -95,10 +95,6 @@ func (r *Render) RenderPolygon(p *Polygon) {
 
         for i := 0; i < len(p.Vertices); i += 4 {
 
-            //if i + 3 > len(p.Vertices) {
-            //    continue
-            //}
-
             quad := gl.NewQuad(
                 p.Vertices[i+3],
                 p.Vertices[i+2],

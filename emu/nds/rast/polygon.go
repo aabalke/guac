@@ -240,7 +240,15 @@ func (p *Polygon) GetTexture(vram VRAM) gl.Texture {
 
     case TEX_FMT_4X4:
 
-        panic("UNSETUP TEXTURE FMT 4X4")
+        return &gl.CompressedTexture{
+            Width: int(t.SizeS),
+            Height: int(t.SizeT),
+            Vram: vram,
+            VramBase: t.VramOffset,
+            PalBase: t.PaletteBaseAddr * 0x10,
+        }
+
+        //panic("UNSETUP TEXTURE FMT 4X4")
 
     default: // this loads entire direct color texture in memory and sends it
         
