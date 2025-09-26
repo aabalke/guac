@@ -27,7 +27,7 @@ func (nds *Nds) graphics(y uint32) {
 	case 2:
 		nds.vramDisplay(y, a)
 	case 3:
-		panic("UNSETUP MAIN MEMORY DISPLAY")
+        nds.MemFifoDisplay(a)
 	}
 
     switch b.Dispcnt.DisplayMode {
@@ -59,6 +59,10 @@ func (nds *Nds) vramDisplay(y uint32, engine *ppu.Engine) {
         index := (x + (y * SCREEN_WIDTH)) * 4
         nds.applyColor(palData, index, engine.Pixels)
     }
+}
+
+func (nds *Nds) MemFifoDisplay(engine *ppu.Engine) {
+    copy(*engine.Pixels, nds.ppu.DisplayFifo.Pixels)
 }
 
 func (nds *Nds) standard(y uint32, engine *ppu.Engine) {
@@ -129,6 +133,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_3D :
                 palData, ok = nds.set3d(engine, bg, x, y)
+
             case ppu.BG_TYPE_BGM:
 				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_256:
@@ -164,7 +169,6 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 
             switch {
             case obj.Mode == 3:
-
                 palData, ok = nds.setBmpObjectAffinePixel(engine, obj, x, y)
             case obj.RotScale:
                 palData, ok = nds.setObjectAffinePixel(engine, obj, x, y)
@@ -257,7 +261,10 @@ func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {
 
 func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, bool) {
 	index := (x + (y * SCREEN_WIDTH))
-    pal, ok:= uint32(nds.ppu.Rasterizer.Render.PixelPalettes[index]), true
+
+    render := nds.ppu.Rasterizer.Render
+
+    pal, ok:= uint32(render.PixelPalettes[index]), render.AlphaPixels[index]
 
     if nds.ppu.Rasterizer.Disp3dCnt.RearPlaneBitmapEnabled == true {
         panic("Has Rear Plane")
@@ -570,7 +577,7 @@ func (nds *Nds) setDirectBitmap(engine *ppu.Engine, bg *ppu.Background, x uint32
 		return 0, false
 	}
 
-    addr := uint32(xIdx+(yIdx * int(bg.W) * 2))
+    addr := uint32(xIdx+(yIdx * int(bg.W))) * 2
 
     addr += bg.ScreenBaseBlock * 8
 
@@ -582,7 +589,7 @@ func (nds *Nds) setDirectBitmap(engine *ppu.Engine, bg *ppu.Background, x uint32
     data := uint32(nds.ppu.Vram.Read(addr, true))
     data |= uint32(nds.ppu.Vram.Read(addr + 1, true)) << 8
 
-    // if on transparent???
+    // if on transparent??? maybe not
     if transparent := (data >> 15) & 1 == 0; transparent {
         return 0, false
     }
@@ -606,7 +613,7 @@ func (nds *Nds) setRawBitmap(engine *ppu.Engine, x, y uint32) (uint32, bool) {
     case 3: bank = &nds.ppu.Vram.D
     }
 
-    bank = &nds.ppu.Vram.A
+    //bank = &nds.ppu.Vram.A
 
     //data := uint32(binary.LittleEndian.Uint16(bank[addr:]) &^ 0x80)
     data := uint32(binary.LittleEndian.Uint16(bank[addr:]))
@@ -894,17 +901,26 @@ func getObjTileAddr(obj *ppu.Object, enTileX, enTileY, inTileX, inTileY uint32) 
 	return tileAddr + inTileIdx
 }
 
-func getBmpTileAddr(obj *ppu.Object, xIdx, yIdx int) uint32 {
+func getBmpTileAddr(obj *ppu.Object, xIdx, yIdx uint32) uint32 {
 
     const BYTES_PER_PIXEL = 2
 
 	if obj.OneDimensional {
-        return uint32((xIdx+(yIdx << int(obj.BmpBoundaryShift))) * BYTES_PER_PIXEL)
+        return uint32(xIdx+(yIdx << obj.BmpBoundaryShift)) * BYTES_PER_PIXEL
 	}
 
-    panic("OBJ BMP 2D, make sure addr calc accurate")
+    //fmt.Printf("OBJ BMP 2D, need to match Obj 2D Tile.\n")
+    maskX := obj.BmpBoundaryMask
+    base := ((obj.CharName & maskX) << 4) + ((obj.CharName & ^maskX) << 7)
 
-    return uint32((xIdx+(yIdx << int(obj.BmpBoundaryShift))) * BYTES_PER_PIXEL)
+    var pixelOffset uint32
+    if obj.ObjBmpMapping == ppu.OBJ_BMP_128_2D {
+        pixelOffset = (yIdx*(obj.W << 1) + xIdx) * BYTES_PER_PIXEL
+    } else {
+        pixelOffset = (yIdx*(obj.W << 2) + xIdx) * BYTES_PER_PIXEL
+    }
+
+    return base + pixelOffset
 }
 
 func getBgPaletteData(nds *Nds, engine *ppu.Engine, bgIdx uint32, pal256 bool, palNum, tileData, inTileX uint32) (uint32, bool) {
@@ -1115,7 +1131,7 @@ func (nds *Nds) setBmpObjectAffinePixel(engine *ppu.Engine, obj *ppu.Object, x, 
 		return 0, false
 	}
 
-	addr := getBmpTileAddr(obj, xIdx, yIdx)
+	addr := getBmpTileAddr(obj, uint32(xIdx), uint32(yIdx))
 
     vramOffset := uint32(0x40_0000)
     if engine.IsB {
@@ -1128,9 +1144,6 @@ func (nds *Nds) setBmpObjectAffinePixel(engine *ppu.Engine, obj *ppu.Object, x, 
     if alpha := (data & 0x8000) == 0; alpha {
         return 0, false
     }
-
-    data &^= 0x8000
-
 
     return data, true
 }

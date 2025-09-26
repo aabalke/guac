@@ -221,7 +221,6 @@ BLX ARM needs to occur before Cond
 # Games (Decrypted)
 
 ### Nonpanic Crash
-Housemd
 Zelda Spirit Tracks
 Zelda Phantom Hourglass
 Sonic Chronicles The Dark Brotherhood
@@ -229,8 +228,12 @@ Mario And Luigi Bowsers Inside Story
 Pokemon Heartgold
 Metroid Prime Hunters
 
-### Booting (Buggyie)
+### Capture Required
+Housemd
+Lego Star Wars the Complete Saga
 Nintendogs Best Friends
+
+### Booting (Buggyie)
 Animal Crossing Wild World
 Brain Age
 Sonic Colors

@@ -8,6 +8,12 @@ import (
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
+const (
+	SCREEN_WIDTH  = 256
+	SCREEN_HEIGHT = 192
+)
+
+
 type PPU struct {
     EngineA Engine
     EngineB Engine
@@ -23,6 +29,9 @@ type PPU struct {
 
     Pram PRAM
     Vram VRAM
+
+    Capture Capture
+    DisplayFifo DisplayFifo
 }
 
 type Engine struct {
@@ -148,6 +157,7 @@ type Object struct {
 
     TileBoundaryShift uint32
     BmpBoundaryShift uint32
+    BmpBoundaryMask uint32
 }
 
 func NewPPU(top, bottom *[]byte, irq *cpu.Irq) *PPU {
@@ -158,6 +168,8 @@ func NewPPU(top, bottom *[]byte, irq *cpu.Irq) *PPU {
     p.EngineB.Pixels = top
     p.EngineB.IsB = true
     p.Rasterizer = rast.NewRasterizer(&p.Vram, irq)
+    p.Capture.Init(&p.Vram, p, &p.EngineA.Dispcnt.VramBlock)
+    p.DisplayFifo.Pixels = make([]uint8, SCREEN_WIDTH*SCREEN_HEIGHT*4)
 
     return p
 
@@ -173,11 +185,10 @@ func (p *PPU) Update(addr, v uint32) {
 
     if capture := addr >= 0x60 && addr < 0x68; capture {
         //fmt.Printf("CAPTURE %08X %02X\n", addr, v)
-
+        return
     }
 
     if engineRender := addr >= 0x320 && addr < 0x400; engineRender && p.RenderingEngine {
-
         return
     }
 
@@ -891,19 +902,18 @@ func (e *Engine) UpdateObjMapping(d *Dispcnt) {
         switch {
         case !d.BitmapObj1D && !d.BitmapObj256:
             obj.ObjBmpMapping = OBJ_BMP_128_2D
-            // this calc needs to be fixed
-            //obj.BmpBoundaryShift = 8
-            //panic("NEED TO SET UP 2D BITMAP OBJ")
+            obj.BmpBoundaryMask = 0x0F
         case !d.BitmapObj1D && d.BitmapObj256:
             obj.ObjBmpMapping = OBJ_BMP_256_2D
-            //obj.BmpBoundaryShift = 8
+            obj.BmpBoundaryMask = 0x1F
+
             //panic("NEED TO SET UP 2D BITMAP OBJ")
         case d.BitmapObj1D && !d.BitmapObj256 && !d.BitmapObjBoundary:
             obj.ObjBmpMapping = OBJ_BMP_128_1D
-            obj.TileBoundaryShift = 7 // 256
+            obj.BmpBoundaryShift = 6 //128
         case d.BitmapObj1D && !d.BitmapObj256 && d.BitmapObjBoundary:
             obj.ObjBmpMapping = OBJ_BMP_256_1D
-            obj.TileBoundaryShift = 8 // 256
+            obj.BmpBoundaryShift = 6 //256
         case d.BitmapObj1D && d.BitmapObj256:
             panic("DISPCNT HAS BOTH BITMAP 1D AND 256 SET")
         }
