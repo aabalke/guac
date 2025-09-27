@@ -349,80 +349,22 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         g.Texture.WriteCoord(data[1])
 
     case 0x23:
-
-        g.Vertex = g.ActivePoly.WriteVtx16(
-            data,
-            &g.ClipMatrix,
-            g.Color,
-            g.Texture.S,
-            g.Texture.T,
-            &g.StoredNormal,
-        )
+        g.Vertex = g.ActivePoly.WriteVertex(data, g, V_16)
 
     case 0x24:
-
-        g.Vertex = g.ActivePoly.WriteVtx10(
-            data,
-            &g.ClipMatrix,
-            g.Color,
-            g.Texture.S,
-            g.Texture.T,
-            &g.StoredNormal,
-        )
+        g.Vertex = g.ActivePoly.WriteVertex(data, g, V_10)
 
     case 0x25:
-
-        g.Vertex = g.ActivePoly.WriteVtxRelative(
-            data,
-            &g.ClipMatrix,
-            g.Color,
-            g.Texture.S,
-            g.Texture.T,
-            g.Vertex,
-            REL_XY,
-            &g.StoredNormal,
-        )
+        g.Vertex = g.ActivePoly.WriteVertex(data, g, V_XY)
 
     case 0x26:
-
-        g.Vertex = g.ActivePoly.WriteVtxRelative(
-            data,
-            &g.ClipMatrix,
-            g.Color,
-            g.Texture.S,
-            g.Texture.T,
-            g.Vertex,
-            REL_XZ,
-            &g.StoredNormal,
-        )
+        g.Vertex = g.ActivePoly.WriteVertex(data, g, V_XZ)
 
     case 0x27:
-
-        g.Vertex = g.ActivePoly.WriteVtxRelative(
-            data,
-            &g.ClipMatrix,
-            g.Color,
-            g.Texture.S,
-            g.Texture.T,
-            g.Vertex,
-            REL_YZ,
-            &g.StoredNormal,
-        )
+        g.Vertex = g.ActivePoly.WriteVertex(data, g, V_YZ)
 
     case 0x28:
-
-        // not sure if accurate
-
-        g.Vertex = g.ActivePoly.WriteVtxDiff(
-            data,
-            &g.ClipMatrix,
-            g.Color,
-            g.Texture.S,
-            g.Texture.T,
-            g.Vertex,
-            REL_YZ,
-            &g.StoredNormal,
-        )
+        g.Vertex = g.ActivePoly.WriteVertex(data, g, V_DF)
 
     case 0x29:
 

@@ -53,6 +53,93 @@ func (p *Polygon) WriteAttrs(v uint32) {
     //fmt.Printf("LIGHTS % v\n", p.LightsEnabled)
 }
 
+const (
+
+    V_16 = 0
+    V_10 = 1
+    V_XY = 2
+    V_XZ = 3
+    V_YZ = 4
+    V_DF = 5
+
+)
+
+func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Vertex {
+
+    var S, T float64
+    S = g.Texture.S
+    T = g.Texture.T
+    switch g.Texture.TransformationMode { // textrans
+    case 0: // continue
+    case 1:
+
+        textureVertex := gl.VectorW{
+            X: S,
+            Y: T,
+            Z: 1.0/16,
+            W: 1.0/16,
+        }
+
+        mtx := &g.MtxStacks.Stacks[3].CurrMtx
+
+        //S = textureVertex.Dot(mtx.Col(0))
+        //T = textureVertex.Dot(mtx.Col(1))
+        S = textureVertex.Dot(mtx.Row(0))
+        T = textureVertex.Dot(mtx.Row(1))
+
+    default:
+        //panic("UNSETUP TEXTURE TRANSFORMATION MODE")
+    }
+
+    var x, y, z float64
+
+    switch method {
+    case V_16:
+        x = utils.Convert16ToFloat(uint16(data[1]), 12)
+        y = utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
+        z = utils.Convert16ToFloat(uint16(data[2]), 12)
+    case V_10:
+        x = utils.Convert10ToFloat(uint16(data[1]), 6)
+        y = utils.Convert10ToFloat(uint16(data[1] >> 10), 6)
+        z = utils.Convert10ToFloat(uint16(data[1] >> 20), 6)
+    case V_XY:
+        prev := g.Vertex
+        x = utils.Convert16ToFloat(uint16(data[1]), 12)
+        y = utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
+        z = prev.Position.Z
+    case V_XZ:
+        prev := g.Vertex
+        x = utils.Convert16ToFloat(uint16(data[1]), 12)
+        y = prev.Position.Y
+        z = utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
+    case V_YZ:
+        prev := g.Vertex
+        x = prev.Position.X
+        y = utils.Convert16ToFloat(uint16(data[1]), 12)
+        z = utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
+    case V_DF:
+        prev := g.Vertex
+        convert := func(v uint16) float64 {
+            raw := int32(v & 0x3FF)
+            if raw&0x200 != 0 {
+                raw |= ^0x3FF
+            }
+
+            f := float64(raw) / (1 << 9)
+
+            return f / 8.0
+        }
+
+        x = convert(uint16(data[1]))     + prev.Position.X
+        y = convert(uint16(data[1]>>10)) + prev.Position.Y
+        z = convert(uint16(data[1]>>20)) + prev.Position.Z
+    }
+
+    v := p.GetVertex(x, y, z, &g.ClipMatrix, g.Color, S, T, &g.StoredNormal)
+    p.Vertices = append(p.Vertices, v)
+    return &v
+}
+
 func (p *Polygon) GetVertex(x, y, z float64, clipMtx *gl.Matrix, color gl.Color, S, T float64, normal *gl.Vector) gl.Vertex {
 
     vert := gl.VectorW{X: x,Y: y,Z: z,W: 1.0}
@@ -69,93 +156,6 @@ func (p *Polygon) GetVertex(x, y, z float64, clipMtx *gl.Matrix, color gl.Color,
     }
 
     return v
-}
-
-func (p *Polygon) WriteVtx16(data []uint32, clipMtx *gl.Matrix, color gl.Color, S, T float64, normal *gl.Vector) *gl.Vertex {
-
-    x := utils.Convert16ToFloat(uint16(data[1]), 12)
-    y := utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
-    z := utils.Convert16ToFloat(uint16(data[2]), 12)
-
-    v := p.GetVertex(x, y, z, clipMtx, color, S, T, normal)
-    p.Vertices = append(p.Vertices, v)
-    return &v
-}
-
-func (p *Polygon) WriteVtx10(data []uint32, clipMtx *gl.Matrix, color gl.Color, S, T float64, normal *gl.Vector) *gl.Vertex {
-
-    x := utils.Convert10ToFloat(uint16(data[1]), 6)
-    y := utils.Convert10ToFloat(uint16(data[1] >> 10), 6)
-    z := utils.Convert10ToFloat(uint16(data[1] >> 20), 6)
-
-    v := p.GetVertex(x, y, z, clipMtx, color, S, T, normal)
-    p.Vertices = append(p.Vertices, v)
-    return &v
-}
-
-const (
-    REL_XY = 0
-    REL_XZ = 1
-    REL_YZ = 2
-)
-
-func (p *Polygon) WriteVtxRelative(data []uint32, clipMtx *gl.Matrix, color gl.Color, S, T float64, prev *gl.Vertex, set uint8, normal *gl.Vector) *gl.Vertex {
-
-    var x, y, z float64
-    switch set {
-    case REL_XY:
-        x = utils.Convert16ToFloat(uint16(data[1]), 12)
-        y = utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
-        z = prev.Position.Z
-    case REL_XZ:
-        x = utils.Convert16ToFloat(uint16(data[1]), 12)
-        y = prev.Position.Y
-        z = utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
-    case REL_YZ:
-        x = prev.Position.X
-        y = utils.Convert16ToFloat(uint16(data[1]), 12)
-        z = utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
-    }
-
-    v := p.GetVertex(x, y, z, clipMtx, color, S, T, normal)
-    p.Vertices = append(p.Vertices, v)
-    return &v
-}
-
-func (p *Polygon) WriteVtxDiff(data []uint32, clipMtx *gl.Matrix, color gl.Color, S, T float64, prev *gl.Vertex, set uint8, normal *gl.Vector) *gl.Vertex {
-
-    // mine
-    //convert := func(v uint16) float64 {
-    //    v &= 0x3FF
-    //    v <<= 6
-    //    a := float64(int16(v) >> 6)
-    //    a /= 8
-    //    return a
-    //}
-
-    convert := func(v uint16) float64 {
-        // 10-bit signed value
-        raw := int32(v & 0x3FF)
-        if raw&0x200 != 0 { // if sign bit set
-            raw |= ^0x3FF   // sign extend
-        }
-
-        // raw is now signed 10-bit integer
-
-        // Convert to float with 9 fractional bits
-        f := float64(raw) / (1 << 9) // divide by 512
-
-        // Expand to 12-bit fraction by dividing by 8
-        return f / 8.0
-    }
-
-    x := convert(uint16(data[1]))     + prev.Position.X
-    y := convert(uint16(data[1]>>10)) + prev.Position.Y
-    z := convert(uint16(data[1]>>20)) + prev.Position.Z
-
-    v := p.GetVertex(x, y, z, clipMtx, color, S, T, normal)
-    p.Vertices = append(p.Vertices, v)
-    return &v
 }
 
 // this is temp using imagetexture, would be best to get texture more effectently

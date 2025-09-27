@@ -44,6 +44,10 @@ func (tex *Texture) WriteParam(v uint32) {
     tex.TransparentZero = utils.BitEnabled(v, 29)
     tex.TransformationMode = utils.GetVarData(v, 30, 31)
 
+    //if tex.TransformationMode != 0 {
+    //    fmt.Printf("MODE %02d\n", tex.TransformationMode)
+    //}
+
     //if tex.Format != 0 && tex.Format != 7 && tex.Format != 2 {panic(fmt.Sprintf("Unsetup texture format %d", tex.Format))}
 }
 

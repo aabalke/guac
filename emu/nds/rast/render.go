@@ -41,13 +41,9 @@ func NewRender(rast *Rasterizer, buffers *Buffers, rp *RearPlane) *Render {
 
 func (r *Render) UpdateRender() {
 
-    //r.Rasterizer.DebugTexture(7)
-    //return
-
     r.Context.ClearColor = r.RearPlane.ClearColor
     r.Context.ClearColorBuffer()
     r.Context.ClearDepthBuffer()
-
 
     r.Context.Shader = gl.NewNdsShader(r.Rasterizer.GeoEngine.Lights)
 
@@ -61,6 +57,7 @@ func (r *Render) UpdateRender() {
 	image := r.Context.Image()
 
     r.ImageToPixels(image)
+    //r.Rasterizer.DebugTexture()
 }
 
 func (r *Render) RenderPolygon(p *Polygon) {

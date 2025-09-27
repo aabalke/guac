@@ -54,6 +54,36 @@ func Screen(w, h int) Matrix {
 	}
 }
 
+func (m Matrix) Col(i int) VectorW {
+	switch i {
+	case 0:
+		return VectorW{m.X00, m.X10, m.X20, m.X30}
+	case 1:
+		return VectorW{m.X01, m.X11, m.X21, m.X31}
+	case 2:
+		return VectorW{m.X02, m.X12, m.X22, m.X32}
+	case 3:
+		return VectorW{m.X03, m.X13, m.X23, m.X33}
+	default:
+		panic("invalid column index")
+	}
+}
+
+func (m Matrix) Row(i int) VectorW {
+	switch i {
+	case 0:
+		return VectorW{m.X00, m.X01, m.X02, m.X03}
+	case 1:
+		return VectorW{m.X10, m.X11, m.X12, m.X13}
+	case 2:
+		return VectorW{m.X20, m.X21, m.X22, m.X23}
+	case 3:
+		return VectorW{m.X30, m.X31, m.X32, m.X33}
+	default:
+		panic("invalid row index")
+	}
+}
+
 func (m Matrix) Translate(v Vector) Matrix {
 	return Translate(v).Mul(m)
 }

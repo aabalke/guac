@@ -152,7 +152,6 @@ type PalColorTexture struct {
     BitsPerTexel uint32
     BitsPerTexelShift uint32
     TransparentZero bool
-
 }
 
 func (t *PalColorTexture) Sample(u, v float64) Color {
@@ -253,8 +252,6 @@ func (t *TranslucentTexture) getColor(x, y int) Color {
         colorIdx = palIdx & 0b11111
     }
 
-    //log.Printf("TRANSLUCENT TEXTURE. NEED ALPHA SETUP")
-
     colorIdx *= 2
 
     data := uint32(t.Vram.ReadPalTexture(t.PalBase + colorIdx))
@@ -288,6 +285,7 @@ func (t *CompressedTexture) Sample(u, v float64) Color {
 	v -= math.Floor(v)
 	x := int(u * float64(t.Width))
 	y := int(v * float64(t.Height))
+
     return t.getColor(x, y)
 }
 
@@ -309,14 +307,19 @@ func (t *CompressedTexture) BilinearSample(u, v float64) Color {
 
 func (t *CompressedTexture) getColor(x, y int) Color {
 
-    slot1Base := uint32(0x2_0000)
+    //slot1Base := uint32(0x2_0000)
 
     slot0Base := t.VramBase
     palBase := t.PalBase
 
+    slot1Base := uint32(0x2_0000)
+
+    if slot0Base >= 0x4_0000 {
+        slot1Base += uint32(0x1_0000)
+    }
+
     blockX, blockY := x   >> 2, y   >> 2
     texelX, texelY := x & 0b11, y & 0b11
-
     blockIdx := uint32(blockY*(t.Width/4) + blockX)
 
     blockData := uint32(t.Vram.ReadTexture(slot0Base + blockIdx * 4))
