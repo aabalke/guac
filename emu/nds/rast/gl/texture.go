@@ -17,7 +17,6 @@ type VRAM interface {
 type Texture interface {
 	Sample(u, v float64) Color
 	BilinearSample(u, v float64) Color
-    NearestNeightborSample(u , v float64) Color
 }
 
 type BilinearCoords struct {
@@ -27,7 +26,6 @@ type BilinearCoords struct {
 }
 
 func getBilinearCoords(w, h, u, v float64) BilinearCoords {
-	v = 1 - v
 	u -= math.Floor(u)
 	v -= math.Floor(v)
 	x := u * float64(w-1)
@@ -77,18 +75,6 @@ func (t *ImageTexture) Sample(u, v float64) Color {
 	return MakeColor(t.Image.At(x, y))
 }
 
-func (t *ImageTexture) NearestNeightborSample(u, v float64) Color {
-    v = 1 - v
-
-    u -= math.Floor(u)
-    v -= math.Floor(v)
-
-    x := int(math.Round(u * float64(t.Width-1)))
-    y := int(math.Round(v * float64(t.Height-1)))
-
-    return MakeColor(t.Image.At(x, y))
-}
-
 func (t *ImageTexture) BilinearSample(u, v float64) Color {
 
     coords := getBilinearCoords(float64(t.Width), float64(t.Height), u, v)
@@ -122,23 +108,10 @@ type DirectColorTexture struct {
 }
 
 func (t *DirectColorTexture) Sample(u, v float64) Color {
-	v = 1 - v
 	u -= math.Floor(u)
 	v -= math.Floor(v)
 	x := int(u * float64(t.Width))
 	y := int(v * float64(t.Height))
-    return t.getColor(x, y)
-}
-
-func (t *DirectColorTexture) NearestNeightborSample(u, v float64) Color {
-    v = 1 - v
-
-    u -= math.Floor(u)
-    v -= math.Floor(v)
-
-    x := int(math.Round(u * float64(t.Width-1)))
-    y := int(math.Round(v * float64(t.Height-1)))
-
     return t.getColor(x, y)
 }
 
@@ -179,26 +152,14 @@ type PalColorTexture struct {
     BitsPerTexel uint32
     BitsPerTexelShift uint32
     TransparentZero bool
+
 }
 
 func (t *PalColorTexture) Sample(u, v float64) Color {
-	v = 1 - v
 	u -= math.Floor(u)
 	v -= math.Floor(v)
 	x := int(u * float64(t.Width))
 	y := int(v * float64(t.Height))
-    return t.getColor(x, y)
-}
-
-func (t *PalColorTexture) NearestNeightborSample(u, v float64) Color {
-    v = 1 - v
-
-    u -= math.Floor(u)
-    v -= math.Floor(v)
-
-    x := int(math.Round(u * float64(t.Width-1)))
-    y := int(math.Round(v * float64(t.Height-1)))
-
     return t.getColor(x, y)
 }
 
@@ -255,23 +216,10 @@ type TranslucentTexture struct {
 }
 
 func (t *TranslucentTexture) Sample(u, v float64) Color {
-	v = 1 - v
 	u -= math.Floor(u)
 	v -= math.Floor(v)
 	x := int(u * float64(t.Width))
 	y := int(v * float64(t.Height))
-    return t.getColor(x, y)
-}
-
-func (t *TranslucentTexture) NearestNeightborSample(u, v float64) Color {
-    v = 1 - v
-
-    u -= math.Floor(u)
-    v -= math.Floor(v)
-
-    x := int(math.Round(u * float64(t.Width-1)))
-    y := int(math.Round(v * float64(t.Height-1)))
-
     return t.getColor(x, y)
 }
 
@@ -294,7 +242,6 @@ func (t *TranslucentTexture) BilinearSample(u, v float64) Color {
 func (t *TranslucentTexture) getColor(x, y int) Color {
 
     i := uint32(x + (y * t.Width))
-
 
     palIdx := uint32(t.Vram.ReadTexture(t.VramBase + i))
 
@@ -326,7 +273,6 @@ func (t *TranslucentTexture) getColor(x, y int) Color {
         c.A = float64(palIdx >> 5) / 7
     }
 
-
     return c
 }
 
@@ -338,11 +284,11 @@ type CompressedTexture struct {
 }
 
 func (t *CompressedTexture) Sample(u, v float64) Color {
-    return MakeColor(color.White)
-}
-
-func (t *CompressedTexture) NearestNeightborSample(u, v float64) Color {
-    return MakeColor(color.White)
+	u -= math.Floor(u)
+	v -= math.Floor(v)
+	x := int(u * float64(t.Width))
+	y := int(v * float64(t.Height))
+    return t.getColor(x, y)
 }
 
 func (t *CompressedTexture) BilinearSample(u, v float64) Color {

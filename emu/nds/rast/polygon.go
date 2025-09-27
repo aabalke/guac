@@ -89,8 +89,6 @@ func (p *Polygon) WriteVtx10(data []uint32, clipMtx *gl.Matrix, color gl.Color, 
     z := utils.Convert10ToFloat(uint16(data[1] >> 20), 6)
 
     v := p.GetVertex(x, y, z, clipMtx, color, S, T, normal)
-
-
     p.Vertices = append(p.Vertices, v)
     return &v
 }
@@ -126,7 +124,6 @@ func (p *Polygon) WriteVtxRelative(data []uint32, clipMtx *gl.Matrix, color gl.C
 
 func (p *Polygon) WriteVtxDiff(data []uint32, clipMtx *gl.Matrix, color gl.Color, S, T float64, prev *gl.Vertex, set uint8, normal *gl.Vector) *gl.Vertex {
 
-
     // mine
     //convert := func(v uint16) float64 {
     //    v &= 0x3FF
@@ -137,20 +134,20 @@ func (p *Polygon) WriteVtxDiff(data []uint32, clipMtx *gl.Matrix, color gl.Color
     //}
 
     convert := func(v uint16) float64 {
-    // 10-bit signed value
-    raw := int32(v & 0x3FF)
-    if raw&0x200 != 0 { // if sign bit set
-        raw |= ^0x3FF   // sign extend
+        // 10-bit signed value
+        raw := int32(v & 0x3FF)
+        if raw&0x200 != 0 { // if sign bit set
+            raw |= ^0x3FF   // sign extend
+        }
+
+        // raw is now signed 10-bit integer
+
+        // Convert to float with 9 fractional bits
+        f := float64(raw) / (1 << 9) // divide by 512
+
+        // Expand to 12-bit fraction by dividing by 8
+        return f / 8.0
     }
-
-    // raw is now signed 10-bit integer
-
-    // Convert to float with 9 fractional bits
-    f := float64(raw) / (1 << 9) // divide by 512
-
-    // Expand to 12-bit fraction by dividing by 8
-    return f / 8.0
-}
 
     x := convert(uint16(data[1]))     + prev.Position.X
     y := convert(uint16(data[1]>>10)) + prev.Position.Y

@@ -167,7 +167,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             s1.CurrMtx = gl.Identity()
         }
 
-        g.UpdateClipMtx()
 
     case 0x16:
 
@@ -195,7 +194,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             s1.CurrMtx = m
         }
 
-        g.UpdateClipMtx()
 
     case 0x17:
 
@@ -220,7 +218,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             s1.CurrMtx = m
         }
 
-        g.UpdateClipMtx()
 
     case 0x18:
 
@@ -248,7 +245,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             s1.CurrMtx = m.Mul(s1.CurrMtx)
         }
 
-        g.UpdateClipMtx()
 
     case 0x19:
 
@@ -273,7 +269,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             s1.CurrMtx = m.Mul(s1.CurrMtx)
         }
 
-        g.UpdateClipMtx()
 
     case 0x1A:
 
@@ -295,7 +290,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             s1.CurrMtx = m.Mul(s1.CurrMtx)
         }
 
-        g.UpdateClipMtx()
 
     case 0x1B:
 
@@ -312,7 +306,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             s1.CurrMtx = s1.CurrMtx.Scale(v)
         }
 
-        g.UpdateClipMtx()
 
     case 0x1C:
 
@@ -327,7 +320,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             s1.CurrMtx = s1.CurrMtx.Translate(v)
         }
 
-        g.UpdateClipMtx()
 
     case 0x20:
 
@@ -517,6 +509,8 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
     }
 
     g.Data = []uint32{}
+
+    g.UpdateClipMtx()
 
     //fmt.Printf("STATUS %v\n", g.MtxStacks.ClipMatrix)
 }

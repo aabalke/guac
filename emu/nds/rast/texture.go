@@ -1,7 +1,6 @@
 package rast
 
 import (
-
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
@@ -24,16 +23,13 @@ type Texture struct {
 	SizeS, SizeT       uint32
 	Format             uint32
 	TransparentZero    bool
-	TransformationMode uint8
+	TransformationMode uint32
 	PaletteBaseAddr    uint32
 }
 
 func (tex *Texture) WriteCoord(v uint32) {
-
-    // not sure why T has to be flipped, maybe sets to top left instead of bottom left?
-
     tex.S = utils.Convert16ToFloat(uint16(v), 4)
-    tex.T = -utils.Convert16ToFloat(uint16(v >> 16), 4)
+    tex.T = utils.Convert16ToFloat(uint16(v >> 16), 4)
 }
 
 func (tex *Texture) WriteParam(v uint32) {
@@ -46,7 +42,7 @@ func (tex *Texture) WriteParam(v uint32) {
     tex.SizeT = 8 << utils.GetVarData(v, 23, 25)
     tex.Format = utils.GetVarData(v, 26, 28)
     tex.TransparentZero = utils.BitEnabled(v, 29)
-    tex.PaletteBaseAddr = utils.GetVarData(v, 30, 31)
+    tex.TransformationMode = utils.GetVarData(v, 30, 31)
 
     //if tex.Format != 0 && tex.Format != 7 && tex.Format != 2 {panic(fmt.Sprintf("Unsetup texture format %d", tex.Format))}
 }
