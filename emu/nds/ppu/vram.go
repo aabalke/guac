@@ -67,14 +67,16 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         vm.CNT_A.Write(v)
 
         if vm.CNT_A.Mst == 3 {
-            vm.TextureSlots[0] = &vm.A
+            //vm.TextureSlots[0] = &vm.A
+            vm.TextureSlots[vm.CNT_A.Ofs] = &vm.A
         }
 
 	case 0x241:
         vm.CNT_B.Write(v)
 
         if vm.CNT_B.Mst == 3 {
-            vm.TextureSlots[1] = &vm.B
+            //vm.TextureSlots[1] = &vm.B
+            vm.TextureSlots[vm.CNT_B.Ofs] = &vm.B
         }
 
 	case 0x242:
@@ -95,7 +97,7 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         }
 
         if vm.CNT_C.Mst == 3 {
-            vm.TextureSlots[2] = &vm.C
+            vm.TextureSlots[vm.CNT_C.Ofs] = &vm.C
         }
 
 
@@ -118,7 +120,8 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         }
 
         if vm.CNT_D.Mst == 3 {
-            vm.TextureSlots[3] = &vm.D
+            //vm.TextureSlots[3] = &vm.D
+            vm.TextureSlots[vm.CNT_D.Ofs] = &vm.D
         }
 
 	case 0x244:
