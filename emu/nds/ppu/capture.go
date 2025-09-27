@@ -22,9 +22,10 @@ type Capture struct {
     VramBlocks [4]*[0x2_0000]uint8
 
     TopA *bool
+    Top, Bottom *[]uint8
 }
 
-func (c *Capture) Init(vram *VRAM, ppu *PPU, rdBlk *uint32) {
+func (c *Capture) Init(vram *VRAM, ppu *PPU, rdBlk *uint32, b, t *[]uint8) {
 
     c.VramBlocks[0] = &vram.A
     c.VramBlocks[1] = &vram.B
@@ -32,6 +33,8 @@ func (c *Capture) Init(vram *VRAM, ppu *PPU, rdBlk *uint32) {
     c.VramBlocks[3] = &vram.D
     c.TopA = &ppu.TopA
     c.ReadBlock = rdBlk
+    c.Bottom = b
+    c.Top = t
 }
 
 func (c *Capture) Write(addr uint32, v uint8) {
@@ -132,16 +135,16 @@ func (c *Capture) TempLimiter() {
     }
 }
 
-func (c *Capture) StartCapture(top, bottom *[]uint8) {
+func (c *Capture) StartCapture() {
 
     if !c.Enabled {
         return
     }
 
-    screen := bottom
+    screen := c.Bottom
 
     if *c.TopA {
-        screen = top
+        screen = c.Top
     }
 
     j := uint32(0)

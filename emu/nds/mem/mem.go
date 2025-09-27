@@ -265,6 +265,11 @@ func (mem *Mem) Write8(addr uint32, v uint8, arm9 bool) {
 }
 func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
 
+    if arm9 && addr >= 0x0400_0068 && addr < 0x0400_006C {
+        mem.ppu.DisplayFifo.FifoWrite(v)
+        return
+    }
+
     switch addr {
     default:
         mem.Write(addr, uint8(v), arm9)
@@ -281,6 +286,12 @@ func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
 
         if gxfifo := addr >= 0x400_0400 && addr < 0x4000440; gxfifo {
             mem.ppu.Rasterizer.GeoCmdFifo(v)
+            return
+        }
+
+        if addr >= 0x0400_0068 && addr < 0x0400_006C {
+            mem.ppu.DisplayFifo.FifoWrite(uint16(v))
+            mem.ppu.DisplayFifo.FifoWrite(uint16(v>>16))
             return
         }
     }
@@ -312,10 +323,6 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
     case addr >= 0xB0 && addr < 0xE0:
         return mem.ReadDma(mem.dma9, addr)
     case (addr >= 0x320 && addr < 0x6A3) || (addr &^ 1 == 0x60):
-        if addr >= 0x440 && addr < 0x600 {
-            panic(fmt.Sprintf("READ HALF or BYTE TO 3D %08X\n", addr))
-        }
-
         return mem.ppu.Rasterizer.Read(addr)
     }
 
@@ -328,6 +335,13 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
         return uint8(mem.Vcount)
     case 0x7:
         return uint8(mem.Vcount >> 8)
+
+    case 0x64: return mem.ppu.Capture.Read(addr)
+    case 0x65: return mem.ppu.Capture.Read(addr)
+    case 0x66: return mem.ppu.Capture.Read(addr)
+    case 0x67: return mem.ppu.Capture.Read(addr)
+    case 0x68: return 0
+    case 0x69: return 0
 
 	case 0x100:
 		return mem.Timers[0].ReadD(false)
@@ -492,6 +506,19 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
     case 0x7:
         mem.Vcount &= 0xFF
         mem.Vcount |= uint32(v) << 8
+
+    case 0x64:
+        mem.ppu.Capture.Write(addr, v)
+    case 0x65:
+        mem.ppu.Capture.Write(addr, v)
+    case 0x66:
+        mem.ppu.Capture.Write(addr, v)
+    case 0x67:
+        mem.ppu.Capture.Write(addr, v)
+    case 0x68: panic("ADDR WRITE 0x68 FIFO")
+    case 0x69: panic("ADDR WRITE 0x69 FIFO")
+    case 0x6A: panic("ADDR WRITE 0x6A FIFO")
+    case 0x6B: panic("ADDR WRITE 0x6B FIFO")
 
     case 0x184:
         mem.Ipc.WriteCnt(v, 0, true)

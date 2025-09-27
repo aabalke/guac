@@ -53,6 +53,7 @@ const (
 func (shader *NdsShader) Fragment(v Vertex) Color {
 
     vertexColor := v.Color
+    //vertexColor.A = 0xFF
 
     if shader.Texture != nil {
         //vertexColor = shader.Texture.NearestNeightborSample(v.Texture.X, v.Texture.Y)

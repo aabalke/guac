@@ -168,7 +168,7 @@ func NewPPU(top, bottom *[]byte, irq *cpu.Irq) *PPU {
     p.EngineB.Pixels = top
     p.EngineB.IsB = true
     p.Rasterizer = rast.NewRasterizer(&p.Vram, irq)
-    p.Capture.Init(&p.Vram, p, &p.EngineA.Dispcnt.VramBlock)
+    p.Capture.Init(&p.Vram, p, &p.EngineA.Dispcnt.VramBlock, bottom, top)
     p.DisplayFifo.Pixels = make([]uint8, SCREEN_WIDTH*SCREEN_HEIGHT*4)
 
     return p

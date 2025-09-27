@@ -394,11 +394,8 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 			nds.ppu.EngineB.Backgrounds[3].BgAffineReset()
 
 		case SCREEN_HEIGHT:
-            nds.ppu.Capture.StartCapture(
-                &nds.PixelsTop,
-                &nds.PixelsBottom,
-            )
-            nds.ppu.Capture.EndCapture()
+            //nds.ppu.Capture.StartCapture()
+            //nds.ppu.Capture.EndCapture()
 			dispstat.SetVBlank(true)
 			nds.CheckDmas(dma.ARM9_DMA_MODE_VBL, true)
 			nds.CheckDmas(dma.ARM7_DMA_MODE_VBL, true)

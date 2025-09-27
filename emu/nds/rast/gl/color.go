@@ -35,7 +35,7 @@ func MakeColorFrom15Bit(r, g, b uint8) Color {
 	b = (b << 3) | (b >> 2)
 
 	const d = 0xff
-	return Color{float64(r) / d, float64(g) / d, float64(b) / d, d / d}
+	return Color{float64(r) / d, float64(g) / d, float64(b) / d, 1}
 
 }
 
@@ -48,10 +48,9 @@ func HexColorLiteral( x uint32) Color {
     r := (x >> 16) & 0xFF
     g := (x >> 8) & 0xFF
     b := (x) & 0xFF
-    a := 0xFF
 
 	const d = 0xff
-	return Color{float64(r) / d, float64(g) / d, float64(b) / d, float64(a) / d}
+	return Color{float64(r) / d, float64(g) / d, float64(b) / d, 1}
 
 }
 
