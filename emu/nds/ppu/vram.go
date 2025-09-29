@@ -3,6 +3,7 @@ package ppu
 import (
 	"unsafe"
 
+	"github.com/aabalke/guac/emu/nds/rast"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
@@ -45,6 +46,22 @@ type VRAM struct {
 
     TextureSlots [4]*[0x2_0000]uint8
     TexPalSlots  [6]unsafe.Pointer
+
+    TextureCache *rast.TextureCache
+}
+
+func (v *VRAM) Init(t *rast.TextureCache) {
+    v.TextureCache = t
+    v.CNT_A.Write(0x80)
+    v.CNT_B.Write(0x80)
+    v.CNT_C.Write(0x80)
+    v.CNT_D.Write(0x80)
+    v.CNT_E.Write(0x80)
+    v.CNT_F.Write(0x80)
+    v.CNT_G.Write(0x80)
+    v.CNT_H.Write(0x80)
+    v.CNT_I.Write(0x80)
+
 }
 
 type VramCnt struct {
@@ -67,15 +84,19 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         vm.CNT_A.Write(v)
 
         if vm.CNT_A.Mst == 3 {
+            vm.TextureCache.Reset()
             vm.TextureSlots[vm.CNT_A.Ofs] = &vm.A
         }
+
 
 	case 0x241:
         vm.CNT_B.Write(v)
 
         if vm.CNT_B.Mst == 3 {
+            vm.TextureCache.Reset()
             vm.TextureSlots[vm.CNT_B.Ofs] = &vm.B
         }
+
 
 	case 0x242:
         vm.CNT_C.Write(v)
@@ -95,6 +116,7 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         }
 
         if vm.CNT_C.Mst == 3 {
+            vm.TextureCache.Reset()
             vm.TextureSlots[vm.CNT_C.Ofs] = &vm.C
         }
 
@@ -117,14 +139,17 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         }
 
         if vm.CNT_D.Mst == 3 {
+            vm.TextureCache.Reset()
             vm.TextureSlots[vm.CNT_D.Ofs] = &vm.D
         }
+
 
 	case 0x244:
         vm.CNT_E.Write(v)
 
         switch vm.CNT_E.Mst {
         case 3:
+            vm.TextureCache.Reset()
             vm.TexPalSlots[0] = unsafe.Pointer(&vm.E)
             vm.TexPalSlots[1] = unsafe.Add(unsafe.Pointer(&vm.E), 0x4000)
             vm.TexPalSlots[2] = unsafe.Add(unsafe.Pointer(&vm.E), 0x8000)
@@ -142,6 +167,7 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
 
         switch vm.CNT_F.Mst {
         case 3:
+            vm.TextureCache.Reset()
             idx := (vm.CNT_F.Ofs & 1) + (vm.CNT_F.Ofs >> 1) * 4
             vm.TexPalSlots[idx] = unsafe.Pointer(&vm.F)
         case 4:
@@ -158,12 +184,14 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
             vm.ExtAPalObj = &vm.F
         }
 
+
 	case 0x246:
         vm.CNT_G.Write(v)
 
 
         switch vm.CNT_G.Mst {
         case 3:
+            vm.TextureCache.Reset()
             idx := (vm.CNT_G.Ofs & 1) + (vm.CNT_G.Ofs >> 1) * 4
             vm.TexPalSlots[idx] = unsafe.Pointer(&vm.G)
         case 4:
@@ -179,6 +207,7 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         case 5:
             vm.ExtAPalObj = &vm.G
         }
+
 
     // 0x247 is WRAMCNT
 	case 0x248:

@@ -97,16 +97,8 @@ func NewMemory(arm7Pc *uint32, halted7, halted9 *bool, dma7, dma9 *[4]dma.DMA, i
 
     m.Spi.Init()
     m.Gamecard.Init(irq7, irq9, dma7, dma9, c)
-
-    m.ppu.Vram.CNT_A.Write(0x80)
-    m.ppu.Vram.CNT_B.Write(0x80)
-    m.ppu.Vram.CNT_C.Write(0x80)
-    m.ppu.Vram.CNT_D.Write(0x80)
-    m.ppu.Vram.CNT_E.Write(0x80)
-    m.ppu.Vram.CNT_F.Write(0x80)
-    m.ppu.Vram.CNT_G.Write(0x80)
-    m.ppu.Vram.CNT_H.Write(0x80)
-    m.ppu.Vram.CNT_I.Write(0x80)
+    
+    m.ppu.Vram.Init(&ppu.Rasterizer.GeoEngine.TextureCache)
 
 	return m
 }

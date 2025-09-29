@@ -49,7 +49,10 @@ func (r *Render) UpdateRender() {
 
     for _, p := range r.Buffers.GetPolygons() {
         //r.Context.Shader.SetTexture(*r.Texture)
-        r.Context.Shader.SetTexture(p.GetTexture(r.Rasterizer.VRAM))
+        r.Context.Shader.SetTexture(
+            p.GetTexture(
+                r.Rasterizer.VRAM,
+                &r.Rasterizer.GeoEngine.TextureCache))
         r.Context.Shader.(*gl.NdsShader).LightEnabled = p.LightsEnabled
         r.RenderPolygon(&p)
     }

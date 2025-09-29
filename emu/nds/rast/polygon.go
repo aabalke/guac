@@ -1,8 +1,8 @@
 package rast
 
 import (
-	"image"
-	"image/color"
+	//"image"
+	//"image/color"
 
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 	"github.com/aabalke/guac/emu/nds/utils"
@@ -54,14 +54,12 @@ func (p *Polygon) WriteAttrs(v uint32) {
 }
 
 const (
-
     V_16 = 0
     V_10 = 1
     V_XY = 2
     V_XZ = 3
     V_YZ = 4
     V_DF = 5
-
 )
 
 func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Vertex {
@@ -69,7 +67,7 @@ func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Ver
     var S, T float64
     S = g.Texture.S
     T = g.Texture.T
-    switch g.Texture.TransformationMode { // textrans
+    switch g.Texture.TransformationMode {
     case 0: // continue
     case 1:
 
@@ -84,8 +82,6 @@ func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Ver
 
         S = textureVertex.Dot(mtx.Col(0))
         T = textureVertex.Dot(mtx.Col(1))
-        //S = textureVertex.Dot(mtx.Row(0))
-        //T = textureVertex.Dot(mtx.Row(1))
 
     default:
         //panic("UNSETUP TEXTURE TRANSFORMATION MODE")
@@ -158,258 +154,21 @@ func (p *Polygon) GetVertex(x, y, z float64, clipMtx *gl.Matrix, color gl.Color,
     return v
 }
 
-// this is temp using imagetexture, would be best to get texture more effectently
-func (p *Polygon) GetTexture(vram VRAM) gl.Texture {
+func (p *Polygon) GetTexture(vram VRAM, cache *TextureCache) gl.Texture {
 
     t := p.Texture
 
-    switch t.Format {
-
-    case TEX_FMT_NONE:
+    if t.Format == TEX_FMT_NONE {
         return nil
-
-    case TEX_FMT_4_PAL:
-
-        return &gl.PalColorTexture{
-            Width: int(t.SizeS),
-            Height: int(t.SizeT),
-            Vram: vram,
-            VramBase: t.VramOffset,
-            PalBase: t.PaletteBaseAddr * 0x08,
-            BitsPerTexel: 2,
-            BitsPerTexelShift: 2,
-            TransparentZero: t.TransparentZero,
-            RepeatS: t.RepeatS,
-            RepeatT: t.RepeatT,
-            FlipS: t.FlipS,
-            FlipT: t.FlipT,
-        }
-
-    case TEX_FMT_16_PAL:
-
-        return &gl.PalColorTexture{
-            Width: int(t.SizeS),
-            Height: int(t.SizeT),
-            Vram: vram,
-            VramBase: t.VramOffset,
-            PalBase: t.PaletteBaseAddr * 0x10,
-            BitsPerTexel: 4,
-            BitsPerTexelShift: 1,
-            TransparentZero: t.TransparentZero,
-            RepeatS: t.RepeatS,
-            RepeatT: t.RepeatT,
-            FlipS: t.FlipS,
-            FlipT: t.FlipT,
-        }
-
-    case TEX_FMT_256_PAL:
-
-        return &gl.PalColorTexture{
-            Width: int(t.SizeS),
-            Height: int(t.SizeT),
-            Vram: vram,
-            VramBase: t.VramOffset,
-            PalBase: t.PaletteBaseAddr * 0x10,
-            BitsPerTexel: 8,
-            BitsPerTexelShift: 0,
-            TransparentZero: t.TransparentZero,
-            RepeatS: t.RepeatS,
-            RepeatT: t.RepeatT,
-            FlipS: t.FlipS,
-            FlipT: t.FlipT,
-        }
-
-    case TEX_FMT_DIRECT: 
-
-        return &gl.DirectColorTexture{
-            Width: int(t.SizeS),
-            Height: int(t.SizeT),
-            Vram: vram,
-            VramBase: t.VramOffset,
-            RepeatS: t.RepeatS,
-            RepeatT: t.RepeatT,
-            FlipS: t.FlipS,
-            FlipT: t.FlipT,
-        }
-
-    case TEX_FMT_A3I5:
-
-        return &gl.TranslucentTexture{
-            Width: int(t.SizeS),
-            Height: int(t.SizeT),
-            Vram: vram,
-            VramBase: t.VramOffset,
-            PalBase: t.PaletteBaseAddr * 0x10,
-            ColorIdxBits: 5,
-            RepeatS: t.RepeatS,
-            RepeatT: t.RepeatT,
-            FlipS: t.FlipS,
-            FlipT: t.FlipT,
-        }
-
-    case TEX_FMT_A5I3:
-
-        return &gl.TranslucentTexture{
-            Width: int(t.SizeS),
-            Height: int(t.SizeT),
-            Vram: vram,
-            VramBase: t.VramOffset,
-            PalBase: t.PaletteBaseAddr * 0x10,
-            ColorIdxBits: 3,
-            RepeatS: t.RepeatS,
-            RepeatT: t.RepeatT,
-            FlipS: t.FlipS,
-            FlipT: t.FlipT,
-        }
-
-    case TEX_FMT_4X4:
-
-        return &gl.CompressedTexture{
-            Width: int(t.SizeS),
-            Height: int(t.SizeT),
-            Vram: vram,
-            VramBase: t.VramOffset,
-            PalBase: t.PaletteBaseAddr * 0x10,
-            RepeatS: t.RepeatS,
-            RepeatT: t.RepeatT,
-            FlipS: t.FlipS,
-            FlipT: t.FlipT,
-            PitchShift: t.PitchShift,
-            CachedTexture: get4x4(vram, &p.Texture),
-        }
-
-        //panic("UNSETUP TEXTURE FMT 4X4")
-
-    default: // this loads entire direct color texture in memory and sends it
-        
-        img := image.NewRGBA(image.Rect(0,0,int(t.SizeS), int(t.SizeT)))
-        for i := uint32(0); i < t.SizeS * t.SizeT * 2; i += 2 {  
-
-            data := uint32(vram.ReadTexture(i+0))
-            data |= uint32(vram.ReadTexture(i+1)) << 8
-
-            x := int((i >> 1) % t.SizeS)
-            y := int((i >> 1) / t.SizeS)
-
-            r, g, b := RGB15ToRGB24(
-                uint8(data & 0b11111),
-                uint8(data >> 5) & 0b11111,
-                uint8(data >> 10) & 0b11111,
-            )
-
-            img.Set(x, y, color.RGBA{r, g, b, 0xFF})
-        }
-        return &gl.ImageTexture{
-            Width: int(t.SizeS),
-            Height: int(t.SizeT),
-            Image: img,
-        }
-
     }
 
-    panic("UNKNOWN TEXTURE TYPE")
-}
-
-func get4x4(vram VRAM, tex *Texture) []uint8 {
-
-	off := tex.VramOffset
-	out := make([]uint8, (tex.SizeS)*(tex.SizeT)*2)
-
-    const SLOT_SIZE = 128 * 1024
-
-	var xtraoff uint32
-	switch slot := off / SLOT_SIZE; slot {
-	case 0:
-		xtraoff = SLOT_SIZE + off/2
-	case 2:
-		xtraoff = SLOT_SIZE + (off-2*SLOT_SIZE)/2 + 0x10000
-	default:
-        return []uint8{}
-		//panic("compressed texture in wrong slot?")
-	}
-
-	for y := uint32(0); y < tex.SizeT; y += 4 {
-		for x := uint32(0); x < tex.SizeS; x += 4 {
-			xtra := (
-                uint32(vram.ReadTexture(xtraoff+0)) |
-				uint32(vram.ReadTexture(xtraoff+1)) << 8)
-
-			xtraoff += 2
-			mode := xtra >> 14
-			paloff := uint32(xtra & 0x3FFF)
-
-			palAddr := (tex.PaletteBaseAddr * 0x10) + paloff*4
-
-			var colors [4]uint16
-			colors[0] = (uint16(vram.ReadPalTexture(palAddr+0)) |
-				uint16(vram.ReadPalTexture(palAddr+1))<<8)
-			colors[1] = (uint16(vram.ReadPalTexture(palAddr+2)) |
-				uint16(vram.ReadPalTexture(palAddr+3))<<8)
-			colors2 := (uint16(vram.ReadPalTexture(palAddr+4)) |
-				uint16(vram.ReadPalTexture(palAddr+5))<<8)
-			colors3 := (uint16(vram.ReadPalTexture(palAddr+6)) |
-				uint16(vram.ReadPalTexture(palAddr+7))<<8)
-
-			switch mode {
-			case 0:
-				colors[2] = colors2
-			case 1:
-				colors[2] = blendMode1(colors[0], colors[1])
-			case 2:
-				colors[2] = colors2
-				colors[3] = colors3
-			case 3:
-				colors[2] = blendMode3(colors[0], colors[1])
-				colors[3] = blendMode3(colors[1], colors[0])
-			}
-
-			for j := range uint32(4) {
-				pack := vram.ReadTexture(off)
-				off++
-				for i := range uint32(4) {
-                    k := ((y+j)<<tex.PitchShift+(x+i))*2
-					tex := (pack >> uint(i*2)) & 3
-
-					out[k] = uint8(colors[tex])
-					out[k+1] = uint8(colors[tex] >> 8)
-				}
-			}
-		}
-	}
-
-	return out
-}
-
-func blendMode1(a, b uint16) uint16 {
-
-    aR := uint16(a) & 0b11111
-    aG := uint16(a>>5) & 0b11111
-    aB := uint16(a>>10) & 0b11111
-
-    bR := uint16(b) & 0b11111
-    bG := uint16(b>>5) & 0b11111
-    bB := uint16(b>>10) & 0b11111
-
-    oR := (((aR + bR) / 2) & 0b11111)
-    oG := (((aG + bG) / 2) & 0b11111) << 5
-    oB := (((aB + bB) / 2) & 0b11111) << 10
-
-    return oR | oG | oB
-}
-
-func blendMode3(a, b uint16) uint16 {
-
-    aR := uint16(a) & 0b11111
-    aG := uint16(a>>5) & 0b11111
-    aB := uint16(a>>10) & 0b11111
-
-    bR := uint16(b) & 0b11111
-    bG := uint16(b>>5) & 0b11111
-    bB := uint16(b>>10) & 0b11111
-
-    oR := (((aR*5 + bR*3) / 8) & 0b11111)
-    oG := (((aG*5 + bG*3) / 8) & 0b11111) << 5
-    oB := (((aB*5 + bB*3) / 8) & 0b11111) << 10
-
-    return oR | oG | oB
+    return &gl.NdsTexture{
+        Width: int(t.SizeS),
+        Height: int(t.SizeT),
+        RepeatS: t.RepeatS,
+        RepeatT: t.RepeatT,
+        FlipS: t.FlipS,
+        FlipT: t.FlipT,
+        CachedTexture: cache.Get(vram, &p.Texture),
+    }
 }

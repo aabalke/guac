@@ -36,6 +36,8 @@ type GeoEngine struct {
     PosTestData [4]uint32
 
     Lights [4]gl.Light
+
+    TextureCache TextureCache
 }
 
 func NewGeoEngine(buffers *Buffers, irq *cpu.Irq) *GeoEngine {
@@ -44,6 +46,7 @@ func NewGeoEngine(buffers *Buffers, irq *cpu.Irq) *GeoEngine {
         Buffers: buffers,
         MtxStacks: NewMtxStacks(),
         //Color: gl.Black,
+        TextureCache: make(map[uint32]*[]uint8, 0),
     }
 }
 
