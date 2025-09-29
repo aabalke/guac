@@ -109,6 +109,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 
 	var objMode uint32
 	var inObjWindow bool
+    var is3d bool
 
 	// work backwards for proper priorities
 	for i := 3; i >= 0; i-- {
@@ -133,7 +134,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_3D :
                 palData, ok = nds.set3d(engine, bg, x, y)
-
+                is3d = true // this will need to be updated
             case ppu.BG_TYPE_BGM:
 				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_256:
@@ -188,7 +189,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 		}
 	}
 
-	finalPalData := bldPal.Blend(objMode == 1, x, y, wins, inObjWindow)
+	finalPalData := bldPal.Blend(objMode == 1, x, y, wins, inObjWindow, is3d)
 	index := (x + (y * SCREEN_WIDTH)) << 2
 	nds.applyColor(finalPalData, uint32(index), engine.Pixels)
 }

@@ -1,6 +1,7 @@
 package gl
 
 import (
+	"encoding/binary"
 	"image"
 	"image/color"
 	_ "image/jpeg"
@@ -45,6 +46,48 @@ func getBilinearCoords(w, h, u, v float64) BilinearCoords {
         X1: x1,
         Y1: y1,
     }
+}
+
+func getTextureCoords(u, v float64, w, h int, repeatT, repeatS, flipT, flipS bool) (int, int) {
+
+
+	x := int(u * float64(w))
+	y := int(v * float64(h))
+
+    if repeatT {
+
+        flip := flipT && int(v) & 1 == 1 
+        v -= math.Floor(v)
+        tmp := int(v * float64(h))
+
+        if flip {
+            y = h - tmp
+        } else {
+            y = tmp
+        }
+
+    } else {
+        y = min(h-1, y)
+        y = max(y, 0)
+    }
+
+    if repeatS {
+        flip := flipS && int(u) & 1 == 1 
+        u -= math.Floor(u)
+        tmp := int(u * float64(w))
+
+        if flip {
+            x = w - tmp
+        } else {
+            x = tmp
+        }
+
+    } else {
+        x = min(w-1, x)
+        x = max(x, 0)
+    }
+
+    return x, y
 }
 
 //func LoadTexture(path string) (Texture, error) {
@@ -105,13 +148,17 @@ type DirectColorTexture struct {
     Width, Height int
     Vram VRAM
     VramBase uint32
+	RepeatS, RepeatT   bool
+	FlipS, FlipT       bool
 }
 
 func (t *DirectColorTexture) Sample(u, v float64) Color {
-	u -= math.Floor(u)
-	v -= math.Floor(v)
-	x := int(u * float64(t.Width))
-	y := int(v * float64(t.Height))
+    x, y := getTextureCoords(
+        u, v,
+        t.Width, t.Height,
+        t.RepeatT, t.RepeatS,
+        t.FlipT, t.FlipS,
+    )
     return t.getColor(x, y)
 }
 
@@ -152,13 +199,18 @@ type PalColorTexture struct {
     BitsPerTexel uint32
     BitsPerTexelShift uint32
     TransparentZero bool
+	RepeatS, RepeatT   bool
+	FlipS, FlipT       bool
 }
 
 func (t *PalColorTexture) Sample(u, v float64) Color {
-	u -= math.Floor(u)
-	v -= math.Floor(v)
-	x := int(u * float64(t.Width))
-	y := int(v * float64(t.Height))
+
+    x, y := getTextureCoords(
+        u, v,
+        t.Width, t.Height,
+        t.RepeatT, t.RepeatS,
+        t.FlipT, t.FlipS,
+    )
     return t.getColor(x, y)
 }
 
@@ -212,13 +264,19 @@ type TranslucentTexture struct {
     VramBase uint32
     PalBase uint32
     ColorIdxBits uint32
+	RepeatS, RepeatT   bool
+	FlipS, FlipT       bool
 }
 
 func (t *TranslucentTexture) Sample(u, v float64) Color {
-	u -= math.Floor(u)
-	v -= math.Floor(v)
-	x := int(u * float64(t.Width))
-	y := int(v * float64(t.Height))
+
+    x, y := getTextureCoords(
+        u, v,
+        t.Width, t.Height,
+        t.RepeatT, t.RepeatS,
+        t.FlipT, t.FlipS,
+    )
+
     return t.getColor(x, y)
 }
 
@@ -278,13 +336,20 @@ type CompressedTexture struct {
     Vram VRAM
     VramBase uint32
     PalBase uint32
+	RepeatS, RepeatT   bool
+	FlipS, FlipT       bool
+    PitchShift uint32
+    CachedTexture []uint8
 }
 
 func (t *CompressedTexture) Sample(u, v float64) Color {
-	u -= math.Floor(u)
-	v -= math.Floor(v)
-	x := int(u * float64(t.Width))
-	y := int(v * float64(t.Height))
+
+    x, y := getTextureCoords(
+        u, v,
+        t.Width, t.Height,
+        t.RepeatT, t.RepeatS,
+        t.FlipT, t.FlipS,
+    )
 
     return t.getColor(x, y)
 }
@@ -307,110 +372,19 @@ func (t *CompressedTexture) BilinearSample(u, v float64) Color {
 
 func (t *CompressedTexture) getColor(x, y int) Color {
 
-    //slot1Base := uint32(0x2_0000)
+    idx := (x + y * t.Width) * 2
 
-    slot0Base := t.VramBase
-    palBase := t.PalBase
-
-    slot1Base := uint32(0x2_0000)
-
-    if slot0Base >= 0x4_0000 {
-        slot1Base += uint32(0x1_0000)
+    if idx + 1 >= len(t.CachedTexture) {
+        return Black
     }
 
-    blockX, blockY := x   >> 2, y   >> 2
-    texelX, texelY := x & 0b11, y & 0b11
-    blockIdx := uint32(blockY*(t.Width/4) + blockX)
+    data := binary.LittleEndian.Uint16(t.CachedTexture[idx:])
 
-    blockData := uint32(t.Vram.ReadTexture(slot0Base + blockIdx * 4))
-    blockData |= uint32(t.Vram.ReadTexture(slot0Base + blockIdx * 4 + 1)) << 8
-    blockData |= uint32(t.Vram.ReadTexture(slot0Base + blockIdx * 4 + 2)) << 16
-    blockData |= uint32(t.Vram.ReadTexture(slot0Base + blockIdx * 4 + 3)) << 24
-    rowBits := (blockData >> (texelY*8)) & 0xFF
-    texelVal := (rowBits >> (texelX*2)) & 0b11
-
-    palInfo := uint32(t.Vram.ReadTexture(slot1Base + blockIdx*2))
-    palInfo |= uint32(t.Vram.ReadTexture(slot1Base + blockIdx*2 + 1)) << 8
-    palOffset := (palInfo & 0x3FFF) * 4
-    mode := (palInfo >> 14) & 0b11
-
-    color0 := uint16(t.Vram.ReadPalTexture(palBase + palOffset + 0))
-    color0 |= uint16(t.Vram.ReadPalTexture(palBase + palOffset + 1)) << 8
-    color1 := uint16(t.Vram.ReadPalTexture(palBase + palOffset + 2))
-    color1 |= uint16(t.Vram.ReadPalTexture(palBase + palOffset + 3)) << 8
-    color2 := uint16(t.Vram.ReadPalTexture(palBase + palOffset + 4))
-    color2 |= uint16(t.Vram.ReadPalTexture(palBase + palOffset + 5)) << 8
-    color3 := uint16(t.Vram.ReadPalTexture(palBase + palOffset + 6))
-    color3 |= uint16(t.Vram.ReadPalTexture(palBase + palOffset + 7)) << 8
-
-    blendMode1 := func (a, b uint16) uint16 {
-
-        aR := uint16(a) & 0b11111
-        aG := uint16(a >> 5) & 0b11111
-        aB := uint16(a >> 10)& 0b11111
-
-        bR := uint16(b) & 0b11111
-        bG := uint16(b >> 5) & 0b11111
-        bB := uint16(b >> 10)& 0b11111
-
-        oR := (((aR + bR) / 2) & 0b11111)
-        oG := (((aG + bG) / 2) & 0b11111) << 5
-        oB := (((aB + bB) / 2) & 0b11111) << 10
-
-        return oR | oG | oB
-    }
-
-    blendMode3 := func (a, b uint16) uint16 {
-
-        aR := uint16(a) & 0b11111
-        aG := uint16(a >> 5) & 0b11111
-        aB := uint16(a >> 10)& 0b11111
-
-        bR := uint16(b) & 0b11111
-        bG := uint16(b >> 5) & 0b11111
-        bB := uint16(b >> 10)& 0b11111
-
-        oR := (((aR * 5 + bR * 3) / 8) & 0b11111)
-        oG := (((aG * 5 + bG * 3) / 8) & 0b11111) << 5
-        oB := (((aB * 5 + bB * 3) / 8) & 0b11111) << 10
-
-        return oR | oG | oB
-    }
+    return MakeColorFrom15Bit(
+        uint8(data & 0b11111),
+        uint8(data >> 5) & 0b11111,
+        uint8(data >> 10) & 0b11111,
+    )
 
 
-    convert := func(v uint16) Color {
-        return MakeColorFrom15Bit(
-            uint8(v & 0b11111),
-            uint8(v >> 5) & 0b11111,
-            uint8(v >> 10) & 0b11111,
-        )
-    }
-
-    switch texelVal {
-    case 0:
-        return convert(color0)
-    case 1:
-        return convert(color1)
-    case 2:
-        switch mode {
-        case 1:
-            return convert(blendMode1(color0, color1))
-        case 3:
-            return convert(blendMode3(color0, color1))
-        default:
-            return convert(color2)
-        }
-
-    case 3:
-        switch mode {
-        case 2:
-            return convert(color3)
-        case 3:
-            return convert(blendMode3(color1, color0))
-        default:
-            return MakeColor(color.Transparent)
-        }
-    }
-
-    panic("UNKNOWN TEXEL VALUE OR MODE")
 }

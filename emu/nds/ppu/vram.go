@@ -67,7 +67,6 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         vm.CNT_A.Write(v)
 
         if vm.CNT_A.Mst == 3 {
-            //vm.TextureSlots[0] = &vm.A
             vm.TextureSlots[vm.CNT_A.Ofs] = &vm.A
         }
 
@@ -75,7 +74,6 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         vm.CNT_B.Write(v)
 
         if vm.CNT_B.Mst == 3 {
-            //vm.TextureSlots[1] = &vm.B
             vm.TextureSlots[vm.CNT_B.Ofs] = &vm.B
         }
 
@@ -100,7 +98,6 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
             vm.TextureSlots[vm.CNT_C.Ofs] = &vm.C
         }
 
-
 	case 0x243:
         vm.CNT_D.Write(v)
 
@@ -120,7 +117,6 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         }
 
         if vm.CNT_D.Mst == 3 {
-            //vm.TextureSlots[3] = &vm.D
             vm.TextureSlots[vm.CNT_D.Ofs] = &vm.D
         }
 
@@ -146,7 +142,6 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
 
         switch vm.CNT_F.Mst {
         case 3:
-            // should these be incre of +0x4000?
             idx := (vm.CNT_F.Ofs & 1) + (vm.CNT_F.Ofs >> 1) * 4
             vm.TexPalSlots[idx] = unsafe.Pointer(&vm.F)
         case 4:
@@ -169,7 +164,6 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
 
         switch vm.CNT_G.Mst {
         case 3:
-            // should these be incre of +0x4000?
             idx := (vm.CNT_G.Ofs & 1) + (vm.CNT_G.Ofs >> 1) * 4
             vm.TexPalSlots[idx] = unsafe.Pointer(&vm.G)
         case 4:
@@ -244,7 +238,6 @@ func (vm *VRAM) Write(addr uint32, v uint8, arm9 bool) {
             switch vm.CNT_C.Mst {
             case 0: base = uint32(0x84_0000)
             case 1: base = 0x20000 * uint32(vm.CNT_C.Ofs)
-            case 2: // given to arm7, can arm9 access?
             case 4: base = 0x20_0000
             }
             if addr >= base && addr < base + 0x2_0000 {
@@ -257,7 +250,6 @@ func (vm *VRAM) Write(addr uint32, v uint8, arm9 bool) {
             switch vm.CNT_D.Mst {
             case 0: base = uint32(0x86_0000)
             case 1: base = 0x20000 * uint32(vm.CNT_D.Ofs)
-            case 2: // given to arm7, can arm9 access?
             case 4: base = 0x60_0000
             }
             if addr >= base && addr < base + 0x2_0000 {

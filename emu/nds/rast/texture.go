@@ -1,6 +1,8 @@
 package rast
 
 import (
+	"fmt"
+
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
@@ -25,6 +27,7 @@ type Texture struct {
 	TransparentZero    bool
 	TransformationMode uint32
 	PaletteBaseAddr    uint32
+    PitchShift uint32
 }
 
 func (tex *Texture) WriteCoord(v uint32) {
@@ -38,17 +41,17 @@ func (tex *Texture) WriteParam(v uint32) {
     tex.RepeatT = utils.BitEnabled(v, 17)
     tex.FlipS = utils.BitEnabled(v, 18)
     tex.FlipT = utils.BitEnabled(v, 19)
+    tex.PitchShift = utils.GetVarData(v, 20, 22) + 3
     tex.SizeS = 8 << utils.GetVarData(v, 20, 22)
     tex.SizeT = 8 << utils.GetVarData(v, 23, 25)
+
     tex.Format = utils.GetVarData(v, 26, 28)
     tex.TransparentZero = utils.BitEnabled(v, 29)
     tex.TransformationMode = utils.GetVarData(v, 30, 31)
 
-    //if tex.TransformationMode != 0 {
-    //    fmt.Printf("MODE %02d\n", tex.TransformationMode)
-    //}
-
-    //if tex.Format != 0 && tex.Format != 7 && tex.Format != 2 {panic(fmt.Sprintf("Unsetup texture format %d", tex.Format))}
+    if tex.TransformationMode > 1 {
+        fmt.Printf("MODE %02d\n", tex.TransformationMode)
+    }
 }
 
 func (text *Texture) WritePalBase(v uint32) {

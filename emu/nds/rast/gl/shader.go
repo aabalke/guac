@@ -57,6 +57,8 @@ func (shader *NdsShader) Fragment(v Vertex) Color {
 
     if shader.Texture != nil {
         vertexColor = shader.Texture.Sample(v.Texture.X, v.Texture.Y)
+
+        //bilinear sample needs texture coords
         //vertexColor = shader.Texture.BilinearSample(v.Texture.X, v.Texture.Y)
     }
 

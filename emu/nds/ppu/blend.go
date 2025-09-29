@@ -72,34 +72,38 @@ func (bp *BlendPalettes) SetBlendPalettes(palData uint32, bgIdx uint32, obj bool
 	}
 }
 
-func (bp *BlendPalettes) Blend(objTransparent bool, x, y uint32, wins *Windows, inObjWindow bool) uint32 {
+func (bp *BlendPalettes) Blend(objTransparent bool, x, y uint32, wins *Windows, inObjWindow bool, is3d bool) uint32 {
 
-	if !windowBldPixelAllowed(x, y, wins, inObjWindow) {
-		return bp.noBlend(objTransparent)
-	}
+    if !windowBldPixelAllowed(x, y, wins, inObjWindow) {
+		return bp.noBlend(objTransparent, is3d)
+    }
 
 	switch bp.Bld.Mode {
 	case BLD_MODE_OFF:
-		return bp.noBlend(objTransparent)
+		return bp.noBlend(objTransparent, is3d)
 	case BLD_MODE_STD:
-		return bp.alphaBlend()
+		return bp.alphaBlend(is3d)
 	case BLD_MODE_WHITE:
 		return bp.grayscaleBlend(true)
 	case BLD_MODE_BLACK:
 		return bp.grayscaleBlend(false)
 	default:
-		return bp.noBlend(objTransparent)
+		return bp.noBlend(objTransparent, is3d)
 	}
 }
 
-func (bp *BlendPalettes) noBlend(objTransparent bool) uint32 {
+func (bp *BlendPalettes) noBlend(objTransparent, is3d bool) uint32 {
 	if objTransparent {
-		return bp.alphaBlend()
+		return bp.alphaBlend(is3d)
 	}
 	return bp.NoBlendPalette
 }
 
-func (bp *BlendPalettes) alphaBlend() uint32 {
+func (bp *BlendPalettes) alphaBlend(is3d bool) uint32 {
+
+    if is3d { // this will need to be updated
+		return bp.NoBlendPalette
+    }
 
 	if !bp.hasA || !bp.hasB || !bp.targetATop {
 		return bp.NoBlendPalette
