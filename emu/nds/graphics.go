@@ -109,7 +109,6 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 
 	var objMode uint32
 	var inObjWindow bool
-    var is3d bool
 
 	// work backwards for proper priorities
 	for i := 3; i >= 0; i-- {
@@ -123,7 +122,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 				continue
 			}
 
-            palData, ok := uint32(0), false
+            palData, alpha, ok := uint32(0), float64(1), false
 
             switch bg.Type {
             case ppu.BG_TYPE_TEX:
@@ -133,8 +132,8 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
             case ppu.BG_TYPE_LAR:
 				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_3D :
-                palData, ok = nds.set3d(engine, bg, x, y)
-                is3d = true // this will need to be updated
+                palData, alpha = nds.set3d(engine, bg, x, y)
+                ok = true
             case ppu.BG_TYPE_BGM:
 				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_256:
@@ -144,7 +143,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
             }
 
 			if ok {
-				bldPal.SetBlendPalettes(palData, uint32(bgIdx), false, false)
+				bldPal.SetBlendPalettes(palData, uint32(bgIdx), false, false, true, alpha)
 			}
 		}
 
@@ -183,13 +182,13 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 				break ObjectLoop
 			case ok:
 				objMode = obj.Mode
-				bldPal.SetBlendPalettes(palData, 0, true, objMode == 1)
+				bldPal.SetBlendPalettes(palData, 0, true, objMode == 1, false, 0)
 				break ObjectLoop
 			}
 		}
 	}
 
-	finalPalData := bldPal.Blend(objMode == 1, x, y, wins, inObjWindow, is3d)
+	finalPalData := bldPal.Blend(objMode == 1, x, y, wins, inObjWindow)
 	index := (x + (y * SCREEN_WIDTH)) << 2
 	nds.applyColor(finalPalData, uint32(index), engine.Pixels)
 }
@@ -260,19 +259,19 @@ func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {
 	return bgs
 }
 
-func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, bool) {
+func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, float64) {
 	index := (x + (y * SCREEN_WIDTH))
 
     render := nds.ppu.Rasterizer.Render
 
-    pal, ok:= uint32(render.PixelPalettes[index]), render.AlphaPixels[index]
+    pal, alpha := uint32(render.PixelPalettes[index]), render.Alphas[index]
 
     if nds.ppu.Rasterizer.Disp3dCnt.RearPlaneBitmapEnabled == true {
         panic("Has Rear Plane")
         //return nds.setRearBitmap(engine, bg, x, y)
     }
 
-    return pal, ok
+    return pal, alpha
 }
 
 func (nds *Nds) setRearBitmap(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, bool) {

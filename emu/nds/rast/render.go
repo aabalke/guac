@@ -16,7 +16,7 @@ const (
 type Render struct {
     Rasterizer *Rasterizer
     PixelPalettes []uint32
-    AlphaPixels []bool
+    Alphas []float64
 	Context *gl.Context
     Buffers *Buffers
     RearPlane *RearPlane
@@ -29,9 +29,8 @@ func NewRender(rast *Rasterizer, buffers *Buffers, rp *RearPlane) *Render {
         Buffers: buffers,
         Context: gl.NewContext(WIDTH, HEIGHT),
         PixelPalettes: make([]uint32, WIDTH*HEIGHT),
-        AlphaPixels: make([]bool, WIDTH*HEIGHT),
+        Alphas: make([]float64, WIDTH*HEIGHT),
         RearPlane: rp,
-
     }
 
     r.Context.Cull = gl.CullNone
@@ -60,7 +59,6 @@ func (r *Render) UpdateRender() {
 	image := r.Context.Image()
 
     r.ImageToPixels(image)
-    //r.Rasterizer.DebugTexture()
 }
 
 func (r *Render) RenderPolygon(p *Polygon) {
@@ -149,7 +147,7 @@ func (r *Render) ImageToPixels(img image.Image) {
         for x := range WIDTH {
             c := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
             r.PixelPalettes[i] = uint32(RGB24ToRGB15(c.R, c.G, c.B))
-            r.AlphaPixels[i] = c.A == 0xFF
+            r.Alphas[i] = float64(c.A) / 0xFF
             i++
         }
     }

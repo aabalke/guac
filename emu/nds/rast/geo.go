@@ -46,7 +46,7 @@ func NewGeoEngine(buffers *Buffers, irq *cpu.Irq) *GeoEngine {
         Buffers: buffers,
         MtxStacks: NewMtxStacks(),
         //Color: gl.Black,
-        TextureCache: make(map[uint32]*[]uint8, 0),
+        TextureCache: make(map[uint32]*[]gl.Color, 0),
     }
 }
 

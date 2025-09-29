@@ -1,7 +1,6 @@
 package gl
 
 import (
-	"encoding/binary"
 	"math"
 )
 
@@ -15,89 +14,15 @@ type Texture interface {
 	BilinearSample(u, v float64) Color
 }
 
-type BilinearCoords struct {
-    X, Y float64
-    X0, Y0 int
-    X1, Y1 int
-}
-
-func getBilinearCoords(w, h, u, v float64) BilinearCoords {
-	u -= math.Floor(u)
-	v -= math.Floor(v)
-	x := u * float64(w-1)
-	y := v * float64(h-1)
-	x0 := int(x)
-	y0 := int(y)
-	x1 := x0 + 1
-	y1 := y0 + 1
-	x -= float64(x0)
-	y -= float64(y0)
-
-    return BilinearCoords{
-        X: x,
-        Y: y,
-        X0: x0,
-        Y0: y0,
-        X1: x1,
-        Y1: y1,
-    }
-}
-
-func getTextureCoords(u, v float64, w, h int, repeatT, repeatS, flipT, flipS bool) (int, int) {
-
-	x := int(u * float64(w))
-	y := int(v * float64(h))
-
-    if repeatT {
-
-        flip := flipT && int(v) & 1 == 1 
-        v -= math.Floor(v)
-        tmp := int(v * float64(h))
-
-        if flip {
-            y = h - tmp
-        } else {
-            y = tmp
-        }
-
-    } else {
-        y = min(h-1, y)
-        y = max(y, 0)
-    }
-
-    if repeatS {
-        flip := flipS && int(u) & 1 == 1 
-        u -= math.Floor(u)
-        tmp := int(u * float64(w))
-
-        if flip {
-            x = w - tmp
-        } else {
-            x = tmp
-        }
-
-    } else {
-        x = min(w-1, x)
-        x = max(x, 0)
-    }
-
-    return x, y
-}
-
 type NdsTexture struct {
-    Width, Height int
-	RepeatS, RepeatT   bool
-	FlipS, FlipT       bool
-    CachedTexture *[]uint8
+    Width, Height       int
+	RepeatS, RepeatT    bool
+	FlipS, FlipT        bool
+    CachedTexture       *[]Color
 }
 
 func (t *NdsTexture) Sample(u, v float64) Color {
-    x, y := getTextureCoords(
-        u, v,
-        t.Width, t.Height,
-        t.RepeatT, t.RepeatS,
-        t.FlipT, t.FlipS,
-    )
+    x, y := t.getTextureCoords(u, v)
     return t.getColor(x, y)
 }
 
@@ -116,19 +41,86 @@ func (t *NdsTexture) BilinearSample(u, v float64) Color {
 	return c
 }
 
-func (t *NdsTexture) getColor(x, y int) Color {
+func (t *NdsTexture) getColor(x, y uint32) Color {
 
-    idx := (x + y * t.Width) * 2
+    idx := (x + y * uint32(t.Width))
 
-    if idx + 1 >= len(*t.CachedTexture) {
-        return Black
+    if idx >= uint32(len(*t.CachedTexture)) {
+        return Transparent
     }
 
-    data := binary.LittleEndian.Uint16((*t.CachedTexture)[idx:])
+    return (*t.CachedTexture)[idx]
+}
 
-    return MakeColorFrom15Bit(
-        uint8(data & 0b11111),
-        uint8(data >> 5) & 0b11111,
-        uint8(data >> 10) & 0b11111,
-    )
+func (t *NdsTexture) getTextureCoords(u, v float64) (uint32, uint32) {
+
+	x := int(u * float64(t.Width))
+	y := int(v * float64(t.Height))
+
+    if t.RepeatT {
+
+        flip := t.FlipT && int(v) & 1 == 1 
+        v -= math.Floor(v)
+        tmp := int(v * float64(t.Height))
+
+        // does tmp need - 1 not just flip??
+
+        if flip {
+            y = t.Height - tmp - 1
+        } else {
+            y = tmp
+        }
+
+    } else {
+        y = min(t.Height-1, y)
+        y = max(y, 0)
+    }
+
+    if t.RepeatS {
+        flip := t.FlipS && int(u) & 1 == 1 
+        u -= math.Floor(u)
+        tmp := int(u * float64(t.Width))
+
+        // does tmp need - 1 not just flip??
+
+        if flip {
+            x = t.Width - tmp - 1
+        } else {
+            x = tmp
+        }
+
+    } else {
+        x = min(t.Width-1, x)
+        x = max(x, 0)
+    }
+
+    return uint32(x), uint32(y)
+}
+
+type BilinearCoords struct {
+    X,  Y float64
+    X0, Y0 uint32
+    X1, Y1 uint32
+}
+
+func getBilinearCoords(w, h, u, v float64) BilinearCoords {
+	u -= math.Floor(u)
+	v -= math.Floor(v)
+	x := u * float64(w-1)
+	y := v * float64(h-1)
+	x0 := int(x)
+	y0 := int(y)
+	x1 := x0 + 1
+	y1 := y0 + 1
+	x -= float64(x0)
+	y -= float64(y0)
+
+    return BilinearCoords{
+        X: x,
+        Y: y,
+        X0: uint32(x0),
+        Y0: uint32(y0),
+        X1: uint32(x1),
+        Y1: uint32(y1),
+    }
 }
