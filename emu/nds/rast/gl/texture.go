@@ -59,7 +59,7 @@ func (t *NdsTexture) getTextureCoords(u, v float64) (uint32, uint32) {
 
     if t.RepeatT {
 
-        flip := t.FlipT && int(v) & 1 == 1 
+        flip := t.FlipT && uint(math.Floor(v)) & 1 == 1
         v -= math.Floor(v)
         tmp := int(v * float64(t.Height))
 
@@ -77,7 +77,7 @@ func (t *NdsTexture) getTextureCoords(u, v float64) (uint32, uint32) {
     }
 
     if t.RepeatS {
-        flip := t.FlipS && int(u) & 1 == 1 
+        flip := t.FlipS && uint(math.Floor(u)) & 1 == 1 
         u -= math.Floor(u)
         tmp := int(u * float64(t.Width))
 
