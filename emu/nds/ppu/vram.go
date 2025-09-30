@@ -48,6 +48,11 @@ type VRAM struct {
     TexPalSlots  [6]unsafe.Pointer
 
     TextureCache *rast.TextureCache
+
+    banks [9]struct{
+        bank unsafe.Pointer
+        cnt *VramCnt
+    }
 }
 
 func (v *VRAM) Init(t *rast.TextureCache) {
@@ -62,18 +67,40 @@ func (v *VRAM) Init(t *rast.TextureCache) {
     v.CNT_H.Write(0x80)
     v.CNT_I.Write(0x80)
 
+	v.CNT_A.Size  = 0x2_0000
+	v.CNT_B.Size  = 0x2_0000
+	v.CNT_C.Size  = 0x2_0000
+	v.CNT_D.Size  = 0x2_0000
+	v.CNT_E.Size  = 0x1_0000
+	v.CNT_F.Size  = 0x0_4000
+	v.CNT_G.Size  = 0x0_4000
+	v.CNT_H.Size  = 0x0_8000
+	v.CNT_I.Size  = 0x0_4000
+
+    v.banks[0] = struct{bank unsafe.Pointer; cnt *VramCnt}{ bank: unsafe.Pointer(&v.A), cnt: &v.CNT_A}
+    v.banks[1] = struct{bank unsafe.Pointer; cnt *VramCnt}{ bank: unsafe.Pointer(&v.B), cnt: &v.CNT_B}
+    v.banks[2] = struct{bank unsafe.Pointer; cnt *VramCnt}{ bank: unsafe.Pointer(&v.C), cnt: &v.CNT_C}
+    v.banks[3] = struct{bank unsafe.Pointer; cnt *VramCnt}{ bank: unsafe.Pointer(&v.D), cnt: &v.CNT_D}
+    v.banks[4] = struct{bank unsafe.Pointer; cnt *VramCnt}{ bank: unsafe.Pointer(&v.E), cnt: &v.CNT_E}
+    v.banks[5] = struct{bank unsafe.Pointer; cnt *VramCnt}{ bank: unsafe.Pointer(&v.F), cnt: &v.CNT_F}
+    v.banks[6] = struct{bank unsafe.Pointer; cnt *VramCnt}{ bank: unsafe.Pointer(&v.G), cnt: &v.CNT_G}
+    v.banks[7] = struct{bank unsafe.Pointer; cnt *VramCnt}{ bank: unsafe.Pointer(&v.H), cnt: &v.CNT_H}
+    v.banks[8] = struct{bank unsafe.Pointer; cnt *VramCnt}{ bank: unsafe.Pointer(&v.I), cnt: &v.CNT_I}
 }
 
 type VramCnt struct {
     V uint8
-	Mst, Ofs uint8
+	Mst uint8
 	Enabled  bool
+    Ofs uint32
+    Base uint32
+    Size uint32
 }
 
 func (vc *VramCnt) Write(v uint8) {
     vc.V = v & 0b1001_1111
 	vc.Mst = v & 0b111
-    vc.Ofs = uint8(utils.GetVarData(uint32(v), 3, 4))
+    vc.Ofs = uint32(utils.GetVarData(uint32(v), 3, 4))
 	vc.Enabled = utils.BitEnabled(uint32(v), 7)
 }
 
@@ -81,154 +108,208 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
 
 	switch addr {
 	case 0x240:
-        vm.CNT_A.Write(v)
 
-        if vm.CNT_A.Mst == 3 {
+        cnt := &vm.CNT_A
+        bank := &vm.A
+
+        cnt.Write(v)
+
+        cnt.Base = 0x100_0000
+
+        switch cnt.Mst {
+        case 0: cnt.Base = uint32(0x80_0000)
+        case 1: cnt.Base = 0x20000 * cnt.Ofs
+        case 2: cnt.Base = 0x400000 + 0x20000 * cnt.Ofs
+        case 3:
             vm.TextureCache.Reset()
-            vm.TextureSlots[vm.CNT_A.Ofs] = &vm.A
+            vm.TextureSlots[cnt.Ofs] = bank
         }
 
 
 	case 0x241:
-        vm.CNT_B.Write(v)
 
-        if vm.CNT_B.Mst == 3 {
+        cnt := &vm.CNT_B
+        bank := &vm.B
+
+        cnt.Write(v)
+
+        cnt.Base = 0x100_0000
+
+        switch cnt.Mst {
+        case 0: cnt.Base = uint32(0x82_0000)
+        case 1: cnt.Base = 0x20000 * cnt.Ofs
+        case 2: cnt.Base = 0x400000 + 0x20000 * cnt.Ofs
+        case 3:
             vm.TextureCache.Reset()
-            vm.TextureSlots[vm.CNT_B.Ofs] = &vm.B
+            vm.TextureSlots[cnt.Ofs] = bank
         }
 
 
 	case 0x242:
-        vm.CNT_C.Write(v)
 
-        //vm.isCArm7 = v & 0b10000011 == 0b10000010
-        //vm.CNT_7 &^= 1
-        //if vm.isCArm7 {
-        //    vm.CNT_7 |= 1
-        //}
+        cnt := &vm.CNT_C
+        bank := &vm.C
 
-        if arm7 := vm.CNT_C.Enabled && vm.CNT_C.Mst == 2 && vm.CNT_C.Ofs < 2; arm7 {
+        cnt.Write(v)
+        cnt.Base = 0x100_0000
+
+        vm.isCArm7 = false
+        vm.CNT_7 &^= 1
+
+        switch cnt.Mst {
+        case 0: cnt.Base = uint32(0x84_0000)
+        case 1: cnt.Base = 0x20000 * cnt.Ofs
+        case 2:
+
+            if cnt.Ofs >= 2 { panic("INVALID ARM7 CNT C OFS")}
+
             vm.isCArm7 = true
             vm.CNT_7 |= 1
-        } else {
-            vm.isCArm7 = false
-            vm.CNT_7 &^= 1
-        }
 
-        if vm.CNT_C.Mst == 3 {
+        case 3:
             vm.TextureCache.Reset()
-            vm.TextureSlots[vm.CNT_C.Ofs] = &vm.C
+            vm.TextureSlots[cnt.Ofs] = bank
+        case 4: cnt.Base = 0x20_0000
         }
 
 	case 0x243:
-        vm.CNT_D.Write(v)
 
-        //vm.isDArm7 = v & 0b10000011 == 0b10000010
-        //vm.CNT_7 &^= 0b10
-        //if vm.isDArm7 {
-        //    fmt.Printf("")
-        //    vm.CNT_7 |= 0b10
-        //}
+        cnt := &vm.CNT_D
+        bank := &vm.D
 
-        if arm7 := vm.CNT_D.Enabled && vm.CNT_D.Mst == 2 && vm.CNT_D.Ofs < 2; arm7 {
+        cnt.Write(v)
+        cnt.Base = 0x100_0000
+
+        vm.isDArm7 = false
+        vm.CNT_7 &^= 0b10
+
+        switch cnt.Mst {
+        case 0: cnt.Base = uint32(0x86_0000)
+        case 1: cnt.Base = 0x20000 * cnt.Ofs
+        case 2:
+
+            if cnt.Ofs >= 2 { panic("INVALID ARM7 CNT D OFS")}
+
             vm.isDArm7 = true
             vm.CNT_7 |= 0b10
-        } else {
-            vm.isDArm7 = false
-            vm.CNT_7 &^= 0b10
-        }
 
-        if vm.CNT_D.Mst == 3 {
-            vm.TextureCache.Reset()
-            vm.TextureSlots[vm.CNT_D.Ofs] = &vm.D
-        }
-
-
-	case 0x244:
-        vm.CNT_E.Write(v)
-
-        switch vm.CNT_E.Mst {
         case 3:
             vm.TextureCache.Reset()
-            vm.TexPalSlots[0] = unsafe.Pointer(&vm.E)
-            vm.TexPalSlots[1] = unsafe.Add(unsafe.Pointer(&vm.E), 0x4000)
-            vm.TexPalSlots[2] = unsafe.Add(unsafe.Pointer(&vm.E), 0x8000)
-            vm.TexPalSlots[3] = unsafe.Add(unsafe.Pointer(&vm.E), 0xC000)
+            vm.TextureSlots[cnt.Ofs] = bank
+        case 4: cnt.Base = 0x60_0000
+        }
+
+	case 0x244:
+
+        cnt := &vm.CNT_E
+        bank := &vm.E
+        cnt.Write(v)
+        cnt.Base = 0x100_0000
+
+        switch cnt.Mst {
+        case 0: cnt.Base = uint32(0x88_0000)
+        case 1: cnt.Base = 0
+        case 2: cnt.Base = 0x40_0000
+        case 3:
+            vm.TextureCache.Reset()
+            vm.TexPalSlots[0] = unsafe.Pointer(bank)
+            vm.TexPalSlots[1] = unsafe.Add(unsafe.Pointer(bank), 0x4000)
+            vm.TexPalSlots[2] = unsafe.Add(unsafe.Pointer(bank), 0x8000)
+            vm.TexPalSlots[3] = unsafe.Add(unsafe.Pointer(bank), 0xC000)
 
         case 4:
-            vm.ExtABgSlot0 = unsafe.Pointer(&vm.E)
-            vm.ExtABgSlot1 = unsafe.Add(unsafe.Pointer(&vm.E), 0x2000)
-            vm.ExtABgSlot2 = unsafe.Add(unsafe.Pointer(&vm.E), 0x4000)
-            vm.ExtABgSlot3 = unsafe.Add(unsafe.Pointer(&vm.E), 0x6000)
+            vm.ExtABgSlot0 = unsafe.Pointer(bank)
+            vm.ExtABgSlot1 = unsafe.Add(unsafe.Pointer(bank), 0x2000)
+            vm.ExtABgSlot2 = unsafe.Add(unsafe.Pointer(bank), 0x4000)
+            vm.ExtABgSlot3 = unsafe.Add(unsafe.Pointer(bank), 0x6000)
         }
 
 	case 0x245:
-        vm.CNT_F.Write(v)
 
-        switch vm.CNT_F.Mst {
+        cnt := &vm.CNT_F
+        bank := &vm.F
+        cnt.Write(v)
+        cnt.Base = 0x100_0000
+
+        switch cnt.Mst {
+        case 0: cnt.Base = uint32(0x89_0000)
+        case 1: cnt.Base = (0x4000 * uint32(cnt.Ofs & 1)) + (0x10000 * uint32(cnt.Ofs >> 1))
+        case 2: cnt.Base = 0x40_0000 + (0x4000 * uint32(cnt.Ofs & 1)) + (0x10000 * uint32(cnt.Ofs >> 1))
         case 3:
             vm.TextureCache.Reset()
-            idx := (vm.CNT_F.Ofs & 1) + (vm.CNT_F.Ofs >> 1) * 4
-            vm.TexPalSlots[idx] = unsafe.Pointer(&vm.F)
+            idx := (cnt.Ofs & 1) + (cnt.Ofs >> 1) * 4
+            vm.TexPalSlots[idx] = unsafe.Pointer(bank)
         case 4:
 
-            if vm.CNT_F.Ofs == 0 {
-                vm.ExtABgSlot0 = unsafe.Pointer(&vm.F)
-                vm.ExtABgSlot1 = unsafe.Add(unsafe.Pointer(&vm.F), 0x2000)
+            if cnt.Ofs == 0 {
+                vm.ExtABgSlot0 = unsafe.Pointer(bank)
+                vm.ExtABgSlot1 = unsafe.Add(unsafe.Pointer(bank), 0x2000)
             } else {
-                vm.ExtABgSlot2 = unsafe.Pointer(&vm.F)
-                vm.ExtABgSlot3 = unsafe.Add(unsafe.Pointer(&vm.F), 0x2000)
+                vm.ExtABgSlot2 = unsafe.Pointer(bank)
+                vm.ExtABgSlot3 = unsafe.Add(unsafe.Pointer(bank), 0x2000)
             }
 
         case 5:
-            vm.ExtAPalObj = &vm.F
+            vm.ExtAPalObj = bank
         }
-
 
 	case 0x246:
-        vm.CNT_G.Write(v)
+        cnt := &vm.CNT_G
+        bank := &vm.G
+        cnt.Write(v)
+        cnt.Base = 0x100_0000
 
-
-        switch vm.CNT_G.Mst {
+        switch cnt.Mst {
+        case 0: cnt.Base = uint32(0x89_4000)
+        case 1: cnt.Base = (0x4000 * uint32(cnt.Ofs & 1)) + (0x10000 * uint32(cnt.Ofs >> 1))
+        case 2: cnt.Base = 0x40_0000 + (0x4000 * uint32(cnt.Ofs & 1)) + (0x10000 * uint32(cnt.Ofs >> 1))
         case 3:
             vm.TextureCache.Reset()
-            idx := (vm.CNT_G.Ofs & 1) + (vm.CNT_G.Ofs >> 1) * 4
-            vm.TexPalSlots[idx] = unsafe.Pointer(&vm.G)
+            idx := (cnt.Ofs & 1) + (cnt.Ofs >> 1) * 4
+            vm.TexPalSlots[idx] = unsafe.Pointer(bank)
         case 4:
 
-            if vm.CNT_G.Ofs == 0 {
-                vm.ExtABgSlot0 = unsafe.Pointer(&vm.G)
-                vm.ExtABgSlot1 = unsafe.Add(unsafe.Pointer(&vm.G), 0x2000)
+            if cnt.Ofs == 0 {
+                vm.ExtABgSlot0 = unsafe.Pointer(bank)
+                vm.ExtABgSlot1 = unsafe.Add(unsafe.Pointer(bank), 0x2000)
             } else {
-                vm.ExtABgSlot2 = unsafe.Pointer(&vm.G)
-                vm.ExtABgSlot3 = unsafe.Add(unsafe.Pointer(&vm.G), 0x2000)
+                vm.ExtABgSlot2 = unsafe.Pointer(bank)
+                vm.ExtABgSlot3 = unsafe.Add(unsafe.Pointer(bank), 0x2000)
             }
 
         case 5:
-            vm.ExtAPalObj = &vm.G
+            vm.ExtAPalObj = bank
         }
-
 
     // 0x247 is WRAMCNT
 	case 0x248:
-        vm.CNT_H.Write(v)
+        cnt := &vm.CNT_H
+        bank := &vm.H
+        cnt.Write(v)
+        cnt.Base = 0x100_0000
 
-        if vm.CNT_H.Mst == 2 {
-            vm.ExtBBgSlot0 = unsafe.Pointer(&vm.H)
-            vm.ExtBBgSlot1 = unsafe.Add(unsafe.Pointer(&vm.H), 0x2000)
-            vm.ExtBBgSlot2 = unsafe.Add(unsafe.Pointer(&vm.H), 0x4000)
-            vm.ExtBBgSlot3 = unsafe.Add(unsafe.Pointer(&vm.H), 0x6000)
-        } else {
-            vm.ExtBBgSlot0 = nil
-            vm.ExtBBgSlot1 = nil
-            vm.ExtBBgSlot2 = nil
-            vm.ExtBBgSlot3 = nil
+        switch cnt.Mst {
+        case 0: cnt.Base = 0x89_8000
+        case 1: cnt.Base = 0x20_0000
+        case 2:
+            vm.ExtBBgSlot0 = unsafe.Pointer(bank)
+            vm.ExtBBgSlot1 = unsafe.Add(unsafe.Pointer(bank), 0x2000)
+            vm.ExtBBgSlot2 = unsafe.Add(unsafe.Pointer(bank), 0x4000)
+            vm.ExtBBgSlot3 = unsafe.Add(unsafe.Pointer(bank), 0x6000)
         }
 
 	case 0x249:
-        vm.CNT_I.Write(v)
+        cnt := &vm.CNT_I
+        bank := &vm.I
+        cnt.Write(v)
+        cnt.Base = 0x100_0000
 
-        if vm.CNT_I.Mst == 3 { vm.ExtBPalObj = &vm.I }
+        switch cnt.Mst {
+        case 0: cnt.Base = uint32(0x8A_0000)
+        case 1: cnt.Base = 0x20_8000
+        case 2: cnt.Base = 0x60_0000
+        case 3: vm.ExtBPalObj = bank
+        }
 	}
 }
 
@@ -236,124 +317,42 @@ func (vm *VRAM) Write(addr uint32, v uint8, arm9 bool) {
 
     addr &= 0xFF_FFFF
 
-    if arm9 {
+    if !arm9 {
 
-        base := uint32(0x100_0000) // make sure 0 does not grab everything
-        if vm.CNT_A.Enabled {
-            switch vm.CNT_A.Mst {
-            case 0: base = uint32(0x80_0000)
-            case 1: base = 0x20000 * uint32(vm.CNT_A.Ofs)
-            case 2: base = 0x400000 + 0x20000 * uint32(vm.CNT_A.Ofs)
-            }
-            if addr >= base && addr < base + 0x2_0000 {
-                vm.A[addr - base] = v
-            }
+        cnt := &vm.CNT_C
+        bank := &vm.C
+
+        if vm.isCArm7 && addr >= (cnt.Ofs * cnt.Size) {
+            bank[addr & 0x1FFFF] = v
         }
 
-        base = uint32(0x100_0000)
-        if vm.CNT_B.Enabled {
-            switch vm.CNT_B.Mst {
-            case 0: base = uint32(0x82_0000)
-            case 1: base = 0x20000 * uint32(vm.CNT_B.Ofs)
-            case 2: base = 0x400000 + 0x20000 * uint32(vm.CNT_B.Ofs)
-            }
-            if addr >= base && addr < base + 0x2_0000 {
-                vm.B[addr - base] = v
-            }
-        }
+        cnt = &vm.CNT_D
+        bank = &vm.D
 
-        base = uint32(0x100_0000)
-        if vm.CNT_C.Enabled {
-            switch vm.CNT_C.Mst {
-            case 0: base = uint32(0x84_0000)
-            case 1: base = 0x20000 * uint32(vm.CNT_C.Ofs)
-            case 4: base = 0x20_0000
-            }
-            if addr >= base && addr < base + 0x2_0000 {
-                vm.C[addr - base] = v
-            }
-        }
-
-        base = uint32(0x100_0000)
-        if vm.CNT_D.Enabled {
-            switch vm.CNT_D.Mst {
-            case 0: base = uint32(0x86_0000)
-            case 1: base = 0x20000 * uint32(vm.CNT_D.Ofs)
-            case 4: base = 0x60_0000
-            }
-            if addr >= base && addr < base + 0x2_0000 {
-                vm.D[addr - base] = v
-            }
-        }
-
-        base = uint32(0x100_0000)
-        if vm.CNT_E.Enabled {
-            switch vm.CNT_E.Mst {
-            case 0: base = uint32(0x88_0000)
-            case 1: base = 0
-            case 2: base = 0x40_0000
-            }
-            if addr >= base && addr < base + 0x1_0000 {
-                vm.E[addr - base] = v
-            }
-        }
-
-        base = uint32(0x100_0000)
-        if vm.CNT_F.Enabled {
-            switch vm.CNT_F.Mst {
-            case 0: base = uint32(0x89_0000)
-            case 1: base = (0x4000 * uint32(vm.CNT_G.Ofs & 1)) + (0x10000 * uint32(vm.CNT_G.Ofs >> 1))
-            case 2: base = 0x40_0000 + (0x4000 * uint32(vm.CNT_G.Ofs & 1)) + (0x10000 * uint32(vm.CNT_G.Ofs >> 1))
-            }
-            if addr >= base && addr < base + 0x4000 {
-                vm.F[addr - base] = v
-            }
-        }
-
-        base = uint32(0x100_0000)
-        if vm.CNT_G.Enabled {
-            switch vm.CNT_G.Mst {
-            case 0: base = uint32(0x89_4000)
-            case 1: base = (0x4000 * uint32(vm.CNT_G.Ofs & 1)) + (0x10000 * uint32(vm.CNT_G.Ofs >> 1))
-            case 2: base = 0x40_0000 + (0x4000 * uint32(vm.CNT_G.Ofs & 1)) + (0x10000 * uint32(vm.CNT_G.Ofs >> 1))
-            }
-            if addr >= base && addr < base + 0x4000 {
-                vm.G[addr - base] = v
-            }
-        }
-
-        base = uint32(0x100_0000)
-        if vm.CNT_H.Enabled {
-            switch vm.CNT_H.Mst {
-            case 0: base = 0x89_8000
-            case 1: base = 0x20_0000
-            }
-            if addr >= base && addr < base + 0x8000 {
-                vm.H[addr - base] = v
-            }
-        }
-
-        base = uint32(0x100_0000)
-        if vm.CNT_I.Enabled {
-            switch vm.CNT_I.Mst {
-            case 0: base = uint32(0x8A_0000)
-            case 1: base = 0x20_8000
-            case 2: base = 0x60_0000
-            }
-            if addr >= base && addr < base + 0x4000 {
-                vm.I[addr - base] = v
-            }
+        if vm.isDArm7 && addr >= (cnt.Ofs * cnt.Size) {
+            bank[addr & 0x1FFFF] = v
         }
 
         return
     }
 
-    if vm.isCArm7 && addr >= (uint32(vm.CNT_C.Ofs) * 0x20000) {
-        vm.C[addr & 0x1FFFF] = v
-    }
+    for i, vb := range &vm.banks {
 
-    if vm.isDArm7 && addr >= (uint32(vm.CNT_D.Ofs) * 0x20000) {
-        vm.D[addr & 0x1FFFF] = v
+        if !vb.cnt.Enabled {
+            continue
+        }
+
+
+        if addr >= vb.cnt.Base && addr < vb.cnt.Base + vb.cnt.Size {
+
+            if i < 3 || (i >= 4 && i < 7) {
+                vm.TextureCache.Reset()
+            }
+
+
+            (*[0x2_0000]uint8)(vb.bank)[addr - vb.cnt.Base] = v
+            // return ???
+        }
     }
 }
 
@@ -361,129 +360,60 @@ func (vm *VRAM) Read(addr uint32, arm9 bool) uint8 {
 
     addr &= 0xFF_FFFF
 
-    if arm9 {
+    if !arm9 {
 
-        base := uint32(0x100_0000) // make sure 0 does not grab everything
-        if vm.CNT_A.Enabled {
-            switch vm.CNT_A.Mst {
-            case 0: base = uint32(0x80_0000)
-            case 1: base = 0x20000 * uint32(vm.CNT_A.Ofs)
-            case 2: base = 0x400000 + 0x20000 * uint32(vm.CNT_A.Ofs)
-            }
-            if addr >= base && addr < base + 0x2_0000 {
-                return vm.A[addr - base]
-            }
+        cnt := &vm.CNT_C
+        bank := &vm.C
+
+        if vm.isCArm7 && addr >= (cnt.Ofs * cnt.Size) {
+            return bank[addr & 0x1FFFF]
         }
 
-        base = uint32(0x100_0000) // make sure 0 does not grab everything
-        if vm.CNT_B.Enabled {
-            switch vm.CNT_B.Mst {
-            case 0: base = uint32(0x82_0000)
-            case 1: base = 0x20000 * uint32(vm.CNT_B.Ofs)
-            case 2: base = 0x400000 + 0x20000 * uint32(vm.CNT_B.Ofs)
-            }
-            if addr >= base && addr < base + 0x2_0000 {
-                return vm.B[addr - base]
-            }
-        }
+        cnt = &vm.CNT_D
+        bank = &vm.D
 
-        base = uint32(0x100_0000) // make sure 0 does not grab everything
-        if vm.CNT_C.Enabled {
-            switch vm.CNT_C.Mst {
-            case 0: base = uint32(0x84_0000)
-            case 1: base = 0x20000 * uint32(vm.CNT_C.Ofs)
-            case 2: // given to arm7
-            case 4: base = 0x20_0000
-            }
-            if addr >= base && addr < base + 0x2_0000 {
-                return vm.C[addr - base]
-            }
-        }
-
-        base = uint32(0x100_0000) // make sure 0 does not grab everything
-        if vm.CNT_D.Enabled {
-            switch vm.CNT_D.Mst {
-            case 0: base = uint32(0x86_0000)
-            case 1: base = 0x20000 * uint32(vm.CNT_D.Ofs)
-            case 2: // given to arm7
-            case 4: base = 0x60_0000
-            }
-            if addr >= base && addr < base + 0x2_0000 {
-                return vm.D[addr - base]
-            }
-        }
-
-        base = uint32(0x100_0000) // make sure 0 does not grab everything
-        if vm.CNT_E.Enabled {
-            switch vm.CNT_E.Mst {
-            case 0: base = uint32(0x88_0000)
-            case 1: base = 0
-            case 2: base = 0x40_0000
-            }
-            if addr >= base && addr < base + 0x1_0000 {
-                return vm.E[addr - base]
-            }
-        }
-
-        base = uint32(0x100_0000) // make sure 0 does not grab everything
-        if vm.CNT_F.Enabled {
-            switch vm.CNT_F.Mst {
-            case 0: base = uint32(0x89_0000)
-            case 1: base = (0x4000 * uint32(vm.CNT_F.Ofs & 1)) + (0x10000 * uint32(vm.CNT_F.Ofs >> 1))
-            case 2: base = 0x40_0000 + (0x4000 * uint32(vm.CNT_F.Ofs & 1)) + (0x10000 * uint32(vm.CNT_F.Ofs >> 1))
-            }
-            if addr >= base && addr < base + 0x4000 {
-                return vm.F[addr - base]
-            }
-        }
-
-        base = uint32(0x100_0000) // make sure 0 does not grab everything
-        if vm.CNT_G.Enabled {
-            switch vm.CNT_G.Mst {
-            case 0: base = uint32(0x89_4000)
-            case 1: base = (0x4000 * uint32(vm.CNT_G.Ofs & 1)) + (0x10000 * uint32(vm.CNT_G.Ofs >> 1))
-            case 2: base = 0x40_0000 + (0x4000 * uint32(vm.CNT_G.Ofs & 1)) + (0x10000 * uint32(vm.CNT_G.Ofs >> 1))
-            }
-            if addr >= base && addr < base + 0x4000 {
-                return vm.G[addr - base]
-            }
-        }
-
-        base = uint32(0x100_0000) // make sure 0 does not grab everything
-        if vm.CNT_H.Enabled {
-            switch vm.CNT_H.Mst {
-            case 0: base = 0x89_8000
-            case 1: base = 0x20_0000
-            }
-            if addr >= base && addr < base + 0x8000 {
-                return vm.H[addr - base]
-            }
-        }
-
-        base = uint32(0x100_0000) // make sure 0 does not grab everything
-        if vm.CNT_I.Enabled {
-            switch vm.CNT_I.Mst {
-            case 0: base = uint32(0x8A_0000)
-            case 1: base = 0x20_8000
-            case 2: base = 0x60_0000
-            }
-            if addr >= base && addr < base + 0x4000 {
-                return vm.I[addr - base]
-            }
+        if vm.isDArm7 && addr >= (cnt.Ofs * cnt.Size) {
+            return bank[addr & 0x1FFFF]
         }
 
         return 0
     }
 
-    if vm.isCArm7 && addr >= (uint32(vm.CNT_C.Ofs) * 0x20000) {
-        return vm.C[addr & 0x1FFFF]
-    }
+    for _, v := range &vm.banks {
 
-    if vm.isDArm7 && addr >= (uint32(vm.CNT_D.Ofs) * 0x20000) {
-        return vm.D[addr & 0x1FFFF]
+        if !v.cnt.Enabled {
+            continue
+        }
+
+        if addr >= v.cnt.Base && addr < v.cnt.Base + v.cnt.Size {
+            return (*[0x2_0000]uint8)(v.bank)[addr - v.cnt.Base]
+        }
     }
 
     return 0
+}
+
+// used by graphics to quickly get pointer for multiple reads (halfs, words etc)
+func (vm *VRAM) ReadPointer(addr uint32) *[2]uint8 {
+
+    for _, v := range &vm.banks {
+
+        if !v.cnt.Enabled {
+            continue
+        }
+
+        if !(addr >= v.cnt.Base && addr < v.cnt.Base + v.cnt.Size) {
+            continue
+        }
+
+        if addr + 1 >= v.cnt.Base + v.cnt.Size {
+            return &[2]uint8{0,0}
+        }
+
+        return ((*[2]uint8)((*[0x2_0000]uint8)(v.bank)[addr - v.cnt.Base:]))
+    }
+
+    return &[2]uint8{0,0}
 }
 
 func (vm *VRAM) ReadTexture(addr uint32) uint8 {

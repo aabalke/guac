@@ -138,13 +138,12 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
             v, _ := mem.Tcm.Read(addr)
             return v
 		case 0x2:
-            ramUsageUnimplimented(addr)
+            //ramUsageUnimplimented(addr)
 			return mem.MainRam[addr & 0x3F_FFFF]
 		case 0x3:
             return mem.WRAM.Read(addr, true)
 		case 0x4:
             //fmt.Printf("IO READ ARM9 %08X arm9 %t\n", addr, arm9)
-            printIO(addr, arm9, false)
 			return mem.ReadArm9IO(addr - 0x400_0000)
 		case 0x5:
             return mem.ppu.Pram.Read(addr, mem.ppu)

@@ -234,21 +234,21 @@ Lego Star Wars the Complete Saga
 Nintendogs Best Friends
 
 ### Booting (Buggyie)
-Animal Crossing Wild World
 Brain Age
 Sonic Colors
 Big Brain Academy
 Tetris Ds
-Cooking Mama
 Brain Age 2
 Pokemon Diamond
 Pokemon Ranger
 Mario Party
 Mario and Luigi Partners in Time
-Mario Kart Ds
-Super Mario 64
-New Super Mario Bros
 
 ### No Known errors
 Yoshis Island
 Pokemon Blue Rescue Team
+Animal Crossing Wild World
+Cooking Mama
+Mario Kart Ds
+Super Mario 64
+New Super Mario Bros

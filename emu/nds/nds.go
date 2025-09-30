@@ -228,8 +228,8 @@ func (nds *Nds) Update() {
 
 	for nds.Drawn = false; !nds.Drawn; {
 
-        nds.checkBadPc()
-        nds.checkMode()
+        //nds.checkBadPc()
+        //nds.checkMode()
 
         // arm9 thumb ~1 cycles, arm ~2 cycles
         // arm7 thumb ~2 cycles, arm ~4 cycles

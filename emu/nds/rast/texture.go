@@ -1,7 +1,6 @@
 package rast
 
 import (
-	"fmt"
 
 	"github.com/aabalke/guac/emu/nds/utils"
 )
@@ -50,7 +49,7 @@ func (tex *Texture) WriteParam(v uint32) {
     tex.TransformationMode = utils.GetVarData(v, 30, 31)
 
     if tex.TransformationMode > 1 {
-        fmt.Printf("MODE %02d\n", tex.TransformationMode)
+        //fmt.Printf("MODE %02d\n", tex.TransformationMode)
     }
 }
 
