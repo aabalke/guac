@@ -58,13 +58,14 @@ type Mem struct {
     BiosProt BiosProt
     WifiWaitCnt WifiWaitCnt
     Timers [8]Timer
+
 }
 
 type BiosProt uint16
 type WifiWaitCnt uint8
 
 func NewMemory(arm7Pc *uint32, halted7, halted9 *bool, dma7, dma9 *[4]dma.DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PPU) Mem {
-	m := Mem{
+m := Mem{
         halted7: halted7,
         halted9: halted9,
         dma7: dma7,
@@ -168,13 +169,13 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
         return 0xFF
 
     case 0x2:
-        ramUsageUnimplimented(addr)
+        //ramUsageUnimplimented(addr)
         return mem.MainRam[addr&0x3F_FFFF]
     case 0x3:
         return mem.WRAM.Read(addr, false)
     case 0x4:
         //fmt.Printf("IO READ ARM9 %08X arm9 %t\n", addr, arm9)
-        printIO(addr, arm9, false)
+        //printIO(addr, arm9, false)
         return mem.ReadArm7IO(addr-0x400_0000)
     case 0x6:
         return mem.ppu.Vram.Read(addr, false)
@@ -218,12 +219,12 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 		case 0x0, 0x1:
             mem.Tcm.Write(addr, v)
 		case 0x2:
-            clearTempUnimplimented(addr)
+            //clearTempUnimplimented(addr)
 			mem.MainRam[addr&0x3F_FFFF] = v
 		case 0x3:
             mem.WRAM.Write(addr, v, true)
 		case 0x4:
-            printIO(addr, arm9, true)
+            //printIO(addr, arm9, true)
 			mem.WriteArm9IO(addr-0x400_0000, v)
         case 0x5:
             mem.ppu.Pram.Write(addr, v, mem.ppu)
@@ -239,12 +240,12 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 
     switch addr >> 24 {
     case 0x2:
-        clearTempUnimplimented(addr)
+        //clearTempUnimplimented(addr)
         mem.MainRam[addr&0x3F_FFFF] = v
     case 0x3:
         mem.WRAM.Write(addr, v, false)
     case 0x4:
-        printIO(addr, arm9, true)
+        //printIO(addr, arm9, true)
         mem.WriteArm7IO(addr-0x400_0000, v)
     case 0x6:
         mem.ppu.Vram.Write(addr, v, false)

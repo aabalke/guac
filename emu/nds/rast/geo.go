@@ -45,7 +45,7 @@ func NewGeoEngine(buffers *Buffers, irq *cpu.Irq) *GeoEngine {
         Irq: irq,
         Buffers: buffers,
         MtxStacks: NewMtxStacks(),
-        //Color: gl.Black,
+        Color: gl.Transparent,
         TextureCache: make(map[uint32]*[]gl.Color, 0),
     }
 }
@@ -124,8 +124,6 @@ func (g *GeoEngine) PackedFifo() {
 
 // packed cmds not implimented yet
 
-var cnt uint32
-
 func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
     //fmt.Printf("DATA % X\n", data)
@@ -169,7 +167,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         if sMode == 2 {
             s1.CurrMtx = gl.Identity()
         }
-
 
     case 0x16:
 
@@ -221,7 +218,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             s1.CurrMtx = m
         }
 
-
     case 0x18:
 
         m := gl.Matrix{
@@ -247,7 +243,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         if sMode == 2 {
             s1.CurrMtx = m.Mul(s1.CurrMtx)
         }
-
 
     case 0x19:
 
@@ -293,7 +288,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             s1.CurrMtx = m.Mul(s1.CurrMtx)
         }
 
-
     case 0x1B:
 
         v := gl.Vector{
@@ -309,7 +303,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             s1.CurrMtx = s1.CurrMtx.Scale(v)
         }
 
-
     case 0x1C:
 
         v := gl.Vector{
@@ -322,7 +315,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         if sMode == 2 {
             s1.CurrMtx = s1.CurrMtx.Translate(v)
         }
-
 
     case 0x20:
 
@@ -404,6 +396,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
     case 0x40:
 
         if len(g.ActivePoly.Vertices) != 0 {
+
             fmt.Printf("BAD ACTIVE POLYGON HAS VERTICIES WHEN SETTING NEW BEGIN. WAS END_VTXS NOT CALLED? VERTS LEN %d\n", len(g.ActivePoly.Vertices))
             g.ActivePoly.Texture = g.Texture
             g.Buffers.Append(g.ActivePoly)
@@ -432,6 +425,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         g.Buffers.BisRendering = !g.Buffers.BisRendering
 
     case 0x60: 
+
         g.Viewport.X1 = uint8(data[1])
         g.Viewport.Y1 = uint8(data[1] >> 8)
         g.Viewport.X2 = uint8(data[1] >> 16)
@@ -449,7 +443,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
     default:
         //panic(fmt.Sprintf("UNSETUP GX CMD %02X\n", cmd))
-        //fmt.Printf("UNSETUP GX CMD %02X\n", cmd)
+        fmt.Printf("UNSETUP GX CMD %02X\n", cmd)
 
     }
 
@@ -465,7 +459,6 @@ func (g *GeoEngine) UpdateClipMtx() {
     per := g.MtxStacks.Stacks[0].CurrMtx
 
     g.ClipMatrix = pos.Mul(per)
-
 }
 
 func (g *GeoEngine) ValidParamCount(fifo bool) bool {

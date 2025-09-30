@@ -97,7 +97,7 @@ func (g *Game) GetGamepadButtons() ([]ebiten.StandardGamepadButton, []ebiten.Sta
 func (g *Game) Update() error {
 
 	//if g.flags.Profile && g.frame >= 1000 {
-	if g.flags.Profile && g.frame >= 5000 {
+	if g.flags.Profile && g.frame >= 2000 {
 		return exit
 	}
 

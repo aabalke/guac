@@ -12,6 +12,7 @@ func (t *TextureCache) Add(vram VRAM, tex *Texture) {
 
 	switch tex.Format {
 	case TEX_FMT_4_PAL:
+
 		(*t)[tex.VramOffset] = t.getPaletted(vram, tex, 2, 2)
 	case TEX_FMT_16_PAL:
 		(*t)[tex.VramOffset] = t.getPaletted(vram, tex, 4, 1)

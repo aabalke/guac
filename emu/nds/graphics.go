@@ -135,8 +135,8 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
             case ppu.BG_TYPE_LAR:
 				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_3D :
-                palData, alpha = nds.set3d(engine, bg, x, y)
-                ok = true
+                palData, alpha, ok = nds.set3d(engine, bg, x, y)
+
             case ppu.BG_TYPE_BGM:
 				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_256:
@@ -262,19 +262,35 @@ func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {
 	return bgs
 }
 
-func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, float64) {
-	index := (x + (y * SCREEN_WIDTH))
+func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, float64, bool) {
+
+
+    //xIdx := int(x) + int(bg.XOffset)
+    //yIdx := int(y) + int(bg.YOffset)
+	xIdx := (x + bg.XOffset) & ((bg.W) - 1)
+	yIdx := (y + bg.YOffset) & ((bg.H) - 1)
+
+	index := (xIdx + (yIdx * SCREEN_WIDTH))
+
+    if xIdx >= SCREEN_WIDTH || xIdx <= 0 {
+        return 0, 0, false
+    }
+
+    if yIdx >= SCREEN_HEIGHT || yIdx <= 0 {
+        return 0, 0, false
+    }
 
     render := nds.ppu.Rasterizer.Render
 
     pal, alpha := uint32(render.PixelPalettes[index]), render.Alphas[index]
 
     if nds.ppu.Rasterizer.Disp3dCnt.RearPlaneBitmapEnabled == true {
-        panic("Has Rear Plane")
+        panic("Has Rear Plane Bitmap")
         //return nds.setRearBitmap(engine, bg, x, y)
     }
 
-    return pal, alpha
+    return pal, alpha, alpha > 0
+    //return pal, alpha, true
 }
 
 func (nds *Nds) setRearBitmap(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, bool) {

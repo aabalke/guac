@@ -70,6 +70,10 @@ func (r *Render) RenderPolygon(p *Polygon) {
         p.Vertices[i].CalcTextureVector(tW, tH)
     }
 
+    if len(p.Vertices) == 0 {
+        return
+    }
+
     switch p.PrimitiveType {
     case PRIM_SEP_TRI:
 
