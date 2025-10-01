@@ -670,7 +670,12 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
         if sdt.Rd == PC {
             c.toggleThumb()
             r[sdt.Rd] -= 4
-            r[sdt.Rd] &^= 0b11
+
+            if c.Reg.IsThumb {
+                r[sdt.Rd] &^= 0b1
+            } else {
+                r[sdt.Rd] &^= 0b11
+            }
         }
 
 	case !sdt.Load && sdt.Byte:
