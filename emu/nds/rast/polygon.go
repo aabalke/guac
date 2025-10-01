@@ -71,7 +71,7 @@ const (
 func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Vertex {
 
     c := g.Color
-    c.A = g.ActivePoly.Alpha
+    //c.A = g.ActivePoly.Alpha
 
     var S, T float64
     S = g.Texture.S
