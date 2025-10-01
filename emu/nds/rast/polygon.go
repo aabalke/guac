@@ -4,6 +4,7 @@ import (
 	//"image"
 	//"image/color"
 
+
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
@@ -25,7 +26,7 @@ type Polygon struct {
 	RenderBehind1Dot       bool
 	DrawEqualDepthPixels   bool
 	FogEnabled             bool
-	Alpha                  uint32
+	Alpha                  float64
 	Id                     uint32
 
 	PrimitiveType uint8
@@ -47,8 +48,13 @@ func (p *Polygon) WriteAttrs(v uint32) {
     p.RenderBehind1Dot = utils.BitEnabled(v, 13)
     p.DrawEqualDepthPixels = utils.BitEnabled(v, 14)
     p.FogEnabled = utils.BitEnabled(v, 15)
-    p.Alpha = utils.GetVarData(v, 16, 20)
+    p.Alpha = float64(utils.GetVarData(v, 16, 20)) / 31
     p.Id = utils.GetVarData(v, 24, 29)
+
+    // some 3d examples set alpha to zero, but display solid (Mixed 3d text example)
+    if p.Alpha == 0 {
+        p.Alpha = 1
+    }
 
     //fmt.Printf("LIGHTS % v\n", p.LightsEnabled)
 }
@@ -63,6 +69,9 @@ const (
 )
 
 func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Vertex {
+
+    c := g.Color
+    c.A = g.ActivePoly.Alpha
 
     var S, T float64
     S = g.Texture.S
@@ -131,7 +140,7 @@ func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Ver
         z = convert(uint16(data[1]>>20)) + prev.Position.Z
     }
 
-    v := p.GetVertex(x, y, z, &g.ClipMatrix, g.Color, S, T, &g.StoredNormal)
+    v := p.GetVertex(x, y, z, &g.ClipMatrix, c, S, T, &g.StoredNormal)
     p.Vertices = append(p.Vertices, v)
     return &v
 }

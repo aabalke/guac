@@ -12,6 +12,7 @@ import (
 	"github.com/aabalke/guac/emu/nds/mem"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/nds/ppu"
+	"github.com/aabalke/guac/emu/nds/snd"
 	"github.com/aabalke/guac/emu/nds/utils"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -68,6 +69,8 @@ func NewNds(path string, _ *oto.Context) *Nds {
 		ImageBottom:  ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 	}
 
+    s := &snd.Snd{}
+
     irq9 := cpu.Irq{IsArm9: true}
 	irq7 := cpu.Irq{}
 
@@ -92,7 +95,8 @@ func NewNds(path string, _ *oto.Context) *Nds {
         &nds.arm7.Reg.R[15],
         &nds.arm7.Halted, &nds.arm9.Halted,
         &nds.arm7.Dma, &nds.arm9.Dma,
-        &irq7, &irq9, &nds.Cartridge, nds.ppu)
+        &irq7, &irq9,
+        &nds.Cartridge, nds.ppu, s)
 
     nds.arm9.Dma[0].Init(0, &nds.mem, &irq9, true)
     nds.arm9.Dma[1].Init(1, &nds.mem, &irq9, true)
@@ -234,12 +238,23 @@ func (nds *Nds) Update() {
         // arm9 thumb ~1 cycles, arm ~2 cycles
         // arm7 thumb ~2 cycles, arm ~4 cycles
 
+        //if CURR_INST >= 21672024 {
+        //    fmt.Printf("PC %08X %08X CURR %d\n", r[15], nds.mem.Read32(r[15], true), CURR_INST)
+        //}
+
+        //if CURR_INST & 1000 == 0 {
+        //    nds.mem.Keypad.KEYINPUT = 0b11_1110_0111
+        //} else {
+        //    nds.mem.Keypad.KEYINPUT = 0b11_1111_1111
+        //}
+
 		if !nds.arm9.Halted {
             thumbExec :=  nds.arm9.Reg.IsThumb
             armExec := !nds.arm9.Reg.IsThumb && nds.AccCycles & 0b1 == 0
 
             if thumbExec || armExec  {
-                //logger.Update(405_492_000, 405_700_000, CURR_INST, true)
+                //fmt.Printf("PC %08X CURR %d\n", r[15], CURR_INST)
+                //logger.Update(450000, 452955, CURR_INST, true)
                 _, ok := nds.arm9.Execute()
                 if !ok {
                     fmt.Printf("ARM9 Decode Error: PC %08X CURR %d\n", r[15], CURR_INST)
@@ -259,7 +274,7 @@ func (nds *Nds) Update() {
             armExec := !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b11 == 0
 
             if thumbExec || armExec  {
-                //logger.Update(405_492_000, 405_700_000, CURR_INST, true)
+                //logger.Update(21529164, 21_672_000, CURR_INST, false)
                 _, ok := nds.arm7.Execute()
                 if !ok {
                     fmt.Printf("ARM7 Decode Error: PC %08X CURR %d\n", r7[15], CURR_INST)
@@ -363,11 +378,14 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 
 			a.ObjPriorities = nds.getObjPriority(uint32(vcount), &a.Objects)
 			b.ObjPriorities = nds.getObjPriority(uint32(vcount), &b.Objects)
+
+            //nds.ppu.Capture.CaptureLine(vcount)
+
 			nds.graphics(uint32(vcount))
-			nds.ppu.EngineA.Backgrounds[2].BgAffineUpdate()
-			nds.ppu.EngineA.Backgrounds[3].BgAffineUpdate()
-			nds.ppu.EngineB.Backgrounds[2].BgAffineUpdate()
-			nds.ppu.EngineB.Backgrounds[3].BgAffineUpdate()
+			a.Backgrounds[2].BgAffineUpdate()
+			a.Backgrounds[3].BgAffineUpdate()
+			b.Backgrounds[2].BgAffineUpdate()
+			b.Backgrounds[3].BgAffineUpdate()
 			nds.CheckDmas(dma.ARM9_DMA_MODE_HBL, true)
 		}
 	}

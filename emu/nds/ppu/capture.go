@@ -18,6 +18,7 @@ type Capture struct {
 
 	Src     uint8
 	Enabled bool
+    ActiveCapture bool
 
     VramBlocks [4]*[0x2_0000]uint8
 
@@ -26,7 +27,6 @@ type Capture struct {
 }
 
 func (c *Capture) Init(vram *VRAM, ppu *PPU, rdBlk *uint32, b, t *[]uint8) {
-
     c.VramBlocks[0] = &vram.A
     c.VramBlocks[1] = &vram.B
     c.VramBlocks[2] = &vram.C
@@ -43,9 +43,9 @@ func (c *Capture) Write(addr uint32, v uint8) {
 
 	switch addr {
 	case 0x64:
-		c.EVA = uint8(utils.GetVarData(uint32(v), 0, 4))
+		c.EVA = min(uint8(utils.GetVarData(uint32(v), 0, 4)), 16)
 	case 0x65:
-		c.EVB = uint8(utils.GetVarData(uint32(v), 0, 4))
+		c.EVB = min(uint8(utils.GetVarData(uint32(v), 0, 4)), 16)
 	case 0x66:
         c.WriteBlock = v & 0b11
         c.WriteOffset = uint32(v >> 2) & 0b11
@@ -137,9 +137,13 @@ func (c *Capture) TempLimiter() {
 
 func (c *Capture) StartCapture() {
 
+    return
+
     if !c.Enabled {
         return
     }
+
+    //c.ActiveCapture = true
 
     screen := c.Bottom
 
@@ -167,8 +171,59 @@ func (c *Capture) StartCapture() {
     }
 }
 
+func (c *Capture) CaptureLine(y uint32) {
+
+    return
+
+    if !c.ActiveCapture {
+        return
+    }
+
+    screen := c.Bottom
+
+    if *c.TopA {
+        screen = c.Top
+    }
+
+    block := c.VramBlocks[c.WriteBlock]
+
+    for x := range uint32(SCREEN_WIDTH) {
+        i := (x + (y * SCREEN_WIDTH)) * 4
+        j := (x + (y * SCREEN_WIDTH)) * 2
+
+        v := Convert24to15(
+            (*screen)[i+0],
+            (*screen)[i+1],
+            (*screen)[i+2],
+        )
+
+        v |= 0x8000
+
+        binary.LittleEndian.PutUint16(block[j+c.WriteOffset:], v)
+    }
+
+
+    //for i := 0; i < len(*screen); i += 4 {
+
+    //    v = Convert24to15(
+    //        (*screen)[i+0],
+    //        (*screen)[i+1],
+    //        (*screen)[i+2],
+    //    )
+
+    //    v |= 0x8000
+
+    //    binary.LittleEndian.PutUint16(block[j+c.WriteOffset:], v)
+
+    //    j += 2
+    //}
+
+}
+
 func (c *Capture) EndCapture() {
-    c.Enabled = false
+    return
+
+    c.ActiveCapture = false
 }
 
 func Convert24to15(r, g, b uint8) uint16 {

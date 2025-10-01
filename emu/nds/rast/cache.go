@@ -12,7 +12,6 @@ func (t *TextureCache) Add(vram VRAM, tex *Texture) {
 
 	switch tex.Format {
 	case TEX_FMT_4_PAL:
-
 		(*t)[tex.VramOffset] = t.getPaletted(vram, tex, 2, 2)
 	case TEX_FMT_16_PAL:
 		(*t)[tex.VramOffset] = t.getPaletted(vram, tex, 4, 1)
@@ -196,10 +195,8 @@ func (t *TextureCache) getCompressed(vram VRAM, tex *Texture) *[]gl.Color {
 				colors2 := (uint16(vram.ReadPalTexture(palAddr+4)) |
 					uint16(vram.ReadPalTexture(palAddr+5))<<8)
 				colors[2] = colors2
-				colors[3] = 0x8000
 			case 1:
 				colors[2] = blendMode1(colors[0], colors[1])
-				colors[3] = 0x8000
 			case 2:
 				colors2 := (uint16(vram.ReadPalTexture(palAddr+4)) |
 					uint16(vram.ReadPalTexture(palAddr+5))<<8)
@@ -219,15 +216,16 @@ func (t *TextureCache) getCompressed(vram VRAM, tex *Texture) *[]gl.Color {
 					k := ((y+j)<<tex.PitchShift + (x + i))
 					tex := (pack >> uint(i*2)) & 3
 
+                    if tex == 3 && mode <= 1 {
+                        out[k] = gl.Transparent
+                        continue
+                    }
+
                     out[k] =  gl.MakeColorFrom15Bit(
                         uint8(colors[tex] & 0b11111),
                         uint8(colors[tex] >> 5) & 0b11111,
                         uint8(colors[tex] >> 10) & 0b11111,
                     )
-
-                    if tex == 3 && mode <= 1 {
-                        out[k] = gl.Transparent
-                    }
 				}
 			}
 		}

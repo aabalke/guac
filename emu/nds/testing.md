@@ -226,16 +226,13 @@ Zelda Phantom Hourglass
 Sonic Chronicles The Dark Brotherhood
 Mario And Luigi Bowsers Inside Story
 Pokemon Heartgold
-Metroid Prime Hunters
 
-### Capture Required
+### Booting (Buggyie)
 Housemd
 Lego Star Wars the Complete Saga
 Nintendogs Best Friends
-
-### Booting (Buggyie)
+Metroid Prime Hunters
 Brain Age
-Sonic Colors
 Big Brain Academy
 Tetris Ds
 Brain Age 2
@@ -244,7 +241,8 @@ Pokemon Ranger
 Mario Party
 Mario and Luigi Partners in Time
 
-### No Known errors
+### Playable
+Sonic Colors
 Yoshis Island
 Pokemon Blue Rescue Team
 Animal Crossing Wild World

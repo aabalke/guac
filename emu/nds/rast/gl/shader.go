@@ -85,7 +85,7 @@ func (shader *NdsShader) Fragment(v Vertex) Color {
         //vertexColor = vertexColor.Add(White.Mul(ambient.Add(diffuseColor)))
     }
 
-    vertexColor = vertexColor.Min(White)
+    //vertexColor = vertexColor.Min(White)
 
     return vertexColor
 

@@ -398,9 +398,8 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         if len(g.ActivePoly.Vertices) != 0 {
 
             fmt.Printf("BAD ACTIVE POLYGON HAS VERTICIES WHEN SETTING NEW BEGIN. WAS END_VTXS NOT CALLED? VERTS LEN %d\n", len(g.ActivePoly.Vertices))
-            g.ActivePoly.Texture = g.Texture
-            g.Buffers.Append(g.ActivePoly)
-            g.ActivePoly.Vertices = []gl.Vertex{}
+
+            g.AddPolygon()
         }
 
         g.ActivePoly = g.PrepPoly
@@ -410,9 +409,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
     case 0x41:
 
-        g.ActivePoly.Texture = g.Texture
-        g.Buffers.Append(g.ActivePoly)
-        g.ActivePoly.Vertices = []gl.Vertex{}
+        g.AddPolygon()
 
     case 0x50:
 
@@ -511,6 +508,19 @@ func (g *GeoEngine) ValidParamCount(fifo bool) bool {
     }
 
     panic(fmt.Sprintf("UNKNOWN CMD GXFIFO % 2X", g.Data))
+}
+
+func (g *GeoEngine) AddPolygon() {
+
+    //if shadow := g.ActivePoly.Mode == 3; shadow {
+    //    g.ActivePoly.Vertices = []gl.Vertex{}
+    //    return
+    //}
+
+    g.ActivePoly.Texture = g.Texture
+    g.Buffers.Append(g.ActivePoly)
+    g.ActivePoly.Vertices = []gl.Vertex{}
+
 }
 
 func Write15BitColor(v uint32) gl.Color {

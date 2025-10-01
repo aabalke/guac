@@ -9,6 +9,7 @@ import (
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/nds/mem/spi"
 	"github.com/aabalke/guac/emu/nds/ppu"
+	"github.com/aabalke/guac/emu/nds/snd"
 )
 
 //go:embed res_/bios7.bin
@@ -59,12 +60,13 @@ type Mem struct {
     WifiWaitCnt WifiWaitCnt
     Timers [8]Timer
 
+    Snd *snd.Snd
 }
 
 type BiosProt uint16
 type WifiWaitCnt uint8
 
-func NewMemory(arm7Pc *uint32, halted7, halted9 *bool, dma7, dma9 *[4]dma.DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PPU) Mem {
+func NewMemory(arm7Pc *uint32, halted7, halted9 *bool, dma7, dma9 *[4]dma.DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PPU, snd *snd.Snd) Mem {
 m := Mem{
         halted7: halted7,
         halted9: halted9,
@@ -75,6 +77,7 @@ m := Mem{
         Cartridge: c,
         ppu: ppu,
         arm7Pc: arm7Pc,
+        Snd: snd,
     }
 
     // i believe this is default
@@ -176,6 +179,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
     case 0x4:
         //fmt.Printf("IO READ ARM9 %08X arm9 %t\n", addr, arm9)
         //printIO(addr, arm9, false)
+        //fmt.Printf("RD IO %08X\n", addr)
         return mem.ReadArm7IO(addr-0x400_0000)
     case 0x6:
         return mem.ppu.Vram.Read(addr, false)
@@ -668,6 +672,8 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
     switch {
     case addr >= 0xB0 && addr < 0xE0:
         return mem.ReadDma(mem.dma7, addr)
+    case addr >= 0x400 && addr < 0x600:
+        return mem.Snd.Read(addr)
     }
 
 	switch addr {
@@ -823,9 +829,9 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
         return uint8(mem.BiosProt >> 8)
 
 
-    case 808000:
+    case 0x808000:
         return 0x40
-    case 808001:
+    case 0x808001:
         return 0xC3
 
 	default:
@@ -847,6 +853,9 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
         mem.WriteDma(mem.dma7, addr, v)
         return
 
+    case addr >= 0x400 && addr < 0x600:
+        mem.Snd.Write(addr, v)
+        return
     }
 
 	switch addr {

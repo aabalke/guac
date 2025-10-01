@@ -11,8 +11,6 @@ import (
 )
 
 var b16 = binary.LittleEndian.Uint16
-var b32 = binary.LittleEndian.Uint32
-
 var _ = fmt.Sprintf("")
 
 var wg = sync.WaitGroup{}
@@ -28,6 +26,7 @@ func (nds *Nds) graphics(y uint32) {
 	case 1:
 		nds.standard(y, a)
 	case 2:
+		//nds.standard(y, a)
 		nds.vramDisplay(y, a)
 	case 3:
         nds.MemFifoDisplay(a)
