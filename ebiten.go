@@ -162,8 +162,11 @@ func (g *Game) Update() error {
 	case NDS:
 		g.nds.InputHandler(keys, buttons, g.mouse, g.frame)
 		g.nds.Update()
-		g.nds.ImageTop.WritePixels(g.nds.PixelsTop)
-		g.nds.ImageBottom.WritePixels(g.nds.PixelsBottom)
+
+        t, b := g.nds.GetScreens()
+        g.nds.ImageTop.WritePixels(*t)
+        g.nds.ImageBottom.WritePixels(*b)
+
 	case GBA:
 		g.gba.InputHandler(keys, buttons)
 		g.gba.Update()

@@ -27,6 +27,7 @@ func (nds *Nds) graphics(y uint32) {
 		nds.standard(y, a)
 	case 2:
 		nds.vramDisplay(y, a)
+		//nds.standard(y, a)
 	case 3:
         nds.MemFifoDisplay(a)
 	}
@@ -47,10 +48,10 @@ func (nds *Nds) screenoff(y uint32, colorByte uint8, engine *ppu.Engine) {
 	for x = range SCREEN_WIDTH {
 
 		index := (x + (y * SCREEN_WIDTH)) * 4
-		(*engine.Pixels)[index]   = colorByte
-		(*engine.Pixels)[index+1] = colorByte
-		(*engine.Pixels)[index+2] = colorByte
-		(*engine.Pixels)[index+3] = 0xFF
+		(engine.Pixels)[index]   = colorByte
+		(engine.Pixels)[index+1] = colorByte
+		(engine.Pixels)[index+2] = colorByte
+		(engine.Pixels)[index+3] = 0xFF
 	}
 }
 
@@ -60,12 +61,12 @@ func (nds *Nds) vramDisplay(y uint32, engine *ppu.Engine) {
 	for x = range SCREEN_WIDTH {
         palData, _ := nds.setRawBitmap(engine, x, y)
         index := (x + (y * SCREEN_WIDTH)) * 4
-        nds.applyColor(palData, index, engine.Pixels)
+        nds.applyColor(palData, index, &engine.Pixels)
     }
 }
 
 func (nds *Nds) MemFifoDisplay(engine *ppu.Engine) {
-    copy(*engine.Pixels, nds.ppu.DisplayFifo.Pixels)
+    copy(engine.Pixels, nds.ppu.DisplayFifo.Pixels)
 }
 
 func (nds *Nds) standard(y uint32, engine *ppu.Engine) {
@@ -193,7 +194,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 
 	finalPalData := bldPal.Blend(objMode == 1, x, y, wins, inObjWindow)
 	index := (x + (y * SCREEN_WIDTH)) << 2
-	nds.applyColor(finalPalData, uint32(index), engine.Pixels)
+	nds.applyColor(finalPalData, uint32(index), &engine.Pixels)
 }
 
 func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {

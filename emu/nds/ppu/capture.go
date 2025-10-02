@@ -26,19 +26,16 @@ type Capture struct {
 
     VramBlocks [4]*[0x2_0000]uint8
 
-    TopA *bool
-    Top, Bottom *[]uint8
+    Pixels *[]uint8
 }
 
-func (c *Capture) Init(vram *VRAM, ppu *PPU, rdBlk *uint32, b, t *[]uint8) {
+func (c *Capture) Init(vram *VRAM, ppu *PPU, rdBlk *uint32, pixels *[]uint8) {
     c.VramBlocks[0] = &vram.A
     c.VramBlocks[1] = &vram.B
     c.VramBlocks[2] = &vram.C
     c.VramBlocks[3] = &vram.D
-    c.TopA = &ppu.TopA
     c.ReadBlock = rdBlk
-    c.Bottom = b
-    c.Top = t
+    c.Pixels = pixels
 }
 
 func (c *Capture) Write(addr uint32, v uint8) {
@@ -154,12 +151,6 @@ func (c *Capture) CaptureLine(y uint32) {
         return
     }
 
-    screen := c.Bottom
-
-    if *c.TopA {
-        screen = c.Top
-    }
-
     block := c.VramBlocks[c.WriteBlock]
 
     for x := range uint32(SCREEN_WIDTH) {
@@ -167,9 +158,9 @@ func (c *Capture) CaptureLine(y uint32) {
         j := (x + (y * SCREEN_WIDTH)) * 2
 
         v := Convert24to15(
-            (*screen)[i+0],
-            (*screen)[i+1],
-            (*screen)[i+2],
+            (*c.Pixels)[i+0],
+            (*c.Pixels)[i+1],
+            (*c.Pixels)[i+2],
         )
 
         v |= 0x8000

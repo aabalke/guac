@@ -50,7 +50,7 @@ type Nds struct {
 	Debugger Debugger
 
 	Muted, Paused, Drawn    bool
-	PixelsTop, PixelsBottom []byte
+	//PixelsTop, PixelsBottom []byte
 	ImageTop, ImageBottom   *ebiten.Image
 
     BtmAbs struct{T, B, L, R, W, H int} 
@@ -63,8 +63,6 @@ var logger *Logger
 func NewNds(path string, _ *oto.Context) *Nds {
 
 	nds := Nds{
-		PixelsTop:    make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
-		PixelsBottom: make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
 		ImageTop:     ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 		ImageBottom:  ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 	}
@@ -74,7 +72,7 @@ func NewNds(path string, _ *oto.Context) *Nds {
     irq9 := cpu.Irq{IsArm9: true}
 	irq7 := cpu.Irq{}
 
-    nds.ppu = ppu.NewPPU(&nds.PixelsTop, &nds.PixelsBottom, &irq9)
+    nds.ppu = ppu.NewPPU(&irq9)
 
 
     for i := range 8 {
@@ -307,6 +305,15 @@ func (nds *Nds) ToggleMute() bool {
 func (nds *Nds) TogglePause() bool {
 	nds.Paused = !nds.Paused
 	return nds.Paused
+}
+
+func (nds *Nds) GetScreens() (t, b *[]byte) {
+
+    if nds.ppu.TopA {
+        return &nds.ppu.EngineA.Pixels, &nds.ppu.EngineB.Pixels
+    }
+
+    return &nds.ppu.EngineB.Pixels, &nds.ppu.EngineA.Pixels
 }
 
 func (nds *Nds) Close() {

@@ -29,16 +29,7 @@ func (p *PowCnt) WriteCNT1(b, v uint32, ppu *ppu.PPU) {
         p.V |= uint16(v&0b1000_0010) << 8
 
         ppu.EngineB2D = utils.BitEnabled(v, 1)
-
-
-        prevTopA := ppu.TopA
         ppu.TopA = utils.BitEnabled(v, 7)
-
-        if prevTopA != ppu.TopA {
-            a := ppu.EngineA.Pixels
-            ppu.EngineA.Pixels = ppu.EngineB.Pixels
-            ppu.EngineB.Pixels = a
-        }
     }
 }
 

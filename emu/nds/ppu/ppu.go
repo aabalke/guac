@@ -36,7 +36,7 @@ type PPU struct {
 
 type Engine struct {
 
-    Pixels *[]byte
+    Pixels []byte
     IsB bool
 
 	Dispcnt Dispcnt
@@ -160,16 +160,20 @@ type Object struct {
     BmpBoundaryMask uint32
 }
 
-func NewPPU(top, bottom *[]byte, irq *cpu.Irq) *PPU {
+func NewPPU(irq *cpu.Irq) *PPU {
 
     p := &PPU{}
 
-    p.EngineA.Pixels = bottom
-    p.EngineB.Pixels = top
+    p.EngineA.Pixels = make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)
+    p.EngineB.Pixels = make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)
     p.EngineB.IsB = true
 
     p.Rasterizer = rast.NewRasterizer(&p.Vram, irq)
-    p.Capture.Init(&p.Vram, p, &p.EngineA.Dispcnt.VramBlock, bottom, top)
+    p.Capture.Init(
+        &p.Vram,
+        p,
+        &p.EngineA.Dispcnt.VramBlock,
+        &p.EngineA.Pixels)
     p.DisplayFifo.Pixels = make([]uint8, SCREEN_WIDTH*SCREEN_HEIGHT*4)
 
     return p
