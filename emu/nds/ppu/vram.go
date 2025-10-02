@@ -31,21 +31,12 @@ type VRAM struct {
     CNT_7 uint8
     isCArm7, isDArm7 bool
 
-    ExtABgSlot0 unsafe.Pointer
-    ExtABgSlot1 unsafe.Pointer
-    ExtABgSlot2 unsafe.Pointer
-    ExtABgSlot3 unsafe.Pointer
-
-    ExtBBgSlot0 unsafe.Pointer
-    ExtBBgSlot1 unsafe.Pointer
-    ExtBBgSlot2 unsafe.Pointer
-    ExtBBgSlot3 unsafe.Pointer
-
+    ExtABgSlots [4]*[0x2000]uint8
+    ExtBBgSlots [4]*[0x2000]uint8
     ExtAPalObj *[0x4000]uint8
     ExtBPalObj *[0x4000]uint8
-
     TextureSlots [4]*[0x2_0000]uint8
-    TexPalSlots  [6]unsafe.Pointer
+    TexPalSlots  [6]*[0x4000]uint8
 
     TextureCache *rast.TextureCache
 
@@ -212,16 +203,16 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         case 2: cnt.Base = 0x40_0000
         case 3:
             vm.TextureCache.Reset()
-            vm.TexPalSlots[0] = unsafe.Pointer(bank)
-            vm.TexPalSlots[1] = unsafe.Add(unsafe.Pointer(bank), 0x4000)
-            vm.TexPalSlots[2] = unsafe.Add(unsafe.Pointer(bank), 0x8000)
-            vm.TexPalSlots[3] = unsafe.Add(unsafe.Pointer(bank), 0xC000)
+            vm.TexPalSlots[0] = (*[0x4000]uint8)(unsafe.Pointer(bank))
+            vm.TexPalSlots[1] = (*[0x4000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x4000))
+            vm.TexPalSlots[2] = (*[0x4000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x8000))
+            vm.TexPalSlots[3] = (*[0x4000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0xC000))
 
         case 4:
-            vm.ExtABgSlot0 = unsafe.Pointer(bank)
-            vm.ExtABgSlot1 = unsafe.Add(unsafe.Pointer(bank), 0x2000)
-            vm.ExtABgSlot2 = unsafe.Add(unsafe.Pointer(bank), 0x4000)
-            vm.ExtABgSlot3 = unsafe.Add(unsafe.Pointer(bank), 0x6000)
+            vm.ExtABgSlots[0] = (*[0x2000]uint8)(unsafe.Pointer(bank))
+            vm.ExtABgSlots[1] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x2000))
+            vm.ExtABgSlots[2] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x4000))
+            vm.ExtABgSlots[3] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x6000))
         }
 
 	case 0x245:
@@ -238,15 +229,15 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         case 3:
             vm.TextureCache.Reset()
             idx := (cnt.Ofs & 1) + (cnt.Ofs >> 1) * 4
-            vm.TexPalSlots[idx] = unsafe.Pointer(bank)
+            vm.TexPalSlots[idx] = (*[0x4000]uint8)(unsafe.Pointer(bank))
         case 4:
 
             if cnt.Ofs == 0 {
-                vm.ExtABgSlot0 = unsafe.Pointer(bank)
-                vm.ExtABgSlot1 = unsafe.Add(unsafe.Pointer(bank), 0x2000)
-            } else {
-                vm.ExtABgSlot2 = unsafe.Pointer(bank)
-                vm.ExtABgSlot3 = unsafe.Add(unsafe.Pointer(bank), 0x2000)
+                vm.ExtABgSlots[0] = (*[0x2000]uint8)(unsafe.Pointer(bank))
+                vm.ExtABgSlots[1] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x2000))
+            } else {            
+                vm.ExtABgSlots[2] = (*[0x2000]uint8)(unsafe.Pointer(bank))
+                vm.ExtABgSlots[3] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x2000))
             }
 
         case 5:
@@ -266,15 +257,14 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         case 3:
             vm.TextureCache.Reset()
             idx := (cnt.Ofs & 1) + (cnt.Ofs >> 1) * 4
-            vm.TexPalSlots[idx] = unsafe.Pointer(bank)
+            vm.TexPalSlots[idx] = (*[0x4000]uint8)(unsafe.Pointer(bank))
         case 4:
-
             if cnt.Ofs == 0 {
-                vm.ExtABgSlot0 = unsafe.Pointer(bank)
-                vm.ExtABgSlot1 = unsafe.Add(unsafe.Pointer(bank), 0x2000)
-            } else {
-                vm.ExtABgSlot2 = unsafe.Pointer(bank)
-                vm.ExtABgSlot3 = unsafe.Add(unsafe.Pointer(bank), 0x2000)
+                vm.ExtABgSlots[0] = (*[0x2000]uint8)(unsafe.Pointer(bank))
+                vm.ExtABgSlots[1] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x2000))
+            } else {            
+                vm.ExtABgSlots[2] = (*[0x2000]uint8)(unsafe.Pointer(bank))
+                vm.ExtABgSlots[3] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x2000))
             }
 
         case 5:
@@ -292,10 +282,10 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         case 0: cnt.Base = 0x89_8000
         case 1: cnt.Base = 0x20_0000
         case 2:
-            vm.ExtBBgSlot0 = unsafe.Pointer(bank)
-            vm.ExtBBgSlot1 = unsafe.Add(unsafe.Pointer(bank), 0x2000)
-            vm.ExtBBgSlot2 = unsafe.Add(unsafe.Pointer(bank), 0x4000)
-            vm.ExtBBgSlot3 = unsafe.Add(unsafe.Pointer(bank), 0x6000)
+            vm.ExtBBgSlots[0] = (*[0x2000]uint8)(unsafe.Pointer(bank))
+            vm.ExtBBgSlots[1] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x2000))
+            vm.ExtBBgSlots[2] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x4000))
+            vm.ExtBBgSlots[3] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x6000))
         }
 
 	case 0x249:
@@ -417,10 +407,9 @@ func (vm *VRAM) ReadPointer(addr uint32) *[2]uint8 {
 }
 
 func (vm *VRAM) ReadTexture(addr uint32) uint8 {
-    return vm.TextureSlots[addr>>17][addr&0x1FFFF]
+    return vm.TextureSlots[addr >> 17][addr & 0x1FFFF]
 }
 
 func (vm *VRAM) ReadPalTexture(addr uint32) uint8 {
-    slot := (*[0x4000]uint8)(vm.TexPalSlots[addr >> 14])
-    return (*slot)[addr&0x3FFF]
+    return vm.TexPalSlots[addr >> 14][addr & 0x3FFF]
 }
