@@ -167,6 +167,7 @@ func NewPPU(top, bottom *[]byte, irq *cpu.Irq) *PPU {
     p.EngineA.Pixels = bottom
     p.EngineB.Pixels = top
     p.EngineB.IsB = true
+
     p.Rasterizer = rast.NewRasterizer(&p.Vram, irq)
     p.Capture.Init(&p.Vram, p, &p.EngineA.Dispcnt.VramBlock, bottom, top)
     p.DisplayFifo.Pixels = make([]uint8, SCREEN_WIDTH*SCREEN_HEIGHT*4)
@@ -719,36 +720,49 @@ func (obj *Object) SetSize(shape, size uint32) {
 		switch size {
 		case 0:
 			obj.H, obj.W = 8, 8
+            return
 		case 1:
 			obj.H, obj.W = 16, 16
+            return
 		case 2:
 			obj.H, obj.W = 32, 32
+            return
 		case 3:
 			obj.H, obj.W = 64, 64
+            return
 		}
 	case HORIZONTAL:
 		switch size {
 		case 0:
 			obj.H, obj.W = 8, 16
+            return
 		case 1:
 			obj.H, obj.W = 8, 32
+            return
 		case 2:
 			obj.H, obj.W = 16, 32
+            return
 		case 3:
 			obj.H, obj.W = 32, 64
+            return
 		}
 	case VERTICAL:
 		switch size {
 		case 0:
 			obj.H, obj.W = 16, 8
+            return
 		case 1:
 			obj.H, obj.W = 32, 8
+            return
 		case 2:
 			obj.H, obj.W = 32, 16
+            return
 		case 3:
 			obj.H, obj.W = 64, 32
+            return
 		}
 	}
+
 }
 
 func (bg *Background) BgAffineReset() {
@@ -786,7 +800,7 @@ func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
 
 	switch attrIdx {
 	case 0:
-		obj.Y = attr & 0b1111_1111
+		obj.Y = attr
 	case 1:
 
 		obj.RotScale = utils.BitEnabled(attr, 0)
@@ -803,6 +817,8 @@ func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
 			obj.Disable = utils.BitEnabled(attr, 1)
 		}
 
+
+
 	case 2:
 		obj.X &^= 0xFF
 		obj.X |= attr
@@ -818,6 +834,7 @@ func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
 		}
 		obj.HFlip = utils.BitEnabled(attr, 4)
 		obj.VFlip = utils.BitEnabled(attr, 5)
+
 	case 4:
 		obj.CharName &^= 0xFF
 		obj.CharName |= attr
@@ -879,7 +896,14 @@ func (e *Engine) UpdateObjMapping(d *Dispcnt) {
 
     for i := range e.Objects {
 
+
         obj := &e.Objects[i]
+
+        obj.ObjTileMapping = 0
+        obj.TileBoundaryShift = 0
+        obj.ObjBmpMapping = 0
+        obj.BmpBoundaryShift = 0
+        obj.BmpBoundaryMask = 0
 
         switch {
         case !d.TileObj1D:
@@ -910,7 +934,7 @@ func (e *Engine) UpdateObjMapping(d *Dispcnt) {
             //panic("NEED TO SET UP 2D BITMAP OBJ")
         case d.BitmapObj1D && !d.BitmapObj256 && !d.BitmapObjBoundary:
             obj.ObjBmpMapping = OBJ_BMP_128_1D
-            obj.BmpBoundaryShift = 6 //128
+            obj.BmpBoundaryShift = 5 //128
         case d.BitmapObj1D && !d.BitmapObj256 && d.BitmapObjBoundary:
             obj.ObjBmpMapping = OBJ_BMP_256_1D
             obj.BmpBoundaryShift = 6 //256

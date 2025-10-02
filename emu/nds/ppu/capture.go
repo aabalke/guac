@@ -8,10 +8,14 @@ import (
 
 type Capture struct {
 	EVA, EVB    uint8
+
 	WriteBlock  uint8
-	WriteOffset uint32
+    WriteOffset uint32
+	WriteOffsetV uint8
+
 	ReadBlock  *uint32
-	ReadOffset  uint8
+    ReadOffset uint32
+	ReadOffsetV  uint8
 
 	Size                uint8
 	SrcA3D, SrcBMemFifo bool
@@ -48,16 +52,18 @@ func (c *Capture) Write(addr uint32, v uint8) {
 		c.EVB = min(uint8(utils.GetVarData(uint32(v), 0, 4)), 16)
 	case 0x66:
         c.WriteBlock = v & 0b11
-        c.WriteOffset = uint32(v >> 2) & 0b11
+        c.WriteOffsetV = (v >> 2) & 0b11
+        c.WriteOffset = (uint32(v >> 2) & 0b11) * 0x8000
         c.Size = (v >> 4) & 0b11
-
 	case 0x67:
         c.SrcA3D = utils.BitEnabled(uint32(v), 0)
         c.SrcBMemFifo = utils.BitEnabled(uint32(v), 1)
-        c.ReadOffset = (v >> 2) & 0b11
+        c.ReadOffsetV = (v >> 2) & 0b11
+        c.ReadOffset = (uint32(v >> 2) & 0b11) * 0x8000
 
         c.Src = (v >> 5) & 0b11
         c.Enabled = utils.BitEnabled(uint32(v), 7)
+
 	}
 
     c.TempLimiter()
@@ -74,13 +80,11 @@ func (c *Capture) Read(addr uint32) uint8 {
 		return c.EVB
 	case 0x66:
 
-        var v uint8
-        v |= c.WriteBlock
-        v |= uint8(c.WriteOffset << 2)
-        v |= (c.Size << 4)
+        v := c.WriteBlock
+        v |= c.WriteOffsetV << 2
+        v |= c.Size << 4
 
         return v
-
 
 	case 0x67:
 
@@ -94,8 +98,8 @@ func (c *Capture) Read(addr uint32) uint8 {
             v |= 0b10
         }
 
-        v |= (c.ReadOffset << 2)
-        v |= (c.Src << 6)
+        v |= c.ReadOffsetV << 2
+        v |= c.Src << 6
 
         if c.Enabled {
             v |= 1 << 7
@@ -137,43 +141,14 @@ func (c *Capture) TempLimiter() {
 
 func (c *Capture) StartCapture() {
 
-    return
-
     if !c.Enabled {
         return
     }
 
-    //c.ActiveCapture = true
-
-    screen := c.Bottom
-
-    if *c.TopA {
-        screen = c.Top
-    }
-
-    j := uint32(0)
-    v := uint16(0)
-    block := c.VramBlocks[c.WriteBlock]
-
-    for i := 0; i < len(*screen); i += 4 {
-
-        v = Convert24to15(
-            (*screen)[i+0],
-            (*screen)[i+1],
-            (*screen)[i+2],
-        )
-
-        v |= 0x8000
-
-        binary.LittleEndian.PutUint16(block[j+c.WriteOffset:], v)
-
-        j += 2
-    }
+    c.ActiveCapture = true
 }
 
 func (c *Capture) CaptureLine(y uint32) {
-
-    return
 
     if !c.ActiveCapture {
         return
@@ -201,29 +176,11 @@ func (c *Capture) CaptureLine(y uint32) {
 
         binary.LittleEndian.PutUint16(block[j+c.WriteOffset:], v)
     }
-
-
-    //for i := 0; i < len(*screen); i += 4 {
-
-    //    v = Convert24to15(
-    //        (*screen)[i+0],
-    //        (*screen)[i+1],
-    //        (*screen)[i+2],
-    //    )
-
-    //    v |= 0x8000
-
-    //    binary.LittleEndian.PutUint16(block[j+c.WriteOffset:], v)
-
-    //    j += 2
-    //}
-
 }
 
 func (c *Capture) EndCapture() {
-    return
-
     c.ActiveCapture = false
+    c.Enabled = false
 }
 
 func Convert24to15(r, g, b uint8) uint16 {

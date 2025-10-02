@@ -255,6 +255,7 @@ func (nds *Nds) Update() {
             if thumbExec || armExec  {
                 //fmt.Printf("PC %08X CURR %d\n", r[15], CURR_INST)
                 //logger.Update(450000, 452955, CURR_INST, true)
+
                 _, ok := nds.arm9.Execute()
                 if !ok {
                     fmt.Printf("ARM9 Decode Error: PC %08X CURR %d\n", r[15], CURR_INST)
@@ -379,8 +380,6 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 			a.ObjPriorities = nds.getObjPriority(uint32(vcount), &a.Objects)
 			b.ObjPriorities = nds.getObjPriority(uint32(vcount), &b.Objects)
 
-            //nds.ppu.Capture.CaptureLine(vcount)
-
 			nds.graphics(uint32(vcount))
 			a.Backgrounds[2].BgAffineUpdate()
 			a.Backgrounds[3].BgAffineUpdate()
@@ -405,6 +404,7 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 
 		switch vcount {
 		case 0:
+            nds.ppu.Capture.StartCapture()
 			nds.CheckDmas(dma.ARM9_DMA_MODE_STA, true)
 			nds.ppu.EngineA.Backgrounds[2].BgAffineReset()
 			nds.ppu.EngineA.Backgrounds[3].BgAffineReset()
@@ -412,8 +412,7 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 			nds.ppu.EngineB.Backgrounds[3].BgAffineReset()
 
 		case SCREEN_HEIGHT:
-            //nds.ppu.Capture.StartCapture()
-            //nds.ppu.Capture.EndCapture()
+            nds.ppu.Capture.EndCapture()
 			dispstat.SetVBlank(true)
 			nds.CheckDmas(dma.ARM9_DMA_MODE_VBL, true)
 			nds.CheckDmas(dma.ARM7_DMA_MODE_VBL, true)

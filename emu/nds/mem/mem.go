@@ -99,6 +99,9 @@ m := Mem{
     m.Rtc.RegStatus1 = 0x02
     m.Rtc.RegStatus2 = 0x41
 
+    m.PowCnt.WriteCNT1(0, 0x0F, ppu)
+    m.PowCnt.WriteCNT1(1, 0x82, ppu)
+
     m.Spi.Init()
     m.Gamecard.Init(irq7, irq9, dma7, dma9, c)
     
