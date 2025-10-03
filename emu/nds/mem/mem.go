@@ -96,8 +96,7 @@ m := Mem{
 
 	m.LoadBios()
 
-    m.Rtc.RegStatus1 = 0x02
-    m.Rtc.RegStatus2 = 0x41
+    m.Rtc.InitRtc()
 
     m.PowCnt.WriteCNT1(0, 0x0F, ppu)
     m.PowCnt.WriteCNT1(1, 0x82, ppu)
@@ -469,11 +468,16 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 
 func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 
+
     if addr >= 0x188 && addr < 0x190 { panic("WRITE IPC FIFO FROM BYTE OR HALF")}
 
     if ppu := addr < 0x70 || (addr >= 0x1000 && addr < 0x1070); ppu {
         mem.ppu.Update(addr, uint32(v))
     }
+
+    //if !(addr >= 0x208 && addr < 0x240) {
+    //    fmt.Printf("ARM9 WRITE ADDR %08X V %02X\n", addr, v)
+    //}
 
     switch {
     case addr >= 0x280 && addr < 0x2B0:
@@ -831,7 +835,6 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
     case 0x309:
         return uint8(mem.BiosProt >> 8)
 
-
     case 0x808000:
         return 0x40
     case 0x808001:
@@ -847,6 +850,10 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 
 
     if addr >= 0x188 && addr < 0x190 { panic("WRITE IPC FIFO FROM BYTE OR HALF")}
+
+    //if !(addr >= 0x208 && addr < 0x240) {
+    //    fmt.Printf("ARM7 WRITE ADDR %08X V %02X\n", addr, v)
+    //}
 
     switch {
     case addr < 0x4:

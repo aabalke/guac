@@ -235,11 +235,6 @@ func (cpu *Cpu) CheckIrq() {
 	interruptEnabled := !cpu.Reg.CPSR.GetFlag(FLAG_I)
 	interrupts := cpu.Irq.IE&cpu.Irq.IF != 0
 
-    if cpu.Irq.IF & 0x100 != 0 {
-        panic("HERE IF 7")
-    }
-
-
 	if interrupts {
 		cpu.Halted = false
 	}
