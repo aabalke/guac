@@ -268,14 +268,14 @@ func (dma *DMA) CheckGamecart(arm9 bool) {
         return
     }
 
-    if !(dma.Src == 0x4100010 && dma.SrcAdj == DMA_ADJ_NON && dma.WordCount == 1 && dma.isWord && dma.Repeat) {
+    if (arm9 && dma.Mode != ARM9_DMA_MODE_DSC) {
+        return
+    }
+    if (!arm9 && dma.Mode != ARM7_DMA_MODE_DSC) {
         return
     }
 
-    if !(arm9 && dma.Mode == ARM9_DMA_MODE_DSC) {
-        return
-    }
-    if !(!arm9 && dma.Mode == ARM7_DMA_MODE_DSC) {
+    if !(dma.Src == 0x4100010 && dma.SrcAdj == DMA_ADJ_NON && dma.WordCount == 1 && dma.isWord && dma.Repeat) {
         return
     }
 

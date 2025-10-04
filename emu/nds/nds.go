@@ -69,8 +69,8 @@ func NewNds(path string, _ *oto.Context) *Nds {
 
     s := &snd.Snd{}
 
-    irq9 := cpu.Irq{IsArm9: true}
 	irq7 := cpu.Irq{}
+    irq9 := cpu.Irq{IsArm9: true}
 
     nds.ppu = ppu.NewPPU(&irq9)
 
@@ -214,6 +214,8 @@ func (nds *Nds) checkMode() {
     }
 }
 
+var prev uint32
+
 func (nds *Nds) Update() {
 
     r := &nds.arm9.Reg.R
@@ -236,23 +238,49 @@ func (nds *Nds) Update() {
         // arm9 thumb ~1 cycles, arm ~2 cycles
         // arm7 thumb ~2 cycles, arm ~4 cycles
 
-        //if CURR_INST >= 21672024 {
-        //    fmt.Printf("PC %08X %08X CURR %d\n", r[15], nds.mem.Read32(r[15], true), CURR_INST)
+        //if CURR_INST % 10_000_000 == 0 {
+        //    fmt.Printf("IE %08X IF %08X\n", nds.arm9.Irq.IE, nds.arm9.Irq.IF)
         //}
 
-        //if CURR_INST & 1000 == 0 {
-        //    nds.mem.Keypad.KEYINPUT = 0b11_1110_0111
-        //} else {
-        //    nds.mem.Keypad.KEYINPUT = 0b11_1111_1111
+        //if nds.arm9.Irq.IE == 0xE0009 {
+        //    panic(fmt.Sprintf("CURR %d\n", CURR_INST))
         //}
 
+        //if r[15] == 0x0204F6A4 {
+        //    nds.Debugger.PrintLine(true)
+        //}
+
+        //if nds.arm9.Irq.IE != prev {
+        //    fmt.Printf("NEW IE %08X CURR %d\n", nds.arm9.Irq.IE, CURR_INST)
+
+        //    //if nds.arm9.Irq.IE == 0xC0009 {
+        //    //    os.Exit(0)
+        //    //}
+
+        //    prev = nds.arm9.Irq.IE
+        //}
+
+        //if r[15] == 0x00204F6E4 {
+        //    panic("GOOD ADDR")
+        //}
+
+        //if r[15] == 0x0204F6A4 {
+        //    //nds.Debugger.print(int(CURR_INST))
+        //    fmt.Printf("V %08X\n", nds.mem.Read32(0x027E3A00, true))
+        //    fmt.Printf("V %08X\n", nds.mem.Read32(0x027E3A00+4, true))
+        //    fmt.Printf("V %08X\n", nds.mem.Read32(0x027E3A00+8, true))
+        //    fmt.Printf("V %08X\n", nds.mem.Read32(0x027E3A00+12, true))
+        //}
+
+        //if r7[15] == 0x37FB90C {
 		if !nds.arm9.Halted {
             thumbExec :=  nds.arm9.Reg.IsThumb
             armExec := !nds.arm9.Reg.IsThumb && nds.AccCycles & 0b1 == 0
 
             if thumbExec || armExec  {
                 //fmt.Printf("PC %08X CURR %d\n", r[15], CURR_INST)
-                //logger.Update(450000, 452955, CURR_INST, true)
+                //logger.Update(100_000_000, 101_000_000, CURR_INST, true)
+                //logger.Update(4810000, 4912002, CURR_INST, true)
 
                 _, ok := nds.arm9.Execute()
                 if !ok {
@@ -263,7 +291,7 @@ func (nds *Nds) Update() {
                 nds.CheckGeoDmas()
 
                 if nds.ppu.Rasterizer.GeoEngine.GxStat.FifoIrq != 0 {
-                    nds.arm9.Irq.SetIRQ(21)
+                    nds.arm9.Irq.SetIRQ(cpu.IRQ_GEO_CMD_FIFO)
                 }
             }
 		}
@@ -273,7 +301,12 @@ func (nds *Nds) Update() {
             armExec := !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b11 == 0
 
             if thumbExec || armExec  {
-                //logger.Update(21529164, 21_672_000, CURR_INST, false)
+                //logger.Update(4_000_000, 4_226_485, CURR_INST, false)
+
+                //if r7[15] == 0x37FE32C {
+                //    fmt.Printf("R0 %08X R1 %08X CURR %d\n", r7[0], r7[1], CURR_INST)
+                //}
+
                 _, ok := nds.arm7.Execute()
                 if !ok {
                     fmt.Printf("ARM7 Decode Error: PC %08X CURR %d\n", r7[15], CURR_INST)
@@ -436,6 +469,7 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 		dispstat.SetVCFlag(match)
 
 		if vcounterIRQ := utils.BitEnabled(uint32(*dispstat), 5); vcounterIRQ && match {
+
 			nds.arm9.Irq.SetIRQ(2)
 			nds.arm7.Irq.SetIRQ(2)
 		}

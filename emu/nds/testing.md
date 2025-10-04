@@ -99,10 +99,10 @@ FileSystem
     👍 nitrodir
     ❌ overlays (matches nocash, libfat fails)
 
-
 Graphics
 
     3D
+        👍 Both 3D
         👍 Display List
         👍 Simple Quad
         👍 Simple Tri
@@ -123,25 +123,15 @@ Graphics
             Lesson 10b
             Lesson 11
         👍 Mixed Text 3D
-        Palette Cube
-            
-            ❌ A3I5 Translucent Texture (alpha not setup)
-            👍 4-Color Palette Texture     
-            👍 16-Color Palette Texture    
-            👍 256-Color Palette Texture   
-            ❌ 4x4-Texel Compressed Texture
-            ❌ A5I3 Translucent Texture (alpha not setup)
-            👍 Direct Texture              
-        👍 BoxTest
-
-
-
+        👍 Palette Cube
+       
+       👍 BoxTest
     capture
 
     Effects (windows match nocash but not melon, not sure on correct)
     👍 Ext_palettes
     gl2d
-    grit
+    👍 grit
     Printing
 
     👍 Backgrounds
@@ -177,8 +167,8 @@ Graphics
 
 input
     addon
-    keyboard
-        async
+    👍 keyboard
+        👍 async
         👍 stdin
     touch_pad
         touch_look
@@ -189,6 +179,9 @@ input
 templates
 
 time
+    👍 RealTimeClock
+    👍 Stopwatch
+    TimerCallback (I believe good, need snd setup)
 
 ### Personal Test to Build
 

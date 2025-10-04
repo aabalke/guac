@@ -1,6 +1,7 @@
 package arm9
 
 import (
+
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/cpu/cp15"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
@@ -98,9 +99,9 @@ func NewCpu(m cpu.MemoryInterface, irq *cpu.Irq, cp15 *cp15.Cp15) *Cpu {
     // skip bios
     c.Irq.IME = true
     // IrqIpcRecvFifo, IrqTimers, IrqVBlank
-    c.Irq.IE |= 1 << 0
-    c.Irq.IE |= 1 << 3
-    c.Irq.IE |= 1 << 17
+    //c.Irq.IE |= 1 << 0
+    //c.Irq.IE |= 1 << 3
+    //c.Irq.IE |= 1 << 17
 
 	return c
 }
@@ -245,6 +246,16 @@ func (cpu *Cpu) CheckIrq() {
 	}
 
 	if interruptEnabled && interrupts && cpu.Irq.IME {
+
+        //if cpu.Irq.IF & (1 << 19) != 0 {
+        //    fmt.Printf("Gamecard Irq set IF\n")
+        //}
+
+        //if cpu.Irq.IE & cpu.Irq.IF & (1 << 19) != 0 {
+        //    fmt.Printf("Handling Gamecard Irq\n")
+        //    panic("GOOD")
+        //}
+
 		cpu.exception(VEC_IRQ, MODE_IRQ)
 	}
 }

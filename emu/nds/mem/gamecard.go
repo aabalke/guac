@@ -385,6 +385,8 @@ func (r *RomCtrl) WriteCmdIn(v, b uint8, arm9 bool) {
 }
 func (r *RomCtrl) ReadCmdIn(arm9 bool) uint32 {
 
+    //fmt.Printf("READ CMD IN\n")
+
     v := r.DataOut
 
     if r.isReady {
@@ -454,7 +456,7 @@ func (r *RomCtrl) Run(arm9 bool) {
             DATA_READ = 0xB7
             GET_CHIP_ID3 = 0xB8
 
-            NAND_STAT = 0xD6
+            //NAND_STAT = 0xD6
         )
 
         switch r.Command[0] {
@@ -484,16 +486,16 @@ func (r *RomCtrl) Run(arm9 bool) {
             buffer = r.Gamecard.ChipId[:]
             //fmt.Printf("CHIP ID = % X\n", r.Gamecard.Buffer)
 
-        case NAND_STAT, 0x94:
+        //case NAND_STAT, 0x94:
 
-            //fmt.Printf("READING NAND STATUS ON Gamecard Key2\n")
+        //    //fmt.Printf("READING NAND STATUS ON Gamecard Key2\n")
 
-            // 0x20 is value on startup
+        //    // 0x20 is value on startup
 
-            // this is temp (0xFF) to force next
-            //r.Gamecard.Buffer = []uint8{0x20, 0x20, 0x20, 0x20}
-            //r.Gamecard.Buffer = []uint8{0x0, 0x0, 0x0, 0x0}
-            buffer = r.Gamecard.ChipId[:]
+        //    // this is temp (0xFF) to force next
+        //    //r.Gamecard.Buffer = []uint8{0x20, 0x20, 0x20, 0x20}
+        //    //r.Gamecard.Buffer = []uint8{0x0, 0x0, 0x0, 0x0}
+        //    buffer = r.Gamecard.ChipId[:]
 
         //case 0xB5:
         //    fmt.Printf("READING NAND HIGHZ ON Gamecard Key2\n")
@@ -501,7 +503,7 @@ func (r *RomCtrl) Run(arm9 bool) {
         //    r.Gamecard.Transfer(true)
 
         default:
-            //panic(fmt.Sprintf("Unsupported Gamecard Key2 Cmd %02X", r.Command[0]))
+            panic(fmt.Sprintf("Unsupported Gamecard Key2 Cmd %02X", r.Command[0]))
             buffer = nil //[]uint8{0,0,0,0}
         }
         r.Gamecard.Buffer = buffer
@@ -512,6 +514,8 @@ func (r *RomCtrl) Run(arm9 bool) {
 
 func (g *Gamecard) Transfer(initial bool, arm9 bool) {
 
+    //fmt.Printf("INIT %t LEN %d\n", initial, len(g.Buffer))
+
     if len(g.Buffer) == 0 {
 
         g.RomCtrl.v &^= (1 << 31)
@@ -520,7 +524,6 @@ func (g *Gamecard) Transfer(initial bool, arm9 bool) {
         g.RomCtrl.isReady = false
 
         if g.RomTransferIrq {
-
             if arm9 {
                 g.irq9.SetIRQ(cpu.IRQ_CARD_TRANS_COMPLETE)
             } else {

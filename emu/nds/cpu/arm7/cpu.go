@@ -1,6 +1,7 @@
 package arm7
 
 import (
+
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 )
@@ -94,9 +95,9 @@ func NewCpu(mem cpu.MemoryInterface, irq *cpu.Irq) *Cpu {
 
     c.Irq.IME = true
     // IrqIpcRecvFifo, IrqTimers, IrqVBlank
-    c.Irq.IE |= 1 << 0
-    c.Irq.IE |= 1 << 3
-    c.Irq.IE |= 1 << 17
+    //c.Irq.IE |= 1 << 0
+    //c.Irq.IE |= 1 << 3
+    //c.Irq.IE |= 1 << 17
 
 	return c
 }
@@ -240,6 +241,7 @@ func (cpu *Cpu) CheckIrq() {
 	}
 
 	if interruptEnabled && interrupts && cpu.Irq.IME {
+
 		cpu.exception(VEC_IRQ, MODE_IRQ)
 	}
 }
