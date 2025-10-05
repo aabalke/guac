@@ -144,7 +144,9 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
             v, _ := mem.Tcm.Read(addr)
             return v
 		case 0x2:
-            //ramUsageUnimplimented(addr)
+
+
+            ramUsageUnimplimented(addr)
 			return mem.MainRam[addr & 0x3F_FFFF]
 		case 0x3:
             return mem.WRAM.Read(addr, true)
@@ -174,7 +176,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
         return 0xFF
 
     case 0x2:
-        //ramUsageUnimplimented(addr)
+        ramUsageUnimplimented(addr)
         return mem.MainRam[addr&0x3F_FFFF]
     case 0x3:
         return mem.WRAM.Read(addr, false)
@@ -225,7 +227,7 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 		case 0x0, 0x1:
             mem.Tcm.Write(addr, v)
 		case 0x2:
-            //clearTempUnimplimented(addr)
+            clearTempUnimplimented(addr)
 			mem.MainRam[addr&0x3F_FFFF] = v
 		case 0x3:
             mem.WRAM.Write(addr, v, true)
@@ -246,7 +248,7 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 
     switch addr >> 24 {
     case 0x2:
-        //clearTempUnimplimented(addr)
+        clearTempUnimplimented(addr)
         mem.MainRam[addr&0x3F_FFFF] = v
     case 0x3:
         mem.WRAM.Write(addr, v, false)

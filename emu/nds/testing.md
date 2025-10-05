@@ -213,17 +213,19 @@ BLX ARM needs to occur before Cond
 
 # Games (Decrypted)
 
-### Nonpanic Crash
+### Crash on Boot
+Pokemon Heartgold
 Zelda Spirit Tracks
 Zelda Phantom Hourglass
+
+### Crash in Game
 Sonic Chronicles The Dark Brotherhood
 Mario And Luigi Bowsers Inside Story
-Pokemon Heartgold
+Nintendogs Best Friends
 
-### Booting (Buggyie)
+### 
 Housemd
 Lego Star Wars the Complete Saga
-Nintendogs Best Friends
 Metroid Prime Hunters
 Brain Age
 Big Brain Academy

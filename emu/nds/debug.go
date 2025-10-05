@@ -109,31 +109,32 @@ func (d *Debugger) print(i int) {
 	//p("MODE", BANK_ID[mode])
 
 	s("--------  --------")
-	start := 0x6200000
-	count := 0x70
-	for i := start; i < start + (count * 4); i += 16 {
+	//start := 0x6200000
+	//count := 0x70
+	//for i := start; i < start + (count * 4); i += 16 {
 
-        s := fmt.Sprintf("%08X: ", i)
+    //    s := fmt.Sprintf("%08X: ", i)
 
-        for j := range 16 {
-            s += fmt.Sprintf("%02X ", d.nds.mem.Read(uint32(i + j), true))
-        }
-        fmt.Printf("%s\n", s)
-	}
-
-    for i := range 0x100_0000 / 4 {
-
-        if a := d.nds.mem.Read32(0x600_0000 + (uint32(i) * 4), true); a == 0xFBDE {
-            panic(fmt.Sprintf("ADDR %08X", a))
-        }
-
-    }
-
-	//start = 0x400_00EC
-	//count = 2
-	//for i := start; i < start + (count * 4); i += 4 {
-	//    p(fmt.Sprintf("ADDR %X", i), d.nds.mem.Read32(uint32(i), true))
+    //    for j := range 16 {
+    //        s += fmt.Sprintf("%02X ", d.nds.mem.Read(uint32(i + j), true))
+    //    }
+    //    fmt.Printf("%s\n", s)
 	//}
+
+    //for i := range 0x100_0000 / 4 {
+
+    //    if a := d.nds.mem.Read32(0x600_0000 + (uint32(i) * 4), true); a == 0xFBDE {
+    //        panic(fmt.Sprintf("ADDR %08X", a))
+    //    }
+
+    //}
+
+    start := 0x2171CD0
+	count := 16
+	//for i := start; i <= start - (count * 4); i -= 4 {
+	for i := start; i >= start - (count * 4); i -= 4 {
+	    p(fmt.Sprintf("ADDR %X", i), d.nds.mem.Read32(uint32(i), true))
+	}
 	s("------")
 }
 

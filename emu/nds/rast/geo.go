@@ -134,6 +134,8 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
     //fmt.Printf("C %05d %t PACKED %08X IDX %02d % 9X\n", cnt, fifo, g.PackedCmds, g.PackedIdx, data)
     //cnt++
+    //fmt.Printf("DATA % X\n", data)
+
 
     if cmd := data[0]; cmd == 0x30 || cmd == 0x31 || cmd == 0x34 {
         g.Data = []uint32{}

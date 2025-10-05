@@ -1,13 +1,9 @@
 package dma
 
 import (
-	"fmt"
-
 	"github.com/aabalke/guac/emu/gba/utils"
 	"github.com/aabalke/guac/emu/nds/cpu"
 )
-
-var _ = fmt.Sprintf("")
 
 const (
 	ARM9_DMA_MODE_IMM = 0
@@ -43,8 +39,6 @@ type DMA struct {
 	Idx int
     arm9 bool
 
-
-    //Cpu *arm9.Cpu
     mem MemoryInterface
     irq *cpu.Irq
 
@@ -68,6 +62,9 @@ type DMA struct {
 	Enabled bool
 
 	Value uint32
+
+    InitialGc bool
+    GcDst uint32
 }
 
 func (dma *DMA) Init(idx int, mem MemoryInterface, irq *cpu.Irq, arm9 bool) {
@@ -93,10 +90,6 @@ func (dma *DMA) ReadControl(hi bool) uint8 {
 	return uint8(dma.Control)
 }
 
-func (dma *DMA) MaskAddr(v uint32, src bool) uint32 {
-	return v // & 0xFFF_FFFE
-}
-
 func (dma *DMA) WriteSrc(v uint8, byte uint32) {
 	dma.Src = utils.ReplaceByte(dma.Src, uint32(v), byte)
 	dma.InitSrc = dma.Src
@@ -105,6 +98,7 @@ func (dma *DMA) WriteSrc(v uint8, byte uint32) {
 func (dma *DMA) WriteDst(v uint8, byte uint32) {
 	dma.Dst = utils.ReplaceByte(dma.Dst, uint32(v), byte)
 	dma.InitDst = dma.Dst
+    dma.GcDst = dma.Dst
 }
 
 func (dma *DMA) WriteCount(v uint8, hi bool) {
@@ -152,9 +146,10 @@ func (dma *DMA) disable() {
 	dma.Control &^= 0b1000_0000_0000_0000
 }
 
-func (dma *DMA) Transfer() {
+func (dma *DMA) GCTransfer(initial bool) {
+}
 
-    //fmt.Printf("DMA%d: %08X %08X %04X%04X\n", dma.Idx, dma.Src, dma.Dst, dma.Control, dma.WordCount)
+func (dma *DMA) Transfer() {
 
 	mem := dma.mem
 	count := dma.WordCount
@@ -230,6 +225,7 @@ func (dma *DMA) Transfer() {
 
 		tmpDst = uint32(int64(tmpDst) + dstOffset)
 		tmpSrc = uint32(int64(tmpSrc) + srcOffset)
+
 	}
 
 	//DMA_FINISHED = DMA_ACTIVE
@@ -246,23 +242,22 @@ func (dma *DMA) Transfer() {
 	}
 
 	if dma.DstAdj == DMA_ADJ_RES {
-		// dma.Dst stays the same
-		dma.Dst = dma.InitDst
-		dma.Src = dma.MaskAddr(tmpSrc, true)
+        dma.Dst = dma.InitDst
+        dma.Src = tmpSrc
 		return
 	}
 
-	dma.Src = dma.MaskAddr(tmpSrc, true)
-	dma.Dst = dma.MaskAddr(tmpDst, false)
+	dma.Src = tmpSrc
+	dma.Dst = tmpDst
 }
 
 func (dma *DMA) CheckMode(mode uint32) bool {
 	return mode == dma.Mode && dma.Enabled
 }
 
-func (dma *DMA) CheckGamecart(arm9 bool) {
+func (dma *DMA) GamecartTransfer(arm9, initial bool) {
 
-    //After sending a command, data can be read from this register manually (when the DRQ bit is set), or by DMA (with DMASAD=4100010h, Fixed Source Address, Length=1, Size=32bit, Repeat=On, Mode=DS Gamecard)
+    const GC_SRC = 0x4100010
 
     if !dma.Enabled {
         return
@@ -275,11 +270,45 @@ func (dma *DMA) CheckGamecart(arm9 bool) {
         return
     }
 
-    if !(dma.Src == 0x4100010 && dma.SrcAdj == DMA_ADJ_NON && dma.WordCount == 1 && dma.isWord && dma.Repeat) {
+    if notGamecart := !(
+        dma.Src == GC_SRC &&
+        dma.SrcAdj == DMA_ADJ_NON &&
+        dma.WordCount == 1 &&
+        dma.isWord &&
+        dma.Repeat); notGamecart {
         return
     }
 
-    dma.Transfer()
+    //fmt.Printf("DMA%d: %08X %08X %04X%04X INITIAL GC %t GC DST %08X\n", dma.Idx, dma.Src, dma.Dst, dma.Control, dma.WordCount, dma.InitialGc, dma.GcDst)
+
+	mem := dma.mem
+
+
+    // gamecard transfer requires recursive access.
+    // Therefore, GcDst is incremented before access to not cause same dst loop
+
+    if initial {
+        dma.GcDst = dma.Dst &^ 0b11
+    } else {
+        dma.GcDst += 4
+    }
+
+    tmpDst := dma.GcDst &^ 0b11
+
+    dstOffset := 4
+    switch dma.DstAdj {
+    case DMA_ADJ_NON: dstOffset = 0
+    case DMA_ADJ_DEC: dstOffset = -4
+    }
+
+    v := mem.Read32(GC_SRC, dma.arm9)
+    mem.Write32(tmpDst, v, dma.arm9)
+
+	dma.Dst = uint32(int(tmpDst) + dstOffset)
+
+	if dma.IRQ {
+		dma.irq.SetIRQ(8 + uint32(dma.Idx))
+	}
 }
 
 type MemoryInterface interface {

@@ -23,7 +23,6 @@ type Gamecard struct {
     AuxSpi  *AuxSPI
     RomCtrl *RomCtrl
 
-
     Key2 Key2
 
     IsArm7 bool
@@ -385,9 +384,10 @@ func (r *RomCtrl) WriteCmdIn(v, b uint8, arm9 bool) {
 }
 func (r *RomCtrl) ReadCmdIn(arm9 bool) uint32 {
 
-    //fmt.Printf("READ CMD IN\n")
 
     v := r.DataOut
+
+    //fmt.Printf("READ CMD IN V %08X\n", v)
 
     if r.isReady {
         r.isReady = false
@@ -432,7 +432,7 @@ func (r *RomCtrl) UpdateEncryption() {
 
 func (r *RomCtrl) Run(arm9 bool) {
 
-    //log.Printf("RUNNING COMMAND %X\n", r.Command)
+    //log.Printf("RUNNING COMMAND %X %08X\n", r.Command, r.v)
 
     // Data Block size   (0=None, 1..6=100h SHL (1..6) bytes, 7=4 bytes)
     switch r.BlockSizeBits {
@@ -525,6 +525,7 @@ func (g *Gamecard) Transfer(initial bool, arm9 bool) {
 
         if g.RomTransferIrq {
             if arm9 {
+
                 g.irq9.SetIRQ(cpu.IRQ_CARD_TRANS_COMPLETE)
             } else {
                 g.irq7.SetIRQ(cpu.IRQ_CARD_TRANS_COMPLETE)
@@ -544,7 +545,7 @@ func (g *Gamecard) Transfer(initial bool, arm9 bool) {
     g.RomCtrl.isReady = true
 
     for i := range 4 {
-        g.dma7[i].CheckGamecart(false)
-        g.dma9[i].CheckGamecart(true)
+        g.dma7[i].GamecartTransfer(false, initial)
+        g.dma9[i].GamecartTransfer(true, initial)
     }
 }
