@@ -1,7 +1,6 @@
 package arm7
 
 import (
-	"fmt"
 
 	"github.com/aabalke/guac/emu/nds/utils"
 )
@@ -13,8 +12,6 @@ type Block struct {
 }
 
 func (c *Cpu) Block(opcode uint32) {
-
-	r := &c.Reg.R
 
 	block := &Block{
 		Opcode:    opcode,
@@ -35,16 +32,8 @@ func (c *Cpu) Block(opcode uint32) {
 
 	block.RnValue = c.Reg.R[block.Rn]
 
-    if block.ForceUser {
-
-        if block.Rn >= 13 &&
-            (utils.BitEnabled(block.Rlist, 14) ||
-            utils.BitEnabled(block.Rlist, 13)) {
-            fmt.Printf("LDM ^ RN %02d RLIST %16b\n", block.Rn, block.Rlist)
-            fmt.Printf("BEFOR SP %08X LR %08X PC %08X CPSR %08X SPS %08X LRS %08X\n", r[13], r[14], r[15], c.Reg.CPSR, c.Reg.SP, c.Reg.LR)
-        }
-
-		c.Reg.setMode(mode, MODE_USR)
+	if utils.BitEnabled(block.Opcode, 15) && block.PSR {
+		panic("LDM WITH R15 AND SET USED")
 	}
 
 	incPc := true
@@ -54,29 +43,36 @@ func (c *Cpu) Block(opcode uint32) {
 		c.stm(block)
 	}
 
-	if !block.Writeback {
-		r[block.Rn] = block.RnValue
-	}
-
-    if block.ForceUser {
-		c.Reg.setMode(MODE_USR, mode)
-        if block.Rn >= 13 &&
-        (utils.BitEnabled(block.Rlist, 14) ||
-        utils.BitEnabled(block.Rlist, 13)) {
-            fmt.Printf("AFTER SP %08X LR %08X PC %08X CPSR %08X SPS %08X LRS %08X\n", r[13], r[14], r[15], c.Reg.CPSR, c.Reg.SP, c.Reg.LR)
-        }
-	}
-
-	if utils.BitEnabled(block.Opcode, 15) && block.PSR {
-		panic("LDM WITH R15 AND SET USED")
-	}
-
 	if incPc {
 		c.Reg.R[PC] += 4
 	}
 }
 
 func (c *Cpu) ldm(block *Block) bool {
+
+    ref := [16]*uint32{
+        &c.Reg.R[0],
+        &c.Reg.R[1],
+        &c.Reg.R[2],
+        &c.Reg.R[3],
+        &c.Reg.R[4],
+        &c.Reg.R[5],
+        &c.Reg.R[6],
+        &c.Reg.R[7],
+        &c.Reg.R[8],
+        &c.Reg.R[9],
+        &c.Reg.R[10],
+        &c.Reg.R[11],
+        &c.Reg.R[12],
+        &c.Reg.R[13],
+        &c.Reg.R[14],
+        &c.Reg.R[15],
+    }
+
+    if block.ForceUser {
+        ref[13] = &c.Reg.SP[BANK_ID[MODE_USR]]
+        ref[14] = &c.Reg.LR[BANK_ID[MODE_USR]]
+    }
 
 	incPC := true
 	r := &c.Reg.R
@@ -118,7 +114,7 @@ func (c *Cpu) ldm(block *Block) bool {
 		case ib && regBitEnabled:
 
 			addr += 4
-			r[reg] = c.mem.Read32(addr, false)
+			*ref[reg] = c.mem.Read32(addr, false)
 
 			if reg == PC {
 				incPC = incPC && false
@@ -129,7 +125,7 @@ func (c *Cpu) ldm(block *Block) bool {
 
 		case ia && regBitEnabled:
 
-			r[reg] = c.mem.Read32(addr, false)
+			*ref[reg] = c.mem.Read32(addr, false)
 
 			if reg == PC {
 				incPC = incPC && false
@@ -143,7 +139,7 @@ func (c *Cpu) ldm(block *Block) bool {
 		case db && decRegBitEnabled: // pop
 
 			addr -= 4
-			r[15-reg] = c.mem.Read32(addr, false)
+			*ref[15 - reg] = c.mem.Read32(addr, false)
 
 			if 15-reg == PC {
 				incPC = incPC && false
@@ -154,7 +150,7 @@ func (c *Cpu) ldm(block *Block) bool {
 
 		case da && decRegBitEnabled:
 
-			r[15-reg] = c.mem.Read32(addr, false)
+			*ref[15 - reg] = c.mem.Read32(addr, false)
 			addr -= 4
 
 			if 15-reg == PC {
@@ -172,10 +168,39 @@ func (c *Cpu) ldm(block *Block) bool {
 		r[block.Rn] -= (regCount * 4)
 	}
 
+    if !block.Writeback {
+        r[block.Rn] = block.RnValue
+    }
+
+
 	return incPC
 }
 
 func (c *Cpu) stm(block *Block) {
+
+    ref := [16]*uint32{
+        &c.Reg.R[0],
+        &c.Reg.R[1],
+        &c.Reg.R[2],
+        &c.Reg.R[3],
+        &c.Reg.R[4],
+        &c.Reg.R[5],
+        &c.Reg.R[6],
+        &c.Reg.R[7],
+        &c.Reg.R[8],
+        &c.Reg.R[9],
+        &c.Reg.R[10],
+        &c.Reg.R[11],
+        &c.Reg.R[12],
+        &c.Reg.R[13],
+        &c.Reg.R[14],
+        &c.Reg.R[15],
+    }
+
+    if block.ForceUser {
+        ref[13] = &c.Reg.SP[BANK_ID[MODE_USR]]
+        ref[14] = &c.Reg.LR[BANK_ID[MODE_USR]]
+    }
 
 	r := &c.Reg.R
 
@@ -230,19 +255,19 @@ func (c *Cpu) stm(block *Block) {
 			addr += 4
 
 			if reg == int(block.Rn) {
-				c.mem.Write32(addr, r[reg]-4, false)
-				matchingValue = r[reg]
+				c.mem.Write32(addr, *ref[reg]-4, false)
+				matchingValue = *ref[reg]
 				matchingAddr = addr
 				rnIdx = regCount - count
 				continue
 			}
 
 			if reg == PC {
-				c.mem.Write32(addr, r[reg]+12, false)
+				c.mem.Write32(addr, *ref[reg]+12, false)
 				continue
 			}
 
-			c.mem.Write32(addr, r[reg], false)
+			c.mem.Write32(addr, *ref[reg], false)
 
 		case ia && regBitEnabled:
 
@@ -250,8 +275,8 @@ func (c *Cpu) stm(block *Block) {
 
 			if reg == int(block.Rn) {
 
-				c.mem.Write32(addr, r[reg], false)
-				matchingValue = r[reg] + 4
+				c.mem.Write32(addr, *ref[reg], false)
+				matchingValue = *ref[reg] + 4
 				matchingAddr = addr
 				rnIdx = regCount - count
 				r[block.Rn] += 4
@@ -260,32 +285,33 @@ func (c *Cpu) stm(block *Block) {
 			}
 
 			if reg == PC {
-				c.mem.Write32(addr, r[reg]+12, false)
+				c.mem.Write32(addr, *ref[reg]+12, false)
 				continue
 			}
 
-			c.mem.Write32(addr, r[reg], false)
+			c.mem.Write32(addr, *ref[reg], false)
 
 			r[block.Rn] += 4
 			addr += 4
 
 		case db && decRegBitEnabled: // push
+
 			count++
 
 			r[block.Rn] -= 4
 			addr -= 4
 
 			if 15-reg == int(block.Rn) {
-				matchingValue = r[15-reg]
+				matchingValue = *ref[15-reg]
 				matchingAddr = addr
 				rnIdx = regCount - count // regCount only for 15 - reg
 			}
 			if 15-reg == PC {
-				c.mem.Write32(addr, r[15-reg]+12, false)
+				c.mem.Write32(addr, *ref[15-reg]+12, false)
 				continue
 			}
 
-			c.mem.Write32(addr, r[15-reg], false)
+			c.mem.Write32(addr, *ref[15-reg], false)
 
 		case da && decRegBitEnabled:
 
@@ -294,8 +320,8 @@ func (c *Cpu) stm(block *Block) {
 			decReg := 15 - reg
 
 			if decReg == int(block.Rn) {
-				c.mem.Write32(addr, r[decReg]+(count-1)*4, false)
-				matchingValue = r[decReg] - 4 // -4 offsets above +4 when matching Value (not first smallest)
+				c.mem.Write32(addr, *ref[decReg]+(count-1)*4, false)
+				matchingValue = *ref[decReg] - 4 // -4 offsets above +4 when matching Value (not first smallest)
 				matchingAddr = addr
 				rnIdx = regCount - count
 				r[block.Rn] -= 4
@@ -304,15 +330,20 @@ func (c *Cpu) stm(block *Block) {
 			}
 
 			if decReg == PC {
-				c.mem.Write32(addr, r[decReg]+12, false)
+				c.mem.Write32(addr, *ref[decReg]+12, false)
 				continue
 			}
 
-			c.mem.Write32(addr, r[decReg], false)
+			c.mem.Write32(addr, *ref[decReg], false)
 
 			r[block.Rn] -= 4
 			addr -= 4
 		}
+	}
+
+	if !block.Writeback {
+		r[block.Rn] = block.RnValue
+        return
 	}
 
 	if block.Writeback && smallest {
