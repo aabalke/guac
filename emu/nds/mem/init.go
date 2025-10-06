@@ -230,9 +230,9 @@ func initTempUnimplimented() {
         (*t)[i] = true
     }
 
-    for i := uint32(0x27FFC30); i < 0x27FFC3C; i ++ {
-        (*t)[i] = true
-    }
+    //for i := uint32(0x27FFC30); i < 0x27FFC3C; i ++ {
+    //    (*t)[i] = true
+    //}
 
     for i := uint32(0x27FFC80); i < 0x27FFC80 + 0x70; i ++ {
         (*t)[i] = true
