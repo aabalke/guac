@@ -205,9 +205,8 @@ func (a *AuxSPI) Write(v uint8, b uint8, arm9 bool) {
         return
     case 2:
 
-        if !a.IsBackup || a.Baudrate != 0 {
+        if !a.IsBackup {
             log.Printf("Attempted to Write Data to Rom through AUXSPI.\n")
-            //panic("AUXSPI")
             return
         }
 

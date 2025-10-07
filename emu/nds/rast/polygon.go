@@ -93,7 +93,7 @@ func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Ver
         T = textureVertex.Dot(mtx.Col(1))
 
     default:
-        //panic("UNSETUP TEXTURE TRANSFORMATION MODE")
+        panic("UNSETUP TEXTURE TRANSFORMATION MODE")
     }
 
     var x, y, z float64
@@ -124,20 +124,16 @@ func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Ver
         z = utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
     case V_DF:
         prev := g.Vertex
-        convert := func(v uint16) float64 {
-            raw := int32(v & 0x3FF)
-            if raw&0x200 != 0 {
-                raw |= ^0x3FF
-            }
-
-            f := float64(raw) / (1 << 9)
-
+        convert := func(v uint32) float64 {
+            v &= 0x3FF
+            sext := int32(v << 22) >> 22
+            f := float64(sext) / (1 << 9)
             return f / 8.0
         }
 
-        x = convert(uint16(data[1]))     + prev.Position.X
-        y = convert(uint16(data[1]>>10)) + prev.Position.Y
-        z = convert(uint16(data[1]>>20)) + prev.Position.Z
+        x = convert(data[1])     + prev.Position.X
+        y = convert(data[1]>>10) + prev.Position.Y
+        z = convert(data[1]>>20) + prev.Position.Z
     }
 
     v := p.GetVertex(x, y, z, &g.ClipMatrix, c, S, T, &g.StoredNormal)

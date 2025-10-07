@@ -66,7 +66,7 @@ type NdsConfig struct {
 	ControllerConfig EmulatorControllerConfig `toml:"controller"`
 
 	//SkipHle                bool `toml:"skip_hle"`
-	//Threads                int  `toml:"threads"`
+	Threads                int  `toml:"threads"`
 	//IdleOptimize           bool `toml:"idle_optimize"`
 	//SoundClockUpdateCycles int  `toml:"sound_clock_update_cycles"`
 	//DisableSaves           bool `toml:"disable_saves"`

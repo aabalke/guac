@@ -11,7 +11,6 @@ import (
 )
 
 var b16 = binary.LittleEndian.Uint16
-var _ = fmt.Sprintf("")
 
 var wg = sync.WaitGroup{}
 
@@ -71,7 +70,7 @@ func (nds *Nds) MemFifoDisplay(engine *ppu.Engine) {
 
 func (nds *Nds) standard(y uint32, engine *ppu.Engine) {
 
-	if config.Conf.Gba.Threads == 0 {
+	if config.Conf.Nds.Threads == 0 {
 
 		x := uint32(0)
 		for x = range SCREEN_WIDTH {
@@ -81,7 +80,7 @@ func (nds *Nds) standard(y uint32, engine *ppu.Engine) {
 		return
 	}
 
-	WAIT_GROUPS := config.Conf.Gba.Threads
+	WAIT_GROUPS := config.Conf.Nds.Threads
 	dx := SCREEN_WIDTH / WAIT_GROUPS
 
 	wg.Add(WAIT_GROUPS)
@@ -261,7 +260,6 @@ func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {
 }
 
 func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, float64, bool) {
-
 
     //xIdx := int(x) + int(bg.XOffset)
     //yIdx := int(y) + int(bg.YOffset)
@@ -503,7 +501,6 @@ func (nds *Nds) setAffineBackgroundPixel(engine *ppu.Engine, bg *ppu.Background,
 }
 
 func (nds *Nds) setBmpBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x uint32) (uint32, bool) {
-
 
 	//if !bg.Palette256 {
 	//	panic(fmt.Sprintf("AFFINE WITHOUT PAL 256"))

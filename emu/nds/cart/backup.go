@@ -23,7 +23,6 @@ const (
 	STAT_CONT = 1
 	STAT_DONE = 2
 
-
     // will replace this later
     DATA_SIZE = 0x80_0000
 )

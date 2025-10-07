@@ -113,6 +113,8 @@ l = [4]
 
 [nds]
 
+#threads = 8
+
 [nds.keyboard]
 a = ["J"]
 b = ["K"]
