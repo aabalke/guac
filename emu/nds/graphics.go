@@ -114,6 +114,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 	var objMode uint32
 	var inObjWindow bool
 
+
 	// work backwards for proper priorities
 	for i := 3; i >= 0; i-- {
 
@@ -137,7 +138,6 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_3D :
                 palData, alpha, ok = nds.set3d(engine, bg, x, y)
-
             case ppu.BG_TYPE_BGM:
 				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
             case ppu.BG_TYPE_256:
@@ -533,20 +533,22 @@ func (nds *Nds) setBmpBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x 
 	}
 
     addr := uint32(xIdx+(yIdx * int(bg.W)))
+    addr += bg.ScreenBaseBlock * 8
 
     if engine.IsB {
         addr += 0x20_0000
     }
 
+
     palIdx := uint32(nds.ppu.Vram.Read(addr, true))
 
-    if engine.IsB {
-        palIdx += 0x200
-    }
+    if palIdx == 0 { return 0, false }
 
 	data := nds.getPalette(palIdx, 0, false, engine.IsB)
 
-    // transparent???
+    //if transparent := data & 0x80 != 0; transparent {
+    //    return 0, false
+    //}
 
     return data, true
 }
@@ -813,6 +815,11 @@ func (nds *Nds) getPalette(palIdx uint32, paletteNum uint32, obj, engineB bool) 
     }
 
     addr >>= 1
+
+    if addr >= 0x400 {
+        fmt.Printf("BAD PAL ADDR %04X (> 0x400), isB %t\n", addr, engineB)
+        return 0x0 //FFFF
+    }
 
 	return uint32(nds.ppu.Pram[addr])
 }

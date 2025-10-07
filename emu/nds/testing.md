@@ -215,13 +215,11 @@ BLX ARM needs to occur before Cond
 
 ### Crash on Boot
 Pokemon Heartgold
-Zelda Spirit Tracks
-Zelda Phantom Hourglass
+Clubhouse Games
 
 ### Crash in Game
 Sonic Chronicles The Dark Brotherhood
 Mario And Luigi Bowsers Inside Story
-Nintendogs Best Friends
 
 ### 
 Housemd
@@ -235,6 +233,9 @@ Pokemon Diamond
 Pokemon Ranger
 Mario Party
 Mario and Luigi Partners in Time
+Zelda Spirit Tracks
+Zelda Phantom Hourglass
+Nintendogs Best Friends
 
 ### Playable
 Sonic Colors
