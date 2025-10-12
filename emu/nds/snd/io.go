@@ -20,7 +20,7 @@ func (s *Snd) Write(addr uint32, v uint8) {
 		switch addr {
 		case 0x500:
 
-			s.VolMaster = utils.GetVarData(uint32(v), 0, 6)
+			s.VolMaster = float64(v & 0b111_1111) / 127
 
 		case 0x501:
 
@@ -44,7 +44,6 @@ func (s *Snd) Write(addr uint32, v uint8) {
 
 		return
 	}
-
 }
 
 func (c *Channel) Write(addr uint32, v uint8) {
@@ -66,10 +65,9 @@ func (c *Channel) Write(addr uint32, v uint8) {
         c.Format = uint32(v >> 5) & 0b11
         busy := utils.BitEnabled(uint32(v), 7)
 
-        if busy {
-            c.Start = true
-        } else {
-            c.Start = false
+        c.Start = busy
+
+        if !busy {
             c.Playing = false
         }
 

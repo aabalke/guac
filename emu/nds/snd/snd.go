@@ -20,13 +20,15 @@ const (
 
 type Mem interface {
     Read(addr uint32, arm9 bool) uint8
+    Read16(addr uint32, arm9 bool) uint32
+    Read32(addr uint32, arm9 bool) uint32
 }
 
 type Snd struct {
 
     Mem Mem
 
-	VolMaster uint32
+	VolMaster float64
 	LOut      uint8
 	ROut      uint8
 
@@ -71,24 +73,18 @@ func NewSnd(ctx *oto.Context, freq, rate, cnt int) *Snd {
 	s.Stream = make([]byte, s.streamLen)
 	s.SoundBuffer = make([]int16, s.buffSize)
 
-
-    //s.Channels[0] = NewChannel(s, 440)
-    //s.Channels[1] = NewChannel(s, 523.25)
-    //s.Channels[2] = NewChannel(s, 659.26)
-    //s.Channels[3] = NewChannel(s, 783.99)
-    //s.Channels[4] = NewChannel(s, 220)
-    //s.Channels[5] = NewChannel(s, 110)
-    //s.Channels[6] = NewChannel(s, 523.25 * 2)
-    //s.Channels[7] = NewChannel(s, 659.26 * 2)
-    //s.Channels[8] = NewChannel(s, 783.99 * 2)
-    //s.Channels[9]  = NewChannel(s, 523.25 * 3)
-    //s.Channels[10] = NewChannel(s, 659.26 * 3)
-    //s.Channels[11] = NewChannel(s, 783.99 * 3)
-    //s.Channels[12] = NewChannel(s, 55)
-
     for i := range 16 {
-        s.Channels[i].Snd = s
+        s.Channels[i] = NewChannel(s)
     }
+
+    s.Channels[8].isDuty = true
+    s.Channels[9].isDuty = true
+    s.Channels[10].isDuty = true
+    s.Channels[11].isDuty = true
+    s.Channels[12].isDuty = true
+    s.Channels[13].isDuty = true
+    s.Channels[14].isNoise = true
+    s.Channels[15].isNoise = true
 
 	if !config.Conf.CancelAudioInit {
 		s.player = ctx.NewPlayer()
@@ -182,13 +178,16 @@ func (s *Snd) SoundClock(cycles uint32) {
         l := int32(0)
         r := int32(0)
 
-        for i := range 16 {
+        if s.Enabled {
+            for i := range 16 {
+                c := &s.Channels[i]
+                cl, cr := c.GetSample()
+                l += int32(cl)
+                r += int32(cr)
+            }
 
-            c := &s.Channels[i]
-
-            cl, cr := c.GetSample()
-            l += int32(cl)
-            r += int32(cr)
+            l = int32(float64(l) * float64(s.VolMaster))
+            r = int32(float64(r) * float64(s.VolMaster))
         }
 
 		s.SoundBuffer[s.WritePointer&(s.buffSize-1)] = clip(l)

@@ -308,12 +308,6 @@ func (nds *Nds) setRearBitmap(engine *ppu.Engine, bg *ppu.Background, x, y uint3
 
 func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, bool) {
 
-    vramOffset := uint32(0)
-
-    if engine.IsB {
-        vramOffset = uint32(0x20_0000)
-    }
-
 	xIdx := (x + bg.XOffset) & ((bg.W) - 1)
 	yIdx := (y + bg.YOffset) & ((bg.H) - 1)
 
@@ -342,9 +336,11 @@ func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx
 
     if !engine.IsB {
         mapAddr += engine.Dispcnt.ScreenBase
+    } else {
+        mapAddr += 0x20_0000
     }
 
-    screenData := uint32(b16(nds.ppu.Vram.ReadPointer(vramOffset + mapAddr)[:]))
+    screenData := uint32(b16(nds.ppu.Vram.ReadPointer(mapAddr)[:]))
 
 	tileIdx := (screenData & 0b11_1111_1111) << 5
 
@@ -355,6 +351,8 @@ func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx
 
     if !engine.IsB {
         tileAddr += engine.Dispcnt.CharBase
+    } else {
+        tileAddr += 0x20_0000
     }
 
 	inTileX, inTileY := getPositionsBg(screenData, xIdx, yIdx)
@@ -366,7 +364,7 @@ func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx
 		inTileIdx = (inTileX >> 1) + (inTileY << 2)
 	}
 
-    palIdx := uint32(b16(nds.ppu.Vram.ReadPointer(vramOffset + tileAddr + inTileIdx)[:]))
+    palIdx := uint32(b16(nds.ppu.Vram.ReadPointer(tileAddr + inTileIdx)[:]))
     palNum := screenData >> 12
 
     return getBgPaletteData(nds, engine, bgIdx, bg.Palette256, palNum, palIdx, inTileX)

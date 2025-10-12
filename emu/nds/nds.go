@@ -195,35 +195,32 @@ func (nds *Nds) checkBadPc() {
             panic(fmt.Sprintf("BAD ARM9 PC %08X (LOW WHEN HIGH) CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
     }
 }
+var validModes = map[uint32]bool {
+    0b10000: true,
+    0b10001: true,
+    0b10010: true,
+    0b10011: true,
+    0b10111: true,
+    0b11011: true,
+    0b11111: true,
+}
 
-func (nds *Nds) checkMode() {
+func (nds *Nds) checkMode(arm9 bool) {
 
-    validModes := []uint32 {
-        0b10000,
-        0b10001,
-        0b10010,
-        0b10011,
-        0b10111,
-        0b11011,
-        0b11111,
+    if arm9 {
+
+        m9 := uint32(nds.arm9.Reg.CPSR) & 0x1F
+        _, valid9 := validModes[m9]
+        if !valid9 {
+            panic(fmt.Sprintf("ARM9 MODE INVALID %02X CURR %d\n", m9, CURR_INST))
+        }
+
+        return
     }
 
-    m9 := uint32(nds.arm9.Reg.CPSR) & 0x1F
     m7 := uint32(nds.arm7.Reg.CPSR) & 0x1F
-
-    validM9 := false
-    validM7 := false
-
-    for _, v := range validModes {
-        if v == m9 { validM9 = true }
-        if v == m7 { validM7 = true }
-    }
-
-    if !validM9 {
-        panic(fmt.Sprintf("ARM9 MODE INVALID %02X CURR %d\n", m9, CURR_INST))
-    }
-
-    if !validM7 {
+    _, valid7 := validModes[m7]
+    if !valid7 {
         panic(fmt.Sprintf("ARM7 MODE INVALID %02X CURR %d\n", m7, CURR_INST))
     }
 }
@@ -246,8 +243,7 @@ func (nds *Nds) Update() {
 
 	for nds.Drawn = false; !nds.Drawn; {
 
-        nds.checkBadPc()
-        nds.checkMode()
+        //nds.checkBadPc()
 
         // arm9 thumb ~1 cycles, arm ~2 cycles
         // arm7 thumb ~2 cycles, arm ~4 cycles
@@ -257,6 +253,7 @@ func (nds *Nds) Update() {
             armExec := !nds.arm9.Reg.IsThumb && nds.AccCycles & 0b1 == 0
 
             if thumbExec || armExec  {
+                //nds.checkMode(true)
                 //logger.Update(0, 1, CURR_INST, true)
 
                 _, ok := nds.arm9.Execute()
@@ -278,6 +275,7 @@ func (nds *Nds) Update() {
             armExec := !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b11 == 0
 
             if thumbExec || armExec  {
+                //nds.checkMode(false)
                 //logger.Update(0, 1, CURR_INST, false)
 
 
