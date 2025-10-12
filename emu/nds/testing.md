@@ -213,15 +213,10 @@ BLX ARM needs to occur before Cond
 
 # Games (Decrypted)
 
-### Crash on Boot
-Pokemon Heartgold
-Clubhouse Games
-
-### Crash in Game
 Sonic Chronicles The Dark Brotherhood
 Mario And Luigi Bowsers Inside Story
-
-### 
+Clubhouse Games
+Pokemon Heartgold
 Housemd
 Lego Star Wars the Complete Saga
 Metroid Prime Hunters
@@ -236,8 +231,6 @@ Mario and Luigi Partners in Time
 Zelda Spirit Tracks
 Zelda Phantom Hourglass
 Nintendogs Best Friends
-
-### Playable
 Sonic Colors
 Yoshis Island
 Pokemon Blue Rescue Team

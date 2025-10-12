@@ -38,7 +38,12 @@ const (
 	CYCLES_SCANLINE = CYCLES_HDRAW + CYCLES_HBLANK
 	CYCLES_VDRAW    = CYCLES_SCANLINE * SCREEN_HEIGHT
 	CYCLES_VBLANK   = CYCLES_SCANLINE * 70 // or 71???
-	CYCLES_FRAME    = CYCLES_VDRAW + CYCLES_VBLANK)
+	CYCLES_FRAME    = CYCLES_VDRAW + CYCLES_VBLANK
+
+	CPU_FREQ_HZ   =   33513982
+    SND_FREQUENCY = 48000 // sample rate
+    SND_SAMPLES   = 1024 // 512 in gba?
+)
 
 type Nds struct {
 	mem  mem.Mem
@@ -60,14 +65,13 @@ type Nds struct {
 
 var logger *Logger
 
-func NewNds(path string, _ *oto.Context) *Nds {
+func NewNds(path string, audioCtx *oto.Context) *Nds {
 
 	nds := Nds{
 		ImageTop:     ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 		ImageBottom:  ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 	}
 
-    s := &snd.Snd{}
 
 	irq7 := cpu.Irq{}
     irq9 := cpu.Irq{IsArm9: true}
@@ -89,12 +93,22 @@ func NewNds(path string, _ *oto.Context) *Nds {
 	nds.Debugger = Debugger{&nds}
 	nds.arm7 = *arm7.NewCpu(&nds.mem, &irq7)
 	nds.arm9 = *arm9.NewCpu(&nds.mem, &irq9, cp15)
+
+    s := snd.NewSnd(
+        audioCtx,
+        CPU_FREQ_HZ,
+        SND_FREQUENCY,
+        SND_SAMPLES,
+    )
+
 	nds.mem = mem.NewMemory(
         &nds.arm7.Reg.R[15],
         &nds.arm7.Halted, &nds.arm9.Halted,
         &nds.arm7.Dma, &nds.arm9.Dma,
         &irq7, &irq9,
         &nds.Cartridge, nds.ppu, s)
+
+    s.Mem = &nds.mem
 
     nds.arm9.Dma[0].Init(0, &nds.mem, &irq9, true)
     nds.arm9.Dma[1].Init(1, &nds.mem, &irq9, true)
@@ -232,8 +246,8 @@ func (nds *Nds) Update() {
 
 	for nds.Drawn = false; !nds.Drawn; {
 
-        //nds.checkBadPc()
-        //nds.checkMode()
+        nds.checkBadPc()
+        nds.checkMode()
 
         // arm9 thumb ~1 cycles, arm ~2 cycles
         // arm7 thumb ~2 cycles, arm ~4 cycles
@@ -266,6 +280,13 @@ func (nds *Nds) Update() {
             if thumbExec || armExec  {
                 //logger.Update(0, 1, CURR_INST, false)
 
+
+                //41709140
+
+                //if CURR_INST >= 40_000_000 {
+                //    fmt.Printf("PC %08X CURR %d\n", r7[15], CURR_INST)
+                //}
+
                 _, ok := nds.arm7.Execute()
                 if !ok {
                     fmt.Printf("ARM7 Decode Error: PC %08X CURR %d\n", r7[15], CURR_INST)
@@ -282,6 +303,7 @@ func (nds *Nds) Update() {
 
         CURR_INST++
 	}
+	nds.mem.Snd.Play(nds.Muted)
 }
 
 func (nds *Nds) Tick(cycles uint32) {
@@ -390,7 +412,7 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 
 	if newScanline := currScanlineCycles < prevScanlineCycles; newScanline {
 
-		//gba.Apu.SoundClock(1232, false)
+		nds.mem.Snd.SoundClock(CYCLES_SCANLINE)
 
 		dispstat.SetHBlank(false)
 

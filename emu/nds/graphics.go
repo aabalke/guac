@@ -268,11 +268,7 @@ func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint
 
 	index := (xIdx + (yIdx * SCREEN_WIDTH))
 
-    if xIdx >= SCREEN_WIDTH || xIdx <= 0 {
-        return 0, 0, false
-    }
-
-    if yIdx >= SCREEN_HEIGHT || yIdx <= 0 {
+    if xIdx >= SCREEN_WIDTH || yIdx >= SCREEN_HEIGHT {
         return 0, 0, false
     }
 
@@ -280,10 +276,10 @@ func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint
 
     pal, alpha := uint32(render.PixelPalettes[index]), render.Alphas[index]
 
-    if nds.ppu.Rasterizer.Disp3dCnt.RearPlaneBitmapEnabled == true {
-        panic("Has Rear Plane Bitmap")
-        //return nds.setRearBitmap(engine, bg, x, y)
-    }
+    //if nds.ppu.Rasterizer.Disp3dCnt.RearPlaneBitmapEnabled == true && alpha != 1 {
+    //    pal, ok := nds.setRearBitmap(engine, bg, x, y)
+    //    return pal, 1, ok
+    //}
 
     return pal, alpha, alpha > 0
     //return pal, alpha, true
@@ -291,10 +287,15 @@ func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint
 
 func (nds *Nds) setRearBitmap(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, bool) {
 
-    xIdx := x + bg.XOffset
-    yIdx := y + bg.YOffset
+    const slot3Offset = 0x60000
+
+    xIdx := x + nds.ppu.Rasterizer.RearPlane.OffsetX
+    yIdx := y + nds.ppu.Rasterizer.RearPlane.OffsetY
 
     addr := uint32(xIdx+(yIdx * SCREEN_WIDTH)) * 2
+    addr += slot3Offset
+
+    fmt.Printf("addr %08X Slots % v\n", addr, nds.ppu.Vram.TextureSlots)
 
     data := uint32(nds.ppu.Vram.ReadTexture(addr))
     data |= uint32(nds.ppu.Vram.ReadTexture(addr + 1)) << 8

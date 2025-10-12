@@ -8,7 +8,14 @@ func (s *Snd) Write(addr uint32, v uint8) {
 
 	addr &= 0xFFFF
 
-	if addr >= 0x500 {
+    switch {
+    case addr < 0x400:
+        return
+    case addr < 0x500:
+        i := (addr & 0xF0) >> 4
+        s.Channels[i].Write(addr, v)
+
+    case addr < 0x600:
 
 		switch addr {
 		case 0x500:
@@ -38,9 +45,6 @@ func (s *Snd) Write(addr uint32, v uint8) {
 		return
 	}
 
-    i := (addr & 0xF0) >> 4
-
-    s.Channels[i].Write(addr, v)
 }
 
 func (c *Channel) Write(addr uint32, v uint8) {
@@ -58,14 +62,21 @@ func (c *Channel) Write(addr uint32, v uint8) {
     case 0x3:
 
         c.Duty = uint32(v & 0b111)
-        c.RepeatMode = uint32(v & 0b11) >> 3
-        c.Format = uint32(v & 0b11) >> 5
-        c.Busy = utils.BitEnabled(uint32(v), 7)
+        c.RepeatMode = uint32(v >> 3) & 0b11
+        c.Format = uint32(v >> 5) & 0b11
+        busy := utils.BitEnabled(uint32(v), 7)
+
+        if busy {
+            c.Start = true
+        } else {
+            c.Start = false
+            c.Playing = false
+        }
 
     case 0x4:
 
         c.SrcAddr &^= 0xFF
-        c.SrcAddr |= uint32(v)
+        c.SrcAddr |= uint32(v &^ 0b11)
 
     case 0x5:
 
@@ -80,7 +91,7 @@ func (c *Channel) Write(addr uint32, v uint8) {
     case 0x7:
 
         c.SrcAddr &^= 0xFF << 24
-        c.SrcAddr |= uint32(v) << 24
+        c.SrcAddr |= uint32(v & 0b111) << 24
 
     case 0x8:
 
@@ -91,7 +102,7 @@ func (c *Channel) Write(addr uint32, v uint8) {
 
         c.TimerValue &^= 0xFF << 8
         c.TimerValue |= uint16(v) << 8
-
+ 
     case 0xA:
 
         c.StartPosition &^= 0xFF
@@ -115,13 +126,7 @@ func (c *Channel) Write(addr uint32, v uint8) {
     case 0xE:
 
         c.SndLength &^= 0xFF << 16
-        c.SndLength |= uint32(v) << 16
-
-    case 0xF:
-
-        c.SndLength &^= 0xFF << 24
-        c.SndLength |= uint32(v) << 24
-
+        c.SndLength |= uint32(v & 0b11_1111) << 16
     }
 }
 
@@ -198,10 +203,10 @@ func (c *Channel) Read(addr uint32) uint8 {
     case 0x3:
 
         v := c.Duty
-        v |= c.RepeatMode << 2
-        v |= c.Format << 4
+        v |= c.RepeatMode << 3
+        v |= c.Format << 5
 
-        if c.Busy {
+        if c.Playing {
             v |= 1 << 7
         }
 

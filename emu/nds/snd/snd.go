@@ -1,6 +1,11 @@
 package snd
 
-import "github.com/hajimehoshi/oto"
+import (
+	"fmt"
+
+	"github.com/aabalke/guac/config"
+	"github.com/hajimehoshi/oto"
+)
 
 const (
 	REPEAT_MAN = 0
@@ -14,10 +19,13 @@ const (
 )
 
 type Mem interface {
-    Read(addr uint32) uint8
+    Read(addr uint32, arm9 bool) uint8
 }
 
 type Snd struct {
+
+    Mem Mem
+
 	VolMaster uint32
 	LOut      uint8
 	ROut      uint8
@@ -28,7 +36,6 @@ type Snd struct {
 	Bias     uint32
 
 	Channels [16]Channel
-
 
     player *oto.Player
     Stream []uint8
@@ -47,43 +54,58 @@ type Snd struct {
 	buffSize     uint32
 }
 
-type Channel struct {
-    Snd *Snd
-    Mem *Mem
-	VolMul     uint32
-	VolDiv     uint32
-	Hold       bool
-	Panning    uint32
-	Duty       uint32 // wave duty
-	RepeatMode uint32
-	Format     uint32
-	Busy       bool
-
-	SrcAddr       uint32
-	TimerValue    uint16
-	StartPosition uint16
-	SndLength     uint32
-}
-
 func NewSnd(ctx *oto.Context, freq, rate, cnt int) *Snd {
 
     s := &Snd{
+		WritePointer: 0x200,
+		cpuFreqHz:    freq,
+		sndFrequency: rate,
+		sndSamples:   cnt,
+		sampCycles:   freq / rate,
+		buffSamples:  cnt * 16 * 2,
+		sampleTime:   1.0 / float64(rate),
+		streamLen:    (2 * 2 * rate / 60) - (2*2*rate/60)%4,
+		buffSize:     uint32((cnt) * 16 * 2),
     }
+
+	s.Stream = make([]byte, s.streamLen)
+	s.SoundBuffer = make([]int16, s.buffSize)
+
+
+    //s.Channels[0] = NewChannel(s, 440)
+    //s.Channels[1] = NewChannel(s, 523.25)
+    //s.Channels[2] = NewChannel(s, 659.26)
+    //s.Channels[3] = NewChannel(s, 783.99)
+    //s.Channels[4] = NewChannel(s, 220)
+    //s.Channels[5] = NewChannel(s, 110)
+    //s.Channels[6] = NewChannel(s, 523.25 * 2)
+    //s.Channels[7] = NewChannel(s, 659.26 * 2)
+    //s.Channels[8] = NewChannel(s, 783.99 * 2)
+    //s.Channels[9]  = NewChannel(s, 523.25 * 3)
+    //s.Channels[10] = NewChannel(s, 659.26 * 3)
+    //s.Channels[11] = NewChannel(s, 783.99 * 3)
+    //s.Channels[12] = NewChannel(s, 55)
+
+    for i := range 16 {
+        s.Channels[i].Snd = s
+    }
+
+	if !config.Conf.CancelAudioInit {
+		s.player = ctx.NewPlayer()
+	}
 
     return s
 }
 
 func (s *Snd) Play(muted bool) {
 
-    // snd buffer wrap
-
-    s.Enabled = true
+    s.SoundBufferWrap()
 
     if len(s.Stream) == 0 {
         return
     }
 
-    // snd mix
+    s.Mix()
 
     if muted || s.player == nil {
         return
@@ -107,4 +129,73 @@ func (s *Snd) Mix() {
 			s.ReadPointer++
         }
     }
+
+	// Avoid desync between the Play cursor and the Write cursor
+	delta := (int32(s.WritePointer-s.ReadPointer) >> 8) - (int32(s.WritePointer-s.ReadPointer)>>8)%2
+	if delta > 0 {
+		s.ReadPointer += uint32(delta)
+	} else {
+		s.ReadPointer -= uint32(delta)
+	}
+}
+
+func (a *Snd) GetSample() (int16, int16) {
+
+	if a.WritePointer == a.ReadPointer {
+		fmt.Printf("WRITE AND READ OVERLAP\n")
+	}
+
+	l := a.SoundBuffer[a.ReadPointer&uint32(a.buffSize-1)] << 6
+	a.ReadPointer++
+
+	r := a.SoundBuffer[a.ReadPointer&uint32(a.buffSize-1)] << 6
+	a.ReadPointer++
+
+	return l, r
+}
+
+func (a *Snd) Sync() {
+
+	delta := (int32(a.WritePointer-a.ReadPointer) >> 8) - (int32(a.WritePointer-a.ReadPointer)>>8)%4
+	if delta > 0 {
+		a.ReadPointer += uint32(delta)
+	} else {
+		a.ReadPointer -= uint32(delta)
+	}
+}
+
+func (s *Snd) SoundBufferWrap() {
+	l := s.ReadPointer / uint32(s.buffSize)
+	r := s.WritePointer / uint32(s.buffSize)
+	if l == r {
+		s.ReadPointer &= (uint32(s.buffSize) - 1)
+		s.WritePointer &= (uint32(s.buffSize) - 1)
+	}
+}
+
+func (s *Snd) SoundClock(cycles uint32) {
+
+	s.sndCycles += cycles
+
+	for s.sndCycles >= uint32(s.sampCycles) {
+
+        l := int32(0)
+        r := int32(0)
+
+        for i := range 16 {
+
+            c := &s.Channels[i]
+
+            cl, cr := c.GetSample()
+            l += int32(cl)
+            r += int32(cr)
+        }
+
+		s.SoundBuffer[s.WritePointer&(s.buffSize-1)] = clip(l)
+		s.WritePointer++
+		s.SoundBuffer[s.WritePointer&(s.buffSize-1)] = clip(r)
+		s.WritePointer++
+
+		s.sndCycles -= uint32(s.sampCycles)
+	}
 }
