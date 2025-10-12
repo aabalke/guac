@@ -22,6 +22,9 @@ type Mem interface {
     Read(addr uint32, arm9 bool) uint8
     Read16(addr uint32, arm9 bool) uint32
     Read32(addr uint32, arm9 bool) uint32
+
+    Write(addr uint32, v uint8, arm9 bool)
+    Write16(addr uint32, v uint16, arm9 bool)
 }
 
 type Snd struct {
@@ -38,6 +41,7 @@ type Snd struct {
 	Bias     uint32
 
 	Channels [16]Channel
+    Capture [2]Capture
 
     player *oto.Player
     Stream []uint8
@@ -74,7 +78,7 @@ func NewSnd(ctx *oto.Context, freq, rate, cnt int) *Snd {
 	s.SoundBuffer = make([]int16, s.buffSize)
 
     for i := range 16 {
-        s.Channels[i] = NewChannel(s)
+        s.Channels[i] = NewChannel(i, s)
     }
 
     s.Channels[8].isDuty = true
@@ -85,6 +89,8 @@ func NewSnd(ctx *oto.Context, freq, rate, cnt int) *Snd {
     s.Channels[13].isDuty = true
     s.Channels[14].isNoise = true
     s.Channels[15].isNoise = true
+
+    s.Capture = NewCaptures(s)
 
 	if !config.Conf.CancelAudioInit {
 		s.player = ctx.NewPlayer()
@@ -175,24 +181,31 @@ func (s *Snd) SoundClock(cycles uint32) {
 
 	for s.sndCycles >= uint32(s.sampCycles) {
 
-        l := int32(0)
-        r := int32(0)
+        l := float64(0)
+        r := float64(0)
 
         if s.Enabled {
             for i := range 16 {
                 c := &s.Channels[i]
                 cl, cr := c.GetSample()
-                l += int32(cl)
-                r += int32(cr)
+                l += float64(cl)
+                r += float64(cr)
             }
 
-            l = int32(float64(l) * float64(s.VolMaster))
-            r = int32(float64(r) * float64(s.VolMaster))
+            if mixCapture := !s.Capture[0].ChanSrc; mixCapture {
+                s.Capture[0].Capture(l)
+            }
+            if mixCapture := !s.Capture[1].ChanSrc; mixCapture {
+                s.Capture[1].Capture(r)
+            }
+
+            l = (float64(l) * float64(s.VolMaster))
+            r = (float64(r) * float64(s.VolMaster))
         }
 
-		s.SoundBuffer[s.WritePointer&(s.buffSize-1)] = clip(l)
+		s.SoundBuffer[s.WritePointer&(s.buffSize-1)] = clip(int32(l))
 		s.WritePointer++
-		s.SoundBuffer[s.WritePointer&(s.buffSize-1)] = clip(r)
+		s.SoundBuffer[s.WritePointer&(s.buffSize-1)] = clip(int32(r))
 		s.WritePointer++
 
 		s.sndCycles -= uint32(s.sampCycles)

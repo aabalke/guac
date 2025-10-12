@@ -36,6 +36,7 @@ var (
 )
 
 type Channel struct {
+    Idx int
 	Snd        *Snd
 	Mem        *Mem
 
@@ -66,9 +67,10 @@ type Channel struct {
     phase float64
 }
 
-func NewChannel(s *Snd) Channel {
+func NewChannel(idx int, s *Snd) Channel {
 
 	c := Channel{
+        Idx: idx,
 		Snd: s,
         lfsr: 0x7FFF,
 	}
@@ -128,6 +130,16 @@ func (c *Channel) GetSample() (int8, int8) {
 
 	sample *= float64(c.VolMul)
 
+
+    s := c.Snd
+    if chCapture := c.Idx == 0 && s.Capture[0].ChanSrc; chCapture {
+        s.Capture[0].Capture(sample)
+    }
+
+    if chCapture := c.Idx == 2 && s.Capture[1].ChanSrc; chCapture {
+        s.Capture[1].Capture(sample)
+    }
+
 	l := sample * (float64(127-c.Panning) / 127)
 	r := sample * (float64(c.Panning) / 127)
 
@@ -176,8 +188,8 @@ func (c *Channel) GetPCM16() float64 {
 func (c *Channel) DecompressADPCM() {
 
 	addr := c.SrcAddr
-	length := (c.SndLength * 4) + uint32(4*(c.StartPosition))
-	c.Samples = make([]int16, 0, length*2)
+	length := ((c.SndLength * 4) + uint32(4*(c.StartPosition)) - 4)
+	c.Samples = make([]int16, 0, length)
 
 	head := uint32(c.Snd.Mem.Read32(addr, false))
 
@@ -231,10 +243,8 @@ func (c *Channel) GetADPCM() float64 {
 
 	if int(c.SamplePos) >= len(c.Samples) {
 
-        // this needs to be adjusted
 		if loop := c.RepeatMode == 1; loop {
-			c.SamplePos = (float64((c.StartPosition) * 4) - 4) / 2
-
+            c.SamplePos = (float64(c.StartPosition * 4) - 4)
 		} else {
 			c.Playing = false
 			return 0
