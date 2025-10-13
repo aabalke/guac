@@ -32,8 +32,8 @@ func (c *Cpu) Block(opcode uint32) {
 
 	block.RnValue = c.Reg.R[block.Rn]
 
-	if utils.BitEnabled(block.Opcode, 15) && block.PSR {
-		panic("LDM WITH R15 AND SET USED")
+	if utils.BitEnabled(block.Opcode, 15) && block.PSR && block.Load {
+		panic("ARM7 LDM WITH R15 AND SET USED")
 	}
 
 	incPc := true

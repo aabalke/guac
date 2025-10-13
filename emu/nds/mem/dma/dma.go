@@ -1,6 +1,8 @@
 package dma
 
 import (
+	"unsafe"
+
 	"github.com/aabalke/guac/emu/gba/utils"
 	"github.com/aabalke/guac/emu/nds/cpu"
 )
@@ -146,9 +148,6 @@ func (dma *DMA) disable() {
 	dma.Control &^= 0b1000_0000_0000_0000
 }
 
-func (dma *DMA) GCTransfer(initial bool) {
-}
-
 func (dma *DMA) Transfer() {
 
 	mem := dma.mem
@@ -157,16 +156,6 @@ func (dma *DMA) Transfer() {
     if count == 0 {
         count = dma.DefaultCount
     }
-
-	//if dma.Mode == DMA_MODE_HBL {
-	//	srcInLimited := dma.Src >= 0x600_0000 && dma.Src < 0x800_0000
-	//	dstInLimited := dma.Dst >= 0x600_0000 && dma.Dst < 0x800_0000
-	//	allowed := utils.BitEnabled(uint32(dma.Gba.Mem.IO[0]), 5)
-
-	//	if (srcInLimited || dstInLimited) && !allowed {
-	//		return
-	//	}
-	//}
 
 	dstOffset := int64(0)
 	srcOffset := int64(0)
@@ -180,15 +169,6 @@ func (dma *DMA) Transfer() {
 		tmpDst &^= 0b1
 		tmpSrc &^= 0b1
 	}
-
-	//rom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
-	//if rom && dma.Idx == 0 {
-	//	tmpSrc &= 0x7FF_FFFF
-	//}
-
-	//if rom {
-	//	dma.SrcAdj = DMA_ADJ_INC
-	//}
 
 	ofs := int64(2)
 	if dma.isWord {
@@ -227,9 +207,6 @@ func (dma *DMA) Transfer() {
 		tmpSrc = uint32(int64(tmpSrc) + srcOffset)
 
 	}
-
-	//DMA_FINISHED = DMA_ACTIVE
-	//DMA_ACTIVE = prevActive
 
 	if dma.IRQ {
 		dma.irq.SetIRQ(8 + uint32(dma.Idx))
@@ -279,10 +256,7 @@ func (dma *DMA) GamecartTransfer(arm9, initial bool) {
         return
     }
 
-    //fmt.Printf("DMA%d: %08X %08X %04X%04X INITIAL GC %t GC DST %08X\n", dma.Idx, dma.Src, dma.Dst, dma.Control, dma.WordCount, dma.InitialGc, dma.GcDst)
-
 	mem := dma.mem
-
 
     // gamecard transfer requires recursive access.
     // Therefore, GcDst is incremented before access to not cause same dst loop
@@ -311,12 +285,68 @@ func (dma *DMA) GamecartTransfer(arm9, initial bool) {
 	}
 }
 
+func (dma *DMA) GxTransfer() {
+
+    if dma.Dst != 0x400_0400 || dma.DstAdj != DMA_ADJ_NON || !dma.isWord {
+        dma.Transfer()
+        return
+    }
+
+	count := dma.WordCount
+    if count == 0 {
+        count = dma.DefaultCount
+    }
+
+	ofs := int(2)
+	if dma.isWord {
+		ofs = 4
+	}
+
+	srcOffset := int(0)
+	switch dma.SrcAdj {
+	case DMA_ADJ_INC: srcOffset = ofs
+	case DMA_ADJ_DEC: srcOffset = -ofs
+	}
+
+	mem := dma.mem
+	tmpSrc := int(dma.Src &^ 0b11)
+
+    ptr, ok := mem.ReadPtr(uint32(tmpSrc), dma.arm9)
+    if !ok {
+        for range count {
+            mem.WriteGXFIFO(mem.Read32(uint32(tmpSrc), dma.arm9))
+            tmpSrc += srcOffset
+        }
+    } else {
+        for i := range count {
+            v := *(*uint32)(unsafe.Add(ptr, srcOffset*int(i)))
+            mem.WriteGXFIFO(v)
+        }
+
+        tmpSrc += srcOffset * int(count)
+    }
+
+
+	if dma.IRQ {
+		dma.irq.SetIRQ(8 + uint32(dma.Idx))
+	}
+
+	if !dma.Repeat {
+		dma.disable()
+		return
+	}
+
+	dma.Src = uint32(tmpSrc)
+}
+
 type MemoryInterface interface {
     Write8(addr uint32, v uint8, arm9 bool)
     Write16(addr uint32, v uint16, arm9 bool)
     Write32(addr uint32, v uint32, arm9 bool)
+    WriteGXFIFO(v uint32)
 
     Read8(addr uint32, arm9 bool) uint32
     Read16(addr uint32, arm9 bool) uint32
     Read32(addr uint32, arm9 bool) uint32
+    ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool)
 }

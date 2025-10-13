@@ -383,8 +383,44 @@ func (vm *VRAM) Read(addr uint32, arm9 bool) uint8 {
     return 0
 }
 
-// used by graphics to quickly get pointer for multiple reads (halfs, words etc)
-func (vm *VRAM) ReadPointer(addr uint32) *[2]uint8 {
+func (vm *VRAM) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
+
+    addr &= 0xFF_FFFF
+
+    if !arm9 {
+
+        cnt := &vm.CNT_C
+        bank := &vm.C
+
+        if vm.isCArm7 && addr >= (cnt.Ofs * cnt.Size) {
+            return unsafe.Add(unsafe.Pointer(bank), addr & 0x1FFFF), true
+        }
+
+        cnt = &vm.CNT_D
+        bank = &vm.D
+
+        if vm.isDArm7 && addr >= (cnt.Ofs * cnt.Size) {
+            return unsafe.Add(unsafe.Pointer(bank), addr & 0x1FFFF), true
+        }
+
+        return nil, false
+    }
+
+    for _, v := range &vm.banks {
+
+        if !v.cnt.Enabled {
+            continue
+        }
+
+        if addr >= v.cnt.Base && addr < v.cnt.Base + v.cnt.Size {
+            return unsafe.Add(v.bank, addr - v.cnt.Base), true
+        }
+    }
+
+    return nil, false
+}
+
+func (vm *VRAM) ReadGraphical(addr uint32) uint16 {
 
     for _, v := range &vm.banks {
 
@@ -397,13 +433,13 @@ func (vm *VRAM) ReadPointer(addr uint32) *[2]uint8 {
         }
 
         if addr + 1 >= v.cnt.Base + v.cnt.Size {
-            return &[2]uint8{0,0}
+            return uint16((*[1]uint8)(unsafe.Add(v.bank, addr - v.cnt.Base))[0])
         }
 
-        return ((*[2]uint8)((*[0x2_0000]uint8)(v.bank)[addr - v.cnt.Base:]))
+        return (*[1]uint16)(unsafe.Add(v.bank, addr - v.cnt.Base))[0]
     }
 
-    return &[2]uint8{0,0}
+    return 0
 }
 
 func (vm *VRAM) ReadTexture(addr uint32) uint8 {

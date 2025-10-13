@@ -69,22 +69,3 @@ func (s *Irq) WriteIF(v uint8, byte uint8) {
 func (s *Irq) SetIRQ(irq uint32) {
 	s.IF |= (1 << irq)
 }
-
-// this is now handled by cpu instance
-//func (s *Irq) checkIRQ(cpsrEnabled bool) (unhalted, exception bool) {
-//
-//	//interruptEnabled := !s.Gba.Cpu.Reg.CPSR.GetFlag(FLAG_I)
-//	interrupts := s.IF&s.IE != 0
-//
-//	if interrupts {
-//        unhalted = true
-//		//s.Gba.Halted = false
-//	}
-//
-//	if cpsrEnabled && s.IME && interrupts {
-//        exception = true
-//		//s.Gba.exception(VEC_IRQ, MODE_IRQ)
-//	}
-//
-//    return unhalted, exception
-//}

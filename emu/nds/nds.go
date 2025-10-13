@@ -225,17 +225,11 @@ func (nds *Nds) checkMode(arm9 bool) {
     }
 }
 
-var prev uint32
 
 func (nds *Nds) Update() {
 
     r := &nds.arm9.Reg.R
     r7 := &nds.arm7.Reg.R
-    read := nds.mem.Read32
-
-    _ = r
-    _ = r7
-    _ = read
 
 	if nds.Paused {
 		return
@@ -278,13 +272,6 @@ func (nds *Nds) Update() {
                 //nds.checkMode(false)
                 //logger.Update(0, 1, CURR_INST, false)
 
-
-                //41709140
-
-                //if CURR_INST >= 40_000_000 {
-                //    fmt.Printf("PC %08X CURR %d\n", r7[15], CURR_INST)
-                //}
-
                 _, ok := nds.arm7.Execute()
                 if !ok {
                     fmt.Printf("ARM7 Decode Error: PC %08X CURR %d\n", r7[15], CURR_INST)
@@ -293,21 +280,26 @@ func (nds *Nds) Update() {
             }
         }
 
-        nds.Tick(1)
+        nds.VideoUpdate(1)
+
+        if timerCycles & timerMask == 0 {
+            nds.UpdateTimers(timerMask + 1)
+        }
 
 		// irq has to be at end (count up tests)
 		nds.arm9.CheckIrq()
         nds.arm7.CheckIrq()
+
+        timerCycles++
 
         CURR_INST++
 	}
 	nds.mem.Snd.Play(nds.Muted)
 }
 
-func (nds *Nds) Tick(cycles uint32) {
-    nds.VideoUpdate(cycles)
-    nds.UpdateTimers(cycles)
-}
+// run timer update only every mask amount of cycles
+var timerCycles uint8
+const timerMask = 0b11
 
 func (nds *Nds) ToggleMute() bool {
 	nds.Muted = !nds.Muted
@@ -448,7 +440,6 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 		dispstat.SetVCFlag(match)
 
 		if vcounterIRQ := utils.BitEnabled(uint32(*dispstat), 5); vcounterIRQ && match {
-
 			nds.arm9.Irq.SetIRQ(2)
 			nds.arm7.Irq.SetIRQ(2)
 		}
@@ -456,7 +447,10 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 
 	if currFrameCycles < prevFrameCycles {
 		nds.Drawn = true
-        nds.ppu.Rasterizer.Render.UpdateRender()
+
+        if nds.ppu.EngineA.Dispcnt.Is3D {
+            nds.ppu.Rasterizer.Render.UpdateRender()
+        }
 	}
 }
 
@@ -487,7 +481,7 @@ func (nds *Nds) CheckGeoDmas() {
             continue
         }
 
-        nds.arm9.Dma[i].Transfer()
+        nds.arm9.Dma[i].GxTransfer()
     }
 }
 
@@ -495,34 +489,26 @@ func (nds *Nds) UpdateTimers(cycles uint32) {
 
 	overflow, setIrq := false, false
 
-    for i := range 4 {
-        if !nds.mem.Timers[i].Enabled {
+    for i := range uint32(8) {
+
+        if i == 4 {
+            overflow, setIrq = false, false
+        }
+
+        t := &nds.mem.Timers[i]
+
+        if !t.Enabled {
             continue
         }
 
-        overflow, setIrq = nds.mem.Timers[i].Update(overflow, cycles)
-
-        if !setIrq {
-            continue
+        overflow, setIrq = t.Update(overflow, cycles)
+        //overflow, setIrq = t.UpdateSingle(overflow)
+        if setIrq {
+            if i < 4 {
+                nds.arm9.Irq.SetIRQ(3 + i)
+            } else {
+                nds.arm7.Irq.SetIRQ(i - 1) // 3 - 4 + i (i is 4 - 8) not 0 - 4
+            }
         }
-
-        nds.arm9.Irq.SetIRQ(3 + uint32(i))
-    }
-
-	overflow, setIrq = false, false
-
-    for i := 4; i < 8; i++ {
-
-        if !nds.mem.Timers[i].Enabled {
-            continue
-        }
-
-        overflow, setIrq = nds.mem.Timers[i].Update(overflow, cycles)
-
-        if !setIrq {
-            continue
-        }
-
-        nds.arm7.Irq.SetIRQ(3 + uint32(i - 4))
     }
 }

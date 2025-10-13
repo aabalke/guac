@@ -4,6 +4,10 @@ import "fmt"
 
 func (r *Rasterizer) Read(addr uint32) uint8 {
 
+    if addr >= 0x630 && addr < 0x636 {
+        panic("READ VEC TEST")
+    }
+
     //if addr & 0b11 == 0 { fmt.Printf("R ADDR %08X\n", addr) }
 	switch addr {
 	case 0x60:

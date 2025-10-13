@@ -233,15 +233,13 @@ func (cpu *Cpu) toggleThumb() {
 
 func (cpu *Cpu) CheckIrq() {
 
-	interruptEnabled := !cpu.Reg.CPSR.GetFlag(FLAG_I)
-	interrupts := cpu.Irq.IE&cpu.Irq.IF != 0
+	if interrupts := cpu.Irq.IE&cpu.Irq.IF != 0; !interrupts {
+        return
+    }
 
-	if interrupts {
-		cpu.Halted = false
-	}
+    cpu.Halted = false
 
-	if interruptEnabled && interrupts && cpu.Irq.IME {
-
+	if !cpu.Reg.CPSR.GetFlag(FLAG_I) && cpu.Irq.IME {
 		cpu.exception(VEC_IRQ, MODE_IRQ)
 	}
 }

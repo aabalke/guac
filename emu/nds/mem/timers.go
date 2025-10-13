@@ -21,6 +21,35 @@ type Timer struct {
 	FreqShift   uint32
 }
 
+func (t *Timer) UpdateSingle(overflow bool) (bool, bool) {
+
+    // this only works if you update 1 cycle per run
+
+	increment := uint32(0)
+
+    if !t.Cascade {
+        t.Elapsed++
+
+        if t.Elapsed >= t.Freq {
+            increment = t.Elapsed >> t.FreqShift
+            t.Elapsed -= increment << t.FreqShift
+        }
+    } else if overflow {
+        increment = 1
+    }
+
+	total := t.D + increment
+
+	if notOverflow := !(total > 0xFFFF); notOverflow {
+		t.D = total
+		return false, false
+	}
+
+	t.D = t.SavedInitialValue + (total & 0xFFFF)
+
+	return true, t.OverflowIRQ
+}
+
 func (t *Timer) Update(overflow bool, cycles uint32) (bool, bool)  {
 
 	increment := uint32(0)

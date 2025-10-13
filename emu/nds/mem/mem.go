@@ -2,7 +2,9 @@ package mem
 
 import (
 	_ "embed"
+	"encoding/binary"
 	"fmt"
+	"unsafe"
 
 	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/cpu"
@@ -23,8 +25,6 @@ type Mem struct {
     Tcm Tcm
 	MainRam         [0x40_0000]uint8
 	WRAM            WRAM
-    //Pram            ppu.PRAM
-    //Vram            ppu.VRAM
     Oam             [0x800]uint8
 
 	Arm7Bios [0x4000]uint8
@@ -38,8 +38,6 @@ type Mem struct {
     dma7, dma9 *[4]dma.DMA
 
     arm7Pc *uint32
-
-    //LowVector bool
 
     ppu *ppu.PPU
     Cartridge *cart.Cartridge
@@ -144,9 +142,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
             v, _ := mem.Tcm.Read(addr)
             return v
 		case 0x2:
-
-
-            ramUsageUnimplimented(addr)
+            //ramUsageUnimplimented(addr)
 			return mem.MainRam[addr & 0x3F_FFFF]
 		case 0x3:
             return mem.WRAM.Read(addr, true)
@@ -176,7 +172,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
         return 0xFF
 
     case 0x2:
-        ramUsageUnimplimented(addr)
+        //ramUsageUnimplimented(addr)
         return mem.MainRam[addr&0x3F_FFFF]
     case 0x3:
         return mem.WRAM.Read(addr, false)
@@ -199,9 +195,16 @@ func (mem *Mem) Read8(addr uint32, arm9 bool) uint32 {
 	return uint32(mem.Read(addr, arm9))
 }
 func (mem *Mem) Read16(addr uint32, arm9 bool) uint32 {
+    if ptr, ok := mem.ReadPtr(addr, arm9); ok {
+        return uint32(binary.LittleEndian.Uint16((*[4]uint8)(ptr)[:]))
+    }
 	return uint32(mem.Read(addr, arm9)) | (uint32(mem.Read(addr+1, arm9)) << 8)
 }
 func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
+
+    if ptr, ok := mem.ReadPtr(addr, arm9); ok {
+        return binary.LittleEndian.Uint32((*[4]uint8)(ptr)[:])
+    }
 
     switch addr {
     case 0x410_0000:
@@ -212,6 +215,98 @@ func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
         a := uint32(mem.Read(addr+2, arm9)) | (uint32(mem.Read(addr+3, arm9)) << 8)
         b := uint32(mem.Read(addr, arm9)) | (uint32(mem.Read(addr+1, arm9)) << 8)
         return (a << 16) | b
+    }
+}
+
+func (mem *Mem) WritePtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
+
+    if arm9 {
+
+        if v, ok := mem.Tcm.ReadTcmWindowPtr(addr); ok {
+            return v, ok
+        }
+
+		switch addr >> 24 {
+		case 0x0, 0x1:
+            return mem.Tcm.ReadPtr(addr)
+		case 0x2:
+            return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr & 0x3F_FFFF), true
+		case 0x3:
+            return mem.WRAM.ReadPtr(addr, true)
+		}
+
+        return nil, false
+    }
+
+    switch addr >> 24 {
+    case 0x0:
+
+        if addr < 0x4000 && (*mem.arm7Pc) < 0x4000 {
+            return unsafe.Add(unsafe.Pointer(&mem.Arm7Bios), addr), true
+        }
+
+        return nil, false
+
+    case 0x2:
+        return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr & 0x3F_FFFF), true
+    case 0x3:
+        return mem.WRAM.ReadPtr(addr, false)
+    case 0x6:
+        return mem.ppu.Vram.ReadPtr(addr, false)
+    default:
+        return nil, false
+    }
+}
+
+func (mem *Mem) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
+
+    if arm9 {
+
+		if addr > 0xFF00_0000 {
+            return unsafe.Add(unsafe.Pointer(&mem.Arm9Bios), addr & 0x0FFF), true
+		}
+
+        //if v, ok := mem.Tcm.ReadTcmWindow(addr); ok {
+        if v, ok := mem.Tcm.ReadTcmWindowPtr(addr); ok {
+            return v, ok
+        }
+
+		switch addr >> 24 {
+		case 0x0, 0x1:
+            return mem.Tcm.ReadPtr(addr)
+		case 0x2:
+            return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr & 0x3F_FFFF), true
+		case 0x3:
+            return mem.WRAM.ReadPtr(addr, true)
+		case 0x5:
+            return nil, false
+            //return mem.ppu.Pram.Read(addr, mem.ppu)
+		case 0x6:
+            return mem.ppu.Vram.ReadPtr(addr, true)
+		case 0x7:
+            return unsafe.Add(unsafe.Pointer(&mem.Oam), addr & 0x7FF), true
+		}
+
+        return nil, false
+    }
+
+    switch addr >> 24 {
+    case 0x0:
+
+        if addr < 0x4000 && (*mem.arm7Pc) < 0x4000 {
+            return unsafe.Add(unsafe.Pointer(&mem.Arm7Bios), addr), true
+        }
+
+        return nil, false
+
+    case 0x2:
+        return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr & 0x3F_FFFF), true
+    case 0x3:
+        return mem.WRAM.ReadPtr(addr, false)
+    case 0x6:
+        return mem.ppu.Vram.ReadPtr(addr, false)
+    default:
+        return nil, false
     }
 }
 
@@ -227,7 +322,7 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 		case 0x0, 0x1:
             mem.Tcm.Write(addr, v)
 		case 0x2:
-            clearTempUnimplimented(addr)
+            //clearTempUnimplimented(addr)
 			mem.MainRam[addr&0x3F_FFFF] = v
 		case 0x3:
             mem.WRAM.Write(addr, v, true)
@@ -248,7 +343,7 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 
     switch addr >> 24 {
     case 0x2:
-        clearTempUnimplimented(addr)
+        //clearTempUnimplimented(addr)
         mem.MainRam[addr&0x3F_FFFF] = v
     case 0x3:
         mem.WRAM.Write(addr, v, false)
@@ -265,20 +360,28 @@ func (mem *Mem) Write8(addr uint32, v uint8, arm9 bool) {
 }
 func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
 
+    if ptr, ok := mem.WritePtr(addr, arm9); ok {
+        binary.LittleEndian.PutUint16((*[4]uint8)(ptr)[:], v)
+        return
+    }
+
     if arm9 && addr >= 0x0400_0068 && addr < 0x0400_006C {
         mem.ppu.DisplayFifo.FifoWrite(v)
         return
     }
 
-    switch addr {
-    default:
-        mem.Write(addr, uint8(v), arm9)
-        mem.Write(addr+1, uint8(v>>8), arm9)
-    }
+    mem.Write(addr, uint8(v), arm9)
+    mem.Write(addr+1, uint8(v>>8), arm9)
 }
 func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
 
+    if ptr, ok := mem.WritePtr(addr, arm9); ok {
+        binary.LittleEndian.PutUint32((*[4]uint8)(ptr)[:], v)
+        return
+    }
+
     if arm9 {
+
         if geo := addr >= 0x4000440 && addr < 0x4000600; geo {
             mem.ppu.Rasterizer.GeoCmd(addr, v)
             return
@@ -296,15 +399,20 @@ func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
         }
     }
 
+
     switch addr {
     case 0x400_0188: 
         mem.Ipc.WriteFifo(v, arm9)
     default:
-        mem.Write(addr, uint8(v), arm9)
+        mem.Write(addr+0, uint8(v), arm9)
         mem.Write(addr+1, uint8(v>>8), arm9)
         mem.Write(addr+2, uint8(v>>16), arm9)
         mem.Write(addr+3, uint8(v>>24), arm9)
     }
+}
+
+func (mem *Mem) WriteGXFIFO(v uint32) {
+    mem.ppu.Rasterizer.GeoCmdFifo(v)
 }
 
 func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
@@ -1181,45 +1289,4 @@ func (m *Mem) WriteDma(dmas *[4]dma.DMA, addr uint32, v uint8) {
 	case 0x00DF:
 		dmas[3].WriteControl(v, true)
     }
-}
-
-func printIO(addr uint32, arm9, write bool) {
-
-    //if three := addr >= 0x400_0320 && addr < 0x400_06A5; three && arm9 {
-    //if three := addr >= 0x400_0600 && addr < 0x400_0601; three && arm9 {
-    //    fmt.Printf("IO %08X ARM9 %t WRITE %t\n", addr, arm9, write)
-    //    return
-    //}
-
-    if wifi := addr >= 0x480_0000 && addr < 0x490_0000; wifi && !write {
-        //fmt.Printf("WIFI READ %08X\n", addr)
-    }
-
-
-    if irq := addr >= 0x400_0208 && addr < 0x400_0218; irq {
-        return
-    }
-
-    if cart := addr >= 0x400_0180 && addr < 0x400_01BC; cart {
-        return
-    }
-
-    if spi := addr >= 0x400_01A0 && addr < 0x400_01C4; spi && !arm9 {
-        return
-    }
-
-    if three := addr >= 0x400_0320 && addr < 0x400_06A5; three && arm9 {
-        return
-    }
-
-    if sound := addr >= 0x400_0400 && addr < 0x400051C; sound && !arm9 {
-        return
-    }
-
-    if math := addr >= 0x400_0280 && addr < 0x40002C0; math && arm9 {
-        return
-    }
-
-    //fmt.Printf("IO %08X ARM9 %t WRITE %t\n", addr, arm9, write)
-
 }

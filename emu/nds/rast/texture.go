@@ -35,6 +35,7 @@ func (tex *Texture) WriteCoord(v uint32) {
 }
 
 func (tex *Texture) WriteParam(v uint32) {
+
     tex.VramOffset = (v & 0xFFFF) * 8
     tex.RepeatS = utils.BitEnabled(v, 16)
     tex.RepeatT = utils.BitEnabled(v, 17)

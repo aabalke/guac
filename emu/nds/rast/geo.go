@@ -12,6 +12,7 @@ type GeoEngine struct {
     Irq *cpu.Irq
     Buffers *Buffers
     Data []uint32
+    VRAM VRAM
 
     GxStat GXSTAT
 
@@ -40,13 +41,15 @@ type GeoEngine struct {
     TextureCache TextureCache
 }
 
-func NewGeoEngine(buffers *Buffers, irq *cpu.Irq) *GeoEngine {
+func NewGeoEngine(buffers *Buffers, irq *cpu.Irq, vram VRAM) *GeoEngine {
     return &GeoEngine{
+        VRAM: vram,
         Irq: irq,
         Buffers: buffers,
         MtxStacks: NewMtxStacks(),
         //Color: gl.Transparent,
         TextureCache: make(map[uint32]*[]gl.Color, 0),
+        Vertex: &gl.Vertex{},
     }
 }
 
@@ -269,7 +272,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             s1.CurrMtx = m.Mul(s1.CurrMtx)
         }
 
-
     case 0x1A:
 
         m := gl.Matrix{
@@ -399,7 +401,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
         if len(g.ActivePoly.Vertices) != 0 {
 
-            fmt.Printf("BAD ACTIVE POLYGON HAS VERTICIES WHEN SETTING NEW BEGIN. WAS END_VTXS NOT CALLED? VERTS LEN %d\n", len(g.ActivePoly.Vertices))
+            //fmt.Printf("BAD ACTIVE POLYGON HAS VERTICIES WHEN SETTING NEW BEGIN. WAS END_VTXS NOT CALLED? VERTS LEN %d\n", len(g.ActivePoly.Vertices))
 
             g.AddPolygon()
         }
@@ -454,10 +456,51 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 }
 
 func (g *GeoEngine) UpdateClipMtx() {
-    pos := g.MtxStacks.Stacks[1].CurrMtx
-    per := g.MtxStacks.Stacks[0].CurrMtx
+    pos := &g.MtxStacks.Stacks[1].CurrMtx
+    per := &g.MtxStacks.Stacks[0].CurrMtx
 
-    g.ClipMatrix = pos.Mul(per)
+    g.ClipMatrix = pos.Mul(*per)
+}
+
+var paramCnt = map[uint32]int{
+    0x00: 1,
+    0x10: 1,
+    0x11: 1,
+    0x12: 1,
+    0x13: 1,
+    0x14: 1,
+    0x15: 1,
+    0x16: 16,
+    0x17: 12,
+    0x18: 16,
+    0x19: 12,
+    0x1A: 9,
+    0x1B: 3,
+    0x1C: 3,
+    0x20: 1,
+    0x21: 1,
+    0x22: 1,
+    0x23: 2,
+    0x24: 1,
+    0x25: 1,
+    0x26: 1,
+    0x27: 1,
+    0x28: 1,
+    0x29: 1,
+    0x2A: 1,
+    0x2B: 1,
+    0x30: 1,
+    0x31: 1,
+    0x32: 1,
+    0x33: 1,
+    0x34: 32,
+    0x40: 1,
+    0x41: 1,
+    0x50: 1,
+    0x60: 1,
+    0x70: 3,
+    0x71: 2,
+    0x72: 1,
 }
 
 func (g *GeoEngine) ValidParamCount(fifo bool) bool {
@@ -467,82 +510,38 @@ func (g *GeoEngine) ValidParamCount(fifo bool) bool {
 
     // when using fifo, sometimes no param provided, but when using io
     // dummy param is provided.
-
-    switch cmd {
-    case 0x00: return params == 1 || (fifo && params == 0) 
-    case 0x10: return params == 1 
-    case 0x11: return params == 1 || (fifo && params == 0)
-    case 0x12: return params == 1 
-    case 0x13: return params == 1 
-    case 0x14: return params == 1 
-    case 0x15: return params == 1 || (fifo && params == 0)
-    case 0x16: return params == 16
-    case 0x17: return params == 12
-    case 0x18: return params == 16
-    case 0x19: return params == 12
-    case 0x1A: return params == 9 
-    case 0x1B: return params == 3 
-    case 0x1C: return params == 3 
-    case 0x20: return params == 1 
-    case 0x21: return params == 1 
-    case 0x22: return params == 1 
-    case 0x23: return params == 2 
-    case 0x24: return params == 1 
-    case 0x25: return params == 1 
-    case 0x26: return params == 1 
-    case 0x27: return params == 1 
-    case 0x28: return params == 1 
-    case 0x29: return params == 1 
-    case 0x2A: return params == 1 
-    case 0x2B: return params == 1 
-    case 0x30: return params == 1 
-    case 0x31: return params == 1 
-    case 0x32: return params == 1 
-    case 0x33: return params == 1 
-    case 0x34: return params == 32
-    case 0x40: return params == 1 
-    case 0x41: return params == 1 || (fifo && params == 0)
-    case 0x50: return params == 1 
-    case 0x60: return params == 1 
-    case 0x70: return params == 3 
-    case 0x71: return params == 2 
-    case 0x72: return params == 1 
+    if fifo && params == 0 {
+        if cmd == 0x00 || cmd == 0x11 || cmd == 0x15 || cmd == 0x41 {
+            return true
+        }
     }
 
-    panic(fmt.Sprintf("UNKNOWN CMD GXFIFO % 2X", g.Data))
+    cnt, ok := paramCnt[cmd]
+    if !ok {
+        panic(fmt.Sprintf("UNKNOWN CMD GXFIFO % 2X", g.Data))
+    }
+
+    return cnt == params
 }
 
 func (g *GeoEngine) AddPolygon() {
 
+
     //if shadow := g.ActivePoly.Mode == 3; shadow {
-    //    g.ActivePoly.Vertices = []gl.Vertex{}
-    //    return
+    //    //g.ActivePoly.Vertices = []gl.Vertex{}
+    //    //return
     //}
 
-    g.ActivePoly.Texture = g.Texture
+    //g.ActivePoly.Texture = g.Texture
     g.Buffers.Append(g.ActivePoly)
     g.ActivePoly.Vertices = []gl.Vertex{}
 
 }
 
 func Write15BitColor(v uint32) gl.Color {
-
     return gl.MakeColorFrom15Bit(
 	uint8((v) & 0b11111),
 	uint8((v >> 5) & 0b11111),
 	uint8((v >> 10) & 0b11111),
     )
-
-	//r = (r << 3) | (r >> 2)
-	//g = (g << 3) | (g >> 2)
-	//b = (b << 3) | (b >> 2)
-
-    //c := color.RGBA{
-    //    R: r,
-    //    G: g,
-    //    B: b,
-    //    A: 0xFF,
-    //}
-
-    //return gl.MakeColor(c)
 }

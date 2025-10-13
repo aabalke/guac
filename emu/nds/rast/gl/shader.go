@@ -53,9 +53,9 @@ const (
 func (shader *NdsShader) Fragment(v Vertex) Color {
 
     vertexColor := v.Color
-    //vertexColor.A = 0xFF
 
     if shader.Texture != nil {
+
         vertexColor = shader.Texture.Sample(v.Texture.X, v.Texture.Y)
 
         //bilinear sample needs texture coords
@@ -68,9 +68,9 @@ func (shader *NdsShader) Fragment(v Vertex) Color {
 
     for i := range 4 {
 
-        //if !shader.LightEnabled[i] {
-        //    continue
-        //}
+        if !shader.LightEnabled[i] {
+            continue
+        }
 
         lightDirection := shader.Lights[i].Direction
         lightColor := shader.Lights[i].Color

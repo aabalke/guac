@@ -237,25 +237,13 @@ func (cpu *Cpu) toggleThumb() {
 
 func (cpu *Cpu) CheckIrq() {
 
-	interruptEnabled := !cpu.Reg.CPSR.GetFlag(FLAG_I)
-	interrupts := cpu.Irq.IE&cpu.Irq.IF != 0
+	if interrupts := cpu.Irq.IE&cpu.Irq.IF != 0; !interrupts {
+        return
+    }
 
+    cpu.Halted = false
 
-	if interrupts {
-		cpu.Halted = false
-	}
-
-	if interruptEnabled && interrupts && cpu.Irq.IME {
-
-        //if cpu.Irq.IF & (1 << 19) != 0 {
-        //    fmt.Printf("Gamecard Irq set IF\n")
-        //}
-
-        //if cpu.Irq.IE & cpu.Irq.IF & (1 << 19) != 0 {
-        //    fmt.Printf("Handling Gamecard Irq\n")
-        //    panic("GOOD")
-        //}
-
+	if !cpu.Reg.CPSR.GetFlag(FLAG_I) && cpu.Irq.IME {
 		cpu.exception(VEC_IRQ, MODE_IRQ)
 	}
 }

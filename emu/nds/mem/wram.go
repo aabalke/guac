@@ -1,5 +1,7 @@
 package mem
 
+import "unsafe"
+
 type WRAM struct {
 	Wram [0x8000]uint8
 	CNT  uint8
@@ -18,7 +20,6 @@ func (w *WRAM) ReadCNT() uint8 {
 func (w *WRAM) Write(addr uint32, v uint8, arm9 bool) {
 
 	if arm9 {
-
 
 		switch w.CNT {
 		case 0:
@@ -83,4 +84,39 @@ func (w *WRAM) Read(addr uint32, arm9 bool) uint8 {
 	}
 
 	return 0
+}
+
+func (w *WRAM) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
+
+	if arm9 {
+		switch w.CNT {
+		case 0:
+            return unsafe.Add(unsafe.Pointer(&w.Wram), addr % 0x8000), true
+		case 1:
+            return unsafe.Add(unsafe.Pointer(&w.Wram), 0x4000 + addr % 0x4000), true
+		case 2:
+            return unsafe.Add(unsafe.Pointer(&w.Wram), addr % 0x4000), true
+		case 3:
+            return nil, false
+		}
+
+        return nil, false
+	}
+
+	if addr >= 0x380_0000 {
+        return unsafe.Add(unsafe.Pointer(&w.WRAM7), addr & 0xFFFF), true
+	}
+
+	switch w.CNT {
+	case 0:
+        return unsafe.Add(unsafe.Pointer(&w.WRAM7), addr & 0xFFFF), true
+	case 1:
+        return unsafe.Add(unsafe.Pointer(&w.Wram), addr % 0x4000), true
+	case 2:
+        return unsafe.Add(unsafe.Pointer(&w.Wram), 0x4000 + addr % 0x4000), true
+	case 3:
+        return unsafe.Add(unsafe.Pointer(&w.Wram), addr % 0x8000), true
+	}
+
+	return nil, false
 }
