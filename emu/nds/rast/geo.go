@@ -12,7 +12,6 @@ type GeoEngine struct {
     Irq *cpu.Irq
     Buffers *Buffers
     Data []uint32
-    VRAM VRAM
 
     GxStat GXSTAT
 
@@ -41,15 +40,13 @@ type GeoEngine struct {
     TextureCache TextureCache
 }
 
-func NewGeoEngine(buffers *Buffers, irq *cpu.Irq, vram VRAM) *GeoEngine {
+func NewGeoEngine(buffers *Buffers, irq *cpu.Irq) *GeoEngine {
     return &GeoEngine{
-        VRAM: vram,
         Irq: irq,
         Buffers: buffers,
         MtxStacks: NewMtxStacks(),
         //Color: gl.Transparent,
         TextureCache: make(map[uint32]*[]gl.Color, 0),
-        Vertex: &gl.Vertex{},
     }
 }
 
@@ -272,6 +269,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             s1.CurrMtx = m.Mul(s1.CurrMtx)
         }
 
+
     case 0x1A:
 
         m := gl.Matrix{
@@ -382,15 +380,12 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         x := utils.Convert10ToFloat(uint16(data[1]), 9)
         y := utils.Convert10ToFloat(uint16(data[1] >> 10), 9)
         z := utils.Convert10ToFloat(uint16(data[1] >> 20), 9)
-        // not sure if need to use VectorW
         v := gl.Vector{X: x, Y: y, Z: z}
         idx := data[1] >> 30
 
         directionalMtx := g.MtxStacks.Stacks[2].CurrMtx
         g.Lights[idx].Direction = directionalMtx.MulPosition(v)
         g.Lights[idx].Direction = g.Lights[idx].Direction.Normalize()
-
-        //fmt.Printf("UPDATING % .2f\n", g.Lights[idx].Direction)
 
     case 0x33:
 
@@ -399,10 +394,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
     case 0x40:
 
-        if len(g.ActivePoly.Vertices) != 0 {
-
-            //fmt.Printf("BAD ACTIVE POLYGON HAS VERTICIES WHEN SETTING NEW BEGIN. WAS END_VTXS NOT CALLED? VERTS LEN %d\n", len(g.ActivePoly.Vertices))
-
+        if endPoly := len(g.ActivePoly.Vertices) != 0; endPoly {
             g.AddPolygon()
         }
 
@@ -440,29 +432,21 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         g.PosTestData = g.PosTest(data, &g.ClipMatrix)
 
     case 0x0:
-        //fmt.Printf("UNSETUP GX CMD %02X\n", cmd)
-
     default:
-        //panic(fmt.Sprintf("UNSETUP GX CMD %02X\n", cmd))
         fmt.Printf("UNSETUP GX CMD %02X\n", cmd)
-
     }
 
     g.Data = []uint32{}
-
     g.UpdateClipMtx()
-
-    //fmt.Printf("STATUS %v\n", g.MtxStacks.ClipMatrix)
 }
 
 func (g *GeoEngine) UpdateClipMtx() {
     pos := &g.MtxStacks.Stacks[1].CurrMtx
     per := &g.MtxStacks.Stacks[0].CurrMtx
-
     g.ClipMatrix = pos.Mul(*per)
 }
 
-var paramCnt = map[uint32]int{
+var paramCnt = map[uint32]int {
     0x00: 1,
     0x10: 1,
     0x11: 1,
@@ -501,7 +485,7 @@ var paramCnt = map[uint32]int{
     0x70: 3,
     0x71: 2,
     0x72: 1,
-}
+    }
 
 func (g *GeoEngine) ValidParamCount(fifo bool) bool {
 
@@ -511,28 +495,25 @@ func (g *GeoEngine) ValidParamCount(fifo bool) bool {
     // when using fifo, sometimes no param provided, but when using io
     // dummy param is provided.
     if fifo && params == 0 {
-        if cmd == 0x00 || cmd == 0x11 || cmd == 0x15 || cmd == 0x41 {
-            return true
-        }
+        if (
+            cmd == 0x00 ||
+            cmd == 0x11 ||
+            cmd == 0x15 ||
+            cmd == 0x41) {
+                return true
+            }
     }
 
-    cnt, ok := paramCnt[cmd]
+    v, ok := paramCnt[cmd]
     if !ok {
         panic(fmt.Sprintf("UNKNOWN CMD GXFIFO % 2X", g.Data))
     }
 
-    return cnt == params
+    return v == params
 }
 
 func (g *GeoEngine) AddPolygon() {
-
-
-    //if shadow := g.ActivePoly.Mode == 3; shadow {
-    //    //g.ActivePoly.Vertices = []gl.Vertex{}
-    //    //return
-    //}
-
-    //g.ActivePoly.Texture = g.Texture
+    g.ActivePoly.Texture = g.Texture
     g.Buffers.Append(g.ActivePoly)
     g.ActivePoly.Vertices = []gl.Vertex{}
 

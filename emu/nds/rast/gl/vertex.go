@@ -16,7 +16,6 @@ type Vertex struct {
     DiffuseColor Color
     EmissionColor Color
 
-    NdsTexture *NdsTexture
 }
 
 func (a Vertex) Outside() bool {

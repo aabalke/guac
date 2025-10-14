@@ -37,7 +37,7 @@ func NewRasterizer(vram VRAM, irq *cpu.Irq) *Rasterizer {
 
     r.VRAM = vram
 
-    r.GeoEngine = NewGeoEngine(&r.Buffers, irq, vram)
+    r.GeoEngine = NewGeoEngine(&r.Buffers, irq)
 
     r.Render = NewRender(r, &r.Buffers, &r.RearPlane)
 

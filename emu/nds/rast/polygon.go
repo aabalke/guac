@@ -1,6 +1,10 @@
 package rast
 
 import (
+	//"image"
+	//"image/color"
+
+
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
@@ -27,6 +31,8 @@ type Polygon struct {
 
 	PrimitiveType uint8
 	Vertices      []gl.Vertex
+
+    Texture Texture
 }
 
 func (p *Polygon) WriteAttrs(v uint32) {
@@ -49,10 +55,6 @@ func (p *Polygon) WriteAttrs(v uint32) {
     if p.Alpha == 0 {
         p.Alpha = 1
     }
-
-    //if p.Mode == 3 {
-    //    log.Printf("SHADOW %08X\n", v)
-    //}
 
     //fmt.Printf("LIGHTS % v\n", p.LightsEnabled)
 }
@@ -135,14 +137,13 @@ func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Ver
     }
 
     v := p.GetVertex(x, y, z, &g.ClipMatrix, c, S, T, &g.StoredNormal)
-    v.NdsTexture = p.GetTexture(g.VRAM, &g.TextureCache, &g.Texture)
     p.Vertices = append(p.Vertices, v)
     return &v
 }
 
 func (p *Polygon) GetVertex(x, y, z float64, clipMtx *gl.Matrix, color gl.Color, S, T float64, normal *gl.Vector) gl.Vertex {
 
-    vert := gl.VectorW{X: x, Y: y, Z: z, W: 1}
+    vert := gl.VectorW{X: x,Y: y,Z: z,W: 1.0}
     output := clipMtx.MulVectorW(vert)
 
     v := gl.Vertex{
@@ -158,7 +159,9 @@ func (p *Polygon) GetVertex(x, y, z float64, clipMtx *gl.Matrix, color gl.Color,
     return v
 }
 
-func (p *Polygon) GetTexture(vram VRAM, cache *TextureCache, t *Texture) *gl.NdsTexture {
+func (p *Polygon) GetTexture(vram VRAM, cache *TextureCache) gl.Texture {
+
+    t := p.Texture
 
     if t.Format == TEX_FMT_NONE {
         return nil
@@ -171,6 +174,6 @@ func (p *Polygon) GetTexture(vram VRAM, cache *TextureCache, t *Texture) *gl.Nds
         RepeatT: t.RepeatT,
         FlipS: t.FlipS,
         FlipT: t.FlipT,
-        CachedTexture: cache.Get(vram, t),
+        CachedTexture: cache.Get(vram, &p.Texture),
     }
 }
