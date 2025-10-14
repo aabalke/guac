@@ -34,6 +34,7 @@ type GeoEngine struct {
 
     ClipMatrix gl.Matrix
     PosTestData [4]uint32
+    VecTestData [3]uint16
 
     Lights [4]gl.Light
 
@@ -432,6 +433,10 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
     case 0x71:
 
         g.PosTestData = g.PosTest(data, &g.ClipMatrix)
+
+    case 0x72:
+
+        g.VecTestData = g.VecTest(data, &g.MtxStacks.Stacks[2].CurrMtx)
 
     case 0x0:
     default:

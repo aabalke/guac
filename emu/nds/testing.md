@@ -213,8 +213,11 @@ BLX ARM needs to occur before Cond
 
 # Games (Decrypted)
 
-Sonic Chronicles The Dark Brotherhood
+### Cpu Crashes
 Mario And Luigi Bowsers Inside Story
+Mario Kart Ds
+
+Sonic Chronicles The Dark Brotherhood
 Clubhouse Games
 Pokemon Heartgold
 Housemd
@@ -236,6 +239,5 @@ Yoshis Island
 Pokemon Blue Rescue Team
 Animal Crossing Wild World
 Cooking Mama
-Mario Kart Ds
 Super Mario 64
 New Super Mario Bros

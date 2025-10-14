@@ -43,9 +43,24 @@ func (g *GeoEngine) PosTest(data []uint32, clipMtx *gl.Matrix) [4]uint32 {
     vw := clipMtx.MulVectorW(gl.VectorW{X: x, Y: y, Z: z, W: 1.0})
 
     return [4]uint32{
-        utils.ConvertS19_12FloatToUint32(vw.X),
-        utils.ConvertS19_12FloatToUint32(vw.Y),
-        utils.ConvertS19_12FloatToUint32(vw.Z),
-        utils.ConvertS19_12FloatToUint32(vw.W),
+        utils.ConvertFromFloat(vw.X, 12),
+        utils.ConvertFromFloat(vw.Y, 12),
+        utils.ConvertFromFloat(vw.Z, 12),
+        utils.ConvertFromFloat(vw.W, 12),
+    }
+}
+
+func (g *GeoEngine) VecTest(data []uint32, dirMtx *gl.Matrix) [3]uint16 {
+
+	x := utils.Convert10ToFloat(uint16(data[1]), 9)
+	y := utils.Convert10ToFloat(uint16(data[1]>>10), 9)
+	z := utils.Convert10ToFloat(uint16(data[1]>>20), 9)
+
+    vw := dirMtx.MulVectorW(gl.VectorW{X: x, Y: y, Z: z, W: 1.0})
+
+    return [3]uint16{
+        utils.ConvertFromFloat4_0_12(vw.X),
+        utils.ConvertFromFloat4_0_12(vw.Y),
+        utils.ConvertFromFloat4_0_12(vw.Z),
     }
 }

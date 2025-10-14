@@ -1,5 +1,7 @@
 package utils
 
+import "math"
+
 func Convert20_8Float(v int32) float64 {
 
 	// sign extend
@@ -15,12 +17,18 @@ func Convert8_8Float(v int16) float64 {
 	return float64(v>>8) + (float64(v&0xFF) / 256.0)
 }
 
+func ConvertFromFloat(f float64, bitFractional uint8) uint32 {
+	scaled := f * float64(uint64(1)<<bitFractional)
+	val := int32(math.Round(scaled))
+	return uint32(val)
+}
+
 func ConvertToFloat(v uint32, bitFractional uint8) float64 {
-    return float64(int32(v)) / float64(int(1) << bitFractional)
+	return float64(int32(v)) / float64(int(1)<<bitFractional)
 }
 
 func Convert16ToFloat(v uint16, bitFractional uint8) float64 {
-    return float64(int16(v)) / float64(int(1) << bitFractional)
+	return float64(int16(v)) / float64(int(1)<<bitFractional)
 }
 
 func Convert10ToFloat(v uint16, bitFractional uint8) float64 {
@@ -29,16 +37,22 @@ func Convert10ToFloat(v uint16, bitFractional uint8) float64 {
 	return float64(s) / float64(int(1)<<bitFractional)
 }
 
-func ConvertS19_12FloatToUint32(v float64) uint32 {
-    // scale by 2^12
-    scaled := int64(v * 4096.0)
+func ConvertFromFloat4_0_12(f float64) uint16 {
+    const bitFractional = 12
+    const totalBits = 16
+    const signBits = 4
 
-    // valid range: -2^31 .. 2^31-1 (since it's stored in 32 bits signed)
-    if scaled > 0x7FFFFFFF {
-        scaled = 0x7FFFFFFF
-    } else if scaled < -0x80000000 {
-        scaled = -0x80000000
+    scaled := f * float64(1<<bitFractional)
+    val := int16(math.Round(scaled))
+
+    maxAllowed := int16((1 << (signBits - 1)) - 1) << bitFractional // 7 << 12
+    minAllowed := -int16(1 << (signBits - 1)) << bitFractional      // -8 << 12
+
+    if val > maxAllowed {
+        val = maxAllowed
+    } else if val < minAllowed {
+        val = minAllowed
     }
 
-    return uint32(int32(scaled))
+    return uint16(val)
 }

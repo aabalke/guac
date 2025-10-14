@@ -1,15 +1,24 @@
 package rast
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/aabalke/guac/emu/nds/utils"
+)
 
 func (r *Rasterizer) Read(addr uint32) uint8 {
 
-    if addr >= 0x630 && addr < 0x636 {
-        panic("READ VEC RESULT")
-    }
-
-    if addr >= 0x640 && addr < 0x6B0 {
-        panic("READ CLIP MTX OR DIR MTX")
+    switch {
+    case addr < 0x620:
+        // fall
+    case addr < 0x630:
+        return r.ReadPosTest(addr)
+    case addr < 0x640:
+        return r.ReadVecTest(addr)
+    case addr < 0x680:
+        return r.ReadClipMtx(addr)
+    case addr < 0x6A4:
+        return r.ReadVecMtx(addr)
     }
 
     //if addr & 0b11 == 0 { fmt.Printf("R ADDR %08X\n", addr) }
@@ -75,25 +84,8 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
         for _, v := range *polys {
             vertCnt += len(v.Vertices)
         }
-
         return uint8(min(6144, vertCnt) >> 8)
 
-    case 0x620: return uint8(r.GeoEngine.PosTestData[0] >> 0)
-    case 0x621: return uint8(r.GeoEngine.PosTestData[0] >> 8)
-    case 0x622: return uint8(r.GeoEngine.PosTestData[0] >> 16)
-    case 0x623: return uint8(r.GeoEngine.PosTestData[0] >> 24)
-    case 0x624: return uint8(r.GeoEngine.PosTestData[1] >> 0)
-    case 0x625: return uint8(r.GeoEngine.PosTestData[1] >> 8)
-    case 0x626: return uint8(r.GeoEngine.PosTestData[1] >> 16)
-    case 0x627: return uint8(r.GeoEngine.PosTestData[1] >> 24)
-    case 0x628: return uint8(r.GeoEngine.PosTestData[2] >> 0)
-    case 0x629: return uint8(r.GeoEngine.PosTestData[2] >> 8)
-    case 0x62A: return uint8(r.GeoEngine.PosTestData[2] >> 16)
-    case 0x62B: return uint8(r.GeoEngine.PosTestData[2] >> 24)
-    case 0x62C: return uint8(r.GeoEngine.PosTestData[3] >> 0)
-    case 0x62D: return uint8(r.GeoEngine.PosTestData[3] >> 8)
-    case 0x62E: return uint8(r.GeoEngine.PosTestData[3] >> 16)
-    case 0x62F: return uint8(r.GeoEngine.PosTestData[3] >> 24)
 
 	}
 
@@ -102,6 +94,172 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
     return 0
 
     panic(fmt.Sprintf("READ UNSETUP 3D IO %08X\n", addr))
+}
+
+func (r *Rasterizer) ReadPosTest(addr uint32) uint8 {
+
+    d := &r.GeoEngine.PosTestData
+
+    switch addr {
+    case 0x620: return uint8(d[0] >> 0)
+    case 0x621: return uint8(d[0] >> 8)
+    case 0x622: return uint8(d[0] >> 16)
+    case 0x623: return uint8(d[0] >> 24)
+    case 0x624: return uint8(d[1] >> 0)
+    case 0x625: return uint8(d[1] >> 8)
+    case 0x626: return uint8(d[1] >> 16)
+    case 0x627: return uint8(d[1] >> 24)
+    case 0x628: return uint8(d[2] >> 0)
+    case 0x629: return uint8(d[2] >> 8)
+    case 0x62A: return uint8(d[2] >> 16)
+    case 0x62B: return uint8(d[2] >> 24)
+    case 0x62C: return uint8(d[3] >> 0)
+    case 0x62D: return uint8(d[3] >> 8)
+    case 0x62E: return uint8(d[3] >> 16)
+    case 0x62F: return uint8(d[3] >> 24)
+    }
+
+    return 0
+}
+
+func (r *Rasterizer) ReadVecTest(addr uint32) uint8 {
+
+    d := &r.GeoEngine.VecTestData
+
+    switch addr {
+    case 0x630: return uint8(d[0] >> 0)
+    case 0x631: return uint8(d[0] >> 8)
+    case 0x632: return uint8(d[1] >> 0)
+    case 0x633: return uint8(d[1] >> 8)
+    case 0x634: return uint8(d[2] >> 0)
+    case 0x635: return uint8(d[2] >> 8)
+    }
+
+    return 0
+}
+
+func (r *Rasterizer) ReadClipMtx(addr uint32) uint8 {
+
+    mtx := &r.GeoEngine.ClipMatrix
+
+    switch addr {
+    case 0x640: return uint8(utils.ConvertFromFloat(mtx.X00, 12) >> 0)
+    case 0x641: return uint8(utils.ConvertFromFloat(mtx.X00, 12) >> 8) 
+    case 0x642: return uint8(utils.ConvertFromFloat(mtx.X00, 12) >> 16)
+    case 0x643: return uint8(utils.ConvertFromFloat(mtx.X00, 12) >> 24)
+    case 0x644: return uint8(utils.ConvertFromFloat(mtx.X01, 12) >> 0)
+    case 0x645: return uint8(utils.ConvertFromFloat(mtx.X01, 12) >> 8) 
+    case 0x646: return uint8(utils.ConvertFromFloat(mtx.X01, 12) >> 16)
+    case 0x647: return uint8(utils.ConvertFromFloat(mtx.X01, 12) >> 24)
+    case 0x648: return uint8(utils.ConvertFromFloat(mtx.X02, 12) >> 0)
+    case 0x649: return uint8(utils.ConvertFromFloat(mtx.X02, 12) >> 8) 
+    case 0x64A: return uint8(utils.ConvertFromFloat(mtx.X02, 12) >> 16)
+    case 0x64B: return uint8(utils.ConvertFromFloat(mtx.X02, 12) >> 24)
+    case 0x64C: return uint8(utils.ConvertFromFloat(mtx.X03, 12) >> 0)
+    case 0x64D: return uint8(utils.ConvertFromFloat(mtx.X03, 12) >> 8) 
+    case 0x64E: return uint8(utils.ConvertFromFloat(mtx.X03, 12) >> 16)
+    case 0x64F: return uint8(utils.ConvertFromFloat(mtx.X03, 12) >> 24)
+
+    case 0x650: return uint8(utils.ConvertFromFloat(mtx.X10, 12) >> 0)
+    case 0x651: return uint8(utils.ConvertFromFloat(mtx.X10, 12) >> 8) 
+    case 0x652: return uint8(utils.ConvertFromFloat(mtx.X10, 12) >> 16)
+    case 0x653: return uint8(utils.ConvertFromFloat(mtx.X10, 12) >> 24)
+    case 0x654: return uint8(utils.ConvertFromFloat(mtx.X11, 12) >> 0)
+    case 0x655: return uint8(utils.ConvertFromFloat(mtx.X11, 12) >> 8) 
+    case 0x656: return uint8(utils.ConvertFromFloat(mtx.X11, 12) >> 16)
+    case 0x657: return uint8(utils.ConvertFromFloat(mtx.X11, 12) >> 24)
+    case 0x658: return uint8(utils.ConvertFromFloat(mtx.X12, 12) >> 0)
+    case 0x659: return uint8(utils.ConvertFromFloat(mtx.X12, 12) >> 8) 
+    case 0x65A: return uint8(utils.ConvertFromFloat(mtx.X12, 12) >> 16)
+    case 0x65B: return uint8(utils.ConvertFromFloat(mtx.X12, 12) >> 24)
+    case 0x65C: return uint8(utils.ConvertFromFloat(mtx.X13, 12) >> 0)
+    case 0x65D: return uint8(utils.ConvertFromFloat(mtx.X13, 12) >> 8) 
+    case 0x65E: return uint8(utils.ConvertFromFloat(mtx.X13, 12) >> 16)
+    case 0x65F: return uint8(utils.ConvertFromFloat(mtx.X13, 12) >> 24)
+
+    case 0x660: return uint8(utils.ConvertFromFloat(mtx.X20, 12) >> 0)
+    case 0x661: return uint8(utils.ConvertFromFloat(mtx.X20, 12) >> 8) 
+    case 0x662: return uint8(utils.ConvertFromFloat(mtx.X20, 12) >> 16)
+    case 0x663: return uint8(utils.ConvertFromFloat(mtx.X20, 12) >> 24)
+    case 0x664: return uint8(utils.ConvertFromFloat(mtx.X21, 12) >> 0)
+    case 0x665: return uint8(utils.ConvertFromFloat(mtx.X21, 12) >> 8) 
+    case 0x666: return uint8(utils.ConvertFromFloat(mtx.X21, 12) >> 16)
+    case 0x667: return uint8(utils.ConvertFromFloat(mtx.X21, 12) >> 24)
+    case 0x668: return uint8(utils.ConvertFromFloat(mtx.X22, 12) >> 0)
+    case 0x669: return uint8(utils.ConvertFromFloat(mtx.X22, 12) >> 8) 
+    case 0x66A: return uint8(utils.ConvertFromFloat(mtx.X22, 12) >> 16)
+    case 0x66B: return uint8(utils.ConvertFromFloat(mtx.X22, 12) >> 24)
+    case 0x66C: return uint8(utils.ConvertFromFloat(mtx.X23, 12) >> 0)
+    case 0x66D: return uint8(utils.ConvertFromFloat(mtx.X23, 12) >> 8) 
+    case 0x66E: return uint8(utils.ConvertFromFloat(mtx.X23, 12) >> 16)
+    case 0x66F: return uint8(utils.ConvertFromFloat(mtx.X23, 12) >> 24)
+
+    case 0x670: return uint8(utils.ConvertFromFloat(mtx.X30, 12) >> 0)
+    case 0x671: return uint8(utils.ConvertFromFloat(mtx.X30, 12) >> 8) 
+    case 0x672: return uint8(utils.ConvertFromFloat(mtx.X30, 12) >> 16)
+    case 0x673: return uint8(utils.ConvertFromFloat(mtx.X30, 12) >> 24)
+    case 0x674: return uint8(utils.ConvertFromFloat(mtx.X31, 12) >> 0)
+    case 0x675: return uint8(utils.ConvertFromFloat(mtx.X31, 12) >> 8) 
+    case 0x676: return uint8(utils.ConvertFromFloat(mtx.X31, 12) >> 16)
+    case 0x677: return uint8(utils.ConvertFromFloat(mtx.X31, 12) >> 24)
+    case 0x678: return uint8(utils.ConvertFromFloat(mtx.X32, 12) >> 0)
+    case 0x679: return uint8(utils.ConvertFromFloat(mtx.X32, 12) >> 8) 
+    case 0x67A: return uint8(utils.ConvertFromFloat(mtx.X32, 12) >> 16)
+    case 0x67B: return uint8(utils.ConvertFromFloat(mtx.X32, 12) >> 24)
+    case 0x67C: return uint8(utils.ConvertFromFloat(mtx.X33, 12) >> 0)
+    case 0x67D: return uint8(utils.ConvertFromFloat(mtx.X33, 12) >> 8) 
+    case 0x67E: return uint8(utils.ConvertFromFloat(mtx.X33, 12) >> 16)
+    case 0x67F: return uint8(utils.ConvertFromFloat(mtx.X33, 12) >> 24)
+    }
+    panic(fmt.Sprintf("CLIP MTX READ FROM NON CLIP MTX ADDR %08X", addr))
+}
+
+func (r *Rasterizer) ReadVecMtx(addr uint32) uint8 {
+
+    mtx := &r.GeoEngine.MtxStacks.Stacks[2].CurrMtx
+
+    switch addr {
+    case 0x680: return uint8(utils.ConvertFromFloat(mtx.X00, 12) >> 0)
+    case 0x681: return uint8(utils.ConvertFromFloat(mtx.X00, 12) >> 8) 
+    case 0x682: return uint8(utils.ConvertFromFloat(mtx.X00, 12) >> 16)
+    case 0x683: return uint8(utils.ConvertFromFloat(mtx.X00, 12) >> 24)
+    case 0x684: return uint8(utils.ConvertFromFloat(mtx.X01, 12) >> 0)
+    case 0x685: return uint8(utils.ConvertFromFloat(mtx.X01, 12) >> 8) 
+    case 0x686: return uint8(utils.ConvertFromFloat(mtx.X01, 12) >> 16)
+    case 0x687: return uint8(utils.ConvertFromFloat(mtx.X01, 12) >> 24)
+    case 0x688: return uint8(utils.ConvertFromFloat(mtx.X02, 12) >> 0)
+    case 0x689: return uint8(utils.ConvertFromFloat(mtx.X02, 12) >> 8) 
+    case 0x68A: return uint8(utils.ConvertFromFloat(mtx.X02, 12) >> 16)
+    case 0x68B: return uint8(utils.ConvertFromFloat(mtx.X02, 12) >> 24)
+    case 0x68C: return uint8(utils.ConvertFromFloat(mtx.X10, 12) >> 0)
+    case 0x68D: return uint8(utils.ConvertFromFloat(mtx.X10, 12) >> 8) 
+    case 0x68E: return uint8(utils.ConvertFromFloat(mtx.X10, 12) >> 16)
+    case 0x68F: return uint8(utils.ConvertFromFloat(mtx.X10, 12) >> 24)
+
+    case 0x690: return uint8(utils.ConvertFromFloat(mtx.X11, 12) >> 0)
+    case 0x691: return uint8(utils.ConvertFromFloat(mtx.X11, 12) >> 8) 
+    case 0x692: return uint8(utils.ConvertFromFloat(mtx.X11, 12) >> 16)
+    case 0x693: return uint8(utils.ConvertFromFloat(mtx.X11, 12) >> 24)
+    case 0x694: return uint8(utils.ConvertFromFloat(mtx.X12, 12) >> 0)
+    case 0x695: return uint8(utils.ConvertFromFloat(mtx.X12, 12) >> 8) 
+    case 0x696: return uint8(utils.ConvertFromFloat(mtx.X12, 12) >> 16)
+    case 0x697: return uint8(utils.ConvertFromFloat(mtx.X12, 12) >> 24)
+    case 0x698: return uint8(utils.ConvertFromFloat(mtx.X20, 12) >> 0)
+    case 0x699: return uint8(utils.ConvertFromFloat(mtx.X20, 12) >> 8) 
+    case 0x69A: return uint8(utils.ConvertFromFloat(mtx.X20, 12) >> 16)
+    case 0x69B: return uint8(utils.ConvertFromFloat(mtx.X20, 12) >> 24)
+    case 0x69C: return uint8(utils.ConvertFromFloat(mtx.X21, 12) >> 0)
+    case 0x69D: return uint8(utils.ConvertFromFloat(mtx.X21, 12) >> 8) 
+    case 0x69E: return uint8(utils.ConvertFromFloat(mtx.X21, 12) >> 16)
+    case 0x69F: return uint8(utils.ConvertFromFloat(mtx.X21, 12) >> 24)
+
+    case 0x6A0: return uint8(utils.ConvertFromFloat(mtx.X22, 12) >> 0)
+    case 0x6A1: return uint8(utils.ConvertFromFloat(mtx.X22, 12) >> 8) 
+    case 0x6A2: return uint8(utils.ConvertFromFloat(mtx.X22, 12) >> 16)
+    case 0x6A3: return uint8(utils.ConvertFromFloat(mtx.X22, 12) >> 24)
+    }
+
+    panic(fmt.Sprintf("VEC MTX READ FROM NON VEC MTX ADDR %08X", addr))
 }
 
 func (r *Rasterizer) Write(addr uint32, v uint8) {

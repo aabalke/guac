@@ -599,6 +599,11 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 
 	r := &c.Reg.R
 
+    if utils.BitEnabled(opcode, 25) && utils.BitEnabled(opcode, 4) {
+        fmt.Printf("SDT MALFORMED PC %08X OPCODE %08X\n", r[15], opcode)
+    }
+
+
 	sdt := NewSdtData(opcode, c)
 
 	pre, post, _ := generateSdtAddress(sdt, c)
