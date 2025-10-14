@@ -481,7 +481,8 @@ func (nds *Nds) CheckGeoDmas() {
             continue
         }
 
-        nds.arm9.Dma[i].GxTransfer()
+        //nds.arm9.Dma[i].GxTransfer()
+        nds.arm9.Dma[i].Transfer()
     }
 }
 

@@ -137,6 +137,7 @@ func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Ver
     }
 
     v := p.GetVertex(x, y, z, &g.ClipMatrix, c, S, T, &g.StoredNormal)
+    v.NdsTexture = p.GetTexture(g.Vram, &g.TextureCache)
     p.Vertices = append(p.Vertices, v)
     return &v
 }
@@ -159,9 +160,9 @@ func (p *Polygon) GetVertex(x, y, z float64, clipMtx *gl.Matrix, color gl.Color,
     return v
 }
 
-func (p *Polygon) GetTexture(vram VRAM, cache *TextureCache) gl.Texture {
+func (p *Polygon) GetTexture(vram VRAM, cache *TextureCache) *gl.NdsTexture {
 
-    t := p.Texture
+    t := &p.Texture
 
     if t.Format == TEX_FMT_NONE {
         return nil
@@ -174,6 +175,6 @@ func (p *Polygon) GetTexture(vram VRAM, cache *TextureCache) gl.Texture {
         RepeatT: t.RepeatT,
         FlipS: t.FlipS,
         FlipT: t.FlipT,
-        CachedTexture: cache.Get(vram, &p.Texture),
+        CachedTexture: cache.Get(vram, t),
     }
 }

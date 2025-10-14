@@ -576,21 +576,19 @@ const (
 	LDR_PLD
 )
 
-var sdtInstance Sdt
+var sdt Sdt
 
 type Sdt struct {
-	Opcode, Rd, Rn, RnValue, RdValue, Offset, Shift, ShiftType, Rm uint32
-	Set, I, Load, WriteBack, MemoryMgmt, Pre, Up, Byte, Pld        bool
+	Rd, Rn, RnValue, RdValue, Offset, Shift, ShiftType, Rm uint32
+	Set, I, Load, WriteBack, MemoryMgmt, Pre, Up, Byte        bool
 }
 
 func NewSdtData(opcode uint32, cpu *Cpu) *Sdt {
-	valid := utils.GetVarData(opcode, 26, 27) == 0b01
-	if !valid {
+	if valid := utils.GetVarData(opcode, 26, 27) == 0b01; !valid {
 		panic("Malformed Sdt Instruction")
 	}
 
-	sdtInstance = Sdt{
-		Opcode: opcode,
+	sdt = Sdt{
 		I:      utils.BitEnabled(opcode, 25),
 		Pre:    utils.BitEnabled(opcode, 24),
 		Up:     utils.BitEnabled(opcode, 23),
@@ -598,61 +596,33 @@ func NewSdtData(opcode uint32, cpu *Cpu) *Sdt {
 		Load:   utils.BitEnabled(opcode, 20),
 		Rn:     utils.GetByte(opcode, 16),
 		Rd:     utils.GetByte(opcode, 12),
-	}
-
-	sdt := &sdtInstance
-
-	if sdt.Pre {
-		sdt.WriteBack = utils.BitEnabled(opcode, 21)
-	} else {
-		sdt.MemoryMgmt = utils.BitEnabled(opcode, 21)
-	}
-
-	if sdt.I {
-		sdt.Shift = utils.GetVarData(opcode, 7, 11)
-		sdt.ShiftType = utils.GetVarData(opcode, 5, 6)
-
-		if utils.BitEnabled(opcode, 4) {
-			panic("Malformed Single Data Transfer")
-		}
-
-		sdt.Rm = utils.GetByte(opcode, 0)
-	} else {
-		sdt.Offset = utils.GetVarData(opcode, 0, 11)
+        WriteBack: utils.BitEnabled(opcode, 21),
+        MemoryMgmt: utils.BitEnabled(opcode, 21),
+        Shift: utils.GetVarData(opcode, 7, 11),
+        ShiftType: utils.GetVarData(opcode, 5, 6),
+        Rm: utils.GetByte(opcode, 0),
+        Offset: utils.GetVarData(opcode, 0, 11),
 	}
 
 	sdt.RdValue = cpu.Reg.R[sdt.Rd]
 	sdt.RnValue = cpu.Reg.R[sdt.Rn]
 
-	sdt.Pld = (opcode>>28) == 0b1111 &&
-		sdt.Pre == true &&
-		sdt.Byte == true &&
-		sdt.WriteBack == false &&
-		sdt.Load == true &&
-		sdt.Rd == 0b1111
+    if sdt.I && utils.BitEnabled(opcode, 4) {
+        panic("Malformed Single Data Transfer")
+    }
 
-	return sdt
+	return &sdt
 }
 
 func (c *Cpu) Sdt(opcode uint32) uint32 {
 
 	r := &c.Reg.R
 
-
 	sdt := NewSdtData(opcode, c)
-
 
 	pre, post, _ := generateSdtAddress(sdt, c)
 
 	addr := pre &^ 0b11
-
-	//if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
-	//	addr = pre
-	//}
-
-	if sdt.Pld {
-		panic("Need to handle PLD Inst")
-	}
 
 	switch {
 	case sdt.Load && sdt.Byte:
@@ -711,14 +681,11 @@ func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack 
 	if !sdt.I {
 		offset = sdt.Offset
 	} else {
-		shift := sdt.Opcode >> 7 & 0b11111
-
-		rm := sdt.Opcode & 0b1111
 
 		shiftArgs := utils.ShiftArgs{
-			SType:     sdt.Opcode >> 5 & 0b11,
-			Val:       r[rm],
-			Is:        shift,
+			SType:     sdt.ShiftType,
+			Val:       r[sdt.Rm],
+			Is:        sdt.Shift,
 			IsCarry:   false,
 			Immediate: true,
 			CurrCarry: cpu.Reg.CPSR.GetFlag(FLAG_C),
@@ -791,8 +758,12 @@ func (cpu *Cpu) BX(opcode uint32) {
 	case INST_BLX:
 
 		if rn == 14 {
-			panic("BLX WITH r14 RN USED")
 			// Using BLX R14 is possible (sets PC=Old_LR, and New_LR=retadr).
+            tmp := r[14]
+            r[14] = r[PC] + 4
+            r[PC] = tmp
+            cpu.toggleThumb()
+            return
 		}
 
 		r[14] = r[PC] + 4

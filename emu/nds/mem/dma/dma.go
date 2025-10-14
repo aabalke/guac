@@ -191,22 +191,40 @@ func (dma *DMA) Transfer() {
 		panic("DMA SRC SET TO PROHIBITTED")
 	}
 
-	for i := uint32(0); i < count; i++ {
+    srcPtr, ok := mem.ReadPtr(uint32(tmpSrc), dma.arm9)
+    srcPtrTop, okEnd := mem.ReadPtr(uint32(int(tmpSrc) + int(dstOffset) * int(count)), dma.arm9)
+    if ok && okEnd &&(srcPtr == srcPtrTop) {
 
-		if dma.isWord {
-            dma.Value = mem.Read32(tmpSrc &^ 3, dma.arm9)
-            mem.Write32(tmpDst&^3, dma.Value, dma.arm9)
-
-		} else {
-            dma.Value = mem.Read16(tmpSrc &^ 1, dma.arm9)
-            dma.Value |= (dma.Value << 16)
-            mem.Write16(tmpDst&^1, uint16(dma.Value), dma.arm9)
+        for i := uint32(0); i < count; i++ {
+            if dma.isWord {
+                v := *(*uint32)(unsafe.Add(srcPtr, srcOffset*int64(i)))
+                mem.Write32(tmpDst, v, dma.arm9)
+            } else {
+                v := *(*uint16)(unsafe.Add(srcPtr, srcOffset*int64(i)))
+                mem.Write16(tmpDst, v, dma.arm9)
+            }
         }
 
-		tmpDst = uint32(int64(tmpDst) + dstOffset)
-		tmpSrc = uint32(int64(tmpSrc) + srcOffset)
+        tmpDst = uint32(int64(tmpDst) + int64(count) * int64(dstOffset))
+        tmpSrc = uint32(int64(tmpSrc) + int64(count) * int64(srcOffset))
 
-	}
+    } else {
+
+        for i := uint32(0); i < count; i++ {
+            if dma.isWord {
+                dma.Value = mem.Read32(tmpSrc &^ 3, dma.arm9)
+                mem.Write32(tmpDst&^3, dma.Value, dma.arm9)
+
+            } else {
+                dma.Value = mem.Read16(tmpSrc &^ 1, dma.arm9)
+                dma.Value |= (dma.Value << 16)
+                mem.Write16(tmpDst&^1, uint16(dma.Value), dma.arm9)
+            }
+
+            tmpDst = uint32(int64(tmpDst) + dstOffset)
+            tmpSrc = uint32(int64(tmpSrc) + srcOffset)
+        }
+    }
 
 	if dma.IRQ {
 		dma.irq.SetIRQ(8 + uint32(dma.Idx))

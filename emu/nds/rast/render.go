@@ -48,10 +48,10 @@ func (r *Render) UpdateRender() {
 
     for _, p := range r.Buffers.GetPolygons() {
         //r.Context.Shader.SetTexture(*r.Texture)
-        r.Context.Shader.SetTexture(
-            p.GetTexture(
-                r.Rasterizer.VRAM,
-                &r.Rasterizer.GeoEngine.TextureCache))
+        //r.Context.Shader.SetTexture(
+        //    p.GetTexture(
+        //        r.Rasterizer.VRAM,
+        //        &r.Rasterizer.GeoEngine.TextureCache))
         r.Context.Shader.(*gl.NdsShader).LightEnabled = p.LightsEnabled
         r.RenderPolygon(&p)
     }
@@ -63,12 +63,12 @@ func (r *Render) UpdateRender() {
 
 func (r *Render) RenderPolygon(p *Polygon) {
 
-    tW := int(p.Texture.SizeS)
-    tH := int(p.Texture.SizeT)
+    //tW := int(p.Texture.SizeS)
+    //tH := int(p.Texture.SizeT)
 
-    for i := range len(p.Vertices) {
-        p.Vertices[i].CalcTextureVector(tW, tH)
-    }
+    //for i := range len(p.Vertices) {
+    //    p.Vertices[i].CalcTextureVector(tW, tH)
+    //}
 
     if len(p.Vertices) == 0 {
         return
@@ -82,6 +82,15 @@ func (r *Render) RenderPolygon(p *Polygon) {
         }
 
         for i := 0; i < len(p.Vertices); i += 3 {
+            if p.Vertices[i].NdsTexture != nil {
+                r.Context.Shader.SetTexture(p.Vertices[i].NdsTexture)
+                tW := int(p.Texture.SizeS)
+                tH := int(p.Texture.SizeT)
+
+                p.Vertices[i+2].CalcTextureVector(tW, tH)
+                p.Vertices[i+1].CalcTextureVector(tW, tH)
+                p.Vertices[i+0].CalcTextureVector(tW, tH)
+            }
 
             tri := gl.NewTriangle(
                 p.Vertices[i+2],
@@ -99,6 +108,17 @@ func (r *Render) RenderPolygon(p *Polygon) {
 
         for i := 0; i < len(p.Vertices); i += 4 {
 
+            if p.Vertices[i].NdsTexture != nil {
+                r.Context.Shader.SetTexture(p.Vertices[i].NdsTexture)
+                tW := int(p.Texture.SizeS)
+                tH := int(p.Texture.SizeT)
+
+                p.Vertices[i+3].CalcTextureVector(tW, tH)
+                p.Vertices[i+2].CalcTextureVector(tW, tH)
+                p.Vertices[i+1].CalcTextureVector(tW, tH)
+                p.Vertices[i+0].CalcTextureVector(tW, tH)
+            }
+
             quad := gl.NewQuad(
                 p.Vertices[i+3],
                 p.Vertices[i+2],
@@ -111,6 +131,16 @@ func (r *Render) RenderPolygon(p *Polygon) {
     case PRIM_TRI_STRIP:
 
         for i := 2; i < len(p.Vertices); i++ {
+
+            if p.Vertices[i].NdsTexture != nil {
+                r.Context.Shader.SetTexture(p.Vertices[i].NdsTexture)
+                tW := int(p.Texture.SizeS)
+                tH := int(p.Texture.SizeT)
+
+                p.Vertices[i-2].CalcTextureVector(tW, tH)
+                p.Vertices[i-1].CalcTextureVector(tW, tH)
+                p.Vertices[i+0].CalcTextureVector(tW, tH)
+            }
 
             if clockwise := i & 1 == 1; clockwise {
                 tri := gl.NewTriangle(
@@ -133,6 +163,17 @@ func (r *Render) RenderPolygon(p *Polygon) {
     case PRIM_QUAD_STRIP:
 
         for i := 2; i + 1 < len(p.Vertices); i += 2 {
+
+            if p.Vertices[i].NdsTexture != nil {
+                r.Context.Shader.SetTexture(p.Vertices[i].NdsTexture)
+                tW := int(p.Texture.SizeS)
+                tH := int(p.Texture.SizeT)
+
+                p.Vertices[i-2].CalcTextureVector(tW, tH)
+                p.Vertices[i-1].CalcTextureVector(tW, tH)
+                p.Vertices[i+1].CalcTextureVector(tW, tH)
+                p.Vertices[i+0].CalcTextureVector(tW, tH)
+            }
 
             quad := gl.NewQuad(
                 p.Vertices[i-2],

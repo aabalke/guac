@@ -38,10 +38,12 @@ type GeoEngine struct {
     Lights [4]gl.Light
 
     TextureCache TextureCache
+    Vram VRAM
 }
 
-func NewGeoEngine(buffers *Buffers, irq *cpu.Irq) *GeoEngine {
+func NewGeoEngine(buffers *Buffers, irq *cpu.Irq, vram VRAM) *GeoEngine {
     return &GeoEngine{
+        Vram: vram,
         Irq: irq,
         Buffers: buffers,
         MtxStacks: NewMtxStacks(),
@@ -435,9 +437,12 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
     default:
         fmt.Printf("UNSETUP GX CMD %02X\n", cmd)
     }
+    // this is necessary because "GetTexture" method requires copy of g.Texture NOT pointer
+    g.ActivePoly.Texture = g.Texture
 
     g.Data = []uint32{}
     g.UpdateClipMtx()
+
 }
 
 func (g *GeoEngine) UpdateClipMtx() {

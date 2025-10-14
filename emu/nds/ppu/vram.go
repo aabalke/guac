@@ -339,7 +339,6 @@ func (vm *VRAM) Write(addr uint32, v uint8, arm9 bool) {
                 vm.TextureCache.Reset()
             }
 
-
             (*[0x2_0000]uint8)(vb.bank)[addr - vb.cnt.Base] = v
             // return ???
         }
