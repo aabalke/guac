@@ -73,28 +73,8 @@ func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Ver
     c := g.Color
     //c.A = g.ActivePoly.Alpha
 
-    var S, T float64
-    S = g.Texture.S
-    T = g.Texture.T
-    switch g.Texture.TransformationMode {
-    case 0: // continue
-    case 1:
-
-        textureVertex := gl.VectorW{
-            X: S,
-            Y: T,
-            Z: 1.0/16,
-            W: 1.0/16,
-        }
-
-        mtx := &g.MtxStacks.Stacks[3].CurrMtx
-
-        S = textureVertex.Dot(mtx.Col(0))
-        T = textureVertex.Dot(mtx.Col(1))
-
-    default:
-        panic("UNSETUP TEXTURE TRANSFORMATION MODE")
-    }
+    S := g.Texture.S
+    T := g.Texture.T
 
     var x, y, z float64
 

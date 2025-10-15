@@ -1,7 +1,7 @@
 package rast
 
 import (
-
+	"github.com/aabalke/guac/emu/nds/rast/gl"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
@@ -17,6 +17,7 @@ const (
 )
 
 type Texture struct {
+	Sv, Tv               float64
 	S, T               float64
 	VramOffset         uint32
 	RepeatS, RepeatT   bool
@@ -29,9 +30,26 @@ type Texture struct {
     PitchShift uint32
 }
 
-func (tex *Texture) WriteCoord(v uint32) {
-    tex.S = utils.Convert16ToFloat(uint16(v), 4)
-    tex.T = utils.Convert16ToFloat(uint16(v >> 16), 4)
+func (tex *Texture) WriteCoord(v uint32, g *GeoEngine) {
+    tex.Sv = utils.Convert16ToFloat(uint16(v), 4)
+    tex.Tv = utils.Convert16ToFloat(uint16(v >> 16), 4)
+    tex.S = tex.Sv
+    tex.T = tex.Tv
+
+    if tex.TransformationMode == 1 {
+
+        textureVertex := gl.VectorW{
+            X: tex.Sv,
+            Y: tex.Tv,
+            Z: 1.0/16,
+            W: 1.0/16,
+        }
+
+        mtx := &g.MtxStacks.Stacks[3].CurrMtx
+
+        tex.S = textureVertex.Dot(mtx.Col(0))
+        tex.T = textureVertex.Dot(mtx.Col(1))
+    }
 }
 
 func (tex *Texture) WriteParam(v uint32) {
@@ -48,7 +66,8 @@ func (tex *Texture) WriteParam(v uint32) {
     tex.TransparentZero = utils.BitEnabled(v, 29)
     tex.TransformationMode = utils.GetVarData(v, 30, 31)
 
-    if tex.TransformationMode > 1 {
+    if tex.TransformationMode == 3 {
+        panic("VTC TEXT MODE")
         //fmt.Printf("MODE %02d\n", tex.TransformationMode)
     }
 }

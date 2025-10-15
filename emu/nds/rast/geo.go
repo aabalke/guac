@@ -340,13 +340,36 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
         directionalMtx := g.MtxStacks.Stacks[2].CurrMtx
         g.StoredNormal = directionalMtx.MulPosition(v)
-        g.StoredNormal = g.StoredNormal.Normalize()
 
+
+        if tex := &g.Texture; tex.TransformationMode == 2 {
+
+            // this is wrong, check new super mario bros big coins
+
+            vtx := gl.VectorW{
+                X: g.StoredNormal.X,
+                Y: g.StoredNormal.Y,
+                Z: g.StoredNormal.Z,
+                W: 1.0,
+            }
+
+            // copy do not ptr
+            mtx := g.MtxStacks.Stacks[3].CurrMtx
+
+            mtx.X30 = tex.S
+            mtx.X31 = tex.T
+
+            tex.S = vtx.Dot(mtx.Col(0))
+            tex.T = vtx.Dot(mtx.Col(1))
+
+        }
+
+        g.StoredNormal = g.StoredNormal.Normalize()
         g.StoredNormal = g.StoredNormal.MulScalar(-1)
 
     case 0x22:
 
-        g.Texture.WriteCoord(data[1])
+        g.Texture.WriteCoord(data[1], g)
 
     case 0x23:
         g.Vertex = g.ActivePoly.WriteVertex(data, g, V_16)
