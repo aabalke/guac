@@ -32,6 +32,8 @@ type PPU struct {
 
     Capture Capture
     DisplayFifo DisplayFifo
+
+    WHITE_SCANLINE []uint8
 }
 
 type Engine struct {
@@ -40,6 +42,8 @@ type Engine struct {
     IsB bool
 
 	Dispcnt Dispcnt
+
+    MasterBright MasterBright
 
 	Objects     [128]Object
 	Backgrounds [4]Background
@@ -176,13 +180,18 @@ func NewPPU(irq *cpu.Irq) *PPU {
         &p.EngineA.Pixels)
     p.DisplayFifo.Pixels = make([]uint8, SCREEN_WIDTH*SCREEN_HEIGHT*4)
 
-    return p
+    // screenoff optimization
+    p.WHITE_SCANLINE = make([]uint8, SCREEN_WIDTH * 4)
+    for i := range len(p.WHITE_SCANLINE) {
+        p.WHITE_SCANLINE[i] = 0xFF
+    }
 
+    return p
 }
 
 func (p *PPU) Update(addr, v uint32) {
 
-    if engineA := addr < 0x60; engineA && p.EngineA2D {
+    if engineA := addr < 0x60 || addr >= 0x6C && addr < 0x6E; engineA && p.EngineA2D {
 
         p.EngineA.UpdateEngine(addr, v)
         return
@@ -201,7 +210,7 @@ func (p *PPU) Update(addr, v uint32) {
         return
     }
 
-    if engineB := addr >= 0x1000 && addr < 0x1060; engineB && p.EngineB2D {
+    if engineB := addr >= 0x1000 && addr < 0x1060 || addr >= 0x106C && addr < 0x106E; engineB && p.EngineB2D {
         p.EngineB.UpdateEngine(addr & 0xFF, v)
         return
     }
@@ -316,6 +325,10 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
 
 	case 0x54:
 		e.Blend.yEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
+    case 0x6C:
+        e.MasterBright.Write(uint8(v), 0)
+    case 0x6D:
+        e.MasterBright.Write(uint8(v), 1)
     }
 
 }
@@ -946,4 +959,72 @@ func (e *Engine) UpdateObjMapping(d *Dispcnt) {
             panic("DISPCNT HAS BOTH BITMAP 1D AND 256 SET")
         }
     }
+}
+
+type MasterBright struct {
+    Factor uint32
+    Mode uint8
+}
+
+const (
+    MB_NONE = 0
+    MB_UP   = 1
+    MB_DOWN = 2
+)
+
+func (m *MasterBright) Write(v, b uint8) {
+    switch b {
+    case 0:
+        m.Factor = min(16, uint32(v) & 0b11111)
+
+    case 1:
+        m.Mode = v >> 6
+    }
+}
+
+func (m *MasterBright) Read(b uint8) uint8 {
+    switch b {
+    case 0:
+        return uint8(m.Factor)
+
+    case 1:
+        return m.Mode << 6
+    default:
+        return 0
+    }
+}
+
+func (m *MasterBright) Apply(v uint32) (uint8, uint8, uint8) {
+
+    // takes in 15bit and returns 24bit
+
+    r := ((v)       & 0x1F)
+    g := ((v >> 5)  & 0x1F)
+    b := ((v >> 10) & 0x1F)
+
+    switch m.Mode {
+    case MB_NONE:
+        // convert
+        r = (r << 3) | (r >> 2)
+        g = (g << 3) | (g >> 2)
+        b = (b << 3) | (b >> 2)
+        return uint8(r), uint8(g), uint8(b)
+
+    case MB_UP:
+        r += (31 - r) * m.Factor >> 4
+        g += (31 - g) * m.Factor >> 4
+        b += (31 - b) * m.Factor >> 4
+
+    case MB_DOWN:
+        r -= r * m.Factor >> 4
+        g -= g * m.Factor >> 4
+        b -= b * m.Factor >> 4
+    }
+
+    // convert
+	r = (r << 3) | (r >> 2)
+	g = (g << 3) | (g >> 2)
+	b = (b << 3) | (b >> 2)
+
+    return uint8(r), uint8(g), uint8(b)
 }

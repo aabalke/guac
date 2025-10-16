@@ -450,6 +450,14 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
     case 0x67: return mem.ppu.Capture.Read(addr)
     case 0x68: return 0
     case 0x69: return 0
+    case 0x6C:
+        return mem.ppu.EngineA.MasterBright.Read(0)
+    case 0x6D:
+        return mem.ppu.EngineA.MasterBright.Read(1)
+    case 0x106C:
+        return mem.ppu.EngineB.MasterBright.Read(0)
+    case 0x106D:
+        return mem.ppu.EngineB.MasterBright.Read(1)
 
 	case 0x100:
 		return mem.Timers[0].ReadD(false)

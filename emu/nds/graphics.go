@@ -21,7 +21,7 @@ func (nds *Nds) graphics(y uint32) {
 
 	switch a.Dispcnt.DisplayMode {
 	case 0:
-		nds.screenoff(y, 0xFF, a)
+		nds.screenoff(y, a)
 	case 1:
 		nds.standard(y, a)
 	case 2:
@@ -35,23 +35,16 @@ func (nds *Nds) graphics(y uint32) {
 
     switch b.Dispcnt.DisplayMode {
     case 0:
-        nds.screenoff(y, 0xFF, b)
+        nds.screenoff(y, b)
     case 1:
         nds.standard(y, b)
     }
 }
 
-func (nds *Nds) screenoff(y uint32, colorByte uint8, engine *ppu.Engine) {
-
-	x := uint32(0)
-	for x = range SCREEN_WIDTH {
-
-		index := (x + (y * SCREEN_WIDTH)) * 4
-		(engine.Pixels)[index]   = colorByte
-		(engine.Pixels)[index+1] = colorByte
-		(engine.Pixels)[index+2] = colorByte
-		(engine.Pixels)[index+3] = 0xFF
-	}
+func (nds *Nds) screenoff(y uint32, engine *ppu.Engine) {
+    start := y * SCREEN_WIDTH << 2
+    end := start + SCREEN_WIDTH << 2
+    copy(engine.Pixels[start:end], nds.ppu.WHITE_SCANLINE)
 }
 
 func (nds *Nds) vramDisplay(y uint32, engine *ppu.Engine) {
@@ -59,8 +52,13 @@ func (nds *Nds) vramDisplay(y uint32, engine *ppu.Engine) {
 	x := uint32(0)
 	for x = range SCREEN_WIDTH {
         palData, _ := nds.setRawBitmap(engine, x, y)
-        index := (x + (y * SCREEN_WIDTH)) * 4
-        nds.applyColor(palData, index, &engine.Pixels)
+        r, g, b := engine.MasterBright.Apply(palData)
+        i := (x + (y * SCREEN_WIDTH)) << 2
+
+        (engine.Pixels)[i] = r
+        (engine.Pixels)[i+1] = g
+        (engine.Pixels)[i+2] = b
+        //(engine.Pixels)[i+3] = 0xFF
     }
 }
 
@@ -188,9 +186,13 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 		}
 	}
 
-	finalPalData := bldPal.Blend(objMode == 1, x, y, wins, inObjWindow)
-	index := (x + (y * SCREEN_WIDTH)) << 2
-	nds.applyColor(finalPalData, uint32(index), &engine.Pixels)
+	palData := bldPal.Blend(objMode == 1, x, y, wins, inObjWindow)
+    r, g, b := engine.MasterBright.Apply(palData)
+	i := (x + (y * SCREEN_WIDTH)) << 2
+	(engine.Pixels)[i] = r
+	(engine.Pixels)[i+1] = g
+	(engine.Pixels)[i+2] = b
+	//(engine.Pixels)[i+3] = 0xFF
 }
 
 func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {
@@ -200,7 +202,7 @@ func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {
     getExtended := func(bg *ppu.Background) uint8 {
 
         if !bg.Palette256 {
-            return ppu.BG_TYPE_BGM // what does lsb char block do? text vs affine?
+            return ppu.BG_TYPE_BGM
         }
 
         // CharBaseBlock is precalced, need to / 0x4000
@@ -311,13 +313,16 @@ func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx
 	xIdx := (x + bg.XOffset) & ((bg.W) - 1)
 	yIdx := (y + bg.YOffset) & ((bg.H) - 1)
 
-	if bg.Mosaic && engine.Mosaic.BgH != 0 {
-		xIdx -= xIdx % (engine.Mosaic.BgH + 1)
-	}
+    if bg.Mosaic {
 
-	if bg.Mosaic && engine.Mosaic.BgV != 0 {
-		yIdx -= yIdx % (engine.Mosaic.BgV + 1)
-	}
+        if engine.Mosaic.BgH != 0 {
+            xIdx -= xIdx % (engine.Mosaic.BgH + 1)
+        }
+
+        if engine.Mosaic.BgV != 0 {
+            yIdx -= yIdx % (engine.Mosaic.BgV + 1)
+        }
+    }
 
 	map_x := xIdx >> 3
 	map_y := yIdx >> 3
@@ -334,13 +339,16 @@ func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx
 
 	mapAddr := bg.ScreenBaseBlock + mapIdx
 
+    var banks uint32
     if !engine.IsB {
         mapAddr += engine.Dispcnt.ScreenBase
+        banks = ppu.BANKS_A_2D_BG
     } else {
         mapAddr += 0x20_0000
+        banks = ppu.BANKS_B_2D_BG
     }
 
-    screenData := uint32(nds.ppu.Vram.ReadGraphical(mapAddr))
+    screenData := uint32(nds.ppu.Vram.ReadGraphical(mapAddr, banks))
 
 	tileIdx := (screenData & 0b11_1111_1111) << 5
 
@@ -364,7 +372,7 @@ func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx
 		inTileIdx = (inTileX >> 1) + (inTileY << 2)
 	}
 
-    palIdx := uint32(nds.ppu.Vram.ReadGraphical(tileAddr + inTileIdx))
+    palIdx := uint32(nds.ppu.Vram.ReadGraphical(tileAddr + inTileIdx, banks))
     palNum := screenData >> 12
 
     return getBgPaletteData(nds, engine, bgIdx, bg.Palette256, palNum, palIdx, inTileX)
@@ -415,11 +423,15 @@ func (nds *Nds) setAffine16BackgroundPixel(engine *ppu.Engine, bg *ppu.Backgroun
 
 	mapAddr := bg.ScreenBaseBlock + mapIdx
 
+    var banks uint32
     if !engine.IsB {
         mapAddr += engine.Dispcnt.ScreenBase
+        banks = ppu.BANKS_A_2D_BG
+    } else {
+        banks = ppu.BANKS_B_2D_BG
     }
 
-    screenData := uint32(nds.ppu.Vram.ReadGraphical(vramOffset + mapAddr))
+    screenData := uint32(nds.ppu.Vram.ReadGraphical(vramOffset + mapAddr, banks))
 
 	tileIdx := (screenData & 0b11_1111_1111) << 5
 
@@ -594,12 +606,16 @@ func (nds *Nds) setDirectBitmap(engine *ppu.Engine, bg *ppu.Background, x uint32
 
     addr += bg.ScreenBaseBlock * 8
 
+    var banks uint32
     if engine.IsB {
         addr += 0x20_0000
+        banks = ppu.BANKS_B_2D_BG
+    } else {
+        banks = ppu.BANKS_A_2D_BG
     }
 
     //palIdx := uint32(nds.ppu.Vram.Read(addr, true))
-    data := uint32(nds.ppu.Vram.ReadGraphical(addr))
+    data := uint32(nds.ppu.Vram.ReadGraphical(addr, banks))
 
     // if on transparent??? maybe not
     //if transparent := (data >> 15) & 1 == 0; transparent {
@@ -633,21 +649,6 @@ func (nds *Nds) setRawBitmap(engine *ppu.Engine, x, y uint32) (uint32, bool) {
 
     return data, true
 
-}
-
-func (nds *Nds) applyColor(data, i uint32, pixels *[]byte) {
-	r := uint8((data) & 0b11111)
-	g := uint8((data >> 5) & 0b11111)
-	b := uint8((data >> 10) & 0b11111)
-
-	r = (r << 3) | (r >> 2)
-	g = (g << 3) | (g >> 2)
-	b = (b << 3) | (b >> 2)
-
-	(*pixels)[i] = r
-	(*pixels)[i+1] = g
-	(*pixels)[i+2] = b
-	(*pixels)[i+3] = 0xFF
 }
 
 func (nds *Nds) getBgPriority(y uint32, mode uint32, bgs *[4]ppu.Background) [4][]uint32 {
@@ -905,7 +906,6 @@ func getBgPaletteData(nds *Nds, engine *ppu.Engine, bgIdx uint32, pal256 bool, p
     //    fmt.Printf("PAL IDX %0X PAL NUM %08X\n", palIdx, palNum)
     //}
 
-
 	var palIdx uint32
 	if pal256 {
 		palIdx = tileData & 0xFF
@@ -956,7 +956,6 @@ func getPaletteData(nds *Nds, engine *ppu.Engine, pal256 bool, pal, tileData, in
 	if palIdx == 0 {
 		return 0, false
 	}
-
 
     // this is from gba, does not work with ext palettes, but assume it still
     // is needed for std
@@ -1037,11 +1036,15 @@ func (nds *Nds) setObjTilePixel(engine *ppu.Engine, obj *ppu.Object, x, y uint32
 	addr := getObjTileAddr(obj, enTileX, enTileY, inTileX, inTileY)
 
     vramOffset := uint32(0x40_0000)
+    var banks uint32
     if engine.IsB {
         vramOffset = uint32(0x60_0000)
+        banks = ppu.BANKS_B_2D_OBJ
+    } else {
+        banks = ppu.BANKS_A_2D_OBJ
     }
 
-    tileData := uint32(nds.ppu.Vram.ReadGraphical(vramOffset + addr))
+    tileData := uint32(nds.ppu.Vram.ReadGraphical(vramOffset + addr, banks))
 
 	return getPaletteData(nds, engine, obj.Palette256, obj.Palette, tileData, uint32(inTileX))
 }
@@ -1062,11 +1065,15 @@ func (nds *Nds) setObjBmpPixel(engine *ppu.Engine, obj *ppu.Object, x, y uint32)
 	addr := getBmpTileAddr(obj, uint32(xIdx), uint32(yIdx))
 
     vramOffset := uint32(0x40_0000)
+    var banks uint32
     if engine.IsB {
         vramOffset = uint32(0x60_0000)
+        banks = ppu.BANKS_B_2D_OBJ
+    } else {
+        banks = ppu.BANKS_A_2D_OBJ
     }
 
-    data := uint32(nds.ppu.Vram.ReadGraphical(vramOffset + addr))
+    data := uint32(nds.ppu.Vram.ReadGraphical(vramOffset + addr, banks))
 
     if alpha := (data & 0x8000) == 0; alpha {
         return 0, false
@@ -1152,5 +1159,4 @@ func (nds *Nds) getAffineCoordinates(engine *ppu.Engine, obj *ppu.Object, x, y u
 	yIdx = int(obj.Pc*xOrigin+obj.Pd*yOrigin) + (int(obj.H) / 2)
 
     return xIdx, yIdx
-
 }

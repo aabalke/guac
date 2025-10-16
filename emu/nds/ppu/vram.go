@@ -419,7 +419,15 @@ func (vm *VRAM) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
     return nil, false
 }
 
-func (vm *VRAM) ReadGraphical(addr uint32) uint16 {
+const (
+    //                IHGFEDCBA
+    BANKS_A_2D_BG = 0b001111111
+    BANKS_A_2D_OBJ= 0b001110011
+    BANKS_B_2D_BG = 0b110000100
+    BANKS_B_2D_OBJ= 0b100001000
+)
+
+func (vm *VRAM) ReadGraphical(addr uint32, bankFlags uint32) uint16 {
 
     for _, v := range &vm.banks {
 
@@ -427,15 +435,23 @@ func (vm *VRAM) ReadGraphical(addr uint32) uint16 {
             continue
         }
 
-        if !(addr >= v.cnt.Base && addr < v.cnt.Base + v.cnt.Size) {
+        // no noticeable improvement
+        // leave early if not a bank used in mode
+        //if bankFlags & (1 << i) == 0 {
+        //    continue
+        //}
+
+        end := v.cnt.Base + v.cnt.Size
+
+        if addr < v.cnt.Base || addr >= end {
             continue
         }
 
-        if addr + 1 >= v.cnt.Base + v.cnt.Size {
-            return uint16((*[1]uint8)(unsafe.Add(v.bank, addr - v.cnt.Base))[0])
+        if addr + 1 >= end {
+            return uint16(*(*uint8)(unsafe.Add(v.bank, addr - v.cnt.Base)))
         }
 
-        return (*[1]uint16)(unsafe.Add(v.bank, addr - v.cnt.Base))[0]
+        return *(*uint16)(unsafe.Add(v.bank, addr - v.cnt.Base))
     }
 
     return 0
