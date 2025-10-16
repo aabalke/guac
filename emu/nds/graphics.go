@@ -28,6 +28,7 @@ func (nds *Nds) graphics(y uint32) {
 		nds.vramDisplay(y, a)
 		//nds.standard(y, a)
 	case 3:
+        panic("MAIN MEM FIFO")
         nds.MemFifoDisplay(a)
 	}
 

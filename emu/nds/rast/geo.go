@@ -36,8 +36,6 @@ type GeoEngine struct {
     PosTestData [4]uint32
     VecTestData [3]uint16
 
-    Lights [4]gl.Light
-
     TextureCache TextureCache
     Vram VRAM
 }
@@ -140,7 +138,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
     //fmt.Printf("DATA % X\n", data)
 
 
-    if cmd := data[0]; cmd == 0x30 || cmd == 0x31 || cmd == 0x34 {
+    if cmd := data[0]; cmd >= 0x30 && cmd <= 0x35 {
         g.Data = []uint32{}
         return
     }
@@ -327,43 +325,26 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
     case 0x21:
 
-        convert := func(v uint16) float64 {
-            v &= 0x3FF
-            val := int16(v << 6) >> 6
-            return float64(val) / 512
-        }
-
-        x := convert(uint16(data[1]))
-        y := convert(uint16(data[1]>>10))
-        z := convert(uint16(data[1]>>20))
-        v := gl.Vector{X: x, Y: y, Z: z}
-
-        directionalMtx := g.MtxStacks.Stacks[2].CurrMtx
-        g.StoredNormal = directionalMtx.MulPosition(v)
-
+        x := utils.Convert10ToFloat(uint16(data[1]), 9)
+        y := utils.Convert10ToFloat(uint16(data[1]>>10), 9)
+        z := utils.Convert10ToFloat(uint16(data[1]>>20), 9)
 
         if tex := &g.Texture; tex.TransformationMode == 2 {
 
-            // this is wrong, check new super mario bros big coins
-
             vtx := gl.VectorW{
-                X: g.StoredNormal.X,
-                Y: g.StoredNormal.Y,
-                Z: g.StoredNormal.Z,
-                W: 1.0,
+                X: x,
+                Y: y,
+                Z: z,
             }
 
-            // copy do not ptr
-            mtx := g.MtxStacks.Stacks[3].CurrMtx
-
-            mtx.X30 = tex.S
-            mtx.X31 = tex.T
-
-            tex.S = vtx.Dot(mtx.Col(0))
-            tex.T = vtx.Dot(mtx.Col(1))
-
+            mtx := &g.MtxStacks.Stacks[3].CurrMtx
+            tex.S = tex.Sv + vtx.Dot3(mtx.Col(0))
+            tex.T = tex.Tv + vtx.Dot3(mtx.Col(1))
         }
 
+        directionalMtx := g.MtxStacks.Stacks[2].CurrMtx
+        v := gl.Vector{X: x, Y: y, Z: z}
+        g.StoredNormal = directionalMtx.MulPosition(v)
         g.StoredNormal = g.StoredNormal.Normalize()
         g.StoredNormal = g.StoredNormal.MulScalar(-1)
 
@@ -403,20 +384,20 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
     case 0x32:
 
-        x := utils.Convert10ToFloat(uint16(data[1]), 9)
-        y := utils.Convert10ToFloat(uint16(data[1] >> 10), 9)
-        z := utils.Convert10ToFloat(uint16(data[1] >> 20), 9)
-        v := gl.Vector{X: x, Y: y, Z: z}
-        idx := data[1] >> 30
+        //x := utils.Convert10ToFloat(uint16(data[1]), 9)
+        //y := utils.Convert10ToFloat(uint16(data[1] >> 10), 9)
+        //z := utils.Convert10ToFloat(uint16(data[1] >> 20), 9)
+        //v := gl.Vector{X: x, Y: y, Z: z}
+        //idx := data[1] >> 30
 
-        directionalMtx := g.MtxStacks.Stacks[2].CurrMtx
-        g.Lights[idx].Direction = directionalMtx.MulPosition(v)
-        g.Lights[idx].Direction = g.Lights[idx].Direction.Normalize()
+        //directionalMtx := g.MtxStacks.Stacks[2].CurrMtx
+        //g.Lights[idx].Direction = directionalMtx.MulPosition(v)
+        //g.Lights[idx].Direction = g.Lights[idx].Direction.Normalize()
 
     case 0x33:
 
-        idx := data[1] >> 30
-        g.Lights[idx].Color = Write15BitColor(data[1])
+        //idx := data[1] >> 30
+        //g.Lights[idx].Color = Write15BitColor(data[1])
 
     case 0x40:
 

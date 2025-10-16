@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"errors"
 	"log"
+	"runtime/pprof"
 	"slices"
 
 	"github.com/aabalke/guac/config"
@@ -96,6 +97,20 @@ func (g *Game) GetGamepadButtons() ([]ebiten.StandardGamepadButton, []ebiten.Sta
 
 func (g *Game) Update() error {
 
+    //if g.flags.Profile && isProfiling {
+
+    //    if profileFrames >= 1000 {
+    //        return exit
+    //    }
+
+    //    profileFrames++
+    //}
+
+    //if g.frame == 1500 {
+    //    isProfiling = true
+    //    pprof.StartCPUProfile(f)
+    //}
+
 	if g.flags.Profile && g.frame >= 1000 {
 	//if g.flags.Profile && g.frame >= 2000 {
 		return exit
@@ -125,6 +140,9 @@ func (g *Game) Update() error {
 			g.TogglePause()
 		case slices.Contains(keyConfig.Mute, keyStr):
 			g.ToggleMute()
+		//case slices.Contains([]string{"B"}, keyStr):
+        //    isProfiling = true
+		//    pprof.StartCPUProfile(f)
 		}
 	}
 

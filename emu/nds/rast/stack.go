@@ -38,11 +38,16 @@ func (m *MtxStacks) Push() {
 
     s := &m.Stacks[m.Mode]
     s1 := &m.Stacks[1]
+    s2 := &m.Stacks[2]
 
     idx := int(*s.Pointer) % len(s.Mtxs)
 
     s.Mtxs[idx] = s.CurrMtx
-    if m.Mode == 2 {
+
+    switch m.Mode {
+    case 1:
+        s2.Mtxs[idx] = s2.CurrMtx
+    case 2:
         s1.Mtxs[idx] = s1.CurrMtx
     }
 
@@ -55,6 +60,7 @@ func (m *MtxStacks) Pop(param uint32) {
 
     s := &m.Stacks[m.Mode]
     s1 := &m.Stacks[1]
+    s2 := &m.Stacks[2]
 
     offset := int(param & 0b1_1111)
 
@@ -71,7 +77,10 @@ func (m *MtxStacks) Pop(param uint32) {
 
     s.CurrMtx = s.Mtxs[idx]
 
-    if m.Mode == 2 {
+    switch m.Mode {
+    case 1:
+        s2.CurrMtx = s2.Mtxs[idx]
+    case 2:
         s1.CurrMtx = s1.Mtxs[idx]
     }
 }
@@ -80,6 +89,7 @@ func (m *MtxStacks) Store(param uint32) {
 
     s := &m.Stacks[m.Mode]
     s1 := &m.Stacks[1]
+    s2 := &m.Stacks[2]
 
     idx := param & 0b1_1111
 
@@ -93,7 +103,10 @@ func (m *MtxStacks) Store(param uint32) {
 
     s.Mtxs[idx] = s.CurrMtx
 
-    if m.Mode == 2 {
+    switch m.Mode {
+    case 1:
+        s2.Mtxs[idx] = s2.CurrMtx
+    case 2:
         s1.Mtxs[idx] = s1.CurrMtx
     }
 }
@@ -102,6 +115,7 @@ func (m *MtxStacks) Restore(param uint32) {
 
     s := &m.Stacks[m.Mode]
     s1 := &m.Stacks[1]
+    s2 := &m.Stacks[2]
 
     idx := param & 0b1_1111
 
@@ -115,7 +129,10 @@ func (m *MtxStacks) Restore(param uint32) {
 
     s.CurrMtx = s.Mtxs[idx]
 
-    if m.Mode == 2 {
+    switch m.Mode {
+    case 1:
+        s2.CurrMtx = s2.Mtxs[idx]
+    case 2:
         s1.CurrMtx = s1.Mtxs[idx]
     }
 }

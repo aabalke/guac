@@ -42,7 +42,7 @@ type Context struct {
 	ColorBuffer  *image.NRGBA
 	DepthBuffer  []float64
 	ClearColor   Color
-	Shader       Shader
+	Shader       *Shader
 	ReadDepth    bool
 	WriteDepth   bool
 	WriteColor   bool
@@ -147,16 +147,19 @@ func edge(a, b, c Vector) float64 {
 	return (b.X-c.X)*(a.Y-c.Y) - (b.Y-c.Y)*(a.X-c.X)
 }
 
+// these variables remove reallocations
+var vert Vertex
+
 func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo {
 	var info RasterizeInfo
 
 	// integer bounding box
-	min := s0.Min(s1.Min(s2)).Floor()
-	max := s0.Max(s1.Max(s2)).Ceil()
-	x0 := int(min.X)
-	x1 := int(max.X)
-	y0 := int(min.Y)
-	y1 := int(max.Y)
+	minValue := s0.Min(s1.Min(s2)).Floor()
+	maxValue := s0.Max(s1.Max(s2)).Ceil()
+	x0 := int(minValue.X)
+	x1 := int(maxValue.X)
+	y0 := int(minValue.Y)
+	y1 := int(maxValue.Y)
 
 	// forward differencing variables
 	p := Vector{float64(x0) + 0.5, float64(y0) + 0.5, 0}
@@ -195,10 +198,9 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 			d = d2
 		}
 		d = float64(int(d))
-		if d < 0 {
-			// occurs in pathological cases
-			d = 0
-		}
+        // occurs in pathological cases
+        d = max(0, d)
+
 		w0 := w00 + a12*d
 		w1 := w01 + a20*d
 		w2 := w02 + a01*d
@@ -234,10 +236,16 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 			// perspective-correct interpolation of vertex data
 			b := VectorW{b0 * r0, b1 * r1, b2 * r2, 0}
 			b.W = 1 / (b.X + b.Y + b.Z)
-			v := InterpolateVertexes(v0, v1, v2, b)
+			//v := InterpolateVertexes(v0, v1, v2, b)
+			vert.InterpolateVertexes(v0, v1, v2, b)
 			// invoke fragment shader
-			color := dc.Shader.Fragment(v)
-			if color == Discard {
+			//color := dc.Shader.Fragment(v)
+			dc.Shader.Fragment(&vert)
+
+            color := &vert.Color
+
+
+			if *color == Discard {
 				continue
 			}
 			// update buffers atomically
@@ -279,39 +287,6 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 	return info
 }
 
-func (dc *Context) line(v0, v1 Vertex, s0, s1 Vector) RasterizeInfo {
-	n := s1.Sub(s0).Perpendicular().MulScalar(dc.LineWidth / 2)
-	s0 = s0.Add(s0.Sub(s1).Normalize().MulScalar(dc.LineWidth / 2))
-	s1 = s1.Add(s1.Sub(s0).Normalize().MulScalar(dc.LineWidth / 2))
-	s00 := s0.Add(n)
-	s01 := s0.Sub(n)
-	s10 := s1.Add(n)
-	s11 := s1.Sub(n)
-	info1 := dc.rasterize(v1, v0, v0, s11, s01, s00)
-	info2 := dc.rasterize(v1, v1, v0, s10, s11, s00)
-	return info1.Add(info2)
-}
-
-func (dc *Context) wireframe(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo {
-	info1 := dc.line(v0, v1, s0, s1)
-	info2 := dc.line(v1, v2, s1, s2)
-	info3 := dc.line(v2, v0, s2, s0)
-	return info1.Add(info2).Add(info3)
-}
-
-func (dc *Context) drawClippedLine(v0, v1 Vertex) RasterizeInfo {
-	// normalized device coordinates
-	ndc0 := v0.Output.DivScalar(v0.Output.W).Vector()
-	ndc1 := v1.Output.DivScalar(v1.Output.W).Vector()
-
-	// screen coordinates
-	s0 := dc.screenMatrix.MulPosition(ndc0)
-	s1 := dc.screenMatrix.MulPosition(ndc1)
-
-	// rasterize
-	return dc.line(v0, v1, s0, s1)
-}
-
 func (dc *Context) drawClippedTriangle(v0, v1, v2 Vertex) RasterizeInfo {
 	// normalized device coordinates
 	ndc0 := v0.Output.DivScalar(v0.Output.W).Vector()
@@ -338,40 +313,13 @@ func (dc *Context) drawClippedTriangle(v0, v1, v2 Vertex) RasterizeInfo {
 	s0 := dc.screenMatrix.MulPosition(ndc0)
 	s1 := dc.screenMatrix.MulPosition(ndc1)
 	s2 := dc.screenMatrix.MulPosition(ndc2)
-
-	// rasterize
-	if dc.Wireframe {
-		return dc.wireframe(v0, v1, v2, s0, s1, s2)
-	} else {
-		return dc.rasterize(v0, v1, v2, s0, s1, s2)
-	}
-}
-
-func (dc *Context) DrawLine(t *Line) RasterizeInfo {
-    panic("DRAW LINE")
-	// invoke vertex shader
-	//v1 := dc.Shader.Vertex(t.V1)
-	//v2 := dc.Shader.Vertex(t.V2)
-
-	//if v1.Outside() || v2.Outside() {
-	//	// clip to viewing volume
-	//	line := ClipLine(NewLine(v1, v2))
-	//	if line != nil {
-	//		return dc.drawClippedLine(line.V1, line.V2)
-	//	} else {
-	//		return RasterizeInfo{}
-	//	}
-	//} else {
-	//	// no need to clip
-	//	return dc.drawClippedLine(v1, v2)
-	//}
+    return dc.rasterize(v0, v1, v2, s0, s1, s2)
 }
 
 func (dc *Context) DrawTriangle(t *Triangle) RasterizeInfo {
-	// invoke vertex shader
-	v1 := dc.Shader.Vertex(t.V1)
-	v2 := dc.Shader.Vertex(t.V2)
-	v3 := dc.Shader.Vertex(t.V3)
+	v1 := t.V1
+	v2 := t.V2
+	v3 := t.V3
 
 	if v1.Outside() || v2.Outside() || v3.Outside() {
 
@@ -390,11 +338,10 @@ func (dc *Context) DrawTriangle(t *Triangle) RasterizeInfo {
 }
 
 func (dc *Context) DrawQuad(q *Quad) RasterizeInfo {
-	// invoke vertex shader
-	v1 := dc.Shader.Vertex(q.V1)
-	v2 := dc.Shader.Vertex(q.V2)
-	v3 := dc.Shader.Vertex(q.V3)
-	v4 := dc.Shader.Vertex(q.V4)
+	v1 := q.V1
+	v2 := q.V2
+	v3 := q.V3
+	v4 := q.V4
 
     var result RasterizeInfo
 
@@ -430,54 +377,3 @@ func (dc *Context) DrawQuad(q *Quad) RasterizeInfo {
     return result
 
 }
-
-//
-//func (dc *Context) DrawLines(lines []*Line) RasterizeInfo {
-//	wn := runtime.NumCPU()
-//	ch := make(chan RasterizeInfo, wn)
-//	for wi := 0; wi < wn; wi++ {
-//		go func(wi int) {
-//			var result RasterizeInfo
-//			for i, l := range lines {
-//				if i%wn == wi {
-//					info := dc.DrawLine(l)
-//					result = result.Add(info)
-//				}
-//			}
-//			ch <- result
-//		}(wi)
-//	}
-//	var result RasterizeInfo
-//	for wi := 0; wi < wn; wi++ {
-//		result = result.Add(<-ch)
-//	}
-//	return result
-//}
-//
-//func (dc *Context) DrawTriangles(triangles []*Triangle) RasterizeInfo {
-//	wn := runtime.NumCPU()
-//	ch := make(chan RasterizeInfo, wn)
-//	for wi := 0; wi < wn; wi++ {
-//		go func(wi int) {
-//			var result RasterizeInfo
-//			for i, t := range triangles {
-//				if i%wn == wi {
-//					info := dc.DrawTriangle(t)
-//					result = result.Add(info)
-//				}
-//			}
-//			ch <- result
-//		}(wi)
-//	}
-//	var result RasterizeInfo
-//	for wi := 0; wi < wn; wi++ {
-//		result = result.Add(<-ch)
-//	}
-//	return result
-//}
-//
-//func (dc *Context) DrawMesh(mesh *Mesh) RasterizeInfo {
-//	info1 := dc.DrawTriangles(mesh.Triangles)
-//	info2 := dc.DrawLines(mesh.Lines)
-//	return info1.Add(info2)
-//}

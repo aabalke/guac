@@ -20,13 +20,6 @@ func Identity() Matrix {
 }
 
 func Translate(v Vector) Matrix {
-    // col based
-	//return Matrix{
-	//	1, 0, 0, v.X,
-	//	0, 1, 0, v.Y,
-	//	0, 0, 1, v.Z,
-	//	0, 0, 0, 1}
-
     // row based
 	return Matrix{
 		1, 0, 0, 0,

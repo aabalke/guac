@@ -52,7 +52,7 @@ func NewAluData(opcode uint32, cpu *Cpu) *Alu {
 	aluData.LogicalFlags = false
 	aluData.Test = false
 
-	aluData.Op2, aluData.Carry = cpu.GetOp2(opcode)
+	aluData.Op2, aluData.Carry = cpu.GetOp2(&aluData)
 
 	if aluData.Rn != PC {
 		aluData.RnValue = cpu.Reg.R[aluData.Rn]
@@ -98,18 +98,18 @@ func (cpu *Cpu) Alu(opcode uint32) {
 	}
 }
 
-func (cpu *Cpu) GetOp2(opcode uint32) (uint32, bool) {
+func (cpu *Cpu) GetOp2(alu *Alu) (uint32, bool) {
 
 	reg := &cpu.Reg
 
-	isCarry := utils.BitEnabled(opcode, 20)
+    opcode := alu.Opcode
+
 	currCarry := reg.CPSR.GetFlag(FLAG_C)
 
-	if immediate := utils.BitEnabled(opcode, 25); immediate {
-
+	if alu.Immediate {
 		nn := utils.GetVarData(opcode, 0, 7)
 		ro := utils.GetVarData(opcode, 8, 11) * 2
-		op2, setCarry, carry := utils.Ror(nn, ro, isCarry, false, currCarry)
+		op2, setCarry, carry := utils.Ror(nn, ro, alu.Set, false, currCarry)
 
 		if setCarry {
 			reg.CPSR.SetFlag(FLAG_C, carry)
@@ -120,8 +120,7 @@ func (cpu *Cpu) GetOp2(opcode uint32) (uint32, bool) {
 
 	is := utils.GetVarData(opcode, 7, 11)
 	var additional uint32
-	rm := utils.GetByte(opcode, 0)
-	if rm == PC {
+	if alu.Rm == PC {
 		additional += 8
 	}
 
@@ -129,7 +128,7 @@ func (cpu *Cpu) GetOp2(opcode uint32) (uint32, bool) {
 	if shiftRegister {
 		is = reg.R[(opcode>>8)&0b1111] & 0b1111_1111
 
-		if rm == PC {
+		if alu.Rm == PC {
 			additional += 4
 		}
 
@@ -137,9 +136,9 @@ func (cpu *Cpu) GetOp2(opcode uint32) (uint32, bool) {
 
 	shiftArgs := utils.ShiftArgs{
 		SType:     opcode >> 5 & 0b11,
-		Val:       reg.R[rm] + additional,
+		Val:       reg.R[alu.Rm] + additional,
 		Is:        is,
-		IsCarry:   isCarry,
+		IsCarry:   alu.Set,
 		Immediate: !shiftRegister,
 		CurrCarry: currCarry,
 	}
@@ -583,7 +582,10 @@ type Sdt struct {
 	Set, I, Load, WriteBack, MemoryMgmt, Pre, Up, Byte        bool
 }
 
-func NewSdtData(opcode uint32, cpu *Cpu) *Sdt {
+func (c *Cpu) Sdt(opcode uint32) uint32 {
+
+	r := &c.Reg.R
+
 	if valid := utils.GetVarData(opcode, 26, 27) == 0b01; !valid {
 		panic("Malformed Sdt Instruction")
 	}
@@ -604,23 +606,14 @@ func NewSdtData(opcode uint32, cpu *Cpu) *Sdt {
         Offset: utils.GetVarData(opcode, 0, 11),
 	}
 
-	sdt.RdValue = cpu.Reg.R[sdt.Rd]
-	sdt.RnValue = cpu.Reg.R[sdt.Rn]
+	sdt.RdValue = c.Reg.R[sdt.Rd]
+	sdt.RnValue = c.Reg.R[sdt.Rn]
 
     if sdt.I && utils.BitEnabled(opcode, 4) {
         panic("Malformed Single Data Transfer")
     }
 
-	return &sdt
-}
-
-func (c *Cpu) Sdt(opcode uint32) uint32 {
-
-	r := &c.Reg.R
-
-	sdt := NewSdtData(opcode, c)
-
-	pre, post, _ := generateSdtAddress(sdt, c)
+	pre, post := generateSdtAddress(&sdt, c)
 
 	addr := pre &^ 0b11
 
@@ -673,7 +666,7 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 	return 4
 }
 
-func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack bool) {
+func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32) {
 
 	r := &cpu.Reg.R
 
@@ -706,10 +699,10 @@ func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack 
 	}
 
 	if sdt.Pre {
-        return addr, addr, !(offset == 0)
+        return addr, addr
 	}
 
-	return r[sdt.Rn], addr, false
+	return r[sdt.Rn], addr
 }
 
 func (cpu *Cpu) BLX(opcode uint32) {

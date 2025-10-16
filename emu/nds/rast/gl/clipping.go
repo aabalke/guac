@@ -51,6 +51,9 @@ func sutherlandHodgman(points []VectorW, planes []clipPlane) []VectorW {
 	return output
 }
 
+// removes allocation overhead
+var v1, v2, v3 Vertex
+
 func ClipTriangle(t *Triangle) []*Triangle {
 	w1 := t.V1.Output
 	w2 := t.V2.Output
@@ -65,9 +68,9 @@ func ClipTriangle(t *Triangle) []*Triangle {
 		b1 := Barycentric(p1, p2, p3, newPoints[0].Vector())
 		b2 := Barycentric(p1, p2, p3, newPoints[i-1].Vector())
 		b3 := Barycentric(p1, p2, p3, newPoints[i].Vector())
-		v1 := InterpolateVertexes(t.V1, t.V2, t.V3, b1)
-		v2 := InterpolateVertexes(t.V1, t.V2, t.V3, b2)
-		v3 := InterpolateVertexes(t.V1, t.V2, t.V3, b3)
+		v1.InterpolateVertexes(t.V1, t.V2, t.V3, b1)
+		v2.InterpolateVertexes(t.V1, t.V2, t.V3, b2)
+		v3.InterpolateVertexes(t.V1, t.V2, t.V3, b3)
 		result = append(result, NewTriangle(v1, v2, v3))
 	}
 	return result

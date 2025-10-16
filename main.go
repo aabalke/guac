@@ -28,20 +28,25 @@ const (
 //go:embed icons/icon.png
 var icon []byte
 
+var f *os.File
+
+var isProfiling bool
+var profileFrames uint32
+
 func main() {
 
 	config.Conf.Decode()
 
 	flags := getFlags()
 
-	var f *os.File
-
 	if flags.Profile {
 
-		f, err := os.Create("cpu.prof")
+        fi, err := os.Create("cpu.prof")
 		if err != nil {
 			panic(err)
 		}
+
+        f = fi
 
 		pprof.StartCPUProfile(f)
 

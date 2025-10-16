@@ -44,15 +44,9 @@ func (r *Render) UpdateRender() {
     r.Context.ClearColorBuffer()
     r.Context.ClearDepthBuffer()
 
-    r.Context.Shader = gl.NewNdsShader(r.Rasterizer.GeoEngine.Lights)
+    r.Context.Shader = gl.NewShader()
 
     for _, p := range r.Buffers.GetPolygons() {
-        //r.Context.Shader.SetTexture(*r.Texture)
-        //r.Context.Shader.SetTexture(
-        //    p.GetTexture(
-        //        r.Rasterizer.VRAM,
-        //        &r.Rasterizer.GeoEngine.TextureCache))
-        r.Context.Shader.(*gl.NdsShader).LightEnabled = p.LightsEnabled
         r.RenderPolygon(&p)
     }
 
@@ -62,13 +56,6 @@ func (r *Render) UpdateRender() {
 }
 
 func (r *Render) RenderPolygon(p *Polygon) {
-
-    //tW := int(p.Texture.SizeS)
-    //tH := int(p.Texture.SizeT)
-
-    //for i := range len(p.Vertices) {
-    //    p.Vertices[i].CalcTextureVector(tW, tH)
-    //}
 
     if len(p.Vertices) == 0 {
         return

@@ -80,6 +80,13 @@ func (a Vector) Cross(b Vector) Vector {
 	return Vector{x, y, z}
 }
 
+func (a *Vector) NormalizePtr() {
+    invLen := 1 / math.Sqrt(a.X*a.X + a.Y*a.Y + a.Z*a.Z)
+    a.X *= invLen
+    a.Y *= invLen
+    a.Z *= invLen
+}
+
 func (a Vector) Normalize() Vector {
 	r := 1 / math.Sqrt(a.X*a.X+a.Y*a.Y+a.Z*a.Z)
 	return Vector{a.X * r, a.Y * r, a.Z * r}
@@ -217,6 +224,11 @@ func (a VectorW) Outside() bool {
 func (a VectorW) Dot(b VectorW) float64 {
 	return a.X*b.X + a.Y*b.Y + a.Z*b.Z + a.W*b.W
 }
+
+func (a VectorW) Dot3(b VectorW) float64 {
+	return a.X*b.X + a.Y*b.Y + a.Z*b.Z
+}
+
 
 func (a VectorW) Add(b VectorW) VectorW {
 	return VectorW{a.X + b.X, a.Y + b.Y, a.Z + b.Z, a.W + b.W}

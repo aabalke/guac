@@ -88,12 +88,14 @@ func (w *WRAM) Read(addr uint32, arm9 bool) uint8 {
 
 func (w *WRAM) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
 
+
 	if arm9 {
 		switch w.CNT {
 		case 0:
+            // this fails tcm test rockwrestler
             return unsafe.Add(unsafe.Pointer(&w.Wram), addr % 0x8000), true
 		case 1:
-            return unsafe.Add(unsafe.Pointer(&w.Wram), 0x4000 + addr % 0x4000), true
+            return unsafe.Add(unsafe.Pointer(&w.Wram), 0x4000 + (addr % 0x4000)), true
 		case 2:
             return unsafe.Add(unsafe.Pointer(&w.Wram), addr % 0x4000), true
 		case 3:
@@ -113,7 +115,7 @@ func (w *WRAM) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
 	case 1:
         return unsafe.Add(unsafe.Pointer(&w.Wram), addr % 0x4000), true
 	case 2:
-        return unsafe.Add(unsafe.Pointer(&w.Wram), 0x4000 + addr % 0x4000), true
+        return unsafe.Add(unsafe.Pointer(&w.Wram), 0x4000 + (addr % 0x4000)), true
 	case 3:
         return unsafe.Add(unsafe.Pointer(&w.Wram), addr % 0x8000), true
 	}
