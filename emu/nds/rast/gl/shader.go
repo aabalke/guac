@@ -1,7 +1,7 @@
 package gl
 
 type Shader struct {
-    Texture Texture
+    Texture *Texture
 }
 
 func NewShader() *Shader {
@@ -15,5 +15,5 @@ func (s *Shader) Fragment(v *Vertex) {
 }
 
 func (s *Shader) SetTexture(texture Texture) {
-    s.Texture = texture
+    s.Texture = &texture
 }

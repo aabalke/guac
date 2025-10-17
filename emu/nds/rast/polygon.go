@@ -140,7 +140,7 @@ func (p *Polygon) GetVertex(x, y, z float64, clipMtx *gl.Matrix, color gl.Color,
     return v
 }
 
-func (p *Polygon) GetTexture(vram VRAM, cache *TextureCache) *gl.NdsTexture {
+func (p *Polygon) GetTexture(vram VRAM, cache *TextureCache) *gl.Texture {
 
     t := &p.Texture
 
@@ -148,7 +148,7 @@ func (p *Polygon) GetTexture(vram VRAM, cache *TextureCache) *gl.NdsTexture {
         return nil
     }
 
-    return &gl.NdsTexture{
+    return &gl.Texture{
         Width: int(t.SizeS),
         Height: int(t.SizeT),
         RepeatS: t.RepeatS,

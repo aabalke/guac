@@ -9,24 +9,19 @@ type VRAM interface {
     ReadPalTexture(uint32) uint8
 }
 
-type Texture interface {
-	Sample(u, v float64) Color
-	BilinearSample(u, v float64) Color
-}
-
-type NdsTexture struct {
+type Texture struct {
     Width, Height       int
 	RepeatS, RepeatT    bool
 	FlipS, FlipT        bool
     CachedTexture       *[]Color
 }
 
-func (t *NdsTexture) Sample(u, v float64) Color {
+func (t *Texture) Sample(u, v float64) Color {
     x, y := t.getTextureCoords(u, v)
     return t.getColor(x, y)
 }
 
-func (t *NdsTexture) BilinearSample(u, v float64) Color {
+func (t *Texture) BilinearSample(u, v float64) Color {
     coords := getBilinearCoords(float64(t.Width), float64(t.Height), u, v)
 	c00 := t.getColor(coords.X0, coords.Y0)
 	c01 := t.getColor(coords.X0, coords.Y1)
@@ -41,10 +36,9 @@ func (t *NdsTexture) BilinearSample(u, v float64) Color {
 	return c
 }
 
-func (t *NdsTexture) getColor(x, y uint32) Color {
+func (t *Texture) getColor(x, y uint32) Color {
 
     idx := (x + y * uint32(t.Width))
-
     if idx >= uint32(len(*t.CachedTexture)) {
         return Transparent
     }
@@ -52,7 +46,7 @@ func (t *NdsTexture) getColor(x, y uint32) Color {
     return (*t.CachedTexture)[idx]
 }
 
-func (t *NdsTexture) getTextureCoords(u, v float64) (uint32, uint32) {
+func (t *Texture) getTextureCoords(u, v float64) (uint32, uint32) {
 
 	x := int(u * float64(t.Width))
 	y := int(v * float64(t.Height))

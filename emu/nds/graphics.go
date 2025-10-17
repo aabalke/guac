@@ -154,7 +154,6 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 		}
 
         ObjectLoop:
-		//for j := len((*objPriorities)[i]) - 1; j >= 0; j-- {
 		for j := 0; j < len((*objPriorities)[i]); j++ {
 
 			objIdx := (*objPriorities)[i][j]

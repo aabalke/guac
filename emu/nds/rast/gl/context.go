@@ -249,8 +249,8 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 				continue
 			}
 			// update buffers atomically
-			lock := &dc.locks[(x+y)&255]
-			lock.Lock()
+			//lock := &dc.locks[(x+y)&255]
+			//lock.Lock()
 			// check depth buffer again
 			if bz <= dc.DepthBuffer[i] || !dc.ReadDepth {
 				info.UpdatedPixels++
@@ -277,7 +277,7 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 					}
 				}
 			}
-			lock.Unlock()
+			//lock.Unlock()
 		}
 		w00 += b12
 		w01 += b20

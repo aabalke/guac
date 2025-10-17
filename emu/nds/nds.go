@@ -3,6 +3,7 @@ package nds
 import (
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/cpu"
@@ -225,16 +226,37 @@ func (nds *Nds) checkMode(arm9 bool) {
     }
 }
 
+var wg2 = sync.WaitGroup{}
 
 func (nds *Nds) Update() {
 
-    r := &nds.arm9.Reg.R
-    r7 := &nds.arm7.Reg.R
 
 	if nds.Paused {
 		return
 	}
 
+	wg2.Add(2)
+
+    go func() {
+        defer wg2.Done()
+        if nds.ppu.EngineA.Dispcnt.Is3D {
+            nds.ppu.Rasterizer.Render.UpdateRender()
+        }
+    }()
+
+    go func() {
+        defer wg2.Done()
+        nds.UpdateFrame()
+    }()
+
+
+    wg2.Wait()
+}
+
+func (nds *Nds) UpdateFrame() {
+
+    r := &nds.arm9.Reg.R
+    r7 := &nds.arm7.Reg.R
 	for nds.Drawn = false; !nds.Drawn; {
 
         //nds.checkBadPc()
@@ -244,7 +266,7 @@ func (nds *Nds) Update() {
 
 		if !nds.arm9.Halted {
             thumbExec :=  nds.arm9.Reg.IsThumb
-            armExec := !nds.arm9.Reg.IsThumb && nds.AccCycles & 0b1 == 0
+            armExec :=   !nds.arm9.Reg.IsThumb && nds.AccCycles & 0b1 == 0
 
             if thumbExec || armExec  {
                 //nds.checkMode(true)
@@ -266,7 +288,7 @@ func (nds *Nds) Update() {
 
         if !nds.arm7.Halted {
             thumbExec :=  nds.arm7.Reg.IsThumb && nds.AccCycles & 0b1 == 0
-            armExec := !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b11 == 0
+            armExec :=   !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b11 == 0
 
             if thumbExec || armExec  {
                 //nds.checkMode(false)
@@ -294,12 +316,13 @@ func (nds *Nds) Update() {
 
         CURR_INST++
 	}
+
 	nds.mem.Snd.Play(nds.Muted)
 }
 
 // run timer update only every mask amount of cycles
 var timerCycles uint8
-const timerMask = 0b11
+const timerMask = 0b111
 
 func (nds *Nds) ToggleMute() bool {
 	nds.Muted = !nds.Muted
@@ -447,10 +470,6 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 
 	if currFrameCycles < prevFrameCycles {
 		nds.Drawn = true
-
-        if nds.ppu.EngineA.Dispcnt.Is3D {
-            nds.ppu.Rasterizer.Render.UpdateRender()
-        }
 	}
 }
 

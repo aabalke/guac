@@ -10,22 +10,21 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 
 	opcode := cpu.mem.Read32(r[PC], true)
 
-    switch {
-    case isBLX(opcode):
-        cpu.BLX(opcode)
-        return 4, true
+        switch {
+        case isBLX(opcode):
+            cpu.BLX(opcode)
+            return 4, true
 
-    case isPLD(opcode):
-        fmt.Printf("PC %08X OPCODE %08X CPSR %08X\n", r[PC], opcode, cpu.Reg.CPSR)
-        panic("PLD")
-        return 4, true
+        case isPLD(opcode):
+            fmt.Printf("PC %08X OPCODE %08X CPSR %08X\n", r[PC], opcode, cpu.Reg.CPSR)
+            panic("PLD")
+            return 4, true
 
-    case !cpu.CheckCond(opcode >> 28):
+        case !cpu.CheckCond(opcode >> 28):
 
-		r[PC] += 4
-		return 4, true
-    }
-
+            r[PC] += 4
+            return 4, true
+        }
 
 	if swi := (opcode>>24)&0xF == 0xF; swi {
 		//cpu.Gba.Mem.BIOS_MODE = BIOS_SWI

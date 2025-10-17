@@ -375,6 +375,11 @@ func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
 }
 func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
 
+    if arm9 && addr == 0x400_0400 {
+        mem.ppu.Rasterizer.GeoEngine.Fifo(v)
+        return
+    }
+
     if ptr, ok := mem.WritePtr(addr, arm9); ok {
         binary.LittleEndian.PutUint32((*[4]uint8)(ptr)[:], v)
         return
@@ -388,7 +393,8 @@ func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
         }
 
         if gxfifo := addr >= 0x400_0400 && addr < 0x4000440; gxfifo {
-            mem.ppu.Rasterizer.GeoCmdFifo(v)
+            mem.ppu.Rasterizer.GeoEngine.Fifo(v)
+            //mem.ppu.Rasterizer.GeoCmdFifo(v)
             return
         }
 
@@ -412,7 +418,7 @@ func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
 }
 
 func (mem *Mem) WriteGXFIFO(v uint32) {
-    mem.ppu.Rasterizer.GeoCmdFifo(v)
+    mem.ppu.Rasterizer.GeoEngine.Fifo(v)
 }
 
 func (mem *Mem) ReadArm9IO(addr uint32) uint8 {

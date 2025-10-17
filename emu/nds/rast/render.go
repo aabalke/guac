@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 
+	"sync"
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 )
 
@@ -20,6 +21,8 @@ type Render struct {
 	Context *gl.Context
     Buffers *Buffers
     RearPlane *RearPlane
+
+	lock        sync.Mutex
 }
 
 func NewRender(rast *Rasterizer, buffers *Buffers, rp *RearPlane) *Render {
@@ -34,6 +37,7 @@ func NewRender(rast *Rasterizer, buffers *Buffers, rp *RearPlane) *Render {
     }
 
     r.Context.Cull = gl.CullNone
+    r.Context.Shader = gl.NewShader()
 
     return r
 }
@@ -44,15 +48,13 @@ func (r *Render) UpdateRender() {
     r.Context.ClearColorBuffer()
     r.Context.ClearDepthBuffer()
 
-    r.Context.Shader = gl.NewShader()
+    polygons := r.Buffers.GetPolygons()
 
-    for _, p := range r.Buffers.GetPolygons() {
+    for _, p := range polygons {
         r.RenderPolygon(&p)
     }
 
-	image := r.Context.Image()
-
-    r.ImageToPixels(image)
+    r.ImageToPixels(r.Context.Image())
 }
 
 func (r *Render) RenderPolygon(p *Polygon) {
@@ -70,7 +72,7 @@ func (r *Render) RenderPolygon(p *Polygon) {
 
         for i := 0; i < len(p.Vertices); i += 3 {
             if p.Vertices[i].NdsTexture != nil {
-                r.Context.Shader.SetTexture(p.Vertices[i].NdsTexture)
+                r.Context.Shader.SetTexture(*p.Vertices[i].NdsTexture)
                 tW := int(p.Texture.SizeS)
                 tH := int(p.Texture.SizeT)
 
@@ -96,7 +98,7 @@ func (r *Render) RenderPolygon(p *Polygon) {
         for i := 0; i < len(p.Vertices); i += 4 {
 
             if p.Vertices[i].NdsTexture != nil {
-                r.Context.Shader.SetTexture(p.Vertices[i].NdsTexture)
+                r.Context.Shader.SetTexture(*p.Vertices[i].NdsTexture)
                 tW := int(p.Texture.SizeS)
                 tH := int(p.Texture.SizeT)
 
@@ -120,7 +122,7 @@ func (r *Render) RenderPolygon(p *Polygon) {
         for i := 2; i < len(p.Vertices); i++ {
 
             if p.Vertices[i].NdsTexture != nil {
-                r.Context.Shader.SetTexture(p.Vertices[i].NdsTexture)
+                r.Context.Shader.SetTexture(*p.Vertices[i].NdsTexture)
                 tW := int(p.Texture.SizeS)
                 tH := int(p.Texture.SizeT)
 
@@ -152,7 +154,7 @@ func (r *Render) RenderPolygon(p *Polygon) {
         for i := 2; i + 1 < len(p.Vertices); i += 2 {
 
             if p.Vertices[i].NdsTexture != nil {
-                r.Context.Shader.SetTexture(p.Vertices[i].NdsTexture)
+                r.Context.Shader.SetTexture(*p.Vertices[i].NdsTexture)
                 tW := int(p.Texture.SizeS)
                 tH := int(p.Texture.SizeT)
 
@@ -175,6 +177,8 @@ func (r *Render) RenderPolygon(p *Polygon) {
 }
 
 func (r *Render) ImageToPixels(img image.Image) {
+    r.lock.Lock()
+
     i := 0
     for y := range HEIGHT {
         for x := range WIDTH {
@@ -184,6 +188,8 @@ func (r *Render) ImageToPixels(img image.Image) {
             i++
         }
     }
+
+	r.lock.Unlock()
 }
 
 func RGB24ToRGB15(r, g, b uint8) uint16 {

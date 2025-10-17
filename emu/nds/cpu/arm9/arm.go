@@ -4,13 +4,10 @@ import (
 	"fmt"
 	"math"
 	"math/bits"
-	"os"
 
 	"github.com/aabalke/guac/emu/nds/cpu/cp15"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
-
-var _ = os.Args
 
 const (
 	AND = iota
@@ -77,11 +74,8 @@ func (cpu *Cpu) Alu(opcode uint32) {
 	switch alu.Inst {
 	case AND, EOR, ORR, MOV, MVN, BIC:
 		alu.LogicalFlags = true
-		alu.Test = false
 		cpu.logical(alu)
 	case ADD, ADC, SUB, SBC, RSB, RSC:
-		alu.LogicalFlags = false
-		alu.Test = false
 		cpu.arithmetic(alu)
 	case TST, TEQ:
 		alu.Test = true
@@ -89,7 +83,6 @@ func (cpu *Cpu) Alu(opcode uint32) {
 		cpu.test(alu)
 	case CMP, CMN:
 		alu.Test = true
-		alu.LogicalFlags = false
 		cpu.test(alu)
 	}
 
@@ -620,7 +613,7 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 	switch {
 	case sdt.Load && sdt.Byte:
 		// DO NOT WORD ALIGN
-		r[sdt.Rd] = uint32(c.mem.Read8(pre, true))
+		r[sdt.Rd] = c.mem.Read8(pre, true)
 
 	case sdt.Load && !sdt.Byte:
 

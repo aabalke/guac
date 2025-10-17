@@ -129,20 +129,6 @@ func (a Matrix) MulVectorW(b VectorW) VectorW {
     y := b.X*a.X01 + b.Y*a.X11 + b.Z*a.X21 + b.W*a.X31
     z := b.X*a.X02 + b.Y*a.X12 + b.Z*a.X22 + b.W*a.X32
     w := b.X*a.X03 + b.Y*a.X13 + b.Z*a.X23 + b.W*a.X33
-
-    // col based
-	//x := a.X00*b.X + a.X01*b.Y + a.X02*b.Z + a.X03*b.W
-	//y := a.X10*b.X + a.X11*b.Y + a.X12*b.Z + a.X13*b.W
-	//z := a.X20*b.X + a.X21*b.Y + a.X22*b.Z + a.X23*b.W
-	//w := a.X30*b.X + a.X31*b.Y + a.X32*b.Z + a.X33*b.W
-
-    //w = 4
-
-    //fmt.Printf("%v %v %v %v\n", b.X, b.Y, b.Z, W)
-    //fmt.Printf("%v %v %v %v\n", a.X30, a.X31, a.X32, a.X33)
-
-    //fmt.Printf("W IN % f OUT % f %v\n", b.W, w, b)
-    //w = 4
 	return VectorW{x, y, z, w}
 
 }
@@ -152,26 +138,6 @@ func (a Matrix) MulDirection(b Vector) Vector {
 	y := a.X10*b.X + a.X11*b.Y + a.X12*b.Z
 	z := a.X20*b.X + a.X21*b.Y + a.X22*b.Z
 	return Vector{x, y, z}.Normalize()
-}
-
-func (a Matrix) MulBox(box Box) Box {
-	// http://dev.theomader.com/transform-bounding-boxes/
-	r := Vector{a.X00, a.X10, a.X20}
-	u := Vector{a.X01, a.X11, a.X21}
-	b := Vector{a.X02, a.X12, a.X22}
-	t := Vector{a.X03, a.X13, a.X23}
-	xa := r.MulScalar(box.Min.X)
-	xb := r.MulScalar(box.Max.X)
-	ya := u.MulScalar(box.Min.Y)
-	yb := u.MulScalar(box.Max.Y)
-	za := b.MulScalar(box.Min.Z)
-	zb := b.MulScalar(box.Max.Z)
-	xa, xb = xa.Min(xb), xa.Max(xb)
-	ya, yb = ya.Min(yb), ya.Max(yb)
-	za, zb = za.Min(zb), za.Max(zb)
-	min := xa.Add(ya).Add(za).Add(t)
-	max := xb.Add(yb).Add(zb).Add(t)
-	return Box{min, max}
 }
 
 func (a *Matrix) Print() {

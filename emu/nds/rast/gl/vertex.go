@@ -7,13 +7,12 @@ type Vertex struct {
 	Color    Color
 	Output   VectorW
     W float64
-
     S, T float64
 
     DiffuseColor Color
     EmissionColor Color
 
-    NdsTexture *NdsTexture
+    NdsTexture *Texture
 }
 
 func (a Vertex) Outside() bool {
@@ -57,7 +56,6 @@ func InterpolateVectors(v1, v2, v3 Vector, b VectorW) Vector {
 	n = n.Add(v1.MulScalar(b.X))
 	n = n.Add(v2.MulScalar(b.Y))
 	n = n.Add(v3.MulScalar(b.Z))
-
 	return n.MulScalar(b.W)
 }
 
