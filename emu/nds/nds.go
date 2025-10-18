@@ -230,7 +230,6 @@ var wg2 = sync.WaitGroup{}
 
 func (nds *Nds) Update() {
 
-
 	if nds.Paused {
 		return
 	}
@@ -248,7 +247,6 @@ func (nds *Nds) Update() {
         defer wg2.Done()
         nds.UpdateFrame()
     }()
-
 
     wg2.Wait()
 }

@@ -52,9 +52,9 @@ func (p *Polygon) WriteAttrs(v uint32) {
     p.Id = utils.GetVarData(v, 24, 29)
 
     // some 3d examples set alpha to zero, but display solid (Mixed 3d text example)
-    if p.Alpha == 0 {
-        p.Alpha = 1
-    }
+    //if p.Alpha == 0 {
+    //    p.Alpha = 1
+    //}
 
     //fmt.Printf("LIGHTS % v\n", p.LightsEnabled)
 }
@@ -68,42 +68,44 @@ const (
     V_DF = 5
 )
 
-func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Vertex {
-
-    c := g.Color
-    //c.A = g.ActivePoly.Alpha
-
-    S := g.Texture.S
-    T := g.Texture.T
-
-    var x, y, z float64
-
-    switch method {
-    case V_16:
-        x = utils.Convert16ToFloat(uint16(data[1]), 12)
-        y = utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
-        z = utils.Convert16ToFloat(uint16(data[2]), 12)
-    case V_10:
-        x = utils.Convert10ToFloat(uint16(data[1]), 6)
-        y = utils.Convert10ToFloat(uint16(data[1] >> 10), 6)
-        z = utils.Convert10ToFloat(uint16(data[1] >> 20), 6)
-    case V_XY:
-        prev := g.Vertex
-        x = utils.Convert16ToFloat(uint16(data[1]), 12)
-        y = utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
-        z = prev.Position.Z
-    case V_XZ:
-        prev := g.Vertex
-        x = utils.Convert16ToFloat(uint16(data[1]), 12)
-        y = prev.Position.Y
-        z = utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
-    case V_YZ:
-        prev := g.Vertex
-        x = prev.Position.X
-        y = utils.Convert16ToFloat(uint16(data[1]), 12)
-        z = utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
-    case V_DF:
-        prev := g.Vertex
+var coordFuncs = [...]func(data []uint32, prev *gl.Vertex) (float64, float64, float64) {
+    //V_16:
+    func(data []uint32, _ *gl.Vertex) (float64, float64, float64) {
+        x := utils.Convert16ToFloat(uint16(data[1]), 12)
+        y := utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
+        z := utils.Convert16ToFloat(uint16(data[2]), 12)
+        return x, y, z
+    },
+    //V_10:
+    func(data []uint32, _ *gl.Vertex) (float64, float64, float64) {
+        x := utils.Convert10ToFloat(uint16(data[1]), 6)
+        y := utils.Convert10ToFloat(uint16(data[1] >> 10), 6)
+        z := utils.Convert10ToFloat(uint16(data[1] >> 20), 6)
+        return x, y, z
+    },
+    //V_XY:
+    func(data []uint32, prev *gl.Vertex) (float64, float64, float64) {
+        x := utils.Convert16ToFloat(uint16(data[1]), 12)
+        y := utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
+        z := prev.Position.Z
+        return x, y, z
+    },
+    //V_XZ:
+    func(data []uint32, prev *gl.Vertex) (float64, float64, float64) {
+        x := utils.Convert16ToFloat(uint16(data[1]), 12)
+        y := prev.Position.Y
+        z := utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
+        return x, y, z
+    },
+    //V_YZ:
+    func(data []uint32, prev *gl.Vertex) (float64, float64, float64) {
+        x := prev.Position.X
+        y := utils.Convert16ToFloat(uint16(data[1]), 12)
+        z := utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
+        return x, y, z
+    },
+    //V_DF:
+    func(data []uint32, prev *gl.Vertex) (float64, float64, float64) {
         convert := func(v uint32) float64 {
             v &= 0x3FF
             sext := int32(v << 22) >> 22
@@ -111,38 +113,37 @@ func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Ver
             return f / 8.0
         }
 
-        x = convert(data[1])     + prev.Position.X
-        y = convert(data[1]>>10) + prev.Position.Y
-        z = convert(data[1]>>20) + prev.Position.Z
-    }
+        x := convert(data[1])     + prev.Position.X
+        y := convert(data[1]>>10) + prev.Position.Y
+        z := convert(data[1]>>20) + prev.Position.Z
+        return x, y, z
+    },
+}
 
-    v := p.GetVertex(x, y, z, &g.ClipMatrix, c, S, T, &g.StoredNormal)
-    v.NdsTexture = p.GetTexture(g.Vram, &g.TextureCache)
+func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Vertex {
+    x, y, z := coordFuncs[method](data, g.Vertex)
+    v := p.GetVertex(g, x, y, z)
     p.Vertices = append(p.Vertices, v)
     return &v
 }
 
-func (p *Polygon) GetVertex(x, y, z float64, clipMtx *gl.Matrix, color gl.Color, S, T float64, normal *gl.Vector) gl.Vertex {
-
-    vert := gl.VectorW{X: x,Y: y,Z: z,W: 1.0}
-    output := clipMtx.MulVectorW(vert)
-
-    v := gl.Vertex{
-        Normal: *normal,
-        Position: gl.Vector{ X: x, Y: y, Z: z },
-        Color: color,
-        W: 1.0,
-        S: S,
-        T: T,
+func (p *Polygon) GetVertex(g *GeoEngine, x, y, z float64) gl.Vertex {
+    pos := gl.VectorW{X: x, Y: y, Z: z, W: 1.0}
+    output := g.ClipMatrix.MulVectorW(pos)
+    return gl.Vertex{
+        Normal: g.StoredNormal,
+        Position: pos,
+        Color: g.Color,
+        S: g.Texture.S,
+        T: g.Texture.T,
         Output: output,
+        NdsTexture: p.GetTexture(g.Vram, &g.TextureCache, g.Texture),
     }
-
-    return v
 }
 
-func (p *Polygon) GetTexture(vram VRAM, cache *TextureCache) *gl.Texture {
+func (p *Polygon) GetTexture(vram VRAM, cache *TextureCache, t Texture) *gl.Texture {
 
-    t := &p.Texture
+    // texture has to be copy
 
     if t.Format == TEX_FMT_NONE {
         return nil
@@ -155,6 +156,6 @@ func (p *Polygon) GetTexture(vram VRAM, cache *TextureCache) *gl.Texture {
         RepeatT: t.RepeatT,
         FlipS: t.FlipS,
         FlipT: t.FlipT,
-        CachedTexture: cache.Get(vram, t),
+        CachedTexture: cache.Get(vram, &t),
     }
 }

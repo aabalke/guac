@@ -14,6 +14,6 @@ func (s *Shader) Fragment(v *Vertex) {
     }
 }
 
-func (s *Shader) SetTexture(texture Texture) {
-    s.Texture = &texture
+func (s *Shader) SetTexture(texture *Texture) {
+    s.Texture = texture
 }

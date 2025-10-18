@@ -17,6 +17,7 @@ const (
 )
 
 type Texture struct {
+    Discard bool
 	Sv, Tv               float64
 	S, T               float64
 	VramOffset         uint32

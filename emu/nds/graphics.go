@@ -100,6 +100,31 @@ func (nds *Nds) standard(y uint32, engine *ppu.Engine) {
 	wg.Wait()
 }
 
+var bgFuncs = [...]func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (palData uint32, ok bool) {
+    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, bool) {
+        return nds.setBackgroundPixel(engine, bg, bgIdx, x, y)
+    },
+    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, bool) {
+        return nds.setAffineBackgroundPixel(engine, bg, bgIdx, x)
+    },
+    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, bool) {
+        return nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
+    },
+    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, bool) {
+        palData, _, ok := nds.set3d(engine, bg, x, y)
+        return palData, ok
+    },
+    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, bool) {
+        return nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
+    },
+    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, bool) {
+        return nds.setBmpBackgroundPixel(engine, bg, x)
+    },
+    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, bool) {
+        return nds.setDirectBitmap(engine, bg, x)
+    },
+}
+
 func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 	dispcnt := &engine.Dispcnt
 	wins := &engine.Windows
@@ -125,24 +150,8 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 				continue
 			}
 
-            palData, alpha, ok := uint32(0), float64(1), false
-
-            switch bg.Type {
-            case ppu.BG_TYPE_TEX:
-                palData, ok = nds.setBackgroundPixel(engine, bg, bgIdx, x, y)
-            case ppu.BG_TYPE_AFF:
-				palData, ok = nds.setAffineBackgroundPixel(engine, bg, bgIdx, x)
-            case ppu.BG_TYPE_LAR:
-				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
-            case ppu.BG_TYPE_3D :
-                palData, alpha, ok = nds.set3d(engine, bg, x, y)
-            case ppu.BG_TYPE_BGM:
-				palData, ok = nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
-            case ppu.BG_TYPE_256:
-				palData, ok = nds.setBmpBackgroundPixel(engine, bg, x)
-            case ppu.BG_TYPE_DIR:
-				palData, ok = nds.setDirectBitmap(engine, bg, x)
-            }
+            alpha := float64(1)
+            palData, ok := bgFuncs[bg.Type](nds, engine, bg, bgIdx, x, y)
 
 			if ok {
 				bldPal.SetBlendPalettes(palData, uint32(bgIdx), false, false, true, alpha)
@@ -156,17 +165,15 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
         ObjectLoop:
 		for j := 0; j < len((*objPriorities)[i]); j++ {
 
-			objIdx := (*objPriorities)[i][j]
-	        obj := &engine.Objects[objIdx]
-
-            obj.OneDimensional = dispcnt.TileObj1D
-
 			if !ppu.WindowObjPixelAllowed(x, y, wins) {
 				continue
 			}
 
-			var palData uint32
-			var ok bool
+			objIdx := (*objPriorities)[i][j]
+	        obj := &engine.Objects[objIdx]
+            obj.OneDimensional = dispcnt.TileObj1D
+
+            palData, ok := uint32(0), false
 
             if bmp:= obj.Mode == 3; bmp {
                 palData, ok = nds.setObjBmpPixel(engine, obj, x, y)
@@ -174,16 +181,19 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
                 palData, ok = nds.setObjTilePixel(engine, obj, x, y)
             }
 
-			switch {
-			case ok && obj.Mode == 2:
-				inObjWindow = true
-				break ObjectLoop
-			case ok:
-				objMode = obj.Mode
-				bldPal.SetBlendPalettes(palData, 0, true, objMode == 1, false, 0)
-				break ObjectLoop
-			}
-		}
+            if !ok {
+                continue
+            }
+
+            if obj.Mode == 2 {
+                inObjWindow = true
+                break ObjectLoop
+            }
+
+            objMode = obj.Mode
+            bldPal.SetBlendPalettes(palData, 0, true, objMode == 1, false, 0)
+            break ObjectLoop
+        }
 	}
 
 	palData := bldPal.Blend(objMode == 1, x, y, wins, inObjWindow)

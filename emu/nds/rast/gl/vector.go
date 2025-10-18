@@ -245,3 +245,10 @@ func (a VectorW) MulScalar(b float64) VectorW {
 func (a VectorW) DivScalar(b float64) VectorW {
 	return VectorW{a.X / b, a.Y / b, a.Z / b, a.W / b}
 }
+
+func (a VectorW) Cross(b VectorW) Vector {
+	x := a.Y*b.Z - a.Z*b.Y
+	y := a.Z*b.X - a.X*b.Z
+	z := a.X*b.Y - a.Y*b.X
+	return Vector{x, y, z}
+}

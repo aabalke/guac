@@ -1,17 +1,12 @@
 package gl
 
 type Vertex struct {
-	Position Vector
+	Position VectorW
 	Normal   Vector
 	Texture  Vector
 	Color    Color
 	Output   VectorW
-    W float64
     S, T float64
-
-    DiffuseColor Color
-    EmissionColor Color
-
     NdsTexture *Texture
 }
 
@@ -26,7 +21,7 @@ func (vert *Vertex) CalcTextureVector(w, h int) {
 }
 
 func (v *Vertex) InterpolateVertexes(v1, v2, v3 Vertex, b VectorW) *Vertex {
-	v.Position = InterpolateVectors(v1.Position, v2.Position, v3.Position, b)
+	v.Position = InterpolateVectorWs(v1.Position, v2.Position, v3.Position, b)
 	v.Normal = InterpolateVectors(v1.Normal, v2.Normal, v3.Normal, b)
     v.Normal.NormalizePtr()
 	v.Texture = InterpolateVectors(v1.Texture, v2.Texture, v3.Texture, b)

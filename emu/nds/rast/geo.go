@@ -406,7 +406,10 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         }
 
         g.ActivePoly = g.PrepPoly
-        g.PrepPoly = Polygon{}
+
+        // do not clear poly - need state of params for next
+        //g.PrepPoly = Polygon{}
+        //g.PrepPoly.LightsEnabled
 
         g.ActivePoly.PrimitiveType = uint8(data[1] & 0b11)
 
@@ -447,7 +450,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         fmt.Printf("UNSETUP GX CMD %02X\n", cmd)
     }
     // this is necessary because "GetTexture" method requires copy of g.Texture NOT pointer
-    g.ActivePoly.Texture = g.Texture
+    //g.ActivePoly.Texture = g.Texture
 
     g.Data = []uint32{}
     g.UpdateClipMtx()
@@ -530,7 +533,6 @@ func (g *GeoEngine) AddPolygon() {
     g.ActivePoly.Texture = g.Texture
     g.Buffers.Append(g.ActivePoly)
     g.ActivePoly.Vertices = []gl.Vertex{}
-
 }
 
 func Write15BitColor(v uint32) gl.Color {

@@ -63,6 +63,14 @@ func (r *Render) RenderPolygon(p *Polygon) {
         return
     }
 
+    if p.Mode == 3 {
+        for i := range p.Vertices {
+            p.Vertices[i].Color = gl.Transparent
+            p.Vertices[i].NdsTexture = nil
+            //p.Vertices[i].Color = gl.Color{A: 1, R: 1}
+        }
+    }
+
     switch p.PrimitiveType {
     case PRIM_SEP_TRI:
 
@@ -71,10 +79,10 @@ func (r *Render) RenderPolygon(p *Polygon) {
         }
 
         for i := 0; i < len(p.Vertices); i += 3 {
+            r.Context.Shader.SetTexture(p.Vertices[i].NdsTexture)
             if p.Vertices[i].NdsTexture != nil {
-                r.Context.Shader.SetTexture(*p.Vertices[i].NdsTexture)
-                tW := int(p.Texture.SizeS)
-                tH := int(p.Texture.SizeT)
+                tW := p.Vertices[i].NdsTexture.Width
+                tH := p.Vertices[i].NdsTexture.Height
 
                 p.Vertices[i+2].CalcTextureVector(tW, tH)
                 p.Vertices[i+1].CalcTextureVector(tW, tH)
@@ -97,10 +105,10 @@ func (r *Render) RenderPolygon(p *Polygon) {
 
         for i := 0; i < len(p.Vertices); i += 4 {
 
+            r.Context.Shader.SetTexture(p.Vertices[i].NdsTexture)
             if p.Vertices[i].NdsTexture != nil {
-                r.Context.Shader.SetTexture(*p.Vertices[i].NdsTexture)
-                tW := int(p.Texture.SizeS)
-                tH := int(p.Texture.SizeT)
+                tW := p.Vertices[i].NdsTexture.Width
+                tH := p.Vertices[i].NdsTexture.Height
 
                 p.Vertices[i+3].CalcTextureVector(tW, tH)
                 p.Vertices[i+2].CalcTextureVector(tW, tH)
@@ -121,10 +129,10 @@ func (r *Render) RenderPolygon(p *Polygon) {
 
         for i := 2; i < len(p.Vertices); i++ {
 
+            r.Context.Shader.SetTexture(p.Vertices[i].NdsTexture)
             if p.Vertices[i].NdsTexture != nil {
-                r.Context.Shader.SetTexture(*p.Vertices[i].NdsTexture)
-                tW := int(p.Texture.SizeS)
-                tH := int(p.Texture.SizeT)
+                tW := p.Vertices[i].NdsTexture.Width
+                tH := p.Vertices[i].NdsTexture.Height
 
                 p.Vertices[i-2].CalcTextureVector(tW, tH)
                 p.Vertices[i-1].CalcTextureVector(tW, tH)
@@ -153,10 +161,10 @@ func (r *Render) RenderPolygon(p *Polygon) {
 
         for i := 2; i + 1 < len(p.Vertices); i += 2 {
 
+            r.Context.Shader.SetTexture(p.Vertices[i].NdsTexture)
             if p.Vertices[i].NdsTexture != nil {
-                r.Context.Shader.SetTexture(*p.Vertices[i].NdsTexture)
-                tW := int(p.Texture.SizeS)
-                tH := int(p.Texture.SizeT)
+                tW := p.Vertices[i].NdsTexture.Width
+                tH := p.Vertices[i].NdsTexture.Height
 
                 p.Vertices[i-2].CalcTextureVector(tW, tH)
                 p.Vertices[i-1].CalcTextureVector(tW, tH)
