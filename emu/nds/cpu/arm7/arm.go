@@ -537,64 +537,6 @@ const (
 	LDR_PLD
 )
 
-var sdtInstance Sdt
-
-type Sdt struct {
-	Opcode, Rd, Rn, RnValue, RdValue, Offset, Shift, ShiftType, Rm uint32
-	Set, I, Load, WriteBack, MemoryMgmt, Pre, Up, Byte, Pld        bool
-}
-
-func NewSdtData(opcode uint32, cpu *Cpu) *Sdt {
-	valid := utils.GetVarData(opcode, 26, 27) == 0b01
-	if !valid {
-		panic("Malformed Sdt Instruction")
-	}
-
-	sdtInstance = Sdt{
-		Opcode: opcode,
-		I:      utils.BitEnabled(opcode, 25),
-		Pre:    utils.BitEnabled(opcode, 24),
-		Up:     utils.BitEnabled(opcode, 23),
-		Byte:   utils.BitEnabled(opcode, 22),
-		Load:   utils.BitEnabled(opcode, 20),
-		Rn:     utils.GetByte(opcode, 16),
-		Rd:     utils.GetByte(opcode, 12),
-	}
-
-	sdt := &sdtInstance
-
-	if sdt.Pre {
-		sdt.WriteBack = utils.BitEnabled(opcode, 21)
-	} else {
-		sdt.MemoryMgmt = utils.BitEnabled(opcode, 21)
-	}
-
-	if sdt.I {
-		sdt.Shift = utils.GetVarData(opcode, 7, 11)
-		sdt.ShiftType = utils.GetVarData(opcode, 5, 6)
-
-		if utils.BitEnabled(opcode, 4) {
-			panic("Malformed Single Data Transfer")
-		}
-
-		sdt.Rm = utils.GetByte(opcode, 0)
-	} else {
-		sdt.Offset = utils.GetVarData(opcode, 0, 11)
-	}
-
-	sdt.RdValue = cpu.Reg.R[sdt.Rd]
-	sdt.RnValue = cpu.Reg.R[sdt.Rn]
-
-	sdt.Pld = (opcode>>28) == 0b1111 &&
-		sdt.Pre == true &&
-		sdt.Byte == true &&
-		sdt.WriteBack == false &&
-		sdt.Load == true &&
-		sdt.Rd == 0b1111
-
-	return sdt
-}
-
 func (c *Cpu) Sdt(opcode uint32) uint32 {
 
 	r := &c.Reg.R
@@ -603,58 +545,70 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
         fmt.Printf("SDT MALFORMED PC %08X OPCODE %08X\n", r[15], opcode)
     }
 
+    rd := utils.GetByte(opcode, 12)
+    rn := utils.GetByte(opcode, 16)
+    byte := utils.BitEnabled(opcode, 22)
+    load := utils.BitEnabled(opcode, 20)
 
-	sdt := NewSdtData(opcode, c)
-
-	pre, post, _ := generateSdtAddress(sdt, c)
+	post := generateSdtAddress(c, opcode)
+    pre := r[rn]
+    preFlag := utils.BitEnabled(opcode, 24)
+    if preFlag {
+        pre = post
+	}
 
 	addr := pre &^ 0b11
 
-	if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
-		addr = pre
-	}
+	//if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
+	//	addr = pre
+	//}
 
-	if sdt.Pld {
+    if pld := ((opcode>>28) == 0b1111 &&
+		preFlag &&
+		byte &&
+        !utils.BitEnabled(opcode, 21) &&
+		load &&
+		rd == 0b1111); pld {
 		panic("Need to handle PLD Inst")
-	}
+    }
 
 	switch {
-	case sdt.Load && sdt.Byte:
+	case load && byte:
 
 		// DO NOT WORD ALIGN
-		r[sdt.Rd] = uint32(c.mem.Read8(pre, false))
+		r[rd] = uint32(c.mem.Read8(pre, false))
 
-	case sdt.Load && !sdt.Byte:
+	case load && !byte:
 
 		v := c.mem.Read32(addr, false)
 		is := (pre & 0b11) << 3
 		v = utils.RorSimple(v, is)
 		//v, _, _ = utils.Ror(v, is, false, false, false)
 
-		if sdt.Rd == PC { // not sure if this is right
+		if rd == PC { // not sure if this is right
 			v -= 4
 		}
 
-		r[sdt.Rd] = v
+		r[rd] = v
 
-	case !sdt.Load && sdt.Byte:
+	case !load && byte:
 
-		c.mem.Write8(pre, uint8(r[sdt.Rd]), false)
+		c.mem.Write8(pre, uint8(r[rd]), false)
 
-	case !sdt.Load && !sdt.Byte:
+	case !load && !byte:
 
-		v := r[sdt.Rd]
-		if sdt.Rd == PC {
+		v := r[rd]
+		if rd == PC {
 			v += 12
 		}
 
 		c.mem.Write32(addr, v, false)
 	}
 
-	skipLoadWriteBack := sdt.Load && (sdt.Rn == sdt.Rd)
-
-	if (sdt.WriteBack || !sdt.Pre) && !skipLoadWriteBack {
-		r[sdt.Rn] = post
+	skipLoadWriteBack := load && (rn == rd)
+    writeback := !utils.BitEnabled(opcode, 24) || utils.BitEnabled(opcode, 21)
+	if writeback && !skipLoadWriteBack {
+		r[rn] = post
 	}
 
 	c.Reg.R[PC] += 4
@@ -662,20 +616,22 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 	return 4
 }
 
-func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack bool) {
+func generateSdtAddress(cpu *Cpu, opcode uint32) uint32 {
 
 	r := &cpu.Reg.R
 
 	var offset uint32
-	if !sdt.I {
-		offset = sdt.Offset
-	} else {
-		shift := sdt.Opcode >> 7 & 0b11111
+    if imm := utils.BitEnabled(opcode, 25); imm {
+        if utils.BitEnabled(opcode, 4) {
+            panic("Malformed Single Data Transfer")
+        }
 
-		rm := sdt.Opcode & 0b1111
+        shift := utils.GetVarData(opcode, 7, 11)
+        shiftType := utils.GetVarData(opcode, 5, 6)
+        rm := utils.GetByte(opcode, 0)
 
 		shiftArgs := utils.ShiftArgs{
-			SType:     sdt.Opcode >> 5 & 0b11,
+			SType:     shiftType,
 			Val:       r[rm],
 			Is:        shift,
 			IsCarry:   false,
@@ -684,24 +640,21 @@ func generateSdtAddress(sdt *Sdt, cpu *Cpu) (pre uint32, post uint32, writeBack 
 		}
 
 		offset, _, _ = utils.Shift(&shiftArgs)
-	}
+	} else {
+        offset = utils.GetVarData(opcode, 0, 11)
+    }
 
-	addr := r[sdt.Rn]
-	if sdt.Rn == PC {
+	rn := utils.GetByte(opcode, 16)
+	addr := r[rn]
+	if rn == PC {
 		addr += 8
 	}
-	if sdt.Up {
-		addr += offset
 
-	} else {
-		addr -= offset
+    if up := utils.BitEnabled(opcode, 23); up {
+        return addr + offset
 	}
 
-	if sdt.Pre {
-        return addr, addr, !(offset == 0)
-	}
-
-	return r[sdt.Rn], addr, false
+    return addr - offset
 }
 
 func (cpu *Cpu) B(opcode uint32) {

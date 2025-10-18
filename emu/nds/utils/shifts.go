@@ -7,67 +7,59 @@ const (
 	ROR
 )
 
-type ShiftArgs struct {
-	SType, Val, Is                uint32
-	IsCarry, Immediate, CurrCarry bool
-}
+var ShiftFuncs = [4]func(val, is uint32, isCarry, imm, currCarry bool) (shift uint32, setCarry, carry bool) {
+    func(val, is uint32, isCarry, imm, currCarry bool) (shift uint32, setCarry, carry bool) {
 
-func Shift(s *ShiftArgs) (shift uint32, setCarry, carry bool) {
-	switch s.SType {
-	case LSL:
-		return Lsl(s.Val, s.Is, s.IsCarry, s.Immediate)
-	case LSR:
-		return Lsr(s.Val, s.Is, s.IsCarry, s.Immediate)
-	case ASR:
-		return Asr(s.Val, s.Is, s.IsCarry, s.Immediate)
-	case ROR:
-		return Ror(s.Val, s.Is, s.IsCarry, s.Immediate, s.CurrCarry)
-	default:
-		panic("Unknown Shift Type")
-	}
-}
+        // LSL
 
-func Lsl(val, is uint32, isCarry, immediate bool) (shift uint32, setCarry, carry bool) {
+        if is == 0 && imm {
+            return val, false, false
+        }
 
-	if is == 0 && immediate {
-		return val, false, false
-	}
+        if is > 32 {
+            return 0, isCarry, false
+        }
 
-	if is > 32 {
-		return 0, isCarry, false
-	}
+        setCarry = is > 0 && isCarry
+        carry = val&(1<<(32-is)) > 0
+        return val << is, setCarry, carry
+    },
+    func(val, is uint32, isCarry, imm, currCarry bool) (shift uint32, setCarry, carry bool) {
 
-	setCarry = is > 0 && isCarry
-	carry = val&(1<<(32-is)) > 0
-	return val << is, setCarry, carry
-}
+        // LSR
 
-func Lsr(val, is uint32, isCarry, immediate bool) (shift uint32, setCarry, carry bool) {
+        if is == 0 && imm {
+            is = 32
+        }
 
-	if is == 0 && immediate {
-		is = 32
-	}
+        setCarry = is > 0 && isCarry
+        carry = val&(1<<(is-1)) > 0
+        return val >> is, setCarry, carry
+    },
+    func(val, is uint32, isCarry, imm, currCarry bool) (shift uint32, setCarry, carry bool) {
 
-	setCarry = is > 0 && isCarry
-	carry = val&(1<<(is-1)) > 0
-	return val >> is, setCarry, carry
-}
+        // ASR
 
-func Asr(val, is uint32, isCarry, immediate bool) (shift uint32, setCarry, carry bool) {
+        if (is == 0 && imm) || is > 32 {
+            is = 32
+        }
 
-	if (is == 0 && immediate) || is > 32 {
-		is = 32
-	}
+        setCarry = is > 0 && isCarry
+        carry = val&(1<<(is-1)) > 0
 
-	setCarry = is > 0 && isCarry
-	carry = val&(1<<(is-1)) > 0
+        msb := val & 0x8000_0000
+        for range is {
+            val = (val >> 1) | msb
+        }
 
-	msb := val & 0x8000_0000
-	for range is {
-		val = (val >> 1) | msb
-	}
+        return val, setCarry, carry
+    },
+    func(val, is uint32, isCarry, imm, currCarry bool) (shift uint32, setCarry, carry bool) {
 
-	return val, setCarry, carry
+        // ROR
+
+        return Ror(val, is, isCarry, imm, currCarry)
+    },
 }
 
 func Ror(val, is uint32, isCarry, immediate bool, currCarry bool) (shift uint32, setCarry, carry bool) {

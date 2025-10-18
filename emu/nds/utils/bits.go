@@ -5,7 +5,7 @@ func BitEnabled(v uint32, bit uint8) bool {
 }
 
 func GetByte(i uint32, offsetBit uint8) uint32 {
-	return GetVarData(i, offsetBit, offsetBit+3)
+    return (i >> offsetBit) & 0b1111
 }
 
 func GetVarData(i uint32, s, e uint8) uint32 {
