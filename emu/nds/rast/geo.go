@@ -2,6 +2,7 @@ package rast
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/rast/gl"
@@ -46,6 +47,7 @@ func NewGeoEngine(buffers *Buffers, irq *cpu.Irq, vram VRAM) *GeoEngine {
         MtxStacks: NewMtxStacks(),
         //Color: gl.Transparent,
         TextureCache: make(map[uint32]*[]gl.Color, 0),
+        Vertex: &gl.Vertex{},
     }
 }
 
@@ -134,12 +136,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
     //fmt.Printf("C %05d %t PACKED %08X IDX %02d % 9X\n", cnt, fifo, g.PackedCmds, g.PackedIdx, data)
     //cnt++
     //fmt.Printf("DATA % X\n", data)
-
-
-    if cmd := data[0]; cmd >= 0x30 && cmd <= 0x35 {
-        g.Data = []uint32{}
-        return
-    }
 
     s := &g.MtxStacks.Stacks[g.MtxStacks.Mode]
     s1 := &g.MtxStacks.Stacks[1]
@@ -362,12 +358,47 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         }
 
         directionalMtx := g.MtxStacks.Stacks[2].CurrMtx
-        v := gl.Vector{X: x, Y: y, Z: z}
+        v := gl.Vector{
+            X: x,
+            Y: y,
+            Z: z,
+        }
 
         n := &g.LightData.Normal
         *n = directionalMtx.MulPosition(v)
-        *n = n.Normalize()
-        *n = n.MulScalar(-1)
+        //*n = n.Normalize()
+        //*n = n.MulScalar(-1)
+
+        g.Color = g.LightData.EmissionColor
+
+        for i, v := range g.LightData.Lights {
+
+            if !g.ActivePoly.LightsEnabled[i] {
+                continue
+            }
+
+            // stuff
+            diffuseLevel := max(0, -(v.Vector.Dot(*n)))
+            shininessLevel := math.Pow(max(0, -(v.HalfVector.Dot(*n))), 2)
+
+            if g.LightData.UseSpecularTbl {
+                shininessLevel = g.LightData.ShininessTbl[uint32(shininessLevel)]
+            }
+
+            g.Color.R += g.LightData.SpecularColor.R * v.Color.R * shininessLevel
+            g.Color.R += g.LightData.DiffuseColor.R * v.Color.R * diffuseLevel
+            g.Color.R += g.LightData.AmbientColor.R * v.Color.R
+
+            g.Color.G += g.LightData.SpecularColor.G * v.Color.G * shininessLevel
+            g.Color.G += g.LightData.DiffuseColor.G * v.Color.G * diffuseLevel
+            g.Color.G += g.LightData.AmbientColor.G * v.Color.G
+
+            g.Color.B += g.LightData.SpecularColor.B * v.Color.B * shininessLevel
+            g.Color.B += g.LightData.DiffuseColor.B * v.Color.B * diffuseLevel
+            g.Color.B += g.LightData.AmbientColor.B * v.Color.B
+        }
+
+        g.Color.A = 1
 
     case 0x22:
 
@@ -406,7 +437,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
     case 0x30:
 
         g.LightData.DiffuseColor = Write15BitColor(data[1])
-        g.LightData.AmbientColor = Write15BitColor(data[2])
+        g.LightData.AmbientColor = Write15BitColor(data[1]>>16)
 
         if setVertex := data[1] >> 15 != 0; setVertex {
             g.Color = g.LightData.DiffuseColor
@@ -415,7 +446,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
     case 0x31:
 
         g.LightData.SpecularColor = Write15BitColor(data[1])
-        g.LightData.EmissionColor = Write15BitColor(data[2])
+        g.LightData.EmissionColor = Write15BitColor(data[1]>>16)
         g.LightData.UseSpecularTbl = utils.BitEnabled(data[1], 15)
 
     case 0x32:
@@ -425,10 +456,15 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         z := utils.Convert10ToFloat(uint16(data[1] >> 20), 9)
         v := gl.Vector{X: x, Y: y, Z: z}
         directionalMtx := g.MtxStacks.Stacks[2].CurrMtx
+
         idx := data[1] >> 30
         light := &g.LightData.Lights[idx]
         light.Vector = directionalMtx.MulPosition(v)
         light.Vector = light.Vector.Normalize()
+
+        LINE_OF_SIGHT_VEC := gl.Vector{X: 0, Y: -1}
+        light.HalfVector = light.Vector.Add(LINE_OF_SIGHT_VEC)
+        light.HalfVector = light.HalfVector.Mul(gl.Vector{X: 0.5, Y: 0.5, Z: 0.5})
 
     case 0x33:
 
@@ -436,8 +472,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         g.LightData.Lights[idx].Color = Write15BitColor(data[1])
 
     case 0x34:
-
-        println("SET SHININESS TBL")
 
         sTbl := &g.LightData.ShininessTbl
 
@@ -460,7 +494,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
         // do not clear poly - need state of params for next
         //g.PrepPoly = Polygon{}
-        //g.PrepPoly.LightsEnabled
 
         g.ActivePoly.PrimitiveType = uint8(data[1] & 0b11)
 
@@ -500,12 +533,9 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
     default:
         fmt.Printf("UNSETUP GX CMD %02X\n", cmd)
     }
-    // this is necessary because "GetTexture" method requires copy of g.Texture NOT pointer
-    //g.ActivePoly.Texture = g.Texture
 
     g.Data = []uint32{}
     g.UpdateClipMtx()
-
 }
 
 func (g *GeoEngine) UpdateClipMtx() {

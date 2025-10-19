@@ -14,6 +14,8 @@ type Texture struct {
 	RepeatS, RepeatT    bool
 	FlipS, FlipT        bool
     CachedTexture       *[]Color
+    Mode uint8
+    TextureAlpha float64
 }
 
 func (t *Texture) Sample(u, v float64) Color {

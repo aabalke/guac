@@ -229,7 +229,6 @@ func (a VectorW) Dot3(b VectorW) float64 {
 	return a.X*b.X + a.Y*b.Y + a.Z*b.Z
 }
 
-
 func (a VectorW) Add(b VectorW) VectorW {
 	return VectorW{a.X + b.X, a.Y + b.Y, a.Z + b.Z, a.W + b.W}
 }

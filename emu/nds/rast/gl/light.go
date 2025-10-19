@@ -13,7 +13,8 @@ type LightData struct {
 
 type Light struct {
     Vector Vector
+    HalfVector Vector
     Color Color
 }
 
-type ShininessTbl [32]float64
+type ShininessTbl [32 * 8]float64

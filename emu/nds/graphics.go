@@ -59,7 +59,7 @@ func (nds *Nds) vramDisplay(y uint32, engine *ppu.Engine) {
         (engine.Pixels)[i] = r
         (engine.Pixels)[i+1] = g
         (engine.Pixels)[i+2] = b
-        //(engine.Pixels)[i+3] = 0xFF
+        (engine.Pixels)[i+3] = 0xFF
     }
 }
 
@@ -202,7 +202,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 	(engine.Pixels)[i] = r
 	(engine.Pixels)[i+1] = g
 	(engine.Pixels)[i+2] = b
-	//(engine.Pixels)[i+3] = 0xFF
+	(engine.Pixels)[i+3] = 0xFF
 }
 
 func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {

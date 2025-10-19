@@ -55,8 +55,6 @@ func (p *Polygon) WriteAttrs(v uint32) {
     //if p.Alpha == 0 {
     //    p.Alpha = 1
     //}
-
-    //fmt.Printf("LIGHTS % v\n", p.LightsEnabled)
 }
 
 const (
@@ -126,9 +124,9 @@ func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Ver
     if tex := &g.Texture; tex.TransformationMode == 3 {
 
         vtx := gl.VectorW{
-            X: x/16,
-            Y: y/16,
-            Z: z/16,
+            X: x,
+            Y: y,
+            Z: z,
         }
 
         mtx := &g.MtxStacks.Stacks[3].CurrMtx
@@ -144,8 +142,9 @@ func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Ver
 func (p *Polygon) GetVertex(g *GeoEngine, x, y, z float64) gl.Vertex {
     pos := gl.VectorW{X: x, Y: y, Z: z, W: 1.0}
     output := g.ClipMatrix.MulVectorW(pos)
+    clr := g.Color
+    clr.A = p.Alpha
     return gl.Vertex{
-        Normal: g.LightData.Normal,
         Position: pos,
         Color: g.Color,
         S: g.Texture.S,
@@ -171,5 +170,7 @@ func (p *Polygon) GetTexture(vram VRAM, cache *TextureCache, t Texture) *gl.Text
         FlipS: t.FlipS,
         FlipT: t.FlipT,
         CachedTexture: cache.Get(vram, &t),
+        Mode: p.Mode,
+        TextureAlpha: p.Alpha,
     }
 }
