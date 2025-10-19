@@ -122,6 +122,20 @@ var coordFuncs = [...]func(data []uint32, prev *gl.Vertex) (float64, float64, fl
 
 func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Vertex {
     x, y, z := coordFuncs[method](data, g.Vertex)
+
+    if tex := &g.Texture; tex.TransformationMode == 3 {
+
+        vtx := gl.VectorW{
+            X: x/16,
+            Y: y/16,
+            Z: z/16,
+        }
+
+        mtx := &g.MtxStacks.Stacks[3].CurrMtx
+        tex.S = tex.Sv + vtx.Dot3(mtx.Col(0))
+        tex.T = tex.Tv + vtx.Dot3(mtx.Col(1))
+    }
+
     v := p.GetVertex(g, x, y, z)
     p.Vertices = append(p.Vertices, v)
     return &v
@@ -131,7 +145,7 @@ func (p *Polygon) GetVertex(g *GeoEngine, x, y, z float64) gl.Vertex {
     pos := gl.VectorW{X: x, Y: y, Z: z, W: 1.0}
     output := g.ClipMatrix.MulVectorW(pos)
     return gl.Vertex{
-        Normal: g.StoredNormal,
+        Normal: g.LightData.Normal,
         Position: pos,
         Color: g.Color,
         S: g.Texture.S,

@@ -63,7 +63,7 @@ func (r *Render) RenderPolygon(p *Polygon) {
         return
     }
 
-    if p.Mode == 3 {
+    if shadow := p.Mode == 3; shadow {
         for i := range p.Vertices {
             p.Vertices[i].Color = gl.Transparent
             p.Vertices[i].NdsTexture = nil

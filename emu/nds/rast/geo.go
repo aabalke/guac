@@ -22,11 +22,9 @@ type GeoEngine struct {
     ActivePoly Polygon
 
     Color gl.Color
-
     Texture Texture
-
+    LightData gl.LightData
     Vertex *gl.Vertex
-    StoredNormal gl.Vector
 
     Packed bool
     PackedCmds [4]uint32
@@ -299,11 +297,12 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             Z: utils.ConvertToFloat(data[3], 12),
         }
 
+
         // no effect on vector matrix - keeps light vector length intact
-        if sMode != 2 {
-            s.CurrMtx = s.CurrMtx.Scale(v)
-        } else {
+        if sMode == 2 {
             s1.CurrMtx = s1.CurrMtx.Scale(v)
+        } else {
+            s.CurrMtx = s.CurrMtx.Scale(v)
         }
 
     case 0x1C:
@@ -325,16 +324,36 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
     case 0x21:
 
+        
+        //IF TexCoordTransformMode=2 THEN TexCoord=NormalVector*Matrix (see TexCoord)
+        //NormalVector=NormalVector*DirectionalMatrix
+        //VertexColor = EmissionColor
+        //FOR i=0 to 3
+        //IF PolygonAttrLight[i]=enabled THEN
+        //DiffuseLevel = max(0,-(LightVector[i]*NormalVector))
+        //ShininessLevel = max(0,(-HalfVector[i])*(NormalVector))^2
+        //IF TableEnabled THEN ShininessLevel = ShininessTable[ShininessLevel]
+        //;note: below processed separately for the R,G,B color components...
+        //VertexColor = VertexColor + SpecularColor*LightColor[i]*ShininessLevel
+        //VertexColor = VertexColor + DiffuseColor*LightColor[i]*DiffuseLevel
+        //VertexColor = VertexColor + AmbientColor*LightColor[i]
+        //ENDIF
+        //NEXT i
+
         x := utils.Convert10ToFloat(uint16(data[1]), 9)
         y := utils.Convert10ToFloat(uint16(data[1]>>10), 9)
         z := utils.Convert10ToFloat(uint16(data[1]>>20), 9)
 
+        // I do not believe normal vector for lighting needs scaling
+
         if tex := &g.Texture; tex.TransformationMode == 2 {
 
+            // divide 16 fixes fixed point scaling (normal .9, mtx .12)
+
             vtx := gl.VectorW{
-                X: x,
-                Y: y,
-                Z: z,
+                X: x/16,
+                Y: y/16,
+                Z: z/16,
             }
 
             mtx := &g.MtxStacks.Stacks[3].CurrMtx
@@ -344,9 +363,11 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
         directionalMtx := g.MtxStacks.Stacks[2].CurrMtx
         v := gl.Vector{X: x, Y: y, Z: z}
-        g.StoredNormal = directionalMtx.MulPosition(v)
-        g.StoredNormal = g.StoredNormal.Normalize()
-        g.StoredNormal = g.StoredNormal.MulScalar(-1)
+
+        n := &g.LightData.Normal
+        *n = directionalMtx.MulPosition(v)
+        *n = n.Normalize()
+        *n = n.MulScalar(-1)
 
     case 0x22:
 
@@ -382,22 +403,52 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
         g.Texture.WritePalBase(data[1])
 
+    case 0x30:
+
+        g.LightData.DiffuseColor = Write15BitColor(data[1])
+        g.LightData.AmbientColor = Write15BitColor(data[2])
+
+        if setVertex := data[1] >> 15 != 0; setVertex {
+            g.Color = g.LightData.DiffuseColor
+        }
+
+    case 0x31:
+
+        g.LightData.SpecularColor = Write15BitColor(data[1])
+        g.LightData.EmissionColor = Write15BitColor(data[2])
+        g.LightData.UseSpecularTbl = utils.BitEnabled(data[1], 15)
+
     case 0x32:
 
-        //x := utils.Convert10ToFloat(uint16(data[1]), 9)
-        //y := utils.Convert10ToFloat(uint16(data[1] >> 10), 9)
-        //z := utils.Convert10ToFloat(uint16(data[1] >> 20), 9)
-        //v := gl.Vector{X: x, Y: y, Z: z}
-        //idx := data[1] >> 30
-
-        //directionalMtx := g.MtxStacks.Stacks[2].CurrMtx
-        //g.Lights[idx].Direction = directionalMtx.MulPosition(v)
-        //g.Lights[idx].Direction = g.Lights[idx].Direction.Normalize()
+        x := utils.Convert10ToFloat(uint16(data[1]), 9)
+        y := utils.Convert10ToFloat(uint16(data[1] >> 10), 9)
+        z := utils.Convert10ToFloat(uint16(data[1] >> 20), 9)
+        v := gl.Vector{X: x, Y: y, Z: z}
+        directionalMtx := g.MtxStacks.Stacks[2].CurrMtx
+        idx := data[1] >> 30
+        light := &g.LightData.Lights[idx]
+        light.Vector = directionalMtx.MulPosition(v)
+        light.Vector = light.Vector.Normalize()
 
     case 0x33:
 
-        //idx := data[1] >> 30
-        //g.Lights[idx].Color = Write15BitColor(data[1])
+        idx := data[1] >> 30
+        g.LightData.Lights[idx].Color = Write15BitColor(data[1])
+
+    case 0x34:
+
+        println("SET SHININESS TBL")
+
+        sTbl := &g.LightData.ShininessTbl
+
+        var i uint32
+        for _, v := range data[1:] {
+            sTbl[i+0] = float64((v)       & 0xFF) / 256
+            sTbl[i+1] = float64((v >> 8)  & 0xFF) / 256
+            sTbl[i+2] = float64((v >> 16) & 0xFF) / 256
+            sTbl[i+3] = float64((v >> 24) & 0xFF) / 256
+            i += 4
+        }
 
     case 0x40:
 
