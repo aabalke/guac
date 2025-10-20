@@ -55,12 +55,11 @@ func (g *GeoEngine) VecTest(data []uint32, dirMtx *gl.Matrix) [3]uint16 {
 	x := utils.Convert10ToFloat(uint16(data[1]), 9)
 	y := utils.Convert10ToFloat(uint16(data[1]>>10), 9)
 	z := utils.Convert10ToFloat(uint16(data[1]>>20), 9)
-
-    vw := dirMtx.MulVectorW(gl.VectorW{X: x, Y: y, Z: z, W: 1.0})
+    v := dirMtx.VecMul3x3(gl.Vector{X: x, Y: y, Z: z})
 
     return [3]uint16{
-        utils.ConvertFromFloat4_0_12(vw.X),
-        utils.ConvertFromFloat4_0_12(vw.Y),
-        utils.ConvertFromFloat4_0_12(vw.Z),
+        utils.ConvertFromFloat4_0_12(v.X),
+        utils.ConvertFromFloat4_0_12(v.Y),
+        utils.ConvertFromFloat4_0_12(v.Z),
     }
 }

@@ -47,6 +47,19 @@ func Screen(w, h int) Matrix {
 	}
 }
 
+func (m Matrix) Col3(i int) Vector {
+	switch i {
+	case 0:
+		return Vector{m.X00, m.X10, m.X20}
+	case 1:
+		return Vector{m.X01, m.X11, m.X21}
+	case 2:
+		return Vector{m.X02, m.X12, m.X22}
+	default:
+		panic("invalid column index")
+	}
+}
+
 func (m Matrix) Col(i int) VectorW {
 	switch i {
 	case 0:
@@ -105,6 +118,14 @@ func (a Matrix) Mul(b Matrix) Matrix {
 	m.X33 = a.X30*b.X03 + a.X31*b.X13 + a.X32*b.X23 + a.X33*b.X33
 	return m
 }
+
+func (a Matrix) VecMul3x3(b Vector) Vector {
+    x := b.Dot(a.Col3(0))
+    y := b.Dot(a.Col3(1))
+    z := b.Dot(a.Col3(2))
+    return Vector{x, y, z}
+}
+
 
 func (a Matrix) MulPosition(b Vector) Vector {
 	x := a.X00*b.X + a.X01*b.Y + a.X02*b.Z + a.X03

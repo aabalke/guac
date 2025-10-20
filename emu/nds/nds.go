@@ -228,11 +228,22 @@ func (nds *Nds) checkMode(arm9 bool) {
 
 var wg2 = sync.WaitGroup{}
 
+// breaks 2 3D screen when multithreaded
+//const singleThread = true
+
 func (nds *Nds) Update() {
 
 	if nds.Paused {
 		return
 	}
+
+    //if singleThread {
+    //    if nds.ppu.EngineA.Dispcnt.Is3D {
+    //        nds.ppu.Rasterizer.Render.UpdateRender()
+    //    }
+    //    nds.UpdateFrame()
+    //    return
+    //}
 
 	wg2.Add(2)
 

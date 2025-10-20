@@ -1,54 +1,68 @@
 package gl
 
+//import "fmt"
+
 type Shader struct {
-    Texture *Texture
+	Texture *Texture
 }
 
 func NewShader() *Shader {
 	return &Shader{}
 }
 
-const a = float64(1)/ 32
+const FACTOR = 32.0
 
 func (s *Shader) Fragment(v *Vertex) {
 
-    if s.Texture == nil {
-        return
-    }
+	if s.Texture == nil {
+		return
+	}
 
-    texClr := s.Texture.Sample(v.Texture.X, v.Texture.Y)
+	texClr := s.Texture.Sample(v.Texture.X, v.Texture.Y)
 
-    switch s.Texture.Mode {
-    case 0:
+	switch s.Texture.Mode {
+	case 0:
 
-        v.Color.R = ((texClr.R + a)*(v.Color.R + a) - a)
-        v.Color.G = ((texClr.G + a)*(v.Color.G + a) - a)
-        v.Color.B = ((texClr.B + a)*(v.Color.B + a) - a)
-        v.Color.A = ((texClr.A + a)*(v.Color.A + a) - a)
+		con := func(v, t float64) float64 {
+			v *= FACTOR
+			t *= FACTOR
+			return max(0, min(1, ((t) * (v) - 1)/(FACTOR * FACTOR)))
+		}
 
-    case 1:
+		v.Color.R = con(v.Color.R, texClr.R)
+		v.Color.G = con(v.Color.G, texClr.G)
+		v.Color.B = con(v.Color.B, texClr.B)
+		v.Color.A = con(v.Color.A, texClr.A)
 
-        // alpha causes errors in mario kart
+	case 1:
 
-        if texClr.A != 0 {
-            v.Color.R = ((texClr.R * texClr.A)+(v.Color.R*(1-texClr.A)) - a)
-            v.Color.G = ((texClr.G * texClr.A)+(v.Color.G*(1-texClr.A)) - a)
-            v.Color.B = ((texClr.B * texClr.A)+(v.Color.B*(1-texClr.A)) - a)
-        }
+		con := func(v, t float64, at float64) float64 {
 
-        if texClr.A == 1 {
-            v.Color.R = texClr.R
-            v.Color.G = texClr.G
-            v.Color.B = texClr.B
-        }
+			v *= FACTOR
+			t *= FACTOR
+			at *= FACTOR
 
-    // toon and highlight shading not implimented
+			switch {
+			case at <= 0:
+				return v
+			case at >= FACTOR:
+				return t
+			default:
+				return (t*at + v*(FACTOR-at)) / (FACTOR * FACTOR)
+			}
+		}
 
-    default:
-        v.Color = texClr
-    }
+		v.Color.R = con(v.Color.R, texClr.R, texClr.A)
+		v.Color.G = con(v.Color.G, texClr.G, texClr.A)
+		v.Color.B = con(v.Color.B, texClr.B, texClr.A)
+
+	// toon and highlight shading not implimented
+
+	default:
+		v.Color = texClr
+	}
 }
 
 func (s *Shader) SetTexture(texture *Texture) {
-    s.Texture = texture
+	s.Texture = texture
 }

@@ -244,7 +244,6 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 
             color := &vert.Color
 
-
 			if *color == Discard {
 				continue
 			}

@@ -106,8 +106,6 @@ func (g *GeoEngine) PackedFifo() {
 
     g.PackedIdx = (g.PackedIdx + 1) & 0b11
 
-    //fmt.Printf("Updating PackedIdx %02d\n", g.PackedIdx)
-
     if finishedPacked := g.PackedIdx == 0; finishedPacked {
         g.Data = []uint32{}
         //fmt.Printf("Finished 4 Packed Commands\n")
@@ -116,26 +114,16 @@ func (g *GeoEngine) PackedFifo() {
         return
     }
 
-    //fmt.Printf("Moving to Next Packed Command.\n")
-
     g.Data = append(g.Data, g.PackedCmds[g.PackedIdx])
 
     g.PackedFifo()
 }
 
-// packed cmds not implimented yet
-
 func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
-
-    //fmt.Printf("DATA % X\n", data)
 
     if !g.ValidParamCount(fifo) {
         return
     }
-
-    //fmt.Printf("C %05d %t PACKED %08X IDX %02d % 9X\n", cnt, fifo, g.PackedCmds, g.PackedIdx, data)
-    //cnt++
-    //fmt.Printf("DATA % X\n", data)
 
     s := &g.MtxStacks.Stacks[g.MtxStacks.Mode]
     s1 := &g.MtxStacks.Stacks[1]
@@ -320,7 +308,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
     case 0x21:
 
-        
         //IF TexCoordTransformMode=2 THEN TexCoord=NormalVector*Matrix (see TexCoord)
         //NormalVector=NormalVector*DirectionalMatrix
         //VertexColor = EmissionColor
@@ -339,8 +326,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         x := utils.Convert10ToFloat(uint16(data[1]), 9)
         y := utils.Convert10ToFloat(uint16(data[1]>>10), 9)
         z := utils.Convert10ToFloat(uint16(data[1]>>20), 9)
-
-        // I do not believe normal vector for lighting needs scaling
 
         if tex := &g.Texture; tex.TransformationMode == 2 {
 
@@ -365,40 +350,38 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         }
 
         n := &g.LightData.Normal
-        *n = directionalMtx.MulPosition(v)
-        //*n = n.Normalize()
-        //*n = n.MulScalar(-1)
+        *n = directionalMtx.VecMul3x3(v)
 
-        g.Color = g.LightData.EmissionColor
+        ld := &g.LightData
+        g.Color = ld.EmissionColor
 
-        for i, v := range g.LightData.Lights {
+        for i, v := range ld.Lights {
 
             if !g.ActivePoly.LightsEnabled[i] {
                 continue
             }
 
-            // stuff
             diffuseLevel := max(0, -(v.Vector.Dot(*n)))
             shininessLevel := math.Pow(max(0, -(v.HalfVector.Dot(*n))), 2)
 
-            if g.LightData.UseSpecularTbl {
-                shininessLevel = g.LightData.ShininessTbl[uint32(shininessLevel)]
+            if ld.UseSpecularTbl {
+                shininessLevel = ld.ShininessTbl[uint32(shininessLevel)]
             }
 
-            g.Color.R += g.LightData.SpecularColor.R * v.Color.R * shininessLevel
-            g.Color.R += g.LightData.DiffuseColor.R * v.Color.R * diffuseLevel
-            g.Color.R += g.LightData.AmbientColor.R * v.Color.R
+            g.Color.R += ld.SpecularColor.R * v.Color.R * shininessLevel
+            g.Color.R += ld.DiffuseColor.R  * v.Color.R * diffuseLevel
+            g.Color.R += ld.AmbientColor.R  * v.Color.R
 
-            g.Color.G += g.LightData.SpecularColor.G * v.Color.G * shininessLevel
-            g.Color.G += g.LightData.DiffuseColor.G * v.Color.G * diffuseLevel
-            g.Color.G += g.LightData.AmbientColor.G * v.Color.G
+            g.Color.G += ld.SpecularColor.G * v.Color.G * shininessLevel
+            g.Color.G += ld.DiffuseColor.G  * v.Color.G * diffuseLevel
+            g.Color.G += ld.AmbientColor.G  * v.Color.G
 
-            g.Color.B += g.LightData.SpecularColor.B * v.Color.B * shininessLevel
-            g.Color.B += g.LightData.DiffuseColor.B * v.Color.B * diffuseLevel
-            g.Color.B += g.LightData.AmbientColor.B * v.Color.B
+            g.Color.B += ld.SpecularColor.B * v.Color.B * shininessLevel
+            g.Color.B += ld.DiffuseColor.B  * v.Color.B * diffuseLevel
+            g.Color.B += ld.AmbientColor.B  * v.Color.B
         }
 
-        g.Color.A = 1
+        //g.Color.A = 1
 
     case 0x22:
 
@@ -439,7 +422,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         g.LightData.DiffuseColor = Write15BitColor(data[1])
         g.LightData.AmbientColor = Write15BitColor(data[1]>>16)
 
-        if setVertex := data[1] >> 15 != 0; setVertex {
+        if setVertex := utils.BitEnabled(data[1], 15); setVertex {
             g.Color = g.LightData.DiffuseColor
         }
 
@@ -459,12 +442,14 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
         idx := data[1] >> 30
         light := &g.LightData.Lights[idx]
-        light.Vector = directionalMtx.MulPosition(v)
-        light.Vector = light.Vector.Normalize()
+        light.Vector = directionalMtx.VecMul3x3(v)
 
-        LINE_OF_SIGHT_VEC := gl.Vector{X: 0, Y: -1}
-        light.HalfVector = light.Vector.Add(LINE_OF_SIGHT_VEC)
-        light.HalfVector = light.HalfVector.Mul(gl.Vector{X: 0.5, Y: 0.5, Z: 0.5})
+        // line of sight vector
+        light.HalfVector = light.Vector
+        light.HalfVector.Z -= 1
+        light.HalfVector.X /= 2
+        light.HalfVector.Y /= 2
+        light.HalfVector.Z /= 2
 
     case 0x33:
 
