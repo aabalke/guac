@@ -16,6 +16,8 @@ type Texture struct {
     CachedTexture       *[]Color
     Mode uint8
     TextureAlpha float64
+    ToonTbl *[32]Color
+    IsHighlight bool
 }
 
 func (t *Texture) Sample(u, v float64) Color {

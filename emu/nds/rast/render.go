@@ -63,13 +63,13 @@ func (r *Render) RenderPolygon(p *Polygon) {
         return
     }
 
-    if shadow := p.Mode == 3; shadow {
-        for i := range p.Vertices {
-            p.Vertices[i].Color = gl.Transparent
-            p.Vertices[i].NdsTexture = nil
-            //p.Vertices[i].Color = gl.Color{A: 1, R: 1}
-        }
-    }
+    //if shadow := p.Mode == 3; shadow {
+    //    for i := range p.Vertices {
+    //        p.Vertices[i].Color = gl.Transparent
+    //        p.Vertices[i].NdsTexture = nil
+    //        //p.Vertices[i].Color = gl.Color{A: 1, R: 1}
+    //    }
+    //}
 
     switch p.PrimitiveType {
     case PRIM_SEP_TRI:

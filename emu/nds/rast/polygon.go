@@ -1,10 +1,6 @@
 package rast
 
 import (
-	//"image"
-	//"image/color"
-
-
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
@@ -144,23 +140,31 @@ func (p *Polygon) GetVertex(g *GeoEngine, x, y, z float64) gl.Vertex {
     output := g.ClipMatrix.MulVectorW(pos)
     clr := g.Color
     clr.A = p.Alpha
+
     return gl.Vertex{
         Position: pos,
-        Color: g.Color,
+        Color: clr,
         S: g.Texture.S,
         T: g.Texture.T,
         Output: output,
-        NdsTexture: p.GetTexture(g.Vram, &g.TextureCache, g.Texture),
+        NdsTexture: p.GetTexture(g),
     }
 }
 
-func (p *Polygon) GetTexture(vram VRAM, cache *TextureCache, t Texture) *gl.Texture {
+func (p *Polygon) GetTexture(g *GeoEngine) *gl.Texture {
 
     // texture has to be copy
+    t := g.Texture
 
     if t.Format == TEX_FMT_NONE {
-        return nil
+        return &gl.Texture{
+            Mode: p.Mode,
+            ToonTbl: &g.ToonTbl,
+        }
     }
+
+    cache := &g.TextureCache
+    vram := g.Vram
 
     return &gl.Texture{
         Width: int(t.SizeS),
@@ -172,5 +176,7 @@ func (p *Polygon) GetTexture(vram VRAM, cache *TextureCache, t Texture) *gl.Text
         CachedTexture: cache.Get(vram, &t),
         Mode: p.Mode,
         TextureAlpha: p.Alpha,
+        ToonTbl: &g.ToonTbl,
+        IsHighlight: g.Disp3dCnt.HighlightShading,
     }
 }

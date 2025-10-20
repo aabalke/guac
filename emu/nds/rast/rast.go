@@ -15,7 +15,6 @@ const (
 
 type Rasterizer struct {
 
-	Disp3dCnt Disp3dCnt
     Viewport Viewport
 
     GeoEngine *GeoEngine

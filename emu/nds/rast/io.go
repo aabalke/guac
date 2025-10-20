@@ -24,9 +24,9 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
     //if addr & 0b11 == 0 { fmt.Printf("R ADDR %08X\n", addr) }
 	switch addr {
 	case 0x60:
-		return r.Disp3dCnt.Read(0)
+		return r.GeoEngine.Disp3dCnt.Read(0)
 	case 0x61:
-		return r.Disp3dCnt.Read(1)
+		return r.GeoEngine.Disp3dCnt.Read(1)
 	case 0x62:
 		return 0
 	case 0x63:
@@ -264,23 +264,20 @@ func (r *Rasterizer) ReadVecMtx(addr uint32) uint8 {
 
 func (r *Rasterizer) Write(addr uint32, v uint8) {
 
-    if addr >= 0x330 && addr < 0x400 {
-        return
-    }
-
-    //if addr & 0b11 == 0 { fmt.Printf("W ADDR %08X V %02X\n" ,addr ,v) }
-
     switch {
     case addr >= 0x350 && addr < 0x358:
-        r.RearPlane.Write(addr, v)
+        //r.RearPlane.Write(addr, v)
+        return
+    case addr >= 0x380 && addr < 0x3C0:
+        WriteToonTbl(&r.GeoEngine.ToonTbl, addr, v)
         return
     }
 
 	switch addr {
 	case 0x60:
-		r.Disp3dCnt.Write(v, 0)
+		r.GeoEngine.Disp3dCnt.Write(v, 0)
 	case 0x61:
-		r.Disp3dCnt.Write(v, 1)
+		r.GeoEngine.Disp3dCnt.Write(v, 1)
     case 0x62:
         return
     case 0x63:

@@ -18,6 +18,7 @@ type GeoEngine struct {
 
     MtxStacks *MtxStacks
     Viewport Viewport
+	Disp3dCnt Disp3dCnt
 
     PrepPoly Polygon
     ActivePoly Polygon
@@ -34,6 +35,7 @@ type GeoEngine struct {
     ClipMatrix gl.Matrix
     PosTestData [4]uint32
     VecTestData [3]uint16
+    ToonTbl [32]gl.Color
 
     TextureCache TextureCache
     Vram VRAM
@@ -381,6 +383,9 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             g.Color.B += ld.AmbientColor.B  * v.Color.B
         }
 
+        g.Color.R = min(0.99, g.Color.R)
+        g.Color.G = min(0.99, g.Color.G)
+        g.Color.B = min(0.99, g.Color.B)
         //g.Color.A = 1
 
     case 0x22:
