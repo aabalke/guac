@@ -288,6 +288,10 @@ func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint
 
     pal, alpha := uint32(render.PixelPalettes[index]), render.Alphas[index]
 
+
+    //if nds.ppu.Rasterizer.Disp3dCnt.RearPlaneBitmapEnabled == true && alpha != 1 {
+
+
     //if nds.ppu.Rasterizer.Disp3dCnt.RearPlaneBitmapEnabled == true && alpha != 1 {
     //    pal, ok := nds.setRearBitmap(engine, bg, x, y)
     //    return pal, 1, ok

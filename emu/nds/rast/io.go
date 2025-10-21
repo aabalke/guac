@@ -266,7 +266,7 @@ func (r *Rasterizer) Write(addr uint32, v uint8) {
 
     switch {
     case addr >= 0x350 && addr < 0x358:
-        //r.RearPlane.Write(addr, v)
+        r.RearPlane.Write(addr, v)
         return
     case addr >= 0x380 && addr < 0x3C0:
         WriteToonTbl(&r.GeoEngine.ToonTbl, addr, v)

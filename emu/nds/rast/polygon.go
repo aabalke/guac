@@ -46,11 +46,6 @@ func (p *Polygon) WriteAttrs(v uint32) {
     p.FogEnabled = utils.BitEnabled(v, 15)
     p.Alpha = float64(utils.GetVarData(v, 16, 20)) / 31
     p.Id = utils.GetVarData(v, 24, 29)
-
-    // some 3d examples set alpha to zero, but display solid (Mixed 3d text example)
-    //if p.Alpha == 0 {
-    //    p.Alpha = 1
-    //}
 }
 
 const (
@@ -160,6 +155,7 @@ func (p *Polygon) GetTexture(g *GeoEngine) *gl.Texture {
         return &gl.Texture{
             Mode: p.Mode,
             ToonTbl: &g.ToonTbl,
+            IsHighlight: g.Disp3dCnt.HighlightShading,
         }
     }
 
@@ -175,7 +171,6 @@ func (p *Polygon) GetTexture(g *GeoEngine) *gl.Texture {
         FlipT: t.FlipT,
         CachedTexture: cache.Get(vram, &t),
         Mode: p.Mode,
-        TextureAlpha: p.Alpha,
         ToonTbl: &g.ToonTbl,
         IsHighlight: g.Disp3dCnt.HighlightShading,
     }

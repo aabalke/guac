@@ -246,16 +246,23 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 			if *color == Discard {
 				continue
 			}
+
 			// update buffers atomically
 			//lock := &dc.locks[(x+y)&255]
 			//lock.Lock()
 			// check depth buffer again
 			if bz <= dc.DepthBuffer[i] || !dc.ReadDepth {
 				info.UpdatedPixels++
-				if dc.WriteDepth {
-					// update depth buffer
-					dc.DepthBuffer[i] = z
-				}
+                //if !(dc.AlphaBlend && color.A < 1) {
+                //    if dc.WriteDepth {
+                //        // update depth buffer
+                //        dc.DepthBuffer[i] = z
+                //    }
+				//}
+                if dc.WriteDepth {
+                    // update depth buffer
+                    dc.DepthBuffer[i] = z
+                }
 				if dc.WriteColor {
 					// update color buffer
 					if dc.AlphaBlend && color.A < 1 {

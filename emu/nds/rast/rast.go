@@ -1,6 +1,7 @@
 package rast
 
 import (
+
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 	"github.com/aabalke/guac/emu/nds/utils"
@@ -14,12 +15,9 @@ const (
 )
 
 type Rasterizer struct {
-
     Viewport Viewport
-
     GeoEngine *GeoEngine
     Buffers Buffers
-
     Render *Render
     ClearColor gl.Color
     RearPlane RearPlane
@@ -33,13 +31,9 @@ type VRAM interface {
 
 func NewRasterizer(vram VRAM, irq *cpu.Irq) *Rasterizer {
     r := &Rasterizer{}
-
     r.VRAM = vram
-
     r.GeoEngine = NewGeoEngine(&r.Buffers, irq, vram)
-
     r.Render = NewRender(r, &r.Buffers, &r.RearPlane)
-
     return r
 }
 
@@ -198,10 +192,8 @@ func (g *GXSTAT) Read(b uint32) uint8 {
 }
 
 type RearPlane struct {
-    R, G, B uint8
     ClearColor gl.Color
     FogEnabled bool
-    Alpha uint32
     Id uint32
     ClearDepth uint32
     OffsetX, OffsetY uint32
@@ -211,22 +203,17 @@ func (r *RearPlane) Write(addr uint32, v uint8) {
     switch addr {
     case 0x350:
 
-        r.R = v & 0b11111
-        r.G &^= 0b111
-        r.G = (v >> 5) & 0b111
-
-        r.CalcClearColor(r.R, r.G, r.B)
+        r.ClearColor = Convert15BitByte(r.ClearColor, v, false)
 
     case 0x351:
 
-        r.G &= 0b111
-        r.G |= (v & 0b11) << 3
-        r.B = (v >> 3) & 0b11111
-        r.CalcClearColor(r.R, r.G, r.B)
-
+        r.ClearColor = Convert15BitByte(r.ClearColor, v, true)
         r.FogEnabled = utils.BitEnabled(uint32(v), 7)
+
     case 0x352:
-        r.Alpha = uint32(v & 0b1_1111)
+
+        r.ClearColor.A = float64(v & 0x1F) / 0x1F
+
     case 0x353:
         r.Id = uint32(v & 0b11_1111)
 
@@ -243,19 +230,5 @@ func (r *RearPlane) Write(addr uint32, v uint8) {
 
     case 0x357:
         r.OffsetY = uint32(v)
-    }
-}
-
-func (ra *RearPlane) CalcClearColor(r, g, b uint8) {
-
-	r = (r << 3) | (r >> 2)
-	g = (g << 3) | (g >> 2)
-	b = (b << 3) | (b >> 2)
-
-    ra.ClearColor = gl.Color{
-        R: float64(r) / 0xFF,
-        G: float64(g) / 0xFF,
-        B: float64(b) / 0xFF,
-        A: float64(0xFF) / 0xFF,
     }
 }

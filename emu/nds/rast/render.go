@@ -6,6 +6,7 @@ import (
 	"image/color"
 
 	"sync"
+
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 )
 
@@ -44,11 +45,32 @@ func NewRender(rast *Rasterizer, buffers *Buffers, rp *RearPlane) *Render {
 
 func (r *Render) UpdateRender() {
 
-    r.Context.ClearColor = r.RearPlane.ClearColor
+    r.Context.ClearColor = gl.Transparent
+    if !r.Rasterizer.GeoEngine.Disp3dCnt.RearPlaneBitmapEnabled {
+        r.Context.ClearColor = r.RearPlane.ClearColor
+    }
+
     r.Context.ClearColorBuffer()
     r.Context.ClearDepthBuffer()
 
     polygons := r.Buffers.GetPolygons()
+
+    //sort.Slice(polygons, func(i, j int) bool {
+
+    //    average := func(poly Polygon) float64{
+
+    //        a := float64(0)
+    //        for i := range len(poly.Vertices) {
+    //            a += poly.Vertices[i].Output.Z
+    //        }
+    //        a /= float64(len(poly.Vertices))
+    //        return a
+    //    }
+
+    //    zi := average(polygons[i])
+    //    zj := average(polygons[j])
+    //    return zi > zj
+    //})
 
     for _, p := range polygons {
         r.RenderPolygon(&p)
@@ -62,14 +84,6 @@ func (r *Render) RenderPolygon(p *Polygon) {
     if len(p.Vertices) == 0 {
         return
     }
-
-    //if shadow := p.Mode == 3; shadow {
-    //    for i := range p.Vertices {
-    //        p.Vertices[i].Color = gl.Transparent
-    //        p.Vertices[i].NdsTexture = nil
-    //        //p.Vertices[i].Color = gl.Color{A: 1, R: 1}
-    //    }
-    //}
 
     switch p.PrimitiveType {
     case PRIM_SEP_TRI:
@@ -204,7 +218,6 @@ func RGB24ToRGB15(r, g, b uint8) uint16 {
     r5 := uint16(r >> 3)
     g5 := uint16(g >> 3)
     b5 := uint16(b >> 3)
-
     return (b5 << 10) | (g5 << 5) | r5
 }
 

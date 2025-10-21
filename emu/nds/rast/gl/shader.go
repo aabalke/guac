@@ -21,7 +21,6 @@ func (s *Shader) Fragment(v *Vertex) {
         texClr = s.Texture.Sample(v.Texture.X, v.Texture.Y)
     }
 
-
 	switch s.Texture.Mode {
 	case 0:
 
@@ -58,7 +57,6 @@ func (s *Shader) Fragment(v *Vertex) {
 		v.Color.G = con(v.Color.G, texClr.G, texClr.A)
 		v.Color.B = con(v.Color.B, texClr.B, texClr.A)
 
-	// toon and highlight shading not implimented
 	case 2:
 
 		if s.Texture.IsHighlight {

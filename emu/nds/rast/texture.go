@@ -69,7 +69,6 @@ func (tex *Texture) WriteParam(v uint32) {
 
     if tex.TransformationMode == 3 {
         panic("VTX TEXT MODE WHICH I THINK IS GOOD BUT YOU SHOULD CHECK")
-        //fmt.Printf("MODE %02d\n", tex.TransformationMode)
     }
 }
 
