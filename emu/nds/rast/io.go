@@ -297,11 +297,6 @@ func (r *Rasterizer) Write(addr uint32, v uint8) {
 	}
 }
 
-//func (r *Rasterizer) GeoCmdFifo(v uint32) {
-//    //fmt.Printf("WRITING FIFO CMD ADDR V %08X\n", v)
-//    r.GeoEngine.Fifo(v)
-//}
-
 func (r *Rasterizer) GeoCmd(addr, v uint32) {
 
     d := &r.GeoEngine.Data

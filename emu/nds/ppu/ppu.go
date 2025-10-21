@@ -235,8 +235,6 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
 	    e.Dispcnt.Mode = utils.GetVarData(v, 0, 2)
         e.Dispcnt.Is3D = utils.BitEnabled(v, 3)
 
-
-
         e.Dispcnt.TileObj1D = utils.BitEnabled(v, 4)
         e.Dispcnt.BitmapObj256 = utils.BitEnabled(v, 5)
         e.Dispcnt.BitmapObj1D = utils.BitEnabled(v, 6)
@@ -913,7 +911,6 @@ func (e *Engine) UpdateObjMapping(d *Dispcnt) {
 
     for i := range e.Objects {
 
-
         obj := &e.Objects[i]
 
         obj.ObjTileMapping = 0
@@ -951,10 +948,10 @@ func (e *Engine) UpdateObjMapping(d *Dispcnt) {
             //panic("NEED TO SET UP 2D BITMAP OBJ")
         case d.BitmapObj1D && !d.BitmapObj256 && !d.BitmapObjBoundary:
             obj.ObjBmpMapping = OBJ_BMP_128_1D
-            obj.BmpBoundaryShift = 5 //128
+            obj.BmpBoundaryShift = 7 //128
         case d.BitmapObj1D && !d.BitmapObj256 && d.BitmapObjBoundary:
             obj.ObjBmpMapping = OBJ_BMP_256_1D
-            obj.BmpBoundaryShift = 6 //256
+            obj.BmpBoundaryShift = 8 //256
         case d.BitmapObj1D && d.BitmapObj256:
             panic("DISPCNT HAS BOTH BITMAP 1D AND 256 SET")
         }

@@ -17,13 +17,29 @@ const (
 
 type Render struct {
     Rasterizer *Rasterizer
-    PixelPalettes []uint32
-    Alphas []float64
+    Pixels Pixels
+    //PixelPalettes []uint32
+    //Alphas []float64
 	Context *gl.Context
     Buffers *Buffers
     RearPlane *RearPlane
 
 	lock        sync.Mutex
+}
+
+type Pixels struct {
+    PalettesA []uint32
+    PalettesB []uint32
+    AlphaA    []float64
+    AlphaB    []float64
+    WritingB  bool
+}
+
+func (p *Pixels) InitPixels() {
+    p.PalettesA = make([]uint32, WIDTH*HEIGHT)
+    p.PalettesB = make([]uint32, WIDTH*HEIGHT)
+    p.AlphaA = make([]float64, WIDTH*HEIGHT)
+    p.AlphaB = make([]float64, WIDTH*HEIGHT)
 }
 
 func NewRender(rast *Rasterizer, buffers *Buffers, rp *RearPlane) *Render {
@@ -32,10 +48,10 @@ func NewRender(rast *Rasterizer, buffers *Buffers, rp *RearPlane) *Render {
         Rasterizer: rast,
         Buffers: buffers,
         Context: gl.NewContext(WIDTH, HEIGHT),
-        PixelPalettes: make([]uint32, WIDTH*HEIGHT),
-        Alphas: make([]float64, WIDTH*HEIGHT),
         RearPlane: rp,
     }
+
+    r.Pixels.InitPixels()
 
     r.Context.Cull = gl.CullNone
     r.Context.Shader = gl.NewShader()
@@ -205,25 +221,16 @@ func (r *Render) ImageToPixels(img image.Image) {
     for y := range HEIGHT {
         for x := range WIDTH {
             c := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
-            r.PixelPalettes[i] = uint32(RGB24ToRGB15(c.R, c.G, c.B))
-            r.Alphas[i] = float64(c.A) / 0xFF
+            if r.Pixels.WritingB {
+                r.Pixels.PalettesB[i] = uint32(RGB24ToRGB15(c.R, c.G, c.B))
+                r.Pixels.AlphaB[i] = float64(c.A) / 0xFF
+            } else {
+                r.Pixels.PalettesA[i] = uint32(RGB24ToRGB15(c.R, c.G, c.B))
+                r.Pixels.AlphaA[i] = float64(c.A) / 0xFF
+            }
             i++
         }
     }
 
 	r.lock.Unlock()
-}
-
-func RGB24ToRGB15(r, g, b uint8) uint16 {
-    r5 := uint16(r >> 3)
-    g5 := uint16(g >> 3)
-    b5 := uint16(b >> 3)
-    return (b5 << 10) | (g5 << 5) | r5
-}
-
-func RGB15ToRGB24(r, g, b uint8) (uint8, uint8, uint8){
-	r = (r << 3) | (r >> 2)
-	g = (g << 3) | (g >> 2)
-	b = (b << 3) | (b >> 2)
-    return r, g, b
 }

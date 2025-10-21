@@ -203,9 +203,14 @@ func (cpu *Cpu) Alu(opcode uint32) {
 
     aluInst[utils.GetByte(opcode, 21)](cpu, &aluData)
 
-	if aluData.Rd != PC {
+    switch {
+    case aluData.Rd != PC:
 		cpu.Reg.R[15] += 4
-	}
+    case cpu.Reg.IsThumb:
+        cpu.Reg.R[15] &^= 0b1
+    case !cpu.Reg.IsThumb:
+        cpu.Reg.R[15] &^= 0b11
+    }
 }
 
 func (cpu *Cpu) SetOp2(alu *Alu, opcode uint32) {

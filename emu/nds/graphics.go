@@ -171,13 +171,14 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 
 			objIdx := (*objPriorities)[i][j]
 	        obj := &engine.Objects[objIdx]
-            obj.OneDimensional = dispcnt.TileObj1D
 
             palData, ok := uint32(0), false
 
             if bmp:= obj.Mode == 3; bmp {
+                obj.OneDimensional = dispcnt.BitmapObj1D
                 palData, ok = nds.setObjBmpPixel(engine, obj, x, y)
             } else {
+                obj.OneDimensional = dispcnt.TileObj1D
                 palData, ok = nds.setObjTilePixel(engine, obj, x, y)
             }
 
@@ -278,21 +279,24 @@ func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint
 	xIdx := (x + bg.XOffset) & ((bg.W) - 1)
 	yIdx := (y + bg.YOffset) & ((bg.H) - 1)
 
-	index := (xIdx + (yIdx * SCREEN_WIDTH))
+	i := (xIdx + (yIdx * SCREEN_WIDTH))
 
     if xIdx >= SCREEN_WIDTH || yIdx >= SCREEN_HEIGHT {
         return 0, 0, false
     }
 
-    render := nds.ppu.Rasterizer.Render
+    r := nds.ppu.Rasterizer.Render
 
-    pal, alpha := uint32(render.PixelPalettes[index]), render.Alphas[index]
+    pal, alpha := uint32(0), float64(0)
 
+    if !r.Pixels.WritingB {
+        pal, alpha = r.Pixels.PalettesA[i], r.Pixels.AlphaA[i]
+    } else {
+        pal, alpha = r.Pixels.PalettesB[i], r.Pixels.AlphaB[i]
+    }
 
-    //if nds.ppu.Rasterizer.Disp3dCnt.RearPlaneBitmapEnabled == true && alpha != 1 {
-
-
-    //if nds.ppu.Rasterizer.Disp3dCnt.RearPlaneBitmapEnabled == true && alpha != 1 {
+    //if nds.ppu.Rasterizer.GeoEngine.Disp3dCnt.RearPlaneBitmapEnabled == true && alpha != 1 {
+    //    return 0, 0, false
     //    pal, ok := nds.setRearBitmap(engine, bg, x, y)
     //    return pal, 1, ok
     //}
@@ -628,13 +632,12 @@ func (nds *Nds) setDirectBitmap(engine *ppu.Engine, bg *ppu.Background, x uint32
         banks = ppu.BANKS_A_2D_BG
     }
 
-    //palIdx := uint32(nds.ppu.Vram.Read(addr, true))
     data := uint32(nds.ppu.Vram.ReadGraphical(addr, banks))
 
-    // if on transparent??? maybe not
-    //if transparent := (data >> 15) & 1 == 0; transparent {
-    //    return 0, false
-    //}
+    // required sonic dark brotherhood
+    if transparent := (data & 0x8000) == 0; transparent {
+        return 0, false
+    }
 
     return data, true
 

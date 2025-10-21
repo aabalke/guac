@@ -12,6 +12,7 @@ import (
 	"github.com/aabalke/guac/emu/nds/mem/spi"
 	"github.com/aabalke/guac/emu/nds/ppu"
 	"github.com/aabalke/guac/emu/nds/snd"
+	"github.com/aabalke/guac/emu/nds/uhh"
 )
 
 //go:embed res_/bios7.bin
@@ -186,6 +187,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
     case 0x8, 0x9, 0xA:
         return mem.ReadGbaSlot(addr, arm9)
     default:
+        uhh.PrintPcs()
         panic(fmt.Sprintf("ARM7 ADDR %08X INVALID READ\n", addr))
         return 0
     }

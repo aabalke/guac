@@ -2,7 +2,9 @@ package arm7
 
 import (
 	"fmt"
+
 	"github.com/aabalke/guac/emu/gba/utils"
+	"github.com/aabalke/guac/emu/nds/uhh"
 )
 
 const (
@@ -86,9 +88,14 @@ func (cpu *Cpu) Alu(opcode uint32) {
 		cpu.test(alu)
 	}
 
-	if alu.Rd != PC {
+    switch {
+    case aluData.Rd != PC:
 		cpu.Reg.R[15] += 4
-	}
+    case cpu.Reg.IsThumb:
+        cpu.Reg.R[15] &^= 0b1
+    case !cpu.Reg.IsThumb:
+        cpu.Reg.R[15] &^= 0b11
+    }
 }
 
 func (cpu *Cpu) GetOp2(opcode uint32) (uint32, bool) {
@@ -623,6 +630,7 @@ func generateSdtAddress(cpu *Cpu, opcode uint32) uint32 {
 	var offset uint32
     if imm := utils.BitEnabled(opcode, 25); imm {
         if utils.BitEnabled(opcode, 4) {
+            uhh.PrintPcs()
             panic("Malformed Single Data Transfer")
         }
 
@@ -743,6 +751,7 @@ func NewHalf(opcode uint32, c *Cpu) *Half {
 
 	for i, fail := range fails {
 		if fail {
+            uhh.PrintPcs()
 			panic(fmt.Sprintf("Malformed Half Instruction %d %08X", i, opcode))
 		}
 	}

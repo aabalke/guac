@@ -14,6 +14,7 @@ import (
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/nds/ppu"
 	"github.com/aabalke/guac/emu/nds/snd"
+	"github.com/aabalke/guac/emu/nds/uhh"
 	"github.com/aabalke/guac/emu/nds/utils"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -151,45 +152,46 @@ func (nds *Nds) checkBadPc() {
     case !reg9.IsThumb && reg9.R[15] & 0b11 != 0:
         panic(fmt.Sprintf("BAD ARM9 ARM   PC %08X CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
     case reg7.IsThumb && reg7.R[15] & 0b1 != 0:
+        uhh.PrintPcs()
         panic(fmt.Sprintf("BAD ARM7 THUMB PC %08X CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
     case !reg7.IsThumb && reg7.R[15] & 0b11 != 0:
+        uhh.PrintPcs()
         panic(fmt.Sprintf("BAD ARM7 ARM   PC %08X CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
     }
 
+    zeroWordcnt := 0x100
 
-    //zeroWordcnt := 0x20
+    if nds.mem.Read32(reg9.R[15], true) == 0x0 {
 
-    //if nds.mem.Read32(reg9.R[15], true) == 0x0 {
+        zeros := true
 
-    //    zeros := true
+        for i := uint32(0); i < uint32(zeroWordcnt); i += 4 {
+            if nds.mem.Read32(reg9.R[15] + i, true) != 0x0 {
+                zeros = false
+                break
+            }
+        }
 
-    //    for i := uint32(0); i < uint32(zeroWordcnt); i += 4 {
-    //        if nds.mem.Read32(reg9.R[15] + i, true) != 0x0 {
-    //            zeros = false
-    //            break
-    //        }
-    //    }
+        if zeros {
+            panic(fmt.Sprintf("BAD ARM9 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
+        }
+    }
 
-    //    if zeros {
-    //        panic(fmt.Sprintf("BAD ARM9 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
-    //    }
-    //}
+    if nds.mem.Read32(reg7.R[15], false) == 0x0 {
 
-    //if nds.mem.Read32(reg7.R[15], false) == 0x0 {
+        zeros := true
 
-    //    zeros := true
+        for i := uint32(0); i < uint32(zeroWordcnt); i += 4 {
+            if nds.mem.Read32(reg7.R[15] + i, false) != 0x0 {
+                zeros = false
+                break
+            }
+        }
 
-    //    for i := uint32(0); i < uint32(zeroWordcnt); i += 4 {
-    //        if nds.mem.Read32(reg7.R[15] + i, false) != 0x0 {
-    //            zeros = false
-    //            break
-    //        }
-    //    }
-
-    //    if zeros {
-    //        panic(fmt.Sprintf("BAD ARM7 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
-    //    }
-    //}
+        if zeros {
+            panic(fmt.Sprintf("BAD ARM7 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
+        }
+    }
 
 
     if reg9.R[15] < 0x30 && !nds.arm9.LowVector {
@@ -260,6 +262,7 @@ func (nds *Nds) Update() {
     }()
 
     wg2.Wait()
+    nds.ppu.Rasterizer.Render.Pixels.WritingB = !nds.ppu.Rasterizer.Render.Pixels.WritingB
 }
 
 func (nds *Nds) UpdateFrame() {
@@ -268,7 +271,7 @@ func (nds *Nds) UpdateFrame() {
     r7 := &nds.arm7.Reg.R
 	for nds.Drawn = false; !nds.Drawn; {
 
-        //nds.checkBadPc()
+        nds.checkBadPc()
 
         // arm9 thumb ~1 cycles, arm ~2 cycles
         // arm7 thumb ~2 cycles, arm ~4 cycles
@@ -302,9 +305,11 @@ func (nds *Nds) UpdateFrame() {
             if thumbExec || armExec  {
                 //nds.checkMode(false)
                 //logger.Update(0, 1, CURR_INST, false)
+                uhh.UpdatePcs(r7[15], nds.mem.Read32(r7[15], false), uint32(nds.arm7.Reg.CPSR))
 
                 _, ok := nds.arm7.Execute()
                 if !ok {
+                    uhh.PrintPcs()
                     fmt.Printf("ARM7 Decode Error: PC %08X CURR %d\n", r7[15], CURR_INST)
                     os.Exit(0)
                 }

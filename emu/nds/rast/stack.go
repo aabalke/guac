@@ -17,6 +17,19 @@ type MtxStacks struct {
     Stacks [4]MtxStack
 }
 
+type MtxStack struct {
+    CurrMtx gl.Matrix
+	Mtxs []gl.Matrix
+    Pointer *uint8
+    MirrorMask uint8
+}
+
+func (m *MtxStack) Init(size, pointerMask uint8, pointer *uint8) {
+    m.Mtxs = make([]gl.Matrix, size)
+    m.MirrorMask = pointerMask
+    m.Pointer = pointer
+}
+
 func NewMtxStacks() *MtxStacks {
 
     s := &MtxStacks{}
@@ -136,42 +149,3 @@ func (m *MtxStacks) Restore(param uint32) {
         s1.CurrMtx = s1.Mtxs[idx]
     }
 }
-
-type MtxStack struct {
-    CurrMtx gl.Matrix
-	Mtxs []gl.Matrix
-    Pointer *uint8
-    MirrorMask uint8
-}
-
-func (m *MtxStack) Init(size, pointerMask uint8, pointer *uint8) {
-    m.Mtxs = make([]gl.Matrix, size)
-    m.MirrorMask = pointerMask
-    m.Pointer = pointer
-}
-
-func (m *MtxStack) Store(mtx gl.Matrix, param uint32) {
-    panic("NEED TO FIX STORE")
-    // need mtx 0 to not use param
-    idx := int(param & 0b1_1111)
-    if idx == 31{
-        panic("NEED TO SETUP STACK OVERFLOW GX")
-    }
-    m.Mtxs[idx] = mtx
-}
-
-func (m *MtxStack) Restore(param uint32) gl.Matrix {
-    panic("NEED TO FIX RESTORE")
-    // need mtx 0 to not use param
-    idx := int(param & 0b1_1111)
-    if idx == 31{
-        panic("NEED TO SETUP STACK OVERFLOW GX")
-    }
-    return m.Mtxs[idx]
-}
-
-func (m *MtxStack) Curr() gl.Matrix {
-    idx := int(*m.Pointer) % len(m.Mtxs)
-    return m.Mtxs[idx]
-}
-

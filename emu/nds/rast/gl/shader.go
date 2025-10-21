@@ -10,19 +10,9 @@ func NewShader() *Shader {
 
 const FACTOR = 32.0
 
-func (s *Shader) Fragment(v *Vertex) {
+var blendFunc = [...]func(texture *Texture, vColor, tColor Color) Color {
 
-    if s.Texture == nil {
-        return
-    }
-
-	texClr := Color{1, 1, 1, 1}
-	if s.Texture.CachedTexture != nil {
-        texClr = s.Texture.Sample(v.Texture.X, v.Texture.Y)
-    }
-
-	switch s.Texture.Mode {
-	case 0:
+    func(texture *Texture, vColor, tColor Color) Color {
 
 		con := func(v, t float64) float64 {
 			v *= FACTOR
@@ -30,36 +20,29 @@ func (s *Shader) Fragment(v *Vertex) {
 			return max(0, min(1, ((t)*(v)-1)/(FACTOR*FACTOR)))
 		}
 
-		v.Color.R = con(v.Color.R, texClr.R)
-		v.Color.G = con(v.Color.G, texClr.G)
-		v.Color.B = con(v.Color.B, texClr.B)
-		v.Color.A = con(v.Color.A, texClr.A)
+		vColor.R = con(vColor.R, tColor.R)
+		vColor.G = con(vColor.G, tColor.G)
+		vColor.B = con(vColor.B, tColor.B)
+		vColor.A = con(vColor.A, tColor.A)
+        return vColor
+    },
+    func(texture *Texture, vColor, tColor Color) Color {
 
-	case 1:
-
-		con := func(v, t float64, at float64) float64 {
-
+		con := func(v, t, at float64) float64 {
 			v *= FACTOR
 			t *= FACTOR
 			at *= FACTOR
-
-			switch {
-			case at <= 0:
-				return v
-			case at >= FACTOR:
-				return t
-			default:
-				return (t*at + v*(FACTOR-at)) / (FACTOR * FACTOR)
-			}
+            return max(0, min(1, (t*at + v*(FACTOR-at)) / (FACTOR * FACTOR)))
 		}
 
-		v.Color.R = con(v.Color.R, texClr.R, texClr.A)
-		v.Color.G = con(v.Color.G, texClr.G, texClr.A)
-		v.Color.B = con(v.Color.B, texClr.B, texClr.A)
+		vColor.R = con(vColor.R, tColor.R, tColor.A)
+		vColor.G = con(vColor.G, tColor.G, tColor.A)
+		vColor.B = con(vColor.B, tColor.B, tColor.A)
+        return vColor
+    },
+    func(texture *Texture, vColor, tColor Color) Color {
 
-	case 2:
-
-		if s.Texture.IsHighlight {
+		if texture.IsHighlight {
 
 			con := func(s, t float64) float64 {
 				// assume s needs to be added as 0...1
@@ -69,34 +52,48 @@ func (s *Shader) Fragment(v *Vertex) {
 				return max(0, min(1, ((t)*(s)-1)/(FACTOR*FACTOR)+sb))
 			}
 
-			toon := s.Texture.ToonTbl[uint32(v.Color.R*FACTOR)]
+			toon := texture.ToonTbl[uint32(vColor.R*FACTOR)]
 
-			v.Color.R = con(toon.R, texClr.R)
-			v.Color.G = con(toon.G, texClr.G)
-			v.Color.B = con(toon.B, texClr.B)
-			v.Color.A = con(v.Color.A, texClr.A)
+			vColor.R = con(toon.R, tColor.R)
+			vColor.G = con(toon.G, tColor.G)
+			vColor.B = con(toon.B, tColor.B)
+			vColor.A = con(vColor.A, tColor.A)
+            return vColor
+        }
 
-		} else {
+        // toon
 
-			// toon
+        con := func(s, t float64) float64 {
+            s *= FACTOR
+            t *= FACTOR
+            return max(0, min(1, ((t)*(s)-1)/(FACTOR*FACTOR)))
+        }
 
-			con := func(s, t float64) float64 {
-				s *= FACTOR
-				t *= FACTOR
-				return max(0, min(1, ((t)*(s)-1)/(FACTOR*FACTOR)))
-			}
+        toon := texture.ToonTbl[uint32(vColor.R*FACTOR)]
 
-			toon := s.Texture.ToonTbl[uint32(v.Color.R*FACTOR)]
+        vColor.R = con(toon.R, tColor.R)
+        vColor.G = con(toon.G, tColor.G)
+        vColor.B = con(toon.B, tColor.B)
+        vColor.A = con(vColor.A, tColor.A)
+        return vColor
+    },
+    func(texture *Texture, vColor, tColor Color) Color {
+        return Transparent
+    },
+}
 
-			v.Color.R = con(toon.R, texClr.R)
-			v.Color.G = con(toon.G, texClr.G)
-			v.Color.B = con(toon.B, texClr.B)
-			v.Color.A = con(v.Color.A, texClr.A)
-		}
+func (s *Shader) Fragment(v *Vertex) {
 
-    case 3:
-        v.Color = Transparent
-	}
+    if s.Texture == nil {
+        return
+    }
+
+	tColor := White
+	if s.Texture.CachedTexture != nil {
+        tColor = s.Texture.Sample(v.Texture.X, v.Texture.Y)
+    }
+
+    v.Color = blendFunc[s.Texture.Mode](s.Texture, v.Color, tColor)
 }
 
 func (s *Shader) SetTexture(texture *Texture) {
