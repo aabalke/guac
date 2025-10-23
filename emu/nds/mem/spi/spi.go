@@ -36,6 +36,7 @@ func (s *Spi) Init() {
     s.Pmd.Init()
 
     s.TransferDevice = nil
+    //FirmwareConfig()
 }
 
 func (s *Spi) WriteCNT(b, v uint8) {

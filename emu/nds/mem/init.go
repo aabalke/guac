@@ -135,6 +135,8 @@ func setBiosRam(mem *Mem) {
         USER_SETTING_0   = 0x3FE00
     )
 
+    spi.FirmwareConfig()
+
     for i := range uint32(0x100) {
         v := spi.FirmwareData[USER_SETTING_0 + i]
         mem.Write(USER_SETTING_RAM + i, v, true)

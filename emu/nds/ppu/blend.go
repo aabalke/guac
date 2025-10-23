@@ -12,8 +12,8 @@ type BlendPalettes struct {
 	NoBlendPalette, APalette, BPalette uint32
 	hasA, hasB, targetATop             bool
 
-    targetA3d bool
-    alpha float32
+	targetA3d bool
+	alpha     float32
 }
 
 func NewBlendPalette(i uint32, bld *Blend, backdrop uint32) *BlendPalettes {
@@ -40,7 +40,7 @@ func NewBlendPalette(i uint32, bld *Blend, backdrop uint32) *BlendPalettes {
 	return bp
 }
 
-func (bp *BlendPalettes) SetBlendPalettes(palData uint32, bgIdx uint32, obj bool, semiTransparent, targetA3d bool, alpha float64) {
+func (bp *BlendPalettes) SetBlendPalettes(palData uint32, bgIdx uint32, obj bool, semiTransparent, targetA3d bool, alpha float32) {
 
 	bp.NoBlendPalette = palData
 
@@ -66,18 +66,18 @@ func (bp *BlendPalettes) SetBlendPalettes(palData uint32, bgIdx uint32, obj bool
 		bp.hasA = true
 		bp.targetATop = true
 
-        if targetA3d && bgIdx == 0 {
-            bp.targetA3d = true
-            bp.alpha = float32(alpha)
-        } else {
-            bp.targetA3d = false
-        }
+		if targetA3d && bgIdx == 0 {
+			bp.targetA3d = true
+			bp.alpha = alpha
+		} else {
+			bp.targetA3d = false
+		}
 
 	} else {
 		bp.targetATop = false
 
-        // not sure if this is required or correct
-        bp.targetA3d = false
+		// not sure if this is required or correct
+		bp.targetA3d = false
 	}
 
 	if bp.Bld.b[bgIdx] {
@@ -88,9 +88,9 @@ func (bp *BlendPalettes) SetBlendPalettes(palData uint32, bgIdx uint32, obj bool
 
 func (bp *BlendPalettes) Blend(objTransparent bool, x, y uint32, wins *Windows, inObjWindow bool) uint32 {
 
-    if !windowBldPixelAllowed(x, y, wins, inObjWindow) {
+	if !windowBldPixelAllowed(x, y, wins, inObjWindow) {
 		return bp.noBlend(objTransparent)
-    }
+	}
 
 	switch bp.Bld.Mode {
 	case BLD_MODE_OFF:
@@ -116,32 +116,9 @@ func (bp *BlendPalettes) noBlend(objTransparent bool) uint32 {
 
 func (bp *BlendPalettes) alphaBlend() uint32 {
 
-	if !bp.hasA || !bp.hasB || !bp.targetATop {
+	if !bp.hasA || !bp.hasB || !bp.targetATop || bp.alpha >= 1 {
 		return bp.NoBlendPalette
 	}
-
-    if bp.targetA3d { // not sure if accurate
-
-        rA := float32((bp.APalette) & 0x1F)
-        gA := float32((bp.APalette >> 5) & 0x1F)
-        bA := float32((bp.APalette >> 10) & 0x1F)
-        rB := float32((bp.BPalette) & 0x1F)
-        gB := float32((bp.BPalette >> 5) & 0x1F)
-        bB := float32((bp.BPalette >> 10) & 0x1F)
-
-
-        blend := func(a, b float32) uint32 {
-            //val := a*bp.Bld.aEv + b*bp.Bld.bEv
-            val := a*bp.alpha + b*(1 - bp.alpha)
-            return uint32(min(31, val))
-        }
-        r := blend(rA, rB)
-        g := blend(gA, gB)
-        b := blend(bA, bB)
-
-        return r | (g << 5) | (b << 10)
-
-    }
 
 	rA := float32((bp.APalette) & 0x1F)
 	gA := float32((bp.APalette >> 5) & 0x1F)
@@ -151,6 +128,12 @@ func (bp *BlendPalettes) alphaBlend() uint32 {
 	bB := float32((bp.BPalette >> 10) & 0x1F)
 
 	blend := func(a, b float32) uint32 {
+
+		if bp.targetA3d {
+			val := a*bp.alpha + b*(1-bp.alpha)
+			return uint32(min(31, val))
+		}
+
 		val := a*bp.Bld.aEv + b*bp.Bld.bEv
 		return uint32(min(31, val))
 	}

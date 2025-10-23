@@ -159,8 +159,9 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
         case 0x8, 0x9, 0xA:
             return mem.ReadGbaSlot(addr, arm9)
         default:
-            panic(fmt.Sprintf("ARM9 ADDR %08X INVALID READ\n", addr))
             return 0
+            uhh.PrintPcs()
+            panic(fmt.Sprintf("ARM9 ADDR %08X INVALID READ\n", addr))
 		}
 	}
     switch addr >> 24 {
@@ -187,6 +188,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
     case 0x8, 0x9, 0xA:
         return mem.ReadGbaSlot(addr, arm9)
     default:
+        return 0
         uhh.PrintPcs()
         panic(fmt.Sprintf("ARM7 ADDR %08X INVALID READ\n", addr))
         return 0

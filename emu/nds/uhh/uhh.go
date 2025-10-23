@@ -2,19 +2,28 @@ package uhh
 
 import "fmt"
 
-var pcs [50][3]uint32
-
-func PrintPcs() {
-	for _, v := range pcs {
-		fmt.Printf("PC %08X OP %08X CPSR %08X\n", v[0], v[1], v[2])
-	}
+var pcs [60 - 12]struct {
+	r     [16]uint32
+	op    uint32
+	cpsr  uint32
 }
 
-func UpdatePcs(pc, opcode, cpsr uint32) {
+var head int
 
-    for i := 1; i < len(pcs); i++ {
-        pcs[i-1] = pcs[i]
-    }
+func UpdatePcs(r [16]uint32, op, cpsr uint32) {
+	pcs[head] = struct {
+		r     [16]uint32
+		op    uint32
+		cpsr  uint32
+	}{r, op, cpsr}
 
-    pcs[len(pcs) - 1] = [3]uint32{pc, opcode, cpsr}
+	head = (head + 1) % len(pcs)
+}
+
+func PrintPcs() {
+    for i := range len(pcs) {
+		idx := (head + i) % len(pcs)
+		v := pcs[idx]
+		fmt.Printf("R %08X OP %08X CPSR %08X\n", v.r, v.op, v.cpsr)
+	}
 }

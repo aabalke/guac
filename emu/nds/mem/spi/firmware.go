@@ -142,3 +142,5 @@ func (f *Firmware) Write() {
 
     f.WriteBuffer = nil
 }
+
+

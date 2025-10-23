@@ -944,8 +944,6 @@ func (e *Engine) UpdateObjMapping(d *Dispcnt) {
         case !d.BitmapObj1D && d.BitmapObj256:
             obj.ObjBmpMapping = OBJ_BMP_256_2D
             obj.BmpBoundaryMask = 0x1F
-
-            //panic("NEED TO SET UP 2D BITMAP OBJ")
         case d.BitmapObj1D && !d.BitmapObj256 && !d.BitmapObjBoundary:
             obj.ObjBmpMapping = OBJ_BMP_128_1D
             obj.BmpBoundaryShift = 7 //128

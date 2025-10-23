@@ -30,16 +30,16 @@ type Render struct {
 type Pixels struct {
     PalettesA []uint32
     PalettesB []uint32
-    AlphaA    []float64
-    AlphaB    []float64
+    AlphaA    []float32
+    AlphaB    []float32
     WritingB  bool
 }
 
 func (p *Pixels) InitPixels() {
     p.PalettesA = make([]uint32, WIDTH*HEIGHT)
     p.PalettesB = make([]uint32, WIDTH*HEIGHT)
-    p.AlphaA = make([]float64, WIDTH*HEIGHT)
-    p.AlphaB = make([]float64, WIDTH*HEIGHT)
+    p.AlphaA = make([]float32, WIDTH*HEIGHT)
+    p.AlphaB = make([]float32, WIDTH*HEIGHT)
 }
 
 func NewRender(rast *Rasterizer, buffers *Buffers, rp *RearPlane) *Render {
@@ -223,10 +223,10 @@ func (r *Render) ImageToPixels(img image.Image) {
             c := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
             if r.Pixels.WritingB {
                 r.Pixels.PalettesB[i] = uint32(RGB24ToRGB15(c.R, c.G, c.B))
-                r.Pixels.AlphaB[i] = float64(c.A) / 0xFF
+                r.Pixels.AlphaB[i] = float32(c.A) / 0xFF
             } else {
                 r.Pixels.PalettesA[i] = uint32(RGB24ToRGB15(c.R, c.G, c.B))
-                r.Pixels.AlphaA[i] = float64(c.A) / 0xFF
+                r.Pixels.AlphaA[i] = float32(c.A) / 0xFF
             }
             i++
         }

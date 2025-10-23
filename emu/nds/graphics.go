@@ -100,27 +100,26 @@ func (nds *Nds) standard(y uint32, engine *ppu.Engine) {
 	wg.Wait()
 }
 
-var bgFuncs = [...]func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (palData uint32, ok bool) {
-    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, bool) {
+var bgFuncs = [...]func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (palData uint32, alpha float32, ok bool) {
+    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, float32, bool) {
         return nds.setBackgroundPixel(engine, bg, bgIdx, x, y)
     },
-    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, bool) {
+    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, float32, bool) {
         return nds.setAffineBackgroundPixel(engine, bg, bgIdx, x)
     },
-    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, bool) {
+    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, float32, bool) {
         return nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
     },
-    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, bool) {
-        palData, _, ok := nds.set3d(engine, bg, x, y)
-        return palData, ok
+    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, float32, bool) {
+        return nds.set3d(engine, bg, x, y)
     },
-    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, bool) {
+    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, float32, bool) {
         return nds.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
     },
-    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, bool) {
+    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, float32, bool) {
         return nds.setBmpBackgroundPixel(engine, bg, x)
     },
-    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, bool) {
+    func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, float32, bool) {
         return nds.setDirectBitmap(engine, bg, x)
     },
 }
@@ -150,10 +149,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 				continue
 			}
 
-            alpha := float64(1)
-            palData, ok := bgFuncs[bg.Type](nds, engine, bg, bgIdx, x, y)
-
-			if ok {
+            if palData, alpha, ok := bgFuncs[bg.Type](nds, engine, bg, bgIdx, x, y); ok {
 				bldPal.SetBlendPalettes(palData, uint32(bgIdx), false, false, true, alpha)
 			}
 		}
@@ -173,7 +169,6 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 	        obj := &engine.Objects[objIdx]
 
             palData, ok := uint32(0), false
-
             if bmp:= obj.Mode == 3; bmp {
                 obj.OneDimensional = dispcnt.BitmapObj1D
                 palData, ok = nds.setObjBmpPixel(engine, obj, x, y)
@@ -272,7 +267,7 @@ func updateBackgrounds(engine *ppu.Engine) *[4]ppu.Background {
 	return bgs
 }
 
-func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, float64, bool) {
+func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, float32, bool) {
 
     //xIdx := int(x) + int(bg.XOffset)
     //yIdx := int(y) + int(bg.YOffset)
@@ -287,7 +282,7 @@ func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint
 
     r := nds.ppu.Rasterizer.Render
 
-    pal, alpha := uint32(0), float64(0)
+    pal, alpha := uint32(0), float32(0)
 
     if !r.Pixels.WritingB {
         pal, alpha = r.Pixels.PalettesA[i], r.Pixels.AlphaA[i]
@@ -295,14 +290,13 @@ func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint
         pal, alpha = r.Pixels.PalettesB[i], r.Pixels.AlphaB[i]
     }
 
-    //if nds.ppu.Rasterizer.GeoEngine.Disp3dCnt.RearPlaneBitmapEnabled == true && alpha != 1 {
-    //    return 0, 0, false
+    //if nds.ppu.Rasterizer.GeoEngine.Disp3dCnt.RearPlaneBitmapEnabled && alpha != 1 {
     //    pal, ok := nds.setRearBitmap(engine, bg, x, y)
     //    return pal, 1, ok
     //}
 
-    return pal, alpha, alpha > 0
     //return pal, alpha, true
+    return pal, alpha, alpha > 0
 }
 
 func (nds *Nds) setRearBitmap(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, bool) {
@@ -315,7 +309,7 @@ func (nds *Nds) setRearBitmap(engine *ppu.Engine, bg *ppu.Background, x, y uint3
     addr := uint32(xIdx+(yIdx * SCREEN_WIDTH)) * 2
     addr += slot3Offset
 
-    fmt.Printf("addr %08X Slots % v\n", addr, nds.ppu.Vram.TextureSlots)
+    //fmt.Printf("addr %08X Slots % v\n", addr, nds.ppu.Vram.TextureSlots)
 
     data := uint32(nds.ppu.Vram.ReadTexture(addr))
     data |= uint32(nds.ppu.Vram.ReadTexture(addr + 1)) << 8
@@ -326,7 +320,7 @@ func (nds *Nds) setRearBitmap(engine *ppu.Engine, bg *ppu.Background, x, y uint3
 
 }
 
-func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, bool) {
+func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, float32, bool) {
 
 	xIdx := (x + bg.XOffset) & ((bg.W) - 1)
 	yIdx := (y + bg.YOffset) & ((bg.H) - 1)
@@ -396,7 +390,7 @@ func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx
     return getBgPaletteData(nds, engine, bgIdx, bg.Palette256, palNum, palIdx, inTileX)
 }
 
-func (nds *Nds) setAffine16BackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx, x uint32) (uint32, bool) {
+func (nds *Nds) setAffine16BackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx, x uint32) (uint32, float32, bool) {
 
 	//if !bg.Palette256 {
 	//	panic(fmt.Sprintf("AFFINE WITHOUT PAL 256"))
@@ -428,7 +422,7 @@ func (nds *Nds) setAffine16BackgroundPixel(engine *ppu.Engine, bg *ppu.Backgroun
 		xIdx &= int(bg.W) - 1
 		yIdx &= int(bg.H) - 1
 	case !bg.AffineWrap && out:
-		return 0, false
+		return 0, 0, false
 	}
 
     const BYTE_SHIFT = 1
@@ -471,7 +465,7 @@ func (nds *Nds) setAffine16BackgroundPixel(engine *ppu.Engine, bg *ppu.Backgroun
     return getBgPaletteData(nds, engine, bgIdx, true, palNum, palIdx, inTileX)
 }
 
-func (nds *Nds) setAffineBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx, x uint32) (uint32, bool) {
+func (nds *Nds) setAffineBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx, x uint32) (uint32, float32, bool) {
 
     vramOffset := uint32(0)
 
@@ -499,7 +493,7 @@ func (nds *Nds) setAffineBackgroundPixel(engine *ppu.Engine, bg *ppu.Background,
 		xIdx &= int(bg.W) - 1
 		yIdx &= int(bg.H) - 1
 	case !bg.AffineWrap && out:
-		return 0, false
+		return 0, 1, false
 	}
 
 	map_x := (uint32(xIdx)) & (bg.W - 1) >> 3
@@ -529,7 +523,7 @@ func (nds *Nds) setAffineBackgroundPixel(engine *ppu.Engine, bg *ppu.Background,
     return getBgPaletteData(nds, engine, bgIdx, true, pal, palIdx, inTileX)
 }
 
-func (nds *Nds) setBmpBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x uint32) (uint32, bool) {
+func (nds *Nds) setBmpBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x uint32) (uint32, float32, bool) {
 
 	//if !bg.Palette256 {
 	//	panic(fmt.Sprintf("AFFINE WITHOUT PAL 256"))
@@ -555,7 +549,7 @@ func (nds *Nds) setBmpBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x 
 		xIdx &= int(bg.W) - 1
 		yIdx &= int(bg.H) - 1
 	case !bg.AffineWrap && out:
-		return 0, false
+		return 0, 1, false
 	}
 
     addr := uint32(xIdx+(yIdx * int(bg.W)))
@@ -568,7 +562,7 @@ func (nds *Nds) setBmpBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x 
 
     palIdx := uint32(nds.ppu.Vram.Read(addr, true))
 
-    if palIdx == 0 { return 0, false }
+    if palIdx == 0 { return 0, 1, false }
 
 	data := nds.getPalette(palIdx, 0, false, engine.IsB)
 
@@ -576,7 +570,7 @@ func (nds *Nds) setBmpBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x 
     //    return 0, false
     //}
 
-    return data, true
+    return data, 1, true
 }
 
 func getPositionsBg(screenData, xIdx, yIdx uint32) (uint32, uint32) {
@@ -595,7 +589,7 @@ func getPositionsBg(screenData, xIdx, yIdx uint32) (uint32, uint32) {
 	return inTileX, inTileY
 }
 
-func (nds *Nds) setDirectBitmap(engine *ppu.Engine, bg *ppu.Background, x uint32) (uint32, bool) {
+func (nds *Nds) setDirectBitmap(engine *ppu.Engine, bg *ppu.Background, x uint32) (uint32, float32, bool) {
 
 	pa := utils.Convert8_8Float(int16(bg.Pa))
 	pc := utils.Convert8_8Float(int16(bg.Pc))
@@ -617,7 +611,7 @@ func (nds *Nds) setDirectBitmap(engine *ppu.Engine, bg *ppu.Background, x uint32
 		xIdx &= int(bg.W) - 1
 		yIdx &= int(bg.H) - 1
 	case !bg.AffineWrap && out:
-		return 0, false
+		return 0, 1, false
 	}
 
     addr := uint32(xIdx+(yIdx * int(bg.W))) * 2
@@ -636,10 +630,10 @@ func (nds *Nds) setDirectBitmap(engine *ppu.Engine, bg *ppu.Background, x uint32
 
     // required sonic dark brotherhood
     if transparent := (data & 0x8000) == 0; transparent {
-        return 0, false
+        return 0, 1, false
     }
 
-    return data, true
+    return data, 1, true
 
 }
 
@@ -918,7 +912,7 @@ func getBmpTileAddr(obj *ppu.Object, xIdx, yIdx uint32) uint32 {
     return base + pixelOffset
 }
 
-func getBgPaletteData(nds *Nds, engine *ppu.Engine, bgIdx uint32, pal256 bool, palNum, tileData, inTileX uint32) (uint32, bool) {
+func getBgPaletteData(nds *Nds, engine *ppu.Engine, bgIdx uint32, pal256 bool, palNum, tileData, inTileX uint32) (uint32, float32, bool) {
     //if !engine.IsB && x == y && x == 0 {
     //    fmt.Printf("PAL IDX %0X PAL NUM %08X\n", palIdx, palNum)
     //}
@@ -931,14 +925,14 @@ func getBgPaletteData(nds *Nds, engine *ppu.Engine, bgIdx uint32, pal256 bool, p
 	}
 
 	if palIdx == 0 {
-		return 0, false
+		return 0, 1, false
 	}
 
     if engine.Dispcnt.BgExtPal && pal256 {
 
         palNum <<= 4
         palData := nds.getExtendedPalette(engine, bgIdx, false, palIdx, palNum)
-        return palData, true
+        return palData, 1, true
     }
 
     // this is from gba, does not work with ext palettes, but assume it still
@@ -949,7 +943,7 @@ func getBgPaletteData(nds *Nds, engine *ppu.Engine, bgIdx uint32, pal256 bool, p
 
 	palData := nds.getPalette(uint32(palIdx), palNum, false, engine.IsB)
 
-	return palData, true
+	return palData, 1, true
 }
 
 func getPaletteData(nds *Nds, engine *ppu.Engine, pal256 bool, pal, tileData, inTileX uint32) (uint32, bool) {

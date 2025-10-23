@@ -27,7 +27,6 @@ Far-plane intersecting polygons
 Depth Test, Draw Pixels with Depth
 Fog Enable
 Polygon ID
-
 View Volume Clipping is not implimented.
 
 ## Shadow Polygons
@@ -42,9 +41,7 @@ Texture Coordinates Transformation Mode 3 - Vertex source is untested.
 ## Toon, Edge, Fog, Alpha-Blending, Anti-Aliasing
 
 Edge, Fog , Alpha-Blending, and AntiAliasing are not implimented
-
 Toon is implimented.
-
 
 ## Status
 
@@ -58,3 +55,9 @@ All tests are implimented.
 
 Clear color implimented. Polygon Id is not implimented.
 Rear Bitmap not implimented.
+
+## 3D Final Output
+Scrolling - need to fix region size
+priority - i believe working
+special effects - alpha blending incorrect
+window freature - need to force alpha blending above
