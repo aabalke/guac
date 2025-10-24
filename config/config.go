@@ -64,6 +64,7 @@ type GbaConfig struct {
 type NdsConfig struct {
 	KeyboardConfig   EmulatorKeyboardConfig   `toml:"keyboard"`
 	ControllerConfig EmulatorControllerConfig `toml:"controller"`
+    NdsFirmware NdsFirmware `toml:"firmware"`
 
 	//SkipHle                bool `toml:"skip_hle"`
 	Threads                int  `toml:"threads"`
@@ -171,6 +172,7 @@ func (c *Config) Decode() {
 	}
 
 	c.decodeGb()
+    c.decodeNdsFirmware()
     c.decodeMouse()
 }
 

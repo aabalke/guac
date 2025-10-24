@@ -1,7 +1,6 @@
 package spi
 
 import (
-
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
@@ -29,6 +28,7 @@ func (p *Pmd) Init() {
 func (p *Pmd) Transfer(data []uint8) (reply []uint8, stat uint8)  {
 
     idx := data[0]
+    //log.Printf("SPI Power % 02X\n", data)
 
     if write := !utils.BitEnabled(uint32(idx), 7); write {
 

@@ -1,7 +1,6 @@
 package spi
 
 import (
-
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
@@ -71,6 +70,8 @@ func (s *Spi) ReadCNT(b uint8) uint8 {
 
 func (s *Spi) WriteData(v uint8) {
 
+    //fmt.Printf("SPI WRITE DATA % 02X\n", v)
+
     if s.Enabled {
 
         if s.TransferDevice == nil || *s.TransferDevice != s.Device {
@@ -91,9 +92,9 @@ func (s *Spi) WriteData(v uint8) {
         s.TransferDevice = &d
     }
 
+
     var value uint8
 
-    // is this is the right place?
     if len(s.Res) > 0 {
         value = s.Res[0]
         s.Res = s.Res[1:]

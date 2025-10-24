@@ -143,3 +143,11 @@ r = [5]
 l = [4]
 x = [3]
 y = [2]
+
+[nds.firmware]
+# nickname = "guac"
+# message = "This is a message."
+# Gray, Brown, Red, Pink, Orange, Yellow, LimeGreen, Green, DarkGreen, SeaGreen,
+# Turquoise, Blue, DarkBlue, DarkPurple, Violet, Magenta
+# favorite_color = "Pink"
+

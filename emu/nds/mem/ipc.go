@@ -1,7 +1,6 @@
 package mem
 
 import (
-
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
@@ -79,6 +78,7 @@ func (i *IPC) WriteSync(v, b uint8, isArm9 bool) {
 	if !isArm9 {
         local = &i.SYNC7
         remote = &i.SYNC9
+
 	}
 
     if b == 0 {

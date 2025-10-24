@@ -12,7 +12,6 @@ import (
 	"github.com/aabalke/guac/emu/nds/mem/spi"
 	"github.com/aabalke/guac/emu/nds/ppu"
 	"github.com/aabalke/guac/emu/nds/snd"
-	"github.com/aabalke/guac/emu/nds/uhh"
 )
 
 //go:embed res_/bios7.bin
@@ -160,7 +159,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
             return mem.ReadGbaSlot(addr, arm9)
         default:
             return 0
-            uhh.PrintPcs()
+            //uhh.PrintPcs()
             panic(fmt.Sprintf("ARM9 ADDR %08X INVALID READ\n", addr))
 		}
 	}
@@ -189,7 +188,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
         return mem.ReadGbaSlot(addr, arm9)
     default:
         return 0
-        uhh.PrintPcs()
+        //uhh.PrintPcs()
         panic(fmt.Sprintf("ARM7 ADDR %08X INVALID READ\n", addr))
         return 0
     }
@@ -446,9 +445,9 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 
 	switch addr {
 	case 0x4:
-		return uint8(mem.Dispstat)
+		return uint8(mem.Dispstat.A9)
 	case 0x5:
-		return uint8(mem.Dispstat >> 8)
+		return uint8(mem.Dispstat.A9 >> 8)
     case 0x6:
         return uint8(mem.Vcount)
     case 0x7:
@@ -628,9 +627,9 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 
 	switch addr {
     case 0x4:
-		mem.Dispstat.Write(v, false)
+		mem.Dispstat.Write(v, false, true)
     case 0x5:
-		mem.Dispstat.Write(v, true)
+		mem.Dispstat.Write(v, true, true)
     case 0x6:
         mem.Vcount &^= 0xFF
         mem.Vcount |= uint32(v)
@@ -813,9 +812,9 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 
 	switch addr {
 	case 0x4:
-		return uint8(mem.Dispstat)
+		return uint8(mem.Dispstat.A7)
 	case 0x5:
-		return uint8(mem.Dispstat >> 8)
+		return uint8(mem.Dispstat.A7 >> 8)
     case 0x6:
         return uint8(mem.Vcount)
     case 0x7:
@@ -998,9 +997,9 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 
 	switch addr {
     case 0x4:
-		mem.Dispstat.Write(v, false)
+		mem.Dispstat.Write(v, false, false)
     case 0x5:
-		mem.Dispstat.Write(v, true)
+		mem.Dispstat.Write(v, true, false)
 
     case 0x6:
         mem.Vcount &^= 0xFF

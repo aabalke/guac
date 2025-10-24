@@ -14,7 +14,6 @@ import (
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/nds/ppu"
 	"github.com/aabalke/guac/emu/nds/snd"
-	"github.com/aabalke/guac/emu/nds/uhh"
 	"github.com/aabalke/guac/emu/nds/utils"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -51,15 +50,13 @@ type Nds struct {
 	mem  mem.Mem
 	arm7 arm7.Cpu
 	arm9 arm9.Cpu
-    ppu *ppu.PPU
+    ppu  *ppu.PPU
     Cartridge cart.Cartridge
 
 	Debugger Debugger
 
 	Muted, Paused, Drawn    bool
-	//PixelsTop, PixelsBottom []byte
 	ImageTop, ImageBottom   *ebiten.Image
-
     BtmAbs struct{T, B, L, R, W, H int} 
 
     AccCycles uint32
@@ -152,10 +149,10 @@ func (nds *Nds) checkBadPc() {
     case !reg9.IsThumb && reg9.R[15] & 0b11 != 0:
         panic(fmt.Sprintf("BAD ARM9 ARM   PC %08X CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
     case reg7.IsThumb && reg7.R[15] & 0b1 != 0:
-        uhh.PrintPcs()
+        //uhh.PrintPcs()
         panic(fmt.Sprintf("BAD ARM7 THUMB PC %08X CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
     case !reg7.IsThumb && reg7.R[15] & 0b11 != 0:
-        uhh.PrintPcs()
+        //uhh.PrintPcs()
         panic(fmt.Sprintf("BAD ARM7 ARM   PC %08X CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
     }
 
@@ -239,6 +236,8 @@ func (nds *Nds) Update() {
 		return
 	}
 
+    render := nds.ppu.Rasterizer.Render
+
     //if singleThread {
     //    if nds.ppu.EngineA.Dispcnt.Is3D {
     //        nds.ppu.Rasterizer.Render.UpdateRender()
@@ -252,7 +251,7 @@ func (nds *Nds) Update() {
     go func() {
         defer wg2.Done()
         if nds.ppu.EngineA.Dispcnt.Is3D {
-            nds.ppu.Rasterizer.Render.UpdateRender()
+            render.UpdateRender()
         }
     }()
 
@@ -262,7 +261,7 @@ func (nds *Nds) Update() {
     }()
 
     wg2.Wait()
-    nds.ppu.Rasterizer.Render.Pixels.WritingB = !nds.ppu.Rasterizer.Render.Pixels.WritingB
+    render.Pixels.WritingB = !render.Pixels.WritingB
 }
 
 func (nds *Nds) UpdateFrame() {
@@ -315,9 +314,24 @@ func (nds *Nds) UpdateFrame() {
                 //logger.Update(0, 1, CURR_INST, false)
                 //uhh.UpdatePcs(r7[15], nds.mem.Read32(r7[15], false), uint32(nds.arm7.Reg.CPSR))
 
+                //if uhh.GoodA {
+                //    //fmt.Printf("LYC %04X\n", nds.mem.Dispstat.GetLYC())
+                //    //uhh.CNT++
+                //    //nds.arm7.Irq.IE |= 1 << 4
+                //    //nds.arm7.Irq.IF |= 1 << 2
+                //    //logger.Write(CURR_INST, false)
+                //}
+
+                //if uhh.CNT >= 3000 {
+                //    fmt.Printf("IE %08X\n", nds.arm7.Irq.IE)
+                //    logger.Close()
+                //    os.Exit(0)
+                //}
+
+
                 _, ok := nds.arm7.Execute()
                 if !ok {
-                    uhh.PrintPcs()
+                    //uhh.PrintPcs()
                     fmt.Printf("ARM7 Decode Error: PC %08X CURR %d\n", r7[15], CURR_INST)
                     os.Exit(0)
                 }
@@ -366,7 +380,7 @@ func (nds *Nds) GetScreens() (t, b *[]byte) {
 }
 
 func (nds *Nds) Close() {
-	nds.Muted = true
+	nds.Muted  = true
 	nds.Paused = true
 
     logger.Close()
@@ -419,8 +433,11 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 	if enteredHblank := inHblank && prevInHdraw; enteredHblank {
 
 		dispstat.SetHBlank(true)
-		if utils.BitEnabled(uint32(*dispstat), 4) {
+		if utils.BitEnabled(uint32(dispstat.A9), 4) {
 			nds.arm9.Irq.SetIRQ(1)
+		}
+
+		if utils.BitEnabled(uint32(dispstat.A7), 4) {
 			nds.arm7.Irq.SetIRQ(1)
 		}
 
@@ -473,19 +490,27 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 			nds.CheckDmas(dma.ARM9_DMA_MODE_VBL, true)
 			nds.CheckDmas(dma.ARM7_DMA_MODE_VBL, true)
 		case SCREEN_HEIGHT + 1:
-			if utils.BitEnabled(uint32(*dispstat), 3) {
+            if utils.BitEnabled(uint32(dispstat.A9), 3) {
                 nds.arm9.Irq.SetIRQ(0)
+			}
+            if utils.BitEnabled(uint32(dispstat.A7), 3) {
                 nds.arm7.Irq.SetIRQ(0)
 			}
 		case NUM_SCANLINES - 1:
 			dispstat.SetVBlank(false)
 		}
 
-		match := dispstat.GetLYC() == vcount
-		dispstat.SetVCFlag(match)
+        // should vcount be checked separately per cpu???
 
-		if vcounterIRQ := utils.BitEnabled(uint32(*dispstat), 5); vcounterIRQ && match {
+		match := dispstat.GetLYC(true) == vcount
+		dispstat.SetVCFlag(match, true)
+		if vcounterIRQ := utils.BitEnabled(uint32(dispstat.A9), 5); vcounterIRQ && match {
 			nds.arm9.Irq.SetIRQ(2)
+		}
+
+		match = dispstat.GetLYC(false) == vcount
+		dispstat.SetVCFlag(match, false)
+		if vcounterIRQ := utils.BitEnabled(uint32(dispstat.A7), 5); vcounterIRQ && match {
 			nds.arm7.Irq.SetIRQ(2)
 		}
 	}
