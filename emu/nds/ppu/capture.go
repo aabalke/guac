@@ -3,6 +3,7 @@ package ppu
 import (
 	"encoding/binary"
 
+	"github.com/aabalke/guac/emu/nds/rast"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
@@ -27,15 +28,18 @@ type Capture struct {
     VramBlocks [4]*[0x2_0000]uint8
 
     Pixels *[]uint8
+    Pixels3d *rast.Pixels
+
 }
 
-func (c *Capture) Init(vram *VRAM, ppu *PPU, rdBlk *uint32, pixels *[]uint8) {
+func (c *Capture) Init(vram *VRAM, ppu *PPU, rdBlk *uint32, pixels *[]uint8, pixels3d *rast.Pixels) {
     c.VramBlocks[0] = &vram.A
     c.VramBlocks[1] = &vram.B
     c.VramBlocks[2] = &vram.C
     c.VramBlocks[3] = &vram.D
     c.ReadBlock = rdBlk
     c.Pixels = pixels
+    c.Pixels3d = pixels3d
 }
 
 func (c *Capture) Write(addr uint32, v uint8) {
@@ -60,7 +64,6 @@ func (c *Capture) Write(addr uint32, v uint8) {
 
         c.Src = (v >> 5) & 0b11
         c.Enabled = utils.BitEnabled(uint32(v), 7)
-
 	}
 
     c.TempLimiter()
@@ -123,10 +126,6 @@ func (c *Capture) TempLimiter() {
         panic("UNSETUP CAPTURE SETTING SIZE")
     }
 
-    //if c.SrcA3D {
-    //    panic("UNSETUP CAPTURE SETTING 3d only")
-    //}
-
     if c.SrcBMemFifo {
         panic("UNSETUP CAPTURE SETTING fifo")
     }
@@ -147,15 +146,35 @@ func (c *Capture) StartCapture() {
 
 func (c *Capture) CaptureLine(y uint32) {
 
-    if !c.ActiveCapture {
-        return
-    }
+    //if !c.ActiveCapture {
+    //    return
+    //}
 
     block := c.VramBlocks[c.WriteBlock]
 
     for x := range uint32(SCREEN_WIDTH) {
-        i := (x + (y * SCREEN_WIDTH)) * 4
         j := (x + (y * SCREEN_WIDTH)) * 2
+
+        if c.SrcA3D {
+            i := (x + (y * SCREEN_WIDTH))
+            v, alpha := uint32(0), float32(0)
+            pixels := c.Pixels3d
+            if !pixels.WritingB {
+                v, alpha = pixels.PalettesA[i], pixels.AlphaA[i]
+            } else {
+                v, alpha = pixels.PalettesB[i], pixels.AlphaB[i]
+            }
+
+            if alpha > 0 {
+                v |= 0x8000
+            }
+
+            binary.LittleEndian.PutUint16(block[j+c.WriteOffset:], uint16(v))
+
+            continue
+        }
+
+        i := (x + (y * SCREEN_WIDTH)) * 4
 
         v := Convert24to15(
             (*c.Pixels)[i+0],
@@ -164,7 +183,6 @@ func (c *Capture) CaptureLine(y uint32) {
         )
 
         v |= 0x8000
-
         binary.LittleEndian.PutUint16(block[j+c.WriteOffset:], v)
     }
 }

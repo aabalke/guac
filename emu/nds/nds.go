@@ -314,21 +314,6 @@ func (nds *Nds) UpdateFrame() {
                 //logger.Update(0, 1, CURR_INST, false)
                 //uhh.UpdatePcs(r7[15], nds.mem.Read32(r7[15], false), uint32(nds.arm7.Reg.CPSR))
 
-                //if uhh.GoodA {
-                //    //fmt.Printf("LYC %04X\n", nds.mem.Dispstat.GetLYC())
-                //    //uhh.CNT++
-                //    //nds.arm7.Irq.IE |= 1 << 4
-                //    //nds.arm7.Irq.IF |= 1 << 2
-                //    //logger.Write(CURR_INST, false)
-                //}
-
-                //if uhh.CNT >= 3000 {
-                //    fmt.Printf("IE %08X\n", nds.arm7.Irq.IE)
-                //    logger.Close()
-                //    os.Exit(0)
-                //}
-
-
                 _, ok := nds.arm7.Execute()
                 if !ok {
                     //uhh.PrintPcs()

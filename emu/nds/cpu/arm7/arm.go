@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/aabalke/guac/emu/gba/utils"
-	"github.com/aabalke/guac/emu/nds/uhh"
 )
 
 const (
@@ -630,7 +629,7 @@ func generateSdtAddress(cpu *Cpu, opcode uint32) uint32 {
 	var offset uint32
     if imm := utils.BitEnabled(opcode, 25); imm {
         if utils.BitEnabled(opcode, 4) {
-            uhh.PrintPcs()
+            //uhh.PrintPcs()
             panic("Malformed Single Data Transfer")
         }
 
@@ -751,7 +750,7 @@ func NewHalf(opcode uint32, c *Cpu) *Half {
 
 	for i, fail := range fails {
 		if fail {
-            uhh.PrintPcs()
+            //uhh.PrintPcs()
 			panic(fmt.Sprintf("Malformed Half Instruction %d %08X", i, opcode))
 		}
 	}

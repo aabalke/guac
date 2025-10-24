@@ -18,21 +18,36 @@ func (nds *Nds) graphics(y uint32) {
 
     a := &nds.ppu.EngineA
     b := &nds.ppu.EngineB
+    capture := &nds.ppu.Capture
 
 	switch a.Dispcnt.DisplayMode {
 	case 0:
 		nds.screenoff(y, a)
+
 	case 1:
+
 		nds.standard(y, a)
+        if  capture.ActiveCapture {
+            capture.CaptureLine(y)
+        }
+
 	case 2:
+        if capture.ActiveCapture {
+		    nds.standard(y, a)
+            capture.CaptureLine(y)
+        }
+
 		nds.vramDisplay(y, a)
-		//nds.standard(y, a)
+
 	case 3:
         panic("MAIN MEM FIFO")
+        if capture.ActiveCapture {
+		    nds.standard(y, a)
+            capture.CaptureLine(y)
+        }
         nds.MemFifoDisplay(a)
-	}
 
-    nds.ppu.Capture.CaptureLine(y)
+	}
 
     switch b.Dispcnt.DisplayMode {
     case 0:

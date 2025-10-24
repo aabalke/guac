@@ -177,7 +177,9 @@ func NewPPU(irq *cpu.Irq) *PPU {
         &p.Vram,
         p,
         &p.EngineA.Dispcnt.VramBlock,
-        &p.EngineA.Pixels)
+        &p.EngineA.Pixels,
+        &p.Rasterizer.Render.Pixels,
+    )
     p.DisplayFifo.Pixels = make([]uint8, SCREEN_WIDTH*SCREEN_HEIGHT*4)
 
     // screenoff optimization
