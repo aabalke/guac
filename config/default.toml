@@ -114,6 +114,7 @@ l = [4]
 [nds]
 
 #threads = 8
+#disable_saves = true
 
 [nds.keyboard]
 a = ["J"]

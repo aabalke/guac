@@ -41,7 +41,7 @@ type Gamecard struct {
     ChipId [4]uint8
 }
 
-func (g *Gamecard) Init(irq7, irq9 *cpu.Irq, dma7, dma9 *[4]dma.DMA, c *cart.Cartridge) {
+func (g *Gamecard) Init(irq7, irq9 *cpu.Irq, dma7, dma9 *[4]dma.DMA, c *cart.Cartridge, savepath string, saveFlag *bool) {
 
     g.irq7 = irq7
     g.irq9 = irq9
@@ -50,7 +50,7 @@ func (g *Gamecard) Init(irq7, irq9 *cpu.Irq, dma7, dma9 *[4]dma.DMA, c *cart.Car
     g.Cartridge = c
 
     g.Backup = &cart.Backup{}
-    g.Backup.Init()
+    g.Backup.Init(savepath, saveFlag)
 
     g.ExMem = &ExMem{Gamecard: g}
     g.AuxSpi = &AuxSPI{Gamecard: g}

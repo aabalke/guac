@@ -65,12 +65,12 @@ type NdsConfig struct {
 	KeyboardConfig   EmulatorKeyboardConfig   `toml:"keyboard"`
 	ControllerConfig EmulatorControllerConfig `toml:"controller"`
     NdsFirmware NdsFirmware `toml:"firmware"`
+	Threads                int  `toml:"threads"`
+	DisableSaves           bool `toml:"disable_saves"`
 
 	//SkipHle                bool `toml:"skip_hle"`
-	Threads                int  `toml:"threads"`
 	//IdleOptimize           bool `toml:"idle_optimize"`
 	//SoundClockUpdateCycles int  `toml:"sound_clock_update_cycles"`
-	//DisableSaves           bool `toml:"disable_saves"`
 }
 
 type KeyboardConfig struct {

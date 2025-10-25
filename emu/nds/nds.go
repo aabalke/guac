@@ -105,7 +105,7 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
         &nds.arm7.Halted, &nds.arm9.Halted,
         &nds.arm7.Dma, &nds.arm9.Dma,
         &irq7, &irq9,
-        &nds.Cartridge, nds.ppu, s)
+        &nds.Cartridge, nds.ppu, s, path + ".save")
 
     s.Mem = &nds.mem
 

@@ -4,8 +4,10 @@ import (
 	_ "embed"
 	"encoding/binary"
 	"fmt"
+	"time"
 	"unsafe"
 
+	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
@@ -59,12 +61,14 @@ type Mem struct {
     Timers [8]Timer
 
     Snd *snd.Snd
+
+    Save bool
 }
 
 type BiosProt uint16
 type WifiWaitCnt uint8
 
-func NewMemory(arm7Pc *uint32, halted7, halted9 *bool, dma7, dma9 *[4]dma.DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PPU, snd *snd.Snd) Mem {
+func NewMemory(arm7Pc *uint32, halted7, halted9 *bool, dma7, dma9 *[4]dma.DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PPU, snd *snd.Snd, savepath string) Mem {
 m := Mem{
         halted7: halted7,
         halted9: halted9,
@@ -100,11 +104,31 @@ m := Mem{
     m.PowCnt.WriteCNT1(1, 0x82, ppu)
 
     m.Spi.Init()
-    m.Gamecard.Init(irq7, irq9, dma7, dma9, c)
+    m.Gamecard.Init(irq7, irq9, dma7, dma9, c, savepath, &m.Save)
     
     m.ppu.Vram.Init(&ppu.Rasterizer.GeoEngine.TextureCache)
 
+    m.InitSaveLoop()
+
 	return m
+}
+
+func (m *Mem) InitSaveLoop() {
+
+	if config.Conf.Nds.DisableSaves {
+		return
+	}
+
+	saveTicker := time.Tick(time.Second)
+
+	go func() {
+		for range saveTicker {
+			if m.Save {
+				m.Gamecard.Backup.Save()
+				m.Save = false
+			}
+		}
+	}()
 }
 
 var lockWrites bool

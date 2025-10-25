@@ -1,6 +1,12 @@
 package cart
 
-import "fmt"
+import (
+	"bufio"
+	"fmt"
+	"log"
+	"os"
+
+)
 
 const (
 	INST_NONE = 0x00
@@ -28,8 +34,10 @@ const (
 )
 
 type Backup struct {
+    SavPath string
     Data [DATA_SIZE]uint8
 	Idx  uint32
+    SaveFlag *bool
 
 	Addr         uint32
 	WriteEnabled bool
@@ -41,13 +49,45 @@ type Backup struct {
     WriteProtection uint8
 }
 
-func (b *Backup) Init() {
+func (b *Backup) Init(savpath string, saveFlag *bool) {
+
+    b.SavPath = savpath
+    b.SaveFlag = saveFlag
 
 	for i := range len(b.Data) {
 		b.Data[i] = 0xFF
 	}
 
     b.AutoDetect = true
+
+	sBuf, err := os.ReadFile(b.SavPath)
+	if err != nil {
+		return
+	}
+
+	for i := range len(sBuf) {
+        b.Data[i] = uint8(sBuf[i])
+	}
+
+}
+
+func (b *Backup) Save() {
+
+    log.Printf("Saving Game Path: %s\n", b.SavPath)
+
+	f, err := os.Create(b.SavPath)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	writer := bufio.NewWriter(f)
+
+    _, err = writer.Write(b.Data[:])
+	if err != nil {
+		panic(err)
+	}
+
 }
 
 func (b *Backup) Detect(data []uint8) bool {
@@ -150,6 +190,8 @@ func (b *Backup) Transfer(data []uint8) (reply []uint8, stat uint8) {
         }
 
         b.checkSize()
+
+        *b.SaveFlag = true
 
         copy(b.Data[b.Addr:], data[1+b.AddrSize:])
 

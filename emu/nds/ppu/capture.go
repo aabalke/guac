@@ -183,6 +183,7 @@ func (c *Capture) CaptureLine(y uint32) {
         )
 
         v |= 0x8000
+
         binary.LittleEndian.PutUint16(block[j+c.WriteOffset:], v)
     }
 }
