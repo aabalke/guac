@@ -2,20 +2,15 @@ package utils
 
 import "math"
 
-func Convert20_8Float(v int32) float64 {
-
-	// sign extend
-	sBit := 27
-	if v&(1<<sBit) != 0 {
-		v |= ^((1 << ((sBit) + 1)) - 1)
-	}
-
-	return float64(v>>8) + (float64(v&0xFF) / 256.0)
+func Convert28ToFloat(v uint32, bitFractional uint8) float64 {
+	v &= 0xFFF_FFFF
+	s := int32(v<<4) >> 4
+	return float64(s) / float64(int(1)<<bitFractional)
 }
 
-func Convert8_8Float(v int16) float64 {
-	return float64(v>>8) + (float64(v&0xFF) / 256.0)
-}
+//func Convert8_8Float(v int16) float64 {
+//	return float64(v>>8) + (float64(v&0xFF) / 256.0)
+//}
 
 func ConvertFromFloat(f float64, bitFractional uint8) uint32 {
 	scaled := f * float64(uint64(1)<<bitFractional)

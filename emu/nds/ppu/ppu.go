@@ -265,13 +265,6 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
 	case 0x2:
 
         e.Dispcnt.DisplayMode = utils.GetVarData(v, 0, 1)
-
-        // housemd when displaymode == 1, crash
-
-        //if !e.IsB && e.Dispcnt.Is3D {
-        //    fmt.Printf("MODE SET %02d 3D %t\n", e.Dispcnt.DisplayMode, e.Dispcnt.Is3D)
-        //}
-
         e.Dispcnt.VramBlock = utils.GetVarData(v, 2, 3)
         e.Dispcnt.TileObjBoundary = utils.GetVarData(v, 4, 5)
 		e.Dispcnt.BitmapObjBoundary = utils.BitEnabled(v, 6)
@@ -285,10 +278,6 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
         e.Dispcnt.BgExtPal = utils.BitEnabled(v, 6)
         e.Dispcnt.ObjExtPal = utils.BitEnabled(v, 7)
         e.UpdateObjMapping(&e.Dispcnt)
-
-        //if !e.IsB && e.Dispcnt.Is3D {
-        //    fmt.Printf("MODE SET %02d 3D %t\n", e.Dispcnt.DisplayMode, e.Dispcnt.Is3D)
-        //}
 
 	case 0x4C:
 
@@ -783,13 +772,13 @@ func (obj *Object) SetSize(shape, size uint32) {
 }
 
 func (bg *Background) BgAffineReset() {
-	bg.OutX = utils.Convert20_8Float(int32(bg.aXOffset))
-	bg.OutY = utils.Convert20_8Float(int32(bg.aYOffset))
+	bg.OutX = utils.Convert28ToFloat(bg.aXOffset, 8)
+	bg.OutY = utils.Convert28ToFloat(bg.aYOffset, 8)
 }
 
 func (bg *Background) BgAffineUpdate() {
-	bg.OutX += utils.Convert8_8Float(int16(bg.Pb))
-	bg.OutY += utils.Convert8_8Float(int16(bg.Pd))
+	bg.OutX += utils.Convert16ToFloat(uint16(bg.Pb), 8)
+	bg.OutY += utils.Convert16ToFloat(uint16(bg.Pd), 8)
 }
 
 func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {

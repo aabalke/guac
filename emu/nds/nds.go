@@ -272,10 +272,6 @@ func (nds *Nds) UpdateFrame() {
 
         //nds.checkBadPc()
 
-        //if CURR_INST == 1_000_000_000 {
-        //    println("HIT")
-        //}
-
         // arm9 thumb ~1 cycles, arm ~2 cycles
         // arm7 thumb ~2 cycles, arm ~4 cycles
 
@@ -286,10 +282,6 @@ func (nds *Nds) UpdateFrame() {
             if thumbExec || armExec  {
                 //nds.checkMode(true)
                 //logger.Update(0, 1, CURR_INST, true)
-
-                //if CURR_INST >= 1_000_000_000 {
-                //    uhh.UpdatePcs(*r, nds.mem.Read32(r[15], true), uint32(nds.arm9.Reg.CPSR))
-                //}
 
                 _, ok := nds.arm9.Execute()
                 if !ok {
@@ -312,8 +304,7 @@ func (nds *Nds) UpdateFrame() {
             if thumbExec || armExec  {
                 //nds.checkMode(false)
                 //logger.Update(0, 1, CURR_INST, false)
-                //uhh.UpdatePcs(r7[15], nds.mem.Read32(r7[15], false), uint32(nds.arm7.Reg.CPSR))
-
+                //uhh.UpdatePcs(*r7, nds.mem.Read32(r7[15], false), uint32(nds.arm7.Reg.CPSR))
                 _, ok := nds.arm7.Execute()
                 if !ok {
                     //uhh.PrintPcs()
@@ -432,8 +423,8 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
             b := &nds.ppu.EngineB
 			updateBackgrounds(a)
 			updateBackgrounds(b)
-			a.BgPriorities = nds.getBgPriority(uint32(vcount), a.Dispcnt.Mode, &a.Backgrounds)
-			b.BgPriorities = nds.getBgPriority(uint32(vcount), b.Dispcnt.Mode, &b.Backgrounds)
+			a.BgPriorities = nds.getBgPriority(vcount, a.Dispcnt.Mode, &a.Backgrounds)
+			b.BgPriorities = nds.getBgPriority(vcount, b.Dispcnt.Mode, &b.Backgrounds)
 
 			a.ObjPriorities = nds.getObjPriority(uint32(vcount), &a.Objects)
 			b.ObjPriorities = nds.getObjPriority(uint32(vcount), &b.Objects)
@@ -472,8 +463,8 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 		case SCREEN_HEIGHT:
             nds.ppu.Capture.EndCapture()
 			dispstat.SetVBlank(true)
-			nds.CheckDmas(dma.ARM9_DMA_MODE_VBL, true)
-			nds.CheckDmas(dma.ARM7_DMA_MODE_VBL, true)
+			nds.CheckDmas(dma.DMA_MODE_VBL, true)
+			nds.CheckDmas(dma.DMA_MODE_VBL, false)
 		case SCREEN_HEIGHT + 1:
             if utils.BitEnabled(uint32(dispstat.A9), 3) {
                 nds.arm9.Irq.SetIRQ(0)
@@ -484,8 +475,6 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 		case NUM_SCANLINES - 1:
 			dispstat.SetVBlank(false)
 		}
-
-        // should vcount be checked separately per cpu???
 
 		match := dispstat.GetLYC(true) == vcount
 		dispstat.SetVCFlag(match, true)

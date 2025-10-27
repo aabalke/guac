@@ -213,31 +213,42 @@ BLX ARM needs to occur before Cond
 
 # Games (Decrypted)
 
-### Cpu Crashes
+### 3D Texture Flashing
 Mario And Luigi Bowsers Inside Story
+Pokemon Ranger
+
+### Capture Crash (arm7 starts reading too soon, grabs capture not vram work ram)
 Mario Kart Ds
 
+
+### 3D Alpha Blend
 Sonic Chronicles The Dark Brotherhood
-Clubhouse Games
+
+### 3D Same Z Error
+Animal Crossing Wild World
+Cooking Mama
+New Super Mario Bros (also error with Affine16, pa,pc bgs)
+Pokemon Diamond
+
+### Misc 3D
 Pokemon Heartgold
-Housemd
-Lego Star Wars the Complete Saga
 Metroid Prime Hunters
+Nintendogs Best Friends
+
+### No known errors
 Brain Age
+Brain Age 2
 Big Brain Academy
 Tetris Ds
-Brain Age 2
-Pokemon Diamond
-Pokemon Ranger
+Yoshis Island
+Pokemon Blue Rescue Team
+
+Clubhouse Games
+Housemd
+Lego Star Wars the Complete Saga
 Mario Party
 Mario and Luigi Partners in Time
 Zelda Spirit Tracks
 Zelda Phantom Hourglass
-Nintendogs Best Friends
 Sonic Colors
-Yoshis Island
-Pokemon Blue Rescue Team
-Animal Crossing Wild World
-Cooking Mama
 Super Mario 64
-New Super Mario Bros

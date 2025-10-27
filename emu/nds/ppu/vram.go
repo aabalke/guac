@@ -312,14 +312,14 @@ func (vm *VRAM) Write(addr uint32, v uint8, arm9 bool) {
         cnt := &vm.CNT_C
         bank := &vm.C
 
-        if vm.isCArm7 && addr >= (cnt.Ofs * cnt.Size) {
+        if cnt.Enabled && vm.isCArm7 && addr >= (cnt.Ofs * cnt.Size) {
             bank[addr & 0x1FFFF] = v
         }
 
         cnt = &vm.CNT_D
         bank = &vm.D
 
-        if vm.isDArm7 && addr >= (cnt.Ofs * cnt.Size) {
+        if cnt.Enabled && vm.isDArm7 && addr >= (cnt.Ofs * cnt.Size) {
             bank[addr & 0x1FFFF] = v
         }
 
@@ -339,6 +339,7 @@ func (vm *VRAM) Write(addr uint32, v uint8, arm9 bool) {
                 vm.TextureCache.Reset()
             }
 
+
             (*[0x2_0000]uint8)(vb.bank)[addr - vb.cnt.Base] = v
             // return ???
         }
@@ -354,23 +355,31 @@ func (vm *VRAM) Read(addr uint32, arm9 bool) uint8 {
         cnt := &vm.CNT_C
         bank := &vm.C
 
-        if vm.isCArm7 && addr >= (cnt.Ofs * cnt.Size) {
+        if cnt.Enabled && vm.isCArm7 && addr >= (cnt.Ofs * cnt.Size) {
             return bank[addr & 0x1FFFF]
         }
 
         cnt = &vm.CNT_D
         bank = &vm.D
 
-        if vm.isDArm7 && addr >= (cnt.Ofs * cnt.Size) {
+        if cnt.Enabled && vm.isDArm7 && addr >= (cnt.Ofs * cnt.Size) {
             return bank[addr & 0x1FFFF]
         }
 
         return 0
     }
 
-    for _, v := range &vm.banks {
+    for i, v := range &vm.banks {
 
         if !v.cnt.Enabled {
+            continue
+        }
+
+        if i == 2 && vm.isCArm7 {
+            continue
+        }
+
+        if i == 3 && vm.isDArm7 {
             continue
         }
 
@@ -391,23 +400,31 @@ func (vm *VRAM) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
         cnt := &vm.CNT_C
         bank := &vm.C
 
-        if vm.isCArm7 && addr >= (cnt.Ofs * cnt.Size) {
+        if cnt.Enabled && vm.isCArm7 && addr >= (cnt.Ofs * cnt.Size) {
             return unsafe.Add(unsafe.Pointer(bank), addr & 0x1FFFF), true
         }
 
         cnt = &vm.CNT_D
         bank = &vm.D
 
-        if vm.isDArm7 && addr >= (cnt.Ofs * cnt.Size) {
+        if cnt.Enabled && vm.isDArm7 && addr >= (cnt.Ofs * cnt.Size) {
             return unsafe.Add(unsafe.Pointer(bank), addr & 0x1FFFF), true
         }
 
         return nil, false
     }
 
-    for _, v := range &vm.banks {
+    for i, v := range &vm.banks {
 
         if !v.cnt.Enabled {
+            continue
+        }
+
+        if i == 2 && vm.isCArm7 {
+            continue
+        }
+
+        if i == 3 && vm.isDArm7 {
             continue
         }
 
@@ -429,9 +446,17 @@ const (
 
 func (vm *VRAM) ReadGraphical(addr uint32, bankFlags uint32) uint16 {
 
-    for _, v := range &vm.banks {
+    for i, v := range &vm.banks {
 
         if !v.cnt.Enabled {
+            continue
+        }
+
+        if i == 2 && vm.isCArm7 {
+            continue
+        }
+
+        if i == 3 && vm.isDArm7 {
             continue
         }
 
@@ -458,9 +483,31 @@ func (vm *VRAM) ReadGraphical(addr uint32, bankFlags uint32) uint16 {
 }
 
 func (vm *VRAM) ReadTexture(addr uint32) uint8 {
-    return vm.TextureSlots[addr >> 17][addr & 0x1FFFF]
+
+    region := addr >> 17
+
+    if region >= 4 {
+        return 0
+    }
+
+    if vm.TextureSlots[region] == nil {
+        return 0
+    }
+
+    return vm.TextureSlots[region][addr & 0x1FFFF]
 }
 
 func (vm *VRAM) ReadPalTexture(addr uint32) uint8 {
-    return vm.TexPalSlots[addr >> 14][addr & 0x3FFF]
+
+    region := addr >> 14
+
+    if region >= 6 {
+        return 0
+    }
+
+    if vm.TexPalSlots[region] == nil {
+        return 0
+    }
+
+    return vm.TexPalSlots[region][addr & 0x3FFF]
 }
