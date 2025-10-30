@@ -30,6 +30,7 @@ type Capture struct {
     Pixels *[]uint8
     Pixels3d *rast.Pixels
 
+    arm7CBlock, arm7DBlock *bool
 }
 
 func (c *Capture) Init(vram *VRAM, ppu *PPU, rdBlk *uint32, pixels *[]uint8, pixels3d *rast.Pixels) {
@@ -40,6 +41,8 @@ func (c *Capture) Init(vram *VRAM, ppu *PPU, rdBlk *uint32, pixels *[]uint8, pix
     c.ReadBlock = rdBlk
     c.Pixels = pixels
     c.Pixels3d = pixels3d
+    c.arm7CBlock = &vram.isCArm7
+    c.arm7DBlock = &vram.isDArm7
 }
 
 func (c *Capture) Write(addr uint32, v uint8) {
@@ -153,6 +156,17 @@ func (c *Capture) CaptureLine(y uint32, isRenderingB bool) {
     //}
 
     block := c.VramBlocks[c.WriteBlock]
+
+    // these smooth over timings with arm7 usage after capture
+    // ex. mario kart transitions
+    if blockCArm7 := c.WriteBlock == 2 && *c.arm7CBlock; blockCArm7 {
+        return
+    }
+
+    if blockDArm7 := c.WriteBlock == 3 && *c.arm7DBlock; blockDArm7 {
+        return
+    }
+
 
     for x := range uint32(SCREEN_WIDTH) {
         j := (x + (y * SCREEN_WIDTH)) * 2

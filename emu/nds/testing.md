@@ -217,10 +217,6 @@ BLX ARM needs to occur before Cond
 Mario And Luigi Bowsers Inside Story
 Pokemon Ranger
 
-### Capture Crash (arm7 starts reading too soon, grabs capture not vram work ram)
-Mario Kart Ds
-
-
 ### 3D Alpha Blend
 Sonic Chronicles The Dark Brotherhood
 New Super Mario Bros (also error with Affine16, pa,pc bgs, and same z error)
@@ -242,13 +238,16 @@ Big Brain Academy
 Tetris Ds
 Yoshis Island
 Pokemon Blue Rescue Team
+Mario Kart Ds
+
+## 3D Screen Flickering
+Zelda Spirit Tracks
+Zelda Phantom Hourglass
 
 Clubhouse Games
 Housemd
 Lego Star Wars the Complete Saga
 Mario Party
 Mario and Luigi Partners in Time
-Zelda Spirit Tracks
-Zelda Phantom Hourglass
 Sonic Colors
 Super Mario 64

@@ -71,12 +71,10 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 		ImageBottom:  ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 	}
 
-
 	irq7 := cpu.Irq{}
     irq9 := cpu.Irq{IsArm9: true}
 
     nds.ppu = ppu.NewPPU(&irq9)
-
 
     for i := range 8 {
         if i < 4 {
