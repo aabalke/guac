@@ -20,6 +20,8 @@ func (nds *Nds) graphics(y uint32) {
     b := &nds.ppu.EngineB
     capture := &nds.ppu.Capture
 
+    renderingB := nds.ppu.Rasterizer.Buffers.BisRendering
+
 	switch a.Dispcnt.DisplayMode {
 	case 0:
 		nds.screenoff(y, a)
@@ -28,13 +30,13 @@ func (nds *Nds) graphics(y uint32) {
 
 		nds.standard(y, a)
         if  capture.ActiveCapture {
-            capture.CaptureLine(y)
+            capture.CaptureLine(y, renderingB)
         }
 
 	case 2:
         if capture.ActiveCapture {
 		    nds.standard(y, a)
-            capture.CaptureLine(y)
+            capture.CaptureLine(y, renderingB)
         }
 
 		nds.vramDisplay(y, a)
@@ -43,7 +45,7 @@ func (nds *Nds) graphics(y uint32) {
         panic("MAIN MEM FIFO")
         if capture.ActiveCapture {
 		    nds.standard(y, a)
-            capture.CaptureLine(y)
+            capture.CaptureLine(y, renderingB)
         }
         nds.MemFifoDisplay(a)
 
@@ -299,10 +301,14 @@ func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint
 
     pal, alpha := uint32(0), float32(0)
 
-    if !r.Pixels.WritingB {
+    if r.Rasterizer.Buffers.BisRendering {
         pal, alpha = r.Pixels.PalettesA[i], r.Pixels.AlphaA[i]
     } else {
         pal, alpha = r.Pixels.PalettesB[i], r.Pixels.AlphaB[i]
+    }
+
+    if alpha == 0 {
+        return pal, alpha, false
     }
 
     //if nds.ppu.Rasterizer.GeoEngine.Disp3dCnt.RearPlaneBitmapEnabled && alpha != 1 {
@@ -316,20 +322,22 @@ func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint
 
 func (nds *Nds) setRearBitmap(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, bool) {
 
-    const slot3Offset = 0x60000
-
-    xIdx := x + nds.ppu.Rasterizer.RearPlane.OffsetX
-    yIdx := y + nds.ppu.Rasterizer.RearPlane.OffsetY
+    xIdx := x //+ nds.ppu.Rasterizer.RearPlane.OffsetX
+    yIdx := y //+ nds.ppu.Rasterizer.RearPlane.OffsetY
 
     addr := uint32(xIdx+(yIdx * SCREEN_WIDTH)) * 2
-    addr += slot3Offset
+    if x ==0 && y==0 {
+        fmt.Printf("addr %08X Slots % v\n", addr, nds.ppu.Vram.TextureSlots)
+    }
 
-    //fmt.Printf("addr %08X Slots % v\n", addr, nds.ppu.Vram.TextureSlots)
 
-    data := uint32(nds.ppu.Vram.ReadTexture(addr))
-    data |= uint32(nds.ppu.Vram.ReadTexture(addr + 1)) << 8
+    if nds.ppu.Vram.TextureSlots[2] == nil {
+        return 0, true
+    }
 
-    data &^= 0x80
+    data := uint32(b16((nds.ppu.Vram.TextureSlots[2])[addr:]))
+
+    data &^= 0x8000
 
     return data, true
 
@@ -411,14 +419,8 @@ func (nds *Nds) setAffine16BackgroundPixel(engine *ppu.Engine, bg *ppu.Backgroun
 	//	panic(fmt.Sprintf("AFFINE WITHOUT PAL 256"))
 	//}
 
-    vramOffset := uint32(0)
-
-    if engine.IsB {
-        vramOffset = uint32(0x20_0000)
-    }
-
-	pa := utils.Convert8_8Float(int16(bg.Pa))
-	pc := utils.Convert8_8Float(int16(bg.Pc))
+	pa := utils.Convert16ToFloat(uint16(bg.Pa), 8)
+	pc := utils.Convert16ToFloat(uint16(bg.Pc), 8)
 	xIdx := int(pa*float64(x) + bg.OutX)
 	yIdx := int(pc*float64(x) + bg.OutY)
 
@@ -437,7 +439,7 @@ func (nds *Nds) setAffine16BackgroundPixel(engine *ppu.Engine, bg *ppu.Backgroun
 		xIdx &= int(bg.W) - 1
 		yIdx &= int(bg.H) - 1
 	case !bg.AffineWrap && out:
-		return 0, 0, false
+		return 0, 1, false
 	}
 
     const BYTE_SHIFT = 1
@@ -455,10 +457,11 @@ func (nds *Nds) setAffine16BackgroundPixel(engine *ppu.Engine, bg *ppu.Backgroun
         mapAddr += engine.Dispcnt.ScreenBase
         banks = ppu.BANKS_A_2D_BG
     } else {
+        mapAddr += 0x20_0000
         banks = ppu.BANKS_B_2D_BG
     }
 
-    screenData := uint32(nds.ppu.Vram.ReadGraphical(vramOffset + mapAddr, banks))
+    screenData := uint32(nds.ppu.Vram.ReadGraphical(mapAddr, banks))
 
 	tileIdx := (screenData & 0b11_1111_1111) << 5
 
@@ -467,14 +470,13 @@ func (nds *Nds) setAffine16BackgroundPixel(engine *ppu.Engine, bg *ppu.Backgroun
 
     if !engine.IsB {
         tileAddr += engine.Dispcnt.CharBase
+    } else {
+        tileAddr += 0x20_0000
     }
 
 	inTileX, inTileY := getPositionsBg(screenData, uint32(xIdx), uint32(yIdx))
-
 	inTileIdx := uint32(inTileX) + uint32(inTileY<<3)
-
-	addr := vramOffset + tileAddr + inTileIdx
-    palIdx := uint32(nds.ppu.Vram.Read(addr, true))
+    palIdx := uint32(nds.ppu.Vram.Read(tileAddr + inTileIdx, true))
     palNum := screenData >> 12
 
     return getBgPaletteData(nds, engine, bgIdx, true, palNum, palIdx, inTileX)
@@ -488,8 +490,8 @@ func (nds *Nds) setAffineBackgroundPixel(engine *ppu.Engine, bg *ppu.Background,
         vramOffset = uint32(0x20_0000)
     }
 
-	pa := utils.Convert8_8Float(int16(bg.Pa))
-	pc := utils.Convert8_8Float(int16(bg.Pc))
+	pa := utils.Convert16ToFloat(uint16(bg.Pa), 8)
+	pc := utils.Convert16ToFloat(uint16(bg.Pc), 8)
 	xIdx := int(pa*float64(x) + bg.OutX)
 	yIdx := int(pc*float64(x) + bg.OutY)
 
@@ -527,9 +529,7 @@ func (nds *Nds) setAffineBackgroundPixel(engine *ppu.Engine, bg *ppu.Background,
 	tileAddr := bg.CharBaseBlock + (tileIdx << 6)
 
 	inTileX, inTileY := getPositionsBg(tileIdx, uint32(xIdx), uint32(yIdx))
-
 	inTileIdx := uint32(inTileX) + uint32(inTileY<<3)
-
 	addr := vramOffset + tileAddr + inTileIdx
     palIdx := uint32(nds.ppu.Vram.Read(addr, true))
 
@@ -544,8 +544,8 @@ func (nds *Nds) setBmpBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x 
 	//	panic(fmt.Sprintf("AFFINE WITHOUT PAL 256"))
 	//}
 
-	pa := utils.Convert8_8Float(int16(bg.Pa))
-	pc := utils.Convert8_8Float(int16(bg.Pc))
+	pa := utils.Convert16ToFloat(uint16(bg.Pa), 8)
+	pc := utils.Convert16ToFloat(uint16(bg.Pc), 8)
 	xIdx := int(pa*float64(x) + bg.OutX)
 	yIdx := int(pc*float64(x) + bg.OutY)
 
@@ -606,8 +606,8 @@ func getPositionsBg(screenData, xIdx, yIdx uint32) (uint32, uint32) {
 
 func (nds *Nds) setDirectBitmap(engine *ppu.Engine, bg *ppu.Background, x uint32) (uint32, float32, bool) {
 
-	pa := utils.Convert8_8Float(int16(bg.Pa))
-	pc := utils.Convert8_8Float(int16(bg.Pc))
+	pa := utils.Convert16ToFloat(uint16(bg.Pa), 8)
+	pc := utils.Convert16ToFloat(uint16(bg.Pc), 8)
 	xIdx := int(pa*float64(x) + bg.OutX)
 	yIdx := int(pc*float64(x) + bg.OutY)
 
@@ -800,6 +800,7 @@ func (nds *Nds) getExtendedPalette(engine *ppu.Engine, bgIdx uint32, obj bool, p
         }
 
         slot := vram.ExtABgSlots[slotIdx]
+
 
         return uint32(b16(slot[addr:]))
     case !obj && engine.IsB:

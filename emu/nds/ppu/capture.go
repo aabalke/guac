@@ -144,7 +144,9 @@ func (c *Capture) StartCapture() {
     c.ActiveCapture = true
 }
 
-func (c *Capture) CaptureLine(y uint32) {
+func (c *Capture) CaptureLine(y uint32, isRenderingB bool) {
+
+    //return
 
     //if !c.ActiveCapture {
     //    return
@@ -159,7 +161,7 @@ func (c *Capture) CaptureLine(y uint32) {
             i := (x + (y * SCREEN_WIDTH))
             v, alpha := uint32(0), float32(0)
             pixels := c.Pixels3d
-            if !pixels.WritingB {
+            if isRenderingB {
                 v, alpha = pixels.PalettesA[i], pixels.AlphaA[i]
             } else {
                 v, alpha = pixels.PalettesB[i], pixels.AlphaB[i]

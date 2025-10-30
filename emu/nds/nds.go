@@ -238,7 +238,7 @@ func (nds *Nds) Update() {
 
     render := nds.ppu.Rasterizer.Render
 
-    //if singleThread {
+    //if true {
     //    if nds.ppu.EngineA.Dispcnt.Is3D {
     //        nds.ppu.Rasterizer.Render.UpdateRender()
     //    }
@@ -261,7 +261,6 @@ func (nds *Nds) Update() {
     }()
 
     wg2.Wait()
-    render.Pixels.WritingB = !render.Pixels.WritingB
 }
 
 func (nds *Nds) UpdateFrame() {
@@ -320,7 +319,6 @@ func (nds *Nds) UpdateFrame() {
             nds.UpdateTimers(timerMask + 1)
         }
 
-		// irq has to be at end (count up tests)
 		nds.arm9.CheckIrq()
         nds.arm7.CheckIrq()
 
@@ -465,6 +463,11 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 			dispstat.SetVBlank(true)
 			nds.CheckDmas(dma.DMA_MODE_VBL, true)
 			nds.CheckDmas(dma.DMA_MODE_VBL, false)
+
+            if nds.ppu.Rasterizer.Buffers.SwapSet {
+                nds.ppu.Rasterizer.Buffers.Swap()
+            }
+
 		case SCREEN_HEIGHT + 1:
             if utils.BitEnabled(uint32(dispstat.A9), 3) {
                 nds.arm9.Irq.SetIRQ(0)

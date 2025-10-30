@@ -101,6 +101,7 @@ type BilinearCoords struct {
 }
 
 func getBilinearCoords(w, h, u, v float64) BilinearCoords {
+    panic("Bilinear needs handling similar to nn")
 	u -= math.Floor(u)
 	v -= math.Floor(v)
 	x := u * float64(w-1)

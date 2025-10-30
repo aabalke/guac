@@ -26,6 +26,10 @@ func Translate(v Vector) Matrix {
 		0, 1, 0, 0,
 		0, 0, 1, 0,
 		v.X, v.Y, v.Z, 1}
+		//1, 0, 0, v.X,
+		//0, 1, 0, v.Y,
+		//0, 0, 1, v.Z,
+		//0,0,0, 1}
 }
 
 func Scale(v Vector) Matrix {

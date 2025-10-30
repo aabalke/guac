@@ -42,7 +42,7 @@ type GeoEngine struct {
 }
 
 func NewGeoEngine(buffers *Buffers, irq *cpu.Irq, vram VRAM) *GeoEngine {
-    return &GeoEngine{
+    g := &GeoEngine{
         Vram: vram,
         Irq: irq,
         Buffers: buffers,
@@ -51,6 +51,9 @@ func NewGeoEngine(buffers *Buffers, irq *cpu.Irq, vram VRAM) *GeoEngine {
         TextureCache: make(map[uint32]*[]gl.Color, 0),
         Vertex: &gl.Vertex{},
     }
+
+    g.GxStat.GeoEngine = g
+    return g
 }
 
 func (g *GeoEngine) Fifo(v uint32) {
@@ -137,15 +140,19 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
     case 0x11:
         g.MtxStacks.Push()
+        g.UpdateClipMtx()
 
     case 0x12:
         g.MtxStacks.Pop(data[1])
+        g.UpdateClipMtx()
 
     case 0x13:
         g.MtxStacks.Store(data[1])
+        g.UpdateClipMtx()
 
     case 0x14:
         g.MtxStacks.Restore(data[1])
+        g.UpdateClipMtx()
 
     case 0x15:
 
@@ -154,6 +161,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         if sMode == 2 {
             s1.CurrMtx = gl.Identity()
         }
+        g.UpdateClipMtx()
 
     case 0x16:
 
@@ -181,6 +189,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             s1.CurrMtx = m
         }
 
+        g.UpdateClipMtx()
 
     case 0x17:
 
@@ -204,6 +213,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         if sMode == 2 {
             s1.CurrMtx = m
         }
+        g.UpdateClipMtx()
 
     case 0x18:
 
@@ -230,6 +240,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         if sMode == 2 {
             s1.CurrMtx = m.Mul(s1.CurrMtx)
         }
+        g.UpdateClipMtx()
 
     case 0x19:
 
@@ -254,6 +265,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             s1.CurrMtx = m.Mul(s1.CurrMtx)
         }
 
+        g.UpdateClipMtx()
 
     case 0x1A:
 
@@ -275,6 +287,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             s1.CurrMtx = m.Mul(s1.CurrMtx)
         }
 
+        g.UpdateClipMtx()
     case 0x1B:
 
         v := gl.Vector{
@@ -283,7 +296,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             Z: utils.ConvertToFloat(data[3], 12),
         }
 
-
         // no effect on vector matrix - keeps light vector length intact
         if sMode == 2 {
             s1.CurrMtx = s1.CurrMtx.Scale(v)
@@ -291,6 +303,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             s.CurrMtx = s.CurrMtx.Scale(v)
         }
 
+        g.UpdateClipMtx()
     case 0x1C:
 
         v := gl.Vector{
@@ -303,6 +316,8 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
         if sMode == 2 {
             s1.CurrMtx = s1.CurrMtx.Translate(v)
         }
+
+        g.UpdateClipMtx()
 
     case 0x20:
 
@@ -493,13 +508,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
     case 0x50:
 
-        if g.Buffers.BisRendering {
-            g.Buffers.B = []Polygon{}
-        } else {
-            g.Buffers.A = []Polygon{}
-        }
-
-        g.Buffers.BisRendering = !g.Buffers.BisRendering
+        g.Buffers.SwapSet = true
 
     case 0x60: 
 
@@ -525,13 +534,16 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
     }
 
     g.Data = []uint32{}
-    g.UpdateClipMtx()
+    //g.UpdateClipMtx()
 }
 
 func (g *GeoEngine) UpdateClipMtx() {
-    pos := &g.MtxStacks.Stacks[1].CurrMtx
-    per := &g.MtxStacks.Stacks[0].CurrMtx
-    g.ClipMatrix = pos.Mul(*per)
+    pos := g.MtxStacks.Stacks[1].CurrMtx
+    per := g.MtxStacks.Stacks[0].CurrMtx
+
+    //fmt.Printf("POS X %.2f PER %.2f CLIP %.2f\n", pos.Col(0), per.Col(0), g.ClipMatrix.Col(0))
+
+    g.ClipMatrix = pos.Mul(per)
 }
 
 var paramCnt = map[uint32]int {

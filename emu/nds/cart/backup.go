@@ -87,7 +87,6 @@ func (b *Backup) Save() {
 	if err != nil {
 		panic(err)
 	}
-
 }
 
 func (b *Backup) Detect(data []uint8) bool {

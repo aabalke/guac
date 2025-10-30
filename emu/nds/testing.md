@@ -223,11 +223,11 @@ Mario Kart Ds
 
 ### 3D Alpha Blend
 Sonic Chronicles The Dark Brotherhood
+New Super Mario Bros (also error with Affine16, pa,pc bgs, and same z error)
 
 ### 3D Same Z Error
 Animal Crossing Wild World
 Cooking Mama
-New Super Mario Bros (also error with Affine16, pa,pc bgs)
 Pokemon Diamond
 
 ### Misc 3D

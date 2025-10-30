@@ -32,7 +32,6 @@ type Pixels struct {
     PalettesB []uint32
     AlphaA    []float32
     AlphaB    []float32
-    WritingB  bool
 }
 
 func (p *Pixels) InitPixels() {
@@ -166,7 +165,7 @@ func (r *Render) RenderPolygon(p *Polygon) {
 
                 p.Vertices[i-2].CalcTextureVector(tW, tH)
                 p.Vertices[i-1].CalcTextureVector(tW, tH)
-                p.Vertices[i+0].CalcTextureVector(tW, tH)
+                p.Vertices[i-0].CalcTextureVector(tW, tH)
             }
 
             if clockwise := i & 1 == 1; clockwise {
@@ -221,7 +220,7 @@ func (r *Render) ImageToPixels(img image.Image) {
     for y := range HEIGHT {
         for x := range WIDTH {
             c := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
-            if r.Pixels.WritingB {
+            if r.Rasterizer.Buffers.BisRendering {
                 r.Pixels.PalettesB[i] = uint32(RGB24ToRGB15(c.R, c.G, c.B))
                 r.Pixels.AlphaB[i] = float32(c.A) / 0xFF
             } else {

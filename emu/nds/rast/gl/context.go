@@ -258,13 +258,14 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
                 //        dc.DepthBuffer[i] = z
                 //    }
 				//}
-                if dc.WriteDepth {
+                if dc.WriteDepth && !(dc.AlphaBlend && color.A < 0.999) {
                     // update depth buffer
                     dc.DepthBuffer[i] = z
                 }
 				if dc.WriteColor {
 					// update color buffer
 					if dc.AlphaBlend && color.A < 1 {
+                        //bz -= 1e-3
 						sr, sg, sb, sa := color.NRGBA().RGBA()
 						a := (0xffff - sa) * 0x101
 						j := dc.ColorBuffer.PixOffset(x, y)

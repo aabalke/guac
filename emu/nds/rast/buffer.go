@@ -3,6 +3,9 @@ package rast
 type Buffers struct {
     A, B []Polygon
     BisRendering bool
+
+    //SwapBuffers isn't executed until next VBlank
+    SwapSet bool
 }
 
 func (b *Buffers) Append(p Polygon) {
@@ -22,4 +25,16 @@ func (b *Buffers) GetPolygons() []Polygon {
     }
 
     return b.A
+}
+
+func (b *Buffers) Swap() {
+
+    if b.BisRendering {
+        b.B = []Polygon{}
+    } else {
+        b.A = []Polygon{}
+    }
+
+    b.BisRendering = !b.BisRendering
+    b.SwapSet = false
 }

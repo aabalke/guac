@@ -1,18 +1,20 @@
 package rast
 
 import (
+
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
 const(
-    PRIM_SEP_TRI  = 0
-    PRIM_SEP_QUAD = 1
-    PRIM_TRI_STRIP = 2
+    PRIM_SEP_TRI    = 0
+    PRIM_SEP_QUAD   = 1
+    PRIM_TRI_STRIP  = 2
     PRIM_QUAD_STRIP = 3
 )
 
 type Polygon struct {
+    v uint32
 	LightsEnabled          [4]bool
 	Mode                   uint8
 	RenderBack             bool
@@ -32,6 +34,7 @@ type Polygon struct {
 }
 
 func (p *Polygon) WriteAttrs(v uint32) {
+    p.v = v
     p.LightsEnabled[0] = utils.BitEnabled(v, 0)
     p.LightsEnabled[1] = utils.BitEnabled(v, 1)
     p.LightsEnabled[2] = utils.BitEnabled(v, 2)
@@ -60,9 +63,9 @@ const (
 var coordFuncs = [...]func(data []uint32, prev *gl.Vertex) (float64, float64, float64) {
     //V_16:
     func(data []uint32, _ *gl.Vertex) (float64, float64, float64) {
-        x := utils.Convert16ToFloat(uint16(data[1]), 12)
-        y := utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
-        z := utils.Convert16ToFloat(uint16(data[2]), 12)
+        x := utils.Convert16ToFloat(uint16(data[1]    ), 12)
+        y := utils.Convert16ToFloat(uint16(data[1]>>16), 12)
+        z := utils.Convert16ToFloat(uint16(data[2]    ), 12)
         return x, y, z
     },
     //V_10:
@@ -97,7 +100,7 @@ var coordFuncs = [...]func(data []uint32, prev *gl.Vertex) (float64, float64, fl
     func(data []uint32, prev *gl.Vertex) (float64, float64, float64) {
         convert := func(v uint32) float64 {
             v &= 0x3FF
-            sext := int32(v << 22) >> 22
+            sext := int16(v << 6) >> 6
             f := float64(sext) / (1 << 9)
             return f / 8.0
         }
@@ -126,6 +129,7 @@ func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Ver
     }
 
     v := p.GetVertex(g, x, y, z)
+
     p.Vertices = append(p.Vertices, v)
     return &v
 }
@@ -163,12 +167,12 @@ func (p *Polygon) GetTexture(g *GeoEngine) *gl.Texture {
     vram := g.Vram
 
     return &gl.Texture{
-        Width: int(t.SizeS),
-        Height: int(t.SizeT),
+        Width:   int(t.SizeS),
+        Height:  int(t.SizeT),
         RepeatS: t.RepeatS,
         RepeatT: t.RepeatT,
-        FlipS: t.FlipS,
-        FlipT: t.FlipT,
+        FlipS:   t.FlipS,
+        FlipT:   t.FlipT,
         CachedTexture: cache.Get(vram, &t),
         Mode: p.Mode,
         ToonTbl: &g.ToonTbl,

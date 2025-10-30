@@ -71,14 +71,16 @@ func (t *TextureCache) getPaletted(vram VRAM, tex *Texture, bitsPerTexel, bitsPe
 
 	out := make([]gl.Color, (tex.SizeS)*(tex.SizeT))
 
+    palBase := tex.PaletteBaseAddr
+
 	if bitsPerTexel == 2 {
-		tex.PaletteBaseAddr *= 0x8
+		palBase *= 0x8
 	} else {
-		tex.PaletteBaseAddr *= 0x10
+		palBase *= 0x10
 	}
 
-	for y := range uint32(tex.SizeT) {
-		for x := range uint32(tex.SizeS) {
+	for y := range tex.SizeT {
+		for x := range tex.SizeS {
 			i := uint32(x + (y * tex.SizeS))
 
 			palIdx := uint32(vram.ReadTexture(tex.VramOffset + (i >> bitsPerTexelShift)))
@@ -87,9 +89,9 @@ func (t *TextureCache) getPaletted(vram VRAM, tex *Texture, bitsPerTexel, bitsPe
 			case 2:
 				palIdx = (palIdx >> ((i & 0b11) * bitsPerTexel)) & 0b11
 			case 4:
-				palIdx = (palIdx >> ((i & 0b1) * bitsPerTexel)) & 0b1111
+				palIdx = (palIdx >> ((i & 0b01) * bitsPerTexel)) & 0b1111
 			case 8:
-				palIdx = (palIdx >> ((i & 0b0) * bitsPerTexel)) & 0b1111_1111
+				palIdx = (palIdx >> ((i & 0b00) * bitsPerTexel)) & 0b1111_1111
 			}
 
 			if palIdx == 0 && tex.TransparentZero {
@@ -100,13 +102,13 @@ func (t *TextureCache) getPaletted(vram VRAM, tex *Texture, bitsPerTexel, bitsPe
 			// palettes take up 2 bytes each
 			palIdx *= 2
 
-			data := uint32(vram.ReadPalTexture(tex.PaletteBaseAddr + palIdx))
-			data |= uint32(vram.ReadPalTexture(tex.PaletteBaseAddr+palIdx+1)) << 8
+			data := uint32(vram.ReadPalTexture(palBase+palIdx+0))
+			data |= uint32(vram.ReadPalTexture(palBase+palIdx+1)) << 8
 
             out[i] =  gl.MakeColorFrom15Bit(
-                uint8(data & 0b11111),
-                uint8(data >> 5) & 0b11111,
-                uint8(data >> 10) & 0b11111,
+                uint8(data        & 0x1F),
+                uint8(data >> 5)  & 0x1F,
+                uint8(data >> 10) & 0x1F,
             )
 		}
 	}

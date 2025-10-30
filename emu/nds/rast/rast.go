@@ -104,15 +104,13 @@ const (
 )
 
 type GXSTAT struct {
-    TestBusy bool
+    GeoEngine *GeoEngine
+    //TestBusy bool
     TestInView bool
 
-    PosStackLevel uint8
-    ProjectionStackLevel uint8
-    StackBusy bool
-    StackError bool
+    //StackBusy bool
     FifoEntries uint16
-    GXBusy bool
+    //GXBusy bool
 
     FifoIrq uint8
 }
@@ -121,11 +119,11 @@ func (g *GXSTAT) Write(v, b uint8) {
     switch b {
     case 2:
         if errAck := utils.BitEnabled(uint32(v), 7); errAck {
-            g.StackError = false
-            g.ProjectionStackLevel = 0
+            g.GeoEngine.MtxStacks.Overflow = false
         }
         return
     case 3:
+
         g.FifoIrq = v >> 6
         return
     }
@@ -137,10 +135,11 @@ func (g *GXSTAT) Read(b uint32) uint8 {
 
     switch b {
     case 0:
-        
-        if g.TestBusy {
-            v |= 1
-        }
+       
+        // never?
+        //if g.TestBusy {
+        //    v |= 1
+        //}
 
         if g.TestInView {
             v |= 1 << 1
@@ -150,14 +149,15 @@ func (g *GXSTAT) Read(b uint32) uint8 {
 
     case 1:
 
-        v |= g.PosStackLevel
-        v |= g.ProjectionStackLevel << 5
+        v |= uint8(*g.GeoEngine.MtxStacks.Stacks[1].Pointer) & 0x1F
+        v |= uint8(*g.GeoEngine.MtxStacks.Stacks[0].Pointer) << 5
 
-        if g.StackBusy {
-            v |= 1 << 6
-        }
+        // never?
+        //if g.StackBusy {
+        //    v |= 1 << 6
+        //}
 
-        if g.StackError {
+        if g.GeoEngine.MtxStacks.Overflow {
             v |= 1 << 7
         }
 
@@ -170,6 +170,8 @@ func (g *GXSTAT) Read(b uint32) uint8 {
 
     case 3:
 
+        // I believe fifo entries always zero in emulated
+
         v |= uint8(g.FifoEntries >> 8)
 
         if underHalf := g.FifoEntries < 128; underHalf {
@@ -180,9 +182,10 @@ func (g *GXSTAT) Read(b uint32) uint8 {
             v |= 1 << 2
         }
 
-        if g.GXBusy {
-            v |= 1 << 3
-        }
+        // never?
+        //if g.GXBusy {
+        //    v |= 1 << 3
+        //}
 
         v |= g.FifoIrq << 5
         return v
