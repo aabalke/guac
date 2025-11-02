@@ -179,3 +179,19 @@ func (p *Polygon) GetTexture(g *GeoEngine) *gl.Texture {
         IsHighlight: g.Disp3dCnt.HighlightShading,
     }
 }
+
+func (p *Polygon) valid1DotDepth(depth float64) bool {
+
+    if p.RenderBehind1Dot {
+        return true
+    }
+
+    for i := range len(p.Vertices) {
+        if p.Vertices[i].Output.W <= depth {
+            return true
+        }
+    }
+
+    return false
+
+}

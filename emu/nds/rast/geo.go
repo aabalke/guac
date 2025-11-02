@@ -39,6 +39,8 @@ type GeoEngine struct {
 
     TextureCache TextureCache
     Vram VRAM
+
+    Fog gl.Fog
 }
 
 func NewGeoEngine(buffers *Buffers, irq *cpu.Irq, vram VRAM) *GeoEngine {
@@ -51,6 +53,7 @@ func NewGeoEngine(buffers *Buffers, irq *cpu.Irq, vram VRAM) *GeoEngine {
         TextureCache: make(map[uint32]*[]gl.Color, 0),
         Vertex: &gl.Vertex{},
     }
+    g.Disp3dCnt.Fog = &g.Fog
 
     g.GxStat.GeoEngine = g
     return g
@@ -508,6 +511,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
     case 0x50:
 
+        g.Buffers.DepthBufferW = data[1] & 0b10 != 0
         g.Buffers.SwapSet = true
 
     case 0x60: 
@@ -625,3 +629,4 @@ func Write15BitColor(v uint32) gl.Color {
 	uint8((v >> 10) & 0b11111),
     )
 }
+

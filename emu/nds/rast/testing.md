@@ -14,7 +14,7 @@ Line Segments not implimented
 
 Disp3DCnt Partial
 Viewport Partial
-1DotDepth
+1DotDepth - added, makes no difference I believe
 AlphaTest
 
 ## Polygon Attributes
@@ -23,9 +23,7 @@ Polygon Back Surface
 Polygon Front Surface
 Depth-value for Translucent Pixels
 Far-plane intersecting polygons
-1-Dot polygons behind DISP_1DOT_DEPTH
 Depth Test, Draw Pixels with Depth
-Fog Enable
 Polygon ID
 View Volume Clipping is not implimented.
 
@@ -40,7 +38,7 @@ Texture Coordinates Transformation Mode 3 - Vertex source is untested.
 
 ## Toon, Edge, Fog, Alpha-Blending, Anti-Aliasing
 
-Edge, Fog , Alpha-Blending, and AntiAliasing are not implimented
+Edge, Alpha-Blending, and AntiAliasing are not implimented
 Toon is implimented.
 
 ## Status

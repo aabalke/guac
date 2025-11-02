@@ -20,6 +20,8 @@ func Convert15BitByte(c gl.Color, v uint8, hi bool) gl.Color {
 	//1111_1111|1111_1111
 	//abbb bbgg|gggr rrrr
 
+    a := c.A
+
 	if hi {
 		r := uint8(c.R * 0x1F)
 
@@ -29,7 +31,9 @@ func Convert15BitByte(c gl.Color, v uint8, hi bool) gl.Color {
 
 		b := uint8(v>>2) & 0x1F
 
-		return gl.MakeColorFrom15Bit(r, g, b)
+        c = gl.MakeColorFrom15Bit(r, g, b)
+        c.A = a
+        return c
 	}
 	r := v & 0x1F
 
@@ -39,5 +43,7 @@ func Convert15BitByte(c gl.Color, v uint8, hi bool) gl.Color {
 
 	b := uint8(c.B * 0x1F)
 
-	return gl.MakeColorFrom15Bit(r, g, b)
+    c = gl.MakeColorFrom15Bit(r, g, b)
+    c.A = a
+    return c
 }

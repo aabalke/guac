@@ -1,7 +1,6 @@
 package rast
 
 import (
-
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 	"github.com/aabalke/guac/emu/nds/utils"
@@ -22,6 +21,7 @@ type Rasterizer struct {
     ClearColor gl.Color
     RearPlane RearPlane
     VRAM VRAM
+    Disp1Dot Disp1Dot
 }
 
 type VRAM interface {
@@ -34,19 +34,18 @@ func NewRasterizer(vram VRAM, irq *cpu.Irq) *Rasterizer {
     r.VRAM = vram
     r.GeoEngine = NewGeoEngine(&r.Buffers, irq, vram)
     r.Render = NewRender(r, &r.Buffers, &r.RearPlane)
+
     return r
 }
 
 type Disp3dCnt struct {
+    Fog *gl.Fog
 	TextureMapping         bool
 	HighlightShading       bool
 	AlphaTesting           bool
 	AlphaBlending          bool
 	AntiAliasing           bool
 	EdgeMarking            bool
-	FogAlpha               bool
-	FogEnabled             bool
-	FogDepth               uint8
 	ColorRdlinesOverflow   bool
 	PolygonRamOverflow     bool
 	RearPlaneBitmapEnabled bool
@@ -66,27 +65,28 @@ func (d *Disp3dCnt) Write(v, b uint8) {
 		d.AlphaBlending = utils.BitEnabled(uint32(v), 3)
 		d.AntiAliasing = utils.BitEnabled(uint32(v), 4)
 		d.EdgeMarking = utils.BitEnabled(uint32(v), 5)
-		d.FogAlpha = utils.BitEnabled(uint32(v), 6)
-		d.FogEnabled = utils.BitEnabled(uint32(v), 7)
+		d.Fog.AlphaOnly = utils.BitEnabled(uint32(v), 6)
+		d.Fog.Enabled = utils.BitEnabled(uint32(v), 7)
 
         d.v &^= 0xFF
         d.v |= uint16(v)
 		return
 	}
 
-    d.v &^= 0b1100_0000
-	d.v |= (uint16(v &^ 0b11) << (8 * b))
+    d.v &^= 0b0100_1111 << 8
+	d.v |= (uint16(v & 0b0100_1111) << 8)
 
-	//d.FogDepth need to calc
+    d.Fog.Step = 0x400 >> (v & 0b1111)
+    d.Fog.UpdateBoundaries()
 
     if utils.BitEnabled(uint32(v), 4) {
         d.ColorRdlinesOverflow = false
-        d.v &^= 0b1_0000
+        d.v &^= 0b1_0000 << 8
     }
 
     if utils.BitEnabled(uint32(v), 5) {
         d.PolygonRamOverflow = false
-        d.v &^= 0b10_0000
+        d.v &^= 0b10_0000 << 8
     }
 
 	d.RearPlaneBitmapEnabled = utils.BitEnabled(uint32(v), 6)
@@ -234,4 +234,9 @@ func (r *RearPlane) Write(addr uint32, v uint8) {
     case 0x357:
         r.OffsetY = uint32(v)
     }
+}
+
+type Disp1Dot struct {
+    param uint16
+    V float64
 }

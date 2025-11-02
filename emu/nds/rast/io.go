@@ -8,6 +8,10 @@ import (
 
 func (r *Rasterizer) Read(addr uint32) uint8 {
 
+    if addr >= 0x358 && addr < 0x380 {
+        return r.ReadFog(addr)
+    }
+
     switch {
     case addr < 0x620:
         // fall
@@ -85,8 +89,6 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
             vertCnt += len(v.Vertices)
         }
         return uint8(min(6144, vertCnt) >> 8)
-
-
 	}
 
     //fmt.Printf("READ UNSETUP 3D IO %08X\n", addr)
@@ -264,6 +266,11 @@ func (r *Rasterizer) ReadVecMtx(addr uint32) uint8 {
 
 func (r *Rasterizer) Write(addr uint32, v uint8) {
 
+    if addr >= 0x358 && addr < 0x380 {
+        r.WriteFog(addr, v)
+        return
+    }
+
     switch {
     case addr >= 0x350 && addr < 0x358:
         r.RearPlane.Write(addr, v)
@@ -291,10 +298,75 @@ func (r *Rasterizer) Write(addr uint32, v uint8) {
 	case 0x603:
 		r.GeoEngine.GxStat.Write(v, 3)
 
+    case 0x610:
+        r.Disp1Dot.param &^= 0xFF
+        r.Disp1Dot.param |= uint16(v)
+        r.Disp1Dot.V = float64(r.Disp1Dot.param) / 8
+
+    case 0x611:
+        v &= 0b0111_1111
+        r.Disp1Dot.param &^= 0xFF << 8
+        r.Disp1Dot.param |= uint16(v) << 8
+        r.Disp1Dot.V = float64(r.Disp1Dot.param) / 8
+
     default:
         //fmt.Printf("WRITE UNSETUP 3D IO %08X\n", addr)
         //panic(fmt.Sprintf("WRITES UNSETUP 3D IO %08X %02X\n", addr, v))
 	}
+}
+
+func (r *Rasterizer) WriteFog(addr uint32, v uint8) {
+
+    f := &r.GeoEngine.Fog
+
+    if addr >= 0x360 && addr < 0x380 {
+        addr -= 0x360
+        f.Density[addr] = v & 0b0111_1111
+        return
+    }
+
+    switch addr {
+    case 0x358:
+        f.Color = Convert15BitByte(f.Color, v, false)
+    case 0x359:
+        f.Color = Convert15BitByte(f.Color, v, true)
+    case 0x35A:
+        f.Color.A = float64(v & 0x1F) / 0x1F
+
+    case 0x35C:
+        f.Offset &^= 0xFF
+        f.Offset |= uint16(v)
+        f.UpdateBoundaries()
+
+    case 0x35D:
+        v &= 0b0111_1111
+        f.Offset &^= 0xFF << 8
+        f.Offset |= uint16(v) << 8
+        f.UpdateBoundaries()
+    }
+}
+
+func (r *Rasterizer) ReadFog(addr uint32) uint8 {
+
+    f := &r.GeoEngine.Fog
+
+    if addr >= 0x360 && addr < 0x380 {
+        addr -= 0x360
+        return f.Density[addr]
+    }
+
+    switch addr {
+    case 0x35A:
+        return uint8(f.Color.A * 0x1F)
+
+    case 0x35C:
+        return uint8(f.Offset)
+
+    case 0x35D:
+        return uint8(f.Offset >> 8)
+    }
+
+    return 0
 }
 
 func (r *Rasterizer) GeoCmd(addr, v uint32) {

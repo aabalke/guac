@@ -317,6 +317,22 @@ func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint
     //}
 
     //return pal, alpha, true
+
+    if noblend := nds.ppu.EngineA.Blend.Mode == 0; noblend {
+
+        // this is only important if the 3d screen is the only one, nothing is behind it, and alpha != 1. 
+        // really only noticed in devkit tests ( nehe/lesson10)
+
+        r := float32(pal         & 0x1F) * alpha
+        g := float32((pal >>  5) & 0x1F) * alpha
+        b := float32((pal >> 10) & 0x1F) * alpha
+
+        pal &= 0x8000
+        pal |= uint32(r) & 0x1F
+        pal |= ((uint32(g) & 0x1F) <<  5)
+        pal |= ((uint32(b) & 0x1F) << 10)
+    }
+
     return pal, alpha, alpha > 0
 }
 

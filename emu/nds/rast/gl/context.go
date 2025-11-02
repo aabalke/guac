@@ -3,8 +3,11 @@ package gl
 import (
 	"image"
 	"image/color"
-	"math"
 	"sync"
+)
+
+const (
+    MAX_DEPTH = float64(0x7FFF)
 )
 
 type Face int
@@ -54,6 +57,10 @@ type Context struct {
 	DepthBias    float64
 	screenMatrix Matrix
 	locks        []sync.Mutex
+
+    DepthBufferW []float64
+    FogEnabledBuffer []bool // bools for if polygon has fog enabled
+    PolygonFogEnabled bool
 }
 
 func NewContext(width, height int) *Context {
@@ -62,6 +69,8 @@ func NewContext(width, height int) *Context {
 	dc.Height = height
 	dc.ColorBuffer = image.NewNRGBA(image.Rect(0, 0, width, height))
 	dc.DepthBuffer = make([]float64, width*height)
+	dc.DepthBufferW = make([]float64, width*height)
+	dc.FogEnabledBuffer = make([]bool, width*height)
 	dc.ClearColor = Transparent
 	dc.ReadDepth = true
 	dc.WriteDepth = true
@@ -82,11 +91,15 @@ func (dc *Context) Image() image.Image {
 	return dc.ColorBuffer
 }
 
+func (dc *Context) SetColor(x, y int, color color.Color) {
+    dc.ColorBuffer.Set(x, y, color)
+}
+
 func (dc *Context) DepthImage() image.Image {
-	lo := math.MaxFloat64
-	hi := -math.MaxFloat64
+	lo := MAX_DEPTH
+	hi := -MAX_DEPTH
 	for _, d := range dc.DepthBuffer {
-		if d == math.MaxFloat64 {
+		if d == MAX_DEPTH {
 			continue
 		}
 		if d < lo {
@@ -103,7 +116,7 @@ func (dc *Context) DepthImage() image.Image {
 		for x := 0; x < dc.Width; x++ {
 			d := dc.DepthBuffer[i]
 			t := (d - lo) / (hi - lo)
-			if d == math.MaxFloat64 {
+			if d == MAX_DEPTH {
 				t = 1
 			}
 			c := color.Gray16{uint16(t * 0xffff)}
@@ -135,11 +148,13 @@ func (dc *Context) ClearColorBuffer() {
 func (dc *Context) ClearDepthBufferWith(value float64) {
 	for i := range dc.DepthBuffer {
 		dc.DepthBuffer[i] = value
+		dc.DepthBufferW[i] = value
 	}
 }
 
 func (dc *Context) ClearDepthBuffer() {
-	dc.ClearDepthBufferWith(math.MaxFloat64)
+    // nds max is 0x7FFF
+	dc.ClearDepthBufferWith(MAX_DEPTH)
 }
 
 func edge(a, b, c Vector) float64 {
@@ -240,11 +255,12 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 			// invoke fragment shader
 			//color := dc.Shader.Fragment(v)
 			dc.Shader.Fragment(&vert)
-            color := &vert.Color
 
-			if *color == Discard {
+			if vert.Color == Discard {
 				continue
 			}
+
+            color := &vert.Color
 
 			// update buffers atomically
 			//lock := &dc.locks[(x+y)&255]
@@ -252,6 +268,10 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 			// check depth buffer again
 			if bz <= dc.DepthBuffer[i] || !dc.ReadDepth {
 				info.UpdatedPixels++
+
+                // not sure if this should be with depth buffers
+                dc.FogEnabledBuffer[i] = dc.PolygonFogEnabled
+
                 //if !(dc.AlphaBlend && color.A < 1) {
                 //    if dc.WriteDepth {
                 //        // update depth buffer
@@ -261,6 +281,7 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
                 if dc.WriteDepth && !(dc.AlphaBlend && color.A < 0.999) {
                     // update depth buffer
                     dc.DepthBuffer[i] = z
+                    dc.DepthBufferW[i] = b.W
                 }
 				if dc.WriteColor {
 					// update color buffer

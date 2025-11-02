@@ -70,6 +70,8 @@ func (r *Render) UpdateRender() {
 
     polygons := r.Buffers.GetPolygons()
 
+    // sort based on swap buffer flag???
+
     //sort.Slice(polygons, func(i, j int) bool {
 
     //    average := func(poly Polygon) float64{
@@ -88,10 +90,49 @@ func (r *Render) UpdateRender() {
     //})
 
     for _, p := range polygons {
+
+        // 1 dot check seems unneeded
+        //if !p.valid1DotDepth(r.Rasterizer.Disp1Dot.V) {
+        //    return
+        //}
+
         r.RenderPolygon(&p)
     }
 
+    if r.Rasterizer.GeoEngine.Fog.Enabled {
+        r.ApplyFog()
+    }
+
     r.ImageToPixels(r.Context.Image())
+}
+
+func (r *Render) ApplyFog() {
+
+    fog := &r.Rasterizer.GeoEngine.Fog
+
+    for y := range r.Context.Height {
+        for x := range r.Context.Width {
+
+            i := x + y * r.Context.Width
+
+            if !r.Context.FogEnabledBuffer[i] {
+                continue
+            }
+
+            c := gl.MakeColor(r.Context.Image().At(x, y))
+
+            var depth float64
+
+            if r.Buffers.DepthBufferW {
+                depth = r.Context.DepthBufferW[i] * 8
+            } else {
+                depth = r.Context.DepthBuffer[i] * 0x7FFF
+            }
+
+            ca := gl.MakeColorColor(fog.ApplyFog(c, depth))
+            r.Context.SetColor(x, y, ca)
+        }
+    }
 }
 
 func (r *Render) RenderPolygon(p *Polygon) {
@@ -99,6 +140,8 @@ func (r *Render) RenderPolygon(p *Polygon) {
     if len(p.Vertices) == 0 {
         return
     }
+
+    r.Context.PolygonFogEnabled = p.FogEnabled
 
     switch p.PrimitiveType {
     case PRIM_SEP_TRI:
@@ -220,12 +263,18 @@ func (r *Render) ImageToPixels(img image.Image) {
     for y := range HEIGHT {
         for x := range WIDTH {
             c := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
+
+            // limit to 5 bit, maybe 6??? rounds things nicely
+            // ex. if value is .99, then will still be slightly not visible on screen - its jarring
+            alpha := (c.A >> 3)
+            alpha = (alpha << 3) | (alpha >> 2)
+
             if r.Rasterizer.Buffers.BisRendering {
                 r.Pixels.PalettesB[i] = uint32(RGB24ToRGB15(c.R, c.G, c.B))
-                r.Pixels.AlphaB[i] = float32(c.A) / 0xFF
+                r.Pixels.AlphaB[i] = float32(alpha) / 0xFF
             } else {
                 r.Pixels.PalettesA[i] = uint32(RGB24ToRGB15(c.R, c.G, c.B))
-                r.Pixels.AlphaA[i] = float32(c.A) / 0xFF
+                r.Pixels.AlphaA[i] = float32(alpha) / 0xFF
             }
             i++
         }

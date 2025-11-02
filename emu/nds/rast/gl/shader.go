@@ -69,7 +69,7 @@ var blendFunc = [...]func(texture *Texture, vColor, tColor Color) Color {
             return max(0, min(1, ((t)*(s)-1)/(FACTOR*FACTOR)))
         }
 
-        toon := texture.ToonTbl[uint32(vColor.R*FACTOR)]
+        toon := texture.ToonTbl[uint32(vColor.R*FACTOR)& 0x1F]
 
         vColor.R = con(toon.R, tColor.R)
         vColor.G = con(toon.G, tColor.G)
