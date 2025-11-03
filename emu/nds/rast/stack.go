@@ -79,6 +79,10 @@ func (m *MtxStacks) Pop(param uint32) {
             m.Overflow = true
         }
 
+        if *s.Pointer < 0 {
+            *s.Pointer += len(s.Mtxs)
+        }
+
         idx := int(*s.Pointer) % len(s.Mtxs)
 
         s1 := &m.Stacks[1]

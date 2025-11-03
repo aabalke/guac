@@ -3,8 +3,8 @@ package rast
 type Buffers struct {
     A, B []Polygon
     BisRendering bool
-
     DepthBufferW bool
+    ManualSort bool
 
     //SwapBuffers isn't executed until next VBlank
     SwapSet bool
@@ -39,5 +39,4 @@ func (b *Buffers) Swap() {
 
     b.BisRendering = !b.BisRendering
     b.SwapSet = false
-    //b.DepthBufferW = false
 }

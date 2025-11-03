@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"sort"
 
 	"sync"
 
@@ -52,7 +53,8 @@ func NewRender(rast *Rasterizer, buffers *Buffers, rp *RearPlane) *Render {
 
     r.Pixels.InitPixels()
 
-    r.Context.Cull = gl.CullNone
+    //r.Context.Cull = gl.CullFront
+    //r.Context.Cull = gl.CullNone
     r.Context.Shader = gl.NewShader()
 
     return r
@@ -68,26 +70,26 @@ func (r *Render) UpdateRender() {
     r.Context.ClearColorBuffer()
     r.Context.ClearDepthBuffer()
 
+    r.Context.AlphaBlending = r.Rasterizer.GeoEngine.Disp3dCnt.AlphaBlending
+
     polygons := r.Buffers.GetPolygons()
 
-    // sort based on swap buffer flag???
+    if !r.Buffers.ManualSort {
+        sort.Slice(polygons, func(i, j int) bool {
 
-    //sort.Slice(polygons, func(i, j int) bool {
+            average := func(poly Polygon) float64{
+                sum := float64(0)
+                for i := range len(poly.Vertices) {
+                    sum += poly.Vertices[i].Output.Y
+                }
+                return sum / float64(len(poly.Vertices))
+            }
 
-    //    average := func(poly Polygon) float64{
-
-    //        a := float64(0)
-    //        for i := range len(poly.Vertices) {
-    //            a += poly.Vertices[i].Output.Z
-    //        }
-    //        a /= float64(len(poly.Vertices))
-    //        return a
-    //    }
-
-    //    zi := average(polygons[i])
-    //    zj := average(polygons[j])
-    //    return zi > zj
-    //})
+            zi := average(polygons[i])
+            zj := average(polygons[j])
+            return zi > zj
+        })
+    }
 
     for _, p := range polygons {
 
@@ -142,6 +144,17 @@ func (r *Render) RenderPolygon(p *Polygon) {
     }
 
     r.Context.PolygonFogEnabled = p.FogEnabled
+
+    //switch {
+    //case p.RenderFront && p.RenderBack:
+    //    r.Context.Cull = gl.CullNone
+    //case p.RenderFront && !p.RenderBack:
+    //    r.Context.Cull = gl.CullBack
+    //case !p.RenderFront && p.RenderBack:
+    //    r.Context.Cull = gl.CullFront
+    //default:
+    //    return
+    //}
 
     switch p.PrimitiveType {
     case PRIM_SEP_TRI:

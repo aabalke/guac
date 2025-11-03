@@ -13,7 +13,6 @@ type Capture struct {
 	WriteBlock  uint8
     WriteOffset uint32
 	WriteOffsetV uint8
-
 	ReadBlock  *uint32
     ReadOffset uint32
 	ReadOffsetV  uint8
@@ -31,6 +30,17 @@ type Capture struct {
     Pixels3d *rast.Pixels
 
     arm7CBlock, arm7DBlock *bool
+
+    ActiveData ActiveData
+}
+
+type ActiveData struct {
+	WriteBlock  uint8
+    WriteOffset uint32
+	WriteOffsetV uint8
+	ReadBlock  *uint32
+    ReadOffset uint32
+	ReadOffsetV  uint8
 }
 
 func (c *Capture) Init(vram *VRAM, ppu *PPU, rdBlk *uint32, pixels *[]uint8, pixels3d *rast.Pixels) {
@@ -73,6 +83,7 @@ func (c *Capture) Write(addr uint32, v uint8) {
 }
 
 func (c *Capture) Read(addr uint32) uint8 {
+
 
     addr &= 0xFF
 
@@ -140,9 +151,22 @@ func (c *Capture) TempLimiter() {
 
 func (c *Capture) StartCapture() {
 
-    if !c.Enabled {
-        return
+    //if !c.Enabled {
+    //    return
+    //}
+
+    c.ActiveData = ActiveData{
+        WriteBlock: c.WriteBlock,
+        WriteOffset: c.WriteOffset,
+	    ReadBlock: c.ReadBlock,
+        ReadOffset: c.ReadOffset,
     }
+
+    if c.ActiveCapture {
+        panic("ACTIVE CAPTURE ON START CAPTURE")
+    }
+
+    //uhh.V = uint32(c.WriteBlock)
 
     c.ActiveCapture = true
 }
@@ -155,18 +179,17 @@ func (c *Capture) CaptureLine(y uint32, isRenderingB bool) {
     //    return
     //}
 
-    block := c.VramBlocks[c.WriteBlock]
+    block := c.VramBlocks[c.ActiveData.WriteBlock]
 
     // these smooth over timings with arm7 usage after capture
     // ex. mario kart transitions
-    if blockCArm7 := c.WriteBlock == 2 && *c.arm7CBlock; blockCArm7 {
+    if blockCArm7 := c.ActiveData.WriteBlock == 2 && *c.arm7CBlock; blockCArm7 {
         return
     }
 
-    if blockDArm7 := c.WriteBlock == 3 && *c.arm7DBlock; blockDArm7 {
+    if blockDArm7 := c.ActiveData.WriteBlock == 3 && *c.arm7DBlock; blockDArm7 {
         return
     }
-
 
     for x := range uint32(SCREEN_WIDTH) {
         j := (x + (y * SCREEN_WIDTH)) * 2
@@ -185,7 +208,7 @@ func (c *Capture) CaptureLine(y uint32, isRenderingB bool) {
                 v |= 0x8000
             }
 
-            binary.LittleEndian.PutUint16(block[j+c.WriteOffset:], uint16(v))
+            binary.LittleEndian.PutUint16(block[j+c.ActiveData.WriteOffset:], uint16(v))
 
             continue
         }
@@ -200,7 +223,7 @@ func (c *Capture) CaptureLine(y uint32, isRenderingB bool) {
 
         v |= 0x8000
 
-        binary.LittleEndian.PutUint16(block[j+c.WriteOffset:], v)
+        binary.LittleEndian.PutUint16(block[j+c.ActiveData.WriteOffset:], v)
     }
 }
 

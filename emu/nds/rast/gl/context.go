@@ -3,7 +3,6 @@ package gl
 import (
 	"image"
 	"image/color"
-	"sync"
 )
 
 const (
@@ -49,14 +48,12 @@ type Context struct {
 	ReadDepth    bool
 	WriteDepth   bool
 	WriteColor   bool
-	AlphaBlend   bool
+	AlphaBlending   bool
 	Wireframe    bool
 	FrontFace    Face
 	Cull         Cull
 	LineWidth    float64
-	DepthBias    float64
 	screenMatrix Matrix
-	locks        []sync.Mutex
 
     DepthBufferW []float64
     FogEnabledBuffer []bool // bools for if polygon has fog enabled
@@ -75,14 +72,11 @@ func NewContext(width, height int) *Context {
 	dc.ReadDepth = true
 	dc.WriteDepth = true
 	dc.WriteColor = true
-	dc.AlphaBlend = true
 	dc.Wireframe = false
 	dc.FrontFace = FaceCCW
-	dc.Cull = CullBack
+	dc.Cull = CullNone
 	dc.LineWidth = 2
-	dc.DepthBias = 0
 	dc.screenMatrix = Screen(width, height)
-	dc.locks = make([]sync.Mutex, 256)
 	dc.ClearDepthBuffer()
 	return dc
 }
@@ -243,7 +237,7 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 			}
 			info.TotalPixels++
 			z := b0*s0.Z + b1*s1.Z + b2*s2.Z
-			bz := z + dc.DepthBias
+			bz := z
 			if dc.ReadDepth && bz > dc.DepthBuffer[i] { // safe w/out lock?
 				continue
 			}
@@ -262,48 +256,37 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 
             color := &vert.Color
 
-			// update buffers atomically
-			//lock := &dc.locks[(x+y)&255]
-			//lock.Lock()
-			// check depth buffer again
 			if bz <= dc.DepthBuffer[i] || !dc.ReadDepth {
 				info.UpdatedPixels++
 
                 // not sure if this should be with depth buffers
                 dc.FogEnabledBuffer[i] = dc.PolygonFogEnabled
 
-                //if !(dc.AlphaBlend && color.A < 1) {
-                //    if dc.WriteDepth {
-                //        // update depth buffer
-                //        dc.DepthBuffer[i] = z
-                //    }
-				//}
-                if dc.WriteDepth && !(dc.AlphaBlend && color.A < 0.999) {
-                    // update depth buffer
+                // this will need to be fixed
+                if !(dc.AlphaBlending && color.A < 0.999) {
+                //if !dc.AlphaBlending || color.A > 0 {
                     dc.DepthBuffer[i] = z
                     dc.DepthBufferW[i] = b.W
                 }
-				if dc.WriteColor {
-					// update color buffer
-					if dc.AlphaBlend && color.A < 1 {
-                        //bz -= 1e-3
-						sr, sg, sb, sa := color.NRGBA().RGBA()
-						a := (0xffff - sa) * 0x101
-						j := dc.ColorBuffer.PixOffset(x, y)
-						dr := &dc.ColorBuffer.Pix[j+0]
-						dg := &dc.ColorBuffer.Pix[j+1]
-						db := &dc.ColorBuffer.Pix[j+2]
-						da := &dc.ColorBuffer.Pix[j+3]
-						*dr = uint8((uint32(*dr)*a/0xffff + sr) >> 8)
-						*dg = uint8((uint32(*dg)*a/0xffff + sg) >> 8)
-						*db = uint8((uint32(*db)*a/0xffff + sb) >> 8)
-						*da = uint8((uint32(*da)*a/0xffff + sa) >> 8)
-					} else {
-						dc.ColorBuffer.SetNRGBA(x, y, color.NRGBA())
-					}
-				}
-			}
-			//lock.Unlock()
+
+                if !dc.AlphaBlending || color.A >= 1 {
+                    dc.ColorBuffer.SetNRGBA(x, y, color.NRGBA())
+                    continue
+                }
+
+                sr, sg, sb, sa := color.NRGBA().RGBA()
+                a := (0xffff - sa) * 0x101
+                j := dc.ColorBuffer.PixOffset(x, y)
+                dr := &dc.ColorBuffer.Pix[j+0]
+                dg := &dc.ColorBuffer.Pix[j+1]
+                db := &dc.ColorBuffer.Pix[j+2]
+                da := &dc.ColorBuffer.Pix[j+3]
+                *dr = uint8((uint32(*dr)*a/0xffff + sr) >> 8)
+                *dg = uint8((uint32(*dg)*a/0xffff + sg) >> 8)
+                *db = uint8((uint32(*db)*a/0xffff + sb) >> 8)
+                *da = max(*da, uint8(float64(sa) / 0xFFFF * 0xFF))
+                //*da = uint8((uint32(*da)*a/0xffff + sa) >> 8)
+            }
 		}
 		w00 += b12
 		w01 += b20
