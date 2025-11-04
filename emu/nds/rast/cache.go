@@ -2,7 +2,9 @@ package rast
 
 import "github.com/aabalke/guac/emu/nds/rast/gl"
 
-type TextureCache map[uint32]*[]gl.Color
+type TextureCache map[key]*[]gl.Color
+
+type key struct{base, offset uint32}
 
 func (t *TextureCache) Reset() {
 	clear(*t)
@@ -10,21 +12,23 @@ func (t *TextureCache) Reset() {
 
 func (t *TextureCache) Add(vram VRAM, tex *Texture) {
 
+    key := key{tex.PaletteBaseAddr, tex.VramOffset}
+
 	switch tex.Format {
 	case TEX_FMT_4_PAL:
-		(*t)[tex.VramOffset] = t.getPaletted(vram, tex, 2, 2)
+		(*t)[key] = t.getPaletted(vram, tex, 2, 2)
 	case TEX_FMT_16_PAL:
-		(*t)[tex.VramOffset] = t.getPaletted(vram, tex, 4, 1)
+		(*t)[key] = t.getPaletted(vram, tex, 4, 1)
 	case TEX_FMT_256_PAL:
-		(*t)[tex.VramOffset] = t.getPaletted(vram, tex, 8, 0)
+		(*t)[key] = t.getPaletted(vram, tex, 8, 0)
 	case TEX_FMT_A3I5:
-		(*t)[tex.VramOffset] = t.getTranslucent(vram, tex, 5)
+		(*t)[key] = t.getTranslucent(vram, tex, 5)
 	case TEX_FMT_A5I3:
-		(*t)[tex.VramOffset] = t.getTranslucent(vram, tex, 3)
+		(*t)[key] = t.getTranslucent(vram, tex, 3)
 	case TEX_FMT_4X4:
-		(*t)[tex.VramOffset] = t.getCompressed(vram, tex)
+		(*t)[key] = t.getCompressed(vram, tex)
 	case TEX_FMT_DIRECT:
-		(*t)[tex.VramOffset] = t.getDirect(vram, tex)
+		(*t)[key] = t.getDirect(vram, tex)
 	default:
 		panic("UNSETUP TEX CACHE METHOD")
 	}
@@ -32,10 +36,12 @@ func (t *TextureCache) Add(vram VRAM, tex *Texture) {
 
 func (t *TextureCache) Get(vram VRAM, tex *Texture) *[]gl.Color {
 
-	v, ok := (*t)[tex.VramOffset]
+    key := key{tex.PaletteBaseAddr, tex.VramOffset}
+	v, ok := (*t)[key]
+
 	if !ok {
 		t.Add(vram, tex)
-		return (*t)[tex.VramOffset]
+		return (*t)[key]
 	}
 
 	return v

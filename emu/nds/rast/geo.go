@@ -50,7 +50,7 @@ func NewGeoEngine(buffers *Buffers, irq *cpu.Irq, vram VRAM) *GeoEngine {
         Buffers: buffers,
         MtxStacks: NewMtxStacks(),
         //Color: gl.Transparent,
-        TextureCache: make(map[uint32]*[]gl.Color, 0),
+        TextureCache: make(map[key]*[]gl.Color, 0),
         Vertex: &gl.Vertex{},
     }
     g.Disp3dCnt.Fog = &g.Fog
