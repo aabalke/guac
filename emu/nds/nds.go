@@ -14,6 +14,7 @@ import (
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/nds/ppu"
 	"github.com/aabalke/guac/emu/nds/snd"
+	"github.com/aabalke/guac/emu/nds/uhh"
 	"github.com/aabalke/guac/emu/nds/utils"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -33,6 +34,9 @@ const (
 	//NUM_SCANLINES   = SCREEN_HEIGHT + 70 // or 71 ???
 	NUM_SCANLINES   = SCREEN_HEIGHT + 70 // or 71 ???
 
+
+    // the graphics run zt 33Mhz ( arm7 speed, so arm9 runs twice)
+
 	CYCLES_HDRAW    = 1606
 	//CYCLES_HBLANK   = 524 // need to verify
 	CYCLES_HBLANK   = 526 // need to verify
@@ -41,7 +45,7 @@ const (
 	CYCLES_VBLANK   = CYCLES_SCANLINE * 70 // or 71???
 	CYCLES_FRAME    = CYCLES_VDRAW + CYCLES_VBLANK
 
-	CPU_FREQ_HZ   =   33513982
+	CPU_FREQ_HZ   = 33513982
     SND_FREQUENCY = 48000 // sample rate
     SND_SAMPLES   = 1024 // 512 in gba?
 )
@@ -60,6 +64,8 @@ type Nds struct {
     BtmAbs struct{T, B, L, R, W, H int} 
 
     AccCycles uint32
+
+    Frame uint64
 }
 
 var logger *Logger
@@ -237,10 +243,10 @@ func (nds *Nds) Update() {
     render := nds.ppu.Rasterizer.Render
 
     //if true {
+    //    nds.UpdateFrame()
     //    if nds.ppu.EngineA.Dispcnt.Is3D {
     //        nds.ppu.Rasterizer.Render.UpdateRender()
     //    }
-    //    nds.UpdateFrame()
     //    return
     //}
 
@@ -269,16 +275,14 @@ func (nds *Nds) UpdateFrame() {
 
         //nds.checkBadPc()
 
-        // arm9 thumb ~1 cycles, arm ~2 cycles
-        // arm7 thumb ~2 cycles, arm ~4 cycles
-
 		if !nds.arm9.Halted {
-            thumbExec :=  nds.arm9.Reg.IsThumb
-            armExec :=   !nds.arm9.Reg.IsThumb && nds.AccCycles & 0b1 == 0
+
+            //nds.checkMode(true)
+            //logger.Update(0, 1, CURR_INST, true)
+            thumbExec :=  nds.arm7.Reg.IsThumb
+            armExec :=   !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b1 == 0
 
             if thumbExec || armExec  {
-                //nds.checkMode(true)
-                //logger.Update(0, 1, CURR_INST, true)
 
                 _, ok := nds.arm9.Execute()
                 if !ok {
@@ -292,11 +296,34 @@ func (nds *Nds) UpdateFrame() {
                     nds.arm9.Irq.SetIRQ(cpu.IRQ_GEO_CMD_FIFO)
                 }
             }
-		}
+        }
+
+		if !nds.arm9.Halted {
+
+            //nds.checkMode(true)
+            //logger.Update(0, 1, CURR_INST, true)
+            thumbExec :=  nds.arm7.Reg.IsThumb
+            armExec :=   !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b1 == 0
+
+            if thumbExec || armExec  {
+
+                _, ok := nds.arm9.Execute()
+                if !ok {
+                    fmt.Printf("ARM9 Decode Error: PC %08X CURR %d\n", r[15], CURR_INST)
+                    os.Exit(0)
+                }
+
+                nds.CheckGeoDmas()
+
+                if nds.ppu.Rasterizer.GeoEngine.GxStat.FifoIrq != 0 {
+                    nds.arm9.Irq.SetIRQ(cpu.IRQ_GEO_CMD_FIFO)
+                }
+            }
+        }
 
         if !nds.arm7.Halted {
-            thumbExec :=  nds.arm7.Reg.IsThumb && nds.AccCycles & 0b1 == 0
-            armExec :=   !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b11 == 0
+            thumbExec :=  nds.arm7.Reg.IsThumb //&& nds.AccCycles & 0b1 == 0
+            armExec :=   !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b1 == 0
 
             if thumbExec || armExec  {
                 //nds.checkMode(false)
@@ -326,6 +353,8 @@ func (nds *Nds) UpdateFrame() {
 	}
 
 	nds.mem.Snd.Play(nds.Muted)
+
+    nds.Frame++
 }
 
 // run timer update only every mask amount of cycles
@@ -344,11 +373,14 @@ func (nds *Nds) TogglePause() bool {
 
 func (nds *Nds) GetScreens() (t, b *[]byte) {
 
+    pa := &nds.ppu.EngineA.Pixels
+    pb := &nds.ppu.EngineB.Pixels
+
     if nds.ppu.TopA {
-        return &nds.ppu.EngineA.Pixels, &nds.ppu.EngineB.Pixels
+        return pa, pb
     }
 
-    return &nds.ppu.EngineB.Pixels, &nds.ppu.EngineA.Pixels
+    return pb, pa
 }
 
 func (nds *Nds) Close() {
@@ -447,9 +479,28 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 
         nds.mem.Vcount = vcount
 
+        //uhh.V = vcount
+
+        if vcount == 0 {
+            uhh.A = nds.ppu.TopA
+        }
+
+        //if vcount == 194 {
+        //    logger.CustomWrite(nds.Frame, fmt.Sprintf("FRAME %08d, TOPA 0: %t, TOPA 194: %t", nds.Frame, uhh.A, nds.ppu.TopA))
+        //}
+
+        //if nds.Frame >= 400 {
+        //    logger.Close()
+        //    os.Exit(0)
+        //}
+
+        capture := &nds.ppu.Capture
+
 		switch vcount {
 		case 0:
-            nds.ppu.Capture.StartCapture()
+            if capture.Enabled {
+                capture.StartCapture()
+            }
 			nds.CheckDmas(dma.ARM9_DMA_MODE_STA, true)
 			nds.ppu.EngineA.Backgrounds[2].BgAffineReset()
 			nds.ppu.EngineA.Backgrounds[3].BgAffineReset()
@@ -457,7 +508,9 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 			nds.ppu.EngineB.Backgrounds[3].BgAffineReset()
 
 		case SCREEN_HEIGHT:
-            nds.ppu.Capture.EndCapture()
+            if capture.ActiveCapture {
+                capture.EndCapture()
+            }
 			dispstat.SetVBlank(true)
 			nds.CheckDmas(dma.DMA_MODE_VBL, true)
 			nds.CheckDmas(dma.DMA_MODE_VBL, false)
@@ -518,9 +571,10 @@ func (nds *Nds) CheckGeoDmas() {
             continue
         }
 
-        if overHalf := !(nds.ppu.Rasterizer.GeoEngine.GxStat.FifoEntries <= 128); overHalf {
-            continue
-        }
+        // never true
+        //if overHalf := nds.ppu.Rasterizer.GeoEngine.GxStat.FifoEntries >= 128; overHalf {
+        //    continue
+        //}
 
         //nds.arm9.Dma[i].GxTransfer()
         nds.arm9.Dma[i].Transfer()

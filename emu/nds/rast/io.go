@@ -46,25 +46,25 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
     case 0x604:
 
         if r.GeoEngine.Buffers.BisRendering {
-            return uint8(min(2048, len(r.GeoEngine.Buffers.A)))
+            return uint8(min(2048, len(r.GeoEngine.Buffers.A.Polys)))
         } 
 
-        return uint8(min(2048, len(r.GeoEngine.Buffers.B)))
+        return uint8(min(2048, len(r.GeoEngine.Buffers.B.Polys)))
 
     case 0x605:
 
         if r.GeoEngine.Buffers.BisRendering {
-            return uint8(min(2048, len(r.GeoEngine.Buffers.A)) >> 8)
+            return uint8(min(2048, len(r.GeoEngine.Buffers.A.Polys)) >> 8)
         } 
 
-        return uint8(min(2048, len(r.GeoEngine.Buffers.B)) >> 8)
+        return uint8(min(2048, len(r.GeoEngine.Buffers.B.Polys)) >> 8)
 
     case 0x606:
 
-        polys := &r.GeoEngine.Buffers.B
+        polys := &r.GeoEngine.Buffers.B.Polys
 
         if r.GeoEngine.Buffers.BisRendering {
-            polys = &r.GeoEngine.Buffers.A
+            polys = &r.GeoEngine.Buffers.A.Polys
         } 
 
         vertCnt := 0
@@ -77,10 +77,10 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
 
     case 0x607:
 
-        polys := &r.GeoEngine.Buffers.B
+        polys := &r.GeoEngine.Buffers.B.Polys
 
         if r.GeoEngine.Buffers.BisRendering {
-            polys = &r.GeoEngine.Buffers.A
+            polys = &r.GeoEngine.Buffers.A.Polys
         } 
 
         vertCnt := 0

@@ -511,9 +511,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
     case 0x50:
 
-        g.Buffers.ManualSort = data[1] & 0b1 != 0
-        g.Buffers.DepthBufferW = data[1] & 0b10 != 0
-        g.Buffers.SwapSet = true
+        g.Buffers.SwapCmd(data[1])
 
     case 0x60: 
 

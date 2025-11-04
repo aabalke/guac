@@ -19,12 +19,9 @@ const (
 type Render struct {
     Rasterizer *Rasterizer
     Pixels Pixels
-    //PixelPalettes []uint32
-    //Alphas []float64
 	Context *gl.Context
     Buffers *Buffers
     RearPlane *RearPlane
-
 	lock        sync.Mutex
 }
 
@@ -72,9 +69,9 @@ func (r *Render) UpdateRender() {
 
     r.Context.AlphaBlending = r.Rasterizer.GeoEngine.Disp3dCnt.AlphaBlending
 
-    polygons := r.Buffers.GetPolygons()
+    polygons, manualSort, depthW := r.Buffers.GetPolygons()
 
-    if !r.Buffers.ManualSort {
+    if !manualSort {
         sort.Slice(polygons, func(i, j int) bool {
 
             average := func(poly Polygon) float64{
@@ -102,13 +99,13 @@ func (r *Render) UpdateRender() {
     }
 
     if r.Rasterizer.GeoEngine.Fog.Enabled {
-        r.ApplyFog()
+        r.ApplyFog(depthW)
     }
 
     r.ImageToPixels(r.Context.Image())
 }
 
-func (r *Render) ApplyFog() {
+func (r *Render) ApplyFog(depthW bool) {
 
     fog := &r.Rasterizer.GeoEngine.Fog
 
@@ -125,7 +122,7 @@ func (r *Render) ApplyFog() {
 
             var depth float64
 
-            if r.Buffers.DepthBufferW {
+            if depthW {
                 depth = r.Context.DepthBufferW[i] * 8
             } else {
                 depth = r.Context.DepthBuffer[i] * 0x7FFF
@@ -144,14 +141,15 @@ func (r *Render) RenderPolygon(p *Polygon) {
     }
 
     r.Context.PolygonFogEnabled = p.FogEnabled
+    r.Context.NewTranslucentDepth = p.SetNewTranslucentDepth
 
     //switch {
     //case p.RenderFront && p.RenderBack:
     //    r.Context.Cull = gl.CullNone
     //case p.RenderFront && !p.RenderBack:
-    //    r.Context.Cull = gl.CullBack
-    //case !p.RenderFront && p.RenderBack:
     //    r.Context.Cull = gl.CullFront
+    //case !p.RenderFront && p.RenderBack:
+    //    r.Context.Cull = gl.CullBack
     //default:
     //    return
     //}
