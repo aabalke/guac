@@ -10,11 +10,11 @@ import (
 	"github.com/aabalke/guac/emu/nds/cpu/arm7"
 	"github.com/aabalke/guac/emu/nds/cpu/arm9"
 	"github.com/aabalke/guac/emu/nds/cpu/cp15"
+	"github.com/aabalke/guac/emu/nds/debug"
 	"github.com/aabalke/guac/emu/nds/mem"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/nds/ppu"
 	"github.com/aabalke/guac/emu/nds/snd"
-	"github.com/aabalke/guac/emu/nds/uhh"
 	"github.com/aabalke/guac/emu/nds/utils"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -22,7 +22,6 @@ import (
 )
 
 var (
-	CURR_INST = uint64(0)
     _ = os.Args
     _ = fmt.Sprintf("")
 )
@@ -34,9 +33,7 @@ const (
 	//NUM_SCANLINES   = SCREEN_HEIGHT + 70 // or 71 ???
 	NUM_SCANLINES   = SCREEN_HEIGHT + 70 // or 71 ???
 
-
-    // the graphics run zt 33Mhz ( arm7 speed, so arm9 runs twice)
-
+    // the graphics run zt 33Mhz ( arm7 speed, so arm9 runs twice every cycle)
 	CYCLES_HDRAW    = 1606
 	//CYCLES_HBLANK   = 524 // need to verify
 	CYCLES_HBLANK   = 526 // need to verify
@@ -57,8 +54,6 @@ type Nds struct {
     ppu  *ppu.PPU
     Cartridge cart.Cartridge
 
-	Debugger Debugger
-
 	Muted, Paused, Drawn    bool
 	ImageTop, ImageBottom   *ebiten.Image
     BtmAbs struct{T, B, L, R, W, H int} 
@@ -67,8 +62,6 @@ type Nds struct {
 
     Frame uint64
 }
-
-var logger *Logger
 
 func NewNds(path string, audioCtx *oto.Context) *Nds {
 
@@ -93,7 +86,6 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
     cp15 := &cp15.Cp15{}
     cp15.Init(&nds.mem)
 
-	nds.Debugger = Debugger{&nds}
 	nds.arm7 = *arm7.NewCpu(&nds.mem, &irq7)
 	nds.arm9 = *arm9.NewCpu(&nds.mem, &irq9, cp15)
 
@@ -128,7 +120,7 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 
     nds.DirtyInit()
 
-    logger = NewLogger("./log.csv", &nds)
+    debug.Init("./log.csv")
 
 	return &nds
 }
@@ -139,25 +131,25 @@ func (nds *Nds) checkBadPc() {
     reg7 := &nds.arm7.Reg
 
     if reg9.R[15] > 0x400_0000 && reg9.R[15] < 0xFFFF_0000 {
-        panic(fmt.Sprintf("BAD ARM9 PC %08X CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
+        panic(fmt.Sprintf("BAD ARM9 PC %08X CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, debug.CURR_INST))
     }
     if (reg7.R[15] > 0x400_0000 && reg7.R[15] < 0x600_0000) || reg7.R[15] >= 0x700_0000 {
-        panic(fmt.Sprintf("BAD ARM7 PC %08X CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
+        panic(fmt.Sprintf("BAD ARM7 PC %08X CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, debug.CURR_INST))
     }
 
     // should probably check proper vramwram for arm7
 
     switch {
     case reg9.IsThumb && reg9.R[15] & 0b1 != 0:
-        panic(fmt.Sprintf("BAD ARM9 THUMB PC %08X CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
+        panic(fmt.Sprintf("BAD ARM9 THUMB PC %08X CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, debug.CURR_INST))
     case !reg9.IsThumb && reg9.R[15] & 0b11 != 0:
-        panic(fmt.Sprintf("BAD ARM9 ARM   PC %08X CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
+        panic(fmt.Sprintf("BAD ARM9 ARM   PC %08X CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, debug.CURR_INST))
     case reg7.IsThumb && reg7.R[15] & 0b1 != 0:
         //uhh.PrintPcs()
-        panic(fmt.Sprintf("BAD ARM7 THUMB PC %08X CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
+        panic(fmt.Sprintf("BAD ARM7 THUMB PC %08X CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, debug.CURR_INST))
     case !reg7.IsThumb && reg7.R[15] & 0b11 != 0:
         //uhh.PrintPcs()
-        panic(fmt.Sprintf("BAD ARM7 ARM   PC %08X CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
+        panic(fmt.Sprintf("BAD ARM7 ARM   PC %08X CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, debug.CURR_INST))
     }
 
     zeroWordcnt := 0x100
@@ -174,7 +166,7 @@ func (nds *Nds) checkBadPc() {
         }
 
         if zeros {
-            panic(fmt.Sprintf("BAD ARM9 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
+            panic(fmt.Sprintf("BAD ARM9 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, debug.CURR_INST))
         }
     }
 
@@ -190,13 +182,13 @@ func (nds *Nds) checkBadPc() {
         }
 
         if zeros {
-            panic(fmt.Sprintf("BAD ARM7 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, CURR_INST))
+            panic(fmt.Sprintf("BAD ARM7 PC %08X (ZEROS) CPSR %08X CURR %d\n", reg7.R[15], reg7.CPSR, debug.CURR_INST))
         }
     }
 
 
     if reg9.R[15] < 0x30 && !nds.arm9.LowVector {
-            panic(fmt.Sprintf("BAD ARM9 PC %08X (LOW WHEN HIGH) CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, CURR_INST))
+            panic(fmt.Sprintf("BAD ARM9 PC %08X (LOW WHEN HIGH) CPSR %08X CURR %d\n", reg9.R[15], reg9.CPSR, debug.CURR_INST))
     }
 }
 var validModes = map[uint32]bool {
@@ -216,7 +208,7 @@ func (nds *Nds) checkMode(arm9 bool) {
         m9 := uint32(nds.arm9.Reg.CPSR) & 0x1F
         _, valid9 := validModes[m9]
         if !valid9 {
-            panic(fmt.Sprintf("ARM9 MODE INVALID %02X CURR %d\n", m9, CURR_INST))
+            panic(fmt.Sprintf("ARM9 MODE INVALID %02X CURR %d\n", m9, debug.CURR_INST))
         }
 
         return
@@ -225,14 +217,13 @@ func (nds *Nds) checkMode(arm9 bool) {
     m7 := uint32(nds.arm7.Reg.CPSR) & 0x1F
     _, valid7 := validModes[m7]
     if !valid7 {
-        panic(fmt.Sprintf("ARM7 MODE INVALID %02X CURR %d\n", m7, CURR_INST))
+        panic(fmt.Sprintf("ARM7 MODE INVALID %02X CURR %d\n", m7, debug.CURR_INST))
     }
 }
 
 var wg2 = sync.WaitGroup{}
 
-// breaks 2 3D screen when multithreaded
-//const singleThread = true
+const singleThread = !true
 
 func (nds *Nds) Update() {
 
@@ -242,13 +233,13 @@ func (nds *Nds) Update() {
 
     render := nds.ppu.Rasterizer.Render
 
-    //if true {
-    //    nds.UpdateFrame()
-    //    if nds.ppu.EngineA.Dispcnt.Is3D {
-    //        nds.ppu.Rasterizer.Render.UpdateRender()
-    //    }
-    //    return
-    //}
+    if singleThread {
+        nds.UpdateFrame()
+        if nds.ppu.EngineA.Dispcnt.Is3D {
+            nds.ppu.Rasterizer.Render.UpdateRender()
+        }
+        return
+    }
 
 	wg2.Add(2)
 
@@ -278,15 +269,16 @@ func (nds *Nds) UpdateFrame() {
 		if !nds.arm9.Halted {
 
             //nds.checkMode(true)
-            //logger.Update(0, 1, CURR_INST, true)
+
             thumbExec :=  nds.arm7.Reg.IsThumb
             armExec :=   !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b1 == 0
 
             if thumbExec || armExec  {
 
+                //Log(nds, 0, 100_000, true)
                 _, ok := nds.arm9.Execute()
                 if !ok {
-                    fmt.Printf("ARM9 Decode Error: PC %08X CURR %d\n", r[15], CURR_INST)
+                    fmt.Printf("ARM9 Decode Error: PC %08X CURR %d\n", r[15], debug.CURR_INST)
                     os.Exit(0)
                 }
 
@@ -301,7 +293,6 @@ func (nds *Nds) UpdateFrame() {
 		if !nds.arm9.Halted {
 
             //nds.checkMode(true)
-            //logger.Update(0, 1, CURR_INST, true)
             thumbExec :=  nds.arm7.Reg.IsThumb
             armExec :=   !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b1 == 0
 
@@ -309,7 +300,7 @@ func (nds *Nds) UpdateFrame() {
 
                 _, ok := nds.arm9.Execute()
                 if !ok {
-                    fmt.Printf("ARM9 Decode Error: PC %08X CURR %d\n", r[15], CURR_INST)
+                    fmt.Printf("ARM9 Decode Error: PC %08X CURR %d\n", r[15], debug.CURR_INST)
                     os.Exit(0)
                 }
 
@@ -322,17 +313,16 @@ func (nds *Nds) UpdateFrame() {
         }
 
         if !nds.arm7.Halted {
-            thumbExec :=  nds.arm7.Reg.IsThumb //&& nds.AccCycles & 0b1 == 0
-            armExec :=   !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b1 == 0
+            thumbExec :=  nds.arm7.Reg.IsThumb && nds.AccCycles & 0b1 == 0
+            armExec :=   !nds.arm7.Reg.IsThumb && nds.AccCycles & 0b11 == 0
 
             if thumbExec || armExec  {
                 //nds.checkMode(false)
-                //logger.Update(0, 1, CURR_INST, false)
                 //uhh.UpdatePcs(*r7, nds.mem.Read32(r7[15], false), uint32(nds.arm7.Reg.CPSR))
                 _, ok := nds.arm7.Execute()
                 if !ok {
                     //uhh.PrintPcs()
-                    fmt.Printf("ARM7 Decode Error: PC %08X CURR %d\n", r7[15], CURR_INST)
+                    fmt.Printf("ARM7 Decode Error: PC %08X CURR %d\n", r7[15], debug.CURR_INST)
                     os.Exit(0)
                 }
             }
@@ -349,7 +339,7 @@ func (nds *Nds) UpdateFrame() {
 
         timerCycles++
 
-        CURR_INST++
+        debug.CURR_INST++
 	}
 
 	nds.mem.Snd.Play(nds.Muted)
@@ -387,8 +377,7 @@ func (nds *Nds) Close() {
 	nds.Muted  = true
 	nds.Paused = true
 
-    logger.Close()
-    logger = nil
+    debug.L.Close()
 }
 
 func (nds *Nds) LoadGame(path string) {
@@ -478,21 +467,6 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 		}
 
         nds.mem.Vcount = vcount
-
-        //uhh.V = vcount
-
-        if vcount == 0 {
-            uhh.A = nds.ppu.TopA
-        }
-
-        //if vcount == 194 {
-        //    logger.CustomWrite(nds.Frame, fmt.Sprintf("FRAME %08d, TOPA 0: %t, TOPA 194: %t", nds.Frame, uhh.A, nds.ppu.TopA))
-        //}
-
-        //if nds.Frame >= 400 {
-        //    logger.Close()
-        //    os.Exit(0)
-        //}
 
         capture := &nds.ppu.Capture
 

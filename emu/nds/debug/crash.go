@@ -1,10 +1,6 @@
-package uhh
+package debug
 
 import "fmt"
-
-var Good = false
-var GoodA = false
-var CNT = uint64(0)
 
 var pcs [50]struct {
 	r     [16]uint32

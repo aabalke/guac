@@ -10,7 +10,7 @@ type Cartridge struct {
 	RomLength uint32
 	Header    Header
 
-	Rom [0x800_0000]uint8
+	Rom []uint8
 }
 
 func NewCartridge(rom, sav string) Cartridge {
@@ -18,6 +18,7 @@ func NewCartridge(rom, sav string) Cartridge {
 	c := Cartridge{
 		RomPath: rom,
 		SavPath: sav,
+        Rom: make([]uint8, 0),
 	}
 
 	c.load()
@@ -37,6 +38,6 @@ func (c *Cartridge) load() {
 	c.RomLength = uint32(len(buf))
 
 	for i := range len(buf) {
-		c.Rom[i] = uint8(buf[i])
+        c.Rom = append(c.Rom, buf[i])
 	}
 }

@@ -42,7 +42,7 @@ const (
 
 func setBiosRam(mem *Mem) {
 
-    c := &mem.Cartridge.Rom
+    c := mem.Cartridge.Rom[:0x1000]
     f := &spi.FirmwareData
 
     h := &mem.Cartridge.Header

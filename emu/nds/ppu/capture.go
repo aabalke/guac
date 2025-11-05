@@ -128,12 +128,12 @@ func (c *Capture) Read(addr uint32) uint8 {
 func (c *Capture) TempLimiter() {
 
     if c.EVA != 0 && c.EVA != 16 {
-        panic("UNSETUP CAPTURE SETTING")
+        panic("UNSETUP CAPTURE SETTING BLEND A")
     }
 
     if c.EVB != 0 {
         // need read block from dispcnt
-        panic("UNSETUP CAPTURE SETTING")
+        panic("UNSETUP CAPTURE SETTING BLEND B")
     }
 
     if c.Size != 3 && c.Size != 0 {

@@ -219,7 +219,7 @@ func (b *Backup) Transfer(data []uint8) (reply []uint8, stat uint8) {
         return nil, STAT_DONE
 
 	default:
-		panic(fmt.Sprintf("UNKNOWN OR UN SETUP BACKUP INST CODE %02X", inst))
+		panic(fmt.Sprintf("UNKNOWN OR UN SETUP BACKUP INST CODE %02X. DATA %02X", inst, data))
 		return nil, STAT_DONE
 	}
 }

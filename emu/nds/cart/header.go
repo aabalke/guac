@@ -50,18 +50,17 @@ func NewHeader(c *Cartridge) Header {
 
 	h.validate()
 
-	println(h.Title)
-	println(h.GameCode)
-	println(h.UnitCode)
-	fmt.Printf("ARM9 OFF %08X\n", h.Arm9Offset)
-	fmt.Printf("ARM9 ENT %08X\n", h.Arm9EntryAddr)
-	fmt.Printf("ARM9 RAM %08X\n", h.Arm9RamAddr)
-	fmt.Printf("ARM9 SIZ %08X\n", h.Arm9Size)
+    fmt.Printf("TITLE %s CODE %s UNIT %d\n", h.Title, h.GameCode, h.UnitCode)
 
-	fmt.Printf("ARM7 OFF %08X\n", h.Arm7Offset)
-	fmt.Printf("ARM7 ENT %08X\n", h.Arm7EntryAddr)
-	fmt.Printf("ARM7 RAM %08X\n", h.Arm7RamAddr)
-	fmt.Printf("ARM7 SIZ %08X\n", h.Arm7Size)
+	//fmt.Printf("ARM9 OFF %08X\n", h.Arm9Offset)
+	//fmt.Printf("ARM9 ENT %08X\n", h.Arm9EntryAddr)
+	//fmt.Printf("ARM9 RAM %08X\n", h.Arm9RamAddr)
+	//fmt.Printf("ARM9 SIZ %08X\n", h.Arm9Size)
+
+	//fmt.Printf("ARM7 OFF %08X\n", h.Arm7Offset)
+	//fmt.Printf("ARM7 ENT %08X\n", h.Arm7EntryAddr)
+	//fmt.Printf("ARM7 RAM %08X\n", h.Arm7RamAddr)
+	//fmt.Printf("ARM7 SIZ %08X\n", h.Arm7Size)
 	//fmt.Printf("ROM  VAL %08X\n", binary.LittleEndian.Uint32(c.Rom[0x4008:]))
 
 	return h
