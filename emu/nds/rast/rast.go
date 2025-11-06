@@ -1,6 +1,7 @@
 package rast
 
 import (
+	"image/color"
 
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/rast/gl"
@@ -23,6 +24,7 @@ type Rasterizer struct {
     RearPlane RearPlane
     VRAM VRAM
     Disp1Dot Disp1Dot
+    Edge Edge
 }
 
 type VRAM interface {
@@ -35,6 +37,10 @@ func NewRasterizer(vram VRAM, irq *cpu.Irq) *Rasterizer {
     r.VRAM = vram
     r.GeoEngine = NewGeoEngine(&r.Buffers, irq, vram)
     r.Render = NewRender(r, &r.Buffers, &r.RearPlane)
+
+    for i := range len(r.Edge.Color) {
+        r.Edge.Color[i] = color.RGBA{A: 0xFF}
+    }
 
     return r
 }
@@ -240,4 +246,51 @@ func (r *RearPlane) Write(addr uint32, v uint8) {
 type Disp1Dot struct {
     param uint16
     V float64
+}
+
+type Edge struct {
+    V [8]uint16
+    Color [8]color.Color
+}
+
+func (e *Edge) Write(addr uint32, v uint8) {
+
+    addr -= 0x330
+
+    i := addr / 2
+    hi := addr & 1 == 1
+
+    c := gl.MakeColor(e.Color[i])
+
+    e.Color[i] = gl.MakeColorColor(Convert15BitByte(c, v, hi))
+
+    //discard := color.RGBA{}
+
+    //if e.Color[i] != discard {
+    //    r, g, b, a := e.Color[i].RGBA()
+    //    fmt.Printf("%d COLOR %d %d %d %d\n", i, r, g, b, a)
+    //}
+
+    if hi {
+        e.V[i] &= 0xFF
+        e.V[i] |= uint16(v) << 8
+
+    } else {
+        e.V[i] &^= 0xFF
+        e.V[i] |= uint16(v)
+    }
+}
+
+func (e *Edge) Read(addr uint32) uint8 {
+
+    addr -= 0x330
+
+    i := addr / 2
+    hi := addr & 1 == 1
+
+    if hi {
+        return uint8(e.V[i] >> 8)
+    }
+
+    return uint8(e.V[i])
 }

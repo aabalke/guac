@@ -266,17 +266,18 @@ func (r *Rasterizer) ReadVecMtx(addr uint32) uint8 {
 
 func (r *Rasterizer) Write(addr uint32, v uint8) {
 
-    if addr >= 0x358 && addr < 0x380 {
-        r.WriteFog(addr, v)
-        return
-    }
-
     switch {
     case addr >= 0x350 && addr < 0x358:
         r.RearPlane.Write(addr, v)
         return
     case addr >= 0x380 && addr < 0x3C0:
         WriteToonTbl(&r.GeoEngine.ToonTbl, addr, v)
+        return
+    case addr >= 0x358 && addr < 0x380:
+        r.WriteFog(addr, v)
+        return
+    case addr >= 0x330 && addr < 0x340:
+        r.Edge.Write(addr, v)
         return
     }
 

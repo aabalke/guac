@@ -49,7 +49,6 @@ func (tex *Texture) WriteCoord(v uint32, g *GeoEngine) {
     }
 
     mtx := &g.MtxStacks.Stacks[3].CurrMtx
-
     tex.S = textureVertex.Dot(mtx.Col(0))
     tex.T = textureVertex.Dot(mtx.Col(1))
 }

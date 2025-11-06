@@ -1,12 +1,19 @@
 package gl
 
 import (
+	"fmt"
 	"image"
 	"image/color"
+	"math"
+)
+
+var (
+    _ = fmt.Sprintf("")
 )
 
 const (
     MAX_DEPTH = float64(0x7FFF)
+    EDGE_THRES = 1
 )
 
 type Face int
@@ -58,6 +65,13 @@ type Context struct {
     DepthBufferW []float64
     FogEnabledBuffer []bool // bools for if polygon has fog enabled
     PolygonFogEnabled bool
+    NewTranslucentDepth bool
+
+    EdgeBuffer []bool
+    PolyIdBuffer []uint32
+    PolygonId uint32
+    EdgeEnabled bool
+    PolygonOpaque bool
 }
 
 func NewContext(width, height int) *Context {
@@ -68,6 +82,8 @@ func NewContext(width, height int) *Context {
 	dc.DepthBuffer = make([]float64, width*height)
 	dc.DepthBufferW = make([]float64, width*height)
 	dc.FogEnabledBuffer = make([]bool, width*height)
+	dc.EdgeBuffer = make([]bool, width*height)
+	dc.PolyIdBuffer = make([]uint32, width*height)
 	dc.ClearColor = Transparent
 	dc.ReadDepth = true
 	dc.WriteDepth = true
@@ -87,6 +103,83 @@ func (dc *Context) Image() image.Image {
 
 func (dc *Context) SetColor(x, y int, color color.Color) {
     dc.ColorBuffer.Set(x, y, color)
+}
+
+func (dc *Context) EdgeId(x, y int, depthW bool) (uint32, bool) {
+
+    i := x + y * dc.Width
+    if !dc.EdgeBuffer[i] {
+        return 0, false
+    }
+
+    depths := &dc.DepthBuffer
+    if depthW {
+        depths = &dc.DepthBufferW
+    }
+
+    depth := (*depths)[i]
+    id := dc.PolyIdBuffer[i]
+    mask := len(dc.PolyIdBuffer) - 1
+
+    neighbors := [4]int{
+        min(mask, max(0, (i-1       ))),
+        min(mask, max(0, (i+1       ))),
+        min(mask, max(0, (i-dc.Width))),
+        min(mask, max(0, (i+dc.Width))),
+    }
+
+    for _, n := range neighbors {
+
+        if nid := dc.PolyIdBuffer[n]; nid == id {
+            continue
+        }
+
+        if depth < (*depths)[n] {
+            return id, true
+        }
+    }
+
+    return 0, false
+}
+
+func (dc *Context) BoolImage() image.Image {
+
+	im := image.NewGray16(image.Rect(0, 0, dc.Width, dc.Height))
+	var i int
+	for y := 0; y < dc.Height; y++ {
+		for x := 0; x < dc.Width; x++ {
+			d := dc.EdgeBuffer[i]
+            t := 0
+			if d {
+				t = 1
+			}
+			c := color.Gray16{uint16(t * 0xffff)}
+			im.SetGray16(x, y, c)
+			i++
+		}
+	}
+	return im
+}
+
+
+func (dc *Context) BufferImage() image.Image {
+	im := image.NewGray16(image.Rect(0, 0, dc.Width, dc.Height))
+	var i int
+	for y := 0; y < dc.Height; y++ {
+		for x := 0; x < dc.Width; x++ {
+			d := dc.PolyIdBuffer[i]
+
+            t := 0 
+            if d == 8 {
+                t = 1
+            }
+
+			c := color.Gray16{uint16(t * 0xffff)}
+			im.SetGray16(x, y, c)
+			i++
+		}
+	}
+	return im
 }
 
 func (dc *Context) DepthImage() image.Image {
@@ -143,6 +236,13 @@ func (dc *Context) ClearDepthBufferWith(value float64) {
 	for i := range dc.DepthBuffer {
 		dc.DepthBuffer[i] = value
 		dc.DepthBufferW[i] = value
+	}
+}
+
+func (dc *Context) ClearEdgeBuffer() {
+	for i := range len(dc.EdgeBuffer) {
+		dc.EdgeBuffer[i] = false
+		dc.PolyIdBuffer[i] = 0xFF // invalid value (0 is valid)
 	}
 }
 
@@ -213,6 +313,14 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 		w1 := w01 + a20*d
 		w2 := w02 + a01*d
 		wasInside := false
+
+        grad0 := math.Hypot(a12, b12) * ra // for b0
+        grad1 := math.Hypot(a20, b20) * ra // for b1
+        grad2 := math.Hypot(a01, b01) * ra // for b2
+        edgeThickness0 := EDGE_THRES * grad0
+        edgeThickness1 := EDGE_THRES * grad1
+        edgeThickness2 := EDGE_THRES * grad2
+
 		for x := x0 + int(d); x <= x1; x++ {
 			b0 := w0 * ra
 			b1 := w1 * ra
@@ -262,9 +370,27 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
                 // not sure if this should be with depth buffers
                 dc.FogEnabledBuffer[i] = dc.PolygonFogEnabled
 
+                if dc.PolygonOpaque {
+
+                    if edge := (
+                    b0 < edgeThickness0 ||
+                    b1 < edgeThickness1 ||
+                    b2 < edgeThickness2); edge {
+
+                        dc.EdgeBuffer[i] = dc.EdgeEnabled
+
+                        // Wireframe
+                        //vert.Color = Color{0, 255, 0, 255} // can use to apply wireframe
+                    } else {
+                        dc.EdgeBuffer[i] = false
+                    }
+                    dc.PolyIdBuffer[i] = dc.PolygonId
+                }
+
                 // this will need to be fixed
                 if !(dc.AlphaBlending && color.A < 0.999) {
-                //if !dc.AlphaBlending || color.A > 0 {
+
+                //if !dc.AlphaBlending || (dc.AlphaBlending && color.A > 0 && dc.NewTranslucentDepth) {
                     dc.DepthBuffer[i] = z
                     dc.DepthBufferW[i] = b.W
                 }
@@ -277,10 +403,18 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
                 sr, sg, sb, sa := color.NRGBA().RGBA()
                 a := (0xffff - sa) * 0x101
                 j := dc.ColorBuffer.PixOffset(x, y)
+                da := &dc.ColorBuffer.Pix[j+3]
+
+                if *da == 0 {
+                    dc.ColorBuffer.SetNRGBA(x, y, color.NRGBA())
+                    continue
+                }
+
                 dr := &dc.ColorBuffer.Pix[j+0]
                 dg := &dc.ColorBuffer.Pix[j+1]
                 db := &dc.ColorBuffer.Pix[j+2]
-                da := &dc.ColorBuffer.Pix[j+3]
+
+
                 *dr = uint8((uint32(*dr)*a/0xffff + sr) >> 8)
                 *dg = uint8((uint32(*dg)*a/0xffff + sg) >> 8)
                 *db = uint8((uint32(*db)*a/0xffff + sb) >> 8)

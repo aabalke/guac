@@ -1,4 +1,4 @@
-//package nds
+package debug
 //
 //import (
 //	"fmt"

@@ -66,8 +66,10 @@ func (r *Render) UpdateRender() {
 
     r.Context.ClearColorBuffer()
     r.Context.ClearDepthBuffer()
+    r.Context.ClearEdgeBuffer()
 
     r.Context.AlphaBlending = r.Rasterizer.GeoEngine.Disp3dCnt.AlphaBlending
+    r.Context.EdgeEnabled   = r.Rasterizer.GeoEngine.Disp3dCnt.EdgeMarking
 
     polygons, manualSort, depthW := r.Buffers.GetPolygons()
 
@@ -102,7 +104,12 @@ func (r *Render) UpdateRender() {
         r.ApplyFog(depthW)
     }
 
+    if r.Rasterizer.GeoEngine.Disp3dCnt.EdgeMarking {
+        r.ApplyEdge(depthW)
+    }
+
     r.ImageToPixels(r.Context.Image())
+    //r.ImageToPixels(r.Context.BufferImage())
 }
 
 func (r *Render) ApplyFog(depthW bool) {
@@ -134,6 +141,23 @@ func (r *Render) ApplyFog(depthW bool) {
     }
 }
 
+func (r *Render) ApplyEdge(depthW bool) {
+
+    for y := range r.Context.Height {
+        for x := range r.Context.Width {
+            id, ok := r.Context.EdgeId(x, y, depthW)
+            if !ok {
+                //r.Context.SetColor(x, y, color.White)
+                continue
+            }
+
+            i := id / 8
+            c := r.Rasterizer.Edge.Color[i]
+            r.Context.SetColor(x, y, c)
+        }
+    }
+}
+
 func (r *Render) RenderPolygon(p *Polygon) {
 
     if len(p.Vertices) == 0 {
@@ -142,6 +166,9 @@ func (r *Render) RenderPolygon(p *Polygon) {
 
     r.Context.PolygonFogEnabled = p.FogEnabled
     r.Context.NewTranslucentDepth = p.SetNewTranslucentDepth
+    r.Context.PolygonId = p.Id
+    r.Context.PolygonOpaque = p.AlphaV == 0x1F || p.AlphaV == 0
+    r.Context.Wireframe = p.AlphaV == 0
 
     //switch {
     //case p.RenderFront && p.RenderBack:

@@ -1,7 +1,15 @@
 This project includes code adapted from third party code under the following licenses:
 
+
+GBA
+
 - APU and HLE Bios from akatsuki105/magia 005c616 (MIT License)
 - Cartridge and VideoUpdate from RidgeX/ygba a30c442 (BSD-3 Clause License)
+
+NDS
+
+- Bios MelonDS
+- Serial Interfaces and Other Perpheral implimentations from rasky/ndsemu (MIT License)
 
 All other code is @ 2025 Aaron Balke, licensed under a BSD-3 Clause License
 

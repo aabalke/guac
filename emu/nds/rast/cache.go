@@ -1,6 +1,8 @@
 package rast
 
-import "github.com/aabalke/guac/emu/nds/rast/gl"
+import (
+	"github.com/aabalke/guac/emu/nds/rast/gl"
+)
 
 type TextureCache map[key]*[]gl.Color
 
@@ -10,9 +12,7 @@ func (t *TextureCache) Reset() {
 	clear(*t)
 }
 
-func (t *TextureCache) Add(vram VRAM, tex *Texture) {
-
-    key := key{tex.PaletteBaseAddr, tex.VramOffset}
+func (t *TextureCache) Add(vram VRAM, tex *Texture, key key) {
 
 	switch tex.Format {
 	case TEX_FMT_4_PAL:
@@ -38,9 +38,8 @@ func (t *TextureCache) Get(vram VRAM, tex *Texture) *[]gl.Color {
 
     key := key{tex.PaletteBaseAddr, tex.VramOffset}
 	v, ok := (*t)[key]
-
 	if !ok {
-		t.Add(vram, tex)
+		t.Add(vram, tex, key)
 		return (*t)[key]
 	}
 
@@ -77,6 +76,7 @@ func (t *TextureCache) getPaletted(vram VRAM, tex *Texture, bitsPerTexel, bitsPe
 
 	out := make([]gl.Color, (tex.SizeS)*(tex.SizeT))
 
+
     palBase := tex.PaletteBaseAddr
 
 	if bitsPerTexel == 2 {
@@ -105,6 +105,12 @@ func (t *TextureCache) getPaletted(vram VRAM, tex *Texture, bitsPerTexel, bitsPe
                 continue
 			}
 
+            //if tex.PaletteBaseAddr != 0x82 {
+            //    out[i] = gl.Color{A: 0.5}
+			//    //out[i] = gl.Transparent
+            //    continue
+            //}
+
 			// palettes take up 2 bytes each
 			palIdx *= 2
 
@@ -112,7 +118,7 @@ func (t *TextureCache) getPaletted(vram VRAM, tex *Texture, bitsPerTexel, bitsPe
 			data |= uint32(vram.ReadPalTexture(palBase+palIdx+1)) << 8
 
             out[i] =  gl.MakeColorFrom15Bit(
-                uint8(data        & 0x1F),
+                uint8(data)       & 0x1F,
                 uint8(data >> 5)  & 0x1F,
                 uint8(data >> 10) & 0x1F,
             )
@@ -163,6 +169,8 @@ func (t *TextureCache) getTranslucent(vram VRAM, tex *Texture, colorBits uint8) 
 
 	return &out
 }
+
+// rasky/ndsemu
 
 func (t *TextureCache) getCompressed(vram VRAM, tex *Texture) *[]gl.Color {
 
@@ -244,34 +252,34 @@ func (t *TextureCache) getCompressed(vram VRAM, tex *Texture) *[]gl.Color {
 
 func blendMode1(a, b uint16) uint16 {
 
-	aR := uint16(a) & 0b11111
-	aG := uint16(a>>5) & 0b11111
-	aB := uint16(a>>10) & 0b11111
+	aR := uint16(a) & 0x1F
+	aG := uint16(a>>5) & 0x1F
+	aB := uint16(a>>10) & 0x1F
 
-	bR := uint16(b) & 0b11111
-	bG := uint16(b>>5) & 0b11111
-	bB := uint16(b>>10) & 0b11111
+	bR := uint16(b) & 0x1F
+	bG := uint16(b>>5) & 0x1F
+	bB := uint16(b>>10) & 0x1F
 
-	oR := (((aR + bR) / 2) & 0b11111)
-	oG := (((aG + bG) / 2) & 0b11111) << 5
-	oB := (((aB + bB) / 2) & 0b11111) << 10
+	oR := (((aR + bR) / 2) & 0x1F)
+	oG := (((aG + bG) / 2) & 0x1F) << 5
+	oB := (((aB + bB) / 2) & 0x1F) << 10
 
 	return oR | oG | oB
 }
 
 func blendMode3(a, b uint16) uint16 {
 
-	aR := uint16(a) & 0b11111
-	aG := uint16(a>>5) & 0b11111
-	aB := uint16(a>>10) & 0b11111
+	aR := uint16(a) & 0x1F
+	aG := uint16(a>>5) & 0x1F
+	aB := uint16(a>>10) & 0x1F
 
-	bR := uint16(b) & 0b11111
-	bG := uint16(b>>5) & 0b11111
-	bB := uint16(b>>10) & 0b11111
+	bR := uint16(b) & 0x1F
+	bG := uint16(b>>5) & 0x1F
+	bB := uint16(b>>10) & 0x1F
 
-	oR := (((aR*5 + bR*3) / 8) & 0b11111)
-	oG := (((aG*5 + bG*3) / 8) & 0b11111) << 5
-	oB := (((aB*5 + bB*3) / 8) & 0b11111) << 10
+	oR := (((aR*5 + bR*3) / 8) & 0x1F)
+	oG := (((aG*5 + bG*3) / 8) & 0x1F) << 5
+	oB := (((aB*5 + bB*3) / 8) & 0x1F) << 10
 
 	return oR | oG | oB
 }

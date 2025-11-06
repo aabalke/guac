@@ -25,6 +25,7 @@ type Polygon struct {
 	DrawEqualDepthPixels   bool
 	FogEnabled             bool
 	Alpha                  float64
+	AlphaV                 uint32
 	Id                     uint32
 
 	PrimitiveType uint8
@@ -47,7 +48,8 @@ func (p *Polygon) WriteAttrs(v uint32) {
     p.RenderBehind1Dot = utils.BitEnabled(v, 13)
     p.DrawEqualDepthPixels = utils.BitEnabled(v, 14)
     p.FogEnabled = utils.BitEnabled(v, 15)
-    p.Alpha = float64(utils.GetVarData(v, 16, 20)) / 31
+    p.Alpha = (float64(utils.GetVarData(v, 16, 20)) - 1) / 30 // 0 is wireframe
+    p.AlphaV = utils.GetVarData(v, 16, 20)
     p.Id = utils.GetVarData(v, 24, 29)
 }
 

@@ -44,7 +44,6 @@ func setBiosRam(mem *Mem) {
 
     c := mem.Cartridge.Rom[:0x1000]
     f := &spi.FirmwareData
-
     h := &mem.Cartridge.Header
 
     for i := range h.Arm9Size {

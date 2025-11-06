@@ -230,6 +230,8 @@ Pokemon Diamond
 Pokemon Heartgold
 Metroid Prime Hunters
 Nintendogs Best Friends
+Zelda Spirit Tracks
+Zelda Phantom Hourglass
 
 ### No known errors
 Brain Age
@@ -239,10 +241,6 @@ Tetris Ds
 Yoshis Island
 Pokemon Blue Rescue Team
 Mario Kart Ds
-
-## 3D Screen Flickering
-Zelda Spirit Tracks
-Zelda Phantom Hourglass
 
 Clubhouse Games
 Housemd
