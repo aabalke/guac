@@ -72,6 +72,11 @@ type Context struct {
     PolygonId uint32
     EdgeEnabled bool
     PolygonOpaque bool
+
+    EdgeClearId uint32
+    ClearDepth uint32
+
+    DepthW bool
 }
 
 func NewContext(width, height int) *Context {
@@ -93,7 +98,7 @@ func NewContext(width, height int) *Context {
 	dc.Cull = CullNone
 	dc.LineWidth = 2
 	dc.screenMatrix = Screen(width, height)
-	dc.ClearDepthBuffer()
+	dc.ClearDepthBufferWith(MAX_DEPTH)
 	return dc
 }
 
@@ -119,23 +124,39 @@ func (dc *Context) EdgeId(x, y int, depthW bool) (uint32, bool) {
 
     depth := (*depths)[i]
     id := dc.PolyIdBuffer[i]
-    mask := len(dc.PolyIdBuffer) - 1
 
     neighbors := [4]int{
-        min(mask, max(0, (i-1       ))),
-        min(mask, max(0, (i+1       ))),
-        min(mask, max(0, (i-dc.Width))),
-        min(mask, max(0, (i+dc.Width))),
+        i-1       ,
+        i+1       ,
+        i-dc.Width,
+        i+dc.Width,
     }
 
-    for _, n := range neighbors {
+    for j, n := range neighbors {
 
-        if nid := dc.PolyIdBuffer[n]; nid == id {
-            continue
-        }
+        if screenOut := (
+            n < 0 ||
+            n >= len(dc.PolyIdBuffer) ||
+            (j == 0 && n % dc.Width == dc.Width - 1) || 
+            (j == 1 && n % dc.Width == 0)); screenOut {
 
-        if depth < (*depths)[n] {
-            return id, true
+            if nid := dc.EdgeClearId; nid == id {
+                continue
+            }
+
+            if depth < float64(dc.ClearDepth) / MAX_DEPTH {
+                return id, true
+            }
+
+        } else {
+
+            if nid := dc.PolyIdBuffer[n]; nid == id {
+                continue
+            }
+
+            if depth < (*depths)[n] {
+                return id, true
+            }
         }
     }
 
@@ -233,22 +254,43 @@ func (dc *Context) ClearColorBuffer() {
 }
 
 func (dc *Context) ClearDepthBufferWith(value float64) {
+
 	for i := range dc.DepthBuffer {
 		dc.DepthBuffer[i] = value
 		dc.DepthBufferW[i] = value
 	}
 }
 
-func (dc *Context) ClearEdgeBuffer() {
+func (dc *Context) ClearEdgeBufferWith(isEdge bool, defaultPolygonId uint32) {
 	for i := range len(dc.EdgeBuffer) {
-		dc.EdgeBuffer[i] = false
-		dc.PolyIdBuffer[i] = 0xFF // invalid value (0 is valid)
+		dc.EdgeBuffer[i] = isEdge
+		dc.PolyIdBuffer[i] = defaultPolygonId // invalid value (0 is valid)
 	}
 }
 
-func (dc *Context) ClearDepthBuffer() {
-    // nds max is 0x7FFF
-	dc.ClearDepthBufferWith(MAX_DEPTH)
+func (dc *Context) ClearFogBufferWith(value bool) {
+	for i := range len(dc.FogEnabledBuffer) {
+		dc.FogEnabledBuffer[i] = value
+	}
+}
+
+func (dc *Context) SetClearBuffers(x, y int, color Color, depth float64, fog bool) {
+
+    i := int(x + y * dc.Width)
+
+    dc.FogEnabledBuffer[i] = fog
+
+    // depth is z normalized range 0...1, w is 4096 (W far, W near is 0)
+    dc.DepthBuffer[i]      = depth / 0xFF_FFFF
+    dc.DepthBufferW[i]     = depth / 0x1000
+
+	c := color.NRGBA()
+    i = dc.ColorBuffer.PixOffset(x, y)
+    dc.ColorBuffer.Pix[i+0] = c.R
+    dc.ColorBuffer.Pix[i+1] = c.G
+    dc.ColorBuffer.Pix[i+2] = c.B
+    dc.ColorBuffer.Pix[i+3] = c.A
+
 }
 
 func edge(a, b, c Vector) float64 {
@@ -344,18 +386,24 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 				continue
 			}
 			info.TotalPixels++
+
 			z := b0*s0.Z + b1*s1.Z + b2*s2.Z
-			bz := z
-			if dc.ReadDepth && bz > dc.DepthBuffer[i] { // safe w/out lock?
-				continue
-			}
 			// perspective-correct interpolation of vertex data
 			b := VectorW{b0 * r0, b1 * r1, b2 * r2, 0}
 			b.W = 1 / (b.X + b.Y + b.Z)
-			//v := InterpolateVertexes(v0, v1, v2, b)
+
+            depthBuffer := &dc.DepthBuffer
+            depth := z
+            if dc.DepthW {
+                depthBuffer = &dc.DepthBufferW
+                depth = b.W
+            }
+
+			if dc.ReadDepth && depth > (*depthBuffer)[i] {
+				continue
+			}
+
 			vert.InterpolateVertexes(v0, v1, v2, b)
-			// invoke fragment shader
-			//color := dc.Shader.Fragment(v)
 			dc.Shader.Fragment(&vert)
 
 			if vert.Color == Discard {
@@ -364,11 +412,8 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 
             color := &vert.Color
 
-			if bz <= dc.DepthBuffer[i] || !dc.ReadDepth {
+			if depth <= (*depthBuffer)[i] || !dc.ReadDepth {
 				info.UpdatedPixels++
-
-                // not sure if this should be with depth buffers
-                dc.FogEnabledBuffer[i] = dc.PolygonFogEnabled
 
                 if dc.PolygonOpaque {
 
@@ -385,14 +430,17 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
                         dc.EdgeBuffer[i] = false
                     }
                     dc.PolyIdBuffer[i] = dc.PolygonId
+                    dc.FogEnabledBuffer[i] = dc.PolygonFogEnabled
+                } else {
+                    // When rendering translucent pixels, the old flag in the framebuffer gets ANDed with PolygonAttr.Bit15.
+                    dc.FogEnabledBuffer[i] = dc.FogEnabledBuffer[i] && dc.PolygonFogEnabled
                 }
 
                 // this will need to be fixed
                 if !(dc.AlphaBlending && color.A < 0.999) {
 
                 //if !dc.AlphaBlending || (dc.AlphaBlending && color.A > 0 && dc.NewTranslucentDepth) {
-                    dc.DepthBuffer[i] = z
-                    dc.DepthBufferW[i] = b.W
+                    (*depthBuffer)[i] = depth
                 }
 
                 if !dc.AlphaBlending || color.A >= 1 {

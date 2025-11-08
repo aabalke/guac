@@ -57,38 +57,143 @@ func NewRender(rast *Rasterizer, buffers *Buffers, rp *RearPlane) *Render {
     return r
 }
 
-func (r *Render) UpdateRender() {
-
-    r.Context.ClearColor = gl.Transparent
-    if !r.Rasterizer.GeoEngine.Disp3dCnt.RearPlaneBitmapEnabled {
-        r.Context.ClearColor = r.RearPlane.ClearColor
-    }
-
-    r.Context.ClearColorBuffer()
-    r.Context.ClearDepthBuffer()
-    r.Context.ClearEdgeBuffer()
+func (r *Render) ResetRasterizer() {
 
     r.Context.AlphaBlending = r.Rasterizer.GeoEngine.Disp3dCnt.AlphaBlending
     r.Context.EdgeEnabled   = r.Rasterizer.GeoEngine.Disp3dCnt.EdgeMarking
+    r.Context.ClearColor = gl.Transparent
 
-    polygons, manualSort, depthW := r.Buffers.GetPolygons()
+    if !r.RearPlane.Enabled {
+        r.Context.EdgeClearId = 0xFF
+        r.Context.ClearDepth = uint32(gl.MAX_DEPTH)
+        r.Context.ClearColorBufferWith(gl.Transparent)
+        r.Context.ClearDepthBufferWith(gl.MAX_DEPTH)
+        r.Context.ClearEdgeBufferWith(false, 0xFF)
+        r.Context.ClearFogBufferWith(false)
+        return
+    }
 
-    if !manualSort {
-        sort.Slice(polygons, func(i, j int) bool {
+    r.Context.EdgeClearId = r.RearPlane.Id
 
-            average := func(poly Polygon) float64{
-                sum := float64(0)
-                for i := range len(poly.Vertices) {
-                    sum += poly.Vertices[i].Output.Y
-                }
-                return sum / float64(len(poly.Vertices))
+    if bitmap := r.Rasterizer.GeoEngine.Disp3dCnt.RearPlaneBitmapEnabled; bitmap {
+        r.Context.ClearDepth = r.RearPlane.ClearDepth
+        r.Context.ClearColorBufferWith(gl.Transparent)
+        r.Context.ClearDepthBufferWith(gl.MAX_DEPTH)
+        r.Context.ClearEdgeBufferWith(false, r.RearPlane.Id)
+        r.Context.ClearFogBufferWith(false)
+
+        r.ClearBitmapPlane()
+        return
+    }
+
+
+    r.Context.ClearDepth = r.RearPlane.ClearDepth
+    r.Context.ClearColorBufferWith(r.RearPlane.ClearColor)
+    r.Context.ClearDepthBufferWith(float64(r.RearPlane.ClearDepth))
+    r.Context.ClearEdgeBufferWith(false, r.RearPlane.Id)
+    r.Context.ClearFogBufferWith(r.RearPlane.FogEnabled)
+}
+
+func (r *Render) ClearBitmapPlane() {
+
+    const (
+        SLOT2_BASE = 0x40000
+        SLOT3_BASE = 0x60000
+    )
+
+    dc := r.Context
+    vram := r.Rasterizer.GeoEngine.Vram
+
+    for y := range dc.Height {
+        for x := range dc.Width {
+
+            xIdx := (x + int(r.Rasterizer.RearPlane.OffsetX)) //& 255
+            yIdx := (y + int(r.Rasterizer.RearPlane.OffsetY)) //& 255
+
+            addr := uint32(xIdx+(yIdx * dc.Width)) * 2
+            colorData := uint16(vram.ReadTexture(SLOT2_BASE + addr))
+            colorData |= uint16(vram.ReadTexture(SLOT2_BASE + addr + 1)) << 8
+
+            c := gl.MakeColorFrom15Bit(
+                uint8(colorData) & 0x1F,
+                uint8(colorData >> 5) & 0x1F,
+                uint8(colorData >> 10) & 0x1F,
+            )
+
+            if transparent := colorData & 0x8000 == 0; transparent {
+                c.A = 0
             }
 
-            zi := average(polygons[i])
-            zj := average(polygons[j])
-            return zi > zj
-        })
+            depthData := uint16(vram.ReadTexture(SLOT3_BASE + addr))
+            depthData |= uint16(vram.ReadTexture(SLOT3_BASE + addr + 1)) << 8
+
+            depth := uint32(depthData &^ 0x8000)
+            //depth = (depth * 0x200) + ((depth + 1)/ 0x8000) * 0x1FF //gbatek wrong
+            depth = (depth * 0x200) + 0x1FF // desmume / ndsemu say this correct
+
+            // debug
+            //c.R = float64(depth) / 0xFF_FFFF
+            //c.G = float64(depth) / 0xFF_FFFF
+            //c.B = float64(depth) / 0xFF_FFFF
+            //c.A = 1
+
+            fog := depthData & 0x8000 != 0
+
+            dc.SetClearBuffers(x, y, c, float64(depth), fog)
+        }
     }
+}
+
+func (r *Render) UpdateRender() {
+
+    r.ResetRasterizer()
+
+    polygons, manualSortAlpha, depthW := r.Buffers.GetPolygons()
+
+    r.Context.DepthW = depthW
+
+    sort.SliceStable(polygons, func(i, j int) bool {
+
+        pi := polygons[i]
+        pj := polygons[i]
+
+		isolid := pi.Alpha != 1
+		jsolid := pj.Alpha != 1
+		if isolid && !jsolid {
+			return true
+		} else if jsolid && !isolid {
+			return false
+		}
+		// Polygons have the same translucent / solid status
+
+		// Second: sort by "y" solid polygons (or all polygons if
+		// alphaYSort is true)
+        average := func(poly Polygon) float64{
+            sum := float64(0)
+            for i := range len(poly.Vertices) {
+                sum += poly.Vertices[i].Output.Y
+            }
+            return sum / float64(len(poly.Vertices))
+        }
+
+		if isolid || manualSortAlpha {
+			iy := average(pi)
+			jy := average(pj)
+
+			if iy < jy {
+				return true
+			} else if jy < iy {
+				return false
+			}
+		}
+		// Now polygons have the same y
+		// FIXME: sort left-to-right? For now, ignore.
+
+		// Polygons have the same sorting properties.
+		// Return false so that stable sorting keeps them in the right order
+		return false
+
+    })
 
     for _, p := range polygons {
 
@@ -129,11 +234,14 @@ func (r *Render) ApplyFog(depthW bool) {
 
             var depth float64
 
+            // depth is z normalized range 0...1, w is 4096 (W far, W near is 0)
             if depthW {
                 depth = r.Context.DepthBufferW[i] * 8
             } else {
                 depth = r.Context.DepthBuffer[i] * 0x7FFF
             }
+
+            depth = max(0, min(depth, 0x7FFF))
 
             ca := gl.MakeColorColor(fog.ApplyFog(c, depth))
             r.Context.SetColor(x, y, ca)

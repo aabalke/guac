@@ -311,13 +311,6 @@ func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint
         return pal, alpha, false
     }
 
-    //if nds.ppu.Rasterizer.GeoEngine.Disp3dCnt.RearPlaneBitmapEnabled && alpha != 1 {
-    //    pal, ok := nds.setRearBitmap(engine, bg, x, y)
-    //    return pal, 1, ok
-    //}
-
-    //return pal, alpha, true
-
     if noblend := nds.ppu.EngineA.Blend.Mode == 0; noblend {
 
         // this is only important if the 3d screen is the only one, nothing is behind it, and alpha != 1. 
@@ -334,29 +327,6 @@ func (nds *Nds) set3d(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint
     }
 
     return pal, alpha, alpha > 0
-}
-
-func (nds *Nds) setRearBitmap(engine *ppu.Engine, bg *ppu.Background, x, y uint32) (uint32, bool) {
-
-    xIdx := x //+ nds.ppu.Rasterizer.RearPlane.OffsetX
-    yIdx := y //+ nds.ppu.Rasterizer.RearPlane.OffsetY
-
-    addr := uint32(xIdx+(yIdx * SCREEN_WIDTH)) * 2
-    if x ==0 && y==0 {
-        fmt.Printf("addr %08X Slots % v\n", addr, nds.ppu.Vram.TextureSlots)
-    }
-
-
-    if nds.ppu.Vram.TextureSlots[2] == nil {
-        return 0, true
-    }
-
-    data := uint32(b16((nds.ppu.Vram.TextureSlots[2])[addr:]))
-
-    data &^= 0x8000
-
-    return data, true
-
 }
 
 func (nds *Nds) setBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (uint32, float32, bool) {

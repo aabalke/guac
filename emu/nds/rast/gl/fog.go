@@ -58,7 +58,7 @@ func (f *Fog) ApplyFog(c Color, depth float64) Color {
 	c.R = (f.Color.R*den + c.R*(1-den))
 	c.G = (f.Color.G*den + c.G*(1-den))
 	c.B = (f.Color.B*den + c.B*(1-den))
-	//c.A = (f.Color.A*den + c.A*(1-den))
+	c.A = (f.Color.A*den + c.A*(1-den))
 	return c
 }
 

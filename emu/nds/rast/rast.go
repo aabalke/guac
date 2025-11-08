@@ -202,6 +202,8 @@ func (g *GXSTAT) Read(b uint32) uint8 {
 }
 
 type RearPlane struct {
+    paramActive [8]bool
+    Enabled bool
     ClearColor gl.Color
     FogEnabled bool
     Id uint32
@@ -210,6 +212,16 @@ type RearPlane struct {
 }
 
 func (r *RearPlane) Write(addr uint32, v uint8) {
+
+    // disable rearplane if all zero
+    r.paramActive[addr - 0x350] = v != 0
+    r.Enabled = false
+    for _, v := range r.paramActive {
+        if v {
+            r.Enabled = true
+        }
+    }
+
     switch addr {
     case 0x350:
 

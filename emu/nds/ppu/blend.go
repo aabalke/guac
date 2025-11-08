@@ -131,8 +131,6 @@ func (bp *BlendPalettes) alphaBlend() uint32 {
 
 		if bp.targetA3d {
 			val := a*(bp.alpha) + b*(1 - bp.alpha)
-            //val := b + (a - b) * (bp.alpha * 0.5)
-			//fmt.Printf("A %.2f, B %.2f ALPHA %.2f, VAL %.2f\n", a, b, bp.alpha, val)
 			return min(31, max(0, uint32(val)))
 		}
 
