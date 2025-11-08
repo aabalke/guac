@@ -24,7 +24,7 @@ func Gray(x float64) Color {
 
 func MakeColorColor(c Color) color.Color {
 	const d = 0xff
-	return color.RGBA{
+	return color.NRGBA {
         uint8(c.R * d),
         uint8(c.G * d),
         uint8(c.B * d),
