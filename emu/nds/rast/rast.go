@@ -37,6 +37,7 @@ func NewRasterizer(vram VRAM, irq *cpu.Irq) *Rasterizer {
     r.VRAM = vram
     r.GeoEngine = NewGeoEngine(&r.Buffers, irq, vram)
     r.Render = NewRender(r, &r.Buffers, &r.RearPlane)
+    r.RearPlane.VRAM = vram
 
     for i := range len(r.Edge.Color) {
         r.Edge.Color[i] = color.RGBA{A: 0xFF}
@@ -199,60 +200,6 @@ func (g *GXSTAT) Read(b uint32) uint8 {
     }
 
     return 0
-}
-
-type RearPlane struct {
-    paramActive [8]bool
-    Enabled bool
-    ClearColor gl.Color
-    FogEnabled bool
-    Id uint32
-    ClearDepth uint32
-    OffsetX, OffsetY uint32
-}
-
-func (r *RearPlane) Write(addr uint32, v uint8) {
-
-    // disable rearplane if all zero
-    r.paramActive[addr - 0x350] = v != 0
-    r.Enabled = false
-    for _, v := range r.paramActive {
-        if v {
-            r.Enabled = true
-        }
-    }
-
-    switch addr {
-    case 0x350:
-
-        r.ClearColor = Convert15BitByte(r.ClearColor, v, false)
-
-    case 0x351:
-
-        r.ClearColor = Convert15BitByte(r.ClearColor, v, true)
-        r.FogEnabled = utils.BitEnabled(uint32(v), 7)
-
-    case 0x352:
-
-        r.ClearColor.A = float64(v & 0x1F) / 0x1F
-
-    case 0x353:
-        r.Id = uint32(v & 0b11_1111)
-
-    case 0x354:
-        r.ClearDepth &^= 0xFF
-        r.ClearDepth |= uint32(v)
-
-    case 0x355:
-        r.ClearDepth &^= 0xFF << 8
-        r.ClearDepth |= uint32(v &^ 0x80) << 8
-
-    case 0x356:
-        r.OffsetX = uint32(v)
-
-    case 0x357:
-        r.OffsetY = uint32(v)
-    }
 }
 
 type Disp1Dot struct {

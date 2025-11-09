@@ -285,7 +285,16 @@ func (r *Rasterizer) Write(addr uint32, v uint8) {
 	case 0x60:
 		r.GeoEngine.Disp3dCnt.Write(v, 0)
 	case 0x61:
+
+        prevRear := r.GeoEngine.Disp3dCnt.RearPlaneBitmapEnabled
+
 		r.GeoEngine.Disp3dCnt.Write(v, 1)
+
+        if r.GeoEngine.Disp3dCnt.RearPlaneBitmapEnabled && !prevRear {
+            r.RearPlane.Cache()
+        }
+
+
     case 0x62:
         return
     case 0x63:

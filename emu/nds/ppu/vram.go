@@ -160,6 +160,7 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         case 3:
             vm.TextureCache.Reset()
             vm.TextureSlots[cnt.Ofs] = bank
+
         case 4: cnt.Base = 0x20_0000
         }
 
@@ -187,6 +188,7 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
         case 3:
             vm.TextureCache.Reset()
             vm.TextureSlots[cnt.Ofs] = bank
+
         case 4: cnt.Base = 0x60_0000
         }
 
@@ -338,7 +340,6 @@ func (vm *VRAM) Write(addr uint32, v uint8, arm9 bool) {
             if i < 3 || (i >= 4 && i < 7) {
                 vm.TextureCache.Reset()
             }
-
 
             (*[0x2_0000]uint8)(vb.bank)[addr - vb.cnt.Base] = v
             // return ???

@@ -105,8 +105,9 @@ m := Mem{
 
     m.Spi.Init()
     m.Gamecard.Init(irq7, irq9, dma7, dma9, c, savepath, &m.Save)
-    
-    m.ppu.Vram.Init(&ppu.Rasterizer.GeoEngine.TextureCache)
+
+    texCache := &ppu.Rasterizer.GeoEngine.TextureCache
+    m.ppu.Vram.Init(texCache)
 
     m.InitSaveLoop()
 

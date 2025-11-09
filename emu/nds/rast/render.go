@@ -97,49 +97,23 @@ func (r *Render) ResetRasterizer() {
 func (r *Render) ClearBitmapPlane() {
 
     const (
-        SLOT2_BASE = 0x40000
-        SLOT3_BASE = 0x60000
+        WIDTH = 256
     )
 
     dc := r.Context
-    vram := r.Rasterizer.GeoEngine.Vram
 
     for y := range dc.Height {
         for x := range dc.Width {
 
-            xIdx := (x + int(r.Rasterizer.RearPlane.OffsetX)) //& 255
-            yIdx := (y + int(r.Rasterizer.RearPlane.OffsetY)) //& 255
+            xIdx := (x )//+ int(r.Rasterizer.RearPlane.OffsetX)) & 255
+            yIdx := (y )//+ int(r.Rasterizer.RearPlane.OffsetY)) & 255
 
-            addr := uint32(xIdx+(yIdx * dc.Width)) * 2
-            colorData := uint16(vram.ReadTexture(SLOT2_BASE + addr))
-            colorData |= uint16(vram.ReadTexture(SLOT2_BASE + addr + 1)) << 8
+            i := xIdx + yIdx * WIDTH
 
-            c := gl.MakeColorFrom15Bit(
-                uint8(colorData) & 0x1F,
-                uint8(colorData >> 5) & 0x1F,
-                uint8(colorData >> 10) & 0x1F,
-            )
-
-            if transparent := colorData & 0x8000 == 0; transparent {
-                c.A = 0
-            }
-
-            depthData := uint16(vram.ReadTexture(SLOT3_BASE + addr))
-            depthData |= uint16(vram.ReadTexture(SLOT3_BASE + addr + 1)) << 8
-
-            depth := uint32(depthData &^ 0x8000)
-            //depth = (depth * 0x200) + ((depth + 1)/ 0x8000) * 0x1FF //gbatek wrong
-            depth = (depth * 0x200) + 0x1FF // desmume / ndsemu say this correct
-
-            // debug
-            //c.R = float64(depth) / 0xFF_FFFF
-            //c.G = float64(depth) / 0xFF_FFFF
-            //c.B = float64(depth) / 0xFF_FFFF
-            //c.A = 1
-
-            fog := depthData & 0x8000 != 0
-
-            dc.SetClearBuffers(x, y, c, float64(depth), fog)
+            c := r.RearPlane.Color[i]
+            d := r.RearPlane.Depth[i]
+            f := r.RearPlane.Fog[i]
+            dc.SetClearBuffers(x, y, c, d, f)
         }
     }
 }
