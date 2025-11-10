@@ -2,7 +2,6 @@ package gl
 
 type Vertex struct {
 	Position VectorW
-	//Normal   Vector
 	Texture  Vector
 	Color    Color
 	Output   VectorW
@@ -20,46 +19,36 @@ func (vert *Vertex) CalcTextureVector(w, h int) {
     vert.Texture = Vector{X: u, Y: v, Z: 0}
 }
 
-func (v *Vertex) InterpolateVertexes(v1, v2, v3 Vertex, b VectorW) *Vertex {
-	//v.Position = InterpolateVectorWs(v1.Position, v2.Position, v3.Position, b)
-	//v.Normal = InterpolateVectors(v1.Normal, v2.Normal, v3.Normal, b)
-    //v.Normal.NormalizePtr()
+func (v *Vertex) InterpolateVertexes(v1, v2, v3 *Vertex, b *VectorW) {
 	v.Texture = InterpolateVectors(v1.Texture, v2.Texture, v3.Texture, b)
-	v.Color = InterpolateColors(v1.Color, v2.Color, v3.Color, b)
-	v.Output = InterpolateVectorWs(v1.Output, v2.Output, v3.Output, b)
-	return v
+	v.Color   = InterpolateColors(v1.Color, v2.Color, v3.Color, b)
+	v.Output  = InterpolateVectorWs(v1.Output, v2.Output, v3.Output, b)
 }
 
-func InterpolateFloats(v1, v2, v3 float64, b VectorW) float64 {
-	var n float64
-	n += v1 * b.X
-	n += v2 * b.Y
-	n += v3 * b.Z
-	return n * b.W
+func InterpolateColors(v1, v2, v3 Color, b *VectorW) Color {
+	return Color{
+		R: (v1.R*b.X + v2.R*b.Y + v3.R*b.Z) * b.W,
+		G: (v1.G*b.X + v2.G*b.Y + v3.G*b.Z) * b.W,
+		B: (v1.B*b.X + v2.B*b.Y + v3.B*b.Z) * b.W,
+		A: (v1.A*b.X + v2.A*b.Y + v3.A*b.Z) * b.W,
+	}
 }
 
-func InterpolateColors(v1, v2, v3 Color, b VectorW) Color {
-	n := Color{}
-	n = n.Add(v1.MulScalar(b.X))
-	n = n.Add(v2.MulScalar(b.Y))
-	n = n.Add(v3.MulScalar(b.Z))
-	return n.MulScalar(b.W)
+func InterpolateVectors(v1, v2, v3 Vector, b *VectorW) Vector {
+	return Vector{
+		X: (v1.X*b.X + v2.X*b.Y + v3.X*b.Z) * b.W,
+		Y: (v1.Y*b.X + v2.Y*b.Y + v3.Y*b.Z) * b.W,
+		Z: (v1.Z*b.X + v2.Z*b.Y + v3.Z*b.Z) * b.W,
+	}
 }
 
-func InterpolateVectors(v1, v2, v3 Vector, b VectorW) Vector {
-	n := Vector{}
-	n = n.Add(v1.MulScalar(b.X))
-	n = n.Add(v2.MulScalar(b.Y))
-	n = n.Add(v3.MulScalar(b.Z))
-	return n.MulScalar(b.W)
-}
-
-func InterpolateVectorWs(v1, v2, v3, b VectorW) VectorW {
-	n := VectorW{}
-	n = n.Add(v1.MulScalar(b.X))
-	n = n.Add(v2.MulScalar(b.Y))
-	n = n.Add(v3.MulScalar(b.Z))
-	return n.MulScalar(b.W)
+func InterpolateVectorWs(v1, v2, v3 VectorW, b *VectorW) VectorW {
+	return VectorW{
+		X: (v1.X*b.X + v2.X*b.Y + v3.X*b.Z) * b.W,
+		Y: (v1.Y*b.X + v2.Y*b.Y + v3.Y*b.Z) * b.W,
+		Z: (v1.Z*b.X + v2.Z*b.Y + v3.Z*b.Z) * b.W,
+		W: (v1.W*b.X + v2.W*b.Y + v3.W*b.Z) * b.W,
+	}
 }
 
 func Barycentric(p1, p2, p3, p Vector) VectorW {

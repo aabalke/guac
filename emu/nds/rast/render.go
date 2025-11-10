@@ -2,8 +2,6 @@ package rast
 
 import (
 	"fmt"
-	"image"
-	"image/color"
 	"sort"
 
 	"sync"
@@ -66,10 +64,14 @@ func (r *Render) ResetRasterizer() {
     if !r.RearPlane.Enabled {
         r.Context.EdgeClearId = 0xFF
         r.Context.ClearDepth = uint32(gl.MAX_DEPTH)
-        r.Context.ClearColorBufferWith(gl.Transparent)
-        r.Context.ClearDepthBufferWith(gl.MAX_DEPTH)
-        r.Context.ClearEdgeBufferWith(false, 0xFF)
-        r.Context.ClearFogBufferWith(false)
+
+        r.Context.ClearBuffers(
+            gl.Transparent,
+            gl.MAX_DEPTH,
+            false,
+            0xFF,
+            false,
+        )
         return
     }
 
@@ -77,21 +79,26 @@ func (r *Render) ResetRasterizer() {
 
     if bitmap := r.Rasterizer.GeoEngine.Disp3dCnt.RearPlaneBitmapEnabled; bitmap {
         r.Context.ClearDepth = r.RearPlane.ClearDepth
-        r.Context.ClearColorBufferWith(gl.Transparent)
-        r.Context.ClearDepthBufferWith(gl.MAX_DEPTH)
-        r.Context.ClearEdgeBufferWith(false, r.RearPlane.Id)
-        r.Context.ClearFogBufferWith(false)
+        r.Context.ClearBuffers(
+            gl.Transparent,
+            gl.MAX_DEPTH,
+            false,
+            r.RearPlane.Id,
+            false,
+        )
 
         r.ClearBitmapPlane()
         return
     }
 
-
     r.Context.ClearDepth = r.RearPlane.ClearDepth
-    r.Context.ClearColorBufferWith(r.RearPlane.ClearColor)
-    r.Context.ClearDepthBufferWith(float64(r.RearPlane.ClearDepth))
-    r.Context.ClearEdgeBufferWith(false, r.RearPlane.Id)
-    r.Context.ClearFogBufferWith(r.RearPlane.FogEnabled)
+    r.Context.ClearBuffers(
+        r.RearPlane.ClearColor,
+        float64(r.RearPlane.ClearDepth),
+        false,
+        r.RearPlane.Id,
+        r.RearPlane.FogEnabled,
+    )
 }
 
 func (r *Render) ClearBitmapPlane() {
@@ -101,19 +108,22 @@ func (r *Render) ClearBitmapPlane() {
     )
 
     dc := r.Context
+    rp := &r.Rasterizer.RearPlane
+
+    // could dma copy to buffers if zero offset
 
     for y := range dc.Height {
         for x := range dc.Width {
 
-            xIdx := (x )//+ int(r.Rasterizer.RearPlane.OffsetX)) & 255
-            yIdx := (y )//+ int(r.Rasterizer.RearPlane.OffsetY)) & 255
+            xIdx := (x)//+ int(rp.OffsetX)) & 255
+            yIdx := (y)//+ int(rp.OffsetY)) & 255
 
             i := xIdx + yIdx * WIDTH
 
-            c := r.RearPlane.Color[i]
-            d := r.RearPlane.Depth[i]
-            f := r.RearPlane.Fog[i]
-            dc.SetClearBuffers(x, y, c, d, f)
+            c := rp.Color[i]
+            d := rp.Depth[i]
+            f := rp.Fog[i]
+            dc.ClearBuffersPixel(x, y, c, d, f)
         }
     }
 }
@@ -187,7 +197,7 @@ func (r *Render) UpdateRender() {
         r.ApplyEdge(depthW)
     }
 
-    r.ImageToPixels(r.Context.Image())
+    r.ImageToPixels(*r.Context.Image())
     //r.ImageToPixels(r.Context.BufferImage())
 }
 
@@ -204,7 +214,9 @@ func (r *Render) ApplyFog(depthW bool) {
                 continue
             }
 
-            c := gl.MakeColor(r.Context.Image().At(x, y))
+            //c := gl.MakeColor(r.Context.Image().At(x, y))
+
+            c := (*r.Context.Image())[x + y * WIDTH]
 
             var depth float64
 
@@ -217,8 +229,8 @@ func (r *Render) ApplyFog(depthW bool) {
 
             depth = max(0, min(depth, 0x7FFF))
 
-            ca := gl.MakeColorColor(fog.ApplyFog(c, depth))
-            r.Context.SetColor(x, y, ca)
+            //ca := gl.MakeColorColor(fog.ApplyFog(c, depth))
+            r.Context.SetColor(x, y, fog.ApplyFog(c, depth))
         }
     }
 }
@@ -247,10 +259,11 @@ func (r *Render) RenderPolygon(p *Polygon) {
     }
 
     r.Context.PolygonFogEnabled = p.FogEnabled
+    r.Context.DepthEqual = p.DrawEqualDepthPixels
     r.Context.NewTranslucentDepth = p.SetNewTranslucentDepth
     r.Context.PolygonId = p.Id
     r.Context.PolygonOpaque = p.AlphaV == 0x1F || p.AlphaV == 0
-    r.Context.Wireframe = p.AlphaV == 0
+    //r.Context.Wireframe = p.AlphaV == 0
 
     //switch {
     //case p.RenderFront && p.RenderBack:
@@ -376,27 +389,31 @@ func (r *Render) RenderPolygon(p *Polygon) {
     }
 }
 
-func (r *Render) ImageToPixels(img image.Image) {
+func (r *Render) ImageToPixels(img []gl.Color) {
     r.lock.Lock()
 
-    i := 0
     for y := range HEIGHT {
         for x := range WIDTH {
-            c := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
+            i := x + y * WIDTH
+            c := img[i]
+            r5 := uint32(min(0x1F, max(0, c.R * 0x1F)))
+            g5 := uint32(min(0x1F, max(0, c.G * 0x1F)))
+            b5 := uint32(min(0x1F, max(0, c.B * 0x1F)))
+
+            v := r5 | g5 << 5 | b5 << 10
 
             // limit to 5 bit, maybe 6??? rounds things nicely
             // ex. if value is .99, then will still be slightly not visible on screen - its jarring
-            alpha := (c.A >> 3)
-            alpha = (alpha << 3) | (alpha >> 2)
+            //alpha := (c.A >> 3)
+            //alpha = (alpha << 3) | (alpha >> 2)
 
             if r.Rasterizer.Buffers.BisRendering {
-                r.Pixels.PalettesB[i] = uint32(RGB24ToRGB15(c.R, c.G, c.B))
-                r.Pixels.AlphaB[i] = float32(alpha) / 0xFF
+                r.Pixels.PalettesB[i] = v
+                r.Pixels.AlphaB[i] = float32(c.A)
             } else {
-                r.Pixels.PalettesA[i] = uint32(RGB24ToRGB15(c.R, c.G, c.B))
-                r.Pixels.AlphaA[i] = float32(alpha) / 0xFF
+                r.Pixels.PalettesA[i] = v
+                r.Pixels.AlphaA[i] = float32(c.A)
             }
-            i++
         }
     }
 

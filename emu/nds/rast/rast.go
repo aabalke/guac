@@ -1,7 +1,6 @@
 package rast
 
 import (
-	"image/color"
 
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/rast/gl"
@@ -40,7 +39,7 @@ func NewRasterizer(vram VRAM, irq *cpu.Irq) *Rasterizer {
     r.RearPlane.VRAM = vram
 
     for i := range len(r.Edge.Color) {
-        r.Edge.Color[i] = color.RGBA{A: 0xFF}
+        r.Edge.Color[i] = gl.Color{A: 1}
     }
 
     return r
@@ -209,7 +208,7 @@ type Disp1Dot struct {
 
 type Edge struct {
     V [8]uint16
-    Color [8]color.Color
+    Color [8]gl.Color
 }
 
 func (e *Edge) Write(addr uint32, v uint8) {
@@ -219,9 +218,9 @@ func (e *Edge) Write(addr uint32, v uint8) {
     i := addr / 2
     hi := addr & 1 == 1
 
-    c := gl.MakeColor(e.Color[i])
+    c := e.Color[i]
 
-    e.Color[i] = gl.MakeColorColor(Convert15BitByte(c, v, hi))
+    e.Color[i] = Convert15BitByte(c, v, hi)
 
     //discard := color.RGBA{}
 

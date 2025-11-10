@@ -2,8 +2,6 @@ package gl
 
 import (
 	"fmt"
-	"image"
-	"image/color"
 	"math"
 )
 
@@ -48,27 +46,23 @@ func (info RasterizeInfo) Add(other RasterizeInfo) RasterizeInfo {
 type Context struct {
 	Width        int
 	Height       int
-	ColorBuffer  *image.NRGBA
+    ColorBuffer  []Color
 	DepthBuffer  []float64
-	ClearColor   Color
-	Shader       *Shader
-	ReadDepth    bool
-	WriteDepth   bool
-	WriteColor   bool
-	AlphaBlending   bool
-	Wireframe    bool
-	FrontFace    Face
-	Cull         Cull
-	LineWidth    float64
-	screenMatrix Matrix
-
     DepthBufferW []float64
     FogEnabledBuffer []bool // bools for if polygon has fog enabled
+    EdgeBuffer []bool
+    PolyIdBuffer []uint32
+
+	ClearColor   Color
+	Shader       *Shader
+	AlphaBlending   bool
+	FrontFace    Face
+	Cull         Cull
+	screenMatrix Matrix
+
     PolygonFogEnabled bool
     NewTranslucentDepth bool
 
-    EdgeBuffer []bool
-    PolyIdBuffer []uint32
     PolygonId uint32
     EdgeEnabled bool
     PolygonOpaque bool
@@ -77,37 +71,32 @@ type Context struct {
     ClearDepth uint32
 
     DepthW bool
+    DepthEqual bool // draw pixels with depth less vs less or equal
 }
 
 func NewContext(width, height int) *Context {
 	dc := &Context{}
 	dc.Width = width
 	dc.Height = height
-	dc.ColorBuffer = image.NewNRGBA(image.Rect(0, 0, width, height))
-	dc.DepthBuffer = make([]float64, width*height)
+    dc.ColorBuffer  = make([]Color, width*height)
+	dc.DepthBuffer  = make([]float64, width*height)
 	dc.DepthBufferW = make([]float64, width*height)
 	dc.FogEnabledBuffer = make([]bool, width*height)
 	dc.EdgeBuffer = make([]bool, width*height)
 	dc.PolyIdBuffer = make([]uint32, width*height)
 	dc.ClearColor = Transparent
-	dc.ReadDepth = true
-	dc.WriteDepth = true
-	dc.WriteColor = true
-	dc.Wireframe = false
 	dc.FrontFace = FaceCCW
 	dc.Cull = CullNone
-	dc.LineWidth = 2
 	dc.screenMatrix = Screen(width, height)
-	dc.ClearDepthBufferWith(MAX_DEPTH)
 	return dc
 }
 
-func (dc *Context) Image() image.Image {
-	return dc.ColorBuffer
+func (dc *Context) Image() *[]Color {
+	return &dc.ColorBuffer
 }
 
-func (dc *Context) SetColor(x, y int, color color.Color) {
-    dc.ColorBuffer.Set(x, y, color)
+func (dc *Context) SetColor(x, y int, color Color) {
+    dc.ColorBuffer[x + y * dc.Width] = color
 }
 
 func (dc *Context) EdgeId(x, y int, depthW bool) (uint32, bool) {
@@ -163,134 +152,27 @@ func (dc *Context) EdgeId(x, y int, depthW bool) (uint32, bool) {
     return 0, false
 }
 
-func (dc *Context) BoolImage() image.Image {
+func (dc *Context) ClearBuffers(c Color, depth float64, edge bool, polyId uint32, fog bool) {
 
-	im := image.NewGray16(image.Rect(0, 0, dc.Width, dc.Height))
-	var i int
-	for y := 0; y < dc.Height; y++ {
-		for x := 0; x < dc.Width; x++ {
-			d := dc.EdgeBuffer[i]
-            t := 0
-			if d {
-				t = 1
-			}
-			c := color.Gray16{uint16(t * 0xffff)}
-			im.SetGray16(x, y, c)
-			i++
-		}
-	}
-	return im
+	for i := range dc.ColorBuffer {
+        dc.ColorBuffer[i] = c
+		dc.DepthBuffer[i] = depth
+		dc.DepthBufferW[i] = depth
+		dc.EdgeBuffer[i] = edge
+		dc.PolyIdBuffer[i] = polyId // invalid value (0 is valid)
+		dc.FogEnabledBuffer[i] = fog
+    }
 }
 
+func (dc *Context) ClearBuffersPixel(x, y int, color Color, depth float64, fog bool) {
 
-func (dc *Context) BufferImage() image.Image {
-	im := image.NewGray16(image.Rect(0, 0, dc.Width, dc.Height))
-	var i int
-	for y := 0; y < dc.Height; y++ {
-		for x := 0; x < dc.Width; x++ {
-			d := dc.PolyIdBuffer[i]
+    i := x + y * dc.Width
 
-            t := 0 
-            if d == 8 {
-                t = 1
-            }
-
-			c := color.Gray16{uint16(t * 0xffff)}
-			im.SetGray16(x, y, c)
-			i++
-		}
-	}
-	return im
-}
-
-func (dc *Context) DepthImage() image.Image {
-	lo := MAX_DEPTH
-	hi := -MAX_DEPTH
-	for _, d := range dc.DepthBuffer {
-		if d == MAX_DEPTH {
-			continue
-		}
-		if d < lo {
-			lo = d
-		}
-		if d > hi {
-			hi = d
-		}
-	}
-
-	im := image.NewGray16(image.Rect(0, 0, dc.Width, dc.Height))
-	var i int
-	for y := 0; y < dc.Height; y++ {
-		for x := 0; x < dc.Width; x++ {
-			d := dc.DepthBuffer[i]
-			t := (d - lo) / (hi - lo)
-			if d == MAX_DEPTH {
-				t = 1
-			}
-			c := color.Gray16{uint16(t * 0xffff)}
-			im.SetGray16(x, y, c)
-			i++
-		}
-	}
-	return im
-}
-
-func (dc *Context) ClearColorBufferWith(color Color) {
-	c := color.NRGBA()
-	for y := 0; y < dc.Height; y++ {
-		i := dc.ColorBuffer.PixOffset(0, y)
-		for x := 0; x < dc.Width; x++ {
-			dc.ColorBuffer.Pix[i+0] = c.R
-			dc.ColorBuffer.Pix[i+1] = c.G
-			dc.ColorBuffer.Pix[i+2] = c.B
-			dc.ColorBuffer.Pix[i+3] = c.A
-			i += 4
-		}
-	}
-}
-
-func (dc *Context) ClearColorBuffer() {
-	dc.ClearColorBufferWith(dc.ClearColor)
-}
-
-func (dc *Context) ClearDepthBufferWith(value float64) {
-
-	for i := range dc.DepthBuffer {
-		dc.DepthBuffer[i] = value
-		dc.DepthBufferW[i] = value
-	}
-}
-
-func (dc *Context) ClearEdgeBufferWith(isEdge bool, defaultPolygonId uint32) {
-	for i := range len(dc.EdgeBuffer) {
-		dc.EdgeBuffer[i] = isEdge
-		dc.PolyIdBuffer[i] = defaultPolygonId // invalid value (0 is valid)
-	}
-}
-
-func (dc *Context) ClearFogBufferWith(value bool) {
-	for i := range len(dc.FogEnabledBuffer) {
-		dc.FogEnabledBuffer[i] = value
-	}
-}
-
-func (dc *Context) SetClearBuffers(x, y int, color Color, depth float64, fog bool) {
-
-    i := int(x + y * dc.Width)
-
-    dc.FogEnabledBuffer[i] = fog
-
+    dc.ColorBuffer[i] = color
     // depth is z normalized range 0...1, w is 4096 (W far, W near is 0)
     dc.DepthBuffer[i]      = depth / 0xFF_FFFF
     dc.DepthBufferW[i]     = depth / 0x1000
-
-	c := color.NRGBA()
-    i = dc.ColorBuffer.PixOffset(x, y)
-    dc.ColorBuffer.Pix[i+0] = c.R
-    dc.ColorBuffer.Pix[i+1] = c.G
-    dc.ColorBuffer.Pix[i+2] = c.B
-    dc.ColorBuffer.Pix[i+3] = c.A
-
+    dc.FogEnabledBuffer[i] = fog
 }
 
 func edge(a, b, c Vector) float64 {
@@ -399,11 +281,11 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
                 depth = b.W
             }
 
-			if dc.ReadDepth && depth > (*depthBuffer)[i] {
+            if (dc.DepthEqual && depth >= (*depthBuffer)[i]) || depth > (*depthBuffer)[i] {
 				continue
 			}
 
-			vert.InterpolateVertexes(v0, v1, v2, b)
+			vert.InterpolateVertexes(&v0, &v1, &v2, &b)
 			dc.Shader.Fragment(&vert)
 
 			if vert.Color == Discard {
@@ -412,12 +294,11 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 
             color := &vert.Color
 
-			if depth <= (*depthBuffer)[i] || !dc.ReadDepth {
-				info.UpdatedPixels++
+            info.UpdatedPixels++
 
-                if dc.PolygonOpaque {
+            if dc.PolygonOpaque {
 
-                    if edge := (
+                if edge := (
                     b0 < edgeThickness0 ||
                     b1 < edgeThickness1 ||
                     b2 < edgeThickness2); edge {
@@ -434,42 +315,33 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
                 } else {
                     // When rendering translucent pixels, the old flag in the framebuffer gets ANDed with PolygonAttr.Bit15.
                     dc.FogEnabledBuffer[i] = dc.FogEnabledBuffer[i] && dc.PolygonFogEnabled
-                }
-
-                // this will need to be fixed
-                if !(dc.AlphaBlending && color.A < 0.999) {
-
-                //if !dc.AlphaBlending || (dc.AlphaBlending && color.A > 0 && dc.NewTranslucentDepth) {
-                    (*depthBuffer)[i] = depth
-                }
-
-                if !dc.AlphaBlending || color.A >= 1 {
-                    dc.ColorBuffer.SetNRGBA(x, y, color.NRGBA())
-                    continue
-                }
-
-                sr, sg, sb, sa := color.NRGBA().RGBA()
-                a := (0xffff - sa) * 0x101
-                j := dc.ColorBuffer.PixOffset(x, y)
-                da := &dc.ColorBuffer.Pix[j+3]
-
-                if *da == 0 {
-                    dc.ColorBuffer.SetNRGBA(x, y, color.NRGBA())
-                    continue
-                }
-
-                dr := &dc.ColorBuffer.Pix[j+0]
-                dg := &dc.ColorBuffer.Pix[j+1]
-                db := &dc.ColorBuffer.Pix[j+2]
-
-
-                *dr = uint8((uint32(*dr)*a/0xffff + sr) >> 8)
-                *dg = uint8((uint32(*dg)*a/0xffff + sg) >> 8)
-                *db = uint8((uint32(*db)*a/0xffff + sb) >> 8)
-                *da = max(*da, uint8(float64(sa) / 0xFFFF * 0xFF))
-                //*da = uint8((uint32(*da)*a/0xffff + sa) >> 8)
             }
-		}
+
+            // this will need to be fixed
+            //if !(dc.AlphaBlending && color.A < 0.999) {
+            //if !dc.AlphaBlending || (dc.AlphaBlending && color.A > 0 && dc.NewTranslucentDepth) {
+            //if !dc.AlphaBlending || dc.NewTranslucentDepth || color.A >= 0.999 {
+
+            if (!dc.AlphaBlending ||
+                dc.PolygonOpaque ||
+                dc.NewTranslucentDepth) {
+
+                (*depthBuffer)[i] = depth
+            }
+
+            j := &dc.ColorBuffer[i]
+
+            if !dc.AlphaBlending || color.A >= 1 || j.A < 0 {
+                dc.ColorBuffer[i] = *color
+                continue
+            }
+
+            j.R = min(1, max(0, (color.R * color.A) + (j.R * (1 - color.A))))
+            j.G = min(1, max(0, (color.G * color.A) + (j.G * (1 - color.A))))
+            j.B = min(1, max(0, (color.B * color.A) + (j.B * (1 - color.A))))
+            j.A = min(1, max(0, max(j.A, color.A)))
+        }
+
 		w00 += b12
 		w01 += b20
 		w02 += b01

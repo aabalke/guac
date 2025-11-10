@@ -1,9 +1,5 @@
 package gl
 
-import (
-	"fmt"
-)
-
 type Matrix struct {
 	X00, X01, X02, X03 float64
 	X10, X11, X12, X13 float64
@@ -79,21 +75,6 @@ func (m Matrix) Col(i int) VectorW {
 	}
 }
 
-func (m Matrix) Row(i int) VectorW {
-	switch i {
-	case 0:
-		return VectorW{m.X00, m.X01, m.X02, m.X03}
-	case 1:
-		return VectorW{m.X10, m.X11, m.X12, m.X13}
-	case 2:
-		return VectorW{m.X20, m.X21, m.X22, m.X23}
-	case 3:
-		return VectorW{m.X30, m.X31, m.X32, m.X33}
-	default:
-		panic("invalid row index")
-	}
-}
-
 func (m Matrix) Translate(v Vector) Matrix {
 	return Translate(v).Mul(m)
 }
@@ -130,7 +111,6 @@ func (a Matrix) VecMul3x3(b Vector) Vector {
     return Vector{x, y, z}
 }
 
-
 func (a Matrix) MulPosition(b Vector) Vector {
 	x := a.X00*b.X + a.X01*b.Y + a.X02*b.Z + a.X03
 	y := a.X10*b.X + a.X11*b.Y + a.X12*b.Z + a.X13
@@ -143,33 +123,14 @@ func (a Matrix) MulPositionW(b Vector) VectorW {
 	y := a.X10*b.X + a.X11*b.Y + a.X12*b.Z + a.X13
 	z := a.X20*b.X + a.X21*b.Y + a.X22*b.Z + a.X23
 	w := a.X30*b.X + a.X31*b.Y + a.X32*b.Z + a.X33
-
 	return VectorW{x, y, z, w}
 }
 
 func (a Matrix) MulVectorW(b VectorW) VectorW {
-
     // row based
     x := b.X*a.X00 + b.Y*a.X10 + b.Z*a.X20 + b.W*a.X30
     y := b.X*a.X01 + b.Y*a.X11 + b.Z*a.X21 + b.W*a.X31
     z := b.X*a.X02 + b.Y*a.X12 + b.Z*a.X22 + b.W*a.X32
     w := b.X*a.X03 + b.Y*a.X13 + b.Z*a.X23 + b.W*a.X33
 	return VectorW{x, y, z, w}
-
-}
-
-func (a Matrix) MulDirection(b Vector) Vector {
-	x := a.X00*b.X + a.X01*b.Y + a.X02*b.Z
-	y := a.X10*b.X + a.X11*b.Y + a.X12*b.Z
-	z := a.X20*b.X + a.X21*b.Y + a.X22*b.Z
-	return Vector{x, y, z}.Normalize()
-}
-
-func (a *Matrix) Print() {
-
-    fmt.Printf("Matrix:\n")
-    fmt.Printf("[ %.2f %.2f %.2f %.2f]\n", a.X00, a.X01, a.X02, a.X03)
-    fmt.Printf("[ %.2f %.2f %.2f %.2f]\n", a.X10, a.X11, a.X12, a.X13)
-    fmt.Printf("[ %.2f %.2f %.2f %.2f]\n", a.X20, a.X21, a.X22, a.X23)
-    fmt.Printf("[ %.2f %.2f %.2f %.2f]\n", a.X30, a.X31, a.X32, a.X33)
 }

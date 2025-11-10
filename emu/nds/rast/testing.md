@@ -6,7 +6,7 @@ All matrix cmds, light params, and vertex cmds are implimented.
 
 ## General
 
-Error with overlapping alpha textures - depthbuffer rasterize()
+Alpha errors
 Capture with 3d has problems.
 Line Segments not implimented
 
@@ -19,8 +19,7 @@ AlphaTest
 
 ## Polygon Attributes
 
-Polygon Back Surface
-Polygon Front Surface
+Polygon Back Surface, Front Surface - Culling
 Depth-value for Translucent Pixels
 Far-plane intersecting polygons
 Depth Test, Draw Pixels with Depth
@@ -38,8 +37,9 @@ Texture Coordinates Transformation Mode 3 - Vertex source is untested.
 
 ## Toon, Edge, Fog, Alpha-Blending, Anti-Aliasing
 
-Edge, Alpha-Blending, and AntiAliasing are not implimented
-Toon is implimented.
+Alpha-Blending incorrect
+AntiAliasing not implimented
+Toon, Fog, and Edge implimented
 
 ## Status
 
@@ -51,8 +51,7 @@ All tests are implimented.
 
 ## Rear-Plane
 
-Clear color implimented. Polygon Id is not implimented.
-Rear Bitmap not implimented.
+Should be all good. Cache may not update properly.
 
 ## 3D Final Output
 Scrolling - need to fix region size
