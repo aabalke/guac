@@ -129,7 +129,7 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 
 var wg2 = sync.WaitGroup{}
 
-const singleThread = true
+const singleThread = !true
 
 func (nds *Nds) Update() {
 
@@ -373,6 +373,10 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 			nds.ppu.EngineB.Backgrounds[2].BgAffineReset()
 			nds.ppu.EngineB.Backgrounds[3].BgAffineReset()
 
+            if nds.ppu.Rasterizer.GeoEngine.Disp3dCnt.RearPlaneBitmapEnabled {
+                nds.ppu.Rasterizer.RearPlane.Cache()
+            }
+
 		case SCREEN_HEIGHT:
             if capture.ActiveCapture {
                 capture.EndCapture()
@@ -380,6 +384,7 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 			dispstat.SetVBlank(true)
 			nds.CheckDmas(dma.DMA_MODE_VBL, true)
 			nds.CheckDmas(dma.DMA_MODE_VBL, false)
+
 
             if nds.ppu.Rasterizer.Buffers.SwapSet {
                 nds.ppu.Rasterizer.Buffers.Swap()
