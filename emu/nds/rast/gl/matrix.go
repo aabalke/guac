@@ -1,10 +1,10 @@
 package gl
 
 type Matrix struct {
-	X00, X01, X02, X03 float64
-	X10, X11, X12, X13 float64
-	X20, X21, X22, X23 float64
-	X30, X31, X32, X33 float64
+	X00, X01, X02, X03 float32
+	X10, X11, X12, X13 float32
+	X20, X21, X22, X23 float32
+	X30, X31, X32, X33 float32
 }
 
 func Identity() Matrix {
@@ -37,8 +37,8 @@ func Scale(v Vector) Matrix {
 }
 
 func Screen(w, h int) Matrix {
-	w2 := float64(w) / 2
-	h2 := float64(h) / 2
+	w2 := float32(w) / 2
+	h2 := float32(h) / 2
 	return Matrix{
 		w2, 0, 0, w2,
 		0, -h2, 0, h2,

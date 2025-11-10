@@ -5,7 +5,7 @@ type Vertex struct {
 	Texture  Vector
 	Color    Color
 	Output   VectorW
-    S, T float64
+    S, T float32
     NdsTexture *Texture
 }
 
@@ -14,8 +14,8 @@ func (a Vertex) Outside() bool {
 }
 
 func (vert *Vertex) CalcTextureVector(w, h int) {
-    u := vert.S / float64(w)
-    v := vert.T / float64(h)
+    u := vert.S / float32(w)
+    v := vert.T / float32(h)
     vert.Texture = Vector{X: u, Y: v, Z: 0}
 }
 

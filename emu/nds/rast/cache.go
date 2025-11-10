@@ -160,9 +160,9 @@ func (t *TextureCache) getTranslucent(vram VRAM, tex *Texture, colorBits uint8) 
 
             switch colorBits {
             case 3:
-                out[i].A = float64(palIdx >> 3) / 31
+                out[i].A = float32(palIdx >> 3) / 31
             case 5:
-                out[i].A = float64(palIdx >> 5) / 7
+                out[i].A = float32(palIdx >> 5) / 7
             }
 		}
 	}

@@ -19,13 +19,13 @@ type Texture struct {
     IsHighlight bool
 }
 
-func (t *Texture) Sample(u, v float64) Color {
+func (t *Texture) Sample(u, v float32) Color {
     x, y := t.getTextureCoords(u, v)
     return t.getColor(x, y)
 }
 
-func (t *Texture) BilinearSample(u, v float64) Color {
-    coords := getBilinearCoords(float64(t.Width), float64(t.Height), u, v)
+func (t *Texture) BilinearSample(u, v float32) Color {
+    coords := getBilinearCoords(float32(t.Width), float32(t.Height), u, v)
 	c00 := t.getColor(coords.X0, coords.Y0)
 	c01 := t.getColor(coords.X0, coords.Y1)
 	c10 := t.getColor(coords.X1, coords.Y0)
@@ -49,16 +49,16 @@ func (t *Texture) getColor(x, y uint32) Color {
     return (*t.CachedTexture)[idx]
 }
 
-func (t *Texture) getTextureCoords(u, v float64) (uint32, uint32) {
+func (t *Texture) getTextureCoords(u, v float32) (uint32, uint32) {
 
-	x := int(u * float64(t.Width))
-	y := int(v * float64(t.Height))
+	x := int(u * float32(t.Width))
+	y := int(v * float32(t.Height))
 
     if t.RepeatT {
 
-        flip := t.FlipT && uint(math.Floor(v)) & 1 == 1
-        v -= math.Floor(v)
-        tmp := int(v * float64(t.Height))
+        flip := t.FlipT && uint(math.Floor(float64(v))) & 1 == 1
+        v -= float32(math.Floor(float64(v)))
+        tmp := int(v * float32(t.Height))
 
         // does tmp need - 1 not just flip??
 
@@ -74,9 +74,9 @@ func (t *Texture) getTextureCoords(u, v float64) (uint32, uint32) {
     }
 
     if t.RepeatS {
-        flip := t.FlipS && uint(math.Floor(u)) & 1 == 1 
-        u -= math.Floor(u)
-        tmp := int(u * float64(t.Width))
+        flip := t.FlipS && uint(math.Floor(float64(u))) & 1 == 1 
+        u -= float32(math.Floor(float64(u)))
+        tmp := int(u * float32(t.Width))
 
         // does tmp need - 1 not just flip??
 
@@ -95,23 +95,23 @@ func (t *Texture) getTextureCoords(u, v float64) (uint32, uint32) {
 }
 
 type BilinearCoords struct {
-    X,  Y float64
+    X,  Y float32
     X0, Y0 uint32
     X1, Y1 uint32
 }
 
-func getBilinearCoords(w, h, u, v float64) BilinearCoords {
+func getBilinearCoords(w, h, u, v float32) BilinearCoords {
     panic("Bilinear needs handling similar to nn")
-	u -= math.Floor(u)
-	v -= math.Floor(v)
-	x := u * float64(w-1)
-	y := v * float64(h-1)
+	u -= float32(math.Floor(float64(u)))
+	v -= float32(math.Floor(float64(v)))
+	x := u * float32(w-1)
+	y := v * float32(h-1)
 	x0 := int(x)
 	y0 := int(y)
 	x1 := x0 + 1
 	y1 := y0 + 1
-	x -= float64(x0)
-	y -= float64(y0)
+	x -= float32(x0)
+	y -= float32(y0)
 
     return BilinearCoords{
         X: x,

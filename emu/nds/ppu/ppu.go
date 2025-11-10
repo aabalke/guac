@@ -772,13 +772,13 @@ func (obj *Object) SetSize(shape, size uint32) {
 }
 
 func (bg *Background) BgAffineReset() {
-	bg.OutX = utils.Convert28ToFloat(bg.aXOffset, 8)
-	bg.OutY = utils.Convert28ToFloat(bg.aYOffset, 8)
+	bg.OutX = float64(utils.Convert28ToFloat(bg.aXOffset, 8))
+	bg.OutY = float64(utils.Convert28ToFloat(bg.aYOffset, 8))
 }
 
 func (bg *Background) BgAffineUpdate() {
-	bg.OutX += utils.Convert16ToFloat(uint16(bg.Pb), 8)
-	bg.OutY += utils.Convert16ToFloat(uint16(bg.Pd), 8)
+	bg.OutX += float64(utils.Convert16ToFloat(uint16(bg.Pb), 8))
+	bg.OutY += float64(utils.Convert16ToFloat(uint16(bg.Pd), 8))
 }
 
 func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {

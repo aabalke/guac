@@ -341,7 +341,7 @@ func (r *Rasterizer) WriteFog(addr uint32, v uint8) {
     case 0x359:
         f.Color = Convert15BitByte(f.Color, v, true)
     case 0x35A:
-        f.Color.A = float64(v & 0x1F) / 0x1F
+        f.Color.A = float32(v & 0x1F) / 0x1F
 
     case 0x35C:
         f.Offset &^= 0xFF

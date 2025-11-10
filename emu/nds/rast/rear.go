@@ -43,7 +43,7 @@ func (r *RearPlane) Write(addr uint32, v uint8) {
 
 	case 0x352:
 
-		r.ClearColor.A = float64(v&0x1F) / 0x1F
+		r.ClearColor.A = float32(v&0x1F) / 0x1F
 
 	case 0x353:
 		r.Id = uint32(v & 0b11_1111)

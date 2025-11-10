@@ -17,8 +17,8 @@ const (
 )
 
 type Texture struct {
-	Sv, Tv             float64
-	S, T               float64
+	Sv, Tv             float32
+	S, T               float32
 	VramOffset         uint32
 	RepeatS, RepeatT   bool
 	FlipS, FlipT       bool

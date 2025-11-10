@@ -10,7 +10,7 @@ var (
 )
 
 const (
-    MAX_DEPTH = float64(0x7FFF)
+    MAX_DEPTH = float32(0x7FFF)
     EDGE_THRES = 1
 )
 
@@ -47,8 +47,8 @@ type Context struct {
 	Width        int
 	Height       int
     ColorBuffer  []Color
-	DepthBuffer  []float64
-    DepthBufferW []float64
+	DepthBuffer  []float32
+    DepthBufferW []float32
     FogEnabledBuffer []bool // bools for if polygon has fog enabled
     EdgeBuffer []bool
     PolyIdBuffer []uint32
@@ -79,8 +79,8 @@ func NewContext(width, height int) *Context {
 	dc.Width = width
 	dc.Height = height
     dc.ColorBuffer  = make([]Color, width*height)
-	dc.DepthBuffer  = make([]float64, width*height)
-	dc.DepthBufferW = make([]float64, width*height)
+	dc.DepthBuffer  = make([]float32, width*height)
+	dc.DepthBufferW = make([]float32, width*height)
 	dc.FogEnabledBuffer = make([]bool, width*height)
 	dc.EdgeBuffer = make([]bool, width*height)
 	dc.PolyIdBuffer = make([]uint32, width*height)
@@ -133,7 +133,7 @@ func (dc *Context) EdgeId(x, y int, depthW bool) (uint32, bool) {
                 continue
             }
 
-            if depth < float64(dc.ClearDepth) / MAX_DEPTH {
+            if depth < float32(dc.ClearDepth) / MAX_DEPTH {
                 return id, true
             }
 
@@ -152,7 +152,7 @@ func (dc *Context) EdgeId(x, y int, depthW bool) (uint32, bool) {
     return 0, false
 }
 
-func (dc *Context) ClearBuffers(c Color, depth float64, edge bool, polyId uint32, fog bool) {
+func (dc *Context) ClearBuffers(c Color, depth float32, edge bool, polyId uint32, fog bool) {
 
 	for i := range dc.ColorBuffer {
         dc.ColorBuffer[i] = c
@@ -164,7 +164,7 @@ func (dc *Context) ClearBuffers(c Color, depth float64, edge bool, polyId uint32
     }
 }
 
-func (dc *Context) ClearBuffersPixel(x, y int, color Color, depth float64, fog bool) {
+func (dc *Context) ClearBuffersPixel(x, y int, color Color, depth float32, fog bool) {
 
     i := x + y * dc.Width
 
@@ -175,7 +175,7 @@ func (dc *Context) ClearBuffersPixel(x, y int, color Color, depth float64, fog b
     dc.FogEnabledBuffer[i] = fog
 }
 
-func edge(a, b, c Vector) float64 {
+func edge(a, b, c Vector) float32 {
 	return (b.X-c.X)*(a.Y-c.Y) - (b.Y-c.Y)*(a.X-c.X)
 }
 
@@ -194,7 +194,7 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 	y1 := int(maxValue.Y)
 
 	// forward differencing variables
-	p := Vector{float64(x0) + 0.5, float64(y0) + 0.5, 0}
+	p := Vector{float32(x0) + 0.5, float32(y0) + 0.5, 0}
 	w00 := edge(s1, s2, p)
 	w01 := edge(s2, s0, p)
 	w02 := edge(s0, s1, p)
@@ -216,7 +216,7 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 
 	// iterate over all pixels in bounding box
 	for y := y0; y <= y1; y++ {
-		var d float64
+		var d float32
 		d0 := -w00 * ra12
 		d1 := -w01 * ra20
 		d2 := -w02 * ra01
@@ -229,7 +229,7 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 		if w02 < 0 && d2 > d {
 			d = d2
 		}
-		d = float64(int(d))
+		d = float32(int(d))
         // occurs in pathological cases
         d = max(0, d)
 
@@ -238,9 +238,9 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 		w2 := w02 + a01*d
 		wasInside := false
 
-        grad0 := math.Hypot(a12, b12) * ra // for b0
-        grad1 := math.Hypot(a20, b20) * ra // for b1
-        grad2 := math.Hypot(a01, b01) * ra // for b2
+        grad0 := float32(math.Hypot(float64(a12), float64(b12))) * ra // for b0
+        grad1 := float32(math.Hypot(float64(a20), float64(b20))) * ra // for b1
+        grad2 := float32(math.Hypot(float64(a01), float64(b01))) * ra // for b2
         edgeThickness0 := EDGE_THRES * grad0
         edgeThickness1 := EDGE_THRES * grad1
         edgeThickness2 := EDGE_THRES * grad2

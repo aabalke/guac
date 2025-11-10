@@ -24,7 +24,7 @@ type Polygon struct {
 	RenderBehind1Dot       bool
 	DrawEqualDepthPixels   bool
 	FogEnabled             bool
-	Alpha                  float64
+	Alpha                  float32
 	AlphaV                 uint32
 	Id                     uint32
 
@@ -48,7 +48,7 @@ func (p *Polygon) WriteAttrs(v uint32) {
     p.RenderBehind1Dot = utils.BitEnabled(v, 13)
     p.DrawEqualDepthPixels = utils.BitEnabled(v, 14)
     p.FogEnabled = utils.BitEnabled(v, 15)
-    p.Alpha = (float64(utils.GetVarData(v, 16, 20)) - 1) / 30 // 0 is wireframe
+    p.Alpha = (float32(utils.GetVarData(v, 16, 20)) - 1) / 30 // 0 is wireframe
     p.AlphaV = utils.GetVarData(v, 16, 20)
     p.Id = utils.GetVarData(v, 24, 29)
 }
@@ -62,48 +62,48 @@ const (
     V_DF = 5
 )
 
-var coordFuncs = [...]func(data []uint32, prev *gl.Vertex) (float64, float64, float64) {
+var coordFuncs = [...]func(data []uint32, prev *gl.Vertex) (float32, float32, float32) {
     //V_16:
-    func(data []uint32, _ *gl.Vertex) (float64, float64, float64) {
+    func(data []uint32, _ *gl.Vertex) (float32, float32, float32) {
         x := utils.Convert16ToFloat(uint16(data[1]    ), 12)
         y := utils.Convert16ToFloat(uint16(data[1]>>16), 12)
         z := utils.Convert16ToFloat(uint16(data[2]    ), 12)
         return x, y, z
     },
     //V_10:
-    func(data []uint32, _ *gl.Vertex) (float64, float64, float64) {
+    func(data []uint32, _ *gl.Vertex) (float32, float32, float32) {
         x := utils.Convert10ToFloat(uint16(data[1]), 6)
         y := utils.Convert10ToFloat(uint16(data[1] >> 10), 6)
         z := utils.Convert10ToFloat(uint16(data[1] >> 20), 6)
         return x, y, z
     },
     //V_XY:
-    func(data []uint32, prev *gl.Vertex) (float64, float64, float64) {
+    func(data []uint32, prev *gl.Vertex) (float32, float32, float32) {
         x := utils.Convert16ToFloat(uint16(data[1]), 12)
         y := utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
         z := prev.Position.Z
         return x, y, z
     },
     //V_XZ:
-    func(data []uint32, prev *gl.Vertex) (float64, float64, float64) {
+    func(data []uint32, prev *gl.Vertex) (float32, float32, float32) {
         x := utils.Convert16ToFloat(uint16(data[1]), 12)
         y := prev.Position.Y
         z := utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
         return x, y, z
     },
     //V_YZ:
-    func(data []uint32, prev *gl.Vertex) (float64, float64, float64) {
+    func(data []uint32, prev *gl.Vertex) (float32, float32, float32) {
         x := prev.Position.X
         y := utils.Convert16ToFloat(uint16(data[1]), 12)
         z := utils.Convert16ToFloat(uint16(data[1] >> 16), 12)
         return x, y, z
     },
     //V_DF:
-    func(data []uint32, prev *gl.Vertex) (float64, float64, float64) {
-        convert := func(v uint32) float64 {
+    func(data []uint32, prev *gl.Vertex) (float32, float32, float32) {
+        convert := func(v uint32) float32 {
             v &= 0x3FF
             sext := int16(v << 6) >> 6
-            f := float64(sext) / (1 << 9)
+            f := float32(sext) / (1 << 9)
             return f / 8.0
         }
 
@@ -136,7 +136,7 @@ func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Ver
     return &v
 }
 
-func (p *Polygon) GetVertex(g *GeoEngine, x, y, z float64) gl.Vertex {
+func (p *Polygon) GetVertex(g *GeoEngine, x, y, z float32) gl.Vertex {
     pos := gl.VectorW{X: x, Y: y, Z: z, W: 1.0}
     output := g.ClipMatrix.MulVectorW(pos)
     clr := g.Color
@@ -182,7 +182,7 @@ func (p *Polygon) GetTexture(g *GeoEngine) *gl.Texture {
     }
 }
 
-func (p *Polygon) valid1DotDepth(depth float64) bool {
+func (p *Polygon) valid1DotDepth(depth float32) bool {
 
     if p.RenderBehind1Dot {
         return true

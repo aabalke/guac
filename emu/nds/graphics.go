@@ -405,8 +405,8 @@ func (nds *Nds) setAffine16BackgroundPixel(engine *ppu.Engine, bg *ppu.Backgroun
 	//	panic(fmt.Sprintf("AFFINE WITHOUT PAL 256"))
 	//}
 
-	pa := utils.Convert16ToFloat(uint16(bg.Pa), 8)
-	pc := utils.Convert16ToFloat(uint16(bg.Pc), 8)
+	pa := float64(utils.Convert16ToFloat(uint16(bg.Pa), 8))
+	pc := float64(utils.Convert16ToFloat(uint16(bg.Pc), 8))
 	xIdx := int(pa*float64(x) + bg.OutX)
 	yIdx := int(pc*float64(x) + bg.OutY)
 
@@ -476,8 +476,8 @@ func (nds *Nds) setAffineBackgroundPixel(engine *ppu.Engine, bg *ppu.Background,
         vramOffset = uint32(0x20_0000)
     }
 
-	pa := utils.Convert16ToFloat(uint16(bg.Pa), 8)
-	pc := utils.Convert16ToFloat(uint16(bg.Pc), 8)
+	pa := float64(utils.Convert16ToFloat(uint16(bg.Pa), 8))
+	pc := float64(utils.Convert16ToFloat(uint16(bg.Pc), 8))
 	xIdx := int(pa*float64(x) + bg.OutX)
 	yIdx := int(pc*float64(x) + bg.OutY)
 
@@ -530,8 +530,8 @@ func (nds *Nds) setBmpBackgroundPixel(engine *ppu.Engine, bg *ppu.Background, x 
 	//	panic(fmt.Sprintf("AFFINE WITHOUT PAL 256"))
 	//}
 
-	pa := utils.Convert16ToFloat(uint16(bg.Pa), 8)
-	pc := utils.Convert16ToFloat(uint16(bg.Pc), 8)
+	pa := float64(utils.Convert16ToFloat(uint16(bg.Pa), 8))
+	pc := float64(utils.Convert16ToFloat(uint16(bg.Pc), 8))
 	xIdx := int(pa*float64(x) + bg.OutX)
 	yIdx := int(pc*float64(x) + bg.OutY)
 
@@ -592,8 +592,8 @@ func getPositionsBg(screenData, xIdx, yIdx uint32) (uint32, uint32) {
 
 func (nds *Nds) setDirectBitmap(engine *ppu.Engine, bg *ppu.Background, x uint32) (uint32, float32, bool) {
 
-	pa := utils.Convert16ToFloat(uint16(bg.Pa), 8)
-	pc := utils.Convert16ToFloat(uint16(bg.Pc), 8)
+	pa := float64(utils.Convert16ToFloat(uint16(bg.Pa), 8))
+	pc := float64(utils.Convert16ToFloat(uint16(bg.Pc), 8))
 	xIdx := int(pa*float64(x) + bg.OutX)
 	yIdx := int(pc*float64(x) + bg.OutY)
 

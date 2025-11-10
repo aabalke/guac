@@ -94,7 +94,7 @@ func (r *Render) ResetRasterizer() {
     r.Context.ClearDepth = r.RearPlane.ClearDepth
     r.Context.ClearBuffers(
         r.RearPlane.ClearColor,
-        float64(r.RearPlane.ClearDepth),
+        float32(r.RearPlane.ClearDepth),
         false,
         r.RearPlane.Id,
         r.RearPlane.FogEnabled,
@@ -121,7 +121,7 @@ func (r *Render) ClearBitmapPlane() {
             i := xIdx + yIdx * WIDTH
 
             c := rp.Color[i]
-            d := rp.Depth[i]
+            d := float32(rp.Depth[i])
             f := rp.Fog[i]
             dc.ClearBuffersPixel(x, y, c, d, f)
         }
@@ -152,12 +152,12 @@ func (r *Render) UpdateRender() {
 
 		// Second: sort by "y" solid polygons (or all polygons if
 		// alphaYSort is true)
-        average := func(poly Polygon) float64{
-            sum := float64(0)
+        average := func(poly Polygon) float32{
+            sum := float32(0)
             for i := range len(poly.Vertices) {
                 sum += poly.Vertices[i].Output.Y
             }
-            return sum / float64(len(poly.Vertices))
+            return sum / float32(len(poly.Vertices))
         }
 
 		if isolid || manualSortAlpha {
@@ -218,7 +218,7 @@ func (r *Render) ApplyFog(depthW bool) {
 
             c := (*r.Context.Image())[x + y * WIDTH]
 
-            var depth float64
+            var depth float32
 
             // depth is z normalized range 0...1, w is 4096 (W far, W near is 0)
             if depthW {

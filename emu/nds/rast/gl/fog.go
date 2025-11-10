@@ -17,37 +17,37 @@ type Fog struct {
 	Step     uint16
 	Color    Color
 	Density  [32]uint8
-	Boundary [32]float64
+	Boundary [32]float32
 }
 
-func (f *Fog) ApplyFog(c Color, depth float64) Color {
+func (f *Fog) ApplyFog(c Color, depth float32) Color {
 
 	region := 0
 	for region < 32 && depth > f.Boundary[region] {
 		region++
 	}
 
-	var d0, d1, b0, b1 float64
+	var d0, d1, b0, b1 float32
 	if region-1 < 0 {
-		d0 = float64(f.Density[0])
+		d0 = float32(f.Density[0])
 		b0 = 0
 	} else {
-		d0 = float64(f.Density[region-1])
+		d0 = float32(f.Density[region-1])
 		b0 = f.Boundary[region-1]
 	}
 
 	if region < 31 {
-		d1 = float64(f.Density[region])
+		d1 = float32(f.Density[region])
 		b1 = f.Boundary[region]
 	} else {
-		d1 = float64(f.Density[31])
+		d1 = float32(f.Density[31])
 		b1 = f.Boundary[31]
 	}
 
 	diff := (depth - b0) / (b1 - b0)
 
-    var den float64
-    if atThreshold := math.IsNaN(diff); atThreshold {
+    var den float32
+    if atThreshold := math.IsNaN(float64(diff)); atThreshold {
         den = d0 / 0x7F
     } else {
         den = (d0*(1-diff) + d1*diff) / 0x7F
@@ -68,6 +68,6 @@ func (f *Fog) ApplyFog(c Color, depth float64) Color {
 
 func (f *Fog) UpdateBoundaries() {
 	for i := range len(f.Boundary) {
-		f.Boundary[i] = float64(f.Offset) + float64(f.Step)*float64(i+1)
+		f.Boundary[i] = float32(f.Offset) + float32(f.Step)*float32(i+1)
 	}
 }

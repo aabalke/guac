@@ -17,4 +17,4 @@ type Light struct {
     Color Color
 }
 
-type ShininessTbl [32 * 8]float64
+type ShininessTbl [32 * 8]float32

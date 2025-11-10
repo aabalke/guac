@@ -14,7 +14,7 @@ var blendFunc = [...]func(texture *Texture, vColor, tColor Color) Color {
 
     func(texture *Texture, vColor, tColor Color) Color {
 
-		con := func(v, t float64) float64 {
+		con := func(v, t float32) float32 {
 			v *= FACTOR
 			t *= FACTOR
 			return max(0, min(1, ((t)*(v)-1)/(FACTOR*FACTOR)))
@@ -28,7 +28,7 @@ var blendFunc = [...]func(texture *Texture, vColor, tColor Color) Color {
     },
     func(texture *Texture, vColor, tColor Color) Color {
 
-		con := func(v, t, at float64) float64 {
+		con := func(v, t, at float32) float32 {
 			v *= FACTOR
 			t *= FACTOR
 			at *= FACTOR
@@ -44,7 +44,7 @@ var blendFunc = [...]func(texture *Texture, vColor, tColor Color) Color {
 
 		if texture.IsHighlight {
 
-			con := func(s, t float64) float64 {
+			con := func(s, t float32) float32 {
 				// assume s needs to be added as 0...1
 				sb := s
 				s *= FACTOR
@@ -63,7 +63,7 @@ var blendFunc = [...]func(texture *Texture, vColor, tColor Color) Color {
 
         // toon
 
-        con := func(s, t float64) float64 {
+        con := func(s, t float32) float32 {
             s *= FACTOR
             t *= FACTOR
             return max(0, min(1, ((t)*(s)-1)/(FACTOR*FACTOR)))

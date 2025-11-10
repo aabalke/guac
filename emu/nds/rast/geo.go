@@ -382,7 +382,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
             }
 
             diffuseLevel := max(0, -(v.Vector.Dot(*n)))
-            shininessLevel := math.Pow(max(0, -(v.HalfVector.Dot(*n))), 2)
+            shininessLevel := float32(math.Pow(float64(max(0, -(v.HalfVector.Dot(*n)))), 2))
 
             if ld.UseSpecularTbl {
                 shininessLevel = ld.ShininessTbl[uint32(shininessLevel)]
@@ -485,10 +485,10 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
         var i uint32
         for _, v := range data[1:] {
-            sTbl[i+0] = float64((v)       & 0xFF) / 256
-            sTbl[i+1] = float64((v >> 8)  & 0xFF) / 256
-            sTbl[i+2] = float64((v >> 16) & 0xFF) / 256
-            sTbl[i+3] = float64((v >> 24) & 0xFF) / 256
+            sTbl[i+0] = float32((v)       & 0xFF) / 256
+            sTbl[i+1] = float32((v >> 8)  & 0xFF) / 256
+            sTbl[i+2] = float32((v >> 16) & 0xFF) / 256
+            sTbl[i+3] = float32((v >> 24) & 0xFF) / 256
             i += 4
         }
 
