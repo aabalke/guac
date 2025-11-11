@@ -48,7 +48,7 @@ func (p *Polygon) WriteAttrs(v uint32) {
     p.RenderBehind1Dot = utils.BitEnabled(v, 13)
     p.DrawEqualDepthPixels = utils.BitEnabled(v, 14)
     p.FogEnabled = utils.BitEnabled(v, 15)
-    p.Alpha = (float32(utils.GetVarData(v, 16, 20)) - 1) / 30 // 0 is wireframe
+    p.Alpha = (float32(utils.GetVarData(v, 16, 20))) / 31 // 0 is wireframe
     p.AlphaV = utils.GetVarData(v, 16, 20)
     p.Id = utils.GetVarData(v, 24, 29)
 }
@@ -196,4 +196,15 @@ func (p *Polygon) valid1DotDepth(depth float32) bool {
 
     return false
 
+}
+
+func (p *Polygon) isAlpha() bool {
+	// Check if the texture contains an alpha value (and we're using it)
+
+    if (p.Texture.Format == TEX_FMT_A3I5 || p.Texture.Format == TEX_FMT_A5I3) &&
+        (p.Mode == 0 || p.Mode == 2) {
+            return true
+    }
+
+    return p.Alpha < 1
 }

@@ -17,6 +17,7 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 
 	if swi := (opcode>>24)&0xF == 0xF; swi {
 		//cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
+
 		cpu.exception(VEC_SWI, MODE_SWI)
 		return 4, true
 		//cycles, incPc := cpu.Gba.SysCall((opcode >> 16) & 0xFF)

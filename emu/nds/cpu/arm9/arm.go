@@ -680,7 +680,6 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 	skipLoadWriteBack := load && (rn == rd)
     writeback := !utils.BitEnabled(opcode, 24) || utils.BitEnabled(opcode, 21)
 	if writeback && !skipLoadWriteBack {
-
 		r[rn] = post
 	}
 

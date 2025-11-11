@@ -249,3 +249,5 @@ Mario Party
 Mario and Luigi Partners in Time
 Sonic Colors
 Super Mario 64
+
+Fog needs work - see lesson 10 (seems good for mario kart)

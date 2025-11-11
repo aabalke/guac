@@ -62,28 +62,28 @@ var ShiftFuncs = [4]func(val, is uint32, isCarry, imm, currCarry bool) (shift ui
     },
 }
 
-func Ror(val, is uint32, isCarry, immediate bool, currCarry bool) (shift uint32, setCarry, carry bool) {
+func Ror(val, is uint32, isCarry, imm, currCarry bool) (shift uint32, setCarry, carry bool) {
 
-	getValue := func(v, shift uint32) uint32 {
-		shift &= 31
-		tmp0 := v >> shift
-		tmp1 := v << (32 - shift)
-		return tmp0 | tmp1
-	}
-
-	if is == 0 && immediate {
+	if is == 0 && imm {
 		c := uint32(0)
 		if currCarry {
 			c = 1
 		}
 
-		return getValue((val&^1)|c, 1), true, val&1 == 1
+		return RorValueCalc((val&^1)|c, 1), true, val&1 == 1
 	}
 
 	carry = (val>>((is-1)&31))&0b1 > 0
 	setCarry = is > 0 && isCarry
 
-	return getValue(val, is), setCarry, carry
+	return RorValueCalc(val, is), setCarry, carry
+}
+
+func RorValueCalc(v, shift uint32) uint32 {
+    shift &= 31
+    tmp0 := v >> shift
+    tmp1 := v << (32 - shift)
+    return tmp0 | tmp1
 }
 
 func RorSimple(v, shift uint32) uint32 {

@@ -10,37 +10,84 @@ func NewShader() *Shader {
 
 const FACTOR = 32.0
 
-var blendFunc = [...]func(texture *Texture, vColor, tColor Color) Color {
+func Modulate(vColor, tColor Color) Color {
+	vColor.R *= tColor.R
+	vColor.G *= tColor.G
+	vColor.B *= tColor.B
+	vColor.A *= tColor.A
 
-    func(texture *Texture, vColor, tColor Color) Color {
+	if vColor.R > 1 {
+		vColor.R = 1
+	}
+	if vColor.G > 1 {
+		vColor.G = 1
+	}
+	if vColor.B > 1 {
+		vColor.B = 1
+	}
+	if vColor.A > 1 {
+		vColor.A = 1
+	}
+	return vColor
+}
 
-		con := func(v, t float32) float32 {
-			v *= FACTOR
-			t *= FACTOR
-			return max(0, min(1, ((t)*(v)-1)/(FACTOR*FACTOR)))
-		}
+func Decal(vColor, tColor Color) Color {
+	at := tColor.A
 
-		vColor.R = con(vColor.R, tColor.R)
-		vColor.G = con(vColor.G, tColor.G)
-		vColor.B = con(vColor.B, tColor.B)
-		vColor.A = con(vColor.A, tColor.A)
-        return vColor
-    },
-    func(texture *Texture, vColor, tColor Color) Color {
+	if at >= 1 {
+		return tColor
+	}
 
-		con := func(v, t, at float32) float32 {
-			v *= FACTOR
-			t *= FACTOR
-			at *= FACTOR
-            return max(0, min(1, (t*at + v*(FACTOR-at)) / (FACTOR * FACTOR)))
-		}
+	vColor.R = tColor.R*at + vColor.R*(1-at)
+	vColor.G = tColor.G*at + vColor.G*(1-at)
+	vColor.B = tColor.B*at + vColor.B*(1-at)
 
-		vColor.R = con(vColor.R, tColor.R, tColor.A)
-		vColor.G = con(vColor.G, tColor.G, tColor.A)
-		vColor.B = con(vColor.B, tColor.B, tColor.A)
-        return vColor
-    },
-    func(texture *Texture, vColor, tColor Color) Color {
+	if vColor.R > 1 {
+		vColor.R = 1
+	}
+	if vColor.G > 1 {
+		vColor.G = 1
+	}
+	if vColor.B > 1 {
+		vColor.B = 1
+	}
+
+	return vColor
+}
+
+var blendFunc = [...]func(texture *Texture, vColor, tColor Color) Color{
+	func(texture *Texture, vColor, tColor Color) Color {
+		return Modulate(vColor, tColor)
+
+		//con := func(v, t float32) float32 {
+		//	v *= FACTOR
+		//	t *= FACTOR
+		//	return max(0, min(1, ((t)*(v)-1)/(FACTOR*FACTOR)))
+		//}
+
+		//vColor.R = con(vColor.R, tColor.R)
+		//vColor.G = con(vColor.G, tColor.G)
+		//vColor.B = con(vColor.B, tColor.B)
+		//vColor.A = con(vColor.A, tColor.A)
+		//return vColor
+	},
+	func(texture *Texture, vColor, tColor Color) Color {
+
+		return Decal(vColor, tColor)
+
+		//con := func(v, t, at float32) float32 {
+		//	v *= FACTOR
+		//	t *= FACTOR
+		//	at *= FACTOR
+		//	return max(0, min(1, (t*at+v*(FACTOR-at))/(FACTOR*FACTOR)))
+		//}
+
+		//vColor.R = con(vColor.R, tColor.R, tColor.A)
+		//vColor.G = con(vColor.G, tColor.G, tColor.A)
+		//vColor.B = con(vColor.B, tColor.B, tColor.A)
+		//return vColor
+	},
+	func(texture *Texture, vColor, tColor Color) Color {
 
 		if texture.IsHighlight {
 
@@ -52,48 +99,49 @@ var blendFunc = [...]func(texture *Texture, vColor, tColor Color) Color {
 				return max(0, min(1, ((t)*(s)-1)/(FACTOR*FACTOR)+sb))
 			}
 
-			toon := texture.ToonTbl[uint32(vColor.R*FACTOR)& 0x1F]
+			toon := texture.ToonTbl[uint32(vColor.R*FACTOR)&0x1F]
 
 			vColor.R = con(toon.R, tColor.R)
 			vColor.G = con(toon.G, tColor.G)
 			vColor.B = con(toon.B, tColor.B)
 			vColor.A = con(vColor.A, tColor.A)
-            return vColor
-        }
+			return vColor
+		}
 
-        // toon
+		// toon
 
-        con := func(s, t float32) float32 {
-            s *= FACTOR
-            t *= FACTOR
-            return max(0, min(1, ((t)*(s)-1)/(FACTOR*FACTOR)))
-        }
+		con := func(s, t float32) float32 {
+			s *= FACTOR
+			t *= FACTOR
+			return max(0, min(1, ((t)*(s)-1)/(FACTOR*FACTOR)))
+		}
 
-        toon := texture.ToonTbl[uint32(vColor.R*FACTOR)& 0x1F]
+		toon := texture.ToonTbl[uint32(vColor.R*FACTOR)&0x1F]
 
-        vColor.R = con(toon.R, tColor.R)
-        vColor.G = con(toon.G, tColor.G)
-        vColor.B = con(toon.B, tColor.B)
-        vColor.A = con(vColor.A, tColor.A)
-        return vColor
-    },
-    func(texture *Texture, vColor, tColor Color) Color {
-        return Transparent
-    },
+		vColor.R = con(toon.R, tColor.R)
+		vColor.G = con(toon.G, tColor.G)
+		vColor.B = con(toon.B, tColor.B)
+		vColor.A = con(vColor.A, tColor.A)
+		return vColor
+	},
+	func(texture *Texture, vColor, tColor Color) Color {
+		return Transparent
+	},
 }
 
 func (s *Shader) Fragment(v *Vertex) {
 
-    if s.Texture == nil {
-        return
-    }
+	if s.Texture == nil {
+		return
+	}
 
-	tColor := White
 	if s.Texture.CachedTexture != nil {
-        tColor = s.Texture.Sample(v.Texture.X, v.Texture.Y)
-    }
+		tColor := s.Texture.Sample(v.Texture.X, v.Texture.Y)
+		v.Color = blendFunc[s.Texture.Mode](s.Texture, v.Color, tColor)
+		return
+	}
 
-    v.Color = blendFunc[s.Texture.Mode](s.Texture, v.Color, tColor)
+	v.Color = blendFunc[s.Texture.Mode](s.Texture, v.Color, White)
 }
 
 func (s *Shader) SetTexture(texture *Texture) {

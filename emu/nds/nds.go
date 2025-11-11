@@ -170,16 +170,12 @@ func (nds *Nds) UpdateFrame() {
 
         //nds.checkBadPc()
 
-        // per graphic cycle, arm9 may run once (arm) or twice (thumb)
-
         if arm := !nds.arm9.Reg.IsThumb; arm {
             nds.StepArm9()
         } else {
             nds.StepArm9()
             nds.StepArm9()
         }
-
-        // per graphic cycle, arm7 may run once (thumb) or none (every other arm)
 
         if nds.arm7.Reg.IsThumb || nds.AccCycles & 1 == 0 {
             nds.StepArm7()
@@ -191,9 +187,6 @@ func (nds *Nds) UpdateFrame() {
             nds.UpdateTimers(TIMER_CYCLE_MASK + 1)
         }
 
-		nds.arm9.CheckIrq()
-        nds.arm7.CheckIrq()
-
         nds.TimerCycles++
         debug.CURR_INST++
 	}
@@ -203,6 +196,8 @@ func (nds *Nds) UpdateFrame() {
 }
 
 func (nds *Nds) StepArm9() {
+
+    nds.arm9.CheckIrq()
 
     if nds.arm9.Halted {
         return
@@ -226,6 +221,8 @@ func (nds *Nds) StepArm9() {
 }
 
 func (nds *Nds) StepArm7() {
+
+    nds.arm7.CheckIrq()
 
     if nds.arm7.Halted {
         return
@@ -437,8 +434,14 @@ func (nds *Nds) CheckDmas(mode uint32, arm9 bool) {
 }
 
 func (nds *Nds) CheckGeoDmas() {
+
     for i := range 4 {
-        if ok := nds.arm9.Dma[i].CheckMode(dma.ARM9_DMA_MODE_GEO); !ok {
+
+        if !nds.arm9.Dma[i].Enabled {
+            continue
+        }
+
+        if nds.arm9.Dma[i].Mode != dma.ARM9_DMA_MODE_GEO {
             continue
         }
 
@@ -447,8 +450,8 @@ func (nds *Nds) CheckGeoDmas() {
         //    continue
         //}
 
-        //nds.arm9.Dma[i].GxTransfer()
-        nds.arm9.Dma[i].Transfer()
+        nds.arm9.Dma[i].GxTransfer()
+        //nds.arm9.Dma[i].Transfer()
     }
 }
 

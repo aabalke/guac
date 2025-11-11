@@ -10,7 +10,7 @@ var (
 )
 
 const (
-    MAX_DEPTH = float32(0x7FFF)
+    MAX_DEPTH = float32(0xFF_FFFF)
     EDGE_THRES = 1
 )
 
@@ -31,17 +31,14 @@ const (
 	CullBack
 )
 
-type RasterizeInfo struct {
-	TotalPixels   uint64
-	UpdatedPixels uint64
-}
+type ShadowMode int
 
-func (info RasterizeInfo) Add(other RasterizeInfo) RasterizeInfo {
-	return RasterizeInfo{
-		info.TotalPixels + other.TotalPixels,
-		info.UpdatedPixels + other.UpdatedPixels,
-	}
-}
+const (
+    _ ShadowMode = iota
+    ShadowBack
+    ShadowFront
+    ShadowRender
+)
 
 type Context struct {
 	Width        int
@@ -72,6 +69,8 @@ type Context struct {
 
     DepthW bool
     DepthEqual bool // draw pixels with depth less vs less or equal
+
+    StencilBuffer []bool
 }
 
 func NewContext(width, height int) *Context {
@@ -81,6 +80,7 @@ func NewContext(width, height int) *Context {
     dc.ColorBuffer  = make([]Color, width*height)
 	dc.DepthBuffer  = make([]float32, width*height)
 	dc.DepthBufferW = make([]float32, width*height)
+	dc.StencilBuffer = make([]bool, width*height)
 	dc.FogEnabledBuffer = make([]bool, width*height)
 	dc.EdgeBuffer = make([]bool, width*height)
 	dc.PolyIdBuffer = make([]uint32, width*height)
@@ -182,8 +182,7 @@ func edge(a, b, c Vector) float32 {
 // these variables remove reallocations
 var vert Vertex
 
-func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo {
-	var info RasterizeInfo
+func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) {
 
 	// integer bounding box
 	minValue := s0.Min(s1.Min(s2)).Floor()
@@ -214,6 +213,13 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 	ra20 := 1 / a20
 	ra01 := 1 / a01
 
+    grad0 := float32(math.Hypot(float64(a12), float64(b12))) * ra // for b0
+    grad1 := float32(math.Hypot(float64(a20), float64(b20))) * ra // for b1
+    grad2 := float32(math.Hypot(float64(a01), float64(b01))) * ra // for b2
+    edgeThickness0 := EDGE_THRES * grad0
+    edgeThickness1 := EDGE_THRES * grad1
+    edgeThickness2 := EDGE_THRES * grad2
+
 	// iterate over all pixels in bounding box
 	for y := y0; y <= y1; y++ {
 		var d float32
@@ -238,13 +244,6 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 		w2 := w02 + a01*d
 		wasInside := false
 
-        grad0 := float32(math.Hypot(float64(a12), float64(b12))) * ra // for b0
-        grad1 := float32(math.Hypot(float64(a20), float64(b20))) * ra // for b1
-        grad2 := float32(math.Hypot(float64(a01), float64(b01))) * ra // for b2
-        edgeThickness0 := EDGE_THRES * grad0
-        edgeThickness1 := EDGE_THRES * grad1
-        edgeThickness2 := EDGE_THRES * grad2
-
 		for x := x0 + int(d); x <= x1; x++ {
 			b0 := w0 * ra
 			b1 := w1 * ra
@@ -267,7 +266,6 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 				// TODO: could also be from fat lines going off screen
 				continue
 			}
-			info.TotalPixels++
 
 			z := b0*s0.Z + b1*s1.Z + b2*s2.Z
 			// perspective-correct interpolation of vertex data
@@ -281,7 +279,13 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
                 depth = b.W
             }
 
-            if (dc.DepthEqual && depth >= (*depthBuffer)[i]) || depth > (*depthBuffer)[i] {
+            if (dc.DepthEqual && !(
+                depth + 0x200 >= (*depthBuffer)[i] && depth - 0x200 < (*depthBuffer)[i])) {
+            //if (dc.DepthEqual && depth != (*depthBuffer)[i]) {
+                continue
+            }
+
+            if !dc.DepthEqual && depth >= (*depthBuffer)[i] {
 				continue
 			}
 
@@ -293,8 +297,6 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 			}
 
             color := &vert.Color
-
-            info.UpdatedPixels++
 
             if dc.PolygonOpaque {
 
@@ -323,7 +325,8 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
             //if !dc.AlphaBlending || dc.NewTranslucentDepth || color.A >= 0.999 {
 
             if (!dc.AlphaBlending ||
-                dc.PolygonOpaque ||
+                dc.PolygonOpaque || // should be based on color.A???
+                color.A >= 0.999 ||
                 dc.NewTranslucentDepth) {
 
                 (*depthBuffer)[i] = depth
@@ -346,11 +349,9 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) RasterizeInfo
 		w01 += b20
 		w02 += b01
 	}
-
-	return info
 }
 
-func (dc *Context) drawClippedTriangle(v0, v1, v2 Vertex) RasterizeInfo {
+func (dc *Context) drawClippedTriangle(v0, v1, v2 Vertex) {
 	// normalized device coordinates
 	ndc0 := v0.Output.DivScalar(v0.Output.W).Vector()
 	ndc1 := v1.Output.DivScalar(v1.Output.W).Vector()
@@ -369,17 +370,17 @@ func (dc *Context) drawClippedTriangle(v0, v1, v2 Vertex) RasterizeInfo {
 		a = -a
 	}
 	if dc.Cull != CullNone && a <= 0 {
-		return RasterizeInfo{}
+		return
 	}
 
 	// screen coordinates
 	s0 := dc.screenMatrix.MulPosition(ndc0)
 	s1 := dc.screenMatrix.MulPosition(ndc1)
 	s2 := dc.screenMatrix.MulPosition(ndc2)
-    return dc.rasterize(v0, v1, v2, s0, s1, s2)
+    dc.rasterize(v0, v1, v2, s0, s1, s2)
 }
 
-func (dc *Context) DrawTriangle(t *Triangle) RasterizeInfo {
+func (dc *Context) DrawTriangle(t *Triangle) {
 	v1 := t.V1
 	v2 := t.V2
 	v3 := t.V3
@@ -388,55 +389,47 @@ func (dc *Context) DrawTriangle(t *Triangle) RasterizeInfo {
 
 		// clip to viewing volume
 		triangles := ClipTriangle(NewTriangle(v1, v2, v3))
-		var result RasterizeInfo
 		for _, t := range triangles {
-			info := dc.drawClippedTriangle(t.V1, t.V2, t.V3)
-			result = result.Add(info)
+			dc.drawClippedTriangle(t.V1, t.V2, t.V3)
 		}
-		return result
-	} else {
-		// no need to clip
-		return dc.drawClippedTriangle(v1, v2, v3)
+		return
 	}
+
+    // no need to clip
+    dc.drawClippedTriangle(v1, v2, v3)
 }
 
-func (dc *Context) DrawQuad(q *Quad) RasterizeInfo {
+func (dc *Context) DrawQuad(q *Quad) {
 	v1 := q.V1
 	v2 := q.V2
 	v3 := q.V3
 	v4 := q.V4
-
-    var result RasterizeInfo
 
     if v1.Outside() || v2.Outside() || v3.Outside() {
 
         // clip to viewing volume
         triangles := ClipTriangle(NewTriangle(v1, v2, v3))
         for _, t := range triangles {
-            info := dc.drawClippedTriangle(t.V1, t.V2, t.V3)
-            result = result.Add(info)
+            dc.drawClippedTriangle(t.V1, t.V2, t.V3)
+            //result = result.Add(info)
         }
 
     } else {
         // no need to clip
-        result = result.Add(dc.drawClippedTriangle(v1, v2, v3))
+        dc.drawClippedTriangle(v1, v2, v3)
     }
 
     if v1.Outside() || v3.Outside() || v4.Outside() {
 
         // clip to viewing volume
         triangles := ClipTriangle(NewTriangle(v1, v3, v4))
-        var result RasterizeInfo
         for _, t := range triangles {
-            //info := dc.drawClippedTriangle(t.V1, t.V2, t.V3)
-            info := dc.drawClippedTriangle(t.V1, t.V2, t.V3)
-            result = result.Add(info)
+            dc.drawClippedTriangle(t.V1, t.V2, t.V3)
         }
-    } else {
-        // no need to clip
-        result = result.Add(dc.drawClippedTriangle(v1, v3, v4))
+
+        return
     }
 
-    return result
-
+    // no need to clip
+    dc.drawClippedTriangle(v1, v3, v4)
 }

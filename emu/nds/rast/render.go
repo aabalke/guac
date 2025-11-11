@@ -2,6 +2,7 @@ package rast
 
 import (
 	"fmt"
+	"math"
 	"sort"
 
 	"sync"
@@ -136,13 +137,15 @@ func (r *Render) UpdateRender() {
 
     r.Context.DepthW = depthW
 
+    // solid polygons sorted first, followed by translucent (unless manual sort alpha)
+
     sort.SliceStable(polygons, func(i, j int) bool {
 
         pi := polygons[i]
-        pj := polygons[i]
+        pj := polygons[j]
 
-		isolid := pi.Alpha != 1
-		jsolid := pj.Alpha != 1
+		isolid := !pi.isAlpha()
+		jsolid := !pj.isAlpha()
 		if isolid && !jsolid {
 			return true
 		} else if jsolid && !isolid {
@@ -152,17 +155,20 @@ func (r *Render) UpdateRender() {
 
 		// Second: sort by "y" solid polygons (or all polygons if
 		// alphaYSort is true)
-        average := func(poly Polygon) float32{
-            sum := float32(0)
+        minY := func(poly Polygon) float32{
+            m := float32(math.MaxFloat32)
             for i := range len(poly.Vertices) {
-                sum += poly.Vertices[i].Output.Y
+                if n := poly.Vertices[i].Output.Y; n < m {
+                    m = n
+                }
             }
-            return sum / float32(len(poly.Vertices))
+
+            return m
         }
 
 		if isolid || manualSortAlpha {
-			iy := average(pi)
-			jy := average(pj)
+			iy := minY(pi)
+			jy := minY(pj)
 
 			if iy < jy {
 				return true
