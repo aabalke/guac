@@ -187,6 +187,9 @@ func (nds *Nds) UpdateFrame() {
             nds.UpdateTimers(TIMER_CYCLE_MASK + 1)
         }
 
+        nds.arm9.CheckIrq()
+        nds.arm7.CheckIrq()
+
         nds.TimerCycles++
         debug.CURR_INST++
 	}
@@ -197,7 +200,6 @@ func (nds *Nds) UpdateFrame() {
 
 func (nds *Nds) StepArm9() {
 
-    nds.arm9.CheckIrq()
 
     if nds.arm9.Halted {
         return
@@ -221,8 +223,6 @@ func (nds *Nds) StepArm9() {
 }
 
 func (nds *Nds) StepArm7() {
-
-    nds.arm7.CheckIrq()
 
     if nds.arm7.Halted {
         return
