@@ -137,7 +137,6 @@ func (nds *Nds) Update() {
 		return
 	}
 
-    render := nds.ppu.Rasterizer.Render
 
     if singleThread {
         nds.UpdateFrame()
@@ -152,7 +151,7 @@ func (nds *Nds) Update() {
     go func() {
         defer wg2.Done()
         if nds.ppu.EngineA.Dispcnt.Is3D {
-            render.UpdateRender()
+            nds.ppu.Rasterizer.Render.UpdateRender()
         }
     }()
 
@@ -187,8 +186,6 @@ func (nds *Nds) UpdateFrame() {
             nds.UpdateTimers(TIMER_CYCLE_MASK + 1)
         }
 
-        nds.arm9.CheckIrq()
-        nds.arm7.CheckIrq()
 
         nds.TimerCycles++
         debug.CURR_INST++
@@ -200,6 +197,7 @@ func (nds *Nds) UpdateFrame() {
 
 func (nds *Nds) StepArm9() {
 
+    nds.arm9.CheckIrq()
 
     if nds.arm9.Halted {
         return
@@ -214,15 +212,26 @@ func (nds *Nds) StepArm9() {
         os.Exit(0)
     }
 
-    nds.CheckGeoDmas()
+
+
+    //nds.CheckGeoDmas()
+    if dmaC & D == 0 {
+        nds.CheckGeoDmas()
+    }
+
+    dmaC++
 
     if nds.ppu.Rasterizer.GeoEngine.GxStat.FifoIrq != 0 {
         nds.arm9.Irq.SetIRQ(cpu.IRQ_GEO_CMD_FIFO)
     }
-
 }
 
+var dmaC = uint32(0)
+const D = 0b1111
+
 func (nds *Nds) StepArm7() {
+
+    nds.arm7.CheckIrq()
 
     if nds.arm7.Halted {
         return
@@ -329,11 +338,11 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
             b := &nds.ppu.EngineB
 			updateBackgrounds(a)
 			updateBackgrounds(b)
-			a.BgPriorities = nds.getBgPriority(vcount, a.Dispcnt.Mode, &a.Backgrounds)
-			b.BgPriorities = nds.getBgPriority(vcount, b.Dispcnt.Mode, &b.Backgrounds)
+			a.BgPriorities = nds.getBgPriority(vcount, a.Dispcnt.Mode, &a.Backgrounds, &a.Windows)
+			b.BgPriorities = nds.getBgPriority(vcount, b.Dispcnt.Mode, &b.Backgrounds, &b.Windows)
 
-			a.ObjPriorities = nds.getObjPriority(uint32(vcount), &a.Objects)
-			b.ObjPriorities = nds.getObjPriority(uint32(vcount), &b.Objects)
+			a.ObjPriorities = nds.getObjPriority(uint32(vcount), &a.Objects, &a.Windows)
+			b.ObjPriorities = nds.getObjPriority(uint32(vcount), &b.Objects, &b.Windows)
 
 			nds.graphics(uint32(vcount))
 			a.Backgrounds[2].BgAffineUpdate()
@@ -381,7 +390,6 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 			dispstat.SetVBlank(true)
 			nds.CheckDmas(dma.DMA_MODE_VBL, true)
 			nds.CheckDmas(dma.DMA_MODE_VBL, false)
-
 
             if nds.ppu.Rasterizer.Buffers.SwapSet {
                 nds.ppu.Rasterizer.Buffers.Swap()

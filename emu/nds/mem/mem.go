@@ -230,16 +230,17 @@ func (mem *Mem) Read16(addr uint32, arm9 bool) uint32 {
 }
 func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
 
-    if ptr, ok := mem.ReadPtr(addr, arm9); ok {
-        return binary.LittleEndian.Uint32((*[4]uint8)(ptr)[:])
-    }
-
     switch addr {
     case 0x410_0000:
         return mem.Ipc.ReadFifo(arm9)
     case 0x410_0010:
         return mem.Gamecard.RomCtrl.ReadCmdIn(arm9)
     default:
+
+        if ptr, ok := mem.ReadPtr(addr, arm9); ok {
+            return binary.LittleEndian.Uint32((*[4]uint8)(ptr)[:])
+        }
+
         a := uint32(mem.Read(addr+2, arm9)) | (uint32(mem.Read(addr+3, arm9)) << 8)
         b := uint32(mem.Read(addr, arm9)) | (uint32(mem.Read(addr+1, arm9)) << 8)
         return (a << 16) | b
@@ -388,13 +389,14 @@ func (mem *Mem) Write8(addr uint32, v uint8, arm9 bool) {
 }
 func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
 
-    if ptr, ok := mem.WritePtr(addr, arm9); ok {
-        binary.LittleEndian.PutUint16((*[4]uint8)(ptr)[:], v)
-        return
-    }
 
     if arm9 && addr >= 0x0400_0068 && addr < 0x0400_006C {
         mem.ppu.DisplayFifo.FifoWrite(v)
+        return
+    }
+
+    if ptr, ok := mem.WritePtr(addr, arm9); ok {
+        binary.LittleEndian.PutUint16((*[4]uint8)(ptr)[:], v)
         return
     }
 
@@ -408,10 +410,6 @@ func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
         return
     }
 
-    if ptr, ok := mem.WritePtr(addr, arm9); ok {
-        binary.LittleEndian.PutUint32((*[4]uint8)(ptr)[:], v)
-        return
-    }
 
     if arm9 {
 
@@ -434,10 +432,15 @@ func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
     }
 
 
+
     switch addr {
     case 0x400_0188: 
         mem.Ipc.WriteFifo(v, arm9)
     default:
+        if ptr, ok := mem.WritePtr(addr, arm9); ok {
+            binary.LittleEndian.PutUint32((*[4]uint8)(ptr)[:], v)
+            return
+        }
         mem.Write(addr+0, uint8(v), arm9)
         mem.Write(addr+1, uint8(v>>8), arm9)
         mem.Write(addr+2, uint8(v>>16), arm9)

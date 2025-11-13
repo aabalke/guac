@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/nds/ppu"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
@@ -16,47 +15,56 @@ var wg = sync.WaitGroup{}
 
 func (nds *Nds) graphics(y uint32) {
 
-    a := &nds.ppu.EngineA
-    b := &nds.ppu.EngineB
-    capture := &nds.ppu.Capture
+	wg.Add(2)
+    go func() {
+        defer wg.Done()
 
-    renderingB := nds.ppu.Rasterizer.Buffers.BisRendering
+        a := &nds.ppu.EngineA
+        capture := &nds.ppu.Capture
+        renderingB := nds.ppu.Rasterizer.Buffers.BisRendering
 
-	switch a.Dispcnt.DisplayMode {
-	case 0:
-		nds.screenoff(y, a)
+        switch a.Dispcnt.DisplayMode {
+        case 0:
+            nds.screenoff(y, a)
 
-	case 1:
+        case 1:
 
-		nds.standard(y, a)
-        if  capture.ActiveCapture {
-            capture.CaptureLine(y, renderingB)
+            nds.standard(y, a)
+            if  capture.ActiveCapture {
+                capture.CaptureLine(y, renderingB)
+            }
+
+        case 2:
+            if capture.ActiveCapture {
+                nds.standard(y, a)
+                capture.CaptureLine(y, renderingB)
+            }
+
+            nds.vramDisplay(y, a)
+
+        case 3:
+            panic("MAIN MEM FIFO")
+            if capture.ActiveCapture {
+                nds.standard(y, a)
+                capture.CaptureLine(y, renderingB)
+            }
+            nds.MemFifoDisplay(a)
         }
+    }()
 
-	case 2:
-        if capture.ActiveCapture {
-		    nds.standard(y, a)
-            capture.CaptureLine(y, renderingB)
+    go func() {
+        defer wg.Done()
+
+        b := &nds.ppu.EngineB
+        switch b.Dispcnt.DisplayMode {
+        case 0:
+            nds.screenoff(y, b)
+        case 1:
+            nds.standard(y, b)
         }
+    }()
 
-		nds.vramDisplay(y, a)
-
-	case 3:
-        panic("MAIN MEM FIFO")
-        if capture.ActiveCapture {
-		    nds.standard(y, a)
-            capture.CaptureLine(y, renderingB)
-        }
-        nds.MemFifoDisplay(a)
-
-	}
-
-    switch b.Dispcnt.DisplayMode {
-    case 0:
-        nds.screenoff(y, b)
-    case 1:
-        nds.standard(y, b)
-    }
+    wg.Wait()
 }
 
 func (nds *Nds) screenoff(y uint32, engine *ppu.Engine) {
@@ -86,35 +94,10 @@ func (nds *Nds) MemFifoDisplay(engine *ppu.Engine) {
 
 func (nds *Nds) standard(y uint32, engine *ppu.Engine) {
 
-	if config.Conf.Nds.Threads == 0 {
-
-		x := uint32(0)
-		for x = range SCREEN_WIDTH {
-			nds.render(x, y, engine)
-		}
-
-		return
-	}
-
-	WAIT_GROUPS := config.Conf.Nds.Threads
-	dx := SCREEN_WIDTH / WAIT_GROUPS
-
-	wg.Add(WAIT_GROUPS)
-
-	for i := range WAIT_GROUPS {
-
-		go func(i int) {
-
-			defer wg.Done()
-
-			for j := range dx {
-				x := uint32((i * dx) + j)
-				nds.render(x, y, engine)
-			}
-		}(i)
-	}
-
-	wg.Wait()
+    x := uint32(0)
+    for x = range SCREEN_WIDTH {
+        nds.render(x, y, engine)
+    }
 }
 
 var bgFuncs = [...]func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx, x, y uint32) (palData uint32, alpha float32, ok bool) {
@@ -175,12 +158,12 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 			continue
 		}
 
+        if !ppu.WindowObjPixelAllowedX(x, y, wins) {
+            continue
+        }
+
         ObjectLoop:
 		for j := 0; j < len((*objPriorities)[i]); j++ {
-
-			if !ppu.WindowObjPixelAllowed(x, y, wins) {
-				continue
-			}
 
 			objIdx := (*objPriorities)[i][j]
 	        obj := &engine.Objects[objIdx]
@@ -663,11 +646,11 @@ func (nds *Nds) setRawBitmap(engine *ppu.Engine, x, y uint32) (uint32, bool) {
 
 }
 
-func (nds *Nds) getBgPriority(y uint32, mode uint32, bgs *[4]ppu.Background) [4][]uint32 {
+func (nds *Nds) getBgPriority(y uint32, mode uint32, bgs *[4]ppu.Background, wins *ppu.Windows) [4][]uint32 {
 
 	priorities := [4][]uint32{}
 
-	for i := range 4 {
+	for i := range uint32(4) {
 
 		if bgs[i].Invalid || !bgs[i].Enabled {
 			continue
@@ -677,6 +660,10 @@ func (nds *Nds) getBgPriority(y uint32, mode uint32, bgs *[4]ppu.Background) [4]
 			continue
 		}
 
+        //if !ppu.WindowPixelAllowedScanline(i, y, wins) {
+        //    continue
+        //}
+
         priority := bgs[i].Priority
 
 		priorities[priority] = append(priorities[priority], uint32(i))
@@ -685,7 +672,7 @@ func (nds *Nds) getBgPriority(y uint32, mode uint32, bgs *[4]ppu.Background) [4]
 	return priorities
 }
 
-func (nds *Nds) getObjPriority(y uint32, objects *[128]ppu.Object) [4][]uint32 {
+func (nds *Nds) getObjPriority(y uint32, objects *[128]ppu.Object, wins *ppu.Windows) [4][]uint32 {
 
 	priorities := [4][]uint32{}
 
@@ -700,6 +687,10 @@ func (nds *Nds) getObjPriority(y uint32, objects *[128]ppu.Object) [4][]uint32 {
 		if objNotScanline(obj, y) {
 			continue
 		}
+
+        if !ppu.WindowObjPixelAllowedScanline(y, wins) {
+            continue
+        }
 
 		priority := obj.Priority
 

@@ -674,6 +674,11 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 		}
 
         addr := pre &^ 0b11
+
+        if addr == 0x400_0400 {
+
+        }
+
 		c.mem.Write32(addr, v, true)
 	}
 

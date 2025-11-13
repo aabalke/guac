@@ -1,6 +1,7 @@
 package arm7
 
 import (
+	"unsafe"
 
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
@@ -14,6 +15,8 @@ type Cpu struct {
     Sleeped bool
 
     Dma [4]dma.DMA
+
+    PcPtr unsafe.Pointer
 }
 
 const (
@@ -241,5 +244,49 @@ func (cpu *Cpu) CheckIrq() {
 
 	if !cpu.Reg.CPSR.GetFlag(FLAG_I) && cpu.Irq.IME {
 		cpu.exception(VEC_IRQ, MODE_IRQ)
+        cpu.PcPtr = nil
 	}
+}
+
+func (cpu *Cpu) GetOpArm() uint32 {
+
+    if cpu.PcPtr == nil {
+        r := &cpu.Reg.R
+        if p, ok := cpu.mem.ReadPtr(r[PC], false); ok {
+            cpu.PcPtr = p
+        } else {
+            return cpu.mem.Read32(r[PC], false)
+        }
+    }
+
+    op := *(*uint32)(cpu.PcPtr)
+    cpu.PcPtr = unsafe.Add(cpu.PcPtr, 4)
+
+    if isBranching := ((op >> 27) & 1 == 1) || (op >> 12) & 0xF == 0xF; isBranching {
+        cpu.PcPtr = nil
+    }
+
+    return op
+}
+
+func (cpu *Cpu) GetOpThumb() uint16 {
+
+    if cpu.PcPtr == nil {
+
+        r := &cpu.Reg.R
+        if p, ok := cpu.mem.ReadPtr(r[PC], false); ok {
+            cpu.PcPtr = p
+        } else {
+            return uint16(cpu.mem.Read16(r[PC], false))
+        }
+    }
+
+    op := *(*uint16)(cpu.PcPtr)
+    cpu.PcPtr = unsafe.Add(cpu.PcPtr, 2)
+
+    if isBranching := (op >> 14) != 0; isBranching {
+        cpu.PcPtr = nil
+    }
+
+    return op
 }

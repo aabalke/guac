@@ -8,7 +8,10 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 
 	r := &cpu.Reg.R
 
-	opcode := cpu.mem.Read32(r[PC], true)
+	//opcode := cpu.mem.Read32(r[PC], true)
+
+    opcode := cpu.GetOpArm()
+
 
     switch {
     case isBLX(opcode):

@@ -6,9 +6,10 @@ import (
 
 func (cpu *Cpu) DecodeTHUMB() int {
 
-	r := &cpu.Reg.R
+	//r := &cpu.Reg.R
 
-	opcode := uint16(cpu.mem.Read16(r[PC], false))
+	//opcode := uint16(cpu.mem.Read16(r[PC], false))
+    opcode := cpu.GetOpThumb()
 
 	switch {
 	case isthumbSWI(opcode):

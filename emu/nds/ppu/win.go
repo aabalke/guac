@@ -12,6 +12,25 @@ func inWindow(x, y, l, r, t, b uint32) bool {
 	return inRange(x, l, r) && inRange(y, t, b)
 }
 
+func WindowPixelAllowedScanline(idx, y uint32, wins *Windows) bool {
+
+	if !wins.Enabled {
+		return true
+	}
+
+	win := &wins.Win0
+	if win.Enabled && inRange(y, win.T, win.B) {
+		return win.InBg[idx]
+	}
+
+	win = &wins.Win1
+	if win.Enabled && inRange(y, win.T, win.B) {
+		return win.InBg[idx]
+	}
+
+	return wins.OutBg[idx]
+}
+
 func WindowPixelAllowed(idx, x, y uint32, wins *Windows) bool {
 
 	if !wins.Enabled {
@@ -19,19 +38,21 @@ func WindowPixelAllowed(idx, x, y uint32, wins *Windows) bool {
 	}
 
 	win := &wins.Win0
-	if win.Enabled && inWindow(x, y, win.L, win.R, win.T, win.B) {
+	//if win.Enabled && inWindow(x, y, win.L, win.R, win.T, win.B) {
+	if win.Enabled && inRange(x, win.L, win.R) {
 		return win.InBg[idx]
 	}
 
 	win = &wins.Win1
-	if win.Enabled && inWindow(x, y, win.L, win.R, win.T, win.B) {
+	//if win.Enabled && inWindow(x, y, win.L, win.R, win.T, win.B) {
+	if win.Enabled && inRange(x, win.L, win.R) {
 		return win.InBg[idx]
 	}
 
 	return wins.OutBg[idx]
 }
 
-func WindowObjPixelAllowed(x, y uint32, wins *Windows) bool {
+func WindowObjPixelAllowedScanline(y uint32, wins *Windows) bool {
 
 	if !wins.Enabled {
 		return true
@@ -42,11 +63,36 @@ func WindowObjPixelAllowed(x, y uint32, wins *Windows) bool {
 	}
 
 	win := &wins.Win0
+	if win.Enabled && inRange(y, win.T, win.B) {
+		return win.InObj
+	}
+
+	win = &wins.Win1
+	if win.Enabled && inRange(y, win.T, win.B) {
+		return win.InObj
+	}
+
+	return wins.OutObj
+}
+
+func WindowObjPixelAllowedX(x, y uint32, wins *Windows) bool {
+
+	if !wins.Enabled {
+		return true
+	}
+
+	if !wins.Win0.Enabled && !wins.Win1.Enabled {
+		return true
+	}
+
+	win := &wins.Win0
+	//if win.Enabled && inRange(x, win.L, win.R) {
 	if win.Enabled && inWindow(x, y, win.L, win.R, win.T, win.B) {
 		return win.InObj
 	}
 
 	win = &wins.Win1
+	//if win.Enabled && inRange(x, win.L, win.R) {
 	if win.Enabled && inWindow(x, y, win.L, win.R, win.T, win.B) {
 		return win.InObj
 	}
@@ -55,6 +101,7 @@ func WindowObjPixelAllowed(x, y uint32, wins *Windows) bool {
 }
 
 func windowBldPixelAllowed(x, y uint32, wins *Windows, inObjWindow bool) bool {
+
 	if !wins.Enabled {
 		return true
 	}
