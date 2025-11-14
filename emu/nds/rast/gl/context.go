@@ -3,6 +3,8 @@ package gl
 import (
 	"fmt"
 	"math"
+
+	"github.com/aabalke/guac/emu/nds/utils"
 )
 
 var (
@@ -12,6 +14,10 @@ var (
 const (
     MAX_DEPTH = float32(0xFF_FFFF)
     EDGE_THRES = 1
+
+    // higher number is less precise, important for proper ordering with overlapping polys
+    // cooking mama requires ~ 0.01
+    DEPTH_PRECISION = 0.01
 )
 
 type Face int
@@ -285,7 +291,7 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) {
                 continue
             }
 
-            if !dc.DepthEqual && depth >= (*depthBuffer)[i] {
+            if !dc.DepthEqual && depth >= (*depthBuffer)[i] + DEPTH_PRECISION {
 				continue
 			}
 
@@ -319,17 +325,12 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) {
                     dc.FogEnabledBuffer[i] = dc.FogEnabledBuffer[i] && dc.PolygonFogEnabled
             }
 
-            // this will need to be fixed
-            //if !(dc.AlphaBlending && color.A < 0.999) {
-            //if !dc.AlphaBlending || (dc.AlphaBlending && color.A > 0 && dc.NewTranslucentDepth) {
-            //if !dc.AlphaBlending || dc.NewTranslucentDepth || color.A >= 0.999 {
-
             if (!dc.AlphaBlending ||
-                dc.PolygonOpaque || // should be based on color.A???
+                dc.PolygonOpaque ||
                 color.A >= 0.999 ||
                 dc.NewTranslucentDepth) {
 
-                (*depthBuffer)[i] = depth
+                (*depthBuffer)[i] = utils.FloatFloor(depth, DEPTH_PRECISION)
             }
 
             j := &dc.ColorBuffer[i]

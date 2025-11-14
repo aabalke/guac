@@ -1,5 +1,7 @@
 package gl
 
+import "github.com/aabalke/guac/emu/nds/utils"
+
 type Shader struct {
 	Texture *Texture
 }
@@ -138,10 +140,12 @@ func (s *Shader) Fragment(v *Vertex) {
 	if s.Texture.CachedTexture != nil {
 		tColor := s.Texture.Sample(v.Texture.X, v.Texture.Y)
 		v.Color = blendFunc[s.Texture.Mode](s.Texture, v.Color, tColor)
+        v.Color.A = utils.FloatRound(v.Color.A, 0.05)
 		return
 	}
 
 	v.Color = blendFunc[s.Texture.Mode](s.Texture, v.Color, White)
+	v.Color.A = utils.FloatRound(v.Color.A, 0.05)
 }
 
 func (s *Shader) SetTexture(texture *Texture) {

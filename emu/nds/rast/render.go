@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/aabalke/guac/emu/nds/rast/gl"
+	"github.com/aabalke/guac/emu/nds/utils"
 )
 
 const (
@@ -412,6 +413,8 @@ func (r *Render) ImageToPixels(img []gl.Color) {
             // ex. if value is .99, then will still be slightly not visible on screen - its jarring
             //alpha := (c.A >> 3)
             //alpha = (alpha << 3) | (alpha >> 2)
+
+            c.A = utils.FloatRound(c.A, 0.05)
 
             if r.Rasterizer.Buffers.BisRendering {
                 r.Pixels.PalettesB[i] = v

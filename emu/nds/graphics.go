@@ -127,15 +127,13 @@ var bgFuncs = [...]func(nds *Nds, engine *ppu.Engine, bg *ppu.Background, bgIdx,
 func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 	dispcnt := &engine.Dispcnt
 	wins := &engine.Windows
-	bgs := &engine.Backgrounds
 	objPriorities := &engine.ObjPriorities
 	bgPriorities := &engine.BgPriorities
 
-	bldPal := ppu.NewBlendPalette(x, &engine.Blend, nds.getPalette(0, 0, false, engine.IsB))
+	bldPal := ppu.NewBlendPalette(&engine.Blend, nds.getPalette(0, 0, false, engine.IsB))
 
 	var objMode uint32
 	var inObjWindow bool
-
 
 	// work backwards for proper priorities
 	for i := 3; i >= 0; i-- {
@@ -143,14 +141,14 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 		for j := len(bgPriorities[i]) - 1; j >= 0; j-- {
 
 			bgIdx := bgPriorities[i][j]
-			bg := &bgs[bgIdx]
+            bg := &engine.Backgrounds[bgIdx]
 
 			if !ppu.WindowPixelAllowed(bgIdx, x, y, wins) {
 				continue
 			}
 
             if palData, alpha, ok := bgFuncs[bg.Type](nds, engine, bg, bgIdx, x, y); ok {
-				bldPal.SetBlendPalettes(palData, uint32(bgIdx), false, false, true, alpha)
+				bldPal.SetBgPalettes(palData, bgIdx, bg.Type == ppu.BG_TYPE_3D, alpha)
 			}
 		}
 
@@ -187,7 +185,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
             }
 
             objMode = obj.Mode
-            bldPal.SetBlendPalettes(palData, 0, true, objMode == 1, false, 0)
+            bldPal.SetObjPalettes(palData, objMode == 1)
             break ObjectLoop
         }
 	}

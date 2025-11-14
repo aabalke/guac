@@ -137,7 +137,6 @@ func (nds *Nds) Update() {
 		return
 	}
 
-
     if singleThread {
         nds.UpdateFrame()
         if nds.ppu.EngineA.Dispcnt.Is3D {

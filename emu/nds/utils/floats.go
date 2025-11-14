@@ -51,3 +51,11 @@ func ConvertFromFloat4_0_12(f float32) uint16 {
 
     return uint16(val)
 }
+
+func FloatRound(v, step float32) float32 {
+    return float32(math.Round(float64(v/step)) * float64(step))
+}
+
+func FloatFloor(v, step float32) float32 {
+    return float32(int(v/step)) * step
+}

@@ -16,13 +16,11 @@ type BlendPalettes struct {
 	alpha     float32
 }
 
-func NewBlendPalette(i uint32, bld *Blend, backdrop uint32) *BlendPalettes {
+func NewBlendPalette(bld *Blend, backdrop uint32) *BlendPalettes {
 
 	bp := &BlendPalettes{
 		Bld: bld,
 	}
-
-	//backdrop := gba.getPalette(0, 0, false)
 
 	bp.NoBlendPalette = backdrop
 
@@ -40,50 +38,52 @@ func NewBlendPalette(i uint32, bld *Blend, backdrop uint32) *BlendPalettes {
 	return bp
 }
 
-func (bp *BlendPalettes) SetBlendPalettes(palData uint32, bgIdx uint32, obj bool, semiTransparent, targetA3d bool, alpha float32) {
+func (bp *BlendPalettes) SetBgPalettes(palData, bgIdx uint32, targetA3d bool, alpha float32) {
 
 	bp.NoBlendPalette = palData
-
-	if obj {
-
-		if bp.Bld.a[4] || semiTransparent {
-			bp.APalette = palData
-			bp.hasA = true
-			bp.targetATop = true
-		} else {
-			bp.targetATop = false
-		}
-
-		if bp.Bld.b[4] {
-			bp.BPalette = palData
-			bp.hasB = true
-		}
-		return
-	}
 
 	if bp.Bld.a[bgIdx] {
 		bp.APalette = palData
 		bp.hasA = true
 		bp.targetATop = true
+        bp.targetA3d = false
 
 		if targetA3d && bgIdx == 0 {
 			bp.targetA3d = true
 			bp.alpha = alpha
-		} else {
-			bp.targetA3d = false
 		}
 
-	} else {
-		bp.targetATop = false
+        return
+    }
 
-		// not sure if this is required or correct
-		bp.targetA3d = false
-	}
+    bp.targetATop = false
 
-	if bp.Bld.b[bgIdx] {
-		bp.BPalette = palData
-		bp.hasB = true
-	}
+    // not sure if this is required or correct
+    bp.targetA3d = false
+
+    if bp.Bld.b[bgIdx] {
+        bp.BPalette = palData
+        bp.hasB = true
+    }
+}
+
+func (bp *BlendPalettes) SetObjPalettes(palData uint32, semiTransparent bool) {
+
+    bp.NoBlendPalette = palData
+
+    if bp.Bld.a[4] || semiTransparent {
+        bp.APalette = palData
+        bp.hasA = true
+        bp.targetATop = true
+        return
+    }
+
+    bp.targetATop = false
+    if bp.Bld.b[4] {
+        bp.BPalette = palData
+        bp.hasB = true
+    }
+
 }
 
 func (bp *BlendPalettes) Blend(objTransparent bool, x, y uint32, wins *Windows, inObjWindow bool) uint32 {
