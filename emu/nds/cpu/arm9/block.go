@@ -32,7 +32,7 @@ func (c *Cpu) Block(opcode uint32) {
 		Rn:          utils.GetVarData(opcode, 16, 19),
 		Rlist:       utils.GetVarData(opcode, 0, 15),
 	}
-	mode := c.Reg.getMode()
+	mode := c.Reg.CPSR.Mode
     block.ForceUser = (
         block.PSR &&
         mode != MODE_USR && 
@@ -155,7 +155,7 @@ func (cpu *Cpu) ldm(block *Block) {
 
 	if utils.BitEnabled(block.Opcode, 15) && block.PSR {
 
-        curr := cpu.Reg.getMode()
+        curr := cpu.Reg.CPSR.Mode
         spsr := cpu.Reg.SPSR[BANK_ID[curr]]
 
         reg := &cpu.Reg
@@ -168,11 +168,8 @@ func (cpu *Cpu) ldm(block *Block) {
 
         //cpu.Reg.setMode(cpu.Reg.getMode(), uint32(cpu.Reg.SPSR[BANK_ID[cpu.Reg.getMode()]]) & 0x1F)
 
-        next := uint32(spsr) & 0b11111
-        //cpsr := uint32(reg.CPSR)
-
-        reg.CPSR = Cond(spsr)
-        reg.IsThumb = reg.CPSR.GetFlag(FLAG_T)
+        next := spsr.Mode
+        reg.CPSR = spsr
 
         if curr == MODE_USR {
             panic("USER MODE LDM PC CHANGE")

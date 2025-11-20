@@ -30,16 +30,16 @@ func (nds *Nds) LogCpu(arm9 bool) {
     )
 
     if arm9 {
-        cpu := &nds.arm9
+        cpu := nds.arm9
         r = cpu.Reg.R
-        cpsr = uint32(cpu.Reg.CPSR)
-        if cpu.Reg.IsThumb {
+        cpsr = cpu.Reg.CPSR.Get()
+        if cpu.Reg.CPSR.T {
             opcode = nds.mem.Read16(r[15], true)
         } else {
             opcode = nds.mem.Read32(r[15], true)
         }
     } else {
-        cpu := &nds.arm7
+        cpu := nds.arm7
         r = cpu.Reg.R
         cpsr = uint32(cpu.Reg.CPSR)
         if cpu.Reg.IsThumb {

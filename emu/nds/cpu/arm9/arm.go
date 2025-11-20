@@ -115,8 +115,8 @@ var aluInst = [16]func(cpu *Cpu, alu *Alu){
         res := uint64(alu.RnValue) & uint64(alu.Op2)
         cpu.testExit(alu)
         if set := utils.BitEnabled(alu.Opcode, 20); set {
-            cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-            cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+            cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
+            cpu.Reg.CPSR.Z = uint32(res) == 0
         }
     },
 
@@ -125,8 +125,8 @@ var aluInst = [16]func(cpu *Cpu, alu *Alu){
         res := uint64(alu.RnValue) ^ uint64(alu.Op2)
         cpu.testExit(alu)
         if set := utils.BitEnabled(alu.Opcode, 20); set {
-            cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-            cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+            cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
+            cpu.Reg.CPSR.Z = uint32(res) == 0
         }
     },
 
@@ -188,16 +188,36 @@ func (cpu *Cpu) Alu(opcode uint32) {
 
 	aluData.Opcode = opcode
 	aluData.Rd = utils.GetByte(opcode, 12)
-
-	cpu.SetOp2(&aluData, opcode)
-
+    aluData.Carry = cpu.Reg.CPSR.C
     rn := utils.GetByte(opcode, 16)
 	aluData.RnValue = cpu.Reg.R[rn]
-    if rn == PC {
-        if imm := utils.BitEnabled(opcode, 25) || !utils.BitEnabled(opcode, 4); imm {
-            aluData.RnValue += 8
+
+    if imm := (opcode>>25) & 1 == 1; imm {
+
+        if opcode & 0xFFF == 0 {
+            aluData.Op2 = 0
         } else {
-            aluData.RnValue += 12
+            cpu.SetOp2Imm(&aluData, opcode)
+        }
+
+        if rn == PC {
+            aluData.RnValue += 8
+        }
+
+    } else {
+
+        if (opcode >> 4) & 0xFF == 0 && (opcode & 0xF != 0xF) {
+            aluData.Op2 = cpu.Reg.R[opcode & 0xF]
+        } else {
+            cpu.SetOp2Reg(&aluData, opcode)
+        }
+
+        if rn == PC {
+            if imm := !utils.BitEnabled(opcode, 4); imm {
+                aluData.RnValue += 8
+            } else {
+                aluData.RnValue += 12
+            }
         }
     }
 
@@ -206,65 +226,56 @@ func (cpu *Cpu) Alu(opcode uint32) {
     switch {
     case aluData.Rd != PC:
 		cpu.Reg.R[15] += 4
-    case cpu.Reg.IsThumb:
+    case cpu.Reg.CPSR.T:
         cpu.Reg.R[15] &^= 0b1
-    case !cpu.Reg.IsThumb:
+    case !cpu.Reg.CPSR.T:
         cpu.Reg.R[15] &^= 0b11
     }
 }
 
-func (cpu *Cpu) SetOp2(alu *Alu, opcode uint32) {
+func (cpu *Cpu) SetOp2Imm(alu *Alu, opcode uint32) {
+
+    // Ror Special with assumptions
+    nn := opcode & 0xFF
+    ro := ((opcode >> 8) & 0xF) << 1
+    carry := (nn>>((ro-1)&31))&0b1 > 0
+    alu.Op2 = nn >> ro | (nn << (32 - ro))
+    if setCarry := ro > 0 && (opcode >> 20) & 1 == 1; setCarry {
+        cpu.Reg.CPSR.C = carry
+    }
+}
+
+func (cpu *Cpu) SetOp2Reg(alu *Alu, opcode uint32) {
 
 	reg := &cpu.Reg
-	alu.Carry = reg.CPSR.GetFlag(FLAG_C)
 
-    set := utils.BitEnabled(opcode, 20)
-
-    if imm := utils.BitEnabled(opcode, 25); imm {
-
-        // Ror Special with assumptions
-		nn := utils.GetVarData(opcode, 0, 7)
-		ro := utils.GetVarData(opcode, 8, 11) << 1
-        carry := (nn>>((ro-1)&31))&0b1 > 0
-        setCarry := ro > 0 && set
-        op2 := nn >> ro
-        op2 |= nn << (32 - ro)
-
-		if setCarry {
-			reg.CPSR.SetFlag(FLAG_C, carry)
-		}
-
-        alu.Op2 = op2
-        return
-	}
-
-    rm := utils.GetByte(opcode, 0)
+    rm := opcode & 0xF
 	var additional uint32
 	if rm == PC {
-		additional += 8
+		additional = 8
 	}
 
-	shiftRegister := utils.BitEnabled(opcode, 4)
-	is := utils.GetVarData(opcode, 7, 11)
+    shiftRegister := (opcode >> 4) & 1 == 1
+    is := ((opcode >> 7) & 0x1F)
 
 	if shiftRegister {
-		is = reg.R[(opcode>>8)&0b1111] & 0b1111_1111
+		is = reg.R[(opcode>>8) & 0xF] & 0xFF
 
 		if rm == PC {
-			additional += 4
+			additional = 12
 		}
 	}
 
 	op2, setCarry, carry := utils.ShiftFuncs[opcode >> 5 & 0b11](
 		reg.R[rm] + additional,
 		is,
-		set,
+        (opcode >> 20) & 1 == 1, // set
 		!shiftRegister,
 		alu.Carry,
     )
 
 	if setCarry {
-		reg.CPSR.SetFlag(FLAG_C, carry)
+        reg.CPSR.C = carry
 	}
 
     alu.Op2 = op2
@@ -282,8 +293,8 @@ func (cpu *Cpu) movExit(alu *Alu, res uint32) {
 		return
 	}
 
-    rm := utils.GetByte(alu.Opcode, 0)
-	if swiExit := alu.Rd == PC && rm == LR; swiExit {
+    rm := utils.GetByte(alu.Opcode, 0) == LR && (alu.Opcode >> 25) & 1 == 0
+	if swiExit := alu.Rd == PC && rm; swiExit {
 		cpu.ExitException(MODE_SWI)
         if cpu.Reg.R[15] & 1 == 1 {
             cpu.toggleThumb()
@@ -292,8 +303,8 @@ func (cpu *Cpu) movExit(alu *Alu, res uint32) {
 		return
 	}
 
-    cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-    cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+    cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
+    cpu.Reg.CPSR.Z = uint32(res) == 0
 }
 
 func (cpu *Cpu) logicalExit(alu *Alu, res uint32) {
@@ -308,8 +319,8 @@ func (cpu *Cpu) logicalExit(alu *Alu, res uint32) {
 		return
 	}
 
-    cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-    cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+    cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
+    cpu.Reg.CPSR.Z = uint32(res) == 0
 }
 
 func (cpu *Cpu) testExit(alu *Alu) {
@@ -331,13 +342,12 @@ func (cpu *Cpu) psrSwitch() {
 
 	// PC is updated in final bios inst
 
-	curr := cpu.Reg.getMode()
+	curr := cpu.Reg.CPSR.Mode
 
 	i := BANK_ID[curr]
 	reg.CPSR = reg.SPSR[i]
-	reg.IsThumb = reg.CPSR.GetFlag(FLAG_T)
 
-	next := cpu.Reg.getMode()
+	next := cpu.Reg.CPSR.Mode
 	c := BANK_ID[next]
 
 	// if you set this up for fiq, get the special registers
@@ -381,7 +391,7 @@ func (cpu *Cpu) setSubFlags(alu *Alu, res uint64) {
 
     if alu.Rd == PC {
         if rn := utils.GetByte(alu.Opcode, 16); rn == LR {
-            switch cpu.Reg.getMode() {
+            switch cpu.Reg.CPSR.Mode {
             case MODE_ABT:
                 cpu.Reg.R[15] += 4
                 cpu.ExitException(MODE_ABT)
@@ -414,10 +424,10 @@ func (cpu *Cpu) setSubFlags(alu *Alu, res uint64) {
     v := (rnSign != opSign) && (rSign != rnSign)
 	c := res < 0x1_0000_0000
 
-	cpu.Reg.CPSR.SetFlag(FLAG_V, v)
-	cpu.Reg.CPSR.SetFlag(FLAG_C, c)
-	cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-	cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+    cpu.Reg.CPSR.V = v
+    cpu.Reg.CPSR.C = c
+    cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
+    cpu.Reg.CPSR.Z = uint32(res) == 0
 }
 
 func (cpu *Cpu) setAluFlags(alu *Alu, res uint64, instSet uint32) {
@@ -442,10 +452,10 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64, instSet uint32) {
 		c = res < 0x1_0000_0000
 	}
 
-	cpu.Reg.CPSR.SetFlag(FLAG_V, v)
-	cpu.Reg.CPSR.SetFlag(FLAG_C, c)
-	cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-	cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+    cpu.Reg.CPSR.V = v
+    cpu.Reg.CPSR.C = c
+    cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
+    cpu.Reg.CPSR.Z = uint32(res) == 0
 }
 
 const (
@@ -485,18 +495,21 @@ func (cpu *Cpu) Mul(opcode uint32) {
 		r[rd] = res
 
 		if set {
-			cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
-			cpu.Reg.CPSR.SetFlag(FLAG_N, (res>>31&0b1) != 0)
+            cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
+            cpu.Reg.CPSR.Z = uint32(res) == 0
 			// FLAG_C "destroyed" ARM <5, ignored ARM >=5
-			cpu.Reg.CPSR.SetFlag(FLAG_C, false)
+            //cpu.Reg.CPSR.C = false
 		}
 
 		r[PC] += 4
 		return
+
+
     case UMAAL:
 	    panic("UMAAL is UNSUPPORTED")
     
     case UMULL, UMLAL:
+
 		res := uint64(r[rm]) * uint64(r[rs])
 
 		if inst == UMLAL {
@@ -507,14 +520,11 @@ func (cpu *Cpu) Mul(opcode uint32) {
 		r[rn] = uint32(res)
 
 		if set {
-			//cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 63 & 0b1) != 0)
-			cpu.Reg.CPSR.SetFlag(FLAG_N, (res>>63&1) == 1)
-			cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
+            cpu.Reg.CPSR.N = (res >> 63 & 1) != 0
+            cpu.Reg.CPSR.Z = res == 0
 			// FLAG_C "destroyed" ARM <5, ignored ARM >=5
 			// need carry to pass mgba suite
-			//c := res >= 0x1_0000_0000
-			//cpu.Reg.CPSR.SetFlag(FLAG_C, c)
-			cpu.Reg.CPSR.SetFlag(FLAG_C, false)
+            cpu.Reg.CPSR.C = false
 			// FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
 		}
 
@@ -532,10 +542,10 @@ func (cpu *Cpu) Mul(opcode uint32) {
         r[rn] = uint32(res)
 
         if set {
-            cpu.Reg.CPSR.SetFlag(FLAG_N, (res>>63&1) == 1)
-            cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
+            cpu.Reg.CPSR.N = (res >> 63) & 1 == 1
+            cpu.Reg.CPSR.Z = res == 0
+            cpu.Reg.CPSR.C = false
             // FLAG_C "destroyed" ARM <5, ignored ARM >=5
-            cpu.Reg.CPSR.SetFlag(FLAG_C, false)
             // FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
         }
 
@@ -557,30 +567,25 @@ func (cpu *Cpu) Mul(opcode uint32) {
 
         res := rmV * rsV
 
-        if res + rnV > math.MaxInt32 || res + rnV < math.MinInt32 {
-            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
-        }
-
         res += rnV
 
         r[rd] = uint32(res)
 
         if (res > math.MaxInt32 || res < math.MinInt32) {
-            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            cpu.Reg.CPSR.Q = true
         }
-
 
     case SMLAWySMLALWy:
 
-        rmV := int64(int32(r[rm]))
         rsV := int64(int16((r[rs] >> (16 * y) & 0xFFFF)))
+        rmV := int64(int32(r[rm]))
         res := (rmV * rsV) >> 16
 
         if smulwa := x == 0; smulwa {
             add := int64(int32(r[rn]))
 
             if res + add > math.MaxInt32 || res + add < math.MinInt32 {
-                cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+                cpu.Reg.CPSR.Q = true
             }
 
             res += add
@@ -655,7 +660,7 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
             c.toggleThumb()
             r[rd] -= 4
 
-            if c.Reg.IsThumb {
+            if c.Reg.CPSR.T {
                 r[rd] &^= 0b1
             } else {
                 r[rd] &^= 0b11
@@ -712,7 +717,7 @@ func generateSdtAddress(cpu *Cpu, opcode uint32) uint32 {
 			shift,
 			false,
 			true,
-			cpu.Reg.CPSR.GetFlag(FLAG_C),
+			cpu.Reg.CPSR.C,
         )
 
 	} else {
@@ -733,6 +738,7 @@ func generateSdtAddress(cpu *Cpu, opcode uint32) uint32 {
 }
 
 func (cpu *Cpu) BLX(opcode uint32) {
+
     r := &cpu.Reg.R
 
     r[14] = r[15] + 4
@@ -743,7 +749,7 @@ func (cpu *Cpu) BLX(opcode uint32) {
         r[PC] += 2
     }
 
-    cpu.Reg.CPSR.SetThumb(true, cpu)
+    cpu.Reg.CPSR.T = true
 }
 
 func (cpu *Cpu) B(opcode uint32) {
@@ -1085,17 +1091,18 @@ func (cpu *Cpu) mrs(psr *PSR) {
 	r := &cpu.Reg.R
 
 	if psr.SPSR {
-		mode := cpu.Reg.getMode()
-		r[psr.Rd] = uint32(cpu.Reg.SPSR[BANK_ID[mode]])
+		mode := cpu.Reg.CPSR.Mode
+        r[psr.Rd] = cpu.Reg.SPSR[BANK_ID[mode]].Get()
 		return
 	}
 
 	mask := PRIV_MASK
-	if cpu.Reg.getMode() == MODE_USR {
+	if cpu.Reg.CPSR.Mode == MODE_USR {
 		mask = USR_MASK
 	}
 
-	r[psr.Rd] = uint32(cpu.Reg.CPSR) & mask
+
+	r[psr.Rd] = uint32(cpu.Reg.CPSR.Get()) & mask
 }
 
 const (
@@ -1132,7 +1139,7 @@ func (cpu *Cpu) msr(psr *PSR) {
 	}
 
 	secMask := PRIV_MASK
-	curr := cpu.Reg.getMode()
+	curr := cpu.Reg.CPSR.Mode
 	if curr == MODE_USR {
 		secMask = USR_MASK
 	}
@@ -1148,24 +1155,23 @@ func (cpu *Cpu) msr(psr *PSR) {
 		var spsr uint32
 
 		if curr == MODE_USR || curr == MODE_SYS {
-			spsr = uint32(reg.CPSR) &^ mask
+			spsr = uint32(reg.CPSR.Get()) &^ mask
 		} else {
-			spsr = uint32(reg.SPSR[BANK_ID[curr]]) &^ mask
+			spsr = uint32(reg.SPSR[BANK_ID[curr]].Get()) &^ mask
 		}
 
 		spsr |= v & mask
-		reg.SPSR[BANK_ID[curr]] = Cond(spsr)
+		reg.SPSR[BANK_ID[curr]].Set(spsr)
 
 		return
 	}
 
 	next := v & 0b11111
-	cpsr := uint32(reg.CPSR) &^ mask
+	cpsr := uint32(reg.CPSR.Get()) &^ mask
 
 	cpsr |= v & mask
 
-	reg.CPSR = Cond(cpsr)
-	reg.IsThumb = reg.CPSR.GetFlag(FLAG_T)
+	reg.CPSR.Set(cpsr)
 
 	if skip := BANK_ID[curr] == BANK_ID[next]; skip {
 		return
@@ -1268,11 +1274,11 @@ func (cpu *Cpu) Qalu(opcode uint32) {
 
         switch {
         case rmV + rnV > math.MaxInt32:
-            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            cpu.Reg.CPSR.Q = true
             r[rd] = math.MaxInt32
 
         case rmV + rnV < math.MinInt32:
-            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            cpu.Reg.CPSR.Q = true
             r[rd] = 0x8000_0000
         default:
             r[rd] = uint32(int32(rmV + rnV))
@@ -1282,10 +1288,10 @@ func (cpu *Cpu) Qalu(opcode uint32) {
     case QSUB:
         switch {
         case rmV - rnV < math.MinInt32:
-            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            cpu.Reg.CPSR.Q = true
             r[rd] = 0x8000_0000
         case rmV - rnV > math.MaxInt32:
-            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            cpu.Reg.CPSR.Q = true
             r[rd] = math.MaxInt32
         default:
             r[rd] = uint32(int32(rmV - rnV))
@@ -1293,15 +1299,15 @@ func (cpu *Cpu) Qalu(opcode uint32) {
     case QDADD:
 
         if rnV * 2 > math.MaxInt32 || rnV * 2 < math.MinInt32 {
-            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            cpu.Reg.CPSR.Q = true
         }
 
         switch {
         case rmV + min(rnV * 2, math.MaxInt32) > math.MaxInt32:
-            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            cpu.Reg.CPSR.Q = true
             r[rd] = math.MaxInt32
         case rmV + min(rnV * 2, math.MaxInt32) < math.MinInt32:
-            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            cpu.Reg.CPSR.Q = true
             r[rd] = 0x8000_0000
         default:
             r[rd] = uint32(int32(rmV + max(min(rnV * 2, math.MaxInt32), math.MinInt32)))
@@ -1310,15 +1316,15 @@ func (cpu *Cpu) Qalu(opcode uint32) {
     case QDSUB:
 
         if rnV * 2 > math.MaxInt32 || rnV * 2 < math.MinInt32 {
-            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            cpu.Reg.CPSR.Q = true
         }
 
         switch {
         case rmV - min(rnV * 2, math.MaxInt32) > math.MaxInt32:
-            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            cpu.Reg.CPSR.Q = true
             r[rd] = math.MaxInt32
         case rmV - min(rnV * 2, math.MaxInt32) < math.MinInt32:
-            cpu.Reg.CPSR.SetFlag(FLAG_Q, true)
+            cpu.Reg.CPSR.Q = true
             r[rd] = 0x8000_0000
         default:
             r[rd] = uint32(int32(rmV - max(min(rnV * 2, math.MaxInt32), math.MinInt32)))
@@ -1331,9 +1337,10 @@ func (cpu *Cpu) Qalu(opcode uint32) {
 func (cpu *Cpu) Clz(opcode uint32) {
 
     r := &cpu.Reg.R
+    rm := opcode & 0b1111
+
 
     rd := utils.GetVarData(opcode, 12, 15)
-    rm := opcode & 0b1111
 
     r[rd] = uint32(bits.LeadingZeros32(r[rm]))
 

@@ -50,8 +50,8 @@ const (
 
 type Nds struct {
 	mem  mem.Mem
-	arm7 arm7.Cpu
-	arm9 arm9.Cpu
+	arm7 *arm7.Cpu
+	arm9 *arm9.Cpu
     ppu  *ppu.PPU
     Cartridge cart.Cartridge
 
@@ -88,8 +88,8 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
     cp15 := &cp15.Cp15{}
     cp15.Init(&nds.mem)
 
-	nds.arm7 = *arm7.NewCpu(&nds.mem, &irq7)
-	nds.arm9 = *arm9.NewCpu(&nds.mem, &irq9, cp15)
+	nds.arm7 = arm7.NewCpu(&nds.mem, &irq7)
+	nds.arm9 = arm9.NewCpu(&nds.mem, &irq9, cp15)
 
     s := snd.NewSnd(
         audioCtx,
@@ -129,7 +129,7 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 
 var wg2 = sync.WaitGroup{}
 
-const singleThread = !true
+const singleThread = true
 
 func (nds *Nds) Update() {
 
@@ -162,22 +162,44 @@ func (nds *Nds) Update() {
     wg2.Wait()
 }
 
+const REQ_CYCLES = 32
+
 func (nds *Nds) UpdateFrame() {
 
 	for nds.Drawn = false; !nds.Drawn; {
 
         //nds.checkBadPc()
 
-        if arm := !nds.arm9.Reg.IsThumb; arm {
-            nds.StepArm9()
-        } else {
-            nds.StepArm9()
-            nds.StepArm9()
+        for c := 0; c < REQ_CYCLES; {
+
+            if arm := !nds.arm9.Reg.CPSR.T; arm {
+                c += nds.StepArm9()
+            } else {
+                c += nds.StepArm9()
+                c += nds.StepArm9()
+            }
         }
 
-        if nds.arm7.Reg.IsThumb || nds.AccCycles & 1 == 0 {
-            nds.StepArm7()
+        for c := 0; c < REQ_CYCLES; {
+            if nds.arm7.Reg.IsThumb || nds.AccCycles & 1 == 0 {
+                c += nds.StepArm7()
+            } else {
+                c++
+            }
+
         }
+
+        nds.StepOther()
+        //debug.CURR_INST++
+	}
+
+	nds.mem.Snd.Play(nds.Muted)
+    nds.Frame++
+}
+
+func (nds *Nds) StepOther() {
+
+    for range REQ_CYCLES { 
 
         nds.VideoUpdate(1)
 
@@ -185,32 +207,27 @@ func (nds *Nds) UpdateFrame() {
             nds.UpdateTimers(TIMER_CYCLE_MASK + 1)
         }
 
-
         nds.TimerCycles++
-        debug.CURR_INST++
-	}
-
-	nds.mem.Snd.Play(nds.Muted)
-    nds.Frame++
+    }
 }
 
-func (nds *Nds) StepArm9() {
+func (nds *Nds) StepArm9() int {
 
     nds.arm9.CheckIrq()
 
     if nds.arm9.Halted {
-        return
+        return 1
     }
 
     r := &nds.arm9.Reg.R
 
-    //Log(nds, 0, 100_000, true)
-    _, ok := nds.arm9.Execute()
+
+    //Log(nds, 0, 10_000, true)
+    cycles, ok := nds.arm9.Execute()
     if !ok {
         fmt.Printf("ARM9 Decode Error: PC %08X CURR %d\n", r[15], debug.CURR_INST)
         os.Exit(0)
     }
-
 
 
     //nds.CheckGeoDmas()
@@ -223,29 +240,33 @@ func (nds *Nds) StepArm9() {
     if nds.ppu.Rasterizer.GeoEngine.GxStat.FifoIrq != 0 {
         nds.arm9.Irq.SetIRQ(cpu.IRQ_GEO_CMD_FIFO)
     }
+
+    return cycles
 }
 
 var dmaC = uint32(0)
 const D = 0b1111
 
-func (nds *Nds) StepArm7() {
+func (nds *Nds) StepArm7() int {
 
     nds.arm7.CheckIrq()
 
     if nds.arm7.Halted {
-        return
+        return 1
     }
 
     r7 := &nds.arm7.Reg.R
 
     //nds.checkMode(false)
     //uhh.UpdatePcs(*r7, nds.mem.Read32(r7[15], false), uint32(nds.arm7.Reg.CPSR))
-    _, ok := nds.arm7.Execute()
+    cycles, ok := nds.arm7.Execute()
     if !ok {
         //uhh.PrintPcs()
         fmt.Printf("ARM7 Decode Error: PC %08X CURR %d\n", r7[15], debug.CURR_INST)
         os.Exit(0)
     }
+
+    return cycles
 }
 
 func (nds *Nds) ToggleMute() bool {
@@ -290,7 +311,7 @@ func (nds *Nds) DirtyInit() {
     nds.arm9.Reg.R[13] = 0x3002F7C
     nds.arm9.Reg.R[14] = nds.Cartridge.Header.Arm9EntryAddr
     nds.arm9.Reg.R[15] = nds.Cartridge.Header.Arm9EntryAddr
-    nds.arm9.Reg.CPSR = 0x000_001F
+    nds.arm9.Reg.CPSR.Set(0x000_001F)
 
     nds.arm7.Reg.R[12] = nds.Cartridge.Header.Arm7EntryAddr
     //nds.arm7.Reg.R[13] = 0x3002F7C

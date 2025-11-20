@@ -13,21 +13,12 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 
 	if !cpu.CheckCond(opcode >> 28) {
 		r[PC] += 4
-		return 4, true
+		return 1, true
 	}
 
 	if swi := (opcode>>24)&0xF == 0xF; swi {
-		//cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
-
 		cpu.exception(VEC_SWI, MODE_SWI)
-		return 4, true
-		//cycles, incPc := cpu.Gba.SysCall((opcode >> 16) & 0xFF)
-
-		//if incPc {
-		//	r[PC] += 4
-		//}
-
-		//return cycles
+		return 1, true
 	}
 
 	switch (opcode >> 25) & 0b111 {
@@ -36,8 +27,7 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 		case isBX(opcode):
 			cpu.BX(opcode)
 		case isSDT(opcode):
-			cycles := cpu.Sdt(opcode)
-			return int(cycles), true
+			cpu.Sdt(opcode)
 		case isHalf(opcode):
 			cpu.Half(opcode)
 		case isPSR(opcode):
@@ -52,13 +42,13 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 			panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X", opcode, r[PC]))
 		}
 
-		return 4, true
+		return 1, true
 	case 0b001:
 
 		switch {
 		case isSDT(opcode):
-			cycles := cpu.Sdt(opcode)
-			return int(cycles), true
+			cpu.Sdt(opcode)
+			return 1, true
 		case isHalf(opcode):
 			cpu.Half(opcode)
 		case isPSR(opcode):
@@ -71,23 +61,22 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 			panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X", opcode, r[PC]))
 		}
 
-		return 4, true
+		return 1, true
 	case 0b010:
 	case 0b011:
 	case 0b100:
 		cpu.Block(opcode)
-		return 4, true
+		return 1, true
 	case 0b101:
 		cpu.B(opcode)
-		return 4, true
+		return 1, true
 	}
 
 	switch {
 	case isBX(opcode):
 		cpu.BX(opcode)
 	case isSDT(opcode):
-		cycles := cpu.Sdt(opcode)
-		return int(cycles), true
+		cpu.Sdt(opcode)
 	case isBlock(opcode):
 		cpu.Block(opcode)
 	case isHalf(opcode):
@@ -103,12 +92,11 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 	case isALU(opcode):
 		cpu.Alu(opcode)
 	default:
-		//panic(fmt.Sprintf("Unable to Decode ARM 7 %08X, at PC %08X", opcode, r[PC]))
 		fmt.Printf("Unable to Decode ARM 7 %08X, at PC %08X\n", opcode, r[PC])
         return 0, false
 	}
 
-	return 4, true
+	return 1, true
 }
 
 func isOpcodeFormat(opcode, mask, format uint32) bool {

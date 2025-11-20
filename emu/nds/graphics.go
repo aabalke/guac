@@ -2,7 +2,6 @@ package nds
 
 import (
 	"encoding/binary"
-	"fmt"
 	"sync"
 
 	"github.com/aabalke/guac/emu/nds/ppu"
@@ -14,6 +13,51 @@ var b16 = binary.LittleEndian.Uint16
 var wg = sync.WaitGroup{}
 
 func (nds *Nds) graphics(y uint32) {
+
+
+    if singleThread {
+
+        a := &nds.ppu.EngineA
+        capture := &nds.ppu.Capture
+        renderingB := nds.ppu.Rasterizer.Buffers.BisRendering
+
+        switch a.Dispcnt.DisplayMode {
+        case 0:
+            nds.screenoff(y, a)
+
+        case 1:
+
+            nds.standard(y, a)
+            if  capture.ActiveCapture {
+                capture.CaptureLine(y, renderingB)
+            }
+
+        case 2:
+            if capture.ActiveCapture {
+                nds.standard(y, a)
+                capture.CaptureLine(y, renderingB)
+            }
+
+            nds.vramDisplay(y, a)
+
+        case 3:
+            panic("MAIN MEM FIFO")
+            if capture.ActiveCapture {
+                nds.standard(y, a)
+                capture.CaptureLine(y, renderingB)
+            }
+            nds.MemFifoDisplay(a)
+        }
+
+        b := &nds.ppu.EngineB
+        switch b.Dispcnt.DisplayMode {
+        case 0:
+            nds.screenoff(y, b)
+        case 1:
+            nds.standard(y, b)
+        }
+        return
+    }
 
 	wg.Add(2)
     go func() {
@@ -132,7 +176,7 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
 
 	bldPal := ppu.NewBlendPalette(&engine.Blend, nds.getPalette(0, 0, false, engine.IsB))
 
-	var objMode uint32
+	var isSemiTransparent bool
 	var inObjWindow bool
 
 	// work backwards for proper priorities
@@ -184,13 +228,13 @@ func (nds *Nds) render(x, y uint32, engine *ppu.Engine) {
                 break ObjectLoop
             }
 
-            objMode = obj.Mode
-            bldPal.SetObjPalettes(palData, objMode == 1)
+            isSemiTransparent = obj.Mode == 1
+            bldPal.SetObjPalettes(palData, isSemiTransparent)
             break ObjectLoop
         }
 	}
 
-	palData := bldPal.Blend(objMode == 1, x, y, wins, inObjWindow)
+	palData := bldPal.Blend(isSemiTransparent, x, y, wins, inObjWindow)
     r, g, b := engine.MasterBright.Apply(palData)
 	i := (x + (y * SCREEN_WIDTH)) << 2
 	(engine.Pixels)[i] = r
@@ -815,10 +859,10 @@ func (nds *Nds) getPalette(palIdx uint32, paletteNum uint32, obj, engineB bool) 
 
     addr >>= 1
 
-    if addr >= 0x400 {
-        fmt.Printf("BAD PAL ADDR %04X (> 0x400), isB %t\n", addr, engineB)
-        return 0x0 //FFFF
-    }
+    //if addr >= 0x400 {
+    //    fmt.Printf("BAD PAL ADDR %04X (> 0x400), isB %t\n", addr, engineB)
+    //    return 0x0 //FFFF
+    //}
 
 	return uint32(nds.ppu.Pram[addr])
 }
@@ -955,9 +999,6 @@ func getPaletteData(nds *Nds, engine *ppu.Engine, pal256 bool, pal, tileData, in
         palData := nds.getExtendedPalette(engine, 0, true, palIdx, pal)
         return palData, true
     }
-	if palIdx == 0 {
-		return 0, false
-	}
 
     // this is from gba, does not work with ext palettes, but assume it still
     // is needed for std
