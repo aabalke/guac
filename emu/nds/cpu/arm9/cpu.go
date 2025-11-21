@@ -479,3 +479,23 @@ var fastFuncs = map[uint32]func(cpu *Cpu) (uint32, int) {
 func (cpu *Cpu) Read32(addr uint32) uint32 {
     return cpu.mem.Read32(addr, true)
 }
+
+func (cpu *Cpu) Read16(addr uint32) uint32 {
+    return cpu.mem.Read16(addr, true)
+}
+
+func (cpu *Cpu) Read8(addr uint32) uint32 {
+    return cpu.mem.Read8(addr, true)
+}
+
+func (cpu *Cpu) Write32(addr, v uint32) {
+    cpu.mem.Write32(addr, v, true)
+}
+
+func (cpu *Cpu) Write16(addr uint32, v uint16) {
+    cpu.mem.Write16(addr, v, true)
+}
+
+func (cpu *Cpu) Write8(addr uint32, v uint8) {
+    cpu.mem.Write8(addr, v, true)
+}

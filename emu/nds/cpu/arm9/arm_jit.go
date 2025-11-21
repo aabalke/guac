@@ -289,3 +289,172 @@ func (j *Jit) MulQFlag(r amd64.Register) {
 
     j.Mov(amd64.Dl, Q)
 }
+
+func (j *Jit) emitSwp(op uint32) {
+
+    isByte := (op >> 22) & 1 != 0
+    rn := (op >> 16) & 0xF
+    rd := (op >> 12) & 0xF
+    rm := op & 0xF
+
+    if isByte {
+
+        // rax ptr
+        // rbx rn
+        // rcx rm
+
+        j.MovAbs(uint64(cpuPtr), amd64.Rax)
+        j.Movl(j.REG(rn), amd64.Ebx)
+
+        j.Movl(j.REG(rm), amd64.Ecx)
+        j.And(amd64.Imm{Val: 0xFF}, amd64.Rcx)
+
+        j.Push(amd64.Rbx)
+        j.Push(amd64.Rcx)
+
+        j.CallFuncGo((*Cpu).Read8)
+        j.Movl(amd64.Eax, j.REG(rd))
+
+        j.Pop(amd64.Rcx)
+        j.Pop(amd64.Rbx)
+
+        j.MovAbs(uint64(cpuPtr), amd64.Rax)
+        j.CallFuncGo((*Cpu).Write8)
+
+        return
+    }
+
+    j.MovAbs(uint64(cpuPtr), amd64.Rax)
+
+    j.Movl(j.REG(rn), amd64.Ebx)
+    j.Movl(j.REG(rm), amd64.Ecx)
+
+    j.Push(amd64.Rbx)
+    j.Push(amd64.Rcx)
+
+    j.Xor(amd64.Imm{Val: 0b11}, amd64.Ebx)
+    j.CallFuncGo((*Cpu).Read32)
+
+    // rcx is rn after call since x86 needs CL for Ror
+
+    j.Mov(amd64.Indirect{Base: amd64.Rsp, Offset: 16}, amd64.Rcx)
+    j.And(amd64.Imm{Val: 0b11}, amd64.Ecx)
+    j.Shl(amd64.Imm{Val: 0b11}, amd64.Ecx)
+    j.And(amd64.Imm{Val: 31}, amd64.Ecx)
+
+    j.RorCl(amd64.Eax)
+
+    j.Movl(amd64.Eax, j.REG(rd))
+
+    j.Pop(amd64.Rcx)
+    j.Pop(amd64.Rbx)
+
+    j.MovAbs(uint64(cpuPtr), amd64.Rax)
+    j.CallFuncGo((*Cpu).Write32)
+}
+
+func (j *Jit) emitQalu(op uint32) {
+
+    boolean := amd64.Imm{Val: 1}
+    maxInt32 := amd64.Imm{Val: math.MaxInt32}
+    minInt32 := amd64.Imm{Val: math.MinInt32}
+
+    inst := (op >> 20) & 0xF
+    rn := (op >> 16) & 0xF
+    rd := (op >> 12) & 0xF
+    rm := op & 0xF
+
+    j.Mov(j.REG(rm), amd64.Eax)
+    j.Shl(amd64.Imm{Val: 32}, amd64.Rax)
+    j.Sar(amd64.Imm{Val: 32}, amd64.Rax)
+
+    j.Mov(j.REG(rn), amd64.Ebx)
+    j.Shl(amd64.Imm{Val: 32}, amd64.Rbx)
+    j.Sar(amd64.Imm{Val: 32}, amd64.Rbx)
+
+    switch inst{
+    case QADD, QSUB:
+
+        j.Mov(Q, amd64.Cl)
+
+        if inst == QADD {
+            j.Add(amd64.Rbx, amd64.Rax)
+        } else {
+            j.Sub(amd64.Rbx, amd64.Rax)
+        }
+
+        j.Cmp(maxInt32, amd64.Rax)
+        skipA := j.JccForward(amd64.CC_LE)
+        j.Mov(boolean, amd64.Rcx)
+        j.Mov(maxInt32, amd64.Rax)
+        skipA()
+
+        j.Cmp(minInt32, amd64.Rax)
+        skipB := j.JccForward(amd64.CC_GE)
+        j.Mov(boolean, amd64.Rcx)
+        j.MovAbs(uint64(0x8000_0000), amd64.Rax)
+        skipB()
+
+        j.Mov(amd64.Cl, Q)
+        j.Movl(amd64.Eax, j.REG(rd))
+
+    case QDADD, QDSUB:
+
+        j.Mov(Q, amd64.Cl)
+
+        // imul needs rax so tmp mov rax to r10 and back
+        // also imul dst is rax, set to rbx to get proper order
+        j.Mov(amd64.Rax, amd64.R10)
+        j.Mov(amd64.Imm{Val: 2}, amd64.Rax)
+
+        j.Imul(amd64.Rbx)
+        j.Mov(amd64.Rax, amd64.Rbx)
+        j.Mov(amd64.R10, amd64.Rax)
+
+        // check if rn * 2 flips q flag
+
+        j.Cmp(maxInt32, amd64.Rbx)
+        skipA1 := j.JccForward(amd64.CC_LE)
+        j.Mov(boolean, amd64.Rcx)
+        j.Mov(maxInt32, amd64.Rbx)
+        skipA1()
+
+        j.Cmp(minInt32, amd64.Rbx)
+        skipB1 := j.JccForward(amd64.CC_GE)
+        j.Mov(boolean, amd64.Rcx)
+        j.Mov(minInt32, amd64.Rbx)
+        skipB1()
+
+        var skip func()
+        if inst == QDADD {
+            j.Add(amd64.Rbx, amd64.Rax)
+            // im not sure why special case for -1 is needed here but not golang
+            j.MovAbs(uint64(0xFFFF_FFFF), amd64.Rdx)
+            j.Cmp(amd64.Rdx, amd64.Rax)
+            skip = j.JccForward(amd64.CC_Z)
+        } else {
+            j.Sub(amd64.Rbx, amd64.Rax)
+            // im not sure why special case for 0 is needed here but not golang
+            j.MovAbs(uint64(0x0), amd64.Rdx)
+            j.Cmp(amd64.Edx, amd64.Eax)
+            skip = j.JccForward(amd64.CC_Z)
+        }
+
+        j.Cmp(maxInt32, amd64.Rax)
+        skipA := j.JccForward(amd64.CC_LE)
+        j.Mov(boolean, amd64.Rcx)
+        j.Mov(maxInt32, amd64.Rax)
+        skipA()
+
+        j.Cmp(minInt32, amd64.Rax)
+        skipB := j.JccForward(amd64.CC_GE)
+        j.Mov(boolean, amd64.Rcx)
+        j.Mov(minInt32, amd64.Rax)
+        skipB()
+
+        skip()
+
+        j.Mov(amd64.Cl, Q)
+        j.Movl(amd64.Eax, j.REG(rd))
+    }
+}

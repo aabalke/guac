@@ -124,9 +124,13 @@ func (j *Jit) TestInst(op uint32) {
     asm.MovAbs(uint64(cpuPtr), amd64.R15)
 
     //j.emitClz(op)
-    j.emitMul(op)
+    //j.emitMul(op)
+    //j.emitSwp(op)
+    j.emitQalu(op)
 
     asm.Ret()
 
     asm.BuildTo(&j.Blocks[10].f)
 }
+
+// SHL SAR vs MOXSV /

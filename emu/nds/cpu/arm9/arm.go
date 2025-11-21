@@ -1225,26 +1225,21 @@ func (cpu *Cpu) Swp(opcode uint32) {
 	rmValue := r[rm]
 	rnValue := r[rn]
 
-	aligned := rnValue
-
-	var rnMemValue uint32
 	if isByte {
-		rnMemValue = cpu.mem.Read8(rnValue, true)
-		r[rd] = rnMemValue
+		r[rd] = cpu.mem.Read8(rnValue, true)
 		cpu.mem.Write8(rnValue, uint8(rmValue), true)
 		r[PC] += 4
 		return
+    }
 
-	} else {
-		aligned = rnValue &^ 0b11
-		rnMemValue = cpu.mem.Read32(aligned, true)
-		is := (rnValue & 0b11) << 3
-		//rnMemValue, _, _ = utils.Ror(rnMemValue, is, false, false, false)
-		rnMemValue = utils.RorSimple(rnMemValue, is)
-	}
+    v := cpu.mem.Read32(rnValue &^ 0b11, true)
+    is := (rnValue & 0b11) << 3
 
-	r[rd] = rnMemValue
-	cpu.mem.Write32(aligned, rmValue, true)
+    //rnMemValue, _, _ = utils.Ror(rnMemValue, is, false, false, false)
+    v = utils.RorSimple(v, is)
+
+	r[rd] = v
+	cpu.mem.Write32(rnValue, rmValue, true)
 	r[PC] += 4
 }
 
@@ -1253,83 +1248,49 @@ const (
     QSUB = 2
     QDADD = 4
     QDSUB = 6
-
-    MIN_INT32 = 0x8000_0000
 )
 
 func (cpu *Cpu) Qalu(opcode uint32) {
 
     r := &cpu.Reg.R
 
-    inst := utils.GetVarData(opcode, 20, 23)
-    rn := utils.GetVarData(opcode, 16, 19)
-    rd := utils.GetVarData(opcode, 12, 15)
-    rm := utils.GetVarData(opcode, 0, 3)
+    inst := (opcode >> 20) & 0xF
+    rnV := int64(int32(r[(opcode >> 16) & 0xF]))
+    rmV := int64(int32(r[opcode & 0xF]))
 
-    rnV := int64(int32(r[rn]))
-    rmV := int64(int32(r[rm]))
+    if double := inst >= 4; double {
 
-    switch inst {
-    case QADD:
+        rnV *= 2
 
-        switch {
-        case rmV + rnV > math.MaxInt32:
+        if rnV > math.MaxInt32 {
             cpu.Reg.CPSR.Q = true
-            r[rd] = math.MaxInt32
-
-        case rmV + rnV < math.MinInt32:
-            cpu.Reg.CPSR.Q = true
-            r[rd] = 0x8000_0000
-        default:
-            r[rd] = uint32(int32(rmV + rnV))
+            rnV = math.MaxInt32
         }
 
-
-    case QSUB:
-        switch {
-        case rmV - rnV < math.MinInt32:
+        if rnV < math.MinInt32 {
             cpu.Reg.CPSR.Q = true
-            r[rd] = 0x8000_0000
-        case rmV - rnV > math.MaxInt32:
-            cpu.Reg.CPSR.Q = true
-            r[rd] = math.MaxInt32
-        default:
-            r[rd] = uint32(int32(rmV - rnV))
-        }
-    case QDADD:
-
-        if rnV * 2 > math.MaxInt32 || rnV * 2 < math.MinInt32 {
-            cpu.Reg.CPSR.Q = true
-        }
-
-        switch {
-        case rmV + min(rnV * 2, math.MaxInt32) > math.MaxInt32:
-            cpu.Reg.CPSR.Q = true
-            r[rd] = math.MaxInt32
-        case rmV + min(rnV * 2, math.MaxInt32) < math.MinInt32:
-            cpu.Reg.CPSR.Q = true
-            r[rd] = 0x8000_0000
-        default:
-            r[rd] = uint32(int32(rmV + max(min(rnV * 2, math.MaxInt32), math.MinInt32)))
-        }
-
-    case QDSUB:
-
-        if rnV * 2 > math.MaxInt32 || rnV * 2 < math.MinInt32 {
-            cpu.Reg.CPSR.Q = true
-        }
-
-        switch {
-        case rmV - min(rnV * 2, math.MaxInt32) > math.MaxInt32:
-            cpu.Reg.CPSR.Q = true
-            r[rd] = math.MaxInt32
-        case rmV - min(rnV * 2, math.MaxInt32) < math.MinInt32:
-            cpu.Reg.CPSR.Q = true
-            r[rd] = 0x8000_0000
-        default:
-            r[rd] = uint32(int32(rmV - max(min(rnV * 2, math.MaxInt32), math.MinInt32)))
+            rnV = math.MinInt32
         }
     }
+
+    if inst == QADD || inst == QDADD {
+        rnV += rmV
+    } else {
+        rnV = rmV - rnV
+    }
+
+    if rnV > math.MaxInt32 {
+        cpu.Reg.CPSR.Q = true
+        rnV = math.MaxInt32
+    }
+
+    if rnV < math.MinInt32 {
+        cpu.Reg.CPSR.Q = true
+        rnV = math.MinInt32
+    }
+
+    rd := (opcode >> 12) & 0xF
+    r[rd] = uint32(rnV)
 
     r[PC] += 4
 }
