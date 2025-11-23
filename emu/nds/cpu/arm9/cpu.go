@@ -123,7 +123,7 @@ func NewCpu(m cpu.MemoryInterface, irq *cpu.Irq, cp15 *cp15.Cp15) *Cpu {
     c.Irq.IME = true
 
     c.Jit = NewJit(c)
-    c.Jit.CreateBlocks()
+    //c.Jit.CreateBlocks()
 
 	return c
 }
@@ -229,9 +229,9 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
         } else {
             cpu.LoopCnt++
 
-            if f, ok := fastFuncs[r[PC]]; ok {
-                return f(cpu)
-            }
+            //if f, ok := fastFuncs[r[PC]]; ok {
+            //    return f(cpu)
+            //}
         }
 
         // this is here for debugging above, could probably move earlier

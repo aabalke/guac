@@ -9,24 +9,24 @@ import (
 
 type Jit struct {
 	Cpu    *Cpu
-	Blocks [0x10]JitBlock
+	//Blocks [0x10]JitBlock
     *amd64.Assembler
+    F func()
 }
 
-type JitBlock struct {
-	f      func() int64
-	initPc uint32
-    finalPc uint32
-    finalOp uint32
-	Length uint32
-}
+//type JitBlock struct {
+//	f      func() int64
+//	initPc uint32
+//    finalPc uint32
+//    finalOp uint32
+//	Length uint32
+//}
 
 func NewJit(cpu *Cpu) *Jit {
 
-    cpuPtr = uintptr(unsafe.Pointer(cpu))
     return &Jit{
         Cpu: cpu,
-        Blocks: [0x10]JitBlock{},
+        //Blocks: [0x10]JitBlock{},
     }
 }
 
@@ -50,8 +50,6 @@ func CallBlk(asm *amd64.Assembler, framesize int32, f func()) {
 //}
 
 var (
-    cpuPtr uintptr
-
     CPU = amd64.R15 // always set R15 to CPU ptr
     REG = int32(unsafe.Offsetof(Cpu{}.Reg))
     CPSR = REG + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR))
@@ -74,42 +72,54 @@ func (j *Jit) REG(i uint32) amd64.Operand {
     }
 }
 
-func (j *Jit) CreateBlocks() {
-
-    pc := uint32(0x2039A88)
-
-    j.Blocks[0] = JitBlock{
-        initPc: pc,
-        Length: 8,
-        finalPc: 0x0203_9AA0,
-        finalOp: 0x1AFF_FFF8,
-    }
-
-    asm, err := amd64.New(gojit.PageSize)
-    if err != nil {
-        panic(err)
-    }
-
-    // setup, not sure if needed per Block
-    asm.ABI = amd64.GoABI
-    asm.MovAbs(uint64(cpuPtr), amd64.R15)
-
-
-    //0x02039A88
-    asm.MovAbs(uint64(cpuPtr), amd64.Rax)
-    asm.Mov(amd64.Imm{Val: 0x2}, amd64.Rbx) // addr
-    asm.CallFuncGo((*Cpu).Read32)
-
-    asm.MovAbs(2, amd64.Rbx)
-    asm.Cmp(amd64.Rax, amd64.Rbx)
-    asm.SETcc(amd64.CC_Z, Z)
-
-    asm.Mov(amd64.Imm{Val: 0x2039AA0}, PC_REG)
-
-    asm.Ret() // make sure RAX is return value on amd64
-
-    asm.BuildTo(&j.Blocks[0].f)
+func (j *Jit) StackOffset(i int32, dst amd64.Register) {
+    j.Mov(amd64.Indirect{Base: amd64.Rsp, Offset: (i * 8)}, dst)
 }
+
+//func (j *Jit) CreateBlocks() {
+//
+//    pc := uint32(0x2039A88)
+//
+//    j.Blocks[0] = JitBlock{
+//        initPc: pc,
+//        Length: 8,
+//        finalPc: 0x0203_9AA0,
+//        finalOp: 0x1AFF_FFF8,
+//    }
+//
+//    asm, err := amd64.New(gojit.PageSize)
+//    if err != nil {
+//        panic(err)
+//    }
+//
+//    // setup, not sure if needed per Block
+//    asm.ABI = amd64.GoABI
+//    asm.MovAbs(uint64(cpuPtr), amd64.R15)
+//
+//
+//    //0x02039A88
+//    asm.MovAbs(uint64(cpuPtr), amd64.Rax)
+//    asm.Mov(amd64.Imm{Val: 0x2}, amd64.Rbx) // addr
+//    asm.CallFuncGo((*Cpu).Read32)
+//
+//    asm.MovAbs(2, amd64.Rbx)
+//    asm.Cmp(amd64.Rax, amd64.Rbx)
+//    asm.SETcc(amd64.CC_Z, Z)
+//
+//    asm.Mov(amd64.Imm{Val: 0x2039AA0}, PC_REG)
+//
+//    asm.Ret() // make sure RAX is return value on amd64
+//
+//    asm.BuildTo(&j.Blocks[0].f)
+//}
+
+//if rd != PC {
+//    cpu.Jit.TestInst(opcode)
+//    cpu.Jit.F()
+//    cpu.Reg.R[PC] += 4
+//    return
+//}
+
 
 func (j *Jit) TestInst(op uint32) {
 
@@ -121,16 +131,20 @@ func (j *Jit) TestInst(op uint32) {
     j.Assembler = asm
 
     asm.ABI = amd64.GoABI
-    asm.MovAbs(uint64(cpuPtr), amd64.R15)
+    //cpuPtr = uintptr(unsafe.Pointer(cpu))
+    asm.MovAbs(uint64(uintptr(unsafe.Pointer(j.Cpu))), amd64.R15)
 
     //j.emitClz(op)
     //j.emitMul(op)
     //j.emitSwp(op)
-    j.emitQalu(op)
+    //j.emitQalu(op)
+    //j.emitSdt(op)
+    //j.emitAlu(op)
 
     asm.Ret()
 
-    asm.BuildTo(&j.Blocks[10].f)
+    //asm.BuildTo(&j.Blocks[10].f)
+    asm.BuildTo(&j.F)
 }
 
 // SHL SAR vs MOXSV /

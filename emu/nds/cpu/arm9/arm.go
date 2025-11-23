@@ -623,7 +623,7 @@ const (
 	LDR_PLD
 )
 
-func (c *Cpu) Sdt(opcode uint32) uint32 {
+func (c *Cpu) Sdt(opcode uint32) {
 
 	r := &c.Reg.R
 
@@ -631,14 +631,17 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 		panic("Malformed Sdt Instruction")
 	}
 
-	rd := utils.GetByte(opcode, 12)
-	rn := utils.GetByte(opcode, 16)
-    byte := utils.BitEnabled(opcode, 22)
-    load := utils.BitEnabled(opcode, 20)
+
+    rd   := (opcode >> 12) & 0xF
+    rn   := (opcode >> 16) & 0xF
+    preFlag  := (opcode >> 24) & 1 != 0
+    byte := (opcode >> 22) & 1 != 0
+    wb   := (opcode >> 21) & 1 != 0
+    load := (opcode >> 20) & 1 != 0
 
 	post := generateSdtAddress(c, opcode)
     pre := r[rn]
-    if preFlag := utils.BitEnabled(opcode, 24); preFlag {
+    if preFlag {
         pre = post
 	}
 
@@ -680,22 +683,14 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 
         addr := pre &^ 0b11
 
-        if addr == 0x400_0400 {
-
-        }
-
 		c.mem.Write32(addr, v, true)
 	}
 
-	skipLoadWriteBack := load && (rn == rd)
-    writeback := !utils.BitEnabled(opcode, 24) || utils.BitEnabled(opcode, 21)
-	if writeback && !skipLoadWriteBack {
+    if writeback := (!preFlag || wb) && !(load && rn == rd); writeback {
 		r[rn] = post
-	}
+    }
 
 	c.Reg.R[PC] += 4
-
-	return 4
 }
 
 func generateSdtAddress(cpu *Cpu, opcode uint32) uint32 {
@@ -703,7 +698,8 @@ func generateSdtAddress(cpu *Cpu, opcode uint32) uint32 {
 	r := &cpu.Reg.R
 
 	var offset uint32
-    if imm := utils.BitEnabled(opcode, 25); imm {
+    if shReg := (opcode >> 25) & 1 != 0; shReg {
+
         if utils.BitEnabled(opcode, 4) {
             panic("Malformed Single Data Transfer")
         }
@@ -720,7 +716,8 @@ func generateSdtAddress(cpu *Cpu, opcode uint32) uint32 {
 			cpu.Reg.CPSR.C,
         )
 
-	} else {
+    } else {
+
         offset = utils.GetVarData(opcode, 0, 11)
     }
 
