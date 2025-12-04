@@ -3,6 +3,7 @@ package amd64
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/aabalke/guac/emu/nds/cpu/arm9/jit"
 )
@@ -19,11 +20,19 @@ type Assembler struct {
 	err error
 }
 
+var p bool
+
 func New(size int) (*Assembler, error) {
 	buf, e := gojit.Alloc(size)
 	if e != nil {
 		return nil, e
 	}
+
+    if !p {
+        fmt.Printf("ADDR ASSEMBLER %p\n", buf)
+        p = true
+    }
+
 	return &Assembler{Buf: buf}, nil
 }
 
@@ -71,7 +80,7 @@ func (a *Assembler) int32(i uint32) {
 		a.err = ErrBufferTooSmall
 		return
 	}
-	a.Buf[a.Off] = byte(i & 0xFF)
+	a.Buf[a.Off+0] = byte(i & 0xFF)
 	a.Buf[a.Off+1] = byte(i >> 8)
 	a.Buf[a.Off+2] = byte(i >> 16)
 	a.Buf[a.Off+3] = byte(i >> 24)

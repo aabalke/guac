@@ -16,6 +16,7 @@ import (
 
 	"os"
 	"runtime/pprof"
+    //"runtime/debug"
 )
 
 const (
@@ -30,10 +31,12 @@ var icon []byte
 
 var f *os.File
 
-var isProfiling bool
-var profileFrames uint32
+//var isProfiling bool
+//var profileFrames uint32
 
 func main() {
+    
+    //debug.SetGCPercent(-1) // disables GC
 
 	config.Conf.Decode()
 
@@ -48,7 +51,7 @@ func main() {
 
         f = fi
 
-		pprof.StartCPUProfile(f)
+		//pprof.StartCPUProfile(f)
 
 		ebiten.SetTPS(2000)
 
@@ -68,7 +71,12 @@ func main() {
 		ebiten.SetFullscreen(true)
 	}
 
+    //opts := &ebiten.RunGameOptions{
+    //    SingleThread: true,
+    //}
+
 	if err := ebiten.RunGame(NewGame(flags)); err != nil && err != exit {
+	//if err := ebiten.RunGameWithOptions(NewGame(flags), opts); err != nil && err != exit {
 		log.Fatal(err)
 	}
 

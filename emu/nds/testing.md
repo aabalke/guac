@@ -218,13 +218,11 @@ Mario And Luigi Bowsers Inside Story
 Pokemon Ranger
 
 ### 3D Alpha Blend
-Sonic Chronicles The Dark Brotherhood
 New Super Mario Bros (also error with Affine16, pa,pc bgs, and same z error)
 
 ### 3D Same Z Error
-Animal Crossing Wild World
 Cooking Mama
-Pokemon Diamond
+Pokemon Diamond (Save Error)
 
 ### Misc 3D
 Pokemon Heartgold
@@ -234,6 +232,7 @@ Zelda Spirit Tracks
 Zelda Phantom Hourglass
 
 ### No known errors
+Animal Crossing Wild World
 Brain Age
 Brain Age 2
 Big Brain Academy
@@ -241,7 +240,9 @@ Tetris Ds
 Yoshis Island
 Pokemon Blue Rescue Team
 Mario Kart Ds
+Sonic Chronicles The Dark Brotherhood
 
+### Other
 Clubhouse Games
 Housemd
 Lego Star Wars the Complete Saga
@@ -250,4 +251,4 @@ Mario and Luigi Partners in Time
 Sonic Colors
 Super Mario 64
 
-Fog needs work - see lesson 10 (seems good for mario kart)
+Fog needs work - see lesson 10 (seems good for mario kart, probably DepthW vs DepthZ related)

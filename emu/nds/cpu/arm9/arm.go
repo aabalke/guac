@@ -1,10 +1,11 @@
 package arm9
 
 import (
+	"fmt"
 	"math"
 	"math/bits"
 
-	"github.com/aabalke/guac/emu/nds/cpu/cp15"
+	"github.com/aabalke/guac/emu/nds/cpu/arm9/cp15"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
@@ -26,6 +27,8 @@ const (
 	BIC
 	MVN
 )
+
+var _ = fmt.Sprintf
 
 var aluInst = [16]func(cpu *Cpu, alu *Alu){
 
@@ -625,8 +628,6 @@ const (
 	LDR_PLD
 )
 
-const base = 0x200_0000
-
 func (c *Cpu) Sdt(opcode uint32) {
 
 	r := &c.Reg.R
@@ -645,11 +646,19 @@ func (c *Cpu) Sdt(opcode uint32) {
     wb   := (opcode >> 21) & 1 != 0
     wb    = (wb || !preFlag) && !(load && rn == rd)
 
+    //if (rd != PC) {
+    //    //reg := c.Reg
+    //    c.Jit.TestInst(opcode, c.Jit.emitSdt)
+    //    r[PC] += 4
+    //    //c.Reg = reg
+    //    return
+    //}
+
 	var offset uint32
     if shReg := (opcode >> 25) & 1 != 0; shReg {
 
         if utils.BitEnabled(opcode, 4) {
-            panic("Malformed Single Data Transfer")
+            panic("Malformed Single Data Transfer O_o")
         }
 
         shift := (opcode >> 7) & 0x1F
@@ -677,17 +686,6 @@ func (c *Cpu) Sdt(opcode uint32) {
 	} else {
         post -= offset
     }
-
-    //if rd != PC && load && byte &&
-    //    (post >= base && post < base + 0x100_0000) {
-
-    //    sr := c.Reg.R
-    //    c.Jit.TestInst(opcode, c.Jit.emitSdt)
-    //    c.Reg.R = sr
-    //    r = &c.Reg.R
-    //    //r[PC] += 4
-    //    //return
-    //}
 
     pre := r[rn]
     if preFlag {
@@ -728,7 +726,7 @@ func (c *Cpu) Sdt(opcode uint32) {
 		r[rn] = post
     }
 
-	c.Reg.R[PC] += 4
+	r[PC] += 4
 }
 
 func (cpu *Cpu) BLX(opcode uint32) {
@@ -812,28 +810,21 @@ func (c *Cpu) Half(op uint32) {
     preFlag := (op >> 24) & 1 != 0
     load := (op >> 20) & 1 != 0
     inst := (op >> 5)  & 0b11
-
-    rnv := r[rn]
-    rdv := r[rd]
-    var rd2v uint32
-
     wb := (op >> 21) & 1 != 0
     wb = (wb || !preFlag) && !(load && (rn == rd))
 
+    //if (rd != PC) {
+    //    //reg := c.Reg
+    //    c.Jit.TestInst(op, c.Jit.emitHalf)
+    //    c.Reg.R[PC] += 4
+    //    //c.Reg = reg
+    //    return
+    //}
+
+    rnv := r[rn]
 	if rn == PC {
         rnv += 8
 	}
-
-	if rd == PC {
-        rdv += 12
-	}
-
-    if inst == STRD {
-        rd2v = r[rd + 1]
-        if rd + 1 == PC {
-            rd2v += 12
-        }
-    }
 
 	var offset uint32
     if imm := (op >> 22) & 1 != 0; imm {
@@ -842,7 +833,7 @@ func (c *Cpu) Half(op uint32) {
         offset = r[op & 0xF]
 	}
 
-	post := r[rn]
+	post := rnv
 
     if up := (op >> 23) & 1 != 0; up {
 		post += offset
@@ -852,7 +843,7 @@ func (c *Cpu) Half(op uint32) {
 
     pre := post
     if !preFlag {
-        pre = r[rn]
+        pre = rnv
     }
 
     if inst == RESERVED {
@@ -860,6 +851,14 @@ func (c *Cpu) Half(op uint32) {
     }
 
 	if !load {
+        rdv := r[rd]
+
+        if rd == PC {
+            rdv += 12
+        }
+
+        if inst == STRD && !load {
+        }
 		switch inst {
 		case STRH:
             c.mem.Write16(pre &^ 1, uint16(rdv), true)
@@ -870,6 +869,12 @@ func (c *Cpu) Half(op uint32) {
             r[rd + 1] = c.mem.Read32(addr + 4, true)
 
 		case STRD:
+            var rd2v uint32
+            rd2v = r[rd + 1]
+            if rd + 1 == PC {
+                rd2v += 12
+            }
+
             addr := pre &^ 0b111
             c.mem.Write32(addr, rdv, true)
             c.mem.Write32(addr + 4, rd2v, true)
@@ -918,6 +923,7 @@ func (cpu *Cpu) Psr(opcode uint32) {
     if spsr := (opcode >> 22) & 1 != 0; spsr {
 		mode := cpu.Reg.CPSR.Mode
         r[rd] = cpu.Reg.SPSR[BANK_ID[mode]].Get()
+        r[PC] += 4
 		return
 	}
 
@@ -927,7 +933,7 @@ func (cpu *Cpu) Psr(opcode uint32) {
 	}
 
 	r[rd] = uint32(cpu.Reg.CPSR.Get()) & mask
-	cpu.Reg.R[15] += 4
+    r[PC] += 4
 }
 
 const (
@@ -1045,17 +1051,18 @@ func (cpu *Cpu) msr(op uint32) {
 
 func (cpu *Cpu) Swp(opcode uint32) {
 
-	isByte := utils.BitEnabled(opcode, 22)
+	byte := utils.BitEnabled(opcode, 22)
 	rn := utils.GetByte(opcode, 16)
 	rd := utils.GetByte(opcode, 12)
 	rm := utils.GetByte(opcode, 0)
+
 
 	r := &cpu.Reg.R
 
 	rmValue := r[rm]
 	rnValue := r[rn]
 
-	if isByte {
+	if byte {
 		r[rd] = cpu.mem.Read8(rnValue, true)
 		cpu.mem.Write8(rnValue, uint8(rmValue), true)
 		r[PC] += 4
@@ -1128,11 +1135,8 @@ func (cpu *Cpu) Qalu(opcode uint32) {
 func (cpu *Cpu) Clz(opcode uint32) {
 
     r := &cpu.Reg.R
-    rm := opcode & 0b1111
-
-
-    rd := utils.GetVarData(opcode, 12, 15)
-
+    rm := opcode & 0xF
+    rd := (opcode >> 12) & 0xF
     r[rd] = uint32(bits.LeadingZeros32(r[rm]))
 
     r[PC] += 4

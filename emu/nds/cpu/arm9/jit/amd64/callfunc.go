@@ -5,7 +5,7 @@ import (
 	"unsafe"
 )
 
-func (a *Assembler) CallFunc(f any) {
+func (a *Assembler) InternalCallFunc(f any) {
 
 	if reflect.TypeOf(f).Kind() != reflect.Func {
 		panic("CallFunc: Can't call non-func")

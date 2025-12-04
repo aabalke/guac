@@ -5,13 +5,15 @@ Swp
 Mul
 Clz
 QAlu
+ALU
+HALF
+
+-- problem
+SDT
 
 ## Todo
-SDT
 BLOCK
-HALF
 PSR
-ALU
 COPRO
 
 
@@ -21,4 +23,3 @@ PLD
 EXCEPTION (SWI UNDEF BKPT)
 B
 BX
- 

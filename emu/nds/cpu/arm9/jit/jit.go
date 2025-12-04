@@ -4,8 +4,9 @@
 package gojit
 
 import (
+
 	"github.com/edsrzf/mmap-go"
-    
+
 	"reflect"
 	"unsafe"
 )
@@ -21,6 +22,7 @@ const PageSize = 4096
 // len most likely needs to be a multiple of PageSize.
 func Alloc(len int) ([]byte, error) {
 	b, err := mmap.MapRegion(nil, len, mmap.EXEC|mmap.RDWR, mmap.ANON, int64(0))
+
 	return b, err
 }
 

@@ -113,6 +113,7 @@ l = [4]
 
 [nds]
 
+#multithread_3d = true
 #threads = 8
 #disable_saves = true
 

@@ -5,11 +5,12 @@ import (
 	"os"
 	"sync"
 
+	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/cpu"
 	"github.com/aabalke/guac/emu/nds/cpu/arm7"
 	"github.com/aabalke/guac/emu/nds/cpu/arm9"
-	"github.com/aabalke/guac/emu/nds/cpu/cp15"
+	"github.com/aabalke/guac/emu/nds/cpu/arm9/cp15"
 	"github.com/aabalke/guac/emu/nds/debug"
 	"github.com/aabalke/guac/emu/nds/mem"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
@@ -103,6 +104,7 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
         &nds.arm7.Halted, &nds.arm9.Halted,
         &nds.arm7.Dma, &nds.arm9.Dma,
         &irq7, &irq9,
+        nil, nds.arm9.Jit,
         &nds.Cartridge, nds.ppu, s, path + ".save")
 
     s.Mem = &nds.mem
@@ -129,7 +131,7 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 
 var wg2 = sync.WaitGroup{}
 
-const singleThread = true
+const singleThread = !true
 
 func (nds *Nds) Update() {
 
@@ -162,25 +164,37 @@ func (nds *Nds) Update() {
     wg2.Wait()
 }
 
-const REQ_CYCLES = 32
-
 func (nds *Nds) UpdateFrame() {
+
+    //if nds.Frame == 900 {
+    //    fmt.Printf("MAX %08X MIN %08X\n", arm9.MaxPc, arm9.MinPc)
+    //}
 
 	for nds.Drawn = false; !nds.Drawn; {
 
         //nds.checkBadPc()
+        //if arm := !nds.arm9.Reg.CPSR.T; arm {
+        //    nds.StepArm9()
+        //} else {
+        //    nds.StepArm9()
+        //    nds.StepArm9()
+        //}
+        //if nds.arm7.Reg.IsThumb || nds.AccCycles & 1 == 0 {
+        //    nds.StepArm7()
+        //}
 
-        for c := 0; c < REQ_CYCLES; {
+        for c := 0; c < int(config.Conf.Nds.NdsJit.BatchInst); {
 
-            if arm := !nds.arm9.Reg.CPSR.T; arm {
-                c += nds.StepArm9()
-            } else {
-                c += nds.StepArm9()
-                c += nds.StepArm9()
-            }
+            c += nds.StepArm9()
+            //if arm := !nds.arm9.Reg.CPSR.T; arm {
+            //    c += nds.StepArm9()
+            //} else {
+            //    c += nds.StepArm9()
+            //    c += nds.StepArm9()
+            //}
         }
 
-        for c := 0; c < REQ_CYCLES; {
+        for c := 0; c < int(config.Conf.Nds.NdsJit.BatchInst); {
             if nds.arm7.Reg.IsThumb || nds.AccCycles & 1 == 0 {
                 c += nds.StepArm7()
             } else {
@@ -189,7 +203,12 @@ func (nds *Nds) UpdateFrame() {
 
         }
 
-        nds.StepOther()
+        nds.StepOther(config.Conf.Nds.NdsJit.BatchInst)
+        //for c := 0; c < int(config.Conf.Nds.NdsJit.BatchInst); {
+        //    nds.StepOther(config.Conf.Nds.NdsJit.BatchInst)
+        //    c++
+        //}
+
         //debug.CURR_INST++
 	}
 
@@ -197,18 +216,15 @@ func (nds *Nds) UpdateFrame() {
     nds.Frame++
 }
 
-func (nds *Nds) StepOther() {
+func (nds *Nds) StepOther(reqInst uint32) {
 
-    for range REQ_CYCLES { 
+    nds.VideoUpdate(reqInst)
 
-        nds.VideoUpdate(1)
-
-        if nds.TimerCycles & TIMER_CYCLE_MASK == 0 {
-            nds.UpdateTimers(TIMER_CYCLE_MASK + 1)
-        }
-
-        nds.TimerCycles++
+    if nds.TimerCycles & TIMER_CYCLE_MASK == 0 {
+        nds.UpdateTimers(TIMER_CYCLE_MASK + 1)
     }
+
+    nds.TimerCycles += uint8(reqInst)
 }
 
 func (nds *Nds) StepArm9() int {
@@ -220,7 +236,6 @@ func (nds *Nds) StepArm9() int {
     }
 
     r := &nds.arm9.Reg.R
-
 
     //Log(nds, 0, 10_000, true)
     cycles, ok := nds.arm9.Execute()

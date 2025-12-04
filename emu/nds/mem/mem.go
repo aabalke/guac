@@ -41,9 +41,8 @@ type Mem struct {
 
     arm7Pc *uint32
 
-    ppu *ppu.PPU
+    Ppu *ppu.PPU
     Cartridge *cart.Cartridge
-
 
     Vcount uint32
     Dispstat Dispstat
@@ -63,13 +62,25 @@ type Mem struct {
     Snd *snd.Snd
 
     Save bool
+
+    Jit9 Jit
 }
 
 type BiosProt uint16
 type WifiWaitCnt uint8
 
-func NewMemory(arm7Pc *uint32, halted7, halted9 *bool, dma7, dma9 *[4]dma.DMA, irq7, irq9 *cpu.Irq, c *cart.Cartridge, ppu *ppu.PPU, snd *snd.Snd, savepath string) Mem {
-m := Mem{
+func NewMemory(
+    arm7Pc *uint32,
+    halted7, halted9 *bool,
+    dma7, dma9 *[4]dma.DMA,
+    irq7, irq9 *cpu.Irq,
+    _, jit9 Jit,
+    c *cart.Cartridge,
+    Ppu *ppu.PPU,
+    snd *snd.Snd,
+    savepath string) Mem {
+
+    m := Mem{
         halted7: halted7,
         halted9: halted9,
         dma7: dma7,
@@ -77,9 +88,10 @@ m := Mem{
         irq9: irq9,
         irq7: irq7,
         Cartridge: c,
-        ppu: ppu,
+        Ppu: Ppu,
         arm7Pc: arm7Pc,
         Snd: snd,
+        Jit9: jit9,
     }
 
     // i believe this is default
@@ -100,14 +112,14 @@ m := Mem{
 
     m.Rtc.InitRtc()
 
-    m.PowCnt.WriteCNT1(0, 0x0F, ppu)
-    m.PowCnt.WriteCNT1(1, 0x82, ppu)
+    m.PowCnt.WriteCNT1(0, 0x0F, Ppu)
+    m.PowCnt.WriteCNT1(1, 0x82, Ppu)
 
     m.Spi.Init()
     m.Gamecard.Init(irq7, irq9, dma7, dma9, c, savepath, &m.Save)
 
-    texCache := &ppu.Rasterizer.GeoEngine.TextureCache
-    m.ppu.Vram.Init(texCache)
+    texCache := &Ppu.Rasterizer.GeoEngine.TextureCache
+    m.Ppu.Vram.Init(texCache)
 
     m.InitSaveLoop()
 
@@ -119,6 +131,10 @@ func (m *Mem) InitSaveLoop() {
 	if config.Conf.Nds.DisableSaves {
 		return
 	}
+
+    //println("SAVE DISABLED")
+
+    //return
 
 	saveTicker := time.Tick(time.Second)
 
@@ -175,9 +191,9 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
             //fmt.Printf("IO READ ARM9 %08X arm9 %t\n", addr, arm9)
 			return mem.ReadArm9IO(addr - 0x400_0000)
 		case 0x5:
-            return mem.ppu.Pram.Read(addr, mem.ppu)
+            return mem.Ppu.Pram.Read(addr, mem.Ppu)
 		case 0x6:
-            return mem.ppu.Vram.Read(addr, true)
+            return mem.Ppu.Vram.Read(addr, true)
 		case 0x7:
             return mem.Oam[addr & 0x7FF]
         case 0x8, 0x9, 0xA:
@@ -208,7 +224,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
         //fmt.Printf("RD IO %08X\n", addr)
         return mem.ReadArm7IO(addr-0x400_0000)
     case 0x6:
-        return mem.ppu.Vram.Read(addr, false)
+        return mem.Ppu.Vram.Read(addr, false)
     case 0x8, 0x9, 0xA:
         return mem.ReadGbaSlot(addr, arm9)
     default:
@@ -248,6 +264,7 @@ func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
 }
 
 func (mem *Mem) WritePtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
+    mem.Jit9.InvalidatePage(addr)
 
     if arm9 {
 
@@ -281,7 +298,7 @@ func (mem *Mem) WritePtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
     case 0x3:
         return mem.WRAM.ReadPtr(addr, false)
     case 0x6:
-        return mem.ppu.Vram.ReadPtr(addr, false)
+        return mem.Ppu.Vram.ReadPtr(addr, false)
     default:
         return nil, false
     }
@@ -309,9 +326,9 @@ func (mem *Mem) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
             return mem.WRAM.ReadPtr(addr, true)
 		case 0x5:
             return nil, false
-            //return mem.ppu.Pram.Read(addr, mem.ppu)
+            //return mem.Ppu.Pram.Read(addr, mem.ppu)
 		case 0x6:
-            return mem.ppu.Vram.ReadPtr(addr, true)
+            return mem.Ppu.Vram.ReadPtr(addr, true)
 		case 0x7:
             return unsafe.Add(unsafe.Pointer(&mem.Oam), addr & 0x7FF), true
 		}
@@ -333,13 +350,15 @@ func (mem *Mem) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
     case 0x3:
         return mem.WRAM.ReadPtr(addr, false)
     case 0x6:
-        return mem.ppu.Vram.ReadPtr(addr, false)
+        return mem.Ppu.Vram.ReadPtr(addr, false)
     default:
         return nil, false
     }
 }
 
 func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
+
+    mem.Jit9.InvalidatePage(addr)
 
 	if arm9 {
 
@@ -359,12 +378,12 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
             //printIO(addr, arm9, true)
 			mem.WriteArm9IO(addr-0x400_0000, v)
         case 0x5:
-            mem.ppu.Pram.Write(addr, v, mem.ppu)
+            mem.Ppu.Pram.Write(addr, v, mem.Ppu)
 		case 0x6:
-            mem.ppu.Vram.Write(addr, v, true)
+            mem.Ppu.Vram.Write(addr, v, true)
 		case 0x7:
             mem.Oam[addr & 0x7FF] = v
-            mem.ppu.UpdateOAM(addr, v, &mem.Oam)
+            mem.Ppu.UpdateOAM(addr, v, &mem.Oam)
 		}
 
         return
@@ -380,7 +399,7 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
         //printIO(addr, arm9, true)
         mem.WriteArm7IO(addr-0x400_0000, v)
     case 0x6:
-        mem.ppu.Vram.Write(addr, v, false)
+        mem.Ppu.Vram.Write(addr, v, false)
     }
 }
 
@@ -391,7 +410,7 @@ func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
 
 
     if arm9 && addr >= 0x0400_0068 && addr < 0x0400_006C {
-        mem.ppu.DisplayFifo.FifoWrite(v)
+        mem.Ppu.DisplayFifo.FifoWrite(v)
         return
     }
 
@@ -406,7 +425,7 @@ func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
 func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
 
     if arm9 && addr == 0x400_0400 {
-        mem.ppu.Rasterizer.GeoEngine.Fifo(v)
+        mem.Ppu.Rasterizer.GeoEngine.Fifo(v)
         return
     }
 
@@ -414,19 +433,19 @@ func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
     if arm9 {
 
         if geo := addr >= 0x4000440 && addr < 0x4000600; geo {
-            mem.ppu.Rasterizer.GeoCmd(addr, v)
+            mem.Ppu.Rasterizer.GeoCmd(addr, v)
             return
         }
 
         if gxfifo := addr >= 0x400_0400 && addr < 0x4000440; gxfifo {
-            mem.ppu.Rasterizer.GeoEngine.Fifo(v)
-            //mem.ppu.Rasterizer.GeoCmdFifo(v)
+            mem.Ppu.Rasterizer.GeoEngine.Fifo(v)
+            //mem.Ppu.Rasterizer.GeoCmdFifo(v)
             return
         }
 
         if addr >= 0x0400_0068 && addr < 0x0400_006C {
-            mem.ppu.DisplayFifo.FifoWrite(uint16(v))
-            mem.ppu.DisplayFifo.FifoWrite(uint16(v>>16))
+            mem.Ppu.DisplayFifo.FifoWrite(uint16(v))
+            mem.Ppu.DisplayFifo.FifoWrite(uint16(v>>16))
             return
         }
     }
@@ -449,7 +468,7 @@ func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
 }
 
 func (mem *Mem) WriteGXFIFO(v uint32) {
-    mem.ppu.Rasterizer.GeoEngine.Fifo(v)
+    mem.Ppu.Rasterizer.GeoEngine.Fifo(v)
 }
 
 func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
@@ -468,7 +487,7 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
     case addr >= 0xB0 && addr < 0xE0:
         return mem.ReadDma(mem.dma9, addr)
     case (addr >= 0x320 && addr < 0x6A3) || (addr &^ 1 == 0x60):
-        return mem.ppu.Rasterizer.Read(addr)
+        return mem.Ppu.Rasterizer.Read(addr)
     }
 
 	switch addr {
@@ -481,20 +500,20 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
     case 0x7:
         return uint8(mem.Vcount >> 8)
 
-    case 0x64: return mem.ppu.Capture.Read(addr)
-    case 0x65: return mem.ppu.Capture.Read(addr)
-    case 0x66: return mem.ppu.Capture.Read(addr)
-    case 0x67: return mem.ppu.Capture.Read(addr)
+    case 0x64: return mem.Ppu.Capture.Read(addr)
+    case 0x65: return mem.Ppu.Capture.Read(addr)
+    case 0x66: return mem.Ppu.Capture.Read(addr)
+    case 0x67: return mem.Ppu.Capture.Read(addr)
     case 0x68: return 0
     case 0x69: return 0
     case 0x6C:
-        return mem.ppu.EngineA.MasterBright.Read(0)
+        return mem.Ppu.EngineA.MasterBright.Read(0)
     case 0x6D:
-        return mem.ppu.EngineA.MasterBright.Read(1)
+        return mem.Ppu.EngineA.MasterBright.Read(1)
     case 0x106C:
-        return mem.ppu.EngineB.MasterBright.Read(0)
+        return mem.Ppu.EngineB.MasterBright.Read(0)
     case 0x106D:
-        return mem.ppu.EngineB.MasterBright.Read(1)
+        return mem.Ppu.EngineB.MasterBright.Read(1)
 
 	case 0x100:
 		return mem.Timers[0].ReadD(false)
@@ -594,15 +613,15 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 		return mem.irq9.ReadIF(2)
 	case 0x217:
 		return mem.irq9.ReadIF(3)
-    case 0x240: return mem.ppu.Vram.CNT_A.V
-    case 0x241: return mem.ppu.Vram.CNT_B.V
-    case 0x242: return mem.ppu.Vram.CNT_C.V
-    case 0x243: return mem.ppu.Vram.CNT_D.V
-    case 0x244: return mem.ppu.Vram.CNT_E.V
-    case 0x245: return mem.ppu.Vram.CNT_F.V
-    case 0x246: return mem.ppu.Vram.CNT_G.V
-    case 0x248: return mem.ppu.Vram.CNT_H.V
-    case 0x249: return mem.ppu.Vram.CNT_I.V
+    case 0x240: return mem.Ppu.Vram.CNT_A.V
+    case 0x241: return mem.Ppu.Vram.CNT_B.V
+    case 0x242: return mem.Ppu.Vram.CNT_C.V
+    case 0x243: return mem.Ppu.Vram.CNT_D.V
+    case 0x244: return mem.Ppu.Vram.CNT_E.V
+    case 0x245: return mem.Ppu.Vram.CNT_F.V
+    case 0x246: return mem.Ppu.Vram.CNT_G.V
+    case 0x248: return mem.Ppu.Vram.CNT_H.V
+    case 0x249: return mem.Ppu.Vram.CNT_I.V
 
     case 0x247:
         return mem.WRAM.ReadCNT()
@@ -627,7 +646,7 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
     if addr >= 0x188 && addr < 0x190 { panic("WRITE IPC FIFO FROM BYTE OR HALF")}
 
     if ppu := addr < 0x70 || (addr >= 0x1000 && addr < 0x1070); ppu {
-        mem.ppu.Update(addr, uint32(v))
+        mem.Ppu.Update(addr, uint32(v))
     }
 
     //if !(addr >= 0x208 && addr < 0x240) {
@@ -649,7 +668,7 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
             panic(fmt.Sprintf("WRITE HALF or BYTE TO 3D %08X\n", addr))
         }
 
-        mem.ppu.Rasterizer.Write(addr, v)
+        mem.Ppu.Rasterizer.Write(addr, v)
         return
     }
 
@@ -666,13 +685,13 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
         mem.Vcount |= uint32(v) << 8
 
     case 0x64:
-        mem.ppu.Capture.Write(addr, v)
+        mem.Ppu.Capture.Write(addr, v)
     case 0x65:
-        mem.ppu.Capture.Write(addr, v)
+        mem.Ppu.Capture.Write(addr, v)
     case 0x66:
-        mem.ppu.Capture.Write(addr, v)
+        mem.Ppu.Capture.Write(addr, v)
     case 0x67:
-        mem.ppu.Capture.Write(addr, v)
+        mem.Ppu.Capture.Write(addr, v)
     case 0x68: panic("ADDR WRITE 0x68 FIFO")
     case 0x69: panic("ADDR WRITE 0x69 FIFO")
     case 0x6A: panic("ADDR WRITE 0x6A FIFO")
@@ -794,25 +813,25 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 		mem.irq9.WriteIF(v, 3)
 
     // vram reads - gbatek says read only, needed to match no$gba
-    case 0x240: mem.ppu.Vram.WriteCNT(addr, v)
-    case 0x241: mem.ppu.Vram.WriteCNT(addr, v)
-    case 0x242: mem.ppu.Vram.WriteCNT(addr, v)
-    case 0x243: mem.ppu.Vram.WriteCNT(addr, v)
-    case 0x244: mem.ppu.Vram.WriteCNT(addr, v)
-    case 0x245: mem.ppu.Vram.WriteCNT(addr, v)
-    case 0x246: mem.ppu.Vram.WriteCNT(addr, v)
+    case 0x240: mem.Ppu.Vram.WriteCNT(addr, v)
+    case 0x241: mem.Ppu.Vram.WriteCNT(addr, v)
+    case 0x242: mem.Ppu.Vram.WriteCNT(addr, v)
+    case 0x243: mem.Ppu.Vram.WriteCNT(addr, v)
+    case 0x244: mem.Ppu.Vram.WriteCNT(addr, v)
+    case 0x245: mem.Ppu.Vram.WriteCNT(addr, v)
+    case 0x246: mem.Ppu.Vram.WriteCNT(addr, v)
     case 0x247:
         mem.WRAM.WriteCNT(v)
-    case 0x248: mem.ppu.Vram.WriteCNT(addr, v)
-    case 0x249: mem.ppu.Vram.WriteCNT(addr, v)
+    case 0x248: mem.Ppu.Vram.WriteCNT(addr, v)
+    case 0x249: mem.Ppu.Vram.WriteCNT(addr, v)
 
     case 0x300:
         mem.PostFlg.Write(v, true)
 
     case 0x304:
-        mem.PowCnt.WriteCNT1(0, uint32(v), mem.ppu)
+        mem.PowCnt.WriteCNT1(0, uint32(v), mem.Ppu)
     case 0x305:
-        mem.PowCnt.WriteCNT1(1, uint32(v), mem.ppu)
+        mem.PowCnt.WriteCNT1(1, uint32(v), mem.Ppu)
 
 	default:
         //panic(fmt.Sprintf("WRTE UNKNOWN ARM9 IO ADDR %08X", addr))
@@ -967,7 +986,7 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 		return mem.irq7.ReadIF(3)
 
     case 0x240:
-        return mem.ppu.Vram.CNT_7
+        return mem.Ppu.Vram.CNT_7
     case 0x241:
         return mem.WRAM.ReadCNT()
 
@@ -1012,7 +1031,7 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 
     switch {
     case addr < 0x4:
-        mem.ppu.Update(addr, uint32(v))
+        mem.Ppu.Update(addr, uint32(v))
 
     case addr >= 0xB0 && addr < 0xE0:
         mem.WriteDma(mem.dma7, addr, v)

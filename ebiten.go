@@ -11,6 +11,7 @@ import (
 	gameboy "github.com/aabalke/guac/emu/gb"
 	"github.com/aabalke/guac/emu/gba"
 	"github.com/aabalke/guac/emu/nds"
+	"github.com/aabalke/guac/emu/nds/debug"
 	"github.com/aabalke/guac/input"
 	"github.com/aabalke/guac/menu"
 
@@ -95,24 +96,24 @@ func (g *Game) GetGamepadButtons() ([]ebiten.StandardGamepadButton, []ebiten.Sta
 	return justButtons, buttons
 }
 
+const (
+    //PRF_START = 1200
+    //PRF_END   = PRF_START + 2000
+    PRF_START = 0
+    PRF_END   = 1000
+)
+
 func (g *Game) Update() error {
 
-    //if g.flags.Profile && isProfiling {
+    if g.flags.Profile && g.frame == PRF_START {
+        debug.B[0] = true
+        println("starting profiling")
+        //isProfiling = true
+        pprof.StartCPUProfile(f)
+    }
 
-    //    if profileFrames >= 1000 {
-    //        return exit
-    //    }
-
-    //    profileFrames++
-    //}
-
-    //if g.frame == 1500 {
-    //    isProfiling = true
-    //    pprof.StartCPUProfile(f)
-    //}
-
-	if g.flags.Profile && g.frame >= 1000 {
-	//if g.flags.Profile && g.frame >= 2000 {
+	if g.flags.Profile && g.frame >= PRF_END {
+        println("ending profiling")
 		return exit
 	}
 
