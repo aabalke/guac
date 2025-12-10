@@ -4,7 +4,7 @@ import (
 	"log"
 	"math"
 
-	"github.com/aabalke/guac/emu/nds/cpu/arm9/jit/amd64"
+	"github.com/aabalke/guac/emu/jit/amd64"
 	"github.com/aabalke/guac/emu/nds/utils"
 	sys "golang.org/x/sys/cpu"
 )
@@ -720,7 +720,7 @@ func (j *Jit) emitAluOp2Reg(op uint32, setcarry bool) {
 			j.SarCl(amd64.Ebx)
 
 			if setcarry {
-				j.SETcc(amd64.CC_B, amd64.R10) // x86 carry in R10
+				j.SETcc(amd64.CC_C, amd64.R10) // x86 carry in R10
 
 				// If the shift value was >= 32, EBX is either 0 or FFFFFFFF,
 				// and the carry must be 0 or 1 (respectively).
@@ -731,11 +731,14 @@ func (j *Jit) emitAluOp2Reg(op uint32, setcarry bool) {
 
 		case 0, 1: // lsl / lsr
 			if shtype == 0 {
+
+
 				j.ShlCl(amd64.Ebx)
 			} else {
 				j.ShrCl(amd64.Ebx)
 			}
 			if !setcarry {
+
 				// Adjust shifts for amounts >= 32; in ARM, shift amounts
 				// are well-defined for amounts >= 32, like in Go.
 				j.Cmp(amd64.Imm(32), amd64.Ecx)
@@ -748,17 +751,17 @@ func (j *Jit) emitAluOp2Reg(op uint32, setcarry bool) {
 				//   shift == 32: nothing was shifted (it's shift=0 in x86 semantic);
 				//                use bit 0 or 31 of EBX (depending on shift direction)
 				//   shift > 32: carry must be zero
-				j.SETcc(amd64.CC_B, amd64.R10) // x86 carry in R10
+				j.SETcc(amd64.CC_C, amd64.R10) // x86 carry in R10
 				if shtype == 0 {
 					j.Bt(amd64.Imm(0), amd64.Ebx)
 				} else {
 					j.Bt(amd64.Imm(31), amd64.Ebx)
 				}
 
-				j.SETcc(amd64.CC_B, amd64.R11) // EBX bit 0 or 31 in R11 (this will only be used if shift==32)
+				j.SETcc(amd64.CC_C, amd64.R9) // EBX bit 0 or 31 in R11 (this will only be used if shift==32)
 
 				j.Cmp(amd64.Imm(32), amd64.Ecx)
-				j.Cmovcc(amd64.CC_Z, amd64.R11, amd64.R10) // shift == 32 -> EBX 0/31 bit in R10
+				j.Cmovcc(amd64.CC_Z, amd64.R9, amd64.R10) // shift == 32 -> EBX 0/31 bit in R10
 
 				j.Sbb(amd64.Eax, amd64.Eax)
 				j.And(amd64.Eax, amd64.Ebx)
@@ -790,7 +793,7 @@ func (j *Jit) emitAluOp2Reg(op uint32, setcarry bool) {
 			}
 			j.Shl(amd64.Imm(int32(shift)), amd64.Ebx)
 			if setcarry {
-				j.SETcc(amd64.CC_B, C)
+				j.SETcc(amd64.CC_C, C)
 			}
 		case 1, 2: // lsr/asr
 			if shift == 0 {
@@ -798,7 +801,7 @@ func (j *Jit) emitAluOp2Reg(op uint32, setcarry bool) {
 				// and then clear the output or set it to -1
 				if setcarry {
 					j.Bt(amd64.Imm(31), amd64.Ebx)
-					j.SETcc(amd64.CC_B, C)
+					j.SETcc(amd64.CC_C, C)
 				}
 				if shtype == 1 {
 					j.Xor(amd64.Ebx, amd64.Ebx)
@@ -812,7 +815,7 @@ func (j *Jit) emitAluOp2Reg(op uint32, setcarry bool) {
 					j.Sar(amd64.Imm(int32(shift)), amd64.Ebx)
 				}
 				if setcarry {
-					j.SETcc(amd64.CC_B, C)
+					j.SETcc(amd64.CC_C, C)
 				}
 			}
 		case 3: // ror
@@ -824,7 +827,7 @@ func (j *Jit) emitAluOp2Reg(op uint32, setcarry bool) {
 				j.Ror(amd64.Imm(int32(shift)), amd64.Ebx)
 			}
 			if setcarry {
-				j.SETcc(amd64.CC_B, C)
+				j.SETcc(amd64.CC_C, C)
 			}
 		}
 	}
@@ -864,6 +867,8 @@ func (j *Jit) emitAlu(op uint32) {
             }
         }
 
+        j.Movl(j.REG(rn), amd64.Eax)
+
         if rn == PC {
             j.Add(amd64.Imm(8), amd64.Eax)
         }
@@ -873,6 +878,8 @@ func (j *Jit) emitAlu(op uint32) {
         // shift
         j.emitAluOp2Reg(op, set)
 
+        j.Movl(j.REG(rn), amd64.Eax)
+
         if rn == PC {
             if imm := (op >> 4) & 1 != 0; imm {
                 j.Add(amd64.Imm(8), amd64.Eax)
@@ -881,8 +888,6 @@ func (j *Jit) emitAlu(op uint32) {
             }
         }
     }
-
-    j.Movl(j.REG(rn), amd64.Eax)
 
     aluInstJit[inst](j, op, rd)
 }
@@ -919,7 +924,7 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32) {
 
         if set := (op >> 20) & 1 != 0; set {
             j.SETcc(amd64.CC_O, V)
-            j.SETcc(amd64.CC_B, C)
+            j.SETcc(amd64.CC_NC, C)
             j.SETcc(amd64.CC_S, N)
             j.SETcc(amd64.CC_Z, Z)
         }
@@ -933,7 +938,7 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32) {
 
         if set := (op >> 20) & 1 != 0; set {
             j.SETcc(amd64.CC_O, V)
-            j.SETcc(amd64.CC_B, C)
+            j.SETcc(amd64.CC_NC, C)
             j.SETcc(amd64.CC_S, N)
             j.SETcc(amd64.CC_Z, Z)
         }
@@ -947,7 +952,7 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32) {
 
         if set := (op >> 20) & 1 != 0; set {
             j.SETcc(amd64.CC_O, V)
-            j.SETcc(amd64.CC_B, C)
+            j.SETcc(amd64.CC_C, C)
             j.SETcc(amd64.CC_S, N)
             j.SETcc(amd64.CC_Z, Z)
         }
@@ -962,7 +967,7 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32) {
 
         if set := (op >> 20) & 1 != 0; set {
             j.SETcc(amd64.CC_O, V)
-            j.SETcc(amd64.CC_B, C)
+            j.SETcc(amd64.CC_C, C)
             j.SETcc(amd64.CC_S, N)
             j.SETcc(amd64.CC_Z, Z)
         }
@@ -1027,7 +1032,7 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32) {
 
         if set := (op >> 20) & 1 != 0; set {
             j.SETcc(amd64.CC_O, V)
-            j.SETcc(amd64.CC_B, C)
+            j.SETcc(amd64.CC_NC, C)
             j.SETcc(amd64.CC_S, N)
             j.SETcc(amd64.CC_Z, Z)
         }
@@ -1039,7 +1044,7 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32) {
 
         if set := (op >> 20) & 1 != 0; set {
             j.SETcc(amd64.CC_O, V)
-            j.SETcc(amd64.CC_B, C)
+            j.SETcc(amd64.CC_C, C)
             j.SETcc(amd64.CC_S, N)
             j.SETcc(amd64.CC_Z, Z)
         }
@@ -1070,6 +1075,7 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32) {
 
     // BIC
     func(j *Jit, op, rd uint32) {
+
         j.Not(amd64.Ebx)
         j.And(amd64.Ebx, amd64.Eax)
 

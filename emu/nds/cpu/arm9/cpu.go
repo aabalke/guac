@@ -122,7 +122,6 @@ func NewCpu(m cpu.MemoryInterface, irq *cpu.Irq, cp15 *cp15.Cp15) *Cpu {
     c.Irq.IME = true
 
     c.Jit = NewJit(c)
-    //c.Jit.CreateBlocks()
 
 	return c
 }
@@ -216,21 +215,28 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 
         if config.Conf.Nds.NdsJit.Enabled {
 
-            if p := cpu.Jit.Pages[r[PC] >> PAGE_SHIFT]; p != nil {
-                if b := p.Blocks[(r[PC] & PAGE_MASK) >> 2]; b != nil {
-                    if b.f != nil {
-                        b.f()
-                        r[PC] = b.finalPc
-                        cpu.isBranching = true
-                        return b.finalOp, int(b.Length)
-                    }
-                }
+            pc := r[PC]
+            pageIdx := pc >> PAGE_SHIFT
+            blockIdx := (pc & PAGE_MASK) >> 2 // aligned to arm
+
+            if p := cpu.Jit.Pages[pageIdx]; (
+                p != nil &&
+                p.Blocks[blockIdx] != nil &&
+                p.Blocks[blockIdx].f != nil) {
+
+                b := p.Blocks[blockIdx]
+                b.f()
+
+                cpu.Jit.get(pageIdx)
+                //cpu.Jit.Metrics[pageIdx][blockIdx]++
+                r[PC] = b.finalPc
+                cpu.isBranching = true
+
+                return b.finalOp, int(b.Length)
             }
 
-            cpu.Jit.UpdateMetrics(r[PC])
-            //cpu.Jit.CreateBlock(r[PC], config.Conf.Nds.NdsJit.BatchInst)
-            //b, ok = cpu.Jit.Blocks[r[PC]]
-
+            cpu.Jit.UpdateMetrics(pc)
+            //cpu.Jit.DeletePages()
         }
 
         if r[PC] != cpu.BranchPc {
@@ -275,10 +281,6 @@ func (cpu *Cpu) GetOpThumb() uint16 {
             cpu.PcPtr = nil
         } else {
             cpu.LoopCnt++
-
-            //if cpu.LoopCnt == 100 {
-            //    fmt.Printf("LOOP OVER PC %08X LEN %08d\n", cpu.BranchPc, cpu.LoopLen)
-            //}
         }
     }
 

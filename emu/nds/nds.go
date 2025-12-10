@@ -104,6 +104,7 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
         &nds.arm7.Halted, &nds.arm9.Halted,
         &nds.arm7.Dma, &nds.arm9.Dma,
         &irq7, &irq9,
+        //nds.arm7.Jit, nds.arm9.Jit,
         nil, nds.arm9.Jit,
         &nds.Cartridge, nds.ppu, s, path + ".save")
 
@@ -194,12 +195,13 @@ func (nds *Nds) UpdateFrame() {
             //}
         }
 
-        for c := 0; c < int(config.Conf.Nds.NdsJit.BatchInst); {
-            if nds.arm7.Reg.IsThumb || nds.AccCycles & 1 == 0 {
-                c += nds.StepArm7()
-            } else {
-                c++
-            }
+        for c := 0; c < max(int(config.Conf.Nds.NdsJit.BatchInst) / 2, 1); {
+            c += nds.StepArm7()
+            //if nds.arm7.Reg.CPSR.T || nds.AccCycles & 1 == 0 {
+            //    c += nds.StepArm7()
+            //} else {
+            //    c++
+            //}
 
         }
 
@@ -272,7 +274,6 @@ func (nds *Nds) StepArm7() int {
 
     r7 := &nds.arm7.Reg.R
 
-    //nds.checkMode(false)
     //uhh.UpdatePcs(*r7, nds.mem.Read32(r7[15], false), uint32(nds.arm7.Reg.CPSR))
     cycles, ok := nds.arm7.Execute()
     if !ok {
@@ -332,7 +333,7 @@ func (nds *Nds) DirtyInit() {
     //nds.arm7.Reg.R[13] = 0x3002F7C
     nds.arm7.Reg.R[14] = nds.Cartridge.Header.Arm7EntryAddr
     nds.arm7.Reg.R[15] = nds.Cartridge.Header.Arm7EntryAddr
-    nds.arm7.Reg.CPSR = 0x000_001F
+    nds.arm7.Reg.CPSR.Set(0x000_001F)
 
     nds.arm7.Halted = false
     nds.arm9.Halted = false

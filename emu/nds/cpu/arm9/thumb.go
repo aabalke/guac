@@ -23,7 +23,6 @@ const (
 	THUMB_MVN
 )
 
-
 func (cpu *Cpu) ThumbAlu(opcode uint16) {
 
     inst := (opcode >> 6) & 0xF
@@ -31,6 +30,27 @@ func (cpu *Cpu) ThumbAlu(opcode uint16) {
     rd := opcode & 0x7
 
     r := &cpu.Reg.R
+
+    //if (rd != PC) && (
+    //    inst == THUMB_AND ||
+    //    inst == THUMB_EOR ||
+    //    inst == THUMB_ORR ||
+    //    inst == THUMB_BIC ||
+    //    inst == THUMB_MVN ||
+
+    //    inst == THUMB_NEG ||
+
+    //    inst == THUMB_CMN ||
+    //    inst == THUMB_CMP ||
+    //    inst == THUMB_TST ||
+
+    //    inst == THUMB_MUL) {
+    //    //reg := c.Reg
+    //    cpu.Jit.TestInst(uint32(opcode), cpu.Jit.emitThumbAlu)
+    //    r[PC] += 2
+    //    //c.Reg = reg
+    //    return
+    //}
 
 	switch inst {
 	case THUMB_MUL:
@@ -44,6 +64,7 @@ func (cpu *Cpu) ThumbAlu(opcode uint16) {
         cpu.Reg.CPSR.N = (res & 0x8000_0000) != 0
         cpu.Reg.CPSR.Z = uint32(res) == 0
 	case THUMB_TST, THUMB_CMN, THUMB_CMP:
+
 
         var res uint64
         rdv, rsv := uint64(r[rd]), uint64(r[rs])
@@ -385,8 +406,15 @@ func (cpu *Cpu) ThumbAddSub(opcode uint16) {
 	rnImm := uint64(utils.GetVarData(uint32(opcode), 6, 8))
 	rs := uint64(utils.GetVarData(uint32(opcode), 3, 5))
 	rd := uint64(utils.GetVarData(uint32(opcode), 0, 2))
-
 	r := &cpu.Reg.R
+
+    //if (rd != PC) {
+    //    //reg := c.Reg
+    //    cpu.Jit.TestInst(uint32(opcode), cpu.Jit.emitThumbAddSub)
+    //    r[PC] += 2
+    //    //c.Reg = reg
+    //    return
+    //}
 
 	rsValue := uint64(r[rs])
 	rnValue := uint64(r[rnImm])
@@ -737,11 +765,18 @@ func (cpu *Cpu) thumbPushPop(opcode uint16) {
 }
 
 func (cpu *Cpu) thumbRelative(opcode uint16) {
-
 	r := &cpu.Reg.R
 	isSP := utils.BitEnabled(uint32(opcode), 11)
 	rd := utils.GetVarData(uint32(opcode), 8, 10)
 	nn := utils.GetVarData(uint32(opcode), 0, 7) * 4
+
+    //if (rd != PC) {
+    //    //reg := c.Reg
+    //    cpu.Jit.TestInst(uint32(opcode), cpu.Jit.emitThumbRelative)
+    //    r[PC] += 2
+    //    //c.Reg = reg
+    //    return
+    //}
 
 	if isSP {
 		r[rd] = r[13] + nn
@@ -827,8 +862,9 @@ func (cpu *Cpu) thumbShifted(opcode uint16) {
 }
 
 func (cpu *Cpu) thumbStack(opcode uint16) {
-
 	r := &cpu.Reg.R
+
+
 	nn := utils.GetVarData(uint32(opcode), 0, 6) * 4
 	sub := utils.BitEnabled(uint32(opcode), 7)
 

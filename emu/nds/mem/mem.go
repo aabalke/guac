@@ -63,7 +63,7 @@ type Mem struct {
 
     Save bool
 
-    Jit9 Jit
+    Jit7, Jit9 Jit
 }
 
 type BiosProt uint16
@@ -74,7 +74,7 @@ func NewMemory(
     halted7, halted9 *bool,
     dma7, dma9 *[4]dma.DMA,
     irq7, irq9 *cpu.Irq,
-    _, jit9 Jit,
+    jit7, jit9 Jit,
     c *cart.Cartridge,
     Ppu *ppu.PPU,
     snd *snd.Snd,
@@ -91,6 +91,7 @@ func NewMemory(
         Ppu: Ppu,
         arm7Pc: arm7Pc,
         Snd: snd,
+        Jit7: jit7,
         Jit9: jit9,
     }
 
@@ -264,6 +265,7 @@ func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
 }
 
 func (mem *Mem) WritePtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
+    //mem.Jit7.InvalidatePage(addr)
     mem.Jit9.InvalidatePage(addr)
 
     if arm9 {
@@ -358,6 +360,7 @@ func (mem *Mem) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
 
 func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 
+    //mem.Jit7.InvalidatePage(addr)
     mem.Jit9.InvalidatePage(addr)
 
 	if arm9 {

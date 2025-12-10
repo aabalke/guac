@@ -208,6 +208,33 @@ var aluData Alu
 
 func (cpu *Cpu) Alu(opcode uint32) {
 
+    //inst := (opcode >> 21) & 0xF
+    //rd := (opcode >> 12) & 0xF != 0xF
+    //uhh := (
+    //    inst == 0x2 ||
+    //    inst == 0x4 ||
+    //    inst == 0xD ||
+    //    inst == 0xA)
+
+    //uhh = uhh && rd
+
+    //orig := cpu.Reg
+    //var jitt Reg
+
+    //if rd {
+    //    reg := cpu.Reg
+    //    //fmt.Printf("R %08X\n", cpu.Reg.R)
+    //    cpu.Jit.TestInst(opcode, cpu.Jit.emitAlu)
+
+    //    //fmt.Printf("R %08X\n", cpu.Reg.R)
+    //    //panic("SDFH")
+    //    //cpu.Reg.R[PC] += 4
+    //    //return
+    //    jitt = cpu.Reg
+    //    cpu.Reg = reg
+    //    //return
+    //}
+
 	aluData.Opcode = opcode
 	aluData.Rd = utils.GetByte(opcode, 12)
     aluData.Carry = cpu.Reg.CPSR.C
@@ -282,6 +309,16 @@ func (cpu *Cpu) Alu(opcode uint32) {
     }
 
     aluInst[utils.GetByte(opcode, 21)](cpu, &aluData)
+
+    //if rd {
+    //    if cpu.Reg != jitt {
+    //        fmt.Printf("OP %08X\n", opcode)
+    //        fmt.Printf("ORIGIN %08X CPSR %08X\n", orig.R, orig.CPSR.Get())
+    //        fmt.Printf("JITTED %08X CPSR %08X\n", jitt.R, jitt.CPSR.Get())
+    //        fmt.Printf("CORREC %08X CPSR %08X\n\n", cpu.Reg.R, cpu.Reg.CPSR.Get())
+    //        panic("BAD")
+    //    }
+    //}
 
     switch {
     case aluData.Rd != PC:
@@ -745,6 +782,11 @@ func (cpu *Cpu) BLX(opcode uint32) {
 }
 
 func (cpu *Cpu) B(opcode uint32) {
+
+    if immLoop := opcode == 0xEAFFFFFE; immLoop {
+        cpu.Halted = true
+        return
+    }
 
     r := &cpu.Reg.R
 

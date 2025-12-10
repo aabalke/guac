@@ -65,6 +65,7 @@ type NdsConfig struct {
 	KeyboardConfig   EmulatorKeyboardConfig   `toml:"keyboard"`
 	ControllerConfig EmulatorControllerConfig `toml:"controller"`
     NdsFirmware NdsFirmware `toml:"firmware"`
+    NdsJit NdsJit   `toml:"jit"`
 	Threads                int  `toml:"threads"`
 	DisableSaves           bool `toml:"disable_saves"`
 
@@ -172,8 +173,13 @@ func (c *Config) Decode() {
 	}
 
 	c.decodeGb()
-    c.decodeNdsFirmware()
+    c.decodeNds()
     c.decodeMouse()
+}
+
+func (c *Config) decodeNds() {
+    c.decodeNdsFirmware()
+    c.decodeNdsJit()
 }
 
 func (c *Config) decodeGb() {

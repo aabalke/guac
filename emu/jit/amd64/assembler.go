@@ -3,9 +3,7 @@ package amd64
 
 import (
 	"errors"
-	"fmt"
-
-	"github.com/aabalke/guac/emu/nds/cpu/arm9/jit"
+	"github.com/aabalke/guac/emu/jit"
 )
 
 var ErrBufferTooSmall = errors.New("buffer is too small")
@@ -18,9 +16,8 @@ type Assembler struct {
 	Buf []byte
 	Off int
 	err error
+    IsReleased bool
 }
-
-var p bool
 
 func New(size int) (*Assembler, error) {
 	buf, e := gojit.Alloc(size)
@@ -28,16 +25,12 @@ func New(size int) (*Assembler, error) {
 		return nil, e
 	}
 
-    if !p {
-        fmt.Printf("ADDR ASSEMBLER %p\n", buf)
-        p = true
-    }
-
 	return &Assembler{Buf: buf}, nil
 }
 
 func (a *Assembler) Release() {
 	gojit.Release(a.Buf)
+    a.IsReleased = true
 }
 
 func (a *Assembler) BuildTo(out any) {
