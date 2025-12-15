@@ -23,219 +23,245 @@ const (
 	THUMB_MVN
 )
 
+type ThumbAlu struct {
+	Opcode, Inst, Rs, Rd uint16
+}
+
+var thumbAluData ThumbAlu
+
 func (cpu *Cpu) ThumbAlu(opcode uint16) {
 
-    inst := (opcode >> 6) & 0xF
-    rs := (opcode >> 3) & 0x7
-    rd := opcode & 0x7
+	thumbAluData.Opcode = opcode
+	thumbAluData.Inst = uint16(utils.GetByte(uint32(opcode), 6))
+	thumbAluData.Rs = uint16(utils.GetVarData(uint32(opcode), 3, 5))
+	thumbAluData.Rd = uint16(utils.GetVarData(uint32(opcode), 0, 2))
 
-    r := &cpu.Reg.R
+	alu := &thumbAluData
 
-    //if (rd != PC) && (
-    //    inst == THUMB_AND ||
-    //    inst == THUMB_EOR ||
-    //    inst == THUMB_ORR ||
-    //    inst == THUMB_BIC ||
-    //    inst == THUMB_MVN ||
-
-    //    inst == THUMB_NEG ||
-
-    //    inst == THUMB_CMN ||
-    //    inst == THUMB_CMP ||
-    //    inst == THUMB_TST ||
-
-    //    inst == THUMB_MUL) {
-    //    //reg := c.Reg
-    //    cpu.Jit.TestInst(uint32(opcode), cpu.Jit.emitThumbAlu)
-    //    r[PC] += 2
-    //    //c.Reg = reg
-    //    return
-    //}
-
-	switch inst {
+	switch alu.Inst {
 	case THUMB_MUL:
-
-        res := uint64(r[rd]) * uint64(r[rs])
-        r[rd] = uint32(res)
-
-        // ARM < 4, carry flag destroyed, ARM >= 5, carry flag unchanged
-        //cpu.Reg.CPSR.SetFlag(FLAG_C, false)
-
-        cpu.Reg.CPSR.N = (res & 0x8000_0000) != 0
-        cpu.Reg.CPSR.Z = uint32(res) == 0
+		cpu.thumbMuliply(alu)
 	case THUMB_TST, THUMB_CMN, THUMB_CMP:
-
-
-        var res uint64
-        rdv, rsv := uint64(r[rd]), uint64(r[rs])
-
-        switch inst {
-        case THUMB_TST:
-            res = rdv & rsv
-        case THUMB_CMP:
-            res = rdv - rsv
-            rdSign := uint8(rdv>>31) & 1
-            rsSign := uint8(r[rs]>>31) & 1
-            resSign := uint8(res>>31) & 1
-            v := (rdSign != rsSign) && (resSign != rdSign)
-            c := res < 0x1_0000_0000
-            cpu.Reg.CPSR.C = c
-            cpu.Reg.CPSR.V = v
-        case THUMB_CMN:
-            res = rdv + rsv
-            rdSign := uint8(rdv>>31) & 1
-            rsSign := uint8(r[rs]>>31) & 1
-            resSign := uint8(res>>31) & 1
-            v := (rdSign == rsSign) && (resSign != rdSign)
-            c := res >= 0x1_0000_0000
-            cpu.Reg.CPSR.C = c
-            cpu.Reg.CPSR.V = v
-        }
-
-        cpu.Reg.CPSR.N = (res & 0x8000_0000) != 0
-        cpu.Reg.CPSR.Z = uint32(res) == 0
-
-    case THUMB_AND, THUMB_EOR, THUMB_ORR, THUMB_BIC, THUMB_MVN:
-
-        var res uint32
-        a, b := r[rd], r[rs]
-
-        switch inst {
-        case THUMB_AND:
-            res = a & b
-        case THUMB_EOR:
-            res = a ^ b
-        case THUMB_ORR:
-            res = a | b
-        case THUMB_BIC:
-            res = a &^ b
-        case THUMB_MVN:
-            res = ^b
-        }
-
-        r[rd] = res
-
-        cpu.Reg.CPSR.N = (res & 0x8000_0000) != 0
-        cpu.Reg.CPSR.Z = uint32(res) == 0
-
+		cpu.thumbTest(alu)
+	case THUMB_AND, THUMB_EOR, THUMB_ORR, THUMB_BIC, THUMB_MVN:
+		cpu.thumbLogical(alu)
 	default:
+		cpu.thumbArithmetic(alu)
+	}
 
-        carry := uint64(0)
-        if cpu.Reg.CPSR.C {
-            carry = 1
-        }
+	cpu.Reg.R[15] += 2
+}
 
-        rdValue := uint64(r[rd])
-        res := uint64(0)
-        u1, u2, u3 := rdValue, uint64(r[rs]), carry
-        var v, c bool
+func (cpu *Cpu) thumbMuliply(alu *ThumbAlu) {
 
-        switch inst {
-        case THUMB_LSL:
+	r := &cpu.Reg.R
 
-            if u2 > 32 {
-                res = 0
-            } else {
-                c = u1&(1<<(32-u2)) > 0
-                res = u1 << (u2 & 0xFF)
-            }
+	res := uint64(r[alu.Rd]) * uint64(r[alu.Rs])
 
-        case THUMB_LSR:
-            c = u1&(1<<(u2-1)) > 0
-            res = u1 >> (u2 & 0xFF)
+	r[alu.Rd] = uint32(res)
 
-        case THUMB_ASR:
-            if u2 > 32 {
-                u2 = 32
-            } else if u2 > 0 {
-                c = u1&(1<<(u2-1)) > 0
-            }
+	// ARM < 4, carry flag destroyed, ARM >= 5, carry flag unchanged
+	//cpu.Reg.CPSR.SetFlag(FLAG_C, false)
 
-            tmp := u1
-            msb := tmp & 0x8000_0000
+    cpu.Reg.CPSR.N = (res & 0x8000_0000) != 0
+    cpu.Reg.CPSR.Z = uint32(res) == 0
+}
 
-            for range u2 {
-                tmp = (tmp >> 1) | msb
-            }
+func (cpu *Cpu) thumbLogical(alu *ThumbAlu) {
 
-            res = uint64(tmp)
-        case THUMB_ADC:
-            res = u1 + u2 + u3
-        case THUMB_SBC:
+	r := &cpu.Reg.R
 
-            if u3 == 1 {
-                u3 = 0
-            } else {
-                u3 = 1
-            }
+	var res uint32
+	a, b := r[alu.Rd], r[alu.Rs]
 
-            res = u1 - u2 - u3
-        case THUMB_ROR:
+	switch alu.Inst {
+	case THUMB_AND:
+		res = a & b
+	case THUMB_EOR:
+		res = a ^ b
+	case THUMB_ORR:
+		res = a | b
+	case THUMB_BIC:
+		res = a &^ b
+	case THUMB_MVN:
+		res = ^b
+	}
 
-            c = (u1>>((u2-1)%32))&1 > 0
+	r[alu.Rd] = res
 
-            shift := u2 % 32
-            tmp0 := u1 >> shift
-            tmp1 := u1 << (32 - (shift))
-            res = tmp0 | tmp1
+    cpu.Reg.CPSR.N = (res & 0x8000_0000) != 0
+    cpu.Reg.CPSR.Z = uint32(res) == 0
+}
 
-        case THUMB_NEG:
-            res = 0 - u2
-        }
+func (cpu *Cpu) thumbArithmetic(alu *ThumbAlu) {
 
-        r[rd] = uint32(res)
+	r := &cpu.Reg.R
 
-        rdSign := uint8(rdValue>>31) & 1
-        rsSign := uint8(r[rs]>>31) & 1
-        rSign := uint8(res>>31) & 1
+	var oper func(uint64, uint64, uint64) uint64
 
-        switch inst {
-        case THUMB_ADC:
-            v = (rdSign == rsSign) && (rSign != rdSign)
-            c = res >= 0x1_0000_0000
-        case THUMB_SBC, THUMB_NEG:
-            v = (rdSign != rsSign) && (rSign != rdSign)
-            c = res < 0x1_0000_0000
-        }
+	var v, c bool
 
-        cpu.Reg.CPSR.N = (res & 0x8000_0000) != 0
-        cpu.Reg.CPSR.Z = uint32(res) == 0
+	switch alu.Inst {
+	case THUMB_LSL:
+		oper = func(u1, u2, u3 uint64) uint64 {
 
-        switch inst {
-        case THUMB_LSL, THUMB_LSR, THUMB_ASR, THUMB_ROR:
-            if (r[rs] & 0xFF) == 0 {
-                goto out
-            }
-        }
+			if u2 > 32 {
+				return 0
+			}
 
+			c = u1&(1<<(32-u2)) > 0
+
+			return u1 << (u2 & 0xFF)
+		}
+	case THUMB_LSR:
+		oper = func(u1, u2, u3 uint64) uint64 {
+
+			c = u1&(1<<(u2-1)) > 0
+
+			return u1 >> (u2 & 0xFF)
+		}
+	case THUMB_ASR:
+		oper = func(u1, u2, u3 uint64) uint64 {
+
+			if u2 > 32 {
+				u2 = 32
+			}
+
+			if u2 > 0 {
+				c = u1&(1<<(u2-1)) > 0
+			}
+
+			tmp := u1
+			msb := tmp & 0x8000_0000
+
+			for range u2 {
+				tmp = (tmp >> 1) | msb
+			}
+
+			return uint64(tmp)
+		}
+	case THUMB_ADC:
+		oper = func(u1, u2, u3 uint64) uint64 { return u1 + u2 + u3 }
+	case THUMB_SBC:
+		oper = func(u1, u2, u3 uint64) uint64 {
+
+			if u3 == 1 {
+				u3 = 0
+			} else {
+				u3 = 1
+			}
+
+			return u1 - u2 - u3
+		}
+	case THUMB_ROR:
+		oper = func(u1, u2, u3 uint64) uint64 {
+
+			c = (u1>>((u2-1)%32))&1 > 0
+
+			shift := u2 % 32
+			tmp0 := u1 >> shift
+			tmp1 := u1 << (32 - (shift))
+			return tmp0 | tmp1
+		}
+	case THUMB_NEG:
+		oper = func(_, u2, _ uint64) uint64 { return 0 - u2 }
+	}
+
+	carry := uint64(0)
+	if cpu.Reg.CPSR.C {
+		carry = 1
+	}
+
+	rdValue := uint64(r[alu.Rd])
+
+	res := oper(rdValue, uint64(r[alu.Rs]), carry)
+
+	r[alu.Rd] = uint32(res)
+
+	rdSign := uint8(rdValue>>31) & 1
+	rsSign := uint8(r[alu.Rs]>>31) & 1
+	rSign := uint8(res>>31) & 1
+
+	switch alu.Inst {
+	case THUMB_ADC:
+		v = (rdSign == rsSign) && (rSign != rdSign)
+		c = res >= 0x1_0000_0000
+	case THUMB_SBC, THUMB_NEG:
+		v = (rdSign != rsSign) && (rSign != rdSign)
+		c = res < 0x1_0000_0000
+	}
+
+    cpu.Reg.CPSR.N = (res & 0x8000_0000) != 0
+    cpu.Reg.CPSR.Z = uint32(res) == 0
+
+	switch alu.Inst {
+	case THUMB_LSL, THUMB_LSR, THUMB_ASR, THUMB_ROR:
+		if (r[alu.Rs] & 0xFF) == 0 {
+			return
+		}
+	}
+
+    cpu.Reg.CPSR.C = c
+
+	switch alu.Inst {
+	case THUMB_LSL, THUMB_LSR, THUMB_ASR, THUMB_ROR:
+		return
+	}
+
+    cpu.Reg.CPSR.V = v
+}
+
+func (cpu *Cpu) thumbTest(alu *ThumbAlu) {
+
+	r := &cpu.Reg.R
+
+	var res uint64
+	a, b := uint64(r[alu.Rd]), uint64(r[alu.Rs])
+	rdValue := uint64(r[alu.Rd])
+
+	switch alu.Inst {
+	case THUMB_TST:
+		res = a & b
+	case THUMB_CMP:
+		res = a - b
+	case THUMB_CMN:
+		res = a + b
+	}
+
+	rdSign := uint8(rdValue>>31) & 1
+	rsSign := uint8(r[alu.Rs]>>31) & 1
+	resSign := uint8(res>>31) & 1
+	switch alu.Inst {
+	case THUMB_CMP:
+		v := (rdSign != rsSign) && (resSign != rdSign)
+		c := res < 0x1_0000_0000
         cpu.Reg.CPSR.C = c
-
-        switch inst {
-        case THUMB_LSL, THUMB_LSR, THUMB_ASR, THUMB_ROR:
-            goto out
-        }
-
         cpu.Reg.CPSR.V = v
-    }
 
-    out:
+	case THUMB_CMN:
+		v := (rdSign == rsSign) && (resSign != rdSign)
+		c := res >= 0x1_0000_0000
+        cpu.Reg.CPSR.C = c
+        cpu.Reg.CPSR.V = v
+	}
 
-    cpu.Reg.R[15] += 2
+    cpu.Reg.CPSR.N = (res & 0x8000_0000) != 0
+    cpu.Reg.CPSR.Z = uint32(res) == 0
 }
 
 func (cpu *Cpu) HiRegBX(opcode uint16) int {
 
-    // only cmp effects flags
+	// only cmp effects flags
 
-    inst := uint16(utils.GetVarData(uint32(opcode), 8, 9))
-    mSBd := utils.BitEnabled(uint32(opcode), 7)
-    mSBs := utils.BitEnabled(uint32(opcode), 6)
-    rs := uint16(utils.GetVarData(uint32(opcode), 3, 6))
-    rd := uint16(utils.GetVarData(uint32(opcode), 0, 2))
+	inst := uint16(utils.GetVarData(uint32(opcode), 8, 9))
+	mSBd := utils.BitEnabled(uint32(opcode), 7)
+	mSBs := utils.BitEnabled(uint32(opcode), 6)
+	rs := uint16(utils.GetVarData(uint32(opcode), 3, 6))
+	rd := uint16(utils.GetVarData(uint32(opcode), 0, 2))
 
-    if inst != 3 && mSBd {
-        rd |= 0b1000
-    }
+	if inst != 3 && mSBd {
+		rd |= 0b1000
+	}
 
 	if mSBs {
 		rs |= 0b1000
@@ -406,15 +432,8 @@ func (cpu *Cpu) ThumbAddSub(opcode uint16) {
 	rnImm := uint64(utils.GetVarData(uint32(opcode), 6, 8))
 	rs := uint64(utils.GetVarData(uint32(opcode), 3, 5))
 	rd := uint64(utils.GetVarData(uint32(opcode), 0, 2))
-	r := &cpu.Reg.R
 
-    //if (rd != PC) {
-    //    //reg := c.Reg
-    //    cpu.Jit.TestInst(uint32(opcode), cpu.Jit.emitThumbAddSub)
-    //    r[PC] += 2
-    //    //c.Reg = reg
-    //    return
-    //}
+	r := &cpu.Reg.R
 
 	rsValue := uint64(r[rs])
 	rnValue := uint64(r[rnImm])
@@ -765,18 +784,11 @@ func (cpu *Cpu) thumbPushPop(opcode uint16) {
 }
 
 func (cpu *Cpu) thumbRelative(opcode uint16) {
+
 	r := &cpu.Reg.R
 	isSP := utils.BitEnabled(uint32(opcode), 11)
 	rd := utils.GetVarData(uint32(opcode), 8, 10)
 	nn := utils.GetVarData(uint32(opcode), 0, 7) * 4
-
-    //if (rd != PC) {
-    //    //reg := c.Reg
-    //    cpu.Jit.TestInst(uint32(opcode), cpu.Jit.emitThumbRelative)
-    //    r[PC] += 2
-    //    //c.Reg = reg
-    //    return
-    //}
 
 	if isSP {
 		r[rd] = r[13] + nn
@@ -862,9 +874,8 @@ func (cpu *Cpu) thumbShifted(opcode uint16) {
 }
 
 func (cpu *Cpu) thumbStack(opcode uint16) {
+
 	r := &cpu.Reg.R
-
-
 	nn := utils.GetVarData(uint32(opcode), 0, 6) * 4
 	sub := utils.BitEnabled(uint32(opcode), 7)
 

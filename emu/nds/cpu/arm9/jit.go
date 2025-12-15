@@ -2,7 +2,7 @@ package arm9
 
 import (
 	"fmt"
-	"runtime/debug"
+	d "runtime/debug"
 	"unsafe"
 
 	"github.com/aabalke/guac/config"
@@ -15,6 +15,8 @@ var _ = fmt.Sprintf
 const (
     PAGE_MASK = 0xFFFF
     PAGE_SHIFT = 16
+
+    conc = !true
 )
 
 var (
@@ -91,7 +93,9 @@ func NewJit(cpu *Cpu) *Jit {
 	j.Head.Next = j.Tail
 	j.Tail.Prev = j.Head
 
-    go j.bgBlockComp()
+    if conc {
+        go j.bgBlockComp()
+    }
 
     return j
 }
@@ -138,80 +142,45 @@ func (j *Jit) InvalidatePage(addr uint32) {
     j.invalidPages = append(j.invalidPages, addr >> PAGE_SHIFT)
 }
 
-//func (j *Jit) DeletePage(id uint32) {
-//
-//    return
-//
-//    page := j.Pages[id]
-//    if page == nil {
-//        return
-//    }
-//
-//    //fmt.Printf("PAGE DELETED %08X\n", id)
-//    //j.GetPageData(id)
-//
-//    for i := range len(page.Blocks) {
-//
-//        //fmt.Printf("--- DEL BLOCK %02d\n", i)
-//
-//        //fmt.Printf("RELEASE CALLED\n")
-//
-//        if page.Blocks[i] == nil {
-//            //fmt.Printf("------ BLOCK IS NIL, SKIP DEL %02d\n", i)
-//            continue
-//        }
-//
-//        if j.Pages[id].Blocks[i].assembler == nil {
-//            continue
-//        }
-//
-//        j.Pages[id].Blocks[i].assembler.Release()
-//    }
-//
-//    j.Metrics[id] = nil
-//    j.Pages[id] = nil
-//}
-//
-//func (j *Jit) DeletePages() {
-//    // this clears invalid pages after resources not being used by cpu implimentations (if cpu writes to its own blocks we get big errors
-//
-//    return
-//
-//    j.Cnt = uint64(max(0, int(j.Cnt) - len(j.invalidPages)))
-//
-//    for _, v := range j.invalidPages {
-//
-//        if j.Pages[v] == nil {
-//            continue
-//        }
-//
-//        for i := range j.Pages[v].Blocks {
-//
-//            if j.Pages[v].Blocks[i] == nil {
-//                continue
-//            }
-//
-//            if j.Pages[v].Blocks[i].assembler == nil {
-//                continue
-//            }
-//
-//            j.Pages[v].Blocks[i].assembler.Release()
-//        }
-//
-//        j.remove(j.Pages[v])
-//        j.Pages[v] = nil
-//    }
-//
-//    j.invalidPages = []uint32{}
-//}
+func (j *Jit) DeletePages() {
+    // this clears invalid pages after resources not being used by cpu implimentations (if cpu writes to its own blocks we get big errors
+
+    j.Cnt = uint64(max(0, int(j.Cnt) - len(j.invalidPages)))
+
+    for _, v := range j.invalidPages {
+
+        if j.Pages[v] == nil {
+            continue
+        }
+
+        for i := range j.Pages[v].Blocks {
+
+            if j.Pages[v].Blocks[i] == nil {
+                continue
+            }
+
+            if j.Pages[v].Blocks[i].assembler == nil {
+                continue
+            }
+
+            j.Pages[v].Blocks[i].assembler.Release()
+        }
+
+        j.remove(j.Pages[v])
+        j.Pages[v] = nil
+    }
+
+    j.invalidPages = []uint32{}
+}
 
 func (j *Jit) CreateBlock(pc uint32) {
 
-    reqInst := config.Conf.Nds.NdsJit.BatchInst
+    //reqInst := config.Conf.Nds.NdsJit.BatchInst
 
-    old := debug.SetGCPercent(-1)
+    old := d.SetGCPercent(-1)
 
 	pageIdx := pc >> PAGE_SHIFT
+    blockIdx := (pc & PAGE_MASK) >> 2
 
     page := j.Pages[pageIdx]
     if page == nil {
@@ -221,39 +190,9 @@ func (j *Jit) CreateBlock(pc uint32) {
 			Blocks: make([]*JitBlock, (1<<PAGE_SHIFT)>>2),
 		}
 
-		//j.Metrics[pageIdx] = make([]uint32, (1<<PAGE_SHIFT)>>2)
-
-		//fmt.Printf("PAGE %08X CNT %02d\n", pageIdx, j.Cnt)
-        //fmt.Printf("ADDING %08X\n", page.id)
 		j.add(page)
         j.Pages[pageIdx] = page
-
-        //fmt.Printf("Creating Page\n")
-        //j.GetPagesData()
-
-
-
-		//j.Cnt++
-
-		//if j.Cnt > j.Capacity {
-		//	tail := j.popTail()
-		//	//fmt.Printf("TAIL %08X\n", tail.id)
-        //    j.invalidPages = append(j.invalidPages, tail.id)
-        //    //j.DeletePage(tail.id)
-		//	//j.remove(tail)
-		//	//j.Cnt--
-        //    //panic("COMPLETED FIRST DELETE")
-		//}
     }
-
-    blockIdx := (pc & PAGE_MASK) >> 2
-
-    page.Blocks[blockIdx] = &JitBlock{
-        initPc: pc,
-        Length: reqInst,
-    }
-
-    //fmt.Printf("CREATING BLOCK PAGE %08X\n", pc >> PAGE_SHIFT)
 
     asm, err := amd64.New(gojit.PageSize)
     if err != nil {
@@ -262,11 +201,10 @@ func (j *Jit) CreateBlock(pc uint32) {
 
     j.Assembler = asm
 
-    block := page.Blocks[(pc & PAGE_MASK) >> 2]
-    block.assembler = asm
-
-    // setup, not sure if needed per Block
-    //asm.MovAbs(uint64(uintptr(unsafe.Pointer(j.Cpu))), amd64.R15)
+    block := &JitBlock{
+        initPc: pc,
+        assembler: asm,
+    }
 
     j.frameSize = 20 * 4
 	j.Sub(amd64.Imm(int32(j.frameSize + 8)), amd64.Rsp)
@@ -285,22 +223,58 @@ func (j *Jit) CreateBlock(pc uint32) {
     CpuPointer = j.Cpu
     j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
 
-    initPc, lastPc, length := pc, pc, uint32(0)
+    tempPc := pc
+    var length, op, i, iA uint32
 
+    p, ok := j.Cpu.mem.ReadPtr(tempPc, true)
+    if !ok {
+        panic("READ BAD")
+    }
 
-    for reqInst := uint32(32); reqInst > 0; {
+    for {
 
-        done, isBranch, resInst, finalPc := j.emitContBlock(initPc, lastPc, reqInst, length)
-        length += resInst
-        if done {
+        op = *(*uint32)(unsafe.Add(p, i*4))
+
+        //if ok, newPc := j.emitBranch(op, tempPc); ok {
+        //    tempPc = newPc
+        //    length += i
+        //    i = 0
+
+        //    p, ok = j.Cpu.mem.ReadPtr(tempPc, true)
+        //    if !ok {
+        //        panic("READ BAD")
+        //    }
+        //    continue
+        //}
+
+        if ok := j.emitOp(op, tempPc); !ok {
+            length += i
             break
         }
 
-        if isBranch {
-            reqInst -= resInst
-            lastPc = finalPc
+        if iA >= config.Conf.Nds.NdsJit.BatchInst {
+            length += i
+            break
         }
+
+        i++
+        iA++
+        tempPc += 4
     }
+
+    block.Length = length
+    block.finalOp = op
+    block.finalPc = tempPc
+
+    //if debug.B[6] {
+    //    fmt.Printf(
+    //        "LEN %08d INIT PC %08X FINAL OP %08X PC %08X\n",
+    //        block.Length,
+    //        block.initPc,
+    //        block.finalOp, block.finalPc)
+
+    //    debug.B[6] = false
+    //}
 
 	j.Mov(amd64.Indirect{
         Base: amd64.Rsp,
@@ -311,47 +285,8 @@ func (j *Jit) CreateBlock(pc uint32) {
 
     j.BuildTo(&block.f)
 
-    debug.SetGCPercent(old)
-}
-
-func (j *Jit) emitContBlock(initPc, lastPc, reqInst, length uint32) (done, isBranch bool, resInst, finalPc uint32) {
-
-    p, ok := j.Cpu.mem.ReadPtr(lastPc, true)
-    if !ok {
-        return true, false, 0, 0
-    }
-
-    for i := range uint32(reqInst) {
-
-        op := *(*uint32)(unsafe.Add(p, i * 4))
-
-        if ok, newPc := j.emitBranch(op, lastPc + i * 4); ok {
-            return false, true, i, newPc
-        }
-
-        if ok := j.emitOp(op, lastPc +i * 4); !ok {
-
-            pageIdx := initPc >> PAGE_SHIFT
-            blockIdx := (initPc & PAGE_MASK) >> 2
-
-            block := j.Pages[pageIdx].Blocks[blockIdx]
-            block.Length = i + length
-            block.finalOp = op
-            block.finalPc = lastPc + i * 4
-            return true, false, i, lastPc + i * 4
-        }
-    }
-
-    //op := *(*uint32)(unsafe.Add(p, reqInst * 4))
-    //block := &j.Pages[initPc >> 16].Blocks[(initPc & PAGE_MASK) / 4]
-
-    //(*block).Length = reqInst + length
-    //(*block).finalOp = op
-    //(*block).finalPc = lastPc + reqInst * 4
-    //return true, false, reqInst, lastPc + reqInst * 4
-
-    // if looped through all req Inst just keep going
-    return false, false, reqInst, lastPc + reqInst * 4
+    page.Blocks[blockIdx] = block
+    d.SetGCPercent(old)
 }
 
 func (j *Jit) emitBranch(op, lastPc uint32) (ok bool, newPc uint32) {
@@ -449,12 +384,12 @@ func (j *Jit) emitOp(op uint32, pc uint32) bool {
 
     ok := j.DecodeARM(op, pc)
 
-    j.Add(amd64.Imm(4), j.REG(PC))
-
 	// Complete JCC instruction used for cond (if any)
 	for _, tgt := range jcctargets {
 		tgt()
 	}
+
+    j.Add(amd64.Imm(4), j.REG(PC))
 
     return ok
 }
@@ -486,9 +421,40 @@ func (jit *Jit) DecodeARM(opcode uint32, pc uint32) bool {
         wb   := (opcode >> 21) & 1 != 0
         wb    = (wb || !pre) && !(load && rn == rd)
 
-        if rd == PC && (load || wb) {
+        if rd == PC { //&& (load || wb) {
             return false
         }
+
+        //byte := (opcode >> 22) & 1 != 0
+        //shReg := (opcode >> 25) & 1 != 0
+        //offset := opcode & 0xFFF
+
+        //if opcode & 0xFFFF_F000 == 0xE594_1000 {
+        ////if (load &&
+        ////    !byte &&
+        ////    pre &&
+        ////    !shReg &&
+        ////    !wb &&
+        ////    rd == 0x1 &&
+        ////    rn == 0x4 &&
+        ////    offset != 0) {
+
+//      //      if debug.B[6] {
+//      //          panic("DID NOT RUN AS ARM9 BEFORE NEXT")
+//      //      }
+//
+        //    debug.B[6] = true
+
+        //    fmt.Printf("PC %08X OP %08X\n", pc, opcode)
+        //    //return false
+        //}
+
+        //if (!load && !byte && pre &&
+        //    !shReg &&
+        //    rd < 0x8 && rn < 0x8) {
+        //    fmt.Printf("SDT %08X\n", opcode)
+        //    return false
+        //}
 
         jit.emitSdt(opcode)
         return true
@@ -535,6 +501,29 @@ func (jit *Jit) DecodeARM(opcode uint32, pc uint32) bool {
             return false
         }
 
+
+
+        inst := (opcode >> 21) & 0xF
+        set := (opcode >> 20) & 1 != 0
+        imm := (opcode >> 25) & 1 != 0
+        rm := (opcode >> 0) & 0xF
+
+        // swi exit
+        if inst == MOV && set && imm && rm == LR {
+            return false
+        }
+
+
+        //shReg := (opcode >> 4) & 1 != 0
+        //shType := (opcode >> 5) & 0b11
+        ////rd := (opcode >> 12) & 0xF
+        //shift := (opcode >> 7) & 0x1F
+        //if inst == 0x4 && !set && !imm && !shReg && shType == 0 && shift != 0 && rm >= 0x8 {
+        //if opcode & 0xFFFF_00FF == 0xE082_008E {
+        //    fmt.Printf("PC %08X OP %08X\n", pc, opcode)
+        //    return false
+        //}
+
         jit.emitAlu(opcode)
 
         return true
@@ -546,7 +535,7 @@ func (jit *Jit) DecodeARM(opcode uint32, pc uint32) bool {
 
 func (j *Jit) TestInst(op uint32, f func(op uint32)) {
 
-    old := debug.SetGCPercent(-1)
+    old := d.SetGCPercent(-1)
 
     asm, err := amd64.New(gojit.PageSize)
     if err != nil {
@@ -585,7 +574,7 @@ func (j *Jit) TestInst(op uint32, f func(op uint32)) {
     asm.BuildTo(&j.testFunc)
 
     j.testFunc()
-    debug.SetGCPercent(old)
+    d.SetGCPercent(old)
 
     asm.Release()
 }
@@ -642,11 +631,45 @@ func (j *Jit) UpdateMetrics(pc uint32) {
 	j.Metrics[pageIdx][blockIdx]++
 
     if j.Metrics[pageIdx][blockIdx] > threshold {
-
-        select {
-        case j.blockCh <-pc:
-        default:
-            j.Metrics[pageIdx][blockIdx]--
+        if conc {
+            select {
+            case j.blockCh <-pc:
+            default:
+                j.Metrics[pageIdx][blockIdx]--
+            }
+        } else {
+            j.CreateBlock(pc)
         }
+    }
+}
+
+var (
+    rpc uint32
+    sav Reg
+    sta Reg
+)
+
+func (j *Jit) StartTest(op uint32, compare bool, f func(op uint32)) {
+
+    cpu := j.Cpu
+    rpc = cpu.Reg.R[15]
+    sta = cpu.Reg
+
+    cpu.Jit.TestInst(op, f)
+
+    sav = cpu.Reg
+
+    cpu.Reg = sta
+}
+
+func (j *Jit) EndTest(op uint32, compare bool) {
+
+    cpu := j.Cpu
+
+    if compare && cpu.Reg != sav {
+        fmt.Printf("STA REG %08X CPSR %08X\n", sta.R, sta.CPSR.Get())
+        fmt.Printf("JIT REG %08X CPSR %08X\n", sav.R, sav.CPSR.Get())
+        fmt.Printf("COR REG %08X CPSR %08X\n", cpu.Reg.R, cpu.Reg.CPSR.Get())
+        panic(fmt.Sprintf("Bad Compare %08X %08X", rpc, op))
     }
 }

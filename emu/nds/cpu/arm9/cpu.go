@@ -227,16 +227,19 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
                 b := p.Blocks[blockIdx]
                 b.f()
 
-                cpu.Jit.get(pageIdx)
+                //cpu.Jit.get(pageIdx)
                 //cpu.Jit.Metrics[pageIdx][blockIdx]++
                 r[PC] = b.finalPc
+
+                //fmt.Printf("PCPC %08X %08X\n\n", b.finalPc, b.finalOp)
+
                 cpu.isBranching = true
 
                 return b.finalOp, int(b.Length)
             }
 
             cpu.Jit.UpdateMetrics(pc)
-            //cpu.Jit.DeletePages()
+            cpu.Jit.DeletePages()
         }
 
         if r[PC] != cpu.BranchPc {

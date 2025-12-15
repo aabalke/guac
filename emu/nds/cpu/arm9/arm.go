@@ -208,32 +208,8 @@ var aluData Alu
 
 func (cpu *Cpu) Alu(opcode uint32) {
 
-    //inst := (opcode >> 21) & 0xF
-    //rd := (opcode >> 12) & 0xF != 0xF
-    //uhh := (
-    //    inst == 0x2 ||
-    //    inst == 0x4 ||
-    //    inst == 0xD ||
-    //    inst == 0xA)
-
-    //uhh = uhh && rd
-
-    //orig := cpu.Reg
-    //var jitt Reg
-
-    //if rd {
-    //    reg := cpu.Reg
-    //    //fmt.Printf("R %08X\n", cpu.Reg.R)
-    //    cpu.Jit.TestInst(opcode, cpu.Jit.emitAlu)
-
-    //    //fmt.Printf("R %08X\n", cpu.Reg.R)
-    //    //panic("SDFH")
-    //    //cpu.Reg.R[PC] += 4
-    //    //return
-    //    jitt = cpu.Reg
-    //    cpu.Reg = reg
-    //    //return
-    //}
+    //compare := (opcode >>12) & 0xF != PC
+    //cpu.Jit.StartTest(opcode, compare, cpu.Jit.emitAlu)
 
 	aluData.Opcode = opcode
 	aluData.Rd = utils.GetByte(opcode, 12)
@@ -262,7 +238,7 @@ func (cpu *Cpu) Alu(opcode uint32) {
 
     } else {
 
-        if (opcode >> 4) & 0xFF == 0 && (opcode & 0xF != 0xF) {
+        if earlyRet := (opcode >> 4) & 0xFF == 0 && (opcode & 0xF != 0xF); earlyRet {
             aluData.Op2 = cpu.Reg.R[opcode & 0xF]
         } else {
             reg := &cpu.Reg
@@ -310,15 +286,7 @@ func (cpu *Cpu) Alu(opcode uint32) {
 
     aluInst[utils.GetByte(opcode, 21)](cpu, &aluData)
 
-    //if rd {
-    //    if cpu.Reg != jitt {
-    //        fmt.Printf("OP %08X\n", opcode)
-    //        fmt.Printf("ORIGIN %08X CPSR %08X\n", orig.R, orig.CPSR.Get())
-    //        fmt.Printf("JITTED %08X CPSR %08X\n", jitt.R, jitt.CPSR.Get())
-    //        fmt.Printf("CORREC %08X CPSR %08X\n\n", cpu.Reg.R, cpu.Reg.CPSR.Get())
-    //        panic("BAD")
-    //    }
-    //}
+    //cpu.Jit.EndTest(opcode, compare)
 
     switch {
     case aluData.Rd != PC:
@@ -674,6 +642,7 @@ func (c *Cpu) Sdt(opcode uint32) {
 	}
 
     rd   := (opcode >> 12) & 0xF
+
     rn   := (opcode >> 16) & 0xF
     preFlag  := (opcode >> 24) & 1 != 0
     byte := (opcode >> 22) & 1 != 0
@@ -683,11 +652,44 @@ func (c *Cpu) Sdt(opcode uint32) {
     wb   := (opcode >> 21) & 1 != 0
     wb    = (wb || !preFlag) && !(load && rn == rd)
 
+    //sh := (opcode >> 25) & 1 != 0
+    //off := opcode & 0xFFF
+    //if load && !byte && preFlag && !sh && off != 0 {
+    //if opcode & 0xFFFF_F000 == 0xE594_1000 && debug.B[6] {
+
+    //    fmt.Printf("PC %08X OP %08X R1 %08X R4 %08X\n", r[15], opcode, r[1], r[4])
+
+    //    c.Jit.TestInst(opcode, c.Jit.emitSdt)
+    //    r[PC] += 4
+    //    debug.B[6] = false
+    //    return
+    //}
+
+
     //if (rd != PC) {
     //    //reg := c.Reg
     //    c.Jit.TestInst(opcode, c.Jit.emitSdt)
     //    r[PC] += 4
     //    //c.Reg = reg
+    //    return
+    //}
+
+    //if (
+    //    !load &&
+    //    !byte &&
+    //    preFlag &&
+    //    //rd < 0x8 &&
+    //    //rn < 0x8 &&
+    //    //rd >= 0x2 &&
+    //    //rd < 0x3 &&
+    //    rd == 0x2 &&
+    //    rn == 0x1 &&
+    //    true) {
+
+    //if opcode == 0xB5812000 && r[1] == 0x04000400 {
+    //    //fmt.Printf("SDT %08X r1 %08X r2 %08X\n", opcode, r[1], r[2])
+    //    c.Jit.TestInst(opcode, c.Jit.emitSdt)
+    //    r[PC] += 4
     //    return
     //}
 
@@ -953,13 +955,14 @@ func (c *Cpu) Half(op uint32) {
 
 func (cpu *Cpu) Psr(opcode uint32) {
 
+	r := &cpu.Reg.R
+
     if msr := (opcode >> 21) & 1 != 0; msr {
 		cpu.msr(opcode)
-		cpu.Reg.R[15] += 4
+		r[PC] += 4
 		return
 	}
 
-	r := &cpu.Reg.R
     rd := (opcode >> 12) & 0xF
 
     if spsr := (opcode >> 22) & 1 != 0; spsr {

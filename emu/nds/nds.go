@@ -167,49 +167,40 @@ func (nds *Nds) Update() {
 
 func (nds *Nds) UpdateFrame() {
 
-    //if nds.Frame == 900 {
-    //    fmt.Printf("MAX %08X MIN %08X\n", arm9.MaxPc, arm9.MinPc)
-    //}
-
 	for nds.Drawn = false; !nds.Drawn; {
 
         //nds.checkBadPc()
-        //if arm := !nds.arm9.Reg.CPSR.T; arm {
-        //    nds.StepArm9()
-        //} else {
-        //    nds.StepArm9()
-        //    nds.StepArm9()
-        //}
-        //if nds.arm7.Reg.IsThumb || nds.AccCycles & 1 == 0 {
-        //    nds.StepArm7()
-        //}
 
-        for c := 0; c < int(config.Conf.Nds.NdsJit.BatchInst); {
+        if config.Conf.Nds.NdsJit.Enabled {
 
-            c += nds.StepArm9()
-            //if arm := !nds.arm9.Reg.CPSR.T; arm {
-            //    c += nds.StepArm9()
-            //} else {
-            //    c += nds.StepArm9()
-            //    c += nds.StepArm9()
-            //}
+            for c := int(config.Conf.Nds.NdsJit.BatchInstA9); c >= 0; {
+                c -= int(nds.StepArm9())
+            }
+
+            for c := int(config.Conf.Nds.NdsJit.BatchInstA7); c >= 0; {
+                c -= int(nds.StepArm7())
+            }
+
+            for c := uint32(0); c < config.Conf.Nds.NdsJit.BatchInstA7; {
+                nds.StepOther()
+                c++
+            }
+
+        } else {
+
+            if arm := !nds.arm9.Reg.CPSR.T; arm {
+                nds.StepArm9()
+            } else {
+                nds.StepArm9()
+                nds.StepArm9()
+            }
+
+            if nds.arm7.Reg.CPSR.T || nds.AccCycles & 1 == 0 {
+                nds.StepArm7()
+            }
+
+            nds.StepOther()
         }
-
-        for c := 0; c < max(int(config.Conf.Nds.NdsJit.BatchInst) / 2, 1); {
-            c += nds.StepArm7()
-            //if nds.arm7.Reg.CPSR.T || nds.AccCycles & 1 == 0 {
-            //    c += nds.StepArm7()
-            //} else {
-            //    c++
-            //}
-
-        }
-
-        nds.StepOther(config.Conf.Nds.NdsJit.BatchInst)
-        //for c := 0; c < int(config.Conf.Nds.NdsJit.BatchInst); {
-        //    nds.StepOther(config.Conf.Nds.NdsJit.BatchInst)
-        //    c++
-        //}
 
         //debug.CURR_INST++
 	}
@@ -218,23 +209,23 @@ func (nds *Nds) UpdateFrame() {
     nds.Frame++
 }
 
-func (nds *Nds) StepOther(reqInst uint32) {
+func (nds *Nds) StepOther() {
 
-    nds.VideoUpdate(reqInst)
+    nds.VideoUpdate(1)
 
     if nds.TimerCycles & TIMER_CYCLE_MASK == 0 {
         nds.UpdateTimers(TIMER_CYCLE_MASK + 1)
     }
 
-    nds.TimerCycles += uint8(reqInst)
+    nds.TimerCycles += 1
 }
 
-func (nds *Nds) StepArm9() int {
+func (nds *Nds) StepArm9() uint32 {
 
     nds.arm9.CheckIrq()
 
     if nds.arm9.Halted {
-        return 1
+        return 0xFFFF_FFFF // max to exit step
     }
 
     r := &nds.arm9.Reg.R
@@ -258,18 +249,18 @@ func (nds *Nds) StepArm9() int {
         nds.arm9.Irq.SetIRQ(cpu.IRQ_GEO_CMD_FIFO)
     }
 
-    return cycles
+    return uint32(cycles)
 }
 
 var dmaC = uint32(0)
 const D = 0b1111
 
-func (nds *Nds) StepArm7() int {
+func (nds *Nds) StepArm7() uint32 {
 
     nds.arm7.CheckIrq()
 
     if nds.arm7.Halted {
-        return 1
+        return 0xFFFF_FFFF // max to exit step
     }
 
     r7 := &nds.arm7.Reg.R
@@ -282,7 +273,7 @@ func (nds *Nds) StepArm7() int {
         os.Exit(0)
     }
 
-    return cycles
+    return uint32(cycles)
 }
 
 func (nds *Nds) ToggleMute() bool {

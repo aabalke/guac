@@ -699,6 +699,7 @@ func (j *Jit) emitAluOp2Reg(op uint32, setcarry bool) {
 
 		switch shtype {
 		case 3: // rot
+
 			j.RorCl(amd64.Ebx)
 			if setcarry {
 				// set carry from x86 sign. We can't rely on the x86 carry
@@ -823,6 +824,7 @@ func (j *Jit) emitAluOp2Reg(op uint32, setcarry bool) {
 				// shift == 0 -> rcr #1
 				j.Bt(amd64.Imm(0), C)
 				j.Rcr(amd64.Imm(1), amd64.Ebx)
+                setcarry = true
 			} else {
 				j.Ror(amd64.Imm(int32(shift)), amd64.Ebx)
 			}
@@ -846,6 +848,7 @@ func (j *Jit) emitAlu(op uint32) {
     if inst == 5 || inst == 7 || inst == 6 {
         j.Xor(amd64.Rcx, amd64.Rcx)
         j.Mov(C, amd64.Cl)
+        j.Mov(amd64.Rcx, amd64.R8)
     }
 
     j.Movl(j.REG(rn), amd64.Eax)
@@ -887,6 +890,10 @@ func (j *Jit) emitAlu(op uint32) {
                 j.Add(amd64.Imm(12), amd64.Eax)
             }
         }
+    }
+
+    if inst == 5 || inst == 7 || inst == 6 {
+        j.Mov(amd64.R8, amd64.Rcx)
     }
 
     aluInstJit[inst](j, op, rd)
