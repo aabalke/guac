@@ -206,19 +206,25 @@ func (j *Jit) CreateBlock(pc uint32) {
         assembler: asm,
     }
 
-    j.frameSize = 20 * 4
-	j.Sub(amd64.Imm(int32(j.frameSize + 8)), amd64.Rsp)
-	j.Mov(amd64.Rbp, amd64.Indirect{
-        Base: amd64.Rsp, 
-        Offset: int32(j.frameSize),
-        Bits: 64},
-    )
-	j.Lea(amd64.Indirect{
-        Base: amd64.Rsp, 
-        Offset: int32(j.frameSize),
-        Bits: 64},
-        amd64.Rbp,
-    )
+    fs := 0
+
+    j.Push(amd64.Rbp)
+    j.Mov(amd64.Rsp, amd64.Rbp)
+    j.Sub(amd64.Imm(fs + 8), amd64.Rsp)
+
+    //j.frameSize = 20 * 8
+	//j.Sub(amd64.Imm(int32(j.frameSize + 8)), amd64.Rsp)
+	//j.Mov(amd64.Rbp, amd64.Indirect{
+    //    Base: amd64.Rsp, 
+    //    Offset: int32(j.frameSize),
+    //    Bits: 64},
+    //)
+	//j.Lea(amd64.Indirect{
+    //    Base: amd64.Rsp, 
+    //    Offset: int32(j.frameSize),
+    //    Bits: 64},
+    //    amd64.Rbp,
+    //)
 
     CpuPointer = j.Cpu
     j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
@@ -276,12 +282,20 @@ func (j *Jit) CreateBlock(pc uint32) {
     //    debug.B[6] = false
     //}
 
-	j.Mov(amd64.Indirect{
-        Base: amd64.Rsp,
-        Offset: int32(j.frameSize),
-        Bits: 64}, amd64.Rbp)
-	j.Add(amd64.Imm(int32(j.frameSize + 8)), amd64.Rsp)
-    asm.Ret()
+	//j.Mov(amd64.Indirect{
+    //    Base: amd64.Rsp,
+    //    Offset: int32(j.frameSize),
+    //    Bits: 64}, amd64.Rbp)
+	//j.Add(amd64.Imm(int32(j.frameSize + 8)), amd64.Rsp)
+    //asm.Ret()
+
+    j.Add(amd64.Imm(fs + 8), amd64.Rsp)
+    j.Pop(amd64.Rbp)
+    j.Ret()
+
+    for j.Off&15 != 0 {
+        j.Int3()
+    }
 
     j.BuildTo(&block.f)
 
@@ -414,52 +428,16 @@ func (jit *Jit) DecodeARM(opcode uint32, pc uint32) bool {
 	case isSDT(opcode):
 
         rd   := (opcode >> 12) & 0xF
-        rn   := (opcode >> 16) & 0xF
-        pre  := (opcode >> 24) & 1 != 0
-        load := (opcode >> 20) & 1 != 0
 
-        wb   := (opcode >> 21) & 1 != 0
-        wb    = (wb || !pre) && !(load && rn == rd)
-
-        if rd == PC { //&& (load || wb) {
+        if rd == PC {
             return false
         }
-
-        //byte := (opcode >> 22) & 1 != 0
-        //shReg := (opcode >> 25) & 1 != 0
-        //offset := opcode & 0xFFF
-
-        //if opcode & 0xFFFF_F000 == 0xE594_1000 {
-        ////if (load &&
-        ////    !byte &&
-        ////    pre &&
-        ////    !shReg &&
-        ////    !wb &&
-        ////    rd == 0x1 &&
-        ////    rn == 0x4 &&
-        ////    offset != 0) {
-
-//      //      if debug.B[6] {
-//      //          panic("DID NOT RUN AS ARM9 BEFORE NEXT")
-//      //      }
-//
-        //    debug.B[6] = true
-
-        //    fmt.Printf("PC %08X OP %08X\n", pc, opcode)
-        //    //return false
-        //}
-
-        //if (!load && !byte && pre &&
-        //    !shReg &&
-        //    rd < 0x8 && rn < 0x8) {
-        //    fmt.Printf("SDT %08X\n", opcode)
-        //    return false
-        //}
 
         jit.emitSdt(opcode)
         return true
 	case isBlock(opcode):
 
+        return false
         if pcIncluded := opcode & 0x8000 != 0; pcIncluded {
             return false
         } 
@@ -469,6 +447,7 @@ func (jit *Jit) DecodeARM(opcode uint32, pc uint32) bool {
 
 	case isHalf(opcode):
 
+        return false
         if rd := (opcode >> 12) & 0xF; rd == PC {
             return false
         }
@@ -501,8 +480,6 @@ func (jit *Jit) DecodeARM(opcode uint32, pc uint32) bool {
             return false
         }
 
-
-
         inst := (opcode >> 21) & 0xF
         set := (opcode >> 20) & 1 != 0
         imm := (opcode >> 25) & 1 != 0
@@ -512,7 +489,6 @@ func (jit *Jit) DecodeARM(opcode uint32, pc uint32) bool {
         if inst == MOV && set && imm && rm == LR {
             return false
         }
-
 
         //shReg := (opcode >> 4) & 1 != 0
         //shType := (opcode >> 5) & 0b11
@@ -579,26 +555,38 @@ func (j *Jit) TestInst(op uint32, f func(op uint32)) {
     asm.Release()
 }
 
+//go:noinline
+//go:nosplit
 func Read(addr uint32) uint32 {
     return CpuPointer.mem.Read8(addr, true)
 }
 
+//go:noinline
+//go:nosplit
 func Read16(addr uint32) uint32 {
     return CpuPointer.mem.Read16(addr, true)
 }
 
+//go:noinline
+//go:nosplit
 func Read32(addr uint32) uint32 {
     return CpuPointer.mem.Read32(addr, true)
 }
 
+//go:noinline
+//go:nosplit
 func Write(addr uint32, v uint8) {
     CpuPointer.mem.Write8(addr, v, true)
 }
 
+//go:noinline
+//go:nosplit
 func Write16(addr uint32, v uint16) {
     CpuPointer.mem.Write16(addr, v, true)
 }
 
+//go:noinline
+//go:nosplit
 func Write32(addr, v uint32) {
     CpuPointer.mem.Write32(addr, v, true)
 }
@@ -651,6 +639,10 @@ var (
 
 func (j *Jit) StartTest(op uint32, compare bool, f func(op uint32)) {
 
+    if !compare {
+        return
+    }
+
     cpu := j.Cpu
     rpc = cpu.Reg.R[15]
     sta = cpu.Reg
@@ -665,11 +657,12 @@ func (j *Jit) StartTest(op uint32, compare bool, f func(op uint32)) {
 func (j *Jit) EndTest(op uint32, compare bool) {
 
     cpu := j.Cpu
-
-    if compare && cpu.Reg != sav {
-        fmt.Printf("STA REG %08X CPSR %08X\n", sta.R, sta.CPSR.Get())
-        fmt.Printf("JIT REG %08X CPSR %08X\n", sav.R, sav.CPSR.Get())
-        fmt.Printf("COR REG %08X CPSR %08X\n", cpu.Reg.R, cpu.Reg.CPSR.Get())
-        panic(fmt.Sprintf("Bad Compare %08X %08X", rpc, op))
+    if !(compare && cpu.Reg != sav) {
+        return
     }
+
+    fmt.Printf("STA REG %08X CPSR %08X\n", sta.R, sta.CPSR.Get())
+    fmt.Printf("JIT REG %08X CPSR %08X\n", sav.R, sav.CPSR.Get())
+    fmt.Printf("COR REG %08X CPSR %08X\n", cpu.Reg.R, cpu.Reg.CPSR.Get())
+    panic(fmt.Sprintf("Bad Compare %08X %08X", rpc, op))
 }

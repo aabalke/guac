@@ -36,3 +36,7 @@ using a LRU method (Least Recently Used). This method allows for a 2-5x speed in
 Gojit is used as a base jit implimentation; however, many changes had to be made to get it to work with the modern
 Go ABI (internal application binary interface). Gojit was last updated a decade ago - modern versions of golang use
 registers and the stack for function parameter and return argument passing - previous version used only the stack. 
+
+
+
+I was checking the rrx std which was setting the C flag incorrectly 

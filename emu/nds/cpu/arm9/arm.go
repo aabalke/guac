@@ -10,6 +10,13 @@ import (
 )
 
 const (
+	LSL = iota
+	LSR
+	ASR
+	ROR
+)
+
+const (
 	AND = iota
 	EOR
 	SUB
@@ -210,26 +217,23 @@ func (cpu *Cpu) Alu(opcode uint32) {
 
     //compare := (opcode >>12) & 0xF != PC
     //cpu.Jit.StartTest(opcode, compare, cpu.Jit.emitAlu)
+    //logical := inst & 0b0110 == 0b0000 || inst & 0b1100 == 0b1100
 
 	aluData.Opcode = opcode
 	aluData.Rd = utils.GetByte(opcode, 12)
     aluData.Carry = cpu.Reg.CPSR.C
-    rn := utils.GetByte(opcode, 16)
-	aluData.RnValue = cpu.Reg.R[rn]
+    rn := (opcode >> 16) & 0xF
+    aluData.RnValue = cpu.Reg.R[rn]
 
     if imm := (opcode>>25) & 1 == 1; imm {
 
-        if opcode & 0xFFF == 0 {
-            aluData.Op2 = 0
-        } else {
-            // Ror Special with assumptions
-            nn := opcode & 0xFF
-            ro := ((opcode >> 8) & 0xF) << 1
-            carry := (nn>>((ro-1)&31))&0b1 > 0
-            aluData.Op2 = nn >> ro | (nn << (32 - ro))
-            if setCarry := ro > 0 && (opcode >> 20) & 1 == 1; setCarry {
-                cpu.Reg.CPSR.C = carry
-            }
+        // Ror Special with assumptions
+        nn := opcode & 0xFF
+        ro := ((opcode >> 8) & 0xF) << 1
+        carry := (nn >> (ro-1)) & 1 != 0
+        aluData.Op2 = bits.RotateLeft32(nn, -int(ro))
+        if setCarry := ro != 0 && (opcode >> 20) & 1 == 1; setCarry {
+            cpu.Reg.CPSR.C = carry
         }
 
         if rn == PC {
@@ -238,42 +242,7 @@ func (cpu *Cpu) Alu(opcode uint32) {
 
     } else {
 
-        if earlyRet := (opcode >> 4) & 0xFF == 0 && (opcode & 0xF != 0xF); earlyRet {
-            aluData.Op2 = cpu.Reg.R[opcode & 0xF]
-        } else {
-            reg := &cpu.Reg
-
-            rm := opcode & 0xF
-            var additional uint32
-            if rm == PC {
-                additional = 8
-            }
-
-            shiftRegister := (opcode >> 4) & 1 == 1
-            is := ((opcode >> 7) & 0x1F)
-
-            if shiftRegister {
-                is = reg.R[(opcode>>8) & 0xF] & 0xFF
-
-                if rm == PC {
-                    additional = 12
-                }
-            }
-
-            op2, setCarry, carry := utils.ShiftFuncs[opcode >> 5 & 0b11](
-                reg.R[rm] + additional,
-                is,
-                (opcode >> 20) & 1 == 1, // set
-                !shiftRegister,
-                aluData.Carry,
-            )
-
-            if setCarry {
-                reg.CPSR.C = carry
-            }
-
-            aluData.Op2 = op2
-        }
+        aluData.Op2 = cpu.getShiftedAluReg(opcode)
 
         if rn == PC {
             if imm := !utils.BitEnabled(opcode, 4); imm {
@@ -284,7 +253,8 @@ func (cpu *Cpu) Alu(opcode uint32) {
         }
     }
 
-    aluInst[utils.GetByte(opcode, 21)](cpu, &aluData)
+    inst := (opcode >> 21) & 0xF
+    aluInst[inst](cpu, &aluData)
 
     //cpu.Jit.EndTest(opcode, compare)
 
@@ -296,6 +266,128 @@ func (cpu *Cpu) Alu(opcode uint32) {
     case !cpu.Reg.CPSR.T:
         cpu.Reg.R[15] &^= 0b11
     }
+}
+
+func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
+
+    r := &cpu.Reg.R
+
+    carry := cpu.Reg.CPSR.C
+
+    shReg    := (op >> 4) & 1 != 0
+    shType   := (op >> 5) & 0b11
+    setCarry := (op >> 20) & 1 != 0
+    inst     := (op >> 21) & 0xF
+    logical  := inst & 0b0110 == 0b0000 || inst & 0b1100 == 0b1100
+    rm       := op & 0xF
+    op2 := r[rm]
+    var shift uint32
+
+    if shReg {
+        rs := (op >> 8) & 0xF
+        shift = r[rs] & 0xFF
+
+        if rm == PC {
+            op2 += 12
+        }
+
+        setCarry = setCarry && shift != 0
+
+    } else {
+
+        shift = (op >> 7) & 0x1F
+
+        if rm == PC {
+            op2 += 8
+        }
+
+        if special := shift == 0; special {
+            switch shType{
+            case LSL:
+                return op2
+            case LSR:
+                cpu.Reg.CPSR.C = op2 & 0x8000_0000 != 0
+                return 0
+            case ASR:
+
+                signed := op2 & 0x8000_0000 != 0
+
+                if setCarry {
+                    cpu.Reg.CPSR.C = signed
+                }
+
+                if signed {
+                    return 0xFFFF_FFFF
+                }
+
+                return 0
+
+            case ROR:
+
+                cpu.Reg.CPSR.C = op2 & 1 != 0
+
+                op2 >>= 1
+                if carry {
+                    op2 |= 0x8000_0000
+                }
+
+                return op2
+            }
+        }
+    }
+
+    setCarry = setCarry && logical
+
+    // https://iitd-plos.github.io/col718/ref/arm-instructionset.pdf
+
+    switch shType {
+    case LSL:
+
+        if shift > 32 {
+            op2 = 0
+            carry = false
+        } else {
+            carry = op2 & (1 << (32-shift)) != 0
+            op2 <<= shift
+        }
+
+    case LSR:
+
+        if shift > 32 {
+            op2 = 0
+            carry = false
+        } else {
+            carry = op2 & (1 << (shift-1)) != 0
+            op2 >>= shift
+        }
+
+    case ASR:
+
+        if shift > 32 {
+
+            signed := op2 & 0x8000_0000 != 0
+            carry = signed
+
+            if signed {
+                op2 = 0xFFFF_FFFF
+            } else {
+                op2 = 0x0
+            }
+        } else {
+            carry = op2 & (1 << (shift-1)) != 0
+            op2 = uint32(int32(op2) >> shift)
+        }
+
+    case ROR:
+        carry = (op2 >> ((shift-1) & 31)) & 1 != 0
+        op2 = bits.RotateLeft32(op2, -int(shift))
+    }
+
+    if setCarry {
+        cpu.Reg.CPSR.C = carry
+    }
+
+    return op2
 }
 
 func (cpu *Cpu) movExit(alu *Alu, res uint32) {
@@ -633,86 +725,82 @@ const (
 	LDR_PLD
 )
 
-func (c *Cpu) Sdt(opcode uint32) {
+func (c *Cpu) Sdt(op uint32) {
 
 	r := &c.Reg.R
 
-	if valid := utils.GetVarData(opcode, 26, 27) == 0b01; !valid {
+    if valid   := (op >> 26) & 0b11 == 0b01; !valid {
 		panic("Malformed Sdt Instruction")
 	}
 
-    rd   := (opcode >> 12) & 0xF
+    rd   := (op >> 12) & 0xF
+    rn   := (op >> 16) & 0xF
+    reg  := (op >> 25) & 1 != 0
+    pre  := (op >> 24) & 1 != 0
+    up   := (op >> 23) & 1 != 0
+    byte := (op >> 22) & 1 != 0
+    load := (op >> 20) & 1 != 0
+    wb   := (op >> 21) & 1 != 0 || !pre
 
-    rn   := (opcode >> 16) & 0xF
-    preFlag  := (opcode >> 24) & 1 != 0
-    byte := (opcode >> 22) & 1 != 0
-    load := (opcode >> 20) & 1 != 0
-    up   := (opcode >> 23) & 1 != 0
+    //compare := rd != PC
+    //////c.Jit.StartTest(op, compare, c.Jit.emitSdt)
 
-    wb   := (opcode >> 21) & 1 != 0
-    wb    = (wb || !preFlag) && !(load && rn == rd)
-
-    //sh := (opcode >> 25) & 1 != 0
-    //off := opcode & 0xFFF
-    //if load && !byte && preFlag && !sh && off != 0 {
-    //if opcode & 0xFFFF_F000 == 0xE594_1000 && debug.B[6] {
-
-    //    fmt.Printf("PC %08X OP %08X R1 %08X R4 %08X\n", r[15], opcode, r[1], r[4])
-
-    //    c.Jit.TestInst(opcode, c.Jit.emitSdt)
-    //    r[PC] += 4
-    //    debug.B[6] = false
+    //if compare {
+    //    c.Jit.TestInst(op, c.Jit.emitSdt)
+    //    r[15] += 4
     //    return
     //}
 
+	var offset, prev uint32
+    if reg {
 
-    //if (rd != PC) {
-    //    //reg := c.Reg
-    //    c.Jit.TestInst(opcode, c.Jit.emitSdt)
-    //    r[PC] += 4
-    //    //c.Reg = reg
-    //    return
-    //}
-
-    //if (
-    //    !load &&
-    //    !byte &&
-    //    preFlag &&
-    //    //rd < 0x8 &&
-    //    //rn < 0x8 &&
-    //    //rd >= 0x2 &&
-    //    //rd < 0x3 &&
-    //    rd == 0x2 &&
-    //    rn == 0x1 &&
-    //    true) {
-
-    //if opcode == 0xB5812000 && r[1] == 0x04000400 {
-    //    //fmt.Printf("SDT %08X r1 %08X r2 %08X\n", opcode, r[1], r[2])
-    //    c.Jit.TestInst(opcode, c.Jit.emitSdt)
-    //    r[PC] += 4
-    //    return
-    //}
-
-	var offset uint32
-    if shReg := (opcode >> 25) & 1 != 0; shReg {
-
-        if utils.BitEnabled(opcode, 4) {
+        if (op >> 4) & 1 != 0 {
             panic("Malformed Single Data Transfer O_o")
         }
 
-        shift := (opcode >> 7) & 0x1F
-        sType := (opcode >> 5) & 0b11
+        shift := (op >> 7) & 0x1F
+        sType := (op >> 5) & 0b11
+        rm    := op & 0xF
 
-        offset, _, _ = utils.ShiftFuncs[sType](
-			r[opcode & 0xF],
-			shift,
-			false,
-			true,
-			c.Reg.CPSR.C,
-        )
+        switch sType {
+        case LSL:
+
+            offset = r[rm] << shift
+
+        case LSR:
+
+            if shift == 0 {
+                shift = 32
+            }
+
+            offset = r[rm] >> shift
+
+        case ASR:
+
+            if shift == 0 {
+                shift = 32
+            }
+            
+            offset = uint32(int32(r[rm]) >> shift)
+
+        case ROR:
+
+            if shift == 0 {
+
+                offset = r[rm] >> 1
+
+                if c.Reg.CPSR.C {
+                    offset |= 0x8000_0000
+                }
+            } else {
+
+                offset = bits.RotateLeft32(r[rm], -int(shift))
+            }
+
+        }
 
     } else {
-        offset = opcode & 0xFFF
+        offset = op & 0xFFF
     }
 
 	post := r[rn]
@@ -726,19 +814,24 @@ func (c *Cpu) Sdt(opcode uint32) {
         post -= offset
     }
 
-    pre := r[rn]
-    if preFlag {
-        pre = post
-	}
+    if pre {
+        prev = post
+	} else {
+        prev = r[rn]
+    }
+
+    if wb {
+		r[rn] = post
+    }
 
     if load {
         if byte {
             // DO NOT WORD ALIGN
-            r[rd] = c.mem.Read8(pre, true)
+            r[rd] = c.mem.Read8(prev, true)
         } else {
 
-            v := c.mem.Read32(pre &^ 0b11, true)
-            is := (pre & 0b11) << 3
+            v := c.mem.Read32(prev &^ 0b11, true)
+            is := (prev & 0b11) << 3
             v = utils.RorSimple(v, is)
 
             r[rd] = v
@@ -750,20 +843,18 @@ func (c *Cpu) Sdt(opcode uint32) {
         }
     } else {
         if byte {
-		    c.mem.Write8(pre, uint8(r[rd]), true)
+		    c.mem.Write8(prev, uint8(r[rd]), true)
         } else {
             v := r[rd]
             if rd == PC {
                 v += 12
             }
 
-            c.mem.Write32(pre &^ 0b11, v, true)
+            c.mem.Write32(prev &^ 0b11, v, true)
         }
     }
 
-    if wb {
-		r[rn] = post
-    }
+    //c.Jit.EndTest(op, compare)
 
 	r[PC] += 4
 }

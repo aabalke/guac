@@ -80,12 +80,12 @@ func (j *Jit) emitMul(op uint32) {
 
         if inst == UMLAL {
             //j.Xor(amd64.Rcx, amd64.Rcx)
-            //j.Xor(amd64.Rdx, amd64.Rdx)
+            //j.Xor(amd64.Rdi, amd64.Rdi)
             j.Movl(j.REG(rd), amd64.Ecx)
             j.Shl(amd64.Imm(32), amd64.Rcx)
-            j.Movl(j.REG(rn), amd64.Edx)
+            j.Movl(j.REG(rn), amd64.Edi)
             j.Add(amd64.Rcx, amd64.Rax)
-            j.Add(amd64.Rdx, amd64.Rax)
+            j.Add(amd64.Rdi, amd64.Rax)
         }
 
         if set {
@@ -120,12 +120,12 @@ func (j *Jit) emitMul(op uint32) {
 
         if inst == SMLAL {
             //j.Xor(amd64.Rcx, amd64.Rcx)
-            //j.Xor(amd64.Rdx, amd64.Rdx)
+            //j.Xor(amd64.Rdi, amd64.Rdi)
             j.Movl(j.REG(rd), amd64.Ecx)
             j.Shl(amd64.Imm(32), amd64.Rcx)
-            j.Movl(j.REG(rn), amd64.Edx)
+            j.Movl(j.REG(rn), amd64.Edi)
             j.Add(amd64.Rcx, amd64.Rax)
-            j.Add(amd64.Rdx, amd64.Rax)
+            j.Add(amd64.Rdi, amd64.Rax)
         }
 
         if set {
@@ -284,10 +284,10 @@ func (j *Jit) MulQFlag(r amd64.Register) {
     j.Mov(amd64.Imm(1), amd64.R10)
 
     j.Cmp(amd64.Imm(math.MaxInt32), r)
-    j.Cmovcc(amd64.CC_GE, amd64.R10, amd64.Rdx)
+    j.Cmovcc(amd64.CC_GE, amd64.R10, amd64.Rdi)
 
     j.Cmp(amd64.Imm(math.MinInt32), r)
-    j.Cmovcc(amd64.CC_LE, amd64.R10, amd64.Rdx)
+    j.Cmovcc(amd64.CC_LE, amd64.R10, amd64.Rdi)
 
     j.Mov(amd64.Dl, Q)
 }
@@ -407,14 +407,14 @@ func (j *Jit) emitQalu(op uint32) {
         if inst == QDADD {
             j.Add(amd64.Rbx, amd64.Rax)
             // im not sure why special case for -1 is needed here but not golang
-            j.MovAbs(uint64(0xFFFF_FFFF), amd64.Rdx)
-            j.Cmp(amd64.Rdx, amd64.Rax)
+            j.MovAbs(uint64(0xFFFF_FFFF), amd64.Rdi)
+            j.Cmp(amd64.Rdi, amd64.Rax)
             skip = j.JccForward(amd64.CC_Z)
         } else {
             j.Sub(amd64.Rbx, amd64.Rax)
             // im not sure why special case for 0 is needed here but not golang
-            j.MovAbs(uint64(0x0), amd64.Rdx)
-            j.Cmp(amd64.Edx, amd64.Eax)
+            j.MovAbs(uint64(0x0), amd64.Rdi)
+            j.Cmp(amd64.Edi, amd64.Eax)
             skip = j.JccForward(amd64.CC_Z)
         }
 
@@ -571,18 +571,17 @@ func (j *Jit) emitSdt(op uint32) {
     up   := (op >> 23) & 1 != 0
     byte := (op >> 22) & 1 != 0
     load := (op >> 20) & 1 != 0
-
-    wb   := (op >> 21) & 1 != 0
-    wb    = (wb || !pre) && !(load && rn == rd)
+    wb   := (op >> 21) & 1 != 0 || !pre
 
     // offset
     if reg {
-        // alu op2 reg outputs in Ebx
-        j.emitAluOp2Reg(op, false)
+        j.emitSdtRegShift(op)
         j.Mov(amd64.Rbx, amd64.Rcx)
     } else {
         j.Mov(amd64.Imm(int32(op & 0xFFF)), amd64.Rcx)
     }
+
+    // rn ebx, shift ecx
 
     j.Movl(j.REG(rn), amd64.Ebx)
 
@@ -603,12 +602,10 @@ func (j *Jit) emitSdt(op uint32) {
     }
 
     if wb {
-        //j.Mov(amd64.Rbx, amd64.R13)
-        j.Push(amd64.Rbx)
+        j.Movl(amd64.Ebx, j.REG(rn))
     }
 
     if load {
-
         if byte {
             j.CallFunc(Read)
         } else {
@@ -638,26 +635,90 @@ func (j *Jit) emitSdt(op uint32) {
             j.CallFunc(Write32)
         }
     }
+}
 
-    if wb {
-        //j.Mov(amd64.R13, amd64.Rax)
-        j.Pop(amd64.Rax)
-        j.Movl(amd64.Eax, j.REG(rn))
+func (j *Jit) emitSdtRegShift(op uint32) {
+
+    rm     := op & 0xF
+    shType := (op >> 5) & 0b11
+    is     := (op >> 7) & 0x1F
+
+    // ebx rm, ecx shift
+
+	j.Movl(j.REG(rm), amd64.Ebx)
+
+    if rm == PC {
+        panic("rm cannot include pc sdt")
+    }
+
+    switch shType {
+    case LSL:
+
+        j.Mov(amd64.Imm(is), amd64.Rcx)
+        j.ShlCl(amd64.Ebx)
+
+        j.Cmp(amd64.Imm(32), amd64.Ecx)
+        j.Sbb(amd64.Eax, amd64.Eax)
+        j.And(amd64.Eax, amd64.Ebx)
+        return
+
+    case LSR:
+
+        if is == 0 {
+            is = 32
+        }
+
+        j.Mov(amd64.Imm(is), amd64.Rcx)
+        j.ShrCl(amd64.Ebx)
+
+        j.Cmp(amd64.Imm(32), amd64.Ecx)
+        j.Sbb(amd64.Eax, amd64.Eax)
+        j.And(amd64.Eax, amd64.Ebx)
+        return
+
+    case ASR:
+
+        if is == 0 {
+            is = 32
+        }
+
+        j.Movl(amd64.Imm(is), amd64.Ecx)
+
+        j.Cmp(amd64.Imm(32), amd64.Ecx)
+        j.Sbb(amd64.Eax, amd64.Eax)
+        j.Not(amd64.Eax)
+        j.Or(amd64.Eax, amd64.Ecx)
+
+        j.SarCl(amd64.Ebx)
+        return
+
+    case ROR:
+
+        if is == 0 {
+            // set CF flag based on C value (carry). Then complete RRX
+            j.Bt(amd64.Imm(0), C)
+            j.Rcr(amd64.Imm(1), amd64.Ebx)
+            return
+        }
+
+        j.Movl(amd64.Imm(is), amd64.Ecx)
+        j.RorCl(amd64.Ebx)
+        return
     }
 }
 
 func (j *Jit) ToggleThumb() {
 
-    j.Movl(j.REG(PC), amd64.Edx)
-    j.And(amd64.Imm(1), amd64.Edx)
-    //j.Cmp(amd64.Imm(0}, amd64.Edx)
+    j.Movl(j.REG(PC), amd64.Edi)
+    j.And(amd64.Imm(1), amd64.Edi)
+    //j.Cmp(amd64.Imm(0}, amd64.Edi)
     j.SETcc(amd64.CC_NZ, T)
     j.Cmovcc(amd64.CC_NZ, amd64.Imm(1), amd64.Ecx)
     j.Cmovcc(amd64.CC_Z, amd64.Imm(3), amd64.Ecx)
 
     j.Not(amd64.Ecx)
-    j.And(amd64.Ecx, amd64.Edx)
-    j.Movl(amd64.Edx, j.REG(PC))
+    j.And(amd64.Ecx, amd64.Edi)
+    j.Movl(amd64.Edi, j.REG(PC))
 
 	//reg.CPSR.T = reg.R[PC]&1 > 0
 
@@ -1136,14 +1197,14 @@ func (j *Jit) emitBlock(op uint32) {
     load := (op >> 20) & 1 != 0
     //forceUserTemp := psr && (j.Cpu.Reg.CPSR.Mode != MODE_USR) && (!load || !pcIncluded)
     j.Xor(amd64.Rdi, amd64.Rdi)
-    j.Xor(amd64.Rdx, amd64.Rdx)
+    j.Xor(amd64.Rdi, amd64.Rdi)
     if psr && (!load || !pcIncluded) {
         j.Mov(MODE, amd64.Edi)
         j.Cmp(amd64.Imm(MODE_USR), amd64.Edi)
-        j.SETcc(amd64.CC_NZ, amd64.Rdx)
+        j.SETcc(amd64.CC_NZ, amd64.Rdi)
     }
 
-    j.Push(amd64.Edx)
+    j.Push(amd64.Edi)
 
     regCount := utils.CountBits(rlist)
 
@@ -1174,31 +1235,31 @@ func (j *Jit) emitBlock(op uint32) {
 
         // rdx already has forceuser bit
 
-        j.And(amd64.Imm(1), amd64.Edx)
+        j.And(amd64.Imm(1), amd64.Edi)
 
-        j.Cmp(amd64.Imm(1), amd64.Edx)
+        j.Cmp(amd64.Imm(1), amd64.Edi)
         normal := j.JccForward(amd64.CC_NZ)
 
         switch rn {
         case 13:
-            j.Movl(j.UserBankReg(false), amd64.Edx)
+            j.Movl(j.UserBankReg(false), amd64.Edi)
         case 14:
-            j.Movl(j.UserBankReg(true), amd64.Edx)
+            j.Movl(j.UserBankReg(true), amd64.Edi)
         }
 
         userModeJump := j.JmpForward()
 
         normal()
 
-        j.Movl(j.REG(rn), amd64.Edx)
+        j.Movl(j.REG(rn), amd64.Edi)
 
         userModeJump()
 
     } else {
-        j.Movl(j.REG(rn), amd64.Edx)
+        j.Movl(j.REG(rn), amd64.Edi)
     }
 
-    j.Push(amd64.Edx)
+    j.Push(amd64.Edi)
 
     reg := uint32(0)
     if !up {
@@ -1234,12 +1295,12 @@ func (j *Jit) emitBlock(op uint32) {
                     Base: amd64.Rsp,
                     Offset: int32(8 * 4),
                     Bits: 64}, 
-                    amd64.Rdx,
+                    amd64.Rdi,
                 )
 
-                j.And(amd64.Imm(1), amd64.Edx)
+                j.And(amd64.Imm(1), amd64.Edi)
 
-                j.Cmp(amd64.Imm(1), amd64.Edx)
+                j.Cmp(amd64.Imm(1), amd64.Edi)
                 normal := j.JccForward(amd64.CC_NZ)
 
                 switch reg {
@@ -1289,12 +1350,12 @@ func (j *Jit) emitBlock(op uint32) {
                         Base: amd64.Rsp,
                         Offset: int32(8 * 4),
                         Bits: 64}, 
-                        amd64.Rdx,
+                        amd64.Rdi,
                     )
 
-                    j.And(amd64.Imm(1), amd64.Edx)
+                    j.And(amd64.Imm(1), amd64.Edi)
 
-                    j.Cmp(amd64.Imm(1), amd64.Edx)
+                    j.Cmp(amd64.Imm(1), amd64.Edi)
                     normal := j.JccForward(amd64.CC_NZ)
                     switch reg {
                     case 13:

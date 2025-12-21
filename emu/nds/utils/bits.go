@@ -1,11 +1,13 @@
 package utils
 
+import "math/bits"
+
 func BitEnabled(v uint32, bit uint8) bool {
 	return v&(1<<bit) != 0
 }
 
 func GetByte(i uint32, offsetBit uint8) uint32 {
-    return (i >> offsetBit) & 0b1111
+	return (i >> offsetBit) & 0b1111
 }
 
 func GetVarData(i uint32, s, e uint8) uint32 {
@@ -25,4 +27,10 @@ func ReplaceByte(value uint32, newByte uint32, byteOffset uint32) uint32 {
 	bitOffset := 8 * byteOffset
 	mask := uint32(0b1111_1111)
 	return (value &^ (mask << bitOffset)) | (newByte << bitOffset)
+}
+
+func RorSimple(v, shift uint32) uint32 {
+	shift &= 31
+	return bits.RotateLeft32(v, -int(shift))
+	//return (v >> shift) | (v << (32 - shift))
 }
