@@ -168,7 +168,7 @@ func (c *Cond) Get() uint32 {
 func (c *Cond) Set(v uint32) {
     c.N = (v >> FLAG_N) & 1 == 1
     c.Z = (v >> FLAG_Z) & 1 == 1
-    c.C = (v >> FLAG_C) & 1 == 1
+c.C = (v >> FLAG_C) & 1 == 1
     c.V = (v >> FLAG_V) & 1 == 1
     c.Q = (v >> FLAG_Q) & 1 == 1
     c.I = (v >> FLAG_I) & 1 == 1
@@ -215,6 +215,16 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 
         if config.Conf.Nds.NdsJit.Enabled {
 
+            //b := cpu.Jit.CreateBlockTest(r[PC])
+            //b.f()
+            //b.assembler.Release()
+
+            //r[PC] = b.finalPc
+            ////fmt.Printf("PCPC %08X %08X\n\n", b.finalPc, b.finalOp)
+            //cpu.isBranching = true
+
+            //return b.finalOp, int(b.Length)
+
             pc := r[PC]
             pageIdx := pc >> PAGE_SHIFT
             blockIdx := (pc & PAGE_MASK) >> 2 // aligned to arm
@@ -226,6 +236,9 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 
                 b := p.Blocks[blockIdx]
                 b.f()
+
+                //gojit.CallJit(&b.assembler.Buf[0])
+
 
                 //cpu.Jit.get(pageIdx)
                 //cpu.Jit.Metrics[pageIdx][blockIdx]++

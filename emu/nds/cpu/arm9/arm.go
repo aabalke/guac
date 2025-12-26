@@ -215,9 +215,10 @@ var aluData Alu
 
 func (cpu *Cpu) Alu(opcode uint32) {
 
-    //compare := (opcode >>12) & 0xF != PC
+    //reggy   := (opcode >> 25) & 1 == 0
+    //rd := (opcode >>12) & 0xF
+    //compare := !reggy && rd != PC
     //cpu.Jit.StartTest(opcode, compare, cpu.Jit.emitAlu)
-    //logical := inst & 0b0110 == 0b0000 || inst & 0b1100 == 0b1100
 
 	aluData.Opcode = opcode
 	aluData.Rd = utils.GetByte(opcode, 12)
@@ -227,13 +228,14 @@ func (cpu *Cpu) Alu(opcode uint32) {
 
     if imm := (opcode>>25) & 1 == 1; imm {
 
-        // Ror Special with assumptions
-        nn := opcode & 0xFF
         ro := ((opcode >> 8) & 0xF) << 1
-        carry := (nn >> (ro-1)) & 1 != 0
-        aluData.Op2 = bits.RotateLeft32(nn, -int(ro))
+        aluData.Op2 = bits.RotateLeft32(opcode & 0xFF, -int(ro))
+
         if setCarry := ro != 0 && (opcode >> 20) & 1 == 1; setCarry {
-            cpu.Reg.CPSR.C = carry
+            // I believe this matches
+            //carry := (nn >> (ro-1)) & 1 != 0 // this line must be before opcode
+            cpu.Reg.CPSR.C = aluData.Op2 >> 31 != 0
+            //cpu.Reg.CPSR.C = carry
         }
 
         if rn == PC {
@@ -256,7 +258,6 @@ func (cpu *Cpu) Alu(opcode uint32) {
     inst := (opcode >> 21) & 0xF
     aluInst[inst](cpu, &aluData)
 
-    //cpu.Jit.EndTest(opcode, compare)
 
     switch {
     case aluData.Rd != PC:
@@ -266,6 +267,8 @@ func (cpu *Cpu) Alu(opcode uint32) {
     case !cpu.Reg.CPSR.T:
         cpu.Reg.R[15] &^= 0b11
     }
+
+    //cpu.Jit.EndTest(opcode, compare)
 }
 
 func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
@@ -276,11 +279,14 @@ func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
 
     shReg    := (op >> 4) & 1 != 0
     shType   := (op >> 5) & 0b11
+
     setCarry := (op >> 20) & 1 != 0
     inst     := (op >> 21) & 0xF
     logical  := inst & 0b0110 == 0b0000 || inst & 0b1100 == 0b1100
+    setCarry = setCarry && logical
+
     rm       := op & 0xF
-    op2 := r[rm]
+    op2      := r[rm]
     var shift uint32
 
     if shReg {
@@ -290,8 +296,6 @@ func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
         if rm == PC {
             op2 += 12
         }
-
-        setCarry = setCarry && shift != 0
 
     } else {
 
@@ -336,35 +340,46 @@ func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
         }
     }
 
-    setCarry = setCarry && logical
-
     // https://iitd-plos.github.io/col718/ref/arm-instructionset.pdf
+
+    if regZero := shift == 0; regZero {
+        // op2 unchanges, carry is set to original carry (no change)
+        return op2
+    }
 
     switch shType {
     case LSL:
 
-        if shift > 32 {
+        switch {
+        case shift > 32:
             op2 = 0
             carry = false
-        } else {
+        case shift == 32:
+            carry = op2 & 1 != 0
+            op2 = 0
+        default:
             carry = op2 & (1 << (32-shift)) != 0
             op2 <<= shift
         }
 
     case LSR:
 
-        if shift > 32 {
+        switch {
+        case shift > 32:
             op2 = 0
             carry = false
-        } else {
+        case shift == 32:
+            carry = op2 & 0x8000_0000 != 0
+            op2 = 0
+        default:
             carry = op2 & (1 << (shift-1)) != 0
             op2 >>= shift
         }
 
     case ASR:
 
-        if shift > 32 {
-
+        switch {
+        case shift >= 32:
             signed := op2 & 0x8000_0000 != 0
             carry = signed
 
@@ -373,14 +388,22 @@ func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
             } else {
                 op2 = 0x0
             }
-        } else {
+
+        default:
             carry = op2 & (1 << (shift-1)) != 0
             op2 = uint32(int32(op2) >> shift)
         }
 
     case ROR:
-        carry = (op2 >> ((shift-1) & 31)) & 1 != 0
-        op2 = bits.RotateLeft32(op2, -int(shift))
+
+        switch {
+        case shift == 32:
+            // op2 unchanges
+            carry = op2 & 0x8000_0000 != 0
+        default:
+            carry = (op2 >> ((shift-1) & 31)) & 1 != 0
+            op2 = bits.RotateLeft32(op2, -int(shift))
+        }
     }
 
     if setCarry {
@@ -743,7 +766,7 @@ func (c *Cpu) Sdt(op uint32) {
     wb   := (op >> 21) & 1 != 0 || !pre
 
     //compare := rd != PC
-    //////c.Jit.StartTest(op, compare, c.Jit.emitSdt)
+    ////c.Jit.StartTest(op, compare, c.Jit.emitSdt)
 
     //if compare {
     //    c.Jit.TestInst(op, c.Jit.emitSdt)
@@ -1187,32 +1210,38 @@ func (cpu *Cpu) msr(op uint32) {
 
 func (cpu *Cpu) Swp(opcode uint32) {
 
-	byte := utils.BitEnabled(opcode, 22)
-	rn := utils.GetByte(opcode, 16)
-	rd := utils.GetByte(opcode, 12)
-	rm := utils.GetByte(opcode, 0)
-
+    isByte := (opcode >> 22) & 1 != 0
+    rn := (opcode >> 16) & 0xF
+    rd := (opcode >> 12) & 0xF
+    rm := opcode & 0xF
 
 	r := &cpu.Reg.R
 
 	rmValue := r[rm]
 	rnValue := r[rn]
 
-	if byte {
+    //compare := isByte && rm != rn
+
+    //rn0 := cpu.mem.Read32(rnValue, true)
+    //rm0 := cpu.mem.Read32(rmValue, true)
+    //cpu.Jit.TestInst(opcode, cpu.Jit.emitSwp)
+    //cpu.Jit.StartTest(opcode, compare, cpu.Jit.emitSwp)
+    //cpu.mem.Write32(rnValue, rn0, true)
+    //cpu.mem.Write32(rmValue, rm0, true)
+
+	if isByte {
 		r[rd] = cpu.mem.Read8(rnValue, true)
 		cpu.mem.Write8(rnValue, uint8(rmValue), true)
-		r[PC] += 4
-		return
+    } else {
+        v := cpu.mem.Read32(rnValue &^ 0b11, true)
+        is := (rnValue & 0b11) << 3
+        v = bits.RotateLeft32(v, -int(is & 31))
+        r[rd] = v
+        cpu.mem.Write32(rnValue, rmValue, true)
     }
 
-    v := cpu.mem.Read32(rnValue &^ 0b11, true)
-    is := (rnValue & 0b11) << 3
+    //cpu.Jit.EndTest(opcode, compare)
 
-    //rnMemValue, _, _ = utils.Ror(rnMemValue, is, false, false, false)
-    v = utils.RorSimple(v, is)
-
-	r[rd] = v
-	cpu.mem.Write32(rnValue, rmValue, true)
 	r[PC] += 4
 }
 

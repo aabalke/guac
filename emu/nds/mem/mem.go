@@ -199,6 +199,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
             return mem.Oam[addr & 0x7FF]
         case 0x8, 0x9, 0xA:
             return mem.ReadGbaSlot(addr, arm9)
+
         default:
             return 0
             //uhh.PrintPcs()

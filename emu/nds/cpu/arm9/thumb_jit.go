@@ -3,7 +3,7 @@ package arm9
 import (
 	"fmt"
 
-	"github.com/aabalke/guac/emu/jit/amd64"
+	amd64 "github.com/aabalke/gojit"
 )
 
 func (j *Jit) emitThumbStack(op uint32) {

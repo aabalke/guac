@@ -2,12 +2,10 @@ package arm9
 
 import (
 	"fmt"
-	d "runtime/debug"
 	"unsafe"
 
-	"github.com/aabalke/guac/config"
-	"github.com/aabalke/guac/emu/jit"
-	"github.com/aabalke/guac/emu/jit/amd64"
+	//"github.com/aabalke/guac/config"
+	"github.com/aabalke/gojit"
 )
 
 var _ = fmt.Sprintf
@@ -16,35 +14,35 @@ const (
     PAGE_MASK = 0xFFFF
     PAGE_SHIFT = 16
 
-    conc = !true
+    CONCURRENT_BLOCKS = true // this is for testing
 )
 
 var (
     CpuPointer *Cpu
-    CPU    = amd64.R11
+    CPU    = gojit.R9
     REG    = int32(unsafe.Offsetof(Cpu{}.Reg))
     R      = REG + int32(unsafe.Offsetof(Reg{}.R))
     CPSR   = REG + int32(unsafe.Offsetof(Reg{}.CPSR))
-    MODE = amd64.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.Mode)), Bits: 32}
-    N = amd64.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.N)), Bits: 8}
-    Z = amd64.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.Z)), Bits: 8}
-    C = amd64.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.C)), Bits: 8}
-    V = amd64.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.V)), Bits: 8}
-    Q = amd64.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.Q)), Bits: 8}
-    I = amd64.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.I)), Bits: 8}
-    F = amd64.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.F)), Bits: 8}
-    T = amd64.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.T)), Bits: 8}
+    MODE = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.Mode)), Bits: 32}
+    N = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.N)), Bits: 8}
+    Z = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.Z)), Bits: 8}
+    C = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.C)), Bits: 8}
+    V = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.V)), Bits: 8}
+    Q = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.Q)), Bits: 8}
+    I = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.I)), Bits: 8}
+    F = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.F)), Bits: 8}
+    T = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.T)), Bits: 8}
 )
 
 type Jit struct {
-    *amd64.Assembler
+    *gojit.Assembler
 	Cpu    *Cpu
 
     Pages [0x1_0000_0000 >> PAGE_SHIFT]*Page // need 0xFFFF_FFFF for bios
-    Head *Page
-    Tail *Page
-    Cnt uint64
-    Capacity uint64
+    //Head *Page
+    //Tail *Page
+    //Cnt uint64
+    //Capacity uint64
 
     Metrics [0x1_0000_0000 >> PAGE_SHIFT][]uint32
 
@@ -63,39 +61,38 @@ type Jit struct {
 }
 
 type Page struct {
-
-    id uint32
-	Prev *Page
-	Next *Page
-    Blocks []*JitBlock
+    id      uint32
+	//Prev    *Page
+	//Next    *Page
+    Blocks  []*JitBlock
     Written bool
 }
 
 type JitBlock struct {
-	f      func()
-	initPc uint32
-    finalPc uint32
-    finalOp uint32
-	Length uint32
-    assembler *amd64.Assembler
+    f         func()
+	initPc    uint32
+    finalPc   uint32
+    finalOp   uint32
+	Length    uint32
+    assembler *gojit.Assembler
 }
 
 func NewJit(cpu *Cpu) *Jit {
 
     j := &Jit{
-		Head:     &Page{},
-		Tail:     &Page{},
-        Capacity: 5, //0x1_0000_0000 >> PAGE_SHIFT,
+		//Head:     &Page{},
+		//Tail:     &Page{},
+        //Capacity: 5, //0x1_0000_0000 >> PAGE_SHIFT,
         Cpu: cpu,
         blockCh: make(chan uint32),
     }
 
-	j.Head.Next = j.Tail
-	j.Tail.Prev = j.Head
+	//j.Head.Next = j.Tail
+	//j.Tail.Prev = j.Head
 
-    if conc {
-        go j.bgBlockComp()
-    }
+
+
+    go j.bgBlockComp()
 
     return j
 }
@@ -106,27 +103,27 @@ func (j *Jit) bgBlockComp() {
     }
 }
 
-func (j *Jit) UserBankReg(isLr bool) amd64.Indirect {
+func (j *Jit) UserBankReg(isLr bool) gojit.Indirect {
 
     // user bank id is 0, so return first uint32 in SP and LR [6]uint32s
 
     if isLr {
-        return amd64.Indirect{
+        return gojit.Indirect{
             Base: CPU,
             Offset: REG + int32(unsafe.Offsetof(Reg{}.LR)),
             Bits: 32,
         }
     }
 
-    return amd64.Indirect{
+    return gojit.Indirect{
         Base: CPU,
         Offset: REG + int32(unsafe.Offsetof(Reg{}.SP)),
         Bits: 32,
     }
 }
 
-func (j *Jit) REG(i uint32) amd64.Indirect {
-    return amd64.Indirect{
+func (j *Jit) REG(i uint32) gojit.Indirect {
+    return gojit.Indirect{
         Base: CPU,
         Offset: R + int32(i * 4),
         Bits: 32,
@@ -145,7 +142,11 @@ func (j *Jit) InvalidatePage(addr uint32) {
 func (j *Jit) DeletePages() {
     // this clears invalid pages after resources not being used by cpu implimentations (if cpu writes to its own blocks we get big errors
 
-    j.Cnt = uint64(max(0, int(j.Cnt) - len(j.invalidPages)))
+    //j.Cnt = uint64(max(0, int(j.Cnt) - len(j.invalidPages)))
+
+    if len(j.invalidPages) == 0 {
+        return
+    }
 
     for _, v := range j.invalidPages {
 
@@ -166,18 +167,70 @@ func (j *Jit) DeletePages() {
             j.Pages[v].Blocks[i].assembler.Release()
         }
 
-        j.remove(j.Pages[v])
+        //j.remove(j.Pages[v])
         j.Pages[v] = nil
     }
 
     j.invalidPages = []uint32{}
 }
 
+var testBlock JitBlock
+
+func (j *Jit) CreateBlockTest(pc uint32) *JitBlock {
+
+    asm, err := gojit.New(gojit.PageSize)
+    if err != nil {
+        panic(err)
+    }
+
+    j.Assembler = asm
+
+    testBlock = JitBlock{
+        initPc: pc,
+        assembler: asm,
+    }
+
+    CpuPointer = j.Cpu
+    j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
+
+    tempPc := pc
+    var length, op, i, iA uint32
+
+    p, ok := j.Cpu.mem.ReadPtr(tempPc, true)
+    if !ok {
+        panic("READ BAD")
+    }
+
+    for {
+
+        op = *(*uint32)(unsafe.Add(p, i*4))
+
+        if ok := j.emitOp(op, tempPc); !ok {
+            length += i
+            break
+        }
+
+        i++
+        iA++
+        tempPc += 4
+    }
+
+    testBlock.Length = length
+    testBlock.finalOp = op
+    testBlock.finalPc = tempPc
+
+    gojit.ExitAssembler(asm)
+
+    testBlock.f = func () {
+        gojit.CallJit(&asm.Buf[0])
+    }
+
+    return &testBlock
+}
+
 func (j *Jit) CreateBlock(pc uint32) {
 
     //reqInst := config.Conf.Nds.NdsJit.BatchInst
-
-    old := d.SetGCPercent(-1)
 
 	pageIdx := pc >> PAGE_SHIFT
     blockIdx := (pc & PAGE_MASK) >> 2
@@ -190,11 +243,12 @@ func (j *Jit) CreateBlock(pc uint32) {
 			Blocks: make([]*JitBlock, (1<<PAGE_SHIFT)>>2),
 		}
 
-		j.add(page)
+		//j.add(page)
         j.Pages[pageIdx] = page
     }
 
-    asm, err := amd64.New(gojit.PageSize)
+    const pagesize = 1024 * 1024
+    asm, err := gojit.New(pagesize)
     if err != nil {
         panic(err)
     }
@@ -205,26 +259,6 @@ func (j *Jit) CreateBlock(pc uint32) {
         initPc: pc,
         assembler: asm,
     }
-
-    fs := 0
-
-    j.Push(amd64.Rbp)
-    j.Mov(amd64.Rsp, amd64.Rbp)
-    j.Sub(amd64.Imm(fs + 8), amd64.Rsp)
-
-    //j.frameSize = 20 * 8
-	//j.Sub(amd64.Imm(int32(j.frameSize + 8)), amd64.Rsp)
-	//j.Mov(amd64.Rbp, amd64.Indirect{
-    //    Base: amd64.Rsp, 
-    //    Offset: int32(j.frameSize),
-    //    Bits: 64},
-    //)
-	//j.Lea(amd64.Indirect{
-    //    Base: amd64.Rsp, 
-    //    Offset: int32(j.frameSize),
-    //    Bits: 64},
-    //    amd64.Rbp,
-    //)
 
     CpuPointer = j.Cpu
     j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
@@ -258,10 +292,10 @@ func (j *Jit) CreateBlock(pc uint32) {
             break
         }
 
-        if iA >= config.Conf.Nds.NdsJit.BatchInst {
-            length += i
-            break
-        }
+        //if iA >= config.Conf.Nds.NdsJit.BatchInst {
+        //    length += i
+        //    break
+        //}
 
         i++
         iA++
@@ -272,35 +306,18 @@ func (j *Jit) CreateBlock(pc uint32) {
     block.finalOp = op
     block.finalPc = tempPc
 
-    //if debug.B[6] {
-    //    fmt.Printf(
-    //        "LEN %08d INIT PC %08X FINAL OP %08X PC %08X\n",
-    //        block.Length,
-    //        block.initPc,
-    //        block.finalOp, block.finalPc)
+    gojit.ExitAssembler(asm)
 
-    //    debug.B[6] = false
-    //}
-
-	//j.Mov(amd64.Indirect{
-    //    Base: amd64.Rsp,
-    //    Offset: int32(j.frameSize),
-    //    Bits: 64}, amd64.Rbp)
-	//j.Add(amd64.Imm(int32(j.frameSize + 8)), amd64.Rsp)
-    //asm.Ret()
-
-    j.Add(amd64.Imm(fs + 8), amd64.Rsp)
-    j.Pop(amd64.Rbp)
-    j.Ret()
-
-    for j.Off&15 != 0 {
-        j.Int3()
+    if err := asm.Error(); err != nil {
+        println("err in block creation, skipping")
+        return
     }
 
-    j.BuildTo(&block.f)
+    block.f = func () {
+        gojit.CallJit(&asm.Buf[0])
+    }
 
     page.Blocks[blockIdx] = block
-    d.SetGCPercent(old)
 }
 
 func (j *Jit) emitBranch(op, lastPc uint32) (ok bool, newPc uint32) {
@@ -314,26 +331,29 @@ func (j *Jit) emitBranch(op, lastPc uint32) (ok bool, newPc uint32) {
     }
 
     if immLoop := op == 0xEAFFFFFE; immLoop {
+        // panic this should be in jit code
         j.Cpu.Halted = true
         return true, lastPc
     }
 
     if isLink := (op >> 24) & 1 != 0; isLink {
-        j.Movl(amd64.Imm(lastPc + 4), j.REG(14))
+        j.Movl(gojit.Imm(lastPc + 4), j.REG(14))
     }
 
-    //j.Movl(j.REG(15), amd64.Eax)
-    //j.Add(amd64.Imm(uint32((int32(op)<<8)>>6) + 8), amd64.Eax)
-    //j.Movl(amd64.Eax, j.REG(15))
+    //j.Movl(j.REG(15), j.Eax)
+    //j.Add(gojit.Imm(uint32((int32(op)<<8)>>6) + 8), j.Eax)
+    //j.Movl(j.Eax, j.REG(15))
 
 	newPc = lastPc + uint32((int32(op)<<8)>>6) + 8
-    j.Movl(amd64.Imm(newPc), j.REG(15))
+    j.Movl(gojit.Imm(newPc), j.REG(15))
 
     return true, newPc
 
 }
 
 func (j *Jit) emitOp(op uint32, pc uint32) bool {
+
+    // thank you rasky
 
 	cond := op >> 28
 	var jcctargets []func()
@@ -342,56 +362,56 @@ func (j *Jit) emitOp(op uint32, pc uint32) bool {
 	case 0xE, 0xF:
 		// nothing to do, always executed
 	case 0x0: // Z
-		j.Bt(amd64.Imm(0), Z)
-		jcctargets = append(jcctargets, j.JccForward(amd64.CC_NC))
+		j.Bt(gojit.Imm(0), Z)
+		jcctargets = append(jcctargets, j.JccForward(gojit.CC_NC))
 	case 0x1: // !Z
-		j.Bt(amd64.Imm(0), Z)
-		jcctargets = append(jcctargets, j.JccForward(amd64.CC_C))
+		j.Bt(gojit.Imm(0), Z)
+		jcctargets = append(jcctargets, j.JccForward(gojit.CC_C))
 	case 0x2: // C
-		j.Bt(amd64.Imm(0), C)
-		jcctargets = append(jcctargets, j.JccForward(amd64.CC_NC))
+		j.Bt(gojit.Imm(0), C)
+		jcctargets = append(jcctargets, j.JccForward(gojit.CC_NC))
 	case 0x3: // !C
-		j.Bt(amd64.Imm(0), C)
-		jcctargets = append(jcctargets, j.JccForward(amd64.CC_C))
+		j.Bt(gojit.Imm(0), C)
+		jcctargets = append(jcctargets, j.JccForward(gojit.CC_C))
 	case 0x4: // N
-		j.Bt(amd64.Imm(0), N)
-		jcctargets = append(jcctargets, j.JccForward(amd64.CC_NC))
+		j.Bt(gojit.Imm(0), N)
+		jcctargets = append(jcctargets, j.JccForward(gojit.CC_NC))
 	case 0x5: // !N
-		j.Bt(amd64.Imm(0), N)
-		jcctargets = append(jcctargets, j.JccForward(amd64.CC_C))
+		j.Bt(gojit.Imm(0), N)
+		jcctargets = append(jcctargets, j.JccForward(gojit.CC_C))
 	case 0x6: // V
-		j.Bt(amd64.Imm(0), V)
-		jcctargets = append(jcctargets, j.JccForward(amd64.CC_NC))
+		j.Bt(gojit.Imm(0), V)
+		jcctargets = append(jcctargets, j.JccForward(gojit.CC_NC))
 	case 0x7: // !V
-		j.Bt(amd64.Imm(0), V)
-		jcctargets = append(jcctargets, j.JccForward(amd64.CC_C))
+		j.Bt(gojit.Imm(0), V)
+		jcctargets = append(jcctargets, j.JccForward(gojit.CC_C))
 	case 0x8: // C && !Z
-		j.Bt(amd64.Imm(0), C)
-		jcctargets = append(jcctargets, j.JccForward(amd64.CC_NC))
-		j.Bt(amd64.Imm(0), Z)
-		jcctargets = append(jcctargets, j.JccForward(amd64.CC_C))
+		j.Bt(gojit.Imm(0), C)
+		jcctargets = append(jcctargets, j.JccForward(gojit.CC_NC))
+		j.Bt(gojit.Imm(0), Z)
+		jcctargets = append(jcctargets, j.JccForward(gojit.CC_C))
 	case 0x9: // !C || Z
-		j.Movb(C, amd64.Al)
-		j.Xorb(amd64.Imm(1), amd64.Al)
-		j.Orb(Z, amd64.Al)
-		jcctargets = append(jcctargets, j.JccForward(amd64.CC_Z))
+		j.Movb(C, gojit.Al)
+		j.Xorb(gojit.Imm(1), gojit.Al)
+		j.Orb(Z, gojit.Al)
+		jcctargets = append(jcctargets, j.JccForward(gojit.CC_Z))
 	case 0xC: // !Z && N==V
-		j.Bt(amd64.Imm(0), Z)
-		jcctargets = append(jcctargets, j.JccForward(amd64.CC_C))
+		j.Bt(gojit.Imm(0), Z)
+		jcctargets = append(jcctargets, j.JccForward(gojit.CC_C))
 		fallthrough
 	case 0xA, 0xB: // N==V / N!=V
-		j.Movb(N, amd64.Al)
-		j.Xorb(V, amd64.Al)
+		j.Movb(N, gojit.Al)
+		j.Xorb(V, gojit.Al)
 		if cond == 0xA || cond == 0xC {
-			jcctargets = append(jcctargets, j.JccForward(amd64.CC_NZ))
+			jcctargets = append(jcctargets, j.JccForward(gojit.CC_NZ))
 		} else {
-			jcctargets = append(jcctargets, j.JccForward(amd64.CC_Z))
+			jcctargets = append(jcctargets, j.JccForward(gojit.CC_Z))
 		}
 	case 0xD: // Z || N==V / N!=V
-		j.Movb(N, amd64.Al)
-		j.Xorb(V, amd64.Al)
-		j.Orb(Z, amd64.Al)
-		jcctargets = append(jcctargets, j.JccForward(amd64.CC_Z))
+		j.Movb(N, gojit.Al)
+		j.Xorb(V, gojit.Al)
+		j.Orb(Z, gojit.Al)
+		jcctargets = append(jcctargets, j.JccForward(gojit.CC_Z))
 	default:
 		panic("unreachable")
 	}
@@ -403,7 +423,7 @@ func (j *Jit) emitOp(op uint32, pc uint32) bool {
 		tgt()
 	}
 
-    j.Add(amd64.Imm(4), j.REG(PC))
+    j.Add(gojit.Imm(4), j.REG(PC))
 
     return ok
 }
@@ -427,8 +447,7 @@ func (jit *Jit) DecodeARM(opcode uint32, pc uint32) bool {
 	case isBX(opcode):
 	case isSDT(opcode):
 
-        rd   := (opcode >> 12) & 0xF
-
+        rd := (opcode >> 12) & 0xF
         if rd == PC {
             return false
         }
@@ -438,6 +457,7 @@ func (jit *Jit) DecodeARM(opcode uint32, pc uint32) bool {
 	case isBlock(opcode):
 
         return false
+
         if pcIncluded := opcode & 0x8000 != 0; pcIncluded {
             return false
         } 
@@ -447,7 +467,6 @@ func (jit *Jit) DecodeARM(opcode uint32, pc uint32) bool {
 
 	case isHalf(opcode):
 
-        return false
         if rd := (opcode >> 12) & 0xF; rd == PC {
             return false
         }
@@ -490,19 +509,9 @@ func (jit *Jit) DecodeARM(opcode uint32, pc uint32) bool {
             return false
         }
 
-        //shReg := (opcode >> 4) & 1 != 0
-        //shType := (opcode >> 5) & 0b11
-        ////rd := (opcode >> 12) & 0xF
-        //shift := (opcode >> 7) & 0x1F
-        //if inst == 0x4 && !set && !imm && !shReg && shType == 0 && shift != 0 && rm >= 0x8 {
-        //if opcode & 0xFFFF_00FF == 0xE082_008E {
-        //    fmt.Printf("PC %08X OP %08X\n", pc, opcode)
-        //    return false
-        //}
-
         jit.emitAlu(opcode)
-
         return true
+
     case isCoDataReg(opcode):
 	}
 
@@ -511,81 +520,54 @@ func (jit *Jit) DecodeARM(opcode uint32, pc uint32) bool {
 
 func (j *Jit) TestInst(op uint32, f func(op uint32)) {
 
-    old := d.SetGCPercent(-1)
-
-    asm, err := amd64.New(gojit.PageSize)
+    asm, err := gojit.New(gojit.PageSize)
     if err != nil {
         panic(err)
     }
 
     j.Assembler = asm
 
-    j.frameSize = 20 * 4
-	j.Sub(amd64.Imm(int32(j.frameSize + 8)), amd64.Rsp)
-	j.Mov(amd64.Rbp, amd64.Indirect{
-        Base: amd64.Rsp, 
-        Offset: int32(j.frameSize),
-        Bits: 64},
-    )
-
-	j.Lea(amd64.Indirect{
-        Base: amd64.Rsp, 
-        Offset: int32(j.frameSize),
-        Bits: 64},
-        amd64.Rbp,
-    )
-
     CpuPointer = j.Cpu
     j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
 
     f(op)
 
-	j.Mov(amd64.Indirect{
-        Base: amd64.Rsp,
-        Offset: int32(j.frameSize),
-        Bits: 64}, amd64.Rbp)
-	j.Add(amd64.Imm(int32(j.frameSize + 8)), amd64.Rsp)
-    asm.Ret()
+    gojit.ExitAssembler(asm)
 
-    asm.BuildTo(&j.testFunc)
+    if err := asm.Error(); err != nil {
+        panic(err)
+    }
 
-    j.testFunc()
-    d.SetGCPercent(old)
+    gojit.CallJit(&asm.Buf[0])
 
     asm.Release()
 }
 
-//go:noinline
 //go:nosplit
 func Read(addr uint32) uint32 {
     return CpuPointer.mem.Read8(addr, true)
 }
 
-//go:noinline
 //go:nosplit
 func Read16(addr uint32) uint32 {
     return CpuPointer.mem.Read16(addr, true)
 }
 
-//go:noinline
 //go:nosplit
 func Read32(addr uint32) uint32 {
     return CpuPointer.mem.Read32(addr, true)
 }
 
-//go:noinline
 //go:nosplit
 func Write(addr uint32, v uint8) {
     CpuPointer.mem.Write8(addr, v, true)
 }
 
-//go:noinline
 //go:nosplit
 func Write16(addr uint32, v uint16) {
     CpuPointer.mem.Write16(addr, v, true)
 }
 
-//go:noinline
 //go:nosplit
 func Write32(addr, v uint32) {
     CpuPointer.mem.Write32(addr, v, true)
@@ -606,11 +588,11 @@ func (j *Jit) UpdateMetrics(pc uint32) {
     //j.set(pc)
 
     pageIdx := pc >> PAGE_SHIFT
-    blockIdx := (pc & PAGE_MASK) >> 2 // aligned to arm
+    blockIdx := (pc & PAGE_MASK) >> 2 // aligned to word for arm
 
-    if page := j.Pages[pageIdx]; page != nil {
-		j.moveToHead(page)
-    }
+    //if page := j.Pages[pageIdx]; page != nil {
+	//	j.moveToHead(page)
+    //}
 
     if metrics := j.Metrics[pageIdx]; metrics == nil {
         j.Metrics[pageIdx] = make([]uint32, (1 << PAGE_SHIFT) >> 2)
@@ -619,7 +601,8 @@ func (j *Jit) UpdateMetrics(pc uint32) {
 	j.Metrics[pageIdx][blockIdx]++
 
     if j.Metrics[pageIdx][blockIdx] > threshold {
-        if conc {
+
+        if CONCURRENT_BLOCKS {
             select {
             case j.blockCh <-pc:
             default:

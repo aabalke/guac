@@ -3,8 +3,10 @@ package arm9
 import (
 	"log"
 	"math"
+	"math/bits"
+	"unsafe"
 
-	"github.com/aabalke/guac/emu/jit/amd64"
+	amd64 "github.com/aabalke/gojit"
 	"github.com/aabalke/guac/emu/nds/utils"
 	sys "golang.org/x/sys/cpu"
 )
@@ -605,16 +607,19 @@ func (j *Jit) emitSdt(op uint32) {
         j.Movl(amd64.Ebx, j.REG(rn))
     }
 
+    CpuPointer = j.Cpu
+    j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
+
     if load {
         if byte {
             j.CallFunc(Read)
         } else {
-            //j.Mov(amd64.Rax, amd64.R12)
-            j.Push(amd64.Rax)
+            j.Mov(amd64.Rax, amd64.R12)
+            //j.Push(amd64.Rax)
             j.And(amd64.Imm(^0b11), amd64.Rax)
             j.CallFunc(Read32)
-            j.Pop(amd64.Rcx)
-            //j.Mov(amd64.R12, amd64.Rcx)
+            //j.Pop(amd64.Rcx)
+            j.Mov(amd64.R12, amd64.Rcx)
             j.And(amd64.Imm(0b11), amd64.Ecx)
             j.Shl(amd64.Imm(0b11), amd64.Ecx)
             j.And(amd64.Imm(31), amd64.Ecx)
@@ -730,170 +735,212 @@ func (j *Jit) ToggleThumb() {
 	//reg.R[PC] &^= 3
 }
 
-func (j *Jit) emitAluOp2Reg(op uint32, setcarry bool) {
-	shtype := (op >> 5) & 3
-	byreg := op&0x10 != 0
-    rm := op & 0xF
+func (j *Jit) emitAluOp2Reg(op uint32) {
 
-	// load value to be shifted/rotated into ebx
+    shReg    := (op >> 4) & 1 != 0
+    shType   := (op >> 5) & 0b11
+    setCarry := (op >> 20) & 1 != 0
+    inst     := (op >> 21) & 0xF
+    logical  := inst & 0b0110 == 0b0000 || inst & 0b1100 == 0b1100
+    rm       := op & 0xF
+
+    setCarry  = setCarry && logical
+    if setCarry {
+        j.Mov(amd64.Imm(1), amd64.Rdi)
+    } else {
+        j.Mov(amd64.Imm(0), amd64.Rdi)
+    }
+
+    // rbx: op2
+    // rcx: shift
+    // rdx: original carry
+    // rdi: setcarry
+
+    j.Movb(C, amd64.Dl)
 	j.Movl(j.REG(rm), amd64.Ebx)
 
-	// now load into ECX that shift amount, that can be
-	// either foudn in a register or as immediate
-	if byreg {
+    if shReg {
+        rs := (op >> 8) & 0xF
+
+        j.Movl(j.REG(rs), amd64.Ecx)
+        j.And(amd64.Imm(0xFF), amd64.Ecx)
 
         if rm == PC {
             j.Add(amd64.Imm(12), amd64.Ebx)
         }
 
-		if (op>>7)&1 != 0 {
-			panic("bit7 in op2 with reg, should not be here")
-		}
-		// cpu.Regs[15] += 4
-		// move shift amount from armreg into ECX
-		j.Movl(j.REG((op>>8)&0xF), amd64.Ecx)
-		// and ecx & 0xFF
-		j.And(amd64.Imm(0xFF), amd64.Ecx)
-		// if ecx == 0 -> jump forward (ebx is ok as-is)
-		op2end := j.JccShortForward(amd64.CC_Z)
-		//j.AddCycles(1)
 
-		switch shtype {
-		case 3: // rot
+    } else {
 
-			j.RorCl(amd64.Ebx)
-			if setcarry {
-				// set carry from x86 sign. We can't rely on the x86 carry
-				// flag because it is different when CL=32 (for x86 it means
-				// 0, so x86 carry is not affected).
-				j.Test(amd64.Ebx, amd64.Ebx)
-				j.SETcc(amd64.CC_S, amd64.R10)
-			}
-		case 2: // asr
-			// Calculate shift = max(shift, 31). We actually put 0xFFFFFFFF
-			// in ECX, but that is parsed as 31 by x86
-			j.Cmp(amd64.Imm(32), amd64.Ecx)
-			j.Sbb(amd64.Eax, amd64.Eax)
-			j.Not(amd64.Eax)
-			j.Or(amd64.Eax, amd64.Ecx)
+        shift := (op >> 7) & 0x1F
 
-			// Shift right. This is now always performed correctly as we
-			// maxed out the value before.
-			j.SarCl(amd64.Ebx)
-
-			if setcarry {
-				j.SETcc(amd64.CC_C, amd64.R10) // x86 carry in R10
-
-				// If the shift value was >= 32, EBX is either 0 or FFFFFFFF,
-				// and the carry must be 0 or 1 (respectively).
-				j.Test(amd64.Eax, amd64.Eax)
-				j.Cmovcc(amd64.CC_NZ, amd64.Ebx, amd64.R10d)
-				j.And(amd64.Imm(1), amd64.R10d)
-			}
-
-		case 0, 1: // lsl / lsr
-			if shtype == 0 {
-
-
-				j.ShlCl(amd64.Ebx)
-			} else {
-				j.ShrCl(amd64.Ebx)
-			}
-			if !setcarry {
-
-				// Adjust shifts for amounts >= 32; in ARM, shift amounts
-				// are well-defined for amounts >= 32, like in Go.
-				j.Cmp(amd64.Imm(32), amd64.Ecx)
-				j.Sbb(amd64.Eax, amd64.Eax)
-				j.And(amd64.Eax, amd64.Ebx)
-			} else {
-				// We need to both adjust the result for shift >= 32 and
-				// compute carry flag. The ARM carry flag can be computed like this:
-				//   shift < 32: use x86 carry
-				//   shift == 32: nothing was shifted (it's shift=0 in x86 semantic);
-				//                use bit 0 or 31 of EBX (depending on shift direction)
-				//   shift > 32: carry must be zero
-				j.SETcc(amd64.CC_C, amd64.R10) // x86 carry in R10
-				if shtype == 0 {
-					j.Bt(amd64.Imm(0), amd64.Ebx)
-				} else {
-					j.Bt(amd64.Imm(31), amd64.Ebx)
-				}
-
-				j.SETcc(amd64.CC_C, amd64.R9) // EBX bit 0 or 31 in R11 (this will only be used if shift==32)
-
-				j.Cmp(amd64.Imm(32), amd64.Ecx)
-				j.Cmovcc(amd64.CC_Z, amd64.R9, amd64.R10) // shift == 32 -> EBX 0/31 bit in R10
-
-				j.Sbb(amd64.Eax, amd64.Eax)
-				j.And(amd64.Eax, amd64.Ebx)
-
-				j.Cmp(amd64.Imm(33), amd64.Ecx) // shift >= 33 -> clear R10
-				j.Sbb(amd64.Eax, amd64.Eax)
-				j.And(amd64.Eax, amd64.Ebx)
-				j.And(amd64.Eax, amd64.R10d)
-			}
-		}
-
-		if setcarry {
-			j.Movl(amd64.R10d, amd64.Eax)
-			j.Movb(amd64.Al, C)
-		}
-
-		op2end()
-	} else {
         if rm == PC {
             j.Add(amd64.Imm(8), amd64.Ebx)
         }
 
-		shift := (op >> 7) & 0x1F
+        if special := shift == 0; special {
+            switch shType{
+            case LSL:
+            case LSR:
 
-		switch shtype {
-		case 0: // lsl
-			if shift == 0 {
-				return
-			}
-			j.Shl(amd64.Imm(int32(shift)), amd64.Ebx)
-			if setcarry {
-				j.SETcc(amd64.CC_C, C)
-			}
-		case 1, 2: // lsr/asr
-			if shift == 0 {
-				// Equal to >>32 in Go, so bit31 is carry
-				// and then clear the output or set it to -1
-				if setcarry {
-					j.Bt(amd64.Imm(31), amd64.Ebx)
-					j.SETcc(amd64.CC_C, C)
-				}
-				if shtype == 1 {
-					j.Xor(amd64.Ebx, amd64.Ebx)
-				} else {
-					j.Sar(amd64.Imm(31), amd64.Ebx)
-				}
-			} else {
-				if shtype == 1 {
-					j.Shr(amd64.Imm(int32(shift)), amd64.Ebx)
-				} else {
-					j.Sar(amd64.Imm(int32(shift)), amd64.Ebx)
-				}
-				if setcarry {
-					j.SETcc(amd64.CC_C, C)
-				}
-			}
-		case 3: // ror
-			if shift == 0 {
-				// shift == 0 -> rcr #1
-				j.Bt(amd64.Imm(0), C)
-				j.Rcr(amd64.Imm(1), amd64.Ebx)
-                setcarry = true
-			} else {
-				j.Ror(amd64.Imm(int32(shift)), amd64.Ebx)
-			}
-			if setcarry {
-				j.SETcc(amd64.CC_C, C)
-			}
-		}
-	}
+                j.Bt(amd64.Imm(31), amd64.Ebx)
+                j.SETcc(amd64.CC_C, amd64.Al)
+                j.Movb(amd64.Al, C)
+
+                // clear op2
+                j.Xor(amd64.Ebx, amd64.Ebx)
+            case ASR:
+
+                // sar sets everything to top bit
+                // if setcarry, set carry to bit as well
+
+                j.Sar(amd64.Imm(31), amd64.Ebx)
+
+                if setCarry {
+                    j.Bt(amd64.Imm(31), amd64.Ebx)
+                    j.SETcc(amd64.CC_C, amd64.Al)
+                    j.Movb(amd64.Al, C)
+                }
+
+            case ROR:
+
+                // CF = old carry (EDX & 1)
+                j.Bt(amd64.Imm(0), amd64.Edx)
+
+                // RRX
+                j.Rcr(amd64.Imm(1), amd64.Ebx)
+
+                // CPSR.C = new carry
+                j.SETcc(amd64.CC_C, amd64.Al)
+                j.Movb(amd64.Al, C)
+
+            }
+
+            return
+        }
+
+        j.Mov(amd64.Imm(shift), amd64.Rcx)
+    }
+
+    j.Test(amd64.Rcx, amd64.Rcx)
+    zeroJump := j.JccForward(amd64.CC_Z)
+
+    //// https://iitd-plos.github.io/col718/ref/arm-instructionset.pdf
+
+    switch shType {
+    case LSL, LSR:
+
+        j.Cmp(amd64.Imm(32), amd64.Ecx)
+        shift32 := j.JccForward(amd64.CC_A)
+        equal := j.JccForward(amd64.CC_Z)
+
+        if shType == LSL {
+            // carry = op2 & (1 << (32-shift)) != 0
+            j.Mov(amd64.Imm(32), amd64.Rax)
+            j.Sub(amd64.Ecx, amd64.Eax)
+            j.Bt(amd64.Eax, amd64.Ebx)
+            j.SETcc(amd64.CC_C, amd64.Dl)
+            // op2 <<= shift
+            j.ShlCl(amd64.Ebx)
+        } else {
+            // carry = op2 & (1 << (shift-1)) != 0
+            j.Mov(amd64.Rcx, amd64.Rax)
+            j.Sub(amd64.Imm(1), amd64.Eax)
+            j.Bt(amd64.Eax, amd64.Ebx)
+            j.SETcc(amd64.CC_C, amd64.Dl)
+            // op2 <<= shift
+            j.ShrCl(amd64.Ebx)
+        }
+
+        done := j.JmpForward()
+
+        shift32()
+
+        // carry = op2 & 1 != 0
+        j.Mov(amd64.Rbx, amd64.Rdx)
+        j.And(amd64.Imm(1), amd64.Rdx)
+        // op2 = 0
+        j.Xor(amd64.Rbx, amd64.Rbx)
+
+        done2 := j.JmpForward()
+
+        equal()
+
+        // LSL: carry = op2 & 1 != 0 
+        // LSR: carry = op2 & 0x8000_0000 != 0 
+        j.Mov(amd64.Rbx, amd64.Rdx)
+        if shType == LSL {
+            j.And(amd64.Imm(1), amd64.Rdx)
+        } else {
+            j.Shr(amd64.Imm(31), amd64.Rdx)
+        }
+
+        // op2 = 0
+        j.Xor(amd64.Rbx, amd64.Rbx)
+
+        done()
+        done2()
+
+    case ASR:
+
+        j.Cmp(amd64.Imm(32), amd64.Ecx)
+        shift32ge := j.JccForward(amd64.CC_AE)
+
+        // carry = op2 & (1 << (shift-1)) != 0
+        j.Mov(amd64.Rcx, amd64.Rax)
+        j.Sub(amd64.Imm(1), amd64.Eax)
+        j.Bt(amd64.Eax, amd64.Ebx)
+        j.SETcc(amd64.CC_C, amd64.Dl)
+        // op2 <<= shift
+        j.SarCl(amd64.Ebx)
+
+        done := j.JmpForward()
+
+        shift32ge()
+
+        // op and carry == top bit sar
+        j.Sar(amd64.Imm(31), amd64.Ebx)
+        j.Bt(amd64.Imm(0), amd64.Ebx)
+        j.SETcc(amd64.CC_C, amd64.Dl)
+
+        done()
+
+    case ROR:
+
+        j.Cmp(amd64.Imm(32), amd64.Ecx)
+        equal := j.JccForward(amd64.CC_Z)
+
+        // carry = (op2 >> ((shift-1) & 31)) & 1 != 0
+        j.Mov(amd64.Rcx, amd64.Rax)
+        j.Sub(amd64.Imm(1), amd64.Eax)
+        j.And(amd64.Imm(31), amd64.Eax)
+
+        j.Bt(amd64.Eax, amd64.Ebx)
+        j.SETcc(amd64.CC_C, amd64.Dl)
+
+        // op2 ror shift
+        j.RorCl(amd64.Ebx)
+
+        done := j.JmpForward()
+
+        equal()
+
+        // op2 unchanged
+        // carry = op2 & 0x8000_0000 != 0
+        j.Mov(amd64.Rbx, amd64.Rdx)
+        j.Shr(amd64.Imm(31), amd64.Rdx)
+
+        done()
+    }
+
+    j.Test(amd64.Rdi, amd64.Rdi)
+
+    skip := j.JccForward(amd64.CC_Z)
+
+    j.Movb(amd64.Dl, C)
+
+    zeroJump()
+    skip()
 }
 
 func (j *Jit) emitAlu(op uint32) {
@@ -912,23 +959,15 @@ func (j *Jit) emitAlu(op uint32) {
         j.Mov(amd64.Rcx, amd64.R8)
     }
 
-    j.Movl(j.REG(rn), amd64.Eax)
-
     if imm {
 
-        rot := uint((op >> 7) & 0x1E)
-        op2 := ((op & 0xFF) >> rot) | ((op & 0xFF) << (32 - rot))
+        ro := ((op >> 8) & 0xF) << 1
+        op2 := bits.RotateLeft32(op & 0xFF, -int(ro))
 
         j.Mov(amd64.Imm(int32(op2)), amd64.Rbx)
 
-        if set {
-            if rot != 0 {
-                if op2>>31 != 0 {
-                    j.Movb(amd64.Imm(1), C)
-                } else {
-                    j.Movb(amd64.Imm(0), C)
-                }
-            }
+        if set && ro != 0 {
+            j.Movb(amd64.Imm((op2 >> 31) & 1), C)
         }
 
         j.Movl(j.REG(rn), amd64.Eax)
@@ -938,9 +977,9 @@ func (j *Jit) emitAlu(op uint32) {
         }
     } else {
 
-        // get op2
+        // get op2, op2 will be in bx
         // shift
-        j.emitAluOp2Reg(op, set)
+        j.emitAluOp2Reg(op)
 
         j.Movl(j.REG(rn), amd64.Eax)
 
@@ -957,7 +996,20 @@ func (j *Jit) emitAlu(op uint32) {
         j.Mov(amd64.R8, amd64.Rcx)
     }
 
+    CpuPointer = j.Cpu
+    j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
+
     aluInstJit[inst](j, op, rd)
+
+    //j.Movl(j.REG(PC), amd64.Eax)
+
+    //if rd != PC {
+    //    j.Add(amd64.Imm(4), amd64.Eax)
+    //    j.Movl(amd64.Eax, j.REG(PC))
+    //    return
+    //}
+
+    //panic("jit alu pc == rd not supported, need to setup ind inst and exit")
 }
 
 var aluInstJit = [...]func(j *Jit, op, rd uint32) {
