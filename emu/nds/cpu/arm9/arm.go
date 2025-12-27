@@ -756,17 +756,14 @@ func (c *Cpu) Sdt(op uint32) {
 		panic("Malformed Sdt Instruction")
 	}
 
-    rd   := (op >> 12) & 0xF
-    rn   := (op >> 16) & 0xF
     reg  := (op >> 25) & 1 != 0
     pre  := (op >> 24) & 1 != 0
     up   := (op >> 23) & 1 != 0
     byte := (op >> 22) & 1 != 0
-    load := (op >> 20) & 1 != 0
     wb   := (op >> 21) & 1 != 0 || !pre
-
-    //compare := rd != PC
-    ////c.Jit.StartTest(op, compare, c.Jit.emitSdt)
+    load := (op >> 20) & 1 != 0
+    rn   := (op >> 16) & 0xF
+    rd   := (op >> 12) & 0xF
 
     //if compare {
     //    c.Jit.TestInst(op, c.Jit.emitSdt)
@@ -816,10 +813,8 @@ func (c *Cpu) Sdt(op uint32) {
                     offset |= 0x8000_0000
                 }
             } else {
-
                 offset = bits.RotateLeft32(r[rm], -int(shift))
             }
-
         }
 
     } else {
@@ -843,6 +838,23 @@ func (c *Cpu) Sdt(op uint32) {
         prev = r[rn]
     }
 
+    //compare := (
+    //    rd != PC &&
+    //    prev != 0x410_0000 &&
+    //    prev != 0x410_0010 &&
+    //    !(prev >= 0x400_0180 && prev < 0x400_0200) &&
+    //    !(prev >= 0x400_0400 && prev < 0x400_0600))
+
+    //c.Jit.StartTest(op, compare, c.Jit.emitSdt)
+
+
+    //compare := (
+    //    rd != PC &&
+    //    load &&
+    //    !(wb && rn == rd) &&
+    //    prev & 0xF00_0000 != 0x400_0000)
+    //c.Jit.StartTest(op, compare, c.Jit.emitSdt)
+
     if wb {
 		r[rn] = post
     }
@@ -854,10 +866,8 @@ func (c *Cpu) Sdt(op uint32) {
         } else {
 
             v := c.mem.Read32(prev &^ 0b11, true)
-            is := (prev & 0b11) << 3
-            v = utils.RorSimple(v, is)
-
-            r[rd] = v
+            is := ((prev & 0b11) << 3) & 0x1F
+            r[rd] = bits.RotateLeft32(v, -int(is))
 
             if rd == PC {
                 c.toggleThumb()
@@ -865,14 +875,14 @@ func (c *Cpu) Sdt(op uint32) {
             }
         }
     } else {
-        if byte {
-		    c.mem.Write8(prev, uint8(r[rd]), true)
-        } else {
-            v := r[rd]
-            if rd == PC {
-                v += 12
-            }
+        v := r[rd]
+        if rd == PC {
+            v += 12
+        }
 
+        if byte {
+		    c.mem.Write8(prev, uint8(v), true)
+        } else {
             c.mem.Write32(prev &^ 0b11, v, true)
         }
     }
@@ -968,8 +978,7 @@ func (c *Cpu) Half(op uint32) {
     preFlag := (op >> 24) & 1 != 0
     load := (op >> 20) & 1 != 0
     inst := (op >> 5)  & 0b11
-    wb := (op >> 21) & 1 != 0
-    wb = (wb || !preFlag) && !(load && (rn == rd))
+    wb := (op >> 21) & 1 != 0 || !preFlag
 
     //if (rd != PC) {
     //    //reg := c.Reg
@@ -1004,9 +1013,17 @@ func (c *Cpu) Half(op uint32) {
         pre = rnv
     }
 
+    //compare := (
+    //    rd != PC &&
+    //    load &&
+    //    !(wb && rn == rd) &&
+    //    pre & 0xF00_0000 != 0x400_0000)
+    //c.Jit.StartTest(op, compare, c.Jit.emitHalf)
+
     if inst == RESERVED {
         panic("unsupported half (reserved)")
     }
+
 
 	if !load {
         rdv := r[rd]
@@ -1014,9 +1031,15 @@ func (c *Cpu) Half(op uint32) {
         if rd == PC {
             rdv += 12
         }
-
-        if inst == STRD && !load {
+        rd2v := r[rd + 1]
+        if rd + 1 == PC {
+            rd2v += 12
         }
+
+        if wb {
+            r[rn] = post
+        }
+
 		switch inst {
 		case STRH:
             c.mem.Write16(pre &^ 1, uint16(rdv), true)
@@ -1027,24 +1050,21 @@ func (c *Cpu) Half(op uint32) {
             r[rd + 1] = c.mem.Read32(addr + 4, true)
 
 		case STRD:
-            var rd2v uint32
-            rd2v = r[rd + 1]
-            if rd + 1 == PC {
-                rd2v += 12
-            }
 
             addr := pre &^ 0b111
             c.mem.Write32(addr, rdv, true)
             c.mem.Write32(addr + 4, rd2v, true)
 		}
 
-        if wb {
-            r[rn] = post
-        }
+        //c.Jit.EndTest(op, compare)
 
 		c.Reg.R[15] += 4
 		return
 	}
+
+    if wb {
+        r[rn] = post
+    }
 
 	switch inst {
 	case LDRH:
@@ -1060,9 +1080,8 @@ func (c *Cpu) Half(op uint32) {
         r[rd] = uint32(int32(int16(c.mem.Read16(pre &^ 1, true))))
 	}
 
-    if wb {
-        r[rn] = post
-    }
+    //c.Jit.EndTest(op, compare)
+
 
 	c.Reg.R[15] += 4
 }
