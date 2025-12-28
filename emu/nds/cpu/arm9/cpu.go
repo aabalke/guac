@@ -215,8 +215,8 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 
         if config.Conf.Nds.NdsJit.Enabled {
 
-            pc := r[PC]
-            pageIdx := pc >> PAGE_SHIFT
+            pc       := r[PC]
+            pageIdx  := pc >> PAGE_SHIFT
             blockIdx := (pc & PAGE_MASK) >> 2 // aligned to word (arm)
 
             if p := cpu.Jit.Pages[pageIdx]; (

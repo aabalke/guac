@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"unsafe"
 
-	//"github.com/aabalke/guac/config"
 	"github.com/aabalke/gojit"
+	"github.com/aabalke/guac/config"
 )
 
 var _ = fmt.Sprintf
+var _ = config.Conf
 
 const (
     PAGE_MASK = 0xFFFF
@@ -54,8 +55,6 @@ type Jit struct {
     frameSize     int32
 
     blockCh chan uint32
-
-
 
     Scratch [0x10]uint32
 }
@@ -231,7 +230,7 @@ func (j *Jit) CreateBlock(pc uint32) {
 
         op = *(*uint32)(unsafe.Add(p, i*4))
 
-        // this slows things
+        //// this slows things
         //if ok, newPc := j.emitBranch(op, tempPc); ok {
 
         //    tempPc = newPc
@@ -246,15 +245,15 @@ func (j *Jit) CreateBlock(pc uint32) {
         //    continue
         //}
 
-        if ok := j.emitOp(op, tempPc); !ok {
+        if iA >= config.Conf.Nds.NdsJit.BatchInst {
             length += i
             break
         }
 
-        //if iA >= config.Conf.Nds.NdsJit.BatchInst {
-        //    length += i
-        //    break
-        //}
+        if ok := j.emitOp(op); !ok {
+            length += i
+            break
+        }
 
         i++
         iA++
@@ -276,17 +275,12 @@ func (j *Jit) CreateBlock(pc uint32) {
         return
     }
 
-    //if asm.Off < 0x10 {
-    //    println("block too small, skipping")
-    //    return
-    //}
-
     page.Blocks[blockIdx] = &JitBlock{
         initPc: pc,
         assembler: asm,
         Length: length,
         finalOp: op,
-        finalPc: tempPc,
+        //finalPc: tempPc,
         f: func () {
             gojit.CallJit(&asm.Buf[0])
         },
@@ -331,7 +325,26 @@ func (j *Jit) emitBranch(op, lastPc uint32) (ok bool, newPc uint32) {
     return true, newPc
 }
 
-func (j *Jit) emitOp(op uint32, pc uint32) bool {
+func (j *Jit) emitOp(op uint32) bool {
+
+
+    jcctargets := j.emitCond(op)
+
+    ok := j.DecodeARM(op)
+
+	for _, tgt := range jcctargets {
+		tgt()
+	}
+
+    if ok {
+        j.Add(gojit.Imm(4), j.REG(PC))
+    }
+
+    return ok
+}
+
+//go:inline
+func (j *Jit) emitCond(op uint32) []func() {
 
     // thank you rasky
 
@@ -396,22 +409,10 @@ func (j *Jit) emitOp(op uint32, pc uint32) bool {
 		panic("unreachable")
 	}
 
-    ok := j.DecodeARM(op, pc)
-
-	// Complete JCC instruction used for cond (if any)
-	for _, tgt := range jcctargets {
-		tgt()
-	}
-
-    if ok {
-        j.Add(gojit.Imm(4), j.REG(PC))
-    }
-
-    return ok
+    return jcctargets
 }
 
-func (jit *Jit) DecodeARM(opcode uint32, pc uint32) bool {
-
+func (jit *Jit) DecodeARM(opcode uint32) bool {
 
     switch {
     case isBLX(opcode):
@@ -420,7 +421,7 @@ func (jit *Jit) DecodeARM(opcode uint32, pc uint32) bool {
         return false
     }
 
-    if swi := opcode & 0xF000000 == 0xF000000; swi {
+    if swi := opcode & 0xF00_0000 == 0xF00_0000; swi {
         return false
 	}
 
@@ -430,16 +431,8 @@ func (jit *Jit) DecodeARM(opcode uint32, pc uint32) bool {
 	case isBX(opcode):
 	case isSDT(opcode):
 
-        ////pre  := (opcode >> 24) & 1 != 0
-        //byte := (opcode >> 22) & 1 != 0
-        ////wb   := (opcode >> 21) & 1 != 0 || !pre
-        ////load := (opcode >> 20) & 1 != 0
-
-        //if !byte {
-        //    return false
-        //}
-
-        if rdpc := opcode & 0xF000 == 0xF000; rdpc  {
+        load := (opcode >> 20) & 1 != 0
+        if rdpc := opcode & 0xF000 == 0xF000; rdpc && load {
             return false
         }
 
@@ -447,9 +440,9 @@ func (jit *Jit) DecodeARM(opcode uint32, pc uint32) bool {
         return true
 	case isBlock(opcode):
 
-        return false
-
-        if pcIncluded := opcode & 0x8000 != 0; pcIncluded {
+        load := (opcode >> 20) & 1 != 0
+        pcIncluded := opcode & 0x8000 != 0
+        if pcIncluded && load {
             return false
         } 
 
@@ -458,7 +451,8 @@ func (jit *Jit) DecodeARM(opcode uint32, pc uint32) bool {
 
 	case isHalf(opcode):
 
-        if rdpc := opcode & 0xF000 == 0xF000; rdpc  {
+        load := (opcode >> 20) & 1 != 0
+        if rdpc := opcode & 0xF000 == 0xF000; rdpc && load {
             return false
         }
 
@@ -484,7 +478,7 @@ func (jit *Jit) DecodeARM(opcode uint32, pc uint32) bool {
             return false
         }
 
-        if swiExit := opcode & 0x3F0000F == 0x3F0000F; swiExit {
+        if swiExit := opcode & 0x3F0_000F == 0x3F0_000F; swiExit {
             return false
         }
 
@@ -563,7 +557,7 @@ const threshold = 255
 
 func (j *Jit) UpdateMetrics(pc uint32) {
 
-    pageIdx := pc >> PAGE_SHIFT
+    pageIdx  := pc >> PAGE_SHIFT
     blockIdx := (pc & PAGE_MASK) >> 2 // aligned to word for arm
 
     if metrics := j.Metrics[pageIdx]; metrics == nil {
@@ -595,6 +589,10 @@ var (
 )
 
 func (j *Jit) StartTest(op uint32, compare bool, f func(op uint32)) {
+
+    if config.Conf.Nds.NdsJit.Enabled {
+        panic("Jit Instruction Test is running with Jit Running")
+    }
 
     if !compare {
         return

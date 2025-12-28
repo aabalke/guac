@@ -736,6 +736,8 @@ func (j *Jit) emitSdtRegShift(op uint32) {
 
 func (j *Jit) ToggleThumb() {
 
+    panic("TOGGLE THUMB")
+
     j.Movl(j.REG(PC), amd64.Edi)
     j.And(amd64.Imm(1), amd64.Edi)
     //j.Cmp(amd64.Imm(0}, amd64.Edi)
@@ -1023,7 +1025,7 @@ func (j *Jit) emitAlu(op uint32) {
 
     aluInstJit[inst](j, op, rd)
 
-    //j.Movl(j.REG(PC), amd64.Eax)
+    j.Movl(j.REG(PC), amd64.Eax)
 
     //if rd != PC {
     //    j.Add(amd64.Imm(4), amd64.Eax)
@@ -1031,7 +1033,10 @@ func (j *Jit) emitAlu(op uint32) {
     //    return
     //}
 
-    //panic("jit alu pc == rd not supported, need to setup ind inst and exit")
+    ////// does not handle sub thumb switch
+
+    //j.Add(amd64.Imm(^0b11), amd64.Eax)
+    //j.Movl(amd64.Eax, j.REG(PC))
 }
 
 var aluInstJit = [...]func(j *Jit, op, rd uint32) {
@@ -1156,6 +1161,10 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32) {
             j.SETcc(amd64.CC_S, N)
             j.SETcc(amd64.CC_Z, Z)
         }
+
+        if rd == PC {
+            j.Add(amd64.Imm(4), j.REG(15))
+        }
     },
 
     // TEQ 
@@ -1164,6 +1173,10 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32) {
         if set := (op >> 20) & 1 != 0; set {
             j.SETcc(amd64.CC_S, N)
             j.SETcc(amd64.CC_Z, Z)
+        }
+
+        if rd == PC {
+            j.Add(amd64.Imm(4), j.REG(15))
         }
     },
 
@@ -1178,6 +1191,10 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32) {
             j.SETcc(amd64.CC_S, N)
             j.SETcc(amd64.CC_Z, Z)
         }
+
+        if rd == PC {
+            j.Add(amd64.Imm(4), j.REG(15))
+        }
     },
 
     // CMN
@@ -1189,6 +1206,10 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32) {
             j.SETcc(amd64.CC_C, C)
             j.SETcc(amd64.CC_S, N)
             j.SETcc(amd64.CC_Z, Z)
+        }
+
+        if rd == PC {
+            j.Add(amd64.Imm(4), j.REG(15))
         }
     },
 
@@ -1246,6 +1267,12 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32) {
 
 func (j *Jit) emitBlock(op uint32) {
 
+    // SCRATCH
+    // 0x00: rnv
+    // 0x01: addr
+    // 0x02: wb
+    // 0x10: usermode flag
+
     rlist := op & 0xFFFF
     up := (op >> 23) & 1 != 0
     rn := (op >> 16) & 0xF
@@ -1269,16 +1296,15 @@ func (j *Jit) emitBlock(op uint32) {
     psr  := (op >> 22) & 1 != 0
     wb   := (op >> 21) & 1 != 0
     load := (op >> 20) & 1 != 0
-    //forceUserTemp := psr && (j.Cpu.Reg.CPSR.Mode != MODE_USR) && (!load || !pcIncluded)
-    j.Xor(amd64.Rdi, amd64.Rdi)
-    j.Xor(amd64.Rdi, amd64.Rdi)
-    if psr && (!load || !pcIncluded) {
-        j.Mov(MODE, amd64.Edi)
-        j.Cmp(amd64.Imm(MODE_USR), amd64.Edi)
-        j.SETcc(amd64.CC_NZ, amd64.Rdi)
+
+    j.Xor(amd64.Rax, amd64.Rax)
+    if forceUser := psr && (!load || !pcIncluded); forceUser {
+        j.Mov(MODE, amd64.Eax)
+        j.Cmp(amd64.Imm(MODE_USR), amd64.Eax)
+        j.SETcc(amd64.CC_NZ, amd64.Rax)
     }
 
-    j.Push(amd64.Edi)
+    j.Mov(amd64.Eax, j.SCRATCH(0x10))
 
     regCount := utils.CountBits(rlist)
 
@@ -1293,21 +1319,7 @@ func (j *Jit) emitBlock(op uint32) {
         j.Sub(amd64.Imm(regCount * 4), amd64.Rbx)
     }
 
-    //rnRef := &c.Reg.R[rn]
-
-    //if forceUser && rn == 13 {
-    //    rnRef = &c.Reg.SP[BANK_ID[MODE_USR]]
-    //}
-
-    //if forceUser && rn == 14 {
-    //    rnRef = &c.Reg.LR[BANK_ID[MODE_USR]]
-    //}
-
-    //rnv := *rnRef
-
     if rn == 13 || rn == 14 {
-
-        // rdx already has forceuser bit
 
         j.And(amd64.Imm(1), amd64.Edi)
 
@@ -1333,7 +1345,11 @@ func (j *Jit) emitBlock(op uint32) {
         j.Movl(j.REG(rn), amd64.Edi)
     }
 
-    j.Push(amd64.Edi)
+    // rnv in scratch 0
+    j.Movl(amd64.Edi, j.SCRATCH(0))
+
+    // wb in scratch 2
+    j.Movl(amd64.Ebx, j.SCRATCH(2))
 
     reg := uint32(0)
     if !up {
@@ -1355,24 +1371,15 @@ func (j *Jit) emitBlock(op uint32) {
             }
         }
 
-        if load {
+        j.Movl(amd64.Eax, j.SCRATCH(1))
 
-            j.Push(amd64.Eax)
-            j.Push(amd64.Ebx)
-            j.Push(amd64.Ecx)
+        if load {
 
             j.CallFunc(Read32)
 
             if reg == 13 || reg == 14 {
 
-                j.Movl(amd64.Indirect{ // push / pop is always 64bit
-                    Base: amd64.Rsp,
-                    Offset: int32(8 * 4),
-                    Bits: 64}, 
-                    amd64.Rdi,
-                )
-
-                j.And(amd64.Imm(1), amd64.Edi)
+                j.Movl(j.SCRATCH(0x10), amd64.Edi)
 
                 j.Cmp(amd64.Imm(1), amd64.Edi)
                 normal := j.JccForward(amd64.CC_NZ)
@@ -1396,41 +1403,24 @@ func (j *Jit) emitBlock(op uint32) {
                 j.Movl(amd64.Eax, j.REG(reg))
             }
 
-            j.Pop(amd64.Ecx)
-            j.Pop(amd64.Ebx)
-            j.Pop(amd64.Eax)
-        } else {
 
-            j.Push(amd64.Eax)
-            j.Push(amd64.Ebx)
-            j.Push(amd64.Ecx)
+        } else {
 
             switch reg {
             case rn:
-                j.Movl(amd64.Indirect{ // push / pop is always 64bit
-                    Base: amd64.Rsp,
-                    Offset: int32(8 * 3),
-                    Bits: 64}, 
-                    amd64.Rbx,
-                )
+                j.Movl(j.SCRATCH(0), amd64.Ebx)
             case PC:
                 j.Movl(j.REG(15), amd64.Ebx)
                 j.Add(amd64.Imm(12), amd64.Ebx)
+
             default:
 
                 if reg == 13 || reg == 14 {
 
-                    j.Movl(amd64.Indirect{ // push / pop is always 64bit
-                        Base: amd64.Rsp,
-                        Offset: int32(8 * 4),
-                        Bits: 64}, 
-                        amd64.Rdi,
-                    )
-
-                    j.And(amd64.Imm(1), amd64.Edi)
-
+                    j.Movl(j.SCRATCH(0x10), amd64.Edi)
                     j.Cmp(amd64.Imm(1), amd64.Edi)
                     normal := j.JccForward(amd64.CC_NZ)
+
                     switch reg {
                     case 13:
                         j.Movl(j.UserBankReg(false), amd64.Ebx)
@@ -1445,18 +1435,16 @@ func (j *Jit) emitBlock(op uint32) {
                     j.Movl(j.REG(reg), amd64.Ebx)
 
                     userModeJump()
-
                 } else {
                     j.Movl(j.REG(reg), amd64.Ebx)
                 }
             }
 
             j.CallFunc(Write32)
-
-            j.Pop(amd64.Ecx)
-            j.Pop(amd64.Ebx)
-            j.Pop(amd64.Eax)
         }
+
+        // fix clobbering
+        j.Movl(j.SCRATCH(1), amd64.Eax)
 
         if !pre {
             if up {
@@ -1473,12 +1461,10 @@ func (j *Jit) emitBlock(op uint32) {
         }
     }
 
-    j.Pop(amd64.Eax)
-    j.Pop(amd64.Eax)
-
     if !load {
         if wb {
-            j.Movl(amd64.Ebx, j.REG(rn))
+            j.Movl(j.SCRATCH(2), amd64.Eax)
+            j.Movl(amd64.Eax, j.REG(rn))
         }
 
         return
@@ -1489,10 +1475,12 @@ func (j *Jit) emitBlock(op uint32) {
             isLast := (rlist < (1 << (rn + 1)))
             isOnly := regCount == 1
             if !isLast || isOnly {
-                j.Movl(amd64.Ebx, j.REG(rn))
+                j.Movl(j.SCRATCH(2), amd64.Eax)
+                j.Movl(amd64.Eax, j.REG(rn))
             }
         } else {
-            j.Movl(amd64.Ebx, j.REG(rn))
+            j.Movl(j.SCRATCH(2), amd64.Eax)
+            j.Movl(amd64.Eax, j.REG(rn))
         }
     }
 

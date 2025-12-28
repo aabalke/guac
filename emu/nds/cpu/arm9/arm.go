@@ -440,11 +440,13 @@ func (cpu *Cpu) movExit(alu *Alu, res uint32) {
 }
 
 func (cpu *Cpu) logicalExit(alu *Alu) {
-    if alu.Rd == PC {
-        //cpu.toggleThumb()
-        // this may be a problem still
-        cpu.Reg.R[alu.Rd] &^= 0b1
-    }
+
+    // I think this is already handled by &^ 0b11, &^ 1 in end of alu
+    //if alu.Rd == PC {
+    //    //cpu.toggleThumb()
+    //    // this may be a problem still
+    //    cpu.Reg.R[alu.Rd] &^= 0b1
+    //}
 }
 
 func (cpu *Cpu) testExit(alu *Alu) {
@@ -765,6 +767,7 @@ func (c *Cpu) Sdt(op uint32) {
     rn   := (op >> 16) & 0xF
     rd   := (op >> 12) & 0xF
 
+    //compare := !byte && load && pre && rd != PC
     //if compare {
     //    c.Jit.TestInst(op, c.Jit.emitSdt)
     //    r[15] += 4
@@ -1081,7 +1084,6 @@ func (c *Cpu) Half(op uint32) {
 	}
 
     //c.Jit.EndTest(op, compare)
-
 
 	c.Reg.R[15] += 4
 }
