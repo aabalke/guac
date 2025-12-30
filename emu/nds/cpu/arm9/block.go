@@ -470,7 +470,7 @@ func (c *Cpu) Block(opcode uint32) {
     rlist := opcode & 0xFFFF
     forceUser := psr && (c.Reg.CPSR.Mode != MODE_USR) && (!load || !pcIncluded)
 
-    //compare := !pcIncluded && !load
+    //compare := rlist == 0
     //if compare {
     //    c.Jit.TestInst(opcode, c.Jit.emitBlock)
     //    r[15] += 4

@@ -24,12 +24,10 @@ func (cpu *Cpu) DecodeTHUMB() (int, bool) {
 		cpu.HiRegBX(opcode)
 	case isLSHalf(opcode):
 		cpu.thumbLSHalf(opcode)
-	case isLSSigned(opcode):
-		cpu.thumbLSSigned(opcode)
+	case isThumbSdt(opcode):
+		cpu.thumbSdt(opcode)
 	case isLPC(opcode):
 		cpu.thumbLPC(opcode)
-	case isLSR(opcode):
-		cpu.thumbLSR(opcode)
 	case isLSImm(opcode):
 		cpu.thumbLSImm(opcode)
 	case isPushPop(opcode):
@@ -49,7 +47,7 @@ func (cpu *Cpu) DecodeTHUMB() (int, bool) {
 	case isLSSP(opcode):
 		cpu.thumbLSSP(opcode)
 	case isMulti(opcode):
-		cpu.thumbMulti(opcode)
+		cpu.thumbBlock(opcode)
 	default:
 		r := &cpu.Reg.R
 		fmt.Printf("Unable to Decode ARM 7 %04X, at PC %08X\n", opcode, r[PC])
@@ -105,10 +103,10 @@ func isLSHalf(opcode uint16) bool {
 	)
 }
 
-func isLSSigned(opcode uint16) bool {
+func isThumbSdt(opcode uint16) bool {
 	return isThumbOpcodeFormat(opcode,
-		0b1111_0010_0000_0000,
-		0b0101_0010_0000_0000,
+		0b1111_0000_0000_0000,
+		0b0101_0000_0000_0000,
 	)
 }
 
@@ -116,13 +114,6 @@ func isLPC(opcode uint16) bool {
 	return isThumbOpcodeFormat(opcode,
 		0b1111_1000_0000_0000,
 		0b0100_1000_0000_0000,
-	)
-}
-
-func isLSR(opcode uint16) bool {
-	return isThumbOpcodeFormat(opcode,
-		0b1111_0010_0000_0000,
-		0b0101_0000_0000_0000,
 	)
 }
 

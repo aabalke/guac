@@ -12,10 +12,13 @@ var _ = fmt.Sprintf
 var _ = config.Conf
 
 const (
+    ADDRESS_SPACE = 0x1_0000_0000
     PAGE_MASK = 0xFFFF
     PAGE_SHIFT = 16
 
     CONCURRENT_BLOCKS = true // this is for testing
+
+    JIT_THRESHOLD = 255
 )
 
 var (
@@ -42,8 +45,8 @@ type Jit struct {
     *gojit.Assembler
 	Cpu    *Cpu
 
-    Pages   [0x1_0000_0000 >> PAGE_SHIFT]*Page // need 0xFFFF_FFFF for bios
-    Metrics [0x1_0000_0000 >> PAGE_SHIFT][]uint32
+    Pages   [ADDRESS_SPACE >> PAGE_SHIFT]*Page // need 0xFFFF_FFFF for bios
+    Metrics [ADDRESS_SPACE >> PAGE_SHIFT][]uint32
     Cnt int
 
     invalidPages []uint32
@@ -227,23 +230,7 @@ func (j *Jit) CreateBlock(pc uint32) {
     }
 
     for {
-
         op = *(*uint32)(unsafe.Add(p, i*4))
-
-        //// this slows things
-        //if ok, newPc := j.emitBranch(op, tempPc); ok {
-
-        //    tempPc = newPc
-        //    length += i
-        //    i = 0
-
-        //    p, ok = j.Cpu.mem.ReadPtr(tempPc, true)
-        //    if !ok {
-        //        panic("READ BAD")
-        //    }
-
-        //    continue
-        //}
 
         if iA >= config.Conf.Nds.NdsJit.BatchInst {
             length += i
@@ -280,53 +267,13 @@ func (j *Jit) CreateBlock(pc uint32) {
         assembler: asm,
         Length: length,
         finalOp: op,
-        //finalPc: tempPc,
         f: func () {
             gojit.CallJit(&asm.Buf[0])
         },
     }
 }
 
-func (j *Jit) emitBranch(op, lastPc uint32) (ok bool, newPc uint32) {
-    // only emit branch if always exectues
-	if cond := op & 0xF000_0000; cond < 0xE000_0000 {
-        return false, 0
-    }
-
-    if !isB(op) {
-        return false, 0
-    }
-
-
-    if immLoop := op == 0xEAFFFFFE; immLoop {
-        panic("IMM LOOP")
-        // j.Cpu.Halted = true
-        j.Movb(gojit.Imm(1), HALTED_FLAG)
-        return true, lastPc
-    }
-
-    if isLink := (op >> 24) & 1 != 0; isLink {
-
-        j.Movl(gojit.Imm(lastPc + 4), j.REG(14))
-
-        //return false, 0
-        //j.Movl(j.REG(15), gojit.Eax)
-        //j.Add(gojit.Imm(4), gojit.Eax)
-        //j.Movl(gojit.Eax, j.REG(14))
-    }
-
-    //j.Movl(j.REG(15), gojit.Eax)
-    //j.Add(gojit.Imm((int32(op)<<8)>>6) + 8, gojit.Eax)
-    //j.Movl(gojit.Eax, j.REG(15))
-
-	newPc = lastPc + uint32((int32(op)<<8)>>6) + 8
-    j.Movl(gojit.Imm(newPc), j.REG(15))
-
-    return true, newPc
-}
-
 func (j *Jit) emitOp(op uint32) bool {
-
 
     jcctargets := j.emitCond(op)
 
@@ -412,7 +359,9 @@ func (j *Jit) emitCond(op uint32) []func() {
     return jcctargets
 }
 
+//go:inline
 func (jit *Jit) DecodeARM(opcode uint32) bool {
+
 
     switch {
     case isBLX(opcode):
@@ -473,6 +422,17 @@ func (jit *Jit) DecodeARM(opcode uint32) bool {
         jit.emitQalu(opcode)
         return true
 	case isALU(opcode):
+
+        //inst := (opcode >> 21) & 0xF
+        //imm  := (opcode >> 25) & 1 != 0
+        //set  := (opcode >> 20) & 1 != 0
+        //rd   := (opcode >> 12) & 0xF
+        //rn   := (opcode >> 16) & 0xF
+        if opcode == 0xE0120000 {
+        //if inst == 0 && set && !imm && rd == 0 && rn == 2 {
+            //fmt.Printf("%08X\n", opcode)
+            return false
+        }
 
         if rdpc := opcode & 0xF000 == 0xF000; rdpc  {
             return false
@@ -551,10 +511,6 @@ func (j *Jit) CallFunc(f any) {
     j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
 }
 
-// SHL SAR vs movsx /
-
-const threshold = 255
-
 func (j *Jit) UpdateMetrics(pc uint32) {
 
     pageIdx  := pc >> PAGE_SHIFT
@@ -565,7 +521,7 @@ func (j *Jit) UpdateMetrics(pc uint32) {
     }
 
 	j.Metrics[pageIdx][blockIdx]++
-    if j.Metrics[pageIdx][blockIdx] <= threshold {
+    if j.Metrics[pageIdx][blockIdx] <= JIT_THRESHOLD {
         return
     }
 

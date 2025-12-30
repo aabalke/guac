@@ -3,15 +3,16 @@ package main
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"log"
 	"runtime/pprof"
 	"slices"
+	"time"
 
 	"github.com/aabalke/guac/config"
 	gameboy "github.com/aabalke/guac/emu/gb"
 	"github.com/aabalke/guac/emu/gba"
 	"github.com/aabalke/guac/emu/nds"
-	"github.com/aabalke/guac/emu/nds/debug"
 	"github.com/aabalke/guac/input"
 	"github.com/aabalke/guac/menu"
 
@@ -103,16 +104,24 @@ const (
     PRF_END   = 1000
 )
 
+var t time.Time
+
 func (g *Game) Update() error {
 
     if g.flags.Profile && g.frame == PRF_START {
-        debug.B[0] = true
         println("starting profiling")
         //isProfiling = true
+        t = time.Now()
         pprof.StartCPUProfile(f)
+
     }
 
 	if g.flags.Profile && g.frame >= PRF_END {
+        dur := time.Since(t).Seconds()
+
+        reqDur := (float64(PRF_END - PRF_START) / 60.0)
+
+        fmt.Printf("DURATION %.2f seconds. %.2fx faster.\n", time.Since(t).Seconds(), reqDur / dur)
         println("ending profiling")
 		return exit
 	}

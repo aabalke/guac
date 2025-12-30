@@ -104,6 +104,9 @@ type NdsJit struct {
     PageSize uint32 `toml:"page_size"`
     PageCount uint64 `toml:"page_count"`
     BatchInst uint32 `toml:"batch_inst"`
+
+    BatchInstA9 uint32
+    BatchInstA7 uint32
 }
 
 func (c *Config) decodeNdsJit() {
@@ -119,7 +122,12 @@ func (c *Config) decodeNdsJit() {
 
     if !Conf.Nds.NdsJit.Enabled {
         Conf.Nds.NdsJit.BatchInst = 1
+
     }
+
+
+    Conf.Nds.NdsJit.BatchInstA9 = max(Conf.Nds.NdsJit.BatchInst, 2)
+    Conf.Nds.NdsJit.BatchInstA7 = max(Conf.Nds.NdsJit.BatchInst / 2, 1)
 
     if Conf.Nds.NdsJit.PageCount == 0 {
         errMessageStart := "Invalid Config:"

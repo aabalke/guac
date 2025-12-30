@@ -4,19 +4,23 @@ import (
 	"bytes"
 	_ "embed"
 	"flag"
+	"fmt"
 	"image"
 	"image/png"
 	_ "image/png"
 	"log"
+	"runtime"
 	"strings"
+	"time"
 
 	"github.com/aabalke/guac/config"
 	"github.com/hajimehoshi/ebiten/v2"
+
 	//_ "github.com/silbinarywolf/preferdiscretegpu" //no profiler change
 
 	"os"
+	//"runtime/debug"
 	"runtime/pprof"
-    //"runtime/debug"
 )
 
 const (
@@ -34,7 +38,12 @@ var f *os.File
 //var isProfiling bool
 //var profileFrames uint32
 
+const MAX_TPS = 60 * 4
+
 func main() {
+
+    go debugMemoryErrors()
+    go printTPS()
     
     //debug.SetGCPercent(-1) // disables GC
 
@@ -53,10 +62,10 @@ func main() {
 
 		//pprof.StartCPUProfile(f)
 
-		ebiten.SetTPS(2000)
+		ebiten.SetTPS(MAX_TPS)
 
 	} else if flags.Unlimited {
-		ebiten.SetTPS(2000)
+		ebiten.SetTPS(MAX_TPS)
 	}
 
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
@@ -134,4 +143,31 @@ func getFlags() Flags {
 	}
 
 	return f
+}
+
+// make sure no memory leaks
+func debugMemoryErrors() {
+
+    const maxMemoryAlloc = (1 << 30)
+
+    var m runtime.MemStats
+
+    for {
+        runtime.ReadMemStats(&m)
+
+        if m.Alloc > maxMemoryAlloc {
+            panic("Memory Limit Exceeded")
+        }
+
+        time.Sleep(time.Second)
+    }
+}
+
+func printTPS() {
+
+    t := time.NewTicker(time.Second * 2)
+
+    for range t.C {
+        fmt.Printf("TPS % 4.2f\n", ebiten.ActualTPS())
+    }
 }

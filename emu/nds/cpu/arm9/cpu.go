@@ -301,3 +301,37 @@ func (cpu *Cpu) GetOpThumb() uint16 {
 
     return op
 }
+
+var (
+    t_rpc uint32
+    t_sav Reg
+    t_sta Reg
+)
+
+func (c *Cpu) TestStart(op uint32, f func(op uint32), compare bool) {
+
+    if !compare {
+        return
+    }
+
+    t_rpc = c.Reg.R[15]
+    t_sta = c.Reg
+
+    f(op)
+
+    t_sav = c.Reg
+
+    c.Reg = t_sta
+}
+
+func (c *Cpu) EndTest(op uint32, compare bool) {
+
+    if !(compare && c.Reg != t_sav) {
+        return
+    }
+
+    fmt.Printf("STA REG %08X CPSR %08X\n", t_sta.R, t_sta.CPSR.Get())
+    fmt.Printf("NEW REG %08X CPSR %08X\n", t_sav.R, t_sav.CPSR.Get())
+    fmt.Printf("ORI REG %08X CPSR %08X\n", c.Reg.R, c.Reg.CPSR.Get())
+    panic(fmt.Sprintf("Bad Compare %08X %08X", t_rpc, op))
+}
