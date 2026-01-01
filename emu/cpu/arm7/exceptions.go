@@ -20,16 +20,13 @@ func (cpu *Cpu) exception(addr uint32, mode uint32) {
 	reg := &cpu.Reg
 	r := &cpu.Reg.R
 
-	curr := reg.getMode()
+	curr := reg.CPSR.Mode
 
 	if mode == curr {
 		return
 	}
 
-	//thumb := reg.CPSR.GetFlag(FLAG_T)
-	thumb := reg.IsThumb
-
-	c := BANK_ID[reg.getMode()]
+	c := BANK_ID[reg.CPSR.Mode]
 	i := BANK_ID[mode]
 	reg.SP[c] = r[SP]
 	reg.LR[c] = r[LR]
@@ -38,7 +35,7 @@ func (cpu *Cpu) exception(addr uint32, mode uint32) {
 	reg.SPSR[i] = reg.CPSR
 
 	switch {
-	case mode == MODE_SWI && thumb:
+	case mode == MODE_SWI && reg.CPSR.T:
 		r[LR] = r[PC] + 2
 		reg.LR[i] = r[PC] + 2
 	default:
@@ -46,9 +43,9 @@ func (cpu *Cpu) exception(addr uint32, mode uint32) {
 		reg.LR[i] = r[PC] + 4
 	}
 
-	reg.CPSR.SetMode(mode)
-	reg.CPSR.SetThumb(false, cpu)
-	reg.CPSR.SetFlag(FLAG_I, true)
+	reg.CPSR.Mode = mode
+	reg.CPSR.T = false
+	reg.CPSR.I = true
 
 	r[PC] = addr
 }
@@ -60,8 +57,7 @@ func (cpu *Cpu) ExitException(mode uint32) {
 
 	i := BANK_ID[mode]
 	reg.CPSR = reg.SPSR[i]
-	reg.IsThumb = reg.CPSR.GetFlag(FLAG_T)
-	c := BANK_ID[cpu.Reg.getMode()]
+	c := BANK_ID[cpu.Reg.CPSR.Mode]
 
 	// if you set this up for fiq, get the special registers
 	reg.LR[i] = r[LR]

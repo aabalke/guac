@@ -1,7 +1,7 @@
 package mem
 
 import (
-	"github.com/aabalke/guac/emu/nds/cpu"
+	"github.com/aabalke/guac/emu/cpu"
 )
 
 type IPC struct {

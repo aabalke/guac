@@ -95,7 +95,6 @@ func (gba *GBA) Update() {
 	}
 
 	gba.Apu.Play(gba.Muted)
-
 	gba.Frame++
 
 	return

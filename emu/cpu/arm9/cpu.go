@@ -5,13 +5,10 @@ import (
 	"unsafe"
 
 	"github.com/aabalke/guac/config"
-	"github.com/aabalke/guac/emu/nds/cpu"
-	"github.com/aabalke/guac/emu/nds/cpu/arm9/cp15"
-	"github.com/aabalke/guac/emu/nds/debug"
-	"github.com/aabalke/guac/emu/nds/mem/dma"
+	"github.com/aabalke/guac/emu/cpu"
+	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
 )
 
-var _ = debug.B
 var _ = fmt.Sprint
 
 type Cpu struct {
@@ -23,8 +20,6 @@ type Cpu struct {
 	LowVector bool
 
 	Cp15 *cp15.Cp15
-
-	Dma [4]dma.DMA
 
 	PcPtr       unsafe.Pointer
 	PcOff       int

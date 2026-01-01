@@ -141,6 +141,7 @@ func (gba *GBA) renderTilePixel(x, y uint32) {
 			continue
 		}
 
+        ObjectLoop:
 		for j := len(objPriorities[i]) - 1; j >= 0; j-- {
 			objIdx := objPriorities[i][j]
 			obj := &gba.PPU.Objects[objIdx]
@@ -162,11 +163,11 @@ func (gba *GBA) renderTilePixel(x, y uint32) {
 			switch {
 			case ok && obj.Mode == 2:
 				inObjWindow = true
-				break
+				break ObjectLoop
 			case ok:
 				objMode = obj.Mode
 				bldPal.setBlendPalettes(palData, 0, true, objMode == 1)
-				break
+				break ObjectLoop
 			}
 		}
 	}
@@ -287,6 +288,7 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 
 		if objs := dispcnt.DisplayObj; objs {
 
+            ObjectLoop:
 			for j := len(objPriorities[DEC_IDX]) - 1; j >= 0; j-- {
 				objIdx := objPriorities[DEC_IDX][j]
 				obj := &gba.PPU.Objects[objIdx]
@@ -313,11 +315,11 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 				switch {
 				case ok && obj.Mode == 2:
 					inObjWindow = true
-					break
+					break ObjectLoop
 				case ok:
 					objMode = obj.Mode
 					bldPal.setBlendPalettes(palData, 0, true, objMode == 1)
-					break
+					break ObjectLoop
 				}
 			}
 		}
@@ -537,7 +539,8 @@ func getPositions(obj *Object, xIdx, yIdx uint32) (uint32, uint32, uint32, uint3
 
 func getTileAddr(obj *Object, enTileX, enTileY, inTileX, inTileY uint32) uint32 {
 
-	tileHeight := obj.W << 2
+    const BYTES_PER_PIXEL = 2
+	tileHeight := obj.W << BYTES_PER_PIXEL
 
 	if obj.Palette256 {
 		enTileX <<= 1
@@ -1037,14 +1040,16 @@ func (bp *BlendPalettes) setBlendPalettes(palData uint32, bgIdx uint32, obj bool
 		bp.APalette = palData
 		bp.hasA = true
 		bp.targetATop = true
-	} else {
-		bp.targetATop = false
+        return
+    }
+
+    bp.targetATop = false
+
+    if bp.Bld.b[bgIdx] {
+        bp.BPalette = palData
+        bp.hasB = true
 	}
 
-	if bp.Bld.b[bgIdx] {
-		bp.BPalette = palData
-		bp.hasB = true
-	}
 }
 
 func (bp *BlendPalettes) blend(objTransparent bool, x, y uint32, wins *Windows, inObjWindow bool) uint32 {

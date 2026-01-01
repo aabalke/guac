@@ -1,9 +1,5 @@
 package snd
 
-//import (
-//	"github.com/aabalke/guac/emu/nds/utils"
-//)
-
 func (s *Snd) Write(addr uint32, v uint8) {
 
 	addr &= 0xFFFF

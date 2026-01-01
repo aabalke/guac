@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/aabalke/guac/emu/nds/cart"
-	"github.com/aabalke/guac/emu/nds/cpu"
+	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 )
 

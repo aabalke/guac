@@ -7,7 +7,7 @@ import (
 func (cpu *Cpu) DecodeTHUMB() (int, bool) {
 
 	//opcode := uint16(cpu.mem.Read16(r[PC], false))
-    opcode := cpu.GetOpThumb()
+	opcode := cpu.GetOpThumb()
 
 	switch {
 	case isthumbSWI(opcode):
@@ -53,7 +53,7 @@ func (cpu *Cpu) DecodeTHUMB() (int, bool) {
 	default:
 		r := &cpu.Reg.R
 		fmt.Printf("Unable to Decode ARM 7 %04X, at PC %08X\n", opcode, r[PC])
-        return 0, false
+		return 0, false
 	}
 
 	return 1, true

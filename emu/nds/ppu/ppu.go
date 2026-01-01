@@ -3,7 +3,7 @@ package ppu
 import (
 	"encoding/binary"
 
-	"github.com/aabalke/guac/emu/nds/cpu"
+	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/nds/rast"
 	"github.com/aabalke/guac/emu/nds/utils"
 )

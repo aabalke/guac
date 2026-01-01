@@ -122,10 +122,6 @@ func (p *PPU) UpdatePPU(addr uint32, v uint32) {
 		p.Dispcnt.ForcedBlank = utils.BitEnabled(v, 7)
 
 	case 0x1:
-		//p.Dispcnt.DisplayBg[0] = utils.BitEnabled(v, 0)
-		//p.Dispcnt.DisplayBg[1] = utils.BitEnabled(v, 1)
-		//p.Dispcnt.DisplayBg[2] = utils.BitEnabled(v, 2)
-		//p.Dispcnt.DisplayBg[3] = utils.BitEnabled(v, 3)
 		p.Dispcnt.DisplayObj = utils.BitEnabled(v, 4)
 		p.Dispcnt.DisplayWin0 = utils.BitEnabled(v, 5)
 		p.Dispcnt.DisplayWin1 = utils.BitEnabled(v, 6)
@@ -407,6 +403,7 @@ func (p *PPU) UpdateBackgrounds(addr, v uint32) {
 		p.Backgrounds[1].CharBaseBlock = utils.GetVarData(v, 2, 3) * 0x4000
 		p.Backgrounds[1].Mosaic = utils.BitEnabled(v, 6)
 		p.Backgrounds[1].Palette256 = utils.BitEnabled(v, 7)
+
 	case 0x0B:
 		p.Backgrounds[1].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
 		p.Backgrounds[1].AffineWrap = utils.BitEnabled(v, 5)

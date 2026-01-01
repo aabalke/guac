@@ -920,7 +920,7 @@ func (cpu *Cpu) thumbLSSP(opcode uint16) {
 	r[PC] += 2
 }
 
-func (cpu *Cpu) thumbMulti(opcode uint16) {
+func (cpu *Cpu) thumbMulti(opcode uint32) {
 
 	r := &cpu.Reg.R
 

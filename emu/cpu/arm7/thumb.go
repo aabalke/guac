@@ -63,8 +63,8 @@ func (cpu *Cpu) thumbMuliply(alu *ThumbAlu) {
 	// ARM < 4, carry flag destroyed, ARM >= 5, carry flag unchanged
 	//cpu.Reg.CPSR.SetFlag(FLAG_C, false)
 
-	cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-	cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+	cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
+	cpu.Reg.CPSR.Z = uint32(res) == 0
 }
 
 func (cpu *Cpu) thumbLogical(alu *ThumbAlu) {
@@ -89,8 +89,8 @@ func (cpu *Cpu) thumbLogical(alu *ThumbAlu) {
 
 	r[alu.Rd] = res
 
-	cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-	cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+	cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
+	cpu.Reg.CPSR.Z = uint32(res) == 0
 }
 
 func (cpu *Cpu) thumbArithmetic(alu *ThumbAlu) {
@@ -168,7 +168,7 @@ func (cpu *Cpu) thumbArithmetic(alu *ThumbAlu) {
 	}
 
 	carry := uint64(0)
-	if cpu.Reg.CPSR.GetFlag(FLAG_C) {
+	if cpu.Reg.CPSR.C {
 		carry = 1
 	}
 
@@ -191,8 +191,8 @@ func (cpu *Cpu) thumbArithmetic(alu *ThumbAlu) {
 		c = res < 0x1_0000_0000
 	}
 
-	cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-	cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+	cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
+	cpu.Reg.CPSR.Z = uint32(res) == 0
 
 	switch alu.Inst {
 	case THUMB_LSL, THUMB_LSR, THUMB_ASR, THUMB_ROR:
@@ -201,14 +201,14 @@ func (cpu *Cpu) thumbArithmetic(alu *ThumbAlu) {
 		}
 	}
 
-	cpu.Reg.CPSR.SetFlag(FLAG_C, c)
+	cpu.Reg.CPSR.C = c
 
 	switch alu.Inst {
 	case THUMB_LSL, THUMB_LSR, THUMB_ASR, THUMB_ROR:
 		return
 	}
 
-	cpu.Reg.CPSR.SetFlag(FLAG_V, v)
+	cpu.Reg.CPSR.V = v
 }
 
 func (cpu *Cpu) thumbTest(alu *ThumbAlu) {
@@ -236,17 +236,17 @@ func (cpu *Cpu) thumbTest(alu *ThumbAlu) {
 		v := (rdSign != rsSign) && (resSign != rdSign)
 		c := res < 0x1_0000_0000
 
-		cpu.Reg.CPSR.SetFlag(FLAG_V, v)
-		cpu.Reg.CPSR.SetFlag(FLAG_C, c)
+		cpu.Reg.CPSR.V = v
+		cpu.Reg.CPSR.C = c
 	case THUMB_CMN:
 		v := (rdSign == rsSign) && (resSign != rdSign)
 		c := res >= 0x1_0000_0000
-		cpu.Reg.CPSR.SetFlag(FLAG_V, v)
-		cpu.Reg.CPSR.SetFlag(FLAG_C, c)
+		cpu.Reg.CPSR.V = v
+		cpu.Reg.CPSR.C = c
 	}
 
-	cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-	cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+	cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
+	cpu.Reg.CPSR.Z = uint32(res) == 0
 }
 
 func (cpu *Cpu) HiRegBX(opcode uint16) int {
@@ -319,10 +319,10 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
 		v := (rdSign != rsSign) && (rSign != rdSign)
 		c := res < 0x1_0000_0000
 
-		cpsr.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-		cpsr.SetFlag(FLAG_Z, uint32(res) == 0)
-		cpsr.SetFlag(FLAG_C, c)
-		cpsr.SetFlag(FLAG_V, v)
+		cpsr.N = utils.BitEnabled(uint32(res), 31)
+		cpsr.Z = uint32(res) == 0
+		cpsr.C = c
+		cpsr.V = v
 		return 4
 
 	case inst == 2:
@@ -357,7 +357,7 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
 	case inst == 3:
 
 		if rs == PC {
-			cpsr.SetThumb(false, cpu)
+			cpsr.T = false
 			//R15: CPU switches to ARM state, and PC is auto-aligned as (($+4) AND NOT 2).
 			r[PC] = (r[PC] + 4) &^ 2
 
@@ -365,7 +365,7 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
 		}
 
 		if setThumb := !utils.BitEnabled(r[rs], 0); setThumb {
-			cpsr.SetThumb(false, cpu)
+			cpsr.T = false
 			r[PC] = r[rs] &^ 0b11
 		} else {
 			r[PC] = r[rs] &^ 0b1
@@ -433,10 +433,10 @@ func (cpu *Cpu) ThumbAddSub(opcode uint16) {
 		c = res < 0x1_0000_0000
 	}
 
-	cpsr.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-	cpsr.SetFlag(FLAG_Z, uint32(res) == 0)
-	cpsr.SetFlag(FLAG_C, c)
-	cpsr.SetFlag(FLAG_V, v)
+	cpsr.N = utils.BitEnabled(uint32(res), 31)
+	cpsr.Z = uint32(res) == 0
+	cpsr.C = c
+	cpsr.V = v
 
 	if PC == rd {
 		return
@@ -492,12 +492,12 @@ func (cpu *Cpu) thumbImm(opcode uint16) {
 	}
 
 	if inst != THUMB_IMM_MOV {
-		cpsr.SetFlag(FLAG_C, c)
-		cpsr.SetFlag(FLAG_V, v)
+		cpsr.C = c
+		cpsr.V = v
 	}
 
-	cpsr.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-	cpsr.SetFlag(FLAG_Z, uint32(res) == 0)
+	cpsr.N = utils.BitEnabled(uint32(res), 31)
+	cpsr.Z = uint32(res) == 0
 
 	if PC == rd {
 		return
@@ -817,12 +817,12 @@ func (cpu *Cpu) thumbShifted(opcode uint16) {
 	res, setCarry, carry := utils.Shift(&shiftArgs)
 
 	if setCarry {
-		reg.CPSR.SetFlag(FLAG_C, carry)
+		reg.CPSR.C = carry
 	}
 
 	//cpu.Reg.CPSR.SetFlag(FLAG_V, v)
-	cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-	cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+	cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
+	cpu.Reg.CPSR.Z = uint32(res) == 0
 
 	r[rd] = res
 

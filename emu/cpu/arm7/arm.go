@@ -87,14 +87,14 @@ func (cpu *Cpu) Alu(opcode uint32) {
 		cpu.test(alu)
 	}
 
-    switch {
-    case aluData.Rd != PC:
+	switch {
+	case aluData.Rd != PC:
 		cpu.Reg.R[15] += 4
-    case cpu.Reg.IsThumb:
-        cpu.Reg.R[15] &^= 0b1
-    case !cpu.Reg.IsThumb:
-        cpu.Reg.R[15] &^= 0b11
-    }
+	case cpu.Reg.CPSR.T:
+		cpu.Reg.R[15] &^= 0b1
+	case !cpu.Reg.CPSR.T:
+		cpu.Reg.R[15] &^= 0b11
+	}
 }
 
 func (cpu *Cpu) GetOp2(opcode uint32) (uint32, bool) {
@@ -102,7 +102,7 @@ func (cpu *Cpu) GetOp2(opcode uint32) (uint32, bool) {
 	reg := &cpu.Reg
 
 	isCarry := utils.BitEnabled(opcode, 20)
-	currCarry := reg.CPSR.GetFlag(FLAG_C)
+	currCarry := reg.CPSR.C
 
 	if immediate := utils.BitEnabled(opcode, 25); immediate {
 
@@ -111,7 +111,7 @@ func (cpu *Cpu) GetOp2(opcode uint32) (uint32, bool) {
 		op2, setCarry, carry := utils.Ror(nn, ro, isCarry, false, currCarry)
 
 		if setCarry {
-			reg.CPSR.SetFlag(FLAG_C, carry)
+			reg.CPSR.C = carry
 		}
 
 		return op2, currCarry
@@ -146,7 +146,7 @@ func (cpu *Cpu) GetOp2(opcode uint32) (uint32, bool) {
 	op2, setCarry, carry := utils.Shift(&shiftArgs)
 
 	if setCarry {
-		reg.CPSR.SetFlag(FLAG_C, carry)
+		reg.CPSR.C = carry
 	}
 
 	return op2, currCarry
@@ -172,14 +172,14 @@ func (cpu *Cpu) logical(alu *Alu) {
 
 	cpu.Reg.R[alu.Rd] = res
 
-    if alu.Rd == PC {
-        //cpu.toggleThumb()
+	if alu.Rd == PC {
+		//cpu.toggleThumb()
 
-        // this may be a problem still
-        cpu.Reg.R[alu.Rd] &^= 0b1
+		// this may be a problem still
+		cpu.Reg.R[alu.Rd] &^= 0b1
 
-        //fmt.Printf("LOGICAL RD PC, NEED TO Exchange?\n")
-    }
+		//fmt.Printf("LOGICAL RD PC, NEED TO Exchange?\n")
+	}
 
 	cpu.setAluFlags(alu, uint64(res))
 }
@@ -254,13 +254,12 @@ func (cpu *Cpu) psrSwitch() {
 
 	// PC is updated in final bios inst
 
-	curr := cpu.Reg.getMode()
+	curr := cpu.Reg.CPSR.Mode
 
 	i := BANK_ID[curr]
 	reg.CPSR = reg.SPSR[i]
-	reg.IsThumb = reg.CPSR.GetFlag(FLAG_T)
 
-	next := cpu.Reg.getMode()
+	next := cpu.Reg.CPSR.Mode
 	c := BANK_ID[next]
 
 	// if you set this up for fiq, get the special registers
@@ -324,103 +323,100 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
 	//  For example: MOVS PC,R14  ;return from SWI (PC=R14_svc, CPSR=SPSR_svc).
 	//If S=0: Flags are not affected (not allowed for CMP,CMN,TEQ,TST).
 
-
 	if !alu.Set {
 		return
 	}
-	if abtExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB && cpu.Reg.getMode() == MODE_ABT; abtExit {
+	if abtExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB && cpu.Reg.CPSR.Mode == MODE_ABT; abtExit {
 
-        cpu.Reg.R[15] += 4
+		cpu.Reg.R[15] += 4
 
-        //cpu.toggleThumb()
+		//cpu.toggleThumb()
 		//cpu.ExitException(MODE_ABT)
-        //if cpu.Reg.R[15] & 1 == 1 {
-        //    cpu.toggleThumb()
-        //}
+		//if cpu.Reg.R[15] & 1 == 1 {
+		//    cpu.toggleThumb()
+		//}
 
-        if !cpu.Reg.IsThumb {
-            cpu.Reg.R[15] &^= 0b11
-        } else {
-            // or should this toggle thumb?
-            cpu.Reg.R[15] &^= 0b1
-        }
+		if !cpu.Reg.CPSR.T {
+			cpu.Reg.R[15] &^= 0b11
+		} else {
+			// or should this toggle thumb?
+			cpu.Reg.R[15] &^= 0b1
+		}
 
 		return
 	}
 
-	if swiExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB && cpu.Reg.getMode() == MODE_SWI; swiExit {
-        // toggle after causes errors. maybe after should just be based on bit 0?
-        // ie [pc] & 1 toggle thumb
-        //cpu.toggleThumb()
+	if swiExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB && cpu.Reg.CPSR.Mode == MODE_SWI; swiExit {
+		// toggle after causes errors. maybe after should just be based on bit 0?
+		// ie [pc] & 1 toggle thumb
+		//cpu.toggleThumb()
 		cpu.ExitException(MODE_SWI)
-        //if cpu.Reg.R[15] & 1 == 1 {
-        //    cpu.toggleThumb()
-        //}
+		//if cpu.Reg.R[15] & 1 == 1 {
+		//    cpu.toggleThumb()
+		//}
 
-
-        if !cpu.Reg.IsThumb {
-            // Required. Do not remove. check against gbe+ test
-            cpu.Reg.R[15] &^= 0b11
-        } else {
-            // or should this toggle thumb?
-            cpu.Reg.R[15] &^= 0b1
-        }
+		if !cpu.Reg.CPSR.T {
+			// Required. Do not remove. check against gbe+ test
+			cpu.Reg.R[15] &^= 0b11
+		} else {
+			// or should this toggle thumb?
+			cpu.Reg.R[15] &^= 0b1
+		}
 
 		return
 	}
 
 	if irqExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB; irqExit {
 		cpu.ExitException(MODE_IRQ)
-        //if cpu.Reg.R[15] & 1 == 1 {
-        //    cpu.toggleThumb()
-        //}
+		//if cpu.Reg.R[15] & 1 == 1 {
+		//    cpu.toggleThumb()
+		//}
 
-        if !cpu.Reg.IsThumb {
-            cpu.Reg.R[15] &^= 0b11
-        } else {
-            // or should this toggle thumb?
-            cpu.Reg.R[15] &^= 0b1
-        }
+		if !cpu.Reg.CPSR.T {
+			cpu.Reg.R[15] &^= 0b11
+		} else {
+			// or should this toggle thumb?
+			cpu.Reg.R[15] &^= 0b1
+		}
 
 		return
 	}
 
 	if swiExit := alu.Rd == PC && alu.Rm == LR && alu.Inst == MOV; swiExit {
 		cpu.ExitException(MODE_SWI)
-        //if cpu.Reg.R[15] & 1 == 1 {
-        //    cpu.toggleThumb()
-        //}
+		//if cpu.Reg.R[15] & 1 == 1 {
+		//    cpu.toggleThumb()
+		//}
 
-        if !cpu.Reg.IsThumb {
-            cpu.Reg.R[15] &^= 0b11
-        } else {
-            // or should this toggle thumb?
-            cpu.Reg.R[15] &^= 0b1
-        }
+		if !cpu.Reg.CPSR.T {
+			cpu.Reg.R[15] &^= 0b11
+		} else {
+			// or should this toggle thumb?
+			cpu.Reg.R[15] &^= 0b1
+		}
 
 		return
 	}
 
 	if forceExit := alu.Rd == PC; forceExit {
 		cpu.psrSwitch()
-        //if cpu.Reg.R[15] & 1 == 1 {
-        //    cpu.toggleThumb()
-        //}
+		//if cpu.Reg.R[15] & 1 == 1 {
+		//    cpu.toggleThumb()
+		//}
 
-        if !cpu.Reg.IsThumb {
-            cpu.Reg.R[15] &^= 0b11
-        } else {
-            // or should this toggle thumb?
-            cpu.Reg.R[15] &^= 0b1
-        }
+		if !cpu.Reg.CPSR.T {
+			cpu.Reg.R[15] &^= 0b11
+		} else {
+			// or should this toggle thumb?
+			cpu.Reg.R[15] &^= 0b1
+		}
 
 		return
 	}
 
-
 	if alu.LogicalFlags {
-		cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-		cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+		cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
+		cpu.Reg.CPSR.Z = uint32(res) == 0
 		return
 	}
 
@@ -442,10 +438,10 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
 		c = res < 0x1_0000_0000
 	}
 
-	cpu.Reg.CPSR.SetFlag(FLAG_V, v)
-	cpu.Reg.CPSR.SetFlag(FLAG_C, c)
-	cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-	cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+	cpu.Reg.CPSR.V = v
+	cpu.Reg.CPSR.C = c
+	cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
+	cpu.Reg.CPSR.Z = uint32(res) == 0
 }
 
 const (
@@ -479,10 +475,10 @@ func (cpu *Cpu) Mul(opcode uint32) {
 		r[rd] = res
 
 		if set {
-			cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
-			cpu.Reg.CPSR.SetFlag(FLAG_N, (res>>31&0b1) != 0)
+			cpu.Reg.CPSR.Z = res == 0
+			cpu.Reg.CPSR.N = (res >> 31 & 0b1) != 0
 			// FLAG_C "destroyed" ARM <5, ignored ARM >=5
-			cpu.Reg.CPSR.SetFlag(FLAG_C, false)
+			cpu.Reg.CPSR.C = false
 		}
 
 		r[PC] += 4
@@ -505,13 +501,13 @@ func (cpu *Cpu) Mul(opcode uint32) {
 
 		if set {
 			//cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 63 & 0b1) != 0)
-			cpu.Reg.CPSR.SetFlag(FLAG_N, (res>>63&1) == 1)
-			cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
+			cpu.Reg.CPSR.N = (res >> 63 & 1) == 1
+			cpu.Reg.CPSR.Z = res == 0
 			// FLAG_C "destroyed" ARM <5, ignored ARM >=5
 			// need carry to pass mgba suite
 			//c := res >= 0x1_0000_0000
 			//cpu.Reg.CPSR.SetFlag(FLAG_C, c)
-			cpu.Reg.CPSR.SetFlag(FLAG_C, false)
+			cpu.Reg.CPSR.C = false
 			// FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
 		}
 
@@ -528,10 +524,10 @@ func (cpu *Cpu) Mul(opcode uint32) {
 	r[rn] = uint32(res)
 
 	if set {
-		cpu.Reg.CPSR.SetFlag(FLAG_N, (res>>63&1) == 1)
-		cpu.Reg.CPSR.SetFlag(FLAG_Z, res == 0)
+		cpu.Reg.CPSR.N = (res >> 63 & 1) == 1
+		cpu.Reg.CPSR.Z = res == 0
 		// FLAG_C "destroyed" ARM <5, ignored ARM >=5
-		cpu.Reg.CPSR.SetFlag(FLAG_C, false)
+		cpu.Reg.CPSR.C = false
 		// FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
 	}
 
@@ -547,20 +543,20 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 
 	r := &c.Reg.R
 
-    if utils.BitEnabled(opcode, 25) && utils.BitEnabled(opcode, 4) {
-        fmt.Printf("SDT MALFORMED PC %08X OPCODE %08X\n", r[15], opcode)
-    }
+	if utils.BitEnabled(opcode, 25) && utils.BitEnabled(opcode, 4) {
+		fmt.Printf("SDT MALFORMED PC %08X OPCODE %08X\n", r[15], opcode)
+	}
 
-    rd := utils.GetByte(opcode, 12)
-    rn := utils.GetByte(opcode, 16)
-    byte := utils.BitEnabled(opcode, 22)
-    load := utils.BitEnabled(opcode, 20)
+	rd := utils.GetByte(opcode, 12)
+	rn := utils.GetByte(opcode, 16)
+	byte := utils.BitEnabled(opcode, 22)
+	load := utils.BitEnabled(opcode, 20)
 
 	post := generateSdtAddress(c, opcode)
-    pre := r[rn]
-    preFlag := utils.BitEnabled(opcode, 24)
-    if preFlag {
-        pre = post
+	pre := r[rn]
+	preFlag := utils.BitEnabled(opcode, 24)
+	if preFlag {
+		pre = post
 	}
 
 	addr := pre &^ 0b11
@@ -569,14 +565,14 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 	//	addr = pre
 	//}
 
-    if pld := ((opcode>>28) == 0b1111 &&
+	if pld := ((opcode>>28) == 0b1111 &&
 		preFlag &&
 		byte &&
-        !utils.BitEnabled(opcode, 21) &&
+		!utils.BitEnabled(opcode, 21) &&
 		load &&
 		rd == 0b1111); pld {
 		panic("Need to handle PLD Inst")
-    }
+	}
 
 	switch {
 	case load && byte:
@@ -612,7 +608,7 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 	}
 
 	skipLoadWriteBack := load && (rn == rd)
-    writeback := !utils.BitEnabled(opcode, 24) || utils.BitEnabled(opcode, 21)
+	writeback := !utils.BitEnabled(opcode, 24) || utils.BitEnabled(opcode, 21)
 	if writeback && !skipLoadWriteBack {
 		r[rn] = post
 	}
@@ -627,15 +623,15 @@ func generateSdtAddress(cpu *Cpu, opcode uint32) uint32 {
 	r := &cpu.Reg.R
 
 	var offset uint32
-    if imm := utils.BitEnabled(opcode, 25); imm {
-        if utils.BitEnabled(opcode, 4) {
-            //uhh.PrintPcs()
-            panic("Malformed Single Data Transfer")
-        }
+	if imm := utils.BitEnabled(opcode, 25); imm {
+		if utils.BitEnabled(opcode, 4) {
+			//uhh.PrintPcs()
+			panic("Malformed Single Data Transfer")
+		}
 
-        shift := utils.GetVarData(opcode, 7, 11)
-        shiftType := utils.GetVarData(opcode, 5, 6)
-        rm := utils.GetByte(opcode, 0)
+		shift := utils.GetVarData(opcode, 7, 11)
+		shiftType := utils.GetVarData(opcode, 5, 6)
+		rm := utils.GetByte(opcode, 0)
 
 		shiftArgs := utils.ShiftArgs{
 			SType:     shiftType,
@@ -643,13 +639,13 @@ func generateSdtAddress(cpu *Cpu, opcode uint32) uint32 {
 			Is:        shift,
 			IsCarry:   false,
 			Immediate: true,
-			CurrCarry: cpu.Reg.CPSR.GetFlag(FLAG_C),
+			CurrCarry: cpu.Reg.CPSR.C,
 		}
 
 		offset, _, _ = utils.Shift(&shiftArgs)
 	} else {
-        offset = utils.GetVarData(opcode, 0, 11)
-    }
+		offset = utils.GetVarData(opcode, 0, 11)
+	}
 
 	rn := utils.GetByte(opcode, 16)
 	addr := r[rn]
@@ -657,14 +653,19 @@ func generateSdtAddress(cpu *Cpu, opcode uint32) uint32 {
 		addr += 8
 	}
 
-    if up := utils.BitEnabled(opcode, 23); up {
-        return addr + offset
+	if up := utils.BitEnabled(opcode, 23); up {
+		return addr + offset
 	}
 
-    return addr - offset
+	return addr - offset
 }
 
 func (cpu *Cpu) B(opcode uint32) {
+
+	if immLoop := opcode == 0xEAFFFFFE; immLoop {
+		cpu.Halted = true
+		return
+	}
 
 	isLink := utils.BitEnabled(opcode, 24)
 
@@ -692,9 +693,9 @@ func (cpu *Cpu) BX(opcode uint32) {
 	case INST_BX:
 		cpu.Reg.R[PC] = cpu.Reg.R[rn]
 
-        if rn == PC {
-            cpu.Reg.R[PC] += 8
-        }
+		if rn == PC {
+			cpu.Reg.R[PC] += 8
+		}
 
 		cpu.toggleThumb()
 
@@ -750,7 +751,7 @@ func NewHalf(opcode uint32, c *Cpu) *Half {
 
 	for i, fail := range fails {
 		if fail {
-            //uhh.PrintPcs()
+			//uhh.PrintPcs()
 			panic(fmt.Sprintf("Malformed Half Instruction %d %08X", i, opcode))
 		}
 	}
@@ -985,17 +986,17 @@ func (cpu *Cpu) mrs(psr *PSR) {
 	r := &cpu.Reg.R
 
 	if psr.SPSR {
-		mode := cpu.Reg.getMode()
-		r[psr.Rd] = uint32(cpu.Reg.SPSR[BANK_ID[mode]])
+		mode := cpu.Reg.CPSR.Mode
+		r[psr.Rd] = cpu.Reg.SPSR[BANK_ID[mode]].Get()
 		return
 	}
 
 	mask := PRIV_MASK
-	if cpu.Reg.getMode() == MODE_USR {
+	if cpu.Reg.CPSR.Mode == MODE_USR {
 		mask = USR_MASK
 	}
 
-	r[psr.Rd] = uint32(cpu.Reg.CPSR) & mask
+	r[psr.Rd] = cpu.Reg.CPSR.Get() & mask
 }
 
 const (
@@ -1032,7 +1033,7 @@ func (cpu *Cpu) msr(psr *PSR) {
 	}
 
 	secMask := PRIV_MASK
-	curr := cpu.Reg.getMode()
+	curr := cpu.Reg.CPSR.Mode
 	if curr == MODE_USR {
 		secMask = USR_MASK
 	}
@@ -1048,25 +1049,23 @@ func (cpu *Cpu) msr(psr *PSR) {
 		var spsr uint32
 
 		if curr == MODE_USR || curr == MODE_SYS {
-			spsr = uint32(reg.CPSR) &^ mask
+			spsr = reg.CPSR.Get() &^ mask
 		} else {
-			spsr = uint32(reg.SPSR[BANK_ID[curr]]) &^ mask
+			spsr = reg.SPSR[BANK_ID[curr]].Get() &^ mask
 		}
 
 		spsr |= v & mask
-		reg.SPSR[BANK_ID[curr]] = Cond(spsr)
+		reg.SPSR[BANK_ID[curr]].Set(spsr)
 
 		return
 	}
 
 	next := v & 0b11111
-	cpsr := uint32(reg.CPSR) &^ mask
+	cpsr := uint32(reg.CPSR.Get()) &^ mask
 
 	cpsr |= v & mask
 
-	reg.CPSR = Cond(cpsr)
-
-	reg.IsThumb = reg.CPSR.GetFlag(FLAG_T)
+	reg.CPSR.Set(cpsr)
 
 	if skip := BANK_ID[curr] == BANK_ID[next]; skip {
 		return

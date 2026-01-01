@@ -8,17 +8,17 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 
 	r := &cpu.Reg.R
 
-    //opcode := cpu.mem.Read32(r[PC], false)
-    opcode := cpu.GetOpArm()
+	//opcode := cpu.mem.Read32(r[PC], false)
+	opcode, cycles := cpu.GetOpArm()
 
 	if !cpu.CheckCond(opcode >> 28) {
 		r[PC] += 4
-		return 1, true
+		return cycles + 1, true
 	}
 
 	if swi := (opcode>>24)&0xF == 0xF; swi {
 		cpu.exception(VEC_SWI, MODE_SWI)
-		return 1, true
+		return cycles + 1, true
 	}
 
 	switch (opcode >> 25) & 0b111 {
@@ -42,13 +42,13 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 			panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X", opcode, r[PC]))
 		}
 
-		return 1, true
+		return cycles + 1, true
 	case 0b001:
 
 		switch {
 		case isSDT(opcode):
 			cpu.Sdt(opcode)
-			return 1, true
+			return cycles + 1, true
 		case isHalf(opcode):
 			cpu.Half(opcode)
 		case isPSR(opcode):
@@ -61,15 +61,15 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 			panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X", opcode, r[PC]))
 		}
 
-		return 1, true
+		return cycles + 1, true
 	case 0b010:
 	case 0b011:
 	case 0b100:
 		cpu.Block(opcode)
-		return 1, true
+		return cycles + 1, true
 	case 0b101:
 		cpu.B(opcode)
-		return 1, true
+		return cycles + 1, true
 	}
 
 	switch {
@@ -93,10 +93,10 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 		cpu.Alu(opcode)
 	default:
 		fmt.Printf("Unable to Decode ARM 7 %08X, at PC %08X\n", opcode, r[PC])
-        return 0, false
+		return 0, false
 	}
 
-	return 1, true
+	return cycles + 1, true
 }
 
 func isOpcodeFormat(opcode, mask, format uint32) bool {

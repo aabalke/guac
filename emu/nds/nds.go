@@ -7,10 +7,10 @@ import (
 
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/nds/cart"
-	"github.com/aabalke/guac/emu/nds/cpu"
-	"github.com/aabalke/guac/emu/nds/cpu/arm7"
-	"github.com/aabalke/guac/emu/nds/cpu/arm9"
-	"github.com/aabalke/guac/emu/nds/cpu/arm9/cp15"
+	"github.com/aabalke/guac/emu/cpu"
+	"github.com/aabalke/guac/emu/cpu/arm7"
+	"github.com/aabalke/guac/emu/cpu/arm9"
+	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
 	"github.com/aabalke/guac/emu/nds/debug"
 	"github.com/aabalke/guac/emu/nds/mem"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
@@ -54,6 +54,9 @@ type Nds struct {
 	arm9      *arm9.Cpu
 	ppu       *ppu.PPU
 	Cartridge cart.Cartridge
+
+    dma7 [4]dma.DMA
+    dma9 [4]dma.DMA
 
 	Muted, Paused, Drawn  bool
 	ImageTop, ImageBottom *ebiten.Image
@@ -101,7 +104,7 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 	nds.mem = mem.NewMemory(
 		&nds.arm7.Reg.R[15],
 		&nds.arm7.Halted, &nds.arm9.Halted,
-		&nds.arm7.Dma, &nds.arm9.Dma,
+        &nds.dma7, &nds.dma9,
 		&irq7, &irq9,
 		//nds.arm7.Jit, nds.arm9.Jit,
 		nil, nds.arm9.Jit,
@@ -109,15 +112,15 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 
 	s.Mem = &nds.mem
 
-	nds.arm9.Dma[0].Init(0, &nds.mem, &irq9, true)
-	nds.arm9.Dma[1].Init(1, &nds.mem, &irq9, true)
-	nds.arm9.Dma[2].Init(2, &nds.mem, &irq9, true)
-	nds.arm9.Dma[3].Init(3, &nds.mem, &irq9, true)
+	nds.dma9[0].Init(0, &nds.mem, &irq9, true)
+	nds.dma9[1].Init(1, &nds.mem, &irq9, true)
+	nds.dma9[2].Init(2, &nds.mem, &irq9, true)
+	nds.dma9[3].Init(3, &nds.mem, &irq9, true)
 
-	nds.arm7.Dma[0].Init(0, &nds.mem, &irq7, false)
-	nds.arm7.Dma[1].Init(1, &nds.mem, &irq7, false)
-	nds.arm7.Dma[2].Init(2, &nds.mem, &irq7, false)
-	nds.arm7.Dma[3].Init(3, &nds.mem, &irq7, false)
+	nds.dma7[0].Init(0, &nds.mem, &irq7, false)
+	nds.dma7[1].Init(1, &nds.mem, &irq7, false)
+	nds.dma7[2].Init(2, &nds.mem, &irq7, false)
+	nds.dma7[3].Init(3, &nds.mem, &irq7, false)
 
 	nds.LoadGame(path)
 	//nds.arm9.Reset()
@@ -455,16 +458,16 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 func (nds *Nds) CheckDmas(mode uint32, arm9 bool) {
 	if arm9 {
 		for i := range 4 {
-			if ok := nds.arm9.Dma[i].CheckMode(mode); ok {
-				nds.arm9.Dma[i].Transfer()
+			if ok := nds.dma9[i].CheckMode(mode); ok {
+				nds.dma9[i].Transfer()
 			}
 		}
 		return
 	}
 
 	for i := range 4 {
-		if ok := nds.arm7.Dma[i].CheckMode(mode); ok {
-			nds.arm7.Dma[i].Transfer()
+		if ok := nds.dma7[i].CheckMode(mode); ok {
+			nds.dma7[i].Transfer()
 		}
 	}
 }
@@ -473,11 +476,11 @@ func (nds *Nds) CheckGeoDmas() {
 
 	for i := range 4 {
 
-		if !nds.arm9.Dma[i].Enabled {
+		if !nds.dma9[i].Enabled {
 			continue
 		}
 
-		if nds.arm9.Dma[i].Mode != dma.ARM9_DMA_MODE_GEO {
+		if nds.dma9[i].Mode != dma.ARM9_DMA_MODE_GEO {
 			continue
 		}
 
@@ -486,8 +489,8 @@ func (nds *Nds) CheckGeoDmas() {
 		//    continue
 		//}
 
-		nds.arm9.Dma[i].GxTransfer()
-		//nds.arm9.Dma[i].Transfer()
+		nds.dma9[i].GxTransfer()
+		//nds.dma9[i].Transfer()
 	}
 }
 

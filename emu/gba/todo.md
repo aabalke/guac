@@ -24,3 +24,11 @@ WAVE and pitch of NOISE.
 
 - Serial Comms
 - Other peripherals
+
+
+
+
+
+
+fixes:
+need to copy alu and block from nds - sub r15, r15 r2 ex. need all alu r15s to be 0b11 or 0b1 &^

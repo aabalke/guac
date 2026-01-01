@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/aabalke/guac/emu/nds/cpu"
+	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 	"github.com/aabalke/guac/emu/nds/utils"
 )

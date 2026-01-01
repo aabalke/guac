@@ -77,7 +77,7 @@ func (cpu *Cpu) DecodeTHUMB() int {
 	case isLSSP(opcode):
 		cpu.thumbLSSP(opcode)
 	case isMulti(opcode):
-		cpu.thumbMulti(opcode)
+		cpu.thumbMulti(uint32(opcode))
 	default:
 		r := &cpu.Reg.R
 		panic(fmt.Sprintf("Unable to Decode Thumb %X, at PC %X, INSTR %d", opcode, r[PC], CURR_INST))

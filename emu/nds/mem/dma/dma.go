@@ -3,7 +3,7 @@ package dma
 import (
 	"unsafe"
 
-	"github.com/aabalke/guac/emu/nds/cpu"
+	"github.com/aabalke/guac/emu/cpu"
 )
 
 const (
