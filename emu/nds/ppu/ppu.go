@@ -445,7 +445,7 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 	switch addr {
 	case 0x08:
 		p.Backgrounds[0].Priority = v & 0b11
-		p.Backgrounds[0].CharBaseBlock = ((v >> 2) & 0xF) & 0x4000
+		p.Backgrounds[0].CharBaseBlock = ((v >> 2) & 0xF) * 0x4000
 		p.Backgrounds[0].Mosaic = (v>>6)&1 != 0
 		p.Backgrounds[0].Palette256 = (v>>7)&1 != 0
 	case 0x09:
@@ -455,7 +455,7 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 
 	case 0x0A:
 		p.Backgrounds[1].Priority = v & 0b11
-		p.Backgrounds[1].CharBaseBlock = ((v >> 2) & 0xF) & 0x4000
+		p.Backgrounds[1].CharBaseBlock = ((v >> 2) & 0xF) * 0x4000
 		p.Backgrounds[1].Mosaic = (v>>6)&1 != 0
 		p.Backgrounds[1].Palette256 = (v>>7)&1 != 0
 	case 0x0B:
@@ -465,23 +465,23 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 
 	case 0x0C:
 		p.Backgrounds[2].Priority = v & 0b11
-		p.Backgrounds[2].CharBaseBlock = ((v >> 2) & 0xF) & 0x4000
+		p.Backgrounds[2].CharBaseBlock = ((v >> 2) & 0xF) * 0x4000
 		p.Backgrounds[2].Mosaic = (v>>6)&1 != 0
 		p.Backgrounds[2].Palette256 = (v>>7)&1 != 0
 	case 0x0D:
 		p.Backgrounds[2].ScreenBaseBlock = (v & 0x1F) * 0x800
-		p.Backgrounds[2].AltExtPalSlot = (v>>5)&1 != 0
+		p.Backgrounds[2].AffineWrap = (v>>5)&1 != 0
 		p.Backgrounds[2].Size = (v >> 6) & 0b11
 
 	case 0x0E:
 		p.Backgrounds[3].Priority = v & 0b11
-		p.Backgrounds[3].CharBaseBlock = ((v >> 2) & 0xF) & 0x4000
+		p.Backgrounds[3].CharBaseBlock = ((v >> 2) & 0xF) * 0x4000
 		p.Backgrounds[3].Mosaic = (v>>6)&1 != 0
 		p.Backgrounds[3].Palette256 = (v>>7)&1 != 0
 
 	case 0x0F:
 		p.Backgrounds[3].ScreenBaseBlock = (v & 0x1F) * 0x800
-		p.Backgrounds[3].AltExtPalSlot = (v>>5)&1 != 0
+		p.Backgrounds[3].AffineWrap = (v>>5)&1 != 0
 		p.Backgrounds[3].Size = (v >> 6) & 0b11
 
 	case 0x10:
@@ -806,18 +806,18 @@ func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
 		obj.Y = attr
 	case 1:
 
-		obj.RotScale = (v>>0)&1 != 0
+		obj.RotScale = (attr>>0)&1 != 0
 		obj.Mode = (attr >> 2) & 0b11
-		obj.Mosaic = (v>>4)&1 != 0
-		obj.Palette256 = (v>>5)&1 != 0
+		obj.Mosaic = (attr>>4)&1 != 0
+		obj.Palette256 = (attr>>5)&1 != 0
 		obj.Shape = (attr >> 6) & 0b11
 		obj.SetSize(obj.Shape, obj.Size)
 
 		if obj.RotScale {
-			obj.DoubleSize = (v>>1)&1 != 0
+			obj.DoubleSize = (attr>>1)&1 != 0
 			UpdateAffineParams(obj, oam, engine.IsB)
 		} else {
-			obj.Disable = (v>>1)&1 != 0
+			obj.Disable = (attr>>1)&1 != 0
 		}
 
 	case 2:
@@ -833,8 +833,8 @@ func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
 			obj.RotParams = (attr >> 1) & 0x1F
 			UpdateAffineParams(obj, oam, engine.IsB)
 		}
-		obj.HFlip = (v>>4)&1 != 0
-		obj.VFlip = (v>>5)&1 != 0
+		obj.HFlip = (attr>>4)&1 != 0
+		obj.VFlip = (attr>>5)&1 != 0
 
 	case 4:
 		obj.CharName &^= 0xFF
