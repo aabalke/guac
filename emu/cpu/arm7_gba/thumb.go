@@ -1,4 +1,4 @@
-package gba
+package arm7gba
 
 import (
 	"github.com/aabalke/guac/emu/gba/utils"
@@ -520,12 +520,12 @@ func (cpu *Cpu) thumbLSHalf(opcode uint16) {
 	addr := r[rb] + offset
 
 	if ldr {
-		v := uint32(cpu.Gba.Mem.Read16(addr &^ 1))
+		v := uint32(cpu.mem.Read16(addr &^ 1, false))
 		is := (addr & 1) << 3
 		//v, _, _ = utils.Ror(v, is, false, false, false)
 		r[rd] = utils.RorSimple(v, is)
 	} else {
-		cpu.Gba.Mem.Write16(addr&^1, uint16(r[rd]))
+		cpu.mem.Write16(addr&^1, uint16(r[rd]), false)
 	}
 
 	r[PC] += 2
@@ -550,13 +550,13 @@ func (cpu *Cpu) thumbLSSigned(opcode uint16) {
 	addr := r[rb] + r[ro]
 	switch inst {
 	case THUMB_STRH:
-		//cpu.Gba.Mem.Write16(addr, uint16(r[rd]))
-		cpu.Gba.Mem.Write16(addr&^1, uint16(r[rd]))
+		//cpu.mem.Write16(addr, uint16(r[rd]))
+		cpu.mem.Write16(addr&^1, uint16(r[rd]),false)
 
 	case THUMB_LDSB:
 
 		// sign-expand byte value
-		unexpanded := int8(cpu.Gba.Mem.Read8(addr))
+		unexpanded := int8(cpu.mem.Read8(addr, false))
 		expanded := uint32(unexpanded)
 
 		if unexpanded < 0 {
@@ -566,7 +566,7 @@ func (cpu *Cpu) thumbLSSigned(opcode uint16) {
 		r[rd] = expanded
 
 	case THUMB_LDRH:
-		v := cpu.Gba.Mem.Read16(addr &^ 0b1)
+		v := cpu.mem.Read16(addr &^ 0b1, false)
 		is := (addr & 0b1) << 3
 		//v, _, _ = utils.Ror(v, is, false, false, false)
 		r[rd] = utils.RorSimple(v, is)
@@ -580,7 +580,7 @@ func (cpu *Cpu) thumbLSSigned(opcode uint16) {
 
 		if misaligned := addr&1 == 1; misaligned {
 			// sign-expand BYTE value
-			unexpanded := int16(cpu.Gba.Mem.Read16(addr))
+			unexpanded := int16(cpu.mem.Read16(addr, false))
 			expanded := uint32(unexpanded)
 
 			if int8(unexpanded) < 0 {
@@ -593,7 +593,7 @@ func (cpu *Cpu) thumbLSSigned(opcode uint16) {
 			aligned := addr &^ 0b1
 
 			// sign-expand half value
-			unexpanded := int16(cpu.Gba.Mem.Read16(aligned))
+			unexpanded := int16(cpu.mem.Read16(aligned, false))
 			expanded := uint32(unexpanded)
 
 			if unexpanded < 0 {
@@ -615,7 +615,7 @@ func (cpu *Cpu) thumbLPC(opcode uint16) {
 	nn := utils.GetVarData(uint32(opcode), 0, 7) << 2
 	addr := (r[PC] + 4 + nn) &^ 0b11
 
-	r[rd] = cpu.Gba.Mem.Read32(addr)
+	r[rd] = cpu.mem.Read32(addr, false)
 	r[PC] += 2
 }
 
@@ -639,17 +639,17 @@ func (cpu *Cpu) thumbLSR(opcode uint16) {
 
 	switch inst {
 	case THUMB_STR_REG:
-		//cpu.Gba.Mem.Write32(addr, r[rd])
-		cpu.Gba.Mem.Write32(addr&^0b11, r[rd])
+		//cpu.mem.Write32(addr, r[rd])
+		cpu.mem.Write32(addr&^0b11, r[rd], false)
 	case THUMB_STRB_REG:
-		cpu.Gba.Mem.Write8(addr, uint8(r[rd]))
+		cpu.mem.Write8(addr, uint8(r[rd]), false)
 	case THUMB_LDR_REG:
-		v := cpu.Gba.Mem.Read32(addr &^ 0b11)
+		v := cpu.mem.Read32(addr &^ 0b11, false)
 		is := (addr & 0b11) << 3
 		//r[rd], _, _ = utils.Ror(v, is, false, false, false)
 		r[rd] = utils.RorSimple(v, is)
 	case THUMB_LDRB_REG:
-		r[rd] = cpu.Gba.Mem.Read8(addr)
+		r[rd] = cpu.mem.Read8(addr, false)
 	}
 
 	r[PC] += 2
@@ -674,21 +674,21 @@ func (cpu *Cpu) thumbLSImm(opcode uint16) {
 	switch inst {
 	case THUMB_STR_IMM:
 		addr := r[rb] + (nn << 2)
-		cpu.Gba.Mem.Write32(addr&^0b11, r[rd])
+		cpu.mem.Write32(addr&^0b11, r[rd], false)
 	case THUMB_LDR_IMM:
 		addr := r[rb] + (nn << 2)
-		v := cpu.Gba.Mem.Read32(addr &^ 0b11)
+		v := cpu.mem.Read32(addr &^ 0b11, false)
 		is := (addr & 0b11) << 3
 		//r[rd], _, _ = utils.Ror(v, is, false, false, false)
 		r[rd] = utils.RorSimple(v, is)
 
 	case THUMB_STRB_IMM:
 		addr := r[rb] + nn
-		//cpu.Gba.Mem.Write(addr, uint8(r[rd]), true)
-		cpu.Gba.Mem.Write8(addr, uint8(r[rd]))
+		//cpu.mem.Write(addr, uint8(r[rd]), true)
+		cpu.mem.Write8(addr, uint8(r[rd]), false)
 	case THUMB_LDRB_IMM:
 		addr := r[rb] + nn
-		r[rd] = uint32(cpu.Gba.Mem.Read8(addr))
+		r[rd] = uint32(cpu.mem.Read8(addr, false))
 	}
 
 	r[PC] += 2
@@ -705,15 +705,15 @@ func (cpu *Cpu) thumbPushPop(opcode uint16) {
 	if isPop {
 		for reg := range 8 {
 			if utils.BitEnabled(rlist, uint8(reg)) {
-				r[reg] = cpu.Gba.Mem.Read32(r[SP]) // aligned??
-				//r[reg] = cpu.Gba.Mem.Read32(r[SP] &^ 0b11)
+				r[reg] = cpu.mem.Read32(r[SP], false) // aligned??
+				//r[reg] = cpu.mem.Read32(r[SP] &^ 0b11)
 				r[SP] += 4
 			}
 		}
 
 		if pclr {
 
-			r[PC] = cpu.Gba.Mem.Read32(r[SP]) &^ 0b1
+			r[PC] = cpu.mem.Read32(r[SP], false) &^ 0b1
 			r[SP] += 4
 			//piplining
 			return
@@ -725,13 +725,13 @@ func (cpu *Cpu) thumbPushPop(opcode uint16) {
 
 	if pclr {
 		r[SP] -= 4
-		cpu.Gba.Mem.Write32(r[SP], r[14])
+		cpu.mem.Write32(r[SP], r[14],false)
 	}
 
 	for reg := 7; reg >= 0; reg-- {
 		if utils.BitEnabled(rlist, uint8(reg)) {
 			r[SP] -= 4
-			cpu.Gba.Mem.Write32(r[SP], r[reg])
+			cpu.mem.Write32(r[SP], r[reg], false)
 		}
 	}
 
@@ -848,7 +848,7 @@ func (cpu *Cpu) thumbLongBranch(opcode uint16) {
 
 	r := &cpu.Reg.R
 
-	op2 := cpu.Gba.Mem.Read16(r[PC] + 2)
+	op2 := cpu.mem.Read16(r[PC] + 2, false)
 
 	upper := utils.GetVarData(uint32(opcode), 0, 10)
 	lower := utils.GetVarData(uint32(op2), 0, 10)
@@ -909,12 +909,12 @@ func (cpu *Cpu) thumbLSSP(opcode uint16) {
 	addr := r[SP] + nn
 
 	if ldr {
-		v := cpu.Gba.Mem.Read32(addr &^ 0b11)
+		v := cpu.mem.Read32(addr &^ 0b11, false)
 		is := (addr & 0b11) << 3
 		//r[rd], _, _ = utils.Ror(v, is, false, false, false)
 		r[rd] = utils.RorSimple(v, is)
 	} else {
-		cpu.Gba.Mem.Write32(addr, r[rd])
+		cpu.mem.Write32(addr, r[rd],false)
 	}
 
 	r[PC] += 2
@@ -941,7 +941,7 @@ func (cpu *Cpu) thumbMulti(opcode uint32) {
 		count := uint32(0)
 
 		if rlist == 0 {
-			cpu.Gba.Mem.Write32(r[rb], r[PC]+6)
+			cpu.mem.Write32(r[rb], r[PC]+6,false)
 			r[rb] += 0x40
 			r[PC] += 2
 			return
@@ -953,7 +953,7 @@ func (cpu *Cpu) thumbMulti(opcode uint32) {
 			}
 
 			if reg == int(rb) {
-				cpu.Gba.Mem.Write32(addr, r[reg])
+				cpu.mem.Write32(addr, r[reg],false)
 				matchingValue = r[reg] + 4
 				matchingAddr = addr
 				rbIdx = regCount - count
@@ -962,22 +962,22 @@ func (cpu *Cpu) thumbMulti(opcode uint32) {
 				continue
 			}
 
-			cpu.Gba.Mem.Write32(addr, r[reg])
+			cpu.mem.Write32(addr, r[reg],false)
 
 			r[rb] += 4
 			addr += 4
 		}
 
 		if smallest {
-			//v := cpu.Gba.Mem.Read32(addr)
-			v := cpu.Gba.Mem.Read32(addr & 0b11) // maybe??
-			cpu.Gba.Mem.Write32(r[rb], v-(regCount*2))
+			//v := cpu.mem.Read32(addr)
+			v := cpu.mem.Read32(addr & 0b11, false) // maybe??
+			cpu.mem.Write32(r[rb], v-(regCount*2),false)
 			r[PC] += 2
 			return
 		}
 
 		if matchingRb {
-			cpu.Gba.Mem.Write32(matchingAddr, matchingValue+(rbIdx*2))
+			cpu.mem.Write32(matchingAddr, matchingValue+(rbIdx*2),false)
 			r[PC] += 2
 			return
 		}
@@ -1000,7 +1000,7 @@ func (cpu *Cpu) thumbMulti(opcode uint32) {
 			continue
 		}
 
-		r[reg] = cpu.Gba.Mem.Read32(addr &^ 0b11)
+		r[reg] = cpu.mem.Read32(addr &^ 0b11, false)
 
 		if reg == int(rb) {
 			matchingRb = true

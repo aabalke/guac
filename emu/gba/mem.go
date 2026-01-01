@@ -3,8 +3,10 @@ package gba
 import (
 	//"log"
 	"time"
+	"unsafe"
 
 	"github.com/aabalke/guac/config"
+	arm7gba "github.com/aabalke/guac/emu/cpu/arm7_gba"
 	"github.com/aabalke/guac/emu/gba/utils"
 )
 
@@ -32,10 +34,10 @@ func NewMemory(gba *GBA) Memory {
 	m.initReadRegions()
 	m.initWriteRegions()
 
-	m.Write32(0x4000000, 0x80)
-	m.Write32(0x4000134, 0x800F) // IR requires bit 3 on. I believe this is auth check (sonic adv)
+	m.Write32(0x4000000, 0x80, false)
+	m.Write32(0x4000134, 0x800F, false) // IR requires bit 3 on. I believe this is auth check (sonic adv)
 
-	m.BIOS_MODE = BIOS_STARTUP
+	//m.BIOS_MODE = BIOS_STARTUP
 
 	m.InitSaveLoop()
 
@@ -245,7 +247,10 @@ func (m *Memory) Read(addr uint32) uint8 {
 
 func (m *Memory) ReadBios(addr uint32) uint8 {
 
-	nAddr, ok := BIOS_ADDR[m.BIOS_MODE]
+    // temp handler
+	//nAddr, ok := BIOS_ADDR[m.BIOS_MODE]
+    var nAddr uint32
+    ok := false
 	if !ok {
 		nAddr = 0xE129F000
 	}
@@ -266,9 +271,13 @@ func (m *Memory) ReadBios(addr uint32) uint8 {
 
 func (m *Memory) ReadOpenBus(addr uint32) uint8 {
 
+    return 0
+
 	pc := m.GBA.Cpu.Reg.R[PC]
 
-	if m.GBA.Cpu.Reg.isThumb {
+    if m.GBA.Cpu.Reg.CPSR.GetFlag(arm7gba.FLAG_T) {
+
+	//if m.GBA.Cpu.Reg.isThumb {
 
 		// region based thumb openbus behavior has not been implimented
 
@@ -291,10 +300,10 @@ func (m *Memory) ReadOpenBus(addr uint32) uint8 {
 		//OldLO=LSW(data), OldHI=MSW(data)
 		//Theoretically, this might also change if a DMA transfer occurs.
 
-		return uint8(m.Read32((pc&^1)+4) >> ((addr & 1) << 3))
+		return uint8(m.Read32((pc&^1)+4, false) >> ((addr & 1) << 3))
 	}
 
-	return uint8(m.Read32((pc&^3)+8) >> ((addr & 3) << 3))
+	return uint8(m.Read32((pc&^3)+8, false) >> ((addr & 3) << 3))
 }
 
 func (m *Memory) ReadIO(addr uint32) uint8 {
@@ -452,7 +461,7 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 	return m.IO[addr]
 }
 
-func (m *Memory) Read8(addr uint32) uint32 {
+func (m *Memory) Read8(addr uint32, _ bool) uint32 {
 	if badRom := addr >= 0x800_0000 && addr < 0xE00_0000; badRom {
 		if addr&0x1FF_FFFF >= m.GBA.Cartridge.RomLength {
 			return m.ReadBadRom(addr, 1)
@@ -464,7 +473,7 @@ func (m *Memory) Read8(addr uint32) uint32 {
 
 // Accessing SRAM Area by 16bit/32bit
 // Reading retrieves 8bit value from specified address, multiplied by 0101h (LDRH) or by 01010101h (LDR). Writing changes the 8bit value at the specified address only, being set to LSB of (source_data ROR (address*8)).
-func (m *Memory) Read16(addr uint32) uint32 {
+func (m *Memory) Read16(addr uint32, _ bool) uint32 {
 
 	switch {
 	case addr >= 0xE00_0000:
@@ -494,7 +503,7 @@ func (m *Memory) Read16(addr uint32) uint32 {
 	return uint32(m.Read(addr+1))<<8 | uint32(m.Read(addr))
 }
 
-func (m *Memory) Read32(addr uint32) uint32 {
+func (m *Memory) Read32(addr uint32, _ bool) uint32 {
 
 	switch {
 	case addr >= 0xE00_0000:
@@ -752,13 +761,13 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 		m.GBA.Keypad.writeCNT(v, true)
 
 	case 0x200:
-		m.GBA.Irq.WriteIE(v, false)
+		m.GBA.Irq.WriteIE(v, 0)
 	case 0x201:
-		m.GBA.Irq.WriteIE(v, true)
+		m.GBA.Irq.WriteIE(v, 1)
 	case 0x202:
-		m.GBA.Irq.WriteIF(v, false)
+		m.GBA.Irq.WriteIF(v, 0)
 	case 0x203:
-		m.GBA.Irq.WriteIF(v, true)
+		m.GBA.Irq.WriteIF(v, 1)
 
 	case 0x204:
 		m.IO[addr] = v
@@ -782,7 +791,7 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 
 	case 0x301:
 		m.IO[addr] = v & 0x80
-		m.GBA.Halted = true
+		m.GBA.Cpu.Halted = true
 
 	default:
 		m.IO[addr] = v
@@ -793,11 +802,11 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 	}
 }
 
-func (m *Memory) Write8(addr uint32, v uint8) {
+func (m *Memory) Write8(addr uint32, v uint8, _ bool) {
 	m.Write(addr, v, true)
 }
 
-func (m *Memory) Write16(addr uint32, v uint16) {
+func (m *Memory) Write16(addr uint32, v uint16, _ bool) {
 
 	switch {
 	case addr >= 0xE00_0000:
@@ -819,7 +828,7 @@ func (m *Memory) Write16(addr uint32, v uint16) {
 	m.Write(addr+1, uint8(v>>8), false)
 }
 
-func (m *Memory) Write32(addr uint32, v uint32) {
+func (m *Memory) Write32(addr uint32, v uint32, _ bool) {
 
 	if sram := addr >= 0xE00_0000; sram {
 
@@ -908,4 +917,14 @@ func (m *Memory) ReadIODirectByte(addr uint32) uint32 {
 	default:
 		return uint32(m.IO[addr])
 	}
+}
+
+func (m *Memory) ReadPtr(addr uint32, _ bool) (unsafe.Pointer, bool) {
+    panic("GBA READ PTR NOT IMPLIMENTED")
+    return nil, false
+}
+
+func (m *Memory) WritePtr(addr uint32, _ bool) (unsafe.Pointer, bool) {
+    panic("GBA WRITE PTR NOT IMPLIMENTED")
+    return nil, false
 }

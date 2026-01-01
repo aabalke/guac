@@ -1,4 +1,4 @@
-package gba
+package arm7gba
 
 import (
 	"math/bits"
@@ -149,7 +149,7 @@ func (c *Cpu) ldm(block *Block) bool {
 		case ib && regBitEnabled:
 
 			addr += 4
-			*ref[reg] = c.Gba.Mem.Read32(addr)
+			*ref[reg] = c.mem.Read32(addr, false)
 
 			if reg == PC {
 				incPC = incPC && false
@@ -160,7 +160,7 @@ func (c *Cpu) ldm(block *Block) bool {
 
 		case ia && regBitEnabled:
 
-			*ref[reg] = c.Gba.Mem.Read32(addr)
+			*ref[reg] = c.mem.Read32(addr, false)
 
 			if reg == PC {
 				incPC = incPC && false
@@ -174,7 +174,7 @@ func (c *Cpu) ldm(block *Block) bool {
 		case db && decRegBitEnabled: // pop
 
 			addr -= 4
-			*ref[15 - reg] = c.Gba.Mem.Read32(addr)
+			*ref[15 - reg] = c.mem.Read32(addr, false)
 
 			if 15-reg == PC {
 				incPC = incPC && false
@@ -185,7 +185,7 @@ func (c *Cpu) ldm(block *Block) bool {
 
 		case da && decRegBitEnabled:
 
-			*ref[15 - reg] = c.Gba.Mem.Read32(addr)
+			*ref[15 - reg] = c.mem.Read32(addr, false)
 			addr -= 4
 
 			if 15-reg == PC {
@@ -250,16 +250,16 @@ func (c *Cpu) stm(block *Block) {
 		case ib:
 			addr := r[block.Rn] + 4
 			r[block.Rn] += 0x40
-			c.Gba.Mem.Write32(addr, r[PC]+12)
+			c.mem.Write32(addr, r[PC]+12, false)
 		case ia:
-			c.Gba.Mem.Write32(r[block.Rn], r[PC]+12)
+			c.mem.Write32(r[block.Rn], r[PC]+12, false)
 			r[block.Rn] += 0x40
 		case db:
 			r[block.Rn] -= 0x40
-			c.Gba.Mem.Write32(r[block.Rn], r[PC]+12)
+			c.mem.Write32(r[block.Rn], r[PC]+12, false)
 		case da:
 			r[block.Rn] -= 0x40
-			c.Gba.Mem.Write32(r[block.Rn]+4, r[PC]+12)
+			c.mem.Write32(r[block.Rn]+4, r[PC]+12, false)
 		}
 
 		return
@@ -290,7 +290,7 @@ func (c *Cpu) stm(block *Block) {
 			addr += 4
 
 			if reg == int(block.Rn) {
-				c.Gba.Mem.Write32(addr, *ref[reg]-4)
+				c.mem.Write32(addr, *ref[reg]-4, false)
 				matchingValue = *ref[reg]
 				matchingAddr = addr
 				rnIdx = regCount - count
@@ -298,11 +298,11 @@ func (c *Cpu) stm(block *Block) {
 			}
 
 			if reg == PC {
-				c.Gba.Mem.Write32(addr, *ref[reg]+12)
+				c.mem.Write32(addr, *ref[reg]+12, false)
 				continue
 			}
 
-			c.Gba.Mem.Write32(addr, *ref[reg])
+			c.mem.Write32(addr, *ref[reg], false)
 
 		case ia && regBitEnabled:
 
@@ -310,7 +310,7 @@ func (c *Cpu) stm(block *Block) {
 
 			if reg == int(block.Rn) {
 
-				c.Gba.Mem.Write32(addr, *ref[reg])
+				c.mem.Write32(addr, *ref[reg], false)
 				matchingValue = *ref[reg] + 4
 				matchingAddr = addr
 				rnIdx = regCount - count
@@ -320,11 +320,11 @@ func (c *Cpu) stm(block *Block) {
 			}
 
 			if reg == PC {
-				c.Gba.Mem.Write32(addr, *ref[reg]+12)
+				c.mem.Write32(addr, *ref[reg]+12, false)
 				continue
 			}
 
-			c.Gba.Mem.Write32(addr, *ref[reg])
+			c.mem.Write32(addr, *ref[reg], false)
 
 			r[block.Rn] += 4
 			addr += 4
@@ -342,11 +342,11 @@ func (c *Cpu) stm(block *Block) {
 				rnIdx = regCount - count // regCount only for 15 - reg
 			}
 			if 15-reg == PC {
-				c.Gba.Mem.Write32(addr, *ref[15-reg]+12)
+				c.mem.Write32(addr, *ref[15-reg]+12, false)
 				continue
 			}
 
-			c.Gba.Mem.Write32(addr, *ref[15-reg])
+			c.mem.Write32(addr, *ref[15-reg], false)
 
 		case da && decRegBitEnabled:
 
@@ -355,7 +355,7 @@ func (c *Cpu) stm(block *Block) {
 			decReg := 15 - reg
 
 			if decReg == int(block.Rn) {
-				c.Gba.Mem.Write32(addr, *ref[decReg]+(count-1)*4)
+				c.mem.Write32(addr, *ref[decReg]+(count-1)*4, false)
 				matchingValue = *ref[decReg] - 4 // -4 offsets above +4 when matching Value (not first smallest)
 				matchingAddr = addr
 				rnIdx = regCount - count
@@ -365,11 +365,11 @@ func (c *Cpu) stm(block *Block) {
 			}
 
 			if decReg == PC {
-				c.Gba.Mem.Write32(addr, *ref[decReg]+12)
+				c.mem.Write32(addr, *ref[decReg]+12, false)
 				continue
 			}
 
-			c.Gba.Mem.Write32(addr, *ref[decReg])
+			c.mem.Write32(addr, *ref[decReg], false)
 
 			r[block.Rn] -= 4
 			addr -= 4
@@ -383,23 +383,23 @@ func (c *Cpu) stm(block *Block) {
 
 	if block.Writeback && smallest {
 
-		v := c.Gba.Mem.Read32(addr)
+		v := c.mem.Read32(addr, false)
 
 		if block.Up {
-			c.Gba.Mem.Write32(r[block.Rn], v-(regCount*4))
+			c.mem.Write32(r[block.Rn], v-(regCount*4), false)
 			return
 		}
-		c.Gba.Mem.Write32(r[block.Rn], v+(regCount*4))
+		c.mem.Write32(r[block.Rn], v+(regCount*4), false)
 		return
 	}
 
 	if block.Writeback && matchingRn {
 		if block.Up {
-			c.Gba.Mem.Write32(matchingAddr, matchingValue+(rnIdx*4))
+			c.mem.Write32(matchingAddr, matchingValue+(rnIdx*4), false)
 			return
 		}
 
-		c.Gba.Mem.Write32(matchingAddr, matchingValue-(rnIdx*4))
+		c.mem.Write32(matchingAddr, matchingValue-(rnIdx*4), false)
 		return
 	}
 }

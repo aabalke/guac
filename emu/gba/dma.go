@@ -252,27 +252,27 @@ func (dma *DMA) transfer() {
 		if dma.isWord {
 			switch {
 			case badAddr:
-				mem.Write32(tmpDst&^3, dma.Value)
+				mem.Write32(tmpDst&^3, dma.Value, false)
 			case sram && dma.Idx == 0:
 				dma.Value = 0
-				mem.Write32(tmpDst&^3, dma.Value)
+				mem.Write32(tmpDst&^3, dma.Value, false)
 			default:
-				dma.Value = mem.Read32(tmpSrc &^ 3)
-				mem.Write32(tmpDst&^3, dma.Value)
+				dma.Value = mem.Read32(tmpSrc &^ 3, false)
+				mem.Write32(tmpDst&^3, dma.Value, false)
 			}
 
 		} else {
 
 			switch {
 			case badAddr:
-				mem.Write16(tmpDst&^1, uint16(dma.Value))
+				mem.Write16(tmpDst&^1, uint16(dma.Value), false)
 			case sram && dma.Idx == 0:
 				dma.Value = 0
-				mem.Write16(tmpDst&^1, uint16(dma.Value))
+				mem.Write16(tmpDst&^1, uint16(dma.Value), false)
 			default:
-				dma.Value = mem.Read16(tmpSrc &^ 1)
+				dma.Value = mem.Read16(tmpSrc &^ 1, false)
 				dma.Value |= (dma.Value << 16)
-				mem.Write16(tmpDst&^1, uint16(dma.Value))
+				mem.Write16(tmpDst&^1, uint16(dma.Value), false)
 			}
 		}
 
@@ -284,7 +284,7 @@ func (dma *DMA) transfer() {
 	//DMA_ACTIVE = prevActive
 
 	if dma.IRQ {
-		dma.Gba.Irq.setIRQ(8 + uint32(dma.Idx))
+		dma.Gba.Irq.SetIRQ(8 + uint32(dma.Idx))
 	}
 
 	if !dma.Repeat {
@@ -355,7 +355,7 @@ func (dma *DMA) transferFifo() {
 	}
 
 	for range 4 {
-		v := dma.Gba.Mem.Read32(dma.Src)
+		v := dma.Gba.Mem.Read32(dma.Src, false)
 		//dma.Gba.Mem.Write32(dma.Dst, v) //make sure this and fifoA / fifoB are not same
 		switch dma.Idx {
 		case 1:
@@ -368,7 +368,7 @@ func (dma *DMA) transferFifo() {
 	}
 
 	if dma.IRQ {
-		dma.Gba.Irq.setIRQ(8 + uint32(dma.Idx))
+		dma.Gba.Irq.SetIRQ(8 + uint32(dma.Idx))
 	}
 }
 

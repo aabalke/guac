@@ -1,4 +1,4 @@
-package gba
+package arm7gba
 
 const (
 	VEC_RESET         = 0x00
@@ -11,14 +11,14 @@ const (
 	VEC_FIQ           = 0x1C
 )
 
-func (gba *GBA) exception(addr uint32, mode uint32) {
+func (cpu *Cpu) Exception(addr uint32, mode uint32) {
 
 	if mode != MODE_IRQ && mode != MODE_SWI {
 		panic("UNKNOWN EXCEPTION MODE")
 	}
 
-	reg := &gba.Cpu.Reg
-	r := &gba.Cpu.Reg.R
+	reg := &cpu.Reg
+	r := &cpu.Reg.R
 
 	curr := reg.getMode()
 
@@ -26,12 +26,12 @@ func (gba *GBA) exception(addr uint32, mode uint32) {
 		return
 	}
 
-	switch mode {
-	case MODE_IRQ:
-		gba.Mem.BIOS_MODE = BIOS_IRQ
-	case MODE_SWI:
-		gba.Mem.BIOS_MODE = BIOS_SWI
-	}
+	//switch mode {
+	//case MODE_IRQ:
+	//	cpu.mem.BIOS_MODE = BIOS_IRQ
+	//case MODE_SWI:
+	//	gba.Mem.BIOS_MODE = BIOS_SWI
+	//}
 
 	//thumb := reg.CPSR.GetFlag(FLAG_T)
 	thumb := reg.isThumb
@@ -54,20 +54,19 @@ func (gba *GBA) exception(addr uint32, mode uint32) {
 	}
 
 	reg.CPSR.SetMode(mode)
-	reg.CPSR.SetThumb(false, &gba.Cpu)
+	reg.CPSR.SetThumb(false, cpu)
 	reg.CPSR.SetFlag(FLAG_I, true)
 
 	r[PC] = addr
 	return
 }
 
-func (gba *GBA) ExitException(mode uint32) {
+func (cpu *Cpu) ExitException(mode uint32) {
 
-	if mode == MODE_IRQ {
-		gba.Mem.BIOS_MODE = BIOS_IRQ_POST
-	}
+	//if mode == MODE_IRQ {
+	//	cpu.Mem.BIOS_MODE = BIOS_IRQ_POST
+	//}
 
-	cpu := &gba.Cpu
 	reg := &cpu.Reg
 	r := &cpu.Reg.R
 

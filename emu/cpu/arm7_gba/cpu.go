@@ -1,10 +1,16 @@
-package gba
+package arm7gba
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/aabalke/guac/emu/cpu"
+)
 
 type Cpu struct {
-	Gba *GBA
+	mem    cpu.MemoryInterface
+	Irq    *cpu.Irq
 	Reg Reg
+    Halted bool
 }
 
 const (
@@ -75,28 +81,32 @@ var BIOS_ADDR = map[uint32]uint32{
 	BIOS_IRQ_POST: 0xE55EC002,
 }
 
-func NewCpu(gba *GBA) *Cpu {
+func NewCpu(mem cpu.MemoryInterface, irq *cpu.Irq) *Cpu {
 
 	c := &Cpu{
-		Gba: gba,
+        mem: mem,
+        Irq: irq,
+		//Gba: gba,
 	}
 
-	//c.Reg.R[PC] = 0x0800_0000
-	//c.Reg.CPSR = 0x0000_001F
-	//c.Reg.SPSR[BANK_ID[MODE_IRQ]] = 0x0000_0010
-	//c.Reg.R[0] = 0x0000_0CA5
+    c.Irq.IME = true
 
-	//c.Reg.R[LR] = 0x0800_0000
-	//c.Reg.LR[BANK_ID[MODE_SYS]] =   0x0800_0000
-	//c.Reg.LR[BANK_ID[MODE_USR]] =   0x0800_0000
-	//c.Reg.LR[BANK_ID[MODE_IRQ]] =   0x0800_0000
-	//c.Reg.LR[BANK_ID[MODE_SWI]] =   0x0800_0000
+	c.Reg.R[PC] = 0x0800_0000
+	c.Reg.CPSR = 0x0000_001F
+	c.Reg.SPSR[BANK_ID[MODE_IRQ]] = 0x0000_0010
+	c.Reg.R[0] = 0x0000_0CA5
 
-	//c.Reg.R[SP] = 0x0300_7F00
-	//c.Reg.SP[BANK_ID[MODE_SYS]] =   0x0300_7F00
-	//c.Reg.SP[BANK_ID[MODE_USR]] =   0x0300_7F00
-	//c.Reg.SP[BANK_ID[MODE_IRQ]] =   0x0300_7FA0
-	//c.Reg.SP[BANK_ID[MODE_SWI]] =   0x0300_7FE0
+	c.Reg.R[LR] = 0x0800_0000
+	c.Reg.LR[BANK_ID[MODE_SYS]] =   0x0800_0000
+	c.Reg.LR[BANK_ID[MODE_USR]] =   0x0800_0000
+	c.Reg.LR[BANK_ID[MODE_IRQ]] =   0x0800_0000
+	c.Reg.LR[BANK_ID[MODE_SWI]] =   0x0800_0000
+
+	c.Reg.R[SP] = 0x0300_7F00
+	c.Reg.SP[BANK_ID[MODE_SYS]] =   0x0300_7F00
+	c.Reg.SP[BANK_ID[MODE_USR]] =   0x0300_7F00
+	c.Reg.SP[BANK_ID[MODE_IRQ]] =   0x0300_7FA0
+	c.Reg.SP[BANK_ID[MODE_SWI]] =   0x0300_7FE0
 	return c
 }
 
@@ -247,4 +257,36 @@ func (c *Cpu) EndTest(op uint32, compare bool) {
     fmt.Printf("NEW REG %08X CPSR %08X\n", t_sav.R, t_sav.CPSR)
     fmt.Printf("ORI REG %08X CPSR %08X\n", c.Reg.R, c.Reg.CPSR)
     panic(fmt.Sprintf("Bad Compare %08X %08X", t_rpc, op))
+}
+
+func (cpu *Cpu) CheckIrq() {
+
+	if interrupts := cpu.Irq.IE&cpu.Irq.IF != 0; !interrupts {
+		return
+	}
+
+	cpu.Halted = false
+
+    if !cpu.Reg.CPSR.GetFlag(FLAG_I) && cpu.Irq.IME {
+
+	//if !cpu.Reg.CPSR.I && cpu.Irq.IME {
+		cpu.Exception(VEC_IRQ, MODE_IRQ)
+		//cpu.isBranching = true
+	}
+}
+
+func (cpu *Cpu) toggleThumb() {
+
+	reg := &cpu.Reg
+
+	newFlag := reg.R[PC]&1 > 0
+
+	reg.CPSR.SetThumb(newFlag, cpu)
+
+	if newFlag {
+		reg.R[PC] &^= 1
+		return
+	}
+
+	reg.R[PC] &^= 3
 }

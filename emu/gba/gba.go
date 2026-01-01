@@ -1,8 +1,11 @@
 package gba
 
 import (
+
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/apu"
+	"github.com/aabalke/guac/emu/cpu"
+	arm7gba "github.com/aabalke/guac/emu/cpu/arm7_gba"
 	"github.com/aabalke/guac/emu/gba/cart"
 	"github.com/aabalke/guac/emu/gba/utils"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -10,6 +13,7 @@ import (
 )
 
 const (
+    PC = 15
 	SCREEN_WIDTH  = 240
 	SCREEN_HEIGHT = 160
 
@@ -27,15 +31,15 @@ var CURR_INST = uint64(0)
 type GBA struct {
 	Debugger  Debugger
 	Cartridge cart.Cartridge
-	Cpu       Cpu
+	Cpu       *arm7gba.Cpu
 	Mem       Memory
 	PPU       PPU
 	Timers    [4]Timer
 	Dma       [4]DMA
-	Irq       Irq
+	Irq       cpu.Irq
 	Apu       *apu.Apu
 
-	Paused, Muted, Save, Halted, Drawn bool
+	Paused, Muted, Save, Drawn bool
 	OpenBusOpcode                      uint32
 	AccCycles                          uint32
 	Keypad                             Keypad
@@ -51,9 +55,9 @@ type GBA struct {
 	Frame uint64
 }
 
-func (gba *GBA) SoftReset() {
-	gba.exception(VEC_SWI, MODE_SWI)
-}
+//func (gba *GBA) SoftReset() {
+//	gba.exception(VEC_SWI, MODE_SWI)
+//}
 
 func (gba *GBA) Update() {
 
@@ -63,41 +67,40 @@ func (gba *GBA) Update() {
 		return
 	}
 
-	r := &gba.Cpu.Reg.R
+	//r := &gba.Cpu.Reg.R
 	gba.Drawn = false
 
 	for !gba.Drawn {
 
 		cycles := 4
 
-		if !gba.Halted {
+		if !gba.Cpu.Halted {
 			cycles = gba.Cpu.Execute()
+
 		}
 
 		gba.Tick(uint32(cycles))
 
-		if gba.vsyncAddr != 0 && r[PC] == gba.vsyncAddr {
-			vblRaised := gba.Irq.IdleIrq&1 == 1
-			vblHandled := gba.Irq.IF&1 != 1
-			if !(vblRaised && vblHandled) {
-				gba.Halted = true
-			}
+		//if gba.vsyncAddr != 0 && r[15] == gba.vsyncAddr {
+		//	vblRaised := gba.Irq.IdleIrq&1 == 1
+		//	vblHandled := gba.Irq.IF&1 != 1
+		//	if !(vblRaised && vblHandled) {
+		//		gba.Halted = true
+		//	}
 
-			gba.Irq.IdleIrq = gba.Irq.IF
-		}
+		//	gba.Irq.IdleIrq = gba.Irq.IF
+		//}
 
 		// irq has to be at end (count up tests)
-		gba.Irq.checkIRQ()
+        gba.Cpu.CheckIrq()
 
-		if !gba.Halted {
+		if !gba.Cpu.Halted {
 			CURR_INST++
 		}
 	}
 
 	gba.Apu.Play(gba.Muted)
 	gba.Frame++
-
-	return
 }
 
 func (gba *GBA) Tick(cycles uint32) {
@@ -129,12 +132,13 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 		SoundCyclesMask: max(0x80, uint32(config.Conf.Gba.SoundClockUpdateCycles)),
 	}
 
-	gba.PPU.gba = &gba
-	gba.Irq.Gba = &gba
 	gba.Debugger = Debugger{Gba: &gba, Version: 1}
 
+    gba.Irq = cpu.Irq{}
 	gba.Mem = NewMemory(&gba)
-	gba.Cpu.Gba = &gba
+    gba.Cpu = arm7gba.NewCpu(&gba.Mem, &gba.Irq)
+
+	gba.PPU.gba = &gba
 
 	gba.Timers[0].Gba = &gba
 	gba.Timers[1].Gba = &gba
@@ -157,18 +161,19 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba.Dma[3].Idx = 3
 
 	gba.LoadBios()
-	gba.SoftReset()
+	//gba.Cpu.Exception(arm7gba.VEC_SWI, arm7gba.MODE_SWI)
+    gba.Cpu.Reg.R[15] = 0x800_0000
 	gba.LoadGame(path)
 	gba.SetIdleAddr()
-	InitTrig()
+	//InitTrig()
 
 	startScanline := uint32(0)
 
-	gba.Mem.BIOS_MODE = BIOS_STARTUP
+	gba.Mem.BIOS_MODE = arm7gba.BIOS_STARTUP
 	gba.Mem.IO[0x6] = uint8(startScanline)
 	gba.AccCycles = CYCLES_SCANLINE*startScanline + 859
 
-	gba.Cpu.Reg.CPSR.SetFlag(FLAG_I, false)
+	gba.Cpu.Reg.CPSR.SetFlag(arm7gba.FLAG_I, false)
 
 	return &gba
 }
@@ -193,22 +198,6 @@ func (gba *GBA) LoadGame(path string) {
 	gba.Cartridge = cart.NewCartridge(path, path+".save")
 }
 
-func (gba *GBA) toggleThumb() {
-
-	reg := &gba.Cpu.Reg
-
-	newFlag := reg.R[PC]&1 > 0
-
-	reg.CPSR.SetThumb(newFlag, &gba.Cpu)
-
-	if newFlag {
-		reg.R[PC] &^= 1
-		return
-	}
-
-	reg.R[PC] &^= 3
-}
-
 // RidgeX/ygba BSD3
 func (gba *GBA) VideoUpdate(cycles uint32) {
 
@@ -231,7 +220,7 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 
 		dispstat.SetHBlank(true)
 		if utils.BitEnabled(uint32(*dispstat), 4) {
-			gba.Irq.setIRQ(1)
+            gba.Irq.SetIRQ(1)
 		}
 
 		if vcount < SCREEN_HEIGHT {
@@ -270,7 +259,7 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 			// I believe this is cycle related
 		case SCREEN_HEIGHT + 1:
 			if utils.BitEnabled(uint32(*dispstat), 3) {
-				gba.Irq.setIRQ(0)
+				gba.Irq.SetIRQ(0)
 			}
 		case NUM_SCANLINES - 1:
 			dispstat.SetVBlank(false)
@@ -280,7 +269,7 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 		dispstat.SetVCFlag(match)
 
 		if vcounterIRQ := utils.BitEnabled(uint32(*dispstat), 5); vcounterIRQ && match {
-			gba.Irq.setIRQ(2)
+			gba.Irq.SetIRQ(2)
 		}
 	}
 

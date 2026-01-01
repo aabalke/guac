@@ -1,44 +1,31 @@
-package gba
+package arm7gba
 
 import (
-	"encoding/binary"
 	"fmt"
-	"log"
 )
 
 func (cpu *Cpu) DecodeTHUMB() int {
 
 	r := &cpu.Reg.R
-	mem := &cpu.Gba.Mem
 
-	var opcode uint16
-	switch r[PC] >> 24 {
-	case 0x0:
-		opcode = binary.LittleEndian.Uint16(mem.BIOS[r[PC]:])
-	case 0x2:
-		opcode = binary.LittleEndian.Uint16(mem.WRAM1[r[PC]&0x3FFFF:])
-	case 0x3:
-		opcode = binary.LittleEndian.Uint16(mem.WRAM2[r[PC]&0x7FFF:])
-	case 0x8, 0x9, 0xA, 0xB, 0xC, 0xD:
-		opcode = binary.LittleEndian.Uint16(cpu.Gba.Cartridge.Rom[r[PC]&0x1FFFFFF:])
-	default:
-		log.Printf("Unexpected Arm PC at %08X CURR %d\n", r[PC], CURR_INST)
-		opcode = uint16(cpu.Gba.Mem.Read16(r[PC]))
-	}
+    opcode := uint16(cpu.mem.Read16(r[PC], false))
 
 	switch {
 	case isthumbSWI(opcode):
 		//cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
 		//cpu.Gba.exception(VEC_SWI, MODE_SWI)
 		//return 2
-		cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
-		cycles, incPc := cpu.Gba.SysCall(uint32(opcode) & 0xFF)
+		//cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
 
-		if incPc {
-			cpu.Reg.R[PC] += 2
-		}
+        // skip hle always currently
+		//cycles, incPc := cpu.Gba.SysCall(uint32(opcode) & 0xFF)
+		cpu.Exception(VEC_SWI, MODE_SWI)
 
-		return cycles
+		//if incPc {
+		//	cpu.Reg.R[PC] += 2
+		//}
+
+		return 2
 
 	case isThumbAddSub(opcode):
 		cpu.ThumbAddSub(opcode)
@@ -80,7 +67,7 @@ func (cpu *Cpu) DecodeTHUMB() int {
 		cpu.thumbMulti(uint32(opcode))
 	default:
 		r := &cpu.Reg.R
-		panic(fmt.Sprintf("Unable to Decode Thumb %X, at PC %X, INSTR %d", opcode, r[PC], CURR_INST))
+		panic(fmt.Sprintf("Unable to Decode Thumb %X, at PC %X, INSTR %d", opcode, r[PC]))
 	}
 
 	return 2

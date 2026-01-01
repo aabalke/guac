@@ -1,4 +1,4 @@
-package gba
+package arm7gba
 
 import (
 	"fmt"
@@ -326,12 +326,12 @@ func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
 	}
 
 	if irqExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB; irqExit {
-		cpu.Gba.ExitException(MODE_IRQ)
+		cpu.ExitException(MODE_IRQ)
 		return
 	}
 
 	if swiExit := alu.Rd == PC && alu.Rm == LR && alu.Inst == MOV; swiExit {
-		cpu.Gba.ExitException(MODE_SWI)
+		cpu.ExitException(MODE_SWI)
 		return
 	}
 
@@ -546,11 +546,11 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 	case sdt.Load && sdt.Byte:
 
 		// DO NOT WORD ALIGN
-		r[sdt.Rd] = uint32(c.Gba.Mem.Read8(pre))
+		r[sdt.Rd] = uint32(c.mem.Read8(pre, false))
 
 	case sdt.Load && !sdt.Byte:
 
-		v := c.Gba.Mem.Read32(addr)
+		v := c.mem.Read32(addr, false)
 		is := (pre & 0b11) << 3
 		v = utils.RorSimple(v, is)
 		//v, _, _ = utils.Ror(v, is, false, false, false)
@@ -570,7 +570,7 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 
 	case !sdt.Load && sdt.Byte:
 
-		c.Gba.Mem.Write8(pre, uint8(r[sdt.Rd]))
+		c.mem.Write8(pre, uint8(r[sdt.Rd]), false)
 
 	case !sdt.Load && !sdt.Byte:
 
@@ -579,7 +579,7 @@ func (c *Cpu) Sdt(opcode uint32) uint32 {
 			v += 12
 		}
 
-		c.Gba.Mem.Write32(addr, v)
+		c.mem.Write32(addr, v, false)
 	}
 
 	skipLoadWriteBack := sdt.Load && (sdt.Rn == sdt.Rd)
@@ -662,7 +662,7 @@ func (cpu *Cpu) BX(opcode uint32) {
 	switch inst {
 	case INST_BX:
 		cpu.Reg.R[PC] = cpu.Reg.R[rn]
-		cpu.Gba.toggleThumb()
+        cpu.toggleThumb()
 	case INST_BXJ:
 		panic("Unsupported BXJ Instruction")
 	case INST_BLX:
@@ -715,8 +715,10 @@ func NewHalf(opcode uint32, c *Cpu) *Half {
 
 	for i, fail := range fails {
 		if fail {
-			panic(fmt.Sprintf("Malformed Half Instruction %d %08X %d", i, opcode, CURR_INST))
-		}
+			//panic(fmt.Sprintf("Malformed Half Instruction %d %08X %d", i, opcode, CURR_INST))
+			panic(fmt.Sprintf("Malformed Half Instruction %d %08X %d", i, opcode))
+        }
+		
 	}
 
 	halfData.Rm = utils.GetByte(opcode, 0)
@@ -778,7 +780,7 @@ func signedByteStd(half *Half, cpu *Cpu) {
 
 	if half.Load {
 		// sign-expand byte value
-		unexpanded := int8(cpu.Gba.Mem.Read8(pre))
+		unexpanded := int8(cpu.mem.Read8(pre, false))
 		expanded := uint32(unexpanded)
 
 		if unexpanded < 0 {
@@ -787,7 +789,7 @@ func signedByteStd(half *Half, cpu *Cpu) {
 
 		r[half.Rd] = expanded
 	} else {
-		cpu.Gba.Mem.Write16(addr, uint16(int16(half.RdValue)))
+		cpu.mem.Write16(addr, uint16(int16(half.RdValue)), false)
 	}
 
 	skipLoadWriteBack := half.Load && (half.Rn == half.Rd)
@@ -809,7 +811,7 @@ func signedHalfStd(half *Half, cpu *Cpu) {
 
 		if misaligned := pre&1 == 1; misaligned {
 			// sign-expand BYTE value
-			unexpanded := int16(cpu.Gba.Mem.Read16(pre))
+			unexpanded := int16(cpu.mem.Read16(pre, false))
 			expanded := uint32(unexpanded)
 
 			if int8(unexpanded) < 0 {
@@ -822,7 +824,7 @@ func signedHalfStd(half *Half, cpu *Cpu) {
 		} else {
 
 			// sign-expand half value
-			unexpanded := int16(cpu.Gba.Mem.Read16(pre &^ 0b1))
+			unexpanded := int16(cpu.mem.Read16(pre &^ 0b1, false))
 			expanded := uint32(unexpanded)
 
 			if unexpanded < 0 {
@@ -833,7 +835,7 @@ func signedHalfStd(half *Half, cpu *Cpu) {
 		}
 	} else {
 		addr := pre &^ 0b1
-		cpu.Gba.Mem.Write16(addr, uint16(int16(half.RdValue)))
+		cpu.mem.Write16(addr, uint16(int16(half.RdValue)), false)
 	}
 
 	skipLoadWriteBack := half.Load && (half.Rn == half.Rd)
@@ -852,13 +854,13 @@ func unsignedHalfStd(half *Half, cpu *Cpu) {
 	}
 
 	if half.Load {
-		v := uint32(cpu.Gba.Mem.Read16(addr))
+		v := uint32(cpu.mem.Read16(addr, false))
 		is := (pre & 0b1) << 3
 		v = utils.RorSimple(v, is)
 		//v, _, _ = utils.Ror(v, is, false, false, false)
 		r[half.Rd] = v
 	} else {
-		cpu.Gba.Mem.Write16(addr, uint16(half.RdValue))
+		cpu.mem.Write16(addr, uint16(half.RdValue), false)
 	}
 
 	skipLoadWriteBack := half.Load && (half.Rn == half.Rd)
@@ -1086,21 +1088,21 @@ func (cpu *Cpu) Swp(opcode uint32) {
 
 	var rnMemValue uint32
 	if isByte {
-		rnMemValue = cpu.Gba.Mem.Read8(rnValue)
+		rnMemValue = cpu.mem.Read8(rnValue, false)
 		r[rd] = rnMemValue
-		cpu.Gba.Mem.Write8(rnValue, uint8(rmValue))
+		cpu.mem.Write8(rnValue, uint8(rmValue), false)
 		r[PC] += 4
 		return
 
 	} else {
 		aligned = rnValue &^ 0b11
-		rnMemValue = cpu.Gba.Mem.Read32(aligned)
+		rnMemValue = cpu.mem.Read32(aligned, false)
 		is := (rnValue & 0b11) << 3
 		//rnMemValue, _, _ = utils.Ror(rnMemValue, is, false, false, false)
 		rnMemValue = utils.RorSimple(rnMemValue, is)
 	}
 
 	r[rd] = rnMemValue
-	cpu.Gba.Mem.Write32(aligned, rmValue)
+	cpu.mem.Write32(aligned, rmValue, false)
 	r[PC] += 4
 }

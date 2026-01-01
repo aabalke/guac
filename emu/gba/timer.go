@@ -87,7 +87,7 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
 	}
 
 	if t.OverflowIRQ {
-		t.Gba.Irq.setIRQ(3 + uint32(t.Idx))
+		t.Gba.Irq.SetIRQ(3 + uint32(t.Idx))
 	}
 
 	return true
