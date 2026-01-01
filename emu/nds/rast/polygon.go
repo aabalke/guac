@@ -35,21 +35,21 @@ type Polygon struct {
 
 func (p *Polygon) WriteAttrs(v uint32) {
 	p.v = v
-	p.LightsEnabled[0] = utils.BitEnabled(v, 0)
-	p.LightsEnabled[1] = utils.BitEnabled(v, 1)
-	p.LightsEnabled[2] = utils.BitEnabled(v, 2)
-	p.LightsEnabled[3] = utils.BitEnabled(v, 3)
-	p.Mode = uint8(utils.GetVarData(v, 4, 5))
-	p.RenderBack = utils.BitEnabled(v, 6)
-	p.RenderFront = utils.BitEnabled(v, 7)
-	p.SetNewTranslucentDepth = utils.BitEnabled(v, 11)
-	p.RenderFarPlanePolygons = utils.BitEnabled(v, 12)
-	p.RenderBehind1Dot = utils.BitEnabled(v, 13)
-	p.DrawEqualDepthPixels = utils.BitEnabled(v, 14)
-	p.FogEnabled = utils.BitEnabled(v, 15)
-	p.Alpha = (float32(utils.GetVarData(v, 16, 20))) / 31 // 0 is wireframe
-	p.AlphaV = utils.GetVarData(v, 16, 20)
-	p.Id = utils.GetVarData(v, 24, 29)
+	p.LightsEnabled[0] = (v>>0)&1 != 0
+	p.LightsEnabled[1] = (v>>1)&1 != 0
+	p.LightsEnabled[2] = (v>>2)&1 != 0
+	p.LightsEnabled[3] = (v>>3)&1 != 0
+	p.Mode = uint8(v>>4) & 0b11
+	p.RenderBack = (v>>6)&1 != 0
+	p.RenderFront = (v>>7)&1 != 0
+	p.SetNewTranslucentDepth = (v>>11)&1 != 0
+	p.RenderFarPlanePolygons = (v>>12)&1 != 0
+	p.RenderBehind1Dot = (v>>13)&1 != 0
+	p.DrawEqualDepthPixels = (v>>14)&1 != 0
+	p.FogEnabled = (v>>15)&1 != 0
+	p.Alpha = (float32((v >> 16) & 0x1F)) / 31 // 0 is wireframe
+	p.AlphaV = (v >> 16) & 0x1F
+	p.Id = (v >> 24) & 0x3F
 }
 
 const (

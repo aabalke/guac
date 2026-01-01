@@ -5,7 +5,6 @@ import (
 	"unicode/utf16"
 
 	"github.com/aabalke/guac/config"
-	"github.com/aabalke/guac/emu/nds/utils"
 )
 
 func FirmwareConfig() {
@@ -26,7 +25,7 @@ func FirmwareConfig() {
 	FirmwareData[ofs+0x50] = uint8(len(f.Message))
 	FirmwareData[ofs+0x51] = 0
 
-	crc := utils.Crc16(FirmwareData[ofs:ofs+0x70], 0xFFFF)
+	crc := Crc16(FirmwareData[ofs:ofs+0x70], 0xFFFF)
 	binary.LittleEndian.PutUint16(FirmwareData[ofs+0x72:], crc)
 }
 
@@ -41,4 +40,34 @@ func WriteUTF16(s string, start, cnt uint32) {
 		}
 		binary.LittleEndian.PutUint16(FirmwareData[start+i*2:], v)
 	}
+}
+
+//go:inline
+func Crc16(bytes []uint8, crc uint32) uint16 {
+
+	var vals = [8]uint32{
+		0xC0C1,
+		0xC181,
+		0xC301,
+		0xC601,
+		0xCC01,
+		0xD801,
+		0xF001,
+		0xA001,
+	}
+
+	// crc inits in 0xFFFF, or 0x0
+
+	for i := range len(bytes) {
+		crc ^= uint32(bytes[i])
+		for j := range 8 {
+			carry := crc&1 != 0
+			crc >>= 1
+			if carry {
+				crc ^= vals[j] << (7 - j)
+			}
+		}
+	}
+
+	return uint16(crc)
 }

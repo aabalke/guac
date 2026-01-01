@@ -445,7 +445,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 		g.LightData.DiffuseColor = Write15BitColor(data[1])
 		g.LightData.AmbientColor = Write15BitColor(data[1] >> 16)
 
-		if setVertex := utils.BitEnabled(data[1], 15); setVertex {
+		if setVertex := (data[1]>>15)&1 != 0; setVertex {
 			g.Color = g.LightData.DiffuseColor
 		}
 
@@ -453,7 +453,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
 		g.LightData.SpecularColor = Write15BitColor(data[1])
 		g.LightData.EmissionColor = Write15BitColor(data[1] >> 16)
-		g.LightData.UseSpecularTbl = utils.BitEnabled(data[1], 15)
+		g.LightData.UseSpecularTbl = (data[1]>>15)&1 != 0
 
 	case 0x32:
 

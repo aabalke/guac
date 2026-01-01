@@ -33,15 +33,20 @@ func Convert10ToFloat(v uint16, bitFractional uint8) float32 {
 }
 
 func ConvertFromFloat4_0_12(f float32) uint16 {
-	const bitFractional = 12
-	const totalBits = 16
-	const signBits = 4
 
-	scaled := f * float32(1<<bitFractional)
-	val := int16(math.Round(float64(scaled)))
+	const (
+		bitFractional = 12
+		totalBits     = 16
+		signBits      = 4
+	)
 
-	maxAllowed := int16((1<<(signBits-1))-1) << bitFractional // 7 << 12
-	minAllowed := -int16(1<<(signBits-1)) << bitFractional    // -8 << 12
+	var (
+		scaled = f * float32(1<<bitFractional)
+		val    = int16(math.Round(float64(scaled)))
+
+		maxAllowed = int16((1<<(signBits-1))-1) << bitFractional // 7 << 12
+		minAllowed = -int16(1<<(signBits-1)) << bitFractional    // -8 << 12
+	)
 
 	if val > maxAllowed {
 		val = maxAllowed

@@ -1,7 +1,6 @@
 package arm9
 
 import (
-	"github.com/aabalke/guac/emu/nds/utils"
 	"math/bits"
 	"unsafe"
 )
@@ -765,7 +764,7 @@ func (cpu *Cpu) thumbBlock(opcode uint16) {
 
 	if !ldmia {
 
-		regCount := utils.CountBits(rlist)
+		regCount := uint32(bits.OnesCount32(rlist))
 		matchingValue := uint32(0)
 		matchingAddr := uint32(0) // rn during regs
 		smallest := (rlist & -rlist) == 1<<rb

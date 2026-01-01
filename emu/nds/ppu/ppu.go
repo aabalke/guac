@@ -230,26 +230,26 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
 	switch addr {
 	case 0x0:
 
-		e.Dispcnt.Mode = utils.GetVarData(v, 0, 2)
-		e.Dispcnt.Is3D = utils.BitEnabled(v, 3)
+		e.Dispcnt.Mode = v & 0b111
+		e.Dispcnt.Is3D = (v>>3)&1 != 0
 
-		e.Dispcnt.TileObj1D = utils.BitEnabled(v, 4)
-		e.Dispcnt.BitmapObj256 = utils.BitEnabled(v, 5)
-		e.Dispcnt.BitmapObj1D = utils.BitEnabled(v, 6)
-		e.Dispcnt.ForcedBlank = utils.BitEnabled(v, 7)
+		e.Dispcnt.TileObj1D = (v>>4)&1 != 0
+		e.Dispcnt.BitmapObj256 = (v>>5)&1 != 0
+		e.Dispcnt.BitmapObj1D = (v>>6)&1 != 0
+		e.Dispcnt.ForcedBlank = (v>>7)&1 != 0
 
 		e.UpdateObjMapping(&e.Dispcnt)
 
 	case 0x1:
-		e.Dispcnt.DisplayObj = utils.BitEnabled(v, 4)
-		e.Dispcnt.DisplayWin0 = utils.BitEnabled(v, 5)
-		e.Dispcnt.DisplayWin1 = utils.BitEnabled(v, 6)
-		e.Dispcnt.DisplayObjWin = utils.BitEnabled(v, 7)
+		e.Dispcnt.DisplayObj = (v>>4)&1 != 0
+		e.Dispcnt.DisplayWin0 = (v>>5)&1 != 0
+		e.Dispcnt.DisplayWin1 = (v>>6)&1 != 0
+		e.Dispcnt.DisplayObjWin = (v>>7)&1 != 0
 
-		e.Backgrounds[0].Enabled = utils.BitEnabled(v, 0)
-		e.Backgrounds[1].Enabled = utils.BitEnabled(v, 1)
-		e.Backgrounds[2].Enabled = utils.BitEnabled(v, 2)
-		e.Backgrounds[3].Enabled = utils.BitEnabled(v, 3)
+		e.Backgrounds[0].Enabled = (v>>0)&1 != 0
+		e.Backgrounds[1].Enabled = (v>>1)&1 != 0
+		e.Backgrounds[2].Enabled = (v>>2)&1 != 0
+		e.Backgrounds[3].Enabled = (v>>3)&1 != 0
 
 		wins := &e.Windows
 		wins.Win0.Enabled = e.Dispcnt.DisplayWin0
@@ -259,57 +259,58 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
 		e.UpdateObjMapping(&e.Dispcnt)
 
 	case 0x2:
+		e.Dispcnt.DisplayMode = v & 0b11
+		e.Dispcnt.VramBlock = (v >> 2) & 0b11
+		e.Dispcnt.TileObjBoundary = (v >> 4) & 0b11
 
-		e.Dispcnt.DisplayMode = utils.GetVarData(v, 0, 1)
-		e.Dispcnt.VramBlock = utils.GetVarData(v, 2, 3)
-		e.Dispcnt.TileObjBoundary = utils.GetVarData(v, 4, 5)
-		e.Dispcnt.BitmapObjBoundary = utils.BitEnabled(v, 6)
-		e.Dispcnt.HBlankIntervalFree = utils.BitEnabled(v, 7)
+		e.Dispcnt.BitmapObjBoundary = (v>>6)&1 != 0
+		e.Dispcnt.HBlankIntervalFree = (v>>7)&1 != 0
 		e.UpdateObjMapping(&e.Dispcnt)
 
 	case 0x3:
 
-		e.Dispcnt.CharBase = utils.GetVarData(v, 0, 2) * 0x1_0000
-		e.Dispcnt.ScreenBase = utils.GetVarData(v, 3, 5) * 0x1_0000
-		e.Dispcnt.BgExtPal = utils.BitEnabled(v, 6)
-		e.Dispcnt.ObjExtPal = utils.BitEnabled(v, 7)
+		e.Dispcnt.CharBase = (v & 0b111) * 0x1_0000
+		e.Dispcnt.ScreenBase = ((v >> 3) & 0b111) * 0x1_0000
+
+		e.Dispcnt.BgExtPal = (v>>6)&1 != 0
+		e.Dispcnt.ObjExtPal = (v>>7)&1 != 0
 		e.UpdateObjMapping(&e.Dispcnt)
 
 	case 0x4C:
 
-		e.Mosaic.BgH = utils.GetVarData(v, 0, 3)
-		e.Mosaic.BgV = utils.GetVarData(v, 4, 7)
+		e.Mosaic.BgH = v & 0xF
+		e.Mosaic.BgV = (v >> 4) & 0xF
 
 	case 0x4D:
 
-		e.Mosaic.ObjH = utils.GetVarData(v, 0, 3)
-		e.Mosaic.ObjV = utils.GetVarData(v, 4, 7)
+		e.Mosaic.ObjH = v & 0xF
+		e.Mosaic.ObjV = (v >> 4) & 0xF
 
 	case 0x50:
-		e.Blend.a[0] = utils.BitEnabled(v, 0)
-		e.Blend.a[1] = utils.BitEnabled(v, 1)
-		e.Blend.a[2] = utils.BitEnabled(v, 2)
-		e.Blend.a[3] = utils.BitEnabled(v, 3)
-		e.Blend.a[4] = utils.BitEnabled(v, 4)
-		e.Blend.a[5] = utils.BitEnabled(v, 5)
-		e.Blend.Mode = utils.GetVarData(v, 6, 7)
+		e.Blend.a[0] = (v>>0)&1 != 0
+		e.Blend.a[1] = (v>>1)&1 != 0
+		e.Blend.a[2] = (v>>2)&1 != 0
+		e.Blend.a[3] = (v>>3)&1 != 0
+		e.Blend.a[4] = (v>>4)&1 != 0
+		e.Blend.a[5] = (v>>5)&1 != 0
+		e.Blend.Mode = (v >> 6) & 0b11
 
 	case 0x51:
-		e.Blend.b[0] = utils.BitEnabled(v, 0)
-		e.Blend.b[1] = utils.BitEnabled(v, 1)
-		e.Blend.b[2] = utils.BitEnabled(v, 2)
-		e.Blend.b[3] = utils.BitEnabled(v, 3)
-		e.Blend.b[4] = utils.BitEnabled(v, 4)
-		e.Blend.b[5] = utils.BitEnabled(v, 5)
+		e.Blend.b[0] = (v>>0)&1 != 0
+		e.Blend.b[1] = (v>>1)&1 != 0
+		e.Blend.b[2] = (v>>2)&1 != 0
+		e.Blend.b[3] = (v>>3)&1 != 0
+		e.Blend.b[4] = (v>>4)&1 != 0
+		e.Blend.b[5] = (v>>5)&1 != 0
 
 	case 0x52:
-		e.Blend.aEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
+		e.Blend.aEv = float32(min(16, v&0x1F)) / 16
 
 	case 0x53:
-		e.Blend.bEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
+		e.Blend.bEv = float32(min(16, v&0x1F)) / 16
 
 	case 0x54:
-		e.Blend.yEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
+		e.Blend.yEv = float32(min(16, v&0x1F)) / 16
 	case 0x6C:
 		e.MasterBright.Write(uint8(v), 0)
 	case 0x6D:
@@ -409,33 +410,33 @@ func (engine *Engine) UpdateWin(addr uint32, v uint32) {
 		}
 
 	case WININ0:
-		win0.InBg[0] = utils.BitEnabled(v, 0)
-		win0.InBg[1] = utils.BitEnabled(v, 1)
-		win0.InBg[2] = utils.BitEnabled(v, 2)
-		win0.InBg[3] = utils.BitEnabled(v, 3)
-		win0.InObj = utils.BitEnabled(v, 4)
-		win0.InBld = utils.BitEnabled(v, 5)
+		win0.InBg[0] = (v>>0)&1 != 0
+		win0.InBg[1] = (v>>1)&1 != 0
+		win0.InBg[2] = (v>>2)&1 != 0
+		win0.InBg[3] = (v>>3)&1 != 0
+		win0.InObj = (v>>4)&1 != 0
+		win0.InBld = (v>>5)&1 != 0
 	case WININ1:
-		win1.InBg[0] = utils.BitEnabled(v, 0)
-		win1.InBg[1] = utils.BitEnabled(v, 1)
-		win1.InBg[2] = utils.BitEnabled(v, 2)
-		win1.InBg[3] = utils.BitEnabled(v, 3)
-		win1.InObj = utils.BitEnabled(v, 4)
-		win1.InBld = utils.BitEnabled(v, 5)
+		win1.InBg[0] = (v>>0)&1 != 0
+		win1.InBg[1] = (v>>1)&1 != 0
+		win1.InBg[2] = (v>>2)&1 != 0
+		win1.InBg[3] = (v>>3)&1 != 0
+		win1.InObj = (v>>4)&1 != 0
+		win1.InBld = (v>>5)&1 != 0
 	case WINOUT:
-		wins.OutBg[0] = utils.BitEnabled(v, 0)
-		wins.OutBg[1] = utils.BitEnabled(v, 1)
-		wins.OutBg[2] = utils.BitEnabled(v, 2)
-		wins.OutBg[3] = utils.BitEnabled(v, 3)
-		wins.OutObj = utils.BitEnabled(v, 4)
-		wins.OutBld = utils.BitEnabled(v, 5)
+		wins.OutBg[0] = (v>>0)&1 != 0
+		wins.OutBg[1] = (v>>1)&1 != 0
+		wins.OutBg[2] = (v>>2)&1 != 0
+		wins.OutBg[3] = (v>>3)&1 != 0
+		wins.OutObj = (v>>4)&1 != 0
+		wins.OutBld = (v>>5)&1 != 0
 	case WINOBJ:
-		winObj.InBg[0] = utils.BitEnabled(v, 0)
-		winObj.InBg[1] = utils.BitEnabled(v, 1)
-		winObj.InBg[2] = utils.BitEnabled(v, 2)
-		winObj.InBg[3] = utils.BitEnabled(v, 3)
-		winObj.InObj = utils.BitEnabled(v, 4)
-		winObj.InBld = utils.BitEnabled(v, 5)
+		winObj.InBg[0] = (v>>0)&1 != 0
+		winObj.InBg[1] = (v>>1)&1 != 0
+		winObj.InBg[2] = (v>>2)&1 != 0
+		winObj.InBg[3] = (v>>3)&1 != 0
+		winObj.InObj = (v>>4)&1 != 0
+		winObj.InBld = (v>>5)&1 != 0
 	}
 }
 
@@ -443,45 +444,45 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 
 	switch addr {
 	case 0x08:
-		p.Backgrounds[0].Priority = utils.GetVarData(v, 0, 1)
-		p.Backgrounds[0].CharBaseBlock = utils.GetVarData(v, 2, 5) * 0x4000
-		p.Backgrounds[0].Mosaic = utils.BitEnabled(v, 6)
-		p.Backgrounds[0].Palette256 = utils.BitEnabled(v, 7)
+		p.Backgrounds[0].Priority = v & 0b11
+		p.Backgrounds[0].CharBaseBlock = ((v >> 2) & 0xF) & 0x4000
+		p.Backgrounds[0].Mosaic = (v>>6)&1 != 0
+		p.Backgrounds[0].Palette256 = (v>>7)&1 != 0
 	case 0x09:
-		p.Backgrounds[0].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
-		p.Backgrounds[0].AltExtPalSlot = utils.BitEnabled(v, 5)
-		p.Backgrounds[0].Size = utils.GetVarData(v, 6, 7)
+		p.Backgrounds[0].ScreenBaseBlock = (v & 0x1F) * 0x800
+		p.Backgrounds[0].AltExtPalSlot = (v>>5)&1 != 0
+		p.Backgrounds[0].Size = (v >> 6) & 0b11
 
 	case 0x0A:
-		p.Backgrounds[1].Priority = utils.GetVarData(v, 0, 1)
-		p.Backgrounds[1].CharBaseBlock = utils.GetVarData(v, 2, 5) * 0x4000
-		p.Backgrounds[1].Mosaic = utils.BitEnabled(v, 6)
-		p.Backgrounds[1].Palette256 = utils.BitEnabled(v, 7)
+		p.Backgrounds[1].Priority = v & 0b11
+		p.Backgrounds[1].CharBaseBlock = ((v >> 2) & 0xF) & 0x4000
+		p.Backgrounds[1].Mosaic = (v>>6)&1 != 0
+		p.Backgrounds[1].Palette256 = (v>>7)&1 != 0
 	case 0x0B:
-		p.Backgrounds[1].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
-		p.Backgrounds[1].AltExtPalSlot = utils.BitEnabled(v, 5)
-		p.Backgrounds[1].Size = utils.GetVarData(v, 6, 7)
+		p.Backgrounds[1].ScreenBaseBlock = (v & 0x1F) * 0x800
+		p.Backgrounds[1].AltExtPalSlot = (v>>5)&1 != 0
+		p.Backgrounds[1].Size = (v >> 6) & 0b11
 
 	case 0x0C:
-		p.Backgrounds[2].Priority = utils.GetVarData(v, 0, 1)
-		p.Backgrounds[2].CharBaseBlock = utils.GetVarData(v, 2, 5) * 0x4000
-		p.Backgrounds[2].Mosaic = utils.BitEnabled(v, 6)
-		p.Backgrounds[2].Palette256 = utils.BitEnabled(v, 7)
+		p.Backgrounds[2].Priority = v & 0b11
+		p.Backgrounds[2].CharBaseBlock = ((v >> 2) & 0xF) & 0x4000
+		p.Backgrounds[2].Mosaic = (v>>6)&1 != 0
+		p.Backgrounds[2].Palette256 = (v>>7)&1 != 0
 	case 0x0D:
-		p.Backgrounds[2].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
-		p.Backgrounds[2].AffineWrap = utils.BitEnabled(v, 5)
-		p.Backgrounds[2].Size = utils.GetVarData(v, 6, 7)
+		p.Backgrounds[2].ScreenBaseBlock = (v & 0x1F) * 0x800
+		p.Backgrounds[2].AltExtPalSlot = (v>>5)&1 != 0
+		p.Backgrounds[2].Size = (v >> 6) & 0b11
 
 	case 0x0E:
-		p.Backgrounds[3].Priority = utils.GetVarData(v, 0, 1)
-		p.Backgrounds[3].CharBaseBlock = utils.GetVarData(v, 2, 5) * 0x4000
-		p.Backgrounds[3].Mosaic = utils.BitEnabled(v, 6)
-		p.Backgrounds[3].Palette256 = utils.BitEnabled(v, 7)
+		p.Backgrounds[3].Priority = v & 0b11
+		p.Backgrounds[3].CharBaseBlock = ((v >> 2) & 0xF) & 0x4000
+		p.Backgrounds[3].Mosaic = (v>>6)&1 != 0
+		p.Backgrounds[3].Palette256 = (v>>7)&1 != 0
 
 	case 0x0F:
-		p.Backgrounds[3].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
-		p.Backgrounds[3].AffineWrap = utils.BitEnabled(v, 5)
-		p.Backgrounds[3].Size = utils.GetVarData(v, 6, 7)
+		p.Backgrounds[3].ScreenBaseBlock = (v & 0x1F) * 0x800
+		p.Backgrounds[3].AltExtPalSlot = (v>>5)&1 != 0
+		p.Backgrounds[3].Size = (v >> 6) & 0b11
 
 	case 0x10:
 		p.Backgrounds[0].XOffset &^= 0xFF
@@ -805,18 +806,18 @@ func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
 		obj.Y = attr
 	case 1:
 
-		obj.RotScale = utils.BitEnabled(attr, 0)
-		obj.Mode = utils.GetVarData(attr, 2, 3)
-		obj.Mosaic = utils.BitEnabled(attr, 4)
-		obj.Palette256 = utils.BitEnabled(attr, 5)
-		obj.Shape = utils.GetVarData(attr, 6, 7)
+		obj.RotScale = (v>>0)&1 != 0
+		obj.Mode = (attr >> 2) & 0b11
+		obj.Mosaic = (v>>4)&1 != 0
+		obj.Palette256 = (v>>5)&1 != 0
+		obj.Shape = (attr >> 6) & 0b11
 		obj.SetSize(obj.Shape, obj.Size)
 
 		if obj.RotScale {
-			obj.DoubleSize = utils.BitEnabled(attr, 1)
+			obj.DoubleSize = (v>>1)&1 != 0
 			UpdateAffineParams(obj, oam, engine.IsB)
 		} else {
-			obj.Disable = utils.BitEnabled(attr, 1)
+			obj.Disable = (v>>1)&1 != 0
 		}
 
 	case 2:
@@ -825,15 +826,15 @@ func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
 	case 3:
 		obj.X &= 0xFF
 		obj.X |= (attr & 0b1) << 8
-		obj.Size = utils.GetVarData(attr, 6, 7)
+		obj.Size = (attr >> 6) & 0b11
 		obj.SetSize(obj.Shape, obj.Size)
 
 		if obj.RotScale {
-			obj.RotParams = utils.GetVarData(attr, 1, 5)
+			obj.RotParams = (attr >> 1) & 0x1F
 			UpdateAffineParams(obj, oam, engine.IsB)
 		}
-		obj.HFlip = utils.BitEnabled(attr, 4)
-		obj.VFlip = utils.BitEnabled(attr, 5)
+		obj.HFlip = (v>>4)&1 != 0
+		obj.VFlip = (v>>5)&1 != 0
 
 	case 4:
 		obj.CharName &^= 0xFF
@@ -841,8 +842,8 @@ func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
 	case 5:
 		obj.CharName &= 0xFF
 		obj.CharName |= (attr & 0b11) << 8
-		obj.Priority = utils.GetVarData(attr, 2, 3)
-		obj.Palette = utils.GetVarData(attr, 4, 7)
+		obj.Priority = (attr >> 2) & 0b11
+		obj.Palette = (attr >> 4) & 0xF
 	}
 }
 

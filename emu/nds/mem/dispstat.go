@@ -4,8 +4,6 @@ type Dispstat struct {
 	A7, A9 uint16
 }
 
-//type Dispstat uint16
-
 func (d *Dispstat) Write(v uint8, hi bool, arm9 bool) {
 
 	r := &d.A7
@@ -14,7 +12,7 @@ func (d *Dispstat) Write(v uint8, hi bool, arm9 bool) {
 	}
 
 	if hi {
-		*r = (uint16(*r) & 0b1111_1111) | (uint16(v) << 8)
+		*r = (uint16(*r) & 0xFF) | (uint16(v) << 8)
 		return
 	}
 

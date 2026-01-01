@@ -309,7 +309,7 @@ func (nds *Nds) LoadGame(path string) {
 	nds.Cartridge = cart.NewCartridge(path, path+".save")
 }
 
-//temp
+// temp
 func (nds *Nds) DirtyInit() {
 
 	nds.mem.DirtyTransfer()

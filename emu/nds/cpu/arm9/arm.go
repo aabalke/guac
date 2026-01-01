@@ -7,7 +7,6 @@ import (
 	"unsafe"
 
 	"github.com/aabalke/guac/emu/nds/cpu/arm9/cp15"
-	"github.com/aabalke/guac/emu/nds/utils"
 )
 
 const (
@@ -1218,7 +1217,7 @@ func (c *Cpu) Block(op uint32) {
 		load       = (op>>20)&1 != 0
 		forceUser  = psr && (c.Reg.CPSR.Mode != MODE_USR) && (!load || !pcIncluded)
 		addr       = r[rn] &^ 0b11
-		regCount   = utils.CountBits(rlist)
+		regCount   = uint32(bits.OnesCount32(rlist))
 		wbValue    = r[rn]
 	)
 

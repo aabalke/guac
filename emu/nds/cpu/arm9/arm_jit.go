@@ -6,7 +6,6 @@ import (
 	"unsafe"
 
 	amd64 "github.com/aabalke/gojit"
-	"github.com/aabalke/guac/emu/nds/utils"
 )
 
 func (j *Jit) emitClz(op uint32) {
@@ -1162,7 +1161,7 @@ func (j *Jit) emitBlock(op uint32) {
 
 	j.Mov(amd64.Eax, j.SCRATCH(0x10))
 
-	regCount := utils.CountBits(rlist)
+	regCount := uint32(bits.OnesCount32(rlist))
 
 	j.Movl(j.REG(rn), amd64.Eax)
 	j.Mov(amd64.Rax, amd64.Rbx)

@@ -56,16 +56,17 @@ func (tex *Texture) WriteCoord(v uint32, g *GeoEngine) {
 func (tex *Texture) WriteParam(v uint32) {
 	tex.param = v
 	tex.VramOffset = (v & 0xFFFF) * 8
-	tex.RepeatS = utils.BitEnabled(v, 16)
-	tex.RepeatT = utils.BitEnabled(v, 17)
-	tex.FlipS = utils.BitEnabled(v, 18)
-	tex.FlipT = utils.BitEnabled(v, 19)
-	tex.PitchShift = utils.GetVarData(v, 20, 22) + 3
-	tex.SizeS = 8 << utils.GetVarData(v, 20, 22)
-	tex.SizeT = 8 << utils.GetVarData(v, 23, 25)
-	tex.Format = utils.GetVarData(v, 26, 28)
-	tex.TransparentZero = utils.BitEnabled(v, 29)
-	tex.TransformationMode = utils.GetVarData(v, 30, 31)
+	tex.RepeatS = (v>>16)&1 != 0
+	tex.RepeatT = (v>>17)&1 != 0
+	tex.FlipS = (v>>18)&1 != 0
+	tex.FlipT = (v>>19)&1 != 0
+
+	tex.PitchShift = ((v >> 20) & 0b111) + 3
+	tex.SizeS = 8 << ((v >> 20) & 0b111)
+	tex.SizeT = 8 << ((v >> 23) & 0b111)
+	tex.Format = (v >> 26) & 0b111
+	tex.TransparentZero = (v>>29)&1 != 0
+	tex.TransformationMode = (v >> 30) & 0b11
 
 	if tex.TransformationMode == 3 {
 		panic("VTX TEXT MODE WHICH I THINK IS GOOD BUT YOU SHOULD CHECK")
@@ -73,5 +74,5 @@ func (tex *Texture) WriteParam(v uint32) {
 }
 
 func (text *Texture) WritePalBase(v uint32) {
-	text.PaletteBaseAddr = utils.GetVarData(v, 0, 12)
+	text.PaletteBaseAddr = (v & 0x1FFF)
 }
