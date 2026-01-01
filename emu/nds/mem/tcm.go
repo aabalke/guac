@@ -60,14 +60,13 @@ func (t *Tcm) ReadTcmWindowPtr(addr uint32) (unsafe.Pointer, bool) {
 
 func (t *Tcm) ReadPtr(addr uint32) (unsafe.Pointer, bool) {
 
-
 	if addr < t.ItcmSize {
 
 		if t.ItcmLoadMode || !t.ItcmEnabled {
 			return nil, false
 		}
 
-        return unsafe.Add(unsafe.Pointer(&t.Itcm), addr & 0x7FFF), true
+		return unsafe.Add(unsafe.Pointer(&t.Itcm), addr&0x7FFF), true
 
 	} else if addr >= t.DtcmBase && addr < t.DtcmBase+t.DtcmSize {
 		return t.ReadDtcmPtr(addr)
@@ -82,9 +81,8 @@ func (t *Tcm) ReadDtcmPtr(addr uint32) (unsafe.Pointer, bool) {
 		return nil, false
 	}
 
-    return unsafe.Add(unsafe.Pointer(&t.Dtcm), (addr - t.DtcmBase) & 0x3FFF), true
+	return unsafe.Add(unsafe.Pointer(&t.Dtcm), (addr-t.DtcmBase)&0x3FFF), true
 }
-
 
 func (t *Tcm) WriteDtcm(addr uint32, v uint8) bool {
 

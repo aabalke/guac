@@ -26,30 +26,30 @@ func (a Vector) MulScalar(b float32) Vector {
 
 func (a Vector) Min(b Vector) Vector {
 	return Vector{
-        float32(math.Min(float64(a.X), float64(b.X))),
-        float32(math.Min(float64(a.Y), float64(b.Y))),
-        float32(math.Min(float64(a.Z), float64(b.Z)))}
+		float32(math.Min(float64(a.X), float64(b.X))),
+		float32(math.Min(float64(a.Y), float64(b.Y))),
+		float32(math.Min(float64(a.Z), float64(b.Z)))}
 }
 
 func (a Vector) Max(b Vector) Vector {
 	return Vector{
-        float32(math.Max(float64(a.X), float64(b.X))),
-        float32(math.Max(float64(a.Y), float64(b.Y))),
-        float32(math.Max(float64(a.Z), float64(b.Z)))}
+		float32(math.Max(float64(a.X), float64(b.X))),
+		float32(math.Max(float64(a.Y), float64(b.Y))),
+		float32(math.Max(float64(a.Z), float64(b.Z)))}
 }
 
 func (a Vector) Floor() Vector {
 	return Vector{
-        float32(math.Floor(float64(a.X))),
-        float32(math.Floor(float64(a.Y))),
-        float32(math.Floor(float64(a.Z)))}
+		float32(math.Floor(float64(a.X))),
+		float32(math.Floor(float64(a.Y))),
+		float32(math.Floor(float64(a.Z)))}
 }
 
 func (a Vector) Ceil() Vector {
 	return Vector{
-        float32(math.Ceil(float64(a.X))),
-        float32(math.Ceil(float64(a.Y))),
-        float32(math.Ceil(float64(a.Z)))}
+		float32(math.Ceil(float64(a.X))),
+		float32(math.Ceil(float64(a.Y))),
+		float32(math.Ceil(float64(a.Z)))}
 }
 
 type VectorW struct {

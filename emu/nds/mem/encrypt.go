@@ -8,18 +8,18 @@ package mem
 // 	 L2 = x^5+x^18+x^23+x^31
 
 type Key2 struct {
-    x, y uint64
+	x, y uint64
 }
 
 func NewDefaultKey2() Key2 {
-    return NewKey2(0x58_C56D_E0E8, 0x5C_879B_9B05)
+	return NewKey2(0x58_C56D_E0E8, 0x5C_879B_9B05)
 }
 
 func NewKey2(x, y uint64) Key2 {
-    return Key2{
-        x: br39(x),
-        y: br39(y),
-    }
+	return Key2{
+		x: br39(x),
+		y: br39(y),
+	}
 }
 
 func (k *Key2) Encrypt(output, input []uint8) {

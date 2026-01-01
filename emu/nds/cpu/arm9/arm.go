@@ -478,7 +478,7 @@ func (cpu *Cpu) Mul(op uint32) {
 		rs   = (op >> 8) & 0xF
 		rm   = (op >> 0) & 0xF
 		r    = &cpu.Reg.R
-        cpsr = &cpu.Reg.CPSR
+		cpsr = &cpu.Reg.CPSR
 	)
 
 	switch inst {
@@ -831,9 +831,9 @@ func (c *Cpu) Half(op uint32) {
 		inst    = (op >> 5) & 0b11
 		wb      = (op>>21)&1 != 0 || !preFlag
 		rnv     = r[rn]
-        post    = rnv
+		post    = rnv
 
-        pre, offset uint32
+		pre, offset uint32
 	)
 
 	if rn == PC {
@@ -852,11 +852,11 @@ func (c *Cpu) Half(op uint32) {
 		post -= offset
 	}
 
-    if preFlag {
-        pre = post
-    } else {
+	if preFlag {
+		pre = post
+	} else {
 		pre = rnv
-    }
+	}
 
 	if inst == RESERVED {
 		panic("unsupported half (reserved)")
@@ -1236,22 +1236,22 @@ func (c *Cpu) Block(op uint32) {
 		rnRef = &c.Reg.LR[BANK_ID[MODE_USR]]
 	}
 
-    var (
-        rnv = *rnRef
-        reg = uint32(0)
+	var (
+		rnv = *rnRef
+		reg = uint32(0)
 
-        p unsafe.Pointer
-    )
+		p unsafe.Pointer
+	)
 
 	if !up {
 		reg = 15
 	}
 
-    if load {
-        p, _ = c.mem.ReadPtr(addr, true)
-    } else {
-        p, _ = c.mem.WritePtr(addr, true)
-    }
+	if load {
+		p, _ = c.mem.ReadPtr(addr, true)
+	} else {
+		p, _ = c.mem.WritePtr(addr, true)
+	}
 
 	for range 16 {
 
@@ -1277,14 +1277,14 @@ func (c *Cpu) Block(op uint32) {
 				if p != nil {
 					p = unsafe.Add(p, 4)
 				} else {
-                    addr += 4
-                }
+					addr += 4
+				}
 			} else {
 				if p != nil {
 					p = unsafe.Add(p, -4)
 				} else {
-                    addr -= 4
-                }
+					addr -= 4
+				}
 			}
 		}
 
@@ -1324,14 +1324,14 @@ func (c *Cpu) Block(op uint32) {
 				if p != nil {
 					p = unsafe.Add(p, 4)
 				} else {
-                    addr += 4
-                }
+					addr += 4
+				}
 			} else {
 				if p != nil {
 					p = unsafe.Add(p, -4)
 				} else {
-                    addr -= 4
-                }
+					addr -= 4
+				}
 			}
 		}
 
@@ -1368,10 +1368,10 @@ func (c *Cpu) Block(op uint32) {
 		return
 	}
 
-    if !psr {
-        c.toggleThumb()
-        return
-    }
+	if !psr {
+		c.toggleThumb()
+		return
+	}
 
 	var (
 		curr = c.Reg.CPSR.Mode

@@ -13,37 +13,35 @@ const (
 	SCREEN_HEIGHT = 192
 )
 
-
 type PPU struct {
-    EngineA Engine
-    EngineB Engine
-    Rasterizer *rast.Rasterizer
+	EngineA    Engine
+	EngineB    Engine
+	Rasterizer *rast.Rasterizer
 
-    // these values are updated in PowCnt1
+	// these values are updated in PowCnt1
 
-    // need to impliment port disabling
+	// need to impliment port disabling
 	LcdEnabled                      bool
 	EngineA2D, EngineB2D            bool
 	RenderingEngine, GeometryEngine bool
 	TopA                            bool
 
-    Pram PRAM
-    Vram VRAM
+	Pram PRAM
+	Vram VRAM
 
-    Capture Capture
-    DisplayFifo DisplayFifo
+	Capture     Capture
+	DisplayFifo DisplayFifo
 
-    WHITE_SCANLINE []uint8
+	WHITE_SCANLINE []uint8
 }
 
 type Engine struct {
-
-    Pixels []byte
-    IsB bool
+	Pixels []byte
+	IsB    bool
 
 	Dispcnt Dispcnt
 
-    MasterBright MasterBright
+	MasterBright MasterBright
 
 	Objects     [128]Object
 	Backgrounds [4]Background
@@ -58,23 +56,23 @@ type Engine struct {
 type Dispcnt struct {
 	Mode               uint32
 	Is3D               bool
-    TileObj1D bool
-    BitmapObj256 bool
-    BitmapObj1D bool
+	TileObj1D          bool
+	BitmapObj256       bool
+	BitmapObj1D        bool
 	ForcedBlank        bool
-	DisplayObj    bool
-	DisplayWin0   bool
-	DisplayWin1   bool
-	DisplayObjWin bool
-    DisplayMode uint32
-    VramBlock uint32
-    TileObjBoundary uint32
-    BitmapObjBoundary bool
+	DisplayObj         bool
+	DisplayWin0        bool
+	DisplayWin1        bool
+	DisplayObjWin      bool
+	DisplayMode        uint32
+	VramBlock          uint32
+	TileObjBoundary    uint32
+	BitmapObjBoundary  bool
 	HBlankIntervalFree bool
-    CharBase uint32
-    ScreenBase uint32
-    BgExtPal bool
-    ObjExtPal bool
+	CharBase           uint32
+	ScreenBase         uint32
+	BgExtPal           bool
+	ObjExtPal          bool
 }
 
 // blends are [6]... because Bg0, Bg1, Bg2, Bg3, Obj, Bd
@@ -122,20 +120,19 @@ type Background struct {
 	//PbCalc, PdCalc float64
 	OutX, OutY float64
 
-    Type uint8
+	Type uint8
 
-    AltExtPalSlot bool
-
+	AltExtPalSlot bool
 }
 
 const (
-    BG_TYPE_TEX = 0
-    BG_TYPE_AFF = 1
-    BG_TYPE_LAR = 2
-    BG_TYPE_3D  = 3
-    BG_TYPE_BGM = 4
-    BG_TYPE_256 = 5
-    BG_TYPE_DIR = 6
+	BG_TYPE_TEX = 0
+	BG_TYPE_AFF = 1
+	BG_TYPE_LAR = 2
+	BG_TYPE_3D  = 3
+	BG_TYPE_BGM = 4
+	BG_TYPE_256 = 5
+	BG_TYPE_DIR = 6
 )
 
 type Object struct {
@@ -156,66 +153,66 @@ type Object struct {
 	Palette        uint32
 	OneDimensional bool
 
-    ObjTileMapping uint8
-    ObjBmpMapping uint8
+	ObjTileMapping uint8
+	ObjBmpMapping  uint8
 
-    TileBoundaryShift uint32
-    BmpBoundaryShift uint32
-    BmpBoundaryMask uint32
+	TileBoundaryShift uint32
+	BmpBoundaryShift  uint32
+	BmpBoundaryMask   uint32
 }
 
 func NewPPU(irq *cpu.Irq) *PPU {
 
-    p := &PPU{}
+	p := &PPU{}
 
-    p.EngineA.Pixels = make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)
-    p.EngineB.Pixels = make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)
-    p.EngineB.IsB = true
+	p.EngineA.Pixels = make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)
+	p.EngineB.Pixels = make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)
+	p.EngineB.IsB = true
 
-    p.Rasterizer = rast.NewRasterizer(&p.Vram, irq)
-    p.Capture.Init(
-        &p.Vram,
-        p,
-        &p.EngineA.Dispcnt.VramBlock,
-        &p.EngineA.Pixels,
-        &p.Rasterizer.Render.Pixels,
-    )
-    p.DisplayFifo.Pixels = make([]uint8, SCREEN_WIDTH*SCREEN_HEIGHT*4)
+	p.Rasterizer = rast.NewRasterizer(&p.Vram, irq)
+	p.Capture.Init(
+		&p.Vram,
+		p,
+		&p.EngineA.Dispcnt.VramBlock,
+		&p.EngineA.Pixels,
+		&p.Rasterizer.Render.Pixels,
+	)
+	p.DisplayFifo.Pixels = make([]uint8, SCREEN_WIDTH*SCREEN_HEIGHT*4)
 
-    // screenoff optimization
-    p.WHITE_SCANLINE = make([]uint8, SCREEN_WIDTH * 4)
-    for i := range len(p.WHITE_SCANLINE) {
-        p.WHITE_SCANLINE[i] = 0xFF
-    }
+	// screenoff optimization
+	p.WHITE_SCANLINE = make([]uint8, SCREEN_WIDTH*4)
+	for i := range len(p.WHITE_SCANLINE) {
+		p.WHITE_SCANLINE[i] = 0xFF
+	}
 
-    return p
+	return p
 }
 
 func (p *PPU) Update(addr, v uint32) {
 
-    if engineA := addr < 0x60 || addr >= 0x6C && addr < 0x6E; engineA && p.EngineA2D {
+	if engineA := addr < 0x60 || addr >= 0x6C && addr < 0x6E; engineA && p.EngineA2D {
 
-        p.EngineA.UpdateEngine(addr, v)
-        return
-    }
+		p.EngineA.UpdateEngine(addr, v)
+		return
+	}
 
-    if capture := addr >= 0x60 && addr < 0x68; capture {
-        //fmt.Printf("CAPTURE %08X %02X\n", addr, v)
-        return
-    }
+	if capture := addr >= 0x60 && addr < 0x68; capture {
+		//fmt.Printf("CAPTURE %08X %02X\n", addr, v)
+		return
+	}
 
-    if engineRender := addr >= 0x320 && addr < 0x400; engineRender && p.RenderingEngine {
-        return
-    }
+	if engineRender := addr >= 0x320 && addr < 0x400; engineRender && p.RenderingEngine {
+		return
+	}
 
-    if engineGeo := addr >= 0x400 && addr < 0x700; engineGeo && p.GeometryEngine {
-        return
-    }
+	if engineGeo := addr >= 0x400 && addr < 0x700; engineGeo && p.GeometryEngine {
+		return
+	}
 
-    if engineB := addr >= 0x1000 && addr < 0x1060 || addr >= 0x106C && addr < 0x106E; engineB && p.EngineB2D {
-        p.EngineB.UpdateEngine(addr & 0xFF, v)
-        return
-    }
+	if engineB := addr >= 0x1000 && addr < 0x1060 || addr >= 0x106C && addr < 0x106E; engineB && p.EngineB2D {
+		p.EngineB.UpdateEngine(addr&0xFF, v)
+		return
+	}
 }
 
 func (e *Engine) UpdateEngine(addr, v uint32) {
@@ -225,24 +222,23 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
 		return
 	}
 
-
 	if bgs := addr >= 0x08 && addr < 0x40; bgs {
 		e.UpdateBackgrounds(addr, v)
 		return
 	}
 
-    switch addr {
+	switch addr {
 	case 0x0:
 
-	    e.Dispcnt.Mode = utils.GetVarData(v, 0, 2)
-        e.Dispcnt.Is3D = utils.BitEnabled(v, 3)
+		e.Dispcnt.Mode = utils.GetVarData(v, 0, 2)
+		e.Dispcnt.Is3D = utils.BitEnabled(v, 3)
 
-        e.Dispcnt.TileObj1D = utils.BitEnabled(v, 4)
-        e.Dispcnt.BitmapObj256 = utils.BitEnabled(v, 5)
-        e.Dispcnt.BitmapObj1D = utils.BitEnabled(v, 6)
-        e.Dispcnt.ForcedBlank = utils.BitEnabled(v, 7)
+		e.Dispcnt.TileObj1D = utils.BitEnabled(v, 4)
+		e.Dispcnt.BitmapObj256 = utils.BitEnabled(v, 5)
+		e.Dispcnt.BitmapObj1D = utils.BitEnabled(v, 6)
+		e.Dispcnt.ForcedBlank = utils.BitEnabled(v, 7)
 
-        e.UpdateObjMapping(&e.Dispcnt)
+		e.UpdateObjMapping(&e.Dispcnt)
 
 	case 0x1:
 		e.Dispcnt.DisplayObj = utils.BitEnabled(v, 4)
@@ -260,24 +256,24 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
 		wins.Win1.Enabled = e.Dispcnt.DisplayWin1
 		wins.WinObj.Enabled = e.Dispcnt.DisplayObjWin && e.Dispcnt.DisplayObj
 		wins.Enabled = wins.Win0.Enabled || wins.Win1.Enabled || wins.WinObj.Enabled
-        e.UpdateObjMapping(&e.Dispcnt)
+		e.UpdateObjMapping(&e.Dispcnt)
 
 	case 0x2:
 
-        e.Dispcnt.DisplayMode = utils.GetVarData(v, 0, 1)
-        e.Dispcnt.VramBlock = utils.GetVarData(v, 2, 3)
-        e.Dispcnt.TileObjBoundary = utils.GetVarData(v, 4, 5)
+		e.Dispcnt.DisplayMode = utils.GetVarData(v, 0, 1)
+		e.Dispcnt.VramBlock = utils.GetVarData(v, 2, 3)
+		e.Dispcnt.TileObjBoundary = utils.GetVarData(v, 4, 5)
 		e.Dispcnt.BitmapObjBoundary = utils.BitEnabled(v, 6)
 		e.Dispcnt.HBlankIntervalFree = utils.BitEnabled(v, 7)
-        e.UpdateObjMapping(&e.Dispcnt)
+		e.UpdateObjMapping(&e.Dispcnt)
 
 	case 0x3:
 
-        e.Dispcnt.CharBase = utils.GetVarData(v, 0, 2) * 0x1_0000
-        e.Dispcnt.ScreenBase = utils.GetVarData(v, 3, 5) * 0x1_0000
-        e.Dispcnt.BgExtPal = utils.BitEnabled(v, 6)
-        e.Dispcnt.ObjExtPal = utils.BitEnabled(v, 7)
-        e.UpdateObjMapping(&e.Dispcnt)
+		e.Dispcnt.CharBase = utils.GetVarData(v, 0, 2) * 0x1_0000
+		e.Dispcnt.ScreenBase = utils.GetVarData(v, 3, 5) * 0x1_0000
+		e.Dispcnt.BgExtPal = utils.BitEnabled(v, 6)
+		e.Dispcnt.ObjExtPal = utils.BitEnabled(v, 7)
+		e.UpdateObjMapping(&e.Dispcnt)
 
 	case 0x4C:
 
@@ -314,11 +310,11 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
 
 	case 0x54:
 		e.Blend.yEv = float32(min(16, utils.GetVarData(v, 0, 4))) / 16
-    case 0x6C:
-        e.MasterBright.Write(uint8(v), 0)
-    case 0x6D:
-        e.MasterBright.Write(uint8(v), 1)
-    }
+	case 0x6C:
+		e.MasterBright.Write(uint8(v), 0)
+	case 0x6D:
+		e.MasterBright.Write(uint8(v), 1)
+	}
 
 }
 
@@ -343,8 +339,8 @@ func (engine *Engine) UpdateWin(addr uint32, v uint32) {
 		WINOUT = 0x4A
 		WINOBJ = 0x4B
 
-        SCREEN_WIDTH = 256
-        SCREEN_HEIGHT = 192
+		SCREEN_WIDTH  = 256
+		SCREEN_HEIGHT = 192
 	)
 
 	switch addr {
@@ -453,7 +449,7 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 		p.Backgrounds[0].Palette256 = utils.BitEnabled(v, 7)
 	case 0x09:
 		p.Backgrounds[0].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
-        p.Backgrounds[0].AltExtPalSlot = utils.BitEnabled(v, 5)
+		p.Backgrounds[0].AltExtPalSlot = utils.BitEnabled(v, 5)
 		p.Backgrounds[0].Size = utils.GetVarData(v, 6, 7)
 
 	case 0x0A:
@@ -463,7 +459,7 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 		p.Backgrounds[1].Palette256 = utils.BitEnabled(v, 7)
 	case 0x0B:
 		p.Backgrounds[1].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
-        p.Backgrounds[1].AltExtPalSlot = utils.BitEnabled(v, 5)
+		p.Backgrounds[1].AltExtPalSlot = utils.BitEnabled(v, 5)
 		p.Backgrounds[1].Size = utils.GetVarData(v, 6, 7)
 
 	case 0x0C:
@@ -473,7 +469,7 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 		p.Backgrounds[2].Palette256 = utils.BitEnabled(v, 7)
 	case 0x0D:
 		p.Backgrounds[2].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
-        p.Backgrounds[2].AffineWrap = utils.BitEnabled(v, 5)
+		p.Backgrounds[2].AffineWrap = utils.BitEnabled(v, 5)
 		p.Backgrounds[2].Size = utils.GetVarData(v, 6, 7)
 
 	case 0x0E:
@@ -484,7 +480,7 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 
 	case 0x0F:
 		p.Backgrounds[3].ScreenBaseBlock = utils.GetVarData(v, 0, 4) * 0x800
-        p.Backgrounds[3].AffineWrap = utils.BitEnabled(v, 5)
+		p.Backgrounds[3].AffineWrap = utils.BitEnabled(v, 5)
 		p.Backgrounds[3].Size = utils.GetVarData(v, 6, 7)
 
 	case 0x10:
@@ -661,56 +657,56 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 
 func (bg *Background) SetSize() {
 
-    switch bg.Type {
-    case BG_TYPE_TEX:
-        switch bg.Size {
-        case 0:
-            bg.W, bg.H = 256, 256
-        case 1:
-            bg.W, bg.H = 512, 256
-        case 2:
-            bg.W, bg.H = 256, 512
-        case 3:
-            bg.W, bg.H = 512, 512
-        default:
-            panic("PROHIBITTED BG SIZE")
-        }
-    case BG_TYPE_AFF, BG_TYPE_BGM:
-        switch bg.Size {
-        case 0:
-            bg.W, bg.H = 128, 128
-        case 1:
-            bg.W, bg.H = 256, 256
-        case 2:
-            bg.W, bg.H = 512, 512
-        case 3:
-            bg.W, bg.H = 1024, 1024
-        default:
-            panic("PROHIBITTED AFFINE BG SIZE")
-        }
-    case BG_TYPE_LAR:
-        switch bg.Size {
-        case 0:
-            bg.W, bg.H = 512, 1024
-        case 1:
-            bg.W, bg.H = 1024, 512
-        default:
-            panic("PROHIBITTED LARGE BITMAP BG SIZE")
-        }
-    case BG_TYPE_256, BG_TYPE_DIR:
-        switch bg.Size {
-        case 0:
-            bg.W, bg.H = 128, 128
-        case 1:
-            bg.W, bg.H = 256, 256
-        case 2:
-            bg.W, bg.H = 512, 256
-        case 3:
-            bg.W, bg.H = 512, 512
-        default:
-            panic("PROHIBITTED AFFINE BG SIZE")
-        }
-    }
+	switch bg.Type {
+	case BG_TYPE_TEX:
+		switch bg.Size {
+		case 0:
+			bg.W, bg.H = 256, 256
+		case 1:
+			bg.W, bg.H = 512, 256
+		case 2:
+			bg.W, bg.H = 256, 512
+		case 3:
+			bg.W, bg.H = 512, 512
+		default:
+			panic("PROHIBITTED BG SIZE")
+		}
+	case BG_TYPE_AFF, BG_TYPE_BGM:
+		switch bg.Size {
+		case 0:
+			bg.W, bg.H = 128, 128
+		case 1:
+			bg.W, bg.H = 256, 256
+		case 2:
+			bg.W, bg.H = 512, 512
+		case 3:
+			bg.W, bg.H = 1024, 1024
+		default:
+			panic("PROHIBITTED AFFINE BG SIZE")
+		}
+	case BG_TYPE_LAR:
+		switch bg.Size {
+		case 0:
+			bg.W, bg.H = 512, 1024
+		case 1:
+			bg.W, bg.H = 1024, 512
+		default:
+			panic("PROHIBITTED LARGE BITMAP BG SIZE")
+		}
+	case BG_TYPE_256, BG_TYPE_DIR:
+		switch bg.Size {
+		case 0:
+			bg.W, bg.H = 128, 128
+		case 1:
+			bg.W, bg.H = 256, 256
+		case 2:
+			bg.W, bg.H = 512, 256
+		case 3:
+			bg.W, bg.H = 512, 512
+		default:
+			panic("PROHIBITTED AFFINE BG SIZE")
+		}
+	}
 }
 
 func (obj *Object) SetSize(shape, size uint32) {
@@ -726,46 +722,46 @@ func (obj *Object) SetSize(shape, size uint32) {
 		switch size {
 		case 0:
 			obj.H, obj.W = 8, 8
-            return
+			return
 		case 1:
 			obj.H, obj.W = 16, 16
-            return
+			return
 		case 2:
 			obj.H, obj.W = 32, 32
-            return
+			return
 		case 3:
 			obj.H, obj.W = 64, 64
-            return
+			return
 		}
 	case HORIZONTAL:
 		switch size {
 		case 0:
 			obj.H, obj.W = 8, 16
-            return
+			return
 		case 1:
 			obj.H, obj.W = 8, 32
-            return
+			return
 		case 2:
 			obj.H, obj.W = 16, 32
-            return
+			return
 		case 3:
 			obj.H, obj.W = 32, 64
-            return
+			return
 		}
 	case VERTICAL:
 		switch size {
 		case 0:
 			obj.H, obj.W = 16, 8
-            return
+			return
 		case 1:
 			obj.H, obj.W = 32, 8
-            return
+			return
 		case 2:
 			obj.H, obj.W = 32, 16
-            return
+			return
 		case 3:
 			obj.H, obj.W = 64, 32
-            return
+			return
 		}
 	}
 
@@ -783,13 +779,13 @@ func (bg *Background) BgAffineUpdate() {
 
 func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
 
-    relAddr &= 0x7FF
+	relAddr &= 0x7FF
 
-    engine := &p.EngineA
-    if relAddr >= 0x400 {
-        engine = &p.EngineB
-        //relAddr -= 0x400
-    }
+	engine := &p.EngineA
+	if relAddr >= 0x400 {
+		engine = &p.EngineB
+		//relAddr -= 0x400
+	}
 
 	attrIdx := relAddr % 8
 
@@ -823,8 +819,6 @@ func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
 			obj.Disable = utils.BitEnabled(attr, 1)
 		}
 
-
-
 	case 2:
 		obj.X &^= 0xFF
 		obj.X |= attr
@@ -855,9 +849,9 @@ func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
 func UpdateAffineParams(obj *Object, oam *[0x800]uint8, isB bool) {
 	paramsAddr := obj.RotParams * 0x20
 
-    if isB {
-        paramsAddr += 0x400
-    }
+	if isB {
+		paramsAddr += 0x400
+	}
 
 	obj.Pa = float32(int16(binary.LittleEndian.Uint16(oam[paramsAddr+0x06:]))) / 256
 	obj.Pb = float32(int16(binary.LittleEndian.Uint16(oam[paramsAddr+0x0E:]))) / 256
@@ -886,131 +880,131 @@ func (p *PPU) UpdateAffine(relAddr uint32, engine *Engine, oam *[0x800]uint8) {
 }
 
 const (
-    OBJ_TIL_STD_2D = 0
-    OBJ_TIL_STD_1D = 1
-    OBJ_TIL_064_1D = 2
-    OBJ_TIL_128_1D = 3
-    OBJ_TIL_256_1D = 4
+	OBJ_TIL_STD_2D = 0
+	OBJ_TIL_STD_1D = 1
+	OBJ_TIL_064_1D = 2
+	OBJ_TIL_128_1D = 3
+	OBJ_TIL_256_1D = 4
 
-    OBJ_BMP_128_2D = 0
-    OBJ_BMP_256_2D = 1
-    OBJ_BMP_128_1D = 2
-    OBJ_BMP_256_1D = 3
+	OBJ_BMP_128_2D = 0
+	OBJ_BMP_256_2D = 1
+	OBJ_BMP_128_1D = 2
+	OBJ_BMP_256_1D = 3
 )
 
 func (e *Engine) UpdateObjMapping(d *Dispcnt) {
 
-    for i := range e.Objects {
+	for i := range e.Objects {
 
-        obj := &e.Objects[i]
+		obj := &e.Objects[i]
 
-        obj.ObjTileMapping = 0
-        obj.TileBoundaryShift = 0
-        obj.ObjBmpMapping = 0
-        obj.BmpBoundaryShift = 0
-        obj.BmpBoundaryMask = 0
+		obj.ObjTileMapping = 0
+		obj.TileBoundaryShift = 0
+		obj.ObjBmpMapping = 0
+		obj.BmpBoundaryShift = 0
+		obj.BmpBoundaryMask = 0
 
-        switch {
-        case !d.TileObj1D:
-            obj.ObjTileMapping = OBJ_TIL_STD_2D
-            obj.TileBoundaryShift = 5 // 32
-        case d.TileObj1D && d.TileObjBoundary == 0:
-            obj.ObjTileMapping = OBJ_TIL_STD_1D
-            obj.TileBoundaryShift = 5
-        case d.TileObj1D && d.TileObjBoundary == 1:
-            obj.ObjTileMapping = OBJ_TIL_064_1D
-            obj.TileBoundaryShift = 6 // 64
-        case d.TileObj1D && d.TileObjBoundary == 2:
-            obj.ObjTileMapping = OBJ_TIL_128_1D
-            obj.TileBoundaryShift = 7 // 128
-        case d.TileObj1D && d.TileObjBoundary == 3:
-            obj.ObjTileMapping = OBJ_TIL_256_1D
-            obj.TileBoundaryShift = 8 // 256
-        }
+		switch {
+		case !d.TileObj1D:
+			obj.ObjTileMapping = OBJ_TIL_STD_2D
+			obj.TileBoundaryShift = 5 // 32
+		case d.TileObj1D && d.TileObjBoundary == 0:
+			obj.ObjTileMapping = OBJ_TIL_STD_1D
+			obj.TileBoundaryShift = 5
+		case d.TileObj1D && d.TileObjBoundary == 1:
+			obj.ObjTileMapping = OBJ_TIL_064_1D
+			obj.TileBoundaryShift = 6 // 64
+		case d.TileObj1D && d.TileObjBoundary == 2:
+			obj.ObjTileMapping = OBJ_TIL_128_1D
+			obj.TileBoundaryShift = 7 // 128
+		case d.TileObj1D && d.TileObjBoundary == 3:
+			obj.ObjTileMapping = OBJ_TIL_256_1D
+			obj.TileBoundaryShift = 8 // 256
+		}
 
-        switch {
-        case !d.BitmapObj1D && !d.BitmapObj256:
-            obj.ObjBmpMapping = OBJ_BMP_128_2D
-            obj.BmpBoundaryMask = 0x0F
-        case !d.BitmapObj1D && d.BitmapObj256:
-            obj.ObjBmpMapping = OBJ_BMP_256_2D
-            obj.BmpBoundaryMask = 0x1F
-        case d.BitmapObj1D && !d.BitmapObj256 && !d.BitmapObjBoundary:
-            obj.ObjBmpMapping = OBJ_BMP_128_1D
-            obj.BmpBoundaryShift = 7 //128
-        case d.BitmapObj1D && !d.BitmapObj256 && d.BitmapObjBoundary:
-            obj.ObjBmpMapping = OBJ_BMP_256_1D
-            obj.BmpBoundaryShift = 8 //256
-        case d.BitmapObj1D && d.BitmapObj256:
-            panic("DISPCNT HAS BOTH BITMAP 1D AND 256 SET")
-        }
-    }
+		switch {
+		case !d.BitmapObj1D && !d.BitmapObj256:
+			obj.ObjBmpMapping = OBJ_BMP_128_2D
+			obj.BmpBoundaryMask = 0x0F
+		case !d.BitmapObj1D && d.BitmapObj256:
+			obj.ObjBmpMapping = OBJ_BMP_256_2D
+			obj.BmpBoundaryMask = 0x1F
+		case d.BitmapObj1D && !d.BitmapObj256 && !d.BitmapObjBoundary:
+			obj.ObjBmpMapping = OBJ_BMP_128_1D
+			obj.BmpBoundaryShift = 7 //128
+		case d.BitmapObj1D && !d.BitmapObj256 && d.BitmapObjBoundary:
+			obj.ObjBmpMapping = OBJ_BMP_256_1D
+			obj.BmpBoundaryShift = 8 //256
+		case d.BitmapObj1D && d.BitmapObj256:
+			panic("DISPCNT HAS BOTH BITMAP 1D AND 256 SET")
+		}
+	}
 }
 
 type MasterBright struct {
-    Factor uint32
-    Mode uint8
+	Factor uint32
+	Mode   uint8
 }
 
 const (
-    MB_NONE = 0
-    MB_UP   = 1
-    MB_DOWN = 2
+	MB_NONE = 0
+	MB_UP   = 1
+	MB_DOWN = 2
 )
 
 func (m *MasterBright) Write(v, b uint8) {
-    switch b {
-    case 0:
-        m.Factor = min(16, uint32(v) & 0b11111)
+	switch b {
+	case 0:
+		m.Factor = min(16, uint32(v)&0b11111)
 
-    case 1:
-        m.Mode = v >> 6
-    }
+	case 1:
+		m.Mode = v >> 6
+	}
 }
 
 func (m *MasterBright) Read(b uint8) uint8 {
-    switch b {
-    case 0:
-        return uint8(m.Factor)
+	switch b {
+	case 0:
+		return uint8(m.Factor)
 
-    case 1:
-        return m.Mode << 6
-    default:
-        return 0
-    }
+	case 1:
+		return m.Mode << 6
+	default:
+		return 0
+	}
 }
 
 func (m *MasterBright) Apply(v uint32) (uint8, uint8, uint8) {
 
-    // takes in 15bit and returns 24bit
+	// takes in 15bit and returns 24bit
 
-    r := ((v)       & 0x1F)
-    g := ((v >> 5)  & 0x1F)
-    b := ((v >> 10) & 0x1F)
+	r := ((v) & 0x1F)
+	g := ((v >> 5) & 0x1F)
+	b := ((v >> 10) & 0x1F)
 
-    switch m.Mode {
-    case MB_NONE:
-        // convert
-        r = (r << 3) | (r >> 2)
-        g = (g << 3) | (g >> 2)
-        b = (b << 3) | (b >> 2)
-        return uint8(r), uint8(g), uint8(b)
+	switch m.Mode {
+	case MB_NONE:
+		// convert
+		r = (r << 3) | (r >> 2)
+		g = (g << 3) | (g >> 2)
+		b = (b << 3) | (b >> 2)
+		return uint8(r), uint8(g), uint8(b)
 
-    case MB_UP:
-        r += (31 - r) * m.Factor >> 4
-        g += (31 - g) * m.Factor >> 4
-        b += (31 - b) * m.Factor >> 4
+	case MB_UP:
+		r += (31 - r) * m.Factor >> 4
+		g += (31 - g) * m.Factor >> 4
+		b += (31 - b) * m.Factor >> 4
 
-    case MB_DOWN:
-        r -= r * m.Factor >> 4
-        g -= g * m.Factor >> 4
-        b -= b * m.Factor >> 4
-    }
+	case MB_DOWN:
+		r -= r * m.Factor >> 4
+		g -= g * m.Factor >> 4
+		b -= b * m.Factor >> 4
+	}
 
-    // convert
+	// convert
 	r = (r << 3) | (r >> 2)
 	g = (g << 3) | (g >> 2)
 	b = (b << 3) | (b >> 2)
 
-    return uint8(r), uint8(g), uint8(b)
+	return uint8(r), uint8(g), uint8(b)
 }

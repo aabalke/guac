@@ -8,16 +8,16 @@ import (
 )
 
 var (
-    _ = fmt.Sprintf("")
+	_ = fmt.Sprintf("")
 )
 
 const (
-    MAX_DEPTH = float32(0xFF_FFFF)
-    EDGE_THRES = 1
+	MAX_DEPTH  = float32(0xFF_FFFF)
+	EDGE_THRES = 1
 
-    // higher number is less precise, important for proper ordering with overlapping polys
-    // cooking mama requires ~ 0.01
-    DEPTH_PRECISION = 0.01
+	// higher number is less precise, important for proper ordering with overlapping polys
+	// cooking mama requires ~ 0.01
+	DEPTH_PRECISION = 0.01
 )
 
 type Face int
@@ -40,51 +40,51 @@ const (
 type ShadowMode int
 
 const (
-    _ ShadowMode = iota
-    ShadowBack
-    ShadowFront
-    ShadowRender
+	_ ShadowMode = iota
+	ShadowBack
+	ShadowFront
+	ShadowRender
 )
 
 type Context struct {
-	Width        int
-	Height       int
-    ColorBuffer  []Color
-	DepthBuffer  []float32
-    DepthBufferW []float32
-    FogEnabledBuffer []bool // bools for if polygon has fog enabled
-    EdgeBuffer []bool
-    PolyIdBuffer []uint32
+	Width            int
+	Height           int
+	ColorBuffer      []Color
+	DepthBuffer      []float32
+	DepthBufferW     []float32
+	FogEnabledBuffer []bool // bools for if polygon has fog enabled
+	EdgeBuffer       []bool
+	PolyIdBuffer     []uint32
 
-	ClearColor   Color
-	Shader       *Shader
-	AlphaBlending   bool
-	FrontFace    Face
-	Cull         Cull
-	screenMatrix Matrix
+	ClearColor    Color
+	Shader        *Shader
+	AlphaBlending bool
+	FrontFace     Face
+	Cull          Cull
+	screenMatrix  Matrix
 
-    PolygonFogEnabled bool
-    NewTranslucentDepth bool
+	PolygonFogEnabled   bool
+	NewTranslucentDepth bool
 
-    PolygonId uint32
-    EdgeEnabled bool
-    PolygonOpaque bool
+	PolygonId     uint32
+	EdgeEnabled   bool
+	PolygonOpaque bool
 
-    EdgeClearId uint32
-    ClearDepth uint32
+	EdgeClearId uint32
+	ClearDepth  uint32
 
-    DepthW bool
-    DepthEqual bool // draw pixels with depth less vs less or equal
+	DepthW     bool
+	DepthEqual bool // draw pixels with depth less vs less or equal
 
-    StencilBuffer []bool
+	StencilBuffer []bool
 }
 
 func NewContext(width, height int) *Context {
 	dc := &Context{}
 	dc.Width = width
 	dc.Height = height
-    dc.ColorBuffer  = make([]Color, width*height)
-	dc.DepthBuffer  = make([]float32, width*height)
+	dc.ColorBuffer = make([]Color, width*height)
+	dc.DepthBuffer = make([]float32, width*height)
 	dc.DepthBufferW = make([]float32, width*height)
 	dc.StencilBuffer = make([]bool, width*height)
 	dc.FogEnabledBuffer = make([]bool, width*height)
@@ -102,83 +102,82 @@ func (dc *Context) Image() *[]Color {
 }
 
 func (dc *Context) SetColor(x, y int, color Color) {
-    dc.ColorBuffer[x + y * dc.Width] = color
+	dc.ColorBuffer[x+y*dc.Width] = color
 }
 
 func (dc *Context) EdgeId(x, y int, depthW bool) (uint32, bool) {
 
-    i := x + y * dc.Width
-    if !dc.EdgeBuffer[i] {
-        return 0, false
-    }
+	i := x + y*dc.Width
+	if !dc.EdgeBuffer[i] {
+		return 0, false
+	}
 
-    depths := &dc.DepthBuffer
-    if depthW {
-        depths = &dc.DepthBufferW
-    }
+	depths := &dc.DepthBuffer
+	if depthW {
+		depths = &dc.DepthBufferW
+	}
 
-    depth := (*depths)[i]
-    id := dc.PolyIdBuffer[i]
+	depth := (*depths)[i]
+	id := dc.PolyIdBuffer[i]
 
-    neighbors := [4]int{
-        i-1       ,
-        i+1       ,
-        i-dc.Width,
-        i+dc.Width,
-    }
+	neighbors := [4]int{
+		i - 1,
+		i + 1,
+		i - dc.Width,
+		i + dc.Width,
+	}
 
-    for j, n := range neighbors {
+	for j, n := range neighbors {
 
-        if screenOut := (
-            n < 0 ||
-            n >= len(dc.PolyIdBuffer) ||
-            (j == 0 && n % dc.Width == dc.Width - 1) || 
-            (j == 1 && n % dc.Width == 0)); screenOut {
+		if screenOut := (n < 0 ||
+			n >= len(dc.PolyIdBuffer) ||
+			(j == 0 && n%dc.Width == dc.Width-1) ||
+			(j == 1 && n%dc.Width == 0)); screenOut {
 
-            if nid := dc.EdgeClearId; nid == id {
-                continue
-            }
+			if nid := dc.EdgeClearId; nid == id {
+				continue
+			}
 
-            if depth < float32(dc.ClearDepth) / MAX_DEPTH {
-                return id, true
-            }
+			if depth < float32(dc.ClearDepth)/MAX_DEPTH {
+				return id, true
+			}
 
-        } else {
+		} else {
 
-            if nid := dc.PolyIdBuffer[n]; nid == id {
-                continue
-            }
+			if nid := dc.PolyIdBuffer[n]; nid == id {
+				continue
+			}
 
-            if depth < (*depths)[n] {
-                return id, true
-            }
-        }
-    }
+			if depth < (*depths)[n] {
+				return id, true
+			}
+		}
+	}
 
-    return 0, false
+	return 0, false
 }
 
 func (dc *Context) ClearBuffers(c Color, depth float32, edge bool, polyId uint32, fog bool) {
 
 	for i := range dc.ColorBuffer {
-        dc.ColorBuffer[i] = c
+		dc.ColorBuffer[i] = c
 		dc.DepthBuffer[i] = depth
 		dc.DepthBufferW[i] = depth
 		dc.EdgeBuffer[i] = edge
 		dc.PolyIdBuffer[i] = polyId // invalid value (0 is valid)
 		dc.FogEnabledBuffer[i] = fog
-    }
+	}
 }
 
 func (dc *Context) ClearBuffersPixel(x, y int, color Color, depth float32, fog bool) {
 
-    i := x + y * dc.Width
+	i := x + y*dc.Width
 
-    dc.ColorBuffer[i] = color
-    // depth is z normalized range 0...1, w is 4096 (W far, W near is 0)
-    dc.DepthBuffer[i]      = depth / 0xFF_FFFF
-    dc.DepthBufferW[i]     = depth / 0x1000
-    dc.FogEnabledBuffer[i] = fog
+	dc.ColorBuffer[i] = color
+	// depth is z normalized range 0...1, w is 4096 (W far, W near is 0)
+	dc.DepthBuffer[i] = depth / 0xFF_FFFF
+	dc.DepthBufferW[i] = depth / 0x1000
+	dc.FogEnabledBuffer[i] = fog
 }
 
 func edge(a, b, c Vector) float32 {
@@ -219,12 +218,12 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) {
 	ra20 := 1 / a20
 	ra01 := 1 / a01
 
-    grad0 := float32(math.Hypot(float64(a12), float64(b12))) * ra // for b0
-    grad1 := float32(math.Hypot(float64(a20), float64(b20))) * ra // for b1
-    grad2 := float32(math.Hypot(float64(a01), float64(b01))) * ra // for b2
-    edgeThickness0 := EDGE_THRES * grad0
-    edgeThickness1 := EDGE_THRES * grad1
-    edgeThickness2 := EDGE_THRES * grad2
+	grad0 := float32(math.Hypot(float64(a12), float64(b12))) * ra // for b0
+	grad1 := float32(math.Hypot(float64(a20), float64(b20))) * ra // for b1
+	grad2 := float32(math.Hypot(float64(a01), float64(b01))) * ra // for b2
+	edgeThickness0 := EDGE_THRES * grad0
+	edgeThickness1 := EDGE_THRES * grad1
+	edgeThickness2 := EDGE_THRES * grad2
 
 	// iterate over all pixels in bounding box
 	for y := y0; y <= y1; y++ {
@@ -242,8 +241,8 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) {
 			d = d2
 		}
 		d = float32(int(d))
-        // occurs in pathological cases
-        d = max(0, d)
+		// occurs in pathological cases
+		d = max(0, d)
 
 		w0 := w00 + a12*d
 		w1 := w01 + a20*d
@@ -278,20 +277,19 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) {
 			b := VectorW{b0 * r0, b1 * r1, b2 * r2, 0}
 			b.W = 1 / (b.X + b.Y + b.Z)
 
-            depthBuffer := &dc.DepthBuffer
-            depth := z
-            if dc.DepthW {
-                depthBuffer = &dc.DepthBufferW
-                depth = b.W
-            }
+			depthBuffer := &dc.DepthBuffer
+			depth := z
+			if dc.DepthW {
+				depthBuffer = &dc.DepthBufferW
+				depth = b.W
+			}
 
-            if (dc.DepthEqual && !(
-                depth + 0x200 >= (*depthBuffer)[i] && depth - 0x200 < (*depthBuffer)[i])) {
-            //if (dc.DepthEqual && depth != (*depthBuffer)[i]) {
-                continue
-            }
+			if dc.DepthEqual && !(depth+0x200 >= (*depthBuffer)[i] && depth-0x200 < (*depthBuffer)[i]) {
+				//if (dc.DepthEqual && depth != (*depthBuffer)[i]) {
+				continue
+			}
 
-            if !dc.DepthEqual && depth >= (*depthBuffer)[i] + DEPTH_PRECISION {
+			if !dc.DepthEqual && depth >= (*depthBuffer)[i]+DEPTH_PRECISION {
 				continue
 			}
 
@@ -302,49 +300,48 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) {
 				continue
 			}
 
-            color := &vert.Color
+			color := &vert.Color
 
-            if dc.PolygonOpaque {
+			if dc.PolygonOpaque {
 
-                if edge := (
-                    b0 < edgeThickness0 ||
-                    b1 < edgeThickness1 ||
-                    b2 < edgeThickness2); edge {
+				if edge := (b0 < edgeThickness0 ||
+					b1 < edgeThickness1 ||
+					b2 < edgeThickness2); edge {
 
-                        dc.EdgeBuffer[i] = dc.EdgeEnabled
+					dc.EdgeBuffer[i] = dc.EdgeEnabled
 
-                        // Wireframe
-                        //vert.Color = Color{0, 255, 0, 255} // can use to apply wireframe
-                    } else {
-                        dc.EdgeBuffer[i] = false
-                    }
-                    dc.PolyIdBuffer[i] = dc.PolygonId
-                    dc.FogEnabledBuffer[i] = dc.PolygonFogEnabled
-                } else {
-                    // When rendering translucent pixels, the old flag in the framebuffer gets ANDed with PolygonAttr.Bit15.
-                    dc.FogEnabledBuffer[i] = dc.FogEnabledBuffer[i] && dc.PolygonFogEnabled
-            }
+					// Wireframe
+					//vert.Color = Color{0, 255, 0, 255} // can use to apply wireframe
+				} else {
+					dc.EdgeBuffer[i] = false
+				}
+				dc.PolyIdBuffer[i] = dc.PolygonId
+				dc.FogEnabledBuffer[i] = dc.PolygonFogEnabled
+			} else {
+				// When rendering translucent pixels, the old flag in the framebuffer gets ANDed with PolygonAttr.Bit15.
+				dc.FogEnabledBuffer[i] = dc.FogEnabledBuffer[i] && dc.PolygonFogEnabled
+			}
 
-            if (!dc.AlphaBlending ||
-                dc.PolygonOpaque ||
-                color.A >= 0.999 ||
-                dc.NewTranslucentDepth) {
+			if !dc.AlphaBlending ||
+				dc.PolygonOpaque ||
+				color.A >= 0.999 ||
+				dc.NewTranslucentDepth {
 
-                (*depthBuffer)[i] = utils.FloatFloor(depth, DEPTH_PRECISION)
-            }
+				(*depthBuffer)[i] = utils.FloatFloor(depth, DEPTH_PRECISION)
+			}
 
-            j := &dc.ColorBuffer[i]
+			j := &dc.ColorBuffer[i]
 
-            if !dc.AlphaBlending || color.A >= 1 || j.A < 0 {
-                dc.ColorBuffer[i] = *color
-                continue
-            }
+			if !dc.AlphaBlending || color.A >= 1 || j.A < 0 {
+				dc.ColorBuffer[i] = *color
+				continue
+			}
 
-            j.R = min(1, max(0, (color.R * color.A) + (j.R * (1 - color.A))))
-            j.G = min(1, max(0, (color.G * color.A) + (j.G * (1 - color.A))))
-            j.B = min(1, max(0, (color.B * color.A) + (j.B * (1 - color.A))))
-            j.A = min(1, max(0, max(j.A, color.A)))
-        }
+			j.R = min(1, max(0, (color.R*color.A)+(j.R*(1-color.A))))
+			j.G = min(1, max(0, (color.G*color.A)+(j.G*(1-color.A))))
+			j.B = min(1, max(0, (color.B*color.A)+(j.B*(1-color.A))))
+			j.A = min(1, max(0, max(j.A, color.A)))
+		}
 
 		w00 += b12
 		w01 += b20
@@ -378,7 +375,7 @@ func (dc *Context) drawClippedTriangle(v0, v1, v2 Vertex) {
 	s0 := dc.screenMatrix.MulPosition(ndc0)
 	s1 := dc.screenMatrix.MulPosition(ndc1)
 	s2 := dc.screenMatrix.MulPosition(ndc2)
-    dc.rasterize(v0, v1, v2, s0, s1, s2)
+	dc.rasterize(v0, v1, v2, s0, s1, s2)
 }
 
 func (dc *Context) DrawTriangle(t *Triangle) {
@@ -396,8 +393,8 @@ func (dc *Context) DrawTriangle(t *Triangle) {
 		return
 	}
 
-    // no need to clip
-    dc.drawClippedTriangle(v1, v2, v3)
+	// no need to clip
+	dc.drawClippedTriangle(v1, v2, v3)
 }
 
 func (dc *Context) DrawQuad(q *Quad) {
@@ -406,31 +403,31 @@ func (dc *Context) DrawQuad(q *Quad) {
 	v3 := q.V3
 	v4 := q.V4
 
-    if v1.Outside() || v2.Outside() || v3.Outside() {
+	if v1.Outside() || v2.Outside() || v3.Outside() {
 
-        // clip to viewing volume
-        triangles := ClipTriangle(NewTriangle(v1, v2, v3))
-        for _, t := range triangles {
-            dc.drawClippedTriangle(t.V1, t.V2, t.V3)
-            //result = result.Add(info)
-        }
+		// clip to viewing volume
+		triangles := ClipTriangle(NewTriangle(v1, v2, v3))
+		for _, t := range triangles {
+			dc.drawClippedTriangle(t.V1, t.V2, t.V3)
+			//result = result.Add(info)
+		}
 
-    } else {
-        // no need to clip
-        dc.drawClippedTriangle(v1, v2, v3)
-    }
+	} else {
+		// no need to clip
+		dc.drawClippedTriangle(v1, v2, v3)
+	}
 
-    if v1.Outside() || v3.Outside() || v4.Outside() {
+	if v1.Outside() || v3.Outside() || v4.Outside() {
 
-        // clip to viewing volume
-        triangles := ClipTriangle(NewTriangle(v1, v3, v4))
-        for _, t := range triangles {
-            dc.drawClippedTriangle(t.V1, t.V2, t.V3)
-        }
+		// clip to viewing volume
+		triangles := ClipTriangle(NewTriangle(v1, v3, v4))
+		for _, t := range triangles {
+			dc.drawClippedTriangle(t.V1, t.V2, t.V3)
+		}
 
-        return
-    }
+		return
+	}
 
-    // no need to clip
-    dc.drawClippedTriangle(v1, v3, v4)
+	// no need to clip
+	dc.drawClippedTriangle(v1, v3, v4)
 }

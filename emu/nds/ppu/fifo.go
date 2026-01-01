@@ -1,14 +1,14 @@
 package ppu
 
 type DisplayFifo struct {
-    Pixels []uint8
-    i uint32
+	Pixels []uint8
+	i      uint32
 }
 
 func (d *DisplayFifo) FifoWrite(data uint16) {
 
-	r := uint8((data)       & 0b11111)
-	g := uint8((data >> 5)  & 0b11111)
+	r := uint8((data) & 0b11111)
+	g := uint8((data >> 5) & 0b11111)
 	b := uint8((data >> 10) & 0b11111)
 
 	r = (r << 3) | (r >> 2)

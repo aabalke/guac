@@ -1,12 +1,12 @@
 package gl
 
 type Vertex struct {
-	Position VectorW
-	Texture  Vector
-	Color    Color
-	Output   VectorW
-    S, T float32
-    NdsTexture *Texture
+	Position   VectorW
+	Texture    Vector
+	Color      Color
+	Output     VectorW
+	S, T       float32
+	NdsTexture *Texture
 }
 
 func (a Vertex) Outside() bool {
@@ -14,15 +14,15 @@ func (a Vertex) Outside() bool {
 }
 
 func (vert *Vertex) CalcTextureVector(w, h int) {
-    u := vert.S / float32(w)
-    v := vert.T / float32(h)
-    vert.Texture = Vector{X: u, Y: v, Z: 0}
+	u := vert.S / float32(w)
+	v := vert.T / float32(h)
+	vert.Texture = Vector{X: u, Y: v, Z: 0}
 }
 
 func (v *Vertex) InterpolateVertexes(v1, v2, v3 *Vertex, b *VectorW) {
 	v.Texture = InterpolateVectors(v1.Texture, v2.Texture, v3.Texture, b)
-	v.Color   = InterpolateColors(v1.Color, v2.Color, v3.Color, b)
-	v.Output  = InterpolateVectorWs(v1.Output, v2.Output, v3.Output, b)
+	v.Color = InterpolateColors(v1.Color, v2.Color, v3.Color, b)
+	v.Output = InterpolateVectorWs(v1.Output, v2.Output, v3.Output, b)
 }
 
 func InterpolateColors(v1, v2, v3 Color, b *VectorW) Color {

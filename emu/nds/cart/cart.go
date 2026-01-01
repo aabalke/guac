@@ -18,7 +18,7 @@ func NewCartridge(rom, sav string) Cartridge {
 	c := Cartridge{
 		RomPath: rom,
 		SavPath: sav,
-        Rom: make([]uint8, 0),
+		Rom:     make([]uint8, 0),
 	}
 
 	c.load()
@@ -38,6 +38,6 @@ func (c *Cartridge) load() {
 	c.RomLength = uint32(len(buf))
 
 	for i := range len(buf) {
-        c.Rom = append(c.Rom, buf[i])
+		c.Rom = append(c.Rom, buf[i])
 	}
 }

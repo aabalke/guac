@@ -6,7 +6,7 @@ import (
 
 type TextureCache map[key]*[]gl.Color
 
-type key struct{base, offset uint32}
+type key struct{ base, offset uint32 }
 
 func (t *TextureCache) Reset() {
 	clear(*t)
@@ -36,7 +36,7 @@ func (t *TextureCache) Add(vram VRAM, tex *Texture, key key) {
 
 func (t *TextureCache) Get(vram VRAM, tex *Texture) *[]gl.Color {
 
-    key := key{tex.PaletteBaseAddr, tex.VramOffset}
+	key := key{tex.PaletteBaseAddr, tex.VramOffset}
 	v, ok := (*t)[key]
 	if !ok {
 		t.Add(vram, tex, key)
@@ -52,20 +52,20 @@ func (t *TextureCache) getDirect(vram VRAM, tex *Texture) *[]gl.Color {
 
 	for y := range uint32(tex.SizeT) {
 		for x := range uint32(tex.SizeS) {
-			i := uint32(x+(y*tex.SizeS))
-			data := uint32(vram.ReadTexture(tex.VramOffset+i*2+0))
+			i := uint32(x + (y * tex.SizeS))
+			data := uint32(vram.ReadTexture(tex.VramOffset + i*2 + 0))
 			data |= uint32(vram.ReadTexture(tex.VramOffset+i*2+1)) << 8
 
-            if transparent := data & 0x8000 == 0; transparent {
-                out[i] = gl.Transparent
-                continue
-            }
+			if transparent := data&0x8000 == 0; transparent {
+				out[i] = gl.Transparent
+				continue
+			}
 
-            out[i] =  gl.MakeColorFrom15Bit(
-                uint8(data & 0b11111),
-                uint8(data >> 5) & 0b11111,
-                uint8(data >> 10) & 0b11111,
-            )
+			out[i] = gl.MakeColorFrom15Bit(
+				uint8(data&0b11111),
+				uint8(data>>5)&0b11111,
+				uint8(data>>10)&0b11111,
+			)
 		}
 	}
 
@@ -76,8 +76,7 @@ func (t *TextureCache) getPaletted(vram VRAM, tex *Texture, bitsPerTexel, bitsPe
 
 	out := make([]gl.Color, (tex.SizeS)*(tex.SizeT))
 
-
-    palBase := tex.PaletteBaseAddr
+	palBase := tex.PaletteBaseAddr
 
 	if bitsPerTexel == 2 {
 		palBase *= 0x8
@@ -101,27 +100,27 @@ func (t *TextureCache) getPaletted(vram VRAM, tex *Texture, bitsPerTexel, bitsPe
 			}
 
 			if palIdx == 0 && tex.TransparentZero {
-			    out[i] = gl.Transparent
-                continue
+				out[i] = gl.Transparent
+				continue
 			}
 
-            //if tex.PaletteBaseAddr != 0x82 {
-            //    out[i] = gl.Color{A: 0.5}
+			//if tex.PaletteBaseAddr != 0x82 {
+			//    out[i] = gl.Color{A: 0.5}
 			//    //out[i] = gl.Transparent
-            //    continue
-            //}
+			//    continue
+			//}
 
 			// palettes take up 2 bytes each
 			palIdx *= 2
 
-			data := uint32(vram.ReadPalTexture(palBase+palIdx+0))
+			data := uint32(vram.ReadPalTexture(palBase + palIdx + 0))
 			data |= uint32(vram.ReadPalTexture(palBase+palIdx+1)) << 8
 
-            out[i] =  gl.MakeColorFrom15Bit(
-                uint8(data)       & 0x1F,
-                uint8(data >> 5)  & 0x1F,
-                uint8(data >> 10) & 0x1F,
-            )
+			out[i] = gl.MakeColorFrom15Bit(
+				uint8(data)&0x1F,
+				uint8(data>>5)&0x1F,
+				uint8(data>>10)&0x1F,
+			)
 		}
 	}
 
@@ -149,21 +148,21 @@ func (t *TextureCache) getTranslucent(vram VRAM, tex *Texture, colorBits uint8) 
 
 			colorIdx *= 2
 
-			data := uint32(vram.ReadPalTexture(tex.PaletteBaseAddr+colorIdx))
+			data := uint32(vram.ReadPalTexture(tex.PaletteBaseAddr + colorIdx))
 			data |= uint32(vram.ReadPalTexture(tex.PaletteBaseAddr+colorIdx+1)) << 8
 
-            out[i] =  gl.MakeColorFrom15Bit(
-                uint8(data & 0b11111),
-                uint8(data >> 5) & 0b11111,
-                uint8(data >> 10) & 0b11111,
-            )
+			out[i] = gl.MakeColorFrom15Bit(
+				uint8(data&0b11111),
+				uint8(data>>5)&0b11111,
+				uint8(data>>10)&0b11111,
+			)
 
-            switch colorBits {
-            case 3:
-                out[i].A = float32(palIdx >> 3) / 31
-            case 5:
-                out[i].A = float32(palIdx >> 5) / 7
-            }
+			switch colorBits {
+			case 3:
+				out[i].A = float32(palIdx>>3) / 31
+			case 5:
+				out[i].A = float32(palIdx>>5) / 7
+			}
 		}
 	}
 
@@ -232,16 +231,16 @@ func (t *TextureCache) getCompressed(vram VRAM, tex *Texture) *[]gl.Color {
 					k := ((y+j)<<tex.PitchShift + (x + i))
 					tex := (pack >> uint(i*2)) & 3
 
-                    if tex == 3 && mode <= 1 {
-                        out[k] = gl.Transparent
-                        continue
-                    }
+					if tex == 3 && mode <= 1 {
+						out[k] = gl.Transparent
+						continue
+					}
 
-                    out[k] =  gl.MakeColorFrom15Bit(
-                        uint8(colors[tex] & 0b11111),
-                        uint8(colors[tex] >> 5) & 0b11111,
-                        uint8(colors[tex] >> 10) & 0b11111,
-                    )
+					out[k] = gl.MakeColorFrom15Bit(
+						uint8(colors[tex]&0b11111),
+						uint8(colors[tex]>>5)&0b11111,
+						uint8(colors[tex]>>10)&0b11111,
+					)
 				}
 			}
 		}

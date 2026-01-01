@@ -1,6 +1,6 @@
 package ppu
 
-
+//go:inline
 func inRange(coord, start, end uint32) bool {
 	if end < start {
 		return coord >= start || coord < end
@@ -8,6 +8,7 @@ func inRange(coord, start, end uint32) bool {
 	return coord >= start && coord < end
 }
 
+//go:inline
 func inWindow(x, y, l, r, t, b uint32) bool {
 	return inRange(x, l, r) && inRange(y, t, b)
 }

@@ -24,7 +24,7 @@ func (c *Cpu) DecodeTHUMB() (int, bool) {
 	case isLSHalf(op):
 		c.thumbLSHalf(op)
 	case isThumbSdt(op):
-        c.thumbSdt(op)
+		c.thumbSdt(op)
 	case isLPC(op):
 		c.thumbLPC(op)
 	case isLSImm(op):

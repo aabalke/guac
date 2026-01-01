@@ -1,44 +1,42 @@
 package snd
 
-
 const (
 	MAX = 127
 	MIN = -128
 
 	AMPLIFICATION = 0.125
-	BASE_FREQ = 33_513_982 / 2
+	BASE_FREQ     = 33_513_982 / 2
 )
 
 var (
+	adpcmIndexTable = [8]int16{-1, -1, -1, -1, 2, 4, 6, 8}
+	adpcmTable      = [89]uint16{
+		0x0007, 0x0008, 0x0009, 0x000A, 0x000B, 0x000C, 0x000D, 0x000E, 0x0010, 0x0011, 0x0013, 0x0015,
+		0x0017, 0x0019, 0x001C, 0x001F, 0x0022, 0x0025, 0x0029, 0x002D, 0x0032, 0x0037, 0x003C, 0x0042,
+		0x0049, 0x0050, 0x0058, 0x0061, 0x006B, 0x0076, 0x0082, 0x008F, 0x009D, 0x00AD, 0x00BE, 0x00D1,
+		0x00E6, 0x00FD, 0x0117, 0x0133, 0x0151, 0x0173, 0x0198, 0x01C1, 0x01EE, 0x0220, 0x0256, 0x0292,
+		0x02D4, 0x031C, 0x036C, 0x03C3, 0x0424, 0x048E, 0x0502, 0x0583, 0x0610, 0x06AB, 0x0756, 0x0812,
+		0x08E0, 0x09C3, 0x0ABD, 0x0BD0, 0x0CFF, 0x0E4C, 0x0FBA, 0x114C, 0x1307, 0x14EE, 0x1706, 0x1954,
+		0x1BDC, 0x1EA5, 0x21B6, 0x2515, 0x28CA, 0x2CDF, 0x315B, 0x364B, 0x3BB9, 0x41B2, 0x4844, 0x4F7E,
+		0x5771, 0x602F, 0x69CE, 0x7462, 0x7FFF,
+	}
 
-    adpcmIndexTable = [8]int16{-1, -1, -1, -1, 2, 4, 6, 8}
-    adpcmTable = [89]uint16{
-        0x0007, 0x0008, 0x0009, 0x000A, 0x000B, 0x000C, 0x000D, 0x000E, 0x0010, 0x0011, 0x0013, 0x0015,
-        0x0017, 0x0019, 0x001C, 0x001F, 0x0022, 0x0025, 0x0029, 0x002D, 0x0032, 0x0037, 0x003C, 0x0042,
-        0x0049, 0x0050, 0x0058, 0x0061, 0x006B, 0x0076, 0x0082, 0x008F, 0x009D, 0x00AD, 0x00BE, 0x00D1,
-        0x00E6, 0x00FD, 0x0117, 0x0133, 0x0151, 0x0173, 0x0198, 0x01C1, 0x01EE, 0x0220, 0x0256, 0x0292,
-        0x02D4, 0x031C, 0x036C, 0x03C3, 0x0424, 0x048E, 0x0502, 0x0583, 0x0610, 0x06AB, 0x0756, 0x0812,
-        0x08E0, 0x09C3, 0x0ABD, 0x0BD0, 0x0CFF, 0x0E4C, 0x0FBA, 0x114C, 0x1307, 0x14EE, 0x1706, 0x1954,
-        0x1BDC, 0x1EA5, 0x21B6, 0x2515, 0x28CA, 0x2CDF, 0x315B, 0x364B, 0x3BB9, 0x41B2, 0x4844, 0x4F7E,
-        0x5771, 0x602F, 0x69CE, 0x7462, 0x7FFF,
-    }
-
-    duty = [8]float64{
-        1 - 0.125,
-        1 - 0.250,
-        1 - 0.375,
-        1 - 0.500,
-        1 - 0.625,
-        1 - 0.750,
-        1 - 0.875,
-        1 - 0.000,
-    }
+	duty = [8]float64{
+		1 - 0.125,
+		1 - 0.250,
+		1 - 0.375,
+		1 - 0.500,
+		1 - 0.625,
+		1 - 0.750,
+		1 - 0.875,
+		1 - 0.000,
+	}
 )
 
 type Channel struct {
-    Idx int
-	Snd        *Snd
-	Mem        *Mem
+	Idx int
+	Snd *Snd
+	Mem *Mem
 
 	Start   bool
 	Playing bool
@@ -49,7 +47,7 @@ type Channel struct {
 	Duty       uint32
 	RepeatMode uint32
 	Format     uint32
-    Hold bool
+	Hold       bool
 
 	SrcAddr       uint32
 	TimerValue    uint16
@@ -61,18 +59,18 @@ type Channel struct {
 	Samples []int16
 
 	isNoise bool
-    lfsr uint32
+	lfsr    uint32
 
-    isDuty bool
-    phase float64
+	isDuty bool
+	phase  float64
 }
 
 func NewChannel(idx int, s *Snd) Channel {
 
 	c := Channel{
-        Idx: idx,
-		Snd: s,
-        lfsr: 0x7FFF,
+		Idx:  idx,
+		Snd:  s,
+		lfsr: 0x7FFF,
 	}
 
 	return c
@@ -88,10 +86,10 @@ func (c *Channel) GetSample() (int8, int8) {
 		switch c.Format {
 		case 2:
 			c.DecompressADPCM()
-        case 3:
-            if c.isNoise {
-                c.lfsr = 0x7FFF
-            }
+		case 3:
+			if c.isNoise {
+				c.lfsr = 0x7FFF
+			}
 		}
 	}
 
@@ -103,42 +101,48 @@ func (c *Channel) GetSample() (int8, int8) {
 		return 0, 0
 	}
 
-    sndFreq := float64(c.Snd.sndFrequency)
-    if c.Format == 3 && c.isDuty {
-        //Each duty cycle consists of eight HIGH or LOW samples,
-        //so the sound frequency is 1/8th of the selected sample rate (gbatek)
-        sndFreq *= 8
-    }
+	sndFreq := float64(c.Snd.sndFrequency)
+	if c.Format == 3 && c.isDuty {
+		//Each duty cycle consists of eight HIGH or LOW samples,
+		//so the sound frequency is 1/8th of the selected sample rate (gbatek)
+		sndFreq *= 8
+	}
 
-    // playbackRate / sndFreq == step
-    playbackRate := BASE_FREQ / float64(-int16(c.TimerValue))
-    c.SamplePos += playbackRate / sndFreq
+	// playbackRate / sndFreq == step
+	playbackRate := BASE_FREQ / float64(-int16(c.TimerValue))
+	c.SamplePos += playbackRate / sndFreq
 
 	var sample float64
 	switch c.Format {
-	case 0: sample = c.GetPCM8()
-	case 1: sample = c.GetPCM16()
-	case 2: sample = c.GetADPCM()
-    case 3: sample = c.GetPSG()
+	case 0:
+		sample = c.GetPCM8()
+	case 1:
+		sample = c.GetPCM16()
+	case 2:
+		sample = c.GetADPCM()
+	case 3:
+		sample = c.GetPSG()
 	}
 
 	switch c.VolDiv {
-	case 1: sample /= 2
-	case 2: sample /= 4
-	case 3: sample /= 16
+	case 1:
+		sample /= 2
+	case 2:
+		sample /= 4
+	case 3:
+		sample /= 16
 	}
 
 	sample *= float64(c.VolMul)
 
+	s := c.Snd
+	if chCapture := c.Idx == 0 && s.Capture[0].ChanSrc; chCapture {
+		s.Capture[0].Capture(sample)
+	}
 
-    s := c.Snd
-    if chCapture := c.Idx == 0 && s.Capture[0].ChanSrc; chCapture {
-        s.Capture[0].Capture(sample)
-    }
-
-    if chCapture := c.Idx == 2 && s.Capture[1].ChanSrc; chCapture {
-        s.Capture[1].Capture(sample)
-    }
+	if chCapture := c.Idx == 2 && s.Capture[1].ChanSrc; chCapture {
+		s.Capture[1].Capture(sample)
+	}
 
 	l := sample * (float64(127-c.Panning) / 127)
 	r := sample * (float64(c.Panning) / 127)
@@ -178,9 +182,9 @@ func (c *Channel) GetPCM16() float64 {
 		}
 	}
 
-    v := int16(uint16(c.Snd.Mem.Read16(
-			c.SrcAddr+(uint32(c.SamplePos)*2),
-			false)))
+	v := int16(uint16(c.Snd.Mem.Read16(
+		c.SrcAddr+(uint32(c.SamplePos)*2),
+		false)))
 
 	return float64(v) / 32768
 }
@@ -244,7 +248,7 @@ func (c *Channel) GetADPCM() float64 {
 	if int(c.SamplePos) >= len(c.Samples) {
 
 		if loop := c.RepeatMode == 1; loop {
-            c.SamplePos = (float64(c.StartPosition * 4) - 4)
+			c.SamplePos = (float64(c.StartPosition*4) - 4)
 		} else {
 			c.Playing = false
 			return 0
@@ -256,37 +260,40 @@ func (c *Channel) GetADPCM() float64 {
 }
 
 func (c *Channel) GetPSG() float64 {
-    switch {
-    case c.isNoise: return c.GetNoise()
-    case c.isDuty:  return c.GetWaveDuty()
-    default:        return 0
-    }
+	switch {
+	case c.isNoise:
+		return c.GetNoise()
+	case c.isDuty:
+		return c.GetWaveDuty()
+	default:
+		return 0
+	}
 }
 
 func (c *Channel) GetNoise() float64 {
 
-    // untested
+	// untested
 
-    carry := c.lfsr & 1 == 1
-    c.lfsr >>= 1
+	carry := c.lfsr&1 == 1
+	c.lfsr >>= 1
 
-    if carry {
-        c.lfsr ^= 0x6000
-        return -1
-    }
+	if carry {
+		c.lfsr ^= 0x6000
+		return -1
+	}
 
-    return 1
+	return 1
 }
 
 func (c *Channel) GetWaveDuty() float64 {
 
-    if c.SamplePos >= 1.0 {
-        c.SamplePos -= 1.0
-    }
+	if c.SamplePos >= 1.0 {
+		c.SamplePos -= 1.0
+	}
 
-    if c.SamplePos < duty[c.Duty] {
-        return -1
-    }
+	if c.SamplePos < duty[c.Duty] {
+		return -1
+	}
 
-    return 1
+	return 1
 }

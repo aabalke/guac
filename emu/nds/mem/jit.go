@@ -1,5 +1,5 @@
 package mem
 
 type Jit interface {
-    InvalidatePage(addr uint32)
+	InvalidatePage(addr uint32)
 }

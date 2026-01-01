@@ -46,20 +46,20 @@ func (f *Fog) ApplyFog(c Color, depth float32) Color {
 
 	diff := (depth - b0) / (b1 - b0)
 
-    var den float32
-    if atThreshold := math.IsNaN(float64(diff)); atThreshold {
-        den = d0 / 0x7F
-    } else {
-        den = (d0*(1-diff) + d1*diff) / 0x7F
-    }
+	var den float32
+	if atThreshold := math.IsNaN(float64(diff)); atThreshold {
+		den = d0 / 0x7F
+	} else {
+		den = (d0*(1-diff) + d1*diff) / 0x7F
+	}
 
-    den = max(0, min(1, den))
+	den = max(0, min(1, den))
 
-    if !f.AlphaOnly {
-        c.R = (f.Color.R*den + c.R*(1-den))
-        c.G = (f.Color.G*den + c.G*(1-den))
-        c.B = (f.Color.B*den + c.B*(1-den))
-    }
+	if !f.AlphaOnly {
+		c.R = (f.Color.R*den + c.R*(1-den))
+		c.G = (f.Color.G*den + c.G*(1-den))
+		c.B = (f.Color.B*den + c.B*(1-den))
+	}
 
 	c.A = (f.Color.A*den + c.A*(1-den))
 

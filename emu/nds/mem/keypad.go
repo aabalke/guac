@@ -1,11 +1,9 @@
 package mem
 
-import "github.com/aabalke/guac/emu/gba/utils"
-
 type Keypad struct {
-	KEYINPUT uint16
-    KEYINPUT2 uint16
-	KEYCNT   uint16
+	KEYINPUT  uint16
+	KEYINPUT2 uint16
+	KEYCNT    uint16
 }
 
 func (k *Keypad) readINPUT2() uint8 {
@@ -42,11 +40,11 @@ func (k *Keypad) writeCNT(v uint8, hi bool) {
 
 func (k *Keypad) KeyIRQ() bool {
 
-	if disabled := utils.BitEnabled(uint32(k.KEYCNT), 14); disabled {
+	if disabled := (k.KEYCNT>>14)&1 != 0; disabled {
 		return false
 	}
 
-	andFlag := utils.BitEnabled(uint32(k.KEYCNT), 15)
+	andFlag := (k.KEYCNT>>15)&1 != 0
 
 	if or := !andFlag && ^(k.KEYCNT)&k.KEYINPUT != 0; or {
 		return true

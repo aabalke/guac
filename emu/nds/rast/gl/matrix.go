@@ -16,16 +16,16 @@ func Identity() Matrix {
 }
 
 func Translate(v Vector) Matrix {
-    // row based
+	// row based
 	return Matrix{
 		1, 0, 0, 0,
 		0, 1, 0, 0,
 		0, 0, 1, 0,
 		v.X, v.Y, v.Z, 1}
-		//1, 0, 0, v.X,
-		//0, 1, 0, v.Y,
-		//0, 0, 1, v.Z,
-		//0,0,0, 1}
+	//1, 0, 0, v.X,
+	//0, 1, 0, v.Y,
+	//0, 0, 1, v.Z,
+	//0,0,0, 1}
 }
 
 func Scale(v Vector) Matrix {
@@ -105,10 +105,10 @@ func (a Matrix) Mul(b Matrix) Matrix {
 }
 
 func (a Matrix) VecMul3x3(b Vector) Vector {
-    x := b.Dot(a.Col3(0))
-    y := b.Dot(a.Col3(1))
-    z := b.Dot(a.Col3(2))
-    return Vector{x, y, z}
+	x := b.Dot(a.Col3(0))
+	y := b.Dot(a.Col3(1))
+	z := b.Dot(a.Col3(2))
+	return Vector{x, y, z}
 }
 
 func (a Matrix) MulPosition(b Vector) Vector {
@@ -127,10 +127,10 @@ func (a Matrix) MulPositionW(b Vector) VectorW {
 }
 
 func (a Matrix) MulVectorW(b VectorW) VectorW {
-    // row based
-    x := b.X*a.X00 + b.Y*a.X10 + b.Z*a.X20 + b.W*a.X30
-    y := b.X*a.X01 + b.Y*a.X11 + b.Z*a.X21 + b.W*a.X31
-    z := b.X*a.X02 + b.Y*a.X12 + b.Z*a.X22 + b.W*a.X32
-    w := b.X*a.X03 + b.Y*a.X13 + b.Z*a.X23 + b.W*a.X33
+	// row based
+	x := b.X*a.X00 + b.Y*a.X10 + b.Z*a.X20 + b.W*a.X30
+	y := b.X*a.X01 + b.Y*a.X11 + b.Z*a.X21 + b.W*a.X31
+	z := b.X*a.X02 + b.Y*a.X12 + b.Z*a.X22 + b.W*a.X32
+	w := b.X*a.X03 + b.Y*a.X13 + b.Z*a.X23 + b.W*a.X33
 	return VectorW{x, y, z, w}
 }

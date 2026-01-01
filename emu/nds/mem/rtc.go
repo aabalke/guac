@@ -7,58 +7,57 @@ import (
 // interrupts not setup
 
 type Rtc struct {
+	wasCs    bool
+	wasClk   bool
+	wasWrite bool
 
-    wasCs bool
-    wasClk bool
-    wasWrite bool
+	data uint8
+	cnt  int
 
-    data uint8
-    cnt int
+	RegStatus1 uint8
+	RegStatus2 uint8
 
-    RegStatus1 uint8
-    RegStatus2 uint8
+	IsWriting bool
+	Buffer    []uint8
+	Idx       int
 
-    IsWriting bool
-    Buffer []uint8
-    Idx int
-
-    Alarms [2]Alarm
+	Alarms [2]Alarm
 }
 
 type Alarm struct {
-    Dow uint8
-    Hr  uint8
-    MinFreq uint8
+	Dow     uint8
+	Hr      uint8
+	MinFreq uint8
 }
 
 const (
-    BIT_CLK_OUT = (1 << 1)
-    BIT_SEL_OUT = (1 << 2)
-    BIT_DAT_DIR = (1 << 4)
+	BIT_CLK_OUT = (1 << 1)
+	BIT_SEL_OUT = (1 << 2)
+	BIT_DAT_DIR = (1 << 4)
 
-    CMD_STS1 = 0
-    CMD_ALM1 = 1
-    CMD_DT   = 2
-    CMD_CADJ = 3
-    CMD_STS2 = 4
-    CMD_ALM2 = 5
-    CMD_TIME = 6
-    CMD_FREE = 7
+	CMD_STS1 = 0
+	CMD_ALM1 = 1
+	CMD_DT   = 2
+	CMD_CADJ = 3
+	CMD_STS2 = 4
+	CMD_ALM2 = 5
+	CMD_TIME = 6
+	CMD_FREE = 7
 )
 
 func (r *Rtc) InitRtc() {
-    //r.RegStatus1 = 0x80
-    r.RegStatus1 = 0x00
-    r.RegStatus2 = 0x00
+	//r.RegStatus1 = 0x80
+	r.RegStatus1 = 0x00
+	r.RegStatus2 = 0x00
 }
 
 func (r *Rtc) Write(v uint8) {
 
-    clk     := v & BIT_CLK_OUT != 0
-    cs      := v & BIT_SEL_OUT != 0
-    isWrite := v & BIT_DAT_DIR != 0
+	clk := v&BIT_CLK_OUT != 0
+	cs := v&BIT_SEL_OUT != 0
+	isWrite := v&BIT_DAT_DIR != 0
 
-    if init := cs && !r.wasCs; init {
+	if init := cs && !r.wasCs; init {
 		r.data = 0
 		if isWrite {
 			r.cnt = 8
@@ -67,17 +66,17 @@ func (r *Rtc) Write(v uint8) {
 		}
 	}
 
-    if send := cs && !clk && r.wasClk; send {
-        r.data >>= 1
-        r.cnt++
+	if send := cs && !clk && r.wasClk; send {
+		r.data >>= 1
+		r.cnt++
 		if isWrite {
 			r.data |= (v & 1) << 7
-            if fullByte := r.cnt == 8; fullByte {
+			if fullByte := r.cnt == 8; fullByte {
 				r.WriteData(r.data)
 				r.cnt = 0
 			}
 		} else {
-            if fullByte := r.cnt == 8 || r.wasWrite; fullByte {
+			if fullByte := r.cnt == 8 || r.wasWrite; fullByte {
 				r.data = r.ReadData()
 				r.cnt = 0
 			}
@@ -107,22 +106,22 @@ func (r *Rtc) Read() uint8 {
 
 func (r *Rtc) ReadData() uint8 {
 
-    if r.IsWriting {
-        return 0
-    }
+	if r.IsWriting {
+		return 0
+	}
 
-    if r.Idx >= len(r.Buffer) {
-        return 0
-    }
+	if r.Idx >= len(r.Buffer) {
+		return 0
+	}
 
-    d := r.Buffer[r.Idx]
-    r.Idx++
+	d := r.Buffer[r.Idx]
+	r.Idx++
 
-    return d
+	return d
 }
 
 func (r *Rtc) isFreqDuty() bool {
-    return r.RegStatus2 & (1 << 2) == 0
+	return r.RegStatus2&(1<<2) == 0
 }
 
 var paramCnts = [8]int{1, 3, 7, 1, 1, 3, 3, 1}
@@ -132,10 +131,10 @@ func (r *Rtc) writeReg(v uint8) {
 		paramCnts[1] = 1
 	} else {
 		paramCnts[1] = 3
-    }
+	}
 
 	r.Buffer = append(r.Buffer, v)
-    if needParams := len(r.Buffer) != paramCnts[r.Idx]; needParams {
+	if needParams := len(r.Buffer) != paramCnts[r.Idx]; needParams {
 		return
 	}
 	r.IsWriting = false
@@ -166,13 +165,13 @@ func (r *Rtc) WriteData(v uint8) {
 		return
 	}
 
-    if invalidCmd := v & 0xF != 0b0110; invalidCmd {
+	if invalidCmd := v&0xF != 0b0110; invalidCmd {
 		return
 	}
 
 	reg := (v >> 4) & 7
 
-	if write := v & 0x80 == 0; write {
+	if write := v&0x80 == 0; write {
 		r.IsWriting = true
 		r.Buffer = nil
 		r.Idx = int(reg)
@@ -192,7 +191,7 @@ func (r *Rtc) WriteData(v uint8) {
 		now := time.Now()
 
 		var hour uint8
-        if hr24 := r.RegStatus1 & 2 != 0; hr24 {
+		if hr24 := r.RegStatus1&2 != 0; hr24 {
 			hour = bcd(uint(now.Hour()))
 		} else {
 			hour = bcd(uint(now.Hour() % 12))
@@ -221,8 +220,8 @@ func (r *Rtc) WriteData(v uint8) {
 				r.Alarms[0].MinFreq,
 			)
 
-            return
-        }
+			return
+		}
 
 		r.Buffer = append(r.Buffer,
 			r.Alarms[0].Dow,
@@ -241,9 +240,9 @@ func (r *Rtc) WriteData(v uint8) {
 
 func bcd(v uint) uint8 {
 
-    if v > 99 {
-        return 0xFF
-    }
+	if v > 99 {
+		return 0xFF
+	}
 
-    return uint8((v/10)*16 + (v % 10))
+	return uint8((v/10)*16 + (v % 10))
 }

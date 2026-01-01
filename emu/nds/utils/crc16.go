@@ -13,12 +13,12 @@ var vals = [8]uint32{
 
 func Crc16(bytes []uint8, crc uint32) uint16 {
 
-    // crc inits in 0xFFFF, or 0x0
+	// crc inits in 0xFFFF, or 0x0
 
-    for i := range len(bytes) {
-        crc ^= uint32(bytes[i])
+	for i := range len(bytes) {
+		crc ^= uint32(bytes[i])
 		for j := range 8 {
-			carry := crc & 1 != 0
+			carry := crc&1 != 0
 			crc >>= 1
 			if carry {
 				crc ^= vals[j] << (7 - j)

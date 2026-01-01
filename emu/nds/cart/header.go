@@ -50,7 +50,7 @@ func NewHeader(c *Cartridge) Header {
 
 	h.validate()
 
-    fmt.Printf("TITLE %s CODE %s UNIT %d\n", h.Title, h.GameCode, h.UnitCode)
+	fmt.Printf("TITLE %s CODE %s UNIT %d\n", h.Title, h.GameCode, h.UnitCode)
 
 	//fmt.Printf("ARM9 OFF %08X\n", h.Arm9Offset)
 	//fmt.Printf("ARM9 ENT %08X\n", h.Arm9EntryAddr)

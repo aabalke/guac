@@ -341,60 +341,60 @@ func (s *Sqrt) Read(addr uint32) uint8 {
 func (s *Sqrt) Calc() {
 
 	if s.is64 {
-        s.RES = uint32(sqrt(s.PARAM))
-        return
+		s.RES = uint32(sqrt(s.PARAM))
+		return
 	}
-    s.RES = uint32(sqrt(s.PARAM & 0xFFFF_FFFF))
+	s.RES = uint32(sqrt(s.PARAM & 0xFFFF_FFFF))
 }
 
 func sqrt(input uint64) uint64 {
 
-    if input == 0 {
-        return 0
-    }
+	if input == 0 {
+		return 0
+	}
 
-    lo, hi, bound := uint64(0), input, uint64(1)
+	lo, hi, bound := uint64(0), input, uint64(1)
 
-    for bound < hi {
-        hi >>= 1
-        bound <<= 1
-    }
+	for bound < hi {
+		hi >>= 1
+		bound <<= 1
+	}
 
-    for {
-        hi = input
-        acc := uint64(0)
-        lo = bound
+	for {
+		hi = input
+		acc := uint64(0)
+		lo = bound
 
-        for {
-            oldLower := lo
-            if lo <= hi>>1 {
-                lo <<= 1
-            }
-            if oldLower >= hi>>1 {
-                break
-            }
-        }
+		for {
+			oldLower := lo
+			if lo <= hi>>1 {
+				lo <<= 1
+			}
+			if oldLower >= hi>>1 {
+				break
+			}
+		}
 
-        for {
-            acc <<= 1
-            if hi >= lo {
-                acc++
-                hi -= lo
-            }
-            if lo == bound {
-                break
-            }
-            lo >>= 1
-        }
+		for {
+			acc <<= 1
+			if hi >= lo {
+				acc++
+				hi -= lo
+			}
+			if lo == bound {
+				break
+			}
+			lo >>= 1
+		}
 
-        oldBound := bound
-        bound += acc
-        bound >>= 1
-        if bound >= oldBound {
-            bound = oldBound
-            break
-        }
-    }
+		oldBound := bound
+		bound += acc
+		bound >>= 1
+		if bound >= oldBound {
+			bound = oldBound
+			break
+		}
+	}
 
-    return bound
+	return bound
 }

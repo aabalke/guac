@@ -1,17 +1,17 @@
 package mem
 
 type Dispstat struct {
-    A7, A9 uint16
+	A7, A9 uint16
 }
 
 //type Dispstat uint16
 
 func (d *Dispstat) Write(v uint8, hi bool, arm9 bool) {
 
-    r := &d.A7
-    if arm9 {
-        r = &d.A9
-    }
+	r := &d.A7
+	if arm9 {
+		r = &d.A9
+	}
 
 	if hi {
 		*r = (uint16(*r) & 0b1111_1111) | (uint16(v) << 8)
@@ -25,8 +25,8 @@ func (d *Dispstat) Write(v uint8, hi bool, arm9 bool) {
 func (d *Dispstat) SetVBlank(v bool) {
 
 	if v {
-        d.A7 |= 0b1
-        d.A9 |= 0b1
+		d.A7 |= 0b1
+		d.A9 |= 0b1
 		return
 	}
 
@@ -37,8 +37,8 @@ func (d *Dispstat) SetVBlank(v bool) {
 func (d *Dispstat) SetHBlank(v bool) {
 
 	if v {
-        d.A7 |= 0b10
-        d.A9 |= 0b10
+		d.A7 |= 0b10
+		d.A9 |= 0b10
 		return
 	}
 
@@ -48,14 +48,14 @@ func (d *Dispstat) SetHBlank(v bool) {
 
 func (d *Dispstat) SetVCFlag(v, arm9 bool) {
 
-    r := &d.A7
-    if arm9 {
-        r = &d.A9
-    }
+	r := &d.A7
+	if arm9 {
+		r = &d.A9
+	}
 
 	if v {
-        *r |= 0b100
-        *r |= 0b100
+		*r |= 0b100
+		*r |= 0b100
 		return
 	}
 
@@ -65,10 +65,10 @@ func (d *Dispstat) SetVCFlag(v, arm9 bool) {
 
 func (d *Dispstat) GetLYC(arm9 bool) uint32 {
 
-    r := &d.A7
-    if arm9 {
-        r = &d.A9
-    }
+	r := &d.A7
+	if arm9 {
+		r = &d.A9
+	}
 
-    return uint32(*r >> 8) + ((uint32(*r >> 7) & 1) << 8)
+	return uint32(*r>>8) + ((uint32(*r>>7) & 1) << 8)
 }

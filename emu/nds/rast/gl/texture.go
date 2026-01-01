@@ -5,32 +5,32 @@ import (
 )
 
 type VRAM interface {
-    ReadTexture(uint32) uint8
-    ReadPalTexture(uint32) uint8
+	ReadTexture(uint32) uint8
+	ReadPalTexture(uint32) uint8
 }
 
 type Texture struct {
-    Width, Height       int
-	RepeatS, RepeatT    bool
-	FlipS, FlipT        bool
-    CachedTexture       *[]Color
-    Mode uint8
-    ToonTbl *[32]Color
-    IsHighlight bool
+	Width, Height    int
+	RepeatS, RepeatT bool
+	FlipS, FlipT     bool
+	CachedTexture    *[]Color
+	Mode             uint8
+	ToonTbl          *[32]Color
+	IsHighlight      bool
 }
 
 func (t *Texture) Sample(u, v float32) Color {
-    idx := t.getTextureIdx(u, v)
-    return t.getColor(idx)
+	idx := t.getTextureIdx(u, v)
+	return t.getColor(idx)
 }
 
 func (t *Texture) getColor(idx uint32) Color {
 
-    if idx >= uint32(len(*t.CachedTexture)) {
-        return Transparent
-    }
+	if idx >= uint32(len(*t.CachedTexture)) {
+		return Transparent
+	}
 
-    return (*t.CachedTexture)[idx]
+	return (*t.CachedTexture)[idx]
 }
 
 func (t *Texture) getTextureIdx(u, v float32) uint32 {
@@ -38,44 +38,44 @@ func (t *Texture) getTextureIdx(u, v float32) uint32 {
 	x := int(u * float32(t.Width))
 	y := int(v * float32(t.Height))
 
-    if t.RepeatT {
+	if t.RepeatT {
 
-        flip := t.FlipT && uint(math.Floor(float64(v))) & 1 == 1
-        v -= float32(math.Floor(float64(v)))
-        tmp := int(v * float32(t.Height))
+		flip := t.FlipT && uint(math.Floor(float64(v)))&1 == 1
+		v -= float32(math.Floor(float64(v)))
+		tmp := int(v * float32(t.Height))
 
-        // does tmp need - 1 not just flip??
+		// does tmp need - 1 not just flip??
 
-        if flip {
-            y = t.Height - tmp - 1
-        } else {
-            y = tmp
-        }
+		if flip {
+			y = t.Height - tmp - 1
+		} else {
+			y = tmp
+		}
 
-    } else {
-        y = min(t.Height-1, y)
-        y = max(y, 0)
-    }
+	} else {
+		y = min(t.Height-1, y)
+		y = max(y, 0)
+	}
 
-    if t.RepeatS {
-        flip := t.FlipS && uint(math.Floor(float64(u))) & 1 == 1 
-        u -= float32(math.Floor(float64(u)))
-        tmp := int(u * float32(t.Width))
+	if t.RepeatS {
+		flip := t.FlipS && uint(math.Floor(float64(u)))&1 == 1
+		u -= float32(math.Floor(float64(u)))
+		tmp := int(u * float32(t.Width))
 
-        // does tmp need - 1 not just flip??
+		// does tmp need - 1 not just flip??
 
-        if flip {
-            x = t.Width - tmp - 1
-        } else {
-            x = tmp
-        }
+		if flip {
+			x = t.Width - tmp - 1
+		} else {
+			x = tmp
+		}
 
-    } else {
-        x = min(t.Width-1, x)
-        x = max(x, 0)
-    }
+	} else {
+		x = min(t.Width-1, x)
+		x = max(x, 0)
+	}
 
-    return uint32((x + y * (t.Width)))
+	return uint32((x + y*(t.Width)))
 }
 
 //type BilinearCoords struct {

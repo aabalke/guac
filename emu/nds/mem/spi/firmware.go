@@ -10,137 +10,135 @@ import (
 var FirmwareData []byte
 
 const (
-    INST_NONE = 0x00
+	INST_NONE = 0x00
 
-    INST_RDID = 0x9F
-    INST_READ = 0x03
-    INST_RDSR = 0x05
+	INST_RDID = 0x9F
+	INST_READ = 0x03
+	INST_RDSR = 0x05
 
-    INST_WREN = 0x06
-    INST_WRDI = 0x04
-    INST_PW   = 0x0A
+	INST_WREN = 0x06
+	INST_WRDI = 0x04
+	INST_PW   = 0x0A
 )
 
 type Firmware struct {
-    Idx uint32
+	Idx uint32
 
-    Addr uint32
-    WriteEnabled bool
-    WriteBuffer []uint8
+	Addr         uint32
+	WriteEnabled bool
+	WriteBuffer  []uint8
 }
 
-func (f *Firmware) Transfer(data []uint8) (reply []uint8, stat uint8){
+func (f *Firmware) Transfer(data []uint8) (reply []uint8, stat uint8) {
 
-    switch inst := data[0]; inst {
-    case INST_NONE:
+	switch inst := data[0]; inst {
+	case INST_NONE:
 
-        return nil, STAT_DONE
+		return nil, STAT_DONE
 
-    case INST_RDID:
+	case INST_RDID:
 
-        // 9Fh  RDID Read JEDEC Identification (Read 1..3 ID Bytes)
-        // (Manufacturer, Device Type, Capacity)
+		// 9Fh  RDID Read JEDEC Identification (Read 1..3 ID Bytes)
+		// (Manufacturer, Device Type, Capacity)
 
-        if len(data) < 1 {
-            return nil, STAT_CONT
-        }
+		if len(data) < 1 {
+			return nil, STAT_CONT
+		}
 
-        //ID 20h,40h,11h - ST 45PE10V6 - 128 Kbytes (Nintendo DSi) (nocash)
+		//ID 20h,40h,11h - ST 45PE10V6 - 128 Kbytes (Nintendo DSi) (nocash)
 
-        return []uint8{0x20, 0x40, 0x11}, STAT_DONE
+		return []uint8{0x20, 0x40, 0x11}, STAT_DONE
 
-    case INST_RDSR:
+	case INST_RDSR:
 
-        //05h  RDSR Read Status Register (Read Status Register, endless repeated)
-        //Bit7-2  Not used (zero)
-        //Bit1    WEL Write Enable Latch             (0=No, 1=Enable)
-        //Bit0    WIP Write/Program/Erase in Progess (0=No, 1=Busy)
+		//05h  RDSR Read Status Register (Read Status Register, endless repeated)
+		//Bit7-2  Not used (zero)
+		//Bit1    WEL Write Enable Latch             (0=No, 1=Enable)
+		//Bit0    WIP Write/Program/Erase in Progess (0=No, 1=Busy)
 
-        if f.WriteEnabled {
-            return []uint8{2}, STAT_DONE
-        }
+		if f.WriteEnabled {
+			return []uint8{2}, STAT_DONE
+		}
 
-        return []uint8{0}, STAT_DONE
+		return []uint8{0}, STAT_DONE
 
-    case INST_READ:
+	case INST_READ:
 
-        switch len(data) {
-        case 0, 1, 2, 3:
-            return nil, STAT_CONT
-        case 4:
+		switch len(data) {
+		case 0, 1, 2, 3:
+			return nil, STAT_CONT
+		case 4:
 
-            f.Addr =  uint32(data[1]) << 16
-            f.Addr |= uint32(data[2]) << 8
-            f.Addr |= uint32(data[3])
-        }
+			f.Addr = uint32(data[1]) << 16
+			f.Addr |= uint32(data[2]) << 8
+			f.Addr |= uint32(data[3])
+		}
 
-        const BUF_SIZE = 1024
+		const BUF_SIZE = 1024
 
-        var (
-            buffer []uint8
-            i uint32
-        )
+		var (
+			buffer []uint8
+			i      uint32
+		)
 
-        for i = range BUF_SIZE {
+		for i = range BUF_SIZE {
 
-            if f.Addr + i >= uint32(len(FirmwareData)) {
-                buffer = append(buffer, 0)
-                continue
-            }
+			if f.Addr+i >= uint32(len(FirmwareData)) {
+				buffer = append(buffer, 0)
+				continue
+			}
 
-            buffer = append(buffer, FirmwareData[f.Addr + i])
-        }
+			buffer = append(buffer, FirmwareData[f.Addr+i])
+		}
 
-        f.Addr += BUF_SIZE
+		f.Addr += BUF_SIZE
 
-        return buffer, STAT_CONT
+		return buffer, STAT_CONT
 
-    case INST_WREN:
+	case INST_WREN:
 
-        f.WriteEnabled = true
+		f.WriteEnabled = true
 
-        return nil, STAT_DONE
+		return nil, STAT_DONE
 
-    case INST_WRDI:
+	case INST_WRDI:
 
-        f.WriteEnabled = false
+		f.WriteEnabled = false
 
-        return nil, STAT_DONE
+		return nil, STAT_DONE
 
-    case INST_PW:
+	case INST_PW:
 
-        switch len(data) {
-        case 0, 1, 2, 3:
-            return nil, STAT_CONT
-        case 4:
-            f.Addr =  uint32(data[1]) << 16
-            f.Addr |= uint32(data[2]) << 8
-            f.Addr |= uint32(data[3])
-        }
+		switch len(data) {
+		case 0, 1, 2, 3:
+			return nil, STAT_CONT
+		case 4:
+			f.Addr = uint32(data[1]) << 16
+			f.Addr |= uint32(data[2]) << 8
+			f.Addr |= uint32(data[3])
+		}
 
-        f.WriteBuffer = data[4:]
+		f.WriteBuffer = data[4:]
 
-        return nil, STAT_CONT
+		return nil, STAT_CONT
 
-    default:
-        panic(fmt.Sprintf("UNKNOWN OR UN SETUP FIRMWARE INST CODE %02X", inst))
-        return nil, STAT_DONE
-    }
+	default:
+		panic(fmt.Sprintf("UNKNOWN OR UN SETUP FIRMWARE INST CODE %02X", inst))
+		return nil, STAT_DONE
+	}
 }
 
 func (f *Firmware) Write() {
 
-    if f.WriteBuffer == nil {
-        return
-    }
+	if f.WriteBuffer == nil {
+		return
+	}
 
-    log.Printf("Firmware Write, will need to be stored at some point ADDR %08X V %v\n", f.Addr, f.WriteBuffer)
+	log.Printf("Firmware Write, will need to be stored at some point ADDR %08X V %v\n", f.Addr, f.WriteBuffer)
 
-    //for i, v := range f.WriteBuffer {
-    //    FirmwareData[f.Addr + uint32(i)] = v
-    //}
+	//for i, v := range f.WriteBuffer {
+	//    FirmwareData[f.Addr + uint32(i)] = v
+	//}
 
-    f.WriteBuffer = nil
+	f.WriteBuffer = nil
 }
-
-

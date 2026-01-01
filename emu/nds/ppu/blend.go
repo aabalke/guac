@@ -46,43 +46,43 @@ func (bp *BlendPalettes) SetBgPalettes(palData, bgIdx uint32, targetA3d bool, al
 		bp.APalette = palData
 		bp.hasA = true
 		bp.targetATop = true
-        bp.targetA3d = false
+		bp.targetA3d = false
 
 		if targetA3d && bgIdx == 0 {
 			bp.targetA3d = true
 			bp.alpha = alpha
 		}
 
-        return
-    }
+		return
+	}
 
-    bp.targetATop = false
+	bp.targetATop = false
 
-    // not sure if this is required or correct
-    bp.targetA3d = false
+	// not sure if this is required or correct
+	bp.targetA3d = false
 
-    if bp.Bld.b[bgIdx] {
-        bp.BPalette = palData
-        bp.hasB = true
-    }
+	if bp.Bld.b[bgIdx] {
+		bp.BPalette = palData
+		bp.hasB = true
+	}
 }
 
 func (bp *BlendPalettes) SetObjPalettes(palData uint32, semiTransparent bool) {
 
-    bp.NoBlendPalette = palData
+	bp.NoBlendPalette = palData
 
-    if bp.Bld.a[4] || semiTransparent {
-        bp.APalette = palData
-        bp.hasA = true
-        bp.targetATop = true
-        return
-    }
+	if bp.Bld.a[4] || semiTransparent {
+		bp.APalette = palData
+		bp.hasA = true
+		bp.targetATop = true
+		return
+	}
 
-    bp.targetATop = false
-    if bp.Bld.b[4] {
-        bp.BPalette = palData
-        bp.hasB = true
-    }
+	bp.targetATop = false
+	if bp.Bld.b[4] {
+		bp.BPalette = palData
+		bp.hasB = true
+	}
 
 }
 
@@ -130,7 +130,7 @@ func (bp *BlendPalettes) alphaBlend() uint32 {
 	blend := func(a, b float32) uint32 {
 
 		if bp.targetA3d {
-			val := a*(bp.alpha) + b*(1 - bp.alpha)
+			val := a*(bp.alpha) + b*(1-bp.alpha)
 			return min(31, max(0, uint32(val)))
 		}
 

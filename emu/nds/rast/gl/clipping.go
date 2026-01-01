@@ -1,11 +1,11 @@
 package gl
 
 var clipPlanes = []clipPlane{
-	{VectorW{1, 0, 0, 1},  VectorW{-1, 0, 0, 1}},
+	{VectorW{1, 0, 0, 1}, VectorW{-1, 0, 0, 1}},
 	{VectorW{-1, 0, 0, 1}, VectorW{1, 0, 0, 1}},
-	{VectorW{0, 1, 0, 1},  VectorW{0, -1, 0, 1}},
+	{VectorW{0, 1, 0, 1}, VectorW{0, -1, 0, 1}},
 	{VectorW{0, -1, 0, 1}, VectorW{0, 1, 0, 1}},
-	{VectorW{0, 0, 1, 1},  VectorW{0, 0, -1, 1}},
+	{VectorW{0, 0, 1, 1}, VectorW{0, 0, -1, 1}},
 	{VectorW{0, 0, -1, 1}, VectorW{0, 0, 1, 1}},
 }
 

@@ -1,10 +1,9 @@
 package arm9
 
 import (
+	"github.com/aabalke/guac/emu/nds/utils"
 	"math/bits"
 	"unsafe"
-
-	"github.com/aabalke/guac/emu/nds/utils"
 )
 
 const (
@@ -523,7 +522,7 @@ func (cpu *Cpu) thumbPushPop(op uint16) {
 		pclr  = (op>>8)&1 != 0
 		rlist = op & 0xFF
 		pop   = (op>>11)&1 != 0
-        p unsafe.Pointer
+		p     unsafe.Pointer
 	)
 
 	reg := 0
@@ -531,12 +530,11 @@ func (cpu *Cpu) thumbPushPop(op uint16) {
 		reg = 7
 	}
 
-
-    if pop {
-        p, _ = cpu.mem.ReadPtr(r[SP], true)
-    } else {
-        p, _ = cpu.mem.WritePtr(r[SP], true)
-    }
+	if pop {
+		p, _ = cpu.mem.ReadPtr(r[SP], true)
+	} else {
+		p, _ = cpu.mem.WritePtr(r[SP], true)
+	}
 
 	if !pop && pclr {
 		r[SP] -= 4
@@ -760,9 +758,9 @@ func (cpu *Cpu) thumbLSSP(op uint16) {
 func (cpu *Cpu) thumbBlock(opcode uint16) {
 
 	r := &cpu.Reg.R
-    ldmia := (opcode >> 11) & 1 != 0
-    rb := (opcode >> 8) & 7
-    rlist := uint32(opcode & 0xFF)
+	ldmia := (opcode>>11)&1 != 0
+	rb := (opcode >> 8) & 7
+	rlist := uint32(opcode & 0xFF)
 	addr := r[rb] &^ 0b11
 
 	if !ldmia {
@@ -784,7 +782,7 @@ func (cpu *Cpu) thumbBlock(opcode uint16) {
 		}
 
 		for reg := range 8 {
-            if disabled := (rlist>>reg)&1 == 0; disabled {
+			if disabled := (rlist>>reg)&1 == 0; disabled {
 				continue
 			}
 
@@ -832,7 +830,7 @@ func (cpu *Cpu) thumbBlock(opcode uint16) {
 	}
 
 	for reg := range 8 {
-        if disabled := (rlist>>reg)&1 == 0; disabled {
+		if disabled := (rlist>>reg)&1 == 0; disabled {
 			continue
 		}
 

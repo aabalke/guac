@@ -3,7 +3,6 @@ package dma
 import (
 	"unsafe"
 
-	"github.com/aabalke/guac/emu/gba/utils"
 	"github.com/aabalke/guac/emu/nds/cpu"
 )
 
@@ -65,6 +64,13 @@ type DMA struct {
 	GcDst     uint32
 }
 
+//go:inline
+func ReplaceByte(value uint32, newByte uint32, byteOffset uint32) uint32 {
+	bitOffset := 8 * byteOffset
+	mask := uint32(0b1111_1111)
+	return (value &^ (mask << bitOffset)) | (newByte << bitOffset)
+}
+
 func (dma *DMA) Init(idx int, mem MemoryInterface, irq *cpu.Irq, arm9 bool) {
 	dma.Idx = idx
 	dma.mem = mem
@@ -89,12 +95,12 @@ func (dma *DMA) ReadControl(hi bool) uint8 {
 }
 
 func (dma *DMA) WriteSrc(v uint8, byte uint32) {
-	dma.Src = utils.ReplaceByte(dma.Src, uint32(v), byte)
+	dma.Src = ReplaceByte(dma.Src, uint32(v), byte)
 	dma.InitSrc = dma.Src
 }
 
 func (dma *DMA) WriteDst(v uint8, byte uint32) {
-	dma.Dst = utils.ReplaceByte(dma.Dst, uint32(v), byte)
+	dma.Dst = ReplaceByte(dma.Dst, uint32(v), byte)
 	dma.InitDst = dma.Dst
 	dma.GcDst = dma.Dst
 }
@@ -112,15 +118,15 @@ func (dma *DMA) WriteCount(v uint8, hi bool) {
 func (dma *DMA) WriteControl(v uint8, hi bool) {
 
 	if hi {
-		a := uint32(v)
 		wasDisabled := !dma.Enabled
-		dma.Control = (dma.Control & 0xFF) | (a << 8)
-		dma.SrcAdj = (dma.SrcAdj & 1) | (a&1)<<1
-		dma.Repeat = utils.BitEnabled(a, 1)
-		dma.isWord = utils.BitEnabled(a, 2)
-		dma.Mode = utils.GetVarData(a, 3, 5)
-		dma.IRQ = utils.BitEnabled(a, 6)
-		dma.Enabled = utils.BitEnabled(a, 7)
+		dma.Control = (dma.Control & 0xFF) | uint32(v<<8)
+		dma.SrcAdj = (dma.SrcAdj & 1) | uint32(v&1)<<1
+		dma.Repeat = (v>>1)&1 != 0
+
+		dma.isWord = (v>>2)&1 != 0
+		dma.Mode = uint32(v>>3) & 0b111
+		dma.IRQ = (v>>6)&1 != 0
+		dma.Enabled = (v>>7)&1 != 0
 
 		if wasDisabled && dma.Enabled {
 			dma.Src = dma.InitSrc

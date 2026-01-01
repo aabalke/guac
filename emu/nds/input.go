@@ -17,17 +17,17 @@ func (nds *Nds) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 	k2 := &nds.mem.Keypad.KEYINPUT2
 
 	*k = 0b11_1111_1111
-	*k2 |=  0b0100_1011
+	*k2 |= 0b0100_1011
 	*k2 &^= 0b1000_0000
 
-    mouseInput(nds, mouse, k2)
+	mouseInput(nds, mouse, k2)
 
 	for _, key := range keys {
 
 		keyStr := key.String()
 
 		switch {
-	    case slices.Contains(keyConfig.A, keyStr):
+		case slices.Contains(keyConfig.A, keyStr):
 			*k &^= 0b1
 		case slices.Contains(keyConfig.B, keyStr):
 			*k &^= 0b10
@@ -53,8 +53,8 @@ func (nds *Nds) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 			*k2 &^= 0b10
 		case slices.Contains(keyConfig.Y, keyStr):
 			*k2 &^= 0b10
-		//case slices.Contains(keyConfig.Hinge, keyStr):
-		//	*k2 |= 0b1000_0000
+			//case slices.Contains(keyConfig.Hinge, keyStr):
+			//	*k2 |= 0b1000_0000
 		}
 	}
 
@@ -87,8 +87,8 @@ func (nds *Nds) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 			*k2 &^= 0b1
 		case slices.Contains(buttonConfig.Y, buttonStr):
 			*k2 &^= 0b10
-		//case slices.Contains(buttonConfig.Hinge, buttonStr):
-		//	*k2 |= 0b1000_0000
+			//case slices.Contains(buttonConfig.Hinge, buttonStr):
+			//	*k2 |= 0b1000_0000
 		}
 	}
 
@@ -100,24 +100,21 @@ func (nds *Nds) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 
 func mouseInput(nds *Nds, mouse *input.Mouse, k2 *uint16) {
 
+	tsc := &nds.mem.Spi.Tsc
 
-    tsc := &nds.mem.Spi.Tsc
+	if inBounds := (mouse.X >= nds.BtmAbs.L && mouse.X < nds.BtmAbs.R &&
+		mouse.Y >= nds.BtmAbs.T && mouse.Y < nds.BtmAbs.B); !inBounds || !mouse.DraggedLeft {
 
-    if inBounds := (
-        mouse.X >= nds.BtmAbs.L && mouse.X < nds.BtmAbs.R &&
-        mouse.Y >= nds.BtmAbs.T && mouse.Y < nds.BtmAbs.B);
-        !inBounds || !mouse.DraggedLeft {
+		tsc.TouchActive = false
 
-            tsc.TouchActive = false
+		return
+	}
 
-            return
-    }
+	tsc.TouchActive = true
 
-    tsc.TouchActive = true
+	s := float32(SCREEN_WIDTH) / float32(nds.BtmAbs.W)
 
-    s := float32(SCREEN_WIDTH) / float32(nds.BtmAbs.W)
-
-    tsc.TouchX = uint16(float32(mouse.X - nds.BtmAbs.L) * s)
-    tsc.TouchY = uint16(float32(mouse.Y - nds.BtmAbs.T) * s)
-    *k2 &^= 0b100_0000
+	tsc.TouchX = uint16(float32(mouse.X-nds.BtmAbs.L) * s)
+	tsc.TouchY = uint16(float32(mouse.Y-nds.BtmAbs.T) * s)
+	*k2 &^= 0b100_0000
 }

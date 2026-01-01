@@ -56,7 +56,7 @@ func (w *WRAM) Read(addr uint32, arm9 bool) uint8 {
 
 		switch w.CNT {
 		case 0:
-            return w.Wram[addr&0x7FFF]
+			return w.Wram[addr&0x7FFF]
 		case 1:
 			return w.Wram[0x4000+(addr&0x3FFF)]
 		case 2:
@@ -88,36 +88,35 @@ func (w *WRAM) Read(addr uint32, arm9 bool) uint8 {
 
 func (w *WRAM) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
 
-
 	if arm9 {
 		switch w.CNT {
 		case 0:
-            // this fails tcm test rockwrestler
-            return unsafe.Add(unsafe.Pointer(&w.Wram), addr & 0x7FFF), true
+			// this fails tcm test rockwrestler
+			return unsafe.Add(unsafe.Pointer(&w.Wram), addr&0x7FFF), true
 		case 1:
-            return unsafe.Add(unsafe.Pointer(&w.Wram), 0x4000 + (addr & 0x3FFF)), true
+			return unsafe.Add(unsafe.Pointer(&w.Wram), 0x4000+(addr&0x3FFF)), true
 		case 2:
-            return unsafe.Add(unsafe.Pointer(&w.Wram), addr & 0x3FFF), true
+			return unsafe.Add(unsafe.Pointer(&w.Wram), addr&0x3FFF), true
 		case 3:
-            return nil, false
+			return nil, false
 		}
 
-        return nil, false
+		return nil, false
 	}
 
 	if addr >= 0x380_0000 {
-        return unsafe.Add(unsafe.Pointer(&w.WRAM7), addr & 0xFFFF), true
+		return unsafe.Add(unsafe.Pointer(&w.WRAM7), addr&0xFFFF), true
 	}
 
 	switch w.CNT {
 	case 0:
-        return unsafe.Add(unsafe.Pointer(&w.WRAM7), addr & 0xFFFF), true
+		return unsafe.Add(unsafe.Pointer(&w.WRAM7), addr&0xFFFF), true
 	case 1:
-        return unsafe.Add(unsafe.Pointer(&w.Wram), addr & 0x3FFF), true
+		return unsafe.Add(unsafe.Pointer(&w.Wram), addr&0x3FFF), true
 	case 2:
-        return unsafe.Add(unsafe.Pointer(&w.Wram), 0x4000 + (addr &0x3FFF)), true
+		return unsafe.Add(unsafe.Pointer(&w.Wram), 0x4000+(addr&0x3FFF)), true
 	case 3:
-        return unsafe.Add(unsafe.Pointer(&w.Wram), addr & 0x7FFF), true
+		return unsafe.Add(unsafe.Pointer(&w.Wram), addr&0x7FFF), true
 	}
 
 	return nil, false

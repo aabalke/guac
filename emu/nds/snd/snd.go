@@ -19,17 +19,16 @@ const (
 )
 
 type Mem interface {
-    Read(addr uint32, arm9 bool) uint8
-    Read16(addr uint32, arm9 bool) uint32
-    Read32(addr uint32, arm9 bool) uint32
+	Read(addr uint32, arm9 bool) uint8
+	Read16(addr uint32, arm9 bool) uint32
+	Read32(addr uint32, arm9 bool) uint32
 
-    Write(addr uint32, v uint8, arm9 bool)
-    Write16(addr uint32, v uint16, arm9 bool)
+	Write(addr uint32, v uint8, arm9 bool)
+	Write16(addr uint32, v uint16, arm9 bool)
 }
 
 type Snd struct {
-
-    Mem Mem
+	Mem Mem
 
 	VolMaster float64
 	LOut      uint8
@@ -41,11 +40,11 @@ type Snd struct {
 	Bias     uint32
 
 	Channels [16]Channel
-    Capture [2]Capture
+	Capture  [2]Capture
 
-    player *oto.Player
-    Stream []uint8
-    sndCycles uint32
+	player    *oto.Player
+	Stream    []uint8
+	sndCycles uint32
 
 	SoundBuffer               []int16
 	ReadPointer, WritePointer uint32
@@ -62,7 +61,7 @@ type Snd struct {
 
 func NewSnd(ctx *oto.Context, freq, rate, cnt int) *Snd {
 
-    s := &Snd{
+	s := &Snd{
 		WritePointer: 0x200,
 		cpuFreqHz:    freq,
 		sndFrequency: rate,
@@ -72,65 +71,65 @@ func NewSnd(ctx *oto.Context, freq, rate, cnt int) *Snd {
 		sampleTime:   1.0 / float64(rate),
 		streamLen:    (2 * 2 * rate / 60) - (2*2*rate/60)%4,
 		buffSize:     uint32((cnt) * 16 * 2),
-    }
+	}
 
 	s.Stream = make([]byte, s.streamLen)
 	s.SoundBuffer = make([]int16, s.buffSize)
 
-    for i := range 16 {
-        s.Channels[i] = NewChannel(i, s)
-    }
+	for i := range 16 {
+		s.Channels[i] = NewChannel(i, s)
+	}
 
-    s.Channels[8].isDuty = true
-    s.Channels[9].isDuty = true
-    s.Channels[10].isDuty = true
-    s.Channels[11].isDuty = true
-    s.Channels[12].isDuty = true
-    s.Channels[13].isDuty = true
-    s.Channels[14].isNoise = true
-    s.Channels[15].isNoise = true
+	s.Channels[8].isDuty = true
+	s.Channels[9].isDuty = true
+	s.Channels[10].isDuty = true
+	s.Channels[11].isDuty = true
+	s.Channels[12].isDuty = true
+	s.Channels[13].isDuty = true
+	s.Channels[14].isNoise = true
+	s.Channels[15].isNoise = true
 
-    s.Capture = NewCaptures(s)
+	s.Capture = NewCaptures(s)
 
 	if !config.Conf.CancelAudioInit {
 		s.player = ctx.NewPlayer()
 	}
 
-    return s
+	return s
 }
 
 func (s *Snd) Play(muted bool) {
 
-    s.SoundBufferWrap()
+	s.SoundBufferWrap()
 
-    if len(s.Stream) == 0 {
-        return
-    }
+	if len(s.Stream) == 0 {
+		return
+	}
 
-    s.Mix()
+	s.Mix()
 
-    if muted || s.player == nil {
-        return
-    }
+	if muted || s.player == nil {
+		return
+	}
 
-    s.player.Write(s.Stream)
+	s.player.Write(s.Stream)
 }
 
 func (s *Snd) Close() {
-    s.player.Close()
+	s.player.Close()
 }
 
 func (s *Snd) Mix() {
 
-    for i := 0; i < s.streamLen; i += 4 {
-        for j := range 2 {
-            snd := s.SoundBuffer[s.ReadPointer& uint32(s.buffSize-1)] << 6
+	for i := 0; i < s.streamLen; i += 4 {
+		for j := range 2 {
+			snd := s.SoundBuffer[s.ReadPointer&uint32(s.buffSize-1)] << 6
 			idx := i + (2 * j)
 			s.Stream[idx] = uint8(snd)
 			s.Stream[idx+1] = uint8(snd >> 8)
 			s.ReadPointer++
-        }
-    }
+		}
+	}
 
 	// Avoid desync between the Play cursor and the Write cursor
 	delta := (int32(s.WritePointer-s.ReadPointer) >> 8) - (int32(s.WritePointer-s.ReadPointer)>>8)%2
@@ -181,27 +180,27 @@ func (s *Snd) SoundClock(cycles uint32) {
 
 	for s.sndCycles >= uint32(s.sampCycles) {
 
-        l := float64(0)
-        r := float64(0)
+		l := float64(0)
+		r := float64(0)
 
-        if s.Enabled {
-            for i := range 16 {
-                c := &s.Channels[i]
-                cl, cr := c.GetSample()
-                l += float64(cl)
-                r += float64(cr)
-            }
+		if s.Enabled {
+			for i := range 16 {
+				c := &s.Channels[i]
+				cl, cr := c.GetSample()
+				l += float64(cl)
+				r += float64(cr)
+			}
 
-            if mixCapture := !s.Capture[0].ChanSrc; mixCapture {
-                s.Capture[0].Capture(l)
-            }
-            if mixCapture := !s.Capture[1].ChanSrc; mixCapture {
-                s.Capture[1].Capture(r)
-            }
+			if mixCapture := !s.Capture[0].ChanSrc; mixCapture {
+				s.Capture[0].Capture(l)
+			}
+			if mixCapture := !s.Capture[1].ChanSrc; mixCapture {
+				s.Capture[1].Capture(r)
+			}
 
-            l = (float64(l) * float64(s.VolMaster))
-            r = (float64(r) * float64(s.VolMaster))
-        }
+			l = (float64(l) * float64(s.VolMaster))
+			r = (float64(r) * float64(s.VolMaster))
+		}
 
 		s.SoundBuffer[s.WritePointer&(s.buffSize-1)] = clip(int32(l))
 		s.WritePointer++

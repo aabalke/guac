@@ -2,7 +2,6 @@ package cp15
 
 import (
 	"github.com/aabalke/guac/emu/nds/mem"
-	"github.com/aabalke/guac/emu/nds/utils"
 )
 
 type CpRegister struct {
@@ -83,27 +82,25 @@ func (c *Cp15) Write(v uint32, reg CpRegister, lowVector *bool) {
 		c.R[reg] &^= mask
 		c.R[reg] |= v
 
-		*lowVector = !utils.BitEnabled(c.R[reg], 13)
-		c.mem.Tcm.DtcmEnabled = utils.BitEnabled(c.R[reg], 16)
-		c.mem.Tcm.DtcmLoadMode = utils.BitEnabled(c.R[reg], 17)
-		c.mem.Tcm.ItcmEnabled = utils.BitEnabled(c.R[reg], 18)
-		c.mem.Tcm.ItcmLoadMode = utils.BitEnabled(c.R[reg], 19)
+		*lowVector = (c.R[reg] >> 13) == 0
+
+		c.mem.Tcm.DtcmEnabled = (c.R[reg]>>16)&1 != 0
+		c.mem.Tcm.DtcmLoadMode = (c.R[reg]>>17)&1 != 0
+		c.mem.Tcm.ItcmEnabled = (c.R[reg]>>18)&1 != 0
+		c.mem.Tcm.ItcmLoadMode = (c.R[reg]>>19)&1 != 0
 
 		//if v & 1 == 1 { panic("PU MODE")}
 
 	case DTCM:
 		v &^= 0b1111_1100_0001
-
-		c.mem.Tcm.DtcmSize = 512 << utils.GetVarData(v, 1, 6)
-		c.mem.Tcm.DtcmBase = utils.GetVarData(v, 12, 31) << 12
+		c.mem.Tcm.DtcmSize = 512 << ((v >> 1) & 0x3F)
+		c.mem.Tcm.DtcmBase = v & 0xFFFF_F000
 
 		// base must be size aligned
 
 	case ITCM:
 		v &= 0b111110
-
-		c.mem.Tcm.ItcmSize = 512 << utils.GetVarData(v, 1, 6)
-
+		c.mem.Tcm.ItcmSize = 512 << ((v >> 1) & 0x3F)
 	}
 
 	c.R[reg] = v
