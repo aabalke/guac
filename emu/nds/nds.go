@@ -16,7 +16,6 @@ import (
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/nds/ppu"
 	"github.com/aabalke/guac/emu/nds/snd"
-	"github.com/aabalke/guac/emu/nds/utils"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
@@ -181,6 +180,8 @@ func (nds *Nds) UpdateFrame() {
                 c -= int(nds.StepArm7())
             }
 
+            nds.VideoUpdate(config.Conf.Nds.NdsJit.BatchInstA7)
+
             for c := uint32(0); c < config.Conf.Nds.NdsJit.BatchInstA7; {
                 nds.StepOther()
                 c++
@@ -199,6 +200,7 @@ func (nds *Nds) UpdateFrame() {
                 nds.StepArm7()
             }
 
+            nds.VideoUpdate(1)
             nds.StepOther()
         }
 
@@ -210,8 +212,6 @@ func (nds *Nds) UpdateFrame() {
 }
 
 func (nds *Nds) StepOther() {
-
-    nds.VideoUpdate(1)
 
     if nds.TimerCycles & TIMER_CYCLE_MASK == 0 {
         nds.UpdateTimers(TIMER_CYCLE_MASK + 1)
@@ -351,11 +351,11 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 	if enteredHblank := inHblank && prevInHdraw; enteredHblank {
 
 		dispstat.SetHBlank(true)
-		if utils.BitEnabled(uint32(dispstat.A9), 4) {
+        if (dispstat.A9 >> 4) & 1 != 0 {
 			nds.arm9.Irq.SetIRQ(1)
 		}
 
-		if utils.BitEnabled(uint32(dispstat.A7), 4) {
+        if (dispstat.A7 >> 4) & 1 != 0 {
 			nds.arm7.Irq.SetIRQ(1)
 		}
 
@@ -423,10 +423,11 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
             }
 
 		case SCREEN_HEIGHT + 1:
-            if utils.BitEnabled(uint32(dispstat.A9), 3) {
+            if (dispstat.A9 >> 3) & 1 != 0 {
                 nds.arm9.Irq.SetIRQ(0)
 			}
-            if utils.BitEnabled(uint32(dispstat.A7), 3) {
+
+            if (dispstat.A7 >> 3) & 1 != 0 {
                 nds.arm7.Irq.SetIRQ(0)
 			}
 		case NUM_SCANLINES - 1:
@@ -435,13 +436,13 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 
 		match := dispstat.GetLYC(true) == vcount
 		dispstat.SetVCFlag(match, true)
-		if vcounterIRQ := utils.BitEnabled(uint32(dispstat.A9), 5); vcounterIRQ && match {
+        if vcntIrq := (dispstat.A9 >> 5) & 1 != 0; vcntIrq && match {
 			nds.arm9.Irq.SetIRQ(2)
 		}
 
 		match = dispstat.GetLYC(false) == vcount
 		dispstat.SetVCFlag(match, false)
-		if vcounterIRQ := utils.BitEnabled(uint32(dispstat.A7), 5); vcounterIRQ && match {
+        if vcntIrq := (dispstat.A7 >> 5) & 1 != 0; vcntIrq && match {
 			nds.arm7.Irq.SetIRQ(2)
 		}
 	}

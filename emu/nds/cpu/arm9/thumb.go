@@ -3,6 +3,8 @@ package arm9
 import (
 	"math/bits"
 	"unsafe"
+
+	"github.com/aabalke/guac/emu/nds/utils"
 )
 
 const (
@@ -24,15 +26,15 @@ const (
 	THUMB_MVN
 )
 
-func (cpu *Cpu) ThumbAlu(opcode uint16) {
+func (cpu *Cpu) ThumbAlu(op uint16) {
 
 	var (
 		r    = &cpu.Reg.R
 		cpsr = &cpu.Reg.CPSR
 
-		inst = (opcode >> 6) & 0xF
-		rsv  = r[(opcode>>3)&0x7]
-		rd   = opcode & 0x7
+		inst = (op >> 6) & 0xF
+		rsv  = r[(op>>3)&0x7]
+		rd   = op & 0x7
 		rdv  = r[rd]
 
 		res uint64
@@ -168,17 +170,17 @@ const (
 	HI_BX  = 3
 )
 
-func (cpu *Cpu) HiRegBX(opcode uint16) {
+func (cpu *Cpu) HiRegBX(op uint16) {
 
 	var (
 		r    = &cpu.Reg.R
 		cpsr = &cpu.Reg.CPSR
 
-		inst = (opcode >> 8) & 0b11
-		mSBd = (opcode>>7)&1 != 0
-		mSBs = (opcode>>6)&1 != 0
-		rs   = (opcode >> 3) & 0xF
-		rd   = (opcode) & 0x7
+		inst = (op >> 8) & 0b11
+		mSBd = (op>>7)&1 != 0
+		mSBs = (op>>6)&1 != 0
+		rs   = (op >> 3) & 0xF
+		rd   = (op) & 0x7
 	)
 
 	if inst != 3 && mSBd {
@@ -286,24 +288,24 @@ const (
 	THUMB_SUBImm
 )
 
-func (cpu *Cpu) ThumbAddSub(opcode uint16) {
+func (cpu *Cpu) ThumbAddSub(op uint16) {
 
 	var (
 		r    = &cpu.Reg.R
 		cpsr = &cpu.Reg.CPSR
 
-		inst = (opcode >> 9) & 0b11
-		rsv  = uint32(r[(opcode>>3)&0x7])
-		rd   = (opcode) & 0x7
+		inst = (op >> 9) & 0b11
+		rsv  = uint32(r[(op>>3)&0x7])
+		rd   = (op) & 0x7
 
 		res uint64
 	)
 
 	var op2 uint32
 	if reg := inst < 2; reg {
-		op2 = uint32(r[(opcode>>6)&0x7])
+		op2 = uint32(r[(op>>6)&0x7])
 	} else {
-		op2 = uint32((opcode >> 6) & 0x7)
+		op2 = uint32((op >> 6) & 0x7)
 	}
 
 	switch inst {
@@ -334,14 +336,14 @@ const (
 	THUMB_IMM_SUB
 )
 
-func (cpu *Cpu) thumbImm(opcode uint16) {
+func (cpu *Cpu) thumbImm(op uint16) {
 
 	var (
 		r    = &cpu.Reg.R
 		cpsr = &cpu.Reg.CPSR
-		inst = (opcode >> 11) & 0b11
-		rd   = (opcode >> 8) & 0x7
-		nn   = uint32(opcode & 0xFF)
+		inst = (op >> 11) & 0b11
+		rd   = (op >> 8) & 0x7
+		nn   = uint32(op & 0xFF)
 		rdv  = r[rd]
 
 		res uint64
@@ -373,17 +375,17 @@ func (cpu *Cpu) thumbImm(opcode uint16) {
 	r[PC] += 2
 }
 
-func (cpu *Cpu) thumbLSHalf(opcode uint16) {
+func (cpu *Cpu) thumbLSHalf(op uint16) {
 
 	var (
 		r = &cpu.Reg.R
 
-		offset = uint32((opcode >> 6) & 0x1F << 1)
-		addr   = r[(opcode>>3)&0x7] + offset
-		rd     = (opcode) & 0x7
+		offset = uint32((op >> 6) & 0x1F << 1)
+		addr   = r[(op>>3)&0x7] + offset
+		rd     = (op) & 0x7
 	)
 
-	if ldr := (opcode>>11)&1 != 0; ldr {
+	if ldr := (op>>11)&1 != 0; ldr {
 		v := uint32(cpu.mem.Read16(addr&^1, true))
 		is := (addr & 1) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
@@ -408,15 +410,15 @@ const (
 	THUMB_LDRB_REG
 )
 
-func (cpu *Cpu) thumbSdt(opcode uint16) {
+func (cpu *Cpu) thumbSdt(op uint16) {
 	var (
 		r    = &cpu.Reg.R
-		inst = (opcode >> 10) & 0b11
-		rd   = opcode & 0x7
-		addr = r[(opcode>>3)&0x7] + r[(opcode>>6)&0x7]
+		inst = (op >> 10) & 0b11
+		rd   = op & 0x7
+		addr = r[(op>>3)&0x7] + r[(op>>6)&0x7]
 	)
 
-	if signed := (opcode>>9)&1 != 0; signed {
+	if signed := (op>>9)&1 != 0; signed {
 
 		switch inst {
 		case THUMB_STRH:
@@ -462,12 +464,12 @@ func (cpu *Cpu) thumbSdt(opcode uint16) {
 
 }
 
-func (cpu *Cpu) thumbLPC(opcode uint16) {
+func (cpu *Cpu) thumbLPC(op uint16) {
 
 	var (
 		r    = &cpu.Reg.R
-		rd   = (opcode >> 8) & 0x7
-		nn   = uint32(opcode&0xFF) << 2
+		rd   = (op >> 8) & 0x7
+		nn   = uint32(op&0xFF) << 2
 		addr = (r[PC] + 4 + nn) &^ 0b11
 	)
 
@@ -482,15 +484,15 @@ const (
 	THUMB_LDRB_IMM
 )
 
-func (cpu *Cpu) thumbLSImm(opcode uint16) {
+func (cpu *Cpu) thumbLSImm(op uint16) {
 
 	var (
 		r = &cpu.Reg.R
 
-		inst = (opcode >> 11) & 0b11
-		rd   = opcode & 0x7
-		rb   = (opcode >> 3) & 0x7
-		nn   = uint32(opcode>>6) & 0x1F
+		inst = (op >> 11) & 0b11
+		rd   = op & 0x7
+		rb   = (op >> 3) & 0x7
+		nn   = uint32(op>>6) & 0x1F
 	)
 
 	switch inst {
@@ -514,13 +516,14 @@ func (cpu *Cpu) thumbLSImm(opcode uint16) {
 	r[PC] += 2
 }
 
-func (cpu *Cpu) thumbPushPop(opcode uint16) {
+func (cpu *Cpu) thumbPushPop(op uint16) {
 
 	var (
 		r     = &cpu.Reg.R
-		pclr  = (opcode>>8)&1 != 0
-		rlist = opcode & 0xFF
-		pop   = (opcode>>11)&1 != 0
+		pclr  = (op>>8)&1 != 0
+		rlist = op & 0xFF
+		pop   = (op>>11)&1 != 0
+        p unsafe.Pointer
 	)
 
 	reg := 0
@@ -528,10 +531,12 @@ func (cpu *Cpu) thumbPushPop(opcode uint16) {
 		reg = 7
 	}
 
-	p, ok := cpu.mem.ReadPtr(r[SP], true)
-	if !ok {
-		p = nil
-	}
+
+    if pop {
+        p, _ = cpu.mem.ReadPtr(r[SP], true)
+    } else {
+        p, _ = cpu.mem.WritePtr(r[SP], true)
+    }
 
 	if !pop && pclr {
 		r[SP] -= 4
@@ -595,15 +600,15 @@ func (cpu *Cpu) thumbPushPop(opcode uint16) {
 	r[PC] += 2
 }
 
-func (cpu *Cpu) thumbRelative(opcode uint16) {
+func (cpu *Cpu) thumbRelative(op uint16) {
 
 	var (
 		r  = &cpu.Reg.R
-		rd = (opcode >> 8) & 0x7
-		nn = uint32(opcode&0xFF) << 2
+		rd = (op >> 8) & 0x7
+		nn = uint32(op&0xFF) << 2
 	)
 
-	if isSP := (opcode>>11)&1 != 0; isSP {
+	if isSP := (op>>11)&1 != 0; isSP {
 		r[rd] = r[SP] + nn
 		r[PC] += 2
 		return
@@ -613,39 +618,39 @@ func (cpu *Cpu) thumbRelative(opcode uint16) {
 	r[PC] += 2
 }
 
-func (cpu *Cpu) thumbJumpCalls(opcode uint16) {
+func (cpu *Cpu) thumbJumpCalls(op uint16) {
 
 	r := &cpu.Reg.R
 
-	if !cpu.CheckCond(uint32(opcode>>8) & 0xF) {
+	if !cpu.CheckCond(uint32(op>>8) & 0xF) {
 		r[PC] += 2
 		return
 	}
 
-	nn := int(int8(opcode&0xFF)) << 1
+	nn := int(int8(op&0xFF)) << 1
 	r[PC] = uint32(int(r[PC]) + 4 + nn)
 }
 
-func (cpu *Cpu) thumbB(opcode uint16) {
+func (cpu *Cpu) thumbB(op uint16) {
 
 	r := &cpu.Reg.R
 
 	const shift = 32 - 11 // int32 - offset size
 
-	nn := (int32(uint32(opcode)<<shift) >> shift) << 1
+	nn := (int32(uint32(op)<<shift) >> shift) << 1
 	r[PC] = uint32(int32(r[PC]) + 4 + nn)
 }
 
-func (cpu *Cpu) thumbShifted(opcode uint16) {
+func (cpu *Cpu) thumbShifted(op uint16) {
 
 	var (
 		cpsr = &cpu.Reg.CPSR
 		r    = &cpu.Reg.R
 
-		shType = (opcode >> 11) & 0b11
-		is     = (opcode >> 6) & 0x1F
-		rsv    = r[(opcode>>3)&0x7]
-		rd     = opcode & 0x7
+		shType = (op >> 11) & 0b11
+		is     = (op >> 6) & 0x1F
+		rsv    = r[(op>>3)&0x7]
+		rd     = op & 0x7
 
 		res uint32
 	)
@@ -690,12 +695,12 @@ func (cpu *Cpu) thumbShifted(opcode uint16) {
 	r[PC] += 2
 }
 
-func (cpu *Cpu) thumbStack(opcode uint16) {
+func (cpu *Cpu) thumbStack(op uint16) {
 
 	r := &cpu.Reg.R
-	nn := int(opcode*0x3F) << 2
+	nn := int(op&0x7F) << 2
 
-	if sub := int((opcode>>7)&1) != 0; sub {
+	if sub := (op>>7)&1 != 0; sub {
 		nn = -nn
 	}
 
@@ -705,7 +710,7 @@ func (cpu *Cpu) thumbStack(opcode uint16) {
 
 func (cpu *Cpu) thumbLongBranch(op uint16) {
 
-	const shift = 32 - 22
+	const shift = 32 - 23 // 22 is bits, + 1 for * 2
 	var (
 		r   = &cpu.Reg.R
 		op2 = cpu.mem.Read16(r[PC]+2, true)
@@ -722,26 +727,26 @@ func (cpu *Cpu) thumbLongBranch(op uint16) {
 	}
 }
 
-func (cpu *Cpu) thumbShortLongBranch(opcode uint16) {
+func (cpu *Cpu) thumbShortLongBranch(op uint16) {
 	// Using only the 2nd half of BL as "BL LR+imm" is possible
-	// (for example, Mario Golf Advance Tour for GBA uses opcode F800h as "BL LR+0").
+	// (for example, Mario Golf Advance Tour for GBA uses op F800h as "BL LR+0").
 	// BL LR + nn
 	// bottom half never signed?
 
 	r := &cpu.Reg.R
-	nn := uint32(opcode&0x7FF) << 1
+	nn := uint32(op&0x7FF) << 1
 	tmpLR := r[LR]
 	r[LR] = ((r[PC] + 2) &^ 0b1) + 1
 	r[PC] = (tmpLR + nn) &^ 0b1
 }
 
-func (cpu *Cpu) thumbLSSP(opcode uint16) {
+func (cpu *Cpu) thumbLSSP(op uint16) {
 
 	r := &cpu.Reg.R
-	rd := (opcode >> 8) & 0x7
-	addr := r[SP] + (uint32(opcode&0xFF) << 2)
+	rd := (op >> 8) & 0x7
+	addr := r[SP] + (uint32(op&0xFF) << 2)
 
-	if ldr := (opcode>>11)&1 != 0; ldr {
+	if ldr := (op>>11)&1 != 0; ldr {
 		v := cpu.mem.Read32(addr&^0b11, true)
 		is := (addr & 0b11) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
@@ -754,70 +759,97 @@ func (cpu *Cpu) thumbLSSP(opcode uint16) {
 
 func (cpu *Cpu) thumbBlock(opcode uint16) {
 
-	var (
-		r     = &cpu.Reg.R
-		ldmia = (opcode>>11)&1 != 0
-		rb    = (opcode >> 8) & 0x7
-		rlist = opcode & 0xFF
-	)
+	r := &cpu.Reg.R
+    ldmia := (opcode >> 11) & 1 != 0
+    rb := (opcode >> 8) & 7
+    rlist := uint32(opcode & 0xFF)
+	addr := r[rb] &^ 0b11
 
-	if rlist == 0 {
-		if ldmia {
-			r[rb] += 0x40
-			r[PC] += 8
-		} else {
+	if !ldmia {
+
+		regCount := utils.CountBits(rlist)
+		matchingValue := uint32(0)
+		matchingAddr := uint32(0) // rn during regs
+		smallest := (rlist & -rlist) == 1<<rb
+		matchingRb := (rlist>>rb)&1 == 1
+
+		rbIdx := uint32(0)
+		count := uint32(0)
+
+		if rlist == 0 {
 			cpu.mem.Write32(r[rb], r[PC]+6, true)
 			r[rb] += 0x40
 			r[PC] += 2
+			return
 		}
 
-		return
-	}
-
-	var (
-		oldBase = r[rb]
-		rbv     = r[rb]
-		addr    = r[rb] &^ 0b11
-	)
-
-	p, ok := cpu.mem.ReadPtr(addr, true)
-	if !ok {
-		p = nil
-	}
-
-	for reg := range 8 {
-		if disabled := (rlist>>reg)&1 == 0; disabled {
-			continue
-		}
-
-		if p != nil {
-			if ldmia {
-				r[reg] = *(*uint32)(p)
-			} else {
-				*(*uint32)(p) = r[reg]
+		for reg := range 8 {
+            if disabled := (rlist>>reg)&1 == 0; disabled {
+				continue
 			}
 
-			p = unsafe.Add(p, 4)
-		} else {
-			if ldmia {
-				r[reg] = cpu.mem.Read32(addr, true)
-			} else {
+			if reg == int(rb) {
 				cpu.mem.Write32(addr, r[reg], true)
+				matchingValue = r[reg] + 4
+				matchingAddr = addr
+				rbIdx = regCount - count
+				r[rb] += 4
+				addr += 4
+				continue
 			}
+
+			cpu.mem.Write32(addr, r[reg], true)
+
+			r[rb] += 4
+			addr += 4
 		}
 
-		rbv += 4
-		addr += 4
-	}
+		if smallest {
+			//v := cpu.mem.Read32(addr)
+			v := cpu.mem.Read32(addr&0b11, true) // maybe??
+			cpu.mem.Write32(r[rb], v-(regCount*2), true)
+			r[PC] += 2
+			return
+		}
 
-	if wb := (rlist>>rb)&1 == 0; wb {
-		r[rb] = rbv
+		if matchingRb {
+			cpu.mem.Write32(matchingAddr, matchingValue+(rbIdx*2), true)
+			r[PC] += 2
+			return
+		}
+
 		r[PC] += 2
 		return
 	}
 
-	if !ldmia {
-		cpu.mem.Write32(r[rb]&^0b11, oldBase, true)
+	rbValue := r[rb]
+	matchingRb := false
+
+	if rlist == 0 {
+		r[rb] += 0x40
+		r[PC] += 8
+		return
+	}
+
+	for reg := range 8 {
+        if disabled := (rlist>>reg)&1 == 0; disabled {
+			continue
+		}
+
+		r[reg] = cpu.mem.Read32(addr&^0b11, true)
+
+		if reg == int(rb) {
+			matchingRb = true
+			// do not remove this, needed for golden sun and others
+			rbValue = r[rb]
+		}
+
+		r[rb] += 4
+		addr += 4
+	}
+
+	if matchingRb {
+		r[rb] = rbValue
 	}
 
 	r[PC] += 2

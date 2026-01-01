@@ -34,11 +34,11 @@ const (
 )
 
 type DMA struct {
-	Idx int
-    arm9 bool
+	Idx  int
+	arm9 bool
 
-    mem MemoryInterface
-    irq *cpu.Irq
+	mem MemoryInterface
+	irq *cpu.Irq
 
 	Src     uint32
 	Dst     uint32
@@ -48,7 +48,7 @@ type DMA struct {
 	Control   uint32
 	WordCount uint32
 
-    DefaultCount uint32
+	DefaultCount uint32
 
 	DstAdj  uint32
 	SrcAdj  uint32
@@ -61,29 +61,29 @@ type DMA struct {
 
 	Value uint32
 
-    InitialGc bool
-    GcDst uint32
+	InitialGc bool
+	GcDst     uint32
 }
 
 func (dma *DMA) Init(idx int, mem MemoryInterface, irq *cpu.Irq, arm9 bool) {
-    dma.Idx = idx
-    dma.mem = mem
-    dma.irq = irq
-    dma.arm9 = arm9
+	dma.Idx = idx
+	dma.mem = mem
+	dma.irq = irq
+	dma.arm9 = arm9
 
-    switch {
-    case arm9:
-        dma.DefaultCount = 0x200000
-    case idx == 3:
-        dma.DefaultCount = 0x10000
-    default:
-        dma.DefaultCount = 0x4000
-    }
+	switch {
+	case arm9:
+		dma.DefaultCount = 0x200000
+	case idx == 3:
+		dma.DefaultCount = 0x10000
+	default:
+		dma.DefaultCount = 0x4000
+	}
 }
 
 func (dma *DMA) ReadControl(hi bool) uint8 {
 	if hi {
-		return uint8(dma.Control>>8)
+		return uint8(dma.Control >> 8)
 	}
 	return uint8(dma.Control)
 }
@@ -96,7 +96,7 @@ func (dma *DMA) WriteSrc(v uint8, byte uint32) {
 func (dma *DMA) WriteDst(v uint8, byte uint32) {
 	dma.Dst = utils.ReplaceByte(dma.Dst, uint32(v), byte)
 	dma.InitDst = dma.Dst
-    dma.GcDst = dma.Dst
+	dma.GcDst = dma.Dst
 }
 
 func (dma *DMA) WriteCount(v uint8, hi bool) {
@@ -114,7 +114,7 @@ func (dma *DMA) WriteControl(v uint8, hi bool) {
 	if hi {
 		a := uint32(v)
 		wasDisabled := !dma.Enabled
-		dma.Control = (dma.Control & 0b1111_1111) | (a << 8)
+		dma.Control = (dma.Control & 0xFF) | (a << 8)
 		dma.SrcAdj = (dma.SrcAdj & 1) | (a&1)<<1
 		dma.Repeat = utils.BitEnabled(a, 1)
 		dma.isWord = utils.BitEnabled(a, 2)
@@ -134,41 +134,40 @@ func (dma *DMA) WriteControl(v uint8, hi bool) {
 	}
 
 	a := uint32(v) & 0xE0
-	dma.Control = (dma.Control &^ 0b1111_1111) | a
+	dma.Control = (dma.Control &^ 0xFF) | a
 	dma.DstAdj = (uint32(a) >> 5) & 0b11
 	dma.SrcAdj = (dma.SrcAdj &^ 1) | ((uint32(a) >> 7) & 1)
 }
 
 func (dma *DMA) disable() {
 	dma.Enabled = false
-	dma.Control &^= 0b1000_0000_0000_0000
+	dma.Control &^= 0x8000
 }
 
 func (dma *DMA) Transfer() {
 
-	mem := dma.mem
-	count := dma.WordCount
+	var (
+		mem       = dma.mem
+		count     = dma.WordCount
+		dstOffset int
+		srcOffset int
+		tmpDst    = dma.Dst
+		tmpSrc    = dma.Src
+		ofs       int
+	)
 
-    if count == 0 {
-        count = dma.DefaultCount
-    }
-
-	dstOffset := int64(0)
-	srcOffset := int64(0)
-	tmpDst := dma.Dst
-	tmpSrc := dma.Src
+	if count == 0 {
+		count = dma.DefaultCount
+	}
 
 	if dma.isWord {
 		tmpDst &^= 0b11
 		tmpSrc &^= 0b11
+		ofs = 4
 	} else {
 		tmpDst &^= 0b1
 		tmpSrc &^= 0b1
-	}
-
-	ofs := int64(2)
-	if dma.isWord {
-		ofs = 4
+		ofs = 2
 	}
 
 	switch dma.DstAdj {
@@ -187,40 +186,66 @@ func (dma *DMA) Transfer() {
 		panic("DMA SRC SET TO PROHIBITTED")
 	}
 
-    srcPtr, ok := mem.ReadPtr(uint32(tmpSrc), dma.arm9)
-    srcPtrTop, okEnd := mem.ReadPtr(uint32(int(tmpSrc) + int(dstOffset) * int(count)), dma.arm9)
-    if ok && okEnd &&(srcPtr == srcPtrTop) {
+	srcPtr, _ := mem.ReadPtr(tmpSrc, dma.arm9)
+	if srcPtr != nil {
+		top := uint32(int(tmpSrc) + srcOffset*int(count))
+		if _, ok := mem.ReadPtr(top, dma.arm9); !ok {
+			srcPtr = nil
+		}
+	}
 
-        for i := uint32(0); i < count; i++ {
-            if dma.isWord {
-                v := *(*uint32)(unsafe.Add(srcPtr, srcOffset*int64(i)))
-                mem.Write32(tmpDst, v, dma.arm9)
-            } else {
-                v := *(*uint16)(unsafe.Add(srcPtr, srcOffset*int64(i)))
-                mem.Write16(tmpDst, v, dma.arm9)
-            }
-        }
+	dstPtr, _ := mem.WritePtr(tmpDst, dma.arm9)
+	if dstPtr != nil {
+		top := uint32(int(tmpDst) + dstOffset*int(count))
+		if _, ok := mem.WritePtr(top, dma.arm9); !ok {
+			dstPtr = nil
+		}
+	}
 
-        tmpDst = uint32(int64(tmpDst) + int64(count) * int64(dstOffset))
-        tmpSrc = uint32(int64(tmpSrc) + int64(count) * int64(srcOffset))
+	for range uint32(count) {
+		if dma.isWord {
+			if srcPtr == nil {
+				dma.Value = mem.Read32(tmpSrc&^3, dma.arm9)
+			} else {
+				dma.Value = *(*uint32)(srcPtr)
+			}
 
-    } else {
+			if dstPtr == nil {
+				mem.Write32(tmpDst&^3, dma.Value, dma.arm9)
+			} else {
+				*(*uint32)(unsafe.Add(dstPtr, dstOffset)) = dma.Value
+			}
 
-        for i := uint32(0); i < count; i++ {
-            if dma.isWord {
-                dma.Value = mem.Read32(tmpSrc &^ 3, dma.arm9)
-                mem.Write32(tmpDst&^3, dma.Value, dma.arm9)
+		} else {
+			if srcPtr == nil {
+				dma.Value = mem.Read16(tmpSrc&^1, dma.arm9)
+			} else {
+				dma.Value = uint32(*(*uint16)(srcPtr))
+			}
 
-            } else {
-                dma.Value = mem.Read16(tmpSrc &^ 1, dma.arm9)
-                dma.Value |= (dma.Value << 16)
-                mem.Write16(tmpDst&^1, uint16(dma.Value), dma.arm9)
-            }
+			dma.Value |= (dma.Value << 16)
 
-            tmpDst = uint32(int64(tmpDst) + dstOffset)
-            tmpSrc = uint32(int64(tmpSrc) + srcOffset)
-        }
-    }
+			if dstPtr == nil {
+				mem.Write16(tmpDst&^1, uint16(dma.Value), dma.arm9)
+			} else {
+				*(*uint16)(unsafe.Add(dstPtr, dstOffset)) = uint16(dma.Value)
+			}
+
+			dma.Value = mem.Read16(tmpSrc&^1, dma.arm9)
+			dma.Value |= (dma.Value << 16)
+			mem.Write16(tmpDst&^1, uint16(dma.Value), dma.arm9)
+		}
+
+		tmpDst = uint32(int(tmpDst) + dstOffset)
+		tmpSrc = uint32(int(tmpSrc) + srcOffset)
+
+		if srcPtr != nil {
+			srcPtr = unsafe.Add(srcPtr, srcOffset)
+		}
+		if dstPtr != nil {
+			dstPtr = unsafe.Add(dstPtr, dstOffset)
+		}
+	}
 
 	if dma.IRQ {
 		dma.irq.SetIRQ(8 + uint32(dma.Idx))
@@ -233,8 +258,8 @@ func (dma *DMA) Transfer() {
 	}
 
 	if dma.DstAdj == DMA_ADJ_RES {
-        dma.Dst = dma.InitDst
-        dma.Src = tmpSrc
+		dma.Dst = dma.InitDst
+		dma.Src = tmpSrc
 		return
 	}
 
@@ -248,49 +273,50 @@ func (dma *DMA) CheckMode(mode uint32) bool {
 
 func (dma *DMA) GamecartTransfer(arm9, initial bool) {
 
-    const GC_SRC = 0x4100010
+	const GC_SRC = 0x4100010
 
-    if !dma.Enabled {
-        return
-    }
+	if !dma.Enabled {
+		return
+	}
 
-    if (arm9 && dma.Mode != ARM9_DMA_MODE_DSC) {
-        return
-    }
-    if (!arm9 && dma.Mode != ARM7_DMA_MODE_DSC) {
-        return
-    }
+	if arm9 && dma.Mode != ARM9_DMA_MODE_DSC {
+		return
+	}
+	if !arm9 && dma.Mode != ARM7_DMA_MODE_DSC {
+		return
+	}
 
-    if notGamecart := !(
-        dma.Src == GC_SRC &&
-        dma.SrcAdj == DMA_ADJ_NON &&
-        dma.WordCount == 1 &&
-        dma.isWord &&
-        dma.Repeat); notGamecart {
-        return
-    }
+	if notGamecart := !(dma.Src == GC_SRC &&
+		dma.SrcAdj == DMA_ADJ_NON &&
+		dma.WordCount == 1 &&
+		dma.isWord &&
+		dma.Repeat); notGamecart {
+		return
+	}
 
 	mem := dma.mem
 
-    // gamecard transfer requires recursive access.
-    // Therefore, GcDst is incremented before access to not cause same dst loop
+	// gamecard transfer requires recursive access.
+	// Therefore, GcDst is incremented before access to not cause same dst loop
 
-    if initial {
-        dma.GcDst = dma.Dst &^ 0b11
-    } else {
-        dma.GcDst += 4
-    }
+	if initial {
+		dma.GcDst = dma.Dst &^ 0b11
+	} else {
+		dma.GcDst += 4
+	}
 
-    tmpDst := dma.GcDst &^ 0b11
+	tmpDst := dma.GcDst &^ 0b11
 
-    dstOffset := 4
-    switch dma.DstAdj {
-    case DMA_ADJ_NON: dstOffset = 0
-    case DMA_ADJ_DEC: dstOffset = -4
-    }
+	dstOffset := 4
+	switch dma.DstAdj {
+	case DMA_ADJ_NON:
+		dstOffset = 0
+	case DMA_ADJ_DEC:
+		dstOffset = -4
+	}
 
-    v := mem.Read32(GC_SRC, dma.arm9)
-    mem.Write32(tmpDst, v, dma.arm9)
+	v := mem.Read32(GC_SRC, dma.arm9)
+	mem.Write32(tmpDst, v, dma.arm9)
 
 	dma.Dst = uint32(int(tmpDst) + dstOffset)
 
@@ -301,15 +327,15 @@ func (dma *DMA) GamecartTransfer(arm9, initial bool) {
 
 func (dma *DMA) GxTransfer() {
 
-    if dma.Dst != 0x400_0400 || dma.DstAdj != DMA_ADJ_NON || !dma.isWord {
-        dma.Transfer()
-        return
-    }
+	if dma.Dst != 0x400_0400 || dma.DstAdj != DMA_ADJ_NON || !dma.isWord {
+		dma.Transfer()
+		return
+	}
 
 	count := dma.WordCount
-    if count == 0 {
-        count = dma.DefaultCount
-    }
+	if count == 0 {
+		count = dma.DefaultCount
+	}
 
 	ofs := int(2)
 	if dma.isWord {
@@ -318,28 +344,31 @@ func (dma *DMA) GxTransfer() {
 
 	srcOffset := int(0)
 	switch dma.SrcAdj {
-	case DMA_ADJ_INC: srcOffset = ofs
-	case DMA_ADJ_DEC: srcOffset = -ofs
+	case DMA_ADJ_INC:
+		srcOffset = ofs
+	case DMA_ADJ_DEC:
+		srcOffset = -ofs
 	}
 
 	mem := dma.mem
 	tmpSrc := int(dma.Src &^ 0b11)
 
-    ptr, ok := mem.ReadPtr(uint32(tmpSrc), dma.arm9)
-    if !ok {
-        for range count {
-            mem.WriteGXFIFO(mem.Read32(uint32(tmpSrc), dma.arm9))
-            tmpSrc += srcOffset
-        }
-    } else {
-        for i := range count {
-            v := *(*uint32)(unsafe.Add(ptr, srcOffset*int(i)))
-            mem.WriteGXFIFO(v)
-        }
+	ptr, ok := mem.ReadPtr(uint32(tmpSrc), dma.arm9)
+	if !ok {
+		for range count {
+			mem.WriteGXFIFO(mem.Read32(uint32(tmpSrc), dma.arm9))
+			tmpSrc += srcOffset
+		}
+	} else {
+		for range count {
+			v := *(*uint32)(ptr)
+			mem.WriteGXFIFO(v)
 
-        tmpSrc += srcOffset * int(count)
-    }
+			ptr = unsafe.Add(ptr, srcOffset)
+		}
 
+		tmpSrc += srcOffset * int(count)
+	}
 
 	if dma.IRQ {
 		dma.irq.SetIRQ(8 + uint32(dma.Idx))
@@ -354,13 +383,14 @@ func (dma *DMA) GxTransfer() {
 }
 
 type MemoryInterface interface {
-    Write8(addr uint32, v uint8, arm9 bool)
-    Write16(addr uint32, v uint16, arm9 bool)
-    Write32(addr uint32, v uint32, arm9 bool)
-    WriteGXFIFO(v uint32)
+	Write8(addr uint32, v uint8, arm9 bool)
+	Write16(addr uint32, v uint16, arm9 bool)
+	Write32(addr uint32, v uint32, arm9 bool)
+	WritePtr(addr uint32, arm9 bool) (unsafe.Pointer, bool)
+	WriteGXFIFO(v uint32)
 
-    Read8(addr uint32, arm9 bool) uint32
-    Read16(addr uint32, arm9 bool) uint32
-    Read32(addr uint32, arm9 bool) uint32
-    ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool)
+	Read8(addr uint32, arm9 bool) uint32
+	Read16(addr uint32, arm9 bool) uint32
+	Read32(addr uint32, arm9 bool) uint32
+	ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool)
 }

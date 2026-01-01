@@ -40,3 +40,11 @@ registers and the stack for function parameter and return argument passing - pre
 
 
 I was checking the rrx std which was setting the C flag incorrectly 
+
+
+
+# Todo / Optimizations
+
+- Read / Write Ptr instead of Read32 / Write32 where possible
+- Complete final instruction of block instead of jumping out
+

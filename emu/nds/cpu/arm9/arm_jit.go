@@ -9,1343 +9,1343 @@ import (
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
-
 func (j *Jit) emitClz(op uint32) {
 
 	rd := (op >> 12) & 0xF
 	rm := op & 0xF
 
-    j.Movl(j.REG(rm), amd64.Eax)
-    j.Lzcnt(amd64.Eax, amd64.Eax)
+	j.Movl(j.REG(rm), amd64.Eax)
+	j.Lzcnt(amd64.Eax, amd64.Eax)
 
-    // lzcnt returns op size when input is zero
-    //j.Mov(amd64.Imm(0), amd64.Ebx)
-    //j.Cmovcc(amd64.CC_Z, amd64.Ebx, amd64.Eax)
+	// lzcnt returns op size when input is zero
+	//j.Mov(amd64.Imm(0), amd64.Ebx)
+	//j.Cmovcc(amd64.CC_Z, amd64.Ebx, amd64.Eax)
 
-    j.Movl(amd64.Eax, j.REG(rd))
+	j.Movl(amd64.Eax, j.REG(rd))
 }
 
 func (j *Jit) emitMul(op uint32) {
 
-    inst := (op >> 21) & 0xF
-    set := (op >> 20) & 1 != 0
-    rd := (op >> 16) & 0xF
-    rn := (op >> 12) & 0xF
-    rs := (op >> 8) & 0xF
-    rm := op & 0xF
-
-    switch inst {
-    case MUL, MLA:
-
-        j.Xor(amd64.Rax, amd64.Rax)
-        j.Movl(j.REG(rs), amd64.Eax)
-        j.Mul(j.REG(rm))
-
-        if inst == MLA {
-            j.Add(j.REG(rn), amd64.Eax)
-        }
-
-        if set {
-
-            if inst == MUL { // Mul does not update flags
-                j.Test(amd64.Eax, amd64.Eax)
-            }
-
-            j.SETcc(amd64.CC_S, N)
-            j.SETcc(amd64.CC_Z, Z)
-        }
-
-        j.Movl(amd64.Eax, j.REG(rd))
-        return
-
-    case UMULL, UMLAL:
-
-        j.Xor(amd64.Rax, amd64.Rax)
-
-        j.Movl(j.REG(rs), amd64.Eax)
-        j.Movl(j.REG(rm), amd64.Ebx)
-        j.Mul(amd64.Rbx)
-
-        if inst == UMLAL {
-            //j.Xor(amd64.Rcx, amd64.Rcx)
-            //j.Xor(amd64.Rdi, amd64.Rdi)
-            j.Movl(j.REG(rd), amd64.Ecx)
-            j.Shl(amd64.Imm(32), amd64.Rcx)
-            j.Movl(j.REG(rn), amd64.Edi)
-            j.Add(amd64.Rcx, amd64.Rax)
-            j.Add(amd64.Rdi, amd64.Rax)
-        }
-
-        if set {
-
-            if inst == UMULL {
-                j.Test(amd64.Rax, amd64.Rax)
-            }
-
-            j.SETcc(amd64.CC_S, N)
-            j.SETcc(amd64.CC_Z, Z)
-        }
-
-        j.Movl(amd64.Eax, j.REG(rn))
-        j.Shr(amd64.Imm(32), amd64.Rax)
-        j.Movl(amd64.Eax, j.REG(rd))
-        return
-
-    case SMULL, SMLAL:
-
-        j.Xor(amd64.Rax, amd64.Rax)
-
-        j.Movl(j.REG(rs), amd64.Eax)
-        j.Movl(j.REG(rm), amd64.Ebx)
-
-        // sign extend 32 -> 64
-        j.Movsxd(amd64.Eax, amd64.Rax)
-        j.Movsxd(amd64.Ebx, amd64.Rbx)
-
-        j.Imul(amd64.Rbx)
-
-        if inst == SMLAL {
-            //j.Xor(amd64.Rcx, amd64.Rcx)
-            //j.Xor(amd64.Rdi, amd64.Rdi)
-            j.Movl(j.REG(rd), amd64.Ecx)
-            j.Shl(amd64.Imm(32), amd64.Rcx)
-            j.Movl(j.REG(rn), amd64.Edi)
-            j.Add(amd64.Rcx, amd64.Rax)
-            j.Add(amd64.Rdi, amd64.Rax)
-        }
-
-        if set {
-
-            if inst == SMULL {
-                j.Test(amd64.Rax, amd64.Rax)
-            }
-
-            j.SETcc(amd64.CC_S, N)
-            j.SETcc(amd64.CC_Z, Z)
-        }
-
-        j.Movl(amd64.Eax, j.REG(rn))
-        j.Shr(amd64.Imm(32), amd64.Rax)
-        j.Movl(amd64.Eax, j.REG(rd))
-
-        return
-    }
-
-    x := (op >> 5) & 1 != 0
-    y := (op >> 6) & 1 != 0
-
-    switch inst {
-
-    case SMLAxy:
-
-        // rmv
-
-        j.Movl(j.REG(rm), amd64.Eax)
-
-        if x {
-            j.Sar(amd64.Imm(16), amd64.Eax)
-        }
-
-        j.Movsx(amd64.Ax, amd64.Rax)
-
-        // rsv
-
-        j.Movl(j.REG(rs), amd64.Ebx)
-
-        if y {
-            j.Sar(amd64.Imm(16), amd64.Ebx)
-        }
-
-        j.Movsx(amd64.Bx, amd64.Rbx)
-
-        // rnv
-
-        j.Movl(j.REG(rn), amd64.Ecx)
-        j.Movsxd(amd64.Ecx, amd64.Rcx)
-
-        j.Imul(amd64.Rbx)
-
-        j.Add(amd64.Ecx, amd64.Eax)
-
-        j.SETcc(amd64.CC_O, amd64.Dl)
-        j.Orb(amd64.Dl, Q)
-
-        j.Movl(amd64.Eax, j.REG(rd))
-
-    case SMULxy:
-
-        j.Movl(j.REG(rm), amd64.Eax)
-        j.Movl(j.REG(rs), amd64.Ebx)
-
-        if !x {
-            j.Shl(amd64.Imm(16), amd64.Eax)
-        }
-
-        if !y {
-            j.Shl(amd64.Imm(16), amd64.Ebx)
-        }
-
-        j.Sar(amd64.Imm(16), amd64.Eax)
-        j.Sar(amd64.Imm(16), amd64.Ebx)
-
-        j.Imul(amd64.Ebx)
-
-        j.Movl(amd64.Eax, j.REG(rd))
-
-    case SMLALxy:
-
-        j.Movl(j.REG(rs), amd64.Eax)
-        j.Movl(j.REG(rm), amd64.Ebx)
-
-        if x {
-            j.Shr(amd64.Imm(16), amd64.Ebx)
-        }
-
-        if y {
-            j.Shr(amd64.Imm(16), amd64.Eax)
-        }
-
-        // sign extend 16 -> 64
-        j.Movsx(amd64.Ax, amd64.Rax)
-        j.Movsx(amd64.Bx, amd64.Rbx)
-
-        j.Imul(amd64.Rbx)
-
-        j.Xor(amd64.Rbx, amd64.Rbx)
-        j.Movl(j.REG(rd), amd64.Ebx)
-        j.Movl(j.REG(rn), amd64.Ecx)
-
-        j.Shl(amd64.Imm(32), amd64.Rbx)
-
-        j.Movsxd(amd64.Ecx, amd64.Rcx)
-
-        j.Add(amd64.Rbx, amd64.Rax)
-        j.Add(amd64.Rcx, amd64.Rax)
-
-        j.Movl(amd64.Eax, j.REG(rn))
-        j.Shr(amd64.Imm(32), amd64.Rax)
-        j.Movl(amd64.Eax, j.REG(rd))
-
-    case SMLAWySMLALWy:
-
-        // rsv
-        j.Movl(j.REG(rs), amd64.Eax)
-
-        if y {
-            j.Shr(amd64.Imm(16), amd64.Eax)
-        }
-
-        j.Movsx(amd64.Ax, amd64.Rax)
-
-        // rmv
-        j.Movl(j.REG(rm), amd64.Ebx)
-        j.Movsxd(amd64.Ebx, amd64.Rbx)
-
-        j.Imul(amd64.Rbx)
-        j.Sar(amd64.Imm(16), amd64.Rax)
-
-        if !x {
-
-            // add
-            j.Movl(j.REG(rn), amd64.Ebx)
-            j.Movsxd(amd64.Ebx, amd64.Rbx)
-
-            j.Add(amd64.Ebx, amd64.Eax)
-
-            j.SETcc(amd64.CC_O, amd64.Dl)
-            j.Orb(amd64.Dl, Q)
-
-        }
-
-        j.Movl(amd64.Eax, j.REG(rd))
-    }
-}
-
-func (j *Jit) emitSwp(op uint32) {
-
-    isByte := (op >> 22) & 1 != 0
-    rn := (op >> 16) & 0xF
-    rd := (op >> 12) & 0xF
-    rm := op & 0xF
-
-    j.Movl(j.REG(rn), amd64.Eax)
-    j.Movl(j.REG(rm), amd64.Ebx)
-
-    j.Movl(amd64.Eax, j.SCRATCH(0))
-    j.Movl(amd64.Ebx, j.SCRATCH(1))
-
-    if isByte {
-
-        j.CallFunc(Read)
-        j.Movl(amd64.Eax, j.REG(rd))
-
-        j.Movl(j.SCRATCH(0), amd64.Eax)
-        j.Movl(j.SCRATCH(1), amd64.Ebx)
-
-        j.And(amd64.Imm(0xFF), amd64.Rbx)
-        j.CallFunc(Write)
-        return
-    }
-
-    j.And(amd64.Imm(^0b11), amd64.Rax)
-    j.CallFunc(Read32)
-
-    j.Movl(j.SCRATCH(0), amd64.Ecx)
-    j.And(amd64.Imm(0b11), amd64.Ecx)
-    j.Shl(amd64.Imm(0b11), amd64.Ecx)
-    j.And(amd64.Imm(31), amd64.Ecx)
-    j.RorCl(amd64.Eax)
-    j.Movl(amd64.Eax, j.REG(rd))
-
-    j.Movl(j.SCRATCH(0), amd64.Eax)
-    j.Movl(j.SCRATCH(1), amd64.Ebx)
-    j.CallFunc(Write32)
-}
-
-func (j *Jit) emitQalu(op uint32) {
-
-    maxInt32 := amd64.Imm(math.MaxInt32)
-    minInt32 := amd64.Imm(math.MinInt32)
-
-    inst := (op >> 20) & 0xF
-    rn   := (op >> 16) & 0xF
-    rd   := (op >> 12) & 0xF
-    rm   := op & 0xF
-
-    j.Mov(j.REG(rm), amd64.Eax)
-    j.Movsxd(amd64.Eax, amd64.Rax)
-
-    j.Mov(j.REG(rn), amd64.Ebx)
-    j.Movsxd(amd64.Ebx, amd64.Rbx)
-
-    if double := inst >= 4; double {
-
-        // clamps
-        j.Mov(maxInt32, amd64.Rcx)
-        j.Mov(minInt32, amd64.Rdx)
-
-        // double with add to get int32 overflow
-        j.Add(amd64.Ebx, amd64.Ebx)
-
-        // if not signed clamp is MaxInt32
-        j.Cmovcc(amd64.CC_NS, amd64.Edx, amd64.Ecx)
-        // if overflow replace with clamp
-        j.Cmovcc(amd64.CC_O, amd64.Ecx, amd64.Ebx)
-
-        j.SETcc(amd64.CC_O, amd64.Dl)
-        j.Orb(amd64.Dl, Q)
-    }
-
-    // clamps
-    j.Mov(maxInt32, amd64.Rcx)
-    j.Mov(minInt32, amd64.Rdx)
-
-    if inst == QADD || inst == QDADD {
-        j.Add(amd64.Ebx, amd64.Eax)
-    } else {
-        j.Sub(amd64.Ebx, amd64.Eax)
-    }
-
-    // if not signed clamp is MaxInt32
-    j.Cmovcc(amd64.CC_NS, amd64.Edx, amd64.Ecx)
-    // if overflow replace with clamp
-    j.Cmovcc(amd64.CC_O, amd64.Ecx, amd64.Eax)
-
-    j.SETcc(amd64.CC_O, amd64.Dl)
-    j.Orb(amd64.Dl, Q)
-    j.Movl(amd64.Eax, j.REG(rd))
-}
-
-func (j *Jit) emitHalf(op uint32) {
-
-    rn      := (op >> 16) & 0xF
-    rd      := (op >> 12) & 0xF
-    preFlag := (op >> 24) & 1 != 0
-    load    := (op >> 20) & 1 != 0
-    inst    := (op >> 5)  & 0b11
-    wb      := (op >> 21) & 1 != 0 || !preFlag
-
-    // ax rnv / pre
-    // di offset
-    // cx post
-    // 
-
-    j.Movl(j.REG(rn), amd64.Eax)
-
-    if rn == PC {
-        j.Add(amd64.Imm(8), amd64.Eax)
-    }
-
-    if imm := (op >> 22) & 1 != 0; imm {
-        j.Mov(amd64.Imm((op & 0xF) | (((op >> 8) & 0xF) << 4)), amd64.Edi)
-	} else {
-        j.Movl(j.REG(op & 0xF), amd64.Edi)
-	}
-
-    j.Mov(amd64.Rax, amd64.Rcx)
-
-    if up := (op >> 23) & 1 != 0; up {
-        j.Add(amd64.Edi, amd64.Ecx)
-	} else {
-        j.Sub(amd64.Edi, amd64.Ecx)
-	}
-
-    if preFlag {
-        j.Mov(amd64.Rcx, amd64.Rax)
-    }
-
-    if inst == RESERVED {
-        panic("unsupported half (reserved)")
-    }
-
-    if !load {
-
-        j.Movl(j.REG(rd), amd64.Ebx)
-        if rd == PC {
-            j.Add(amd64.Imm(12), amd64.Ebx)
-        }
-
-        if wb {
-            j.Movl(amd64.Ecx, j.REG(rn))
-        }
-
-		switch inst {
-		case STRH:
-
-            j.And(amd64.Imm(^1), amd64.Rax)
-            j.And(amd64.Imm(0xFFFF), amd64.Rbx)
-            j.CallFunc(Write16)
-
-		case LDRD:
-
-            j.And(amd64.Imm(^0b111), amd64.Rax)
-            j.Movl(amd64.Eax, j.SCRATCH(0))
-
-            j.CallFunc(Read32)
-            j.Movl(amd64.Eax, j.REG(rd))
-
-            j.Movl(j.SCRATCH(0), amd64.Eax)
-            j.Add(amd64.Imm(4), amd64.Rax)
-
-            j.CallFunc(Read32)
-            j.Movl(amd64.Eax, j.REG(rd+1))
-
-		case STRD:
-
-            j.And(amd64.Imm(^0b111), amd64.Rax)
-            j.Movl(amd64.Eax, j.SCRATCH(0))
-
-            j.CallFunc(Write32)
-            j.Movl(amd64.Eax, j.REG(rd))
-
-            j.Movl(j.SCRATCH(0), amd64.Eax)
-            j.Add(amd64.Imm(4), amd64.Rax)
-
-            j.Movl(j.REG(rd+1), amd64.Ebx)
-            if rd + 1 == PC {
-                j.Add(amd64.Imm(12), amd64.Ebx)
-            }
-
-            j.CallFunc(Write32)
-            j.Movl(amd64.Eax, j.REG(rd+1))
+	inst := (op >> 21) & 0xF
+	set := (op>>20)&1 != 0
+	rd := (op >> 16) & 0xF
+	rn := (op >> 12) & 0xF
+	rs := (op >> 8) & 0xF
+	rm := op & 0xF
+
+	switch inst {
+	case MUL, MLA:
+
+		j.Xor(amd64.Rax, amd64.Rax)
+		j.Movl(j.REG(rs), amd64.Eax)
+		j.Mul(j.REG(rm))
+
+		if inst == MLA {
+			j.Add(j.REG(rn), amd64.Eax)
 		}
 
-    } else {
+		if set {
 
-        if wb {
-            j.Movl(amd64.Ecx, j.REG(rn))
-        }
+			if inst == MUL { // Mul does not update flags
+				j.Test(amd64.Eax, amd64.Eax)
+			}
 
-        switch inst {
-        case LDRH:
+			j.SETcc(amd64.CC_S, N)
+			j.SETcc(amd64.CC_Z, Z)
+		}
 
-            j.And(amd64.Imm(^1), amd64.Rax)
-            j.CallFunc(Read16)
+		j.Movl(amd64.Eax, j.REG(rd))
+		return
 
-        case LDRSB:
-            // sign-expand byte value
-            j.CallFunc(Read)
-            j.Movsx(amd64.Al, amd64.Rax)
+	case UMULL, UMLAL:
 
-        case LDRSH:
-            // sign-expand half value
-            j.And(amd64.Imm(^1), amd64.Rax)
-            j.CallFunc(Read16)
+		j.Xor(amd64.Rax, amd64.Rax)
 
-            j.Movsx(amd64.Ax, amd64.Rax)
-        }
+		j.Movl(j.REG(rs), amd64.Eax)
+		j.Movl(j.REG(rm), amd64.Ebx)
+		j.Mul(amd64.Rbx)
 
-        j.Movl(amd64.Eax, j.REG(rd))
-    }
-}
+		if inst == UMLAL {
+			//j.Xor(amd64.Rcx, amd64.Rcx)
+			//j.Xor(amd64.Rdi, amd64.Rdi)
+			j.Movl(j.REG(rd), amd64.Ecx)
+			j.Shl(amd64.Imm(32), amd64.Rcx)
+			j.Movl(j.REG(rn), amd64.Edi)
+			j.Add(amd64.Rcx, amd64.Rax)
+			j.Add(amd64.Rdi, amd64.Rax)
+		}
 
-func (j *Jit) emitSdt(op uint32) {
+		if set {
 
-    rd   := (op >> 12) & 0xF
-    rn   := (op >> 16) & 0xF
-    reg  := (op >> 25) & 1 != 0
-    pre  := (op >> 24) & 1 != 0
-    up   := (op >> 23) & 1 != 0
-    byte := (op >> 22) & 1 != 0
-    load := (op >> 20) & 1 != 0
-    wb   := (op >> 21) & 1 != 0 || !pre
+			if inst == UMULL {
+				j.Test(amd64.Rax, amd64.Rax)
+			}
 
-    // offset
-    if reg {
-        j.emitSdtRegShift(op)
-        CpuPointer = j.Cpu
-        j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
+			j.SETcc(amd64.CC_S, N)
+			j.SETcc(amd64.CC_Z, Z)
+		}
 
-        j.Mov(amd64.Rbx, amd64.Rcx)
-    } else {
-        j.Mov(amd64.Imm(int32(op & 0xFFF)), amd64.Rcx)
-    }
+		j.Movl(amd64.Eax, j.REG(rn))
+		j.Shr(amd64.Imm(32), amd64.Rax)
+		j.Movl(amd64.Eax, j.REG(rd))
+		return
 
-    // rn ebx, shift ecx
+	case SMULL, SMLAL:
 
-    // ax pre
-    // bc post
+		j.Xor(amd64.Rax, amd64.Rax)
 
-    j.Movl(j.REG(rn), amd64.Ebx)
+		j.Movl(j.REG(rs), amd64.Eax)
+		j.Movl(j.REG(rm), amd64.Ebx)
 
-    if rn == PC {
-        j.Add(amd64.Imm(8), amd64.Ebx)
-    }
+		// sign extend 32 -> 64
+		j.Movsxd(amd64.Eax, amd64.Rax)
+		j.Movsxd(amd64.Ebx, amd64.Rbx)
 
-    if up {
-        j.Add(amd64.Ecx, amd64.Ebx)
-    } else {
-        j.Sub(amd64.Ecx, amd64.Ebx)
-    }
+		j.Imul(amd64.Rbx)
 
-    if pre {
-        j.Movl(amd64.Ebx, amd64.Eax)
-    } else {
-        j.Movl(j.REG(rn), amd64.Eax)
-    }
+		if inst == SMLAL {
+			//j.Xor(amd64.Rcx, amd64.Rcx)
+			//j.Xor(amd64.Rdi, amd64.Rdi)
+			j.Movl(j.REG(rd), amd64.Ecx)
+			j.Shl(amd64.Imm(32), amd64.Rcx)
+			j.Movl(j.REG(rn), amd64.Edi)
+			j.Add(amd64.Rcx, amd64.Rax)
+			j.Add(amd64.Rdi, amd64.Rax)
+		}
 
-    if wb {
-        j.Movl(amd64.Ebx, j.REG(rn))
-    }
+		if set {
 
-    if load {
-        if byte {
-            j.CallFunc(Read)
-        } else {
-            j.Movl(amd64.Eax, j.SCRATCH(0))
+			if inst == SMULL {
+				j.Test(amd64.Rax, amd64.Rax)
+			}
 
-            j.And(amd64.Imm(^0b11), amd64.Eax)
-            j.CallFunc(Read32)
+			j.SETcc(amd64.CC_S, N)
+			j.SETcc(amd64.CC_Z, Z)
+		}
 
-            j.Movl(j.SCRATCH(0), amd64.Ecx)
-            j.And(amd64.Imm(0b11), amd64.Ecx)
-            j.Shl(amd64.Imm(0b11), amd64.Ecx)
-            j.RorCl(amd64.Eax)
-        }
-
-        j.Movl(amd64.Eax, j.REG(rd))
-
-    } else {
-
-        j.Movl(j.REG(rd), amd64.Ebx)
-        if rd == PC {
-            j.Add(amd64.Imm(12), amd64.Ebx)
-        }
-
-        if byte {
-            j.And(amd64.Imm(0xFF), amd64.Ebx)
-            j.CallFunc(Write)
-        } else {
-            j.And(amd64.Imm(^0b11), amd64.Eax)
-            j.CallFunc(Write32)
-        }
-    }
-}
-
-func (j *Jit) emitSdtRegShift(op uint32) {
-
-    rm     := op & 0xF
-    shType := (op >> 5) & 0b11
-    shift  := (op >> 7) & 0x1F
-
-    // ebx rm, ecx shift
-
-	j.Movl(j.REG(rm), amd64.Ebx)
-
-    if rm == PC {
-        panic("rm cannot include pc sdt")
-    }
-
-    //if special := shift == 0; special {
-
-    //    if rm == PC {
-    //        j.Add(amd64.Imm(8), amd64.Ebx)
-    //    }
-
-    //    switch shType{
-    //    case LSL:
-    //    case LSR:
-    //        j.Xor(amd64.Ebx, amd64.Ebx)
-    //    case ASR:
-    //        j.Sar(amd64.Imm(31), amd64.Ebx)
-    //    case ROR:
-    //        j.Rcr(amd64.Imm(1), amd64.Ebx)
-    //    }
-    //    return
-    //}
-
-    switch shType {
-    case LSL:
-
-        j.Mov(amd64.Imm(shift), amd64.Rcx)
-        j.ShlCl(amd64.Ebx)
-
-        j.Cmp(amd64.Imm(32), amd64.Ecx)
-        j.Sbb(amd64.Eax, amd64.Eax)
-        j.And(amd64.Eax, amd64.Ebx)
-        return
-
-    case LSR:
-
-        j.Mov(amd64.Imm(shift), amd64.Rcx)
-        j.ShrCl(amd64.Ebx)
-
-        j.Cmp(amd64.Imm(32), amd64.Ecx)
-        j.Sbb(amd64.Eax, amd64.Eax)
-        j.And(amd64.Eax, amd64.Ebx)
-        return
-
-    case ASR:
-
-        j.Movl(amd64.Imm(shift), amd64.Ecx)
-
-        j.Cmp(amd64.Imm(32), amd64.Ecx)
-        j.Sbb(amd64.Eax, amd64.Eax)
-        j.Not(amd64.Eax)
-        j.Or(amd64.Eax, amd64.Ecx)
-
-        j.SarCl(amd64.Ebx)
-        return
-
-    case ROR:
-
-        j.Movl(amd64.Imm(shift), amd64.Ecx)
-        j.RorCl(amd64.Ebx)
-        return
-    }
-}
-
-func (j *Jit) emitAluOp2Reg(op uint32) {
-
-    shReg    := (op >> 4) & 1 != 0
-    shType   := (op >> 5) & 0b11
-    setCarry := (op >> 20) & 1 != 0
-    inst     := (op >> 21) & 0xF
-    logical  := inst & 0b0110 == 0b0000 || inst & 0b1100 == 0b1100
-    rm       := op & 0xF
-
-    setCarry  = setCarry && logical
-    if setCarry {
-        j.Mov(amd64.Imm(1), amd64.Rdi)
-    } else {
-        j.Mov(amd64.Imm(0), amd64.Rdi)
-    }
-
-    // rbx: op2
-    // rcx: shift
-    // rdx: original carry
-    // rdi: setcarry
-
-    j.Movb(C, amd64.Dl)
-	j.Movl(j.REG(rm), amd64.Ebx)
-
-    if shReg {
-        rs := (op >> 8) & 0xF
-
-        j.Movl(j.REG(rs), amd64.Ecx)
-        j.And(amd64.Imm(0xFF), amd64.Ecx)
-
-        if rm == PC {
-            j.Add(amd64.Imm(12), amd64.Ebx)
-        }
-
-
-    } else {
-
-        shift := (op >> 7) & 0x1F
-
-        if rm == PC {
-            j.Add(amd64.Imm(8), amd64.Ebx)
-        }
-
-        if special := shift == 0; special {
-            switch shType{
-            case LSL:
-            case LSR:
-
-                j.Bt(amd64.Imm(31), amd64.Ebx)
-                j.SETcc(amd64.CC_C, C)
-
-                // clear op2
-                j.Xor(amd64.Ebx, amd64.Ebx)
-            case ASR:
-
-                // sar sets everything to top bit
-                // if setcarry, set carry to bit as well
-
-                j.Sar(amd64.Imm(31), amd64.Ebx)
-
-                if setCarry {
-                    j.Bt(amd64.Imm(31), amd64.Ebx)
-                    j.SETcc(amd64.CC_C, C)
-                }
-
-            case ROR:
-
-                // CF = old carry (EDX & 1)
-                j.Bt(amd64.Imm(0), amd64.Edx)
-
-                // RRX
-                j.Rcr(amd64.Imm(1), amd64.Ebx)
-
-                // CPSR.C = new carry
-                j.SETcc(amd64.CC_C, C)
-            }
-
-            return
-        }
-
-        j.Mov(amd64.Imm(shift), amd64.Rcx)
-    }
-
-    j.Test(amd64.Rcx, amd64.Rcx)
-    zeroJump := j.JccForward(amd64.CC_Z)
-
-    // https://iitd-plos.github.io/col718/ref/arm-instructionset.pdf
-
-    switch shType {
-    case LSL, LSR:
-
-        j.Cmp(amd64.Imm(32), amd64.Ecx)
-        shift32 := j.JccForward(amd64.CC_A)
-        equal := j.JccForward(amd64.CC_Z)
-
-        if shType == LSL {
-            // carry = op2 & (1 << (32-shift)) != 0
-            j.Mov(amd64.Imm(32), amd64.Rax)
-            j.Sub(amd64.Ecx, amd64.Eax)
-            j.Bt(amd64.Eax, amd64.Ebx)
-            j.SETcc(amd64.CC_C, amd64.Dl)
-            // op2 <<= shift
-            j.ShlCl(amd64.Ebx)
-        } else {
-            // carry = op2 & (1 << (shift-1)) != 0
-            j.Mov(amd64.Rcx, amd64.Rax)
-            j.Sub(amd64.Imm(1), amd64.Eax)
-            j.Bt(amd64.Eax, amd64.Ebx)
-            j.SETcc(amd64.CC_C, amd64.Dl)
-            // op2 >>= shift
-            j.ShrCl(amd64.Ebx)
-        }
-
-        done := j.JmpForward()
-
-        shift32()
-
-        // carry = op2 & 1 != 0
-        j.Mov(amd64.Rbx, amd64.Rdx)
-        j.And(amd64.Imm(1), amd64.Rdx)
-        // op2 = 0
-        j.Xor(amd64.Rbx, amd64.Rbx)
-
-        done2 := j.JmpForward()
-
-        // this causes errors???
-        equal()
-
-        // LSL: carry = op2 & 1 != 0 
-        // LSR: carry = op2 & 0x8000_0000 != 0 
-        j.Mov(amd64.Rbx, amd64.Rdx)
-        if shType == LSL {
-            j.And(amd64.Imm(1), amd64.Rdx)
-        } else {
-            j.Shr(amd64.Imm(31), amd64.Rdx)
-        }
-
-        // op2 = 0
-        j.Xor(amd64.Rbx, amd64.Rbx)
-
-        done()
-        done2()
-
-    case ASR:
-
-        j.Cmp(amd64.Imm(32), amd64.Ecx)
-        shift32ge := j.JccForward(amd64.CC_AE)
-
-        // carry = op2 & (1 << (shift-1)) != 0
-        j.Mov(amd64.Rcx, amd64.Rax)
-        j.Sub(amd64.Imm(1), amd64.Eax)
-        j.Bt(amd64.Eax, amd64.Ebx)
-        j.SETcc(amd64.CC_C, amd64.Dl)
-        // op2 <<= shift
-        j.SarCl(amd64.Ebx)
-
-        done := j.JmpForward()
-
-        shift32ge()
-
-        // op and carry == top bit sar
-        j.Sar(amd64.Imm(31), amd64.Ebx)
-        j.Bt(amd64.Imm(0), amd64.Ebx)
-        j.SETcc(amd64.CC_C, amd64.Dl)
-
-        done()
-
-    case ROR:
-
-        j.Cmp(amd64.Imm(32), amd64.Ecx)
-        equal := j.JccForward(amd64.CC_Z)
-
-        // carry = (op2 >> ((shift-1) & 31)) & 1 != 0
-        j.Mov(amd64.Rcx, amd64.Rax)
-        j.Sub(amd64.Imm(1), amd64.Eax)
-        j.And(amd64.Imm(31), amd64.Eax)
-
-        j.Bt(amd64.Eax, amd64.Ebx)
-        j.SETcc(amd64.CC_C, amd64.Dl)
-
-        // op2 ror shift
-        j.RorCl(amd64.Ebx)
-
-        done := j.JmpForward()
-
-        equal()
-
-        // op2 unchanged
-        // carry = op2 & 0x8000_0000 != 0
-        j.Mov(amd64.Rbx, amd64.Rdx)
-        j.Shr(amd64.Imm(31), amd64.Rdx)
-
-        done()
-    }
-
-    j.Test(amd64.Rdi, amd64.Rdi)
-
-    skip := j.JccForward(amd64.CC_Z)
-
-    j.Movb(amd64.Dl, C)
-
-    zeroJump()
-    skip()
-}
-
-func (j *Jit) emitAlu(op uint32) {
-
-    inst := (op >> 21) & 0xF
-    rd   := (op >> 12) & 0xF
-    rn   := (op >> 16) & 0xF
-    imm  := (op >> 25) & 1 != 0
-    set  := (op >> 20) & 1 != 0
-
-    // reg and imm
-
-    if inst == 5 || inst == 7 || inst == 6 {
-        j.Xor(amd64.Rcx, amd64.Rcx)
-        j.Movb(C, amd64.Cl)
-        j.Mov(amd64.Rcx, amd64.R8)
-    }
-
-    if imm {
-
-        ro := ((op >> 8) & 0xF) << 1
-        op2 := bits.RotateLeft32(op & 0xFF, -int(ro))
-
-        j.Mov(amd64.Imm(int32(op2)), amd64.Rbx)
-
-        if set && ro != 0 {
-            j.Movb(amd64.Imm((op2 >> 31) & 1), C)
-        }
-
-        j.Movl(j.REG(rn), amd64.Eax)
-
-        if rn == PC {
-            j.Add(amd64.Imm(8), amd64.Eax)
-        }
-    } else {
-
-        // get op2, op2 will be in bx
-        // shift
-        j.emitAluOp2Reg(op)
-
-        j.Movl(j.REG(rn), amd64.Eax)
-
-        if rn == PC {
-            if imm := (op >> 4) & 1 != 0; imm {
-                j.Add(amd64.Imm(8), amd64.Eax)
-            } else {
-                j.Add(amd64.Imm(12), amd64.Eax)
-            }
-        }
-    }
-
-    if inst == 5 || inst == 7 || inst == 6 {
-        j.Mov(amd64.R8, amd64.Rcx)
-    }
-
-    CpuPointer = j.Cpu
-    j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
-
-    aluInstJit[inst](j, op, rd)
-
-    j.Movl(j.REG(PC), amd64.Eax)
-}
-
-var aluInstJit = [...]func(j *Jit, op, rd uint32) {
-
-    // AND 
-    func(j *Jit, op, rd uint32) {
-        j.And(amd64.Ebx, amd64.Eax)
-
-        if set := (op >> 20) & 1 != 0; set {
-            j.SETcc(amd64.CC_S, N)
-            j.SETcc(amd64.CC_Z, Z)
-        }
-
-        j.Movl(amd64.Eax, j.REG(rd))
-    },
-
-    // EOR
-    func(j *Jit, op, rd uint32) {
-        j.Xor(amd64.Ebx, amd64.Eax)
-
-        if set := (op >> 20) & 1 != 0; set {
-            j.SETcc(amd64.CC_S, N)
-            j.SETcc(amd64.CC_Z, Z)
-        }
-
-        j.Movl(amd64.Eax, j.REG(rd))
-    },
-
-    // SUB
-    func(j *Jit, op, rd uint32) {
-        j.Sub(amd64.Ebx, amd64.Eax)
-
-        if set := (op >> 20) & 1 != 0; set {
-            j.SETcc(amd64.CC_O, V)
-            j.SETcc(amd64.CC_NC, C)
-            j.SETcc(amd64.CC_S, N)
-            j.SETcc(amd64.CC_Z, Z)
-        }
-
-        j.Movl(amd64.Eax, j.REG(rd))
-    },
-
-    // RSB
-    func(j *Jit, op, rd uint32) {
-        j.Sub(amd64.Eax, amd64.Ebx)
-
-        if set := (op >> 20) & 1 != 0; set {
-            j.SETcc(amd64.CC_O, V)
-            j.SETcc(amd64.CC_NC, C)
-            j.SETcc(amd64.CC_S, N)
-            j.SETcc(amd64.CC_Z, Z)
-        }
-
-        j.Movl(amd64.Ebx, j.REG(rd))
-    },
-
-    // ADD
-    func(j *Jit, op, rd uint32) {
-        j.Add(amd64.Ebx, amd64.Eax)
-
-        if set := (op >> 20) & 1 != 0; set {
-            j.SETcc(amd64.CC_O, V)
-            j.SETcc(amd64.CC_C, C)
-            j.SETcc(amd64.CC_S, N)
-            j.SETcc(amd64.CC_Z, Z)
-        }
-
-        j.Movl(amd64.Eax, j.REG(rd))
-    },
-
-    // ADC
-    func(j *Jit, op, rd uint32) {
-        j.Bt(amd64.Imm(0), amd64.Cl)
-        j.Adc(amd64.Ebx, amd64.Eax)
-
-        if set := (op >> 20) & 1 != 0; set {
-            j.SETcc(amd64.CC_O, V)
-            j.SETcc(amd64.CC_C, C)
-            j.SETcc(amd64.CC_S, N)
-            j.SETcc(amd64.CC_Z, Z)
-        }
-
-        j.Movl(amd64.Eax, j.REG(rd))
-    },
-
-    // SBC
-    func(j *Jit, op, rd uint32) {
-        j.Bt(amd64.Imm(0), amd64.Cl)
-        j.Cmc() // compliment carry (reverse for sub)
-        j.Sbb(amd64.Ebx, amd64.Eax)
-
-        if set := (op >> 20) & 1 != 0; set {
-            j.SETcc(amd64.CC_O, V)
-            j.SETcc(amd64.CC_NC, C)
-            j.SETcc(amd64.CC_S, N)
-            j.SETcc(amd64.CC_Z, Z)
-        }
-
-        j.Movl(amd64.Eax, j.REG(rd))
-    },
-
-    // RSC
-    func(j *Jit, op, rd uint32) {
-        j.Bt(amd64.Imm(0), amd64.Cl)
-        j.Cmc() // compliment carry (reverse for sub)
-        j.Sbb(amd64.Eax, amd64.Ebx)
-
-        if set := (op >> 20) & 1 != 0; set {
-            j.SETcc(amd64.CC_O, V)
-            j.SETcc(amd64.CC_NC, C)
-            j.SETcc(amd64.CC_S, N)
-            j.SETcc(amd64.CC_Z, Z)
-        }
-
-        j.Movl(amd64.Ebx, j.REG(rd))
-    },
-
-    // TST 
-    func(j *Jit, op, rd uint32) {
-        j.And(amd64.Ebx, amd64.Eax)
-        if set := (op >> 20) & 1 != 0; set {
-            j.SETcc(amd64.CC_S, N)
-            j.SETcc(amd64.CC_Z, Z)
-        }
-
-        if rd == PC {
-            j.Add(amd64.Imm(4), j.REG(15))
-        }
-    },
-
-    // TEQ 
-    func(j *Jit, op, rd uint32) {
-        j.Xor(amd64.Ebx, amd64.Eax)
-        if set := (op >> 20) & 1 != 0; set {
-            j.SETcc(amd64.CC_S, N)
-            j.SETcc(amd64.CC_Z, Z)
-        }
-
-        if rd == PC {
-            j.Add(amd64.Imm(4), j.REG(15))
-        }
-    },
-
-
-    // CMP
-    func(j *Jit, op, rd uint32) {
-        j.Sub(amd64.Ebx, amd64.Eax)
-
-        if set := (op >> 20) & 1 != 0; set {
-            j.SETcc(amd64.CC_O, V)
-            j.SETcc(amd64.CC_NC, C)
-            j.SETcc(amd64.CC_S, N)
-            j.SETcc(amd64.CC_Z, Z)
-        }
-
-        if rd == PC {
-            j.Add(amd64.Imm(4), j.REG(15))
-        }
-    },
-
-    // CMN
-    func(j *Jit, op, rd uint32) {
-        j.Add(amd64.Ebx, amd64.Eax)
-
-        if set := (op >> 20) & 1 != 0; set {
-            j.SETcc(amd64.CC_O, V)
-            j.SETcc(amd64.CC_C, C)
-            j.SETcc(amd64.CC_S, N)
-            j.SETcc(amd64.CC_Z, Z)
-        }
-
-        if rd == PC {
-            j.Add(amd64.Imm(4), j.REG(15))
-        }
-    },
-
-    // ORR
-    func(j *Jit, op, rd uint32) {
-        j.Or(amd64.Ebx, amd64.Eax)
-
-        if set := (op >> 20) & 1 != 0; set {
-            j.SETcc(amd64.CC_S, N)
-            j.SETcc(amd64.CC_Z, Z)
-        }
-
-        j.Movl(amd64.Eax, j.REG(rd))
-    },
-
-    // MOV
-    func(j *Jit, op, rd uint32) {
-        j.Movl(amd64.Ebx, j.REG(rd))
-
-        if set := (op >> 20) & 1 != 0; set {
-            j.Test(amd64.Ebx, amd64.Ebx)
-            j.SETcc(amd64.CC_S, N)
-            j.SETcc(amd64.CC_Z, Z)
-        }
-    },
-
-    // BIC
-    func(j *Jit, op, rd uint32) {
-
-        j.Not(amd64.Ebx)
-        j.And(amd64.Ebx, amd64.Eax)
-
-        if set := (op >> 20) & 1 != 0; set {
-            j.SETcc(amd64.CC_S, N)
-            j.SETcc(amd64.CC_Z, Z)
-        }
-
-        j.Movl(amd64.Eax, j.REG(rd))
-    },
-
-    // MVN
-    func(j *Jit, op, rd uint32) {
-
-        j.Not(amd64.Ebx)
-
-        if set := (op >> 20) & 1 != 0; set {
-            j.Test(amd64.Ebx, amd64.Ebx)
-            j.SETcc(amd64.CC_S, N)
-            j.SETcc(amd64.CC_Z, Z)
-        }
-
-        j.Movl(amd64.Ebx, j.REG(rd))
-    },
-}
-
-func (j *Jit) emitBlock(op uint32) {
-
-    // SCRATCH
-    // 0x00: rnv
-    // 0x01: addr
-    // 0x02: wb
-    // 0x10: usermode flag
-
-    rlist := op & 0xFFFF
-    up := (op >> 23) & 1 != 0
-    rn := (op >> 16) & 0xF
-
-	if rlist == 0 {
-
-		if up {
-            j.Add(amd64.Imm(0x40), j.REG(rn))
-		} else {
-            j.Sub(amd64.Imm(0x40), j.REG(rn))
-        }
+		j.Movl(amd64.Eax, j.REG(rn))
+		j.Shr(amd64.Imm(32), amd64.Rax)
+		j.Movl(amd64.Eax, j.REG(rd))
 
 		return
 	}
 
-    pcIncluded := op & 0x8000 != 0
-    pre  := (op >> 24) & 1 != 0
-    psr  := (op >> 22) & 1 != 0
-    wb   := (op >> 21) & 1 != 0
-    load := (op >> 20) & 1 != 0
+	x := (op>>5)&1 != 0
+	y := (op>>6)&1 != 0
 
-    j.Xor(amd64.Rax, amd64.Rax)
-    if forceUser := psr && (!load || !pcIncluded); forceUser {
-        j.Mov(MODE, amd64.Eax)
-        j.Cmp(amd64.Imm(MODE_USR), amd64.Eax)
-        j.SETcc(amd64.CC_NZ, amd64.Rax)
-    }
+	switch inst {
 
-    j.Mov(amd64.Eax, j.SCRATCH(0x10))
+	case SMLAxy:
 
-    regCount := utils.CountBits(rlist)
+		// rmv
 
-    j.Movl(j.REG(rn), amd64.Eax)
-    j.Mov(amd64.Rax, amd64.Rbx)
+		j.Movl(j.REG(rm), amd64.Eax)
 
-    j.And(amd64.Imm(^0b11), amd64.Rax)
+		if x {
+			j.Sar(amd64.Imm(16), amd64.Eax)
+		}
 
-    if up {
-        j.Add(amd64.Imm(regCount * 4), amd64.Rbx)
-    } else {
-        j.Sub(amd64.Imm(regCount * 4), amd64.Rbx)
-    }
+		j.Movsx(amd64.Ax, amd64.Rax)
 
-    if rn == 13 || rn == 14 {
+		// rsv
 
-        j.And(amd64.Imm(1), amd64.Edi)
+		j.Movl(j.REG(rs), amd64.Ebx)
 
-        j.Cmp(amd64.Imm(1), amd64.Edi)
-        normal := j.JccForward(amd64.CC_NZ)
+		if y {
+			j.Sar(amd64.Imm(16), amd64.Ebx)
+		}
 
-        switch rn {
-        case 13:
-            j.Movl(j.UserBankReg(false), amd64.Edi)
-        case 14:
-            j.Movl(j.UserBankReg(true), amd64.Edi)
-        }
+		j.Movsx(amd64.Bx, amd64.Rbx)
 
-        userModeJump := j.JmpForward()
+		// rnv
 
-        normal()
+		j.Movl(j.REG(rn), amd64.Ecx)
+		j.Movsxd(amd64.Ecx, amd64.Rcx)
 
-        j.Movl(j.REG(rn), amd64.Edi)
+		j.Imul(amd64.Rbx)
 
-        userModeJump()
+		j.Add(amd64.Ecx, amd64.Eax)
 
-    } else {
-        j.Movl(j.REG(rn), amd64.Edi)
-    }
+		j.SETcc(amd64.CC_O, amd64.Dl)
+		j.Orb(amd64.Dl, Q)
 
-    // rnv in scratch 0
-    j.Movl(amd64.Edi, j.SCRATCH(0))
+		j.Movl(amd64.Eax, j.REG(rd))
 
-    // wb in scratch 2
-    j.Movl(amd64.Ebx, j.SCRATCH(2))
+	case SMULxy:
 
-    reg := uint32(0)
-    if !up {
-        reg = 15
-    }
+		j.Movl(j.REG(rm), amd64.Eax)
+		j.Movl(j.REG(rs), amd64.Ebx)
 
-    for range 16 {
+		if !x {
+			j.Shl(amd64.Imm(16), amd64.Eax)
+		}
 
-        if disabled := (rlist >> reg) & 1 == 0; disabled {
-            if up { reg++ } else { reg-- }
-            continue
-        }
+		if !y {
+			j.Shl(amd64.Imm(16), amd64.Ebx)
+		}
 
-        if pre {
-            if up {
-                j.Add(amd64.Imm(4), amd64.Rax)
-            } else {
-                j.Sub(amd64.Imm(4), amd64.Rax)
-            }
-        }
+		j.Sar(amd64.Imm(16), amd64.Eax)
+		j.Sar(amd64.Imm(16), amd64.Ebx)
 
-        j.Movl(amd64.Eax, j.SCRATCH(1))
+		j.Imul(amd64.Ebx)
 
-        if load {
+		j.Movl(amd64.Eax, j.REG(rd))
 
-            j.CallFunc(Read32)
+	case SMLALxy:
 
-            if reg == 13 || reg == 14 {
+		j.Movl(j.REG(rs), amd64.Eax)
+		j.Movl(j.REG(rm), amd64.Ebx)
 
-                j.Movl(j.SCRATCH(0x10), amd64.Edi)
+		if x {
+			j.Shr(amd64.Imm(16), amd64.Ebx)
+		}
 
-                j.Cmp(amd64.Imm(1), amd64.Edi)
-                normal := j.JccForward(amd64.CC_NZ)
+		if y {
+			j.Shr(amd64.Imm(16), amd64.Eax)
+		}
 
-                switch reg {
-                case 13:
-                    j.Movl(amd64.Eax, j.UserBankReg(false))
-                case 14:
-                    j.Movl(amd64.Eax, j.UserBankReg(true))
-                }
+		// sign extend 16 -> 64
+		j.Movsx(amd64.Ax, amd64.Rax)
+		j.Movsx(amd64.Bx, amd64.Rbx)
 
-                userModeJump := j.JmpForward()
+		j.Imul(amd64.Rbx)
 
-                normal()
+		j.Xor(amd64.Rbx, amd64.Rbx)
+		j.Movl(j.REG(rd), amd64.Ebx)
+		j.Movl(j.REG(rn), amd64.Ecx)
 
-                j.Movl(amd64.Eax, j.REG(reg))
+		j.Shl(amd64.Imm(32), amd64.Rbx)
 
-                userModeJump()
+		j.Movsxd(amd64.Ecx, amd64.Rcx)
 
-            } else {
-                j.Movl(amd64.Eax, j.REG(reg))
-            }
+		j.Add(amd64.Rbx, amd64.Rax)
+		j.Add(amd64.Rcx, amd64.Rax)
 
+		j.Movl(amd64.Eax, j.REG(rn))
+		j.Shr(amd64.Imm(32), amd64.Rax)
+		j.Movl(amd64.Eax, j.REG(rd))
 
-        } else {
+	case SMLAWySMLALWy:
 
-            switch reg {
-            case rn:
-                j.Movl(j.SCRATCH(0), amd64.Ebx)
-            case PC:
-                j.Movl(j.REG(15), amd64.Ebx)
-                j.Add(amd64.Imm(12), amd64.Ebx)
+		// rsv
+		j.Movl(j.REG(rs), amd64.Eax)
 
-            default:
+		if y {
+			j.Shr(amd64.Imm(16), amd64.Eax)
+		}
 
-                if reg == 13 || reg == 14 {
+		j.Movsx(amd64.Ax, amd64.Rax)
 
-                    j.Movl(j.SCRATCH(0x10), amd64.Edi)
-                    j.Cmp(amd64.Imm(1), amd64.Edi)
-                    normal := j.JccForward(amd64.CC_NZ)
+		// rmv
+		j.Movl(j.REG(rm), amd64.Ebx)
+		j.Movsxd(amd64.Ebx, amd64.Rbx)
 
-                    switch reg {
-                    case 13:
-                        j.Movl(j.UserBankReg(false), amd64.Ebx)
-                    case 14:
-                        j.Movl(j.UserBankReg(true), amd64.Ebx)
-                    }
+		j.Imul(amd64.Rbx)
+		j.Sar(amd64.Imm(16), amd64.Rax)
 
-                    userModeJump := j.JmpForward()
+		if !x {
 
-                    normal()
+			// add
+			j.Movl(j.REG(rn), amd64.Ebx)
+			j.Movsxd(amd64.Ebx, amd64.Rbx)
 
-                    j.Movl(j.REG(reg), amd64.Ebx)
+			j.Add(amd64.Ebx, amd64.Eax)
 
-                    userModeJump()
-                } else {
-                    j.Movl(j.REG(reg), amd64.Ebx)
-                }
-            }
+			j.SETcc(amd64.CC_O, amd64.Dl)
+			j.Orb(amd64.Dl, Q)
 
-            j.CallFunc(Write32)
-        }
+		}
 
-        // fix clobbering
-        j.Movl(j.SCRATCH(1), amd64.Eax)
+		j.Movl(amd64.Eax, j.REG(rd))
+	}
+}
 
-        if !pre {
-            if up {
-                j.Add(amd64.Imm(4), amd64.Rax)
-            } else {
-                j.Sub(amd64.Imm(4), amd64.Rax)
-            }
-        }
+func (j *Jit) emitSwp(op uint32) {
 
-        if up {
-            reg++
-        } else {
-            reg--
-        }
-    }
+	isByte := (op>>22)&1 != 0
+	rn := (op >> 16) & 0xF
+	rd := (op >> 12) & 0xF
+	rm := op & 0xF
 
-    if !load {
-        if wb {
-            j.Movl(j.SCRATCH(2), amd64.Eax)
-            j.Movl(amd64.Eax, j.REG(rn))
-        }
+	j.Movl(j.REG(rn), amd64.Eax)
+	j.Movl(j.REG(rm), amd64.Ebx)
 
-        return
-    }
+	j.Movl(amd64.Eax, j.SCRATCH(0))
+	j.Movl(amd64.Ebx, j.SCRATCH(1))
 
-    if wb {
-        if rnIncluded := (rlist>>rn) & 1 == 1; rnIncluded {
-            isLast := (rlist < (1 << (rn + 1)))
-            isOnly := regCount == 1
-            if !isLast || isOnly {
-                j.Movl(j.SCRATCH(2), amd64.Eax)
-                j.Movl(amd64.Eax, j.REG(rn))
-            }
-        } else {
-            j.Movl(j.SCRATCH(2), amd64.Eax)
-            j.Movl(amd64.Eax, j.REG(rn))
-        }
-    }
+	if isByte {
 
-    if !pcIncluded {
-        return
-    }
+		j.CallFunc(Read)
+		j.Movl(amd64.Eax, j.REG(rd))
 
-    panic("UNSETUP LDR PC INCLUDED")
+		j.Movl(j.SCRATCH(0), amd64.Eax)
+		j.Movl(j.SCRATCH(1), amd64.Ebx)
+
+		j.And(amd64.Imm(0xFF), amd64.Rbx)
+		j.CallFunc(Write)
+		return
+	}
+
+	j.And(amd64.Imm(^0b11), amd64.Rax)
+	j.CallFunc(Read32)
+
+	j.Movl(j.SCRATCH(0), amd64.Ecx)
+	j.And(amd64.Imm(0b11), amd64.Ecx)
+	j.Shl(amd64.Imm(0b11), amd64.Ecx)
+	j.And(amd64.Imm(31), amd64.Ecx)
+	j.RorCl(amd64.Eax)
+	j.Movl(amd64.Eax, j.REG(rd))
+
+	j.Movl(j.SCRATCH(0), amd64.Eax)
+	j.Movl(j.SCRATCH(1), amd64.Ebx)
+	j.CallFunc(Write32)
+}
+
+func (j *Jit) emitQalu(op uint32) {
+
+	maxInt32 := amd64.Imm(math.MaxInt32)
+	minInt32 := amd64.Imm(math.MinInt32)
+
+	inst := (op >> 20) & 0xF
+	rn := (op >> 16) & 0xF
+	rd := (op >> 12) & 0xF
+	rm := op & 0xF
+
+	j.Mov(j.REG(rm), amd64.Eax)
+	j.Movsxd(amd64.Eax, amd64.Rax)
+
+	j.Mov(j.REG(rn), amd64.Ebx)
+	j.Movsxd(amd64.Ebx, amd64.Rbx)
+
+	if double := inst >= 4; double {
+
+		// clamps
+		j.Mov(maxInt32, amd64.Rcx)
+		j.Mov(minInt32, amd64.Rdx)
+
+		// double with add to get int32 overflow
+		j.Add(amd64.Ebx, amd64.Ebx)
+
+		// if not signed clamp is MaxInt32
+		j.Cmovcc(amd64.CC_NS, amd64.Edx, amd64.Ecx)
+		// if overflow replace with clamp
+		j.Cmovcc(amd64.CC_O, amd64.Ecx, amd64.Ebx)
+
+		j.SETcc(amd64.CC_O, amd64.Dl)
+		j.Orb(amd64.Dl, Q)
+	}
+
+	// clamps
+	j.Mov(maxInt32, amd64.Rcx)
+	j.Mov(minInt32, amd64.Rdx)
+
+	if inst == QADD || inst == QDADD {
+		j.Add(amd64.Ebx, amd64.Eax)
+	} else {
+		j.Sub(amd64.Ebx, amd64.Eax)
+	}
+
+	// if not signed clamp is MaxInt32
+	j.Cmovcc(amd64.CC_NS, amd64.Edx, amd64.Ecx)
+	// if overflow replace with clamp
+	j.Cmovcc(amd64.CC_O, amd64.Ecx, amd64.Eax)
+
+	j.SETcc(amd64.CC_O, amd64.Dl)
+	j.Orb(amd64.Dl, Q)
+	j.Movl(amd64.Eax, j.REG(rd))
+}
+
+func (j *Jit) emitHalf(op uint32) {
+
+	rn := (op >> 16) & 0xF
+	rd := (op >> 12) & 0xF
+	preFlag := (op>>24)&1 != 0
+	load := (op>>20)&1 != 0
+	inst := (op >> 5) & 0b11
+	wb := (op>>21)&1 != 0 || !preFlag
+
+	// ax rnv / pre
+	// di offset
+	// cx post
+	//
+
+	j.Movl(j.REG(rn), amd64.Eax)
+
+	if rn == PC {
+		j.Add(amd64.Imm(8), amd64.Eax)
+	}
+
+	if imm := (op>>22)&1 != 0; imm {
+		j.Mov(amd64.Imm((op&0xF)|(((op>>8)&0xF)<<4)), amd64.Edi)
+	} else {
+		j.Movl(j.REG(op&0xF), amd64.Edi)
+	}
+
+	j.Mov(amd64.Rax, amd64.Rcx)
+
+	if up := (op>>23)&1 != 0; up {
+		j.Add(amd64.Edi, amd64.Ecx)
+	} else {
+		j.Sub(amd64.Edi, amd64.Ecx)
+	}
+
+	if preFlag {
+		j.Mov(amd64.Rcx, amd64.Rax)
+	}
+
+	if inst == RESERVED {
+		panic("unsupported half (reserved)")
+	}
+
+	if !load {
+
+		j.Movl(j.REG(rd), amd64.Ebx)
+		if rd == PC {
+			j.Add(amd64.Imm(12), amd64.Ebx)
+		}
+
+		if wb {
+			j.Movl(amd64.Ecx, j.REG(rn))
+		}
+
+		switch inst {
+		case STRH:
+
+			j.And(amd64.Imm(^1), amd64.Rax)
+			j.And(amd64.Imm(0xFFFF), amd64.Rbx)
+			j.CallFunc(Write16)
+
+		case LDRD:
+
+			j.And(amd64.Imm(^0b111), amd64.Rax)
+			j.Movl(amd64.Eax, j.SCRATCH(0))
+
+			j.CallFunc(Read32)
+			j.Movl(amd64.Eax, j.REG(rd))
+
+			j.Movl(j.SCRATCH(0), amd64.Eax)
+			j.Add(amd64.Imm(4), amd64.Rax)
+
+			j.CallFunc(Read32)
+			j.Movl(amd64.Eax, j.REG(rd+1))
+
+		case STRD:
+
+			j.And(amd64.Imm(^0b111), amd64.Rax)
+			j.Movl(amd64.Eax, j.SCRATCH(0))
+
+			j.CallFunc(Write32)
+			j.Movl(amd64.Eax, j.REG(rd))
+
+			j.Movl(j.SCRATCH(0), amd64.Eax)
+			j.Add(amd64.Imm(4), amd64.Rax)
+
+			j.Movl(j.REG(rd+1), amd64.Ebx)
+			if rd+1 == PC {
+				j.Add(amd64.Imm(12), amd64.Ebx)
+			}
+
+			j.CallFunc(Write32)
+			j.Movl(amd64.Eax, j.REG(rd+1))
+		}
+
+	} else {
+
+		if wb {
+			j.Movl(amd64.Ecx, j.REG(rn))
+		}
+
+		switch inst {
+		case LDRH:
+
+			j.And(amd64.Imm(^1), amd64.Rax)
+			j.CallFunc(Read16)
+
+		case LDRSB:
+			// sign-expand byte value
+			j.CallFunc(Read)
+			j.Movsx(amd64.Al, amd64.Rax)
+
+		case LDRSH:
+			// sign-expand half value
+			j.And(amd64.Imm(^1), amd64.Rax)
+			j.CallFunc(Read16)
+
+			j.Movsx(amd64.Ax, amd64.Rax)
+		}
+
+		j.Movl(amd64.Eax, j.REG(rd))
+	}
+}
+
+func (j *Jit) emitSdt(op uint32) {
+
+	rd := (op >> 12) & 0xF
+	rn := (op >> 16) & 0xF
+	reg := (op>>25)&1 != 0
+	pre := (op>>24)&1 != 0
+	up := (op>>23)&1 != 0
+	byte := (op>>22)&1 != 0
+	load := (op>>20)&1 != 0
+	wb := (op>>21)&1 != 0 || !pre
+
+	// offset
+	if reg {
+		j.emitSdtRegShift(op)
+		CpuPointer = j.Cpu
+		j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
+
+		j.Mov(amd64.Rbx, amd64.Rcx)
+	} else {
+		j.Mov(amd64.Imm(int32(op&0xFFF)), amd64.Rcx)
+	}
+
+	// rn ebx, shift ecx
+
+	// ax pre
+	// bc post
+
+	j.Movl(j.REG(rn), amd64.Ebx)
+
+	if rn == PC {
+		j.Add(amd64.Imm(8), amd64.Ebx)
+	}
+
+	if up {
+		j.Add(amd64.Ecx, amd64.Ebx)
+	} else {
+		j.Sub(amd64.Ecx, amd64.Ebx)
+	}
+
+	if pre {
+		j.Movl(amd64.Ebx, amd64.Eax)
+	} else {
+		j.Movl(j.REG(rn), amd64.Eax)
+	}
+
+	if wb {
+		j.Movl(amd64.Ebx, j.REG(rn))
+	}
+
+	if load {
+		if byte {
+			j.CallFunc(Read)
+		} else {
+			j.Movl(amd64.Eax, j.SCRATCH(0))
+
+			j.And(amd64.Imm(^0b11), amd64.Eax)
+			j.CallFunc(Read32)
+
+			j.Movl(j.SCRATCH(0), amd64.Ecx)
+			j.And(amd64.Imm(0b11), amd64.Ecx)
+			j.Shl(amd64.Imm(0b11), amd64.Ecx)
+			j.RorCl(amd64.Eax)
+		}
+
+		j.Movl(amd64.Eax, j.REG(rd))
+
+	} else {
+
+		j.Movl(j.REG(rd), amd64.Ebx)
+		if rd == PC {
+			j.Add(amd64.Imm(12), amd64.Ebx)
+		}
+
+		if byte {
+			j.And(amd64.Imm(0xFF), amd64.Ebx)
+			j.CallFunc(Write)
+		} else {
+			j.And(amd64.Imm(^0b11), amd64.Eax)
+			j.CallFunc(Write32)
+		}
+	}
+}
+
+func (j *Jit) emitSdtRegShift(op uint32) {
+
+	rm := op & 0xF
+	shType := (op >> 5) & 0b11
+	shift := (op >> 7) & 0x1F
+
+	// ebx rm, ecx shift
+
+	j.Movl(j.REG(rm), amd64.Ebx)
+
+	if rm == PC {
+		panic("rm cannot include pc sdt")
+	}
+
+	//if special := shift == 0; special {
+
+	//    if rm == PC {
+	//        j.Add(amd64.Imm(8), amd64.Ebx)
+	//    }
+
+	//    switch shType{
+	//    case LSL:
+	//    case LSR:
+	//        j.Xor(amd64.Ebx, amd64.Ebx)
+	//    case ASR:
+	//        j.Sar(amd64.Imm(31), amd64.Ebx)
+	//    case ROR:
+	//        j.Rcr(amd64.Imm(1), amd64.Ebx)
+	//    }
+	//    return
+	//}
+
+	switch shType {
+	case LSL:
+
+		j.Mov(amd64.Imm(shift), amd64.Rcx)
+		j.ShlCl(amd64.Ebx)
+
+		j.Cmp(amd64.Imm(32), amd64.Ecx)
+		j.Sbb(amd64.Eax, amd64.Eax)
+		j.And(amd64.Eax, amd64.Ebx)
+		return
+
+	case LSR:
+
+		j.Mov(amd64.Imm(shift), amd64.Rcx)
+		j.ShrCl(amd64.Ebx)
+
+		j.Cmp(amd64.Imm(32), amd64.Ecx)
+		j.Sbb(amd64.Eax, amd64.Eax)
+		j.And(amd64.Eax, amd64.Ebx)
+		return
+
+	case ASR:
+
+		j.Movl(amd64.Imm(shift), amd64.Ecx)
+
+		j.Cmp(amd64.Imm(32), amd64.Ecx)
+		j.Sbb(amd64.Eax, amd64.Eax)
+		j.Not(amd64.Eax)
+		j.Or(amd64.Eax, amd64.Ecx)
+
+		j.SarCl(amd64.Ebx)
+		return
+
+	case ROR:
+
+		j.Movl(amd64.Imm(shift), amd64.Ecx)
+		j.RorCl(amd64.Ebx)
+		return
+	}
+}
+
+func (j *Jit) emitAluOp2Reg(op uint32) {
+
+	shReg := (op>>4)&1 != 0
+	shType := (op >> 5) & 0b11
+	setCarry := (op>>20)&1 != 0
+	inst := (op >> 21) & 0xF
+	logical := inst&0b0110 == 0b0000 || inst&0b1100 == 0b1100
+	rm := op & 0xF
+
+	setCarry = setCarry && logical
+	if setCarry {
+		j.Mov(amd64.Imm(1), amd64.Rdi)
+	} else {
+		j.Mov(amd64.Imm(0), amd64.Rdi)
+	}
+
+	// rbx: op2
+	// rcx: shift
+	// rdx: original carry
+	// rdi: setcarry
+
+	j.Movb(C, amd64.Dl)
+	j.Movl(j.REG(rm), amd64.Ebx)
+
+	if shReg {
+		rs := (op >> 8) & 0xF
+
+		j.Movl(j.REG(rs), amd64.Ecx)
+		j.And(amd64.Imm(0xFF), amd64.Ecx)
+
+		if rm == PC {
+			j.Add(amd64.Imm(12), amd64.Ebx)
+		}
+
+	} else {
+
+		shift := (op >> 7) & 0x1F
+
+		if rm == PC {
+			j.Add(amd64.Imm(8), amd64.Ebx)
+		}
+
+		if special := shift == 0; special {
+			switch shType {
+			case LSL:
+			case LSR:
+
+				j.Bt(amd64.Imm(31), amd64.Ebx)
+				j.SETcc(amd64.CC_C, C)
+
+				// clear op2
+				j.Xor(amd64.Ebx, amd64.Ebx)
+			case ASR:
+
+				// sar sets everything to top bit
+				// if setcarry, set carry to bit as well
+
+				j.Sar(amd64.Imm(31), amd64.Ebx)
+
+				if setCarry {
+					j.Bt(amd64.Imm(31), amd64.Ebx)
+					j.SETcc(amd64.CC_C, C)
+				}
+
+			case ROR:
+
+				// CF = old carry (EDX & 1)
+				j.Bt(amd64.Imm(0), amd64.Edx)
+
+				// RRX
+				j.Rcr(amd64.Imm(1), amd64.Ebx)
+
+				// CPSR.C = new carry
+				j.SETcc(amd64.CC_C, C)
+			}
+
+			return
+		}
+
+		j.Mov(amd64.Imm(shift), amd64.Rcx)
+	}
+
+	j.Test(amd64.Rcx, amd64.Rcx)
+	zeroJump := j.JccForward(amd64.CC_Z)
+
+	// https://iitd-plos.github.io/col718/ref/arm-instructionset.pdf
+
+	switch shType {
+	case LSL, LSR:
+
+		j.Cmp(amd64.Imm(32), amd64.Ecx)
+		shift32 := j.JccForward(amd64.CC_A)
+		equal := j.JccForward(amd64.CC_Z)
+
+		if shType == LSL {
+			// carry = op2 & (1 << (32-shift)) != 0
+			j.Mov(amd64.Imm(32), amd64.Rax)
+			j.Sub(amd64.Ecx, amd64.Eax)
+			j.Bt(amd64.Eax, amd64.Ebx)
+			j.SETcc(amd64.CC_C, amd64.Dl)
+			// op2 <<= shift
+			j.ShlCl(amd64.Ebx)
+		} else {
+			// carry = op2 & (1 << (shift-1)) != 0
+			j.Mov(amd64.Rcx, amd64.Rax)
+			j.Sub(amd64.Imm(1), amd64.Eax)
+			j.Bt(amd64.Eax, amd64.Ebx)
+			j.SETcc(amd64.CC_C, amd64.Dl)
+			// op2 >>= shift
+			j.ShrCl(amd64.Ebx)
+		}
+
+		done := j.JmpForward()
+
+		shift32()
+
+		// carry = op2 & 1 != 0
+		j.Mov(amd64.Rbx, amd64.Rdx)
+		j.And(amd64.Imm(1), amd64.Rdx)
+		// op2 = 0
+		j.Xor(amd64.Rbx, amd64.Rbx)
+
+		done2 := j.JmpForward()
+
+		// this causes errors???
+		equal()
+
+		// LSL: carry = op2 & 1 != 0
+		// LSR: carry = op2 & 0x8000_0000 != 0
+		j.Mov(amd64.Rbx, amd64.Rdx)
+		if shType == LSL {
+			j.And(amd64.Imm(1), amd64.Rdx)
+		} else {
+			j.Shr(amd64.Imm(31), amd64.Rdx)
+		}
+
+		// op2 = 0
+		j.Xor(amd64.Rbx, amd64.Rbx)
+
+		done()
+		done2()
+
+	case ASR:
+
+		j.Cmp(amd64.Imm(32), amd64.Ecx)
+		shift32ge := j.JccForward(amd64.CC_AE)
+
+		// carry = op2 & (1 << (shift-1)) != 0
+		j.Mov(amd64.Rcx, amd64.Rax)
+		j.Sub(amd64.Imm(1), amd64.Eax)
+		j.Bt(amd64.Eax, amd64.Ebx)
+		j.SETcc(amd64.CC_C, amd64.Dl)
+		// op2 <<= shift
+		j.SarCl(amd64.Ebx)
+
+		done := j.JmpForward()
+
+		shift32ge()
+
+		// op and carry == top bit sar
+		j.Sar(amd64.Imm(31), amd64.Ebx)
+		j.Bt(amd64.Imm(0), amd64.Ebx)
+		j.SETcc(amd64.CC_C, amd64.Dl)
+
+		done()
+
+	case ROR:
+
+		j.Cmp(amd64.Imm(32), amd64.Ecx)
+		equal := j.JccForward(amd64.CC_Z)
+
+		// carry = (op2 >> ((shift-1) & 31)) & 1 != 0
+		j.Mov(amd64.Rcx, amd64.Rax)
+		j.Sub(amd64.Imm(1), amd64.Eax)
+		j.And(amd64.Imm(31), amd64.Eax)
+
+		j.Bt(amd64.Eax, amd64.Ebx)
+		j.SETcc(amd64.CC_C, amd64.Dl)
+
+		// op2 ror shift
+		j.RorCl(amd64.Ebx)
+
+		done := j.JmpForward()
+
+		equal()
+
+		// op2 unchanged
+		// carry = op2 & 0x8000_0000 != 0
+		j.Mov(amd64.Rbx, amd64.Rdx)
+		j.Shr(amd64.Imm(31), amd64.Rdx)
+
+		done()
+	}
+
+	j.Test(amd64.Rdi, amd64.Rdi)
+
+	skip := j.JccForward(amd64.CC_Z)
+
+	j.Movb(amd64.Dl, C)
+
+	zeroJump()
+	skip()
+}
+
+func (j *Jit) emitAlu(op uint32) {
+
+	inst := (op >> 21) & 0xF
+	rd := (op >> 12) & 0xF
+	rn := (op >> 16) & 0xF
+	imm := (op>>25)&1 != 0
+	set := (op>>20)&1 != 0
+
+	// reg and imm
+
+	if inst == 5 || inst == 7 || inst == 6 {
+		j.Xor(amd64.Rcx, amd64.Rcx)
+		j.Movb(C, amd64.Cl)
+		j.Mov(amd64.Rcx, amd64.R8)
+	}
+
+	if imm {
+
+		ro := ((op >> 8) & 0xF) << 1
+		op2 := bits.RotateLeft32(op&0xFF, -int(ro))
+
+		j.Mov(amd64.Imm(int32(op2)), amd64.Rbx)
+
+		if set && ro != 0 {
+			j.Movb(amd64.Imm((op2>>31)&1), C)
+		}
+
+		j.Movl(j.REG(rn), amd64.Eax)
+
+		if rn == PC {
+			j.Add(amd64.Imm(8), amd64.Eax)
+		}
+	} else {
+
+		// get op2, op2 will be in bx
+		// shift
+		j.emitAluOp2Reg(op)
+
+		j.Movl(j.REG(rn), amd64.Eax)
+
+		if rn == PC {
+			if imm := (op>>4)&1 != 0; imm {
+				j.Add(amd64.Imm(8), amd64.Eax)
+			} else {
+				j.Add(amd64.Imm(12), amd64.Eax)
+			}
+		}
+	}
+
+	if inst == 5 || inst == 7 || inst == 6 {
+		j.Mov(amd64.R8, amd64.Rcx)
+	}
+
+	CpuPointer = j.Cpu
+	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
+
+	aluInstJit[inst](j, op, rd)
+
+	j.Movl(j.REG(PC), amd64.Eax)
+}
+
+var aluInstJit = [...]func(j *Jit, op, rd uint32){
+
+	// AND
+	func(j *Jit, op, rd uint32) {
+		j.And(amd64.Ebx, amd64.Eax)
+
+		if set := (op>>20)&1 != 0; set {
+			j.SETcc(amd64.CC_S, N)
+			j.SETcc(amd64.CC_Z, Z)
+		}
+
+		j.Movl(amd64.Eax, j.REG(rd))
+	},
+
+	// EOR
+	func(j *Jit, op, rd uint32) {
+		j.Xor(amd64.Ebx, amd64.Eax)
+
+		if set := (op>>20)&1 != 0; set {
+			j.SETcc(amd64.CC_S, N)
+			j.SETcc(amd64.CC_Z, Z)
+		}
+
+		j.Movl(amd64.Eax, j.REG(rd))
+	},
+
+	// SUB
+	func(j *Jit, op, rd uint32) {
+		j.Sub(amd64.Ebx, amd64.Eax)
+
+		if set := (op>>20)&1 != 0; set {
+			j.SETcc(amd64.CC_O, V)
+			j.SETcc(amd64.CC_NC, C)
+			j.SETcc(amd64.CC_S, N)
+			j.SETcc(amd64.CC_Z, Z)
+		}
+
+		j.Movl(amd64.Eax, j.REG(rd))
+	},
+
+	// RSB
+	func(j *Jit, op, rd uint32) {
+		j.Sub(amd64.Eax, amd64.Ebx)
+
+		if set := (op>>20)&1 != 0; set {
+			j.SETcc(amd64.CC_O, V)
+			j.SETcc(amd64.CC_NC, C)
+			j.SETcc(amd64.CC_S, N)
+			j.SETcc(amd64.CC_Z, Z)
+		}
+
+		j.Movl(amd64.Ebx, j.REG(rd))
+	},
+
+	// ADD
+	func(j *Jit, op, rd uint32) {
+		j.Add(amd64.Ebx, amd64.Eax)
+
+		if set := (op>>20)&1 != 0; set {
+			j.SETcc(amd64.CC_O, V)
+			j.SETcc(amd64.CC_C, C)
+			j.SETcc(amd64.CC_S, N)
+			j.SETcc(amd64.CC_Z, Z)
+		}
+
+		j.Movl(amd64.Eax, j.REG(rd))
+	},
+
+	// ADC
+	func(j *Jit, op, rd uint32) {
+		j.Bt(amd64.Imm(0), amd64.Cl)
+		j.Adc(amd64.Ebx, amd64.Eax)
+
+		if set := (op>>20)&1 != 0; set {
+			j.SETcc(amd64.CC_O, V)
+			j.SETcc(amd64.CC_C, C)
+			j.SETcc(amd64.CC_S, N)
+			j.SETcc(amd64.CC_Z, Z)
+		}
+
+		j.Movl(amd64.Eax, j.REG(rd))
+	},
+
+	// SBC
+	func(j *Jit, op, rd uint32) {
+		j.Bt(amd64.Imm(0), amd64.Cl)
+		j.Cmc() // compliment carry (reverse for sub)
+		j.Sbb(amd64.Ebx, amd64.Eax)
+
+		if set := (op>>20)&1 != 0; set {
+			j.SETcc(amd64.CC_O, V)
+			j.SETcc(amd64.CC_NC, C)
+			j.SETcc(amd64.CC_S, N)
+			j.SETcc(amd64.CC_Z, Z)
+		}
+
+		j.Movl(amd64.Eax, j.REG(rd))
+	},
+
+	// RSC
+	func(j *Jit, op, rd uint32) {
+		j.Bt(amd64.Imm(0), amd64.Cl)
+		j.Cmc() // compliment carry (reverse for sub)
+		j.Sbb(amd64.Eax, amd64.Ebx)
+
+		if set := (op>>20)&1 != 0; set {
+			j.SETcc(amd64.CC_O, V)
+			j.SETcc(amd64.CC_NC, C)
+			j.SETcc(amd64.CC_S, N)
+			j.SETcc(amd64.CC_Z, Z)
+		}
+
+		j.Movl(amd64.Ebx, j.REG(rd))
+	},
+
+	// TST
+	func(j *Jit, op, rd uint32) {
+		j.And(amd64.Ebx, amd64.Eax)
+		if set := (op>>20)&1 != 0; set {
+			j.SETcc(amd64.CC_S, N)
+			j.SETcc(amd64.CC_Z, Z)
+		}
+
+		if rd == PC {
+			j.Add(amd64.Imm(4), j.REG(15))
+		}
+	},
+
+	// TEQ
+	func(j *Jit, op, rd uint32) {
+		j.Xor(amd64.Ebx, amd64.Eax)
+		if set := (op>>20)&1 != 0; set {
+			j.SETcc(amd64.CC_S, N)
+			j.SETcc(amd64.CC_Z, Z)
+		}
+
+		if rd == PC {
+			j.Add(amd64.Imm(4), j.REG(15))
+		}
+	},
+
+	// CMP
+	func(j *Jit, op, rd uint32) {
+		j.Sub(amd64.Ebx, amd64.Eax)
+
+		if set := (op>>20)&1 != 0; set {
+			j.SETcc(amd64.CC_O, V)
+			j.SETcc(amd64.CC_NC, C)
+			j.SETcc(amd64.CC_S, N)
+			j.SETcc(amd64.CC_Z, Z)
+		}
+
+		if rd == PC {
+			j.Add(amd64.Imm(4), j.REG(15))
+		}
+	},
+
+	// CMN
+	func(j *Jit, op, rd uint32) {
+		j.Add(amd64.Ebx, amd64.Eax)
+
+		if set := (op>>20)&1 != 0; set {
+			j.SETcc(amd64.CC_O, V)
+			j.SETcc(amd64.CC_C, C)
+			j.SETcc(amd64.CC_S, N)
+			j.SETcc(amd64.CC_Z, Z)
+		}
+
+		if rd == PC {
+			j.Add(amd64.Imm(4), j.REG(15))
+		}
+	},
+
+	// ORR
+	func(j *Jit, op, rd uint32) {
+		j.Or(amd64.Ebx, amd64.Eax)
+
+		if set := (op>>20)&1 != 0; set {
+			j.SETcc(amd64.CC_S, N)
+			j.SETcc(amd64.CC_Z, Z)
+		}
+
+		j.Movl(amd64.Eax, j.REG(rd))
+	},
+
+	// MOV
+	func(j *Jit, op, rd uint32) {
+		j.Movl(amd64.Ebx, j.REG(rd))
+
+		if set := (op>>20)&1 != 0; set {
+			j.Test(amd64.Ebx, amd64.Ebx)
+			j.SETcc(amd64.CC_S, N)
+			j.SETcc(amd64.CC_Z, Z)
+		}
+	},
+
+	// BIC
+	func(j *Jit, op, rd uint32) {
+
+		j.Not(amd64.Ebx)
+		j.And(amd64.Ebx, amd64.Eax)
+
+		if set := (op>>20)&1 != 0; set {
+			j.SETcc(amd64.CC_S, N)
+			j.SETcc(amd64.CC_Z, Z)
+		}
+
+		j.Movl(amd64.Eax, j.REG(rd))
+	},
+
+	// MVN
+	func(j *Jit, op, rd uint32) {
+
+		j.Not(amd64.Ebx)
+
+		if set := (op>>20)&1 != 0; set {
+			j.Test(amd64.Ebx, amd64.Ebx)
+			j.SETcc(amd64.CC_S, N)
+			j.SETcc(amd64.CC_Z, Z)
+		}
+
+		j.Movl(amd64.Ebx, j.REG(rd))
+	},
+}
+
+func (j *Jit) emitBlock(op uint32) {
+
+	// SCRATCH
+	// 0x00: rnv
+	// 0x01: addr
+	// 0x02: wb
+	// 0x10: usermode flag
+
+	rlist := op & 0xFFFF
+	up := (op>>23)&1 != 0
+	rn := (op >> 16) & 0xF
+
+	if rlist == 0 {
+
+		if up {
+			j.Add(amd64.Imm(0x40), j.REG(rn))
+		} else {
+			j.Sub(amd64.Imm(0x40), j.REG(rn))
+		}
+
+		return
+	}
+
+	pcIncluded := op&0x8000 != 0
+	pre := (op>>24)&1 != 0
+	psr := (op>>22)&1 != 0
+	wb := (op>>21)&1 != 0
+	load := (op>>20)&1 != 0
+
+	j.Xor(amd64.Rax, amd64.Rax)
+	if forceUser := psr && (!load || !pcIncluded); forceUser {
+		j.Mov(MODE, amd64.Eax)
+		j.Cmp(amd64.Imm(MODE_USR), amd64.Eax)
+		j.SETcc(amd64.CC_NZ, amd64.Rax)
+	}
+
+	j.Mov(amd64.Eax, j.SCRATCH(0x10))
+
+	regCount := utils.CountBits(rlist)
+
+	j.Movl(j.REG(rn), amd64.Eax)
+	j.Mov(amd64.Rax, amd64.Rbx)
+
+	j.And(amd64.Imm(^0b11), amd64.Rax)
+
+	if up {
+		j.Add(amd64.Imm(regCount*4), amd64.Rbx)
+	} else {
+		j.Sub(amd64.Imm(regCount*4), amd64.Rbx)
+	}
+
+	if rn == 13 || rn == 14 {
+
+		j.And(amd64.Imm(1), amd64.Edi)
+
+		j.Cmp(amd64.Imm(1), amd64.Edi)
+		normal := j.JccForward(amd64.CC_NZ)
+
+		switch rn {
+		case 13:
+			j.Movl(j.UserBankReg(false), amd64.Edi)
+		case 14:
+			j.Movl(j.UserBankReg(true), amd64.Edi)
+		}
+
+		userModeJump := j.JmpForward()
+
+		normal()
+
+		j.Movl(j.REG(rn), amd64.Edi)
+
+		userModeJump()
+
+	} else {
+		j.Movl(j.REG(rn), amd64.Edi)
+	}
+
+	// rnv in scratch 0
+	j.Movl(amd64.Edi, j.SCRATCH(0))
+
+	// wb in scratch 2
+	j.Movl(amd64.Ebx, j.SCRATCH(2))
+
+	reg := uint32(0)
+	if !up {
+		reg = 15
+	}
+
+	for range 16 {
+
+		if disabled := (rlist>>reg)&1 == 0; disabled {
+			if up {
+				reg++
+			} else {
+				reg--
+			}
+			continue
+		}
+
+		if pre {
+			if up {
+				j.Add(amd64.Imm(4), amd64.Rax)
+			} else {
+				j.Sub(amd64.Imm(4), amd64.Rax)
+			}
+		}
+
+		j.Movl(amd64.Eax, j.SCRATCH(1))
+
+		if load {
+
+			j.CallFunc(Read32)
+
+			if reg == 13 || reg == 14 {
+
+				j.Movl(j.SCRATCH(0x10), amd64.Edi)
+
+				j.Cmp(amd64.Imm(1), amd64.Edi)
+				normal := j.JccForward(amd64.CC_NZ)
+
+				switch reg {
+				case 13:
+					j.Movl(amd64.Eax, j.UserBankReg(false))
+				case 14:
+					j.Movl(amd64.Eax, j.UserBankReg(true))
+				}
+
+				userModeJump := j.JmpForward()
+
+				normal()
+
+				j.Movl(amd64.Eax, j.REG(reg))
+
+				userModeJump()
+
+			} else {
+				j.Movl(amd64.Eax, j.REG(reg))
+			}
+
+		} else {
+
+			switch reg {
+			case rn:
+				j.Movl(j.SCRATCH(0), amd64.Ebx)
+			case PC:
+				j.Movl(j.REG(15), amd64.Ebx)
+				j.Add(amd64.Imm(12), amd64.Ebx)
+
+			default:
+
+				if reg == 13 || reg == 14 {
+
+					j.Movl(j.SCRATCH(0x10), amd64.Edi)
+					j.Cmp(amd64.Imm(1), amd64.Edi)
+					normal := j.JccForward(amd64.CC_NZ)
+
+					switch reg {
+					case 13:
+						j.Movl(j.UserBankReg(false), amd64.Ebx)
+					case 14:
+						j.Movl(j.UserBankReg(true), amd64.Ebx)
+					}
+
+					userModeJump := j.JmpForward()
+
+					normal()
+
+					j.Movl(j.REG(reg), amd64.Ebx)
+
+					userModeJump()
+				} else {
+					j.Movl(j.REG(reg), amd64.Ebx)
+				}
+			}
+
+			j.CallFunc(Write32)
+		}
+
+		// fix clobbering
+		j.Movl(j.SCRATCH(1), amd64.Eax)
+
+		if !pre {
+			if up {
+				j.Add(amd64.Imm(4), amd64.Rax)
+			} else {
+				j.Sub(amd64.Imm(4), amd64.Rax)
+			}
+		}
+
+		if up {
+			reg++
+		} else {
+			reg--
+		}
+	}
+
+	if !load {
+		if wb {
+			j.Movl(j.SCRATCH(2), amd64.Eax)
+			j.Movl(amd64.Eax, j.REG(rn))
+		}
+
+		return
+	}
+
+	if wb {
+		if rnIncluded := (rlist>>rn)&1 == 1; rnIncluded {
+			isLast := (rlist < (1 << (rn + 1)))
+			isOnly := regCount == 1
+			if !isLast || isOnly {
+				j.Movl(j.SCRATCH(2), amd64.Eax)
+				j.Movl(amd64.Eax, j.REG(rn))
+			}
+		} else {
+			j.Movl(j.SCRATCH(2), amd64.Eax)
+			j.Movl(amd64.Eax, j.REG(rn))
+		}
+	}
+
+	if !pcIncluded {
+		return
+	}
+
+	panic("UNSETUP LDR PC INCLUDED")
 }
