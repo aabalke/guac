@@ -1,9 +1,8 @@
 package gba
 
 import (
-
-    "fmt"
-    "os"
+	"fmt"
+	"os"
 
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/apu"
@@ -18,7 +17,7 @@ var _ = fmt.Sprintf
 var _ = os.Exit
 
 const (
-    PC = 15
+	PC            = 15
 	SCREEN_WIDTH  = 240
 	SCREEN_HEIGHT = 160
 
@@ -45,9 +44,9 @@ type GBA struct {
 	Apu       *apu.Apu
 
 	Paused, Muted, Save, Drawn bool
-	OpenBusOpcode                      uint32
-	AccCycles                          uint32
-	Keypad                             Keypad
+	OpenBusOpcode              uint32
+	AccCycles                  uint32
+	Keypad                     Keypad
 
 	SoundCycles     uint32
 	SoundCyclesMask uint32
@@ -76,19 +75,19 @@ func (gba *GBA) Update() {
 
 		if !gba.Cpu.Halted {
 
-            thumb := gba.Cpu.Reg.CPSR.T
+			thumb := gba.Cpu.Reg.CPSR.T
 
-            insts, ok := gba.Cpu.Execute()
-            if !ok {
-                panic("BAD")
-            }
+			insts, ok := gba.Cpu.Execute()
+			if !ok {
+				panic("BAD")
+			}
 
-            // do not care about cycle accuracy right now
-            if thumb {
-                cycles = insts << 1
-            } else {
-                cycles = insts << 2
-            }
+			// do not care about cycle accuracy right now
+			if thumb {
+				cycles = insts << 1
+			} else {
+				cycles = insts << 2
+			}
 
 		}
 
@@ -105,7 +104,7 @@ func (gba *GBA) Update() {
 		}
 
 		// irq has to be at end (count up tests)
-        gba.Cpu.CheckIrq()
+		gba.Cpu.CheckIrq()
 
 		if !gba.Cpu.Halted {
 			CURR_INST++
@@ -147,9 +146,9 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 
 	gba.Debugger = Debugger{Gba: &gba, Version: 1}
 
-    gba.Irq = cpu.Irq{}
+	gba.Irq = cpu.Irq{}
 	gba.Mem = NewMemory(&gba)
-    gba.Cpu = arm7.NewCpu(&gba.Mem, &gba.Irq)
+	gba.Cpu = arm7.NewCpu(&gba.Mem, &gba.Irq)
 
 	gba.PPU.gba = &gba
 
@@ -175,7 +174,7 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 
 	gba.LoadBios()
 	gba.Cpu.Exception(arm7.VEC_SWI, arm7.MODE_SWI)
-    //gba.startupNoBios()
+	//gba.startupNoBios()
 	gba.LoadGame(path)
 	gba.SetIdleAddr()
 	//InitTrig()
@@ -186,35 +185,35 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba.Mem.IO[0x6] = uint8(startScanline)
 	gba.AccCycles = CYCLES_SCANLINE*startScanline + 859
 
-    gba.Cpu.Reg.CPSR.I = false
+	gba.Cpu.Reg.CPSR.I = false
 
 	return &gba
 }
 
 func (gba *GBA) startupNoBios() {
-//
-//    c := gba.Cpu
-//
-//    BANK_ID := arm7gba.BANK_ID
-//
-//	c.Irq.IME = true
-//
-//	c.Reg.R[PC] = 0x0800_0000
-//	c.Reg.CPSR = 0x0000_001F
-//	c.Reg.SPSR[BANK_ID[MODE_IRQ]] = 0x0000_0010
-//	c.Reg.R[0] = 0x0000_0CA5
-//
-//	c.Reg.R[LR] = 0x0800_0000
-//	c.Reg.LR[BANK_ID[MODE_SYS]] = 0x0800_0000
-//	c.Reg.LR[BANK_ID[MODE_USR]] = 0x0800_0000
-//	c.Reg.LR[BANK_ID[MODE_IRQ]] = 0x0800_0000
-//	c.Reg.LR[BANK_ID[MODE_SWI]] = 0x0800_0000
-//
-//	c.Reg.R[SP] = 0x0300_7F00
-//	c.Reg.SP[BANK_ID[MODE_SYS]] = 0x0300_7F00
-//	c.Reg.SP[BANK_ID[MODE_USR]] = 0x0300_7F00
-//	c.Reg.SP[BANK_ID[MODE_IRQ]] = 0x0300_7FA0
-//	c.Reg.SP[BANK_ID[MODE_SWI]] = 0x0300_7FE0
+	//
+	//    c := gba.Cpu
+	//
+	//    BANK_ID := arm7gba.BANK_ID
+	//
+	//	c.Irq.IME = true
+	//
+	//	c.Reg.R[PC] = 0x0800_0000
+	//	c.Reg.CPSR = 0x0000_001F
+	//	c.Reg.SPSR[BANK_ID[MODE_IRQ]] = 0x0000_0010
+	//	c.Reg.R[0] = 0x0000_0CA5
+	//
+	//	c.Reg.R[LR] = 0x0800_0000
+	//	c.Reg.LR[BANK_ID[MODE_SYS]] = 0x0800_0000
+	//	c.Reg.LR[BANK_ID[MODE_USR]] = 0x0800_0000
+	//	c.Reg.LR[BANK_ID[MODE_IRQ]] = 0x0800_0000
+	//	c.Reg.LR[BANK_ID[MODE_SWI]] = 0x0800_0000
+	//
+	//	c.Reg.R[SP] = 0x0300_7F00
+	//	c.Reg.SP[BANK_ID[MODE_SYS]] = 0x0300_7F00
+	//	c.Reg.SP[BANK_ID[MODE_USR]] = 0x0300_7F00
+	//	c.Reg.SP[BANK_ID[MODE_IRQ]] = 0x0300_7FA0
+	//	c.Reg.SP[BANK_ID[MODE_SWI]] = 0x0300_7FE0
 }
 
 func (gba *GBA) ToggleMute() bool {
@@ -258,8 +257,8 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 	if enteredHblank := inHblank && prevInHdraw; enteredHblank {
 
 		dispstat.SetHBlank(true)
-        if (*dispstat >> 4) & 1 != 0 {
-            gba.Irq.SetIRQ(1)
+		if (*dispstat>>4)&1 != 0 {
+			gba.Irq.SetIRQ(1)
 		}
 
 		if vcount < SCREEN_HEIGHT {
@@ -297,7 +296,7 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 			// bios/bios.gba needs irq set on screen_height, iridion 3d needs screen_height + 1
 			// I believe this is cycle related
 		case SCREEN_HEIGHT + 1:
-            if (*dispstat >> 3) & 1 != 0 {
+			if (*dispstat>>3)&1 != 0 {
 				gba.Irq.SetIRQ(0)
 			}
 		case NUM_SCANLINES - 1:
@@ -307,7 +306,7 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 		match := dispstat.GetLYC() == vcount
 		dispstat.SetVCFlag(match)
 
-		if vcounterIRQ := (*dispstat >> 5) & 1 != 0; vcounterIRQ && match {
+		if vcounterIRQ := (*dispstat>>5)&1 != 0; vcounterIRQ && match {
 			gba.Irq.SetIRQ(2)
 		}
 	}

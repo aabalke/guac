@@ -1,131 +1,131 @@
 package gba
+
+// import (
 //
-//import (
 //	"bufio"
 //	"fmt"
 //
 //	_ "image/png"
 //	"os"
-//)
 //
+// )
 type Debugger struct {
 	Gba     *GBA
 	Version int
 }
+
+//	func (d *Debugger) print(i int) {
+//		reg := &d.Gba.Cpu.Reg
+//		p := func(a string, b uint32) { fmt.Printf("% 8s: % 9X\n", a, b) }
+//		s := func(a string) { fmt.Printf("%s\n", a) }
 //
-//func (d *Debugger) print(i int) {
-//	reg := &d.Gba.Cpu.Reg
-//	p := func(a string, b uint32) { fmt.Printf("% 8s: % 9X\n", a, b) }
-//	s := func(a string) { fmt.Printf("%s\n", a) }
+//		s("--------  --------")
+//		fmt.Printf("inst dec %d\n", uint32(i))
+//		p("inst", uint32(i))
 //
-//	s("--------  --------")
-//	fmt.Printf("inst dec %d\n", uint32(i))
-//	p("inst", uint32(i))
+//		if d.Gba.Cpu.Reg.isThumb {
+//			p("opcode", d.Gba.Mem.Read16(reg.R[15]))
+//		} else {
+//			p("opcode", d.Gba.Mem.Read32(reg.R[15]))
+//		}
+//		mode := d.Gba.Cpu.Reg.getMode()
+//		s("--------  --------")
+//		p("r00", reg.R[0])
+//		p("r01", reg.R[1])
+//		p("r02", reg.R[2])
+//		p("r03", reg.R[3])
+//		p("r04", reg.R[4])
+//		p("r05", reg.R[5])
+//		p("r06", reg.R[6])
+//		p("r07", reg.R[7])
+//		p("r08", reg.R[8])
+//		p("r09", reg.R[9])
+//		p("r10", reg.R[10])
+//		p("r11", reg.R[11])
+//		p("r12", reg.R[12])
+//		p("sp/r13", reg.R[13])
+//		p("lr/r14", reg.R[14])
+//		p("pc/r15", reg.R[15])
+//		s("--------  --------")
+//		p("cpsr", uint32(reg.CPSR))
+//		p("spsr", uint32(reg.SPSR[BANK_ID[mode]]))
+//		p("MODE", BANK_ID[mode])
+//		//p("0x3007FFC", d.Gba.Mem.Read32(0x3007FFC))
+//		//p("0x4000004", d.Gba.Mem.Read16(0x4000004))
+//		p("40000B0", d.Gba.Mem.Read32(0x40000B0))
+//		//p("4000208", d.Gba.Mem.Read16(0x4000208))
+//		//p("4000200", d.Gba.Mem.Read16(0x4000200))
+//		//p("4000004", d.Gba.Mem.Read32(0x4000004))
+//		//p("4000000", d.Gba.Mem.Read32(0x4000000))
+//		//p("3000000", d.Gba.Mem.Read32(0x3000000))
+//		//p("3008000", d.Gba.Mem.Read32(0x3008000))
 //
-//	if d.Gba.Cpu.Reg.isThumb {
-//		p("opcode", d.Gba.Mem.Read16(reg.R[15]))
-//	} else {
-//		p("opcode", d.Gba.Mem.Read32(reg.R[15]))
-//	}
-//	mode := d.Gba.Cpu.Reg.getMode()
-//	s("--------  --------")
-//	p("r00", reg.R[0])
-//	p("r01", reg.R[1])
-//	p("r02", reg.R[2])
-//	p("r03", reg.R[3])
-//	p("r04", reg.R[4])
-//	p("r05", reg.R[5])
-//	p("r06", reg.R[6])
-//	p("r07", reg.R[7])
-//	p("r08", reg.R[8])
-//	p("r09", reg.R[9])
-//	p("r10", reg.R[10])
-//	p("r11", reg.R[11])
-//	p("r12", reg.R[12])
-//	p("sp/r13", reg.R[13])
-//	p("lr/r14", reg.R[14])
-//	p("pc/r15", reg.R[15])
-//	s("--------  --------")
-//	p("cpsr", uint32(reg.CPSR))
-//	p("spsr", uint32(reg.SPSR[BANK_ID[mode]]))
-//	p("MODE", BANK_ID[mode])
-//	//p("0x3007FFC", d.Gba.Mem.Read32(0x3007FFC))
-//	//p("0x4000004", d.Gba.Mem.Read16(0x4000004))
-//	p("40000B0", d.Gba.Mem.Read32(0x40000B0))
-//	//p("4000208", d.Gba.Mem.Read16(0x4000208))
-//	//p("4000200", d.Gba.Mem.Read16(0x4000200))
-//	//p("4000004", d.Gba.Mem.Read32(0x4000004))
-//	//p("4000000", d.Gba.Mem.Read32(0x4000000))
-//	//p("3000000", d.Gba.Mem.Read32(0x3000000))
-//	//p("3008000", d.Gba.Mem.Read32(0x3008000))
+//		s("--------  --------")
 //
-//	s("--------  --------")
+//		//for i := range len(reg.LR) {
+//		//	p(fmt.Sprintf("LR %02d", i), uint32(reg.LR[uint32(i)]))
+//		//}
 //
-//	//for i := range len(reg.LR) {
-//	//	p(fmt.Sprintf("LR %02d", i), uint32(reg.LR[uint32(i)]))
-//	//}
+//		//s("--------  --------")
+//		////p(fmt.Sprintf("4744 %08X", i), d.Gba.Mem.Read32(0x802E7A4))
+//		//count := 0x20
+//		//start := 0x6003800 + count*4
+//		//for i := start; i >= start-(count*4); i -= 4 {
+//		//	p(fmt.Sprintf("IO %X", i), d.Gba.Mem.Read32(uint32(i)))
+//		//}
 //
-//	//s("--------  --------")
-//	////p(fmt.Sprintf("4744 %08X", i), d.Gba.Mem.Read32(0x802E7A4))
-//	//count := 0x20
-//	//start := 0x6003800 + count*4
-//	//for i := start; i >= start-(count*4); i -= 4 {
-//	//	p(fmt.Sprintf("IO %X", i), d.Gba.Mem.Read32(uint32(i)))
-//	//}
+//		//s("--------  --------")
 //
-//	//s("--------  --------")
+//		//j := uint32(0x4000208)
+//		//p(fmt.Sprintf("IME %04X", j), d.Gba.Mem.Read16(uint32(j)))
+//		//j = uint32(0x4000204)
+//		//p(fmt.Sprintf("WS  %04X", j), d.gba.Mem.Read16(uint32(j)))
+//		//j = uint32(0x4000202)
+//		//p(fmt.Sprintf("IF  %04X", j), d.gba.Mem.Read16(uint32(j)))
+//		//j = uint32(0x4000200)
+//		//p(fmt.Sprintf("IE  %04X", j), d.gba.Mem.Read16(uint32(j)))
 //
-//	//j := uint32(0x4000208)
-//	//p(fmt.Sprintf("IME %04X", j), d.Gba.Mem.Read16(uint32(j)))
-//	//j = uint32(0x4000204)
-//	//p(fmt.Sprintf("WS  %04X", j), d.gba.Mem.Read16(uint32(j)))
-//	//j = uint32(0x4000202)
-//	//p(fmt.Sprintf("IF  %04X", j), d.gba.Mem.Read16(uint32(j)))
-//	//j = uint32(0x4000200)
-//	//p(fmt.Sprintf("IE  %04X", j), d.gba.Mem.Read16(uint32(j)))
+//		//s("\n\n")
+//		//p(fmt.Sprintf("STACK %X", 0x3007E2E), d.gba.Mem.Read32(0x3007E2E))
+//		//for i := 0x0400_00E0; i >= 0x0400_00D0; i -= 4 {
 //
-//	//s("\n\n")
-//	//p(fmt.Sprintf("STACK %X", 0x3007E2E), d.gba.Mem.Read32(0x3007E2E))
-//	//for i := 0x0400_00E0; i >= 0x0400_00D0; i -= 4 {
+//		//start := 0x40000E0
+//		//count := 0x10
+//		//for i := start; i >= start - (count * 4); i -= 4 {
+//		//    p(fmt.Sprintf("IO %X", i), d.gba.Mem.Read32(uint32(i)))
+//		//}
+//		//s("------")
 //
-//	//start := 0x40000E0
-//	//count := 0x10
-//	//for i := start; i >= start - (count * 4); i -= 4 {
-//	//    p(fmt.Sprintf("IO %X", i), d.gba.Mem.Read32(uint32(i)))
-//	//}
-//	//s("------")
-//
-//	//start := 0x3007EB0
-//	//start := 0x30014B0
-//	//start := 0xE000080
-//	//count := 0x20
-//	//for i := start; i >= start - (count * 4); i -= 4 {
-//	//    p(fmt.Sprintf("IO %X", i), d.Gba.Mem.Read32(uint32(i)))
-//	//}
-//}
-//
-//func (d *Debugger) dump(s, e uint32) {
-//
-//	// fix to buffer some day
-//	tmp := ""
-//
-//	for i := s; i <= e; i += 4 {
-//		tmp += fmt.Sprintf("%08X", d.Gba.Mem.Read32(uint32(i)))
-//	}
-//	f, err := os.Create("./dump")
-//	if err != nil {
-//		panic(err)
-//	}
-//	w := bufio.NewWriter(f)
-//	_, err = w.WriteString(tmp)
-//
-//	if err != nil {
-//		panic(err)
+//		//start := 0x3007EB0
+//		//start := 0x30014B0
+//		//start := 0xE000080
+//		//count := 0x20
+//		//for i := start; i >= start - (count * 4); i -= 4 {
+//		//    p(fmt.Sprintf("IO %X", i), d.Gba.Mem.Read32(uint32(i)))
+//		//}
 //	}
 //
-//	w.Flush()
-//}
+// func (d *Debugger) dump(s, e uint32) {
 //
+//		// fix to buffer some day
+//		tmp := ""
+//
+//		for i := s; i <= e; i += 4 {
+//			tmp += fmt.Sprintf("%08X", d.Gba.Mem.Read32(uint32(i)))
+//		}
+//		f, err := os.Create("./dump")
+//		if err != nil {
+//			panic(err)
+//		}
+//		w := bufio.NewWriter(f)
+//		_, err = w.WriteString(tmp)
+//
+//		if err != nil {
+//			panic(err)
+//		}
+//
+//		w.Flush()
+//	}
 type Logger struct {
 	//Instruction    int
 	//MaxInstruction int
@@ -136,8 +136,9 @@ type Logger struct {
 }
 
 func NewLogger(path string, gba *GBA) *Logger {
-    return &Logger{}
+	return &Logger{}
 }
+
 //
 //	l := Logger{}
 //	f, err := os.Create(path)

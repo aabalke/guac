@@ -12,14 +12,14 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 
 		a.SoundCntX = uint16((uint8(a.SoundCntX) & 0x0F) | (v & 0x80))
 
-        if disabled := (v >> 7) & 1 == 0; disabled {
+		if disabled := (v>>7)&1 == 0; disabled {
 			a.Disable()
 		}
 
 		return
 	}
 
-    if disabled := (a.SoundCntX >> 7) & 1 == 0; disabled {
+	if disabled := (a.SoundCntX>>7)&1 == 0; disabled {
 		return
 	}
 
@@ -158,11 +158,11 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 		a.SoundCntH &= 0x00FF
 		a.SoundCntH |= uint16(v) << 8
 
-		if resetFifoA := (a.SoundCntH >> 11) & 1 != 0; resetFifoA {
+		if resetFifoA := (a.SoundCntH>>11)&1 != 0; resetFifoA {
 			a.FifoA.Length = 0
 		}
 
-		if resetFifoB := (a.SoundCntH >> 15) & 1 != 0; resetFifoB {
+		if resetFifoB := (a.SoundCntH>>15)&1 != 0; resetFifoB {
 			a.FifoB.Length = 0
 		}
 

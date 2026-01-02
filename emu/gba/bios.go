@@ -63,6 +63,7 @@ func (gba *GBA) LoadBios() {
 		gba.Mem.BIOS[i] = uint8(biosFile[i])
 	}
 }
+
 //
 //func (gba *GBA) SysCall(inst uint32) (int, bool) {
 //

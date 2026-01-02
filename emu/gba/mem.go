@@ -238,31 +238,31 @@ func (m *Memory) initReadRegions() {
 
 func (m *Memory) ReadPtr(addr uint32, _ bool) (unsafe.Pointer, bool) {
 
-    switch regions := addr >> 24; regions {
-    case 0x2:
-        return unsafe.Add(
-            unsafe.Pointer(&m.WRAM1), addr&0x3FFFF), true
-    case 0x3:
-        return unsafe.Add(
-            unsafe.Pointer(&m.WRAM2), addr&0x7FFF), true
-    case 0x6:
+	switch regions := addr >> 24; regions {
+	case 0x2:
+		return unsafe.Add(
+			unsafe.Pointer(&m.WRAM1), addr&0x3FFFF), true
+	case 0x3:
+		return unsafe.Add(
+			unsafe.Pointer(&m.WRAM2), addr&0x7FFF), true
+	case 0x6:
 		addr &= 0x1FFFF
 		if addr >= 0x18000 {
 			addr -= 0x8000
 		}
-        return unsafe.Add(
-            unsafe.Pointer(&m.VRAM), addr), true
+		return unsafe.Add(
+			unsafe.Pointer(&m.VRAM), addr), true
 
-    case 0x7:
-        return unsafe.Add(
-            unsafe.Pointer(&m.OAM), addr&0x3FF), true
+	case 0x7:
+		return unsafe.Add(
+			unsafe.Pointer(&m.OAM), addr&0x3FF), true
 
-    case 0x8, 0x9, 0xA, 0xB, 0xC, 0xD:
-        return unsafe.Add(
-            unsafe.Pointer(&m.GBA.Cartridge.Rom), addr&0x1FF_FFFF), true
-    default:
-        return nil, false
-    }
+	case 0x8, 0x9, 0xA, 0xB, 0xC, 0xD:
+		return unsafe.Add(
+			unsafe.Pointer(&m.GBA.Cartridge.Rom), addr&0x1FF_FFFF), true
+	default:
+		return nil, false
+	}
 }
 
 func (m *Memory) Read(addr uint32) uint8 {
@@ -271,10 +271,10 @@ func (m *Memory) Read(addr uint32) uint8 {
 
 func (m *Memory) ReadBios(addr uint32) uint8 {
 
-    // temp handler
+	// temp handler
 	//nAddr, ok := BIOS_ADDR[m.BIOS_MODE]
-    var nAddr uint32
-    ok := false
+	var nAddr uint32
+	ok := false
 	if !ok {
 		nAddr = 0xE129F000
 	}
@@ -297,9 +297,9 @@ func (m *Memory) ReadOpenBus(addr uint32) uint8 {
 
 	pc := m.GBA.Cpu.Reg.R[PC]
 
-    if m.GBA.Cpu.Reg.CPSR.T {
+	if m.GBA.Cpu.Reg.CPSR.T {
 
-	//if m.GBA.Cpu.Reg.isThumb {
+		//if m.GBA.Cpu.Reg.isThumb {
 
 		// region based thumb openbus behavior has not been implimented
 
@@ -546,9 +546,9 @@ func (m *Memory) Read32(addr uint32, _ bool) uint32 {
 		}
 	}
 
-    if ptr, ok := m.ReadPtr(addr, false); ok {
-        return binary.LittleEndian.Uint32((*[4]uint8)(ptr)[:])
-    }
+	if ptr, ok := m.ReadPtr(addr, false); ok {
+		return binary.LittleEndian.Uint32((*[4]uint8)(ptr)[:])
+	}
 
 	a := uint32(m.Read(addr+3))<<8 | uint32(m.Read(addr+2))
 	b := uint32(m.Read(addr+1))<<8 | uint32(m.Read(addr))
@@ -862,7 +862,7 @@ func (m *Memory) Write32(addr uint32, v uint32, _ bool) {
 
 	if sram := addr >= 0xE00_0000; sram {
 		is := (addr << 3) & 0x1F
-        v = bits.RotateLeft32(v, -int(is))
+		v = bits.RotateLeft32(v, -int(is))
 		m.Write(addr, uint8(v), false)
 		return
 	}
@@ -947,25 +947,24 @@ func (m *Memory) ReadIODirectByte(addr uint32) uint32 {
 	}
 }
 
-
 func (m *Memory) WritePtr(addr uint32, _ bool) (unsafe.Pointer, bool) {
 
-    switch regions := addr >> 24; regions {
-    case 0x2:
-        return unsafe.Add(
-            unsafe.Pointer(&m.WRAM1), addr&0x3FFFF), true
-    case 0x3:
-        return unsafe.Add(
-            unsafe.Pointer(&m.WRAM2), addr&0x7FFF), true
-    case 0x6:
+	switch regions := addr >> 24; regions {
+	case 0x2:
+		return unsafe.Add(
+			unsafe.Pointer(&m.WRAM1), addr&0x3FFFF), true
+	case 0x3:
+		return unsafe.Add(
+			unsafe.Pointer(&m.WRAM2), addr&0x7FFF), true
+	case 0x6:
 		addr &= 0x1FFFF
 		if addr >= 0x18000 {
 			addr -= 0x8000
 		}
-        return unsafe.Add(
-            unsafe.Pointer(&m.VRAM), addr), true
+		return unsafe.Add(
+			unsafe.Pointer(&m.VRAM), addr), true
 
-    default:
-        return nil, false
-    }
+	default:
+		return nil, false
+	}
 }

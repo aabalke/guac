@@ -35,11 +35,11 @@ func (k *Keypad) writeCNT(v uint8, hi bool) {
 
 func (k *Keypad) keyIRQ() bool {
 
-	if disabled := (k.KEYCNT >> 14) & 1 != 0; disabled {
+	if disabled := (k.KEYCNT>>14)&1 != 0; disabled {
 		return false
 	}
 
-	andFlag := (k.KEYCNT >> 15) & 1 != 0
+	andFlag := (k.KEYCNT>>15)&1 != 0
 
 	if or := !andFlag && ^(k.KEYCNT)&k.KEYINPUT != 0; or {
 		return true

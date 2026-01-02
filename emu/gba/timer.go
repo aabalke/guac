@@ -106,13 +106,13 @@ func (t *Timer) WriteCnt(v uint8, hi bool) {
 
 	oldValue := t.CNT & 0xC7
 	t.CNT = uint32(v) & 0xC7
-    t.Cascade = (t.CNT >> 2) & 1 != 0
-    t.OverflowIRQ = (t.CNT >> 6) & 1 != 0
-    t.Enabled = (t.CNT >> 7) & 1 != 0
+	t.Cascade = (t.CNT>>2)&1 != 0
+	t.OverflowIRQ = (t.CNT>>6)&1 != 0
+	t.Enabled = (t.CNT>>7)&1 != 0
 	t.Freq = t.getFreq()
 	t.FreqShift = t.getFreqShift()
 
-    if setEnabled := (v >> 7) & 1 != 0 && (oldValue >> 7) == 0; setEnabled {
+	if setEnabled := (v>>7)&1 != 0 && (oldValue>>7) == 0; setEnabled {
 		t.D = t.SavedInitialValue
 		t.Elapsed = 0
 	}
@@ -137,9 +137,10 @@ func (t *Timer) WriteD(v uint8, hi bool) {
 	t.SavedInitialValue = (t.SavedInitialValue & 0xFF00) | uint32(v)
 }
 
+//go:inline
 func (t *Timer) getFreq() uint32 {
 
-    switch freq := t.CNT & 0b11; freq {
+	switch freq := t.CNT & 0b11; freq {
 	case 0:
 		return 1
 	case 1:
@@ -153,9 +154,10 @@ func (t *Timer) getFreq() uint32 {
 	return 1
 }
 
+//go:inline
 func (t *Timer) getFreqShift() uint32 {
 
-    switch freq := t.CNT & 0b11; freq {
+	switch freq := t.CNT & 0b11; freq {
 	case 0:
 		return 0
 	case 1:

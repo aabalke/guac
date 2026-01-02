@@ -8,8 +8,8 @@ import (
 	"unsafe"
 
 	"github.com/aabalke/guac/config"
-	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/cpu"
+	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/nds/mem/spi"
 	"github.com/aabalke/guac/emu/nds/ppu"

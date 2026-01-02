@@ -6,11 +6,11 @@ import (
 	"sync"
 
 	"github.com/aabalke/guac/config"
-	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/cpu/arm7"
 	"github.com/aabalke/guac/emu/cpu/arm9"
 	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
+	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/debug"
 	"github.com/aabalke/guac/emu/nds/mem"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
@@ -55,8 +55,8 @@ type Nds struct {
 	ppu       *ppu.PPU
 	Cartridge cart.Cartridge
 
-    dma7 [4]dma.DMA
-    dma9 [4]dma.DMA
+	dma7 [4]dma.DMA
+	dma9 [4]dma.DMA
 
 	Muted, Paused, Drawn  bool
 	ImageTop, ImageBottom *ebiten.Image
@@ -104,7 +104,7 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 	nds.mem = mem.NewMemory(
 		&nds.arm7.Reg.R[15],
 		&nds.arm7.Halted, &nds.arm9.Halted,
-        &nds.dma7, &nds.dma9,
+		&nds.dma7, &nds.dma9,
 		&irq7, &irq9,
 		//nds.arm7.Jit, nds.arm9.Jit,
 		nil, nds.arm9.Jit,

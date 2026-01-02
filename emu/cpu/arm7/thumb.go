@@ -438,17 +438,17 @@ func (cpu *Cpu) thumbSdt(op uint16) {
 			r[rd] = bits.RotateLeft32(v, -int(is))
 
 		case THUMB_LDSH:
-            // On ARM7 aka ARMv4 aka NDS7/GBA:
-            // LDRSH Rd,[odd]  -->  LDRSB Rd,[odd];sign-expand BYTE value
-            if misaligned := addr & 1 != 0; misaligned {
+			// On ARM7 aka ARMv4 aka NDS7/GBA:
+			// LDRSH Rd,[odd]  -->  LDRSB Rd,[odd];sign-expand BYTE value
+			if misaligned := addr&1 != 0; misaligned {
 
-                // sign-expand byte value
-                r[rd] = uint32(int32(int8(cpu.mem.Read8(addr, false))))
+				// sign-expand byte value
+				r[rd] = uint32(int32(int8(cpu.mem.Read8(addr, false))))
 
-            } else {
-                // sign-expand half value
-                r[rd] = uint32(int32(int16(cpu.mem.Read16(addr&^1, false))))
-            }
+			} else {
+				// sign-expand half value
+				r[rd] = uint32(int32(int16(cpu.mem.Read16(addr&^1, false))))
+			}
 		}
 		r[PC] += 2
 
@@ -598,9 +598,9 @@ func (cpu *Cpu) thumbPushPop(op uint16) {
 			r[PC] = cpu.mem.Read32(r[SP], false)
 		}
 
-        r[PC] &^= 1
+		r[PC] &^= 1
 
-        // arm9 toggles thumb bit
+		// arm9 toggles thumb bit
 		//cpu.toggleThumb()
 
 		r[SP] += 4

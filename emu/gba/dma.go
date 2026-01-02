@@ -131,13 +131,13 @@ func (dma *DMA) WriteControl(v uint8, hi bool) {
 		dma.Control = (dma.Control & 0b1111_1111) | (a << 8)
 		dma.SrcAdj = (dma.SrcAdj & 1) | (a&1)<<1
 
-        dma.Repeat = (a >> 1) & 1 != 0
-        dma.isWord = (a >> 2) & 1 != 0
-        dma.DRQ = (a >> 3) & 1 != 0
-        dma.Mode = (a >> 4) & 0b11
+		dma.Repeat = (a>>1)&1 != 0
+		dma.isWord = (a>>2)&1 != 0
+		dma.DRQ = (a>>3)&1 != 0
+		dma.Mode = (a >> 4) & 0b11
 
-        dma.IRQ = (a >> 6) & 1 != 0
-        dma.Enabled = (a >> 7) & 1 != 0
+		dma.IRQ = (a>>6)&1 != 0
+		dma.Enabled = (a>>7)&1 != 0
 
 		// immediate should be 2 cycles after enabling
 
@@ -183,7 +183,7 @@ func (dma *DMA) transfer() {
 	if dma.Mode == DMA_MODE_HBL {
 		srcInLimited := dma.Src >= 0x600_0000 && dma.Src < 0x800_0000
 		dstInLimited := dma.Dst >= 0x600_0000 && dma.Dst < 0x800_0000
-		allowed := (dma.Gba.Mem.IO[0] >> 5) & 1 != 0
+		allowed := (dma.Gba.Mem.IO[0]>>5)&1 != 0
 
 		if (srcInLimited || dstInLimited) && !allowed {
 			return
@@ -253,18 +253,18 @@ func (dma *DMA) transfer() {
 		}
 	}
 
-    for range uint32(count) {
+	for range uint32(count) {
 
 		if eeprom := CheckEeprom(dma.Gba, tmpDst); eeprom {
 			dstRom := tmpDst >= 0x800_0000 && tmpDst < 0xE00_0000
 			srcRom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
 
-            switch count {
-            case 9, 73:
+			switch count {
+			case 9, 73:
 				cart.EepromWidth = 6
-            case 17, 81:
+			case 17, 81:
 				cart.EepromWidth = 14
-            }
+			}
 
 			if srcRom && dstRom {
 				panic("EEPROM HAS BOTH SRC AND DST ROM ADDR")
@@ -279,32 +279,32 @@ func (dma *DMA) transfer() {
 		if dma.isWord {
 
 			if dstPtr == nil {
-                switch {
-                case badAddr:
-                    mem.Write32(tmpDst&^3, dma.Value, false)
-                case sram && dma.Idx == 0:
-                    dma.Value = 0
-                    mem.Write32(tmpDst&^3, dma.Value, false)
-                default:
-                    if srcPtr == nil {
-                        dma.Value = mem.Read32(tmpSrc&^3, false)
-                    } else {
-                        dma.Value = *(*uint32)(srcPtr)
-                    }
-                    mem.Write32(tmpDst&^3, dma.Value, false)
-                }
+				switch {
+				case badAddr:
+					mem.Write32(tmpDst&^3, dma.Value, false)
+				case sram && dma.Idx == 0:
+					dma.Value = 0
+					mem.Write32(tmpDst&^3, dma.Value, false)
+				default:
+					if srcPtr == nil {
+						dma.Value = mem.Read32(tmpSrc&^3, false)
+					} else {
+						dma.Value = *(*uint32)(srcPtr)
+					}
+					mem.Write32(tmpDst&^3, dma.Value, false)
+				}
 			} else {
-                switch {
-                case sram && dma.Idx == 0:
-                    dma.Value = 0
-                default:
-                    if srcPtr == nil {
-                        dma.Value = mem.Read32(tmpSrc&^3, false)
-                    } else {
-                        dma.Value = *(*uint32)(srcPtr)
-                    }
-                    dma.Value = mem.Read32(tmpSrc &^ 3, false)
-                }
+				switch {
+				case sram && dma.Idx == 0:
+					dma.Value = 0
+				default:
+					if srcPtr == nil {
+						dma.Value = mem.Read32(tmpSrc&^3, false)
+					} else {
+						dma.Value = *(*uint32)(srcPtr)
+					}
+					dma.Value = mem.Read32(tmpSrc&^3, false)
+				}
 
 				*(*uint32)(dstPtr) = dma.Value
 			}
@@ -312,32 +312,32 @@ func (dma *DMA) transfer() {
 		} else {
 
 			if dstPtr == nil {
-                switch {
-                case badAddr:
-                    mem.Write16(tmpDst&^1, uint16(dma.Value), false)
-                case sram && dma.Idx == 0:
-                    dma.Value = 0
-                    mem.Write16(tmpDst&^1, uint16(dma.Value), false)
-                default:
-                    if srcPtr == nil {
-                        dma.Value = mem.Read16(tmpSrc&^1, false)
-                    } else {
-                        dma.Value = uint32(*(*uint16)(srcPtr))
-                    }
-                    mem.Write16(tmpDst&^1, uint16(dma.Value), false)
-                }
+				switch {
+				case badAddr:
+					mem.Write16(tmpDst&^1, uint16(dma.Value), false)
+				case sram && dma.Idx == 0:
+					dma.Value = 0
+					mem.Write16(tmpDst&^1, uint16(dma.Value), false)
+				default:
+					if srcPtr == nil {
+						dma.Value = mem.Read16(tmpSrc&^1, false)
+					} else {
+						dma.Value = uint32(*(*uint16)(srcPtr))
+					}
+					mem.Write16(tmpDst&^1, uint16(dma.Value), false)
+				}
 			} else {
-                switch {
-                case sram && dma.Idx == 0:
-                    dma.Value = 0
-                default:
-                    if srcPtr == nil {
-                        dma.Value = mem.Read16(tmpSrc&^1, false)
-                    } else {
-                        dma.Value = uint32(*(*uint16)(srcPtr))
-                    }
-                    dma.Value = mem.Read16(tmpSrc &^ 1, false)
-                }
+				switch {
+				case sram && dma.Idx == 0:
+					dma.Value = 0
+				default:
+					if srcPtr == nil {
+						dma.Value = mem.Read16(tmpSrc&^1, false)
+					} else {
+						dma.Value = uint32(*(*uint16)(srcPtr))
+					}
+					dma.Value = mem.Read16(tmpSrc&^1, false)
+				}
 
 				*(*uint32)(dstPtr) = dma.Value
 			}

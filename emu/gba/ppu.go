@@ -2,7 +2,6 @@ package gba
 
 import (
 	"encoding/binary"
-
 	//"github.com/aabalke/guac/emu/gba/utils"
 )
 
@@ -115,22 +114,22 @@ func (p *PPU) UpdatePPU(addr uint32, v uint32) {
 	switch addr {
 	case 0x0:
 		p.Dispcnt.Mode = v & 0b111
-		p.Dispcnt.CGB = (v >> 3) & 1 != 0
-		p.Dispcnt.DisplayFrame1 = (v >> 4) & 1 != 0
-		p.Dispcnt.HBlankIntervalFree = (v >> 5) & 1 != 0
-		p.Dispcnt.OneDimensional = (v >> 6) & 1 != 0
-		p.Dispcnt.ForcedBlank = (v >> 7) & 1 != 0
+		p.Dispcnt.CGB = (v>>3)&1 != 0
+		p.Dispcnt.DisplayFrame1 = (v>>4)&1 != 0
+		p.Dispcnt.HBlankIntervalFree = (v>>5)&1 != 0
+		p.Dispcnt.OneDimensional = (v>>6)&1 != 0
+		p.Dispcnt.ForcedBlank = (v>>7)&1 != 0
 
 	case 0x1:
-		p.Dispcnt.DisplayObj = (v >> 4) & 1 != 0
-		p.Dispcnt.DisplayWin0 = (v >> 5) & 1 != 0
-		p.Dispcnt.DisplayWin1 = (v >> 6) & 1 != 0
-		p.Dispcnt.DisplayObjWin = (v >> 7) & 1 != 0
+		p.Dispcnt.DisplayObj = (v>>4)&1 != 0
+		p.Dispcnt.DisplayWin0 = (v>>5)&1 != 0
+		p.Dispcnt.DisplayWin1 = (v>>6)&1 != 0
+		p.Dispcnt.DisplayObjWin = (v>>7)&1 != 0
 
-		p.Backgrounds[0].Enabled = (v >> 0) & 1 != 0
-		p.Backgrounds[1].Enabled = (v >> 1) & 1 != 0
-		p.Backgrounds[2].Enabled = (v >> 2) & 1 != 0
-		p.Backgrounds[3].Enabled = (v >> 3) & 1 != 0
+		p.Backgrounds[0].Enabled = (v>>0)&1 != 0
+		p.Backgrounds[1].Enabled = (v>>1)&1 != 0
+		p.Backgrounds[2].Enabled = (v>>2)&1 != 0
+		p.Backgrounds[3].Enabled = (v>>3)&1 != 0
 
 		wins := &p.Windows
 		wins.Win0.Enabled = p.Dispcnt.DisplayWin0
@@ -149,21 +148,21 @@ func (p *PPU) UpdatePPU(addr uint32, v uint32) {
 		p.Mosaic.ObjV = (v >> 4) & 0xF
 
 	case 0x50:
-		p.Blend.a[0] = (v >> 0) & 1 != 0
-		p.Blend.a[1] = (v >> 1) & 1 != 0
-		p.Blend.a[2] = (v >> 2) & 1 != 0
-		p.Blend.a[3] = (v >> 3) & 1 != 0
-		p.Blend.a[4] = (v >> 4) & 1 != 0
-		p.Blend.a[5] = (v >> 5) & 1 != 0
+		p.Blend.a[0] = (v>>0)&1 != 0
+		p.Blend.a[1] = (v>>1)&1 != 0
+		p.Blend.a[2] = (v>>2)&1 != 0
+		p.Blend.a[3] = (v>>3)&1 != 0
+		p.Blend.a[4] = (v>>4)&1 != 0
+		p.Blend.a[5] = (v>>5)&1 != 0
 		p.Blend.Mode = (v >> 6) & 0b11
 
 	case 0x51:
-		p.Blend.b[0] = (v >> 0) & 1 != 0
-		p.Blend.b[1] = (v >> 1) & 1 != 0
-		p.Blend.b[2] = (v >> 2) & 1 != 0
-		p.Blend.b[3] = (v >> 3) & 1 != 0
-		p.Blend.b[4] = (v >> 4) & 1 != 0
-		p.Blend.b[5] = (v >> 5) & 1 != 0
+		p.Blend.b[0] = (v>>0)&1 != 0
+		p.Blend.b[1] = (v>>1)&1 != 0
+		p.Blend.b[2] = (v>>2)&1 != 0
+		p.Blend.b[3] = (v>>3)&1 != 0
+		p.Blend.b[4] = (v>>4)&1 != 0
+		p.Blend.b[5] = (v>>5)&1 != 0
 
 	case 0x52:
 		p.Blend.aEv = float32(min(16, v&0x1F)) / 16
@@ -265,33 +264,33 @@ func (p *PPU) UpdateWin(addr uint32, v uint32) {
 		}
 
 	case WININ0:
-		win0.InBg[0] = (v >> 0) & 1 != 0
-		win0.InBg[1] = (v >> 1) & 1 != 0
-		win0.InBg[2] = (v >> 2) & 1 != 0
-		win0.InBg[3] = (v >> 3) & 1 != 0
-		win0.InObj = (v >> 4) & 1 != 0
-		win0.InBld = (v >> 5) & 1 != 0
+		win0.InBg[0] = (v>>0)&1 != 0
+		win0.InBg[1] = (v>>1)&1 != 0
+		win0.InBg[2] = (v>>2)&1 != 0
+		win0.InBg[3] = (v>>3)&1 != 0
+		win0.InObj = (v>>4)&1 != 0
+		win0.InBld = (v>>5)&1 != 0
 	case WININ1:
-		win1.InBg[0] = (v >> 0) & 1 != 0
-		win1.InBg[1] = (v >> 1) & 1 != 0
-		win1.InBg[2] = (v >> 2) & 1 != 0
-		win1.InBg[3] = (v >> 3) & 1 != 0
-		win1.InObj = (v >> 4) & 1 != 0
-		win1.InBld = (v >> 5) & 1 != 0
+		win1.InBg[0] = (v>>0)&1 != 0
+		win1.InBg[1] = (v>>1)&1 != 0
+		win1.InBg[2] = (v>>2)&1 != 0
+		win1.InBg[3] = (v>>3)&1 != 0
+		win1.InObj = (v>>4)&1 != 0
+		win1.InBld = (v>>5)&1 != 0
 	case WINOUT:
-		wins.OutBg[0] = (v >> 0) & 1 != 0
-		wins.OutBg[1] = (v >> 1) & 1 != 0
-		wins.OutBg[2] = (v >> 2) & 1 != 0
-		wins.OutBg[3] = (v >> 3) & 1 != 0
-		wins.OutObj = (v >> 4) & 1 != 0
-		wins.OutBld = (v >> 5) & 1 != 0
+		wins.OutBg[0] = (v>>0)&1 != 0
+		wins.OutBg[1] = (v>>1)&1 != 0
+		wins.OutBg[2] = (v>>2)&1 != 0
+		wins.OutBg[3] = (v>>3)&1 != 0
+		wins.OutObj = (v>>4)&1 != 0
+		wins.OutBld = (v>>5)&1 != 0
 	case WINOBJ:
-		winObj.InBg[0] = (v >> 0) & 1 != 0
-		winObj.InBg[1] = (v >> 1) & 1 != 0
-		winObj.InBg[2] = (v >> 2) & 1 != 0
-		winObj.InBg[3] = (v >> 3) & 1 != 0
-		winObj.InObj = (v >> 4) & 1 != 0
-		winObj.InBld = (v >> 5) & 1 != 0
+		winObj.InBg[0] = (v>>0)&1 != 0
+		winObj.InBg[1] = (v>>1)&1 != 0
+		winObj.InBg[2] = (v>>2)&1 != 0
+		winObj.InBg[3] = (v>>3)&1 != 0
+		winObj.InObj = (v>>4)&1 != 0
+		winObj.InBld = (v>>5)&1 != 0
 	}
 }
 
