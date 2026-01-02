@@ -38,7 +38,7 @@ var f *os.File
 //var isProfiling bool
 //var profileFrames uint32
 
-const MAX_TPS = 60 * 4
+const MAX_TPS = 60 * 20
 
 func main() {
 

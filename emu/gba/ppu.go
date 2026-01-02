@@ -114,7 +114,7 @@ func (p *PPU) UpdatePPU(addr uint32, v uint32) {
 
 	switch addr {
 	case 0x0:
-		p.Dispcnt.Mode = v & 0b11
+		p.Dispcnt.Mode = v & 0b111
 		p.Dispcnt.CGB = (v >> 3) & 1 != 0
 		p.Dispcnt.DisplayFrame1 = (v >> 4) & 1 != 0
 		p.Dispcnt.HBlankIntervalFree = (v >> 5) & 1 != 0
