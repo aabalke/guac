@@ -2,8 +2,17 @@ package arm7
 
 import (
 	"fmt"
+	"math/bits"
+	"unsafe"
+)
 
-	"github.com/aabalke/guac/emu/gba/utils"
+var _ = fmt.Sprintf
+
+const (
+	LSL = iota
+	LSR
+	ASR
+	ROR
 )
 
 const (
@@ -25,244 +34,385 @@ const (
 	MVN
 )
 
-type Alu struct {
-	Opcode, Rd, Rn, Rm, RnValue, Op2, Inst uint32
-	Immediate, Set                         bool
-	LogicalFlags, Test                     bool
-	Carry                                  bool
-}
+func (cpu *Cpu) Alu(op uint32) {
 
-var aluData Alu
+	var (
+		r     = &cpu.Reg.R
+		cpsr  = &cpu.Reg.CPSR
+		rd    = (op >> 12) & 0xF
+		rn    = (op >> 16) & 0xF
+		carry = cpsr.C
+		rnv   = r[rn]
+		imm   = (op>>25)&1 != 0
 
-func NewAluData(opcode uint32, cpu *Cpu) *Alu {
+		op2 uint32
+	)
 
-	aluData.Opcode = opcode
-	aluData.Inst = utils.GetByte(opcode, 21)
-	aluData.Immediate = utils.BitEnabled(opcode, 25)
-	aluData.Set = utils.BitEnabled(opcode, 20)
-	aluData.Rd = utils.GetByte(opcode, 12)
-	aluData.Rn = utils.GetByte(opcode, 16)
-	aluData.Rm = utils.GetByte(opcode, 0)
-	aluData.LogicalFlags = false
-	aluData.Test = false
+	if imm {
 
-	aluData.Op2, aluData.Carry = cpu.GetOp2(opcode)
+		ro := ((op >> 8) & 0xF) << 1
+		op2 = bits.RotateLeft32(op&0xFF, -int(ro))
 
-	if aluData.Rn != PC {
-		aluData.RnValue = cpu.Reg.R[aluData.Rn]
-		return &aluData
+		if setCarry := ro != 0 && (op>>20)&1 != 0; setCarry {
+			// I believe this matches
+			//carry := (nn >> (ro-1)) & 1 != 0 // this line must be before op
+			cpsr.C = op2>>31 != 0
+		}
+
+		if rn == PC {
+			rnv += 8
+		}
+
+	} else {
+
+		op2 = cpu.getShiftedAluReg(op)
+
+		if rn == PC {
+			if regShift := (op>>4)&1 != 0; regShift {
+				rnv += 12
+			} else {
+				rnv += 8
+			}
+		}
 	}
 
-	shiftImmediate := aluData.Immediate || !utils.BitEnabled(opcode, 4)
-	if shiftImmediate {
-		aluData.RnValue = cpu.Reg.R[PC] + 8
-		return &aluData
-	}
-
-	aluData.RnValue = cpu.Reg.R[PC] + 12
-
-	return &aluData
-}
-
-func (cpu *Cpu) Alu(opcode uint32) {
-
-	alu := NewAluData(opcode, cpu)
-
-	switch alu.Inst {
-	case AND, EOR, ORR, MOV, MVN, BIC:
-		alu.LogicalFlags = true
-		alu.Test = false
-		cpu.logical(alu)
-	case ADD, ADC, SUB, SBC, RSB, RSC:
-		alu.LogicalFlags = false
-		alu.Test = false
-		cpu.arithmetic(alu)
-	case TST, TEQ:
-		alu.Test = true
-		alu.LogicalFlags = true
-		cpu.test(alu)
-	case CMP, CMN:
-		alu.Test = true
-		alu.LogicalFlags = false
-		cpu.test(alu)
-	}
+	inst := (op >> 21) & 0xF
 
 	switch {
-	case aluData.Rd != PC:
-		cpu.Reg.R[15] += 4
-	case cpu.Reg.CPSR.T:
-		cpu.Reg.R[15] &^= 0b1
-	case !cpu.Reg.CPSR.T:
-		cpu.Reg.R[15] &^= 0b11
+	case inst == MOV:
+		res := op2
+		r[rd] = res
+
+		if rd == PC {
+			// not sure on this
+			r[rd] &^= 0b1
+		}
+
+		if set := (op>>20)&1 != 0; set {
+
+			rm := op & 0xF
+
+			if swiExit := !imm && rd == PC && rm == LR; swiExit {
+				cpu.ExitException(MODE_SWI)
+				if r[PC]&1 != 0 {
+					cpu.toggleThumb()
+				}
+			} else {
+				cpsr.N = (uint32(res)>>31)&1 != 0
+				cpsr.Z = uint32(res) == 0
+			}
+		}
+
+	case inst == SUB:
+		res := uint64(rnv) - uint64(op2)
+		r[rd] = uint32(res)
+		if set := (op>>20)&1 != 0; set {
+			if rd == PC {
+				if rn == LR {
+					switch cpsr.Mode {
+					case MODE_ABT:
+						r[PC] += 4
+						cpu.ExitException(MODE_ABT)
+					case MODE_SWI:
+						cpu.ExitException(MODE_SWI)
+					default:
+						cpu.ExitException(MODE_IRQ)
+					}
+
+					if r[PC]&1 != 0 {
+						cpu.toggleThumb()
+					}
+
+				} else {
+
+					// force exit
+					cpu.psrSwitch() // not sure if needed
+					if r[PC]&1 != 0 {
+						cpu.toggleThumb()
+					}
+				}
+			} else {
+				cpsr.V = ((rnv^op2)&(rnv^uint32(res)))>>31 != 0
+				cpsr.C = res < 0x1_0000_0000
+				cpsr.N = (uint32(res)>>31)&1 != 0
+				cpsr.Z = uint32(res) == 0
+			}
+		}
+
+	// test alu
+	case inst >= 0b1000 && inst < 0b1100:
+
+		var res uint64
+
+		switch inst {
+		case TST:
+			res = uint64(rnv) & uint64(op2)
+		case TEQ:
+			res = uint64(rnv) ^ uint64(op2)
+		case CMP:
+			res = uint64(rnv) - uint64(op2)
+		case CMN:
+			res = uint64(rnv) + uint64(op2)
+		}
+
+		if set := (op>>20)&1 != 0; set {
+
+			switch inst {
+			case CMN:
+				cpsr.V = ((^(rnv ^ op2))&(rnv^uint32(res)))>>31 != 0
+				cpsr.C = res >= 0x1_0000_0000
+			case CMP:
+				cpsr.V = ((rnv^op2)&(rnv^uint32(res)))>>31 != 0
+				cpsr.C = res < 0x1_0000_0000
+			}
+
+			cpsr.N = (uint32(res)>>31)&1 != 0
+			cpsr.Z = uint32(res) == 0
+		}
+
+		if rd == PC {
+			r[PC] += 4
+		}
+
+	// logical
+	case inst&0b0110 == 0b0000 || inst&0b1100 == 0b1100:
+
+		var res uint32
+
+		switch inst {
+		case AND:
+			res = rnv & op2
+		case EOR:
+			res = rnv ^ op2
+		case ORR:
+			res = rnv | op2
+		case BIC:
+			res = rnv &^ op2
+		case MVN:
+			res = ^op2
+		}
+
+		r[rd] = res
+
+		if set := (op>>20)&1 != 0; set {
+			cpsr.N = (uint32(res)>>31)&1 != 0
+			cpsr.Z = uint32(res) == 0
+		}
+
+	// arthmetic
+	default:
+
+		var res uint64
+
+		switch inst {
+		case RSB:
+			res = uint64(op2) - uint64(rnv)
+		case ADD:
+			res = uint64(rnv) + uint64(op2)
+		case ADC:
+			res = uint64(rnv) + uint64(op2)
+			if carry {
+				res++
+			}
+		case SBC:
+			res = uint64(rnv) - uint64(op2) - 1
+			if carry {
+				res++
+			}
+		case RSC:
+			res = uint64(op2) - uint64(rnv) - 1
+			if carry {
+				res++
+			}
+		}
+
+		r[rd] = uint32(res)
+
+		if set := (op>>20)&1 != 0; set {
+
+			switch inst {
+			case ADD, ADC:
+				cpsr.V = ((^(rnv ^ op2))&(rnv^uint32(res)))>>31 != 0
+				cpsr.C = res >= 0x1_0000_0000
+			case SBC:
+				cpsr.V = ((rnv^op2)&(rnv^uint32(res)))>>31 != 0
+				cpsr.C = res < 0x1_0000_0000
+			case RSB, RSC:
+				cpsr.V = ((rnv^op2)&(op2^uint32(res)))>>31 != 0
+				cpsr.C = res < 0x1_0000_0000
+			}
+
+			cpsr.N = (uint32(res)>>31)&1 != 0
+			cpsr.Z = uint32(res) == 0
+		}
+	}
+
+	//cpu.Jit.EndTest(op, compare)
+
+	switch {
+	case rd != PC:
+		r[PC] += 4
+	case cpsr.T:
+		r[PC] &^= 0b1
+	case !cpsr.T:
+		r[PC] &^= 0b11
 	}
 }
 
-func (cpu *Cpu) GetOp2(opcode uint32) (uint32, bool) {
+func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
 
-	reg := &cpu.Reg
+	var (
+		r = &cpu.Reg.R
 
-	isCarry := utils.BitEnabled(opcode, 20)
-	currCarry := reg.CPSR.C
+		carry = cpu.Reg.CPSR.C
 
-	if immediate := utils.BitEnabled(opcode, 25); immediate {
+		shReg  = (op>>4)&1 != 0
+		shType = (op >> 5) & 0b11
 
-		nn := utils.GetVarData(opcode, 0, 7)
-		ro := utils.GetVarData(opcode, 8, 11) * 2
-		op2, setCarry, carry := utils.Ror(nn, ro, isCarry, false, currCarry)
+		inst     = (op >> 21) & 0xF
+		logical  = inst&0b0110 == 0b0000 || inst&0b1100 == 0b1100
+		setCarry = (op>>20)&1 != 0 && logical
 
-		if setCarry {
-			reg.CPSR.C = carry
-		}
+		rm  = op & 0xF
+		op2 = r[rm]
 
-		return op2, currCarry
-	}
+		shift uint32
+	)
 
-	is := utils.GetVarData(opcode, 7, 11)
-	var additional uint32
-	rm := utils.GetByte(opcode, 0)
-	if rm == PC {
-		additional += 8
-	}
-
-	shiftRegister := utils.BitEnabled(opcode, 4)
-	if shiftRegister {
-		is = reg.R[(opcode>>8)&0b1111] & 0b1111_1111
+	if shReg {
+		rs := (op >> 8) & 0xF
+		shift = r[rs] & 0xFF
 
 		if rm == PC {
-			additional += 4
+			op2 += 12
 		}
 
+	} else {
+
+		shift = (op >> 7) & 0x1F
+
+		if rm == PC {
+			op2 += 8
+		}
+
+		if special := shift == 0; special {
+			switch shType {
+			case LSL:
+				return op2
+			case LSR:
+				cpu.Reg.CPSR.C = op2&0x8000_0000 != 0
+				return 0
+			case ASR:
+
+				signed := op2&0x8000_0000 != 0
+
+				if setCarry {
+					cpu.Reg.CPSR.C = signed
+				}
+
+				if signed {
+					return 0xFFFF_FFFF
+				}
+
+				return 0
+
+			case ROR:
+
+				cpu.Reg.CPSR.C = op2&1 != 0
+
+				op2 >>= 1
+				if carry {
+					op2 |= 0x8000_0000
+				}
+
+				return op2
+			}
+		}
 	}
 
-	shiftArgs := utils.ShiftArgs{
-		SType:     opcode >> 5 & 0b11,
-		Val:       reg.R[rm] + additional,
-		Is:        is,
-		IsCarry:   isCarry,
-		Immediate: !shiftRegister,
-		CurrCarry: currCarry,
+	// https://iitd-plos.github.io/col718/ref/arm-instructionset.pdf
+
+	if regZero := shift == 0; regZero {
+		// op2 unchanges, carry is set to original carry (no change)
+		return op2
 	}
 
-	op2, setCarry, carry := utils.Shift(&shiftArgs)
+	switch shType {
+	case LSL:
+
+		switch {
+		case shift > 32:
+			op2 = 0
+			carry = false
+		default:
+			carry = op2&(1<<(32-shift)) != 0
+			op2 <<= shift
+		}
+
+	case LSR:
+
+		switch {
+		case shift > 32:
+			op2 = 0
+			carry = false
+		case shift == 32:
+			carry = op2&0x8000_0000 != 0
+			op2 = 0
+		default:
+			carry = op2&(1<<(shift-1)) != 0
+			op2 >>= shift
+		}
+
+	case ASR:
+
+		switch {
+		case shift >= 32:
+			signed := op2&0x8000_0000 != 0
+			carry = signed
+
+			if signed {
+				op2 = 0xFFFF_FFFF
+			} else {
+				op2 = 0x0
+			}
+
+		default:
+			carry = op2&(1<<(shift-1)) != 0
+			op2 = uint32(int32(op2) >> shift)
+		}
+
+	case ROR:
+
+		if shift == 32 {
+			// op2 unchanges
+			carry = op2&0x8000_0000 != 0
+		} else {
+			carry = (op2>>((shift-1)&31))&1 != 0
+			op2 = bits.RotateLeft32(op2, -int(shift))
+		}
+	}
 
 	if setCarry {
-		reg.CPSR.C = carry
+		cpu.Reg.CPSR.C = carry
 	}
 
-	return op2, currCarry
-}
-
-func (cpu *Cpu) logical(alu *Alu) {
-
-	var res uint32
-	switch alu.Inst {
-	case AND:
-		res = alu.RnValue & alu.Op2
-	case EOR:
-		res = alu.RnValue ^ alu.Op2
-	case ORR:
-		res = alu.RnValue | alu.Op2
-	case MOV:
-		res = alu.Op2
-	case MVN:
-		res = ^alu.Op2
-	case BIC:
-		res = alu.RnValue &^ alu.Op2
-	}
-
-	cpu.Reg.R[alu.Rd] = res
-
-	if alu.Rd == PC {
-		//cpu.toggleThumb()
-
-		// this may be a problem still
-		cpu.Reg.R[alu.Rd] &^= 0b1
-
-		//fmt.Printf("LOGICAL RD PC, NEED TO Exchange?\n")
-	}
-
-	cpu.setAluFlags(alu, uint64(res))
-}
-
-func (cpu *Cpu) arithmetic(alu *Alu) {
-
-	carry := uint64(0)
-	if alu.Carry {
-		carry = 1
-	}
-
-	var res uint64
-
-	switch alu.Inst {
-	case ADD:
-		res = uint64(alu.RnValue) + uint64(alu.Op2)
-	case ADC:
-		res = uint64(alu.RnValue) + uint64(alu.Op2) + carry
-	case SUB:
-		res = uint64(alu.RnValue) - uint64(alu.Op2)
-	case SBC:
-		res = uint64(alu.RnValue) - uint64(alu.Op2) + carry - 1
-	case RSB:
-		res = uint64(alu.Op2) - uint64(alu.RnValue)
-	case RSC:
-		res = uint64(alu.Op2) - uint64(alu.RnValue) + carry - 1
-	}
-
-	cpu.Reg.R[alu.Rd] = uint32(res)
-
-	cpu.setAluFlags(alu, res)
-}
-
-func (cpu *Cpu) test(alu *Alu) {
-
-	var res uint64
-	switch alu.Inst {
-	case TST:
-		res = uint64(alu.RnValue) & uint64(alu.Op2)
-	case TEQ:
-		res = uint64(alu.RnValue) ^ uint64(alu.Op2)
-	case CMP:
-		res = uint64(alu.RnValue) - uint64(alu.Op2)
-	case CMN:
-		res = uint64(alu.RnValue) + uint64(alu.Op2)
-	}
-
-	//incPc := true
-
-	switch alu.Inst {
-	case TST, TEQ:
-		cpu.setAluFlags(alu, uint64(uint32(res)))
-	case CMP, CMN:
-		cpu.setAluFlags(alu, res)
-	}
-
-	if alu.Rd == PC {
-		// ARM 3: Bad CMP / CMN / TST / TEQ change the mode
-		// i know it isnt stored spsr, becuase in tests this was zero
-		//cpu.Reg.setMode(cpu.Reg.getMode(), MODE_SYS) // this may be not SYS MODE
-		// maybe spsr but with some more work???
-
-		cpu.Reg.R[PC] += 4
-		return
-	}
+	return op2
 }
 
 func (cpu *Cpu) psrSwitch() {
 
-	reg := &cpu.Reg
-	r := &cpu.Reg.R
+	var (
+		reg  = &cpu.Reg
+		r    = &cpu.Reg.R
+		cpsr = &cpu.Reg.CPSR
+		curr = cpsr.Mode
+		i    = BANK_ID[curr]
+	)
 
-	// PC is updated in final bios inst
-
-	curr := cpu.Reg.CPSR.Mode
-
-	i := BANK_ID[curr]
-	reg.CPSR = reg.SPSR[i]
-
-	next := cpu.Reg.CPSR.Mode
+	*cpsr = reg.SPSR[i]
+	next := cpsr.Mode
 	c := BANK_ID[next]
 
-	// if you set this up for fiq, get the special registers
 	reg.LR[i] = r[LR]
 	reg.SP[i] = r[SP]
 	r[SP] = reg.SP[c]
@@ -299,151 +449,6 @@ func (cpu *Cpu) psrSwitch() {
 	}
 }
 
-func (cpu *Cpu) setAluFlags(alu *Alu, res uint64) {
-
-	//    Returned CPSR Flags
-	//If S=1, Rd<>R15, logical operations (AND,EOR,TST,TEQ,ORR,MOV,BIC,MVN):
-	//  V=not affected
-	//  C=carryflag of shift operation (not affected if LSL#0 or Rs=00h)
-	//  Z=zeroflag of result
-	//  N=signflag of result (result bit 31)
-	//If S=1, Rd<>R15, arithmetic operations (SUB,RSB,ADD,ADC,SBC,RSC,CMP,CMN):
-	//  V=overflowflag of result
-	//  C=carryflag of result
-	//  Z=zeroflag of result
-	//  N=signflag of result (result bit 31)
-	//IF S=1, with unused Rd bits=1111b, {P} opcodes (CMPP/CMNP/TSTP/TEQP):
-	//  R15=result  ;modify PSR bits in R15, ARMv2 and below only.
-	//  In user mode only N,Z,C,V bits of R15 can be changed.
-	//  In other modes additionally I,F,M1,M0 can be changed.
-	//  The PC bits in R15 are left unchanged in all modes.
-	//If S=1, Rd=R15; should not be used in user mode:
-	//  CPSR = SPSR_<current mode>
-	//  PC = result
-	//  For example: MOVS PC,R14  ;return from SWI (PC=R14_svc, CPSR=SPSR_svc).
-	//If S=0: Flags are not affected (not allowed for CMP,CMN,TEQ,TST).
-
-	if !alu.Set {
-		return
-	}
-	if abtExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB && cpu.Reg.CPSR.Mode == MODE_ABT; abtExit {
-
-		cpu.Reg.R[15] += 4
-
-		//cpu.toggleThumb()
-		//cpu.ExitException(MODE_ABT)
-		//if cpu.Reg.R[15] & 1 == 1 {
-		//    cpu.toggleThumb()
-		//}
-
-		if !cpu.Reg.CPSR.T {
-			cpu.Reg.R[15] &^= 0b11
-		} else {
-			// or should this toggle thumb?
-			cpu.Reg.R[15] &^= 0b1
-		}
-
-		return
-	}
-
-	if swiExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB && cpu.Reg.CPSR.Mode == MODE_SWI; swiExit {
-		// toggle after causes errors. maybe after should just be based on bit 0?
-		// ie [pc] & 1 toggle thumb
-		//cpu.toggleThumb()
-		cpu.ExitException(MODE_SWI)
-		//if cpu.Reg.R[15] & 1 == 1 {
-		//    cpu.toggleThumb()
-		//}
-
-		if !cpu.Reg.CPSR.T {
-			// Required. Do not remove. check against gbe+ test
-			cpu.Reg.R[15] &^= 0b11
-		} else {
-			// or should this toggle thumb?
-			cpu.Reg.R[15] &^= 0b1
-		}
-
-		return
-	}
-
-	if irqExit := alu.Rd == PC && alu.Rn == LR && alu.Inst == SUB; irqExit {
-		cpu.ExitException(MODE_IRQ)
-		//if cpu.Reg.R[15] & 1 == 1 {
-		//    cpu.toggleThumb()
-		//}
-
-		if !cpu.Reg.CPSR.T {
-			cpu.Reg.R[15] &^= 0b11
-		} else {
-			// or should this toggle thumb?
-			cpu.Reg.R[15] &^= 0b1
-		}
-
-		return
-	}
-
-	if swiExit := alu.Rd == PC && alu.Rm == LR && alu.Inst == MOV; swiExit {
-		cpu.ExitException(MODE_SWI)
-		//if cpu.Reg.R[15] & 1 == 1 {
-		//    cpu.toggleThumb()
-		//}
-
-		if !cpu.Reg.CPSR.T {
-			cpu.Reg.R[15] &^= 0b11
-		} else {
-			// or should this toggle thumb?
-			cpu.Reg.R[15] &^= 0b1
-		}
-
-		return
-	}
-
-	if forceExit := alu.Rd == PC; forceExit {
-		cpu.psrSwitch()
-		//if cpu.Reg.R[15] & 1 == 1 {
-		//    cpu.toggleThumb()
-		//}
-
-		if !cpu.Reg.CPSR.T {
-			cpu.Reg.R[15] &^= 0b11
-		} else {
-			// or should this toggle thumb?
-			cpu.Reg.R[15] &^= 0b1
-		}
-
-		return
-	}
-
-	if alu.LogicalFlags {
-		cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
-		cpu.Reg.CPSR.Z = uint32(res) == 0
-		return
-	}
-
-	var v, c bool
-	rnSign := uint8(alu.RnValue>>31) & 1
-	opSign := uint8(alu.Op2>>31) & 1
-	rSign := uint8(res>>31) & 1
-
-	switch alu.Inst {
-	case ADD, ADC, CMN:
-		v = (rnSign == opSign) && (rSign != rnSign)
-		c = res >= 0x1_0000_0000
-	case SUB, SBC, CMP:
-		v = (rnSign != opSign) && (rSign != rnSign)
-		c = res < 0x1_0000_0000
-
-	case RSB, RSC:
-		v = (rnSign != opSign) && (rSign != opSign)
-		c = res < 0x1_0000_0000
-	}
-
-	cpu.Reg.CPSR.V = v
-	cpu.Reg.CPSR.C = c
-	cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
-	cpu.Reg.CPSR.Z = uint32(res) == 0
-}
-
 const (
 	MUL   = 0b0
 	MLA   = 0b1
@@ -454,17 +459,21 @@ const (
 	SMLAL = 0b111
 )
 
-func (cpu *Cpu) Mul(opcode uint32) {
+func (cpu *Cpu) Mul(op uint32) {
 
-	inst := utils.GetByte(opcode, 21)
-	set := utils.BitEnabled(opcode, 20)
-	rd := utils.GetByte(opcode, 16)
-	rn := utils.GetByte(opcode, 12)
-	rs := utils.GetByte(opcode, 8)
-	rm := utils.GetByte(opcode, 0)
-	r := &cpu.Reg.R
+	var (
+		inst = (op >> 21) & 0xF
+		set  = (op>>20)&1 != 0
+		rd   = (op >> 16) & 0xF
+		rn   = (op >> 12) & 0xF
+		rs   = (op >> 8) & 0xF
+		rm   = (op >> 0) & 0xF
+		r    = &cpu.Reg.R
+		cpsr = &cpu.Reg.CPSR
+	)
 
-	if mulHalf := inst == MUL || inst == MLA; mulHalf {
+	switch inst {
+	case MUL, MLA:
 
 		res := r[rm] * r[rs]
 
@@ -475,21 +484,20 @@ func (cpu *Cpu) Mul(opcode uint32) {
 		r[rd] = res
 
 		if set {
-			cpu.Reg.CPSR.Z = res == 0
-			cpu.Reg.CPSR.N = (res >> 31 & 0b1) != 0
+			cpsr.N = (uint32(res)>>31)&1 != 0
+			cpsr.Z = uint32(res) == 0
 			// FLAG_C "destroyed" ARM <5, ignored ARM >=5
-			cpu.Reg.CPSR.C = false
+			//cpsr.C = false
 		}
 
 		r[PC] += 4
 		return
-	}
 
-	if inst == UMAAL {
-		panic("UMAAL is UNSUPPORTED")
-	}
+	case UMAAL:
+		panic("arm7 umaal multiply unsupported")
 
-	if mulUnsignedWord := inst == UMULL || inst == UMLAL; mulUnsignedWord {
+	case UMULL, UMLAL:
+
 		res := uint64(r[rm]) * uint64(r[rs])
 
 		if inst == UMLAL {
@@ -500,38 +508,38 @@ func (cpu *Cpu) Mul(opcode uint32) {
 		r[rn] = uint32(res)
 
 		if set {
-			//cpu.Reg.CPSR.SetFlag(FLAG_N, (res >> 63 & 0b1) != 0)
-			cpu.Reg.CPSR.N = (res >> 63 & 1) == 1
-			cpu.Reg.CPSR.Z = res == 0
+			cpsr.N = (res >> 63 & 1) != 0
+			cpsr.Z = res == 0
 			// FLAG_C "destroyed" ARM <5, ignored ARM >=5
 			// need carry to pass mgba suite
-			//c := res >= 0x1_0000_0000
-			//cpu.Reg.CPSR.SetFlag(FLAG_C, c)
-			cpu.Reg.CPSR.C = false
+			cpsr.C = false
+			// FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
+		}
+
+		r[PC] += 4
+		return
+
+	case SMULL, SMLAL:
+
+		res := int64(int32(r[rm])) * int64(int32(r[rs]))
+		if inst == SMLAL {
+			res += int64(r[rd])<<32 | int64(r[rn])
+		}
+
+		r[rd] = uint32(res >> 32)
+		r[rn] = uint32(res)
+
+		if set {
+			cpsr.N = (res>>63)&1 != 0
+			cpsr.Z = res == 0
+			cpsr.C = false
+			// FLAG_C "destroyed" ARM <5, ignored ARM >=5
 			// FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
 		}
 
 		r[PC] += 4
 		return
 	}
-
-	res := int64(int32(r[rm])) * int64(int32(r[rs]))
-	if inst == SMLAL {
-		res += int64(r[rd])<<32 | int64(r[rn])
-	}
-
-	r[rd] = uint32(res >> 32)
-	r[rn] = uint32(res)
-
-	if set {
-		cpu.Reg.CPSR.N = (res >> 63 & 1) == 1
-		cpu.Reg.CPSR.Z = res == 0
-		// FLAG_C "destroyed" ARM <5, ignored ARM >=5
-		cpu.Reg.CPSR.C = false
-		// FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
-	}
-
-	r[PC] += 4
 }
 
 const (
@@ -539,162 +547,168 @@ const (
 	LDR_PLD
 )
 
-func (c *Cpu) Sdt(opcode uint32) uint32 {
+func (c *Cpu) Sdt(op uint32) {
 
-	r := &c.Reg.R
-
-	if utils.BitEnabled(opcode, 25) && utils.BitEnabled(opcode, 4) {
-		fmt.Printf("SDT MALFORMED PC %08X OPCODE %08X\n", r[15], opcode)
+	if valid := (op>>26)&0b11 == 0b01; !valid {
+		panic("Malformed Sdt Instruction")
 	}
 
-	rd := utils.GetByte(opcode, 12)
-	rn := utils.GetByte(opcode, 16)
-	byte := utils.BitEnabled(opcode, 22)
-	load := utils.BitEnabled(opcode, 20)
+	var (
+		r    = &c.Reg.R
+		reg  = (op>>25)&1 != 0
+		pre  = (op>>24)&1 != 0
+		up   = (op>>23)&1 != 0
+		byte = (op>>22)&1 != 0
+		wb   = (op>>21)&1 != 0 || !pre
+		load = (op>>20)&1 != 0
+		rn   = (op >> 16) & 0xF
+		rd   = (op >> 12) & 0xF
 
-	post := generateSdtAddress(c, opcode)
-	pre := r[rn]
-	preFlag := utils.BitEnabled(opcode, 24)
-	if preFlag {
-		pre = post
-	}
+		offset, prev uint32
+	)
 
-	addr := pre &^ 0b11
+	if reg {
 
-	//if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
-	//	addr = pre
-	//}
-
-	if pld := ((opcode>>28) == 0b1111 &&
-		preFlag &&
-		byte &&
-		!utils.BitEnabled(opcode, 21) &&
-		load &&
-		rd == 0b1111); pld {
-		panic("Need to handle PLD Inst")
-	}
-
-	switch {
-	case load && byte:
-
-		// DO NOT WORD ALIGN
-		r[rd] = uint32(c.mem.Read8(pre, false))
-
-	case load && !byte:
-
-		v := c.mem.Read32(addr, false)
-		is := (pre & 0b11) << 3
-		v = utils.RorSimple(v, is)
-		//v, _, _ = utils.Ror(v, is, false, false, false)
-
-		if rd == PC { // not sure if this is right
-			v -= 4
+		if (op>>4)&1 != 0 {
+			panic("Malformed Single Data Transfer O_o")
 		}
 
-		r[rd] = v
+		shift := (op >> 7) & 0x1F
+		sType := (op >> 5) & 0b11
+		rm := op & 0xF
 
-	case !load && byte:
+		switch sType {
+		case LSL:
 
-		c.mem.Write8(pre, uint8(r[rd]), false)
+			offset = r[rm] << shift
 
-	case !load && !byte:
+		case LSR:
 
+			if shift == 0 {
+				shift = 32
+			}
+
+			offset = r[rm] >> shift
+
+		case ASR:
+
+			if shift == 0 {
+				shift = 32
+			}
+
+			offset = uint32(int32(r[rm]) >> shift)
+
+		case ROR:
+
+			if shift == 0 {
+
+				offset = r[rm] >> 1
+
+				if c.Reg.CPSR.C {
+					offset |= 0x8000_0000
+				}
+			} else {
+				offset = bits.RotateLeft32(r[rm], -int(shift))
+			}
+		}
+
+	} else {
+		offset = op & 0xFFF
+	}
+
+	post := r[rn]
+	if rn == PC {
+		post += 8
+	}
+
+	if up {
+		post += offset
+	} else {
+		post -= offset
+	}
+
+	if pre {
+		prev = post
+	} else {
+		prev = r[rn]
+	}
+
+	//if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
+	// no alignment?
+	//}
+
+	if load {
+
+		if byte {
+			// DO NOT WORD ALIGN
+			r[rd] = c.mem.Read8(prev, false)
+		} else {
+
+			v := c.mem.Read32(prev&^0b11, false)
+			is := ((prev & 0b11) << 3) & 0x1F
+			r[rd] = bits.RotateLeft32(v, -int(is))
+
+			if rd == PC {
+				c.toggleThumb() // this was on arm9 - not arm7, not sure
+				r[rd] -= 4
+			}
+		}
+	} else {
 		v := r[rd]
 		if rd == PC {
 			v += 12
 		}
 
-		c.mem.Write32(addr, v, false)
+		if byte {
+			c.mem.Write8(prev, uint8(v), false)
+		} else {
+			c.mem.Write32(prev&^0b11, v, false)
+		}
 	}
 
-	skipLoadWriteBack := load && (rn == rd)
-	writeback := !utils.BitEnabled(opcode, 24) || utils.BitEnabled(opcode, 21)
-	if writeback && !skipLoadWriteBack {
+	if wb && !(load && rn == rd) {
 		r[rn] = post
 	}
 
-	c.Reg.R[PC] += 4
-
-	return 4
+	r[PC] += 4
 }
 
-func generateSdtAddress(cpu *Cpu, opcode uint32) uint32 {
+func (cpu *Cpu) B(op uint32) {
 
-	r := &cpu.Reg.R
-
-	var offset uint32
-	if imm := utils.BitEnabled(opcode, 25); imm {
-		if utils.BitEnabled(opcode, 4) {
-			//uhh.PrintPcs()
-			panic("Malformed Single Data Transfer")
-		}
-
-		shift := utils.GetVarData(opcode, 7, 11)
-		shiftType := utils.GetVarData(opcode, 5, 6)
-		rm := utils.GetByte(opcode, 0)
-
-		shiftArgs := utils.ShiftArgs{
-			SType:     shiftType,
-			Val:       r[rm],
-			Is:        shift,
-			IsCarry:   false,
-			Immediate: true,
-			CurrCarry: cpu.Reg.CPSR.C,
-		}
-
-		offset, _, _ = utils.Shift(&shiftArgs)
-	} else {
-		offset = utils.GetVarData(opcode, 0, 11)
-	}
-
-	rn := utils.GetByte(opcode, 16)
-	addr := r[rn]
-	if rn == PC {
-		addr += 8
-	}
-
-	if up := utils.BitEnabled(opcode, 23); up {
-		return addr + offset
-	}
-
-	return addr - offset
-}
-
-func (cpu *Cpu) B(opcode uint32) {
-
-	if immLoop := opcode == 0xEAFFFFFE; immLoop {
+	if immLoop := op == 0xEAFFFFFE; immLoop {
 		cpu.Halted = true
 		return
 	}
 
-	isLink := utils.BitEnabled(opcode, 24)
-
 	r := &cpu.Reg.R
 
-	if isLink {
+	if link := (op>>24)&1 != 0; link {
 		r[14] = r[15] + 4
 	}
 
-	r[PC] += uint32((int32(opcode)<<8)>>6) + 8
+	r[PC] += uint32((int32(op)<<8)>>6) + 8
 }
 
-func (cpu *Cpu) BX(opcode uint32) {
+const (
+	INST_BX  = 1
+	INST_BXJ = 2
+	INST_BLX = 3
+)
 
-	const (
-		INST_BX  = 1
-		INST_BXJ = 2
-		INST_BLX = 3
+func (cpu *Cpu) BX(op uint32) {
+
+	var (
+		r    = &cpu.Reg.R
+		inst = (op >> 4) & 0xF
+		rn   = op & 0xF
 	)
-
-	inst := utils.GetByte(opcode, 4)
-	rn := utils.GetByte(opcode, 0)
 
 	switch inst {
 	case INST_BX:
-		cpu.Reg.R[PC] = cpu.Reg.R[rn]
+		r[PC] = r[rn]
 
 		if rn == PC {
-			cpu.Reg.R[PC] += 8
+			r[PC] += 8
 		}
 
 		cpu.toggleThumb()
@@ -709,285 +723,126 @@ func (cpu *Cpu) BX(opcode uint32) {
 const (
 	RESERVED = 0
 	STRH     = 1
-	LDRD     = 2
-	STRD     = 3
 
 	LDRH  = 1
 	LDRSB = 2
 	LDRSH = 3
 )
 
-var halfData Half
+func (c *Cpu) Half(op uint32) {
 
-type Half struct {
-	Rn, Rd, Imm, Inst, Rm, RdValue, RnValue, RmValue      uint32
-	Pre, Up, Immediate, WriteBack, Load, MemoryManagement bool
-}
+	var (
+		r       = &c.Reg.R
+		rn      = (op >> 16) & 0xF
+		rd      = (op >> 12) & 0xF
+		preFlag = (op>>24)&1 != 0
+		load    = (op>>20)&1 != 0
+		inst    = (op >> 5) & 0b11
+		wb      = (op>>21)&1 != 0 || !preFlag
+		rnv     = r[rn]
+		post    = rnv
 
-func NewHalf(opcode uint32, c *Cpu) *Half {
+		pre, offset uint32
+	)
 
-	r := &c.Reg.R
+	if rn == PC {
+		rnv += 8
+	}
 
-	halfData.Rn = utils.GetByte(opcode, 16)
-	halfData.Rd = utils.GetByte(opcode, 12)
-	halfData.Pre = utils.BitEnabled(opcode, 24)
-	halfData.Up = utils.BitEnabled(opcode, 23)
-	halfData.Immediate = utils.BitEnabled(opcode, 22)
-	halfData.Load = utils.BitEnabled(opcode, 20)
-	halfData.Inst = utils.GetVarData(opcode, 5, 6)
-
-	if halfData.Pre {
-		halfData.WriteBack = utils.BitEnabled(opcode, 21)
+	if imm := (op>>22)&1 != 0; imm {
+		offset = (op & 0xF) | ((op >> 4) & 0xF0)
 	} else {
-		halfData.WriteBack = true
+		offset = r[op&0xF]
 	}
 
-	fails := []bool{
-		!halfData.Pre && utils.BitEnabled(opcode, 21),
-		!utils.BitEnabled(opcode, 7),
-		!utils.BitEnabled(opcode, 4),
-		//halfData.Immediate && !(utils.GetByte(opcode, 8) == 0b0000),
+	if up := (op>>23)&1 != 0; up {
+		post += offset
+	} else {
+		post -= offset
 	}
 
-	for i, fail := range fails {
-		if fail {
-			//uhh.PrintPcs()
-			panic(fmt.Sprintf("Malformed Half Instruction %d %08X", i, opcode))
+	if preFlag {
+		pre = post
+	} else {
+		pre = rnv
+	}
+
+	if !load {
+		rdv := r[rd]
+		if rd == PC {
+			rdv += 12
 		}
-	}
 
-	halfData.Rm = utils.GetByte(opcode, 0)
-	halfData.RmValue = r[halfData.Rm]
-	halfData.Imm = utils.GetByte(opcode, 8)<<4 | utils.GetByte(opcode, 0)
+		if wb {
+			r[rn] = post
+		}
 
-	halfData.RnValue = r[halfData.Rn]
-	if halfData.Rn == PC {
-		halfData.RnValue += 8
-	}
-
-	halfData.RdValue = r[halfData.Rd]
-	if halfData.Rd == PC {
-		halfData.RdValue += 12
-	}
-
-	return &halfData
-}
-
-func (c *Cpu) Half(opcode uint32) {
-
-	half := NewHalf(opcode, c)
-
-	if !half.Load {
-		switch half.Inst {
-		case RESERVED:
-			panic("RESERVED HALF (Load) NOT SUPPORTED")
+		switch inst {
 		case STRH:
-			unsignedHalfStd(half, c)
-		case LDRD:
-			panic("LDRD NOT SUPPORTED")
-		case STRD:
-			panic("STRD NOT SUPPORTED")
+
+			//if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
+			//	addr = pre
+			//}
+			c.mem.Write16(pre&^1, uint16(rdv), false)
+
+		default:
+			panic("arm7 invalid half inst")
 		}
 
-		c.Reg.R[15] += 4
+		r[PC] += 4
 		return
 	}
 
-	switch half.Inst {
+	if wb {
+		r[rn] = post
+	}
+
+	switch inst {
 	case RESERVED:
-		panic("RESERVED HALF (Store) NOT SUPPORTED")
+		panic("arm7 invalid half inst")
 	case LDRH:
-		unsignedHalfStd(half, c)
+		//if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
+		//    addr = pre
+		//}
+		v := uint32(c.mem.Read16(pre&^1, false))
+		is := (pre & 1) << 3
+		r[rd] = bits.RotateLeft32(v, -int(is))
+
 	case LDRSB:
-		signedByteStd(half, c)
-	case LDRSH:
-		signedHalfStd(half, c)
-	}
-
-	c.Reg.R[15] += 4
-}
-
-func signedByteStd(half *Half, cpu *Cpu) {
-
-	r := &cpu.Reg.R
-	pre, post := halfUnsignedAddress(half, cpu)
-	addr := pre &^ 0b1
-
-	if half.Load {
 		// sign-expand byte value
-		unexpanded := int8(cpu.mem.Read8(pre, false))
-		expanded := uint32(unexpanded)
+		r[rd] = uint32(int32(int8(c.mem.Read8(pre, false))))
 
-		if unexpanded < 0 {
-			expanded |= (0xFFFFFF << 8)
-		}
-
-		r[half.Rd] = expanded
-	} else {
-		cpu.mem.Write16(addr, uint16(int16(half.RdValue)), false)
-	}
-
-	skipLoadWriteBack := half.Load && (half.Rn == half.Rd)
-	if (half.WriteBack || !half.Pre) && !skipLoadWriteBack {
-		r[half.Rn] = post
-	}
-}
-
-func signedHalfStd(half *Half, cpu *Cpu) {
-
-	r := &cpu.Reg.R
-	pre, post := halfUnsignedAddress(half, cpu)
-
-	if half.Load {
+	case LDRSH:
 		// On ARM7 aka ARMv4 aka NDS7/GBA:
-		// LDRSH Rd,[odd]  -->  LDRSB Rd,[odd]         ;sign-expand BYTE value
-		// On ARM9 aka ARMv5 aka NDS9:
-		// LDRSH Rd,[odd]  -->  LDRSH Rd,[odd-1]       ;forced align
-
-		if misaligned := pre&1 == 1; misaligned {
-			// sign-expand BYTE value
-			unexpanded := int16(cpu.mem.Read16(pre, false))
-			expanded := uint32(unexpanded)
-
-			if int8(unexpanded) < 0 {
-				expanded |= (0xFFFFFF << 8)
-			} else {
-				expanded &= 0xFF
-			}
-
-			r[half.Rd] = expanded
+		// LDRSH Rd,[odd]  -->  LDRSB Rd,[odd];sign-expand BYTE value
+		if misaligned := pre&1 != 0; misaligned {
+			// sign-expand byte value
+			r[rd] = uint32(int32(int8(c.mem.Read8(pre, false))))
 		} else {
-
 			// sign-expand half value
-			unexpanded := int16(cpu.mem.Read16(pre&^0b1, false))
-			expanded := uint32(unexpanded)
-
-			if unexpanded < 0 {
-				expanded |= (0xFFFF << 16)
-			}
-
-			r[half.Rd] = expanded
+			r[rd] = uint32(int32(int16(c.mem.Read16(pre&^1, false))))
 		}
-	} else {
-		addr := pre &^ 0b1
-		cpu.mem.Write16(addr, uint16(int16(half.RdValue)), false)
 	}
 
-	skipLoadWriteBack := half.Load && (half.Rn == half.Rd)
-	if (half.WriteBack || !half.Pre) && !skipLoadWriteBack {
-		r[half.Rn] = post
-	}
+	r[PC] += 4
 }
 
-func unsignedHalfStd(half *Half, cpu *Cpu) {
-	r := &cpu.Reg.R
-	pre, post := halfUnsignedAddress(half, cpu)
-	addr := pre &^ 0b1
-
-	if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
-		addr = pre
-	}
-
-	if half.Load {
-		v := uint32(cpu.mem.Read16(addr, false))
-		is := (pre & 0b1) << 3
-		v = utils.RorSimple(v, is)
-		//v, _, _ = utils.Ror(v, is, false, false, false)
-		r[half.Rd] = v
-	} else {
-		cpu.mem.Write16(addr, uint16(half.RdValue), false)
-	}
-
-	skipLoadWriteBack := half.Load && (half.Rn == half.Rd)
-	if (half.WriteBack || !half.Pre) && !skipLoadWriteBack {
-		r[half.Rn] = post
-	}
-}
-
-func halfUnsignedAddress(half *Half, cpu *Cpu) (uint32, uint32) {
+func (cpu *Cpu) Psr(op uint32) {
 
 	r := &cpu.Reg.R
 
-	var offset uint32
-	if half.Immediate {
-		offset = half.Imm
-	} else {
-		offset = half.RmValue
-	}
-
-	addr := r[half.Rn]
-
-	if half.Up {
-		addr += offset
-	} else {
-		addr -= offset
-	}
-
-	if half.Pre {
-		return addr, addr
-	} else {
-		return r[half.Rn], addr
-	}
-}
-
-type PSR struct {
-	Opcode, Rd, Rm, Shift, Imm       uint32
-	SPSR, MSR, Immediate, F, S, X, C bool
-}
-
-func NewPSR(opcode uint32, cpu *Cpu) *PSR {
-
-	psr := &PSR{
-		Opcode:    opcode,
-		Immediate: utils.BitEnabled(opcode, 25),
-		SPSR:      utils.BitEnabled(opcode, 22),
-		MSR:       utils.BitEnabled(opcode, 21),
-	}
-
-	if !psr.MSR {
-		psr.Rd = utils.GetByte(opcode, 12)
-		return psr
-	}
-
-	if psr.MSR {
-		psr.F = utils.BitEnabled(opcode, 19)
-		psr.S = utils.BitEnabled(opcode, 18)
-		psr.X = utils.BitEnabled(opcode, 17)
-		psr.C = utils.BitEnabled(opcode, 16)
-	}
-
-	if psr.Immediate {
-		psr.Shift = utils.GetByte(opcode, 8) * 2
-		psr.Imm = utils.GetVarData(opcode, 0, 7)
-		return psr
-	}
-
-	psr.Rm = utils.GetByte(opcode, 0)
-
-	return psr
-}
-
-func (cpu *Cpu) Psr(opcode uint32) {
-
-	psr := NewPSR(opcode, cpu)
-
-	if psr.MSR {
-		cpu.msr(psr)
-		cpu.Reg.R[15] += 4
+	if msr := (op>>21)&1 != 0; msr {
+		cpu.msr(op)
+		r[PC] += 4
 		return
 	}
 
-	cpu.mrs(psr)
-	cpu.Reg.R[15] += 4
-}
+	rd := (op >> 12) & 0xF
 
-func (cpu *Cpu) mrs(psr *PSR) {
-
-	r := &cpu.Reg.R
-
-	if psr.SPSR {
+	if spsr := (op>>22)&1 != 0; spsr {
 		mode := cpu.Reg.CPSR.Mode
-		r[psr.Rd] = cpu.Reg.SPSR[BANK_ID[mode]].Get()
+		r[rd] = cpu.Reg.SPSR[BANK_ID[mode]].Get()
+		r[PC] += 4
 		return
 	}
 
@@ -996,7 +851,8 @@ func (cpu *Cpu) mrs(psr *PSR) {
 		mask = USR_MASK
 	}
 
-	r[psr.Rd] = cpu.Reg.CPSR.Get() & mask
+	r[rd] = uint32(cpu.Reg.CPSR.Get()) & mask
+	r[PC] += 4
 }
 
 const (
@@ -1005,30 +861,32 @@ const (
 	STATE_MASK uint32 = 0x0100_0020
 )
 
-func (cpu *Cpu) msr(psr *PSR) {
+func (cpu *Cpu) msr(op uint32) {
 
-	reg := &cpu.Reg
 	r := &cpu.Reg.R
 
+	spsrFlag := (op>>22)&1 != 0
+
 	var v uint32
-	if psr.Immediate {
-		v = utils.RorSimple(psr.Imm, psr.Shift)
-		//v, _, _ = utils.Ror(psr.Imm, psr.Shift, false, false, false)
+	if imm := (op>>25)&1 != 0; imm {
+		shift := ((op >> 8) & 0xF) * 2
+		v = bits.RotateLeft32(op&0xFF, -int(shift&31))
+
 	} else {
-		v = r[psr.Rm]
+		v = r[op&0xF]
 	}
 
 	mask := uint32(0)
-	if psr.C {
+	if C := (op>>16)&1 != 0; C {
 		mask |= 0x0000_00FF
 	}
-	if psr.X {
+	if X := (op>>17)&1 != 0; X {
 		mask |= 0x0000_FF00
 	}
-	if psr.S {
+	if S := (op>>18)&1 != 0; S {
 		mask |= 0x00FF_0000
 	}
-	if psr.F {
+	if F := (op>>19)&1 != 0; F {
 		mask |= 0xFF00_0000
 	}
 
@@ -1038,20 +896,22 @@ func (cpu *Cpu) msr(psr *PSR) {
 		secMask = USR_MASK
 	}
 
-	if psr.SPSR {
+	if spsrFlag {
 		secMask |= STATE_MASK
 	}
 
 	mask &= secMask
 
-	if psr.SPSR {
+	reg := &cpu.Reg
+
+	if spsrFlag {
 
 		var spsr uint32
 
 		if curr == MODE_USR || curr == MODE_SYS {
-			spsr = reg.CPSR.Get() &^ mask
+			spsr = uint32(reg.CPSR.Get()) &^ mask
 		} else {
-			spsr = reg.SPSR[BANK_ID[curr]].Get() &^ mask
+			spsr = uint32(reg.SPSR[BANK_ID[curr]].Get()) &^ mask
 		}
 
 		spsr |= v & mask
@@ -1060,7 +920,7 @@ func (cpu *Cpu) msr(psr *PSR) {
 		return
 	}
 
-	next := v & 0b11111
+	next := v & 0x1F
 	cpsr := uint32(reg.CPSR.Get()) &^ mask
 
 	cpsr |= v & mask
@@ -1106,37 +966,250 @@ func (cpu *Cpu) msr(psr *PSR) {
 	}
 }
 
-func (cpu *Cpu) Swp(opcode uint32) {
+func (cpu *Cpu) Swp(op uint32) {
 
-	isByte := utils.BitEnabled(opcode, 22)
-	rn := utils.GetByte(opcode, 16)
-	rd := utils.GetByte(opcode, 12)
-	rm := utils.GetByte(opcode, 0)
+	var (
+		r      = &cpu.Reg.R
+		isByte = (op>>22)&1 != 0
+		rn     = (op >> 16) & 0xF
+		rd     = (op >> 12) & 0xF
+		rm     = op & 0xF
+		rmv    = r[rm]
+		rnv    = r[rn]
+	)
 
-	r := &cpu.Reg.R
-
-	rmValue := r[rm]
-	rnValue := r[rn]
-
-	aligned := rnValue
-
-	var rnMemValue uint32
 	if isByte {
-		rnMemValue = cpu.mem.Read8(rnValue, false)
-		r[rd] = rnMemValue
-		cpu.mem.Write8(rnValue, uint8(rmValue), false)
-		r[PC] += 4
-		return
-
+		r[rd] = cpu.mem.Read8(rnv, false)
+		cpu.mem.Write8(rnv, uint8(rmv), false)
 	} else {
-		aligned = rnValue &^ 0b11
-		rnMemValue = cpu.mem.Read32(aligned, false)
-		is := (rnValue & 0b11) << 3
-		//rnMemValue, _, _ = utils.Ror(rnMemValue, is, false, false, false)
-		rnMemValue = utils.RorSimple(rnMemValue, is)
+		v := cpu.mem.Read32(rnv&^0b11, false)
+		is := (rnv & 0b11) << 3
+		r[rd] = bits.RotateLeft32(v, -int(is))
+		cpu.mem.Write32(rnv&^0b11, rmv, false)
 	}
 
-	r[rd] = rnMemValue
-	cpu.mem.Write32(aligned, rmValue, false)
 	r[PC] += 4
+}
+
+func (c *Cpu) Block(op uint32) {
+
+	var (
+		rlist = op & 0xFFFF
+	)
+
+	if rlist == 0 {
+		panic("arm7 ldm/stm rlist == 0")
+	}
+
+	var (
+		r          = &c.Reg.R
+		pre        = (op>>24)&1 != 0
+		up         = (op>>23)&1 != 0
+		rn         = (op >> 16) & 0xF
+		load       = (op>>20)&1 != 0
+		pcIncluded = op&0x8000 != 0
+		psr        = (op>>22)&1 != 0
+		wb         = (op>>21)&1 != 0
+		forceUser  = psr && (c.Reg.CPSR.Mode != MODE_USR) && (!load || !pcIncluded)
+		addr       = r[rn] &^ 0b11
+		regCount   = uint32(bits.OnesCount32(rlist))
+		wbValue    = r[rn]
+	)
+
+	if up {
+		wbValue += regCount * 4
+	} else {
+		wbValue -= regCount * 4
+	}
+
+	rnRef := &c.Reg.R[rn]
+	if forceUser && rn == 13 {
+		rnRef = &c.Reg.SP[BANK_ID[MODE_USR]]
+	}
+	if forceUser && rn == 14 {
+		rnRef = &c.Reg.LR[BANK_ID[MODE_USR]]
+	}
+
+	var (
+		rnv = *rnRef
+		reg = uint32(0)
+
+		p unsafe.Pointer
+	)
+
+	if !up {
+		reg = 15
+	}
+
+	if load {
+		p, _ = c.mem.ReadPtr(addr, false)
+	} else {
+		p, _ = c.mem.WritePtr(addr, false)
+	}
+
+	for range 16 {
+
+		if disabled := (rlist>>reg)&1 == 0; disabled {
+			if up {
+				reg++
+			} else {
+				reg--
+			}
+			continue
+		}
+
+		ref := &c.Reg.R[reg]
+		if forceUser && reg == 13 {
+			ref = &c.Reg.SP[BANK_ID[MODE_USR]]
+		}
+		if forceUser && reg == 14 {
+			ref = &c.Reg.LR[BANK_ID[MODE_USR]]
+		}
+
+		if pre {
+			if up {
+				if p != nil {
+					p = unsafe.Add(p, 4)
+				} else {
+					addr += 4
+				}
+			} else {
+				if p != nil {
+					p = unsafe.Add(p, -4)
+				} else {
+					addr -= 4
+				}
+			}
+		}
+
+		if load {
+
+			if reg == rn {
+				wb = false
+			}
+
+			if p == nil {
+				*ref = c.mem.Read32(addr, false)
+			} else {
+				*ref = *(*uint32)(p)
+			}
+
+		} else {
+
+			if p == nil {
+				switch reg {
+				case rn:
+
+                    //Store OLD base if Rb is FIRST entry in Rlist
+                    // otherwise store NEW base (STM/ARMv4),
+
+					if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
+						c.mem.Write32(addr, rnv, false)
+					} else {
+						c.mem.Write32(addr, wbValue, false)
+					}
+				case PC:
+					c.mem.Write32(addr, *ref+12, false)
+				default:
+					c.mem.Write32(addr, *ref, false)
+				}
+			} else {
+				switch reg {
+				case rn:
+
+					if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
+						*(*uint32)(p) = rnv
+					} else {
+						*(*uint32)(p) = wbValue
+					}
+				case PC:
+					*(*uint32)(p) = *ref + 12
+				default:
+					*(*uint32)(p) = *ref
+				}
+			}
+		}
+
+		if !pre {
+			if up {
+				if p != nil {
+					p = unsafe.Add(p, 4)
+				} else {
+					addr += 4
+				}
+			} else {
+				if p != nil {
+					p = unsafe.Add(p, -4)
+				} else {
+					addr -= 4
+				}
+			}
+		}
+
+		if up {
+			reg++
+		} else {
+			reg--
+		}
+	}
+
+	if wb {
+		r[rn] = wbValue
+	}
+
+	if !load {
+		r[PC] += 4
+		return
+	}
+
+	if !pcIncluded {
+		r[PC] += 4
+		return
+	}
+
+	if !psr {
+		return
+	}
+
+	var (
+		curr = c.Reg.CPSR.Mode
+		spsr = c.Reg.SPSR[BANK_ID[curr]]
+		next = spsr.Mode
+	)
+
+	c.Reg.CPSR = spsr
+
+	if curr == MODE_USR {
+		panic("USER MODE LDM PC CHANGE")
+	}
+
+	if curr != MODE_FIQ {
+		for i := range 5 {
+			c.Reg.USR[i] = r[8+i]
+		}
+	}
+
+	c.Reg.SP[BANK_ID[curr]] = r[SP]
+	c.Reg.LR[BANK_ID[curr]] = r[LR]
+
+	if curr == MODE_FIQ {
+		for i := range 5 {
+			c.Reg.FIQ[i] = r[8+i]
+		}
+	}
+
+	if next != MODE_FIQ {
+		for i := range 5 {
+			r[8+i] = c.Reg.USR[i]
+		}
+	}
+
+	r[SP] = c.Reg.SP[BANK_ID[next]]
+	r[LR] = c.Reg.LR[BANK_ID[next]]
+
+	if next == MODE_FIQ {
+		for i := range 5 {
+			r[8+i] = c.Reg.FIQ[i]
+		}
+	}
 }

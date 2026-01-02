@@ -2,7 +2,6 @@ package gba
 
 import (
 	"github.com/aabalke/guac/emu/apu"
-	"github.com/aabalke/guac/emu/gba/utils"
 )
 
 func WriteSound(addr uint32, v uint8, a *apu.Apu) {
@@ -13,14 +12,14 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 
 		a.SoundCntX = uint16((uint8(a.SoundCntX) & 0x0F) | (v & 0x80))
 
-		if disabled := !utils.BitEnabled(uint32(v), 7); disabled {
+        if disabled := (v >> 7) & 1 == 0; disabled {
 			a.Disable()
 		}
 
 		return
 	}
 
-	if disabled := !utils.BitEnabled(uint32(a.SoundCntX), 7); disabled {
+    if disabled := (a.SoundCntX >> 7) & 1 == 0; disabled {
 		return
 	}
 
@@ -159,11 +158,11 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 		a.SoundCntH &= 0x00FF
 		a.SoundCntH |= uint16(v) << 8
 
-		if resetFifoA := utils.BitEnabled(uint32(a.SoundCntH), 11); resetFifoA {
+		if resetFifoA := (a.SoundCntH >> 11) & 1 != 0; resetFifoA {
 			a.FifoA.Length = 0
 		}
 
-		if resetFifoB := utils.BitEnabled(uint32(a.SoundCntH), 15); resetFifoB {
+		if resetFifoB := (a.SoundCntH >> 15) & 1 != 0; resetFifoB {
 			a.FifoB.Length = 0
 		}
 

@@ -7,7 +7,6 @@ import (
 	"github.com/aabalke/guac/emu/cpu"
 	arm7 "github.com/aabalke/guac/emu/cpu/arm7"
 	"github.com/aabalke/guac/emu/gba/cart"
-	"github.com/aabalke/guac/emu/gba/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
 )
@@ -253,7 +252,7 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 	if enteredHblank := inHblank && prevInHdraw; enteredHblank {
 
 		dispstat.SetHBlank(true)
-		if utils.BitEnabled(uint32(*dispstat), 4) {
+        if (*dispstat >> 4) & 1 != 0 {
             gba.Irq.SetIRQ(1)
 		}
 
@@ -292,7 +291,7 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 			// bios/bios.gba needs irq set on screen_height, iridion 3d needs screen_height + 1
 			// I believe this is cycle related
 		case SCREEN_HEIGHT + 1:
-			if utils.BitEnabled(uint32(*dispstat), 3) {
+            if (*dispstat >> 3) & 1 != 0 {
 				gba.Irq.SetIRQ(0)
 			}
 		case NUM_SCANLINES - 1:
@@ -302,7 +301,7 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 		match := dispstat.GetLYC() == vcount
 		dispstat.SetVCFlag(match)
 
-		if vcounterIRQ := utils.BitEnabled(uint32(*dispstat), 5); vcounterIRQ && match {
+		if vcounterIRQ := (*dispstat >> 5) & 1 != 0; vcounterIRQ && match {
 			gba.Irq.SetIRQ(2)
 		}
 	}

@@ -705,10 +705,6 @@ func (c *Cpu) Sdt(op uint32) {
 		prev = r[rn]
 	}
 
-	if wb {
-		r[rn] = post
-	}
-
 	if load {
 		if byte {
 			// DO NOT WORD ALIGN
@@ -735,6 +731,10 @@ func (c *Cpu) Sdt(op uint32) {
 		} else {
 			c.mem.Write32(prev&^0b11, v, true)
 		}
+	}
+
+	if wb && !(load && rn == rd) {
+		r[rn] = post
 	}
 
 	r[PC] += 4
@@ -788,6 +788,11 @@ func (cpu *Cpu) BX(op uint32) {
 	switch inst {
 	case INST_BX:
 		r[PC] = r[rn]
+
+		if rn == PC {
+			r[PC] += 8
+		}
+
 		cpu.toggleThumb()
 	case INST_BXJ:
 		panic("Unsupported BXJ Instruction")
@@ -902,7 +907,9 @@ func (c *Cpu) Half(op uint32) {
 
 	switch inst {
 	case LDRH:
-		r[rd] = uint32(c.mem.Read16(pre&^1, true))
+		v := uint32(c.mem.Read16(pre&^1, true))
+		is := (pre & 1) << 3
+		r[rd] = bits.RotateLeft32(v, -int(is))
 
 	case LDRSB:
 		// sign-expand byte value
@@ -1057,25 +1064,24 @@ func (cpu *Cpu) msr(op uint32) {
 
 func (cpu *Cpu) Swp(op uint32) {
 
-	isByte := (op>>22)&1 != 0
-	rn := (op >> 16) & 0xF
-	rd := (op >> 12) & 0xF
-	rm := op & 0xF
-
-	r := &cpu.Reg.R
-
-	rmValue := r[rm]
-	rnValue := r[rn]
+	var (
+		r      = &cpu.Reg.R
+		isByte = (op>>22)&1 != 0
+		rn     = (op >> 16) & 0xF
+		rd     = (op >> 12) & 0xF
+		rm     = op & 0xF
+		rmv    = r[rm]
+		rnv    = r[rn]
+	)
 
 	if isByte {
-		r[rd] = cpu.mem.Read8(rnValue, true)
-		cpu.mem.Write8(rnValue, uint8(rmValue), true)
+		r[rd] = cpu.mem.Read8(rnv, true)
+		cpu.mem.Write8(rnv, uint8(rmv), true)
 	} else {
-		v := cpu.mem.Read32(rnValue&^0b11, true)
-		is := (rnValue & 0b11) << 3
-		v = bits.RotateLeft32(v, -int(is&31))
-		r[rd] = v
-		cpu.mem.Write32(rnValue, rmValue, true)
+		v := cpu.mem.Read32(rnv&^0b11, true)
+		is := (rnv & 0b11) << 3
+		r[rd] = bits.RotateLeft32(v, -int(is))
+		cpu.mem.Write32(rnv&^0b11, rmv, true)
 	}
 
 	r[PC] += 4

@@ -119,7 +119,7 @@ func (dma *DMA) WriteControl(v uint8, hi bool) {
 
 	if hi {
 		wasDisabled := !dma.Enabled
-		dma.Control = (dma.Control & 0xFF) | uint32(v<<8)
+		dma.Control = (dma.Control & 0xFF) | uint32(v)<<8
 		dma.SrcAdj = (dma.SrcAdj & 1) | uint32(v&1)<<1
 		dma.Repeat = (v>>1)&1 != 0
 
@@ -219,7 +219,7 @@ func (dma *DMA) Transfer() {
 			if dstPtr == nil {
 				mem.Write32(tmpDst&^3, dma.Value, dma.arm9)
 			} else {
-				*(*uint32)(unsafe.Add(dstPtr, dstOffset)) = dma.Value
+				*(*uint32)(dstPtr) = dma.Value
 			}
 
 		} else {
@@ -234,7 +234,7 @@ func (dma *DMA) Transfer() {
 			if dstPtr == nil {
 				mem.Write16(tmpDst&^1, uint16(dma.Value), dma.arm9)
 			} else {
-				*(*uint16)(unsafe.Add(dstPtr, dstOffset)) = uint16(dma.Value)
+				*(*uint16)(dstPtr) = uint16(dma.Value)
 			}
 
 			dma.Value = mem.Read16(tmpSrc&^1, dma.arm9)

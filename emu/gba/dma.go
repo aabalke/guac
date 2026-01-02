@@ -1,8 +1,9 @@
 package gba
 
 import (
+	"unsafe"
+
 	"github.com/aabalke/guac/emu/gba/cart"
-	"github.com/aabalke/guac/emu/gba/utils"
 )
 
 //var DMA_ACTIVE = -1
@@ -50,6 +51,13 @@ type DMA struct {
 	Value uint32
 }
 
+//go:inline
+func ReplaceByte(value uint32, newByte uint32, byteOffset uint32) uint32 {
+	bitOffset := 8 * byteOffset
+	mask := uint32(0b1111_1111)
+	return (value &^ (mask << bitOffset)) | (newByte << bitOffset)
+}
+
 func (dma *DMA) ReadControl(hi bool) uint8 {
 	if hi {
 		return uint8(dma.Control>>8) & 0xFF
@@ -78,7 +86,7 @@ func (dma *DMA) WriteSrc(v uint8, byte uint32) {
 		//}
 	}
 
-	dma.Src = utils.ReplaceByte(dma.Src, uint32(v), byte)
+	dma.Src = ReplaceByte(dma.Src, uint32(v), byte)
 	dma.InitSrc = dma.Src
 }
 
@@ -93,7 +101,7 @@ func (dma *DMA) WriteDst(v uint8, byte uint32) {
 		}
 	}
 
-	dma.Dst = utils.ReplaceByte(dma.Dst, uint32(v), byte)
+	dma.Dst = ReplaceByte(dma.Dst, uint32(v), byte)
 	dma.InitDst = dma.Dst
 }
 
@@ -122,12 +130,14 @@ func (dma *DMA) WriteControl(v uint8, hi bool) {
 		wasDisabled := !dma.Enabled
 		dma.Control = (dma.Control & 0b1111_1111) | (a << 8)
 		dma.SrcAdj = (dma.SrcAdj & 1) | (a&1)<<1
-		dma.Repeat = utils.BitEnabled(a, 1)
-		dma.isWord = utils.BitEnabled(a, 2)
-		dma.DRQ = utils.BitEnabled(a, 3)
-		dma.Mode = utils.GetVarData(a, 4, 5)
-		dma.IRQ = utils.BitEnabled(a, 6)
-		dma.Enabled = utils.BitEnabled(a, 7)
+
+        dma.Repeat = (a >> 1) & 1 != 0
+        dma.isWord = (a >> 2) & 1 != 0
+        dma.DRQ = (a >> 3) & 1 != 0
+        dma.Mode = (a >> 4) & 0b11
+
+        dma.IRQ = (a >> 6) & 1 != 0
+        dma.Enabled = (a >> 7) & 1 != 0
 
 		// immediate should be 2 cycles after enabling
 
@@ -173,15 +183,15 @@ func (dma *DMA) transfer() {
 	if dma.Mode == DMA_MODE_HBL {
 		srcInLimited := dma.Src >= 0x600_0000 && dma.Src < 0x800_0000
 		dstInLimited := dma.Dst >= 0x600_0000 && dma.Dst < 0x800_0000
-		allowed := utils.BitEnabled(uint32(dma.Gba.Mem.IO[0]), 5)
+		allowed := (dma.Gba.Mem.IO[0] >> 5) & 1 != 0
 
 		if (srcInLimited || dstInLimited) && !allowed {
 			return
 		}
 	}
 
-	dstOffset := int64(0)
-	srcOffset := int64(0)
+	dstOffset := int(0)
+	srcOffset := int(0)
 	tmpDst := dma.Dst
 	tmpSrc := dma.Src
 
@@ -202,7 +212,7 @@ func (dma *DMA) transfer() {
 		dma.SrcAdj = DMA_ADJ_INC
 	}
 
-	ofs := int64(2)
+	ofs := int(2)
 	if dma.isWord {
 		ofs = 4
 	}
@@ -227,7 +237,23 @@ func (dma *DMA) transfer() {
 		return
 	}
 
-	for i := uint32(0); i < count; i++ {
+	srcPtr, _ := mem.ReadPtr(tmpSrc, false)
+	if srcPtr != nil {
+		top := uint32(int(tmpSrc) + srcOffset*int(count))
+		if _, ok := mem.ReadPtr(top, false); !ok {
+			srcPtr = nil
+		}
+	}
+
+	dstPtr, _ := mem.WritePtr(tmpDst, false)
+	if dstPtr != nil {
+		top := uint32(int(tmpDst) + dstOffset*int(count))
+		if _, ok := mem.WritePtr(top, false); !ok {
+			dstPtr = nil
+		}
+	}
+
+    for range uint32(count) {
 
 		if eeprom := CheckEeprom(dma.Gba, tmpDst); eeprom {
 			dstRom := tmpDst >= 0x800_0000 && tmpDst < 0xE00_0000
@@ -251,34 +277,81 @@ func (dma *DMA) transfer() {
 		sram := tmpSrc >= 0xE00_0000 && tmpSrc < 0x1000_0000
 
 		if dma.isWord {
-			switch {
-			case badAddr:
-				mem.Write32(tmpDst&^3, dma.Value, false)
-			case sram && dma.Idx == 0:
-				dma.Value = 0
-				mem.Write32(tmpDst&^3, dma.Value, false)
-			default:
-				dma.Value = mem.Read32(tmpSrc &^ 3, false)
-				mem.Write32(tmpDst&^3, dma.Value, false)
+
+			if dstPtr == nil {
+                switch {
+                case badAddr:
+                    mem.Write32(tmpDst&^3, dma.Value, false)
+                case sram && dma.Idx == 0:
+                    dma.Value = 0
+                    mem.Write32(tmpDst&^3, dma.Value, false)
+                default:
+                    if srcPtr == nil {
+                        dma.Value = mem.Read32(tmpSrc&^3, false)
+                    } else {
+                        dma.Value = *(*uint32)(srcPtr)
+                    }
+                    mem.Write32(tmpDst&^3, dma.Value, false)
+                }
+			} else {
+                switch {
+                case sram && dma.Idx == 0:
+                    dma.Value = 0
+                default:
+                    if srcPtr == nil {
+                        dma.Value = mem.Read32(tmpSrc&^3, false)
+                    } else {
+                        dma.Value = *(*uint32)(srcPtr)
+                    }
+                    dma.Value = mem.Read32(tmpSrc &^ 3, false)
+                }
+
+				*(*uint32)(dstPtr) = dma.Value
 			}
 
 		} else {
 
-			switch {
-			case badAddr:
-				mem.Write16(tmpDst&^1, uint16(dma.Value), false)
-			case sram && dma.Idx == 0:
-				dma.Value = 0
-				mem.Write16(tmpDst&^1, uint16(dma.Value), false)
-			default:
-				dma.Value = mem.Read16(tmpSrc &^ 1, false)
-				dma.Value |= (dma.Value << 16)
-				mem.Write16(tmpDst&^1, uint16(dma.Value), false)
+			if dstPtr == nil {
+                switch {
+                case badAddr:
+                    mem.Write16(tmpDst&^1, uint16(dma.Value), false)
+                case sram && dma.Idx == 0:
+                    dma.Value = 0
+                    mem.Write16(tmpDst&^1, uint16(dma.Value), false)
+                default:
+                    if srcPtr == nil {
+                        dma.Value = mem.Read16(tmpSrc&^1, false)
+                    } else {
+                        dma.Value = uint32(*(*uint16)(srcPtr))
+                    }
+                    mem.Write16(tmpDst&^1, uint16(dma.Value), false)
+                }
+			} else {
+                switch {
+                case sram && dma.Idx == 0:
+                    dma.Value = 0
+                default:
+                    if srcPtr == nil {
+                        dma.Value = mem.Read16(tmpSrc&^1, false)
+                    } else {
+                        dma.Value = uint32(*(*uint16)(srcPtr))
+                    }
+                    dma.Value = mem.Read16(tmpSrc &^ 1, false)
+                }
+
+				*(*uint32)(dstPtr) = dma.Value
 			}
 		}
 
-		tmpDst = uint32(int64(tmpDst) + dstOffset)
-		tmpSrc = uint32(int64(tmpSrc) + srcOffset)
+		tmpDst = uint32(int(tmpDst) + dstOffset)
+		tmpSrc = uint32(int(tmpSrc) + srcOffset)
+
+		if srcPtr != nil {
+			srcPtr = unsafe.Add(srcPtr, srcOffset)
+		}
+		if dstPtr != nil {
+			dstPtr = unsafe.Add(dstPtr, dstOffset)
+		}
 	}
 
 	//DMA_FINISHED = DMA_ACTIVE

@@ -2,11 +2,11 @@ package gba
 
 import (
 	"encoding/binary"
+	"math/bits"
 	"time"
 	"unsafe"
 
 	"github.com/aabalke/guac/config"
-	"github.com/aabalke/guac/emu/gba/utils"
 )
 
 type Memory struct {
@@ -861,10 +861,8 @@ func (m *Memory) Write16(addr uint32, v uint16, _ bool) {
 func (m *Memory) Write32(addr uint32, v uint32, _ bool) {
 
 	if sram := addr >= 0xE00_0000; sram {
-
-		is := addr << 3
-		v = utils.RorSimple(v, is)
-		//v, _, _ = utils.Ror(v, is, false, false, false)
+		is := (addr << 3) & 0x1F
+        v = bits.RotateLeft32(v, -int(is))
 		m.Write(addr, uint8(v), false)
 		return
 	}
@@ -951,6 +949,23 @@ func (m *Memory) ReadIODirectByte(addr uint32) uint32 {
 
 
 func (m *Memory) WritePtr(addr uint32, _ bool) (unsafe.Pointer, bool) {
-    panic("GBA WRITE PTR NOT IMPLIMENTED")
-    return nil, false
+
+    switch regions := addr >> 24; regions {
+    case 0x2:
+        return unsafe.Add(
+            unsafe.Pointer(&m.WRAM1), addr&0x3FFFF), true
+    case 0x3:
+        return unsafe.Add(
+            unsafe.Pointer(&m.WRAM2), addr&0x7FFF), true
+    case 0x6:
+		addr &= 0x1FFFF
+		if addr >= 0x18000 {
+			addr -= 0x8000
+		}
+        return unsafe.Add(
+            unsafe.Pointer(&m.VRAM), addr), true
+
+    default:
+        return nil, false
+    }
 }
