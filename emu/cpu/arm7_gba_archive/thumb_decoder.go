@@ -4,11 +4,10 @@ import (
 	"fmt"
 )
 
-func (cpu *Cpu) DecodeTHUMB() int {
+func (cpu *Cpu) DecodeTHUMB() (int, bool) {
 
-	r := &cpu.Reg.R
-
-    opcode := uint16(cpu.mem.Read16(r[PC], false))
+	opcode := cpu.GetOpThumb()
+	//opcode := uint16(cpu.mem.Read16(cpu.Reg.R[PC], false))
 
 	switch {
 	case isthumbSWI(opcode):
@@ -17,15 +16,13 @@ func (cpu *Cpu) DecodeTHUMB() int {
 		//return 2
 		//cpu.Gba.Mem.BIOS_MODE = BIOS_SWI
 
-        // skip hle always currently
+		// skip hle always currently
 		//cycles, incPc := cpu.Gba.SysCall(uint32(opcode) & 0xFF)
 		cpu.Exception(VEC_SWI, MODE_SWI)
 
 		//if incPc {
 		//	cpu.Reg.R[PC] += 2
 		//}
-
-		return 2
 
 	case isThumbAddSub(opcode):
 		cpu.ThumbAddSub(opcode)
@@ -36,7 +33,7 @@ func (cpu *Cpu) DecodeTHUMB() int {
 	case isThumbAlu(opcode):
 		cpu.ThumbAlu(opcode)
 	case isThumbHiReg(opcode):
-		return cpu.HiRegBX(opcode)
+		cpu.HiRegBX(opcode)
 	case isLSHalf(opcode):
 		cpu.thumbLSHalf(opcode)
 	case isLSSigned(opcode):
@@ -64,13 +61,13 @@ func (cpu *Cpu) DecodeTHUMB() int {
 	case isLSSP(opcode):
 		cpu.thumbLSSP(opcode)
 	case isMulti(opcode):
-		cpu.thumbMulti(uint32(opcode))
+		cpu.thumbMulti(opcode)
 	default:
 		r := &cpu.Reg.R
 		panic(fmt.Sprintf("Unable to Decode Thumb %X, at PC %X, INSTR %d", opcode, r[PC]))
 	}
 
-	return 2
+	return 1, true
 }
 
 func isThumbOpcodeFormat(opcode, mask, format uint16) bool {

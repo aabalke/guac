@@ -1,12 +1,11 @@
 package gba
 
 import (
-	//"log"
+	"encoding/binary"
 	"time"
 	"unsafe"
 
 	"github.com/aabalke/guac/config"
-	arm7gba "github.com/aabalke/guac/emu/cpu/arm7_gba"
 	"github.com/aabalke/guac/emu/gba/utils"
 )
 
@@ -66,7 +65,6 @@ func (m *Memory) initWriteRegions() {
 
 	for i := range len(m.writeRegions) {
 		m.writeRegions[i] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
-			return
 		}
 	}
 
@@ -140,7 +138,6 @@ func (m *Memory) initWriteRegions() {
 		rel := addr & (0x3FF)
 		m.OAM[rel] = v
 		m.GBA.PPU.UpdateOAM(rel)
-		return
 	}
 
 	m.writeRegions[0xE] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
@@ -151,7 +148,6 @@ func (m *Memory) initWriteRegions() {
 		relative := addr & (0xFFFF)
 
 		cartridge.Write(relative, v)
-		return
 	}
 
 	m.writeRegions[0xF] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
@@ -162,7 +158,6 @@ func (m *Memory) initWriteRegions() {
 		relative := addr & (0xFFFF)
 
 		cartridge.Write(relative, v)
-		return
 	}
 }
 
@@ -241,6 +236,35 @@ func (m *Memory) initReadRegions() {
 	}
 }
 
+func (m *Memory) ReadPtr(addr uint32, _ bool) (unsafe.Pointer, bool) {
+
+    switch regions := addr >> 24; regions {
+    case 0x2:
+        return unsafe.Add(
+            unsafe.Pointer(&m.WRAM1), addr&0x3FFFF), true
+    case 0x3:
+        return unsafe.Add(
+            unsafe.Pointer(&m.WRAM2), addr&0x7FFF), true
+    case 0x6:
+		addr &= 0x1FFFF
+		if addr >= 0x18000 {
+			addr -= 0x8000
+		}
+        return unsafe.Add(
+            unsafe.Pointer(&m.VRAM), addr), true
+
+    case 0x7:
+        return unsafe.Add(
+            unsafe.Pointer(&m.OAM), addr&0x3FF), true
+
+    case 0x8, 0x9, 0xA, 0xB, 0xC, 0xD:
+        return unsafe.Add(
+            unsafe.Pointer(&m.GBA.Cartridge.Rom), addr&0x1FF_FFFF), true
+    default:
+        return nil, false
+    }
+}
+
 func (m *Memory) Read(addr uint32) uint8 {
 	return m.readRegions[addr>>24](m, addr)
 }
@@ -271,11 +295,9 @@ func (m *Memory) ReadBios(addr uint32) uint8 {
 
 func (m *Memory) ReadOpenBus(addr uint32) uint8 {
 
-    return 0
-
 	pc := m.GBA.Cpu.Reg.R[PC]
 
-    if m.GBA.Cpu.Reg.CPSR.GetFlag(arm7gba.FLAG_T) {
+    if m.GBA.Cpu.Reg.CPSR.T {
 
 	//if m.GBA.Cpu.Reg.isThumb {
 
@@ -500,6 +522,10 @@ func (m *Memory) Read16(addr uint32, _ bool) uint32 {
 		}
 	}
 
+	if ptr, ok := m.ReadPtr(addr, false); ok {
+		return uint32(binary.LittleEndian.Uint16((*[4]uint8)(ptr)[:]))
+	}
+
 	return uint32(m.Read(addr+1))<<8 | uint32(m.Read(addr))
 }
 
@@ -519,6 +545,10 @@ func (m *Memory) Read32(addr uint32, _ bool) uint32 {
 			return m.ReadBadRom(addr, 4)
 		}
 	}
+
+    if ptr, ok := m.ReadPtr(addr, false); ok {
+        return binary.LittleEndian.Uint32((*[4]uint8)(ptr)[:])
+    }
 
 	a := uint32(m.Read(addr+3))<<8 | uint32(m.Read(addr+2))
 	b := uint32(m.Read(addr+1))<<8 | uint32(m.Read(addr))
@@ -919,10 +949,6 @@ func (m *Memory) ReadIODirectByte(addr uint32) uint32 {
 	}
 }
 
-func (m *Memory) ReadPtr(addr uint32, _ bool) (unsafe.Pointer, bool) {
-    panic("GBA READ PTR NOT IMPLIMENTED")
-    return nil, false
-}
 
 func (m *Memory) WritePtr(addr uint32, _ bool) (unsafe.Pointer, bool) {
     panic("GBA WRITE PTR NOT IMPLIMENTED")

@@ -63,8 +63,8 @@ func (cpu *Cpu) thumbMuliply(alu *ThumbAlu) {
 	// ARM < 4, carry flag destroyed, ARM >= 5, carry flag unchanged
 	//cpu.Reg.CPSR.SetFlag(FLAG_C, false)
 
-	cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-	cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+	cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
+	cpu.Reg.CPSR.Z = uint32(res) == 0
 }
 
 func (cpu *Cpu) thumbLogical(alu *ThumbAlu) {
@@ -89,8 +89,8 @@ func (cpu *Cpu) thumbLogical(alu *ThumbAlu) {
 
 	r[alu.Rd] = res
 
-	cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-	cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+	cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
+	cpu.Reg.CPSR.Z = uint32(res) == 0
 }
 
 func (cpu *Cpu) thumbArithmetic(alu *ThumbAlu) {
@@ -168,7 +168,7 @@ func (cpu *Cpu) thumbArithmetic(alu *ThumbAlu) {
 	}
 
 	carry := uint64(0)
-	if cpu.Reg.CPSR.GetFlag(FLAG_C) {
+	if cpu.Reg.CPSR.C {
 		carry = 1
 	}
 
@@ -191,8 +191,8 @@ func (cpu *Cpu) thumbArithmetic(alu *ThumbAlu) {
 		c = res < 0x1_0000_0000
 	}
 
-	cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-	cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+	cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
+	cpu.Reg.CPSR.Z = uint32(res) == 0
 
 	switch alu.Inst {
 	case THUMB_LSL, THUMB_LSR, THUMB_ASR, THUMB_ROR:
@@ -201,14 +201,14 @@ func (cpu *Cpu) thumbArithmetic(alu *ThumbAlu) {
 		}
 	}
 
-	cpu.Reg.CPSR.SetFlag(FLAG_C, c)
+	cpu.Reg.CPSR.C = c
 
 	switch alu.Inst {
 	case THUMB_LSL, THUMB_LSR, THUMB_ASR, THUMB_ROR:
 		return
 	}
 
-	cpu.Reg.CPSR.SetFlag(FLAG_V, v)
+	cpu.Reg.CPSR.V = v
 }
 
 func (cpu *Cpu) thumbTest(alu *ThumbAlu) {
@@ -236,17 +236,17 @@ func (cpu *Cpu) thumbTest(alu *ThumbAlu) {
 		v := (rdSign != rsSign) && (resSign != rdSign)
 		c := res < 0x1_0000_0000
 
-		cpu.Reg.CPSR.SetFlag(FLAG_V, v)
-		cpu.Reg.CPSR.SetFlag(FLAG_C, c)
+		cpu.Reg.CPSR.V = v
+		cpu.Reg.CPSR.C = c
 	case THUMB_CMN:
 		v := (rdSign == rsSign) && (resSign != rdSign)
 		c := res >= 0x1_0000_0000
-		cpu.Reg.CPSR.SetFlag(FLAG_V, v)
-		cpu.Reg.CPSR.SetFlag(FLAG_C, c)
+		cpu.Reg.CPSR.V = v
+		cpu.Reg.CPSR.C = c
 	}
 
-	cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-	cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+	cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
+	cpu.Reg.CPSR.Z = uint32(res) == 0
 }
 
 func (cpu *Cpu) HiRegBX(opcode uint16) int {
@@ -319,10 +319,11 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
 		v := (rdSign != rsSign) && (rSign != rdSign)
 		c := res < 0x1_0000_0000
 
-		cpsr.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-		cpsr.SetFlag(FLAG_Z, uint32(res) == 0)
-		cpsr.SetFlag(FLAG_C, c)
-		cpsr.SetFlag(FLAG_V, v)
+		cpsr.N = utils.BitEnabled(uint32(res), 31)
+		cpsr.Z = uint32(res) == 0
+		cpsr.C = c
+		cpsr.V = v
+
 		return 4
 
 	case inst == 2:
@@ -357,7 +358,7 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
 	case inst == 3:
 
 		if rs == PC {
-			cpsr.SetThumb(false, cpu)
+			cpsr.T = false
 			//R15: CPU switches to ARM state, and PC is auto-aligned as (($+4) AND NOT 2).
 			r[PC] = (r[PC] + 4) &^ 2
 
@@ -365,7 +366,7 @@ func (cpu *Cpu) HiRegBX(opcode uint16) int {
 		}
 
 		if setThumb := !utils.BitEnabled(r[rs], 0); setThumb {
-			cpsr.SetThumb(false, cpu)
+			cpsr.T = false
 			r[PC] = r[rs] &^ 0b11
 		} else {
 			r[PC] = r[rs] &^ 0b1
@@ -433,10 +434,10 @@ func (cpu *Cpu) ThumbAddSub(opcode uint16) {
 		c = res < 0x1_0000_0000
 	}
 
-	cpsr.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-	cpsr.SetFlag(FLAG_Z, uint32(res) == 0)
-	cpsr.SetFlag(FLAG_C, c)
-	cpsr.SetFlag(FLAG_V, v)
+	cpsr.N = utils.BitEnabled(uint32(res), 31)
+	cpsr.Z = uint32(res) == 0
+	cpsr.C = c
+	cpsr.V = v
 
 	if PC == rd {
 		return
@@ -492,12 +493,12 @@ func (cpu *Cpu) thumbImm(opcode uint16) {
 	}
 
 	if inst != THUMB_IMM_MOV {
-		cpsr.SetFlag(FLAG_C, c)
-		cpsr.SetFlag(FLAG_V, v)
+		cpsr.C = c
+		cpsr.V = v
 	}
 
-	cpsr.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-	cpsr.SetFlag(FLAG_Z, uint32(res) == 0)
+	cpsr.N = utils.BitEnabled(uint32(res), 31)
+	cpsr.Z = uint32(res) == 0
 
 	if PC == rd {
 		return
@@ -520,7 +521,7 @@ func (cpu *Cpu) thumbLSHalf(opcode uint16) {
 	addr := r[rb] + offset
 
 	if ldr {
-		v := uint32(cpu.mem.Read16(addr &^ 1, false))
+		v := uint32(cpu.mem.Read16(addr&^1, false))
 		is := (addr & 1) << 3
 		//v, _, _ = utils.Ror(v, is, false, false, false)
 		r[rd] = utils.RorSimple(v, is)
@@ -551,7 +552,7 @@ func (cpu *Cpu) thumbLSSigned(opcode uint16) {
 	switch inst {
 	case THUMB_STRH:
 		//cpu.mem.Write16(addr, uint16(r[rd]))
-		cpu.mem.Write16(addr&^1, uint16(r[rd]),false)
+		cpu.mem.Write16(addr&^1, uint16(r[rd]), false)
 
 	case THUMB_LDSB:
 
@@ -566,7 +567,7 @@ func (cpu *Cpu) thumbLSSigned(opcode uint16) {
 		r[rd] = expanded
 
 	case THUMB_LDRH:
-		v := cpu.mem.Read16(addr &^ 0b1, false)
+		v := cpu.mem.Read16(addr&^0b1, false)
 		is := (addr & 0b1) << 3
 		//v, _, _ = utils.Ror(v, is, false, false, false)
 		r[rd] = utils.RorSimple(v, is)
@@ -644,7 +645,7 @@ func (cpu *Cpu) thumbLSR(opcode uint16) {
 	case THUMB_STRB_REG:
 		cpu.mem.Write8(addr, uint8(r[rd]), false)
 	case THUMB_LDR_REG:
-		v := cpu.mem.Read32(addr &^ 0b11, false)
+		v := cpu.mem.Read32(addr&^0b11, false)
 		is := (addr & 0b11) << 3
 		//r[rd], _, _ = utils.Ror(v, is, false, false, false)
 		r[rd] = utils.RorSimple(v, is)
@@ -677,7 +678,7 @@ func (cpu *Cpu) thumbLSImm(opcode uint16) {
 		cpu.mem.Write32(addr&^0b11, r[rd], false)
 	case THUMB_LDR_IMM:
 		addr := r[rb] + (nn << 2)
-		v := cpu.mem.Read32(addr &^ 0b11, false)
+		v := cpu.mem.Read32(addr&^0b11, false)
 		is := (addr & 0b11) << 3
 		//r[rd], _, _ = utils.Ror(v, is, false, false, false)
 		r[rd] = utils.RorSimple(v, is)
@@ -725,7 +726,7 @@ func (cpu *Cpu) thumbPushPop(opcode uint16) {
 
 	if pclr {
 		r[SP] -= 4
-		cpu.mem.Write32(r[SP], r[14],false)
+		cpu.mem.Write32(r[SP], r[14], false)
 	}
 
 	for reg := 7; reg >= 0; reg-- {
@@ -817,12 +818,12 @@ func (cpu *Cpu) thumbShifted(opcode uint16) {
 	res, setCarry, carry := utils.Shift(&shiftArgs)
 
 	if setCarry {
-		reg.CPSR.SetFlag(FLAG_C, carry)
+		reg.CPSR.C = carry
 	}
 
 	//cpu.Reg.CPSR.SetFlag(FLAG_V, v)
-	cpu.Reg.CPSR.SetFlag(FLAG_N, utils.BitEnabled(uint32(res), 31))
-	cpu.Reg.CPSR.SetFlag(FLAG_Z, uint32(res) == 0)
+	cpu.Reg.CPSR.N = utils.BitEnabled(uint32(res), 31)
+	cpu.Reg.CPSR.Z = uint32(res) == 0
 
 	r[rd] = res
 
@@ -848,7 +849,7 @@ func (cpu *Cpu) thumbLongBranch(opcode uint16) {
 
 	r := &cpu.Reg.R
 
-	op2 := cpu.mem.Read16(r[PC] + 2, false)
+	op2 := cpu.mem.Read16(r[PC]+2, false)
 
 	upper := utils.GetVarData(uint32(opcode), 0, 10)
 	lower := utils.GetVarData(uint32(op2), 0, 10)
@@ -909,18 +910,18 @@ func (cpu *Cpu) thumbLSSP(opcode uint16) {
 	addr := r[SP] + nn
 
 	if ldr {
-		v := cpu.mem.Read32(addr &^ 0b11, false)
+		v := cpu.mem.Read32(addr&^0b11, false)
 		is := (addr & 0b11) << 3
 		//r[rd], _, _ = utils.Ror(v, is, false, false, false)
 		r[rd] = utils.RorSimple(v, is)
 	} else {
-		cpu.mem.Write32(addr, r[rd],false)
+		cpu.mem.Write32(addr, r[rd], false)
 	}
 
 	r[PC] += 2
 }
 
-func (cpu *Cpu) thumbMulti(opcode uint32) {
+func (cpu *Cpu) thumbMulti(opcode uint16) {
 
 	r := &cpu.Reg.R
 
@@ -941,7 +942,7 @@ func (cpu *Cpu) thumbMulti(opcode uint32) {
 		count := uint32(0)
 
 		if rlist == 0 {
-			cpu.mem.Write32(r[rb], r[PC]+6,false)
+			cpu.mem.Write32(r[rb], r[PC]+6, false)
 			r[rb] += 0x40
 			r[PC] += 2
 			return
@@ -953,7 +954,7 @@ func (cpu *Cpu) thumbMulti(opcode uint32) {
 			}
 
 			if reg == int(rb) {
-				cpu.mem.Write32(addr, r[reg],false)
+				cpu.mem.Write32(addr, r[reg], false)
 				matchingValue = r[reg] + 4
 				matchingAddr = addr
 				rbIdx = regCount - count
@@ -962,7 +963,7 @@ func (cpu *Cpu) thumbMulti(opcode uint32) {
 				continue
 			}
 
-			cpu.mem.Write32(addr, r[reg],false)
+			cpu.mem.Write32(addr, r[reg], false)
 
 			r[rb] += 4
 			addr += 4
@@ -970,14 +971,14 @@ func (cpu *Cpu) thumbMulti(opcode uint32) {
 
 		if smallest {
 			//v := cpu.mem.Read32(addr)
-			v := cpu.mem.Read32(addr & 0b11, false) // maybe??
-			cpu.mem.Write32(r[rb], v-(regCount*2),false)
+			v := cpu.mem.Read32(addr&0b11, false) // maybe??
+			cpu.mem.Write32(r[rb], v-(regCount*2), false)
 			r[PC] += 2
 			return
 		}
 
 		if matchingRb {
-			cpu.mem.Write32(matchingAddr, matchingValue+(rbIdx*2),false)
+			cpu.mem.Write32(matchingAddr, matchingValue+(rbIdx*2), false)
 			r[PC] += 2
 			return
 		}
@@ -1000,7 +1001,7 @@ func (cpu *Cpu) thumbMulti(opcode uint32) {
 			continue
 		}
 
-		r[reg] = cpu.mem.Read32(addr &^ 0b11, false)
+		r[reg] = cpu.mem.Read32(addr&^0b11, false)
 
 		if reg == int(rb) {
 			matchingRb = true

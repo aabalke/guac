@@ -20,7 +20,7 @@ func (cpu *Cpu) Exception(addr uint32, mode uint32) {
 	reg := &cpu.Reg
 	r := &cpu.Reg.R
 
-	curr := reg.getMode()
+	curr := reg.CPSR.Mode
 
 	if mode == curr {
 		return
@@ -33,10 +33,9 @@ func (cpu *Cpu) Exception(addr uint32, mode uint32) {
 	//	gba.Mem.BIOS_MODE = BIOS_SWI
 	//}
 
-	//thumb := reg.CPSR.GetFlag(FLAG_T)
-	thumb := reg.isThumb
+	thumb := reg.CPSR.T
 
-	c := BANK_ID[reg.getMode()]
+	c := BANK_ID[reg.CPSR.Mode]
 	i := BANK_ID[mode]
 	reg.SP[c] = r[SP]
 	reg.LR[c] = r[LR]
@@ -53,12 +52,11 @@ func (cpu *Cpu) Exception(addr uint32, mode uint32) {
 		reg.LR[i] = r[PC] + 4
 	}
 
-	reg.CPSR.SetMode(mode)
-	reg.CPSR.SetThumb(false, cpu)
-	reg.CPSR.SetFlag(FLAG_I, true)
+	reg.CPSR.Mode = mode
+	reg.CPSR.T = false
+	reg.CPSR.I = true
 
 	r[PC] = addr
-	return
 }
 
 func (cpu *Cpu) ExitException(mode uint32) {
@@ -74,8 +72,7 @@ func (cpu *Cpu) ExitException(mode uint32) {
 
 	i := BANK_ID[mode]
 	reg.CPSR = reg.SPSR[i]
-	reg.isThumb = reg.CPSR.GetFlag(FLAG_T)
-	c := BANK_ID[cpu.Reg.getMode()]
+	c := BANK_ID[cpu.Reg.CPSR.Mode]
 
 	// if you set this up for fiq, get the special registers
 	reg.LR[i] = r[LR]

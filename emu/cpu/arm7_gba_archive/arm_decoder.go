@@ -4,16 +4,17 @@ import (
 	"fmt"
 )
 
-func (cpu *Cpu) DecodeARM() int {
+func (cpu *Cpu) DecodeARM() (int, bool) {
 
 	r := &cpu.Reg.R
-    mem := cpu.mem
 
-    opcode := mem.Read32(r[PC], false)
+	//opcode := cpu.mem.Read32(r[PC], false)
+	//cycles := 0
+	opcode, cycles := cpu.GetOpArm()
 
 	if !cpu.CheckCond(opcode >> 28) {
 		r[PC] += 4
-		return 4
+		return cycles + 1, true
 	}
 
 	if swi := (opcode>>24)&0xF == 0xF; swi {
@@ -26,7 +27,7 @@ func (cpu *Cpu) DecodeARM() int {
 		//	r[PC] += 4
 		//}
 
-		return 4
+		return cycles + 1, true
 	}
 
 	switch (opcode >> 25) & 0b111 {
@@ -35,8 +36,7 @@ func (cpu *Cpu) DecodeARM() int {
 		case isBX(opcode):
 			cpu.BX(opcode)
 		case isSDT(opcode):
-			cycles := cpu.Sdt(opcode)
-			return int(cycles)
+			cpu.Sdt(opcode)
 		case isHalf(opcode):
 			cpu.Half(opcode)
 		case isPSR(opcode):
@@ -48,16 +48,16 @@ func (cpu *Cpu) DecodeARM() int {
 		case isALU(opcode):
 			cpu.Alu(opcode)
 		default:
-			panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X, INSTR %d", opcode, r[PC]))
+			panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X", opcode, r[PC]))
 		}
 
-		return 4
+		return cycles + 1, true
 	case 0b001:
 
 		switch {
 		case isSDT(opcode):
-			cycles := cpu.Sdt(opcode)
-			return int(cycles)
+			cpu.Sdt(opcode)
+			return cycles + 1, true
 		case isHalf(opcode):
 			cpu.Half(opcode)
 		case isPSR(opcode):
@@ -67,26 +67,25 @@ func (cpu *Cpu) DecodeARM() int {
 		case isALU(opcode):
 			cpu.Alu(opcode)
 		default:
-			panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X, INSTR %d", opcode, r[PC]))
+			panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X", opcode, r[PC]))
 		}
 
-		return 4
+		return cycles + 1, true
 	case 0b010:
 	case 0b011:
 	case 0b100:
 		cpu.Block(opcode)
-		return 4
+		return cycles + 1, true
 	case 0b101:
 		cpu.B(opcode)
-		return 4
+		return cycles + 1, true
 	}
 
 	switch {
 	case isBX(opcode):
 		cpu.BX(opcode)
 	case isSDT(opcode):
-		cycles := cpu.Sdt(opcode)
-		return int(cycles)
+		cpu.Sdt(opcode)
 	case isBlock(opcode):
 		cpu.Block(opcode)
 	case isHalf(opcode):
@@ -102,10 +101,11 @@ func (cpu *Cpu) DecodeARM() int {
 	case isALU(opcode):
 		cpu.Alu(opcode)
 	default:
-		panic(fmt.Sprintf("Unable to Decode ARM %08X, at PC %08X, INSTR %d", opcode, r[PC]))
+		fmt.Printf("Unable to Decode ARM 7 %08X, at PC %08X\n", opcode, r[PC])
+		return 0, false
 	}
 
-	return 4
+	return cycles + 1, true
 }
 
 func isOpcodeFormat(opcode, mask, format uint32) bool {

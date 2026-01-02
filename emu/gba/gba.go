@@ -5,7 +5,7 @@ import (
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/apu"
 	"github.com/aabalke/guac/emu/cpu"
-	arm7gba "github.com/aabalke/guac/emu/cpu/arm7_gba"
+	arm7 "github.com/aabalke/guac/emu/cpu/arm7"
 	"github.com/aabalke/guac/emu/gba/cart"
 	"github.com/aabalke/guac/emu/gba/utils"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -31,7 +31,7 @@ var CURR_INST = uint64(0)
 type GBA struct {
 	Debugger  Debugger
 	Cartridge cart.Cartridge
-	Cpu       *arm7gba.Cpu
+	Cpu       *arm7.Cpu
 	Mem       Memory
 	PPU       PPU
 	Timers    [4]Timer
@@ -55,10 +55,6 @@ type GBA struct {
 	Frame uint64
 }
 
-//func (gba *GBA) SoftReset() {
-//	gba.exception(VEC_SWI, MODE_SWI)
-//}
-
 func (gba *GBA) Update() {
 
 	gba.AccCycles = 0
@@ -67,7 +63,6 @@ func (gba *GBA) Update() {
 		return
 	}
 
-	//r := &gba.Cpu.Reg.R
 	gba.Drawn = false
 
 	for !gba.Drawn {
@@ -75,21 +70,34 @@ func (gba *GBA) Update() {
 		cycles := 4
 
 		if !gba.Cpu.Halted {
-			cycles = gba.Cpu.Execute()
+
+            thumb := gba.Cpu.Reg.CPSR.T
+
+            insts, ok := gba.Cpu.Execute()
+            if !ok {
+                panic("BAD")
+            }
+
+            // do not care about cycle accuracy right now
+            if thumb {
+                cycles = insts << 1
+            } else {
+                cycles = insts << 2
+            }
 
 		}
 
 		gba.Tick(uint32(cycles))
 
-		//if gba.vsyncAddr != 0 && r[15] == gba.vsyncAddr {
-		//	vblRaised := gba.Irq.IdleIrq&1 == 1
-		//	vblHandled := gba.Irq.IF&1 != 1
-		//	if !(vblRaised && vblHandled) {
-		//		gba.Halted = true
-		//	}
+		if gba.vsyncAddr != 0 && gba.Cpu.Reg.R[15] == gba.vsyncAddr {
+			vblRaised := gba.Irq.IdleIrq&1 == 1
+			vblHandled := gba.Irq.IF&1 != 1
+			if !(vblRaised && vblHandled) {
+				gba.Cpu.Halted = true
+			}
 
-		//	gba.Irq.IdleIrq = gba.Irq.IF
-		//}
+			gba.Irq.IdleIrq = gba.Irq.IF
+		}
 
 		// irq has to be at end (count up tests)
         gba.Cpu.CheckIrq()
@@ -136,7 +144,7 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 
     gba.Irq = cpu.Irq{}
 	gba.Mem = NewMemory(&gba)
-    gba.Cpu = arm7gba.NewCpu(&gba.Mem, &gba.Irq)
+    gba.Cpu = arm7.NewCpu(&gba.Mem, &gba.Irq)
 
 	gba.PPU.gba = &gba
 
@@ -161,21 +169,47 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba.Dma[3].Idx = 3
 
 	gba.LoadBios()
-	//gba.Cpu.Exception(arm7gba.VEC_SWI, arm7gba.MODE_SWI)
-    gba.Cpu.Reg.R[15] = 0x800_0000
+	gba.Cpu.Exception(arm7.VEC_SWI, arm7.MODE_SWI)
+    //gba.startupNoBios()
 	gba.LoadGame(path)
 	gba.SetIdleAddr()
 	//InitTrig()
 
 	startScanline := uint32(0)
 
-	gba.Mem.BIOS_MODE = arm7gba.BIOS_STARTUP
+	gba.Mem.BIOS_MODE = arm7.BIOS_STARTUP
 	gba.Mem.IO[0x6] = uint8(startScanline)
 	gba.AccCycles = CYCLES_SCANLINE*startScanline + 859
 
-	gba.Cpu.Reg.CPSR.SetFlag(arm7gba.FLAG_I, false)
+    gba.Cpu.Reg.CPSR.I = false
 
 	return &gba
+}
+
+func (gba *GBA) startupNoBios() {
+//
+//    c := gba.Cpu
+//
+//    BANK_ID := arm7gba.BANK_ID
+//
+//	c.Irq.IME = true
+//
+//	c.Reg.R[PC] = 0x0800_0000
+//	c.Reg.CPSR = 0x0000_001F
+//	c.Reg.SPSR[BANK_ID[MODE_IRQ]] = 0x0000_0010
+//	c.Reg.R[0] = 0x0000_0CA5
+//
+//	c.Reg.R[LR] = 0x0800_0000
+//	c.Reg.LR[BANK_ID[MODE_SYS]] = 0x0800_0000
+//	c.Reg.LR[BANK_ID[MODE_USR]] = 0x0800_0000
+//	c.Reg.LR[BANK_ID[MODE_IRQ]] = 0x0800_0000
+//	c.Reg.LR[BANK_ID[MODE_SWI]] = 0x0800_0000
+//
+//	c.Reg.R[SP] = 0x0300_7F00
+//	c.Reg.SP[BANK_ID[MODE_SYS]] = 0x0300_7F00
+//	c.Reg.SP[BANK_ID[MODE_USR]] = 0x0300_7F00
+//	c.Reg.SP[BANK_ID[MODE_IRQ]] = 0x0300_7FA0
+//	c.Reg.SP[BANK_ID[MODE_SWI]] = 0x0300_7FE0
 }
 
 func (gba *GBA) ToggleMute() bool {

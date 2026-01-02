@@ -11,7 +11,7 @@ func (cpu *Cpu) DecodeTHUMB() (int, bool) {
 
 	switch {
 	case isthumbSWI(opcode):
-		cpu.exception(VEC_SWI, MODE_SWI)
+		cpu.Exception(VEC_SWI, MODE_SWI)
 	case isThumbAddSub(opcode):
 		cpu.ThumbAddSub(opcode)
 	case isThumbShift(opcode):

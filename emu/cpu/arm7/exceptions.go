@@ -11,7 +11,7 @@ const (
 	VEC_FIQ           = 0x1C
 )
 
-func (cpu *Cpu) exception(addr uint32, mode uint32) {
+func (cpu *Cpu) Exception(addr uint32, mode uint32) {
 
 	if mode != MODE_IRQ && mode != MODE_SWI {
 		panic("UNKNOWN EXCEPTION MODE")
@@ -25,6 +25,13 @@ func (cpu *Cpu) exception(addr uint32, mode uint32) {
 	if mode == curr {
 		return
 	}
+
+	//switch mode {
+	//case MODE_IRQ:
+	//	cpu.mem.BIOS_MODE = BIOS_IRQ
+	//case MODE_SWI:
+	//	gba.Mem.BIOS_MODE = BIOS_SWI
+	//}
 
 	c := BANK_ID[reg.CPSR.Mode]
 	i := BANK_ID[mode]
@@ -51,6 +58,10 @@ func (cpu *Cpu) exception(addr uint32, mode uint32) {
 }
 
 func (cpu *Cpu) ExitException(mode uint32) {
+
+	//if mode == MODE_IRQ {
+	//	cpu.Mem.BIOS_MODE = BIOS_IRQ_POST
+	//}
 
 	reg := &cpu.Reg
 	r := &cpu.Reg.R

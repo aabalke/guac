@@ -211,7 +211,7 @@ func (cpu *Cpu) CheckIrq() {
 	cpu.Halted = false
 
 	if !cpu.Reg.CPSR.I && cpu.Irq.IME {
-		cpu.exception(VEC_IRQ, MODE_IRQ)
+		cpu.Exception(VEC_IRQ, MODE_IRQ)
 		cpu.isBranching = true
 	}
 }

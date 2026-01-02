@@ -233,11 +233,12 @@ func (dma *DMA) transfer() {
 			dstRom := tmpDst >= 0x800_0000 && tmpDst < 0xE00_0000
 			srcRom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
 
-			if count == 9 || count == 73 {
+            switch count {
+            case 9, 73:
 				cart.EepromWidth = 6
-			} else if count == 17 || count == 81 {
+            case 17, 81:
 				cart.EepromWidth = 14
-			}
+            }
 
 			if srcRom && dstRom {
 				panic("EEPROM HAS BOTH SRC AND DST ROM ADDR")
@@ -302,8 +303,6 @@ func (dma *DMA) transfer() {
 
 	dma.Src = dma.MaskAddr(tmpSrc, true)
 	dma.Dst = dma.MaskAddr(tmpDst, false)
-
-	return
 }
 
 //func (dma *DMA) transferVideo(vcount uint32) {

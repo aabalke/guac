@@ -11,7 +11,7 @@ const (
 	VEC_FIQ           = 0xFFFF_001C
 )
 
-func (cpu *Cpu) exception(addr uint32, mode uint32) {
+func (cpu *Cpu) Exception(addr uint32, mode uint32) {
 
 	var (
 		cpsr = &cpu.Reg.CPSR

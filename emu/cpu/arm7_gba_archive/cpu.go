@@ -1,4 +1,4 @@
-package arm7
+package arm7gba
 
 import (
 	"unsafe"
@@ -111,9 +111,6 @@ func NewCpu(mem cpu.MemoryInterface, irq *cpu.Irq) *Cpu {
 		mem: mem,
 		Irq: irq,
 	}
-
-	// skip bios
-	c.Irq.IME = true
 
 	return c
 }

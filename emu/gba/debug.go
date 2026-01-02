@@ -13,8 +13,7 @@ type Debugger struct {
 	Version int
 }
 //
-func (d *Debugger) print(i int) {
-}
+//func (d *Debugger) print(i int) {
 //	reg := &d.Gba.Cpu.Reg
 //	p := func(a string, b uint32) { fmt.Printf("% 8s: % 9X\n", a, b) }
 //	s := func(a string) { fmt.Printf("%s\n", a) }
@@ -105,8 +104,7 @@ func (d *Debugger) print(i int) {
 //	//}
 //}
 //
-func (d *Debugger) dump(s, e uint32) {
-}
+//func (d *Debugger) dump(s, e uint32) {
 //
 //	// fix to buffer some day
 //	tmp := ""

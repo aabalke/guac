@@ -26,7 +26,7 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 
 	case 0xE:
 		if isBkpt(op) {
-			cpu.exception(VEC_PREFETCHABORT, MODE_ABT)
+			cpu.Exception(VEC_PREFETCHABORT, MODE_ABT)
 			return cycles + 1, true
 		}
 
@@ -38,13 +38,13 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 	}
 
 	if swi := (op>>24)&0xF == 0xF; swi {
-		cpu.exception(VEC_SWI, MODE_SWI)
+		cpu.Exception(VEC_SWI, MODE_SWI)
 		return cycles + 1, true
 	}
 
 	switch {
 	case isBkpt(op):
-		cpu.exception(VEC_PREFETCHABORT, MODE_ABT)
+		cpu.Exception(VEC_PREFETCHABORT, MODE_ABT)
 	case isB(op):
 		cpu.B(op)
 	case isBX(op):

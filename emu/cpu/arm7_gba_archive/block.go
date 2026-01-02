@@ -9,7 +9,7 @@ import (
 type Block struct {
 	Opcode, Rn, RnValue, Rlist    uint32
 	Pre, Up, PSR, Writeback, Load bool
-    ForceUser bool
+	ForceUser                     bool
 }
 
 func (c *Cpu) Block(opcode uint32) {
@@ -25,11 +25,10 @@ func (c *Cpu) Block(opcode uint32) {
 		Rlist:     utils.GetVarData(opcode, 0, 15),
 	}
 
-	mode := c.Reg.getMode()
-    block.ForceUser = (
-        block.PSR &&
-        mode != MODE_USR && 
-        (!block.Load || (block.Load && !utils.BitEnabled(opcode, 15))))
+	mode := c.Reg.CPSR.Mode
+	block.ForceUser = (block.PSR &&
+		mode != MODE_USR &&
+		(!block.Load || (block.Load && !utils.BitEnabled(opcode, 15))))
 
 	block.RnValue = c.Reg.R[block.Rn]
 
@@ -39,43 +38,43 @@ func (c *Cpu) Block(opcode uint32) {
 
 	incPc := true
 	if block.Load {
-        //if block.ForceUser {
+		//if block.ForceUser {
 
-        //    //if block.Rn >= 13 &&
-        //    //(utils.BitEnabled(block.Rlist, 14) ||
-        //    //utils.BitEnabled(block.Rlist, 13)) {
-        //    //    fmt.Printf("LDM ^ RN %02d RLIST %16b\n", block.Rn, block.Rlist)
-        //    //    fmt.Printf("BEFOR SP %08X LR %08X PC %08X CPSR %08X SPS %08X LRS %08X\n", r[13], r[14], r[15], c.Reg.CPSR, c.Reg.SP, c.Reg.LR)
-        //    //}
+		//    //if block.Rn >= 13 &&
+		//    //(utils.BitEnabled(block.Rlist, 14) ||
+		//    //utils.BitEnabled(block.Rlist, 13)) {
+		//    //    fmt.Printf("LDM ^ RN %02d RLIST %16b\n", block.Rn, block.Rlist)
+		//    //    fmt.Printf("BEFOR SP %08X LR %08X PC %08X CPSR %08X SPS %08X LRS %08X\n", r[13], r[14], r[15], c.Reg.CPSR, c.Reg.SP, c.Reg.LR)
+		//    //}
 
-        //    //c.Reg.setMode(mode, MODE_USR)
-        //}
+		//    //c.Reg.setMode(mode, MODE_USR)
+		//}
 		incPc = c.ldm(block)
 
-        if block.ForceUser {
-            //c.Reg.setMode(MODE_USR, mode)
-            //if block.Rn >= 13 &&
-            //(utils.BitEnabled(block.Rlist, 14) ||
-            //utils.BitEnabled(block.Rlist, 13)) {
-            //    fmt.Printf("AFTER SP %08X LR %08X PC %08X CPSR %08X SPS %08X LRS %08X\n", r[13], r[14], r[15], c.Reg.CPSR, c.Reg.SP, c.Reg.LR)
-            //}
-        }
+		if block.ForceUser {
+			//c.Reg.setMode(MODE_USR, mode)
+			//if block.Rn >= 13 &&
+			//(utils.BitEnabled(block.Rlist, 14) ||
+			//utils.BitEnabled(block.Rlist, 13)) {
+			//    fmt.Printf("AFTER SP %08X LR %08X PC %08X CPSR %08X SPS %08X LRS %08X\n", r[13], r[14], r[15], c.Reg.CPSR, c.Reg.SP, c.Reg.LR)
+			//}
+		}
 
 	} else {
-        //if block.Rn >= 13 && block.ForceUser &&
-        //(utils.BitEnabled(block.Rlist, 14) ||
-        //utils.BitEnabled(block.Rlist, 13)) {
-        //    fmt.Printf("LDM ^ RN %02d RLIST %16b\n", block.Rn, block.Rlist)
-        //    fmt.Printf("BEFOR SP %08X LR %08X PC %08X CPSR %08X SPS %08X LRS %08X\n", r[13], r[14], r[15], c.Reg.CPSR, c.Reg.SP, c.Reg.LR)
-        //}
+		//if block.Rn >= 13 && block.ForceUser &&
+		//(utils.BitEnabled(block.Rlist, 14) ||
+		//utils.BitEnabled(block.Rlist, 13)) {
+		//    fmt.Printf("LDM ^ RN %02d RLIST %16b\n", block.Rn, block.Rlist)
+		//    fmt.Printf("BEFOR SP %08X LR %08X PC %08X CPSR %08X SPS %08X LRS %08X\n", r[13], r[14], r[15], c.Reg.CPSR, c.Reg.SP, c.Reg.LR)
+		//}
 
 		c.stm(block)
 
-        //if block.Rn >= 13 && block.ForceUser &&
-        //(utils.BitEnabled(block.Rlist, 14) ||
-        //utils.BitEnabled(block.Rlist, 13)) {
-        //    fmt.Printf("AFTER SP %08X LR %08X PC %08X CPSR %08X SPS %08X LRS %08X\n", r[13], r[14], r[15], c.Reg.CPSR, c.Reg.SP, c.Reg.LR)
-        //}
+		//if block.Rn >= 13 && block.ForceUser &&
+		//(utils.BitEnabled(block.Rlist, 14) ||
+		//utils.BitEnabled(block.Rlist, 13)) {
+		//    fmt.Printf("AFTER SP %08X LR %08X PC %08X CPSR %08X SPS %08X LRS %08X\n", r[13], r[14], r[15], c.Reg.CPSR, c.Reg.SP, c.Reg.LR)
+		//}
 	}
 
 	if incPc {
@@ -85,29 +84,29 @@ func (c *Cpu) Block(opcode uint32) {
 
 func (c *Cpu) ldm(block *Block) bool {
 
-    ref := [16]*uint32{
-        &c.Reg.R[0],
-        &c.Reg.R[1],
-        &c.Reg.R[2],
-        &c.Reg.R[3],
-        &c.Reg.R[4],
-        &c.Reg.R[5],
-        &c.Reg.R[6],
-        &c.Reg.R[7],
-        &c.Reg.R[8],
-        &c.Reg.R[9],
-        &c.Reg.R[10],
-        &c.Reg.R[11],
-        &c.Reg.R[12],
-        &c.Reg.R[13],
-        &c.Reg.R[14],
-        &c.Reg.R[15],
-    }
+	ref := [16]*uint32{
+		&c.Reg.R[0],
+		&c.Reg.R[1],
+		&c.Reg.R[2],
+		&c.Reg.R[3],
+		&c.Reg.R[4],
+		&c.Reg.R[5],
+		&c.Reg.R[6],
+		&c.Reg.R[7],
+		&c.Reg.R[8],
+		&c.Reg.R[9],
+		&c.Reg.R[10],
+		&c.Reg.R[11],
+		&c.Reg.R[12],
+		&c.Reg.R[13],
+		&c.Reg.R[14],
+		&c.Reg.R[15],
+	}
 
-    if block.ForceUser {
-        ref[13] = &c.Reg.SP[BANK_ID[MODE_USR]]
-        ref[14] = &c.Reg.LR[BANK_ID[MODE_USR]]
-    }
+	if block.ForceUser {
+		ref[13] = &c.Reg.SP[BANK_ID[MODE_USR]]
+		ref[14] = &c.Reg.LR[BANK_ID[MODE_USR]]
+	}
 
 	incPC := true
 	r := &c.Reg.R
@@ -130,7 +129,7 @@ func (c *Cpu) ldm(block *Block) bool {
 		return false
 	}
 
-    regCount := uint32(bits.OnesCount32(block.Rlist))
+	regCount := uint32(bits.OnesCount32(block.Rlist))
 
 	if (block.Rlist>>block.Rn)&1 == 1 {
 		regCount--
@@ -174,7 +173,7 @@ func (c *Cpu) ldm(block *Block) bool {
 		case db && decRegBitEnabled: // pop
 
 			addr -= 4
-			*ref[15 - reg] = c.mem.Read32(addr, false)
+			*ref[15-reg] = c.mem.Read32(addr, false)
 
 			if 15-reg == PC {
 				incPC = incPC && false
@@ -185,7 +184,7 @@ func (c *Cpu) ldm(block *Block) bool {
 
 		case da && decRegBitEnabled:
 
-			*ref[15 - reg] = c.mem.Read32(addr, false)
+			*ref[15-reg] = c.mem.Read32(addr, false)
 			addr -= 4
 
 			if 15-reg == PC {
@@ -203,39 +202,38 @@ func (c *Cpu) ldm(block *Block) bool {
 		r[block.Rn] -= (regCount * 4)
 	}
 
-    if !block.Writeback {
-        r[block.Rn] = block.RnValue
-    }
-
+	if !block.Writeback {
+		r[block.Rn] = block.RnValue
+	}
 
 	return incPC
 }
 
 func (c *Cpu) stm(block *Block) {
 
-    ref := [16]*uint32{
-        &c.Reg.R[0],
-        &c.Reg.R[1],
-        &c.Reg.R[2],
-        &c.Reg.R[3],
-        &c.Reg.R[4],
-        &c.Reg.R[5],
-        &c.Reg.R[6],
-        &c.Reg.R[7],
-        &c.Reg.R[8],
-        &c.Reg.R[9],
-        &c.Reg.R[10],
-        &c.Reg.R[11],
-        &c.Reg.R[12],
-        &c.Reg.R[13],
-        &c.Reg.R[14],
-        &c.Reg.R[15],
-    }
+	ref := [16]*uint32{
+		&c.Reg.R[0],
+		&c.Reg.R[1],
+		&c.Reg.R[2],
+		&c.Reg.R[3],
+		&c.Reg.R[4],
+		&c.Reg.R[5],
+		&c.Reg.R[6],
+		&c.Reg.R[7],
+		&c.Reg.R[8],
+		&c.Reg.R[9],
+		&c.Reg.R[10],
+		&c.Reg.R[11],
+		&c.Reg.R[12],
+		&c.Reg.R[13],
+		&c.Reg.R[14],
+		&c.Reg.R[15],
+	}
 
-    if block.ForceUser {
-        ref[13] = &c.Reg.SP[BANK_ID[MODE_USR]]
-        ref[14] = &c.Reg.LR[BANK_ID[MODE_USR]]
-    }
+	if block.ForceUser {
+		ref[13] = &c.Reg.SP[BANK_ID[MODE_USR]]
+		ref[14] = &c.Reg.LR[BANK_ID[MODE_USR]]
+	}
 
 	r := &c.Reg.R
 
@@ -265,7 +263,7 @@ func (c *Cpu) stm(block *Block) {
 		return
 	}
 
-    regCount := uint32(bits.OnesCount32(block.Rlist))
+	regCount := uint32(bits.OnesCount32(block.Rlist))
 
 	smallest := (block.Rlist & -block.Rlist) == 1<<block.Rn
 	matchingRn := (block.Rlist>>block.Rn)&1 == 1
@@ -378,7 +376,7 @@ func (c *Cpu) stm(block *Block) {
 
 	if !block.Writeback {
 		r[block.Rn] = block.RnValue
-        return
+		return
 	}
 
 	if block.Writeback && smallest {
