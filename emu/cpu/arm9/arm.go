@@ -1216,7 +1216,8 @@ func (c *Cpu) Block(op uint32) {
 	}
 
 	var (
-		pcIncluded = op&0x8000 != 0
+		pcIncluded = rlist&0x8000 != 0
+		rnIncluded = (rlist>>rn) & 1 != 0
 		pre        = (op>>24)&1 != 0
 		psr        = (op>>22)&1 != 0
 		wb         = (op>>21)&1 != 0
@@ -1225,6 +1226,8 @@ func (c *Cpu) Block(op uint32) {
 		addr       = r[rn] &^ 0b11
 		regCount   = uint32(bits.OnesCount32(rlist))
 		wbValue    = r[rn]
+        // fiq switch has additional r8 - r12 use mode switch registers
+        forceFIQSwitch = forceUser && c.Reg.CPSR.Mode == MODE_FIQ
 	)
 
 	if up {
@@ -1234,12 +1237,27 @@ func (c *Cpu) Block(op uint32) {
 	}
 
 	rnRef := &c.Reg.R[rn]
-	if forceUser && rn == 13 {
-		rnRef = &c.Reg.SP[BANK_ID[MODE_USR]]
-	}
-	if forceUser && rn == 14 {
-		rnRef = &c.Reg.LR[BANK_ID[MODE_USR]]
-	}
+    switch {
+    case forceFIQSwitch:
+
+        switch {
+        case rn == 13:
+            rnRef = &c.Reg.SP[BANK_ID[MODE_USR]]
+        case rn == 14:
+            rnRef = &c.Reg.LR[BANK_ID[MODE_USR]]
+        case rn >= 8:
+            rnRef = &c.Reg.USR[rn - 8]
+
+        }
+
+    case forceUser:
+        switch {
+        case rn == 13:
+            rnRef = &c.Reg.SP[BANK_ID[MODE_USR]]
+        case rn == 14:
+            rnRef = &c.Reg.LR[BANK_ID[MODE_USR]]
+        }
+    }
 
 	var (
 		rnv = *rnRef
@@ -1270,12 +1288,26 @@ func (c *Cpu) Block(op uint32) {
 		}
 
 		ref := &c.Reg.R[reg]
-		if forceUser && reg == 13 {
-			ref = &c.Reg.SP[BANK_ID[MODE_USR]]
-		}
-		if forceUser && reg == 14 {
-			ref = &c.Reg.LR[BANK_ID[MODE_USR]]
-		}
+        switch {
+        case forceFIQSwitch:
+
+            switch {
+            case reg == 13:
+                ref = &c.Reg.SP[BANK_ID[MODE_USR]]
+            case reg == 14:
+                ref = &c.Reg.LR[BANK_ID[MODE_USR]]
+            case reg >= 8:
+                ref = &c.Reg.USR[reg - 8]
+            }
+
+        case forceUser:
+            switch {
+            case reg == 13:
+                ref = &c.Reg.SP[BANK_ID[MODE_USR]]
+            case reg == 14:
+                ref = &c.Reg.LR[BANK_ID[MODE_USR]]
+            }
+        }
 
 		if pre {
 			if up {
@@ -1357,7 +1389,7 @@ func (c *Cpu) Block(op uint32) {
 	}
 
 	if wb {
-		if rnIncluded := (rlist>>rn)&1 == 1; rnIncluded {
+        if rnIncluded {
 			isLast := (rlist < (1 << (rn + 1)))
 			isOnly := regCount == 1
 			if !isLast || isOnly {

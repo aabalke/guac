@@ -2,6 +2,9 @@ package gba
 
 import (
 
+    "fmt"
+    "os"
+
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/apu"
 	"github.com/aabalke/guac/emu/cpu"
@@ -10,6 +13,9 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
 )
+
+var _ = fmt.Sprintf
+var _ = os.Exit
 
 const (
     PC = 15

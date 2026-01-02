@@ -112,6 +112,9 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 
 		if rsv > 32 {
 			res = 0
+			if rsv != 0 {
+				cpsr.C = false
+			}
 		} else {
 			res = uint64(rdv) << rsv
 			if rsv != 0 {

@@ -994,41 +994,67 @@ func (cpu *Cpu) Swp(op uint32) {
 func (c *Cpu) Block(op uint32) {
 
 	var (
+		r          = &c.Reg.R
 		rlist = op & 0xFFFF
+		regCount   = uint32(bits.OnesCount32(rlist))
+		rn         = (op>>16) & 0xF
+		addr       = r[rn] &^ 0b11
+		up         = (op>>23)&1 != 0
 	)
 
 	if rlist == 0 {
-		panic("arm7 ldm/stm rlist == 0")
+        rlist = 0x8000
+        regCount = 0x10
+
+        // starts at bottom instead
+        if !up {
+            addr -= (regCount << 2) - 4
+        }
 	}
 
 	var (
-		r          = &c.Reg.R
-		pre        = (op>>24)&1 != 0
-		up         = (op>>23)&1 != 0
-		rn         = (op >> 16) & 0xF
 		load       = (op>>20)&1 != 0
-		pcIncluded = op&0x8000 != 0
+		pre        = (op>>24)&1 != 0
+		wbValue    = r[rn]
+		pcIncluded = rlist&0x8000 != 0
+		rnIncluded = (rlist>>rn) & 1 != 0
 		psr        = (op>>22)&1 != 0
 		wb         = (op>>21)&1 != 0
 		forceUser  = psr && (c.Reg.CPSR.Mode != MODE_USR) && (!load || !pcIncluded)
-		addr       = r[rn] &^ 0b11
-		regCount   = uint32(bits.OnesCount32(rlist))
-		wbValue    = r[rn]
+
+        // fiq switch has additional r8 - r12 use mode switch registers
+        forceFIQSwitch = forceUser && c.Reg.CPSR.Mode == MODE_FIQ
 	)
 
 	if up {
-		wbValue += regCount * 4
+		wbValue += regCount << 2
 	} else {
-		wbValue -= regCount * 4
+		wbValue -= regCount << 2
 	}
 
 	rnRef := &c.Reg.R[rn]
-	if forceUser && rn == 13 {
-		rnRef = &c.Reg.SP[BANK_ID[MODE_USR]]
-	}
-	if forceUser && rn == 14 {
-		rnRef = &c.Reg.LR[BANK_ID[MODE_USR]]
-	}
+
+    switch {
+    case forceFIQSwitch:
+
+        switch {
+        case rn == 13:
+            rnRef = &c.Reg.SP[BANK_ID[MODE_USR]]
+        case rn == 14:
+            rnRef = &c.Reg.LR[BANK_ID[MODE_USR]]
+        case rn >= 8:
+            rnRef = &c.Reg.USR[rn - 8]
+
+        }
+
+    case forceUser:
+        switch {
+        case rn == 13:
+            rnRef = &c.Reg.SP[BANK_ID[MODE_USR]]
+        case rn == 14:
+            rnRef = &c.Reg.LR[BANK_ID[MODE_USR]]
+        }
+    }
 
 	var (
 		rnv = *rnRef
@@ -1059,12 +1085,26 @@ func (c *Cpu) Block(op uint32) {
 		}
 
 		ref := &c.Reg.R[reg]
-		if forceUser && reg == 13 {
-			ref = &c.Reg.SP[BANK_ID[MODE_USR]]
-		}
-		if forceUser && reg == 14 {
-			ref = &c.Reg.LR[BANK_ID[MODE_USR]]
-		}
+        switch {
+        case forceFIQSwitch:
+
+            switch {
+            case reg == 13:
+                ref = &c.Reg.SP[BANK_ID[MODE_USR]]
+            case reg == 14:
+                ref = &c.Reg.LR[BANK_ID[MODE_USR]]
+            case reg >= 8:
+                ref = &c.Reg.USR[reg - 8]
+            }
+
+        case forceUser:
+            switch {
+            case reg == 13:
+                ref = &c.Reg.SP[BANK_ID[MODE_USR]]
+            case reg == 14:
+                ref = &c.Reg.LR[BANK_ID[MODE_USR]]
+            }
+        }
 
 		if pre {
 			if up {
@@ -1153,14 +1193,19 @@ func (c *Cpu) Block(op uint32) {
 		}
 	}
 
-	if wb {
-		r[rn] = wbValue
-	}
 
 	if !load {
+        if wb {
+            r[rn] = wbValue
+        }
+
 		r[PC] += 4
 		return
 	}
+
+    if wb && !rnIncluded {
+        r[rn] = wbValue
+    }
 
 	if !pcIncluded {
 		r[PC] += 4
