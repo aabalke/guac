@@ -2,11 +2,16 @@ package ppu
 
 import (
 	"encoding/binary"
+	"fmt"
+	//simd "simd/archsimd"
+	//"unsafe"
 
 	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/nds/rast"
 	"github.com/aabalke/guac/emu/nds/utils"
 )
+
+var _ = fmt.Sprintf
 
 const (
 	SCREEN_WIDTH  = 256
@@ -51,6 +56,8 @@ type Engine struct {
 
 	BgPriorities  [4][]uint32
 	ObjPriorities [4][]uint32
+
+	Simd *Simd
 }
 
 type Dispcnt struct {
@@ -79,7 +86,7 @@ type Dispcnt struct {
 type Blend struct {
 	Mode          uint32
 	a, b          [6]bool
-	aEv, bEv, yEv float32
+	aEv, bEv, yEv uint32
 }
 
 type Windows struct {
@@ -184,6 +191,9 @@ func NewPPU(irq *cpu.Irq) *PPU {
 	for i := range len(p.WHITE_SCANLINE) {
 		p.WHITE_SCANLINE[i] = 0xFF
 	}
+
+    p.EngineA.Simd = NewSimd(&p.EngineA)
+    p.EngineB.Simd = NewSimd(&p.EngineB)
 
 	return p
 }
@@ -304,13 +314,13 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
 		e.Blend.b[5] = (v>>5)&1 != 0
 
 	case 0x52:
-		e.Blend.aEv = float32(min(16, v&0x1F)) / 16
+		e.Blend.aEv = min(16, v&0x1F)
 
 	case 0x53:
-		e.Blend.bEv = float32(min(16, v&0x1F)) / 16
+		e.Blend.bEv = min(16, v&0x1F)
 
 	case 0x54:
-		e.Blend.yEv = float32(min(16, v&0x1F)) / 16
+		e.Blend.yEv = min(16, v&0x1F)
 	case 0x6C:
 		e.MasterBright.Write(uint8(v), 0)
 	case 0x6D:
@@ -940,72 +950,4 @@ func (e *Engine) UpdateObjMapping(d *Dispcnt) {
 			panic("DISPCNT HAS BOTH BITMAP 1D AND 256 SET")
 		}
 	}
-}
-
-type MasterBright struct {
-	Factor uint32
-	Mode   uint8
-}
-
-const (
-	MB_NONE = 0
-	MB_UP   = 1
-	MB_DOWN = 2
-)
-
-func (m *MasterBright) Write(v, b uint8) {
-	switch b {
-	case 0:
-		m.Factor = min(16, uint32(v)&0b11111)
-
-	case 1:
-		m.Mode = v >> 6
-	}
-}
-
-func (m *MasterBright) Read(b uint8) uint8 {
-	switch b {
-	case 0:
-		return uint8(m.Factor)
-
-	case 1:
-		return m.Mode << 6
-	default:
-		return 0
-	}
-}
-
-func (m *MasterBright) Apply(v uint32) (uint8, uint8, uint8) {
-
-	// takes in 15bit and returns 24bit
-
-	r := ((v) & 0x1F)
-	g := ((v >> 5) & 0x1F)
-	b := ((v >> 10) & 0x1F)
-
-	switch m.Mode {
-	case MB_NONE:
-		// convert
-		r = (r << 3) | (r >> 2)
-		g = (g << 3) | (g >> 2)
-		b = (b << 3) | (b >> 2)
-		return uint8(r), uint8(g), uint8(b)
-
-	case MB_UP:
-		r += (31 - r) * m.Factor >> 4
-		g += (31 - g) * m.Factor >> 4
-		b += (31 - b) * m.Factor >> 4
-
-	case MB_DOWN:
-		r -= r * m.Factor >> 4
-		g -= g * m.Factor >> 4
-		b -= b * m.Factor >> 4
-	}
-
-	// convert
-	r = (r << 3) | (r >> 2)
-	g = (g << 3) | (g >> 2)
-	b = (b << 3) | (b >> 2)
-
-	return uint8(r), uint8(g), uint8(b)
 }

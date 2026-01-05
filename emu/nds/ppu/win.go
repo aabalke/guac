@@ -101,7 +101,7 @@ func WindowObjPixelAllowedX(x, y uint32, wins *Windows) bool {
 	return wins.OutObj
 }
 
-func windowBldPixelAllowed(x, y uint32, wins *Windows, inObjWindow bool) bool {
+func WindowBldPixelAllowed(x, y uint32, wins *Windows, inObjWindow bool) bool {
 
 	if !wins.Enabled {
 		return true

@@ -66,6 +66,8 @@ type Nds struct {
 	TimerCycles uint8
 
 	Frame uint64
+
+	isSimd bool
 }
 
 func NewNds(path string, audioCtx *oto.Context) *Nds {
@@ -362,25 +364,10 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 			nds.arm7.Irq.SetIRQ(1)
 		}
 
-		if vcount < SCREEN_HEIGHT {
-
-			a := &nds.ppu.EngineA
-			b := &nds.ppu.EngineB
-			updateBackgrounds(a)
-			updateBackgrounds(b)
-			a.BgPriorities = nds.getBgPriority(vcount, a.Dispcnt.Mode, &a.Backgrounds, &a.Windows)
-			b.BgPriorities = nds.getBgPriority(vcount, b.Dispcnt.Mode, &b.Backgrounds, &b.Windows)
-
-			a.ObjPriorities = nds.getObjPriority(uint32(vcount), &a.Objects, &a.Windows)
-			b.ObjPriorities = nds.getObjPriority(uint32(vcount), &b.Objects, &b.Windows)
-
-			nds.graphics(uint32(vcount))
-			a.Backgrounds[2].BgAffineUpdate()
-			a.Backgrounds[3].BgAffineUpdate()
-			b.Backgrounds[2].BgAffineUpdate()
-			b.Backgrounds[3].BgAffineUpdate()
-			nds.CheckDmas(dma.ARM9_DMA_MODE_HBL, true)
-		}
+        if vcount < SCREEN_HEIGHT {
+            nds.ppu.Graphics(vcount, singleThread)
+            nds.CheckDmas(dma.ARM9_DMA_MODE_HBL, true)
+        }
 	}
 
 	if newScanline := currScanlineCycles < prevScanlineCycles; newScanline {
