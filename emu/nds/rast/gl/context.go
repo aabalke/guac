@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/aabalke/guac/emu/nds/utils"
+	//"github.com/aabalke/guac/emu/nds/utils"
 )
 
 var (
@@ -17,7 +17,8 @@ const (
 
 	// higher number is less precise, important for proper ordering with overlapping polys
 	// cooking mama requires ~ 0.01
-	DEPTH_PRECISION = 0.01
+	//DEPTH_PRECISION = 0.01
+    // does not work, need to find out why
 )
 
 type Face int
@@ -289,7 +290,8 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) {
 				continue
 			}
 
-			if !dc.DepthEqual && depth >= (*depthBuffer)[i]+DEPTH_PRECISION {
+			//if !dc.DepthEqual && depth >= (*depthBuffer)[i]+DEPTH_PRECISION {
+			if !dc.DepthEqual && depth >= (*depthBuffer)[i] {
 				continue
 			}
 
@@ -327,7 +329,8 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) {
 				color.A >= 0.999 ||
 				dc.NewTranslucentDepth {
 
-				(*depthBuffer)[i] = utils.FloatFloor(depth, DEPTH_PRECISION)
+				//(*depthBuffer)[i] = utils.FloatFloor(depth, DEPTH_PRECISION)
+				(*depthBuffer)[i] = depth
 			}
 
 			j := &dc.ColorBuffer[i]

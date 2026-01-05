@@ -5,48 +5,48 @@ import "github.com/aabalke/guac/emu/nds/utils"
 // this is temp share file for sisd and simd graphics
 // once simd is completely implimented this will be removed
 
-func (ppu *PPU) screenoff(y uint32, engine *Engine) {
+func (ppu *PPU) screenoff(y uint32, e *Engine) {
 	start := y * SCREEN_WIDTH << 2
 	end := start + SCREEN_WIDTH<<2
-	copy(engine.Pixels[start:end], ppu.WHITE_SCANLINE)
+	copy(e.Pixels[start:end], ppu.WHITE_SCANLINE)
 }
 
-func (ppu *PPU) MemFifoDisplay(engine *Engine) {
-	copy(engine.Pixels, ppu.DisplayFifo.Pixels)
+func (ppu *PPU) MemFifoDisplay(e *Engine) {
+	copy(e.Pixels, ppu.DisplayFifo.Pixels)
 }
 
-var bgFuncs = [...]func(ppu *PPU, engine *Engine, bg *Background, bgIdx, x, y uint32) (palData uint32, alpha float32, ok bool){
-	func(ppu *PPU, engine *Engine, bg *Background, bgIdx, x, y uint32) (uint32, float32, bool) {
-		return ppu.setBackgroundPixel(engine, bg, bgIdx, x, y)
+var bgFuncs = [...]func(ppu *PPU, e *Engine, bg *Background, bgIdx, x, y uint32) (palData uint32, alpha float32, ok bool){
+	func(ppu *PPU, e *Engine, bg *Background, bgIdx, x, y uint32) (uint32, float32, bool) {
+		return ppu.setBackgroundPixel(e, bg, bgIdx, x, y)
 	},
-	func(ppu *PPU, engine *Engine, bg *Background, bgIdx, x, y uint32) (uint32, float32, bool) {
-		return ppu.setAffineBackgroundPixel(engine, bg, bgIdx, x)
+	func(ppu *PPU, e *Engine, bg *Background, bgIdx, x, y uint32) (uint32, float32, bool) {
+		return ppu.setAffineBackgroundPixel(e, bg, bgIdx, x)
 	},
-	func(ppu *PPU, engine *Engine, bg *Background, bgIdx, x, y uint32) (uint32, float32, bool) {
-		return ppu.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
+	func(ppu *PPU, e *Engine, bg *Background, bgIdx, x, y uint32) (uint32, float32, bool) {
+		return ppu.setAffine16BackgroundPixel(e, bg, bgIdx, x)
 	},
-	func(ppu *PPU, engine *Engine, bg *Background, bgIdx, x, y uint32) (uint32, float32, bool) {
-		return ppu.set3d(engine, bg, x, y)
+	func(ppu *PPU, e *Engine, bg *Background, bgIdx, x, y uint32) (uint32, float32, bool) {
+		return ppu.set3d(e, bg, x, y)
 	},
-	func(ppu *PPU, engine *Engine, bg *Background, bgIdx, x, y uint32) (uint32, float32, bool) {
-		return ppu.setAffine16BackgroundPixel(engine, bg, bgIdx, x)
+	func(ppu *PPU, e *Engine, bg *Background, bgIdx, x, y uint32) (uint32, float32, bool) {
+		return ppu.setAffine16BackgroundPixel(e, bg, bgIdx, x)
 	},
-	func(ppu *PPU, engine *Engine, bg *Background, bgIdx, x, y uint32) (uint32, float32, bool) {
-		return ppu.setBmpBackgroundPixel(engine, bg, x)
+	func(ppu *PPU, e *Engine, bg *Background, bgIdx, x, y uint32) (uint32, float32, bool) {
+		return ppu.setBmpBackgroundPixel(e, bg, x)
 	},
-	func(ppu *PPU, engine *Engine, bg *Background, bgIdx, x, y uint32) (uint32, float32, bool) {
-		return ppu.setDirectBitmap(engine, bg, x)
+	func(ppu *PPU, e *Engine, bg *Background, bgIdx, x, y uint32) (uint32, float32, bool) {
+		return ppu.setDirectBitmap(e, bg, x)
 	},
 }
 
-func (ppu *PPU) render(x, y uint32, engine *Engine, bldPal *BlendPalettes) (bool, bool) {
+func (ppu *PPU) render(x, y uint32, e *Engine, bldPal *BlendPalettes) (bool, bool) {
 
 	var (
-		dispcnt       = &engine.Dispcnt
-		wins          = &engine.Windows
-		bld           = &engine.Blend
-		objPriorities = &engine.ObjPriorities
-		bgPriorities  = &engine.BgPriorities
+		dispcnt       = &e.Dispcnt
+		wins          = &e.Windows
+		bld           = &e.Blend
+		objPriorities = &e.ObjPriorities
+		bgPriorities  = &e.BgPriorities
 
 		isSemiTransparent bool
 		inObjWindow       bool
@@ -58,13 +58,14 @@ func (ppu *PPU) render(x, y uint32, engine *Engine, bldPal *BlendPalettes) (bool
 		for j := len(bgPriorities[i]) - 1; j >= 0; j-- {
 
 			bgIdx := bgPriorities[i][j]
-			bg := &engine.Backgrounds[bgIdx]
 
 			if !WindowPixelAllowed(bgIdx, x, y, wins) {
 				continue
 			}
 
-			if palData, alpha, ok := bgFuncs[bg.Type](ppu, engine, bg, bgIdx, x, y); ok {
+			bg := &e.Backgrounds[bgIdx]
+
+			if palData, alpha, ok := bgFuncs[bg.Type](ppu, e, bg, bgIdx, x, y); ok {
 				bldPal.SetBgPalettes(palData, bgIdx, bg.Type == BG_TYPE_3D, alpha, bld)
 			}
 		}
@@ -81,15 +82,15 @@ func (ppu *PPU) render(x, y uint32, engine *Engine, bldPal *BlendPalettes) (bool
 		for j := 0; j < len((*objPriorities)[i]); j++ {
 
 			objIdx := (*objPriorities)[i][j]
-			obj := &engine.Objects[objIdx]
+			obj := &e.Objects[objIdx]
 
 			palData, ok := uint32(0), false
 			if bmp := obj.Mode == 3; bmp {
 				obj.OneDimensional = dispcnt.BitmapObj1D
-				palData, ok = ppu.setObjBmpPixel(engine, obj, x, y)
+				palData, ok = ppu.setObjBmpPixel(e, obj, x, y)
 			} else {
 				obj.OneDimensional = dispcnt.TileObj1D
-				palData, ok = ppu.setObjTilePixel(engine, obj, x, y)
+				palData, ok = ppu.setObjTilePixel(e, obj, x, y)
 			}
 
 			if !ok {
@@ -177,7 +178,7 @@ func (e *Engine) updateBackgrounds() *[4]Background {
 	return bgs
 }
 
-func (ppu *PPU) set3d(engine *Engine, bg *Background, x, y uint32) (uint32, float32, bool) {
+func (ppu *PPU) set3d(e *Engine, bg *Background, x, y uint32) (uint32, float32, bool) {
 
 	//xIdx := int(x) + int(bg.XOffset)
 	//yIdx := int(y) + int(bg.YOffset)
@@ -222,19 +223,19 @@ func (ppu *PPU) set3d(engine *Engine, bg *Background, x, y uint32) (uint32, floa
 	return pal, alpha, alpha > 0
 }
 
-func (ppu *PPU) setBackgroundPixel(engine *Engine, bg *Background, bgIdx, x, y uint32) (uint32, float32, bool) {
+func (ppu *PPU) setBackgroundPixel(e *Engine, bg *Background, bgIdx, x, y uint32) (uint32, float32, bool) {
 
 	xIdx := (x + bg.XOffset) & ((bg.W) - 1)
 	yIdx := (y + bg.YOffset) & ((bg.H) - 1)
 
 	if bg.Mosaic {
 
-		if engine.Mosaic.BgH != 0 {
-			xIdx -= xIdx % (engine.Mosaic.BgH + 1)
+		if e.Mosaic.BgH != 0 {
+			xIdx -= xIdx % (e.Mosaic.BgH + 1)
 		}
 
-		if engine.Mosaic.BgV != 0 {
-			yIdx -= yIdx % (engine.Mosaic.BgV + 1)
+		if e.Mosaic.BgV != 0 {
+			yIdx -= yIdx % (e.Mosaic.BgV + 1)
 		}
 	}
 
@@ -254,8 +255,8 @@ func (ppu *PPU) setBackgroundPixel(engine *Engine, bg *Background, bgIdx, x, y u
 	mapAddr := bg.ScreenBaseBlock + mapIdx
 
 	var banks uint32
-	if !engine.IsB {
-		mapAddr += engine.Dispcnt.ScreenBase
+	if !e.IsB {
+		mapAddr += e.Dispcnt.ScreenBase
 		banks = BANKS_A_2D_BG
 	} else {
 		mapAddr += 0x20_0000
@@ -271,8 +272,8 @@ func (ppu *PPU) setBackgroundPixel(engine *Engine, bg *Background, bgIdx, x, y u
 		tileAddr += tileIdx
 	}
 
-	if !engine.IsB {
-		tileAddr += engine.Dispcnt.CharBase
+	if !e.IsB {
+		tileAddr += e.Dispcnt.CharBase
 	} else {
 		tileAddr += 0x20_0000
 	}
@@ -289,10 +290,10 @@ func (ppu *PPU) setBackgroundPixel(engine *Engine, bg *Background, bgIdx, x, y u
 	palIdx := uint32(ppu.Vram.ReadGraphical(tileAddr+inTileIdx, banks))
 	palNum := screenData >> 12
 
-	return getBgPaletteData(ppu, engine, bgIdx, bg.Palette256, palNum, palIdx, inTileX)
+	return getBgPaletteData(ppu, e, bgIdx, bg.Palette256, palNum, palIdx, inTileX)
 }
 
-func (ppu *PPU) setAffine16BackgroundPixel(engine *Engine, bg *Background, bgIdx, x uint32) (uint32, float32, bool) {
+func (ppu *PPU) setAffine16BackgroundPixel(e *Engine, bg *Background, bgIdx, x uint32) (uint32, float32, bool) {
 
 	//if !bg.Palette256 {
 	//	panic(fmt.Sprintf("AFFINE WITHOUT PAL 256"))
@@ -303,12 +304,12 @@ func (ppu *PPU) setAffine16BackgroundPixel(engine *Engine, bg *Background, bgIdx
 	xIdx := int(pa*float64(x) + bg.OutX)
 	yIdx := int(pc*float64(x) + bg.OutY)
 
-	if bg.Mosaic && engine.Mosaic.BgH != 0 {
-		xIdx -= xIdx % int(engine.Mosaic.BgH+1)
+	if bg.Mosaic && e.Mosaic.BgH != 0 {
+		xIdx -= xIdx % int(e.Mosaic.BgH+1)
 	}
 
-	if bg.Mosaic && engine.Mosaic.BgV != 0 {
-		yIdx -= yIdx % int(engine.Mosaic.BgV+1)
+	if bg.Mosaic && e.Mosaic.BgV != 0 {
+		yIdx -= yIdx % int(e.Mosaic.BgV+1)
 	}
 
 	out := xIdx < 0 || xIdx >= int(bg.W) || yIdx < 0 || yIdx >= int(bg.H)
@@ -332,8 +333,8 @@ func (ppu *PPU) setAffine16BackgroundPixel(engine *Engine, bg *Background, bgIdx
 	mapAddr := bg.ScreenBaseBlock + mapIdx
 
 	var banks uint32
-	if !engine.IsB {
-		mapAddr += engine.Dispcnt.ScreenBase
+	if !e.IsB {
+		mapAddr += e.Dispcnt.ScreenBase
 		banks = BANKS_A_2D_BG
 	} else {
 		mapAddr += 0x20_0000
@@ -347,8 +348,8 @@ func (ppu *PPU) setAffine16BackgroundPixel(engine *Engine, bg *Background, bgIdx
 	tileAddr := bg.CharBaseBlock + tileIdx
 	tileAddr += tileIdx
 
-	if !engine.IsB {
-		tileAddr += engine.Dispcnt.CharBase
+	if !e.IsB {
+		tileAddr += e.Dispcnt.CharBase
 	} else {
 		tileAddr += 0x20_0000
 	}
@@ -358,14 +359,14 @@ func (ppu *PPU) setAffine16BackgroundPixel(engine *Engine, bg *Background, bgIdx
 	palIdx := uint32(ppu.Vram.Read(tileAddr+inTileIdx, true))
 	palNum := screenData >> 12
 
-	return getBgPaletteData(ppu, engine, bgIdx, true, palNum, palIdx, inTileX)
+	return getBgPaletteData(ppu, e, bgIdx, true, palNum, palIdx, inTileX)
 }
 
-func (ppu *PPU) setAffineBackgroundPixel(engine *Engine, bg *Background, bgIdx, x uint32) (uint32, float32, bool) {
+func (ppu *PPU) setAffineBackgroundPixel(e *Engine, bg *Background, bgIdx, x uint32) (uint32, float32, bool) {
 
 	vramOffset := uint32(0)
 
-	if engine.IsB {
+	if e.IsB {
 		vramOffset = uint32(0x20_0000)
 	}
 
@@ -374,12 +375,12 @@ func (ppu *PPU) setAffineBackgroundPixel(engine *Engine, bg *Background, bgIdx, 
 	xIdx := int(pa*float64(x) + bg.OutX)
 	yIdx := int(pc*float64(x) + bg.OutY)
 
-	if bg.Mosaic && engine.Mosaic.BgH != 0 {
-		xIdx -= xIdx % int(engine.Mosaic.BgH+1)
+	if bg.Mosaic && e.Mosaic.BgH != 0 {
+		xIdx -= xIdx % int(e.Mosaic.BgH+1)
 	}
 
-	if bg.Mosaic && engine.Mosaic.BgV != 0 {
-		yIdx -= yIdx % int(engine.Mosaic.BgV+1)
+	if bg.Mosaic && e.Mosaic.BgV != 0 {
+		yIdx -= yIdx % int(e.Mosaic.BgV+1)
 	}
 
 	out := xIdx < 0 || xIdx >= int(bg.W) || yIdx < 0 || yIdx >= int(bg.H)
@@ -399,8 +400,8 @@ func (ppu *PPU) setAffineBackgroundPixel(engine *Engine, bg *Background, bgIdx, 
 
 	mapAddr := bg.ScreenBaseBlock + mapIdx
 
-	if !engine.IsB {
-		mapAddr += engine.Dispcnt.ScreenBase
+	if !e.IsB {
+		mapAddr += e.Dispcnt.ScreenBase
 	}
 
 	tileIdx := uint32(ppu.Vram.Read(vramOffset+mapAddr, true))
@@ -414,10 +415,10 @@ func (ppu *PPU) setAffineBackgroundPixel(engine *Engine, bg *Background, bgIdx, 
 
 	pal := uint32(0)
 
-	return getBgPaletteData(ppu, engine, bgIdx, true, pal, palIdx, inTileX)
+	return getBgPaletteData(ppu, e, bgIdx, true, pal, palIdx, inTileX)
 }
 
-func (ppu *PPU) setBmpBackgroundPixel(engine *Engine, bg *Background, x uint32) (uint32, float32, bool) {
+func (ppu *PPU) setBmpBackgroundPixel(e *Engine, bg *Background, x uint32) (uint32, float32, bool) {
 
 	//if !bg.Palette256 {
 	//	panic(fmt.Sprintf("AFFINE WITHOUT PAL 256"))
@@ -428,12 +429,12 @@ func (ppu *PPU) setBmpBackgroundPixel(engine *Engine, bg *Background, x uint32) 
 	xIdx := int(pa*float64(x) + bg.OutX)
 	yIdx := int(pc*float64(x) + bg.OutY)
 
-	if bg.Mosaic && engine.Mosaic.BgH != 0 {
-		xIdx -= xIdx % int(engine.Mosaic.BgH+1)
+	if bg.Mosaic && e.Mosaic.BgH != 0 {
+		xIdx -= xIdx % int(e.Mosaic.BgH+1)
 	}
 
-	if bg.Mosaic && engine.Mosaic.BgV != 0 {
-		yIdx -= yIdx % int(engine.Mosaic.BgV+1)
+	if bg.Mosaic && e.Mosaic.BgV != 0 {
+		yIdx -= yIdx % int(e.Mosaic.BgV+1)
 	}
 
 	out := xIdx < 0 || xIdx >= int(bg.W) || yIdx < 0 || yIdx >= int(bg.H)
@@ -449,7 +450,7 @@ func (ppu *PPU) setBmpBackgroundPixel(engine *Engine, bg *Background, x uint32) 
 	addr := uint32(xIdx + (yIdx * int(bg.W)))
 	addr += bg.ScreenBaseBlock * 8
 
-	if engine.IsB {
+	if e.IsB {
 		addr += 0x20_0000
 	}
 
@@ -459,7 +460,7 @@ func (ppu *PPU) setBmpBackgroundPixel(engine *Engine, bg *Background, x uint32) 
 		return 0, 1, false
 	}
 
-	data := ppu.getPalette(palIdx, 0, false, engine.IsB)
+	data := ppu.getPalette(palIdx, 0, false, e.IsB)
 
 	//if transparent := data & 0x80 != 0; transparent {
 	//    return 0, false
@@ -484,19 +485,19 @@ func getPositionsBg(screenData, xIdx, yIdx uint32) (uint32, uint32) {
 	return inTileX, inTileY
 }
 
-func (ppu *PPU) setDirectBitmap(engine *Engine, bg *Background, x uint32) (uint32, float32, bool) {
+func (ppu *PPU) setDirectBitmap(e *Engine, bg *Background, x uint32) (uint32, float32, bool) {
 
 	pa := float64(utils.Convert16ToFloat(uint16(bg.Pa), 8))
 	pc := float64(utils.Convert16ToFloat(uint16(bg.Pc), 8))
 	xIdx := int(pa*float64(x) + bg.OutX)
 	yIdx := int(pc*float64(x) + bg.OutY)
 
-	if bg.Mosaic && engine.Mosaic.BgH != 0 {
-		xIdx -= xIdx % int(engine.Mosaic.BgH+1)
+	if bg.Mosaic && e.Mosaic.BgH != 0 {
+		xIdx -= xIdx % int(e.Mosaic.BgH+1)
 	}
 
-	if bg.Mosaic && engine.Mosaic.BgV != 0 {
-		yIdx -= yIdx % int(engine.Mosaic.BgV+1)
+	if bg.Mosaic && e.Mosaic.BgV != 0 {
+		yIdx -= yIdx % int(e.Mosaic.BgV+1)
 	}
 
 	out := xIdx < 0 || xIdx >= int(bg.W) || yIdx < 0 || yIdx >= int(bg.H)
@@ -514,7 +515,7 @@ func (ppu *PPU) setDirectBitmap(engine *Engine, bg *Background, x uint32) (uint3
 	addr += bg.ScreenBaseBlock * 8
 
 	var banks uint32
-	if engine.IsB {
+	if e.IsB {
 		addr += 0x20_0000
 		banks = BANKS_B_2D_BG
 	} else {
@@ -529,7 +530,6 @@ func (ppu *PPU) setDirectBitmap(engine *Engine, bg *Background, x uint32) (uint3
 	}
 
 	return data, 1, true
-
 }
 
 func (e *Engine) getBgPriority(y uint32) {
@@ -651,7 +651,7 @@ func bgNotScanline(bg *Background, y uint32) bool {
 	return t || b
 }
 
-func (ppu *PPU) getExtendedPalette(engine *Engine, bgIdx uint32, obj bool, palIdx, paletteNum uint32) uint32 {
+func (ppu *PPU) getExtendedPalette(e *Engine, bgIdx uint32, obj bool, palIdx, paletteNum uint32) uint32 {
 
 	//16 colors x 16 palettes --> standard palette memory (=256 colors)
 	//256 colors x 16 palettes --> extended palette memory (=4096 colors)
@@ -664,11 +664,11 @@ func (ppu *PPU) getExtendedPalette(engine *Engine, bgIdx uint32, obj bool, palId
 	// removes un necessary palette slot switches
 
 	switch {
-	case !obj && !engine.IsB:
+	case !obj && !e.IsB:
 
 		slotIdx := bgIdx
 
-		if altSlot := engine.Backgrounds[bgIdx].AltExtPalSlot; altSlot {
+		if altSlot := e.Backgrounds[bgIdx].AltExtPalSlot; altSlot {
 			switch bgIdx {
 			case 0:
 				slotIdx = 2
@@ -680,11 +680,11 @@ func (ppu *PPU) getExtendedPalette(engine *Engine, bgIdx uint32, obj bool, palId
 		slot := vram.ExtABgSlots[slotIdx]
 
 		return uint32(b16(slot[addr:]))
-	case !obj && engine.IsB:
+	case !obj && e.IsB:
 
 		slotIdx := bgIdx
 
-		if altSlot := engine.Backgrounds[bgIdx].AltExtPalSlot; altSlot {
+		if altSlot := e.Backgrounds[bgIdx].AltExtPalSlot; altSlot {
 			switch bgIdx {
 			case 0:
 				slotIdx = 2
@@ -696,16 +696,16 @@ func (ppu *PPU) getExtendedPalette(engine *Engine, bgIdx uint32, obj bool, palId
 		slot := vram.ExtBBgSlots[slotIdx]
 
 		return uint32(b16(slot[addr:]))
-	case obj && !engine.IsB:
+	case obj && !e.IsB:
 		return uint32(b16(vram.ExtAPalObj[addr:]))
-	case obj && engine.IsB:
+	case obj && e.IsB:
 		return uint32(b16(vram.ExtBPalObj[addr:]))
 	}
 
 	return 0
 }
 
-func (ppu *PPU) getPalette(palIdx uint32, paletteNum uint32, obj, engineB bool) uint32 {
+func (ppu *PPU) getPalette(palIdx uint32, paletteNum uint32, obj, eB bool) uint32 {
 
 	addr := (paletteNum << 5) + palIdx<<1
 
@@ -713,14 +713,14 @@ func (ppu *PPU) getPalette(palIdx uint32, paletteNum uint32, obj, engineB bool) 
 		addr += 0x200
 	}
 
-	if engineB {
+	if eB {
 		addr += 0x400
 	}
 
 	addr >>= 1
 
 	//if addr >= 0x400 {
-	//    fmt.Printf("BAD PAL ADDR %04X (> 0x400), isB %t\n", addr, engineB)
+	//    fmt.Printf("BAD PAL ADDR %04X (> 0x400), isB %t\n", addr, eB)
 	//    return 0x0 //FFFF
 	//}
 
@@ -807,8 +807,8 @@ func getBmpTileAddr(obj *Object, xIdx, yIdx uint32) uint32 {
 	return base + pixelOffset
 }
 
-func getBgPaletteData(ppu *PPU, engine *Engine, bgIdx uint32, pal256 bool, palNum, tileData, inTileX uint32) (uint32, float32, bool) {
-	//if !engine.IsB && x == y && x == 0 {
+func getBgPaletteData(ppu *PPU, e *Engine, bgIdx uint32, pal256 bool, palNum, tileData, inTileX uint32) (uint32, float32, bool) {
+	//if !e.IsB && x == y && x == 0 {
 	//    fmt.Printf("PAL IDX %0X PAL NUM %08X\n", palIdx, palNum)
 	//}
 
@@ -823,10 +823,10 @@ func getBgPaletteData(ppu *PPU, engine *Engine, bgIdx uint32, pal256 bool, palNu
 		return 0, 1, false
 	}
 
-	if engine.Dispcnt.BgExtPal && pal256 {
+	if e.Dispcnt.BgExtPal && pal256 {
 
 		palNum <<= 4
-		palData := ppu.getExtendedPalette(engine, bgIdx, false, palIdx, palNum)
+		palData := ppu.getExtendedPalette(e, bgIdx, false, palIdx, palNum)
 		return palData, 1, true
 	}
 
@@ -836,12 +836,12 @@ func getBgPaletteData(ppu *PPU, engine *Engine, bgIdx uint32, pal256 bool, palNu
 		palNum = 0
 	}
 
-	palData := ppu.getPalette(uint32(palIdx), palNum, false, engine.IsB)
+	palData := ppu.getPalette(uint32(palIdx), palNum, false, e.IsB)
 
 	return palData, 1, true
 }
 
-func getPaletteData(ppu *PPU, engine *Engine, pal256 bool, pal, tileData, inTileX uint32) (uint32, bool) {
+func getPaletteData(ppu *PPU, e *Engine, pal256 bool, pal, tileData, inTileX uint32) (uint32, bool) {
 
 	var palIdx uint32
 	if pal256 {
@@ -854,9 +854,9 @@ func getPaletteData(ppu *PPU, engine *Engine, pal256 bool, pal, tileData, inTile
 		return 0, false
 	}
 
-	if engine.Dispcnt.ObjExtPal && pal256 {
+	if e.Dispcnt.ObjExtPal && pal256 {
 		pal <<= 4
-		palData := ppu.getExtendedPalette(engine, 0, true, palIdx, pal)
+		palData := ppu.getExtendedPalette(e, 0, true, palIdx, pal)
 		return palData, true
 	}
 
@@ -866,7 +866,7 @@ func getPaletteData(ppu *PPU, engine *Engine, pal256 bool, pal, tileData, inTile
 		pal = 0
 	}
 
-	palData := ppu.getPalette(uint32(palIdx), pal, true, engine.IsB)
+	palData := ppu.getPalette(uint32(palIdx), pal, true, e.IsB)
 
 	return palData, true
 }
@@ -879,7 +879,7 @@ func outObjectBound(obj *Object, xIdx, yIdx int) bool {
 	return t || b || l || r
 }
 
-func (ppu *PPU) outBouppuAffine(obj *Object, x, y uint32) bool {
+func outBoundAffine(obj *Object, x, y uint32) bool {
 
 	const (
 		MAX_X_MASK = 511
@@ -920,13 +920,13 @@ func (ppu *PPU) outBouppuAffine(obj *Object, x, y uint32) bool {
 		(xWrappedInBouppu || xUnwrappedInBouppu))
 }
 
-func (ppu *PPU) setObjTilePixel(engine *Engine, obj *Object, x, y uint32) (uint32, bool) {
+func (ppu *PPU) setObjTilePixel(e *Engine, obj *Object, x, y uint32) (uint32, bool) {
 
 	xIdx, yIdx, ok := int(0), int(0), false
 	if obj.RotScale {
-		xIdx, yIdx, ok = ppu.getObjAffineCoords(engine, obj, x, y)
+		xIdx, yIdx, ok = getObjAffineCoords(e, obj, x, y)
 	} else {
-		xIdx, yIdx, ok = ppu.getObjNormalCoords(engine, obj, x, y)
+		xIdx, yIdx, ok = getObjNormalCoords(e, obj, x, y)
 	}
 
 	if !ok {
@@ -939,7 +939,7 @@ func (ppu *PPU) setObjTilePixel(engine *Engine, obj *Object, x, y uint32) (uint3
 
 	vramOffset := uint32(0x40_0000)
 	var banks uint32
-	if engine.IsB {
+	if e.IsB {
 		vramOffset = uint32(0x60_0000)
 		banks = BANKS_B_2D_OBJ
 	} else {
@@ -948,16 +948,16 @@ func (ppu *PPU) setObjTilePixel(engine *Engine, obj *Object, x, y uint32) (uint3
 
 	tileData := uint32(ppu.Vram.ReadGraphical(vramOffset+addr, banks))
 
-	return getPaletteData(ppu, engine, obj.Palette256, obj.Palette, tileData, uint32(inTileX))
+	return getPaletteData(ppu, e, obj.Palette256, obj.Palette, tileData, uint32(inTileX))
 }
 
-func (ppu *PPU) setObjBmpPixel(engine *Engine, obj *Object, x, y uint32) (uint32, bool) {
+func (ppu *PPU) setObjBmpPixel(e *Engine, obj *Object, x, y uint32) (uint32, bool) {
 
 	xIdx, yIdx, ok := int(0), int(0), false
 	if obj.RotScale {
-		xIdx, yIdx, ok = ppu.getObjAffineCoords(engine, obj, x, y)
+		xIdx, yIdx, ok = getObjAffineCoords(e, obj, x, y)
 	} else {
-		xIdx, yIdx, ok = ppu.getObjNormalCoords(engine, obj, x, y)
+		xIdx, yIdx, ok = getObjNormalCoords(e, obj, x, y)
 	}
 
 	if !ok {
@@ -968,7 +968,7 @@ func (ppu *PPU) setObjBmpPixel(engine *Engine, obj *Object, x, y uint32) (uint32
 
 	vramOffset := uint32(0x40_0000)
 	var banks uint32
-	if engine.IsB {
+	if e.IsB {
 		vramOffset = uint32(0x60_0000)
 		banks = BANKS_B_2D_OBJ
 	} else {
@@ -984,13 +984,13 @@ func (ppu *PPU) setObjBmpPixel(engine *Engine, obj *Object, x, y uint32) (uint32
 	return data, true
 }
 
-func (ppu *PPU) getObjAffineCoords(engine *Engine, obj *Object, x, y uint32) (int, int, bool) {
+func getObjAffineCoords(e *Engine, obj *Object, x, y uint32) (int, int, bool) {
 
-	if ppu.outBouppuAffine(obj, x, y) {
+	if outBoundAffine(obj, x, y) {
 		return 0, 0, false
 	}
 
-	xIdx, yIdx := ppu.getAffineCoordinates(engine, obj, x, y)
+	xIdx, yIdx := getAffineCoordinates(e, obj, x, y)
 
 	if outObjectBound(obj, xIdx, yIdx) {
 		return 0, 0, false
@@ -999,7 +999,7 @@ func (ppu *PPU) getObjAffineCoords(engine *Engine, obj *Object, x, y uint32) (in
 	return xIdx, yIdx, true
 }
 
-func (ppu *PPU) getObjNormalCoords(engine *Engine, obj *Object, x, y uint32) (int, int, bool) {
+func getObjNormalCoords(e *Engine, obj *Object, x, y uint32) (int, int, bool) {
 
 	yIdx := int(y) - int(obj.Y)
 	xIdx := int(x) - int(obj.X)
@@ -1016,18 +1016,18 @@ func (ppu *PPU) getObjNormalCoords(engine *Engine, obj *Object, x, y uint32) (in
 		return 0, 0, false
 	}
 
-	if obj.Mosaic && engine.Mosaic.ObjH != 0 {
-		xIdx -= xIdx % int(engine.Mosaic.ObjH+1)
+	if obj.Mosaic && e.Mosaic.ObjH != 0 {
+		xIdx -= xIdx % int(e.Mosaic.ObjH+1)
 	}
 
-	if obj.Mosaic && engine.Mosaic.ObjV != 0 {
-		yIdx -= yIdx % int(engine.Mosaic.ObjV+1)
+	if obj.Mosaic && e.Mosaic.ObjV != 0 {
+		yIdx -= yIdx % int(e.Mosaic.ObjV+1)
 	}
 
 	return xIdx, yIdx, true
 }
 
-func (ppu *PPU) getAffineCoordinates(engine *Engine, obj *Object, x, y uint32) (int, int) {
+func getAffineCoordinates(e *Engine, obj *Object, x, y uint32) (int, int) {
 
 	objX := obj.X
 	objY := obj.Y
@@ -1046,12 +1046,12 @@ func (ppu *PPU) getAffineCoordinates(engine *Engine, obj *Object, x, y uint32) (
 		xIdx += 512 // i believe 512 is max
 	}
 
-	if obj.Mosaic && engine.Mosaic.ObjH != 0 {
-		xIdx -= xIdx % int(engine.Mosaic.ObjH+1)
+	if obj.Mosaic && e.Mosaic.ObjH != 0 {
+		xIdx -= xIdx % int(e.Mosaic.ObjH+1)
 	}
 
-	if obj.Mosaic && engine.Mosaic.ObjV != 0 {
-		yIdx -= yIdx % int(engine.Mosaic.ObjV+1)
+	if obj.Mosaic && e.Mosaic.ObjV != 0 {
+		yIdx -= yIdx % int(e.Mosaic.ObjV+1)
 	}
 
 	xOrigin := float32(xIdx - (int(obj.W) / 2))

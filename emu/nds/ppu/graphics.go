@@ -5,9 +5,10 @@ import (
 	"sync"
 )
 
-var b16 = binary.LittleEndian.Uint16
-
-var wg = sync.WaitGroup{}
+var (
+    b16 = binary.LittleEndian.Uint16
+    wg = sync.WaitGroup{}
+)
 
 func (ppu *PPU) Graphics(y uint32, singleThread bool) {
 

@@ -82,8 +82,7 @@ func (c *Cp15) Write(v uint32, reg CpRegister, lowVector *bool) {
 		c.R[reg] &^= mask
 		c.R[reg] |= v
 
-		*lowVector = (c.R[reg] >> 13) == 0
-
+		*lowVector = (c.R[reg] >> 13) & 1 == 0
 		c.mem.Tcm.DtcmEnabled = (c.R[reg]>>16)&1 != 0
 		c.mem.Tcm.DtcmLoadMode = (c.R[reg]>>17)&1 != 0
 		c.mem.Tcm.ItcmEnabled = (c.R[reg]>>18)&1 != 0
