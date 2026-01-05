@@ -119,18 +119,23 @@ func (cpu *Cpu) Alu(op uint32) {
 						cpu.ExitException(MODE_IRQ)
 					}
 
-					if r[PC]&1 != 0 {
-						cpu.toggleThumb()
-					}
+                    // this is different from arm9
+					//if r[PC]&1 != 0 {
+					//	cpu.toggleThumb()
+					//}
 
 				} else {
 
 					// force exit
 					cpu.psrSwitch() // not sure if needed
-					if r[PC]&1 != 0 {
-						cpu.toggleThumb()
-					}
 				}
+
+                if cpsr.T {
+                    r[PC] &^= 0b1
+                } else {
+                    r[PC] &^= 0b11
+                }
+
 			} else {
 				cpsr.V = ((rnv^op2)&(rnv^uint32(res)))>>31 != 0
 				cpsr.C = res < 0x1_0000_0000
