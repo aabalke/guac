@@ -2,6 +2,7 @@ package arm9
 
 import (
 	"fmt"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/aabalke/gojit"
@@ -45,11 +46,13 @@ type Jit struct {
 	*gojit.Assembler
 	Cpu *Cpu
 
-	Pages   [ADDRESS_SPACE >> PAGE_SHIFT]*Page // need 0xFFFF_FFFF for bios
+    Pages []atomic.Pointer[Page]
+
+	//Pages   [ADDRESS_SPACE >> PAGE_SHIFT]*Page // need 0xFFFF_FFFF for bios
 	Metrics [ADDRESS_SPACE >> PAGE_SHIFT][]uint32
 	Cnt     int
 
-	invalidPages []uint32
+	invalidPages []*Page
 
 	// used for testing individual instructions
 	testFunc func()
@@ -64,8 +67,11 @@ type Jit struct {
 
 type Page struct {
 	id      uint32
-	Blocks  []*JitBlock
+	//Blocks  []*JitBlock
+    Blocks []atomic.Pointer[JitBlock]
 	Written bool
+
+    dead atomic.Bool
 }
 
 type JitBlock struct {
@@ -83,6 +89,7 @@ func NewJit(cpu *Cpu) *Jit {
 	j := &Jit{
 		Cpu:     cpu,
 		blockCh: make(chan uint32, 1024),
+        Pages: make([]atomic.Pointer[Page], ADDRESS_SPACE >> PAGE_SHIFT),
 	}
 
 	if CONCURRENT_BLOCKS {
@@ -146,47 +153,39 @@ func (j *Jit) SCRATCH(i uint32) gojit.Indirect {
 
 func (j *Jit) InvalidatePage(addr uint32) {
 
-	if j.Pages[addr>>PAGE_SHIFT] == nil {
+    page := j.Pages[addr>>PAGE_SHIFT].Load()
+    if page == nil {
 		return
 	}
 
-	j.invalidPages = append(j.invalidPages, addr>>PAGE_SHIFT)
+    page.dead.Store(true)
+
+    if old := j.Pages[addr>>PAGE_SHIFT].Swap(nil); old != nil {
+        j.invalidPages = append(j.invalidPages, old)
+        j.Cnt--
+    }
 }
 
 func (j *Jit) DeletePages() {
-	// this clears invalid pages after resources not being used by
-	// cpu implimentations (if cpu writes to its own blocks we get big errors
 
 	if len(j.invalidPages) == 0 {
 		return
 	}
 
-	for _, v := range j.invalidPages {
+	for _, page := range j.invalidPages {
 
-		if j.Pages[v] == nil {
-			continue
+		for i := range page.Blocks {
+
+            block := page.Blocks[i].Load()
+            if block == nil || block.assembler == nil {
+                continue
+            }
+
+            block.assembler.Release()
 		}
-
-		j.Cnt--
-
-		for i := range j.Pages[v].Blocks {
-
-			if j.Pages[v].Blocks[i] == nil {
-				continue
-			}
-
-			if j.Pages[v].Blocks[i].assembler == nil {
-				continue
-			}
-
-			j.Pages[v].Blocks[i].assembler.Release()
-		}
-
-		j.Pages[v] = nil
-		j.Metrics[v] = nil
 	}
 
-	j.invalidPages = []uint32{}
+    j.invalidPages = j.invalidPages[:0]
 }
 
 func (j *Jit) CreateBlock(pc uint32) {
@@ -194,20 +193,25 @@ func (j *Jit) CreateBlock(pc uint32) {
 	pageIdx := pc >> PAGE_SHIFT
 	blockIdx := (pc & PAGE_MASK) >> 2
 
-	page := j.Pages[pageIdx]
+    page := j.Pages[pageIdx].Load()
+
 	if page == nil {
-		page = &Page{
+        newPage := &Page{
 			id:     pageIdx,
-			Blocks: make([]*JitBlock, (1<<PAGE_SHIFT)>>2),
+            Blocks: make([]atomic.Pointer[JitBlock], (1<<PAGE_SHIFT)>>2),
 		}
 
-		j.Pages[pageIdx] = page
+        if j.Pages[pageIdx].CompareAndSwap(nil, newPage) {
+            j.Cnt++
+            page = newPage
+        } else {
+            // other routine won race condition
+            page = j.Pages[pageIdx].Load()
+        }
+    }
 
-		j.Cnt++
-	}
-
-	block := page.Blocks[blockIdx]
-	if block != nil && block.Skip {
+	block := page.Blocks[blockIdx].Load()
+    if block != nil && block.Skip {
 		return
 	}
 
@@ -247,9 +251,8 @@ func (j *Jit) CreateBlock(pc uint32) {
 	}
 
 	if length == 0 {
-		page.Blocks[blockIdx] = &JitBlock{
-			Skip: true,
-		}
+        newBlock := &JitBlock{ Skip: true }
+        page.Blocks[blockIdx].CompareAndSwap(nil, newBlock)
 
 		return
 	}
@@ -261,7 +264,7 @@ func (j *Jit) CreateBlock(pc uint32) {
 		return
 	}
 
-	page.Blocks[blockIdx] = &JitBlock{
+    newBlock := &JitBlock{
 		initPc:    pc,
 		assembler: asm,
 		Length:    length,
@@ -270,6 +273,8 @@ func (j *Jit) CreateBlock(pc uint32) {
 			gojit.CallJit(&asm.Buf[0])
 		},
 	}
+
+    page.Blocks[blockIdx].CompareAndSwap(nil, newBlock)
 }
 
 func (j *Jit) emitOp(op uint32) bool {
@@ -426,11 +431,11 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 		//set  := (op >> 20) & 1 != 0
 		//rd   := (op >> 12) & 0xF
 		//rn   := (op >> 16) & 0xF
-		if op == 0xE0120000 {
-			//if inst == 0 && set && !imm && rd == 0 && rn == 2 {
-			//fmt.Printf("%08X\n", op)
-			return false
-		}
+		//if op == 0xE0120000 {
+		//	//if inst == 0 && set && !imm && rd == 0 && rn == 2 {
+		//	//fmt.Printf("%08X\n", op)
+		//	return false
+		//}
 
 		if rdpc := op&0xF000 == 0xF000; rdpc {
 			return false

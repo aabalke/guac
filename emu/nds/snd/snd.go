@@ -210,3 +210,19 @@ func (s *Snd) SoundClock(cycles uint32) {
 		s.sndCycles -= uint32(s.sampCycles)
 	}
 }
+
+const (
+	SAMP_MAX = 0x1ff
+	SAMP_MIN = -0x200
+)
+
+//go:inline
+func clip(v int32) int16 {
+	if v > SAMP_MAX {
+		return SAMP_MAX
+	}
+	if v < SAMP_MIN {
+		return SAMP_MIN
+	}
+	return int16(v)
+}

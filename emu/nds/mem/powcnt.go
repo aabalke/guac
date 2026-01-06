@@ -15,7 +15,7 @@ func (p *PowCnt) WriteCNT1(b, v uint32, ppu *ppu.PPU) {
 	case 0:
 
 		p.V &^= 0xFF
-		p.V |= uint16(v & 0b1111)
+		p.V |= uint16(v & 0xF)
 
 		ppu.LcdEnabled = (v>>0)&1 != 0
 		ppu.EngineA2D = (v>>1)&1 != 0

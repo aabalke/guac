@@ -230,19 +230,15 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 			pageIdx := pc >> PAGE_SHIFT
 			blockIdx := (pc & PAGE_MASK) >> 2 // aligned to word (arm)
 
-			if p := cpu.Jit.Pages[pageIdx]; p != nil &&
-				p.Blocks[blockIdx] != nil &&
-				p.Blocks[blockIdx].f != nil {
-
-				b := p.Blocks[blockIdx]
-				b.f()
-
-				//r[PC] = b.finalPc
-
-				cpu.isBranching = true
-
-				return b.finalOp, int(b.Length)
-			}
+            page := cpu.Jit.Pages[pageIdx].Load()
+            if page != nil && !page.dead.Load() {
+                block := page.Blocks[blockIdx].Load()
+                if block != nil && !block.Skip && block.f != nil {
+                    block.f()
+                    cpu.isBranching = true
+                    return block.finalOp, int(block.Length)
+                }
+            }
 
 			cpu.Jit.UpdateMetrics(pc)
 			cpu.Jit.DeletePages()
