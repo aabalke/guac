@@ -1,5 +1,6 @@
-package arm9
+{{if .A9 -}}package arm9{{else -}}package arm7{{end}}
 
+{{ if .A9 -}}
 const (
 	VEC_RESET         = 0xFFFF_0000
 	VEC_UND           = 0xFFFF_0004
@@ -11,7 +12,18 @@ const (
 	VEC_FIQ           = 0xFFFF_001C
 )
 
-
+{{ else -}}
+const (
+	VEC_RESET         = 0x0000_0000
+	VEC_UND           = 0x0000_0004
+	VEC_SWI           = 0x0000_0008
+	VEC_PREFETCHABORT = 0x0000_000C
+	VEC_DATAABORT     = 0x0000_0010
+	VEC_ADDR26BIT     = 0x0000_0014
+	VEC_IRQ           = 0x0000_0018
+	VEC_FIQ           = 0x0000_001C
+)
+{{end}}
 
 func (cpu *Cpu) Exception(addr uint32, mode uint32) {
 
@@ -46,12 +58,14 @@ func (cpu *Cpu) Exception(addr uint32, mode uint32) {
 	cpsr.T = false
 	cpsr.I = true
 
-    if cpu.LowVector {
+    {{if .A9 -}}
+
+	if cpu.LowVector {
 		r[PC] = addr & 0xFFFF
 		return
 	}
 
-    
+    {{end}}
 
 	r[PC] = addr
 }

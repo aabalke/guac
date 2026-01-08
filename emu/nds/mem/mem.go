@@ -265,7 +265,7 @@ func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
 }
 
 func (mem *Mem) WritePtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
-	//mem.Jit7.InvalidatePage(addr)
+	mem.Jit7.InvalidatePage(addr)
 	mem.Jit9.InvalidatePage(addr)
 
 	if arm9 {
@@ -287,14 +287,6 @@ func (mem *Mem) WritePtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
 	}
 
 	switch addr >> 24 {
-	case 0x0:
-
-		if addr < 0x4000 && (*mem.arm7Pc) < 0x4000 {
-			return unsafe.Add(unsafe.Pointer(&mem.Arm7Bios), addr), true
-		}
-
-		return nil, false
-
 	case 0x2:
 		return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr&0x3F_FFFF), true
 	case 0x3:
@@ -341,7 +333,7 @@ func (mem *Mem) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
 	switch addr >> 24 {
 	case 0x0:
 
-		if addr < 0x4000 && (*mem.arm7Pc) < 0x4000 {
+		if addr < 0x4000 { // do not limit based on pc, messes up jit arm7
 			return unsafe.Add(unsafe.Pointer(&mem.Arm7Bios), addr), true
 		}
 
@@ -360,7 +352,7 @@ func (mem *Mem) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
 
 func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 
-	//mem.Jit7.InvalidatePage(addr)
+	mem.Jit7.InvalidatePage(addr)
 	mem.Jit9.InvalidatePage(addr)
 
 	if arm9 {

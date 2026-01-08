@@ -1,10 +1,13 @@
-package arm7
+{{if .A9 -}}package arm9{{else -}}package arm7{{end}}
 
 import (
 	"math/bits"
 	"unsafe"
 
-	
+	{{if .A9 -}}
+	"math"
+    "github.com/aabalke/guac/emu/cpu/arm9/cp15"
+    {{end}}
 )
 
 const (
@@ -122,12 +125,17 @@ func (cpu *Cpu) Alu(op uint32) {
 					cpu.psrSwitch() // not sure if needed
 				}
 
+                {{if .A9 -}}
+                if r[PC]&1 != 0 {
+                    cpu.toggleThumb()
+                }
+                {{else -}}
                 if cpsr.T {
                     r[PC] &^= 0b1
                 } else {
                     r[PC] &^= 0b11
                 }
-                
+                {{end}}
 
 			} else {
 				cpsr.V = ((rnv^op2)&(rnv^uint32(res)))>>31 != 0
@@ -456,7 +464,13 @@ const (
 	SMULL = 0b110
 	SMLAL = 0b111
 
-    
+    {{if .A9 -}}
+	SMLAxy        = 0b1000
+	SMLAWySMLALWy = 0b1001
+	SMLALxy       = 0b1010
+	SMULxy        = 0b1011
+
+    {{end}}
 )
 
 func (cpu *Cpu) Mul(op uint32) {
@@ -541,7 +555,71 @@ func (cpu *Cpu) Mul(op uint32) {
 		return
 	}
 
-    
+    {{if .A9 -}}
+
+	x := (op >> 5) & 1
+	y := (op >> 6) & 1
+
+	switch inst {
+	case SMLAxy:
+
+		rmV := int64(int16((r[rm] >> (16 * x)) & 0xFFFF))
+		rsV := int64(int16((r[rs] >> (16 * y)) & 0xFFFF))
+		rnV := int64(int32(r[rn]))
+
+		res := rmV * rsV
+
+		res += rnV
+
+		r[rd] = uint32(res)
+
+		if res > math.MaxInt32 || res < math.MinInt32 {
+			cpsr.Q = true
+		}
+
+	case SMLAWySMLALWy:
+
+		rsV := int64(int16((r[rs] >> (16 * y) & 0xFFFF)))
+		rmV := int64(int32(r[rm]))
+		res := (rmV * rsV) >> 16
+
+		if smulwa := x == 0; smulwa {
+			add := int64(int32(r[rn]))
+
+			if res+add > math.MaxInt32 || res+add < math.MinInt32 {
+				cpsr.Q = true
+			}
+
+			res += add
+		}
+
+		r[rd] = uint32(res)
+
+	case SMLALxy:
+
+		rsV := int64(int16((r[rs] >> (16 * y) & 0xFFFF)))
+		rmV := int64(int16((r[rm] >> (16 * x) & 0xFFFF)))
+
+		res := rsV * rmV
+		add := int64(int32(r[rd]))<<32 | int64(int32(r[rn]))
+		res += add
+
+		r[rd] = uint32(res >> 32)
+		r[rn] = uint32(res)
+
+	case SMULxy:
+
+		rmV := int64(int16((r[rm] >> (16 * x)) & 0xFFFF))
+		rsV := int64(int16((r[rs] >> (16 * y)) & 0xFFFF))
+
+		res := rmV * rsV
+
+		r[rd] = uint32(res)
+	}
+
+	r[PC] += 4
+
+    {{end}}
 }
 
 const (
@@ -635,18 +713,19 @@ func (c *Cpu) Sdt(op uint32) {
 		prev = r[rn]
 	}
 
+    {{if not .A9 -}}
     //if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
 	// no alignment?
 	//}
-    
+    {{end}}
 
 	if load {
 		if byte {
 			// DO NOT WORD ALIGN
-			r[rd] = c.mem.Read8(prev, false)
+			r[rd] = c.mem.Read8(prev, {{.A9}})
 		} else {
 
-			v := c.mem.Read32(prev&^0b11, false)
+			v := c.mem.Read32(prev&^0b11, {{.A9}})
 			is := ((prev & 0b11) << 3) & 0x1F
 			r[rd] = bits.RotateLeft32(v, -int(is))
 
@@ -662,9 +741,9 @@ func (c *Cpu) Sdt(op uint32) {
 		}
 
 		if byte {
-			c.mem.Write8(prev, uint8(v), false)
+			c.mem.Write8(prev, uint8(v), {{.A9}})
 		} else {
-			c.mem.Write32(prev&^0b11, v, false)
+			c.mem.Write32(prev&^0b11, v, {{.A9}})
 		}
 	}
 
@@ -675,7 +754,22 @@ func (c *Cpu) Sdt(op uint32) {
 	r[PC] += 4
 }
 
+{{if .A9 -}}
+func (cpu *Cpu) BLX(op uint32) {
 
+	r := &cpu.Reg.R
+
+	r[14] = r[15] + 4
+
+	r[PC] += uint32((int32(op)<<8)>>6) + 8
+
+	if halfOffset := (op>>24)&1 != 0; halfOffset {
+		r[PC] += 2
+	}
+
+	cpu.Reg.CPSR.T = true
+}
+{{end}}
 
 func (cpu *Cpu) B(op uint32) {
 
@@ -720,8 +814,24 @@ func (cpu *Cpu) BX(op uint32) {
 		panic("Unsupported BXJ Instruction")
 	case INST_BLX:
 
+        {{if .A9 -}}
+
+		if rn == 14 {
+			// Using BLX R14 is possible (sets PC=Old_LR, and New_LR=retadr).
+			tmp := r[14]
+			r[14] = r[PC] + 4
+			r[PC] = tmp
+			cpu.toggleThumb()
+			return
+		}
+
+		r[14] = r[PC] + 4
+		r[PC] = r[rn]
+		cpu.toggleThumb()
+
+        {{else -}}
         panic("unsupported arm7 blx instruction")
-        
+        {{end}}
 	}
 }
 
@@ -784,7 +894,12 @@ func (c *Cpu) Half(op uint32) {
 			rdv += 12
 		}
 
-        
+        {{if .A9 -}}
+		rd2v := r[rd+1]
+		if rd+1 == PC {
+			rd2v += 12
+		}
+        {{end}}
 
 		if wb {
 			r[rn] = post
@@ -792,13 +907,25 @@ func (c *Cpu) Half(op uint32) {
 
 		switch inst {
 		case STRH:
-			c.mem.Write16(pre&^1, uint16(rdv), false)
+			c.mem.Write16(pre&^1, uint16(rdv), {{.A9}})
 
+        {{if .A9 -}}
+		case LDRD:
+			addr := pre &^ 0b111
+			r[rd] = c.mem.Read32(addr, {{.A9}})
+			r[rd+1] = c.mem.Read32(addr+4, {{.A9}})
+
+		case STRD:
+
+			addr := pre &^ 0b111
+			c.mem.Write32(addr, rdv, {{.A9}})
+			c.mem.Write32(addr+4, rd2v, {{.A9}})
+        {{else -}}
         case LDRD:
             panic("unsupported arm7 ldrd instruction")
         case STRD:
             panic("unsupported arm7 strd instruction")
-        
+        {{end}}
 		}
 
 		r[PC] += 4
@@ -811,15 +938,19 @@ func (c *Cpu) Half(op uint32) {
 
 	switch inst {
 	case LDRH:
-		v := uint32(c.mem.Read16(pre&^1, false))
+		v := uint32(c.mem.Read16(pre&^1, {{.A9}}))
 		is := (pre & 1) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
 
 	case LDRSB:
 		// sign-expand byte value
-		r[rd] = uint32(int32(int8(c.mem.Read8(pre, false))))
+		r[rd] = uint32(int32(int8(c.mem.Read8(pre, {{.A9}}))))
 
 	case LDRSH:
+        {{if .A9 -}}
+		// sign-expand half value
+		r[rd] = uint32(int32(int16(c.mem.Read16(pre&^1, {{.A9}}))))
+        {{else -}}
         // On ARM7 aka ARMv4 aka NDS7/GBA:
         // LDRSH Rd,[odd]  -->  LDRSB Rd,[odd];sign-expand BYTE value
         if misaligned := pre&1 != 0; misaligned {
@@ -829,7 +960,7 @@ func (c *Cpu) Half(op uint32) {
             // sign-expand half value
             r[rd] = uint32(int32(int16(c.mem.Read16(pre&^1, false))))
         }
-        
+        {{end}}
 	}
 
 	r[PC] += 4
@@ -987,21 +1118,389 @@ func (cpu *Cpu) Swp(op uint32) {
 	)
 
 	if isByte {
-		r[rd] = cpu.mem.Read8(rnv, false)
-		cpu.mem.Write8(rnv, uint8(rmv), false)
+		r[rd] = cpu.mem.Read8(rnv, {{.A9}})
+		cpu.mem.Write8(rnv, uint8(rmv), {{.A9}})
 	} else {
-		v := cpu.mem.Read32(rnv&^0b11, false)
+		v := cpu.mem.Read32(rnv&^0b11, {{.A9}})
 		is := (rnv & 0b11) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
-		cpu.mem.Write32(rnv&^0b11, rmv, false)
+		cpu.mem.Write32(rnv&^0b11, rmv, {{.A9}})
 	}
 
 	r[PC] += 4
 }
 
+{{if .A9}}
+
+const (
+	QADD  = 0
+	QSUB  = 2
+	QDADD = 4
+	QDSUB = 6
+)
+
+func (cpu *Cpu) Qalu(op uint32) {
+
+	var (
+		r    = &cpu.Reg.R
+		inst = (op >> 20) & 0xF
+		rnV  = int64(int32(r[(op>>16)&0xF]))
+		rmV  = int64(int32(r[op&0xF]))
+	)
+
+	if double := inst >= 4; double {
+
+		rnV *= 2
+
+		if rnV > math.MaxInt32 {
+			cpu.Reg.CPSR.Q = true
+			rnV = math.MaxInt32
+		}
+
+		if rnV < math.MinInt32 {
+			cpu.Reg.CPSR.Q = true
+			rnV = math.MinInt32
+		}
+	}
+
+	if inst == QADD || inst == QDADD {
+		rnV += rmV
+	} else {
+		rnV = rmV - rnV
+	}
+
+	if rnV > math.MaxInt32 {
+		cpu.Reg.CPSR.Q = true
+		rnV = math.MaxInt32
+	}
+
+	if rnV < math.MinInt32 {
+		cpu.Reg.CPSR.Q = true
+		rnV = math.MinInt32
+	}
+
+	rd := (op >> 12) & 0xF
+	r[rd] = uint32(rnV)
+
+	r[PC] += 4
+}
+
+func (cpu *Cpu) Clz(op uint32) {
+
+	r := &cpu.Reg.R
+	rm := op & 0xF
+	rd := (op >> 12) & 0xF
+	r[rd] = uint32(bits.LeadingZeros32(r[rm]))
+	r[PC] += 4
+}
+
+func (cpu *Cpu) CoDataReg(op uint32) {
+
+	var (
+		reg = cp15.CpRegister{
+			Op: uint8((op >> 21) & 0x7),
+			Cn: uint8((op >> 16) & 0xF),
+			Pn: uint8((op >> 8) & 0xF),
+			Cp: uint8((op >> 5) & 0x7),
+			Cm: uint8((op >> 0) & 0xF),
+		}
+
+		r  = &cpu.Reg.R
+		rd = (op >> 12) & 0xF
+	)
+
+	if (op >> 28) == 0xF {
+		panic("MRC2/MCR2")
+	}
+
+	if rd == 15 {
+		panic("SETUP PIPELINE OFFSET CO DATA REG")
+	}
+
+	if mrc := (op>>20)&1 == 1; mrc {
+		r[rd] = cpu.Cp15.Read(reg)
+		r[PC] += 4
+		return
+	}
+
+	if rd == 0 && (reg == cp15.HALT || reg == cp15.HALT2) {
+
+		if !cpu.Irq.IME {
+			panic("ARM9 CPU HALTED WITHOUT IME ENABLED")
+		}
+
+		cpu.Halted = true
+		r[15] += 4
+		return
+	}
+
+	cpu.Cp15.Write(r[rd], reg, &cpu.LowVector)
+	r[15] += 4
+}
 
 
+func (c *Cpu) Block(op uint32) {
 
+	var (
+		r     = &c.Reg.R
+		rlist = op & 0xFFFF
+		up    = (op>>23)&1 != 0
+		rn    = (op >> 16) & 0xF
+	)
+
+	if rlist == 0 {
+
+		r[PC] += 4
+
+		if up {
+			r[rn] += 0x40
+			return
+		}
+
+		r[rn] -= 0x40
+		return
+	}
+
+	var (
+		pcIncluded = rlist&0x8000 != 0
+		rnIncluded = (rlist>>rn)&1 != 0
+		pre        = (op>>24)&1 != 0
+		psr        = (op>>22)&1 != 0
+		wb         = (op>>21)&1 != 0
+		load       = (op>>20)&1 != 0
+		forceUser  = psr && (c.Reg.CPSR.Mode != MODE_USR) && (!load || !pcIncluded)
+		addr       = r[rn] &^ 0b11
+		regCount   = uint32(bits.OnesCount32(rlist))
+		wbValue    = r[rn]
+		// fiq switch has additional r8 - r12 use mode switch registers
+		forceFIQSwitch = forceUser && c.Reg.CPSR.Mode == MODE_FIQ
+	)
+
+	if up {
+		wbValue += regCount * 4
+	} else {
+		wbValue -= regCount * 4
+	}
+
+	rnRef := &c.Reg.R[rn]
+	switch {
+	case forceFIQSwitch:
+
+		switch {
+		case rn == 13:
+			rnRef = &c.Reg.SP[BANK_ID[MODE_USR]]
+		case rn == 14:
+			rnRef = &c.Reg.LR[BANK_ID[MODE_USR]]
+		case rn >= 8:
+			rnRef = &c.Reg.USR[rn-8]
+
+		}
+
+	case forceUser:
+		switch {
+		case rn == 13:
+			rnRef = &c.Reg.SP[BANK_ID[MODE_USR]]
+		case rn == 14:
+			rnRef = &c.Reg.LR[BANK_ID[MODE_USR]]
+		}
+	}
+
+	var (
+		rnv = *rnRef
+		reg = uint32(0)
+
+		p unsafe.Pointer
+	)
+
+	if !up {
+		reg = 15
+	}
+
+	if load {
+		p, _ = c.mem.ReadPtr(addr, {{.A9}})
+	} else {
+		p, _ = c.mem.WritePtr(addr, {{.A9}})
+	}
+
+	for range 16 {
+
+		if disabled := (rlist>>reg)&1 == 0; disabled {
+			if up {
+				reg++
+			} else {
+				reg--
+			}
+			continue
+		}
+
+		ref := &c.Reg.R[reg]
+		switch {
+		case forceFIQSwitch:
+
+			switch {
+			case reg == 13:
+				ref = &c.Reg.SP[BANK_ID[MODE_USR]]
+			case reg == 14:
+				ref = &c.Reg.LR[BANK_ID[MODE_USR]]
+			case reg >= 8:
+				ref = &c.Reg.USR[reg-8]
+			}
+
+		case forceUser:
+			switch {
+			case reg == 13:
+				ref = &c.Reg.SP[BANK_ID[MODE_USR]]
+			case reg == 14:
+				ref = &c.Reg.LR[BANK_ID[MODE_USR]]
+			}
+		}
+
+		if pre {
+			if up {
+				if p != nil {
+					p = unsafe.Add(p, 4)
+				} else {
+					addr += 4
+				}
+			} else {
+				if p != nil {
+					p = unsafe.Add(p, -4)
+				} else {
+					addr -= 4
+				}
+			}
+		}
+
+		if load {
+
+			if p == nil {
+				*ref = c.mem.Read32(addr, {{.A9}})
+			} else {
+				*ref = *(*uint32)(p)
+			}
+
+		} else {
+
+			if p == nil {
+				switch reg {
+				case rn:
+					c.mem.Write32(addr, rnv, {{.A9}})
+				case PC:
+					c.mem.Write32(addr, *ref+12, {{.A9}})
+				default:
+					c.mem.Write32(addr, *ref, {{.A9}})
+				}
+			} else {
+				switch reg {
+				case rn:
+					*(*uint32)(p) = rnv
+				case PC:
+					*(*uint32)(p) = *ref + 12
+				default:
+					*(*uint32)(p) = *ref
+				}
+			}
+		}
+
+		if !pre {
+			if up {
+				if p != nil {
+					p = unsafe.Add(p, 4)
+				} else {
+					addr += 4
+				}
+			} else {
+				if p != nil {
+					p = unsafe.Add(p, -4)
+				} else {
+					addr -= 4
+				}
+			}
+		}
+
+		if up {
+			reg++
+		} else {
+			reg--
+		}
+	}
+
+	if !load {
+		if wb {
+			r[rn] = wbValue
+		}
+
+		r[PC] += 4
+		return
+	}
+
+	if wb {
+		if rnIncluded {
+			isLast := (rlist < (1 << (rn + 1)))
+			isOnly := regCount == 1
+			if !isLast || isOnly {
+				r[rn] = wbValue
+			}
+		} else {
+			r[rn] = wbValue
+		}
+	}
+
+	if !pcIncluded {
+		r[PC] += 4
+		return
+	}
+
+	if !psr {
+		c.toggleThumb()
+		return
+	}
+
+	var (
+		curr = c.Reg.CPSR.Mode
+		spsr = c.Reg.SPSR[BANK_ID[curr]]
+		next = spsr.Mode
+	)
+
+	c.Reg.CPSR = spsr
+
+	if curr == MODE_USR {
+		panic("USER MODE LDM PC CHANGE")
+	}
+
+	if curr != MODE_FIQ {
+		for i := range 5 {
+			c.Reg.USR[i] = r[8+i]
+		}
+	}
+
+	c.Reg.SP[BANK_ID[curr]] = r[SP]
+	c.Reg.LR[BANK_ID[curr]] = r[LR]
+
+	if curr == MODE_FIQ {
+		for i := range 5 {
+			c.Reg.FIQ[i] = r[8+i]
+		}
+	}
+
+	if next != MODE_FIQ {
+		for i := range 5 {
+			r[8+i] = c.Reg.USR[i]
+		}
+	}
+
+	r[SP] = c.Reg.SP[BANK_ID[next]]
+	r[LR] = c.Reg.LR[BANK_ID[next]]
+
+	if next == MODE_FIQ {
+		for i := range 5 {
+			r[8+i] = c.Reg.FIQ[i]
+		}
+	}
+}
+{{end}}
+
+{{if not .A9}}
 
 func (c *Cpu) Block(op uint32) {
 
@@ -1269,4 +1768,4 @@ func (c *Cpu) Block(op uint32) {
 		}
 	}
 }
-
+{{end}}

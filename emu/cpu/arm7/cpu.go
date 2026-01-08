@@ -1,16 +1,20 @@
 package arm7
 
 import (
+    "fmt"
 	"unsafe"
 
 	"github.com/aabalke/guac/emu/cpu"
+    
 )
 
 type Cpu struct {
+	Reg    Reg
 	mem    cpu.MemoryInterface
 	Irq    *cpu.Irq
-	Reg    Reg
 	Halted bool
+
+    
 
 	PcPtr       unsafe.Pointer
 	PcOff       int
@@ -18,6 +22,9 @@ type Cpu struct {
 	BranchPc    uint32
 	LoopCnt     uint32
 	LoopLen     uint32
+
+	Jit *Jit
+    jitEnabled bool
 }
 
 const (
@@ -41,16 +48,11 @@ const (
 	MODE_ABT = 0x17
 	MODE_UND = 0x1B
 	MODE_SYS = 0x1F
-
-	BIOS_STARTUP  = 0
-	BIOS_SWI      = 1
-	BIOS_IRQ      = 2
-	BIOS_IRQ_POST = 3
 )
 
 func (cpu *Cpu) CheckCond(cond uint32) bool {
 
-	cpsr := cpu.Reg.CPSR
+	cpsr := &cpu.Reg.CPSR
 
 	switch cond {
 	case 0xE: // AL (always)
@@ -98,22 +100,20 @@ var BANK_ID = map[uint32]uint32{
 	MODE_UND: 5,
 }
 
-var BIOS_ADDR = map[uint32]uint32{
-	BIOS_STARTUP:  0xE129F000,
-	BIOS_SWI:      0xE3A02004,
-	BIOS_IRQ:      0xE25EF004,
-	BIOS_IRQ_POST: 0xE55EC002,
-}
+func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq) *Cpu {
 
-func NewCpu(mem cpu.MemoryInterface, irq *cpu.Irq) *Cpu {
 
 	c := &Cpu{
-		mem: mem,
-		Irq: irq,
+		mem:  m,
+		Irq:  irq,
+        jitEnabled: jitEnabled,
+        
 	}
 
 	// skip bios
 	c.Irq.IME = true
+
+	c.Jit = NewJit(c)
 
 	return c
 }
@@ -174,29 +174,30 @@ func (c *Cond) Get() uint32 {
 }
 
 func (c *Cond) Set(v uint32) {
-	c.N = (v>>FLAG_N)&1 == 1
-	c.Z = (v>>FLAG_Z)&1 == 1
-	c.C = (v>>FLAG_C)&1 == 1
-	c.V = (v>>FLAG_V)&1 == 1
-	c.Q = (v>>FLAG_Q)&1 == 1
-	c.I = (v>>FLAG_I)&1 == 1
-	c.F = (v>>FLAG_F)&1 == 1
-	c.T = (v>>FLAG_T)&1 == 1
+	c.N = (v>>FLAG_N)&1 != 0
+	c.Z = (v>>FLAG_Z)&1 != 0
+	c.C = (v>>FLAG_C)&1 != 0
+	c.V = (v>>FLAG_V)&1 != 0
+	c.Q = (v>>FLAG_Q)&1 != 0
+	c.I = (v>>FLAG_I)&1 != 0
+	c.F = (v>>FLAG_F)&1 != 0
+	c.T = (v>>FLAG_T)&1 != 0
 	c.Mode = v & 0x1F
 }
 
 func (cpu *Cpu) toggleThumb() {
 
-	reg := &cpu.Reg
+	r := &cpu.Reg.R
+	cpsr := &cpu.Reg.CPSR
 
-	reg.CPSR.T = reg.R[PC]&1 > 0
+	cpsr.T = r[PC]&1 != 0
 
-	if reg.CPSR.T {
-		reg.R[PC] &^= 1
+	if cpsr.T {
+		r[PC] &^= 1
 		return
 	}
 
-	reg.R[PC] &^= 3
+	r[PC] &^= 3
 }
 
 func (cpu *Cpu) CheckIrq() {
@@ -220,6 +221,26 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 	if cpu.isBranching {
 		cpu.isBranching = false
 		cpu.PcOff = 0
+
+		if cpu.jitEnabled {
+
+			pc := r[PC]
+			pageIdx := pc >> PAGE_SHIFT
+			blockIdx := (pc & PAGE_MASK) >> 2 // aligned to word (arm)
+
+            page := cpu.Jit.Pages[pageIdx].Load()
+            if page != nil && !page.dead.Load() {
+                block := page.Blocks[blockIdx].Load()
+                if block != nil && !block.Skip && block.f != nil {
+                    block.f()
+                    cpu.isBranching = true
+                    return block.finalOp, int(block.Length)
+                }
+            }
+
+			cpu.Jit.DeletePages()
+			cpu.Jit.UpdateMetrics(pc)
+		}
 
 		if r[PC] != cpu.BranchPc {
 			cpu.PcPtr = nil
@@ -283,4 +304,38 @@ func (cpu *Cpu) GetOpThumb() uint16 {
 	cpu.isBranching = (op >> 14) != 0
 
 	return op
+}
+
+var (
+	t_rpc uint32
+	t_sav Reg
+	t_sta Reg
+)
+
+func (c *Cpu) TestStart(op uint32, f func(op uint32), compare bool) {
+
+	if !compare {
+		return
+	}
+
+	t_rpc = c.Reg.R[15]
+	t_sta = c.Reg
+
+	f(op)
+
+	t_sav = c.Reg
+
+	c.Reg = t_sta
+}
+
+func (c *Cpu) EndTest(op uint32, compare bool) {
+
+	if !(compare && c.Reg != t_sav) {
+		return
+	}
+
+	fmt.Printf("STA REG %08X CPSR %08X\n", t_sta.R, t_sta.CPSR.Get())
+	fmt.Printf("NEW REG %08X CPSR %08X\n", t_sav.R, t_sav.CPSR.Get())
+	fmt.Printf("ORI REG %08X CPSR %08X\n", c.Reg.R, c.Reg.CPSR.Get())
+	panic(fmt.Sprintf("Bad Compare %08X %08X", t_rpc, op))
 }

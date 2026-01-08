@@ -93,8 +93,8 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 	cp15 := &cp15.Cp15{}
 	cp15.Init(&nds.mem)
 
-	nds.arm7 = arm7.NewCpu(&nds.mem, &irq7)
-	nds.arm9 = arm9.NewCpu(&nds.mem, &irq9, cp15)
+	nds.arm7 = arm7.NewCpu(config.Conf.Nds.NdsJit.Enabled, &nds.mem, &irq7)
+	nds.arm9 = arm9.NewCpu(config.Conf.Nds.NdsJit.Enabled, &nds.mem, &irq9, cp15)
 
 	s := snd.NewSnd(
 		audioCtx,
@@ -108,8 +108,7 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 		&nds.arm7.Halted, &nds.arm9.Halted,
 		&nds.dma7, &nds.dma9,
 		&irq7, &irq9,
-		//nds.arm7.Jit, nds.arm9.Jit,
-		nil, nds.arm9.Jit,
+		nds.arm7.Jit, nds.arm9.Jit,
 		&nds.Cartridge, nds.ppu, s, path+".save")
 
 	s.Mem = &nds.mem

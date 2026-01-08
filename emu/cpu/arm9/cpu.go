@@ -1,15 +1,13 @@
 package arm9
 
 import (
-	"fmt"
+    "fmt"
 	"unsafe"
 
-	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/cpu"
-	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
+    "github.com/aabalke/guac/emu/cpu/arm9/cp15"
+    
 )
-
-var _ = fmt.Sprint
 
 type Cpu struct {
 	Reg    Reg
@@ -17,9 +15,10 @@ type Cpu struct {
 	Irq    *cpu.Irq
 	Halted bool
 
-	LowVector bool
-
+    LowVector bool
 	Cp15 *cp15.Cp15
+
+    
 
 	PcPtr       unsafe.Pointer
 	PcOff       int
@@ -29,6 +28,7 @@ type Cpu struct {
 	LoopLen     uint32
 
 	Jit *Jit
+    jitEnabled bool
 }
 
 const (
@@ -104,12 +104,15 @@ var BANK_ID = map[uint32]uint32{
 	MODE_UND: 5,
 }
 
-func NewCpu(m cpu.MemoryInterface, irq *cpu.Irq, cp15 *cp15.Cp15) *Cpu {
+func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq, cp15 *cp15.Cp15) *Cpu {
+
 
 	c := &Cpu{
 		mem:  m,
 		Irq:  irq,
-		Cp15: cp15,
+        jitEnabled: jitEnabled,
+        Cp15: cp15,
+        
 	}
 
 	// skip bios
@@ -176,14 +179,14 @@ func (c *Cond) Get() uint32 {
 }
 
 func (c *Cond) Set(v uint32) {
-	c.N = (v>>FLAG_N)&1 == 1
-	c.Z = (v>>FLAG_Z)&1 == 1
-	c.C = (v>>FLAG_C)&1 == 1
-	c.V = (v>>FLAG_V)&1 == 1
-	c.Q = (v>>FLAG_Q)&1 == 1
-	c.I = (v>>FLAG_I)&1 == 1
-	c.F = (v>>FLAG_F)&1 == 1
-	c.T = (v>>FLAG_T)&1 == 1
+	c.N = (v>>FLAG_N)&1 != 0
+	c.Z = (v>>FLAG_Z)&1 != 0
+	c.C = (v>>FLAG_C)&1 != 0
+	c.V = (v>>FLAG_V)&1 != 0
+	c.Q = (v>>FLAG_Q)&1 != 0
+	c.I = (v>>FLAG_I)&1 != 0
+	c.F = (v>>FLAG_F)&1 != 0
+	c.T = (v>>FLAG_T)&1 != 0
 	c.Mode = v & 0x1F
 }
 
@@ -224,7 +227,7 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 		cpu.isBranching = false
 		cpu.PcOff = 0
 
-		if config.Conf.Nds.NdsJit.Enabled {
+		if cpu.jitEnabled {
 
 			pc := r[PC]
 			pageIdx := pc >> PAGE_SHIFT
@@ -240,8 +243,8 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
                 }
             }
 
-			cpu.Jit.UpdateMetrics(pc)
 			cpu.Jit.DeletePages()
+			cpu.Jit.UpdateMetrics(pc)
 		}
 
 		if r[PC] != cpu.BranchPc {

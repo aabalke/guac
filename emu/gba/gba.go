@@ -148,7 +148,7 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 
 	gba.Irq = cpu.Irq{}
 	gba.Mem = NewMemory(&gba)
-	gba.Cpu = arm7.NewCpu(&gba.Mem, &gba.Irq)
+	gba.Cpu = arm7.NewCpu(config.Conf.Nds.NdsJit.Enabled, &gba.Mem, &gba.Irq)
 
 	gba.PPU.gba = &gba
 
@@ -181,7 +181,7 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 
 	startScanline := uint32(0)
 
-	gba.Mem.BIOS_MODE = arm7.BIOS_STARTUP
+	//gba.Mem.BIOS_MODE = arm7.BIOS_STARTUP
 	gba.Mem.IO[0x6] = uint8(startScanline)
 	gba.AccCycles = CYCLES_SCANLINE*startScanline + 859
 

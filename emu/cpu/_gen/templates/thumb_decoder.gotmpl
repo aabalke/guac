@@ -1,4 +1,4 @@
-package arm7
+{{if .A9 -}}package arm9{{else -}}package arm7{{end}}
 
 import (
 	"fmt"
@@ -9,7 +9,10 @@ func (c *Cpu) DecodeTHUMB() (int, bool) {
 	op := c.GetOpThumb()
 
 	switch {
-    
+    {{if .A9 -}}
+	case isThumbBkpt(op):
+        panic("unsetup arm9 thumb bkpt")
+    {{end}}
 	case isthumbSWI(op):
 		c.Exception(VEC_SWI, MODE_SWI)
 	case isThumbAddSub(op):
@@ -63,7 +66,15 @@ func isThumbOpFormat(op, mask, fmt uint16) bool {
 	return op&mask == fmt
 }
 
-
+{{if .A9 -}}
+//go:inline
+func isThumbBkpt(op uint16) bool {
+	return isThumbOpFormat(op,
+        0b1011_1110_0000_0000,
+        0b1111_1111_0000_0000,
+	)
+}
+{{end}}
 
 //go:inline
 func isThumbShift(op uint16) bool {

@@ -10,7 +10,7 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 
 	op, cycles := cpu.GetOpArm()
 
-	switch cond := op >> 28; cond {
+    switch cond := op >> 28; cond {
 	case 0xF:
 
 		switch {
@@ -36,6 +36,7 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 			return cycles + 1, true
 		}
 	}
+    
 
 	if swi := (op>>24)&0xF == 0xF; swi {
 		cpu.Exception(VEC_SWI, MODE_SWI)
@@ -43,8 +44,10 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 	}
 
 	switch {
+    
 	case isBkpt(op):
 		cpu.Exception(VEC_PREFETCHABORT, MODE_ABT)
+    
 	case isB(op):
 		cpu.B(op)
 	case isBX(op):
@@ -56,21 +59,25 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 	case isHalf(op):
 		cpu.Half(op)
 	case isUD(op):
-		panic("Need Undefined functionality")
+		panic("unsetup undefined instruction")
 	case isPSR(op):
 		cpu.Psr(op)
 	case isSWP(op):
 		cpu.Swp(op)
 	case isM(op):
 		cpu.Mul(op)
+    
 	case isCLZ(op):
 		cpu.Clz(op)
 	case isQAlu(op):
 		cpu.Qalu(op)
+    
 	case isALU(op):
 		cpu.Alu(op)
+    
 	case isCoDataReg(op):
 		cpu.CoDataReg(op)
+    
 	default:
 		fmt.Printf("Unable to Decode ARM 9 %08X, at PC %08X\n", op, r[PC])
 		return 0, false
@@ -123,6 +130,7 @@ func isCoDataReg(op uint32) bool {
 		0b0000_1110_0000_0000_0000_0000_0000_0000,
 	)
 }
+
 
 //go:inline
 func isSWP(op uint32) bool {

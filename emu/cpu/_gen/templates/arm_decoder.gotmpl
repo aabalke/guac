@@ -1,4 +1,4 @@
-package arm7
+{{if .A9 -}}package arm9{{else -}}package arm7{{end}}
 
 import (
 	"fmt"
@@ -10,11 +10,39 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 
 	op, cycles := cpu.GetOpArm()
 
+    {{ if .A9 -}}
+	switch cond := op >> 28; cond {
+	case 0xF:
+
+		switch {
+		case isBLX(op):
+			cpu.BLX(op)
+			return cycles + 1, true
+
+		case isPLD(op):
+			fmt.Printf("PC %08X OPCODE %08X CPSR %08X\n", r[PC], op, cpu.Reg.CPSR)
+			panic("PLD")
+			return cycles + 1, true
+		}
+
+	case 0xE:
+		if isBkpt(op) {
+			cpu.Exception(VEC_PREFETCHABORT, MODE_ABT)
+			return cycles + 1, true
+		}
+
+	default:
+		if !cpu.CheckCond(cond) {
+			r[PC] += 4
+			return cycles + 1, true
+		}
+	}
+    {{else -}}
     if !cpu.CheckCond(op >> 28) {
         r[PC] += 4
         return cycles + 1, true
     }
-    
+    {{end}}
 
 	if swi := (op>>24)&0xF == 0xF; swi {
 		cpu.Exception(VEC_SWI, MODE_SWI)
@@ -22,7 +50,10 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 	}
 
 	switch {
-    
+    {{if .A9}}
+	case isBkpt(op):
+		cpu.Exception(VEC_PREFETCHABORT, MODE_ABT)
+    {{end}}
 	case isB(op):
 		cpu.B(op)
 	case isBX(op):
@@ -41,10 +72,18 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 		cpu.Swp(op)
 	case isM(op):
 		cpu.Mul(op)
-    
+    {{if .A9}}
+	case isCLZ(op):
+		cpu.Clz(op)
+	case isQAlu(op):
+		cpu.Qalu(op)
+    {{end}}
 	case isALU(op):
 		cpu.Alu(op)
-    
+    {{if .A9}}
+	case isCoDataReg(op):
+		cpu.CoDataReg(op)
+    {{end}}
 	default:
 		fmt.Printf("Unable to Decode ARM 9 %08X, at PC %08X\n", op, r[PC])
 		return 0, false
@@ -58,7 +97,47 @@ func isOpFormat(op, mask, format uint32) bool {
 	return op&mask == format
 }
 
+{{if .A9 -}}
+//go:inline
+func isBLX(op uint32) bool {
+	return isOpFormat(op,
+		0b1111_1110_0000_0000_0000_0000_0000_0000,
+		0b1111_1010_0000_0000_0000_0000_0000_0000,
+	)
+}
 
+//go:inline
+func isBkpt(op uint32) bool {
+	return isOpFormat(op,
+		0b1111_1111_1111_0000_0000_0000_1111_0000,
+		0b1110_0001_0010_0000_0000_0000_0111_0000,
+	)
+}
+
+//go:inline
+func isCLZ(op uint32) bool {
+	return isOpFormat(op,
+		0b0000_1111_1111_1111_0000_1111_1111_0000,
+		0b0000_0001_0110_1111_0000_1111_0001_0000,
+	)
+}
+
+//go:inline
+func isQAlu(op uint32) bool {
+	return isOpFormat(op,
+		0b0000_1111_1001_0000_0000_1111_1111_0000,
+		0b0000_0001_0000_0000_0000_0000_0101_0000,
+	)
+}
+
+//go:inline
+func isCoDataReg(op uint32) bool {
+	return isOpFormat(op,
+		0b0000_1111_0000_0000_0000_0000_0000_0000,
+		0b0000_1110_0000_0000_0000_0000_0000_0000,
+	)
+}
+{{end}}
 
 //go:inline
 func isSWP(op uint32) bool {

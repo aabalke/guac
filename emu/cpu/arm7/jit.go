@@ -1,4 +1,4 @@
-package arm9
+package arm7
 
 import (
     "fmt"
@@ -226,7 +226,7 @@ func (j *Jit) CreateBlock(pc uint32) {
 	tempPc := pc
 	var length, op, i uint32
 
-	p, ok := j.Cpu.mem.ReadPtr(tempPc, true)
+	p, ok := j.Cpu.mem.ReadPtr(tempPc, false)
 	if !ok {
 		panic("READ BAD")
 	}
@@ -234,7 +234,7 @@ func (j *Jit) CreateBlock(pc uint32) {
 	for {
 		op = *(*uint32)(unsafe.Add(p, i*4))
 
-        if i >= config.Conf.Nds.NdsJit.BatchInstA9 {
+        if i >= config.Conf.Nds.NdsJit.BatchInstA7 {
         
 
 			length += i
@@ -367,12 +367,6 @@ func (j *Jit) emitCond(op uint32) []func() {
 //go:inline
 func (jit *Jit) DecodeARM(op uint32) bool {
 
-    switch {
-	case isBLX(op):
-		return false
-	case isPLD(op):
-		return false
-	}
     
 
 	if swi := op&0xF00_0000 == 0xF00_0000; swi {
@@ -380,7 +374,6 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 	}
 
 	switch {
-    case isBkpt(op):
     
 	case isB(op):
 	case isBX(op):
@@ -393,16 +386,7 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 
 		jit.emitSdt(op)
 		return true
-    case isBlock(op):
-
-		load := (op>>20)&1 != 0
-		pcIncluded := op&0x8000 != 0
-		if pcIncluded && load {
-			return false
-		}
-
-		jit.emitBlock(op)
-		return true
+    
 
 	case isHalf(op):
 
@@ -410,6 +394,12 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 		if rdpc := op&0xF000 == 0xF000; rdpc && load {
 			return false
 		}
+
+        inst := (op >> 5) & 0b11
+        if load && inst == LDRSH {
+			return false
+        }
+        
 
 		jit.emitHalf(op)
 		return true
@@ -421,14 +411,19 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 	case isM(op):
 		jit.emitMul(op)
 		return true
-    case isCLZ(op):
-		jit.emitClz(op)
-		return true
-	case isQAlu(op):
-		jit.emitQalu(op)
-		return true
     
 	case isALU(op):
+
+		//inst := (op >> 21) & 0xF
+		//imm  := (op >> 25) & 1 != 0
+		//set  := (op >> 20) & 1 != 0
+		//rd   := (op >> 12) & 0xF
+		//rn   := (op >> 16) & 0xF
+		//if op == 0xE0120000 {
+		//	//if inst == 0 && set && !imm && rd == 0 && rn == 2 {
+		//	//fmt.Printf("%08X\n", op)
+		//	return false
+		//}
 
 		if rdpc := op&0xF000 == 0xF000; rdpc {
 			return false
@@ -441,7 +436,6 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 		jit.emitAlu(op)
 		return true
 
-    case isCoDataReg(op):
     
 	}
 
@@ -450,7 +444,6 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 
 func (j *Jit) TestInst(op uint32, f func(op uint32)) {
 
-	//asm, err := gojit.New(gojit.PageSize)
 	asm, err := gojit.New(gojit.PageSize)
 	if err != nil {
 		panic(err)
@@ -476,32 +469,32 @@ func (j *Jit) TestInst(op uint32, f func(op uint32)) {
 
 //go:nosplit
 func Read(addr uint32) uint32 {
-	return CpuPointer.mem.Read8(addr, true)
+	return CpuPointer.mem.Read8(addr, false)
 }
 
 //go:nosplit
 func Read16(addr uint32) uint32 {
-	return CpuPointer.mem.Read16(addr, true)
+	return CpuPointer.mem.Read16(addr, false)
 }
 
 //go:nosplit
 func Read32(addr uint32) uint32 {
-	return CpuPointer.mem.Read32(addr, true)
+	return CpuPointer.mem.Read32(addr, false)
 }
 
 //go:nosplit
 func Write(addr uint32, v uint8) {
-	CpuPointer.mem.Write8(addr, v, true)
+	CpuPointer.mem.Write8(addr, v, false)
 }
 
 //go:nosplit
 func Write16(addr uint32, v uint16) {
-	CpuPointer.mem.Write16(addr, v, true)
+	CpuPointer.mem.Write16(addr, v, false)
 }
 
 //go:nosplit
 func Write32(addr, v uint32) {
-	CpuPointer.mem.Write32(addr, v, true)
+	CpuPointer.mem.Write32(addr, v, false)
 }
 
 func (j *Jit) CallFunc(f any) {
