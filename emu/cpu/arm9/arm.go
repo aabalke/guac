@@ -4,9 +4,8 @@ import (
 	"math/bits"
 	"unsafe"
 
+	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
 	"math"
-    "github.com/aabalke/guac/emu/cpu/arm9/cp15"
-    
 )
 
 const (
@@ -49,8 +48,8 @@ func (cpu *Cpu) Alu(op uint32) {
 		op2 uint32
 	)
 
-    //compare := rd != PC
-    //cpu.Jit.StartTest(op, compare, cpu.Jit.emitAlu)
+	//compare := rd != PC
+	//cpu.Jit.StartTest(op, compare, cpu.Jit.emitAlu)
 
 	if imm {
 
@@ -127,10 +126,9 @@ func (cpu *Cpu) Alu(op uint32) {
 					cpu.psrSwitch() // not sure if needed
 				}
 
-                if r[PC]&1 != 0 {
-                    cpu.toggleThumb()
-                }
-                
+				if r[PC]&1 != 0 {
+					cpu.toggleThumb()
+				}
 
 			} else {
 				cpsr.V = ((rnv^op2)&(rnv^uint32(res)))>>31 != 0
@@ -459,12 +457,10 @@ const (
 	SMULL = 0b110
 	SMLAL = 0b111
 
-    SMLAxy        = 0b1000
+	SMLAxy        = 0b1000
 	SMLAWySMLALWy = 0b1001
 	SMLALxy       = 0b1010
 	SMULxy        = 0b1011
-
-    
 )
 
 func (cpu *Cpu) Mul(op uint32) {
@@ -502,7 +498,7 @@ func (cpu *Cpu) Mul(op uint32) {
 		return
 
 	case UMAAL:
-        panic("unsupported umaal instruction")
+		panic("unsupported umaal instruction")
 
 	case UMULL, UMLAL:
 
@@ -549,7 +545,7 @@ func (cpu *Cpu) Mul(op uint32) {
 		return
 	}
 
-    x := (op >> 5) & 1
+	x := (op >> 5) & 1
 	y := (op >> 6) & 1
 
 	switch inst {
@@ -611,7 +607,6 @@ func (cpu *Cpu) Mul(op uint32) {
 
 	r[PC] += 4
 
-    
 }
 
 const (
@@ -705,8 +700,6 @@ func (c *Cpu) Sdt(op uint32) {
 		prev = r[rn]
 	}
 
-    
-
 	if load {
 		if byte {
 			// DO NOT WORD ALIGN
@@ -757,7 +750,6 @@ func (cpu *Cpu) BLX(op uint32) {
 	cpu.Reg.CPSR.T = true
 }
 
-
 func (cpu *Cpu) B(op uint32) {
 
 	if immLoop := op == 0xEAFFFFFE; immLoop {
@@ -801,7 +793,7 @@ func (cpu *Cpu) BX(op uint32) {
 		panic("Unsupported BXJ Instruction")
 	case INST_BLX:
 
-        if rn == 14 {
+		if rn == 14 {
 			// Using BLX R14 is possible (sets PC=Old_LR, and New_LR=retadr).
 			tmp := r[14]
 			r[14] = r[PC] + 4
@@ -814,7 +806,6 @@ func (cpu *Cpu) BX(op uint32) {
 		r[PC] = r[rn]
 		cpu.toggleThumb()
 
-        
 	}
 }
 
@@ -877,11 +868,10 @@ func (c *Cpu) Half(op uint32) {
 			rdv += 12
 		}
 
-        rd2v := r[rd+1]
+		rd2v := r[rd+1]
 		if rd+1 == PC {
 			rd2v += 12
 		}
-        
 
 		if wb {
 			r[rn] = post
@@ -891,7 +881,7 @@ func (c *Cpu) Half(op uint32) {
 		case STRH:
 			c.mem.Write16(pre&^1, uint16(rdv), true)
 
-        case LDRD:
+		case LDRD:
 			addr := pre &^ 0b111
 			r[rd] = c.mem.Read32(addr, true)
 			r[rd+1] = c.mem.Read32(addr+4, true)
@@ -901,7 +891,7 @@ func (c *Cpu) Half(op uint32) {
 			addr := pre &^ 0b111
 			c.mem.Write32(addr, rdv, true)
 			c.mem.Write32(addr+4, rd2v, true)
-        
+
 		}
 
 		r[PC] += 4
@@ -923,9 +913,9 @@ func (c *Cpu) Half(op uint32) {
 		r[rd] = uint32(int32(int8(c.mem.Read8(pre, true))))
 
 	case LDRSH:
-        // sign-expand half value
+		// sign-expand half value
 		r[rd] = uint32(int32(int16(c.mem.Read16(pre&^1, true))))
-        
+
 	}
 
 	r[PC] += 4
@@ -1095,8 +1085,6 @@ func (cpu *Cpu) Swp(op uint32) {
 	r[PC] += 4
 }
 
-
-
 const (
 	QADD  = 0
 	QSUB  = 2
@@ -1202,7 +1190,6 @@ func (cpu *Cpu) CoDataReg(op uint32) {
 	cpu.Cp15.Write(r[rd], reg, &cpu.LowVector)
 	r[15] += 4
 }
-
 
 func (c *Cpu) Block(op uint32) {
 
@@ -1463,6 +1450,3 @@ func (c *Cpu) Block(op uint32) {
 		}
 	}
 }
-
-
-

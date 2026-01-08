@@ -439,9 +439,9 @@ func (cpu *Cpu) thumbSdt(op uint16) {
 
 		case THUMB_LDSH:
 
-            // sign-expand half value
+			// sign-expand half value
 			r[rd] = uint32(int32(int16(cpu.mem.Read16(addr&^1, true))))
-            
+
 		}
 
 		r[PC] += 2
@@ -592,8 +592,7 @@ func (cpu *Cpu) thumbPushPop(op uint16) {
 			r[PC] = cpu.mem.Read32(r[SP], true)
 		}
 
-        cpu.toggleThumb()
-        
+		cpu.toggleThumb()
 
 		r[SP] += 4
 		return

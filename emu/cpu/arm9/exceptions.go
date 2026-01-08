@@ -11,8 +11,6 @@ const (
 	VEC_FIQ           = 0xFFFF_001C
 )
 
-
-
 func (cpu *Cpu) Exception(addr uint32, mode uint32) {
 
 	var (
@@ -46,12 +44,10 @@ func (cpu *Cpu) Exception(addr uint32, mode uint32) {
 	cpsr.T = false
 	cpsr.I = true
 
-    if cpu.LowVector {
+	if cpu.LowVector {
 		r[PC] = addr & 0xFFFF
 		return
 	}
-
-    
 
 	r[PC] = addr
 }

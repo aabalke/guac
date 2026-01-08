@@ -1,7 +1,7 @@
 package arm7
 
 import (
-    "fmt"
+	"fmt"
 	"sync/atomic"
 	"unsafe"
 
@@ -43,7 +43,7 @@ type Jit struct {
 	*gojit.Assembler
 	Cpu *Cpu
 
-    Pages []atomic.Pointer[Page]
+	Pages []atomic.Pointer[Page]
 
 	//Pages   [ADDRESS_SPACE >> PAGE_SHIFT]*Page // need 0xFFFF_FFFF for bios
 	Metrics [ADDRESS_SPACE >> PAGE_SHIFT][]uint32
@@ -63,12 +63,12 @@ type Jit struct {
 }
 
 type Page struct {
-	id      uint32
+	id uint32
 	//Blocks  []*JitBlock
-    Blocks []atomic.Pointer[JitBlock]
+	Blocks  []atomic.Pointer[JitBlock]
 	Written bool
 
-    dead atomic.Bool
+	dead atomic.Bool
 }
 
 type JitBlock struct {
@@ -86,7 +86,7 @@ func NewJit(cpu *Cpu) *Jit {
 	j := &Jit{
 		Cpu:     cpu,
 		blockCh: make(chan uint32, 1024),
-        Pages: make([]atomic.Pointer[Page], ADDRESS_SPACE >> PAGE_SHIFT),
+		Pages:   make([]atomic.Pointer[Page], ADDRESS_SPACE>>PAGE_SHIFT),
 	}
 
 	if CONCURRENT_BLOCKS {
@@ -150,18 +150,18 @@ func (j *Jit) SCRATCH(i uint32) gojit.Indirect {
 
 func (j *Jit) InvalidatePage(addr uint32) {
 
-    page := j.Pages[addr>>PAGE_SHIFT].Load()
-    if page == nil {
+	page := j.Pages[addr>>PAGE_SHIFT].Load()
+	if page == nil {
 		return
 	}
 
-    page.dead.Store(true)
+	page.dead.Store(true)
 
-    if old := j.Pages[addr>>PAGE_SHIFT].Swap(nil); old != nil {
+	if old := j.Pages[addr>>PAGE_SHIFT].Swap(nil); old != nil {
 		j.Metrics[addr>>PAGE_SHIFT] = make([]uint32, (1<<PAGE_SHIFT)>>2)
-        j.invalidPages = append(j.invalidPages, old)
-        j.Cnt--
-    }
+		j.invalidPages = append(j.invalidPages, old)
+		j.Cnt--
+	}
 }
 
 func (j *Jit) DeletePages() {
@@ -174,16 +174,16 @@ func (j *Jit) DeletePages() {
 
 		for i := range page.Blocks {
 
-            block := page.Blocks[i].Load()
-            if block == nil || block.assembler == nil {
-                continue
-            }
+			block := page.Blocks[i].Load()
+			if block == nil || block.assembler == nil {
+				continue
+			}
 
-            block.assembler.Release()
+			block.assembler.Release()
 		}
 	}
 
-    j.invalidPages = j.invalidPages[:0]
+	j.invalidPages = j.invalidPages[:0]
 }
 
 func (j *Jit) CreateBlock(pc uint32) {
@@ -191,25 +191,25 @@ func (j *Jit) CreateBlock(pc uint32) {
 	pageIdx := pc >> PAGE_SHIFT
 	blockIdx := (pc & PAGE_MASK) >> 2
 
-    page := j.Pages[pageIdx].Load()
+	page := j.Pages[pageIdx].Load()
 
 	if page == nil {
-        newPage := &Page{
+		newPage := &Page{
 			id:     pageIdx,
-            Blocks: make([]atomic.Pointer[JitBlock], (1<<PAGE_SHIFT)>>2),
+			Blocks: make([]atomic.Pointer[JitBlock], (1<<PAGE_SHIFT)>>2),
 		}
 
-        if j.Pages[pageIdx].CompareAndSwap(nil, newPage) {
-            j.Cnt++
-            page = newPage
-        } else {
-            // other routine won race condition
-            page = j.Pages[pageIdx].Load()
-        }
-    }
+		if j.Pages[pageIdx].CompareAndSwap(nil, newPage) {
+			j.Cnt++
+			page = newPage
+		} else {
+			// other routine won race condition
+			page = j.Pages[pageIdx].Load()
+		}
+	}
 
 	block := page.Blocks[blockIdx].Load()
-    if block != nil && block.Skip {
+	if block != nil && block.Skip {
 		return
 	}
 
@@ -234,8 +234,7 @@ func (j *Jit) CreateBlock(pc uint32) {
 	for {
 		op = *(*uint32)(unsafe.Add(p, i*4))
 
-        if i >= config.Conf.Nds.NdsJit.BatchInstA7 {
-        
+		if i >= config.Conf.Nds.NdsJit.BatchInstA7 {
 
 			length += i
 			break
@@ -251,8 +250,8 @@ func (j *Jit) CreateBlock(pc uint32) {
 	}
 
 	if length == 0 {
-        newBlock := &JitBlock{ Skip: true }
-        page.Blocks[blockIdx].CompareAndSwap(nil, newBlock)
+		newBlock := &JitBlock{Skip: true}
+		page.Blocks[blockIdx].CompareAndSwap(nil, newBlock)
 
 		return
 	}
@@ -264,18 +263,18 @@ func (j *Jit) CreateBlock(pc uint32) {
 		return
 	}
 
-    newBlock := &JitBlock{
+	newBlock := &JitBlock{
 		initPc:    pc,
 		assembler: asm,
 		Length:    length,
 		finalOp:   op,
 		f: func() {
 			//gojit.CallJit(&asm.Buf[0])
-            gojit.CallJit(uintptr(unsafe.Pointer(&asm.Buf[0])))
+			gojit.CallJit(uintptr(unsafe.Pointer(&asm.Buf[0])))
 		},
 	}
 
-    page.Blocks[blockIdx].CompareAndSwap(nil, newBlock)
+	page.Blocks[blockIdx].CompareAndSwap(nil, newBlock)
 }
 
 func (j *Jit) emitOp(op uint32) bool {
@@ -367,14 +366,12 @@ func (j *Jit) emitCond(op uint32) []func() {
 //go:inline
 func (jit *Jit) DecodeARM(op uint32) bool {
 
-    
-
 	if swi := op&0xF00_0000 == 0xF00_0000; swi {
 		return false
 	}
 
 	switch {
-    
+
 	case isB(op):
 	case isBX(op):
 	case isSDT(op):
@@ -386,7 +383,6 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 
 		jit.emitSdt(op)
 		return true
-    
 
 	case isHalf(op):
 
@@ -395,11 +391,10 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 			return false
 		}
 
-        inst := (op >> 5) & 0b11
-        if load && inst == LDRSH {
+		inst := (op >> 5) & 0b11
+		if load && inst == LDRSH {
 			return false
-        }
-        
+		}
 
 		jit.emitHalf(op)
 		return true
@@ -411,7 +406,7 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 	case isM(op):
 		jit.emitMul(op)
 		return true
-    
+
 	case isALU(op):
 
 		//inst := (op >> 21) & 0xF
@@ -436,7 +431,6 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 		jit.emitAlu(op)
 		return true
 
-    
 	}
 
 	return false
@@ -462,7 +456,7 @@ func (j *Jit) TestInst(op uint32, f func(op uint32)) {
 	}
 
 	//gojit.CallJit(&asm.Buf[0])
-    gojit.CallJit(uintptr(unsafe.Pointer(&asm.Buf[0])))
+	gojit.CallJit(uintptr(unsafe.Pointer(&asm.Buf[0])))
 
 	asm.Release()
 }

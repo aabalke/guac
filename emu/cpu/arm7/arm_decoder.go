@@ -10,11 +10,10 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 
 	op, cycles := cpu.GetOpArm()
 
-    if !cpu.CheckCond(op >> 28) {
-        r[PC] += 4
-        return cycles + 1, true
-    }
-    
+	if !cpu.CheckCond(op >> 28) {
+		r[PC] += 4
+		return cycles + 1, true
+	}
 
 	if swi := (op>>24)&0xF == 0xF; swi {
 		cpu.Exception(VEC_SWI, MODE_SWI)
@@ -22,7 +21,7 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 	}
 
 	switch {
-    
+
 	case isB(op):
 		cpu.B(op)
 	case isBX(op):
@@ -41,10 +40,10 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 		cpu.Swp(op)
 	case isM(op):
 		cpu.Mul(op)
-    
+
 	case isALU(op):
 		cpu.Alu(op)
-    
+
 	default:
 		fmt.Printf("Unable to Decode ARM 9 %08X, at PC %08X\n", op, r[PC])
 		return 0, false
@@ -57,8 +56,6 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 func isOpFormat(op, mask, format uint32) bool {
 	return op&mask == format
 }
-
-
 
 //go:inline
 func isSWP(op uint32) bool {

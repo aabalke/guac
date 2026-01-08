@@ -1,8 +1,8 @@
 package arm9
 
 import (
-    "math"
-    
+	"math"
+
 	"math/bits"
 	"unsafe"
 
@@ -23,7 +23,6 @@ func (j *Jit) emitClz(op uint32) {
 
 	j.Movl(amd64.Eax, j.REG(rd))
 }
-
 
 func (j *Jit) emitMul(op uint32) {
 
@@ -54,14 +53,13 @@ func (j *Jit) emitMul(op uint32) {
 			j.SETcc(amd64.CC_S, N)
 			j.SETcc(amd64.CC_Z, Z)
 
-            
 		}
 
 		j.Movl(amd64.Eax, j.REG(rd))
 		return
 
-    case UMAAL:
-        panic("unsupported umaal instruction")
+	case UMAAL:
+		panic("unsupported umaal instruction")
 
 	case UMULL, UMLAL:
 
@@ -89,7 +87,7 @@ func (j *Jit) emitMul(op uint32) {
 
 			j.SETcc(amd64.CC_S, N)
 			j.SETcc(amd64.CC_Z, Z)
-            
+
 		}
 
 		j.Movl(amd64.Eax, j.REG(rn))
@@ -128,7 +126,7 @@ func (j *Jit) emitMul(op uint32) {
 
 			j.SETcc(amd64.CC_S, N)
 			j.SETcc(amd64.CC_Z, Z)
-            
+
 		}
 
 		j.Movl(amd64.Eax, j.REG(rn))
@@ -138,7 +136,7 @@ func (j *Jit) emitMul(op uint32) {
 		return
 	}
 
-    x := (op>>5)&1 != 0
+	x := (op>>5)&1 != 0
 	y := (op>>6)&1 != 0
 
 	switch inst {
@@ -266,7 +264,7 @@ func (j *Jit) emitMul(op uint32) {
 
 		j.Movl(amd64.Eax, j.REG(rd))
 	}
-    
+
 }
 
 func (j *Jit) emitSwp(op uint32) {
@@ -364,7 +362,6 @@ func (j *Jit) emitQalu(op uint32) {
 	j.Movl(amd64.Eax, j.REG(rd))
 }
 
-
 func (j *Jit) emitHalf(op uint32) {
 
 	rn := (op >> 16) & 0xF
@@ -427,7 +424,7 @@ func (j *Jit) emitHalf(op uint32) {
 
 		case LDRD:
 
-            j.And(amd64.Imm(^0b111), amd64.Rax)
+			j.And(amd64.Imm(^0b111), amd64.Rax)
 			j.Movl(amd64.Eax, j.SCRATCH(0))
 
 			j.CallFunc(Read32)
@@ -439,11 +436,9 @@ func (j *Jit) emitHalf(op uint32) {
 			j.CallFunc(Read32)
 			j.Movl(amd64.Eax, j.REG(rd+1))
 
-            
-
 		case STRD:
 
-            j.And(amd64.Imm(^0b111), amd64.Rax)
+			j.And(amd64.Imm(^0b111), amd64.Rax)
 			j.Movl(amd64.Eax, j.SCRATCH(0))
 
 			j.CallFunc(Write32)
@@ -460,7 +455,6 @@ func (j *Jit) emitHalf(op uint32) {
 			j.CallFunc(Write32)
 			j.Movl(amd64.Eax, j.REG(rd+1))
 
-            
 		}
 
 	} else {
@@ -472,34 +466,33 @@ func (j *Jit) emitHalf(op uint32) {
 		switch inst {
 		case LDRH:
 
-            j.Movl(amd64.Eax, j.SCRATCH(0))
+			j.Movl(amd64.Eax, j.SCRATCH(0))
 
 			j.And(amd64.Imm(^1), amd64.Rax)
 			j.CallFunc(Read16)
 
-            j.Movl(j.SCRATCH(0), amd64.Ecx)
-            j.And(amd64.Imm(1), amd64.Ecx)
-            j.Shl(amd64.Imm(3), amd64.Ecx)
-            j.RorCl(amd64.Eax)
-            j.Movl(amd64.Eax, j.REG(rd))
+			j.Movl(j.SCRATCH(0), amd64.Ecx)
+			j.And(amd64.Imm(1), amd64.Ecx)
+			j.Shl(amd64.Imm(3), amd64.Ecx)
+			j.RorCl(amd64.Eax)
+			j.Movl(amd64.Eax, j.REG(rd))
 
 		case LDRSB:
 			// sign-expand byte value
 			j.CallFunc(Read)
 			j.Movsx(amd64.Al, amd64.Rax)
-            j.Movl(amd64.Eax, j.REG(rd))
+			j.Movl(amd64.Eax, j.REG(rd))
 
 		case LDRSH:
 
-            // sign-expand half value
+			// sign-expand half value
 			j.And(amd64.Imm(^1), amd64.Rax)
 			j.CallFunc(Read16)
 
 			j.Movsx(amd64.Ax, amd64.Rax)
-            j.Movl(amd64.Eax, j.REG(rd))
+			j.Movl(amd64.Eax, j.REG(rd))
 
-            
-        }
+		}
 
 	}
 }
@@ -1375,5 +1368,3 @@ func (j *Jit) emitBlock(op uint32) {
 
 	panic("UNSETUP LDR PC INCLUDED")
 }
-
-

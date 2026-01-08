@@ -11,7 +11,6 @@ const (
 	VEC_FIQ           = 0x0000_001C
 )
 
-
 func (cpu *Cpu) Exception(addr uint32, mode uint32) {
 
 	var (
@@ -44,8 +43,6 @@ func (cpu *Cpu) Exception(addr uint32, mode uint32) {
 	cpsr.Mode = mode
 	cpsr.T = false
 	cpsr.I = true
-
-    
 
 	r[PC] = addr
 }

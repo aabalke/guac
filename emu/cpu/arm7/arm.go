@@ -3,8 +3,6 @@ package arm7
 import (
 	"math/bits"
 	"unsafe"
-
-	
 )
 
 const (
@@ -122,12 +120,11 @@ func (cpu *Cpu) Alu(op uint32) {
 					cpu.psrSwitch() // not sure if needed
 				}
 
-                if cpsr.T {
-                    r[PC] &^= 0b1
-                } else {
-                    r[PC] &^= 0b11
-                }
-                
+				if cpsr.T {
+					r[PC] &^= 0b1
+				} else {
+					r[PC] &^= 0b11
+				}
 
 			} else {
 				cpsr.V = ((rnv^op2)&(rnv^uint32(res)))>>31 != 0
@@ -455,8 +452,6 @@ const (
 	UMLAL = 0b101
 	SMULL = 0b110
 	SMLAL = 0b111
-
-    
 )
 
 func (cpu *Cpu) Mul(op uint32) {
@@ -494,7 +489,7 @@ func (cpu *Cpu) Mul(op uint32) {
 		return
 
 	case UMAAL:
-        panic("unsupported umaal instruction")
+		panic("unsupported umaal instruction")
 
 	case UMULL, UMLAL:
 
@@ -541,7 +536,6 @@ func (cpu *Cpu) Mul(op uint32) {
 		return
 	}
 
-    
 }
 
 const (
@@ -635,10 +629,9 @@ func (c *Cpu) Sdt(op uint32) {
 		prev = r[rn]
 	}
 
-    //if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
+	//if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
 	// no alignment?
 	//}
-    
 
 	if load {
 		if byte {
@@ -674,8 +667,6 @@ func (c *Cpu) Sdt(op uint32) {
 
 	r[PC] += 4
 }
-
-
 
 func (cpu *Cpu) B(op uint32) {
 
@@ -720,8 +711,8 @@ func (cpu *Cpu) BX(op uint32) {
 		panic("Unsupported BXJ Instruction")
 	case INST_BLX:
 
-        panic("unsupported arm7 blx instruction")
-        
+		panic("unsupported arm7 blx instruction")
+
 	}
 }
 
@@ -784,8 +775,6 @@ func (c *Cpu) Half(op uint32) {
 			rdv += 12
 		}
 
-        
-
 		if wb {
 			r[rn] = post
 		}
@@ -794,11 +783,11 @@ func (c *Cpu) Half(op uint32) {
 		case STRH:
 			c.mem.Write16(pre&^1, uint16(rdv), false)
 
-        case LDRD:
-            panic("unsupported arm7 ldrd instruction")
-        case STRD:
-            panic("unsupported arm7 strd instruction")
-        
+		case LDRD:
+			panic("unsupported arm7 ldrd instruction")
+		case STRD:
+			panic("unsupported arm7 strd instruction")
+
 		}
 
 		r[PC] += 4
@@ -820,16 +809,16 @@ func (c *Cpu) Half(op uint32) {
 		r[rd] = uint32(int32(int8(c.mem.Read8(pre, false))))
 
 	case LDRSH:
-        // On ARM7 aka ARMv4 aka NDS7/GBA:
-        // LDRSH Rd,[odd]  -->  LDRSB Rd,[odd];sign-expand BYTE value
-        if misaligned := pre&1 != 0; misaligned {
-            // sign-expand byte value
-            r[rd] = uint32(int32(int8(c.mem.Read8(pre, false))))
-        } else {
-            // sign-expand half value
-            r[rd] = uint32(int32(int16(c.mem.Read16(pre&^1, false))))
-        }
-        
+		// On ARM7 aka ARMv4 aka NDS7/GBA:
+		// LDRSH Rd,[odd]  -->  LDRSB Rd,[odd];sign-expand BYTE value
+		if misaligned := pre&1 != 0; misaligned {
+			// sign-expand byte value
+			r[rd] = uint32(int32(int8(c.mem.Read8(pre, false))))
+		} else {
+			// sign-expand half value
+			r[rd] = uint32(int32(int16(c.mem.Read16(pre&^1, false))))
+		}
+
 	}
 
 	r[PC] += 4
@@ -998,10 +987,6 @@ func (cpu *Cpu) Swp(op uint32) {
 
 	r[PC] += 4
 }
-
-
-
-
 
 func (c *Cpu) Block(op uint32) {
 
@@ -1269,4 +1254,3 @@ func (c *Cpu) Block(op uint32) {
 		}
 	}
 }
-

@@ -9,9 +9,9 @@ func (c *Cpu) DecodeTHUMB() (int, bool) {
 	op := c.GetOpThumb()
 
 	switch {
-    case isThumbBkpt(op):
-        panic("unsetup arm9 thumb bkpt")
-    
+	case isThumbBkpt(op):
+		panic("unsetup arm9 thumb bkpt")
+
 	case isthumbSWI(op):
 		c.Exception(VEC_SWI, MODE_SWI)
 	case isThumbAddSub(op):
@@ -59,7 +59,6 @@ func (c *Cpu) DecodeTHUMB() (int, bool) {
 	return 1, true
 }
 
-
 //go:inline
 func isThumbOpFormat(op, mask, fmt uint16) bool {
 	return op&mask == fmt
@@ -68,11 +67,10 @@ func isThumbOpFormat(op, mask, fmt uint16) bool {
 //go:inline
 func isThumbBkpt(op uint16) bool {
 	return isThumbOpFormat(op,
-        0b1011_1110_0000_0000,
-        0b1111_1111_0000_0000,
+		0b1011_1110_0000_0000,
+		0b1111_1111_0000_0000,
 	)
 }
-
 
 //go:inline
 func isThumbShift(op uint16) bool {
@@ -225,4 +223,3 @@ func isthumbSWI(op uint16) bool {
 		0b1101_1111_0000_0000,
 	)
 }
-

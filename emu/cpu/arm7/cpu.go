@@ -1,11 +1,10 @@
 package arm7
 
 import (
-    "fmt"
+	"fmt"
 	"unsafe"
 
 	"github.com/aabalke/guac/emu/cpu"
-    
 )
 
 type Cpu struct {
@@ -14,8 +13,6 @@ type Cpu struct {
 	Irq    *cpu.Irq
 	Halted bool
 
-    
-
 	PcPtr       unsafe.Pointer
 	PcOff       int
 	isBranching bool
@@ -23,8 +20,8 @@ type Cpu struct {
 	LoopCnt     uint32
 	LoopLen     uint32
 
-	Jit *Jit
-    jitEnabled bool
+	Jit        *Jit
+	jitEnabled bool
 }
 
 const (
@@ -102,12 +99,10 @@ var BANK_ID = map[uint32]uint32{
 
 func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq) *Cpu {
 
-
 	c := &Cpu{
-		mem:  m,
-		Irq:  irq,
-        jitEnabled: jitEnabled,
-        
+		mem:        m,
+		Irq:        irq,
+		jitEnabled: jitEnabled,
 	}
 
 	// skip bios
@@ -228,15 +223,15 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 			pageIdx := pc >> PAGE_SHIFT
 			blockIdx := (pc & PAGE_MASK) >> 2 // aligned to word (arm)
 
-            page := cpu.Jit.Pages[pageIdx].Load()
-            if page != nil && !page.dead.Load() {
-                block := page.Blocks[blockIdx].Load()
-                if block != nil && !block.Skip && block.f != nil {
-                    block.f()
-                    cpu.isBranching = true
-                    return block.finalOp, int(block.Length)
-                }
-            }
+			page := cpu.Jit.Pages[pageIdx].Load()
+			if page != nil && !page.dead.Load() {
+				block := page.Blocks[blockIdx].Load()
+				if block != nil && !block.Skip && block.f != nil {
+					block.f()
+					cpu.isBranching = true
+					return block.finalOp, int(block.Length)
+				}
+			}
 
 			cpu.Jit.DeletePages()
 			cpu.Jit.UpdateMetrics(pc)

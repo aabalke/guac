@@ -1,14 +1,11 @@
 package arm7
 
 import (
-    
 	"math/bits"
 	"unsafe"
 
 	amd64 "github.com/aabalke/gojit"
 )
-
-
 
 func (j *Jit) emitMul(op uint32) {
 
@@ -39,15 +36,15 @@ func (j *Jit) emitMul(op uint32) {
 			j.SETcc(amd64.CC_S, N)
 			j.SETcc(amd64.CC_Z, Z)
 
-            j.Movb(amd64.Imm(0), C)
-            
+			j.Movb(amd64.Imm(0), C)
+
 		}
 
 		j.Movl(amd64.Eax, j.REG(rd))
 		return
 
-    case UMAAL:
-        panic("unsupported umaal instruction")
+	case UMAAL:
+		panic("unsupported umaal instruction")
 
 	case UMULL, UMLAL:
 
@@ -75,8 +72,8 @@ func (j *Jit) emitMul(op uint32) {
 
 			j.SETcc(amd64.CC_S, N)
 			j.SETcc(amd64.CC_Z, Z)
-            j.Movb(amd64.Imm(0), C)
-            
+			j.Movb(amd64.Imm(0), C)
+
 		}
 
 		j.Movl(amd64.Eax, j.REG(rn))
@@ -115,8 +112,8 @@ func (j *Jit) emitMul(op uint32) {
 
 			j.SETcc(amd64.CC_S, N)
 			j.SETcc(amd64.CC_Z, Z)
-            j.Movb(amd64.Imm(0), C)
-            
+			j.Movb(amd64.Imm(0), C)
+
 		}
 
 		j.Movl(amd64.Eax, j.REG(rn))
@@ -126,7 +123,6 @@ func (j *Jit) emitMul(op uint32) {
 		return
 	}
 
-    
 }
 
 func (j *Jit) emitSwp(op uint32) {
@@ -169,8 +165,6 @@ func (j *Jit) emitSwp(op uint32) {
 	j.Movl(j.SCRATCH(1), amd64.Ebx)
 	j.CallFunc(Write32)
 }
-
-
 
 func (j *Jit) emitHalf(op uint32) {
 
@@ -234,13 +228,12 @@ func (j *Jit) emitHalf(op uint32) {
 
 		case LDRD:
 
-            panic("unsuppoerted arm7 jit ldrd instruction")
-            
+			panic("unsuppoerted arm7 jit ldrd instruction")
 
 		case STRD:
 
-            panic("unsuppoerted arm7 jit strd instruction")
-            
+			panic("unsuppoerted arm7 jit strd instruction")
+
 		}
 
 	} else {
@@ -252,37 +245,37 @@ func (j *Jit) emitHalf(op uint32) {
 		switch inst {
 		case LDRH:
 
-            j.Movl(amd64.Eax, j.SCRATCH(0))
+			j.Movl(amd64.Eax, j.SCRATCH(0))
 
 			j.And(amd64.Imm(^1), amd64.Rax)
 			j.CallFunc(Read16)
 
-            j.Movl(j.SCRATCH(0), amd64.Ecx)
-            j.And(amd64.Imm(1), amd64.Ecx)
-            j.Shl(amd64.Imm(3), amd64.Ecx)
-            j.RorCl(amd64.Eax)
-            j.Movl(amd64.Eax, j.REG(rd))
+			j.Movl(j.SCRATCH(0), amd64.Ecx)
+			j.And(amd64.Imm(1), amd64.Ecx)
+			j.Shl(amd64.Imm(3), amd64.Ecx)
+			j.RorCl(amd64.Eax)
+			j.Movl(amd64.Eax, j.REG(rd))
 
 		case LDRSB:
 			// sign-expand byte value
 			j.CallFunc(Read)
 			j.Movsx(amd64.Al, amd64.Rax)
-            j.Movl(amd64.Eax, j.REG(rd))
+			j.Movl(amd64.Eax, j.REG(rd))
 
 		case LDRSH:
 
-            panic("unsetup ldrsh arm7 jit")
-            //// On ARM7 aka ARMv4 aka NDS7/GBA:
-            //// LDRSH Rd,[odd]  -->  LDRSB Rd,[odd];sign-expand BYTE value
-            //if misaligned := pre&1 != 0; misaligned {
-            //    // sign-expand byte value
-            //    r[rd] = uint32(int32(int8(c.mem.Read8(pre, false))))
-            //} else {
-            //    // sign-expand half value
-            //    r[rd] = uint32(int32(int16(c.mem.Read16(pre&^1, false))))
-            //}
-            
-        }
+			panic("unsetup ldrsh arm7 jit")
+			//// On ARM7 aka ARMv4 aka NDS7/GBA:
+			//// LDRSH Rd,[odd]  -->  LDRSB Rd,[odd];sign-expand BYTE value
+			//if misaligned := pre&1 != 0; misaligned {
+			//    // sign-expand byte value
+			//    r[rd] = uint32(int32(int8(c.mem.Read8(pre, false))))
+			//} else {
+			//    // sign-expand half value
+			//    r[rd] = uint32(int32(int16(c.mem.Read16(pre&^1, false))))
+			//}
+
+		}
 
 	}
 }
@@ -934,7 +927,5 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32){
 }
 
 func (j *Jit) emitBlock(op uint32) {
-    panic("unsetup block jit  arm7")
+	panic("unsetup block jit  arm7")
 }
-
-

@@ -101,8 +101,7 @@ const (
     //PRF_START = 1200
     //PRF_END   = PRF_START + 2000
     PRF_START = 0
-    //PRF_END   = 1000
-    PRF_END   = 10000
+    PRF_END   = 1000
 )
 
 var t time.Time
