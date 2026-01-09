@@ -519,19 +519,26 @@ func (j *Jit) emitHalf(op uint32) {
 
             {{else -}}
 
-            panic("unsetup ldrsh arm7 jit")
-            //// On ARM7 aka ARMv4 aka NDS7/GBA:
-            //// LDRSH Rd,[odd]  -->  LDRSB Rd,[odd];sign-expand BYTE value
-            //if misaligned := pre&1 != 0; misaligned {
-            //    // sign-expand byte value
-            //    r[rd] = uint32(int32(int8(c.mem.Read8(pre, false))))
-            //} else {
-            //    // sign-expand half value
-            //    r[rd] = uint32(int32(int16(c.mem.Read16(pre&^1, false))))
-            //}
+            j.Bt(amd64.Imm(0), amd64.Eax)
+            half := j.JccForward(amd64.CC_NC)
+
+			// sign-expand byte value
+			j.CallFunc(Read)
+			j.Movsx(amd64.Al, amd64.Rax)
+			j.Movl(amd64.Eax, j.REG(rd))
+            byte := j.JmpForward()
+
+			// sign-expand half value
+            half()
+            j.And(amd64.Imm(^1), amd64.Rax)
+			j.CallFunc(Read16)
+			j.Movsx(amd64.Ax, amd64.Rax)
+			j.Movl(amd64.Eax, j.REG(rd))
+
+            byte()
+
             {{end}}
         }
-
 	}
 }
 

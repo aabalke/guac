@@ -493,7 +493,6 @@ func (j *Jit) emitHalf(op uint32) {
 			j.Movl(amd64.Eax, j.REG(rd))
 
 		}
-
 	}
 }
 

@@ -93,7 +93,7 @@ func NewJit(cpu *Cpu) *Jit {
 	const (
 		//PAGE_SIZE = 0x100000 // 1024 * 1024
 		PAGE_SIZE = 0x10000 // 1024 * 1024
-		AVAIL_ASM = 0x6000
+		AVAIL_ASM = 0x5000
 	)
 
 	j := &Jit{
@@ -243,6 +243,7 @@ func (j *Jit) DeletePages() {
 			}
 
 			j.returnAssembler(block.assembler)
+			block.assembler = nil
 		}
 	}
 
@@ -331,7 +332,6 @@ func (j *Jit) CreateBlock(pc uint32) {
 		Length:    length,
 		finalOp:   op,
 		f: func() {
-			//gojit.CallJit(&asm.Buf[0])
 			gojit.CallJit(uintptr(unsafe.Pointer(&asm.Buf[0])))
 		},
 	}
@@ -453,11 +453,6 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 			return false
 		}
 
-		inst := (op >> 5) & 0b11
-		if load && inst == LDRSH {
-			return false
-		}
-
 		jit.emitHalf(op)
 		return true
 	case isUD(op):
@@ -470,17 +465,6 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 		return true
 
 	case isALU(op):
-
-		//inst := (op >> 21) & 0xF
-		//imm  := (op >> 25) & 1 != 0
-		//set  := (op >> 20) & 1 != 0
-		//rd   := (op >> 12) & 0xF
-		//rn   := (op >> 16) & 0xF
-		//if op == 0xE0120000 {
-		//	//if inst == 0 && set && !imm && rd == 0 && rn == 2 {
-		//	//fmt.Printf("%08X\n", op)
-		//	return false
-		//}
 
 		if rdpc := op&0xF000 == 0xF000; rdpc {
 			return false
