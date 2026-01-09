@@ -60,6 +60,13 @@ type Jit struct {
 	blockCh chan uint32
 
 	Scratch [0x10]uint32
+
+	FreeAssemblers []*gojit.Assembler
+}
+
+type Assembler struct {
+	*gojit.Assembler
+	occupied atomic.Bool
 }
 
 type Page struct {
@@ -83,10 +90,31 @@ type JitBlock struct {
 
 func NewJit(cpu *Cpu) *Jit {
 
+	const (
+		//PAGE_SIZE = 0x100000 // 1024 * 1024
+		PAGE_SIZE = 0x10000 // 1024 * 1024
+		AVAIL_ASM = 0x10000
+	)
+
 	j := &Jit{
-		Cpu:     cpu,
-		blockCh: make(chan uint32, 1024),
-		Pages:   make([]atomic.Pointer[Page], ADDRESS_SPACE>>PAGE_SHIFT),
+		Cpu:            cpu,
+		blockCh:        make(chan uint32, 1024),
+		Pages:          make([]atomic.Pointer[Page], ADDRESS_SPACE>>PAGE_SHIFT),
+		FreeAssemblers: make([]*gojit.Assembler, AVAIL_ASM),
+	}
+
+	for i := range AVAIL_ASM {
+
+		asm, err := gojit.New(PAGE_SIZE)
+		if err != nil {
+			panic(err)
+		}
+
+		if asm == nil {
+			panic("bad asm init")
+		}
+
+		j.FreeAssemblers[i] = asm
 	}
 
 	if CONCURRENT_BLOCKS {
@@ -96,6 +124,15 @@ func NewJit(cpu *Cpu) *Jit {
 	CpuPointer = cpu
 
 	return j
+}
+
+func (j *Jit) Close() {
+
+	// Deleteing pages causes crashes
+	// I believe I need to work on it more
+	//block.assembler.Release()
+
+	// will need to release all FreeAssemblers and ones in blocks
 }
 
 func (j *Jit) concBlockComp() {
@@ -148,6 +185,32 @@ func (j *Jit) SCRATCH(i uint32) gojit.Indirect {
 	}
 }
 
+func (j *Jit) getFreeAssembler() *gojit.Assembler {
+
+	i := len(j.FreeAssemblers)
+
+	if i == 0 {
+		// allocate more at some point?
+		return nil
+	}
+
+	asm := j.FreeAssemblers[i-1]
+	j.FreeAssemblers = j.FreeAssemblers[:i-1]
+
+	return asm
+}
+
+func (j *Jit) returnAssembler(asm *gojit.Assembler) {
+
+	if err := asm.Error(); err != nil {
+		panic(err)
+	}
+
+	asm.Off = 0
+
+	j.FreeAssemblers = append(j.FreeAssemblers, asm)
+}
+
 func (j *Jit) InvalidatePage(addr uint32) {
 
 	page := j.Pages[addr>>PAGE_SHIFT].Load()
@@ -179,9 +242,8 @@ func (j *Jit) DeletePages() {
 				continue
 			}
 
-            // Deleteing pages causes crashes
-            // I believe I need to work on it more
-			//block.assembler.Release()
+			j.returnAssembler(block.assembler)
+            block.assembler = nil
 		}
 	}
 
@@ -215,10 +277,10 @@ func (j *Jit) CreateBlock(pc uint32) {
 		return
 	}
 
-	const pagesize = 0x100000 // 1024 * 1024
-	asm, err := gojit.New(pagesize)
-	if err != nil {
-		panic(err)
+	asm := j.getFreeAssembler()
+	if noFree := asm == nil; noFree {
+        println("no free assemblers")
+		return
 	}
 
 	j.Assembler = asm
@@ -381,6 +443,7 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 
 	switch {
 	case isBkpt(op):
+
 	case isB(op):
 	case isBX(op):
 	case isSDT(op):
@@ -429,6 +492,17 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 
 	case isALU(op):
 
+		//inst := (op >> 21) & 0xF
+		//imm  := (op >> 25) & 1 != 0
+		//set  := (op >> 20) & 1 != 0
+		//rd   := (op >> 12) & 0xF
+		//rn   := (op >> 16) & 0xF
+		//if op == 0xE0120000 {
+		//	//if inst == 0 && set && !imm && rd == 0 && rn == 2 {
+		//	//fmt.Printf("%08X\n", op)
+		//	return false
+		//}
+
 		if rdpc := op&0xF000 == 0xF000; rdpc {
 			return false
 		}
@@ -449,7 +523,6 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 
 func (j *Jit) TestInst(op uint32, f func(op uint32)) {
 
-	//asm, err := gojit.New(gojit.PageSize)
 	asm, err := gojit.New(gojit.PageSize)
 	if err != nil {
 		panic(err)
@@ -467,7 +540,6 @@ func (j *Jit) TestInst(op uint32, f func(op uint32)) {
 		panic(err)
 	}
 
-	//gojit.CallJit(&asm.Buf[0])
 	gojit.CallJit(uintptr(unsafe.Pointer(&asm.Buf[0])))
 
 	asm.Release()

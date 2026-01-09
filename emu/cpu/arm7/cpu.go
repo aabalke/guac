@@ -233,7 +233,6 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 				}
 			}
 
-			cpu.Jit.DeletePages()
 			cpu.Jit.UpdateMetrics(pc)
 		}
 

@@ -48,9 +48,6 @@ func (cpu *Cpu) Alu(op uint32) {
 		op2 uint32
 	)
 
-	//compare := rd != PC
-	//cpu.Jit.StartTest(op, compare, cpu.Jit.emitAlu)
-
 	if imm {
 
 		ro := ((op >> 8) & 0xF) << 1
