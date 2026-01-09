@@ -1,4 +1,5 @@
 //go:build !rc
+
 package ppu
 
 func NewBlendPalette(bld *Blend, backdrop uint32) *BlendPalettes {
@@ -23,7 +24,7 @@ func NewBlendPalette(bld *Blend, backdrop uint32) *BlendPalettes {
 
 func (bp *BlendPalettes) Blend(winBlend, objTransparent bool, bld *Blend) uint32 {
 
-    if winBlend {
+	if winBlend {
 		return bp.noBlend(objTransparent, bld)
 	}
 
@@ -65,11 +66,11 @@ func (bp *BlendPalettes) alphaBlend(bld *Blend) uint32 {
 	blend := func(a, b uint32) uint32 {
 
 		if bp.targetA3d {
-            panic("untested 3d target blend sisd")
-            return max(0, min(31, (a*bp.alpha + b*(1-bp.alpha)) >> 4))
+			panic("untested 3d target blend sisd")
+			return max(0, min(31, (a*bp.alpha+b*(1-bp.alpha))>>4))
 		}
 
-		return min(31, (a*bld.aEv + b*bld.bEv) >> 4)
+		return min(31, (a*bld.aEv+b*bld.bEv)>>4)
 	}
 	r := blend(rA, rB)
 	g := blend(gA, gB)

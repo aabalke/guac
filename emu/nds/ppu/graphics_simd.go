@@ -1,10 +1,10 @@
 //go:build rc
+
 package ppu
 
 import (
 	simd "simd/archsimd"
 	"unsafe"
-
 )
 
 func isSimd() bool {
@@ -57,25 +57,25 @@ func (ppu *PPU) standard(y uint32, engine *Engine) {
 
 	wins := &engine.Windows
 	backdrop := ppu.getPalette(0, 0, false, engine.IsB)
-    bld := &engine.Blend
+	bld := &engine.Blend
 
-    ResetBlendPalettesSIMD(engine.Simd, backdrop, bld)
+	ResetBlendPalettesSIMD(engine.Simd, backdrop, bld)
 
-    for x := range uint32(SCREEN_WIDTH) {
+	for x := range uint32(SCREEN_WIDTH) {
 
-        bldPal := &engine.Simd.BlendPalettes[x]
+		bldPal := &engine.Simd.BlendPalettes[x]
 
-        isSemiTransparent, inObjWindow := ppu.render(x, y, engine, bldPal)
+		isSemiTransparent, inObjWindow := ppu.render(x, y, engine, bldPal)
 
-        winBlend := !WindowBldPixelAllowed(x, y, wins, inObjWindow)
+		winBlend := !WindowBldPixelAllowed(x, y, wins, inObjWindow)
 
-        bldPal.GetBlendModeSIMD(engine.Simd, winBlend, isSemiTransparent, bld, x)
+		bldPal.GetBlendModeSIMD(engine.Simd, winBlend, isSemiTransparent, bld, x)
 
-        //engine.Simd.PalData[x] = bldPal.Blend(winBlend, isSemiTransparent, bld)
-    }
+		//engine.Simd.PalData[x] = bldPal.Blend(winBlend, isSemiTransparent, bld)
+	}
 
-    BlendSIMD(engine.Simd, bld)
+	BlendSIMD(engine.Simd, bld)
 
-    ptr := unsafe.Pointer(&engine.Pixels[(y*SCREEN_WIDTH)*4])
-    engine.MasterBright.ApplySIMD(&engine.Simd.PalData, ptr)
+	ptr := unsafe.Pointer(&engine.Pixels[(y*SCREEN_WIDTH)*4])
+	engine.MasterBright.ApplySIMD(&engine.Simd.PalData, ptr)
 }

@@ -22,7 +22,7 @@ const (
 	NONE = iota
 	GB
 	GBA
-    NDS
+	NDS
 )
 
 func LoadGameData() []GameData {

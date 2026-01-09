@@ -1,9 +1,10 @@
 //go:build rc
+
 package ppu
 
 import (
-    "unsafe"
 	simd "simd/archsimd"
+	"unsafe"
 )
 
 // func (m *MasterBright) ApplySIMD(palettes *[SCREEN_WIDTH]uint32, outPtr unsafe.Pointer) *[SCREEN_WIDTH]uint32 {

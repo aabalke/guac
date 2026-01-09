@@ -211,6 +211,9 @@ func (nds *Nds) UpdateFrame() {
 		//debug.CURR_INST++
 	}
 
+	nds.arm7.Jit.DeletePages()
+	nds.arm9.Jit.DeletePages()
+
 	nds.mem.Snd.Play(nds.Muted)
 	nds.Frame++
 }
@@ -307,13 +310,14 @@ func (nds *Nds) Close() {
 	nds.Paused = true
 
 	debug.L.Close()
+    nds.arm7.Jit.Close()
+    nds.arm9.Jit.Close()
 }
 
 func (nds *Nds) LoadGame(path string) {
 	nds.Cartridge = cart.NewCartridge(path, path+".save")
 }
 
-// temp
 func (nds *Nds) DirtyInit() {
 
 	nds.mem.DirtyTransfer()
@@ -363,10 +367,10 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 			nds.arm7.Irq.SetIRQ(1)
 		}
 
-        if vcount < SCREEN_HEIGHT {
-            nds.ppu.Graphics(vcount, singleThread)
-            nds.CheckDmas(dma.ARM9_DMA_MODE_HBL, true)
-        }
+		if vcount < SCREEN_HEIGHT {
+			nds.ppu.Graphics(vcount, singleThread)
+			nds.CheckDmas(dma.ARM9_DMA_MODE_HBL, true)
+		}
 	}
 
 	if newScanline := currScanlineCycles < prevScanlineCycles; newScanline {
@@ -476,7 +480,6 @@ func (nds *Nds) CheckGeoDmas() {
 		//}
 
 		nds.dma9[i].GxTransfer()
-		//nds.dma9[i].Transfer()
 	}
 }
 
@@ -497,7 +500,6 @@ func (nds *Nds) UpdateTimers(cycles uint32) {
 		}
 
 		overflow, setIrq = t.Update(overflow, cycles)
-		//overflow, setIrq = t.UpdateSingle(overflow)
 		if setIrq {
 			if i < 4 {
 				nds.arm9.Irq.SetIRQ(3 + i)

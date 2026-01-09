@@ -3,7 +3,6 @@ package gl
 import (
 	"fmt"
 	"math"
-
 	//"github.com/aabalke/guac/emu/nds/utils"
 )
 
@@ -18,7 +17,7 @@ const (
 	// higher number is less precise, important for proper ordering with overlapping polys
 	// cooking mama requires ~ 0.01
 	//DEPTH_PRECISION = 0.01
-    // does not work, need to find out why
+	// does not work, need to find out why
 )
 
 type Face int

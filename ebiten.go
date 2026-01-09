@@ -35,7 +35,7 @@ type Game struct {
 	pause *Pause
 	frame uint64
 
-    mouse *input.Mouse
+	mouse *input.Mouse
 
 	paused        bool
 	pauseEndFrame uint64
@@ -52,7 +52,7 @@ func NewGame(flags Flags) *Game {
 	g := &Game{
 		flags:  flags,
 		emuCtx: NewAudioContext(),
-        mouse: input.NewMouse(),
+		mouse:  input.NewMouse(),
 	}
 
 	if !config.Conf.CancelAudioInit {
@@ -98,37 +98,37 @@ func (g *Game) GetGamepadButtons() ([]ebiten.StandardGamepadButton, []ebiten.Sta
 }
 
 const (
-    //PRF_START = 1200
-    //PRF_END   = PRF_START + 2000
-    PRF_START = 0
-    PRF_END   = 1000
+	//PRF_START = 1200
+	//PRF_END   = PRF_START + 2000
+	PRF_START = 0
+	PRF_END   = 1000
 )
 
 var t time.Time
 
 func (g *Game) Update() error {
 
-    if g.flags.Profile && g.frame == PRF_START {
-        println("starting profiling")
-        //isProfiling = true
-        t = time.Now()
-        pprof.StartCPUProfile(f)
+	if g.flags.Profile && g.frame == PRF_START {
+		println("starting profiling")
+		//isProfiling = true
+		t = time.Now()
+		pprof.StartCPUProfile(f)
 
-    }
+	}
 
 	if g.flags.Profile && g.frame >= PRF_END {
-        dur := time.Since(t).Seconds()
+		dur := time.Since(t).Seconds()
 
-        reqDur := (float64(PRF_END - PRF_START) / 60.0)
+		reqDur := (float64(PRF_END-PRF_START) / 60.0)
 
-        fmt.Printf("DURATION %.2f seconds. %.2fx faster.\n", time.Since(t).Seconds(), reqDur / dur)
-        println("ending profiling")
+		fmt.Printf("DURATION %.2f seconds. %.2fx faster.\n", time.Since(t).Seconds(), reqDur/dur)
+		println("ending profiling")
 		return exit
 	}
 
 	g.frame++
 
-    g.mouse.Update()
+	g.mouse.Update()
 
 	justKeys := inpututil.AppendJustPressedKeys([]ebiten.Key{})
 	keys := inpututil.AppendPressedKeys([]ebiten.Key{})
@@ -150,9 +150,9 @@ func (g *Game) Update() error {
 			g.TogglePause()
 		case slices.Contains(keyConfig.Mute, keyStr):
 			g.ToggleMute()
-		//case slices.Contains([]string{"B"}, keyStr):
-        //    isProfiling = true
-		//    pprof.StartCPUProfile(f)
+			//case slices.Contains([]string{"B"}, keyStr):
+			//    isProfiling = true
+			//    pprof.StartCPUProfile(f)
 		}
 	}
 
@@ -191,9 +191,9 @@ func (g *Game) Update() error {
 		g.nds.InputHandler(keys, buttons, g.mouse, g.frame)
 		g.nds.Update()
 
-        t, b := g.nds.GetScreens()
-        g.nds.ImageTop.WritePixels(*t)
-        g.nds.ImageBottom.WritePixels(*b)
+		t, b := g.nds.GetScreens()
+		g.nds.ImageTop.WritePixels(*t)
+		g.nds.ImageBottom.WritePixels(*b)
 
 	case GBA:
 		g.gba.InputHandler(keys, buttons)
@@ -267,7 +267,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	screen.Fill(config.Conf.Backdrop)
 
-    defer g.mouse.Draw(screen)
+	defer g.mouse.Draw(screen)
 
 	switch g.flags.Type {
 	case NONE:
@@ -305,7 +305,7 @@ func ImageFillScreen(screen *ebiten.Image, image *ebiten.Image) {
 	screen.DrawImage(image, op)
 }
 
-func (g *Game) ImageFillScreenMulti(screen *ebiten.Image,  imageTop, imageBottom *ebiten.Image, setHorizontal bool) {
+func (g *Game) ImageFillScreenMulti(screen *ebiten.Image, imageTop, imageBottom *ebiten.Image, setHorizontal bool) {
 
 	sw, sh := float64(screen.Bounds().Dx()), float64(screen.Bounds().Dy())
 	itw, ith := float64(imageTop.Bounds().Dx()), float64(imageTop.Bounds().Dy())
@@ -329,14 +329,21 @@ func (g *Game) ImageFillScreenMulti(screen *ebiten.Image,  imageTop, imageBottom
 		op.GeoM.Translate(offsetX, offsetY)
 		screen.DrawImage(imageBottom, op)
 
-        g.nds.BtmAbs = struct{T int; B int; L int; R int; W int; H int}{
-            T: int(offsetY),
-            B: int(offsetY + (scale * ith)),
-            L: int(offsetX),
-            R: int(offsetX + (scale * itw)),
-            W: int(scale * itw),
-            H: int(scale * ith),
-        }
+		g.nds.BtmAbs = struct {
+			T int
+			B int
+			L int
+			R int
+			W int
+			H int
+		}{
+			T: int(offsetY),
+			B: int(offsetY + (scale * ith)),
+			L: int(offsetX),
+			R: int(offsetX + (scale * itw)),
+			W: int(scale * itw),
+			H: int(scale * ith),
+		}
 
 		return
 	}
@@ -358,14 +365,21 @@ func (g *Game) ImageFillScreenMulti(screen *ebiten.Image,  imageTop, imageBottom
 	op.GeoM.Translate(offsetX, offsetY)
 	screen.DrawImage(imageBottom, op)
 
-    g.nds.BtmAbs = struct{T int; B int; L int; R int; W int; H int}{
-        T: int(offsetY),
-        B: int(offsetY + (scale * ith)),
-        L: int(offsetX),
-        R: int(offsetX + (scale * itw)),
-        W: int(scale * itw),
-        H: int(scale * ith),
-    }
+	g.nds.BtmAbs = struct {
+		T int
+		B int
+		L int
+		R int
+		W int
+		H int
+	}{
+		T: int(offsetY),
+		B: int(offsetY + (scale * ith)),
+		L: int(offsetX),
+		R: int(offsetX + (scale * itw)),
+		W: int(scale * itw),
+		H: int(scale * ith),
+	}
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {

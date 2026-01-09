@@ -10,11 +10,11 @@ const (
 type BlendType uint16
 
 const (
-    BLEND_NONE BlendType = iota
-    BLEND_ALPHA
-    BLEND_ALPHA_3D
-    BLEND_WHITE
-    BLEND_BLACK
+	BLEND_NONE BlendType = iota
+	BLEND_ALPHA
+	BLEND_ALPHA_3D
+	BLEND_WHITE
+	BLEND_BLACK
 )
 
 type BlendPalettes struct {
@@ -37,7 +37,7 @@ func (bp *BlendPalettes) SetBgPalettes(palData, bgIdx uint32, targetA3d bool, al
 
 		if targetA3d && bgIdx == 0 {
 			bp.targetA3d = true
-			bp.alpha = min(16, uint32(alpha * 16))
+			bp.alpha = min(16, uint32(alpha*16))
 		}
 
 		return

@@ -1,4 +1,5 @@
 //go:build !rc
+
 package ppu
 
 func (ppu *PPU) vramDisplay(y uint32, engine *Engine) {
@@ -20,12 +21,12 @@ func (ppu *PPU) standard(y uint32, engine *Engine) {
 
 	wins := &engine.Windows
 	backdrop := ppu.getPalette(0, 0, false, engine.IsB)
-    bld := &engine.Blend
+	bld := &engine.Blend
 
 	for x := range uint32(SCREEN_WIDTH) {
 		bldPal := NewBlendPalette(&engine.Blend, backdrop)
 		isSemiTransparent, inObjWindow := ppu.render(x, y, engine, bldPal)
-        winBlend := !WindowBldPixelAllowed(x, y, wins, inObjWindow)
+		winBlend := !WindowBldPixelAllowed(x, y, wins, inObjWindow)
 		palData := bldPal.Blend(winBlend, isSemiTransparent, bld)
 
 		r, g, b := engine.MasterBright.Apply(palData)

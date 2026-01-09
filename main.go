@@ -42,10 +42,10 @@ const MAX_TPS = 60 * 20
 
 func main() {
 
-    go debugMemoryErrors()
-    go printTPS()
-    
-    //debug.SetGCPercent(-1) // disables GC
+	go debugMemoryErrors()
+	go printTPS()
+
+	//debug.SetGCPercent(-1) // disables GC
 
 	config.Conf.Decode()
 
@@ -53,12 +53,12 @@ func main() {
 
 	if flags.Profile {
 
-        fi, err := os.Create("cpu.prof")
+		fi, err := os.Create("cpu.prof")
 		if err != nil {
 			panic(err)
 		}
 
-        f = fi
+		f = fi
 
 		//pprof.StartCPUProfile(f)
 
@@ -75,17 +75,17 @@ func main() {
 	ebiten.SetWindowSize(256*4, 192*4)
 	//ebiten.SetWindowSize(1280, 720)
 
-    ebiten.SetCursorMode(ebiten.CursorModeHidden)
+	ebiten.SetCursorMode(ebiten.CursorModeHidden)
 	if config.Conf.Fullscreen {
 		ebiten.SetFullscreen(true)
 	}
 
-    //opts := &ebiten.RunGameOptions{
-    //    SingleThread: true,
-    //}
+	//opts := &ebiten.RunGameOptions{
+	//    SingleThread: true,
+	//}
 
 	if err := ebiten.RunGame(NewGame(flags)); err != nil && err != exit {
-	//if err := ebiten.RunGameWithOptions(NewGame(flags), opts); err != nil && err != exit {
+		//if err := ebiten.RunGameWithOptions(NewGame(flags), opts); err != nil && err != exit {
 		log.Fatal(err)
 	}
 
@@ -148,26 +148,26 @@ func getFlags() Flags {
 // make sure no memory leaks
 func debugMemoryErrors() {
 
-    const maxMemoryAlloc = (1 << 30)
+	const maxMemoryAlloc = (1 << 30)
 
-    var m runtime.MemStats
+	var m runtime.MemStats
 
-    for {
-        runtime.ReadMemStats(&m)
+	for {
+		runtime.ReadMemStats(&m)
 
-        if m.Alloc > maxMemoryAlloc {
-            panic("Memory Limit Exceeded")
-        }
+		if m.Alloc > maxMemoryAlloc {
+			panic("Memory Limit Exceeded")
+		}
 
-        time.Sleep(time.Second)
-    }
+		time.Sleep(time.Second)
+	}
 }
 
 func printTPS() {
 
-    t := time.NewTicker(time.Second * 2)
+	t := time.NewTicker(time.Second * 2)
 
-    for range t.C {
-        fmt.Printf("TPS % 4.2f\n", ebiten.ActualTPS())
-    }
+	for range t.C {
+		fmt.Printf("TPS % 4.2f\n", ebiten.ActualTPS())
+	}
 }

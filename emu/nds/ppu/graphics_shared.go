@@ -534,12 +534,12 @@ func (ppu *PPU) setDirectBitmap(e *Engine, bg *Background, x uint32) (uint32, fl
 
 func (e *Engine) getBgPriority(y uint32) {
 
-    var (
-        //mode = e.Dispcnt.Mode
-        //wins = &e.Windows
-        bgs  = &e.Backgrounds
-        priorities = &e.BgPriorities
-    )
+	var (
+		//mode = e.Dispcnt.Mode
+		//wins = &e.Windows
+		bgs        = &e.Backgrounds
+		priorities = &e.BgPriorities
+	)
 
 	p := [4][]uint32{}
 
@@ -562,17 +562,17 @@ func (e *Engine) getBgPriority(y uint32) {
 		p[priority] = append(p[priority], uint32(i))
 	}
 
-    *priorities = p
+	*priorities = p
 }
 
 func (e *Engine) getObjPriority(y uint32) {
 
-    var (
-        //mode = e.Dispcnt.Mode
-        wins = &e.Windows
-        objects  = &e.Objects
-        priorities = &e.ObjPriorities
-    )
+	var (
+		//mode = e.Dispcnt.Mode
+		wins       = &e.Windows
+		objects    = &e.Objects
+		priorities = &e.ObjPriorities
+	)
 
 	p := [4][]uint32{}
 
@@ -597,7 +597,7 @@ func (e *Engine) getObjPriority(y uint32) {
 		p[priority] = append(p[priority], uint32(i))
 	}
 
-    *priorities = p
+	*priorities = p
 }
 
 func objNotScanline(obj *Object, y uint32) bool {

@@ -812,33 +812,33 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 	case 0x101:
 		mem.Timers[0].WriteD(v, true)
 	case 0x102:
-		mem.Timers[0].WriteCnt(v, false)
+		mem.Timers[0].WriteCnt(v)
 	case 0x103:
-		mem.Timers[0].WriteCnt(v, true)
+        return
 	case 0x104:
 		mem.Timers[1].WriteD(v, false)
 	case 0x105:
 		mem.Timers[1].WriteD(v, true)
 	case 0x106:
-		mem.Timers[1].WriteCnt(v, false)
+		mem.Timers[1].WriteCnt(v)
 	case 0x107:
-		mem.Timers[1].WriteCnt(v, true)
+        return
 	case 0x108:
 		mem.Timers[2].WriteD(v, false)
 	case 0x109:
 		mem.Timers[2].WriteD(v, true)
 	case 0x10A:
-		mem.Timers[2].WriteCnt(v, false)
+		mem.Timers[2].WriteCnt(v)
 	case 0x10B:
-		mem.Timers[2].WriteCnt(v, true)
+        return
 	case 0x10C:
 		mem.Timers[3].WriteD(v, false)
 	case 0x10D:
 		mem.Timers[3].WriteD(v, true)
 	case 0x10E:
-		mem.Timers[3].WriteCnt(v, false)
+		mem.Timers[3].WriteCnt(v)
 	case 0x10F:
-		mem.Timers[3].WriteCnt(v, true)
+        return
 
 	case 0x204:
 		mem.Gamecard.ExMem.Write(v, 0)
@@ -1140,33 +1140,33 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 	case 0x101:
 		mem.Timers[4].WriteD(v, true)
 	case 0x102:
-		mem.Timers[4].WriteCnt(v, false)
+		mem.Timers[4].WriteCnt(v)
 	case 0x103:
-		mem.Timers[4].WriteCnt(v, true)
+        return
 	case 0x104:
 		mem.Timers[5].WriteD(v, false)
 	case 0x105:
 		mem.Timers[5].WriteD(v, true)
 	case 0x106:
-		mem.Timers[5].WriteCnt(v, false)
+		mem.Timers[5].WriteCnt(v)
 	case 0x107:
-		mem.Timers[5].WriteCnt(v, true)
+        return
 	case 0x108:
 		mem.Timers[6].WriteD(v, false)
 	case 0x109:
 		mem.Timers[6].WriteD(v, true)
 	case 0x10A:
-		mem.Timers[6].WriteCnt(v, false)
+		mem.Timers[6].WriteCnt(v)
 	case 0x10B:
-		mem.Timers[6].WriteCnt(v, true)
+        return
 	case 0x10C:
 		mem.Timers[7].WriteD(v, false)
 	case 0x10D:
 		mem.Timers[7].WriteD(v, true)
 	case 0x10E:
-		mem.Timers[7].WriteCnt(v, false)
+		mem.Timers[7].WriteCnt(v)
 	case 0x10F:
-		mem.Timers[7].WriteCnt(v, true)
+        return
 
 	case 0x130:
 		return

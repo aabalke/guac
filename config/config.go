@@ -32,15 +32,15 @@ type Config struct {
 }
 
 type MouseConfig struct {
-    Fill   bool `toml:"fill"`
-    Stroke bool `toml:"stroke"`
-    UnSelectedAlpha float32 `toml:"unselected_alpha"`
-    CursorSize int `toml:"cursor_diameter"`
-    StrokeSize int `toml:"stroke_width"`
-    TomlFillColor   int `toml:"fill_color"`
-    TomlStrokeColor int `toml:"stroke_color"`
-    FillColor []uint8
-    StrokeColor []uint8
+	Fill            bool    `toml:"fill"`
+	Stroke          bool    `toml:"stroke"`
+	UnSelectedAlpha float32 `toml:"unselected_alpha"`
+	CursorSize      int     `toml:"cursor_diameter"`
+	StrokeSize      int     `toml:"stroke_width"`
+	TomlFillColor   int     `toml:"fill_color"`
+	TomlStrokeColor int     `toml:"stroke_color"`
+	FillColor       []uint8
+	StrokeColor     []uint8
 }
 
 type GbConfig struct {
@@ -64,10 +64,10 @@ type GbaConfig struct {
 type NdsConfig struct {
 	KeyboardConfig   EmulatorKeyboardConfig   `toml:"keyboard"`
 	ControllerConfig EmulatorControllerConfig `toml:"controller"`
-    NdsFirmware NdsFirmware `toml:"firmware"`
-    NdsJit NdsJit   `toml:"jit"`
-	Threads                int  `toml:"threads"`
-	DisableSaves           bool `toml:"disable_saves"`
+	NdsFirmware      NdsFirmware              `toml:"firmware"`
+	NdsJit           NdsJit                   `toml:"jit"`
+	Threads          int                      `toml:"threads"`
+	DisableSaves     bool                     `toml:"disable_saves"`
 
 	//SkipHle                bool `toml:"skip_hle"`
 	//IdleOptimize           bool `toml:"idle_optimize"`
@@ -115,19 +115,19 @@ type EmulatorKeyboardConfig struct {
 }
 
 type EmulatorControllerConfig struct {
-	A           []int `toml:"a"`
-	B           []int `toml:"b"`
-	Select      []int `toml:"select"`
-	Start       []int `toml:"start"`
-	Left        []int `toml:"left"`
-	Right       []int `toml:"right"`
-	Up          []int `toml:"up"`
-	Down        []int `toml:"down"`
-	R           []int `toml:"r"`
-	L           []int `toml:"l"`
-	X           []int `toml:"x"`
-	Y           []int `toml:"y"`
-	Hinge       []int `toml:"hinge"`
+	A      []int `toml:"a"`
+	B      []int `toml:"b"`
+	Select []int `toml:"select"`
+	Start  []int `toml:"start"`
+	Left   []int `toml:"left"`
+	Right  []int `toml:"right"`
+	Up     []int `toml:"up"`
+	Down   []int `toml:"down"`
+	R      []int `toml:"r"`
+	L      []int `toml:"l"`
+	X      []int `toml:"x"`
+	Y      []int `toml:"y"`
+	Hinge  []int `toml:"hinge"`
 }
 
 func (c *Config) Decode() {
@@ -173,13 +173,13 @@ func (c *Config) Decode() {
 	}
 
 	c.decodeGb()
-    c.decodeNds()
-    c.decodeMouse()
+	c.decodeNds()
+	c.decodeMouse()
 }
 
 func (c *Config) decodeNds() {
-    c.decodeNdsFirmware()
-    c.decodeNdsJit()
+	c.decodeNdsFirmware()
+	c.decodeNdsJit()
 }
 
 func (c *Config) decodeGb() {
@@ -238,12 +238,12 @@ func (c *Config) decodeMouse() {
 	errMessageStart := "Invalid Mouse Config:"
 	errMessageEnd := "Using default fill color."
 
-    if pal < 0 || pal > 0xFFFFFF {
-        s := fmt.Sprintf("mouse fill palette value has invalid 8 bit value.")
+	if pal < 0 || pal > 0xFFFFFF {
+		s := fmt.Sprintf("mouse fill palette value has invalid 8 bit value.")
 
-        log.Printf("%s %s %s\n", errMessageStart, s, errMessageEnd)
-        invalid = true
-    }
+		log.Printf("%s %s %s\n", errMessageStart, s, errMessageEnd)
+		invalid = true
+	}
 
 	if invalid {
 		// greyscale palette
@@ -263,12 +263,12 @@ func (c *Config) decodeMouse() {
 	errMessageStart = "Invalid Mouse Config:"
 	errMessageEnd = "Using default stroke color."
 
-    if pal < 0 || pal > 0xFFFFFF {
-        s := fmt.Sprintf("mouse stroke palette value has invalid 8 bit value.")
+	if pal < 0 || pal > 0xFFFFFF {
+		s := fmt.Sprintf("mouse stroke palette value has invalid 8 bit value.")
 
-        log.Printf("%s %s %s\n", errMessageStart, s, errMessageEnd)
-        invalid = true
-    }
+		log.Printf("%s %s %s\n", errMessageStart, s, errMessageEnd)
+		invalid = true
+	}
 
 	if invalid {
 		// greyscale palette

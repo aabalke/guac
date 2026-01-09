@@ -192,8 +192,8 @@ func NewPPU(irq *cpu.Irq) *PPU {
 		p.WHITE_SCANLINE[i] = 0xFF
 	}
 
-    p.EngineA.Simd = NewSimd(&p.EngineA)
-    p.EngineB.Simd = NewSimd(&p.EngineB)
+	p.EngineA.Simd = NewSimd(&p.EngineA)
+	p.EngineB.Simd = NewSimd(&p.EngineB)
 
 	return p
 }

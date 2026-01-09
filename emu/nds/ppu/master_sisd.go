@@ -1,4 +1,5 @@
 //go:build !rc
+
 package ppu
 
 func (m *MasterBright) Apply(v uint32) (uint8, uint8, uint8) {

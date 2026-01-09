@@ -17,35 +17,6 @@ type Timer struct {
 	FreqShift   uint32
 }
 
-func (t *Timer) UpdateSingle(overflow bool) (bool, bool) {
-
-	// this only works if you update 1 cycle per run
-
-	increment := uint32(0)
-
-	if !t.Cascade {
-		t.Elapsed++
-
-		if t.Elapsed >= t.Freq {
-			increment = t.Elapsed >> t.FreqShift
-			t.Elapsed -= increment << t.FreqShift
-		}
-	} else if overflow {
-		increment = 1
-	}
-
-	total := t.D + increment
-
-	if notOverflow := !(total > 0xFFFF); notOverflow {
-		t.D = total
-		return false, false
-	}
-
-	t.D = t.SavedInitialValue + (total & 0xFFFF)
-
-	return true, t.OverflowIRQ
-}
-
 func (t *Timer) Update(overflow bool, cycles uint32) (bool, bool) {
 
 	increment := uint32(0)
@@ -60,24 +31,16 @@ func (t *Timer) Update(overflow bool, cycles uint32) (bool, bool) {
 		if t.Elapsed >= t.Freq {
 			increment = t.Elapsed >> t.FreqShift
 			t.Elapsed -= increment << t.FreqShift
-			//t.Elapsed -= increment * t.Freq // %= freq
 		}
 	}
 
-	total := t.D + increment
+    t.D += increment
 
-	if notOverflow := !(total > 0xFFFF); notOverflow {
-		t.D = total
-		return false, false
-	}
+    if notOverflow := t.D <= 0xFFFF; notOverflow {
+        return false, false
+    }
 
-	t.D = t.SavedInitialValue + (total & 0xFFFF)
-
-	// in nds function
-	//if t.OverflowIRQ {
-	//	t.Gba.Irq.setIRQ(3 + uint32(t.Idx))
-	//}
-
+    t.D = (t.D & 0xFFFF) + t.SavedInitialValue
 	return true, t.OverflowIRQ
 }
 
@@ -90,13 +53,9 @@ func (t *Timer) ReadCnt(hi bool) uint8 {
 	return uint8(t.CNT)
 }
 
-func (t *Timer) WriteCnt(v uint8, hi bool) {
+func (t *Timer) WriteCnt(v uint8) {
 
-	if hi {
-		return
-	}
-
-	oldValue := t.CNT & 0xC7
+    wasEnabled := t.Enabled
 	t.CNT = uint32(v) & 0xC7
 	t.Cascade = (t.CNT>>2)&1 != 0
 	t.OverflowIRQ = (t.CNT>>6)&1 != 0
@@ -104,10 +63,10 @@ func (t *Timer) WriteCnt(v uint8, hi bool) {
 	t.Freq = t.getFreq()
 	t.FreqShift = t.getFreqShift()
 
-	if setEnabled := (v>>7)&1 != 0 && (oldValue>>7)&1 == 0; setEnabled {
+    if t.Enabled && !wasEnabled {
 		t.D = t.SavedInitialValue
 		t.Elapsed = 0
-	}
+    }
 }
 
 func (t *Timer) ReadD(hi bool) uint8 {

@@ -6,27 +6,27 @@ import (
 )
 
 var (
-    b16 = binary.LittleEndian.Uint16
-    wg = sync.WaitGroup{}
+	b16 = binary.LittleEndian.Uint16
+	wg  = sync.WaitGroup{}
 )
 
 func (ppu *PPU) Graphics(y uint32, singleThread bool) {
 
-    a := &ppu.EngineA
-    b := &ppu.EngineB
-    a.updateBackgrounds()
-    b.updateBackgrounds()
-    a.getBgPriority(y)
-    b.getBgPriority(y)
-    a.getObjPriority(y)
-    b.getObjPriority(y)
+	a := &ppu.EngineA
+	b := &ppu.EngineB
+	a.updateBackgrounds()
+	b.updateBackgrounds()
+	a.getBgPriority(y)
+	b.getBgPriority(y)
+	a.getObjPriority(y)
+	b.getObjPriority(y)
 
-    ppu.buildFrame(y, singleThread)
+	ppu.buildFrame(y, singleThread)
 
-    a.Backgrounds[2].BgAffineUpdate()
-    a.Backgrounds[3].BgAffineUpdate()
-    b.Backgrounds[2].BgAffineUpdate()
-    b.Backgrounds[3].BgAffineUpdate()
+	a.Backgrounds[2].BgAffineUpdate()
+	a.Backgrounds[3].BgAffineUpdate()
+	b.Backgrounds[2].BgAffineUpdate()
+	b.Backgrounds[3].BgAffineUpdate()
 }
 
 func (ppu *PPU) buildFrame(y uint32, singleThread bool) {
