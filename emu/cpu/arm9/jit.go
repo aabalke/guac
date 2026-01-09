@@ -179,7 +179,9 @@ func (j *Jit) DeletePages() {
 				continue
 			}
 
-			block.assembler.Release()
+            // Deleteing pages causes crashes
+            // I believe I need to work on it more
+			//block.assembler.Release()
 		}
 	}
 
@@ -379,7 +381,6 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 
 	switch {
 	case isBkpt(op):
-
 	case isB(op):
 	case isBX(op):
 	case isSDT(op):

@@ -179,7 +179,7 @@ func (j *Jit) DeletePages() {
 				continue
 			}
 
-			block.assembler.Release()
+			//block.assembler.Release()
 		}
 	}
 
