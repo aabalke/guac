@@ -1144,15 +1144,22 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32){
 
 func (j *Jit) emitBlock(op uint32) {
 
-	// SCRATCH
-	// 0x00: rnv
-	// 0x01: addr
-	// 0x02: wb
-	// 0x10: usermode flag
+	var (
+		rlist    = op & 0xFFFF
+		regCount = uint32(bits.OnesCount32(rlist))
+		pre      = (op>>24)&1 != 0
+		psr      = (op>>22)&1 != 0
+		up       = (op>>23)&1 != 0
+		load     = (op>>20)&1 != 0
+		rn       = (op >> 16) & 0xF
+	)
 
-	rlist := op & 0xFFFF
-	up := (op>>23)&1 != 0
-	rn := (op >> 16) & 0xF
+	// rax addr ( Scratch 0)
+	// scratch 1 wbvalue (Rbx temp)
+
+	j.Movl(j.REG(rn), amd64.Eax)
+	j.Movl(amd64.Eax, amd64.Ebx)
+	j.And(amd64.Imm(^0b11), amd64.Eax)
 
 	if rlist == 0 {
 
@@ -1165,67 +1172,46 @@ func (j *Jit) emitBlock(op uint32) {
 		return
 	}
 
-	pcIncluded := op&0x8000 != 0
-	pre := (op>>24)&1 != 0
-	psr := (op>>22)&1 != 0
-	wb := (op>>21)&1 != 0
-	load := (op>>20)&1 != 0
-
-	j.Xor(amd64.Rax, amd64.Rax)
-	if forceUser := psr && (!load || !pcIncluded); forceUser {
-		j.Mov(MODE, amd64.Eax)
-		j.Cmp(amd64.Imm(MODE_USR), amd64.Eax)
-		j.SETcc(amd64.CC_NZ, amd64.Rax)
-	}
-
-	j.Mov(amd64.Eax, j.SCRATCH(0x10))
-
-	regCount := uint32(bits.OnesCount32(rlist))
-
-	j.Movl(j.REG(rn), amd64.Eax)
-	j.Mov(amd64.Rax, amd64.Rbx)
-
-	j.And(amd64.Imm(^0b11), amd64.Rax)
+	var (
+		rnIncluded = (rlist>>rn)&1 != 0
+		wb         = (op>>21)&1 != 0
+	)
 
 	if up {
-		j.Add(amd64.Imm(regCount*4), amd64.Rbx)
+		j.Add(amd64.Imm(regCount<<2), amd64.Ebx)
 	} else {
-		j.Sub(amd64.Imm(regCount*4), amd64.Rbx)
+		j.Sub(amd64.Imm(regCount<<2), amd64.Ebx)
 	}
 
-	if rn == 13 || rn == 14 {
+	j.Movl(amd64.Ebx, j.SCRATCH(1))
 
-		j.And(amd64.Imm(1), amd64.Edi)
+	// rnv Scratch 2
+	j.Movl(j.REG(rn), amd64.Ebx)
 
-		j.Cmp(amd64.Imm(1), amd64.Edi)
-		normal := j.JccForward(amd64.CC_NZ)
+	if psr {
+		j.Movl(MODE, amd64.Edi)
+		j.Cmp(amd64.Imm(MODE_FIQ), amd64.Edi)
+		notFiq := j.JccForward(amd64.CC_NZ)
 
-		switch rn {
-		case 13:
-			j.Movl(j.UserBankReg(13), amd64.Edi)
-		case 14:
-			j.Movl(j.UserBankReg(14), amd64.Edi)
+		if rn >= 8 && rn < PC {
+			j.Movl(j.UserBankReg(rn), amd64.Ebx)
 		}
 
-		userModeJump := j.JmpForward()
+		notFiq()
+		j.Cmp(amd64.Imm(MODE_USR), amd64.Edi)
+		user := j.JccForward(amd64.CC_Z)
 
-		normal()
+		if rn >= 13 && rn < PC {
+			j.Movl(j.UserBankReg(rn), amd64.Ebx)
+		}
 
-		j.Movl(j.REG(rn), amd64.Edi)
-
-		userModeJump()
-
-	} else {
-		j.Movl(j.REG(rn), amd64.Edi)
+		user()
 	}
 
-	// rnv in scratch 0
-	j.Movl(amd64.Edi, j.SCRATCH(0))
-
-	// wb in scratch 2
 	j.Movl(amd64.Ebx, j.SCRATCH(2))
 
 	reg := uint32(0)
+
 	if !up {
 		reg = 15
 	}
@@ -1243,91 +1229,113 @@ func (j *Jit) emitBlock(op uint32) {
 
 		if pre {
 			if up {
-				j.Add(amd64.Imm(4), amd64.Rax)
+				j.Add(amd64.Imm(4), amd64.Eax)
 			} else {
-				j.Sub(amd64.Imm(4), amd64.Rax)
+				j.Sub(amd64.Imm(4), amd64.Eax)
 			}
 		}
 
-		j.Movl(amd64.Eax, j.SCRATCH(1))
+		j.Movl(amd64.Eax, j.SCRATCH(0))
 
 		if load {
 
 			j.CallFunc(Read32)
 
-			if reg == 13 || reg == 14 {
+			if psr {
 
-				j.Movl(j.SCRATCH(0x10), amd64.Edi)
+				j.Movl(MODE, amd64.Edi)
+				j.Cmp(amd64.Imm(MODE_FIQ), amd64.Edi)
+				notFiq := j.JccForward(amd64.CC_NZ)
 
-				j.Cmp(amd64.Imm(1), amd64.Edi)
-				normal := j.JccForward(amd64.CC_NZ)
-
-				switch reg {
-				case 13:
-					j.Movl(amd64.Eax, j.UserBankReg(13))
-				case 14:
-					j.Movl(amd64.Eax, j.UserBankReg(14))
+				if reg >= 8 && reg < PC {
+					j.Movl(amd64.Eax, j.UserBankReg(reg))
+				} else {
+					j.Movl(amd64.Eax, j.REG(reg))
 				}
 
-				userModeJump := j.JmpForward()
+				fiqskip := j.JmpForward()
 
-				normal()
+				notFiq()
+
+				j.Cmp(amd64.Imm(MODE_USR), amd64.Edi)
+				user := j.JccForward(amd64.CC_Z)
+
+				if reg >= 13 && reg < PC {
+					j.Movl(amd64.Eax, j.UserBankReg(reg))
+				} else {
+					j.Movl(amd64.Eax, j.REG(reg))
+				}
+
+				notuserskip := j.JmpForward()
+
+				user()
 
 				j.Movl(amd64.Eax, j.REG(reg))
 
-				userModeJump()
+				fiqskip()
+				notuserskip()
 
 			} else {
 				j.Movl(amd64.Eax, j.REG(reg))
 			}
 
 		} else {
-
 			switch reg {
 			case rn:
-				j.Movl(j.SCRATCH(0), amd64.Ebx)
-			case PC:
-				j.Movl(j.REG(15), amd64.Ebx)
-				j.Add(amd64.Imm(12), amd64.Ebx)
 
+				j.Movl(j.SCRATCH(2), amd64.Ebx)
+
+				j.CallFunc(Write32)
 			default:
 
-				if reg == 13 || reg == 14 {
+				if psr {
 
-					j.Movl(j.SCRATCH(0x10), amd64.Edi)
-					j.Cmp(amd64.Imm(1), amd64.Edi)
-					normal := j.JccForward(amd64.CC_NZ)
+					j.Movl(MODE, amd64.Edi)
+					j.Cmp(amd64.Imm(MODE_FIQ), amd64.Edi)
+					notFiq := j.JccForward(amd64.CC_NZ)
 
-					switch reg {
-					case 13:
-						j.Movl(j.UserBankReg(13), amd64.Ebx)
-					case 14:
-						j.Movl(j.UserBankReg(14), amd64.Ebx)
+					if reg >= 8 && reg < PC {
+						j.Movl(j.UserBankReg(reg), amd64.Ebx)
+					} else {
+						j.Movl(j.REG(reg), amd64.Ebx)
 					}
 
-					userModeJump := j.JmpForward()
+					fiqskip := j.JmpForward()
 
-					normal()
+					notFiq()
+
+					j.Cmp(amd64.Imm(MODE_USR), amd64.Edi)
+					user := j.JccForward(amd64.CC_Z)
+
+					if reg >= 13 && reg < PC {
+						j.Movl(j.UserBankReg(reg), amd64.Ebx)
+					} else {
+						j.Movl(j.REG(reg), amd64.Ebx)
+					}
+
+					notuserskip := j.JmpForward()
+
+					user()
 
 					j.Movl(j.REG(reg), amd64.Ebx)
 
-					userModeJump()
+					fiqskip()
+					notuserskip()
 				} else {
 					j.Movl(j.REG(reg), amd64.Ebx)
 				}
-			}
 
-			j.CallFunc(Write32)
+				j.CallFunc(Write32)
+			}
 		}
 
-		// fix clobbering
-		j.Movl(j.SCRATCH(1), amd64.Eax)
+		j.Movl(j.SCRATCH(0), amd64.Eax)
 
 		if !pre {
 			if up {
-				j.Add(amd64.Imm(4), amd64.Rax)
+				j.Add(amd64.Imm(4), amd64.Eax)
 			} else {
-				j.Sub(amd64.Imm(4), amd64.Rax)
+				j.Sub(amd64.Imm(4), amd64.Eax)
 			}
 		}
 
@@ -1340,7 +1348,7 @@ func (j *Jit) emitBlock(op uint32) {
 
 	if !load {
 		if wb {
-			j.Movl(j.SCRATCH(2), amd64.Eax)
+			j.Movl(j.SCRATCH(1), amd64.Eax)
 			j.Movl(amd64.Eax, j.REG(rn))
 		}
 
@@ -1348,22 +1356,18 @@ func (j *Jit) emitBlock(op uint32) {
 	}
 
 	if wb {
-		if rnIncluded := (rlist>>rn)&1 == 1; rnIncluded {
+
+		if rnIncluded {
 			isLast := (rlist < (1 << (rn + 1)))
 			isOnly := regCount == 1
 			if !isLast || isOnly {
-				j.Movl(j.SCRATCH(2), amd64.Eax)
+				j.Movl(j.SCRATCH(1), amd64.Eax)
 				j.Movl(amd64.Eax, j.REG(rn))
 			}
 		} else {
-			j.Movl(j.SCRATCH(2), amd64.Eax)
+			j.Movl(j.SCRATCH(1), amd64.Eax)
 			j.Movl(amd64.Eax, j.REG(rn))
 		}
 	}
 
-	if !pcIncluded {
-		return
-	}
-
-	panic("UNSETUP LDR PC INCLUDED")
 }

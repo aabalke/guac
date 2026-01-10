@@ -963,7 +963,7 @@ func (j *Jit) emitBlock(op uint32) {
 
 	var (
 		rnIncluded = (rlist>>rn)&1 != 0
-		wb         = (op>>21)&1 != 0 && !(load && rnIncluded)
+		wb         = (op>>21)&1 != 0
 	)
 
 	if up {
@@ -1074,12 +1074,12 @@ func (j *Jit) emitBlock(op uint32) {
 
 				//Store OLD base if Rb is FIRST entry in Rlist
 				// otherwise store NEW base (STM/ARMv4),
-
 				if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
 					j.Movl(j.SCRATCH(2), amd64.Ebx)
 				} else {
 					j.Movl(j.SCRATCH(1), amd64.Ebx)
 				}
+
 				j.CallFunc(Write32)
 			default:
 
@@ -1154,4 +1154,5 @@ func (j *Jit) emitBlock(op uint32) {
 		j.Movl(j.SCRATCH(1), amd64.Eax)
 		j.Movl(amd64.Eax, j.REG(rn))
 	}
+
 }

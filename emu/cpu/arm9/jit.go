@@ -468,7 +468,8 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 
 		load := (op>>20)&1 != 0
 		pcIncluded := op&0x8000 != 0
-		if pcIncluded && load {
+		rlist := op & 0xFFFF
+		if pcIncluded && load || rlist == 0 {
 			return false
 		}
 
