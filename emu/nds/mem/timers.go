@@ -34,13 +34,13 @@ func (t *Timer) Update(overflow bool, cycles uint32) (bool, bool) {
 		}
 	}
 
-    t.D += increment
+	t.D += increment
 
-    if notOverflow := t.D <= 0xFFFF; notOverflow {
-        return false, false
-    }
+	if notOverflow := t.D <= 0xFFFF; notOverflow {
+		return false, false
+	}
 
-    t.D = (t.D & 0xFFFF) + t.SavedInitialValue
+	t.D = (t.D & 0xFFFF) + t.SavedInitialValue
 	return true, t.OverflowIRQ
 }
 
@@ -55,7 +55,7 @@ func (t *Timer) ReadCnt(hi bool) uint8 {
 
 func (t *Timer) WriteCnt(v uint8) {
 
-    wasEnabled := t.Enabled
+	wasEnabled := t.Enabled
 	t.CNT = uint32(v) & 0xC7
 	t.Cascade = (t.CNT>>2)&1 != 0
 	t.OverflowIRQ = (t.CNT>>6)&1 != 0
@@ -63,10 +63,10 @@ func (t *Timer) WriteCnt(v uint8) {
 	t.Freq = t.getFreq()
 	t.FreqShift = t.getFreqShift()
 
-    if t.Enabled && !wasEnabled {
+	if t.Enabled && !wasEnabled {
 		t.D = t.SavedInitialValue
 		t.Elapsed = 0
-    }
+	}
 }
 
 func (t *Timer) ReadD(hi bool) uint8 {

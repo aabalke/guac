@@ -1,11 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"flag"
-	"fmt"
+	"go/format"
 	"os"
-	"os/exec"
-	"syscall"
 	"text/template"
 )
 
@@ -36,15 +35,6 @@ func main() {
     if *flagArm9 {
         generate(*flagPath + "arm9/", CpuConfig{A9: true})
     }
-
-    if err := format(*flagPath + "arm7/..."); err != nil {
-        fmt.Printf("Could not format arm7 cpu implimentation: %s\n", err.Error())
-    }
-
-    if err := format(*flagPath + "arm9/..."); err != nil {
-        fmt.Printf("Could not format arm9 cpu implimentation: %s\n", err.Error())
-    }
-
 }
 
 func generate(exportPath string, cfg CpuConfig) {
@@ -76,29 +66,22 @@ func generate(exportPath string, cfg CpuConfig) {
 }
 
 func generateFile(templatePath, exportPath string, cfg CpuConfig) {
+	tmpl := template.Must(
+		template.ParseFiles(templatePath),
+	)
 
-    tmpl := template.Must(
-        template.ParseFiles(templatePath),
-    )
+	var buf bytes.Buffer
 
-    f, err := os.Create(exportPath)
-    if err != nil {
-        panic(err)
-    }
-    defer f.Close()
+	if err := tmpl.Execute(&buf, cfg); err != nil {
+		panic(err)
+	}
 
-    if err := tmpl.Execute(f, cfg); err != nil {
-        panic(err)
-    }
-}
+	formatted, err := format.Source(buf.Bytes())
+	if err != nil {
+		panic(err)
+	}
 
-func format(s string) error {
-
-    goExec, err := exec.LookPath("go")
-    if err != nil {
-        return err
-    }
-
-    err = syscall.Exec(goExec, []string{"fmt", s}, os.Environ())
-    return err
+	if err := os.WriteFile(exportPath, formatted, 0644); err != nil {
+		panic(err)
+	}
 }

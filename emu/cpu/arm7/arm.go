@@ -1063,9 +1063,9 @@ func (c *Cpu) Block(op uint32) {
 	}
 
 	if load {
-		p, _ = c.mem.ReadPtr(addr, true)
+		p, _ = c.mem.ReadPtr(addr, false)
 	} else {
-		p, _ = c.mem.WritePtr(addr, true)
+		p, _ = c.mem.WritePtr(addr, false)
 	}
 
 	for range 16 {
@@ -1120,7 +1120,7 @@ func (c *Cpu) Block(op uint32) {
 		if load {
 
 			if p == nil {
-				*ref = c.mem.Read32(addr, true)
+				*ref = c.mem.Read32(addr, false)
 			} else {
 				*ref = *(*uint32)(p)
 			}
@@ -1138,9 +1138,9 @@ func (c *Cpu) Block(op uint32) {
 					}
 
 				case PC:
-					c.mem.Write32(addr, *ref+12, true)
+					c.mem.Write32(addr, *ref+12, false)
 				default:
-					c.mem.Write32(addr, *ref, true)
+					c.mem.Write32(addr, *ref, false)
 				}
 			} else {
 				switch reg {
