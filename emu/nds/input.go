@@ -10,11 +10,12 @@ import (
 
 func (nds *Nds) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadButton, mouse *input.Mouse, frame uint64) {
 
-	keyConfig := config.Conf.Nds.KeyboardConfig
-	buttonConfig := config.Conf.Nds.ControllerConfig
-
-	k := &nds.mem.Keypad.KEYINPUT
-	k2 := &nds.mem.Keypad.KEYINPUT2
+	var (
+		keyCfg    = config.Conf.Nds.KeyboardConfig
+		buttonCfg = config.Conf.Nds.ControllerConfig
+		k         = &nds.mem.Keypad.KEYINPUT
+		k2        = &nds.mem.Keypad.KEYINPUT2
+	)
 
 	*k = 0b11_1111_1111
 	*k2 |= 0b0100_1011
@@ -27,34 +28,30 @@ func (nds *Nds) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 		keyStr := key.String()
 
 		switch {
-		case slices.Contains(keyConfig.A, keyStr):
-			*k &^= 0b1
-		case slices.Contains(keyConfig.B, keyStr):
-			*k &^= 0b10
-		case slices.Contains(keyConfig.Select, keyStr):
-			*k &^= 0b100
-		case slices.Contains(keyConfig.Start, keyStr):
-			*k &^= 0b1000
-		case slices.Contains(keyConfig.Right, keyStr):
-			*k &^= 0b10000
-		case slices.Contains(keyConfig.Left, keyStr):
-			*k &^= 0b100000
-		case slices.Contains(keyConfig.Up, keyStr):
-			*k &^= 0b1000000
-		case slices.Contains(keyConfig.Down, keyStr):
-			*k &^= 0b10000000
-		case slices.Contains(keyConfig.R, keyStr):
-			*k &^= 0b100000000
-		case slices.Contains(keyConfig.L, keyStr):
-			*k &^= 0b1000000000
-		case slices.Contains(keyConfig.X, keyStr):
-			*k2 &^= 0b1
-		case slices.Contains(keyConfig.Y, keyStr):
-			*k2 &^= 0b10
-		case slices.Contains(keyConfig.Y, keyStr):
-			*k2 &^= 0b10
-			//case slices.Contains(keyConfig.Hinge, keyStr):
-			//	*k2 |= 0b1000_0000
+		case slices.Contains(keyCfg.A, keyStr):
+			*k &^= 1 << 0
+		case slices.Contains(keyCfg.B, keyStr):
+			*k &^= 1 << 1
+		case slices.Contains(keyCfg.Select, keyStr):
+			*k &^= 1 << 2
+		case slices.Contains(keyCfg.Start, keyStr):
+			*k &^= 1 << 3
+		case slices.Contains(keyCfg.Right, keyStr):
+			*k &^= 1 << 4
+		case slices.Contains(keyCfg.Left, keyStr):
+			*k &^= 1 << 5
+		case slices.Contains(keyCfg.Up, keyStr):
+			*k &^= 1 << 6
+		case slices.Contains(keyCfg.Down, keyStr):
+			*k &^= 1 << 7
+		case slices.Contains(keyCfg.R, keyStr):
+			*k &^= 1 << 8
+		case slices.Contains(keyCfg.L, keyStr):
+			*k &^= 1 << 9
+		case slices.Contains(keyCfg.X, keyStr):
+			*k2 &^= 1 << 0
+		case slices.Contains(keyCfg.Y, keyStr):
+			*k2 &^= 1 << 1
 		}
 	}
 
@@ -63,32 +60,30 @@ func (nds *Nds) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 		buttonStr := int(button)
 
 		switch {
-		case slices.Contains(buttonConfig.A, buttonStr):
-			*k &^= 0b1
-		case slices.Contains(buttonConfig.B, buttonStr):
-			*k &^= 0b10
-		case slices.Contains(buttonConfig.Select, buttonStr):
-			*k &^= 0b100
-		case slices.Contains(buttonConfig.Start, buttonStr):
-			*k &^= 0b1000
-		case slices.Contains(buttonConfig.Right, buttonStr):
-			*k &^= 0b10000
-		case slices.Contains(buttonConfig.Left, buttonStr):
-			*k &^= 0b100000
-		case slices.Contains(buttonConfig.Up, buttonStr):
-			*k &^= 0b1000000
-		case slices.Contains(buttonConfig.Down, buttonStr):
-			*k &^= 0b10000000
-		case slices.Contains(buttonConfig.R, buttonStr):
-			*k &^= 0b100000000
-		case slices.Contains(buttonConfig.L, buttonStr):
-			*k &^= 0b1000000000
-		case slices.Contains(buttonConfig.X, buttonStr):
-			*k2 &^= 0b1
-		case slices.Contains(buttonConfig.Y, buttonStr):
-			*k2 &^= 0b10
-			//case slices.Contains(buttonConfig.Hinge, buttonStr):
-			//	*k2 |= 0b1000_0000
+		case slices.Contains(buttonCfg.A, buttonStr):
+			*k &^= 1 << 0
+		case slices.Contains(buttonCfg.B, buttonStr):
+			*k &^= 1 << 1
+		case slices.Contains(buttonCfg.Select, buttonStr):
+			*k &^= 1 << 2
+		case slices.Contains(buttonCfg.Start, buttonStr):
+			*k &^= 1 << 3
+		case slices.Contains(buttonCfg.Right, buttonStr):
+			*k &^= 1 << 4
+		case slices.Contains(buttonCfg.Left, buttonStr):
+			*k &^= 1 << 5
+		case slices.Contains(buttonCfg.Up, buttonStr):
+			*k &^= 1 << 6
+		case slices.Contains(buttonCfg.Down, buttonStr):
+			*k &^= 1 << 7
+		case slices.Contains(buttonCfg.R, buttonStr):
+			*k &^= 1 << 8
+		case slices.Contains(buttonCfg.L, buttonStr):
+			*k &^= 1 << 9
+		case slices.Contains(buttonCfg.X, buttonStr):
+			*k2 &^= 1 << 0
+		case slices.Contains(buttonCfg.Y, buttonStr):
+			*k2 &^= 1 << 1
 		}
 	}
 

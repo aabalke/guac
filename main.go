@@ -42,10 +42,8 @@ const MAX_TPS = 60 * 20
 
 func main() {
 
-	go debugMemoryErrors()
+    go debugMemoryErrors()
 	go printTPS()
-
-	//debug.SetGCPercent(-1) // disables GC
 
 	config.Conf.Decode()
 

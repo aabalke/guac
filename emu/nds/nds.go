@@ -21,11 +21,6 @@ import (
 	"github.com/hajimehoshi/oto"
 )
 
-var (
-	_ = os.Args
-	_ = fmt.Sprintf("")
-)
-
 const (
 	SCREEN_WIDTH  = 256
 	SCREEN_HEIGHT = 192
@@ -44,8 +39,16 @@ const (
 	SND_FREQUENCY = 48000 // sample rate
 	SND_SAMPLES   = 1024  // 512 in gba?
 
-	// timer
+	// timer and geo shouldn't be checked every inst
+	// these should probably be replaced with a less lazy method
 	TIMER_CYCLE_MASK = 0b111
+	GEO_CYCLE_MASK   = 0b1111
+
+	SINGLE_THREAD = !true // debugging
+)
+
+var (
+	RASTERIZE_WG = sync.WaitGroup{}
 )
 
 type Nds struct {
@@ -64,6 +67,7 @@ type Nds struct {
 
 	AccCycles   uint32
 	TimerCycles uint8
+	GeoCycles   uint8
 
 	Frame uint64
 
@@ -82,12 +86,10 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 
 	nds.ppu = ppu.NewPPU(&irq9)
 
-	for i := range 8 {
-		if i < 4 {
-			nds.mem.Timers[i].IsArm9 = true
-		}
-
-		nds.mem.Timers[i].Idx = i % 4
+	for i := range 4 {
+		nds.mem.Timers[i].Idx = i
+		nds.mem.Timers[i].IsArm9 = true
+		nds.mem.Timers[i+4].Idx = i
 	}
 
 	cp15 := &cp15.Cp15{}
@@ -113,29 +115,18 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 
 	s.Mem = &nds.mem
 
-	nds.dma9[0].Init(0, &nds.mem, &irq9, true)
-	nds.dma9[1].Init(1, &nds.mem, &irq9, true)
-	nds.dma9[2].Init(2, &nds.mem, &irq9, true)
-	nds.dma9[3].Init(3, &nds.mem, &irq9, true)
-
-	nds.dma7[0].Init(0, &nds.mem, &irq7, false)
-	nds.dma7[1].Init(1, &nds.mem, &irq7, false)
-	nds.dma7[2].Init(2, &nds.mem, &irq7, false)
-	nds.dma7[3].Init(3, &nds.mem, &irq7, false)
+	for i := range 4 {
+		nds.dma9[i].Init(i, &nds.mem, &irq9, true)
+		nds.dma7[i].Init(i, &nds.mem, &irq7, false)
+	}
 
 	nds.LoadGame(path)
 	//nds.arm9.Reset()
-
 	nds.DirtyInit()
-
 	debug.Init("./log.csv")
 
 	return &nds
 }
-
-var wg2 = sync.WaitGroup{}
-
-const singleThread = !true
 
 func (nds *Nds) Update() {
 
@@ -143,7 +134,7 @@ func (nds *Nds) Update() {
 		return
 	}
 
-	if singleThread {
+	if SINGLE_THREAD {
 		nds.UpdateFrame()
 		if nds.ppu.EngineA.Dispcnt.Is3D {
 			nds.ppu.Rasterizer.Render.UpdateRender()
@@ -151,21 +142,21 @@ func (nds *Nds) Update() {
 		return
 	}
 
-	wg2.Add(2)
+	RASTERIZE_WG.Add(2)
 
 	go func() {
-		defer wg2.Done()
+		defer RASTERIZE_WG.Done()
 		if nds.ppu.EngineA.Dispcnt.Is3D {
 			nds.ppu.Rasterizer.Render.UpdateRender()
 		}
 	}()
 
 	go func() {
-		defer wg2.Done()
+		defer RASTERIZE_WG.Done()
 		nds.UpdateFrame()
 	}()
 
-	wg2.Wait()
+	RASTERIZE_WG.Wait()
 }
 
 func (nds *Nds) UpdateFrame() {
@@ -211,7 +202,7 @@ func (nds *Nds) UpdateFrame() {
 		//debug.CURR_INST++
 	}
 
-	nds.arm7.Jit.DeletePages()
+	//nds.arm7.Jit.DeletePages()
 	nds.arm9.Jit.DeletePages()
 
 	nds.mem.Snd.Play(nds.Muted)
@@ -224,7 +215,7 @@ func (nds *Nds) StepOther() {
 		nds.UpdateTimers(TIMER_CYCLE_MASK + 1)
 	}
 
-	nds.TimerCycles += 1
+	nds.TimerCycles++
 }
 
 func (nds *Nds) StepArm9() uint32 {
@@ -237,19 +228,17 @@ func (nds *Nds) StepArm9() uint32 {
 
 	r := &nds.arm9.Reg.R
 
-	//Log(nds, 0, 10_000, true)
 	cycles, ok := nds.arm9.Execute()
 	if !ok {
-		fmt.Printf("ARM9 Decode Error: PC %08X CURR %d\n", r[15], debug.CURR_INST)
-		os.Exit(0)
+		fmt.Printf("ARM9 Decode Error: PC %08X\n", r[15])
+		os.Exit(1)
 	}
 
-	//nds.CheckGeoDmas()
-	if dmaC&D == 0 {
+	if nds.GeoCycles&GEO_CYCLE_MASK == 0 {
 		nds.CheckGeoDmas()
 	}
 
-	dmaC++
+	nds.GeoCycles++
 
 	if nds.ppu.Rasterizer.GeoEngine.GxStat.FifoIrq != 0 {
 		nds.arm9.Irq.SetIRQ(cpu.IRQ_GEO_CMD_FIFO)
@@ -257,10 +246,6 @@ func (nds *Nds) StepArm9() uint32 {
 
 	return uint32(cycles)
 }
-
-var dmaC = uint32(0)
-
-const D = 0b1111
 
 func (nds *Nds) StepArm7() uint32 {
 
@@ -272,12 +257,10 @@ func (nds *Nds) StepArm7() uint32 {
 
 	r7 := &nds.arm7.Reg.R
 
-	//uhh.UpdatePcs(*r7, nds.mem.Read32(r7[15], false), uint32(nds.arm7.Reg.CPSR))
 	cycles, ok := nds.arm7.Execute()
 	if !ok {
-		//uhh.PrintPcs()
-		fmt.Printf("ARM7 Decode Error: PC %08X CURR %d\n", r7[15], debug.CURR_INST)
-		os.Exit(0)
+		fmt.Printf("ARM7 Decode Error: PC %08X\n", r7[15])
+		os.Exit(1)
 	}
 
 	return uint32(cycles)
@@ -310,8 +293,8 @@ func (nds *Nds) Close() {
 	nds.Paused = true
 
 	debug.L.Close()
-    nds.arm7.Jit.Close()
-    nds.arm9.Jit.Close()
+	nds.arm7.Jit.Close()
+	nds.arm9.Jit.Close()
 }
 
 func (nds *Nds) LoadGame(path string) {
@@ -368,7 +351,7 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 		}
 
 		if vcount < SCREEN_HEIGHT {
-			nds.ppu.Graphics(vcount, singleThread)
+			nds.ppu.Graphics(vcount, SINGLE_THREAD)
 			nds.CheckDmas(dma.ARM9_DMA_MODE_HBL, true)
 		}
 	}
