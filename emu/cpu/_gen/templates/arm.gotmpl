@@ -1194,6 +1194,7 @@ func (cpu *Cpu) Clz(op uint32) {
 	r[PC] += 4
 }
 
+
 func (cpu *Cpu) CoDataReg(op uint32) {
 
 	var (
@@ -1238,16 +1239,19 @@ func (cpu *Cpu) CoDataReg(op uint32) {
 	r[15] += 4
 }
 
-
+{{end}}
 func (c *Cpu) Block(op uint32) {
 
 	var (
-		r     = &c.Reg.R
-		rlist = op & 0xFFFF
-		up    = (op>>23)&1 != 0
-		rn    = (op >> 16) & 0xF
+		r        = &c.Reg.R
+		rlist    = op & 0xFFFF
+		regCount = uint32(bits.OnesCount32(rlist))
+		rn       = (op >> 16) & 0xF
+		addr     = r[rn] &^ 0b11
+		up       = (op>>23)&1 != 0
 	)
 
+    {{if .A9 -}}
 	if rlist == 0 {
 
 		r[PC] += 4
@@ -1261,6 +1265,20 @@ func (c *Cpu) Block(op uint32) {
 		return
 	}
 
+    {{else -}}
+
+	if rlist == 0 {
+		rlist = 0x8000
+		regCount = 0x10
+
+		// starts at bottom instead
+		if !up {
+			addr -= (regCount << 2) - 4
+		}
+	}
+
+    {{end}}
+
 	var (
 		pcIncluded = rlist&0x8000 != 0
 		rnIncluded = (rlist>>rn)&1 != 0
@@ -1269,8 +1287,6 @@ func (c *Cpu) Block(op uint32) {
 		wb         = (op>>21)&1 != 0
 		load       = (op>>20)&1 != 0
 		forceUser  = psr && (c.Reg.CPSR.Mode != MODE_USR) && (!load || !pcIncluded)
-		addr       = r[rn] &^ 0b11
-		regCount   = uint32(bits.OnesCount32(rlist))
 		wbValue    = r[rn]
 		// fiq switch has additional r8 - r12 use mode switch registers
 		forceFIQSwitch = forceUser && c.Reg.CPSR.Mode == MODE_FIQ
@@ -1317,9 +1333,9 @@ func (c *Cpu) Block(op uint32) {
 	}
 
 	if load {
-		p, _ = c.mem.ReadPtr(addr, {{.A9}})
+		p, _ = c.mem.ReadPtr(addr, true)
 	} else {
-		p, _ = c.mem.WritePtr(addr, {{.A9}})
+		p, _ = c.mem.WritePtr(addr, true)
 	}
 
 	for range 16 {
@@ -1374,7 +1390,7 @@ func (c *Cpu) Block(op uint32) {
 		if load {
 
 			if p == nil {
-				*ref = c.mem.Read32(addr, {{.A9}})
+				*ref = c.mem.Read32(addr, true)
 			} else {
 				*ref = *(*uint32)(p)
 			}
@@ -1384,16 +1400,35 @@ func (c *Cpu) Block(op uint32) {
 			if p == nil {
 				switch reg {
 				case rn:
-					c.mem.Write32(addr, rnv, {{.A9}})
+
+                    {{if .A9 -}}
+					c.mem.Write32(addr, rnv, true)
+                    {{else -}}
+					if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
+						c.mem.Write32(addr, rnv, false)
+					} else {
+						c.mem.Write32(addr, wbValue, false)
+					}
+                    {{end}}
+
 				case PC:
-					c.mem.Write32(addr, *ref+12, {{.A9}})
+					c.mem.Write32(addr, *ref+12, true)
 				default:
-					c.mem.Write32(addr, *ref, {{.A9}})
+					c.mem.Write32(addr, *ref, true)
 				}
 			} else {
 				switch reg {
 				case rn:
+
+                    {{if .A9 -}}
 					*(*uint32)(p) = rnv
+                    {{else -}}
+					if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
+						*(*uint32)(p) = rnv
+					} else {
+						*(*uint32)(p) = wbValue
+					}
+                    {{end}}
 				case PC:
 					*(*uint32)(p) = *ref + 12
 				default:
@@ -1434,6 +1469,8 @@ func (c *Cpu) Block(op uint32) {
 		return
 	}
 
+
+    {{if .A9 -}}
 	if wb {
 		if rnIncluded {
 			isLast := (rlist < (1 << (rn + 1)))
@@ -1445,277 +1482,13 @@ func (c *Cpu) Block(op uint32) {
 			r[rn] = wbValue
 		}
 	}
-
-	if !pcIncluded {
-		r[PC] += 4
-		return
-	}
-
-	if !psr {
-		c.toggleThumb()
-		return
-	}
-
-	var (
-		curr = c.Reg.CPSR.Mode
-		spsr = c.Reg.SPSR[BANK_ID[curr]]
-		next = spsr.Mode
-	)
-
-	c.Reg.CPSR = spsr
-
-	if curr == MODE_USR {
-		panic("USER MODE LDM PC CHANGE")
-	}
-
-	if curr != MODE_FIQ {
-		for i := range 5 {
-			c.Reg.USR[i] = r[8+i]
-		}
-	}
-
-	c.Reg.SP[BANK_ID[curr]] = r[SP]
-	c.Reg.LR[BANK_ID[curr]] = r[LR]
-
-	if curr == MODE_FIQ {
-		for i := range 5 {
-			c.Reg.FIQ[i] = r[8+i]
-		}
-	}
-
-	if next != MODE_FIQ {
-		for i := range 5 {
-			r[8+i] = c.Reg.USR[i]
-		}
-	}
-
-	r[SP] = c.Reg.SP[BANK_ID[next]]
-	r[LR] = c.Reg.LR[BANK_ID[next]]
-
-	if next == MODE_FIQ {
-		for i := range 5 {
-			r[8+i] = c.Reg.FIQ[i]
-		}
-	}
-}
-{{end}}
-
-{{if not .A9}}
-
-func (c *Cpu) Block(op uint32) {
-
-	var (
-		r        = &c.Reg.R
-		rlist    = op & 0xFFFF
-		regCount = uint32(bits.OnesCount32(rlist))
-		rn       = (op >> 16) & 0xF
-		addr     = r[rn] &^ 0b11
-		up       = (op>>23)&1 != 0
-	)
-
-	if rlist == 0 {
-		rlist = 0x8000
-		regCount = 0x10
-
-		// starts at bottom instead
-		if !up {
-			addr -= (regCount << 2) - 4
-		}
-	}
-
-	var (
-		load       = (op>>20)&1 != 0
-		pre        = (op>>24)&1 != 0
-		wbValue    = r[rn]
-		pcIncluded = rlist&0x8000 != 0
-		rnIncluded = (rlist>>rn)&1 != 0
-		psr        = (op>>22)&1 != 0
-		wb         = (op>>21)&1 != 0
-		forceUser  = psr && (c.Reg.CPSR.Mode != MODE_USR) && (!load || !pcIncluded)
-
-		// fiq switch has additional r8 - r12 use mode switch registers
-		forceFIQSwitch = forceUser && c.Reg.CPSR.Mode == MODE_FIQ
-	)
-
-	if up {
-		wbValue += regCount << 2
-	} else {
-		wbValue -= regCount << 2
-	}
-
-	rnRef := &c.Reg.R[rn]
-
-	switch {
-	case forceFIQSwitch:
-
-		switch {
-		case rn == 13:
-			rnRef = &c.Reg.SP[BANK_ID[MODE_USR]]
-		case rn == 14:
-			rnRef = &c.Reg.LR[BANK_ID[MODE_USR]]
-		case rn >= 8:
-			rnRef = &c.Reg.USR[rn-8]
-
-		}
-
-	case forceUser:
-		switch {
-		case rn == 13:
-			rnRef = &c.Reg.SP[BANK_ID[MODE_USR]]
-		case rn == 14:
-			rnRef = &c.Reg.LR[BANK_ID[MODE_USR]]
-		}
-	}
-
-	var (
-		rnv = *rnRef
-		reg = uint32(0)
-
-		p unsafe.Pointer
-	)
-
-	if !up {
-		reg = 15
-	}
-
-	if load {
-		p, _ = c.mem.ReadPtr(addr, false)
-	} else {
-		p, _ = c.mem.WritePtr(addr, false)
-	}
-
-	for range 16 {
-
-		if disabled := (rlist>>reg)&1 == 0; disabled {
-			if up {
-				reg++
-			} else {
-				reg--
-			}
-			continue
-		}
-
-		ref := &c.Reg.R[reg]
-		switch {
-		case forceFIQSwitch:
-
-			switch {
-			case reg == 13:
-				ref = &c.Reg.SP[BANK_ID[MODE_USR]]
-			case reg == 14:
-				ref = &c.Reg.LR[BANK_ID[MODE_USR]]
-			case reg >= 8:
-				ref = &c.Reg.USR[reg-8]
-			}
-
-		case forceUser:
-			switch {
-			case reg == 13:
-				ref = &c.Reg.SP[BANK_ID[MODE_USR]]
-			case reg == 14:
-				ref = &c.Reg.LR[BANK_ID[MODE_USR]]
-			}
-		}
-
-		if pre {
-			if up {
-				if p != nil {
-					p = unsafe.Add(p, 4)
-				} else {
-					addr += 4
-				}
-			} else {
-				if p != nil {
-					p = unsafe.Add(p, -4)
-				} else {
-					addr -= 4
-				}
-			}
-		}
-
-		if load {
-
-			if reg == rn {
-				wb = false
-			}
-
-			if p == nil {
-				*ref = c.mem.Read32(addr, false)
-			} else {
-				*ref = *(*uint32)(p)
-			}
-
-		} else {
-
-			if p == nil {
-				switch reg {
-				case rn:
-
-					//Store OLD base if Rb is FIRST entry in Rlist
-					// otherwise store NEW base (STM/ARMv4),
-
-					if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
-						c.mem.Write32(addr, rnv, false)
-					} else {
-						c.mem.Write32(addr, wbValue, false)
-					}
-				case PC:
-					c.mem.Write32(addr, *ref+12, false)
-				default:
-					c.mem.Write32(addr, *ref, false)
-				}
-			} else {
-				switch reg {
-				case rn:
-
-					if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
-						*(*uint32)(p) = rnv
-					} else {
-						*(*uint32)(p) = wbValue
-					}
-				case PC:
-					*(*uint32)(p) = *ref + 12
-				default:
-					*(*uint32)(p) = *ref
-				}
-			}
-		}
-
-		if !pre {
-			if up {
-				if p != nil {
-					p = unsafe.Add(p, 4)
-				} else {
-					addr += 4
-				}
-			} else {
-				if p != nil {
-					p = unsafe.Add(p, -4)
-				} else {
-					addr -= 4
-				}
-			}
-		}
-
-		if up {
-			reg++
-		} else {
-			reg--
-		}
-	}
-
-	if !load {
-		if wb {
-			r[rn] = wbValue
-		}
-
-		r[PC] += 4
-		return
-	}
-
+    {{else -}}
 	if wb && !rnIncluded {
 		r[rn] = wbValue
 	}
+    {{end}}
+
+    // A9
 
 	if !pcIncluded {
 		r[PC] += 4
@@ -1723,6 +1496,9 @@ func (c *Cpu) Block(op uint32) {
 	}
 
 	if !psr {
+        {{if .A9 -}}
+		c.toggleThumb()
+        {{end}}
 		return
 	}
 
@@ -1768,4 +1544,3 @@ func (c *Cpu) Block(op uint32) {
 		}
 	}
 }
-{{end}}

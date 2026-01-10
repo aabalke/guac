@@ -1010,27 +1010,25 @@ func (c *Cpu) Block(op uint32) {
 	}
 
 	var (
-		load       = (op>>20)&1 != 0
-		pre        = (op>>24)&1 != 0
-		wbValue    = r[rn]
 		pcIncluded = rlist&0x8000 != 0
 		rnIncluded = (rlist>>rn)&1 != 0
+		pre        = (op>>24)&1 != 0
 		psr        = (op>>22)&1 != 0
 		wb         = (op>>21)&1 != 0
+		load       = (op>>20)&1 != 0
 		forceUser  = psr && (c.Reg.CPSR.Mode != MODE_USR) && (!load || !pcIncluded)
-
+		wbValue    = r[rn]
 		// fiq switch has additional r8 - r12 use mode switch registers
 		forceFIQSwitch = forceUser && c.Reg.CPSR.Mode == MODE_FIQ
 	)
 
 	if up {
-		wbValue += regCount << 2
+		wbValue += regCount * 4
 	} else {
-		wbValue -= regCount << 2
+		wbValue -= regCount * 4
 	}
 
 	rnRef := &c.Reg.R[rn]
-
 	switch {
 	case forceFIQSwitch:
 
@@ -1065,9 +1063,9 @@ func (c *Cpu) Block(op uint32) {
 	}
 
 	if load {
-		p, _ = c.mem.ReadPtr(addr, false)
+		p, _ = c.mem.ReadPtr(addr, true)
 	} else {
-		p, _ = c.mem.WritePtr(addr, false)
+		p, _ = c.mem.WritePtr(addr, true)
 	}
 
 	for range 16 {
@@ -1121,12 +1119,8 @@ func (c *Cpu) Block(op uint32) {
 
 		if load {
 
-			if reg == rn {
-				wb = false
-			}
-
 			if p == nil {
-				*ref = c.mem.Read32(addr, false)
+				*ref = c.mem.Read32(addr, true)
 			} else {
 				*ref = *(*uint32)(p)
 			}
@@ -1137,18 +1131,16 @@ func (c *Cpu) Block(op uint32) {
 				switch reg {
 				case rn:
 
-					//Store OLD base if Rb is FIRST entry in Rlist
-					// otherwise store NEW base (STM/ARMv4),
-
 					if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
 						c.mem.Write32(addr, rnv, false)
 					} else {
 						c.mem.Write32(addr, wbValue, false)
 					}
+
 				case PC:
-					c.mem.Write32(addr, *ref+12, false)
+					c.mem.Write32(addr, *ref+12, true)
 				default:
-					c.mem.Write32(addr, *ref, false)
+					c.mem.Write32(addr, *ref, true)
 				}
 			} else {
 				switch reg {
@@ -1159,6 +1151,7 @@ func (c *Cpu) Block(op uint32) {
 					} else {
 						*(*uint32)(p) = wbValue
 					}
+
 				case PC:
 					*(*uint32)(p) = *ref + 12
 				default:
@@ -1203,12 +1196,15 @@ func (c *Cpu) Block(op uint32) {
 		r[rn] = wbValue
 	}
 
+	// A9
+
 	if !pcIncluded {
 		r[PC] += 4
 		return
 	}
 
 	if !psr {
+
 		return
 	}
 

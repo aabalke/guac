@@ -1202,9 +1202,9 @@ func (j *Jit) emitBlock(op uint32) {
 
 		switch rn {
 		case 13:
-			j.Movl(j.UserBankReg(false), amd64.Edi)
+			j.Movl(j.UserBankReg(13), amd64.Edi)
 		case 14:
-			j.Movl(j.UserBankReg(true), amd64.Edi)
+			j.Movl(j.UserBankReg(14), amd64.Edi)
 		}
 
 		userModeJump := j.JmpForward()
@@ -1264,9 +1264,9 @@ func (j *Jit) emitBlock(op uint32) {
 
 				switch reg {
 				case 13:
-					j.Movl(amd64.Eax, j.UserBankReg(false))
+					j.Movl(amd64.Eax, j.UserBankReg(13))
 				case 14:
-					j.Movl(amd64.Eax, j.UserBankReg(true))
+					j.Movl(amd64.Eax, j.UserBankReg(14))
 				}
 
 				userModeJump := j.JmpForward()
@@ -1300,9 +1300,9 @@ func (j *Jit) emitBlock(op uint32) {
 
 					switch reg {
 					case 13:
-						j.Movl(j.UserBankReg(false), amd64.Ebx)
+						j.Movl(j.UserBankReg(13), amd64.Ebx)
 					case 14:
-						j.Movl(j.UserBankReg(true), amd64.Ebx)
+						j.Movl(j.UserBankReg(14), amd64.Ebx)
 					}
 
 					userModeJump := j.JmpForward()

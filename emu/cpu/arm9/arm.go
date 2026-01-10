@@ -1191,10 +1191,12 @@ func (cpu *Cpu) CoDataReg(op uint32) {
 func (c *Cpu) Block(op uint32) {
 
 	var (
-		r     = &c.Reg.R
-		rlist = op & 0xFFFF
-		up    = (op>>23)&1 != 0
-		rn    = (op >> 16) & 0xF
+		r        = &c.Reg.R
+		rlist    = op & 0xFFFF
+		regCount = uint32(bits.OnesCount32(rlist))
+		rn       = (op >> 16) & 0xF
+		addr     = r[rn] &^ 0b11
+		up       = (op>>23)&1 != 0
 	)
 
 	if rlist == 0 {
@@ -1218,8 +1220,6 @@ func (c *Cpu) Block(op uint32) {
 		wb         = (op>>21)&1 != 0
 		load       = (op>>20)&1 != 0
 		forceUser  = psr && (c.Reg.CPSR.Mode != MODE_USR) && (!load || !pcIncluded)
-		addr       = r[rn] &^ 0b11
-		regCount   = uint32(bits.OnesCount32(rlist))
 		wbValue    = r[rn]
 		// fiq switch has additional r8 - r12 use mode switch registers
 		forceFIQSwitch = forceUser && c.Reg.CPSR.Mode == MODE_FIQ
@@ -1333,7 +1333,9 @@ func (c *Cpu) Block(op uint32) {
 			if p == nil {
 				switch reg {
 				case rn:
+
 					c.mem.Write32(addr, rnv, true)
+
 				case PC:
 					c.mem.Write32(addr, *ref+12, true)
 				default:
@@ -1342,7 +1344,9 @@ func (c *Cpu) Block(op uint32) {
 			} else {
 				switch reg {
 				case rn:
+
 					*(*uint32)(p) = rnv
+
 				case PC:
 					*(*uint32)(p) = *ref + 12
 				default:
@@ -1395,6 +1399,8 @@ func (c *Cpu) Block(op uint32) {
 		}
 	}
 
+	// A9
+
 	if !pcIncluded {
 		r[PC] += 4
 		return
@@ -1402,6 +1408,7 @@ func (c *Cpu) Block(op uint32) {
 
 	if !psr {
 		c.toggleThumb()
+
 		return
 	}
 

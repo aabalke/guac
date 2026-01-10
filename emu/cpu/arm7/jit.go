@@ -141,22 +141,33 @@ func (j *Jit) concBlockComp() {
 	}
 }
 
-func (j *Jit) UserBankReg(isLr bool) gojit.Indirect {
+func (j *Jit) UserBankReg(reg uint32) gojit.Indirect {
 
-	// user bank id is 0, so return first uint32 in SP and LR [6]uint32s
+	// sp and lr banks have user bank first, no need to add offsets
 
-	if isLr {
+	if reg < 8 {
+		panic("usr bank reg jit called for < 8")
+	}
+
+	switch reg {
+	case 13:
+		return gojit.Indirect{
+			Base:   CPU,
+			Offset: REG + int32(unsafe.Offsetof(Reg{}.SP)),
+			Bits:   32,
+		}
+	case 14:
 		return gojit.Indirect{
 			Base:   CPU,
 			Offset: REG + int32(unsafe.Offsetof(Reg{}.LR)),
 			Bits:   32,
 		}
-	}
-
-	return gojit.Indirect{
-		Base:   CPU,
-		Offset: REG + int32(unsafe.Offsetof(Reg{}.SP)),
-		Bits:   32,
+	default:
+		return gojit.Indirect{
+			Base:   CPU,
+			Offset: REG + int32(unsafe.Offsetof(Reg{}.USR)) + int32(reg-8)*4,
+			Bits:   32,
+		}
 	}
 }
 
@@ -444,6 +455,16 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 		}
 
 		jit.emitSdt(op)
+		return true
+	case isBlock(op):
+
+		load := (op>>20)&1 != 0
+		pcIncluded := op&0x8000 != 0
+		if pcIncluded && load {
+			return false
+		}
+
+		jit.emitBlock(op)
 		return true
 
 	case isHalf(op):

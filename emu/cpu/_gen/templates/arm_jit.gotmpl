@@ -1249,9 +1249,9 @@ func (j *Jit) emitBlock(op uint32) {
 
 		switch rn {
 		case 13:
-			j.Movl(j.UserBankReg(false), amd64.Edi)
+			j.Movl(j.UserBankReg(13), amd64.Edi)
 		case 14:
-			j.Movl(j.UserBankReg(true), amd64.Edi)
+			j.Movl(j.UserBankReg(14), amd64.Edi)
 		}
 
 		userModeJump := j.JmpForward()
@@ -1311,9 +1311,9 @@ func (j *Jit) emitBlock(op uint32) {
 
 				switch reg {
 				case 13:
-					j.Movl(amd64.Eax, j.UserBankReg(false))
+					j.Movl(amd64.Eax, j.UserBankReg(13))
 				case 14:
-					j.Movl(amd64.Eax, j.UserBankReg(true))
+					j.Movl(amd64.Eax, j.UserBankReg(14))
 				}
 
 				userModeJump := j.JmpForward()
@@ -1347,9 +1347,9 @@ func (j *Jit) emitBlock(op uint32) {
 
 					switch reg {
 					case 13:
-						j.Movl(j.UserBankReg(false), amd64.Ebx)
+						j.Movl(j.UserBankReg(13), amd64.Ebx)
 					case 14:
-						j.Movl(j.UserBankReg(true), amd64.Ebx)
+						j.Movl(j.UserBankReg(14), amd64.Ebx)
 					}
 
 					userModeJump := j.JmpForward()
@@ -1418,7 +1418,227 @@ func (j *Jit) emitBlock(op uint32) {
 {{else -}}
 
 func (j *Jit) emitBlock(op uint32) {
-    panic("unsetup block jit  arm7")
+
+	var (
+		rlist    = op & 0xFFFF
+		regCount = uint32(bits.OnesCount32(rlist))
+		pre        = (op>>24)&1 != 0
+		psr        = (op>>22)&1 != 0
+		up         = (op>>23)&1 != 0
+		load       = (op>>20)&1 != 0
+		rn         = (op>>16)&0xF
+	)
+
+    // rax addr ( Scratch 0)
+    // scratch 1 wbvalue (Rbx temp)
+
+    j.Movl(j.REG(rn), amd64.Eax)
+    j.Movl(amd64.Eax, amd64.Ebx)
+    j.And(amd64.Imm(^0b11), amd64.Eax)
+
+	if rlist == 0 {
+		rlist = 0x8000
+		regCount = 0x10
+
+		// starts at bottom instead
+		if !up {
+            j.Sub(amd64.Imm((regCount << 2) - 4), amd64.Eax)
+		}
+	}
+
+	var (
+		rnIncluded = (rlist>>rn)&1 != 0
+		wb = (op>>21)&1 != 0 && !(load && rnIncluded)
+	)
+
+	if up {
+        j.Add(amd64.Imm(regCount << 2), amd64.Ebx)
+	} else {
+        j.Sub(amd64.Imm(regCount << 2), amd64.Ebx)
+	}
+
+    j.Movl(amd64.Ebx, j.SCRATCH(1))
+
+    // rnv Scratch 2
+    j.Movl(j.REG(rn), amd64.Ebx)
+
+    if psr {
+        j.Movl(MODE, amd64.Edi)
+        j.Cmp(amd64.Imm(MODE_FIQ), amd64.Edi)
+        notFiq := j.JccForward(amd64.CC_NZ)
+
+        if rn >= 8 && rn < PC {
+            j.Movl(j.UserBankReg(rn), amd64.Ebx)
+        }
+
+        notFiq()
+        j.Cmp(amd64.Imm(MODE_USR), amd64.Edi)
+        user := j.JccForward(amd64.CC_Z)
+
+        if rn >= 13 && rn < PC {
+            j.Movl(j.UserBankReg(rn), amd64.Ebx)
+        }
+
+        user()
+    }
+
+    j.Movl(amd64.Ebx, j.SCRATCH(2))
+
+    reg := uint32(0)
+
+	if !up {
+		reg = 15
+	}
+
+	for range 16 {
+
+		if disabled := (rlist>>reg)&1 == 0; disabled {
+			if up {
+				reg++
+			} else {
+				reg--
+			}
+			continue
+		}
+
+		if pre {
+			if up {
+                j.Add(amd64.Imm(4), amd64.Eax)
+            } else {
+                j.Sub(amd64.Imm(4), amd64.Eax)
+			}
+		}
+
+        j.Movl(amd64.Eax, j.SCRATCH(0))
+
+		if load {
+
+            j.CallFunc(Read32)
+
+            if psr {
+
+                j.Movl(MODE, amd64.Edi)
+                j.Cmp(amd64.Imm(MODE_FIQ), amd64.Edi)
+                notFiq := j.JccForward(amd64.CC_NZ)
+
+                if reg >= 8 && reg < PC {
+                    j.Movl(amd64.Eax, j.UserBankReg(reg))
+                } else {
+                    j.Movl(amd64.Eax, j.REG(reg))
+                }
+
+                fiqskip := j.JmpForward()
+
+                notFiq()
+
+                j.Cmp(amd64.Imm(MODE_USR), amd64.Edi)
+                user := j.JccForward(amd64.CC_Z)
+
+                if reg >= 13 && reg < PC {
+                    j.Movl(amd64.Eax, j.UserBankReg(reg))
+                } else {
+                    j.Movl(amd64.Eax, j.REG(reg))
+                }
+
+                notuserskip := j.JmpForward()
+
+                user()
+
+                j.Movl(amd64.Eax, j.REG(reg))
+
+                fiqskip()
+                notuserskip()
+
+            } else {
+                j.Movl(amd64.Eax, j.REG(reg))
+            }
+
+		} else {
+            switch reg {
+            case rn:
+
+                //Store OLD base if Rb is FIRST entry in Rlist
+                // otherwise store NEW base (STM/ARMv4),
+
+                if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
+                    j.Movl(j.SCRATCH(2), amd64.Ebx)
+                } else {
+                    j.Movl(j.SCRATCH(1), amd64.Ebx)
+                }
+                j.CallFunc(Write32)
+            default:
+
+                if psr {
+
+                    j.Movl(MODE, amd64.Edi)
+                    j.Cmp(amd64.Imm(MODE_FIQ), amd64.Edi)
+                    notFiq := j.JccForward(amd64.CC_NZ)
+
+                    if reg >= 8 && reg < PC {
+                        j.Movl(j.UserBankReg(reg), amd64.Ebx)
+                    } else {
+                        j.Movl(j.REG(reg), amd64.Ebx)
+                    }
+
+                    fiqskip := j.JmpForward()
+
+                    notFiq()
+
+                    j.Cmp(amd64.Imm(MODE_USR), amd64.Edi)
+                    user := j.JccForward(amd64.CC_Z)
+
+                    if reg >= 13 && reg < PC {
+                        j.Movl(j.UserBankReg(reg), amd64.Ebx)
+                    } else {
+                        j.Movl(j.REG(reg), amd64.Ebx)
+                    }
+
+                    notuserskip := j.JmpForward()
+
+                    user()
+
+                    j.Movl(j.REG(reg), amd64.Ebx)
+
+                    fiqskip()
+                    notuserskip()
+                } else {
+                    j.Movl(j.REG(reg), amd64.Ebx)
+                }
+
+                j.CallFunc(Write32)
+            }
+        }
+
+        j.Movl(j.SCRATCH(0), amd64.Eax)
+
+		if !pre {
+			if up {
+                j.Add(amd64.Imm(4), amd64.Eax)
+            } else {
+                j.Sub(amd64.Imm(4), amd64.Eax)
+			}
+		}
+
+		if up {
+			reg++
+		} else {
+			reg--
+		}
+	}
+
+	if !load {
+		if wb {
+        j.Movl(j.SCRATCH(1), amd64.Eax)
+        j.Movl(amd64.Eax, j.REG(rn))
+		}
+
+		return
+	}
+
+	if wb && !rnIncluded {
+        j.Movl(j.SCRATCH(1), amd64.Eax)
+        j.Movl(amd64.Eax, j.REG(rn))
+	}
 }
 
 {{end}}
