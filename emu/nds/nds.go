@@ -202,7 +202,7 @@ func (nds *Nds) UpdateFrame() {
 		//debug.CURR_INST++
 	}
 
-	//nds.arm7.Jit.DeletePages()
+	nds.arm7.Jit.DeletePages()
 	nds.arm9.Jit.DeletePages()
 
 	nds.mem.Snd.Play(nds.Muted)

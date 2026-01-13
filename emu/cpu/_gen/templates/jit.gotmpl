@@ -232,6 +232,12 @@ func (j *Jit) returnAssembler(asm *gojit.Assembler) {
     j.FreeAssemblers = append(j.FreeAssemblers, asm)
 }
 
+func (j *Jit) InvalidateAll() {
+    for i := range uint32(len(j.Pages)) {
+        j.InvalidatePage(i << PAGE_SHIFT)
+    }
+}
+
 func (j *Jit) InvalidatePage(addr uint32) {
 
     if j.Pages == nil {
@@ -249,6 +255,8 @@ func (j *Jit) InvalidatePage(addr uint32) {
 		j.Metrics[addr>>PAGE_SHIFT] = make([]uint32, (1<<PAGE_SHIFT)>>2)
         j.invalidPages = append(j.invalidPages, old)
         j.Cnt--
+	} else {
+        panic("tried removing old page on invalidation")
     }
 }
 
@@ -260,19 +268,23 @@ func (j *Jit) DeletePages() {
 
 	for _, page := range j.invalidPages {
 
+		if !page.dead.Load() {
+			panic("tried deleting page which was not dead")
+		}
+
 		for i := range page.Blocks {
 
-            block := page.Blocks[i].Load()
-            if block == nil || block.assembler == nil {
-                continue
-            }
+			block := page.Blocks[i].Load()
+			if block == nil || block.assembler == nil {
+				continue
+			}
 
-            j.returnAssembler(block.assembler)
-            block.assembler = nil
+			j.returnAssembler(block.assembler)
+			block.assembler = nil
 		}
 	}
 
-    j.invalidPages = j.invalidPages[:0]
+	j.invalidPages = j.invalidPages[:0]
 }
 
 func (j *Jit) CreateBlock(pc uint32) {
@@ -282,20 +294,24 @@ func (j *Jit) CreateBlock(pc uint32) {
 
     page := j.Pages[pageIdx].Load()
 
-	if page == nil {
-        newPage := &Page{
+    switch {
+    case page == nil:
+		newPage := &Page{
 			id:     pageIdx,
-            Blocks: make([]atomic.Pointer[JitBlock], (1<<PAGE_SHIFT)>>2),
+			Blocks: make([]atomic.Pointer[JitBlock], (1<<PAGE_SHIFT)>>2),
 		}
 
-        if j.Pages[pageIdx].CompareAndSwap(nil, newPage) {
-            j.Cnt++
-            page = newPage
-        } else {
-            // other routine won race condition
-            page = j.Pages[pageIdx].Load()
-        }
-    }
+		if j.Pages[pageIdx].CompareAndSwap(nil, newPage) {
+			j.Cnt++
+			page = newPage
+		} else {
+			// other routine won race condition
+			page = j.Pages[pageIdx].Load()
+		}
+
+    case page.dead.Load():
+        return
+	}
 
 	block := page.Blocks[blockIdx].Load()
     if block != nil && block.Skip {
@@ -304,6 +320,7 @@ func (j *Jit) CreateBlock(pc uint32) {
 
     asm := j.getFreeAssembler()
     if noFree := asm == nil; noFree {
+        j.InvalidateAll()
         return
     }
 
