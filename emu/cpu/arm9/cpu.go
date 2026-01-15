@@ -232,9 +232,13 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 			page := cpu.Jit.Pages[pageIdx].Load()
 			if page != nil && !page.dead.Load() {
 				block := page.Blocks[blockIdx].Load()
-				if block != nil && !block.Skip && block.f != nil {
+				if block != nil && !block.Skip && block.f != nil && block.refs.Load() == 0 {
+                    block.refs.Add(1)
+                    //fmt.Printf("running block %p %08X\n", block, pc)
 					block.f()
+                    block.refs.Add(-1)
 					cpu.isBranching = true
+                    cpu.Jit.BlockCache.TouchBlock(block)
 					return block.finalOp, int(block.Length)
 				}
 			}
@@ -268,7 +272,7 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 	op := *(*uint32)(unsafe.Add(cpu.PcPtr, cpu.PcOff))
 	cpu.PcOff += 4
 	cpu.LoopLen++
-	cpu.isBranching = ((op>>27)&1 == 1) || (op>>12)&0xF == 0xF
+	cpu.isBranching = ((op>>27)&1 != 0) || (op>>12)&0xF == 0xF
 
 	return op, 0
 }
