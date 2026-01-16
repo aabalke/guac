@@ -16,14 +16,14 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 
 		a.SoundCntX = uint16((uint8(a.SoundCntX) & 0x0F) | (v & 0x80))
 
-		if disabled := !BitEnabled(uint32(a.SoundCntX), 7); disabled {
+		if disabled := (a.SoundCntX>>7)&1 == 0; disabled {
 			return
 		}
 
 		return
 	}
 
-	if disabled := !BitEnabled(uint32(a.SoundCntX), 7); disabled {
+	if disabled := (a.SoundCntX>>7)&1 == 0; disabled {
 		return
 	}
 

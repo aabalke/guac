@@ -120,19 +120,19 @@ func (fr *Flags) setFlags(bits uint8) {
 	var half bool = false
 	var carry bool = false
 
-	if (bits>>7)&0b1 == 1 {
+	if (bits>>7)&1 != 0 {
 		zero = true
 	}
 
-	if (bits>>6)&0b1 == 1 {
+	if (bits>>6)&1 != 0 {
 		sub = true
 	}
 
-	if (bits>>5)&0b1 == 1 {
+	if (bits>>5)&1 != 0 {
 		half = true
 	}
 
-	if (bits>>4)&0b1 == 1 {
+	if (bits>>4)&1 != 0 {
 		carry = true
 	}
 

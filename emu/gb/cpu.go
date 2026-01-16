@@ -1346,14 +1346,18 @@ func (gb *GameBoy) getImmediateData() (d8 uint8, d16 uint16) {
 
 func (gb *GameBoy) execRotAcc(target *uint8, right bool, throughCarry bool) {
 
-	v := gb.getCbValue(target)
-	reg := &gb.Cpu.Registers
-	var res uint8
-	var carry uint8 = 0
-	var carryValue bool = false
+	var (
+		v   = gb.getCbValue(target)
+		reg = &gb.Cpu.Registers
+
+		res        uint8
+		carry      uint8
+		carryValue bool
+	)
 
 	switch {
 	case right && !throughCarry:
+		//res = bits.RotateLeft8(v, -1)
 		res = (v >> 1) | ((v & 1) << 7)
 
 	case right && throughCarry:
@@ -1390,7 +1394,7 @@ func (gb *GameBoy) execRotAcc(target *uint8, right bool, throughCarry bool) {
 	reg.f.HalfCarry = false
 }
 
-func (gb *GameBoy) execRot(target interface{}, right bool, throughCarry bool) {
+func (gb *GameBoy) execRot(target any, right bool, throughCarry bool) {
 
 	v := gb.getCbValue(target)
 	reg := &gb.Cpu.Registers
@@ -1432,7 +1436,7 @@ func (gb *GameBoy) execRot(target interface{}, right bool, throughCarry bool) {
 	reg.f.HalfCarry = false
 }
 
-func (gb *GameBoy) execSLA(target interface{}) {
+func (gb *GameBoy) execSLA(target any) {
 
 	v := gb.getCbValue(target)
 	carry := v >> 7
@@ -1445,7 +1449,7 @@ func (gb *GameBoy) execSLA(target interface{}) {
 	gb.Cpu.Registers.f.Carry = carry == 1
 }
 
-func (gb *GameBoy) execSRA(target interface{}) {
+func (gb *GameBoy) execSRA(target any) {
 
 	v := gb.getCbValue(target)
 	res := (v & 128) | (v >> 1)
@@ -1457,7 +1461,7 @@ func (gb *GameBoy) execSRA(target interface{}) {
 	gb.Cpu.Registers.f.HalfCarry = false
 }
 
-func (gb *GameBoy) execSRL(target interface{}) {
+func (gb *GameBoy) execSRL(target any) {
 
 	v := gb.getCbValue(target)
 	v16 := uint16(v)
@@ -1472,7 +1476,7 @@ func (gb *GameBoy) execSRL(target interface{}) {
 	gb.Cpu.Registers.f.HalfCarry = false
 }
 
-func (gb *GameBoy) execSWAP(target interface{}) {
+func (gb *GameBoy) execSWAP(target any) {
 
 	v := gb.getCbValue(target)
 	a := v >> 4
@@ -1486,7 +1490,7 @@ func (gb *GameBoy) execSWAP(target interface{}) {
 	gb.Cpu.Registers.f.Carry = false
 }
 
-func (gb *GameBoy) execBIT(target interface{}, bit int) {
+func (gb *GameBoy) execBIT(target any, bit int) {
 
 	v := gb.getCbValue(target)
 	gb.Cpu.Registers.f.Zero = (v>>bit)&1 == 0
@@ -1494,14 +1498,14 @@ func (gb *GameBoy) execBIT(target interface{}, bit int) {
 	gb.Cpu.Registers.f.HalfCarry = true
 }
 
-func (gb *GameBoy) execRES(target interface{}, bit int) {
+func (gb *GameBoy) execRES(target any, bit int) {
 
 	v := gb.getCbValue(target)
 	res := v &^ (0b1 << bit)
 	gb.setCbValue(target, res)
 }
 
-func (gb *GameBoy) execSET(target interface{}, bit int) {
+func (gb *GameBoy) execSET(target any, bit int) {
 
 	v := gb.getCbValue(target)
 	res := v | (0b1 << bit)
@@ -1585,7 +1589,7 @@ func (gb *GameBoy) execLdh(target *uint8, from uint16) {
 	*target = v
 }
 
-func (gb *GameBoy) execLd(target interface{}, from interface{}) {
+func (gb *GameBoy) execLd(target any, from any) {
 
 	switch f := from.(type) {
 	case uint8:
@@ -1651,7 +1655,7 @@ func (gb *GameBoy) execLdMem(addr uint16, from any, half bool) {
 	}
 }
 
-func (gb *GameBoy) execAdd(target interface{}, from interface{}) {
+func (gb *GameBoy) execAdd(target any, from any) {
 
 	switch f := from.(type) {
 	case uint8:
@@ -1785,7 +1789,7 @@ func (gb *GameBoy) execCp(to *uint8, from uint8) {
 	gb.Cpu.Registers.f.Carry = from > *to
 }
 
-func (gb *GameBoy) execInc(target interface{}) {
+func (gb *GameBoy) execInc(target any) {
 
 	switch t := target.(type) {
 	case *uint8:
@@ -1802,7 +1806,7 @@ func (gb *GameBoy) execInc(target interface{}) {
 	}
 }
 
-func (gb *GameBoy) execDec(target interface{}) {
+func (gb *GameBoy) execDec(target any) {
 
 	switch t := target.(type) {
 	case *uint8:
@@ -1898,7 +1902,7 @@ func (gb *GameBoy) execRet(condition bool, cyclesIf int, cycles int) (c int, pc 
 	return cycles, gb.Cpu.PC + 1
 }
 
-func (gb *GameBoy) getCbValue(target interface{}) uint8 {
+func (gb *GameBoy) getCbValue(target any) uint8 {
 
 	//Cb only needs register or hlvalue memory location
 
@@ -1919,7 +1923,7 @@ func (gb *GameBoy) getCbValue(target interface{}) uint8 {
 	return v
 }
 
-func (gb *GameBoy) setCbValue(target interface{}, res uint8) {
+func (gb *GameBoy) setCbValue(target any, res uint8) {
 
 	//Cb only needs register or hlvalue memory location
 
