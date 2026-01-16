@@ -42,7 +42,7 @@ const MAX_TPS = 60 * 20
 
 func main() {
 
-	go debugMemoryErrors()
+	//go debugMemoryErrors()
 	go printTPS()
 
 	config.Conf.Decode()

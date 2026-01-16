@@ -9,6 +9,10 @@ import (
 	"unsafe"
 
 	amd64 "github.com/aabalke/gojit"
+
+    {{if .A9 -}}
+	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
+    {{end}}
 )
 
 {{if .A9 -}}
@@ -1450,3 +1454,107 @@ func (j *Jit) emitBlock(op uint32) {
 	}
     {{end}}
 }
+
+func (j *Jit) emitPsr(op uint32) {
+
+    j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
+
+	if msr := (op>>21)&1 != 0; msr {
+        panic("unsetup jit msr")
+	}
+
+	rd := (op >> 12) & 0xF
+
+	if spsr := (op>>22)&1 != 0; spsr {
+        j.Movl(MODE, amd64.Eax)
+        j.CallFunc(GetSpsr)
+        j.Movl(amd64.Eax, j.REG(rd))
+
+		//mode := cpu.Reg.CPSR.Mode
+		//r[rd] = cpu.Reg.SPSR[BANK_ID[mode]].Get()
+		return
+	}
+
+	//mask := PRIV_MASK
+	//if cpu.Reg.CPSR.Mode == MODE_USR {
+	//	mask = USR_MASK
+	//}
+
+	//r[rd] = uint32(cpu.Reg.CPSR.Get()) & mask
+
+    j.Mov(amd64.Imm(CPSR), amd64.Rax)
+    j.Add(CPU, amd64.Rax)
+
+    j.CallFunc((*Cond).Get)
+
+    j.Cmp(amd64.Imm(MODE_USR), MODE)
+    user := j.JccForward(amd64.CC_Z)
+    j.MovAbs(uint64(PRIV_MASK), amd64.Rbx)
+    priv := j.JmpForward()
+    user()
+    j.MovAbs(uint64(USR_MASK), amd64.Rbx)
+    priv()
+
+    j.And(amd64.Rbx, amd64.Rax)
+
+    j.Movl(amd64.Eax, j.REG(rd))
+}
+
+{{if .A9 -}}
+func (j *Jit) emitCoDataReg(op uint32) {
+
+	var (
+		reg = cp15.CpRegister{
+			Op: uint8((op >> 21) & 0x7),
+			Cn: uint8((op >> 16) & 0xF),
+			Pn: uint8((op >> 8) & 0xF),
+			Cp: uint8((op >> 5) & 0x7),
+			Cm: uint8((op >> 0) & 0xF),
+		}
+
+		rd = (op >> 12) & 0xF
+	)
+
+	if (op >> 28) == 0xF {
+		panic("MRC2/MCR2")
+	}
+
+	if rd == 15 {
+        panic("co data reg jit with rd == PC")
+	}
+
+	if mrc := (op>>20)&1 != 0; mrc {
+
+        j.Mov(amd64.Imm(reg.Op), amd64.Rax)
+        j.Mov(amd64.Imm(reg.Cn), amd64.Rbx)
+        j.Mov(amd64.Imm(reg.Pn), amd64.Rcx)
+        j.Mov(amd64.Imm(reg.Cp), amd64.Rdi)
+        j.Mov(amd64.Imm(reg.Cm), amd64.Rsi)
+
+        j.CallFunc(ReadCp15)
+        j.Movl(amd64.Eax, j.REG(rd))
+
+		//r[rd] = cpu.Cp15.Read(&reg)
+		return
+	}
+
+	if rd == 0 && (reg == cp15.HALT || reg == cp15.HALT2) {
+        j.Movb(amd64.Imm(1), HALTED_FLAG)
+		//cpu.Halted = true
+		return
+	}
+
+    j.Movl(j.REG(rd), amd64.Ebx)
+    j.Mov(amd64.Rbx, amd64.R8)
+
+    j.Mov(amd64.Imm(reg.Op), amd64.Rax)
+    j.Mov(amd64.Imm(reg.Cn), amd64.Rbx)
+    j.Mov(amd64.Imm(reg.Pn), amd64.Rcx)
+    j.Mov(amd64.Imm(reg.Cp), amd64.Rdi)
+    j.Mov(amd64.Imm(reg.Cm), amd64.Rsi)
+
+    j.CallFunc(WriteCp15)
+
+	//cpu.Cp15.Write(&reg, &cpu.LowVector, r[rd])
+}
+{{end}}

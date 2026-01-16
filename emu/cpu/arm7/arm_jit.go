@@ -1157,3 +1157,48 @@ func (j *Jit) emitBlock(op uint32) {
 	}
 
 }
+
+func (j *Jit) emitPsr(op uint32) {
+
+	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
+
+	if msr := (op>>21)&1 != 0; msr {
+		panic("unsetup jit msr")
+	}
+
+	rd := (op >> 12) & 0xF
+
+	if spsr := (op>>22)&1 != 0; spsr {
+		j.Movl(MODE, amd64.Eax)
+		j.CallFunc(GetSpsr)
+		j.Movl(amd64.Eax, j.REG(rd))
+
+		//mode := cpu.Reg.CPSR.Mode
+		//r[rd] = cpu.Reg.SPSR[BANK_ID[mode]].Get()
+		return
+	}
+
+	//mask := PRIV_MASK
+	//if cpu.Reg.CPSR.Mode == MODE_USR {
+	//	mask = USR_MASK
+	//}
+
+	//r[rd] = uint32(cpu.Reg.CPSR.Get()) & mask
+
+	j.Mov(amd64.Imm(CPSR), amd64.Rax)
+	j.Add(CPU, amd64.Rax)
+
+	j.CallFunc((*Cond).Get)
+
+	j.Cmp(amd64.Imm(MODE_USR), MODE)
+	user := j.JccForward(amd64.CC_Z)
+	j.MovAbs(uint64(PRIV_MASK), amd64.Rbx)
+	priv := j.JmpForward()
+	user()
+	j.MovAbs(uint64(USR_MASK), amd64.Rbx)
+	priv()
+
+	j.And(amd64.Rbx, amd64.Rax)
+
+	j.Movl(amd64.Eax, j.REG(rd))
+}

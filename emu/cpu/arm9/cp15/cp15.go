@@ -61,17 +61,17 @@ func (c *Cp15) Init(mem *mem.Mem) {
 	c.R[ITCM] = 0x00000020
 }
 
-func (c *Cp15) Read(reg CpRegister) uint32 {
-	return c.R[reg]
+func (c *Cp15) Read(reg *CpRegister) uint32 {
+	return c.R[*reg]
 }
 
-func (c *Cp15) Write(v uint32, reg CpRegister, lowVector *bool) {
+func (c *Cp15) Write(reg *CpRegister, lowVector *bool, v uint32) {
 
 	if reg.Cn == 6 {
 		return
 	}
 
-	switch reg {
+	switch *reg {
 	case TCMP, MAIN, CACH:
 		return
 	case CTRL:
@@ -79,14 +79,14 @@ func (c *Cp15) Write(v uint32, reg CpRegister, lowVector *bool) {
 		mask := uint32(0b1111_1111_0000_1000_0101)
 		v &= mask
 
-		c.R[reg] &^= mask
-		c.R[reg] |= v
+		c.R[*reg] &^= mask
+		c.R[*reg] |= v
 
-		*lowVector = (c.R[reg]>>13)&1 == 0
-		c.mem.Tcm.DtcmEnabled = (c.R[reg]>>16)&1 != 0
-		c.mem.Tcm.DtcmLoadMode = (c.R[reg]>>17)&1 != 0
-		c.mem.Tcm.ItcmEnabled = (c.R[reg]>>18)&1 != 0
-		c.mem.Tcm.ItcmLoadMode = (c.R[reg]>>19)&1 != 0
+		*lowVector = (c.R[*reg]>>13)&1 == 0
+		c.mem.Tcm.DtcmEnabled =  (c.R[*reg]>>16)&1 != 0
+		c.mem.Tcm.DtcmLoadMode = (c.R[*reg]>>17)&1 != 0
+		c.mem.Tcm.ItcmEnabled =  (c.R[*reg]>>18)&1 != 0
+		c.mem.Tcm.ItcmLoadMode = (c.R[*reg]>>19)&1 != 0
 
 		//if v & 1 == 1 { panic("PU MODE")}
 
@@ -102,5 +102,5 @@ func (c *Cp15) Write(v uint32, reg CpRegister, lowVector *bool) {
 		c.mem.Tcm.ItcmSize = 512 << ((v >> 1) & 0x3F)
 	}
 
-	c.R[reg] = v
+	c.R[*reg] = v
 }

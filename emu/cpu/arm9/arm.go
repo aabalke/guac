@@ -1173,7 +1173,7 @@ func (cpu *Cpu) CoDataReg(op uint32) {
 	}
 
 	if mrc := (op>>20)&1 == 1; mrc {
-		r[rd] = cpu.Cp15.Read(reg)
+		r[rd] = cpu.Cp15.Read(&reg)
 		r[PC] += 4
 		return
 	}
@@ -1189,7 +1189,7 @@ func (cpu *Cpu) CoDataReg(op uint32) {
 		return
 	}
 
-	cpu.Cp15.Write(r[rd], reg, &cpu.LowVector)
+	cpu.Cp15.Write(&reg, &cpu.LowVector, r[rd])
 	r[15] += 4
 }
 

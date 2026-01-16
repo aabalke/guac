@@ -65,8 +65,10 @@ func NewJit(cpu *Cpu) *Jit {
 		PAGE_SIZE = 0x10000
 	)
 
+	CpuPointer = cpu
+
 	if !cpu.jitEnabled {
-		j := &Jit{}
+		j := &Jit{Cpu: cpu}
 		return j
 	}
 
@@ -78,8 +80,6 @@ func NewJit(cpu *Cpu) *Jit {
 			PAGE_SIZE),
 		LoopThreshold: config.Conf.Nds.NdsJit.LoopCnt,
 	}
-
-	CpuPointer = cpu
 
 	return j
 }
@@ -141,6 +141,11 @@ func (j *Jit) SCRATCH(i uint32) gojit.Indirect {
 		Offset: SCRATCH + int32(i*4),
 		Bits:   32,
 	}
+}
+
+// gets spsr value, using mode and CPU
+func GetSpsr(mode uint32) uint32 {
+	return CpuPointer.Reg.SPSR[BANK_ID[mode]].Get()
 }
 
 func (j *Jit) InvalidatePage(addr uint32) {
@@ -236,18 +241,39 @@ func (j *Jit) CreateBlock(pc uint32) {
 	for {
 		op = *(*uint32)(unsafe.Add(p, i*4))
 
-		if i >= config.Conf.Nds.NdsJit.BatchInstA7 {
+		if length >= config.Conf.Nds.NdsJit.BatchInstA7 {
 
-			length += i
 			break
 		}
 
+		if isB(op) && op>>28 == 0xE {
+
+			tempPc += uint32((int32(op)<<8)>>6) + 8
+
+			if link := (op>>24)&1 != 0; link {
+				j.Movl(j.REG(PC), gojit.Eax)
+				j.Add(gojit.Imm(4), gojit.Eax)
+				j.Movl(gojit.Eax, j.REG(14))
+
+			}
+
+			j.Movl(gojit.Imm(tempPc), j.REG(PC))
+
+			i = 0
+
+			p, ok = j.Cpu.mem.ReadPtr(tempPc, false)
+			if !ok {
+				panic("READ BAD")
+			}
+			continue
+		}
+
 		if ok := j.emitOp(op); !ok {
-			length += i
 			break
 		}
 
 		i++
+		length++
 		tempPc += 4
 	}
 
@@ -261,8 +287,6 @@ func (j *Jit) CreateBlock(pc uint32) {
 
 	if err := j.Assembler.Error(); err != nil {
 		panic(err)
-		println("err in block creation, skipping")
-		return
 	}
 
 	newBlock.initPc = pc
@@ -386,8 +410,10 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 
 		load := (op>>20)&1 != 0
 		pcIncluded := op&0x8000 != 0
+
 		rlist := op & 0xFFFF
 		if pcIncluded && load || rlist == 0 {
+
 			return false
 		}
 
@@ -405,6 +431,15 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 		return true
 	case isUD(op):
 	case isPSR(op):
+
+		if msr := (op>>21)&1 != 0; msr {
+			return false
+		}
+
+		jit.emitPsr(op)
+
+		return true
+
 	case isSWP(op):
 		jit.emitSwp(op)
 		return true

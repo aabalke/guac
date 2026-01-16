@@ -8,6 +8,8 @@ import (
 
 	"github.com/aabalke/gojit"
 	"github.com/aabalke/guac/config"
+
+	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
 )
 
 const (
@@ -65,8 +67,10 @@ func NewJit(cpu *Cpu) *Jit {
 		PAGE_SIZE = 0x10000
 	)
 
+	CpuPointer = cpu
+
 	if !cpu.jitEnabled {
-		j := &Jit{}
+		j := &Jit{Cpu: cpu}
 		return j
 	}
 
@@ -78,8 +82,6 @@ func NewJit(cpu *Cpu) *Jit {
 			PAGE_SIZE),
 		LoopThreshold: config.Conf.Nds.NdsJit.LoopCnt,
 	}
-
-	CpuPointer = cpu
 
 	return j
 }
@@ -141,6 +143,11 @@ func (j *Jit) SCRATCH(i uint32) gojit.Indirect {
 		Offset: SCRATCH + int32(i*4),
 		Bits:   32,
 	}
+}
+
+// gets spsr value, using mode and CPU
+func GetSpsr(mode uint32) uint32 {
+	return CpuPointer.Reg.SPSR[BANK_ID[mode]].Get()
 }
 
 func (j *Jit) InvalidatePage(addr uint32) {
@@ -236,18 +243,39 @@ func (j *Jit) CreateBlock(pc uint32) {
 	for {
 		op = *(*uint32)(unsafe.Add(p, i*4))
 
-		if i >= config.Conf.Nds.NdsJit.BatchInstA9 {
+		if length >= config.Conf.Nds.NdsJit.BatchInstA9 {
 
-			length += i
 			break
 		}
 
+		if isB(op) && op>>28 == 0xE {
+
+			tempPc += uint32((int32(op)<<8)>>6) + 8
+
+			if link := (op>>24)&1 != 0; link {
+				j.Movl(j.REG(PC), gojit.Eax)
+				j.Add(gojit.Imm(4), gojit.Eax)
+				j.Movl(gojit.Eax, j.REG(14))
+
+			}
+
+			j.Movl(gojit.Imm(tempPc), j.REG(PC))
+
+			i = 0
+
+			p, ok = j.Cpu.mem.ReadPtr(tempPc, true)
+			if !ok {
+				panic("READ BAD")
+			}
+			continue
+		}
+
 		if ok := j.emitOp(op); !ok {
-			length += i
 			break
 		}
 
 		i++
+		length++
 		tempPc += 4
 	}
 
@@ -261,8 +289,6 @@ func (j *Jit) CreateBlock(pc uint32) {
 
 	if err := j.Assembler.Error(); err != nil {
 		panic(err)
-		println("err in block creation, skipping")
-		return
 	}
 
 	newBlock.initPc = pc
@@ -387,8 +413,9 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 
 		load := (op>>20)&1 != 0
 		pcIncluded := op&0x8000 != 0
-		rlist := op & 0xFFFF
-		if pcIncluded && load || rlist == 0 {
+
+		if pcIncluded && load {
+
 			return false
 		}
 
@@ -406,6 +433,15 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 		return true
 	case isUD(op):
 	case isPSR(op):
+
+		if msr := (op>>21)&1 != 0; msr {
+			return false
+		}
+
+		jit.emitPsr(op)
+
+		return true
+
 	case isSWP(op):
 		jit.emitSwp(op)
 		return true
@@ -433,6 +469,8 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 		return true
 
 	case isCoDataReg(op):
+		jit.emitCoDataReg(op)
+		return true
 
 	}
 
@@ -492,6 +530,30 @@ func Write16(addr uint32, v uint16) {
 //go:nosplit
 func Write32(addr, v uint32) {
 	CpuPointer.mem.Write32(addr, v, true)
+}
+
+//go:nosplit
+func ReadCp15(op, cn, pn, cp, cm uint8) uint32 {
+	reg := cp15.CpRegister{
+		Op: op,
+		Cn: cn,
+		Pn: pn,
+		Cp: cp,
+		Cm: cm,
+	}
+	return CpuPointer.Cp15.Read(&reg)
+}
+
+//go:nosplit
+func WriteCp15(op, cn, pn, cp, cm uint8, v uint32) {
+	reg := cp15.CpRegister{
+		Op: op,
+		Cn: cn,
+		Pn: pn,
+		Cp: cp,
+		Cm: cm,
+	}
+	CpuPointer.Cp15.Write(&reg, &CpuPointer.LowVector, v)
 }
 
 func (j *Jit) CallFunc(f any) {

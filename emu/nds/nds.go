@@ -41,8 +41,10 @@ const (
 
 	// timer and geo shouldn't be checked every inst
 	// these should probably be replaced with a less lazy method
-	TIMER_CYCLE_MASK = 0b111
-	GEO_CYCLE_MASK   = 0b1111
+	//TIMER_CYCLE_MASK = 0b111
+	//GEO_CYCLE_MASK   = 0b1111
+	TIMER_CYCLE_MASK = 0xF
+	GEO_CYCLE_MASK   = 0xF
 
 	SINGLE_THREAD = !true // debugging
 )
@@ -202,8 +204,10 @@ func (nds *Nds) UpdateFrame() {
 		//debug.CURR_INST++
 	}
 
-	nds.arm7.Jit.DeletePages()
-	nds.arm9.Jit.DeletePages()
+    if config.Conf.Nds.NdsJit.Enabled {
+        nds.arm7.Jit.DeletePages()
+        nds.arm9.Jit.DeletePages()
+    }
 
 	nds.mem.Snd.Play(nds.Muted)
 	nds.Frame++
