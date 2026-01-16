@@ -14,10 +14,6 @@ const (
 	ADDRESS_SPACE = 0x1_0000_0000
 	PAGE_MASK     = 0xFFFF
 	PAGE_SHIFT    = 16
-
-	CONCURRENT_BLOCKS = false // this is for testing
-
-	JIT_THRESHOLD = 255
 )
 
 var (
@@ -44,42 +40,29 @@ type Jit struct {
 	*gojit.Assembler
 	Cpu *Cpu
 
-	Pages []atomic.Pointer[Page]
-
-	//Pages   [ADDRESS_SPACE >> PAGE_SHIFT]*Page // need 0xFFFF_FFFF for bios
-	Metrics [ADDRESS_SPACE >> PAGE_SHIFT][]uint32
-	Cnt     int
-
+	BlockCache   *BlockCache
+	Pages        []atomic.Pointer[Page]
+	Metrics      [ADDRESS_SPACE >> PAGE_SHIFT][]uint32
 	invalidPages []*Page
 
 	// used for testing individual instructions
 	testFunc func()
 
-	callFrameSize int32
-	frameSize     int32
-
-	blockCh chan uint32
-
 	Scratch [0x10]uint32
 
-    BlockCache *BlockCache
+	LoopThreshold uint32
 }
 
 type Page struct {
-	id uint32
-	//Blocks  []*JitBlock
-	Blocks  []atomic.Pointer[JitBlock]
-	Written bool
-
-	dead atomic.Bool
+	id     uint32
+	Blocks []atomic.Pointer[JitBlock]
+	dead   atomic.Bool
 }
 
 func NewJit(cpu *Cpu) *Jit {
 
 	const (
-		//PAGE_SIZE = 0x100000 // 1024 * 1024
 		PAGE_SIZE = 0x10000
-        BLOCK_CNT = 0x1000
 	)
 
 	if !cpu.jitEnabled {
@@ -88,15 +71,12 @@ func NewJit(cpu *Cpu) *Jit {
 	}
 
 	j := &Jit{
-		Cpu:            cpu,
-		blockCh:        make(chan uint32, 1024),
-		Pages:          make([]atomic.Pointer[Page], ADDRESS_SPACE>>PAGE_SHIFT),
-
-        BlockCache: InitBlockCache(BLOCK_CNT, PAGE_SIZE),
-	}
-
-	if CONCURRENT_BLOCKS {
-		go j.concBlockComp()
+		Cpu:   cpu,
+		Pages: make([]atomic.Pointer[Page], ADDRESS_SPACE>>PAGE_SHIFT),
+		BlockCache: InitBlockCache(
+			config.Conf.Nds.NdsJit.BlockCnt,
+			PAGE_SIZE),
+		LoopThreshold: config.Conf.Nds.NdsJit.LoopCnt,
 	}
 
 	CpuPointer = cpu
@@ -105,18 +85,7 @@ func NewJit(cpu *Cpu) *Jit {
 }
 
 func (j *Jit) Close() {
-
-	// Deleteing pages causes crashes
-	// I believe I need to work on it more
-	//block.assembler.Release()
-
-	// will need to release all FreeAssemblers and ones in blocks
-}
-
-func (j *Jit) concBlockComp() {
-	for pc := range j.blockCh {
-		j.CreateBlock(pc)
-	}
+	j.BlockCache.Close()
 }
 
 func (j *Jit) UserBankReg(reg uint32) gojit.Indirect {
@@ -176,7 +145,6 @@ func (j *Jit) SCRATCH(i uint32) gojit.Indirect {
 
 func (j *Jit) InvalidatePage(addr uint32) {
 
-
 	if j.Pages == nil {
 		return
 	}
@@ -191,7 +159,6 @@ func (j *Jit) InvalidatePage(addr uint32) {
 	if old := j.Pages[addr>>PAGE_SHIFT].Swap(nil); old != nil {
 		j.Metrics[addr>>PAGE_SHIFT] = make([]uint32, (1<<PAGE_SHIFT)>>2)
 		j.invalidPages = append(j.invalidPages, old)
-		j.Cnt--
 	}
 }
 
@@ -210,7 +177,11 @@ func (j *Jit) DeletePages() {
 				continue
 			}
 
-            j.BlockCache.InvalidateBlock(block)
+			if block.Skip {
+				continue
+			}
+
+			j.BlockCache.InvalidateBlock(block)
 		}
 	}
 
@@ -231,25 +202,24 @@ func (j *Jit) CreateBlock(pc uint32) {
 		}
 
 		if j.Pages[pageIdx].CompareAndSwap(nil, newPage) {
-			j.Cnt++
 			page = newPage
 		} else {
 			// other routine won race condition
 			page = j.Pages[pageIdx].Load()
 		}
 	} else if page.dead.Load() {
-        println("page dead, block not created")
-        return
-    }
+		println("page dead, block not created")
+		return
+	}
 
 	if block := page.Blocks[blockIdx].Load(); block != nil && block.Skip {
 		return
 	}
 
-    newBlock := j.BlockCache.AssignBlock(j)
-    if newBlock == nil {
-        return
-    }
+	newBlock := j.BlockCache.AssignBlock(j)
+	if newBlock == nil {
+		return
+	}
 
 	j.Assembler = newBlock.assembler
 
@@ -282,25 +252,22 @@ func (j *Jit) CreateBlock(pc uint32) {
 	}
 
 	if length == 0 {
-        j.BlockCache.PushTail(newBlock)
-        //will need to handle early leave
-		//newBlock := &JitBlock{Skip: true}
-		//page.Blocks[blockIdx].CompareAndSwap(nil, newBlock)
-
+		j.BlockCache.PushTail(newBlock)
+		page.Blocks[blockIdx].CompareAndSwap(nil, j.BlockCache.SkipBlock)
 		return
-    }
+	}
 
 	gojit.ExitAssembler(j.Assembler)
 
 	if err := j.Assembler.Error(); err != nil {
-        panic(err)
+		panic(err)
 		println("err in block creation, skipping")
 		return
 	}
 
-	newBlock.initPc =    pc
-	newBlock.Length =    length
-	newBlock.finalOp =   op
+	newBlock.initPc = pc
+	newBlock.Length = length
+	newBlock.finalOp = op
 	newBlock.f = func() {
 		gojit.CallJit(uintptr(unsafe.Pointer(&newBlock.assembler.Buf[0])))
 	}
@@ -543,17 +510,7 @@ func (j *Jit) UpdateMetrics(pc uint32) {
 	}
 
 	j.Metrics[pageIdx][blockIdx]++
-	if j.Metrics[pageIdx][blockIdx] <= JIT_THRESHOLD {
-		return
-	}
-
-	if CONCURRENT_BLOCKS {
-		select {
-		case j.blockCh <- pc:
-		default:
-			j.Metrics[pageIdx][blockIdx]--
-		}
-
+	if j.Metrics[pageIdx][blockIdx] <= j.LoopThreshold {
 		return
 	}
 

@@ -215,6 +215,36 @@ func (cpu *Cpu) CheckIrq() {
 	}
 }
 
+//go:inline
+func (cpu *Cpu) jitFunction(pc uint32) (uint32, int, bool) {
+	pageIdx := pc >> PAGE_SHIFT
+	blockIdx := (pc & PAGE_MASK) >> 2 // aligned to word (arm)
+
+	page := cpu.Jit.Pages[pageIdx].Load()
+
+	if page == nil || page.dead.Load() {
+		return 0, 0, false
+	}
+
+	block := page.Blocks[blockIdx].Load()
+
+	if block == nil || block.Skip || block.f == nil {
+		return 0, 0, false
+	}
+
+	//if block.refs.Load() != 0 {
+	//    return 0,0,false
+	//}
+
+	//block.refs.Add(1)
+	//fmt.Printf("running block %p %08X\n", block, pc)
+	block.f()
+	//block.refs.Add(-1)
+	cpu.isBranching = true
+	cpu.Jit.BlockCache.TouchBlock(block)
+	return block.finalOp, int(block.Length), true
+}
+
 func (cpu *Cpu) GetOpArm() (uint32, int) {
 
 	r := &cpu.Reg.R
@@ -224,23 +254,9 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 		cpu.PcOff = 0
 
 		if cpu.jitEnabled {
-
 			pc := r[PC]
-			pageIdx := pc >> PAGE_SHIFT
-			blockIdx := (pc & PAGE_MASK) >> 2 // aligned to word (arm)
-
-			page := cpu.Jit.Pages[pageIdx].Load()
-			if page != nil && !page.dead.Load() {
-				block := page.Blocks[blockIdx].Load()
-				if block != nil && !block.Skip && block.f != nil && block.refs.Load() == 0 {
-                    block.refs.Add(1)
-                    //fmt.Printf("running block %p %08X\n", block, pc)
-					block.f()
-                    block.refs.Add(-1)
-					cpu.isBranching = true
-                    cpu.Jit.BlockCache.TouchBlock(block)
-					return block.finalOp, int(block.Length)
-				}
+			if finalOp, length, ok := cpu.jitFunction(pc); ok {
+				return finalOp, length
 			}
 
 			cpu.Jit.UpdateMetrics(pc)

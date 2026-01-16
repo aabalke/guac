@@ -14,10 +14,6 @@ const (
 	ADDRESS_SPACE = 0x1_0000_0000
 	PAGE_MASK     = 0xFFFF
 	PAGE_SHIFT    = 16
-
-	CONCURRENT_BLOCKS = true // this is for testing
-
-	JIT_THRESHOLD = 255
 )
 
 var (
@@ -44,57 +40,29 @@ type Jit struct {
 	*gojit.Assembler
 	Cpu *Cpu
 
-	Pages []atomic.Pointer[Page]
-
-	//Pages   [ADDRESS_SPACE >> PAGE_SHIFT]*Page // need 0xFFFF_FFFF for bios
-	Metrics [ADDRESS_SPACE >> PAGE_SHIFT][]uint32
-	Cnt     int
-
+	BlockCache   *BlockCache
+	Pages        []atomic.Pointer[Page]
+	Metrics      [ADDRESS_SPACE >> PAGE_SHIFT][]uint32
 	invalidPages []*Page
 
 	// used for testing individual instructions
 	testFunc func()
 
-	callFrameSize int32
-	frameSize     int32
-
-	blockCh chan uint32
-
 	Scratch [0x10]uint32
 
-	FreeAssemblers []*gojit.Assembler
-}
-
-type Assembler struct {
-	*gojit.Assembler
-	occupied atomic.Bool
+	LoopThreshold uint32
 }
 
 type Page struct {
-	id uint32
-	//Blocks  []*JitBlock
-	Blocks  []atomic.Pointer[JitBlock]
-	Written bool
-
-	dead atomic.Bool
-}
-
-type JitBlock struct {
-	Skip      bool
-	f         func()
-	initPc    uint32
-	finalPc   uint32
-	finalOp   uint32
-	Length    uint32
-	assembler *gojit.Assembler
+	id     uint32
+	Blocks []atomic.Pointer[JitBlock]
+	dead   atomic.Bool
 }
 
 func NewJit(cpu *Cpu) *Jit {
 
 	const (
-		//PAGE_SIZE = 0x100000 // 1024 * 1024
-		PAGE_SIZE = 0x10000 // 1024 * 1024
-		AVAIL_ASM = 0x5000
+		PAGE_SIZE = 0x10000
 	)
 
 	if !cpu.jitEnabled {
@@ -103,28 +71,12 @@ func NewJit(cpu *Cpu) *Jit {
 	}
 
 	j := &Jit{
-		Cpu:            cpu,
-		blockCh:        make(chan uint32, 1024),
-		Pages:          make([]atomic.Pointer[Page], ADDRESS_SPACE>>PAGE_SHIFT),
-		FreeAssemblers: make([]*gojit.Assembler, AVAIL_ASM),
-	}
-
-	for i := range AVAIL_ASM {
-
-		asm, err := gojit.New(PAGE_SIZE)
-		if err != nil {
-			panic(err)
-		}
-
-		if asm == nil {
-			panic("bad asm init")
-		}
-
-		j.FreeAssemblers[i] = asm
-	}
-
-	if CONCURRENT_BLOCKS {
-		go j.concBlockComp()
+		Cpu:   cpu,
+		Pages: make([]atomic.Pointer[Page], ADDRESS_SPACE>>PAGE_SHIFT),
+		BlockCache: InitBlockCache(
+			config.Conf.Nds.NdsJit.BlockCnt,
+			PAGE_SIZE),
+		LoopThreshold: config.Conf.Nds.NdsJit.LoopCnt,
 	}
 
 	CpuPointer = cpu
@@ -133,18 +85,7 @@ func NewJit(cpu *Cpu) *Jit {
 }
 
 func (j *Jit) Close() {
-
-	// Deleteing pages causes crashes
-	// I believe I need to work on it more
-	//block.assembler.Release()
-
-	// will need to release all FreeAssemblers and ones in blocks
-}
-
-func (j *Jit) concBlockComp() {
-	for pc := range j.blockCh {
-		j.CreateBlock(pc)
-	}
+	j.BlockCache.Close()
 }
 
 func (j *Jit) UserBankReg(reg uint32) gojit.Indirect {
@@ -202,32 +143,6 @@ func (j *Jit) SCRATCH(i uint32) gojit.Indirect {
 	}
 }
 
-func (j *Jit) getFreeAssembler() *gojit.Assembler {
-
-	i := len(j.FreeAssemblers)
-
-	if i == 0 {
-		// allocate more at some point?
-		return nil
-	}
-
-	asm := j.FreeAssemblers[i-1]
-	j.FreeAssemblers = j.FreeAssemblers[:i-1]
-
-	return asm
-}
-
-func (j *Jit) returnAssembler(asm *gojit.Assembler) {
-
-	if err := asm.Error(); err != nil {
-		panic(err)
-	}
-
-	asm.Off = 0
-
-	j.FreeAssemblers = append(j.FreeAssemblers, asm)
-}
-
 func (j *Jit) InvalidatePage(addr uint32) {
 
 	if j.Pages == nil {
@@ -244,7 +159,6 @@ func (j *Jit) InvalidatePage(addr uint32) {
 	if old := j.Pages[addr>>PAGE_SHIFT].Swap(nil); old != nil {
 		j.Metrics[addr>>PAGE_SHIFT] = make([]uint32, (1<<PAGE_SHIFT)>>2)
 		j.invalidPages = append(j.invalidPages, old)
-		j.Cnt--
 	}
 }
 
@@ -258,13 +172,16 @@ func (j *Jit) DeletePages() {
 
 		for i := range page.Blocks {
 
-			block := page.Blocks[i].Load()
-			if block == nil || block.assembler == nil {
+			block := page.Blocks[i].Swap(nil)
+			if block == nil {
 				continue
 			}
 
-			j.returnAssembler(block.assembler)
-			block.assembler = nil
+			if block.Skip {
+				continue
+			}
+
+			j.BlockCache.InvalidateBlock(block)
 		}
 	}
 
@@ -285,25 +202,26 @@ func (j *Jit) CreateBlock(pc uint32) {
 		}
 
 		if j.Pages[pageIdx].CompareAndSwap(nil, newPage) {
-			j.Cnt++
 			page = newPage
 		} else {
 			// other routine won race condition
 			page = j.Pages[pageIdx].Load()
 		}
-	}
-
-	block := page.Blocks[blockIdx].Load()
-	if block != nil && block.Skip {
+	} else if page.dead.Load() {
+		println("page dead, block not created")
 		return
 	}
 
-	asm := j.getFreeAssembler()
-	if noFree := asm == nil; noFree {
+	if block := page.Blocks[blockIdx].Load(); block != nil && block.Skip {
 		return
 	}
 
-	j.Assembler = asm
+	newBlock := j.BlockCache.AssignBlock(j)
+	if newBlock == nil {
+		return
+	}
+
+	j.Assembler = newBlock.assembler
 
 	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
 
@@ -334,27 +252,24 @@ func (j *Jit) CreateBlock(pc uint32) {
 	}
 
 	if length == 0 {
-		newBlock := &JitBlock{Skip: true}
-		page.Blocks[blockIdx].CompareAndSwap(nil, newBlock)
-
+		j.BlockCache.PushTail(newBlock)
+		page.Blocks[blockIdx].CompareAndSwap(nil, j.BlockCache.SkipBlock)
 		return
 	}
 
-	gojit.ExitAssembler(asm)
+	gojit.ExitAssembler(j.Assembler)
 
-	if err := asm.Error(); err != nil {
+	if err := j.Assembler.Error(); err != nil {
+		panic(err)
 		println("err in block creation, skipping")
 		return
 	}
 
-	newBlock := &JitBlock{
-		initPc:    pc,
-		assembler: asm,
-		Length:    length,
-		finalOp:   op,
-		f: func() {
-			gojit.CallJit(uintptr(unsafe.Pointer(&asm.Buf[0])))
-		},
+	newBlock.initPc = pc
+	newBlock.Length = length
+	newBlock.finalOp = op
+	newBlock.f = func() {
+		gojit.CallJit(uintptr(unsafe.Pointer(&newBlock.assembler.Buf[0])))
 	}
 
 	page.Blocks[blockIdx].CompareAndSwap(nil, newBlock)
@@ -586,17 +501,7 @@ func (j *Jit) UpdateMetrics(pc uint32) {
 	}
 
 	j.Metrics[pageIdx][blockIdx]++
-	if j.Metrics[pageIdx][blockIdx] <= JIT_THRESHOLD {
-		return
-	}
-
-	if CONCURRENT_BLOCKS {
-		select {
-		case j.blockCh <- pc:
-		default:
-			j.Metrics[pageIdx][blockIdx]--
-		}
-
+	if j.Metrics[pageIdx][blockIdx] <= j.LoopThreshold {
 		return
 	}
 

@@ -52,6 +52,7 @@ func generate(exportPath string, cfg CpuConfig) {
         "arm_decoder",
         "arm_jit",
         "cpu",
+        "cache",
         "exceptions",
         "jit",
         "thumb",
