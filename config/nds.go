@@ -101,9 +101,12 @@ func (c *Config) decodeNdsFirmware() {
 
 type NdsJit struct {
 	Enabled   bool   `toml:"enabled"`
-	PageSize  uint32 `toml:"page_size"`
-	PageCount uint64 `toml:"page_count"`
+	//PageSize  uint32 `toml:"page_size"`
+	//PageCount uint64 `toml:"page_count"`
 	BatchInst uint32 `toml:"batch_inst"`
+
+    LoopCnt uint32 `toml:"loop_cnt"`
+    BlockCnt uint32 `toml:"block_cnt"`
 
 	BatchInstA9 uint32
 	BatchInstA7 uint32
@@ -128,11 +131,11 @@ func (c *Config) decodeNdsJit() {
 	Conf.Nds.NdsJit.BatchInstA9 = max(Conf.Nds.NdsJit.BatchInst, 2)
 	Conf.Nds.NdsJit.BatchInstA7 = max(Conf.Nds.NdsJit.BatchInst/2, 1)
 
-	if Conf.Nds.NdsJit.PageCount == 0 {
-		errMessageStart := "Invalid Config:"
-		errMessageEnd := "Setting Jit Compiler. Page count to 1024."
-		log.Printf("%s %s\n", errMessageStart, errMessageEnd)
-		//fmt.Printf("Warning)
-		Conf.Nds.NdsJit.PageCount = 0x1024_0000
-	}
+	//if Conf.Nds.NdsJit.PageCount == 0 {
+	//	errMessageStart := "Invalid Config:"
+	//	errMessageEnd := "Setting Jit Compiler. Page count to 1024."
+	//	log.Printf("%s %s\n", errMessageStart, errMessageEnd)
+	//	//fmt.Printf("Warning)
+	//	Conf.Nds.NdsJit.PageCount = 0x1024_0000
+	//}
 }

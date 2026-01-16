@@ -157,14 +157,19 @@ y = [2]
 [nds.jit]
 
 # jit (just in time compilation) converts emulated machine code into native machine code when loops are detected. This increases the speed significantly but can ruin accuracy.
-# jit is only supported for x86 machines, preferrably ones with AVX2, AVX512, and BMI2 support.
+# jit only supports amd64 (64 bit x86 instruction set) with BMI2 extension (2013+)
 
 enabled = true
 
-# how many bytes each jit page is for invalidation
-page_size = 256
+# how many times a loop occurs before jitting
+loop_cnt = 255
 
-# how many instructions to batch at a time
+# cnt of jit blocks in cache (per cpu)
+block_cnt = 0x1000
+
+# how many instructions to batch at a time (use 16, or 32 for best results)
+# to many will cause crashes and artificants by desyncing cpus from sound and graphics
 batch_inst = 32
 
-
+# todo
+# page_size (pageshift / pagemask)
