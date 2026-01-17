@@ -476,6 +476,94 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 
 	return false
 }
+func (j *Jit) DecodeTHUMB(op uint16) bool {
+
+	switch {
+	case isthumbSWI(op):
+		return false
+	case isThumbAddSub(op):
+		j.emitThumbAddSub(uint32(op))
+		return true
+	case isThumbShift(op):
+		j.emitThumbShifted(uint32(op))
+		return true
+	case isThumbImm(op):
+		j.emitThumbImm(uint32(op))
+		return true
+	case isThumbAlu(op):
+		j.emitThumbAlu(uint32(op))
+		return true
+	case isThumbHiReg(op):
+
+		var (
+			inst = (op >> 8) & 0b11
+			mSBd = (op>>7)&1 != 0
+			rd   = op & 0x7
+		)
+
+		if inst != 3 && mSBd {
+			rd |= 0b1000
+		}
+
+		if inst == 3 || rd == PC {
+			return false
+		}
+
+		j.emitThumbHiRegBX(uint32(op))
+		return true
+	case isLSHalf(op):
+		j.emitThumbLSHalf(uint32(op))
+		return true
+	case isThumbSdt(op):
+		j.emitThumbSdt(uint32(op))
+		return true
+	case isLPC(op):
+		j.emitThumbLPC(uint32(op))
+		return true
+	case isLSImm(op):
+		j.emitThumbLSImm(uint32(op))
+		return true
+	case isPushPop(op):
+		pclr := (op>>8)&1 != 0
+		pop := (op>>11)&1 != 0
+		if pop && pclr {
+			return false
+		}
+
+		j.emitThumbPushPop(uint32(op))
+		return true
+	case isRelative(op):
+		j.emitThumbRelative(uint32(op))
+		return true
+	case isThumbB(op):
+		return false
+	case isJumpCall(op):
+		return false
+	case isStack(op):
+		j.emitThumbStack(uint32(op))
+		return true
+	case isLongBranch(op):
+		return false
+	case isShortLongBranch(op):
+		return false
+	case isLSSP(op):
+		j.emitThumbLSSP(uint32(op))
+		return true
+	case isMulti(op):
+
+		ldmia := (op>>11)&1 != 0
+		rlist := op & 0xFF
+
+		if ldmia && rlist == 0 {
+			return false
+		}
+
+		j.emitThumbBlock(uint32(op))
+		return true
+	}
+
+	return false
+}
 
 func (j *Jit) TestInst(op uint32, f func(op uint32)) {
 

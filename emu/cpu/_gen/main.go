@@ -48,15 +48,20 @@ func generate(exportPath string, cfg CpuConfig) {
     }
 
     for _, v := range [...]string{
-        "arm",
-        "arm_decoder",
-        "arm_jit",
+
         "cpu",
         "cache",
         "exceptions",
         "jit",
+
+        "arm",
+        "arm_decoder",
+        "arm_jit",
+
         "thumb",
         "thumb_decoder",
+        "thumb_jit",
+
     } {
         generateFile(
             buildImportPath(v),
