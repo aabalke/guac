@@ -448,10 +448,10 @@ func (cpu *Cpu) thumbSdt(op uint16) {
             // LDRSH Rd,[odd]  -->  LDRSB Rd,[odd];sign-expand BYTE value
             if misaligned := addr&1 != 0; misaligned {
                 // sign-expand byte value
-                r[rd] = uint32(int32(int8(cpu.mem.Read8(addr, false))))
+                r[rd] = uint32(int32(int8(cpu.mem.Read8(addr, {{.A9}}))))
             } else {
                 // sign-expand half value
-                r[rd] = uint32(int32(int16(cpu.mem.Read16(addr&^1, false))))
+                r[rd] = uint32(int32(int16(cpu.mem.Read16(addr&^1, {{.A9}}))))
             }
             {{end}}
 		}
@@ -484,7 +484,7 @@ func (cpu *Cpu) thumbLPC(op uint16) {
 		r    = &cpu.Reg.R
 		rd   = (op >> 8) & 0x7
 		nn   = uint32(op&0xFF) << 2
-		addr = (r[PC] + 4 + nn) &^ 0b11
+		addr = ((r[PC] + 4) &^ 0b11) + nn
 	)
 
 	r[rd] = cpu.mem.Read32(addr, {{.A9}})

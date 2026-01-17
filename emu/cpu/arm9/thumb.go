@@ -473,7 +473,7 @@ func (cpu *Cpu) thumbLPC(op uint16) {
 		r    = &cpu.Reg.R
 		rd   = (op >> 8) & 0x7
 		nn   = uint32(op&0xFF) << 2
-		addr = (r[PC] + 4 + nn) &^ 0b11
+		addr = ((r[PC] + 4) &^ 0b11) + nn
 	)
 
 	r[rd] = cpu.mem.Read32(addr, true)

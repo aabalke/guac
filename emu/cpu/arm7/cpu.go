@@ -18,8 +18,6 @@ type Cpu struct {
 	PcOff       int
 	isBranching bool
 	BranchPc    uint32
-	LoopCnt     uint32
-	LoopLen     uint32
 
 	Jit        *Jit
 	jitEnabled bool
@@ -227,14 +225,7 @@ func (cpu *Cpu) jitFunction(pc uint32) (uint32, int, bool) {
 		return 0, 0, false
 	}
 
-	//if block.refs.Load() != 0 {
-	//    return 0,0,false
-	//}
-
-	//block.refs.Add(1)
-	//fmt.Printf("running block %p %08X\n", block, pc)
 	block.f()
-	//block.refs.Add(-1)
 	cpu.isBranching = true
 	cpu.Jit.BlockCache.TouchBlock(block)
 	return block.finalOp, int(block.Length), true
@@ -259,19 +250,11 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 
 		if r[PC] != cpu.BranchPc {
 			cpu.PcPtr = nil
-
 			// imm loop ended
-
-		} else {
-			cpu.LoopCnt++
 		}
-
-		// this is here for debugging above, could probably move earlier
-		cpu.LoopLen = 0
 	}
 
-	if cpu.PcPtr == nil {
-		cpu.LoopCnt = 0
+	if sequential := cpu.PcPtr == nil; sequential {
 		cpu.BranchPc = r[PC]
 		if p, ok := cpu.mem.ReadPtr(r[PC], false); ok {
 			cpu.PcPtr = p
@@ -282,7 +265,6 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 
 	op := *(*uint32)(unsafe.Add(cpu.PcPtr, cpu.PcOff))
 	cpu.PcOff += 4
-	cpu.LoopLen++
 	cpu.isBranching = ((op>>27)&1 != 0) || (op>>12)&0xF == 0xF
 
 	return op, 0
@@ -297,15 +279,11 @@ func (cpu *Cpu) GetOpThumb() uint16 {
 		cpu.PcOff = 0
 		if r[PC] != cpu.BranchPc {
 			cpu.PcPtr = nil
-		} else {
-			cpu.LoopCnt++
 		}
 	}
 
-	if cpu.PcPtr == nil {
+	if sequential := cpu.PcPtr == nil; sequential {
 		if p, ok := cpu.mem.ReadPtr(r[PC], false); ok {
-			cpu.LoopCnt = 0
-			cpu.LoopLen = 0
 			cpu.BranchPc = r[PC]
 			cpu.PcPtr = p
 		} else {
@@ -315,7 +293,6 @@ func (cpu *Cpu) GetOpThumb() uint16 {
 
 	op := *(*uint16)(unsafe.Add(cpu.PcPtr, cpu.PcOff))
 	cpu.PcOff += 2
-	cpu.LoopLen++
 	cpu.isBranching = (op >> 14) != 0
 
 	return op
