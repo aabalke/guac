@@ -167,7 +167,7 @@ func (j *Jit) InvalidatePage(addr uint32) {
 	page.dead.Store(true)
 
 	if old := j.Pages[addr>>PAGE_SHIFT].Swap(nil); old != nil {
-		j.Metrics[addr>>PAGE_SHIFT] = make([]uint32, (1<<PAGE_SHIFT)>>2)
+		j.Metrics[addr>>PAGE_SHIFT] = make([]uint32, (1<<PAGE_SHIFT)>>1)
 		j.invalidPages = append(j.invalidPages, old)
 	}
 }
@@ -198,17 +198,17 @@ func (j *Jit) DeletePages() {
 	j.invalidPages = j.invalidPages[:0]
 }
 
-func (j *Jit) CreateBlock(pc uint32) {
+func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 
 	pageIdx := pc >> PAGE_SHIFT
-	blockIdx := (pc & PAGE_MASK) >> 2
+	blockIdx := (pc & PAGE_MASK) >> 1
 
 	page := j.Pages[pageIdx].Load()
 
 	if page == nil {
 		newPage := &Page{
 			id:     pageIdx,
-			Blocks: make([]atomic.Pointer[JitBlock], (1<<PAGE_SHIFT)>>2),
+			Blocks: make([]atomic.Pointer[JitBlock], (1<<PAGE_SHIFT)>>1),
 		}
 
 		if j.Pages[pageIdx].CompareAndSwap(nil, newPage) {
@@ -243,47 +243,86 @@ func (j *Jit) CreateBlock(pc uint32) {
 		panic("READ BAD")
 	}
 
-	for {
-		op = *(*uint32)(unsafe.Add(p, i*4))
 
-        {{if .A9 -}}
-		if length >= config.Conf.Nds.NdsJit.BatchInstA9 {
-        {{else -}}
-		if length >= config.Conf.Nds.NdsJit.BatchInstA7 {
-        {{end}}
-			break
-		}
-
-        if isB(op) && op >> 28 == 0xE {
-
-            tempPc += uint32((int32(op)<<8)>>6) + 8
-
-            if link := (op>>24)&1 != 0; link {
-                j.Movl(j.REG(PC), gojit.Eax)
-                j.Add(gojit.Imm(4), gojit.Eax)
-                j.Movl(gojit.Eax, j.REG(14))
-
+    if thumb {
+        for {
+            op = uint32(*(*uint16)(unsafe.Add(p, i*2)))
+            {{if .A9 -}}
+            if length >= config.Conf.Nds.NdsJit.BatchInstA9 {
+            {{else -}}
+            if length >= config.Conf.Nds.NdsJit.BatchInstA7 {
+                {{end}}
+                break
             }
 
-            j.Movl(gojit.Imm(tempPc), j.REG(PC))
+            if isThumbB(uint16(op)) {
 
-            i = 0
+                const shift = 32 - 11 // int32 - offset size
+                nn := (int32(op<<shift) >> shift) << 1
+                tempPc = uint32(int32(tempPc) + 4 + nn)
+                j.Movl(gojit.Imm(tempPc), j.REG(PC))
 
-            p, ok = j.Cpu.mem.ReadPtr(tempPc, {{.A9}})
-            if !ok {
-                panic("READ BAD")
+                i = 0
+
+                p, ok = j.Cpu.mem.ReadPtr(tempPc, {{.A9}})
+                if !ok {
+                    panic("READ BAD")
+                }
+                continue
             }
-            continue
+
+            if ok := j.emitOpThumb(uint16(op)); !ok {
+                break
+            }
+
+            i++
+            length++
+            tempPc += 2
         }
 
-		if ok := j.emitOp(op); !ok {
-			break
-		}
+    } else {
+        for {
+            op = *(*uint32)(unsafe.Add(p, i*4))
 
-		i++
-        length++
-		tempPc += 4
-	}
+            {{if .A9 -}}
+            if length >= config.Conf.Nds.NdsJit.BatchInstA9 {
+            {{else -}}
+            if length >= config.Conf.Nds.NdsJit.BatchInstA7 {
+                {{end}}
+                break
+            }
+
+            if isB(op) && op >> 28 == 0xE {
+
+                tempPc += uint32((int32(op)<<8)>>6) + 8
+
+                    if link := (op>>24)&1 != 0; link {
+                        j.Movl(j.REG(PC), gojit.Eax)
+                            j.Add(gojit.Imm(4), gojit.Eax)
+                            j.Movl(gojit.Eax, j.REG(14))
+
+                    }
+
+                j.Movl(gojit.Imm(tempPc), j.REG(PC))
+
+                    i = 0
+
+                    p, ok = j.Cpu.mem.ReadPtr(tempPc, {{.A9}})
+                    if !ok {
+                        panic("READ BAD")
+                    }
+                continue
+            }
+
+            if ok := j.emitOp(op); !ok {
+                break
+            }
+
+            i++
+            length++
+            tempPc += 4
+        }
+    }
 
 	if length == 0 {
 		j.BlockCache.PushTail(newBlock)
@@ -319,6 +358,17 @@ func (j *Jit) emitOp(op uint32) bool {
 
 	if ok {
 		j.Add(gojit.Imm(4), j.REG(PC))
+	}
+
+	return ok
+}
+
+func (j *Jit) emitOpThumb(op uint16) bool {
+
+	ok := j.DecodeTHUMB(op)
+
+	if ok {
+		j.Add(gojit.Imm(2), j.REG(PC))
 	}
 
 	return ok
@@ -665,13 +715,13 @@ func (j *Jit) CallFunc(f any) {
 	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
 }
 
-func (j *Jit) UpdateMetrics(pc uint32) {
+func (j *Jit) UpdateMetrics(pc uint32, thumb bool) {
 
 	pageIdx := pc >> PAGE_SHIFT
-	blockIdx := (pc & PAGE_MASK) >> 2 // aligned to word for arm
+	blockIdx := (pc & PAGE_MASK) >> 1 // aligned to word for thumb
 
 	if metrics := j.Metrics[pageIdx]; metrics == nil {
-		j.Metrics[pageIdx] = make([]uint32, (1<<PAGE_SHIFT)>>2)
+		j.Metrics[pageIdx] = make([]uint32, (1<<PAGE_SHIFT)>>1)
 	}
 
 	j.Metrics[pageIdx][blockIdx]++
@@ -679,7 +729,7 @@ func (j *Jit) UpdateMetrics(pc uint32) {
 		return
 	}
 
-	j.CreateBlock(pc)
+	j.CreateBlock(pc, thumb)
 }
 
 var (

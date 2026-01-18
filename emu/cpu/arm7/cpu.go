@@ -209,9 +209,10 @@ func (cpu *Cpu) CheckIrq() {
 }
 
 //go:inline
-func (cpu *Cpu) jitFunction(pc uint32) (uint32, int, bool) {
+func (cpu *Cpu) jitFunction(pc uint32, thumb bool) (uint32, int, bool) {
 	pageIdx := pc >> PAGE_SHIFT
-	blockIdx := (pc & PAGE_MASK) >> 2 // aligned to word (arm)
+	//blockIdx := (pc & PAGE_MASK) >> 2 // aligned to word (arm)
+	blockIdx := (pc & PAGE_MASK) >> 1 // aligned to word (arm)
 
 	page := cpu.Jit.Pages[pageIdx].Load()
 
@@ -224,6 +225,10 @@ func (cpu *Cpu) jitFunction(pc uint32) (uint32, int, bool) {
 	if block == nil || block.Skip || block.f == nil {
 		return 0, 0, false
 	}
+
+	//if block.Thumb != thumb {
+	//    panic(fmt.Sprintf("called thumb block %t from %t\n", block.Thumb, thumb))
+	//}
 
 	block.f()
 	cpu.isBranching = true
@@ -241,11 +246,11 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 
 		if cpu.jitEnabled {
 			pc := r[PC]
-			if finalOp, length, ok := cpu.jitFunction(pc); ok {
+			if finalOp, length, ok := cpu.jitFunction(pc, false); ok {
 				return finalOp, length
 			}
 
-			cpu.Jit.UpdateMetrics(pc)
+			cpu.Jit.UpdateMetrics(pc, false)
 		}
 
 		if r[PC] != cpu.BranchPc {
@@ -270,13 +275,21 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 	return op, 0
 }
 
-func (cpu *Cpu) GetOpThumb() uint16 {
+func (cpu *Cpu) GetOpThumb() (uint16, int) {
 
 	r := &cpu.Reg.R
 
 	if cpu.isBranching {
 		cpu.isBranching = false
 		cpu.PcOff = 0
+		if cpu.jitEnabled {
+			pc := r[PC]
+			if finalOp, length, ok := cpu.jitFunction(pc, true); ok {
+				return uint16(finalOp), length
+			}
+
+			cpu.Jit.UpdateMetrics(pc, true)
+		}
 		if r[PC] != cpu.BranchPc {
 			cpu.PcPtr = nil
 		}
@@ -287,15 +300,16 @@ func (cpu *Cpu) GetOpThumb() uint16 {
 			cpu.BranchPc = r[PC]
 			cpu.PcPtr = p
 		} else {
-			return uint16(cpu.mem.Read16(r[PC], false))
+			return uint16(cpu.mem.Read16(r[PC], false)), 0
 		}
 	}
 
 	op := *(*uint16)(unsafe.Add(cpu.PcPtr, cpu.PcOff))
 	cpu.PcOff += 2
-	cpu.isBranching = (op >> 14) != 0
+	//cpu.isBranching = (op >> 14) != 0
+	cpu.isBranching = !DecodeTHUMBBranch(op)
 
-	return op
+	return op, 0
 }
 
 var (
@@ -330,4 +344,79 @@ func (c *Cpu) EndTest(op uint32, compare bool) {
 	fmt.Printf("NEW REG %08X CPSR %08X\n", t_sav.R, t_sav.CPSR.Get())
 	fmt.Printf("ORI REG %08X CPSR %08X\n", c.Reg.R, c.Reg.CPSR.Get())
 	panic(fmt.Sprintf("Bad Compare %08X %08X", t_rpc, op))
+}
+
+func DecodeTHUMBBranch(op uint16) bool {
+
+	switch {
+	case isthumbSWI(op):
+		return false
+	case isThumbAddSub(op):
+		return true
+	case isThumbShift(op):
+		return true
+	case isThumbImm(op):
+		return true
+	case isThumbAlu(op):
+		return true
+	case isThumbHiReg(op):
+
+		var (
+			inst = (op >> 8) & 0b11
+			mSBd = (op>>7)&1 != 0
+			rd   = op & 0x7
+		)
+
+		if inst != 3 && mSBd {
+			rd |= 0b1000
+		}
+
+		if inst == 3 || rd == PC {
+			return false
+		}
+
+		return true
+	case isLSHalf(op):
+		return true
+	case isThumbSdt(op):
+		return true
+	case isLPC(op):
+		return true
+	case isLSImm(op):
+		return true
+	case isPushPop(op):
+		pclr := (op>>8)&1 != 0
+		pop := (op>>11)&1 != 0
+		if pop && pclr {
+			return false
+		}
+
+		return true
+	case isRelative(op):
+		return true
+	case isThumbB(op):
+		return false
+	case isJumpCall(op):
+		return false
+	case isStack(op):
+		return true
+	case isLongBranch(op):
+		return false
+	case isShortLongBranch(op):
+		return false
+	case isLSSP(op):
+		return true
+	case isMulti(op):
+
+		ldmia := (op>>11)&1 != 0
+		rlist := op & 0xFF
+
+		if ldmia && rlist == 0 {
+			return false
+		}
+
+		return true
+	}
+
+	return false
 }

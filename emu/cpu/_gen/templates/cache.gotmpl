@@ -24,6 +24,8 @@ type JitBlock struct {
 	assembler *gojit.Assembler
 
     Prev, Next *JitBlock
+
+    Thumb bool
 }
 
 func InitBlockCache(capacity uint32, page_size int) *BlockCache {
@@ -155,7 +157,7 @@ func (bc *BlockCache) AssignBlock(jit *Jit) *JitBlock {
         revokedPC := block.initPc
         page := jit.Pages[revokedPC>>PAGE_SHIFT].Load()
         if page != nil {
-            page.Blocks[(revokedPC&PAGE_MASK)>>2].Swap(nil)
+            page.Blocks[(revokedPC&PAGE_MASK)>>1].Swap(nil)
         }
     }
 

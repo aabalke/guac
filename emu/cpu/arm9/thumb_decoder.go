@@ -7,7 +7,7 @@ import (
 
 func (c *Cpu) DecodeTHUMB() (int, bool) {
 
-	op := c.GetOpThumb()
+	op, cycles := c.GetOpThumb()
 
 	switch {
 	case isThumbBkpt(op):
@@ -57,7 +57,7 @@ func (c *Cpu) DecodeTHUMB() (int, bool) {
 		return 0, false
 	}
 
-	return 1, true
+	return cycles + 1, true
 }
 
 //go:inline
