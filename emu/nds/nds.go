@@ -84,7 +84,7 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 	}
 
 	irq7 := cpu.Irq{}
-	irq9 := cpu.Irq{IsArm9: true}
+	irq9 := cpu.Irq{}
 
 	nds.ppu = ppu.NewPPU(&irq9)
 
@@ -460,11 +460,6 @@ func (nds *Nds) CheckGeoDmas() {
 		if nds.dma9[i].Mode != dma.ARM9_DMA_MODE_GEO {
 			continue
 		}
-
-		// never true
-		//if overHalf := nds.ppu.Rasterizer.GeoEngine.GxStat.FifoEntries >= 128; overHalf {
-		//    continue
-		//}
 
 		nds.dma9[i].GxTransfer()
 	}

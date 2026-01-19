@@ -31,7 +31,7 @@ type PPU struct {
 	RenderingEngine, GeometryEngine bool
 	TopA                            bool
 
-	Pram PRAM
+	//Pram PRAM
 	Vram VRAM
 
 	Capture     Capture
@@ -43,6 +43,10 @@ type PPU struct {
 type Engine struct {
 	Pixels []byte
 	IsB    bool
+
+    Pram PRAM
+
+    Backdrop *uint16 // always first palette in engine pram
 
 	Dispcnt Dispcnt
 
@@ -58,6 +62,10 @@ type Engine struct {
 	ObjPriorities [4][]uint32
 
 	Simd *Simd
+
+
+    ExtBgSlots [4]*[0x2000]uint8
+    ExtObj     *[0x4000]uint8
 }
 
 type Dispcnt struct {
@@ -194,6 +202,9 @@ func NewPPU(irq *cpu.Irq) *PPU {
 
 	p.EngineA.Simd = NewSimd(&p.EngineA)
 	p.EngineB.Simd = NewSimd(&p.EngineB)
+
+    p.EngineA.Backdrop = &p.EngineA.Pram.Bg[0]
+    p.EngineB.Backdrop = &p.EngineB.Pram.Bg[0]
 
 	return p
 }

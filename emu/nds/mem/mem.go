@@ -119,7 +119,7 @@ func NewMemory(
 	m.Gamecard.Init(irq7, irq9, dma7, dma9, c, savepath, &m.Save)
 
 	texCache := &Ppu.Rasterizer.GeoEngine.TextureCache
-	m.Ppu.Vram.Init(texCache)
+	m.Ppu.Vram.Init(texCache, &m.Ppu.EngineA, &m.Ppu.EngineB)
 
 	m.InitSaveLoop()
 
@@ -170,10 +170,6 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 
 	if arm9 {
 
-		if addr > 0xFF00_0000 {
-			return mem.Arm9Bios[addr&0x0FFF]
-		}
-
 		if v, ok := mem.Tcm.ReadTcmWindow(addr); ok {
 			return v
 		}
@@ -191,18 +187,17 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 			//fmt.Printf("IO READ ARM9 %08X arm9 %t\n", addr, arm9)
 			return mem.ReadArm9IO(addr - 0x400_0000)
 		case 0x5:
-			return mem.Ppu.Pram.Read(addr, mem.Ppu)
+			return mem.Ppu.ReadPram(addr, mem.Ppu)
 		case 0x6:
 			return mem.Ppu.Vram.Read(addr, true)
 		case 0x7:
 			return mem.Oam[addr&0x7FF]
 		case 0x8, 0x9, 0xA:
 			return mem.ReadGbaSlot(addr, arm9)
-
+        case 0xFF:
+			return mem.Arm9Bios[addr&0x0FFF]
 		default:
 			return 0
-			//uhh.PrintPcs()
-			panic(fmt.Sprintf("ARM9 ADDR %08X INVALID READ\n", addr))
 		}
 	}
 	switch addr >> 24 {
@@ -230,9 +225,6 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 		return mem.ReadGbaSlot(addr, arm9)
 	default:
 		return 0
-		//uhh.PrintPcs()
-		panic(fmt.Sprintf("ARM7 ADDR %08X INVALID READ\n", addr))
-		return 0
 	}
 }
 
@@ -258,9 +250,11 @@ func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
 			return binary.LittleEndian.Uint32((*[4]uint8)(ptr)[:])
 		}
 
-		a := uint32(mem.Read(addr+2, arm9)) | (uint32(mem.Read(addr+3, arm9)) << 8)
-		b := uint32(mem.Read(addr, arm9)) | (uint32(mem.Read(addr+1, arm9)) << 8)
-		return (a << 16) | b
+        return (
+            (uint32(mem.Read(addr+3, arm9)) << 24) |
+            (uint32(mem.Read(addr+2, arm9)) << 16) |
+            (uint32(mem.Read(addr+1, arm9)) << 8) |
+            (uint32(mem.Read(addr+0, arm9))))
 	}
 }
 
@@ -302,11 +296,6 @@ func (mem *Mem) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
 
 	if arm9 {
 
-		if addr > 0xFF00_0000 {
-			return unsafe.Add(unsafe.Pointer(&mem.Arm9Bios), addr&0x0FFF), true
-		}
-
-		//if v, ok := mem.Tcm.ReadTcmWindow(addr); ok {
 		if v, ok := mem.Tcm.ReadTcmWindowPtr(addr); ok {
 			return v, ok
 		}
@@ -325,6 +314,8 @@ func (mem *Mem) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
 			return mem.Ppu.Vram.ReadPtr(addr, true)
 		case 0x7:
 			return unsafe.Add(unsafe.Pointer(&mem.Oam), addr&0x7FF), true
+        case 0xFF:
+			return unsafe.Add(unsafe.Pointer(&mem.Arm9Bios), addr&0x0FFF), true
 		}
 
 		return nil, false
@@ -373,7 +364,7 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 			//printIO(addr, arm9, true)
 			mem.WriteArm9IO(addr-0x400_0000, v)
 		case 0x5:
-			mem.Ppu.Pram.Write(addr, v, mem.Ppu)
+			mem.Ppu.WritePram(addr, v, mem.Ppu)
 		case 0x6:
 			mem.Ppu.Vram.Write(addr, v, true)
 		case 0x7:
@@ -418,11 +409,6 @@ func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
 }
 func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
 
-	if arm9 && addr == 0x400_0400 {
-		mem.Ppu.Rasterizer.GeoEngine.Fifo(v)
-		return
-	}
-
 	if arm9 {
 
 		if geo := addr >= 0x4000440 && addr < 0x4000600; geo {
@@ -432,7 +418,6 @@ func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
 
 		if gxfifo := addr >= 0x400_0400 && addr < 0x4000440; gxfifo {
 			mem.Ppu.Rasterizer.GeoEngine.Fifo(v)
-			//mem.Ppu.Rasterizer.GeoCmdFifo(v)
 			return
 		}
 

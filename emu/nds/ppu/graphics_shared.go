@@ -290,7 +290,46 @@ func (ppu *PPU) setBackgroundPixel(e *Engine, bg *Background, bgIdx, x, y uint32
 	palIdx := uint32(ppu.Vram.ReadGraphical(tileAddr+inTileIdx, banks))
 	palNum := screenData >> 12
 
-	return getBgPaletteData(ppu, e, bgIdx, bg.Palette256, palNum, palIdx, inTileX)
+	return getBgPaletteData(e, bg.Palette256, bgIdx, palNum, palIdx, inTileX)
+}
+
+//go:inline
+func getBgPaletteData(e *Engine, pal256 bool, bgIdx, palNum, palIdx, inTileX uint32) (uint32, float32, bool) {
+
+	if pal256 {
+		palIdx &= 0xFF
+	} else {
+		palIdx = (palIdx >> ((inTileX & 1) << 2)) & 0xF
+	}
+
+	if palIdx == 0 {
+		return 0, 1, false
+	}
+
+	if e.Dispcnt.BgExtPal && pal256 {
+        //16 colors x 16 palettes --> standard palette memory (=256 colors)
+        //256 colors x 16 palettes --> extended palette memory (=4096 colors)
+        // this can probably be replaced in the ppu.
+        // ex. vram.ExtABgSlot (unsafe) -> Background[bgIdx].BgSlot (*0x2000uint8)
+        // removes un necessary palette slot switches
+
+        if e.Backgrounds[bgIdx].AltExtPalSlot {
+            bgIdx += 2
+        }
+
+        addr := (palNum << 9) + palIdx<<1
+
+        return uint32(b16(e.ExtBgSlots[bgIdx][addr:])), 1, true
+	}
+
+	// this is from gba, does not work with ext palettes, but assume it still
+	// is needed for std
+	if pal256 {
+		palNum = 0
+	}
+
+	addr := (palNum << 4) + palIdx
+    return uint32(e.Pram.Bg[addr]), 1, true
 }
 
 func (ppu *PPU) setAffine16BackgroundPixel(e *Engine, bg *Background, bgIdx, x uint32) (uint32, float32, bool) {
@@ -359,16 +398,32 @@ func (ppu *PPU) setAffine16BackgroundPixel(e *Engine, bg *Background, bgIdx, x u
 	palIdx := uint32(ppu.Vram.Read(tileAddr+inTileIdx, true))
 	palNum := screenData >> 12
 
-	return getBgPaletteData(ppu, e, bgIdx, true, palNum, palIdx, inTileX)
+    palIdx &= 0xFF
+
+	if palIdx == 0 {
+		return 0, 1, false
+	}
+
+	if e.Dispcnt.BgExtPal {
+        //16 colors x 16 palettes --> standard palette memory (=256 colors)
+        //256 colors x 16 palettes --> extended palette memory (=4096 colors)
+        // this can probably be replaced in the ppu.
+        // ex. vram.ExtABgSlot (unsafe) -> Background[bgIdx].BgSlot (*0x2000uint8)
+        // removes un necessary palette slot switches
+
+        if e.Backgrounds[bgIdx].AltExtPalSlot {
+            bgIdx += 2
+        }
+
+        addr := (palNum << 9) + palIdx<<1
+
+        return uint32(b16(e.ExtBgSlots[bgIdx][addr:])), 1, true
+	}
+
+    return uint32(e.Pram.Bg[palIdx]), 1, true
 }
 
 func (ppu *PPU) setAffineBackgroundPixel(e *Engine, bg *Background, bgIdx, x uint32) (uint32, float32, bool) {
-
-	vramOffset := uint32(0)
-
-	if e.IsB {
-		vramOffset = uint32(0x20_0000)
-	}
 
 	pa := float64(utils.Convert16ToFloat(uint16(bg.Pa), 8))
 	pc := float64(utils.Convert16ToFloat(uint16(bg.Pc), 8))
@@ -404,6 +459,12 @@ func (ppu *PPU) setAffineBackgroundPixel(e *Engine, bg *Background, bgIdx, x uin
 		mapAddr += e.Dispcnt.ScreenBase
 	}
 
+	vramOffset := uint32(0)
+
+	if e.IsB {
+		vramOffset = uint32(0x20_0000)
+	}
+
 	tileIdx := uint32(ppu.Vram.Read(vramOffset+mapAddr, true))
 
 	tileAddr := bg.CharBaseBlock + (tileIdx << 6)
@@ -413,16 +474,24 @@ func (ppu *PPU) setAffineBackgroundPixel(e *Engine, bg *Background, bgIdx, x uin
 	addr := vramOffset + tileAddr + inTileIdx
 	palIdx := uint32(ppu.Vram.Read(addr, true))
 
-	pal := uint32(0)
+    palIdx &= 0xFF
 
-	return getBgPaletteData(ppu, e, bgIdx, true, pal, palIdx, inTileX)
+	if palIdx == 0 {
+		return 0, 1, false
+	}
+
+	if e.Dispcnt.BgExtPal {
+        if e.Backgrounds[bgIdx].AltExtPalSlot {
+            bgIdx += 2
+        }
+
+        return uint32(b16(e.ExtBgSlots[bgIdx][palIdx<<1:])), 1, true
+	}
+
+    return uint32(e.Pram.Bg[palIdx]), 1, true
 }
 
 func (ppu *PPU) setBmpBackgroundPixel(e *Engine, bg *Background, x uint32) (uint32, float32, bool) {
-
-	//if !bg.Palette256 {
-	//	panic(fmt.Sprintf("AFFINE WITHOUT PAL 256"))
-	//}
 
 	pa := float64(utils.Convert16ToFloat(uint16(bg.Pa), 8))
 	pc := float64(utils.Convert16ToFloat(uint16(bg.Pc), 8))
@@ -460,13 +529,11 @@ func (ppu *PPU) setBmpBackgroundPixel(e *Engine, bg *Background, x uint32) (uint
 		return 0, 1, false
 	}
 
-	data := ppu.getPalette(palIdx, 0, false, e.IsB)
+    if e.IsB {
+        return uint32(ppu.EngineB.Pram.Bg[addr]), 1, true
+    }
 
-	//if transparent := data & 0x80 != 0; transparent {
-	//    return 0, false
-	//}
-
-	return data, 1, true
+    return uint32(ppu.EngineA.Pram.Bg[addr]), 1, true
 }
 
 func getPositionsBg(screenData, xIdx, yIdx uint32) (uint32, uint32) {
@@ -474,11 +541,11 @@ func getPositionsBg(screenData, xIdx, yIdx uint32) (uint32, uint32) {
 	inTileY := yIdx & 0b111 //% 8
 	inTileX := xIdx & 0b111 //% 8
 
-	if hFlip := screenData>>10&1 == 1; hFlip {
+	if hFlip := screenData>>10&1 != 0; hFlip {
 		inTileX = 7 - inTileX
 	}
 
-	if vFlip := screenData>>11&1 == 1; vFlip {
+	if vFlip := screenData>>11&1 != 0; vFlip {
 		inTileY = 7 - inTileY
 	}
 
@@ -541,7 +608,7 @@ func (e *Engine) getBgPriority(y uint32) {
 		priorities = &e.BgPriorities
 	)
 
-	p := [4][]uint32{}
+	*priorities = [4][]uint32{}
 
 	for i := range uint32(4) {
 
@@ -557,12 +624,9 @@ func (e *Engine) getBgPriority(y uint32) {
 		//    continue
 		//}
 
-		priority := bgs[i].Priority
-
-		p[priority] = append(p[priority], uint32(i))
+		priority := &priorities[bgs[i].Priority]
+		*priority = append(*priority, uint32(i))
 	}
-
-	*priorities = p
 }
 
 func (e *Engine) getObjPriority(y uint32) {
@@ -574,7 +638,7 @@ func (e *Engine) getObjPriority(y uint32) {
 		priorities = &e.ObjPriorities
 	)
 
-	p := [4][]uint32{}
+	*priorities = [4][]uint32{}
 
 	for i := range 128 {
 
@@ -592,12 +656,9 @@ func (e *Engine) getObjPriority(y uint32) {
 			continue
 		}
 
-		priority := obj.Priority
-
-		p[priority] = append(p[priority], uint32(i))
+		priority := &priorities[obj.Priority]
+		*priority = append(*priority, uint32(i))
 	}
-
-	*priorities = p
 }
 
 func objNotScanline(obj *Object, y uint32) bool {
@@ -649,82 +710,6 @@ func bgNotScanline(bg *Background, y uint32) bool {
 	b := localY-int(bg.H) >= 0
 
 	return t || b
-}
-
-func (ppu *PPU) getExtendedPalette(e *Engine, bgIdx uint32, obj bool, palIdx, paletteNum uint32) uint32 {
-
-	//16 colors x 16 palettes --> standard palette memory (=256 colors)
-	//256 colors x 16 palettes --> extended palette memory (=4096 colors)
-
-	addr := ((paletteNum << 5) + palIdx<<1)
-	vram := &ppu.Vram
-
-	// this can probably be replaced in the ppu.
-	// ex. vram.ExtABgSlot (unsafe) -> Background[bgIdx].BgSlot (*0x2000uint8)
-	// removes un necessary palette slot switches
-
-	switch {
-	case !obj && !e.IsB:
-
-		slotIdx := bgIdx
-
-		if altSlot := e.Backgrounds[bgIdx].AltExtPalSlot; altSlot {
-			switch bgIdx {
-			case 0:
-				slotIdx = 2
-			case 1:
-				slotIdx = 3
-			}
-		}
-
-		slot := vram.ExtABgSlots[slotIdx]
-
-		return uint32(b16(slot[addr:]))
-	case !obj && e.IsB:
-
-		slotIdx := bgIdx
-
-		if altSlot := e.Backgrounds[bgIdx].AltExtPalSlot; altSlot {
-			switch bgIdx {
-			case 0:
-				slotIdx = 2
-			case 1:
-				slotIdx = 3
-			}
-		}
-
-		slot := vram.ExtBBgSlots[slotIdx]
-
-		return uint32(b16(slot[addr:]))
-	case obj && !e.IsB:
-		return uint32(b16(vram.ExtAPalObj[addr:]))
-	case obj && e.IsB:
-		return uint32(b16(vram.ExtBPalObj[addr:]))
-	}
-
-	return 0
-}
-
-func (ppu *PPU) getPalette(palIdx uint32, paletteNum uint32, obj, eB bool) uint32 {
-
-	addr := (paletteNum << 5) + palIdx<<1
-
-	if obj {
-		addr += 0x200
-	}
-
-	if eB {
-		addr += 0x400
-	}
-
-	addr >>= 1
-
-	//if addr >= 0x400 {
-	//    fmt.Printf("BAD PAL ADDR %04X (> 0x400), isB %t\n", addr, eB)
-	//    return 0x0 //FFFF
-	//}
-
-	return uint32(ppu.Pram[addr])
 }
 
 func getPositions(obj *Object, xIdx, yIdx uint32) (uint32, uint32, uint32, uint32) {
@@ -807,47 +792,12 @@ func getBmpTileAddr(obj *Object, xIdx, yIdx uint32) uint32 {
 	return base + pixelOffset
 }
 
-func getBgPaletteData(ppu *PPU, e *Engine, bgIdx uint32, pal256 bool, palNum, tileData, inTileX uint32) (uint32, float32, bool) {
-	//if !e.IsB && x == y && x == 0 {
-	//    fmt.Printf("PAL IDX %0X PAL NUM %08X\n", palIdx, palNum)
-	//}
+func getObjPaletteData(e *Engine, pal256 bool, pal, palIdx, inTileX uint32) (uint32, bool) {
 
-	var palIdx uint32
 	if pal256 {
-		palIdx = tileData & 0xFF
+		palIdx &= 0xFF
 	} else {
-		palIdx = (tileData >> ((inTileX & 1) << 2)) & 0xF
-	}
-
-	if palIdx == 0 {
-		return 0, 1, false
-	}
-
-	if e.Dispcnt.BgExtPal && pal256 {
-
-		palNum <<= 4
-		palData := ppu.getExtendedPalette(e, bgIdx, false, palIdx, palNum)
-		return palData, 1, true
-	}
-
-	// this is from gba, does not work with ext palettes, but assume it still
-	// is needed for std
-	if pal256 {
-		palNum = 0
-	}
-
-	palData := ppu.getPalette(uint32(palIdx), palNum, false, e.IsB)
-
-	return palData, 1, true
-}
-
-func getPaletteData(ppu *PPU, e *Engine, pal256 bool, pal, tileData, inTileX uint32) (uint32, bool) {
-
-	var palIdx uint32
-	if pal256 {
-		palIdx = tileData & 0xFF
-	} else {
-		palIdx = (tileData >> ((inTileX & 1) << 2)) & 0xF
+		palIdx = (palIdx >> ((inTileX & 1) << 2)) & 0xF
 	}
 
 	if palIdx == 0 {
@@ -855,9 +805,15 @@ func getPaletteData(ppu *PPU, e *Engine, pal256 bool, pal, tileData, inTileX uin
 	}
 
 	if e.Dispcnt.ObjExtPal && pal256 {
-		pal <<= 4
-		palData := ppu.getExtendedPalette(e, 0, true, palIdx, pal)
-		return palData, true
+
+        //16 colors x 16 palettes --> standard palette memory (=256 colors)
+        //256 colors x 16 palettes --> extended palette memory (=4096 colors)
+        // this can probably be replaced in the ppu.
+        // ex. vram.ExtABgSlot (unsafe) -> Background[bgIdx].BgSlot (*0x2000uint8)
+        // removes un necessary palette slot switches
+
+        addr := (pal << 9) + palIdx<<1
+        return uint32(b16(e.ExtObj[addr:])), true
 	}
 
 	// this is from gba, does not work with ext palettes, but assume it still
@@ -866,9 +822,8 @@ func getPaletteData(ppu *PPU, e *Engine, pal256 bool, pal, tileData, inTileX uin
 		pal = 0
 	}
 
-	palData := ppu.getPalette(uint32(palIdx), pal, true, e.IsB)
-
-	return palData, true
+	addr := (pal << 4) + palIdx
+    return uint32(e.Pram.Obj[addr]), true
 }
 
 func outObjectBound(obj *Object, xIdx, yIdx int) bool {
@@ -912,12 +867,12 @@ func outBoundAffine(obj *Object, x, y uint32) bool {
 
 	yWrapped := t > b
 	xWrapped := l > r
-	yWrappedInBouppu := !yWrapped && (y >= t && y < b)
-	yUnwrappedInBouppu := yWrapped && (y >= t || y < b)
-	xWrappedInBouppu := !xWrapped && (x >= l && x < r)
-	xUnwrappedInBouppu := xWrapped && (x >= l || x < r)
-	return !((yWrappedInBouppu || yUnwrappedInBouppu) &&
-		(xWrappedInBouppu || xUnwrappedInBouppu))
+	yWrappedInBound := !yWrapped && (y >= t && y < b)
+	yUnwrappedInBound := yWrapped && (y >= t || y < b)
+	xWrappedInBound := !xWrapped && (x >= l && x < r)
+	xUnwrappedInBound := xWrapped && (x >= l || x < r)
+	return !((yWrappedInBound || yUnwrappedInBound) &&
+		(xWrappedInBound || xUnwrappedInBound))
 }
 
 func (ppu *PPU) setObjTilePixel(e *Engine, obj *Object, x, y uint32) (uint32, bool) {
@@ -940,7 +895,7 @@ func (ppu *PPU) setObjTilePixel(e *Engine, obj *Object, x, y uint32) (uint32, bo
 	vramOffset := uint32(0x40_0000)
 	var banks uint32
 	if e.IsB {
-		vramOffset = uint32(0x60_0000)
+		vramOffset = 0x60_0000
 		banks = BANKS_B_2D_OBJ
 	} else {
 		banks = BANKS_A_2D_OBJ
@@ -948,7 +903,7 @@ func (ppu *PPU) setObjTilePixel(e *Engine, obj *Object, x, y uint32) (uint32, bo
 
 	tileData := uint32(ppu.Vram.ReadGraphical(vramOffset+addr, banks))
 
-	return getPaletteData(ppu, e, obj.Palette256, obj.Palette, tileData, uint32(inTileX))
+	return getObjPaletteData(e, obj.Palette256, obj.Palette, tileData, inTileX)
 }
 
 func (ppu *PPU) setObjBmpPixel(e *Engine, obj *Object, x, y uint32) (uint32, bool) {

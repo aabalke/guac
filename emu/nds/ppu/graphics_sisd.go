@@ -20,7 +20,7 @@ func (ppu *PPU) vramDisplay(y uint32, engine *Engine) {
 func (ppu *PPU) standard(y uint32, engine *Engine) {
 
 	wins := &engine.Windows
-	backdrop := ppu.getPalette(0, 0, false, engine.IsB)
+	backdrop := uint32(*engine.Backdrop)
 	bld := &engine.Blend
 
 	for x := range uint32(SCREEN_WIDTH) {

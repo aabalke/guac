@@ -60,8 +60,10 @@ func (t *Timer) WriteCnt(v uint8) {
 	t.Cascade = (t.CNT>>2)&1 != 0
 	t.OverflowIRQ = (t.CNT>>6)&1 != 0
 	t.Enabled = (t.CNT>>7)&1 != 0
-	t.Freq = t.getFreq()
-	t.FreqShift = t.getFreqShift()
+
+    f := freqs[t.CNT & 0b11]
+    t.Freq = f.freq
+    t.FreqShift = f.shift
 
 	if t.Enabled && !wasEnabled {
 		t.D = t.SavedInitialValue
@@ -88,33 +90,12 @@ func (t *Timer) WriteD(v uint8, hi bool) {
 	t.SavedInitialValue = (t.SavedInitialValue & 0xFF00) | uint32(v)
 }
 
-func (t *Timer) getFreq() uint32 {
-	switch freq := (t.CNT & 0b11); freq {
-	case 0:
-		return 1
-	case 1:
-		return 64
-	case 2:
-		return 256
-	case 3:
-		return 1024
-	}
-
-	return 1
-}
-
-func (t *Timer) getFreqShift() uint32 {
-
-	switch freq := (t.CNT & 0b11); freq {
-	case 0:
-		return 0
-	case 1:
-		return 6
-	case 2:
-		return 8
-	case 3:
-		return 10
-	}
-
-	return 0
+var freqs = [...]struct{
+    freq uint32
+    shift uint32
+}{
+    {1, 0},
+    {64, 6},
+    {256, 8},
+    {1024, 10},
 }

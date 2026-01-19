@@ -9,6 +9,8 @@ import (
 	"github.com/aabalke/guac/emu/nds/utils"
 )
 
+var paramCnt = [0x73]int{}
+
 type GeoEngine struct {
 	Irq     *cpu.Irq
 	Buffers *Buffers
@@ -549,47 +551,6 @@ func (g *GeoEngine) UpdateClipMtx() {
 	g.ClipMatrix = pos.Mul(per)
 }
 
-var paramCnt = map[uint32]int{
-	0x00: 1,
-	0x10: 1,
-	0x11: 1,
-	0x12: 1,
-	0x13: 1,
-	0x14: 1,
-	0x15: 1,
-	0x16: 16,
-	0x17: 12,
-	0x18: 16,
-	0x19: 12,
-	0x1A: 9,
-	0x1B: 3,
-	0x1C: 3,
-	0x20: 1,
-	0x21: 1,
-	0x22: 1,
-	0x23: 2,
-	0x24: 1,
-	0x25: 1,
-	0x26: 1,
-	0x27: 1,
-	0x28: 1,
-	0x29: 1,
-	0x2A: 1,
-	0x2B: 1,
-	0x30: 1,
-	0x31: 1,
-	0x32: 1,
-	0x33: 1,
-	0x34: 32,
-	0x40: 1,
-	0x41: 1,
-	0x50: 1,
-	0x60: 1,
-	0x70: 3,
-	0x71: 2,
-	0x72: 1,
-}
-
 func (g *GeoEngine) ValidParamCount(fifo bool) bool {
 
 	cmd := g.Data[0]
@@ -606,12 +567,12 @@ func (g *GeoEngine) ValidParamCount(fifo bool) bool {
 		}
 	}
 
-	v, ok := paramCnt[cmd]
-	if !ok {
+    switch v := paramCnt[cmd]; v {
+    case 0:
 		panic(fmt.Sprintf("UNKNOWN CMD GXFIFO % 2X", g.Data))
+    default:
+        return v == params
 	}
-
-	return v == params
 }
 
 func (g *GeoEngine) AddPolygon() {

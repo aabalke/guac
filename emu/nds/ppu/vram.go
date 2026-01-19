@@ -30,10 +30,12 @@ type VRAM struct {
 	CNT_7            uint8
 	isCArm7, isDArm7 bool
 
-	ExtABgSlots  [4]*[0x2000]uint8
-	ExtBBgSlots  [4]*[0x2000]uint8
-	ExtAPalObj   *[0x4000]uint8
-	ExtBPalObj   *[0x4000]uint8
+	//ExtABgSlots  [4]*[0x2000]uint8
+	//ExtBBgSlots  [4]*[0x2000]uint8
+
+	//ExtAPalObj   *[0x4000]uint8
+	//ExtBPalObj   *[0x4000]uint8
+
 	TextureSlots [4]*[0x2_0000]uint8
 	TexPalSlots  [6]*[0x4000]uint8
 
@@ -43,9 +45,16 @@ type VRAM struct {
 		bank unsafe.Pointer
 		cnt  *VramCnt
 	}
+
+    engineA *Engine
+    engineB *Engine
 }
 
-func (v *VRAM) Init(t *rast.TextureCache) {
+func (v *VRAM) Init(t *rast.TextureCache, a, b *Engine) {
+
+    v.engineA = a
+    v.engineB = b
+
 	v.TextureCache = t
 	v.CNT_A.Write(0x80)
 	v.CNT_B.Write(0x80)
@@ -254,10 +263,10 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
 			vm.TexPalSlots[3] = (*[0x4000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0xC000))
 
 		case 4:
-			vm.ExtABgSlots[0] = (*[0x2000]uint8)(unsafe.Pointer(bank))
-			vm.ExtABgSlots[1] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x2000))
-			vm.ExtABgSlots[2] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x4000))
-			vm.ExtABgSlots[3] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x6000))
+			vm.engineA.ExtBgSlots[0] = (*[0x2000]uint8)(unsafe.Pointer(bank))
+			vm.engineA.ExtBgSlots[1] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x2000))
+			vm.engineA.ExtBgSlots[2] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x4000))
+			vm.engineA.ExtBgSlots[3] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x6000))
 		}
 
 	case 0x245:
@@ -281,15 +290,15 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
 		case 4:
 
 			if cnt.Ofs == 0 {
-				vm.ExtABgSlots[0] = (*[0x2000]uint8)(unsafe.Pointer(bank))
-				vm.ExtABgSlots[1] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x2000))
+				vm.engineA.ExtBgSlots[0] = (*[0x2000]uint8)(unsafe.Pointer(bank))
+				vm.engineA.ExtBgSlots[1] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x2000))
 			} else {
-				vm.ExtABgSlots[2] = (*[0x2000]uint8)(unsafe.Pointer(bank))
-				vm.ExtABgSlots[3] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x2000))
+				vm.engineA.ExtBgSlots[2] = (*[0x2000]uint8)(unsafe.Pointer(bank))
+				vm.engineA.ExtBgSlots[3] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x2000))
 			}
 
 		case 5:
-			vm.ExtAPalObj = bank
+			vm.engineA.ExtObj = bank
 		}
 
 	case 0x246:
@@ -311,15 +320,15 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
 			vm.TexPalSlots[idx] = (*[0x4000]uint8)(unsafe.Pointer(bank))
 		case 4:
 			if cnt.Ofs == 0 {
-				vm.ExtABgSlots[0] = (*[0x2000]uint8)(unsafe.Pointer(bank))
-				vm.ExtABgSlots[1] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x2000))
+				vm.engineA.ExtBgSlots[0] = (*[0x2000]uint8)(unsafe.Pointer(bank))
+				vm.engineA.ExtBgSlots[1] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x2000))
 			} else {
-				vm.ExtABgSlots[2] = (*[0x2000]uint8)(unsafe.Pointer(bank))
-				vm.ExtABgSlots[3] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x2000))
+				vm.engineA.ExtBgSlots[2] = (*[0x2000]uint8)(unsafe.Pointer(bank))
+				vm.engineA.ExtBgSlots[3] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x2000))
 			}
 
 		case 5:
-			vm.ExtAPalObj = bank
+			vm.engineA.ExtObj = bank
 		}
 
 		// 0x247 is WRAMCNT
@@ -335,10 +344,10 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
 		case 1:
 			cnt.Base = 0x20_0000
 		case 2:
-			vm.ExtBBgSlots[0] = (*[0x2000]uint8)(unsafe.Pointer(bank))
-			vm.ExtBBgSlots[1] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x2000))
-			vm.ExtBBgSlots[2] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x4000))
-			vm.ExtBBgSlots[3] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x6000))
+			vm.engineB.ExtBgSlots[0] = (*[0x2000]uint8)(unsafe.Pointer(bank))
+			vm.engineB.ExtBgSlots[1] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x2000))
+			vm.engineB.ExtBgSlots[2] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x4000))
+			vm.engineB.ExtBgSlots[3] = (*[0x2000]uint8)(unsafe.Add(unsafe.Pointer(bank), 0x6000))
 		}
 
 	case 0x249:
@@ -355,7 +364,7 @@ func (vm *VRAM) WriteCNT(addr uint32, v uint8) {
 		case 2:
 			cnt.Base = 0x60_0000
 		case 3:
-			vm.ExtBPalObj = bank
+			vm.engineB.ExtObj = bank
 		}
 	}
 }
@@ -492,7 +501,7 @@ func (vm *VRAM) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
 }
 
 const (
-	//                IHGFEDCBA
+	//                 IHGFEDCBA
 	BANKS_A_2D_BG  = 0b001111111
 	BANKS_A_2D_OBJ = 0b001110011
 	BANKS_B_2D_BG  = 0b110000100
