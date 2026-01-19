@@ -101,12 +101,11 @@ func (c *Config) decodeNdsFirmware() {
 
 type NdsJit struct {
 	Enabled   bool   `toml:"enabled"`
-	//PageSize  uint32 `toml:"page_size"`
-	//PageCount uint64 `toml:"page_count"`
 	BatchInst uint32 `toml:"batch_inst"`
 
     LoopCnt uint32 `toml:"loop_cnt"`
     BlockCnt uint32 `toml:"block_cnt"`
+    PageShift uint32 `toml:"page_shift"`
 
 	BatchInstA9 uint32
 	BatchInstA7 uint32

@@ -225,18 +225,16 @@ func (cpu *Cpu) CheckIrq() {
 
 //go:inline
 func (cpu *Cpu) jitFunction(pc uint32, thumb bool) (uint32, int, bool) {
-	pageIdx := pc >> PAGE_SHIFT
-	//blockIdx := (pc & PAGE_MASK) >> 2 // aligned to word (arm)
-	blockIdx := (pc & PAGE_MASK) >> 1 // aligned to word (arm)
+	pageIdx := pc >> cpu.Jit.PageShift
+	blockIdx := (pc & cpu.Jit.PageMask) >> 1
 
+	page := cpu.Jit.Pages[pageIdx]
 
-	page := cpu.Jit.Pages[pageIdx].Load()
-
-	if page == nil || page.dead.Load() {
+	if page == nil || page.dead {
 		return 0, 0, false
 	}
 
-	block := page.Blocks[blockIdx].Load()
+	block := page.Blocks[blockIdx]
 
 	if block == nil || block.Skip || block.f == nil {
 		return 0, 0, false

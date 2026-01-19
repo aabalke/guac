@@ -3,7 +3,6 @@ package arm7
 
 import (
 	"fmt"
-	"sync/atomic"
 	"unsafe"
 
 	"github.com/aabalke/gojit"
@@ -12,7 +11,6 @@ import (
 
 const (
 	ADDRESS_SPACE = 0x1_0000_0000
-	PAGE_MASK     = 0xFFFF
 	PAGE_SHIFT    = 16
 )
 
@@ -41,7 +39,7 @@ type Jit struct {
 	Cpu *Cpu
 
 	BlockCache   *BlockCache
-	Pages        []atomic.Pointer[Page]
+	Pages        []*Page
 	Metrics      [ADDRESS_SPACE >> PAGE_SHIFT][]uint32
 	invalidPages []*Page
 
@@ -51,12 +49,14 @@ type Jit struct {
 	Scratch [0x10]uint32
 
 	LoopThreshold uint32
+	PageShift     uint32
+	PageMask      uint32
 }
 
 type Page struct {
 	id     uint32
-	Blocks []atomic.Pointer[JitBlock]
-	dead   atomic.Bool
+	Blocks []*JitBlock
+	dead   bool
 }
 
 func NewJit(cpu *Cpu) *Jit {
@@ -72,14 +72,19 @@ func NewJit(cpu *Cpu) *Jit {
 		return j
 	}
 
+	conf := config.Conf.Nds.NdsJit
+
 	j := &Jit{
 		Cpu:   cpu,
-		Pages: make([]atomic.Pointer[Page], ADDRESS_SPACE>>PAGE_SHIFT),
+		Pages: make([]*Page, ADDRESS_SPACE>>conf.PageShift),
 		BlockCache: InitBlockCache(
 			config.Conf.Nds.NdsJit.BlockCnt,
 			PAGE_SIZE),
 		LoopThreshold: config.Conf.Nds.NdsJit.LoopCnt,
 	}
+
+	j.PageShift = conf.PageShift
+	j.PageMask = (1 << conf.PageShift) - 1
 
 	return j
 }
@@ -154,17 +159,16 @@ func (j *Jit) InvalidatePage(addr uint32) {
 		return
 	}
 
-	page := j.Pages[addr>>PAGE_SHIFT].Load()
+	page := j.Pages[addr>>j.PageShift]
 	if page == nil {
 		return
 	}
 
-	page.dead.Store(true)
+	page.dead = true
 
-	if old := j.Pages[addr>>PAGE_SHIFT].Swap(nil); old != nil {
-		j.Metrics[addr>>PAGE_SHIFT] = make([]uint32, (1<<PAGE_SHIFT)>>1)
-		j.invalidPages = append(j.invalidPages, old)
-	}
+	j.Pages[addr>>j.PageShift] = nil
+	j.Metrics[addr>>j.PageShift] = make([]uint32, (1<<j.PageShift)>>1)
+	j.invalidPages = append(j.invalidPages, page)
 }
 
 func (j *Jit) DeletePages() {
@@ -177,10 +181,12 @@ func (j *Jit) DeletePages() {
 
 		for i := range page.Blocks {
 
-			block := page.Blocks[i].Swap(nil)
+			block := page.Blocks[i]
 			if block == nil {
 				continue
 			}
+
+			page.Blocks[i] = nil
 
 			if block.Skip {
 				continue
@@ -195,29 +201,25 @@ func (j *Jit) DeletePages() {
 
 func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 
-	pageIdx := pc >> PAGE_SHIFT
-	blockIdx := (pc & PAGE_MASK) >> 1
+	pageIdx := pc >> j.PageShift
+	blockIdx := (pc & j.PageMask) >> 1
 
-	page := j.Pages[pageIdx].Load()
+	page := j.Pages[pageIdx]
 
 	if page == nil {
-		newPage := &Page{
+		page = &Page{
 			id:     pageIdx,
-			Blocks: make([]atomic.Pointer[JitBlock], (1<<PAGE_SHIFT)>>1),
+			Blocks: make([]*JitBlock, (1<<j.PageShift)>>1),
 		}
 
-		if j.Pages[pageIdx].CompareAndSwap(nil, newPage) {
-			page = newPage
-		} else {
-			// other routine won race condition
-			page = j.Pages[pageIdx].Load()
-		}
-	} else if page.dead.Load() {
+		j.Pages[pageIdx] = page
+
+	} else if page.dead {
 		println("page dead, block not created")
 		return
 	}
 
-	if block := page.Blocks[blockIdx].Load(); block != nil && block.Skip {
+	if block := page.Blocks[blockIdx]; block != nil && block.Skip {
 		return
 	}
 
@@ -314,7 +316,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 
 	if length == 0 {
 		j.BlockCache.PushTail(newBlock)
-		page.Blocks[blockIdx].CompareAndSwap(nil, j.BlockCache.SkipBlock)
+		page.Blocks[blockIdx] = j.BlockCache.SkipBlock
 		return
 	}
 
@@ -331,7 +333,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 		gojit.CallJit(uintptr(unsafe.Pointer(&newBlock.assembler.Buf[0])))
 	}
 
-	page.Blocks[blockIdx].CompareAndSwap(nil, newBlock)
+	page.Blocks[blockIdx] = newBlock
 }
 
 func (j *Jit) emitOp(op uint32) bool {
@@ -662,11 +664,11 @@ func (j *Jit) CallFunc(f any) {
 
 func (j *Jit) UpdateMetrics(pc uint32, thumb bool) {
 
-	pageIdx := pc >> PAGE_SHIFT
-	blockIdx := (pc & PAGE_MASK) >> 1 // aligned to word for thumb
+	pageIdx := pc >> j.PageShift
+	blockIdx := (pc & j.PageMask) >> 1 // aligned to word for thumb
 
 	if metrics := j.Metrics[pageIdx]; metrics == nil {
-		j.Metrics[pageIdx] = make([]uint32, (1<<PAGE_SHIFT)>>1)
+		j.Metrics[pageIdx] = make([]uint32, (1<<j.PageShift)>>1)
 	}
 
 	j.Metrics[pageIdx][blockIdx]++

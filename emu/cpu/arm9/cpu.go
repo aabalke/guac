@@ -215,17 +215,16 @@ func (cpu *Cpu) CheckIrq() {
 
 //go:inline
 func (cpu *Cpu) jitFunction(pc uint32, thumb bool) (uint32, int, bool) {
-	pageIdx := pc >> PAGE_SHIFT
-	//blockIdx := (pc & PAGE_MASK) >> 2 // aligned to word (arm)
-	blockIdx := (pc & PAGE_MASK) >> 1 // aligned to word (arm)
+	pageIdx := pc >> cpu.Jit.PageShift
+	blockIdx := (pc & cpu.Jit.PageMask) >> 1
 
-	page := cpu.Jit.Pages[pageIdx].Load()
+	page := cpu.Jit.Pages[pageIdx]
 
-	if page == nil || page.dead.Load() {
+	if page == nil || page.dead {
 		return 0, 0, false
 	}
 
-	block := page.Blocks[blockIdx].Load()
+	block := page.Blocks[blockIdx]
 
 	if block == nil || block.Skip || block.f == nil {
 		return 0, 0, false
@@ -275,7 +274,8 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 
 	op := *(*uint32)(unsafe.Add(cpu.PcPtr, cpu.PcOff))
 	cpu.PcOff += 4
-	cpu.isBranching = ((op>>27)&1 != 0) || (op>>12)&0xF == 0xF
+	//cpu.isBranching = ((op>>27)&1 != 0) || (op>>12)&0xF == 0xF
+	cpu.isBranching = !cpu.DecodeARMBranch(op)
 
 	return op, 0
 }
@@ -421,6 +421,84 @@ func DecodeTHUMBBranch(op uint16) bool {
 		}
 
 		return true
+	}
+
+	return false
+}
+
+//go:inline
+func (cpu *Cpu) DecodeARMBranch(op uint32) bool {
+
+	if swi := op&0xF00_0000 == 0xF00_0000; swi {
+		return false
+	}
+
+	switch {
+	case isBkpt(op):
+	case isB(op):
+	case isBX(op):
+	case isSDT(op):
+
+		load := (op>>20)&1 != 0
+		if rdpc := op&0xF000 == 0xF000; rdpc && load {
+			// also covers pld
+			return false
+		}
+
+		return true
+	case isBlock(op):
+
+		load := (op>>20)&1 != 0
+		pcIncluded := op&0x8000 != 0
+
+		if pcIncluded && load {
+
+			return false
+		}
+
+		return true
+
+	case isHalf(op):
+
+		load := (op>>20)&1 != 0
+		if rdpc := op&0xF000 == 0xF000; rdpc && load {
+			return false
+		}
+
+		return true
+	case isUD(op):
+	case isPSR(op):
+
+		if msr := (op>>21)&1 != 0; msr {
+			return false
+		}
+
+		return true
+
+	case isSWP(op):
+		return true
+	case isM(op):
+		return true
+	case isCLZ(op):
+		return true
+	case isQAlu(op):
+		return true
+
+	case isALU(op):
+
+		if rdpc := op&0xF000 == 0xF000; rdpc {
+			return false
+		}
+
+		if swiExit := op&0x3F0_000F == 0x3F0_000F; swiExit {
+			return false
+		}
+
+		return true
+
+	case isCoDataReg(op):
+		return true
+
 	}
 
 	return false

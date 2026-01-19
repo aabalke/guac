@@ -155,9 +155,9 @@ func (bc *BlockCache) AssignBlock(jit *Jit) *JitBlock {
     if inUse := block.Length != 0; inUse {
         // need to invalidate pc currently using block
         revokedPC := block.initPc
-        page := jit.Pages[revokedPC>>PAGE_SHIFT].Load()
+        page := jit.Pages[revokedPC>>jit.PageShift]
         if page != nil {
-            page.Blocks[(revokedPC&PAGE_MASK)>>1].Swap(nil)
+            page.Blocks[(revokedPC&jit.PageMask)>>1] = nil
         }
     }
 
