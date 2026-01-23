@@ -536,7 +536,7 @@ func (vm *VRAM) ReadGraphicalPtr(addr uint32) unsafe.Pointer {
 	return nil
 }
 
-func (vm *VRAM) ReadGraphical(addr uint32, bankFlags uint32) uint16 {
+func (vm *VRAM) ReadGraphical(addr uint32) uint16 {
 
 	for i, v := range &vm.banks {
 

@@ -28,9 +28,9 @@ func (ppu *PPU) render(x, y uint32, e *Engine, bldPal *BlendPalettes) (bool, boo
             }
 
             if e.Backgrounds[bgIdx].Type == BG_TYPE_3D {
-                bldPal.SetBgPalettes3d(e.BgPalettes[bgIdx][x], e.BgAlphas[bgIdx][x], bld)
+                bldPal.SetBgPalettes3d(uint32(e.BgPalettes[bgIdx][x]), e.BgAlphas[bgIdx][x], bld)
             } else {
-                bldPal.SetBgPalettes(e.BgPalettes[bgIdx][x], bgIdx, bld)
+                bldPal.SetBgPalettes(uint32(e.BgPalettes[bgIdx][x]), bgIdx, bld)
             }
         }
 

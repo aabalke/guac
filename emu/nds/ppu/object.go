@@ -250,15 +250,11 @@ func (ppu *PPU) setObjTilePixel(e *Engine, obj *Object, x, y uint32) (uint32, bo
 	addr := getObjTileAddr(obj, enTileX, enTileY, inTileX, inTileY)
 
 	vramOffset := uint32(0x40_0000)
-	var banks uint32
 	if e.IsB {
 		vramOffset = 0x60_0000
-		banks = BANKS_B_2D_OBJ
-	} else {
-		banks = BANKS_A_2D_OBJ
 	}
 
-	tileData := uint32(ppu.Vram.ReadGraphical(vramOffset+addr, banks))
+	tileData := uint32(ppu.Vram.ReadGraphical(vramOffset+addr))
 
 	return getObjPaletteData(e, obj.Palette256, obj.Palette, tileData, inTileX)
 }
@@ -279,15 +275,11 @@ func (ppu *PPU) setObjBmpPixel(e *Engine, obj *Object, x, y uint32) (uint32, boo
 	addr := getBmpTileAddr(obj, uint32(xIdx), uint32(yIdx))
 
 	vramOffset := uint32(0x40_0000)
-	var banks uint32
 	if e.IsB {
 		vramOffset = uint32(0x60_0000)
-		banks = BANKS_B_2D_OBJ
-	} else {
-		banks = BANKS_A_2D_OBJ
 	}
 
-	data := uint32(ppu.Vram.ReadGraphical(vramOffset+addr, banks))
+	data := uint32(ppu.Vram.ReadGraphical(vramOffset+addr))
 
 	if alpha := (data & 0x8000) == 0; alpha {
 		return 0, false

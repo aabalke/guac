@@ -11,9 +11,14 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 
 	op, cycles := cpu.GetOpArm()
 
-	if cond := op >> 28; cond < 0xE && !cpu.CheckCond(cond) {
-		r[PC] += 4
-		return cycles + 1, true
+	switch cond := op >> 28; cond {
+	case 0xE: // skip
+
+	default:
+		if !cpu.CheckCond(cond) {
+			r[PC] += 4
+			return cycles + 1, true
+		}
 	}
 
 	if swi := (op>>24)&0xF == 0xF; swi {

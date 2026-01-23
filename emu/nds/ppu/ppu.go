@@ -65,7 +65,7 @@ type Engine struct {
     ExtBgSlots [4]*[0x2000]uint8
     ExtObj     *[0x4000]uint8
 
-    BgPalettes [4][SCREEN_WIDTH]uint32
+    BgPalettes [4][SCREEN_WIDTH]uint16
     BgOks      [4][SCREEN_WIDTH]bool
     BgAlphas   [4][SCREEN_WIDTH]float32
 
