@@ -1,5 +1,3 @@
-//go:build !rc
-
 package ppu
 
 func NewBlendPalette(bld *Blend, backdrop uint32) *BlendPalettes {

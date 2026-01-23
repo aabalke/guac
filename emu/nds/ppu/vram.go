@@ -508,6 +508,34 @@ const (
 	BANKS_B_2D_OBJ = 0b100001000
 )
 
+func (vm *VRAM) ReadGraphicalPtr(addr uint32) unsafe.Pointer {
+
+	for i, v := range &vm.banks {
+
+		if !v.cnt.Enabled {
+			continue
+		}
+
+		if i == 2 && vm.isCArm7 {
+			continue
+		}
+
+		if i == 3 && vm.isDArm7 {
+			continue
+		}
+
+		end := v.cnt.Base + v.cnt.Size
+
+		if addr < v.cnt.Base || addr >= end {
+			continue
+		}
+
+		return unsafe.Add(v.bank, addr-v.cnt.Base)
+	}
+
+	return nil
+}
+
 func (vm *VRAM) ReadGraphical(addr uint32, bankFlags uint32) uint16 {
 
 	for i, v := range &vm.banks {

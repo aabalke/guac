@@ -14,8 +14,12 @@ func (ppu *PPU) Graphics(y uint32, singleThread bool) {
 
 	a := &ppu.EngineA
 	b := &ppu.EngineB
-	a.updateBackgrounds()
-	b.updateBackgrounds()
+
+    for i := range 4 {
+        a.Backgrounds[i].SetSize()
+        b.Backgrounds[i].SetSize()
+    }
+
 	a.getBgPriority(y)
 	b.getBgPriority(y)
 	a.getObjPriority(y)
@@ -57,12 +61,7 @@ func (ppu *PPU) buildFrame(y uint32, singleThread bool) {
 			ppu.vramDisplay(y, a)
 
 		case 3:
-			panic("MAIN MEM FIFO")
-			if capture.ActiveCapture {
-				ppu.standard(y, a)
-				capture.CaptureLine(y, renderingB)
-			}
-			ppu.MemFifoDisplay(a)
+			panic("main memory fifo display unsupported")
 		}
 
 		b := &ppu.EngineB
@@ -103,12 +102,7 @@ func (ppu *PPU) buildFrame(y uint32, singleThread bool) {
 			ppu.vramDisplay(y, a)
 
 		case 3:
-			panic("MAIN MEM FIFO")
-			if capture.ActiveCapture {
-				ppu.standard(y, a)
-				capture.CaptureLine(y, renderingB)
-			}
-			ppu.MemFifoDisplay(a)
+			panic("main memory fifo display unsupported")
 		}
 	}()
 

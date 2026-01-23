@@ -13,87 +13,31 @@ func inWindow(x, y, l, r, t, b uint32) bool {
 	return inRange(x, l, r) && inRange(y, t, b)
 }
 
-func WindowPixelAllowedScanline(idx, y uint32, wins *Windows) bool {
-
-	if !wins.Enabled {
-		return true
-	}
-
-	win := &wins.Win0
-	if win.Enabled && inRange(y, win.T, win.B) {
-		return win.InBg[idx]
-	}
-
-	win = &wins.Win1
-	if win.Enabled && inRange(y, win.T, win.B) {
-		return win.InBg[idx]
-	}
-
-	return wins.OutBg[idx]
+//go:inline
+func (wins *Windows) inWinBg(bgIdx, x, y uint32) bool {
+    win0 := &wins.Win0
+    win1 := &wins.Win1
+    if win0.Enabled && inWindow(x, y, win0.L, win0.R, win0.T, win0.B) {
+        return win0.InBg[bgIdx]
+    } else if win1.Enabled && inWindow(x, y, win1.L, win1.R, win1.T, win1.B) {
+        return win1.InBg[bgIdx]
+    } 
+    return wins.OutBg[bgIdx]
 }
 
-func WindowPixelAllowed(idx, x, y uint32, wins *Windows) bool {
-
-	if !wins.Enabled {
-		return true
-	}
-
-	win := &wins.Win0
-	//if win.Enabled && inWindow(x, y, win.L, win.R, win.T, win.B) {
-	if win.Enabled && inRange(x, win.L, win.R) {
-		return win.InBg[idx]
-	}
-
-	win = &wins.Win1
-	//if win.Enabled && inWindow(x, y, win.L, win.R, win.T, win.B) {
-	if win.Enabled && inRange(x, win.L, win.R) {
-		return win.InBg[idx]
-	}
-
-	return wins.OutBg[idx]
-}
-
-func WindowObjPixelAllowedScanline(y uint32, wins *Windows) bool {
-
-	if !wins.Enabled {
-		return true
-	}
+//go:inline
+func (wins *Windows) inWinObj(x, y uint32) bool {
 
 	if !wins.Win0.Enabled && !wins.Win1.Enabled {
 		return true
 	}
 
 	win := &wins.Win0
-	if win.Enabled && inRange(y, win.T, win.B) {
-		return win.InObj
-	}
-
-	win = &wins.Win1
-	if win.Enabled && inRange(y, win.T, win.B) {
-		return win.InObj
-	}
-
-	return wins.OutObj
-}
-
-func WindowObjPixelAllowedX(x, y uint32, wins *Windows) bool {
-
-	if !wins.Enabled {
-		return true
-	}
-
-	if !wins.Win0.Enabled && !wins.Win1.Enabled {
-		return true
-	}
-
-	win := &wins.Win0
-	//if win.Enabled && inRange(x, win.L, win.R) {
 	if win.Enabled && inWindow(x, y, win.L, win.R, win.T, win.B) {
 		return win.InObj
 	}
 
 	win = &wins.Win1
-	//if win.Enabled && inRange(x, win.L, win.R) {
 	if win.Enabled && inWindow(x, y, win.L, win.R, win.T, win.B) {
 		return win.InObj
 	}
@@ -101,11 +45,8 @@ func WindowObjPixelAllowedX(x, y uint32, wins *Windows) bool {
 	return wins.OutObj
 }
 
-func WindowBldPixelAllowed(x, y uint32, wins *Windows, inObjWindow bool) bool {
-
-	if !wins.Enabled {
-		return true
-	}
+//go:inline
+func (wins *Windows) inWinBld(x, y uint32, inObjWindow bool) bool {
 
 	if !wins.Win0.Enabled && !wins.Win1.Enabled && !wins.WinObj.Enabled {
 		return true

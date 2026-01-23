@@ -394,11 +394,6 @@ func (mem *Mem) Write8(addr uint32, v uint8, arm9 bool) {
 }
 func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
 
-	if arm9 && addr >= 0x0400_0068 && addr < 0x0400_006C {
-		mem.Ppu.DisplayFifo.FifoWrite(v)
-		return
-	}
-
 	if ptr, ok := mem.WritePtr(addr, arm9); ok {
 		binary.LittleEndian.PutUint16((*[4]uint8)(ptr)[:], v)
 		return
@@ -418,12 +413,6 @@ func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
 
 		if gxfifo := addr >= 0x400_0400 && addr < 0x4000440; gxfifo {
 			mem.Ppu.Rasterizer.GeoEngine.Fifo(v)
-			return
-		}
-
-		if addr >= 0x0400_0068 && addr < 0x0400_006C {
-			mem.Ppu.DisplayFifo.FifoWrite(uint16(v))
-			mem.Ppu.DisplayFifo.FifoWrite(uint16(v >> 16))
 			return
 		}
 	}
@@ -694,13 +683,9 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 	case 0x67:
 		mem.Ppu.Capture.Write(addr, v)
 	case 0x68:
-		panic("ADDR WRITE 0x68 FIFO")
 	case 0x69:
-		panic("ADDR WRITE 0x69 FIFO")
 	case 0x6A:
-		panic("ADDR WRITE 0x6A FIFO")
 	case 0x6B:
-		panic("ADDR WRITE 0x6B FIFO")
 
 	case 0x184:
 		mem.Ipc.WriteCnt(v, 0, true)
