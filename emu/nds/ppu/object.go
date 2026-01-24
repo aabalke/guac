@@ -1,35 +1,37 @@
 package ppu
 
+import "encoding/binary"
+
 func (e *Engine) getObjPriority(y uint32) {
 
-    priorities := &e.ObjPriorities
-    priorities[0].Cnt = 0
-    priorities[1].Cnt = 0
-    priorities[2].Cnt = 0
-    priorities[3].Cnt = 0
+	priorities := &e.ObjPriorities
+	priorities[0].Cnt = 0
+	priorities[1].Cnt = 0
+	priorities[2].Cnt = 0
+	priorities[3].Cnt = 0
 
 	for i := range uint32(128) {
 
 		obj := &e.Objects[i]
 
-        switch {
-        case !obj.RotScale && obj.Disable:
-            obj.MasterEnabled = false
+		switch {
+		case !obj.RotScale && obj.Disable:
+			obj.MasterEnabled = false
 			continue
-        case obj.RotScale && obj.RotParams >= 64:
-            obj.MasterEnabled = false
-			continue
-        }
-
-		if objNotScanline(obj, y) {
-            obj.MasterEnabled = false
+		case obj.RotScale && obj.RotParams >= 64:
+			obj.MasterEnabled = false
 			continue
 		}
 
-        obj.MasterEnabled = true
-        p := &priorities[obj.Priority]
-        p.Idx[p.Cnt] = i
-        p.Cnt++
+		if objNotScanline(obj, y) {
+			obj.MasterEnabled = false
+			continue
+		}
+
+		obj.MasterEnabled = true
+		p := &priorities[obj.Priority]
+		p.Idx[p.Cnt] = i
+		p.Cnt++
 	}
 }
 
@@ -149,7 +151,7 @@ func getBmpTileAddr(obj *Object, xIdx, yIdx uint32) uint32 {
 	return base + pixelOffset
 }
 
-func getObjPaletteData(e *Engine, pal256 bool, pal, palIdx, inTileX uint32) (uint32, bool) {
+func getObjPaletteData(e *Engine, pal256 bool, pal, palIdx, inTileX uint32) (uint16, bool) {
 
 	if pal256 {
 		palIdx &= 0xFF
@@ -162,25 +164,16 @@ func getObjPaletteData(e *Engine, pal256 bool, pal, palIdx, inTileX uint32) (uin
 	}
 
 	if e.Dispcnt.ObjExtPal && pal256 {
-
-        //16 colors x 16 palettes --> standard palette memory (=256 colors)
-        //256 colors x 16 palettes --> extended palette memory (=4096 colors)
-        // this can probably be replaced in the ppu.
-        // ex. vram.ExtABgSlot (unsafe) -> Background[bgIdx].BgSlot (*0x2000uint8)
-        // removes un necessary palette slot switches
-
-        addr := (pal << 9) + palIdx<<1
-        return uint32(b16(e.ExtObj[addr:])), true
+		addr := (pal << 9) + palIdx<<1
+		return binary.LittleEndian.Uint16(e.ExtObj[addr:]), true
 	}
 
-	// this is from gba, does not work with ext palettes, but assume it still
-	// is needed for std
 	if pal256 {
 		pal = 0
 	}
 
 	addr := (pal << 4) + palIdx
-    return uint32(e.Pram.Obj[addr]), true
+	return e.Pram.Obj[addr], true
 }
 
 func outObjectBound(obj *Object, xIdx, yIdx int) bool {
@@ -232,7 +225,7 @@ func outBoundAffine(obj *Object, x, y uint32) bool {
 		(xWrappedInBound || xUnwrappedInBound))
 }
 
-func (ppu *PPU) setObjTilePixel(e *Engine, obj *Object, x, y uint32) (uint32, bool) {
+func (ppu *PPU) setObjTilePixel(e *Engine, obj *Object, x, y uint32) (uint16, bool) {
 
 	xIdx, yIdx, ok := int(0), int(0), false
 	if obj.RotScale {
@@ -254,12 +247,12 @@ func (ppu *PPU) setObjTilePixel(e *Engine, obj *Object, x, y uint32) (uint32, bo
 		vramOffset = 0x60_0000
 	}
 
-	tileData := uint32(ppu.Vram.ReadGraphical(vramOffset+addr))
+	tileData := uint32(ppu.Vram.ReadGraphical(vramOffset + addr))
 
 	return getObjPaletteData(e, obj.Palette256, obj.Palette, tileData, inTileX)
 }
 
-func (ppu *PPU) setObjBmpPixel(e *Engine, obj *Object, x, y uint32) (uint32, bool) {
+func (ppu *PPU) setObjBmpPixel(e *Engine, obj *Object, x, y uint32) (uint16, bool) {
 
 	xIdx, yIdx, ok := int(0), int(0), false
 	if obj.RotScale {
@@ -279,7 +272,7 @@ func (ppu *PPU) setObjBmpPixel(e *Engine, obj *Object, x, y uint32) (uint32, boo
 		vramOffset = uint32(0x60_0000)
 	}
 
-	data := uint32(ppu.Vram.ReadGraphical(vramOffset+addr))
+	data := ppu.Vram.ReadGraphical(vramOffset + addr)
 
 	if alpha := (data & 0x8000) == 0; alpha {
 		return 0, false

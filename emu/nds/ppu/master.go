@@ -1,8 +1,10 @@
 package ppu
 
 type MasterBright struct {
-	Factor uint32
+	Factor uint16
 	Mode   uint8
+
+    LUT    [0x8000]uint32
 }
 
 const (
@@ -12,13 +14,20 @@ const (
 )
 
 func (m *MasterBright) Write(v, b uint8) {
+
+    oldFactor := m.Factor
+    oldMode := m.Mode
 	switch b {
 	case 0:
-		m.Factor = min(16, uint32(v)&0b11111)
+		m.Factor = uint16(min(16, v&0x1F))
 
 	case 1:
 		m.Mode = v >> 6
 	}
+
+    if m.Factor != oldFactor || m.Mode != oldMode {
+        m.RebuildLUT()
+    }
 }
 
 func (m *MasterBright) Read(b uint8) uint8 {
@@ -33,34 +42,35 @@ func (m *MasterBright) Read(b uint8) uint8 {
 	}
 }
 
-func (m *MasterBright) Apply(v uint32) (uint8, uint8, uint8) {
+func (m *MasterBright) RebuildLUT() {
+	for v := range 0x8000 {
 
-	//r = (r << 3) | (r >> 2)
-	//g = (g << 3) | (g >> 2)
-	//b = (b << 3) | (b >> 2)
+		r := uint32(v & 0x1F)
+		g := uint32((v >> 5) & 0x1F)
+		b := uint32((v >> 10) & 0x1F)
 
-	// takes in 15bit and returns 24bit
+		switch m.Mode {
+		case MB_UP:
+			r += (31 - r) * uint32(m.Factor) >> 4
+			g += (31 - g) * uint32(m.Factor) >> 4
+			b += (31 - b) * uint32(m.Factor) >> 4
 
-	r := ((v) & 0x1F)
-	g := ((v >> 5) & 0x1F)
-	b := ((v >> 10) & 0x1F)
+		case MB_DOWN:
+			r -= r * uint32(m.Factor) >> 4
+			g -= g * uint32(m.Factor) >> 4
+			b -= b * uint32(m.Factor) >> 4
+		}
 
-	switch m.Mode {
-	case MB_NONE:
-		return bit15tobit24lut[r], bit15tobit24lut[g], bit15tobit24lut[b]
+		R := bit15tobit24lut[r]
+		G := bit15tobit24lut[g]
+		B := bit15tobit24lut[b]
 
-	case MB_UP:
-		r += (31 - r) * m.Factor >> 4
-		g += (31 - g) * m.Factor >> 4
-		b += (31 - b) * m.Factor >> 4
-
-	case MB_DOWN:
-		r -= r * m.Factor >> 4
-		g -= g * m.Factor >> 4
-		b -= b * m.Factor >> 4
+		m.LUT[v] =
+			uint32(R) |
+			uint32(G)<<8 |
+			uint32(B)<<16 | 
+            0xFF00_0000
 	}
-
-	return bit15tobit24lut[r], bit15tobit24lut[g], bit15tobit24lut[b]
 }
 
 var bit15tobit24lut = [32]uint8{

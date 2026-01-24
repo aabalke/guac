@@ -71,6 +71,10 @@ type Engine struct {
 
     ObjPalettes [128][SCREEN_WIDTH]uint32
     ObjOks      [128][SCREEN_WIDTH]bool
+
+    BlendPalettes [SCREEN_WIDTH]BlendPalettes
+    
+    BlendedPalettes [SCREEN_WIDTH]uint16
 }
 
 type Dispcnt struct {
@@ -99,7 +103,7 @@ type Dispcnt struct {
 type Blend struct {
 	Mode          uint32
 	a, b          [6]bool
-	aEv, bEv, yEv uint32
+	aEv, bEv, yEv uint16
 }
 
 type Windows struct {
@@ -212,6 +216,9 @@ func NewPPU(irq *cpu.Irq) *PPU {
 
     p.EngineA.Backdrop = &p.EngineA.Pram.Bg[0]
     p.EngineB.Backdrop = &p.EngineB.Pram.Bg[0]
+
+    p.EngineA.MasterBright.RebuildLUT()
+    p.EngineB.MasterBright.RebuildLUT()
 
 	return p
 }
@@ -337,13 +344,13 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
 		e.Blend.b[5] = (v>>5)&1 != 0
 
 	case 0x52:
-		e.Blend.aEv = min(16, v&0x1F)
+		e.Blend.aEv = uint16(min(16, v&0x1F))
 
 	case 0x53:
-		e.Blend.bEv = min(16, v&0x1F)
+		e.Blend.bEv = uint16(min(16, v&0x1F))
 
 	case 0x54:
-		e.Blend.yEv = min(16, v&0x1F)
+		e.Blend.yEv = uint16(min(16, v&0x1F))
 	case 0x6C:
 		e.MasterBright.Write(uint8(v), 0)
 	case 0x6D:

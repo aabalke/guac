@@ -17,6 +17,8 @@ type VRAM struct {
 	H [0x0_8000]uint8
 	I [0x0_4000]uint8
 
+    VramBlocks [4]*[0x20000]uint8
+
 	CNT_A VramCnt
 	CNT_B VramCnt
 	CNT_C VramCnt
@@ -112,6 +114,12 @@ func (v *VRAM) Init(t *rast.TextureCache, a, b *Engine) {
 		bank unsafe.Pointer
 		cnt  *VramCnt
 	}{bank: unsafe.Pointer(&v.I), cnt: &v.CNT_I}
+
+
+    v.VramBlocks[0] = &v.A
+    v.VramBlocks[1] = &v.B
+    v.VramBlocks[2] = &v.C
+    v.VramBlocks[3] = &v.D
 }
 
 type VramCnt struct {
