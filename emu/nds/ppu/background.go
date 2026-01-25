@@ -40,7 +40,7 @@ func (e *Engine) getBgPriority(y uint32) {
 	}
 }
 
-func (ppu *PPU) threeScanline(e *Engine, bgIdx, y uint32) {
+func (ppu *PPU) threeScanline(e *Engine, bgIdx, priority, y uint32) {
 
     wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
@@ -52,8 +52,12 @@ func (ppu *PPU) threeScanline(e *Engine, bgIdx, y uint32) {
 	}
 
 	for x := range uint32(SCREEN_WIDTH) {
+
+        if covered := e.BgOks[x]; covered {
+            continue
+        }
+
         if wins.Enabled && !wins.inWinBg(bgIdx, x, y) {
-            e.BgOks[bgIdx][x] = false
             continue
         }
 
@@ -61,8 +65,6 @@ func (ppu *PPU) threeScanline(e *Engine, bgIdx, y uint32) {
 		i := (xIdx + (yIdx * SCREEN_WIDTH))
 
 		if xIdx >= SCREEN_WIDTH {
-			e.BgPalettes[bgIdx][x] = 0
-			e.BgOks[bgIdx][x] = false
 			continue
 		}
 
@@ -85,20 +87,20 @@ func (ppu *PPU) threeScanline(e *Engine, bgIdx, y uint32) {
 			g := float32((pal>>5)&0x1F) * alpha
 			b := float32((pal>>10)&0x1F) * alpha
 
-			pal &= 0x8000
 			pal |= uint16(r) & 0x1F
 			pal |= ((uint16(g) & 0x1F) << 5)
 			pal |= ((uint16(b) & 0x1F) << 10)
 		}
 
-		e.BgPalettes[bgIdx][x] = pal
-		e.BgOks[bgIdx][x] = alpha != 0
-		e.BgAlphas[bgIdx][x] = alpha
+		e.BgPals[x] = pal
+		e.BgOks[x] = alpha != 0
+		e.BgAlphas[x] = alpha
+        e.BgIdx[x] = bgIdx
 		continue
 	}
 }
 
-func (ppu *PPU) affineScanline(e *Engine, bgIdx, y uint32) {
+func (ppu *PPU) affineScanline(e *Engine, bgIdx, priority, y uint32) {
 
     wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
@@ -115,9 +117,12 @@ func (ppu *PPU) affineScanline(e *Engine, bgIdx, y uint32) {
     }
 
 	for x := range uint32(SCREEN_WIDTH) {
+        if covered := e.BgOks[x]; covered {
+            continue
+        }
+
 
         if wins.Enabled && !wins.inWinBg(bgIdx, x, y) {
-            e.BgOks[bgIdx][x] = false
             continue
         }
 
@@ -137,8 +142,6 @@ func (ppu *PPU) affineScanline(e *Engine, bgIdx, y uint32) {
 			xIdx &= int(bg.W) - 1
 			yIdx &= int(bg.H) - 1
 		case out:
-			e.BgPalettes[bgIdx][x] = 0
-			e.BgOks[bgIdx][x] = false
 			continue
 		}
 
@@ -166,27 +169,26 @@ func (ppu *PPU) affineScanline(e *Engine, bgIdx, y uint32) {
         )
 
 		if palIdx == 0 {
-			e.BgPalettes[bgIdx][x] = 0
-			e.BgOks[bgIdx][x] = false
 			continue
 		}
+
+        e.BgOks[x] = true
+        e.BgIdx[x] = bgIdx
 
 		if e.Dispcnt.BgExtPal {
 			if e.Backgrounds[bgIdx].AltExtPalSlot {
 				bgIdx += 2
 			}
 
-			e.BgPalettes[bgIdx][x] = binary.LittleEndian.Uint16(e.ExtBgSlots[bgIdx][palIdx<<1:])
-			e.BgOks[bgIdx][x] = true
+			e.BgPals[x] = binary.LittleEndian.Uint16(e.ExtBgSlots[bgIdx][palIdx<<1:])
 			continue
 		}
 
-		e.BgPalettes[bgIdx][x] = e.Pram.Bg[palIdx]
-		e.BgOks[bgIdx][x] = true
+		e.BgPals[x] = e.Pram.Bg[palIdx]
 	}
 }
 
-func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, y uint32) {
+func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, priority, y uint32) {
 
     wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
@@ -200,8 +202,11 @@ func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, y uint32) {
 	pc := float64(utils.Convert16ToFloat(uint16(bg.Pc), 8))
 
 	for x := range uint32(SCREEN_WIDTH) {
+        if covered := e.BgOks[x]; covered {
+            continue
+        }
+
         if wins.Enabled && !wins.inWinBg(bgIdx, x, y) {
-            e.BgOks[bgIdx][x] = false
             continue
         }
 
@@ -223,8 +228,6 @@ func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, y uint32) {
 			xIdx &= int(bg.W) - 1
 			yIdx &= int(bg.H) - 1
 		case !bg.AffineWrap && out:
-			e.BgPalettes[bgIdx][x] = 0
-			e.BgOks[bgIdx][x] = false
 			continue
 		}
 
@@ -269,10 +272,11 @@ func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, y uint32) {
 		palIdx &= 0xFF
 
 		if palIdx == 0 {
-			e.BgPalettes[bgIdx][x] = 0
-			e.BgOks[bgIdx][x] = false
 			continue
 		}
+
+        e.BgOks[x] = true
+        e.BgIdx[x] = bgIdx
 
 		if e.Dispcnt.BgExtPal {
 			if e.Backgrounds[bgIdx].AltExtPalSlot {
@@ -281,17 +285,15 @@ func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, y uint32) {
 
 			addr := (palNum << 9) + palIdx<<1
 
-			e.BgPalettes[bgIdx][x] = binary.LittleEndian.Uint16(e.ExtBgSlots[bgIdx][addr:])
-			e.BgOks[bgIdx][x] = true
+			e.BgPals[x] = binary.LittleEndian.Uint16(e.ExtBgSlots[bgIdx][addr:])
 			continue
 		}
 
-		e.BgPalettes[bgIdx][x] = e.Pram.Bg[palIdx]
-		e.BgOks[bgIdx][x] = true
+		e.BgPals[x] = e.Pram.Bg[palIdx]
 	}
 }
 
-func (ppu *PPU) directBmpScanline(e *Engine, bgIdx, y uint32) {
+func (ppu *PPU) directBmpScanline(e *Engine, bgIdx, priority, y uint32) {
 
     wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
@@ -307,8 +309,11 @@ func (ppu *PPU) directBmpScanline(e *Engine, bgIdx, y uint32) {
 	pc := float64(utils.Convert16ToFloat(uint16(bg.Pc), 8))
 
 	for x := range uint32(SCREEN_WIDTH) {
+        if covered := e.BgOks[x]; covered {
+            continue
+        }
+
         if wins.Enabled && !wins.inWinBg(bgIdx, x, y) {
-            e.BgOks[bgIdx][x] = false
             continue
         }
 
@@ -330,8 +335,6 @@ func (ppu *PPU) directBmpScanline(e *Engine, bgIdx, y uint32) {
 			xIdx &= int(bg.W) - 1
 			yIdx &= int(bg.H) - 1
 		case !bg.AffineWrap && out:
-			e.BgPalettes[bgIdx][x] = 0
-			e.BgOks[bgIdx][x] = false
 			continue
 		}
 
@@ -346,17 +349,16 @@ func (ppu *PPU) directBmpScanline(e *Engine, bgIdx, y uint32) {
 
 		// required sonic dark brotherhood
 		if transparent := (data & 0x8000) == 0; transparent {
-			e.BgPalettes[bgIdx][x] = 0
-			e.BgOks[bgIdx][x] = false
 			continue
 		}
 
-		e.BgPalettes[bgIdx][x] = data
-		e.BgOks[bgIdx][x] = true
+		e.BgPals[x] = data &^ 0x8000
+		e.BgOks[x] = true
+        e.BgIdx[x] = bgIdx
 	}
 }
 
-func (ppu *PPU) bmpScanline(e *Engine, bgIdx, y uint32) {
+func (ppu *PPU) bmpScanline(e *Engine, bgIdx, priority, y uint32) {
 
     wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
@@ -372,8 +374,11 @@ func (ppu *PPU) bmpScanline(e *Engine, bgIdx, y uint32) {
 	pc := float64(utils.Convert16ToFloat(uint16(bg.Pc), 8))
 
 	for x := range uint32(SCREEN_WIDTH) {
+        if covered := e.BgOks[x]; covered {
+            continue
+        }
+
         if wins.Enabled && !wins.inWinBg(bgIdx, x, y) {
-            e.BgOks[bgIdx][x] = false
             continue
         }
 
@@ -395,8 +400,6 @@ func (ppu *PPU) bmpScanline(e *Engine, bgIdx, y uint32) {
 			xIdx &= int(bg.W) - 1
 			yIdx &= int(bg.H) - 1
 		case !bg.AffineWrap && out:
-			e.BgPalettes[bgIdx][x] = 0
-			e.BgOks[bgIdx][x] = false
 			continue
 		}
 
@@ -410,23 +413,22 @@ func (ppu *PPU) bmpScanline(e *Engine, bgIdx, y uint32) {
 		}
 
 		if palIdx == 0 {
-			e.BgPalettes[bgIdx][x] = 0
-			e.BgOks[bgIdx][x] = false
 			continue
 		}
+
+        e.BgOks[x] = true
+        e.BgIdx[x] = bgIdx
 
 		if e.IsB {
-			e.BgPalettes[bgIdx][x] = ppu.EngineB.Pram.Bg[palIdx]
-			e.BgOks[bgIdx][x] = true
+			e.BgPals[x] = ppu.EngineB.Pram.Bg[palIdx]
 			continue
 		}
 
-		e.BgPalettes[bgIdx][x] = ppu.EngineA.Pram.Bg[palIdx]
-		e.BgOks[bgIdx][x] = true
+		e.BgPals[x] = ppu.EngineA.Pram.Bg[palIdx]
 	}
 }
 
-func (ppu *PPU) tiledScanline(e *Engine, bgIdx, y uint32) {
+func (ppu *PPU) tiledScanline(e *Engine, bgIdx, priority, y uint32) {
 
 	const (
 		TILE_SIZE     = 8
@@ -504,8 +506,12 @@ func (ppu *PPU) tiledScanline(e *Engine, bgIdx, y uint32) {
 
 		for px := pxStart; px < 8 && screenX < SCREEN_WIDTH; px++ {
 
+            if e.BgOks[screenX] {
+				screenX++
+                continue
+            }
+
             if wins.Enabled && !wins.inWinBg(bgIdx, screenX, y) {
-				e.BgOks[bgIdx][screenX] = false
 				screenX++
                 continue
             }
@@ -536,7 +542,6 @@ func (ppu *PPU) tiledScanline(e *Engine, bgIdx, y uint32) {
 			}
 
 			if palIdx == 0 {
-				e.BgOks[bgIdx][screenX] = false
 				screenX++
 				continue
 			}
@@ -547,16 +552,17 @@ func (ppu *PPU) tiledScanline(e *Engine, bgIdx, y uint32) {
 					slot += 2
 				}
 				addr := (palNum << 9) + (palIdx << 1)
-				e.BgPalettes[bgIdx][screenX] = binary.LittleEndian.Uint16(e.ExtBgSlots[slot][addr:])
+				e.BgPals[screenX] = binary.LittleEndian.Uint16(e.ExtBgSlots[slot][addr:])
 			} else {
 				if bg.Palette256 {
 					palNum = 0
 				}
 				addr := (palNum << 4) + palIdx
-				e.BgPalettes[bgIdx][screenX] = e.Pram.Bg[addr]
+				e.BgPals[screenX] = e.Pram.Bg[addr]
 			}
 
-			e.BgOks[bgIdx][screenX] = true
+			e.BgOks[screenX] = true
+			e.BgIdx[screenX] = bgIdx
 			screenX++
 		}
 	}

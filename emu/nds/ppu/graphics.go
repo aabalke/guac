@@ -67,128 +67,107 @@ func (ppu *PPU) vramDisplay(y uint32, e *Engine) {
 
     addr := (y * SCREEN_WIDTH) * 2
     for x := range uint32(SCREEN_WIDTH) {
-        e.BlendedPalettes[x] = binary.LittleEndian.Uint16(bank[addr:])
+        e.Blend.Blended[x] = binary.LittleEndian.Uint16(bank[addr:])
         addr += 2
 	}
 
     p32 := (*[SCREEN_WIDTH]uint32)(unsafe.Pointer(&e.Pixels[(y*SCREEN_WIDTH)*4]))
     for x := range uint32(SCREEN_WIDTH) {
-        p32[x] = e.MasterBright.LUT[e.BlendedPalettes[x]]
+        p32[x] = e.MasterBright.LUT[e.Blend.Blended[x]]
     }
 }
 
 func (ppu *PPU) standard(y uint32, e *Engine) {
 
-	bld := &e.Blend
+    ResetBlendPalettes(e)
+    for x := range uint32(SCREEN_WIDTH) {
+        e.Windows.inObjWindow[x] = false
+    }
 
-    for i := range uint32(4) {
+    for priority := 3; priority >= 0; priority-- {
 
-        if !e.Backgrounds[i].MasterEnabled {
+        for x := range uint32(SCREEN_WIDTH) {
+            e.BgOks[x] = false
+            e.ObjOk[x] = false
+        }
+
+        bgPriority := &e.BgPriorities[priority]
+
+        for j := bgPriority.Cnt - 1; j >= 0; j-- {
+            bgIdx := bgPriority.Idx[j]
+
+            if !e.Backgrounds[bgIdx].MasterEnabled {
+                continue
+            }
+
+            switch e.Backgrounds[bgIdx].Type {
+            case BG_TYPE_DIR:
+                ppu.directBmpScanline(e, bgIdx, uint32(priority), y)
+            case BG_TYPE_TEX:
+                ppu.tiledScanline(e, bgIdx, uint32(priority), y)
+            case BG_TYPE_256:
+                ppu.bmpScanline(e, bgIdx, uint32(priority), y)
+            case BG_TYPE_BGM, BG_TYPE_LAR:
+                ppu.affine16Scanline(e, bgIdx, uint32(priority), y)
+            case BG_TYPE_3D:
+                ppu.threeScanline(e, bgIdx, uint32(priority), y)
+            case BG_TYPE_AFF:
+                ppu.affineScanline(e, bgIdx, uint32(priority), y)
+            }
+        }
+
+        e.SetBgPals(uint32(priority))
+
+        if !e.Dispcnt.DisplayObj {
             continue
         }
 
-        switch e.Backgrounds[i].Type {
-        case BG_TYPE_DIR:
-            ppu.directBmpScanline(e, i, y)
-        case BG_TYPE_TEX:
-            ppu.tiledScanline(e, i, y)
-        case BG_TYPE_256:
-            ppu.bmpScanline(e, i, y)
-        case BG_TYPE_BGM:
-            ppu.affine16Scanline(e, i, y)
-        case BG_TYPE_3D:
-            ppu.threeScanline(e, i, y)
-        case BG_TYPE_AFF:
-            ppu.affineScanline(e, i, y)
+        objPriority := &e.ObjPriorities[priority]
+
+        for j := range uint32(objPriority.Cnt) {
+
+            i := objPriority.Idx[j]
+            obj := &e.Objects[i]
+
+            if !obj.MasterEnabled {
+                continue
+            }
+
+            if bmp := obj.Mode == 3; bmp {
+                if obj.RotScale {
+                    ppu.bitmapObjectAffine(e, i, uint32(priority), y)
+                } else {
+                    ppu.bitmapObject(e, i, uint32(priority), y)
+                }
+            } else {
+
+                if obj.RotScale {
+                    ppu.tiledObjectAffine(e, i, uint32(priority), y)
+                } else {
+                    ppu.tiledObject(e, i, uint32(priority), y)
+                }
+            }
         }
+
+        if wins := &e.Windows; wins.Enabled {
+            for x := range uint32(SCREEN_WIDTH) {
+                if e.ObjOk[x] {
+                    wins.inObjWindow[x] = e.ObjMode[x] == 2
+                }
+            }
+        }
+
+        e.SetObjPals(uint32(priority))
     }
 
-    ResetBlendPalettes(e)
-    Render(ppu, e, y)
-    BlendAll(bld, &e.BlendPalettes, &e.BlendedPalettes)
+    BlendAll(&e.Blend, &e.Windows, y)
+
+    for x := range uint32(SCREEN_WIDTH) {
+        e.Blend.Blended[x] &^= 0x8000
+    }
 
     p32 := (*[SCREEN_WIDTH]uint32)(unsafe.Pointer(&e.Pixels[(y*SCREEN_WIDTH)*4]))
     for x := range uint32(SCREEN_WIDTH) {
-        p32[x] = e.MasterBright.LUT[e.BlendedPalettes[x]]
-    }
-}
-
-func Render(ppu *PPU, e *Engine, y uint32) {
-
-    var (
-        dispcnt = &e.Dispcnt
-        wins    = &e.Windows
-        bld     = &e.Blend
-    )
-
-    for x := range uint32(SCREEN_WIDTH) {
-        bldPal := &e.BlendPalettes[x]
-        inObjWindow := false
-
-        for priority := 3; priority >= 0; priority-- {
-
-            bgPriority := &e.BgPriorities[priority]
-            for j := bgPriority.Cnt - 1; j >= 0; j-- {
-
-                bgIdx := bgPriority.Idx[j]
-
-                if !e.BgOks[bgIdx][x] {
-                    continue
-                }
-
-                if e.Backgrounds[bgIdx].Type == BG_TYPE_3D {
-                    bldPal.SetBgPalettes3d(e.BgPalettes[bgIdx][x], e.BgAlphas[bgIdx][x], bld)
-                    continue
-                }
-
-                bldPal.SetBgPalettes(e.BgPalettes[bgIdx][x], bgIdx, bld)
-            }
-
-            if !dispcnt.DisplayObj {
-                continue
-            }
-
-            if wins.Enabled && !wins.inWinObj(x, y) {
-                continue
-            }
-
-            objPriority := &e.ObjPriorities[priority]
-
-            ObjectLoop:
-            for j := range objPriority.Cnt {
-
-                objIdx := objPriority.Idx[j]
-                obj := &e.Objects[objIdx]
-
-                if bmp := obj.Mode == 3; bmp {
-                    obj.OneDimensional = dispcnt.BitmapObj1D
-                    palData, ok := ppu.setObjBmpPixel(e, obj, x, y)
-                    if !ok {
-                        continue
-                    }
-                    bldPal.SetObjPalettes(palData, false, bld)
-                    break ObjectLoop
-                }
-
-                obj.OneDimensional = dispcnt.TileObj1D
-                palData, ok := ppu.setObjTilePixel(e, obj, x, y)
-                if !ok {
-                    continue
-                }
-
-                if obj.Mode == 2 {
-                    inObjWindow = true
-                    break ObjectLoop
-                }
-
-                isSemiTransparent := obj.Mode == 1
-                e.BlendPalettes[x].objTransparent = isSemiTransparent
-                bldPal.SetObjPalettes(palData, isSemiTransparent, bld)
-                break ObjectLoop
-            }
-        }
-
-        winBlend := wins.Enabled && !wins.inWinBld(x, y, inObjWindow)
-        e.BlendPalettes[x].winBlend = winBlend
+        p32[x] = e.MasterBright.LUT[e.Blend.Blended[x]]
     }
 }

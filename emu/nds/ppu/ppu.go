@@ -65,16 +65,20 @@ type Engine struct {
     ExtBgSlots [4]*[0x2000]uint8
     ExtObj     *[0x4000]uint8
 
-    BgPalettes [4][SCREEN_WIDTH]uint16
-    BgOks      [4][SCREEN_WIDTH]bool
-    BgAlphas   [4][SCREEN_WIDTH]float32
+    // these values are used per priority (each priority renders and sets
+    // blend before moving to the next ones)
+    BgPals   [SCREEN_WIDTH]uint16
+    BgOks    [SCREEN_WIDTH]bool
+    BgAlphas [SCREEN_WIDTH]float32
+    BgIdx    [SCREEN_WIDTH]uint32
 
-    ObjPalettes [128][SCREEN_WIDTH]uint32
-    ObjOks      [128][SCREEN_WIDTH]bool
+    ObjPals  [SCREEN_WIDTH]uint16
+    ObjOk    [SCREEN_WIDTH]bool
+    ObjMode  [SCREEN_WIDTH]uint32
 
-    BlendPalettes [SCREEN_WIDTH]BlendPalettes
+    //BlendPalettes [SCREEN_WIDTH]BlendPalettes
     
-    BlendedPalettes [SCREEN_WIDTH]uint16
+    //BlendedPalettes [SCREEN_WIDTH]uint16
 }
 
 type Dispcnt struct {
@@ -99,18 +103,14 @@ type Dispcnt struct {
 	ObjExtPal          bool
 }
 
-// blends are [6]... because Bg0, Bg1, Bg2, Bg3, Obj, Bd
-type Blend struct {
-	Mode          uint32
-	a, b          [6]bool
-	aEv, bEv, yEv uint16
-}
 
 type Windows struct {
 	Enabled            bool
 	Win0, Win1, WinObj Window
 	OutBg              [4]bool
 	OutObj, OutBld     bool
+
+    inObjWindow [SCREEN_WIDTH] bool
 }
 
 type Window struct {
@@ -181,7 +181,6 @@ type Object struct {
 	CharName       uint32
 	Priority       uint32
 	Palette        uint32
-	OneDimensional bool
 
 	ObjTileMapping uint8
 	ObjBmpMapping  uint8

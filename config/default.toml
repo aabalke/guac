@@ -167,9 +167,12 @@ loop_cnt = 255
 # cnt of jit blocks in cache (per cpu)
 block_cnt = 0x1000
 
+page_shift = 16
+
 # how many instructions to batch at a time (use 16, or 32 for best results)
 # to many will cause crashes and artificants by desyncing cpus from sound and graphics
 batch_inst = 32
+
 
 # todo
 # page_size (pageshift / pagemask)

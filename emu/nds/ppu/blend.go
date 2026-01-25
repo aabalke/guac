@@ -1,212 +1,233 @@
 package ppu
 
 const (
-	BLD_MODE_OFF   = 0
-	BLD_MODE_STD   = 1
-	BLD_MODE_WHITE = 2
-	BLD_MODE_BLACK = 3
+	BLD_NONE  = 0
+	BLD_ALPHA = 1
+	BLD_WHITE = 2
+	BLD_BLACK = 3
+    BLD_ALPHA_3D = 4
 )
 
-type BlendType uint16
+// blends are [6]... because Bg0, Bg1, Bg2, Bg3, Obj, Bd
+type Blend struct {
+	Mode          uint32
+	a, b          [6]bool
+	aEv, bEv, yEv uint16
 
-const (
-	BLEND_NONE BlendType = iota
-	BLEND_ALPHA
-	BLEND_ALPHA_3D
-	BLEND_WHITE
-	BLEND_BLACK
-)
+	Blended [SCREEN_WIDTH]uint16
 
-type BlendPalettes struct {
-	NoBlendPalette, APalette, BPalette uint16
-	hasA, hasB, targetATop             bool
+	NoBlendPals [SCREEN_WIDTH]uint16
+	APals       [SCREEN_WIDTH]uint16
+	BPals       [SCREEN_WIDTH]uint16
+	alphas      [SCREEN_WIDTH]uint16
 
-	targetA3d bool
-	alpha     uint16
+	hasA           [SCREEN_WIDTH]bool
+	hasB           [SCREEN_WIDTH]bool
+	targetATop     [SCREEN_WIDTH]bool
+	targetA3d      [SCREEN_WIDTH]bool
+	objTransparent [SCREEN_WIDTH]bool
 
-    winBlend, objTransparent bool
+	outWindow [SCREEN_WIDTH]bool
+    modes [SCREEN_WIDTH]uint32
 }
 
-func (bp *BlendPalettes) SetBgPalettes3d(palData uint16, alpha float32, bld *Blend) {
+// occurs per priority
+func (e *Engine) SetBgPals(priority uint32) {
 
-	bp.NoBlendPalette = palData
+	bld := &e.Blend
 
-	if bld.a[0] {
-		bp.APalette = palData
-		bp.hasA = true
-		bp.targetATop = true
-        bp.targetA3d = true
-        bp.alpha = min(16, uint16(alpha*16))
-		return
-	}
+	for x := range uint32(SCREEN_WIDTH) {
 
-	bp.targetATop = false
+		if !e.BgOks[x] {
+			continue
+		}
 
-	// not sure if this is required or correct
-	bp.targetA3d = false
+		pal := e.BgPals[x]
+		bgIdx := e.BgIdx[x]
 
-	if bld.b[0] {
-		bp.BPalette = palData
-		bp.hasB = true
-	}
-}
+		bld.NoBlendPals[x] = pal
+		bld.targetATop[x] = bld.a[bgIdx]
+		bld.targetA3d[x] = e.Dispcnt.Is3D && bgIdx == 0
 
-func (bp *BlendPalettes) SetBgPalettes(palData uint16, bgIdx uint32, bld *Blend) {
+		if bld.a[bgIdx] {
+			bld.APals[x] = pal
+			bld.hasA[x] = true
+			if bld.targetA3d[x] {
+				bld.alphas[x] = min(16, uint16(e.BgAlphas[x]*16))
+			}
+			continue
+		}
 
-	bp.NoBlendPalette = palData
-
-	if bld.a[bgIdx] {
-		bp.APalette = palData
-		bp.hasA = true
-		bp.targetATop = true
-		bp.targetA3d = false
-		return
-	}
-
-	bp.targetATop = false
-
-	// not sure if this is required or correct
-	bp.targetA3d = false
-
-	if bld.b[bgIdx] {
-		bp.BPalette = palData
-		bp.hasB = true
+		if bld.b[bgIdx] {
+			bld.BPals[x] = pal
+			bld.hasB[x] = true
+		}
 	}
 }
 
-func (bp *BlendPalettes) SetObjPalettes(palData uint16, semiTransparent bool, bld *Blend) {
+// occurs per priority
+func (e *Engine) SetObjPals(priority uint32) {
 
-	bp.NoBlendPalette = palData
+	bld := &e.Blend
 
-	if bld.a[4] || semiTransparent {
-		bp.APalette = palData
-		bp.hasA = true
-		bp.targetATop = true
-		return
+	for x := range uint32(SCREEN_WIDTH) {
+
+		if !e.ObjOk[x] {
+			continue
+		}
+
+		pal := e.ObjPals[x]
+		mode := e.ObjMode[x]
+
+		bld.NoBlendPals[x] = pal
+		bld.objTransparent[x] = mode == 1
+		bld.targetATop[x] = bld.a[4] || bld.objTransparent[x]
+
+		if bld.a[4] || bld.objTransparent[x] {
+			bld.APals[x] = pal
+			bld.hasA[x] = true
+			continue
+		}
+
+		if bld.b[4] {
+			bld.BPals[x] = pal
+			bld.hasB[x] = true
+		}
 	}
-
-	bp.targetATop = false
-	if bld.b[4] {
-		bp.BPalette = palData
-		bp.hasB = true
-	}
-
 }
 
+// occurs per scanline
 func ResetBlendPalettes(e *Engine) {
 
-    bld := &e.Blend
+	bld := &e.Blend
 
-    backdrop := *e.Backdrop
+	backdrop := *e.Backdrop &^ 0x8000
 
-	bp := BlendPalettes{}
+	bld.APals = [SCREEN_WIDTH]uint16{}
+	bld.BPals = [SCREEN_WIDTH]uint16{}
+	bld.alphas = [SCREEN_WIDTH]uint16{}
+	bld.targetA3d = [SCREEN_WIDTH]bool{}
+	bld.objTransparent = [SCREEN_WIDTH]bool{}
+	bld.outWindow = [SCREEN_WIDTH]bool{}
 
-	bp.NoBlendPalette = backdrop
+	for x := range uint32(SCREEN_WIDTH) {
+		bld.NoBlendPals[x] = backdrop
+		bld.hasA[x] = bld.a[5]
+		bld.targetATop[x] = bld.a[5]
+		bld.hasB[x] = bld.b[5]
+	}
 
 	if bld.a[5] {
-		bp.APalette = backdrop
-		bp.hasA = true
-		bp.targetATop = true
+		copy(bld.APals[:], bld.NoBlendPals[:])
 	}
 
 	if bld.b[5] {
-		bp.BPalette = backdrop
-		bp.hasB = true
+		copy(bld.BPals[:], bld.NoBlendPals[:])
+	}
+}
+
+// occurs per scanline
+func BlendAll(bld *Blend, wins *Windows, y uint32) {
+
+	if wins.Enabled {
+		for x := range uint32(SCREEN_WIDTH) {
+			bld.outWindow[x] = !wins.inWinBld(x, y)
+		}
 	}
 
     for x := range uint32(SCREEN_WIDTH) {
-        e.BlendPalettes[x] = bp
-    }
-}
 
-func BlendAll(bld *Blend, bps *[SCREEN_WIDTH]BlendPalettes, blended *[SCREEN_WIDTH]uint16) {
-
-    for x := range uint32(SCREEN_WIDTH) {
-		blended[x] = bps[x].Blend(bld)
-    }
-}
-
-func (bp *BlendPalettes) Blend(bld *Blend) uint16 {
-
-	if bp.winBlend {
-		return bp.noBlend(bld)
-	}
-
-	switch bld.Mode {
-	case BLD_MODE_OFF:
-		return bp.noBlend(bld)
-	case BLD_MODE_STD:
-		return bp.alphaBlend(bld)
-	case BLD_MODE_WHITE:
-		return bp.grayscaleBlend(true, bld)
-	case BLD_MODE_BLACK:
-		return bp.grayscaleBlend(false, bld)
-	default:
-		return bp.noBlend(bld)
-	}
-}
-
-func (bp *BlendPalettes) noBlend(bld *Blend) uint16 {
-	if bp.objTransparent {
-		return bp.alphaBlend(bld)
-	}
-
-	return bp.NoBlendPalette
-}
-
-func (bp *BlendPalettes) alphaBlend(bld *Blend) uint16 {
-
-	if !bp.hasA || !bp.hasB || !bp.targetATop || bp.alpha >= 1 {
-		return bp.NoBlendPalette
-	}
-
-	rA := (bp.APalette) & 0x1F
-	gA := (bp.APalette >> 5) & 0x1F
-	bA := (bp.APalette >> 10) & 0x1F
-	rB := (bp.BPalette) & 0x1F
-	gB := (bp.BPalette >> 5) & 0x1F
-	bB := (bp.BPalette >> 10) & 0x1F
-
-	blend := func(a, b uint16) uint16 {
-
-		if bp.targetA3d {
-			panic("untested 3d target blend sisd")
-			return max(0, min(31, (a*bp.alpha+b*(1-bp.alpha))>>4))
+		bld.modes[x] = bld.Mode
+		if bld.outWindow[x] {
+			bld.modes[x] = BLD_ALPHA
 		}
 
-		return min(31, (a*bld.aEv+b*bld.bEv)>>4)
-	}
-	r := blend(rA, rB)
-	g := blend(gA, gB)
-	b := blend(bA, bB)
+		activeA :=
+			bld.hasA[x] &&
+			bld.targetATop[x] &&
+			bld.alphas[x] < 1
 
-	return r | (g << 5) | (b << 10)
-}
+		allowWin :=
+			!bld.outWindow[x] ||
+			(bld.hasB[x] && bld.objTransparent[x])
 
-func (bp *BlendPalettes) grayscaleBlend(white bool, bld *Blend) uint16 {
+		requireB :=
+			bld.modes[x] == BLD_ALPHA ||
+			(bld.modes[x] == BLD_NONE && bld.objTransparent[x])
 
-	if !bp.hasA || !bp.targetATop {
-		return bp.NoBlendPalette
-	}
+		if noBlending :=
+			!activeA ||
+			!allowWin ||
+			(requireB && !bld.hasB[x]); noBlending {
 
-	rA := (bp.APalette) & 0x1F
-	gA := (bp.APalette >> 5) & 0x1F
-	bA := (bp.APalette >> 10) & 0x1F
+            bld.modes[x] = BLD_NONE
+        }
 
-	blend := func(v uint16) uint16 {
+        if bld.modes[x] == BLD_ALPHA && bld.targetA3d[x] {
+            bld.modes[x] = BLD_ALPHA_3D
+        }
+    }
 
-		if white {
-			v += ((31 - v) * bld.yEv) >> 4
-		} else {
-			v -= (v * bld.yEv) >> 4
+	for x := range uint32(SCREEN_WIDTH) {
+		switch bld.modes[x] {
+        case BLD_NONE:
+			bld.Blended[x] = bld.NoBlendPals[x]
+		case BLD_ALPHA:
+
+            r := (bld.APals[x]) & 0x1F
+            g := (bld.APals[x] >> 5) & 0x1F
+            b := (bld.APals[x] >> 10) & 0x1F
+            rB := (bld.BPals[x]) & 0x1F
+            gB := (bld.BPals[x] >> 5) & 0x1F
+            bB := (bld.BPals[x] >> 10) & 0x1F
+
+            r = min(31, (r*bld.aEv+rB*bld.bEv)>>4)
+            g = min(31, (g*bld.aEv+gB*bld.bEv)>>4)
+            b = min(31, (b*bld.aEv+bB*bld.bEv)>>4)
+
+            bld.Blended[x] = r | (g << 5) | (b << 10)
+
+		case BLD_WHITE:
+
+            r := (bld.APals[x]) & 0x1F
+            g := (bld.APals[x] >> 5) & 0x1F
+            b := (bld.APals[x] >> 10) & 0x1F
+
+            r = min(31, r + ((31 - r) * bld.yEv) >> 4)
+            g = min(31, g + ((31 - g) * bld.yEv) >> 4)
+            b = min(31, b + ((31 - b) * bld.yEv) >> 4)
+
+            bld.Blended[x] = r | (g << 5) | (b << 10)
+
+		case BLD_BLACK:
+
+            r := (bld.APals[x]) & 0x1F
+            g := (bld.APals[x] >> 5) & 0x1F
+            b := (bld.APals[x] >> 10) & 0x1F
+
+            r = min(31, r - (r * bld.yEv) >> 4)
+            g = min(31, g - (g * bld.yEv) >> 4)
+            b = min(31, b - (b * bld.yEv) >> 4)
+
+            bld.Blended[x] = r | (g << 5) | (b << 10)
+
+        case BLD_ALPHA_3D:
+
+            panic("untested 3d target blend sisd")
+            //return max(0, min(31, (a*bld.alpha+b*(1-bp.alpha))>>4))
+
+            r := (bld.APals[x]) & 0x1F
+            g := (bld.APals[x] >> 5) & 0x1F
+            b := (bld.APals[x] >> 10) & 0x1F
+            rB := (bld.BPals[x]) & 0x1F
+            gB := (bld.BPals[x] >> 5) & 0x1F
+            bB := (bld.BPals[x] >> 10) & 0x1F
+
+            r = min(31, (r*bld.aEv+rB*bld.bEv)>>4)
+            g = min(31, (g*bld.aEv+gB*bld.bEv)>>4)
+            b = min(31, (b*bld.aEv+bB*bld.bEv)>>4)
+
+            bld.Blended[x] = r | (g << 5) | (b << 10)
 		}
-
-		return uint16(min(31, v))
 	}
-
-	r := blend(rA)
-	g := blend(gA)
-	b := blend(bA)
-
-	return r | (g << 5) | (b << 10)
 }

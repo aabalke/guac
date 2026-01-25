@@ -46,7 +46,7 @@ func (wins *Windows) inWinObj(x, y uint32) bool {
 }
 
 //go:inline
-func (wins *Windows) inWinBld(x, y uint32, inObjWindow bool) bool {
+func (wins *Windows) inWinBld(x, y uint32) bool {
 
 	if !wins.Win0.Enabled && !wins.Win1.Enabled && !wins.WinObj.Enabled {
 		return true
@@ -62,7 +62,7 @@ func (wins *Windows) inWinBld(x, y uint32, inObjWindow bool) bool {
 		return win.InBld
 	}
 
-	if wins.WinObj.Enabled && inObjWindow {
+	if wins.WinObj.Enabled && wins.inObjWindow[x] {
 		return wins.WinObj.InBld
 	}
 
