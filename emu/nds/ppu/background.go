@@ -445,13 +445,13 @@ func (ppu *PPU) tiledScanline(e *Engine, bgIdx, priority, y uint32) {
 		bgY -= bgY % (e.Mosaic.BgV + 1)
 	}
 
-	mapRowShift := uint32(10) //32 * 32
+	mapRowShift := uint32(10) // 32x32
 	if bg.Size == 3 {
 		mapRowShift = 11 // 64x64
 	}
 
 	var (
-		mapRowOffset = ((bgY >> 8) << mapRowShift) + ((bgY & TILE_ROW_MASK) << 2)
+		mapRowOffset = ((bgY>>8)<<mapRowShift) + ((bgY&TILE_ROW_MASK)<<2)
 		tileBase     = bg.CharBaseBlock
 		mapBase      = bg.ScreenBaseBlock
 	)
@@ -546,24 +546,29 @@ func (ppu *PPU) tiledScanline(e *Engine, bgIdx, priority, y uint32) {
 				continue
 			}
 
+			e.BgOks[screenX] = true
+			e.BgIdx[screenX] = bgIdx
+
 			if e.Dispcnt.BgExtPal && bg.Palette256 {
 				slot := bgIdx
 				if bg.AltExtPalSlot {
 					slot += 2
 				}
 				addr := (palNum << 9) + (palIdx << 1)
-				e.BgPals[screenX] = binary.LittleEndian.Uint16(e.ExtBgSlots[slot][addr:])
-			} else {
-				if bg.Palette256 {
-					palNum = 0
-				}
-				addr := (palNum << 4) + palIdx
-				e.BgPals[screenX] = e.Pram.Bg[addr]
-			}
+                e.BgPals[screenX] = *(*uint16)(unsafe.Pointer(&e.ExtBgSlots[slot][addr]))
+                screenX++
+                continue
+            }
 
-			e.BgOks[screenX] = true
-			e.BgIdx[screenX] = bgIdx
-			screenX++
-		}
+            if bg.Palette256 {
+                e.BgPals[screenX] = e.Pram.Bg[palIdx]
+                screenX++
+                continue
+            }
+
+            addr := (palNum << 4) + palIdx
+            e.BgPals[screenX] = e.Pram.Bg[addr]
+            screenX++
+        }
 	}
 }

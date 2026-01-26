@@ -3,7 +3,6 @@ package ppu
 type MasterBright struct {
 	Factor uint16
 	Mode   uint8
-
     LUT    [0x8000]uint32
 }
 

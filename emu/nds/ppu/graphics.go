@@ -116,7 +116,9 @@ func (ppu *PPU) standard(y uint32, e *Engine) {
             }
         }
 
-        e.SetBgPals(uint32(priority))
+        if bgPriority.Cnt != 0 {
+            e.SetBgPals()
+        }
 
         if !e.Dispcnt.DisplayObj {
             continue
@@ -160,11 +162,7 @@ func (ppu *PPU) standard(y uint32, e *Engine) {
         e.SetObjPals(uint32(priority))
     }
 
-    BlendAll(&e.Blend, &e.Windows, y)
-
-    for x := range uint32(SCREEN_WIDTH) {
-        e.Blend.Blended[x] &^= 0x8000
-    }
+    BlendAll(e.Blend, &e.Windows, y)
 
     p32 := (*[SCREEN_WIDTH]uint32)(unsafe.Pointer(&e.Pixels[(y*SCREEN_WIDTH)*4]))
     for x := range uint32(SCREEN_WIDTH) {

@@ -1,11 +1,11 @@
 package ppu
 
 const (
-	BLD_NONE  = 0
-	BLD_ALPHA = 1
-	BLD_WHITE = 2
-	BLD_BLACK = 3
-    BLD_ALPHA_3D = 4
+	BLD_NONE     = 0
+	BLD_ALPHA    = 1
+	BLD_WHITE    = 2
+	BLD_BLACK    = 3
+	BLD_ALPHA_3D = 4
 )
 
 // blends are [6]... because Bg0, Bg1, Bg2, Bg3, Obj, Bd
@@ -28,13 +28,41 @@ type Blend struct {
 	objTransparent [SCREEN_WIDTH]bool
 
 	outWindow [SCREEN_WIDTH]bool
-    modes [SCREEN_WIDTH]uint32
+	modes     [SCREEN_WIDTH]uint32
+
+	// used to only run mode blend only if a pixel in scanline has mode
+	// BLD_NONE == 0, so bit 0 is a flag for bld none
+	modeFlags uint8
+
+	whiteLut [17][32]uint16
+	blackLut [17][32]uint16
+	alphaLut [17][32]uint16
+}
+
+func NewBlend() *Blend {
+
+	b := &Blend{}
+
+	// set luts
+	for y := range uint16(17) {
+
+		scale := 16 - y
+		whiteBias := (31 * y) >> 4
+
+		for c := range uint16(32) {
+			b.blackLut[y][c] = min(31, (c*scale)>>4)
+			b.whiteLut[y][c] = min(31, ((c*scale)>>4)+whiteBias)
+			b.alphaLut[y][c] = (c * y) >> 4
+		}
+	}
+
+	return b
 }
 
 // occurs per priority
-func (e *Engine) SetBgPals(priority uint32) {
+func (e *Engine) SetBgPals() {
 
-	bld := &e.Blend
+	bld := e.Blend
 
 	for x := range uint32(SCREEN_WIDTH) {
 
@@ -68,7 +96,7 @@ func (e *Engine) SetBgPals(priority uint32) {
 // occurs per priority
 func (e *Engine) SetObjPals(priority uint32) {
 
-	bld := &e.Blend
+	bld := e.Blend
 
 	for x := range uint32(SCREEN_WIDTH) {
 
@@ -99,16 +127,17 @@ func (e *Engine) SetObjPals(priority uint32) {
 // occurs per scanline
 func ResetBlendPalettes(e *Engine) {
 
-	bld := &e.Blend
+	bld := e.Blend
 
 	backdrop := *e.Backdrop &^ 0x8000
 
-	bld.APals = [SCREEN_WIDTH]uint16{}
-	bld.BPals = [SCREEN_WIDTH]uint16{}
+	bld.modeFlags = 0
+
+	//bld.APals = [SCREEN_WIDTH]uint16{}
+	//bld.BPals = [SCREEN_WIDTH]uint16{}
 	bld.alphas = [SCREEN_WIDTH]uint16{}
 	bld.targetA3d = [SCREEN_WIDTH]bool{}
 	bld.objTransparent = [SCREEN_WIDTH]bool{}
-	bld.outWindow = [SCREEN_WIDTH]bool{}
 
 	for x := range uint32(SCREEN_WIDTH) {
 		bld.NoBlendPals[x] = backdrop
@@ -135,99 +164,130 @@ func BlendAll(bld *Blend, wins *Windows, y uint32) {
 		}
 	}
 
-    for x := range uint32(SCREEN_WIDTH) {
+	for x := range uint32(SCREEN_WIDTH) {
 
 		bld.modes[x] = bld.Mode
 		if bld.outWindow[x] {
 			bld.modes[x] = BLD_ALPHA
 		}
 
-		activeA :=
-			bld.hasA[x] &&
-			bld.targetATop[x] &&
-			bld.alphas[x] < 1
+		activeA := bld.hasA[x] && bld.targetATop[x] && bld.alphas[x] < 1
+		allowWin := !bld.outWindow[x] || (bld.hasB[x] && bld.objTransparent[x])
+		requireB := bld.modes[x] == BLD_ALPHA || (bld.modes[x] == BLD_NONE && bld.objTransparent[x])
+		noBlending := !activeA || !allowWin || (requireB && !bld.hasB[x])
 
-		allowWin :=
-			!bld.outWindow[x] ||
-			(bld.hasB[x] && bld.objTransparent[x])
+		if noBlending {
+			bld.modes[x] = BLD_NONE
+		}
 
-		requireB :=
-			bld.modes[x] == BLD_ALPHA ||
-			(bld.modes[x] == BLD_NONE && bld.objTransparent[x])
+		if bld.modes[x] == BLD_ALPHA && bld.targetA3d[x] {
+			bld.modes[x] = BLD_ALPHA_3D
+		}
 
-		if noBlending :=
-			!activeA ||
-			!allowWin ||
-			(requireB && !bld.hasB[x]); noBlending {
+		bld.modeFlags |= 1 << bld.modes[x]
+	}
 
-            bld.modes[x] = BLD_NONE
-        }
+	// checks if all pixels are the same blend mode
+	switch bld.modeFlags {
+	case 1 << BLD_NONE:
 
-        if bld.modes[x] == BLD_ALPHA && bld.targetA3d[x] {
-            bld.modes[x] = BLD_ALPHA_3D
-        }
-    }
+		copy(bld.Blended[:], bld.NoBlendPals[:])
+
+		for x := range uint32(SCREEN_WIDTH) {
+			bld.Blended[x] &^= 0x8000
+		}
+
+		return
+
+	case 1 << BLD_ALPHA:
+
+		aLut := bld.alphaLut[bld.aEv]
+		bLut := bld.alphaLut[bld.bEv]
+
+		for x := range uint32(SCREEN_WIDTH) {
+			var (
+				pA = bld.APals[x]
+				pB = bld.BPals[x]
+
+				r = min(31, aLut[(pA>>0)&0x1F]+bLut[(pB>>0)&0x1F])
+				g = min(31, aLut[(pA>>5)&0x1F]+bLut[(pB>>5)&0x1F])
+				b = min(31, aLut[(pA>>10)&0x1F]+bLut[(pB>>10)&0x1F])
+			)
+
+			bld.Blended[x] = r | (g << 5) | (b << 10)
+		}
+		return
+
+	case 1 << BLD_WHITE:
+
+		lut := &bld.whiteLut[bld.yEv]
+
+		for x := range uint32(SCREEN_WIDTH) {
+			p := bld.APals[x]
+			r := lut[p&0x1F]
+			g := lut[(p>>5)&0x1F]
+			b := lut[(p>>10)&0x1F]
+			bld.Blended[x] = r | (g << 5) | (b << 10)
+		}
+
+		return
+	case 1 << BLD_BLACK:
+
+		lut := &bld.blackLut[bld.yEv]
+
+		for x := range uint32(SCREEN_WIDTH) {
+			p := bld.APals[x]
+			r := lut[p&0x1F]
+			g := lut[(p>>5)&0x1F]
+			b := lut[(p>>10)&0x1F]
+			bld.Blended[x] = r | (g << 5) | (b << 10)
+		}
+
+		return
+		//case 1 << BLD_ALPHA_3D:
+	}
 
 	for x := range uint32(SCREEN_WIDTH) {
 		switch bld.modes[x] {
-        case BLD_NONE:
-			bld.Blended[x] = bld.NoBlendPals[x]
+		case BLD_NONE:
+			bld.Blended[x] = bld.NoBlendPals[x] &^ 0x8000
 		case BLD_ALPHA:
 
-            r := (bld.APals[x]) & 0x1F
-            g := (bld.APals[x] >> 5) & 0x1F
-            b := (bld.APals[x] >> 10) & 0x1F
-            rB := (bld.BPals[x]) & 0x1F
-            gB := (bld.BPals[x] >> 5) & 0x1F
-            bB := (bld.BPals[x] >> 10) & 0x1F
+			var (
+				aLut = bld.alphaLut[bld.aEv]
+				bLut = bld.alphaLut[bld.bEv]
+				pA   = bld.APals[x]
+				pB   = bld.BPals[x]
 
-            r = min(31, (r*bld.aEv+rB*bld.bEv)>>4)
-            g = min(31, (g*bld.aEv+gB*bld.bEv)>>4)
-            b = min(31, (b*bld.aEv+bB*bld.bEv)>>4)
+				r = min(31, aLut[(pA>>0)&0x1F]+bLut[(pB>>0)&0x1F])
+				g = min(31, aLut[(pA>>5)&0x1F]+bLut[(pB>>5)&0x1F])
+				b = min(31, aLut[(pA>>10)&0x1F]+bLut[(pB>>10)&0x1F])
+			)
 
-            bld.Blended[x] = r | (g << 5) | (b << 10)
+			bld.Blended[x] = r | (g << 5) | (b << 10)
 
 		case BLD_WHITE:
 
-            r := (bld.APals[x]) & 0x1F
-            g := (bld.APals[x] >> 5) & 0x1F
-            b := (bld.APals[x] >> 10) & 0x1F
-
-            r = min(31, r + ((31 - r) * bld.yEv) >> 4)
-            g = min(31, g + ((31 - g) * bld.yEv) >> 4)
-            b = min(31, b + ((31 - b) * bld.yEv) >> 4)
-
-            bld.Blended[x] = r | (g << 5) | (b << 10)
+			lut := &bld.whiteLut[bld.yEv]
+			p := bld.APals[x]
+			r := lut[p&0x1F]
+			g := lut[(p>>5)&0x1F]
+			b := lut[(p>>10)&0x1F]
+			bld.Blended[x] = r | (g << 5) | (b << 10)
 
 		case BLD_BLACK:
 
-            r := (bld.APals[x]) & 0x1F
-            g := (bld.APals[x] >> 5) & 0x1F
-            b := (bld.APals[x] >> 10) & 0x1F
+			lut := &bld.blackLut[bld.yEv]
+			p := bld.APals[x]
+			r := lut[p&0x1F]
+			g := lut[(p>>5)&0x1F]
+			b := lut[(p>>10)&0x1F]
+			bld.Blended[x] = r | (g << 5) | (b << 10)
 
-            r = min(31, r - (r * bld.yEv) >> 4)
-            g = min(31, g - (g * bld.yEv) >> 4)
-            b = min(31, b - (b * bld.yEv) >> 4)
-
-            bld.Blended[x] = r | (g << 5) | (b << 10)
-
-        case BLD_ALPHA_3D:
-
-            panic("untested 3d target blend sisd")
-            //return max(0, min(31, (a*bld.alpha+b*(1-bp.alpha))>>4))
-
-            r := (bld.APals[x]) & 0x1F
-            g := (bld.APals[x] >> 5) & 0x1F
-            b := (bld.APals[x] >> 10) & 0x1F
-            rB := (bld.BPals[x]) & 0x1F
-            gB := (bld.BPals[x] >> 5) & 0x1F
-            bB := (bld.BPals[x] >> 10) & 0x1F
-
-            r = min(31, (r*bld.aEv+rB*bld.bEv)>>4)
-            g = min(31, (g*bld.aEv+gB*bld.bEv)>>4)
-            b = min(31, (b*bld.aEv+bB*bld.bEv)>>4)
-
-            bld.Blended[x] = r | (g << 5) | (b << 10)
+		case BLD_ALPHA_3D:
+			panic("untested 3d target blend sisd")
+			// should match bld alpha but with alpha value instead
+			//return max(0, min(31, (a*bld.alpha+b*(1-bp.alpha))>>4))
 		}
 	}
 }

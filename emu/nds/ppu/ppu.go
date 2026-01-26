@@ -50,7 +50,7 @@ type Engine struct {
 	Objects     [128]Object
 	Backgrounds [4]Background
 	Windows     Windows
-	Blend       Blend
+	Blend       *Blend
 	Mosaic      Mosaic
 
     BgPriorities [4]struct {
@@ -75,10 +75,6 @@ type Engine struct {
     ObjPals  [SCREEN_WIDTH]uint16
     ObjOk    [SCREEN_WIDTH]bool
     ObjMode  [SCREEN_WIDTH]uint32
-
-    //BlendPalettes [SCREEN_WIDTH]BlendPalettes
-    
-    //BlendedPalettes [SCREEN_WIDTH]uint16
 }
 
 type Dispcnt struct {
@@ -218,6 +214,9 @@ func NewPPU(irq *cpu.Irq) *PPU {
 
     p.EngineA.MasterBright.RebuildLUT()
     p.EngineB.MasterBright.RebuildLUT()
+
+    p.EngineA.Blend = NewBlend()
+    p.EngineB.Blend = NewBlend()
 
 	return p
 }
@@ -378,9 +377,6 @@ func (engine *Engine) UpdateWin(addr uint32, v uint32) {
 		WININ1 = 0x49
 		WINOUT = 0x4A
 		WINOBJ = 0x4B
-
-		SCREEN_WIDTH  = 256
-		SCREEN_HEIGHT = 192
 	)
 
 	switch addr {

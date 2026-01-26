@@ -1,72 +1,111 @@
 package mem
 
 type Dispstat struct {
-	A7, A9 uint16
+	V bool // shared
+	H bool // shared
+
+	A9VC    bool
+	A9VIrq  bool
+	A9HIrq  bool
+	A9VCIrq bool
+	A9LYC   uint32
+
+	A7VC    bool
+	A7VIrq  bool
+	A7HIrq  bool
+	A7VCIrq bool
+	A7LYC   uint32
 }
 
-func (d *Dispstat) Write(v uint8, hi bool, arm9 bool) {
-
-	r := &d.A7
-	if arm9 {
-		r = &d.A9
-	}
+func (d *Dispstat) Read(hi, arm9 bool) uint8 {
 
 	if hi {
-		*r = (uint16(*r) & 0xFF) | (uint16(v) << 8)
-		return
+		if arm9 {
+			return uint8(d.A9LYC)
+		}
+
+		return uint8(d.A7LYC)
 	}
 
-	v &^= 0b111
-	*r = (uint16(*r) &^ 0b0011_1000) | uint16(v)
-}
+	v := uint8(0)
 
-func (d *Dispstat) SetVBlank(v bool) {
-
-	if v {
-		d.A7 |= 0b1
-		d.A9 |= 0b1
-		return
+	if d.V {
+		v |= 1 << 0
 	}
 
-	d.A7 &^= 0b1
-	d.A9 &^= 0b1
-}
-
-func (d *Dispstat) SetHBlank(v bool) {
-
-	if v {
-		d.A7 |= 0b10
-		d.A9 |= 0b10
-		return
+	if d.H {
+		v |= 1 << 1
 	}
 
-	d.A7 &^= 0b10
-	d.A9 &^= 0b10
-}
-
-func (d *Dispstat) SetVCFlag(v, arm9 bool) {
-
-	r := &d.A7
 	if arm9 {
-		r = &d.A9
+		if d.A9VC {
+			v |= 1 << 2
+		}
+
+		if d.A9VIrq {
+			v |= 1 << 3
+		}
+
+		if d.A9HIrq {
+			v |= 1 << 4
+		}
+
+		if d.A9VCIrq {
+			v |= 1 << 5
+		}
+
+		v |= uint8(d.A9LYC>>8) << 7
+
+		return v
 	}
 
-	if v {
-		*r |= 0b100
-		*r |= 0b100
+	if d.A7VC {
+		v |= 1 << 2
+	}
+
+	if d.A7VIrq {
+		v |= 1 << 3
+	}
+
+	if d.A7HIrq {
+		v |= 1 << 4
+	}
+
+	if d.A7VCIrq {
+		v |= 1 << 5
+	}
+
+	v |= uint8(d.A7LYC>>8) << 7
+
+	return v
+}
+
+func (d *Dispstat) Write(v uint8, hi, arm9 bool) {
+
+	if hi {
+		if arm9 {
+			d.A9LYC = (d.A9LYC & 0xFF) | ((uint32(v) << 8) & 1)
+			return
+		}
+
+		d.A7LYC = (d.A7LYC & 0xFF) | ((uint32(v) << 8) & 1)
 		return
 	}
 
-	*r &^= 0b100
-	*r &^= 0b100
-}
+	d.V = v&(1<<0) != 0
+	d.H = v&(1<<1) != 0
 
-func (d *Dispstat) GetLYC(arm9 bool) uint32 {
-
-	r := &d.A7
 	if arm9 {
-		r = &d.A9
+		d.A9VC = v&(1<<2) != 0
+		d.A9VIrq = v&(1<<3) != 0
+		d.A9HIrq = v&(1<<4) != 0
+		d.A9VCIrq = v&(1<<5) != 0
+		d.A9LYC = (d.A9LYC &^ 0xFF) | uint32(v)
+		return
 	}
-
-	return uint32(*r>>8) + ((uint32(*r>>7) & 1) << 8)
+	d.A7VC = v&(1<<2) != 0
+	d.A7VIrq = v&(1<<3) != 0
+	d.A7HIrq = v&(1<<4) != 0
+	d.A7VCIrq = v&(1<<5) != 0
+	d.A7LYC = (d.A7LYC &^ 0xFF) | uint32(v)
 }

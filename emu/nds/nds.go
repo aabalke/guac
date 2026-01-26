@@ -204,10 +204,10 @@ func (nds *Nds) UpdateFrame() {
 		//debug.CURR_INST++
 	}
 
-    if config.Conf.Nds.NdsJit.Enabled {
-        nds.arm7.Jit.DeletePages()
-        nds.arm9.Jit.DeletePages()
-    }
+	if config.Conf.Nds.NdsJit.Enabled {
+		nds.arm7.Jit.DeletePages()
+		nds.arm9.Jit.DeletePages()
+	}
 
 	nds.mem.Snd.Play(nds.Muted)
 	nds.Frame++
@@ -345,12 +345,12 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 	prevInHdraw := prevScanlineCycles < CYCLES_HDRAW
 	if enteredHblank := inHblank && prevInHdraw; enteredHblank {
 
-		dispstat.SetHBlank(true)
-		if (dispstat.A9>>4)&1 != 0 {
+		dispstat.H = true
+		if dispstat.A9HIrq {
 			nds.arm9.Irq.SetIRQ(1)
 		}
 
-		if (dispstat.A7>>4)&1 != 0 {
+		if dispstat.A7HIrq {
 			nds.arm7.Irq.SetIRQ(1)
 		}
 
@@ -364,7 +364,7 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 
 		nds.mem.Snd.SoundClock(CYCLES_SCANLINE)
 
-		dispstat.SetHBlank(false)
+		dispstat.H = false
 
 		vcount++
 		if vcount >= NUM_SCANLINES {
@@ -394,7 +394,8 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 			if capture.ActiveCapture {
 				capture.EndCapture()
 			}
-			dispstat.SetVBlank(true)
+
+			dispstat.V = true
 			nds.CheckDmas(dma.DMA_MODE_VBL, true)
 			nds.CheckDmas(dma.DMA_MODE_VBL, false)
 
@@ -403,26 +404,26 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 			}
 
 		case SCREEN_HEIGHT + 1:
-			if (dispstat.A9>>3)&1 != 0 {
+			if dispstat.A9VIrq {
 				nds.arm9.Irq.SetIRQ(0)
 			}
 
-			if (dispstat.A7>>3)&1 != 0 {
+			if dispstat.A7VIrq {
 				nds.arm7.Irq.SetIRQ(0)
 			}
 		case NUM_SCANLINES - 1:
-			dispstat.SetVBlank(false)
+			dispstat.V = false
 		}
 
-		match := dispstat.GetLYC(true) == vcount
-		dispstat.SetVCFlag(match, true)
-		if vcntIrq := (dispstat.A9>>5)&1 != 0; vcntIrq && match {
+		match := dispstat.A9LYC == vcount
+		dispstat.A9VC = match
+		if dispstat.A9VCIrq && match {
 			nds.arm9.Irq.SetIRQ(2)
 		}
 
-		match = dispstat.GetLYC(false) == vcount
-		dispstat.SetVCFlag(match, false)
-		if vcntIrq := (dispstat.A7>>5)&1 != 0; vcntIrq && match {
+		match = dispstat.A7LYC == vcount
+		dispstat.A7VC = match
+		if dispstat.A7VCIrq && match {
 			nds.arm7.Irq.SetIRQ(2)
 		}
 	}

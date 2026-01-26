@@ -459,9 +459,9 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 
 	switch addr {
 	case 0x4:
-		return uint8(mem.Dispstat.A9)
+        return mem.Dispstat.Read(false, true)
 	case 0x5:
-		return uint8(mem.Dispstat.A9 >> 8)
+        return mem.Dispstat.Read(true, true)
 	case 0x6:
 		return uint8(mem.Vcount)
 	case 0x7:
@@ -894,9 +894,9 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 
 	switch addr {
 	case 0x4:
-		return uint8(mem.Dispstat.A7)
+        return mem.Dispstat.Read(false, false)
 	case 0x5:
-		return uint8(mem.Dispstat.A7 >> 8)
+        return mem.Dispstat.Read(true, false)
 	case 0x6:
 		return uint8(mem.Vcount)
 	case 0x7:
