@@ -1,7 +1,6 @@
 package ppu
 
 import (
-	"encoding/binary"
 
 	"github.com/aabalke/guac/emu/nds/rast"
 )
@@ -43,15 +42,15 @@ type ActiveData struct {
 }
 
 func (c *Capture) Init(vram *VRAM, ppu *PPU, rdBlk *uint32, pixels *[]uint8, pixels3d *rast.Pixels) {
-	c.VramBlocks[0] = &vram.A
-	c.VramBlocks[1] = &vram.B
-	c.VramBlocks[2] = &vram.C
-	c.VramBlocks[3] = &vram.D
+	c.VramBlocks[0] = &vram.a
+	c.VramBlocks[1] = &vram.b
+	c.VramBlocks[2] = &vram.c
+	c.VramBlocks[3] = &vram.d
 	c.ReadBlock = rdBlk
 	c.Pixels = pixels
 	c.Pixels3d = pixels3d
-	c.arm7CBlock = &vram.isCArm7
-	c.arm7DBlock = &vram.isDArm7
+	c.arm7CBlock = &vram.Cnt[C].arm7
+	c.arm7DBlock = &vram.Cnt[D].arm7
 }
 
 func (c *Capture) Write(addr uint32, v uint8) {
@@ -206,8 +205,8 @@ func (c *Capture) CaptureLine(y uint32, isRenderingB bool) {
 				v |= 0x8000
 			}
 
-			binary.LittleEndian.PutUint16(block[j+c.ActiveData.WriteOffset:], uint16(v))
-
+            (*block)[j+c.ActiveData.WriteOffset] = uint8(v)
+            (*block)[j+c.ActiveData.WriteOffset+1] = uint8(v>>8)
 			continue
 		}
 
@@ -221,7 +220,8 @@ func (c *Capture) CaptureLine(y uint32, isRenderingB bool) {
 
 		v |= 0x8000
 
-		binary.LittleEndian.PutUint16(block[j+c.ActiveData.WriteOffset:], v)
+        (*block)[j+c.ActiveData.WriteOffset] = uint8(v)
+        (*block)[j+c.ActiveData.WriteOffset+1] = uint8(v>>8)
 	}
 }
 

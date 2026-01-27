@@ -195,6 +195,10 @@ func NewPPU(irq *cpu.Irq) *PPU {
 	p.EngineB.IsB = true
 
 	p.Rasterizer = rast.NewRasterizer(&p.Vram, irq)
+
+	texCache := &p.Rasterizer.GeoEngine.TextureCache
+	p.Vram.Init(texCache, &p.EngineA, &p.EngineB)
+
 	p.Capture.Init(
 		&p.Vram,
 		p,
@@ -217,6 +221,7 @@ func NewPPU(irq *cpu.Irq) *PPU {
 
     p.EngineA.Blend = NewBlend()
     p.EngineB.Blend = NewBlend()
+
 
 	return p
 }

@@ -1,7 +1,6 @@
 package ppu
 
 import (
-	"encoding/binary"
 	"unsafe"
 )
 
@@ -124,7 +123,7 @@ func (ppu *PPU) tiledObject(e *Engine, objIdx, priority, y uint32) {
 
         var palIdx uint32
         if ptr == nil {
-            palIdx = uint32(ppu.Vram.ReadGraphical(base + addr))
+            palIdx = uint32(ppu.Vram.Read16(base + addr))
         } else {
             palIdx = uint32(*(*uint16)(unsafe.Add(ptr, addr)))
         }
@@ -195,7 +194,7 @@ func (ppu *PPU) tiledObjectAffine(e *Engine, objIdx, priority, y uint32) {
 
         offset := tileOffset + inTileIdx
 
-        palIdx := uint32(ppu.Vram.ReadGraphical(base+offset))
+        palIdx := uint32(ppu.Vram.Read16(base+offset))
 
         ppu.getObjPalData(e, obj, palIdx, inTileX, priority, x)
     }
@@ -220,7 +219,7 @@ func (ppu *PPU) getObjPalData(e *Engine, obj *Object, palIdx, inTileX, priority,
 
         if e.Dispcnt.ObjExtPal && obj.Palette256 {
             addr := (pal << 9) + palIdx<<1
-            e.ObjPals[x] = binary.LittleEndian.Uint16(e.ExtObj[addr:])
+            e.ObjPals[x] = *(*uint16)(unsafe.Add(unsafe.Pointer(e.ExtObj), addr))
             return
         }
 
@@ -265,7 +264,7 @@ func (ppu *PPU) bitmapObject(e *Engine, objIdx, priority, y uint32) {
             offset = getBmp2d(obj, uint32(xIdx), uint32(yIdx))
         }
 
-        data := ppu.Vram.ReadGraphical(base + offset)
+        data := ppu.Vram.Read16(base + offset)
 
         if alpha := (data & 0x8000) == 0; alpha {
             continue
@@ -310,7 +309,7 @@ func (ppu *PPU) bitmapObjectAffine(e *Engine, objIdx, priority, y uint32) {
             offset = getBmp2d(obj, uint32(xIdx), uint32(yIdx))
         }
 
-        data := ppu.Vram.ReadGraphical(base + offset)
+        data := ppu.Vram.Read16(base + offset)
 
         if alpha := (data & 0x8000) == 0; alpha {
             continue

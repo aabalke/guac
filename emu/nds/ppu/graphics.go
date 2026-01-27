@@ -63,7 +63,7 @@ func (ppu *PPU) screenoff(y uint32, e *Engine) {
 
 func (ppu *PPU) vramDisplay(y uint32, e *Engine) {
 
-    bank := ppu.Vram.VramBlocks[e.Dispcnt.VramBlock]
+    bank := (*[0x20000]uint8)(ppu.Vram.Cnt[e.Dispcnt.VramBlock].bank)
 
     addr := (y * SCREEN_WIDTH) * 2
     for x := range uint32(SCREEN_WIDTH) {
@@ -102,17 +102,17 @@ func (ppu *PPU) standard(y uint32, e *Engine) {
 
             switch e.Backgrounds[bgIdx].Type {
             case BG_TYPE_DIR:
-                ppu.directBmpScanline(e, bgIdx, uint32(priority), y)
+                ppu.directBmpScanline(e, bgIdx, y)
             case BG_TYPE_TEX:
-                ppu.tiledScanline(e, bgIdx, uint32(priority), y)
+                ppu.tiledScanline(e, bgIdx, y)
             case BG_TYPE_256:
-                ppu.bmpScanline(e, bgIdx, uint32(priority), y)
+                ppu.bmpScanline(e, bgIdx, y)
             case BG_TYPE_BGM, BG_TYPE_LAR:
-                ppu.affine16Scanline(e, bgIdx, uint32(priority), y)
+                ppu.affine16Scanline(e, bgIdx, y)
             case BG_TYPE_3D:
-                ppu.threeScanline(e, bgIdx, uint32(priority), y)
+                ppu.threeScanline(e, bgIdx, y)
             case BG_TYPE_AFF:
-                ppu.affineScanline(e, bgIdx, uint32(priority), y)
+                ppu.affineScanline(e, bgIdx, y)
             }
         }
 

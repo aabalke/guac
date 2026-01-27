@@ -1,7 +1,6 @@
 package ppu
 
 import (
-	"encoding/binary"
 	"unsafe"
 
 	"github.com/aabalke/guac/emu/nds/utils"
@@ -40,7 +39,7 @@ func (e *Engine) getBgPriority(y uint32) {
 	}
 }
 
-func (ppu *PPU) threeScanline(e *Engine, bgIdx, priority, y uint32) {
+func (ppu *PPU) threeScanline(e *Engine, bgIdx, y uint32) {
 
     wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
@@ -100,7 +99,7 @@ func (ppu *PPU) threeScanline(e *Engine, bgIdx, priority, y uint32) {
 	}
 }
 
-func (ppu *PPU) affineScanline(e *Engine, bgIdx, priority, y uint32) {
+func (ppu *PPU) affineScanline(e *Engine, bgIdx, y uint32) {
 
     wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
@@ -149,7 +148,7 @@ func (ppu *PPU) affineScanline(e *Engine, bgIdx, priority, y uint32) {
             map_x  = (uint32(xIdx))  & (bg.W - 1) >> 3
             map_y  = (((uint32(yIdx)) & (bg.H - 1)) >> 3) * (bg.W >> 3)
             mapIdx = map_y + map_x
-            data   = uint32(ppu.Vram.Read(base+mapIdx, true))
+            data   = uint32(ppu.Vram.Read9(base+mapIdx))
         )
 
 		inTileX := xIdx & 7
@@ -165,7 +164,7 @@ func (ppu *PPU) affineScanline(e *Engine, bgIdx, priority, y uint32) {
         var (
             inTileIdx = uint32(inTileX) + uint32(inTileY<<3)
             addr      = tileBase + (data << 6) + inTileIdx
-            palIdx    = ppu.Vram.Read(addr, true)
+            palIdx    = ppu.Vram.Read9(addr)
         )
 
 		if palIdx == 0 {
@@ -176,11 +175,12 @@ func (ppu *PPU) affineScanline(e *Engine, bgIdx, priority, y uint32) {
         e.BgIdx[x] = bgIdx
 
 		if e.Dispcnt.BgExtPal {
+            slot := bgIdx
 			if e.Backgrounds[bgIdx].AltExtPalSlot {
-				bgIdx += 2
+                slot += 2
 			}
 
-			e.BgPals[x] = binary.LittleEndian.Uint16(e.ExtBgSlots[bgIdx][palIdx<<1:])
+            e.BgPals[x] = *(*uint16)(unsafe.Add(unsafe.Pointer(e.ExtBgSlots[slot]), addr))
 			continue
 		}
 
@@ -188,7 +188,7 @@ func (ppu *PPU) affineScanline(e *Engine, bgIdx, priority, y uint32) {
 	}
 }
 
-func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, priority, y uint32) {
+func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, y uint32) {
 
     wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
@@ -241,7 +241,7 @@ func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, priority, y uint32) {
 
 		mapAddr := base + mapIdx
 
-		data := uint32(ppu.Vram.ReadGraphical(mapAddr))
+		data := uint32(ppu.Vram.Read16(mapAddr))
 
 		tileIdx := (data & 0b11_1111_1111) << 5
 
@@ -266,7 +266,7 @@ func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, priority, y uint32) {
 		}
 
 		inTileIdx := uint32(inTileX) + uint32(inTileY<<3)
-		palIdx := uint32(ppu.Vram.Read(tileAddr+inTileIdx, true))
+		palIdx := uint32(ppu.Vram.Read9(tileAddr+inTileIdx))
 		palNum := data >> 12
 
 		palIdx &= 0xFF
@@ -279,13 +279,13 @@ func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, priority, y uint32) {
         e.BgIdx[x] = bgIdx
 
 		if e.Dispcnt.BgExtPal {
+            slot := bgIdx
 			if e.Backgrounds[bgIdx].AltExtPalSlot {
-				bgIdx += 2
+				slot += 2
 			}
 
 			addr := (palNum << 9) + palIdx<<1
-
-			e.BgPals[x] = binary.LittleEndian.Uint16(e.ExtBgSlots[bgIdx][addr:])
+            e.BgPals[x] = *(*uint16)(unsafe.Add(unsafe.Pointer(e.ExtBgSlots[slot]), addr))
 			continue
 		}
 
@@ -293,7 +293,7 @@ func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, priority, y uint32) {
 	}
 }
 
-func (ppu *PPU) directBmpScanline(e *Engine, bgIdx, priority, y uint32) {
+func (ppu *PPU) directBmpScanline(e *Engine, bgIdx, y uint32) {
 
     wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
@@ -342,7 +342,7 @@ func (ppu *PPU) directBmpScanline(e *Engine, bgIdx, priority, y uint32) {
 
 		var data uint16
 		if ptr == nil {
-			data = ppu.Vram.ReadGraphical(base + addr)
+			data = ppu.Vram.Read16(base + addr)
 		} else {
 			data = *(*uint16)(unsafe.Add(ptr, addr))
 		}
@@ -358,7 +358,7 @@ func (ppu *PPU) directBmpScanline(e *Engine, bgIdx, priority, y uint32) {
 	}
 }
 
-func (ppu *PPU) bmpScanline(e *Engine, bgIdx, priority, y uint32) {
+func (ppu *PPU) bmpScanline(e *Engine, bgIdx, y uint32) {
 
     wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
@@ -407,7 +407,7 @@ func (ppu *PPU) bmpScanline(e *Engine, bgIdx, priority, y uint32) {
 
 		var palIdx uint32
 		if ptr == nil {
-			palIdx = uint32(ppu.Vram.Read(base+addr, true))
+			palIdx = uint32(ppu.Vram.Read9(base+addr))
 		} else {
 			palIdx = uint32(*(*uint8)(unsafe.Add(ptr, addr)))
 		}
@@ -428,7 +428,7 @@ func (ppu *PPU) bmpScanline(e *Engine, bgIdx, priority, y uint32) {
 	}
 }
 
-func (ppu *PPU) tiledScanline(e *Engine, bgIdx, priority, y uint32) {
+func (ppu *PPU) tiledScanline(e *Engine, bgIdx, y uint32) {
 
 	const (
 		TILE_SIZE     = 8
@@ -477,7 +477,7 @@ func (ppu *PPU) tiledScanline(e *Engine, bgIdx, priority, y uint32) {
 			tileX        = (startTileX + tile) & ((bg.W >> 3) - 1)
 			mapColOffset = (tileX >> 5 << MAP_COL_SH) + (tileX & 31)
 			mapAddr      = mapBase + ((mapRowOffset + mapColOffset) << 1)
-			screenData   = ppu.Vram.ReadGraphical(mapAddr)
+			screenData   = ppu.Vram.Read16(mapAddr)
 			palNum       = screenData >> 12
 			tileNum      = uint32(screenData & 0x03FF)
 			hFlip        = (screenData>>10)&1 != 0
@@ -530,7 +530,7 @@ func (ppu *PPU) tiledScanline(e *Engine, bgIdx, priority, y uint32) {
 
 			var palIdx uint16
 			if ptr == nil {
-				palIdx = ppu.Vram.ReadGraphical(tileAddr + inTileOffset)
+				palIdx = ppu.Vram.Read16(tileAddr + inTileOffset)
 			} else {
 				palIdx = *(*uint16)(unsafe.Add(ptr, inTileOffset))
 			}
@@ -555,7 +555,7 @@ func (ppu *PPU) tiledScanline(e *Engine, bgIdx, priority, y uint32) {
 					slot += 2
 				}
 				addr := (palNum << 9) + (palIdx << 1)
-                e.BgPals[screenX] = *(*uint16)(unsafe.Pointer(&e.ExtBgSlots[slot][addr]))
+                e.BgPals[screenX] = *(*uint16)(unsafe.Add(unsafe.Pointer(e.ExtBgSlots[slot]), addr))
                 screenX++
                 continue
             }

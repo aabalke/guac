@@ -35,7 +35,9 @@ func (t *Tcm) Read(addr uint32) (uint8, bool) {
 
 		return t.Itcm[addr&0x7FFF], true
 
-	} else if addr >= t.DtcmBase && addr < t.DtcmBase+t.DtcmSize {
+	}
+
+    if addr >= t.DtcmBase && addr < t.DtcmBase+t.DtcmSize {
 		return t.ReadDtcm(addr)
 	}
 

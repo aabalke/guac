@@ -13,7 +13,6 @@ func (t *TextureCache) Reset() {
 }
 
 func (t *TextureCache) Add(vram VRAM, tex *Texture, key key) {
-
 	switch tex.Format {
 	case TEX_FMT_4_PAL:
 		(*t)[key] = t.getPaletted(vram, tex, 2, 2)

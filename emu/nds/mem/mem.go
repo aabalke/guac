@@ -118,9 +118,6 @@ func NewMemory(
 	m.Spi.Init()
 	m.Gamecard.Init(irq7, irq9, dma7, dma9, c, savepath, &m.Save)
 
-	texCache := &Ppu.Rasterizer.GeoEngine.TextureCache
-	m.Ppu.Vram.Init(texCache, &m.Ppu.EngineA, &m.Ppu.EngineB)
-
 	m.InitSaveLoop()
 
 	return m
@@ -179,17 +176,15 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 			v, _ := mem.Tcm.Read(addr)
 			return v
 		case 0x2:
-			//ramUsageUnimplimented(addr)
 			return mem.MainRam[addr&0x3F_FFFF]
 		case 0x3:
-			return mem.WRAM.Read(addr, true)
+			return mem.WRAM.Read9(addr)
 		case 0x4:
-			//fmt.Printf("IO READ ARM9 %08X arm9 %t\n", addr, arm9)
 			return mem.ReadArm9IO(addr - 0x400_0000)
 		case 0x5:
 			return mem.Ppu.ReadPram(addr, mem.Ppu)
 		case 0x6:
-			return mem.Ppu.Vram.Read(addr, true)
+			return mem.Ppu.Vram.Read9(addr)
 		case 0x7:
 			return mem.Oam[addr&0x7FF]
 		case 0x8, 0x9, 0xA:
@@ -210,17 +205,13 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 		return 0xFF
 
 	case 0x2:
-		//ramUsageUnimplimented(addr)
 		return mem.MainRam[addr&0x3F_FFFF]
 	case 0x3:
-		return mem.WRAM.Read(addr, false)
+		return mem.WRAM.Read7(addr)
 	case 0x4:
-		//fmt.Printf("IO READ ARM9 %08X arm9 %t\n", addr, arm9)
-		//printIO(addr, arm9, false)
-		//fmt.Printf("RD IO %08X\n", addr)
 		return mem.ReadArm7IO(addr - 0x400_0000)
 	case 0x6:
-		return mem.Ppu.Vram.Read(addr, false)
+		return mem.Ppu.Vram.Read7(addr)
 	case 0x8, 0x9, 0xA:
 		return mem.ReadGbaSlot(addr, arm9)
 	default:
@@ -274,7 +265,9 @@ func (mem *Mem) WritePtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
 		case 0x2:
 			return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr&0x3F_FFFF), true
 		case 0x3:
-			return mem.WRAM.ReadPtr(addr, true)
+			return mem.WRAM.ReadPtr9(addr)
+		case 0x6:
+			return mem.Ppu.Vram.ReadPtr9(addr) // this may break things
 		}
 
 		return nil, false
@@ -284,9 +277,9 @@ func (mem *Mem) WritePtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
 	case 0x2:
 		return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr&0x3F_FFFF), true
 	case 0x3:
-		return mem.WRAM.ReadPtr(addr, false)
+		return mem.WRAM.ReadPtr7(addr)
 	case 0x6:
-		return mem.Ppu.Vram.ReadPtr(addr, false)
+		return mem.Ppu.Vram.ReadPtr7(addr)
 	default:
 		return nil, false
 	}
@@ -306,12 +299,11 @@ func (mem *Mem) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
 		case 0x2:
 			return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr&0x3F_FFFF), true
 		case 0x3:
-			return mem.WRAM.ReadPtr(addr, true)
+			return mem.WRAM.ReadPtr9(addr)
 		case 0x5:
 			return nil, false
-			//return mem.Ppu.Pram.Read(addr, mem.ppu)
 		case 0x6:
-			return mem.Ppu.Vram.ReadPtr(addr, true)
+			return mem.Ppu.Vram.ReadPtr9(addr)
 		case 0x7:
 			return unsafe.Add(unsafe.Pointer(&mem.Oam), addr&0x7FF), true
         case 0xFF:
@@ -333,9 +325,9 @@ func (mem *Mem) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
 	case 0x2:
 		return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr&0x3F_FFFF), true
 	case 0x3:
-		return mem.WRAM.ReadPtr(addr, false)
+		return mem.WRAM.ReadPtr7(addr)
 	case 0x6:
-		return mem.Ppu.Vram.ReadPtr(addr, false)
+		return mem.Ppu.Vram.ReadPtr7(addr)
 	default:
 		return nil, false
 	}
@@ -359,14 +351,13 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 			//clearTempUnimplimented(addr)
 			mem.MainRam[addr&0x3F_FFFF] = v
 		case 0x3:
-			mem.WRAM.Write(addr, v, true)
+			mem.WRAM.Write9(addr, v)
 		case 0x4:
-			//printIO(addr, arm9, true)
 			mem.WriteArm9IO(addr-0x400_0000, v)
 		case 0x5:
 			mem.Ppu.WritePram(addr, v, mem.Ppu)
 		case 0x6:
-			mem.Ppu.Vram.Write(addr, v, true)
+			mem.Ppu.Vram.Write9(addr, v)
 		case 0x7:
 			mem.Oam[addr&0x7FF] = v
 			mem.Ppu.UpdateOAM(addr, v, &mem.Oam)
@@ -380,12 +371,11 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 		//clearTempUnimplimented(addr)
 		mem.MainRam[addr&0x3F_FFFF] = v
 	case 0x3:
-		mem.WRAM.Write(addr, v, false)
+		mem.WRAM.Write7(addr, v)
 	case 0x4:
-		//printIO(addr, arm9, true)
 		mem.WriteArm7IO(addr-0x400_0000, v)
 	case 0x6:
-		mem.Ppu.Vram.Write(addr, v, false)
+		mem.Ppu.Vram.Write7(addr, v)
 	}
 }
 
@@ -595,23 +585,23 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 	case 0x217:
 		return mem.irq9.ReadIF(3)
 	case 0x240:
-		return mem.Ppu.Vram.CNT_A.V
+		return mem.Ppu.Vram.Cnt[ppu.A].V
 	case 0x241:
-		return mem.Ppu.Vram.CNT_B.V
+		return mem.Ppu.Vram.Cnt[ppu.B].V
 	case 0x242:
-		return mem.Ppu.Vram.CNT_C.V
+		return mem.Ppu.Vram.Cnt[ppu.C].V
 	case 0x243:
-		return mem.Ppu.Vram.CNT_D.V
+		return mem.Ppu.Vram.Cnt[ppu.D].V
 	case 0x244:
-		return mem.Ppu.Vram.CNT_E.V
+		return mem.Ppu.Vram.Cnt[ppu.E].V
 	case 0x245:
-		return mem.Ppu.Vram.CNT_F.V
+		return mem.Ppu.Vram.Cnt[ppu.F].V
 	case 0x246:
-		return mem.Ppu.Vram.CNT_G.V
+		return mem.Ppu.Vram.Cnt[ppu.G].V
 	case 0x248:
-		return mem.Ppu.Vram.CNT_H.V
+		return mem.Ppu.Vram.Cnt[ppu.H].V
 	case 0x249:
-		return mem.Ppu.Vram.CNT_I.V
+		return mem.Ppu.Vram.Cnt[ppu.I].V
 
 	case 0x247:
 		return mem.WRAM.ReadCNT()
@@ -838,25 +828,25 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 
 	// vram reads - gbatek says read only, needed to match no$gba
 	case 0x240:
-		mem.Ppu.Vram.WriteCNT(addr, v)
+		mem.Ppu.Vram.WriteCnt(addr, v)
 	case 0x241:
-		mem.Ppu.Vram.WriteCNT(addr, v)
+		mem.Ppu.Vram.WriteCnt(addr, v)
 	case 0x242:
-		mem.Ppu.Vram.WriteCNT(addr, v)
+		mem.Ppu.Vram.WriteCnt(addr, v)
 	case 0x243:
-		mem.Ppu.Vram.WriteCNT(addr, v)
+		mem.Ppu.Vram.WriteCnt(addr, v)
 	case 0x244:
-		mem.Ppu.Vram.WriteCNT(addr, v)
+		mem.Ppu.Vram.WriteCnt(addr, v)
 	case 0x245:
-		mem.Ppu.Vram.WriteCNT(addr, v)
+		mem.Ppu.Vram.WriteCnt(addr, v)
 	case 0x246:
-		mem.Ppu.Vram.WriteCNT(addr, v)
+		mem.Ppu.Vram.WriteCnt(addr, v)
 	case 0x247:
 		mem.WRAM.WriteCNT(v)
 	case 0x248:
-		mem.Ppu.Vram.WriteCNT(addr, v)
+		mem.Ppu.Vram.WriteCnt(addr, v)
 	case 0x249:
-		mem.Ppu.Vram.WriteCNT(addr, v)
+		mem.Ppu.Vram.WriteCnt(addr, v)
 
 	case 0x300:
 		mem.PostFlg.Write(v, true)
@@ -1035,7 +1025,7 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 		return mem.irq7.ReadIF(3)
 
 	case 0x240:
-		return mem.Ppu.Vram.CNT_7
+		return mem.Ppu.Vram.Cnt_7
 	case 0x241:
 		return mem.WRAM.ReadCNT()
 
