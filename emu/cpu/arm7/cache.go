@@ -31,9 +31,10 @@ type JitBlock struct {
 func InitBlockCache(capacity uint32, page_size int) *BlockCache {
 
 	bc := &BlockCache{
-		Blocks: []*JitBlock{},
-		Head:   &JitBlock{},
-		Tail:   &JitBlock{},
+		Blocks:    []*JitBlock{},
+		Head:      &JitBlock{},
+		Tail:      &JitBlock{},
+		SkipBlock: &JitBlock{Skip: true},
 	}
 
 	for range capacity {
@@ -165,7 +166,6 @@ func (bc *BlockCache) AssignBlock(jit *Jit) *JitBlock {
 	block.initPc = 0
 	block.Length = 0
 	block.finalOp = 0
-	block.Skip = false
 	block.f = nil
 
 	return block

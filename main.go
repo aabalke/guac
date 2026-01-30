@@ -19,7 +19,6 @@ import (
 	//_ "github.com/silbinarywolf/preferdiscretegpu" //no profiler change
 
 	"os"
-	//"runtime/debug"
 	"runtime/pprof"
 )
 
@@ -49,6 +48,7 @@ func main() {
 
 	flags := getFlags()
 
+
 	if flags.Profile {
 
 		fi, err := os.Create("cpu.prof")
@@ -73,17 +73,20 @@ func main() {
 	ebiten.SetWindowSize(256*4, 192*4)
 	//ebiten.SetWindowSize(1280, 720)
 
+    ebiten.SetVsyncEnabled(!config.Conf.VsyncDisabled)
+
 	ebiten.SetCursorMode(ebiten.CursorModeHidden)
 	if config.Conf.Fullscreen {
 		ebiten.SetFullscreen(true)
 	}
 
-	//opts := &ebiten.RunGameOptions{
-	//    SingleThread: true,
-	//}
+	opts := &ebiten.RunGameOptions{
+	    //SingleThread: true,
+        //InitUnfocused: true,
+	}
 
-	if err := ebiten.RunGame(NewGame(flags)); err != nil && err != exit {
-		//if err := ebiten.RunGameWithOptions(NewGame(flags), opts); err != nil && err != exit {
+    err := ebiten.RunGameWithOptions(NewGame(flags), opts)
+    if err != nil && err != exit {
 		log.Fatal(err)
 	}
 

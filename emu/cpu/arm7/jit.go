@@ -20,8 +20,7 @@ var (
 	REG         = int32(unsafe.Offsetof(Cpu{}.Reg))
 	R           = REG + int32(unsafe.Offsetof(Reg{}.R))
 	CPSR        = REG + int32(unsafe.Offsetof(Reg{}.CPSR))
-	JIT         = int32(unsafe.Offsetof(Cpu{}.Jit))
-	SCRATCH     = JIT + int32(unsafe.Offsetof(Jit{}.Scratch))
+	SCRATCH     = int32(unsafe.Offsetof(Cpu{}.Scratch))
 	MODE        = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.Mode)), Bits: 32}
 	N           = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.N)), Bits: 8}
 	Z           = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.Z)), Bits: 8}
@@ -45,8 +44,6 @@ type Jit struct {
 
 	// used for testing individual instructions
 	testFunc func()
-
-	Scratch [0x10]uint32
 
 	LoopThreshold uint32
 	PageShift     uint32
@@ -137,7 +134,7 @@ func (j *Jit) SCRATCH(i uint32) gojit.Indirect {
 	// function calls at this time. Simple solution is writing them to memory
 	// this is slower and should be replaced with a stac kor register based method
 
-	if i > uint32(len(j.Scratch)) {
+	if i >= uint32(len(j.Cpu.Scratch)) {
 		panic("Called scratch register in jit > len of scratch registers")
 	}
 
@@ -160,7 +157,7 @@ func (j *Jit) InvalidatePage(addr uint32) {
 	}
 
 	page := j.Pages[addr>>j.PageShift]
-	if page == nil {
+	if page == nil || page.dead {
 		return
 	}
 

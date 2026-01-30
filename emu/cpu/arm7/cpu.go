@@ -21,6 +21,7 @@ type Cpu struct {
 
 	Jit        *Jit
 	jitEnabled bool
+	Scratch    [0x10]uint32
 }
 
 const (
