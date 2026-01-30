@@ -136,11 +136,14 @@ func (nds *Nds) Update() {
 		return
 	}
 
+    if !nds.ppu.EngineA.Dispcnt.Is3D {
+		nds.UpdateFrame()
+        return
+    }
+
 	if SINGLE_THREAD {
 		nds.UpdateFrame()
-		if nds.ppu.EngineA.Dispcnt.Is3D {
-			nds.ppu.Rasterizer.Render.UpdateRender()
-		}
+        nds.ppu.Rasterizer.Render.UpdateRender()
 		return
 	}
 
@@ -148,9 +151,7 @@ func (nds *Nds) Update() {
 
 	go func() {
 		defer RASTERIZE_WG.Done()
-		if nds.ppu.EngineA.Dispcnt.Is3D {
-			nds.ppu.Rasterizer.Render.UpdateRender()
-		}
+        nds.ppu.Rasterizer.Render.UpdateRender()
 	}()
 
 	go func() {
@@ -355,7 +356,7 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 		}
 
 		if vcount < SCREEN_HEIGHT {
-			nds.ppu.Graphics(vcount, SINGLE_THREAD)
+			nds.ppu.Graphics(vcount, uint32(nds.Frame))
 			nds.CheckDmas(dma.ARM9_DMA_MODE_HBL, true)
 		}
 	}

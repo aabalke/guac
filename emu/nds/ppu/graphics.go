@@ -5,7 +5,7 @@ import (
 	"unsafe"
 )
 
-func (ppu *PPU) Graphics(y uint32, singleThread bool) {
+func (ppu *PPU) Graphics(y, frame uint32) {
 
 	a := &ppu.EngineA
 	b := &ppu.EngineB
@@ -20,7 +20,9 @@ func (ppu *PPU) Graphics(y uint32, singleThread bool) {
 	a.getObjPriority(y)
 	b.getObjPriority(y)
 
-	ppu.buildFrame(y)
+    //if frame & ppu.FrameSkipMask == 0 {
+    ppu.buildFrame(y)
+    //}
 
 	a.Backgrounds[2].BgAffineUpdate()
 	a.Backgrounds[3].BgAffineUpdate()

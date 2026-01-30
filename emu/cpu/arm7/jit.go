@@ -21,16 +21,17 @@ var (
 	R           = REG + int32(unsafe.Offsetof(Reg{}.R))
 	CPSR        = REG + int32(unsafe.Offsetof(Reg{}.CPSR))
 	SCRATCH     = int32(unsafe.Offsetof(Cpu{}.Scratch))
-	MODE        = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.Mode)), Bits: 32}
-	N           = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.N)), Bits: 8}
-	Z           = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.Z)), Bits: 8}
-	C           = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.C)), Bits: 8}
-	V           = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.V)), Bits: 8}
-	Q           = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.Q)), Bits: 8}
-	I           = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.I)), Bits: 8}
-	F           = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.F)), Bits: 8}
-	T           = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cpu{}.Reg.CPSR.T)), Bits: 8}
 	HALTED_FLAG = gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Halted)), Bits: 8}
+
+	MODE = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.Mode)), Bits: 32}
+	N    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.N)), Bits: 8}
+	Z    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.Z)), Bits: 8}
+	C    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.C)), Bits: 8}
+	V    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.V)), Bits: 8}
+	Q    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.Q)), Bits: 8}
+	I    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.I)), Bits: 8}
+	F    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.F)), Bits: 8}
+	T    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.T)), Bits: 8}
 )
 
 type Jit struct {

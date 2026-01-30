@@ -196,7 +196,16 @@ func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, y uint32) {
 	base := bg.ScreenBaseBlock
 	if e.IsB {
 		base += 0x20_0000
-	}
+	} else {
+        base += e.Dispcnt.ScreenBase
+    }
+
+    charBase := bg.CharBaseBlock
+    if e.IsB {
+        charBase += 0x20_0000
+    } else {
+        charBase += e.Dispcnt.CharBase
+    }
 
 	pa := float64(utils.Convert16ToFloat(uint16(bg.Pa), 8))
 	pc := float64(utils.Convert16ToFloat(uint16(bg.Pc), 8))
@@ -245,23 +254,17 @@ func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, y uint32) {
 
 		tileIdx := (data & 0b11_1111_1111) << 5
 
-		tileAddr := bg.CharBaseBlock + tileIdx
+		tileAddr := charBase + tileIdx
 		tileAddr += tileIdx
-
-		if !e.IsB {
-			tileAddr += e.Dispcnt.CharBase
-		} else {
-			tileAddr += 0x20_0000
-		}
 
 		inTileY := yIdx & 0b111 //% 8
 		inTileX := xIdx & 0b111 //% 8
 
-		if hFlip := data>>10&1 != 0; hFlip {
+		if hFlip := (data>>10)&1 != 0; hFlip {
 			inTileX = 7 - inTileX
 		}
 
-		if vFlip := data>>11&1 != 0; vFlip {
+		if vFlip := (data>>11)&1 != 0; vFlip {
 			inTileY = 7 - inTileY
 		}
 
