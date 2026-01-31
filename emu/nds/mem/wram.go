@@ -102,8 +102,12 @@ func (w *WRAM) ReadPtr9(addr uint32) (unsafe.Pointer, bool) {
 
 func (w *WRAM) ReadPtr7(addr uint32) (unsafe.Pointer, bool) {
 
-	if addr >= 0x380_0000 {
+    switch {
+    case addr >= 0x380_0000:
 		return unsafe.Add(unsafe.Pointer(&w.WRAM7), addr&0xFFFF), true
+    case addr >= 0x380_0000 - 0x20:
+        // sonic brotherhood has arm7 use wram at 0x37F_FFFA -> 0x380_0000. Need to cancel read ptr near 0x380_0000
+        return nil, false
 	}
 
 	switch w.CNT {

@@ -75,7 +75,7 @@ func (ppu *PPU) vramDisplay(y uint32, e *Engine) {
 
     p32 := (*[SCREEN_WIDTH]uint32)(unsafe.Pointer(&e.Pixels[(y*SCREEN_WIDTH)*4]))
     for x := range uint32(SCREEN_WIDTH) {
-        p32[x] = e.MasterBright.LUT[e.Blend.Blended[x]]
+        p32[x] = e.MasterBright.LUT[e.Blend.Blended[x] &^ 0x8000]
     }
 }
 

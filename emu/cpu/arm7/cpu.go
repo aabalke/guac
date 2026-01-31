@@ -306,9 +306,7 @@ func (cpu *Cpu) GetOpThumb() (uint16, int) {
 
 	op := *(*uint16)(unsafe.Add(cpu.PcPtr, cpu.PcOff))
 	cpu.PcOff += 2
-	//cpu.isBranching = (op >> 14) != 0
 	cpu.isBranching = !DecodeTHUMBBranch(op)
-
 	return op, 0
 }
 
