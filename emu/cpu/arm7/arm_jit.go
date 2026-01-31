@@ -689,9 +689,9 @@ func (j *Jit) emitAlu(op uint32) {
 
 		if rn == PC {
 			if imm := (op>>4)&1 != 0; imm {
-				j.Add(amd64.Imm(8), amd64.Eax)
-			} else {
 				j.Add(amd64.Imm(12), amd64.Eax)
+			} else {
+				j.Add(amd64.Imm(8), amd64.Eax)
 			}
 		}
 	}
