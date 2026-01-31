@@ -235,7 +235,15 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 
 	p, ok := j.Cpu.mem.ReadPtr(tempPc, false)
 	if !ok {
-		panic("READ BAD")
+
+		if tempPc&0xF00_0000 == 0x600_0000 {
+			panic("need to setup VRAM as work ram")
+		}
+
+		//panic(fmt.Sprintf("read ptr bad jit arm7 ADDR %08X", tempPc))
+		j.BlockCache.PushTail(newBlock)
+		page.Blocks[blockIdx] = j.BlockCache.SkipBlock
+		return
 	}
 
 	if thumb {
@@ -257,7 +265,9 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 
 				p, ok = j.Cpu.mem.ReadPtr(tempPc, false)
 				if !ok {
-					panic("READ BAD")
+					j.BlockCache.PushTail(newBlock)
+					page.Blocks[blockIdx] = j.BlockCache.SkipBlock
+					return
 				}
 				continue
 			}
@@ -297,7 +307,9 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 
 				p, ok = j.Cpu.mem.ReadPtr(tempPc, false)
 				if !ok {
-					panic("READ BAD")
+					j.BlockCache.PushTail(newBlock)
+					page.Blocks[blockIdx] = j.BlockCache.SkipBlock
+					return
 				}
 				continue
 			}

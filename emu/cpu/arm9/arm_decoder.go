@@ -74,7 +74,7 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 		cpu.CoDataReg(op)
 
 	default:
-		fmt.Printf("Unable to Decode ARM 9 %08X, at PC %08X\n", op, r[PC])
+		fmt.Printf("Unable to Decode ARM true %08X, at PC %08X\n", op, r[PC])
 		return 0, false
 	}
 

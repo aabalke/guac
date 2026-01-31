@@ -53,7 +53,7 @@ func (c *Cpu) DecodeTHUMB() (int, bool) {
 		c.thumbBlock(op)
 	default:
 		r := &c.Reg.R
-		fmt.Printf("Unable to Decode ARM 7 %04X, at PC %08X\n", op, r[PC])
+		fmt.Printf("Unable to Decode ARM true %04X, at PC %08X\n", op, r[PC])
 		return 0, false
 	}
 
