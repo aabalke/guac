@@ -80,32 +80,36 @@ func (d *Dispstat) Read(hi, arm9 bool) uint8 {
 	return v
 }
 
-func (d *Dispstat) Write(v uint8, hi, arm9 bool) {
+func (d *Dispstat) Write7(v uint8, hi bool) {
 
 	if hi {
-		if arm9 {
-			d.A9LYC = (d.A9LYC & 0xFF) | ((uint32(v) << 8) & 1)
-			return
-		}
-
-		d.A7LYC = (d.A7LYC & 0xFF) | ((uint32(v) << 8) & 1)
+        d.A7LYC = (d.A7LYC &^ 0xFF) | uint32(v)
 		return
 	}
 
 	d.V = v&(1<<0) != 0
 	d.H = v&(1<<1) != 0
 
-	if arm9 {
-		d.A9VC = v&(1<<2) != 0
-		d.A9VIrq = v&(1<<3) != 0
-		d.A9HIrq = v&(1<<4) != 0
-		d.A9VCIrq = v&(1<<5) != 0
-		d.A9LYC = (d.A9LYC &^ 0xFF) | uint32(v)
-		return
-	}
 	d.A7VC = v&(1<<2) != 0
 	d.A7VIrq = v&(1<<3) != 0
 	d.A7HIrq = v&(1<<4) != 0
 	d.A7VCIrq = v&(1<<5) != 0
-	d.A7LYC = (d.A7LYC &^ 0xFF) | uint32(v)
+    d.A7LYC = (d.A7LYC & 0xFF) | (uint32(v & 0x80) << 8)
+}
+
+func (d *Dispstat) Write9(v uint8, hi bool) {
+
+	if hi {
+        d.A9LYC = (d.A9LYC &^ 0xFF) | uint32(v)
+		return
+	}
+
+	d.V = v&(1<<0) != 0
+	d.H = v&(1<<1) != 0
+
+	d.A9VC = v&(1<<2) != 0
+	d.A9VIrq = v&(1<<3) != 0
+	d.A9HIrq = v&(1<<4) != 0
+	d.A9VCIrq = v&(1<<5) != 0
+    d.A9LYC = (d.A9LYC & 0xFF) | (uint32(v & 0x80) << 8)
 }

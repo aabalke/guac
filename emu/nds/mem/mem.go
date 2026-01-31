@@ -654,9 +654,9 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 
 	switch addr {
 	case 0x4:
-		mem.Dispstat.Write(v, false, true)
+		mem.Dispstat.Write9(v, false)
 	case 0x5:
-		mem.Dispstat.Write(v, true, true)
+		mem.Dispstat.Write9(v, true)
 	case 0x6:
 		mem.Vcount &^= 0xFF
 		mem.Vcount |= uint32(v)
@@ -1084,9 +1084,9 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 
 	switch addr {
 	case 0x4:
-		mem.Dispstat.Write(v, false, false)
+		mem.Dispstat.Write7(v, false)
 	case 0x5:
-		mem.Dispstat.Write(v, true, false)
+		mem.Dispstat.Write7(v, true)
 
 	case 0x6:
 		mem.Vcount &^= 0xFF
