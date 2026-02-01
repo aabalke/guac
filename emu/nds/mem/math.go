@@ -17,15 +17,16 @@ type Div struct {
 func (d *Div) Write(addr uint32, v uint8) {
 
 	switch {
-	case addr >= 0x280 && addr < 0x284:
+    case addr < 0x280:
+        return
+	case addr < 0x284:
 		w(&d.cnt, v, addr-0x280)
-
-	case addr >= 0x290 && addr < 0x298:
+    case addr < 0x290:
+        return
+	case addr < 0x298:
 		w(&d.num, v, addr-0x290)
-
-	case addr >= 0x298 && addr < 0x2a0:
+	case addr < 0x2a0:
 		w(&d.den, v, addr-0x298)
-
 	default:
 		return
 	}
@@ -35,21 +36,20 @@ func (d *Div) Write(addr uint32, v uint8) {
 
 func (d *Div) Read(addr uint32) uint8 {
 	switch {
-	case addr >= 0x280 && addr < 0x284:
+    case addr < 0x280:
+        return 0
+	case addr < 0x284:
 		return r(d.cnt, addr-0x280)
-
-	case addr >= 0x290 && addr < 0x298:
+    case addr < 0x290:
+        return 0
+	case addr < 0x298:
 		return r(d.num, addr-0x290)
-
-	case addr >= 0x298 && addr < 0x2a0:
+	case addr < 0x2A0:
 		return r(d.den, addr-0x298)
-
-	case addr >= 0x2a0 && addr < 0x2a8:
-		return r(d.res, addr-0x2a0)
-
-	case addr >= 0x2a8 && addr < 0x2b0:
-		return r(d.rem, addr-0x2a8)
-
+	case addr < 0x2A8:
+		return r(d.res, addr-0x2A0)
+	case addr < 0x2B0:
+		return r(d.rem, addr-0x2A8)
 	default:
 		return 0
 	}
@@ -85,7 +85,7 @@ func (d *Div) Calc() {
 
 	case 2:
 
-		if uint32(d.den) == 0 {
+		if d.den == 0 {
 			d.rem = d.num
 
 			if int64(d.num) < 0 {
@@ -138,7 +138,9 @@ func (s *Sqrt) Write(addr uint32, v uint8) {
 	switch {
 	case addr == 0x2B0:
 		s.is64 = v&1 != 0
-	case addr >= 0x2B8 && addr < 0x2C0:
+    case addr < 0x2B8:
+        return
+	case addr < 0x2C0:
 		w(&s.param, v, addr-0x2B8)
 	default:
 		return
@@ -158,10 +160,11 @@ func (s *Sqrt) Read(addr uint32) uint8 {
 
 		return 0
 
-	case addr >= 0x2B4 && addr < 0x2B8:
+    case addr < 0x2B4:
+        return 0
+	case addr < 0x2B8:
 		return r(uint64(s.res), addr-0x2B4)
-
-	case addr >= 0x2B8 && addr < 0x2C0:
+	case addr < 0x2C0:
 		return r(s.param, addr-0x2B8)
 	}
 
