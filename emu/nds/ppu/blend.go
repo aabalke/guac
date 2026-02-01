@@ -244,7 +244,30 @@ func BlendAll(bld *Blend, wins *Windows, y uint32) {
 		}
 
 		return
-		//case 1 << BLD_ALPHA_3D:
+	case 1 << BLD_ALPHA_3D:
+        for x := range uint32(SCREEN_WIDTH) {
+            var (
+                pA = bld.APals[x]
+                pB = bld.BPals[x]
+                rA = (pA>>0)&0x1F
+                gA = (pA>>5)&0x1F
+                bA = (pA>>10)&0x1F
+                rB = (pB>>0)&0x1F
+                gB = (pB>>5)&0x1F
+                bB = (pB>>10)&0x1F
+
+                a = bld.alphas[x]
+                ai = 1-a
+
+                r = min(31, (rA*a + rB*ai)>>4)
+                g = min(31, (gA*a + gB*ai)>>4)
+                b = min(31, (bA*a + bB*ai)>>4)
+            )
+
+			bld.Blended[x] = r | (g << 5) | (b << 10)
+        }
+
+        return
 	}
 
 	for x := range uint32(SCREEN_WIDTH) {
@@ -285,9 +308,27 @@ func BlendAll(bld *Blend, wins *Windows, y uint32) {
 			bld.Blended[x] = r | (g << 5) | (b << 10)
 
 		case BLD_ALPHA_3D:
-			panic("untested 3d target blend sisd")
-			// should match bld alpha but with alpha value instead
-			//return max(0, min(31, (a*bld.alpha+b*(1-bp.alpha))>>4))
+
+            var (
+                pA = bld.APals[x]
+                pB = bld.BPals[x]
+                rA = (pA>>0)&0x1F
+                gA = (pA>>5)&0x1F
+                bA = (pA>>10)&0x1F
+                rB = (pB>>0)&0x1F
+                gB = (pB>>5)&0x1F
+                bB = (pB>>10)&0x1F
+
+                a = bld.alphas[x]
+                ai = 1-a
+
+
+                r = min(31, (rA*a + rB*ai)>>4)
+                g = min(31, (gA*a + gB*ai)>>4)
+                b = min(31, (bA*a + bB*ai)>>4)
+            )
+
+			bld.Blended[x] = r | (g << 5) | (b << 10)
 		}
 	}
 }
