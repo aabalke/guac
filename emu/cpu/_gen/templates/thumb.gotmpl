@@ -545,11 +545,12 @@ func (cpu *Cpu) thumbPushPop(op uint16) {
 		reg = 7
 	}
 
-	if pop {
-		p, _ = cpu.mem.ReadPtr(r[SP], {{.A9}})
-	} else {
-		p, _ = cpu.mem.WritePtr(r[SP], {{.A9}})
-	}
+    // disabled for now. Need method to handle games that use edge of bank to subtract from. ex. metroid uses 0x200_0000 as addr, then subtracts to place values in different bank at 0x1FF_FFFC
+	//if pop {
+	//	p, _ = cpu.mem.ReadPtr(r[SP], {{.A9}})
+	//} else {
+	//	p, _ = cpu.mem.WritePtr(r[SP], {{.A9}})
+	//}
 
 	if !pop && pclr {
 		r[SP] -= 4

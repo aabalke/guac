@@ -1067,11 +1067,12 @@ func (c *Cpu) Block(op uint32) {
 		reg = 15
 	}
 
-	if load {
-		p, _ = c.mem.ReadPtr(addr, false)
-	} else {
-		p, _ = c.mem.WritePtr(addr, false)
-	}
+	// disabled for now. Need method to handle games that use edge of bank to subtract from. ex. metroid uses 0x200_0000 as addr, then subtracts to place values in different bank at 0x1FF_FFFC
+	//if load {
+	//	p, _ = c.mem.ReadPtr(addr, false)
+	//} else {
+	//	p, _ = c.mem.WritePtr(addr, false)
+	//}
 
 	for range 16 {
 
