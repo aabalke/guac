@@ -258,6 +258,13 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 
 			if isThumbB(uint16(op)) {
 
+				if immLoop := op == 0xE7FE; immLoop {
+					j.Cpu.Halted = true
+					j.BlockCache.PushTail(newBlock)
+					page.Blocks[blockIdx] = j.BlockCache.SkipBlock
+					return
+				}
+
 				const shift = 32 - 11 // int32 - offset size
 				nn := (int32(op<<shift) >> shift) << 1
 				tempPc = uint32(int32(tempPc) + 4 + nn)
@@ -293,6 +300,13 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 			}
 
 			if isB(op) && op>>28 == 0xE {
+
+				if immLoop := op == 0xEAFFFFFE; immLoop {
+					j.Cpu.Halted = true
+					j.BlockCache.PushTail(newBlock)
+					page.Blocks[blockIdx] = j.BlockCache.SkipBlock
+					return
+				}
 
 				tempPc += uint32((int32(op)<<8)>>6) + 8
 
