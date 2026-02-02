@@ -979,7 +979,8 @@ func (j *Jit) emitThumbBlock(op uint32) {
 		if reg == rb {
 			matchingRb = true
 			// do not remove this, needed for golden sun and others
-			j.Movl(j.REG(rb), j.SCRATCH(1))
+			j.Movl(j.REG(rb), amd64.Edi)
+			j.Movl(amd64.Edi, j.SCRATCH(1))
 		}
 
 		j.Add(amd64.Imm(4), j.REG(rb))
@@ -987,6 +988,7 @@ func (j *Jit) emitThumbBlock(op uint32) {
 	}
 
 	if matchingRb {
-		j.Movl(j.SCRATCH(1), j.REG(rb))
+		j.Movl(j.SCRATCH(1), amd64.Eax)
+		j.Movl(amd64.Eax, j.REG(rb))
 	}
 }
