@@ -805,10 +805,10 @@ func (c *Cpu) Half(op uint32) {
 
 	switch inst {
 	case LDRH:
+		//  LDRH Rd,[odd]   -->  LDRH Rd,[odd-1] ROR 8  ;read to bit0-7 and bit24-31
 		v := uint32(c.mem.Read16(pre&^1, false))
 		is := (pre & 1) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
-
 	case LDRSB:
 		// sign-expand byte value
 		r[rd] = uint32(int32(int8(c.mem.Read8(pre, false))))

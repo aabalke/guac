@@ -468,16 +468,11 @@ func (j *Jit) emitHalf(op uint32) {
 
 		switch inst {
 		case LDRH:
-
 			j.Movl(amd64.Eax, j.SCRATCH(0))
-
 			j.And(amd64.Imm(^1), amd64.Rax)
 			j.CallFunc(Read16)
 
-			j.Movl(j.SCRATCH(0), amd64.Ecx)
-			j.And(amd64.Imm(1), amd64.Ecx)
-			j.Shl(amd64.Imm(3), amd64.Ecx)
-			j.RorCl(amd64.Eax)
+			//  LDRH Rd,[odd]   -->  LDRH Rd,[odd-1]        ;forced align
 			j.Movl(amd64.Eax, j.REG(rd))
 
 		case LDRSB:
