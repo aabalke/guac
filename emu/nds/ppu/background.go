@@ -41,7 +41,7 @@ func (e *Engine) getBgPriority(y uint32) {
 
 func (ppu *PPU) threeScanline(e *Engine, bgIdx, y uint32) {
 
-    wins := &e.Windows
+	wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
 
 	yIdx := (y + bg.YOffset) & ((bg.H) - 1)
@@ -52,13 +52,13 @@ func (ppu *PPU) threeScanline(e *Engine, bgIdx, y uint32) {
 
 	for x := range uint32(SCREEN_WIDTH) {
 
-        if covered := e.BgOks[x]; covered {
-            continue
-        }
+		if covered := e.BgOks[x]; covered {
+			continue
+		}
 
-        if wins.Enabled && !wins.inWinBg(bgIdx, x, y) {
-            continue
-        }
+		if wins.Enabled && !wins.inWinBg(bgIdx, x, y) {
+			continue
+		}
 
 		xIdx := (x + bg.XOffset) & ((bg.W) - 1)
 		i := (xIdx + (yIdx * SCREEN_WIDTH))
@@ -94,36 +94,35 @@ func (ppu *PPU) threeScanline(e *Engine, bgIdx, y uint32) {
 		e.BgPals[x] = pal
 		e.BgOks[x] = alpha != 0
 		e.BgAlphas[x] = alpha
-        e.BgIdx[x] = bgIdx
+		e.BgIdx[x] = bgIdx
 		continue
 	}
 }
 
 func (ppu *PPU) affineScanline(e *Engine, bgIdx, y uint32) {
 
-    wins := &e.Windows
+	wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
 	pa := float64(utils.Convert16ToFloat(uint16(bg.Pa), 8))
 	pc := float64(utils.Convert16ToFloat(uint16(bg.Pc), 8))
 
-    base := bg.ScreenBaseBlock
-    tileBase := bg.CharBaseBlock
-    if e.IsB {
-        base += 0x20_0000
-        tileBase += 0x20_0000
-    } else {
-        base += e.Dispcnt.ScreenBase
-    }
+	base := bg.ScreenBaseBlock
+	tileBase := bg.CharBaseBlock
+	if e.IsB {
+		base += 0x20_0000
+		tileBase += 0x20_0000
+	} else {
+		base += e.Dispcnt.ScreenBase
+	}
 
 	for x := range uint32(SCREEN_WIDTH) {
-        if covered := e.BgOks[x]; covered {
-            continue
-        }
+		if covered := e.BgOks[x]; covered {
+			continue
+		}
 
-
-        if wins.Enabled && !wins.inWinBg(bgIdx, x, y) {
-            continue
-        }
+		if wins.Enabled && !wins.inWinBg(bgIdx, x, y) {
+			continue
+		}
 
 		xIdx := int(pa*float64(x) + bg.OutX)
 		if bg.Mosaic && e.Mosaic.BgH != 0 {
@@ -144,12 +143,12 @@ func (ppu *PPU) affineScanline(e *Engine, bgIdx, y uint32) {
 			continue
 		}
 
-        var (
-            map_x  = (uint32(xIdx))  & (bg.W - 1) >> 3
-            map_y  = (((uint32(yIdx)) & (bg.H - 1)) >> 3) * (bg.W >> 3)
-            mapIdx = map_y + map_x
-            data   = uint32(ppu.Vram.Read9(base+mapIdx))
-        )
+		var (
+			map_x  = (uint32(xIdx)) & (bg.W - 1) >> 3
+			map_y  = (((uint32(yIdx)) & (bg.H - 1)) >> 3) * (bg.W >> 3)
+			mapIdx = map_y + map_x
+			data   = uint32(ppu.Vram.Read9(base + mapIdx))
+		)
 
 		inTileX := xIdx & 7
 		if hFlip := (data>>10)&1 != 0; hFlip {
@@ -161,26 +160,26 @@ func (ppu *PPU) affineScanline(e *Engine, bgIdx, y uint32) {
 			inTileY = 7 - inTileY
 		}
 
-        var (
-            inTileIdx = uint32(inTileX) + uint32(inTileY<<3)
-            addr      = tileBase + (data << 6) + inTileIdx
-            palIdx    = ppu.Vram.Read9(addr)
-        )
+		var (
+			inTileIdx = uint32(inTileX) + uint32(inTileY<<3)
+			addr      = tileBase + (data << 6) + inTileIdx
+			palIdx    = ppu.Vram.Read9(addr)
+		)
 
 		if palIdx == 0 {
 			continue
 		}
 
-        e.BgOks[x] = true
-        e.BgIdx[x] = bgIdx
+		e.BgOks[x] = true
+		e.BgIdx[x] = bgIdx
 
 		if e.Dispcnt.BgExtPal {
-            slot := bgIdx
+			slot := bgIdx
 			if e.Backgrounds[bgIdx].AltExtPalSlot {
-                slot += 2
+				slot += 2
 			}
 
-            e.BgPals[x] = *(*uint16)(unsafe.Add(unsafe.Pointer(e.ExtBgSlots[slot]), addr))
+			e.BgPals[x] = *(*uint16)(unsafe.Add(unsafe.Pointer(e.ExtBgSlots[slot]), addr))
 			continue
 		}
 
@@ -190,34 +189,34 @@ func (ppu *PPU) affineScanline(e *Engine, bgIdx, y uint32) {
 
 func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, y uint32) {
 
-    wins := &e.Windows
+	wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
 
 	base := bg.ScreenBaseBlock
 	if e.IsB {
 		base += 0x20_0000
 	} else {
-        base += e.Dispcnt.ScreenBase
-    }
+		base += e.Dispcnt.ScreenBase
+	}
 
-    charBase := bg.CharBaseBlock
-    if e.IsB {
-        charBase += 0x20_0000
-    } else {
-        charBase += e.Dispcnt.CharBase
-    }
+	charBase := bg.CharBaseBlock
+	if e.IsB {
+		charBase += 0x20_0000
+	} else {
+		charBase += e.Dispcnt.CharBase
+	}
 
 	pa := float64(utils.Convert16ToFloat(uint16(bg.Pa), 8))
 	pc := float64(utils.Convert16ToFloat(uint16(bg.Pc), 8))
 
 	for x := range uint32(SCREEN_WIDTH) {
-        if covered := e.BgOks[x]; covered {
-            continue
-        }
+		if covered := e.BgOks[x]; covered {
+			continue
+		}
 
-        if wins.Enabled && !wins.inWinBg(bgIdx, x, y) {
-            continue
-        }
+		if wins.Enabled && !wins.inWinBg(bgIdx, x, y) {
+			continue
+		}
 
 		xIdx := int(pa*float64(x) + bg.OutX)
 		yIdx := int(pc*float64(x) + bg.OutY)
@@ -269,7 +268,7 @@ func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, y uint32) {
 		}
 
 		inTileIdx := uint32(inTileX) + uint32(inTileY<<3)
-		palIdx := uint32(ppu.Vram.Read9(tileAddr+inTileIdx))
+		palIdx := uint32(ppu.Vram.Read9(tileAddr + inTileIdx))
 		palNum := data >> 12
 
 		palIdx &= 0xFF
@@ -278,17 +277,17 @@ func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, y uint32) {
 			continue
 		}
 
-        e.BgOks[x] = true
-        e.BgIdx[x] = bgIdx
+		e.BgOks[x] = true
+		e.BgIdx[x] = bgIdx
 
 		if e.Dispcnt.BgExtPal {
-            slot := bgIdx
+			slot := bgIdx
 			if e.Backgrounds[bgIdx].AltExtPalSlot {
 				slot += 2
 			}
 
 			addr := (palNum << 9) + palIdx<<1
-            e.BgPals[x] = *(*uint16)(unsafe.Add(unsafe.Pointer(e.ExtBgSlots[slot]), addr))
+			e.BgPals[x] = *(*uint16)(unsafe.Add(unsafe.Pointer(e.ExtBgSlots[slot]), addr))
 			continue
 		}
 
@@ -298,7 +297,7 @@ func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, y uint32) {
 
 func (ppu *PPU) directBmpScanline(e *Engine, bgIdx, y uint32) {
 
-    wins := &e.Windows
+	wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
 
 	base := bg.ScreenBaseBlock * 8
@@ -312,13 +311,13 @@ func (ppu *PPU) directBmpScanline(e *Engine, bgIdx, y uint32) {
 	pc := float64(utils.Convert16ToFloat(uint16(bg.Pc), 8))
 
 	for x := range uint32(SCREEN_WIDTH) {
-        if covered := e.BgOks[x]; covered {
-            continue
-        }
+		if covered := e.BgOks[x]; covered {
+			continue
+		}
 
-        if wins.Enabled && !wins.inWinBg(bgIdx, x, y) {
-            continue
-        }
+		if wins.Enabled && !wins.inWinBg(bgIdx, x, y) {
+			continue
+		}
 
 		xIdx := int(pa*float64(x) + bg.OutX)
 		yIdx := int(pc*float64(x) + bg.OutY)
@@ -357,13 +356,13 @@ func (ppu *PPU) directBmpScanline(e *Engine, bgIdx, y uint32) {
 
 		e.BgPals[x] = data &^ 0x8000
 		e.BgOks[x] = true
-        e.BgIdx[x] = bgIdx
+		e.BgIdx[x] = bgIdx
 	}
 }
 
 func (ppu *PPU) bmpScanline(e *Engine, bgIdx, y uint32) {
 
-    wins := &e.Windows
+	wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
 
 	base := bg.ScreenBaseBlock * 8
@@ -377,13 +376,13 @@ func (ppu *PPU) bmpScanline(e *Engine, bgIdx, y uint32) {
 	pc := float64(utils.Convert16ToFloat(uint16(bg.Pc), 8))
 
 	for x := range uint32(SCREEN_WIDTH) {
-        if covered := e.BgOks[x]; covered {
-            continue
-        }
+		if covered := e.BgOks[x]; covered {
+			continue
+		}
 
-        if wins.Enabled && !wins.inWinBg(bgIdx, x, y) {
-            continue
-        }
+		if wins.Enabled && !wins.inWinBg(bgIdx, x, y) {
+			continue
+		}
 
 		xIdx := int(pa*float64(x) + bg.OutX)
 		yIdx := int(pc*float64(x) + bg.OutY)
@@ -410,7 +409,7 @@ func (ppu *PPU) bmpScanline(e *Engine, bgIdx, y uint32) {
 
 		var palIdx uint32
 		if ptr == nil {
-			palIdx = uint32(ppu.Vram.Read9(base+addr))
+			palIdx = uint32(ppu.Vram.Read9(base + addr))
 		} else {
 			palIdx = uint32(*(*uint8)(unsafe.Add(ptr, addr)))
 		}
@@ -419,8 +418,8 @@ func (ppu *PPU) bmpScanline(e *Engine, bgIdx, y uint32) {
 			continue
 		}
 
-        e.BgOks[x] = true
-        e.BgIdx[x] = bgIdx
+		e.BgOks[x] = true
+		e.BgIdx[x] = bgIdx
 
 		if e.IsB {
 			e.BgPals[x] = ppu.EngineB.Pram.Bg[palIdx]
@@ -440,7 +439,7 @@ func (ppu *PPU) tiledScanline(e *Engine, bgIdx, y uint32) {
 		TILE_ROW_MASK = 0xF8
 	)
 
-    wins := &e.Windows
+	wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
 
 	bgY := (y + bg.YOffset) & ((bg.H) - 1)
@@ -454,7 +453,7 @@ func (ppu *PPU) tiledScanline(e *Engine, bgIdx, y uint32) {
 	}
 
 	var (
-		mapRowOffset = ((bgY>>8)<<mapRowShift) + ((bgY&TILE_ROW_MASK)<<2)
+		mapRowOffset = ((bgY >> 8) << mapRowShift) + ((bgY & TILE_ROW_MASK) << 2)
 		tileBase     = bg.CharBaseBlock
 		mapBase      = bg.ScreenBaseBlock
 	)
@@ -509,15 +508,15 @@ func (ppu *PPU) tiledScanline(e *Engine, bgIdx, y uint32) {
 
 		for px := pxStart; px < 8 && screenX < SCREEN_WIDTH; px++ {
 
-            if e.BgOks[screenX] {
+			if e.BgOks[screenX] {
 				screenX++
-                continue
-            }
+				continue
+			}
 
-            if wins.Enabled && !wins.inWinBg(bgIdx, screenX, y) {
+			if wins.Enabled && !wins.inWinBg(bgIdx, screenX, y) {
 				screenX++
-                continue
-            }
+				continue
+			}
 
 			tilePxX := px
 			if hFlip {
@@ -558,20 +557,20 @@ func (ppu *PPU) tiledScanline(e *Engine, bgIdx, y uint32) {
 					slot += 2
 				}
 				addr := (palNum << 9) + (palIdx << 1)
-                e.BgPals[screenX] = *(*uint16)(unsafe.Add(unsafe.Pointer(e.ExtBgSlots[slot]), addr))
-                screenX++
-                continue
-            }
+				e.BgPals[screenX] = *(*uint16)(unsafe.Add(unsafe.Pointer(e.ExtBgSlots[slot]), addr))
+				screenX++
+				continue
+			}
 
-            if bg.Palette256 {
-                e.BgPals[screenX] = e.Pram.Bg[palIdx]
-                screenX++
-                continue
-            }
+			if bg.Palette256 {
+				e.BgPals[screenX] = e.Pram.Bg[palIdx]
+				screenX++
+				continue
+			}
 
-            addr := (palNum << 4) + palIdx
-            e.BgPals[screenX] = e.Pram.Bg[addr]
-            screenX++
-        }
+			addr := (palNum << 4) + palIdx
+			e.BgPals[screenX] = e.Pram.Bg[addr]
+			screenX++
+		}
 	}
 }

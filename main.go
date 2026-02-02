@@ -16,8 +16,6 @@ import (
 	"github.com/aabalke/guac/config"
 	"github.com/hajimehoshi/ebiten/v2"
 
-	//_ "github.com/silbinarywolf/preferdiscretegpu" //no profiler change
-
 	"os"
 	"runtime/pprof"
 )
@@ -33,9 +31,6 @@ const (
 var icon []byte
 
 var f *os.File
-
-//var isProfiling bool
-//var profileFrames uint32
 
 const MAX_TPS = 60 * 20
 

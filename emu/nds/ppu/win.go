@@ -15,14 +15,14 @@ func inWindow(x, y, l, r, t, b uint32) bool {
 
 //go:inline
 func (wins *Windows) inWinBg(bgIdx, x, y uint32) bool {
-    win0 := &wins.Win0
-    win1 := &wins.Win1
-    if win0.Enabled && inWindow(x, y, win0.L, win0.R, win0.T, win0.B) {
-        return win0.InBg[bgIdx]
-    } else if win1.Enabled && inWindow(x, y, win1.L, win1.R, win1.T, win1.B) {
-        return win1.InBg[bgIdx]
-    } 
-    return wins.OutBg[bgIdx]
+	win0 := &wins.Win0
+	win1 := &wins.Win1
+	if win0.Enabled && inWindow(x, y, win0.L, win0.R, win0.T, win0.B) {
+		return win0.InBg[bgIdx]
+	} else if win1.Enabled && inWindow(x, y, win1.L, win1.R, win1.T, win1.B) {
+		return win1.InBg[bgIdx]
+	}
+	return wins.OutBg[bgIdx]
 }
 
 //go:inline

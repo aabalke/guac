@@ -245,29 +245,29 @@ func BlendAll(bld *Blend, wins *Windows, y uint32) {
 
 		return
 	case 1 << BLD_ALPHA_3D:
-        for x := range uint32(SCREEN_WIDTH) {
-            var (
-                pA = bld.APals[x]
-                pB = bld.BPals[x]
-                rA = (pA>>0)&0x1F
-                gA = (pA>>5)&0x1F
-                bA = (pA>>10)&0x1F
-                rB = (pB>>0)&0x1F
-                gB = (pB>>5)&0x1F
-                bB = (pB>>10)&0x1F
+		for x := range uint32(SCREEN_WIDTH) {
+			var (
+				pA = bld.APals[x]
+				pB = bld.BPals[x]
+				rA = (pA >> 0) & 0x1F
+				gA = (pA >> 5) & 0x1F
+				bA = (pA >> 10) & 0x1F
+				rB = (pB >> 0) & 0x1F
+				gB = (pB >> 5) & 0x1F
+				bB = (pB >> 10) & 0x1F
 
-                a = bld.alphas[x]
-                ai = 1-a
+				a  = bld.alphas[x]
+				ai = 1 - a
 
-                r = min(31, (rA*a + rB*ai)>>4)
-                g = min(31, (gA*a + gB*ai)>>4)
-                b = min(31, (bA*a + bB*ai)>>4)
-            )
+				r = min(31, (rA*a+rB*ai)>>4)
+				g = min(31, (gA*a+gB*ai)>>4)
+				b = min(31, (bA*a+bB*ai)>>4)
+			)
 
 			bld.Blended[x] = r | (g << 5) | (b << 10)
-        }
+		}
 
-        return
+		return
 	}
 
 	for x := range uint32(SCREEN_WIDTH) {
@@ -309,24 +309,23 @@ func BlendAll(bld *Blend, wins *Windows, y uint32) {
 
 		case BLD_ALPHA_3D:
 
-            var (
-                pA = bld.APals[x]
-                pB = bld.BPals[x]
-                rA = (pA>>0)&0x1F
-                gA = (pA>>5)&0x1F
-                bA = (pA>>10)&0x1F
-                rB = (pB>>0)&0x1F
-                gB = (pB>>5)&0x1F
-                bB = (pB>>10)&0x1F
+			var (
+				pA = bld.APals[x]
+				pB = bld.BPals[x]
+				rA = (pA >> 0) & 0x1F
+				gA = (pA >> 5) & 0x1F
+				bA = (pA >> 10) & 0x1F
+				rB = (pB >> 0) & 0x1F
+				gB = (pB >> 5) & 0x1F
+				bB = (pB >> 10) & 0x1F
 
-                a = bld.alphas[x]
-                ai = 1-a
+				a  = bld.alphas[x]
+				ai = 1 - a
 
-
-                r = min(31, (rA*a + rB*ai)>>4)
-                g = min(31, (gA*a + gB*ai)>>4)
-                b = min(31, (bA*a + bB*ai)>>4)
-            )
+				r = min(31, (rA*a+rB*ai)>>4)
+				g = min(31, (gA*a+gB*ai)>>4)
+				b = min(31, (bA*a+bB*ai)>>4)
+			)
 
 			bld.Blended[x] = r | (g << 5) | (b << 10)
 		}

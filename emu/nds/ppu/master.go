@@ -3,7 +3,7 @@ package ppu
 type MasterBright struct {
 	Factor uint16
 	Mode   uint8
-    LUT    [0x8000]uint32
+	LUT    [0x8000]uint32
 }
 
 const (
@@ -14,8 +14,8 @@ const (
 
 func (m *MasterBright) Write(v, b uint8) {
 
-    oldFactor := m.Factor
-    oldMode := m.Mode
+	oldFactor := m.Factor
+	oldMode := m.Mode
 	switch b {
 	case 0:
 		m.Factor = uint16(min(16, v&0x1F))
@@ -24,9 +24,9 @@ func (m *MasterBright) Write(v, b uint8) {
 		m.Mode = v >> 6
 	}
 
-    if m.Factor != oldFactor || m.Mode != oldMode {
-        m.RebuildLUT()
-    }
+	if m.Factor != oldFactor || m.Mode != oldMode {
+		m.RebuildLUT()
+	}
 }
 
 func (m *MasterBright) Read(b uint8) uint8 {
@@ -66,9 +66,9 @@ func (m *MasterBright) RebuildLUT() {
 
 		m.LUT[v] =
 			uint32(R) |
-			uint32(G)<<8 |
-			uint32(B)<<16 | 
-            0xFF00_0000
+				uint32(G)<<8 |
+				uint32(B)<<16 |
+				0xFF00_0000
 	}
 }
 

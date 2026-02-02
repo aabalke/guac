@@ -55,36 +55,24 @@ Graphics
     👍 Ext_palettes
     gl2d
     👍 grit
-    Printing
 
-    👍 Backgrounds
-        👍 16 bit color bmp
-        👍 256 bit color bmp
-        👍 all in one
-            👍 Basic
-                👍 1, 2, 3, 4, 5
-                👍 6, 7, 8, 9
-                👍 10, 11, 12, 13
+👍 graphics/backgrounds/16bitcolormap
+👍 graphics/backgrounds/256bitcolormap
+👍 graphics/backgrounds/double_buffer
+👍 graphics/backgrounds/rotation
 
-            👍 Bitmap
-                👍 1, 2, 3, 4
-                👍 5, 6
-                👍 7, 8, 9, 10
+👍 graphics/backgrounds/all_in_one/basic
+👍 graphics/backgrounds/all_in_one/bitmap
+👍 graphics/backgrounds/all_in_one/scrolling
+❌ graphics/backgrounds/all_in_one/advanced - x mosaic on tiled not working
 
-            👍 Scrolling
-            👍 Advanced
-    
-        👍 double buffer
-        👍 rotation
-
-    👍 Sprites
-        👍 allocation test
-        👍 animate simple
-        👍 bitmap sprites
-        👍 fire and sprites
-        👍 simple
-        👍 sprite extended palettes
-        👍 sprite rotate
+ 👍 graphics/sprites/allocation_test
+ 👍 graphics/sprites/animate_simple
+ ❌ graphics/sprites/bitmap_sprites - direct bitmap fails
+ graphics/sprites/fire_and_sprites
+ graphics/sprites/simple
+ graphics/sprites/sprite_extended_palettes
+ graphics/sprites/sprite_rotate
 
 👍 hello_world
 ❌ input/addon

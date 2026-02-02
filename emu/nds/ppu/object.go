@@ -12,9 +12,9 @@ func (e *Engine) getObjPriority(y uint32) {
 	priorities[2].Cnt = 0
 	priorities[3].Cnt = 0
 
-    if !e.Dispcnt.DisplayObj {
-        return
-    }
+	if !e.Dispcnt.DisplayObj {
+		return
+	}
 
 	for i := range uint32(128) {
 
@@ -43,282 +43,279 @@ func (e *Engine) getObjPriority(y uint32) {
 
 func (ppu *PPU) tiledObject(e *Engine, objIdx, priority, y uint32) {
 
-    obj := &e.Objects[objIdx]
+	obj := &e.Objects[objIdx]
 
-    yIdx := int(y) - int(obj.Y)
+	yIdx := int(y) - int(obj.Y)
 
-    if obj.Y > SCREEN_HEIGHT {
-        yIdx += 256 // i believe 256 is max
-    }
+	if obj.Y > SCREEN_HEIGHT {
+		yIdx += 256 // i believe 256 is max
+	}
 
-    if obj.Mosaic && e.Mosaic.ObjV != 0 {
-        yIdx -= yIdx % int(e.Mosaic.ObjV+1)
-    }
+	if obj.Mosaic && e.Mosaic.ObjV != 0 {
+		yIdx -= yIdx % int(e.Mosaic.ObjV+1)
+	}
 
-    enTileY := uint32(yIdx >> 3)
-    inTileY := uint32(yIdx & 7)
-    if obj.VFlip {
-        enTileY = (obj.H / 8) - 1 - enTileY
-        inTileY = 7 - inTileY
-    }
+	enTileY := uint32(yIdx >> 3)
+	inTileY := uint32(yIdx & 7)
+	if obj.VFlip {
+		enTileY = (obj.H / 8) - 1 - enTileY
+		inTileY = 7 - inTileY
+	}
 
-    base := uint32(0x40_0000)
-    if e.IsB {
-        base = 0x60_0000
-    }
+	base := uint32(0x40_0000)
+	if e.IsB {
+		base = 0x60_0000
+	}
 
-    const BYTES_PER_PIXEL = 2
-    w := obj.W << BYTES_PER_PIXEL
-    if obj.Palette256 {
-        w <<= 1
-    }
+	const BYTES_PER_PIXEL = 2
+	w := obj.W << BYTES_PER_PIXEL
+	if obj.Palette256 {
+		w <<= 1
+	}
 
-    if e.Dispcnt.TileObj1D {
-        base += (enTileY * w) + (obj.CharName<<obj.TileBoundaryShift)
-    } else {
-        base += ((enTileY << 5) + obj.CharName) << 5
-    }
+	if e.Dispcnt.TileObj1D {
+		base += (enTileY * w) + (obj.CharName << obj.TileBoundaryShift)
+	} else {
+		base += ((enTileY << 5) + obj.CharName) << 5
+	}
 
-    ptr := ppu.Vram.ReadGraphicalPtr(base)
+	ptr := ppu.Vram.ReadGraphicalPtr(base)
 
-    for x := range uint32(SCREEN_WIDTH) {
+	for x := range uint32(SCREEN_WIDTH) {
 
-        if e.ObjOk[x] {
-            continue
-        }
+		if e.ObjOk[x] {
+			continue
+		}
 
-        if e.Windows.Enabled && !e.Windows.inWinObj(x, y) {
-            continue
-        }
+		if e.Windows.Enabled && !e.Windows.inWinObj(x, y) {
+			continue
+		}
 
-        xIdx := int(x) - int(obj.X)
-        if obj.X > SCREEN_WIDTH {
-            xIdx += 512 // i believe 512 is max
-        }
+		xIdx := int(x) - int(obj.X)
+		if obj.X > SCREEN_WIDTH {
+			xIdx += 512 // i believe 512 is max
+		}
 
-        if obj.Mosaic && e.Mosaic.ObjH != 0 {
-            xIdx -= xIdx % int(e.Mosaic.ObjH+1)
-        }
+		if obj.Mosaic && e.Mosaic.ObjH != 0 {
+			xIdx -= xIdx % int(e.Mosaic.ObjH+1)
+		}
 
-        if outObjectBound(obj, xIdx, yIdx) {
-            continue
-        }
+		if outObjectBound(obj, xIdx, yIdx) {
+			continue
+		}
 
-        enTileX := uint32(xIdx >> 3)
-        inTileX := uint32(xIdx & 7)
-        if obj.HFlip {
-            enTileX = (obj.W >> 3) - 1 - enTileX
-            inTileX = 7 - inTileX
-        }
+		enTileX := uint32(xIdx >> 3)
+		inTileX := uint32(xIdx & 7)
+		if obj.HFlip {
+			enTileX = (obj.W >> 3) - 1 - enTileX
+			inTileX = 7 - inTileX
+		}
 
-        var inTileIdx uint32
-        if obj.Palette256 {
-            enTileX <<= 1
-            inTileIdx = inTileX + (inTileY << 3)
-        } else {
-            inTileIdx = (inTileX >> 1) + (inTileY << 2)
-        }
+		var inTileIdx uint32
+		if obj.Palette256 {
+			enTileX <<= 1
+			inTileIdx = inTileX + (inTileY << 3)
+		} else {
+			inTileIdx = (inTileX >> 1) + (inTileY << 2)
+		}
 
-        addr := (enTileX << 5) + inTileIdx
+		addr := (enTileX << 5) + inTileIdx
 
-        var palIdx uint32
-        if ptr == nil {
-            palIdx = uint32(ppu.Vram.Read16(base + addr))
-        } else {
-            palIdx = uint32(*(*uint16)(unsafe.Add(ptr, addr)))
-        }
+		var palIdx uint32
+		if ptr == nil {
+			palIdx = uint32(ppu.Vram.Read16(base + addr))
+		} else {
+			palIdx = uint32(*(*uint16)(unsafe.Add(ptr, addr)))
+		}
 
-        ppu.getObjPalData(e, obj, palIdx, inTileX, priority, x)
-    }
+		ppu.getObjPalData(e, obj, palIdx, inTileX, priority, x)
+	}
 }
 
 func (ppu *PPU) tiledObjectAffine(e *Engine, objIdx, priority, y uint32) {
 
-    obj := &e.Objects[objIdx]
+	obj := &e.Objects[objIdx]
 
-    base := uint32(0x40_0000)
-    if e.IsB {
-        base = 0x60_0000
-    }
+	base := uint32(0x40_0000)
+	if e.IsB {
+		base = 0x60_0000
+	}
 
-    const BYTES_PER_PIXEL = 2
-    w := obj.W << BYTES_PER_PIXEL
-    if obj.Palette256 {
-        w <<= 1
-    }
+	const BYTES_PER_PIXEL = 2
+	w := obj.W << BYTES_PER_PIXEL
+	if obj.Palette256 {
+		w <<= 1
+	}
 
-    for x := range uint32(SCREEN_WIDTH) {
+	for x := range uint32(SCREEN_WIDTH) {
 
-        if covered := e.ObjOk[x]; covered {
-            continue
-        }
+		if covered := e.ObjOk[x]; covered {
+			continue
+		}
 
-        if outBoundAffine(obj, x, y) {
-            continue
-        }
-        if e.Windows.Enabled && !e.Windows.inWinObj(x, y) {
-            continue
-        }
+		if outBoundAffine(obj, x, y) {
+			continue
+		}
+		if e.Windows.Enabled && !e.Windows.inWinObj(x, y) {
+			continue
+		}
 
+		xIdx, yIdx := getAffineCoordinates(e, obj, x, y)
 
-        xIdx, yIdx := getAffineCoordinates(e, obj, x, y)
+		if outObjectBound(obj, xIdx, yIdx) {
+			continue
+		}
 
-        if outObjectBound(obj, xIdx, yIdx) {
-            continue
-        }
+		enTileY := uint32(yIdx >> 3)
+		enTileX := uint32(xIdx >> 3)
+		inTileY := uint32(yIdx & 7)
+		inTileX := uint32(xIdx & 7)
 
-        enTileY := uint32(yIdx >> 3)
-        enTileX := uint32(xIdx >> 3)
-        inTileY := uint32(yIdx & 7)
-        inTileX := uint32(xIdx & 7)
+		if obj.Palette256 {
+			enTileX <<= 1
+		}
 
-        if obj.Palette256 {
-            enTileX <<= 1
-        }
+		var tileOffset uint32
+		if e.Dispcnt.TileObj1D {
+			tileOffset = (enTileX << 5) + (enTileY * w)
+			tileOffset = (tileOffset + obj.CharName<<obj.TileBoundaryShift)
+		} else {
+			tileOffset = enTileX + (enTileY << 5)
+			tileOffset = (tileOffset + obj.CharName) << 5
+		}
 
-        var tileOffset uint32
-        if e.Dispcnt.TileObj1D {
-            tileOffset = (enTileX << 5) + (enTileY * w)
-            tileOffset = (tileOffset + obj.CharName<<obj.TileBoundaryShift)
-        } else {
-            tileOffset = enTileX + (enTileY << 5)
-            tileOffset = (tileOffset + obj.CharName) << 5
-        }
+		var inTileIdx uint32
+		if obj.Palette256 {
+			inTileIdx = inTileX + (inTileY << 3)
+		} else {
+			inTileIdx = (inTileX >> 1) + (inTileY << 2)
+		}
 
-        var inTileIdx uint32
-        if obj.Palette256 {
-            inTileIdx = inTileX + (inTileY << 3)
-        } else {
-            inTileIdx = (inTileX >> 1) + (inTileY << 2)
-        }
+		offset := tileOffset + inTileIdx
 
-        offset := tileOffset + inTileIdx
+		palIdx := uint32(ppu.Vram.Read16(base + offset))
 
-        palIdx := uint32(ppu.Vram.Read16(base+offset))
-
-        ppu.getObjPalData(e, obj, palIdx, inTileX, priority, x)
-    }
+		ppu.getObjPalData(e, obj, palIdx, inTileX, priority, x)
+	}
 }
 
 func (ppu *PPU) getObjPalData(e *Engine, obj *Object, palIdx, inTileX, priority, x uint32) {
 
-        pal := obj.Palette
+	pal := obj.Palette
 
-        if obj.Palette256 {
-            palIdx &= 0xFF
-        } else {
-            palIdx = (palIdx >> ((inTileX & 1) << 2)) & 0xF
-        }
+	if obj.Palette256 {
+		palIdx &= 0xFF
+	} else {
+		palIdx = (palIdx >> ((inTileX & 1) << 2)) & 0xF
+	}
 
-        if palIdx == 0 {
-            return
-        }
+	if palIdx == 0 {
+		return
+	}
 
-        e.ObjMode[x] = obj.Mode
-        e.ObjOk[x] = true
+	e.ObjMode[x] = obj.Mode
+	e.ObjOk[x] = true
 
-        if e.Dispcnt.ObjExtPal && obj.Palette256 {
-            addr := (pal << 9) + palIdx<<1
-            e.ObjPals[x] = *(*uint16)(unsafe.Add(unsafe.Pointer(e.ExtObj), addr))
-            return
-        }
+	if e.Dispcnt.ObjExtPal && obj.Palette256 {
+		addr := (pal << 9) + palIdx<<1
+		e.ObjPals[x] = *(*uint16)(unsafe.Add(unsafe.Pointer(e.ExtObj), addr))
+		return
+	}
 
-        if obj.Palette256 {
-            e.ObjPals[x] = e.Pram.Obj[palIdx]
-            return
-        }
+	if obj.Palette256 {
+		e.ObjPals[x] = e.Pram.Obj[palIdx]
+		return
+	}
 
-        e.ObjPals[x] = e.Pram.Obj[(pal << 4) + palIdx]
+	e.ObjPals[x] = e.Pram.Obj[(pal<<4)+palIdx]
 }
 
 func (ppu *PPU) bitmapObject(e *Engine, objIdx, priority, y uint32) {
 
-    obj := &e.Objects[objIdx]
+	obj := &e.Objects[objIdx]
 
-    base := uint32(0x40_0000)
-    if e.IsB {
-        base = 0x60_0000
-    }
+	base := uint32(0x40_0000)
+	if e.IsB {
+		base = 0x60_0000
+	}
 
-    for x := range uint32(SCREEN_WIDTH) {
+	for x := range uint32(SCREEN_WIDTH) {
 
-        if covered := e.ObjOk[x]; covered {
-            continue
-        }
-        if e.Windows.Enabled && !e.Windows.inWinObj(x, y) {
-            continue
-        }
+		if covered := e.ObjOk[x]; covered {
+			continue
+		}
+		if e.Windows.Enabled && !e.Windows.inWinObj(x, y) {
+			continue
+		}
 
+		xIdx, yIdx, ok := getObjNormalCoords(e, obj, x, y)
 
-        xIdx, yIdx, ok := getObjNormalCoords(e, obj, x, y)
+		if !ok {
+			continue
+		}
 
-        if !ok {
-            continue
-        }
+		var offset uint32
+		const BYTES_PER_PIXEL = 2
+		if e.Dispcnt.BitmapObj1D {
+			offset = uint32(xIdx+(yIdx<<obj.BmpBoundaryShift)) * BYTES_PER_PIXEL
+		} else {
+			offset = getBmp2d(obj, uint32(xIdx), uint32(yIdx))
+		}
 
-        var offset uint32
-        const BYTES_PER_PIXEL = 2
-        if e.Dispcnt.BitmapObj1D {
-		    offset = uint32(xIdx+(yIdx<<obj.BmpBoundaryShift)) * BYTES_PER_PIXEL
-        } else {
-            offset = getBmp2d(obj, uint32(xIdx), uint32(yIdx))
-        }
+		data := ppu.Vram.Read16(base + offset)
 
-        data := ppu.Vram.Read16(base + offset)
+		if alpha := (data & 0x8000) == 0; alpha {
+			continue
+		}
 
-        if alpha := (data & 0x8000) == 0; alpha {
-            continue
-        }
-
-        e.ObjMode[x] = obj.Mode
-        e.ObjOk[x] = true
-        e.ObjPals[x] = data &^ 0x8000
-    }
+		e.ObjMode[x] = obj.Mode
+		e.ObjOk[x] = true
+		e.ObjPals[x] = data &^ 0x8000
+	}
 }
 
 func (ppu *PPU) bitmapObjectAffine(e *Engine, objIdx, priority, y uint32) {
 
-    obj := &e.Objects[objIdx]
+	obj := &e.Objects[objIdx]
 
-    base := uint32(0x40_0000)
-    if e.IsB {
-        base = 0x60_0000
-    }
+	base := uint32(0x40_0000)
+	if e.IsB {
+		base = 0x60_0000
+	}
 
-    for x := range uint32(SCREEN_WIDTH) {
+	for x := range uint32(SCREEN_WIDTH) {
 
-        if covered := e.ObjOk[x]; covered {
-            continue
-        }
-        if e.Windows.Enabled && !e.Windows.inWinObj(x, y) {
-            continue
-        }
+		if covered := e.ObjOk[x]; covered {
+			continue
+		}
+		if e.Windows.Enabled && !e.Windows.inWinObj(x, y) {
+			continue
+		}
 
+		xIdx, yIdx, ok := getObjAffineCoords(e, obj, x, y)
 
-        xIdx, yIdx, ok := getObjAffineCoords(e, obj, x, y)
+		if !ok {
+			continue
+		}
 
-        if !ok {
-            continue
-        }
+		var offset uint32
+		const BYTES_PER_PIXEL = 2
+		if e.Dispcnt.BitmapObj1D {
+			offset = uint32(xIdx+(yIdx<<obj.BmpBoundaryShift)) * BYTES_PER_PIXEL
+		} else {
+			offset = getBmp2d(obj, uint32(xIdx), uint32(yIdx))
+		}
 
-        var offset uint32
-        const BYTES_PER_PIXEL = 2
-        if e.Dispcnt.BitmapObj1D {
-		    offset = uint32(xIdx+(yIdx<<obj.BmpBoundaryShift)) * BYTES_PER_PIXEL
-        } else {
-            offset = getBmp2d(obj, uint32(xIdx), uint32(yIdx))
-        }
+		data := ppu.Vram.Read16(base + offset)
 
-        data := ppu.Vram.Read16(base + offset)
+		if alpha := (data & 0x8000) == 0; alpha {
+			continue
+		}
 
-        if alpha := (data & 0x8000) == 0; alpha {
-            continue
-        }
-
-        e.ObjMode[x] = obj.Mode
-        e.ObjOk[x] = true
-        e.ObjPals[x] = data &^ 0x8000
-    }
+		e.ObjMode[x] = obj.Mode
+		e.ObjOk[x] = true
+		e.ObjPals[x] = data &^ 0x8000
+	}
 }
 
 func objNotScanline(obj *Object, y uint32) bool {

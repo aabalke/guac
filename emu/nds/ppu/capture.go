@@ -1,7 +1,6 @@
 package ppu
 
 import (
-
 	"github.com/aabalke/guac/emu/nds/rast"
 )
 
@@ -205,8 +204,8 @@ func (c *Capture) CaptureLine(y uint32, isRenderingB bool) {
 				v |= 0x8000
 			}
 
-            (*block)[j+c.ActiveData.WriteOffset] = uint8(v)
-            (*block)[j+c.ActiveData.WriteOffset+1] = uint8(v>>8)
+			(*block)[j+c.ActiveData.WriteOffset] = uint8(v)
+			(*block)[j+c.ActiveData.WriteOffset+1] = uint8(v >> 8)
 			continue
 		}
 
@@ -220,8 +219,8 @@ func (c *Capture) CaptureLine(y uint32, isRenderingB bool) {
 
 		v |= 0x8000
 
-        (*block)[j+c.ActiveData.WriteOffset] = uint8(v)
-        (*block)[j+c.ActiveData.WriteOffset+1] = uint8(v>>8)
+		(*block)[j+c.ActiveData.WriteOffset] = uint8(v)
+		(*block)[j+c.ActiveData.WriteOffset+1] = uint8(v >> 8)
 	}
 }
 
