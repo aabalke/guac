@@ -67,8 +67,7 @@ type DMA struct {
 //go:inline
 func ReplaceByte(value uint32, newByte uint32, byteOffset uint32) uint32 {
 	bitOffset := 8 * byteOffset
-	mask := uint32(0b1111_1111)
-	return (value &^ (mask << bitOffset)) | (newByte << bitOffset)
+	return (value &^ (0xFF << bitOffset)) | (newByte << bitOffset)
 }
 
 func (dma *DMA) Init(idx int, mem MemoryInterface, irq *cpu.Irq, arm9 bool) {

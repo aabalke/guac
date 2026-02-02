@@ -48,7 +48,6 @@ func main() {
 
 	flags := getFlags()
 
-
 	if flags.Profile {
 
 		fi, err := os.Create("cpu.prof")
@@ -73,7 +72,7 @@ func main() {
 	ebiten.SetWindowSize(256*4, 192*4)
 	//ebiten.SetWindowSize(1280, 720)
 
-    ebiten.SetVsyncEnabled(!config.Conf.VsyncDisabled)
+	ebiten.SetVsyncEnabled(!config.Conf.VsyncDisabled)
 
 	ebiten.SetCursorMode(ebiten.CursorModeHidden)
 	if config.Conf.Fullscreen {
@@ -81,12 +80,12 @@ func main() {
 	}
 
 	opts := &ebiten.RunGameOptions{
-	    //SingleThread: true,
-        //InitUnfocused: true,
+		//SingleThread: true,
+		//InitUnfocused: true,
 	}
 
-    err := ebiten.RunGameWithOptions(NewGame(flags), opts)
-    if err != nil && err != exit {
+	err := ebiten.RunGameWithOptions(NewGame(flags), opts)
+	if err != nil && err != exit {
 		log.Fatal(err)
 	}
 

@@ -61,9 +61,9 @@ func (t *Timer) WriteCnt(v uint8) {
 	t.OverflowIRQ = (t.CNT>>6)&1 != 0
 	t.Enabled = (t.CNT>>7)&1 != 0
 
-    f := freqs[t.CNT & 0b11]
-    t.Freq = f.freq
-    t.FreqShift = f.shift
+	f := freqs[t.CNT&0b11]
+	t.Freq = f.freq
+	t.FreqShift = f.shift
 
 	if t.Enabled && !wasEnabled {
 		t.D = t.SavedInitialValue
@@ -90,12 +90,12 @@ func (t *Timer) WriteD(v uint8, hi bool) {
 	t.SavedInitialValue = (t.SavedInitialValue & 0xFF00) | uint32(v)
 }
 
-var freqs = [...]struct{
-    freq uint32
-    shift uint32
+var freqs = [...]struct {
+	freq  uint32
+	shift uint32
 }{
-    {1, 0},
-    {64, 6},
-    {256, 8},
-    {1024, 10},
+	{1, 0},
+	{64, 6},
+	{256, 8},
+	{1024, 10},
 }

@@ -134,19 +134,18 @@ func (r *Render) UpdateRender() {
 
 	r.ResetRasterizer()
 
-	polygons, manualSortAlpha, depthW := r.Buffers.GetPolygons()
+	buffer := r.Buffers.GetBuffer()
 
-	r.Context.DepthW = depthW
+	polygons := buffer.Polys
+
+	r.Context.DepthW = buffer.DepthBufferW
 
 	// solid polygons sorted first, followed by translucent (unless manual sort alpha)
 
 	sort.SliceStable(polygons, func(i, j int) bool {
 
-		pi := polygons[i]
-		pj := polygons[j]
-
-		isolid := !pi.isAlpha()
-		jsolid := !pj.isAlpha()
+		isolid := !polygons[i].isAlpha()
+		jsolid := !polygons[j].isAlpha()
 		if isolid && !jsolid {
 			return true
 		} else if jsolid && !isolid {
@@ -156,7 +155,7 @@ func (r *Render) UpdateRender() {
 
 		// Second: sort by "y" solid polygons (or all polygons if
 		// alphaYSort is true)
-		minY := func(poly Polygon) float32 {
+		minY := func(poly *Polygon) float32 {
 			m := float32(math.MaxFloat32)
 			for i := range len(poly.Vertices) {
 				if n := poly.Vertices[i].Output.Y; n < m {
@@ -167,13 +166,14 @@ func (r *Render) UpdateRender() {
 			return m
 		}
 
-		if isolid || manualSortAlpha {
-			iy := minY(pi)
-			jy := minY(pj)
+		if isolid || buffer.ManualSort {
 
-			if iy < jy {
+			iy := minY(&polygons[i])
+			jy := minY(&polygons[j])
+			switch {
+			case iy < jy:
 				return true
-			} else if jy < iy {
+			case jy < iy:
 				return false
 			}
 		}
@@ -186,22 +186,22 @@ func (r *Render) UpdateRender() {
 
 	})
 
-	for _, p := range polygons {
+	for i := range len(polygons) {
 
 		// 1 dot check seems unneeded
 		//if !p.valid1DotDepth(r.Rasterizer.Disp1Dot.V) {
 		//    return
 		//}
 
-		r.RenderPolygon(&p)
+		r.RenderPolygon(&polygons[i])
 	}
 
 	if r.Rasterizer.GeoEngine.Fog.Enabled {
-		r.ApplyFog(depthW)
+		r.ApplyFog(buffer.DepthBufferW)
 	}
 
 	if r.Rasterizer.GeoEngine.Disp3dCnt.EdgeMarking {
-		r.ApplyEdge(depthW)
+		r.ApplyEdge(buffer.DepthBufferW)
 	}
 
 	r.ImageToPixels(*r.Context.Image())

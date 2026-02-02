@@ -29,6 +29,7 @@ type Config struct {
 	Nds              NdsConfig        `toml:"nds"`
 	KeyboardConfig   KeyboardConfig   `toml:"keyboard"`
 	ControllerConfig ControllerConfig `toml:"controller"`
+	VsyncDisabled    bool             `coml:"vsync_disabled"`
 }
 
 type MouseConfig struct {
@@ -72,6 +73,9 @@ type NdsConfig struct {
 	//SkipHle                bool `toml:"skip_hle"`
 	//IdleOptimize           bool `toml:"idle_optimize"`
 	//SoundClockUpdateCycles int  `toml:"sound_clock_update_cycles"`
+
+	FrameSkip        uint32 `toml:"frame_skip"`
+	DynamicFrameSkip bool   `toml:"dynamic_frame_skip"`
 }
 
 type KeyboardConfig struct {

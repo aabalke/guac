@@ -83,9 +83,9 @@ func (c *Cp15) Write(reg *CpRegister, lowVector *bool, v uint32) {
 		c.R[*reg] |= v
 
 		*lowVector = (c.R[*reg]>>13)&1 == 0
-		c.mem.Tcm.DtcmEnabled =  (c.R[*reg]>>16)&1 != 0
+		c.mem.Tcm.DtcmEnabled = (c.R[*reg]>>16)&1 != 0
 		c.mem.Tcm.DtcmLoadMode = (c.R[*reg]>>17)&1 != 0
-		c.mem.Tcm.ItcmEnabled =  (c.R[*reg]>>18)&1 != 0
+		c.mem.Tcm.ItcmEnabled = (c.R[*reg]>>18)&1 != 0
 		c.mem.Tcm.ItcmLoadMode = (c.R[*reg]>>19)&1 != 0
 
 		//if v & 1 == 1 { panic("PU MODE")}

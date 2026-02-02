@@ -567,11 +567,11 @@ func (g *GeoEngine) ValidParamCount(fifo bool) bool {
 		}
 	}
 
-    switch v := paramCnt[cmd]; v {
-    case 0:
+	switch v := paramCnt[cmd]; v {
+	case 0:
 		panic(fmt.Sprintf("UNKNOWN CMD GXFIFO % 2X", g.Data))
-    default:
-        return v == params
+	default:
+		return v == params
 	}
 }
 
@@ -583,8 +583,8 @@ func (g *GeoEngine) AddPolygon() {
 
 func Write15BitColor(v uint32) gl.Color {
 	return gl.MakeColorFrom15Bit(
-		uint8((v)&0b11111),
-		uint8((v>>5)&0b11111),
-		uint8((v>>10)&0b11111),
+		uint8((v)&0x1F),
+		uint8((v>>5)&0x1F),
+		uint8((v>>10)&0x1F),
 	)
 }

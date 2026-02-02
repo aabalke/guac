@@ -88,7 +88,6 @@ func (gba *GBA) Update() {
 			} else {
 				cycles = insts << 2
 			}
-
 		}
 
 		gba.Tick(uint32(cycles))

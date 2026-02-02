@@ -2,10 +2,12 @@ package mem
 
 import "math"
 
+//go:inline
 func w(d *uint64, v uint8, b uint32) {
 	*d = (*d &^ (0xFF << (b << 3))) | (uint64(v) << (b << 3))
 }
 
+//go:inline
 func r(d uint64, b uint32) uint8 {
 	return uint8(d >> (b << 3))
 }
@@ -17,12 +19,12 @@ type Div struct {
 func (d *Div) Write(addr uint32, v uint8) {
 
 	switch {
-    case addr < 0x280:
-        return
+	case addr < 0x280:
+		return
 	case addr < 0x284:
 		w(&d.cnt, v, addr-0x280)
-    case addr < 0x290:
-        return
+	case addr < 0x290:
+		return
 	case addr < 0x298:
 		w(&d.num, v, addr-0x290)
 	case addr < 0x2a0:
@@ -36,12 +38,12 @@ func (d *Div) Write(addr uint32, v uint8) {
 
 func (d *Div) Read(addr uint32) uint8 {
 	switch {
-    case addr < 0x280:
-        return 0
+	case addr < 0x280:
+		return 0
 	case addr < 0x284:
 		return r(d.cnt, addr-0x280)
-    case addr < 0x290:
-        return 0
+	case addr < 0x290:
+		return 0
 	case addr < 0x298:
 		return r(d.num, addr-0x290)
 	case addr < 0x2A0:
@@ -138,8 +140,8 @@ func (s *Sqrt) Write(addr uint32, v uint8) {
 	switch {
 	case addr == 0x2B0:
 		s.is64 = v&1 != 0
-    case addr < 0x2B8:
-        return
+	case addr < 0x2B8:
+		return
 	case addr < 0x2C0:
 		w(&s.param, v, addr-0x2B8)
 	default:
@@ -160,8 +162,8 @@ func (s *Sqrt) Read(addr uint32) uint8 {
 
 		return 0
 
-    case addr < 0x2B4:
-        return 0
+	case addr < 0x2B4:
+		return 0
 	case addr < 0x2B8:
 		return r(uint64(s.res), addr-0x2B4)
 	case addr < 0x2C0:

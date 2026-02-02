@@ -41,8 +41,6 @@ const (
 
 	// timer and geo shouldn't be checked every inst
 	// these should probably be replaced with a less lazy method
-	//TIMER_CYCLE_MASK = 0b111
-	//GEO_CYCLE_MASK   = 0b1111
 	TIMER_CYCLE_MASK = 0xF
 	GEO_CYCLE_MASK   = 0xF
 
@@ -136,14 +134,14 @@ func (nds *Nds) Update() {
 		return
 	}
 
-    if !nds.ppu.EngineA.Dispcnt.Is3D {
+	if !nds.ppu.EngineA.Dispcnt.Is3D {
 		nds.UpdateFrame()
-        return
-    }
+		return
+	}
 
 	if SINGLE_THREAD {
 		nds.UpdateFrame()
-        nds.ppu.Rasterizer.Render.UpdateRender()
+		nds.ppu.Rasterizer.Render.UpdateRender()
 		return
 	}
 
@@ -151,7 +149,7 @@ func (nds *Nds) Update() {
 
 	go func() {
 		defer RASTERIZE_WG.Done()
-        nds.ppu.Rasterizer.Render.UpdateRender()
+		nds.ppu.Rasterizer.Render.UpdateRender()
 	}()
 
 	go func() {
@@ -166,16 +164,14 @@ func (nds *Nds) UpdateFrame() {
 
 	for nds.Drawn = false; !nds.Drawn; {
 
-		//nds.checkBadPc()
-
 		if config.Conf.Nds.NdsJit.Enabled {
 
-			for c := int(config.Conf.Nds.NdsJit.BatchInstA9); c >= 0; {
-				c -= int(nds.StepArm9())
+			for c := uint32(0); c < config.Conf.Nds.NdsJit.BatchInstA9; {
+				c += nds.StepArm9()
 			}
 
-			for c := int(config.Conf.Nds.NdsJit.BatchInstA7); c >= 0; {
-				c -= int(nds.StepArm7())
+			for c := uint32(0); c < config.Conf.Nds.NdsJit.BatchInstA7; {
+				c += nds.StepArm7()
 			}
 
 			nds.VideoUpdate(config.Conf.Nds.NdsJit.BatchInstA7)
@@ -201,8 +197,6 @@ func (nds *Nds) UpdateFrame() {
 			nds.VideoUpdate(1)
 			nds.StepOther()
 		}
-
-		//debug.CURR_INST++
 	}
 
 	if config.Conf.Nds.NdsJit.Enabled {

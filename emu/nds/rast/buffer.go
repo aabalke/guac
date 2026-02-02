@@ -9,9 +9,10 @@ type Buffers struct {
 }
 
 type Buffer struct {
-	Polys        []Polygon
 	DepthBufferW bool
 	ManualSort   bool
+
+	Polys []Polygon
 }
 
 func (b *Buffers) Append(p Polygon) {
@@ -24,24 +25,25 @@ func (b *Buffers) Append(p Polygon) {
 	b.B.Polys = append(b.B.Polys, p)
 }
 
-func (b *Buffers) GetPolygons() (p []Polygon, manualSort, depthW bool) {
+func (b *Buffers) GetBuffer() *Buffer {
 
 	if b.BisRendering {
-		return b.B.Polys, b.B.ManualSort, b.B.DepthBufferW
+		return &b.B
 	}
 
-	return b.A.Polys, b.A.ManualSort, b.A.DepthBufferW
+	return &b.A
 }
 
 func (b *Buffers) Swap() {
 
+	b.BisRendering = !b.BisRendering
+
+	buf := &b.B
 	if b.BisRendering {
-		b.B = Buffer{}
-	} else {
-		b.A = Buffer{}
+		buf = &b.A
 	}
 
-	b.BisRendering = !b.BisRendering
+	buf.Polys = []Polygon{}
 	b.SwapSet = false
 }
 
@@ -52,7 +54,7 @@ func (b *Buffers) SwapCmd(data uint32) {
 		buf = &b.A
 	}
 
-	buf.ManualSort = data&0b1 != 0
-	buf.DepthBufferW = data&0b10 != 0
+	buf.ManualSort = data&1 != 0
+	buf.DepthBufferW = (data>>1)&1 != 0
 	b.SwapSet = true
 }

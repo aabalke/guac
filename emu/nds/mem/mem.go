@@ -189,7 +189,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 			return mem.Oam[addr&0x7FF]
 		case 0x8, 0x9, 0xA:
 			return mem.ReadGbaSlot(addr, arm9)
-        case 0xFF:
+		case 0xFF:
 			return mem.Arm9Bios[addr&0x0FFF]
 		default:
 			return 0
@@ -241,11 +241,10 @@ func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
 			return binary.LittleEndian.Uint32((*[4]uint8)(ptr)[:])
 		}
 
-        return (
-            (uint32(mem.Read(addr+3, arm9)) << 24) |
-            (uint32(mem.Read(addr+2, arm9)) << 16) |
-            (uint32(mem.Read(addr+1, arm9)) << 8) |
-            (uint32(mem.Read(addr+0, arm9))))
+		return ((uint32(mem.Read(addr+3, arm9)) << 24) |
+			(uint32(mem.Read(addr+2, arm9)) << 16) |
+			(uint32(mem.Read(addr+1, arm9)) << 8) |
+			(uint32(mem.Read(addr+0, arm9))))
 	}
 }
 
@@ -306,7 +305,7 @@ func (mem *Mem) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
 			return mem.Ppu.Vram.ReadPtr9(addr)
 		case 0x7:
 			return unsafe.Add(unsafe.Pointer(&mem.Oam), addr&0x7FF), true
-        case 0xFF:
+		case 0xFF:
 			return unsafe.Add(unsafe.Pointer(&mem.Arm9Bios), addr&0x0FFF), true
 		}
 
@@ -449,9 +448,9 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 
 	switch addr {
 	case 0x4:
-        return mem.Dispstat.Read(false, true)
+		return mem.Dispstat.Read(false, true)
 	case 0x5:
-        return mem.Dispstat.Read(true, true)
+		return mem.Dispstat.Read(true, true)
 	case 0x6:
 		return uint8(mem.Vcount)
 	case 0x7:
@@ -884,9 +883,9 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 
 	switch addr {
 	case 0x4:
-        return mem.Dispstat.Read(false, false)
+		return mem.Dispstat.Read(false, false)
 	case 0x5:
-        return mem.Dispstat.Read(true, false)
+		return mem.Dispstat.Read(true, false)
 	case 0x6:
 		return uint8(mem.Vcount)
 	case 0x7:

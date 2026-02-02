@@ -18,14 +18,14 @@ func (w *WRAM) ReadCNT() uint8 {
 }
 
 func (w *WRAM) Write9(addr uint32, v uint8) {
-    switch w.CNT {
-    case 0:
-        w.Wram[addr&0x7FFF] = v
-    case 1:
-        w.Wram[0x4000+(addr&0x3FFF)] = v
-    case 2:
-        w.Wram[addr&0x3FFF] = v
-    }
+	switch w.CNT {
+	case 0:
+		w.Wram[addr&0x7FFF] = v
+	case 1:
+		w.Wram[0x4000+(addr&0x3FFF)] = v
+	case 2:
+		w.Wram[addr&0x3FFF] = v
+	}
 }
 
 func (w *WRAM) Write7(addr uint32, v uint8) {
@@ -49,29 +49,29 @@ func (w *WRAM) Write7(addr uint32, v uint8) {
 
 func (w *WRAM) Read9(addr uint32) uint8 {
 
-    switch w.CNT {
-    case 0:
-        return w.Wram[addr&0x7FFF]
-    case 1:
-        return w.Wram[0x4000+(addr&0x3FFF)]
-    case 2:
-        return w.Wram[addr&0x3FFF]
-    case 3:
-        return 0 // should this clear ram?
-    }
+	switch w.CNT {
+	case 0:
+		return w.Wram[addr&0x7FFF]
+	case 1:
+		return w.Wram[0x4000+(addr&0x3FFF)]
+	case 2:
+		return w.Wram[addr&0x3FFF]
+	case 3:
+		return 0 // should this clear ram?
+	}
 
-    return 0
+	return 0
 }
 
 func (w *WRAM) Read7(addr uint32) uint8 {
 
 	if addr >= 0x380_0000 {
-		return w.WRAM7[addr & 0xFFFF]
+		return w.WRAM7[addr&0xFFFF]
 	}
 
 	switch w.CNT {
 	case 0:
-		return w.WRAM7[addr & 0xFFFF]
+		return w.WRAM7[addr&0xFFFF]
 	case 1:
 		return w.Wram[addr&0x3FFF]
 	case 2:
@@ -85,29 +85,29 @@ func (w *WRAM) Read7(addr uint32) uint8 {
 
 func (w *WRAM) ReadPtr9(addr uint32) (unsafe.Pointer, bool) {
 
-    switch w.CNT {
-    case 0:
-        // this fails tcm test rockwrestler
-        return unsafe.Add(unsafe.Pointer(&w.Wram), addr&0x7FFF), true
-    case 1:
-        return unsafe.Add(unsafe.Pointer(&w.Wram), 0x4000+(addr&0x3FFF)), true
-    case 2:
-        return unsafe.Add(unsafe.Pointer(&w.Wram), addr&0x3FFF), true
-    case 3:
-        return nil, false
-    }
+	switch w.CNT {
+	case 0:
+		// this fails tcm test rockwrestler
+		return unsafe.Add(unsafe.Pointer(&w.Wram), addr&0x7FFF), true
+	case 1:
+		return unsafe.Add(unsafe.Pointer(&w.Wram), 0x4000+(addr&0x3FFF)), true
+	case 2:
+		return unsafe.Add(unsafe.Pointer(&w.Wram), addr&0x3FFF), true
+	case 3:
+		return nil, false
+	}
 
-    return nil, false
+	return nil, false
 }
 
 func (w *WRAM) ReadPtr7(addr uint32) (unsafe.Pointer, bool) {
 
-    switch {
-    case addr >= 0x380_0000:
+	switch {
+	case addr >= 0x380_0000:
 		return unsafe.Add(unsafe.Pointer(&w.WRAM7), addr&0xFFFF), true
-    case addr >= 0x380_0000 - 0x20:
-        // sonic brotherhood has arm7 use wram at 0x37F_FFFA -> 0x380_0000. Need to cancel read ptr near 0x380_0000
-        return nil, false
+	case addr >= 0x380_0000-0x20:
+		// sonic brotherhood has arm7 use wram at 0x37F_FFFA -> 0x380_0000. Need to cancel read ptr near 0x380_0000
+		return nil, false
 	}
 
 	switch w.CNT {

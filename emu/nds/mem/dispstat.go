@@ -83,7 +83,7 @@ func (d *Dispstat) Read(hi, arm9 bool) uint8 {
 func (d *Dispstat) Write7(v uint8, hi bool) {
 
 	if hi {
-        d.A7LYC = (d.A7LYC &^ 0xFF) | uint32(v)
+		d.A7LYC = (d.A7LYC &^ 0xFF) | uint32(v)
 		return
 	}
 
@@ -94,13 +94,13 @@ func (d *Dispstat) Write7(v uint8, hi bool) {
 	d.A7VIrq = v&(1<<3) != 0
 	d.A7HIrq = v&(1<<4) != 0
 	d.A7VCIrq = v&(1<<5) != 0
-    d.A7LYC = (d.A7LYC & 0xFF) | (uint32(v & 0x80) << 8)
+	d.A7LYC = (d.A7LYC & 0xFF) | (uint32(v&0x80) << 8)
 }
 
 func (d *Dispstat) Write9(v uint8, hi bool) {
 
 	if hi {
-        d.A9LYC = (d.A9LYC &^ 0xFF) | uint32(v)
+		d.A9LYC = (d.A9LYC &^ 0xFF) | uint32(v)
 		return
 	}
 
@@ -111,5 +111,5 @@ func (d *Dispstat) Write9(v uint8, hi bool) {
 	d.A9VIrq = v&(1<<3) != 0
 	d.A9HIrq = v&(1<<4) != 0
 	d.A9VCIrq = v&(1<<5) != 0
-    d.A9LYC = (d.A9LYC & 0xFF) | (uint32(v & 0x80) << 8)
+	d.A9LYC = (d.A9LYC & 0xFF) | (uint32(v&0x80) << 8)
 }

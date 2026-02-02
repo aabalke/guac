@@ -97,8 +97,10 @@ func mouseInput(nds *Nds, mouse *input.Mouse, k2 *uint16) {
 
 	tsc := &nds.mem.Spi.Tsc
 
-	if inBounds := (mouse.X >= nds.BtmAbs.L && mouse.X < nds.BtmAbs.R &&
-		mouse.Y >= nds.BtmAbs.T && mouse.Y < nds.BtmAbs.B); !inBounds || !mouse.DraggedLeft {
+	if inBounds := (mouse.X >= nds.BtmAbs.L &&
+		mouse.X < nds.BtmAbs.R &&
+		mouse.Y >= nds.BtmAbs.T &&
+		mouse.Y < nds.BtmAbs.B); !inBounds || !mouse.DraggedLeft {
 
 		tsc.TouchActive = false
 

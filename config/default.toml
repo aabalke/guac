@@ -4,6 +4,8 @@
 # only cancel audio init for profiling / benchmarking
 # cancel_audio_init = true
 
+vsync_disabled = true
+
 #fullscreen = true
 backdrop_color = 0x0A0A0A
 
@@ -116,6 +118,14 @@ l = [4]
 #multithread_3d = true
 #threads = 8
 #disable_saves = true
+
+# only skip frames in ratios of 2. 2, 4, 8, 16 etc.
+frame_skip = 2
+
+# will override frame skip, run unlimited fps, and attempt to match
+# the number of frames built to 60 fps.
+# ex. if guac is running at 120 fps, it will only build every other frame
+dynamic_frame_skip = true
 
 [nds.keyboard]
 a = ["J"]
