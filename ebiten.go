@@ -22,6 +22,8 @@ import (
 	"github.com/hajimehoshi/oto"
 )
 
+const UNLIMITED_FPS = 1200
+
 var (
 	exit = errors.New("Exit")
 )
@@ -45,6 +47,8 @@ type Game struct {
 
 	menuCtx *audio.Context
 	emuCtx  *oto.Context
+
+    unlimitedFPS bool
 }
 
 func NewGame(flags Flags) *Game {
@@ -146,6 +150,16 @@ func (g *Game) Update() error {
 			ebiten.SetFullscreen(!ebiten.IsFullscreen())
 		case slices.Contains(keyConfig.Quit, keyStr):
 			return exit
+		case slices.Contains(keyConfig.Unlimited, keyStr):
+
+            g.unlimitedFPS = !g.unlimitedFPS
+
+            if g.unlimitedFPS {
+                ebiten.SetTPS(UNLIMITED_FPS)
+            } else {
+                ebiten.SetTPS(60)
+            }
+
 		case slices.Contains(keyConfig.Pause, keyStr):
 			g.TogglePause()
 		case slices.Contains(keyConfig.Mute, keyStr):

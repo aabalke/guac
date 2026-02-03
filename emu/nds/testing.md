@@ -9,52 +9,65 @@
 
 ### Devkitpro examples
 
-Audio
+audio/maxmod/audio_modes
+audio/maxmod/basic_sound
+audio/maxmod/reverb
+audio/maxmod/song_events_example
+audio/maxmod/song_events_example2
+audio/maxmod/streaming
+audio/micrecord
 
-Card
+❌ card/eeprom             - crash
+❌ debugging/exceptiontest - nothing
 
-Debugging
+❌ dswifi/ap_search   - not supported
+❌ dswifi/autoconnect - not supported
+❌ dswifi/httpget     - not supported
 
-Wifi
+filesystem/libfatdir
+filesystem/nitrodir
+filesystem/overlays
 
-FileSystem
-    ❌ libfatdir
-    👍 nitrodir
-    ❌ overlays (matches nocash, libfat fails)
+graphics/3d/3d_both_screens
+graphics/3d/boxtest
+graphics/3d/display_list
+graphics/3d/display_list_2
+graphics/3d/env_mapping
+graphics/3d/mixed_text
+graphics/3d/nehe/lesson01
+graphics/3d/nehe/lesson02
+graphics/3d/nehe/lesson03
+graphics/3d/nehe/lesson04
+graphics/3d/nehe/lesson05
+graphics/3d/nehe/lesson06
+graphics/3d/nehe/lesson07
+graphics/3d/nehe/lesson08
+graphics/3d/nehe/lesson09
+graphics/3d/nehe/lesson10
+graphics/3d/nehe/lesson10b
+graphics/3d/nehe/lesson11
+graphics/3d/ortho
+graphics/3d/paletted_cube
+graphics/3d/picking
+graphics/3d/simple_quad
+graphics/3d/simple_tri
+graphics/3d/textured_cube
+graphics/3d/textured_quad
+graphics/3d/toon_shading
 
-Graphics
+👍 graphics/gl2d/2dplus3d
+❌ graphics/gl2d/dual_screen - need 3d line support
+❌ graphics/gl2d/fonts
+    3d vector blending needs to mix all not just opposite. This is because quads
+    are split into triangles and interpolated only by 3 vertices
+❌ graphics/gl2d/primitives  - need 3d line support
+❌ graphics/gl2d/scrolling   - with jit have problems
+❌ graphics/gl2d/sprites     - spinning 
 
-    3D
-        👍 Both 3D
-        👍 Display List
-        👍 Simple Quad
-        👍 Simple Tri
-        Textured Cube - Needs Capture
-        👍 Textured Quad
-        Ortho (I think needs light and toon, but no visible effect)
-        nehe
-            👍 Lesson 01
-            👍 Lesson 02
-            👍 Lesson 03
-            👍 Lesson 04
-            👍 Lesson 05
-            Lesson 06
-            Lesson 07
-            Lesson 08
-            Lesson 09
-            Lesson 10
-            Lesson 10b
-            Lesson 11
-        👍 Mixed Text 3D
-        👍 Palette Cube
-       
-       👍 BoxTest
-    capture
-
-    Effects (windows match nocash but not melon, not sure on correct)
-    👍 Ext_palettes
-    gl2d
-    👍 grit
+👍 graphics/ext_palettes
+👍 graphics/grit
+👍 graphics/effects
+❌ graphics/capture      - direct bitmap fails
 
 👍 graphics/backgrounds/16bitcolormap
 👍 graphics/backgrounds/256bitcolormap
@@ -66,16 +79,16 @@ Graphics
 👍 graphics/backgrounds/all_in_one/scrolling
 ❌ graphics/backgrounds/all_in_one/advanced - x mosaic on tiled not working
 
- 👍 graphics/sprites/allocation_test
- 👍 graphics/sprites/animate_simple
- ❌ graphics/sprites/bitmap_sprites - direct bitmap fails
- graphics/sprites/fire_and_sprites
- graphics/sprites/simple
- graphics/sprites/sprite_extended_palettes
- graphics/sprites/sprite_rotate
+👍 graphics/sprites/allocation_test
+👍 graphics/sprites/animate_simple
+❌ graphics/sprites/bitmap_sprites - direct bitmap fails
+👍 graphics/sprites/fire_and_sprites
+👍 graphics/sprites/simple
+👍 graphics/sprites/sprite_extended_palettes
+👍 graphics/sprites/sprite_rotate
 
 👍 hello_world
-❌ input/addon
+❌ input/addon - not supported
 👍 input/keyboard/async
 👍 input/keyboard/stdin
 👍 input/touch_pad/touch_look
@@ -83,46 +96,17 @@ Graphics
 👍 pxi/pxi
 👍 time/realtimeclock
 👍 time/stopwatch
-❌ time/timercallback
+👍 time/timercallback
 
 # Games (Decrypted)
 
-### 3D Texture Flashing
-Mario And Luigi Bowsers Inside Story
-Pokemon Ranger
-
-### 3D Alpha Blend
-New Super Mario Bros (also error with Affine16, pa,pc bgs, and same z error)
-
-### 3D Same Z Error
-Cooking Mama
-Pokemon Diamond (Save Error)
-
-### Misc 3D
-Pokemon Heartgold
-Metroid Prime Hunters
-Nintendogs Best Friends
-Zelda Spirit Tracks
-Zelda Phantom Hourglass
-
-### No known errors
-Animal Crossing Wild World
-Brain Age
-Brain Age 2
-Big Brain Academy
-Tetris Ds
-Yoshis Island
-Pokemon Blue Rescue Team
-Mario Kart Ds
-Sonic Chronicles The Dark Brotherhood
-
-### Other
-Clubhouse Games
-Housemd
-Lego Star Wars the Complete Saga
-Mario Party
-Mario and Luigi Partners in Time
-Sonic Colors
+Animal Crossing
+Chrono Trigger
+Mario and Luigi Bowsers Inside Story
+Mario Kart
+Pokemon Diamond
+Pokemon Mystery Dungeon Explorers of Time
+Sonic Chronicles the Dark Brotherhood
 Super Mario 64
-
-Fog needs work - see lesson 10 (seems good for mario kart, probably DepthW vs DepthZ related)
+👍 Tetris DS
+Yoshi's Island - minor decompressed sound problem

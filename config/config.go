@@ -88,6 +88,7 @@ type KeyboardConfig struct {
 	Down       []string `toml:"down"`
 	Fullscreen []string `toml:"fullscreen"`
 	Quit       []string `toml:"quit"`
+	Unlimited  []string `toml:"unlimited"`
 }
 
 type ControllerConfig struct {

@@ -32,8 +32,6 @@ var icon []byte
 
 var f *os.File
 
-const MAX_TPS = 60 * 20
-
 func main() {
 
 	//go debugMemoryErrors()
@@ -52,12 +50,10 @@ func main() {
 
 		f = fi
 
-		//pprof.StartCPUProfile(f)
-
-		ebiten.SetTPS(MAX_TPS)
+		ebiten.SetTPS(UNLIMITED_FPS)
 
 	} else if flags.Unlimited {
-		ebiten.SetTPS(MAX_TPS)
+		ebiten.SetTPS(UNLIMITED_FPS)
 	}
 
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
@@ -79,7 +75,13 @@ func main() {
 		//InitUnfocused: true,
 	}
 
-	err := ebiten.RunGameWithOptions(NewGame(flags), opts)
+    g := NewGame(flags)
+
+    if flags.Profile || flags.Unlimited {
+        g.unlimitedFPS = true
+    }
+
+	err := ebiten.RunGameWithOptions(g, opts)
 	if err != nil && err != exit {
 		log.Fatal(err)
 	}

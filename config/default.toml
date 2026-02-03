@@ -32,6 +32,7 @@ left       = ["A", "ArrowLeft"]
 right      = ["D", "ArrowRight"]
 up         = ["W", "ArrowUp"]
 down       = ["S", "ArrowDown"]
+unlimited  = ["U"]
 
 [controller]
 select = [1]
