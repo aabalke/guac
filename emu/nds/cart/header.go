@@ -8,7 +8,7 @@ import (
 
 type Header struct {
 	Title    string
-	GameCode string
+	GameCode []uint8
 	//MakerCode
 
 	UnitCode       uint8
@@ -31,8 +31,8 @@ type Header struct {
 
 func NewHeader(c *Cartridge) Header {
 	h := Header{
-		Title:          strings.ToUpper(strings.ReplaceAll(string(c.Rom[:0xC]), "\x00", " ")),
-		GameCode:       strings.ToUpper(string(c.Rom[0xC : 0xC+4])),
+		Title: strings.ToUpper(strings.ReplaceAll(string(c.Rom[:0xC]), "\x00", " ")),
+		GameCode:       c.Rom[0xC : 0xC+4],
 		UnitCode:       c.Rom[0x12],
 		EncryptionSeed: c.Rom[0x13],
 		CapacityShift:  c.Rom[0x14],
@@ -50,7 +50,9 @@ func NewHeader(c *Cartridge) Header {
 
 	h.validate()
 
-	fmt.Printf("TITLE %s CODE %s UNIT %d\n", h.Title, h.GameCode, h.UnitCode)
+	gamecodestring := strings.ToUpper(string(h.GameCode))
+
+	fmt.Printf("TITLE %s CODE %s UNIT %d\n", h.Title, gamecodestring, h.UnitCode)
 
 	//fmt.Printf("ARM9 OFF %08X\n", h.Arm9Offset)
 	//fmt.Printf("ARM9 ENT %08X\n", h.Arm9EntryAddr)

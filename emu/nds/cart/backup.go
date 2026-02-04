@@ -1,10 +1,7 @@
 package cart
 
 import (
-	"bufio"
 	"fmt"
-	"log"
-	"os"
 )
 
 const (
@@ -26,16 +23,10 @@ const (
 
 	STAT_CONT = 1
 	STAT_DONE = 2
-
-	// will replace this later
-	DATA_SIZE = 0x80_0000
 )
 
 type Backup struct {
-	SavPath  string
-	Data     [DATA_SIZE]uint8
-	Idx      uint32
-	SaveFlag *bool
+    Cartridge *Cartridge
 
 	Addr         uint32
 	WriteEnabled bool
@@ -45,46 +36,16 @@ type Backup struct {
 	AddrSize   uint32
 
 	WriteProtection uint8
+
+	Size uint32
+	Type uint32
 }
 
-func (b *Backup) Init(savpath string, saveFlag *bool) {
-
-	b.SavPath = savpath
-	b.SaveFlag = saveFlag
-
-	for i := range len(b.Data) {
-		b.Data[i] = 0xFF
-	}
-
-	b.AutoDetect = true
-
-	sBuf, err := os.ReadFile(b.SavPath)
-	if err != nil {
-		return
-	}
-
-	for i := range len(sBuf) {
-		b.Data[i] = uint8(sBuf[i])
-	}
-
-}
-
-func (b *Backup) Save() {
-
-	log.Printf("Saving Game Path: %s\n", b.SavPath)
-
-	f, err := os.Create(b.SavPath)
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-
-	writer := bufio.NewWriter(f)
-
-	_, err = writer.Write(b.Data[:])
-	if err != nil {
-		panic(err)
-	}
+func NewBackup(c *Cartridge) *Backup {
+    return &Backup{
+        Cartridge: c,
+        AutoDetect: true,
+    }
 }
 
 func (b *Backup) Detect(data []uint8) bool {
@@ -118,9 +79,9 @@ func (b *Backup) calcAddr(data []uint8) {
 }
 
 func (b *Backup) checkSize() {
-	if b.Addr >= DATA_SIZE {
-		panic("BACKUP DATA TRANSFER IS BIGGER THAN DATA SIZE")
-	}
+	//if b.Addr >= DATA_SIZE {
+	//	panic("BACKUP DATA TRANSFER IS BIGGER THAN DATA SIZE")
+	//}
 }
 
 func (b *Backup) Transfer(data []uint8) (reply []uint8, stat uint8) {
@@ -136,6 +97,10 @@ func (b *Backup) Transfer(data []uint8) (reply []uint8, stat uint8) {
 
 	case INST_RDSR:
 
+		if len(data) == 1 {
+			return nil, STAT_CONT
+		}
+
 		v := uint8(0xF0)
 		//v := uint8(0x0)
 
@@ -145,9 +110,19 @@ func (b *Backup) Transfer(data []uint8) (reply []uint8, stat uint8) {
 
 		v |= b.WriteProtection << 2
 
+		//for i := range data {
+		//    fmt.Printf("%02X ", data[i])
+		//}
+
+		//fmt.Printf("\n")
+
 		return []uint8{v}, STAT_CONT
 
-	case INST_READ, INST_RDHI:
+	case INST_RDHI:
+
+		panic("read hi")
+
+	case INST_READ:
 
 		if b.AutoDetect && !b.Detect(data) {
 			return nil, STAT_CONT
@@ -166,9 +141,15 @@ func (b *Backup) Transfer(data []uint8) (reply []uint8, stat uint8) {
 		b.checkSize()
 
 		buf := make([]uint8, 256)
-		sz := min(256, uint32(len(b.Data))-b.Addr)
+		sz := min(256, uint32(len(b.Cartridge.Sav))-b.Addr)
 
-		copy(buf[:sz], b.Data[b.Addr:b.Addr+sz])
+		copy(buf[:sz], b.Cartridge.Sav[b.Addr:b.Addr+sz])
+
+		//for i := range data {
+		//    fmt.Printf("%02X ", data[i])
+		//}
+
+		//fmt.Printf("\n")
 		return buf, STAT_CONT
 
 	case INST_WRLO, INST_WRHI:
@@ -187,22 +168,20 @@ func (b *Backup) Transfer(data []uint8) (reply []uint8, stat uint8) {
 
 		b.checkSize()
 
-		*b.SaveFlag = true
+		b.Cartridge.SaveFlag = true
 
-		copy(b.Data[b.Addr:], data[1+b.AddrSize:])
+		copy(b.Cartridge.Sav[b.Addr:], data[1+b.AddrSize:])
 
 		return nil, STAT_CONT
 
 	case INST_WREN:
 
 		b.WriteEnabled = true
-
 		return nil, STAT_DONE
 
 	case INST_WRDI:
 
 		b.WriteEnabled = false
-
 		return nil, STAT_DONE
 
 	case INST_WRSR:

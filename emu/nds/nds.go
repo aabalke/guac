@@ -56,7 +56,7 @@ type Nds struct {
 	arm7      *arm7.Cpu
 	arm9      *arm9.Cpu
 	ppu       *ppu.PPU
-	Cartridge cart.Cartridge
+	Cartridge *cart.Cartridge
 
 	dma7 [4]dma.DMA
 	dma9 [4]dma.DMA
@@ -70,8 +70,6 @@ type Nds struct {
 	GeoCycles   uint8
 
 	Frame uint64
-
-	isSimd bool
 }
 
 func NewNds(path string, audioCtx *oto.Context) *Nds {
@@ -111,7 +109,7 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 		&nds.dma7, &nds.dma9,
 		&irq7, &irq9,
 		nds.arm7.Jit, nds.arm9.Jit,
-		&nds.Cartridge, nds.ppu, s, path+".save")
+		nds.Cartridge, nds.ppu, s)
 
 	s.Mem = &nds.mem
 
@@ -120,9 +118,16 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 		nds.dma7[i].Init(i, &nds.mem, &irq7, false)
 	}
 
-	nds.LoadGame(path)
-	//nds.arm9.Reset()
+    nds.Cartridge = cart.NewCartridge(
+        path, path+".save",
+        &irq7, &irq9,
+        &nds.dma7, &nds.dma9,
+    )
+
+    nds.mem.Cartridge = nds.Cartridge
+
 	nds.DirtyInit()
+
 	debug.Init("./log.csv")
 
 	return &nds
@@ -294,10 +299,6 @@ func (nds *Nds) Close() {
 	debug.L.Close()
 	nds.arm7.Jit.Close()
 	nds.arm9.Jit.Close()
-}
-
-func (nds *Nds) LoadGame(path string) {
-	nds.Cartridge = cart.NewCartridge(path, path+".save")
 }
 
 func (nds *Nds) DirtyInit() {

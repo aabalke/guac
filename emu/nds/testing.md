@@ -62,12 +62,12 @@ graphics/3d/toon_shading
     are split into triangles and interpolated only by 3 vertices
 ❌ graphics/gl2d/primitives  - need 3d line support
 ❌ graphics/gl2d/scrolling   - with jit have problems
-❌ graphics/gl2d/sprites     - spinning 
+❌ graphics/gl2d/sprites     - spinning sprites not blended properly
 
 👍 graphics/ext_palettes
 👍 graphics/grit
 👍 graphics/effects
-❌ graphics/capture      - direct bitmap fails
+❌ graphics/capture - direct bitmap fails
 
 👍 graphics/backgrounds/16bitcolormap
 👍 graphics/backgrounds/256bitcolormap
@@ -104,7 +104,7 @@ Animal Crossing
 Chrono Trigger
 Mario and Luigi Bowsers Inside Story
 Mario Kart
-Pokemon Diamond
+Pokemon Diamond - Save Error
 Pokemon Mystery Dungeon Explorers of Time
 Sonic Chronicles the Dark Brotherhood
 Super Mario 64

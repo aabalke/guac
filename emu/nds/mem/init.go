@@ -36,11 +36,13 @@ const (
 	RAM_BOOT_IND  = 0x27FFC40
 	RAM_WIFI_USER = 0x27FFC80
 
-	CHIP_ID = 0x80007FC2
+	//CHIP_ID = 0x80007FC2
 	//CHIP_ID = 0x03020100
 )
 
-func setBiosRam(mem *Mem) {
+func setBiosRam(mem *Mem, chipId [4]uint8) {
+
+    chip := binary.LittleEndian.Uint32(chipId[:])
 
 	c := mem.Cartridge.Rom[:0x1000]
 	f := &spi.FirmwareData
@@ -58,9 +60,9 @@ func setBiosRam(mem *Mem) {
 
 	// if these are updated, update gamecard version
 	//27FF800h 4     NDS Gamecart Chip ID 1
-	mem.Write32(0x27FF800, CHIP_ID, true)
+	mem.Write32(0x27FF800, chip, true)
 	//27FF804h 4     NDS Gamecart Chip ID 2
-	mem.Write32(0x27FF804, CHIP_ID, true)
+	mem.Write32(0x27FF804, chip, true)
 
 	//27FF808h 2     NDS Cart Header CRC (verified)            ;hdr[15Eh]
 	mem.Write(RAM_CART_HDR_CRC, c[0x15E], true)
@@ -101,9 +103,9 @@ func setBiosRam(mem *Mem) {
 
 	// if these are updated, update gamecard version
 	//27FFC00h 4     NDS Gamecart Chip ID 1   (copy of 27FF800h)
-	mem.Write32(0x27FFC00, CHIP_ID, true)
+	mem.Write32(0x27FFC00, chip, true)
 	//27FFC04h 4     NDS Gamecart Chip ID 2   (copy of 27FF804h)
-	mem.Write32(0x27FFC04, CHIP_ID, true)
+	mem.Write32(0x27FFC04, chip, true)
 
 	//27FFC08h 2     NDS Cart Header CRC      (copy of 27FF808h)
 	mem.Write(0x027FFC08, c[0x15E], true)
