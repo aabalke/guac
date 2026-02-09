@@ -166,31 +166,7 @@ func setBiosRam(mem *Mem, chipId [4]uint8) {
 	//mem.Write(USER_SETTING_RAM + 0x62, 0xE0, true)
 	//mem.Write(USER_SETTING_RAM + 0x63, 0xA0, true)
 
-	// wifi init
-
-	mem.Write(0x4808018, (*f)[0x36], false)
-	mem.Write(0x4808019, (*f)[0x37], false)
-	mem.Write(0x480801A, (*f)[0x38], false)
-	mem.Write(0x480801B, (*f)[0x39], false)
-	mem.Write(0x480801C, (*f)[0x3A], false)
-	mem.Write(0x480801D, (*f)[0x3B], false)
-
-	mem.Write16(0x4808146, binary.LittleEndian.Uint16((*f)[0x44:]), false)
-	mem.Write16(0x4808148, binary.LittleEndian.Uint16((*f)[0x46:]), false)
-	mem.Write16(0x480814A, binary.LittleEndian.Uint16((*f)[0x48:]), false)
-	mem.Write16(0x480814C, binary.LittleEndian.Uint16((*f)[0x4A:]), false)
-	mem.Write16(0x4808120, binary.LittleEndian.Uint16((*f)[0x4C:]), false)
-	mem.Write16(0x4808122, binary.LittleEndian.Uint16((*f)[0x4E:]), false)
-	mem.Write16(0x4808154, binary.LittleEndian.Uint16((*f)[0x50:]), false)
-	mem.Write16(0x4808144, binary.LittleEndian.Uint16((*f)[0x52:]), false)
-	mem.Write16(0x4808130, binary.LittleEndian.Uint16((*f)[0x54:]), false)
-	mem.Write16(0x4808132, binary.LittleEndian.Uint16((*f)[0x56:]), false)
-	mem.Write16(0x4808140, binary.LittleEndian.Uint16((*f)[0x58:]), false)
-	mem.Write16(0x4808142, binary.LittleEndian.Uint16((*f)[0x5A:]), false)
-	mem.Write16(0x4808038, binary.LittleEndian.Uint16((*f)[0x5C:]), false)
-	mem.Write16(0x4808124, binary.LittleEndian.Uint16((*f)[0x5E:]), false)
-	mem.Write16(0x4808128, binary.LittleEndian.Uint16((*f)[0x60:]), false)
-	mem.Write16(0x4808150, binary.LittleEndian.Uint16((*f)[0x62:]), false)
+    mem.Wifi.InitWifi(f)
 
 	initTempUnimplimented()
 }

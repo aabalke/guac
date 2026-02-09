@@ -61,6 +61,7 @@ func NewCartridge(romPath, savPath string, irq7, irq9 *cpu.Irq, dma7, dma9 *[4]d
 	code := binary.LittleEndian.Uint32(c.Header.GameCode)
     c.Backup = NewBackup(c)
     c.readSave(savPath, code)
+    c.Backup.setCartType()
 
 	// matches no cash nitrofs test
 	c.WriteExMem(0x80, 0)
@@ -92,11 +93,11 @@ func (c *Cartridge) readSave(savPath string, gamecode uint32) {
     if romData, ok := roms[gamecode]; ok {
         // in db
         c.Backup.Size = romData.Size
-        c.Backup.Type = romData.BackupType
+        c.Backup.MemType = romData.BackupType
     } else {
         // i believe this are good values
         c.Backup.Size = 0x80_0000
-        c.Backup.Type = 0
+        c.Backup.MemType = 0
     }
 
     c.Sav = make([]uint8, c.Backup.Size)
@@ -138,7 +139,7 @@ func createChipId(b *Backup) [4]uint8 {
 		id[2] = uint8(v >> 8)
 	}
 
-	if nandFlag := b.Type >= 8 && b.Type < 11; nandFlag {
+	if nandFlag := b.MemType >= 8 && b.MemType < 11; nandFlag {
 		id[3] = 0x08
 	}
 

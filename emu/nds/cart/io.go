@@ -61,11 +61,8 @@ func (c *Cartridge) ReadAuxSpi(b uint8) uint8 {
 		}
 
 		return v
-
-	case 2:
-		return c.AuxSpi.Value
-	default:
-		return 0
+    default:
+        panic("unknown byte cnt auxspi")
 	}
 }
 
@@ -115,7 +112,51 @@ func (c *Cartridge) WriteAuxSpi(v uint8, b uint8, arm9 bool) {
 	}
 }
 
+func (c *Cartridge) ReadAuxSpiData() uint8 {
+
+    if !c.NDSSlotEnabled {
+        return 0
+    }
+
+    if !c.AuxSpi.IsBackup {
+        return 0
+    }
+
+    // if busy return 0
+
+    return c.AuxSpi.Value
+}
+
+var match = [4]uint8{
+    0x02, 0x26, 0xd, 0x74,
+}
+
+func h(res []uint8) bool {
+
+    if len(res) < 4 {
+        return false
+    }
+
+    for i := range 4 {
+        if res[i] != match[i] {
+            return false
+        }
+    }
+
+    return true
+}
+
 func (c *Cartridge) WriteAuxSpiData(v uint8) {
+
+    if !c.NDSSlotEnabled {
+        return
+    }
+
+    if !c.AuxSpi.IsBackup {
+        return
+    }
+
+    // if busy return 0
 
 	a := &c.AuxSpi
 
@@ -131,6 +172,10 @@ func (c *Cartridge) WriteAuxSpiData(v uint8) {
 		a.Req = append(a.Req, v)
 
 		a.Res, stat = c.Backup.Transfer(a.Req)
+
+        if h(a.Res) {
+            panic("pulled valid")
+        }
 
 		if stat == STAT_DONE {
 			a.Req = a.Req[:0]

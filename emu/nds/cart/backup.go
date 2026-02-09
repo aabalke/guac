@@ -25,6 +25,33 @@ const (
 	STAT_DONE = 2
 )
 
+const (
+    KB = 1024
+    MB = 1024 * 1024
+)
+
+var savSize = [...]uint32{
+    0,
+    KB/2,
+    KB*8,
+    KB*64,
+    KB*128,
+    KB*256,
+    KB*512,
+    MB,
+    MB*8,
+    MB*16,
+    MB*64,
+}
+
+const (
+    TYPE_NONE = iota
+    TYPE_EEPROM_SM
+    TYPE_EEPROM
+    TYPE_FLASH
+    TYPE_NAND
+)
+
 type Backup struct {
     Cartridge *Cartridge
 
@@ -38,7 +65,8 @@ type Backup struct {
 	WriteProtection uint8
 
 	Size uint32
-	Type uint32
+	MemType uint32
+    Type uint32
 }
 
 func NewBackup(c *Cartridge) *Backup {
@@ -46,6 +74,18 @@ func NewBackup(c *Cartridge) *Backup {
         Cartridge: c,
         AutoDetect: true,
     }
+}
+
+func (b *Backup) setCartType() {
+    switch b.MemType {
+    case 1: b.Type = TYPE_EEPROM_SM
+    case 2, 3, 4: b.Type = TYPE_EEPROM
+    case 5, 6, 7: b.Type = TYPE_FLASH
+    case 8, 9, 10: b.Type = TYPE_NAND
+    default: b.Type = TYPE_NONE
+    }
+
+    println("cart type", b.Type)
 }
 
 func (b *Backup) Detect(data []uint8) bool {
@@ -84,11 +124,51 @@ func (b *Backup) checkSize() {
 	//}
 }
 
+//func (b *Backup) TransferFlash(data []uint8) (reply []uint8, stat uint8) {
+//	switch inst := data[0]; inst {
+//	case INST_NONE:
+//
+//		return nil, STAT_DONE
+//    case INST_RDSR:
+//		v := uint8(0xF0)
+//		if b.WriteEnabled {
+//			v |= 2
+//		}
+//		v |= b.WriteProtection << 2
+//		return []uint8{v}, STAT_CONT
+//
+//    case INST_READ:
+//
+//        if len(data) <= 4 {
+//            return nil, STAT_CONT
+//        }
+//
+//        b.Addr = 0
+//        for _, v := range data[1:] {
+//            b.Addr <<= 8
+//            b.Addr |= uint32(v)
+//        }
+//
+//        if int(b.Addr) > len(b.Cartridge.Sav) {
+//            return nil, STAT_CONT
+//        }
+//
+//		sz := min(256, uint32(len(b.Cartridge.Sav))-b.Addr)
+//		buf := make([]uint8, sz)
+//
+//		copy(buf[:sz], b.Cartridge.Sav[b.Addr:b.Addr+sz])
+//
+//		return buf, STAT_CONT
+//    default:
+//        panic(fmt.Sprintf("unknown flash command %02X", inst))
+//    }
+//}
+
 func (b *Backup) Transfer(data []uint8) (reply []uint8, stat uint8) {
 
-	//fmt.Printf("BACKUP SPI % 2X\n", data)
-
-	//if data[0] == 0x06 { panic("WHAT")}
+    //if b.Type == TYPE_FLASH {
+    //    return b.TransferFlash(data)
+    //}
 
 	switch inst := data[0]; inst {
 	case INST_NONE:

@@ -10,6 +10,7 @@ import (
 	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/nds/mem/spi"
+	"github.com/aabalke/guac/emu/nds/mem/wifi"
 	"github.com/aabalke/guac/emu/nds/ppu"
 	"github.com/aabalke/guac/emu/nds/snd"
 )
@@ -35,6 +36,8 @@ type Mem struct {
 	halted7, halted9 *bool
 	irq7, irq9       *cpu.Irq
 	dma7, dma9       *[4]dma.DMA
+
+    Wifi *wifi.Wifi
 
 	arm7Pc *uint32
 
@@ -110,6 +113,8 @@ func NewMemory(
 	m.PowCnt.WriteCNT1(1, 0x82, Ppu)
 
 	m.Spi.Init()
+
+    m.Wifi = wifi.NewWifi()
 
 	return m
 }
@@ -507,9 +512,9 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 	case 0x1A1:
 		return mem.Cartridge.ReadAuxSpi(1)
 	case 0x1A2:
-		return mem.Cartridge.ReadAuxSpi(2)
+		return mem.Cartridge.ReadAuxSpiData()
 	case 0x1A3:
-		return mem.Cartridge.ReadAuxSpi(3)
+        return 0
 	case 0x1A4:
 		return mem.Cartridge.ReadRomCtrl(0)
 	case 0x1A5:
@@ -673,9 +678,9 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 	case 0x1A1:
 		mem.Cartridge.WriteAuxSpi(v, 1, true)
 	case 0x1A2:
-		mem.Cartridge.WriteAuxSpi(v, 2, true)
+		mem.Cartridge.WriteAuxSpiData(v)
 	case 0x1A3:
-		mem.Cartridge.WriteAuxSpi(v, 3, true)
+        return
 	case 0x1A4:
 		mem.Cartridge.WriteRomCtrl(v, 0, true)
 	case 0x1A5:
@@ -848,6 +853,14 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 		return mem.ReadDma(mem.dma7, addr)
 	case addr >= 0x400 && addr < 0x600:
 		return mem.Snd.Read(addr)
+    case addr >= 0x808000 && addr < 0x809000:
+        //old := debug.B[0]
+        //debug.B[0] = true
+        //if !old && debug.B[0] {
+        //    debug.B[1] = true
+        //}
+
+        return mem.Wifi.Read(addr)
 	}
 
 	switch addr {
@@ -931,9 +944,9 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 	case 0x1A1:
 		return mem.Cartridge.ReadAuxSpi(1)
 	case 0x1A2:
-		return mem.Cartridge.ReadAuxSpi(2)
+		return mem.Cartridge.ReadAuxSpiData()
 	case 0x1A3:
-		return mem.Cartridge.ReadAuxSpi(3)
+		return 0
 	case 0x1A4:
 		return mem.Cartridge.ReadRomCtrl(0)
 	case 0x1A5:
@@ -1016,11 +1029,6 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 	case 0x309:
 		return uint8(mem.BiosProt >> 8)
 
-	case 0x808000:
-		return 0x40
-	case 0x808001:
-		return 0xC3
-
 	default:
 		//panic(fmt.Sprintf("READ UNKNOWN ARM7 IO ADDR %08X", addr))
 		return mem.IO[addr]
@@ -1048,6 +1056,14 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 	case addr >= 0x400 && addr < 0x600:
 		mem.Snd.Write(addr, v)
 		return
+    case addr >= 0x808000 && addr < 0x809000:
+        //old := debug.B[0]
+        //debug.B[0] = true
+        //if !old && debug.B[0] {
+        //    debug.B[1] = true
+        //}
+        mem.Wifi.Write(addr, v)
+        return
 	}
 
 	switch addr {
@@ -1133,9 +1149,9 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 	case 0x1A1:
 		mem.Cartridge.WriteAuxSpi(v, 1, false)
 	case 0x1A2:
-		mem.Cartridge.WriteAuxSpi(v, 2, false)
+		mem.Cartridge.WriteAuxSpiData(v)
 	case 0x1A3:
-		mem.Cartridge.WriteAuxSpi(v, 3, false)
+        return
 	case 0x1A4:
 		mem.Cartridge.WriteRomCtrl(v, 0, false)
 	case 0x1A5:

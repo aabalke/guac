@@ -117,6 +117,7 @@ type EmulatorKeyboardConfig struct {
 	X      []string `toml:"x"`
 	Y      []string `toml:"y"`
 	Hinge  []string `toml:"hinge"`
+    Debug  []string `tom;:"Debug"`
 }
 
 type EmulatorControllerConfig struct {
