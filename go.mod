@@ -2,8 +2,7 @@ module github.com/aabalke/guac
 
 replace github.com/aabalke/gojit => C:\dev\repos\jit\gojit
 
-//go 1.24.5
-go 1.25.5
+go 1.26.0
 
 require (
 	github.com/BurntSushi/toml v1.5.0
