@@ -166,7 +166,7 @@ func setBiosRam(mem *Mem, chipId [4]uint8) {
 	//mem.Write(USER_SETTING_RAM + 0x62, 0xE0, true)
 	//mem.Write(USER_SETTING_RAM + 0x63, 0xA0, true)
 
-    mem.Wifi.InitWifi(f)
+    //mem.Wifi.InitWifi(f)
 
 	initTempUnimplimented()
 }

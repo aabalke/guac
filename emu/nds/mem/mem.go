@@ -197,6 +197,10 @@ func (mem *Mem) Read8(addr uint32, arm9 bool) uint32 {
 	return uint32(mem.Read(addr, arm9))
 }
 func (mem *Mem) Read16(addr uint32, arm9 bool) uint32 {
+
+    if !arm9 && addr >= 0x480_0000 && addr < 0x490_0000 {
+        return uint32(mem.Wifi.Read16(addr))
+    }
 	if ptr, ok := mem.ReadPtr(addr, arm9); ok {
 		return uint32(binary.LittleEndian.Uint16((*[4]uint8)(ptr)[:]))
 	}
@@ -356,6 +360,11 @@ func (mem *Mem) Write8(addr uint32, v uint8, arm9 bool) {
 	mem.Write(addr, v, arm9)
 }
 func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
+
+    if !arm9 && addr >= 0x480_0000 && addr < 0x490_0000 {
+        mem.Wifi.Write16(addr, v)
+        return
+    }
 
 	if ptr, ok := mem.WritePtr(addr, arm9); ok {
 		binary.LittleEndian.PutUint16((*[4]uint8)(ptr)[:], v)
@@ -853,14 +862,6 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 		return mem.ReadDma(mem.dma7, addr)
 	case addr >= 0x400 && addr < 0x600:
 		return mem.Snd.Read(addr)
-    case addr >= 0x808000 && addr < 0x809000:
-        //old := debug.B[0]
-        //debug.B[0] = true
-        //if !old && debug.B[0] {
-        //    debug.B[1] = true
-        //}
-
-        return mem.Wifi.Read(addr)
 	}
 
 	switch addr {
@@ -1056,14 +1057,6 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 	case addr >= 0x400 && addr < 0x600:
 		mem.Snd.Write(addr, v)
 		return
-    case addr >= 0x808000 && addr < 0x809000:
-        //old := debug.B[0]
-        //debug.B[0] = true
-        //if !old && debug.B[0] {
-        //    debug.B[1] = true
-        //}
-        mem.Wifi.Write(addr, v)
-        return
 	}
 
 	switch addr {
