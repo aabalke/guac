@@ -5,26 +5,30 @@ import (
 )
 
 type Wifi struct {
-	WRxBufBegin   uint16//hwio.Reg16 `hwio:"offset=0x50"`
-	WRxBufEnd     uint16//hwio.Reg16 `hwio:"offset=0x52"`
-	WRxBufRdAddr  uint16//hwio.Reg16 `hwio:"offset=0x58,rwmask=0x1FFF"`
-	//WRxBufRdData hwio.Reg16 `hwio:"offset=0x60,readonly,rcb"`
+	WRxBufBegin   uint16
+	WRxBufEnd     uint16
+	WRxBufRdAddr  uint16
 
-	WTxBufWrAddr  uint16 //hwio.Reg16 `hwio:"offset=0x68,rwmask=0x1FFF"`
-	//WTxBufWrData  hwio.Reg16 `hwio:"offset=0x70,writeonly,wcb"`
-	WTxBufGapTop  uint16//hwio.Reg16 `hwio:"offset=0x74,rwmask=0x1FFF"`
-	WTxBufGapDisp uint16//hwio.Reg16 `hwio:"offset=0x76,rwmask=0xFFF"`
+	WTxBufWrAddr  uint16
+	WTxBufGapTop  uint16
+	WTxBufGapDisp uint16
 
-	//BaseBandCnt   hwio.Reg16 `hwio:"offset=0x158,wcb"`
-	BaseBandWrite uint16//hwio.Reg16 `hwio:"offset=0x15A,writeonly"`
-	BaseBandRead  uint16//hwio.Reg16 `hwio:"offset=0x15C,readonly"`
-	BaseBandBusy  uint16//hwio.Reg16 `hwio:"offset=0x15E,readonly"`
-	BaseBandMode  uint16//hwio.Reg16 `hwio:"offset=0x160"`
-	BaseBandPower uint16//hwio.Reg16 `hwio:"offset=0x168"`
+	BaseBandWrite uint16
+	BaseBandRead  uint16
+	BaseBandBusy  uint16
+	BaseBandMode  uint16
+	BaseBandPower uint16
 	bbRegWritable [256]bool
 	bbRegs        [256]uint8
 
-	//Random hwio.Reg16 `hwio:"offset=0x044,readonly,rcb"`
+    PowerState uint16
+    PowerForce uint16
+
+    WInternal  uint16
+    WTxReqRead uint16
+    WRfPins    uint16
+    WRfStatus  uint16
+
 	rand   *rand.Rand
 
     ram [0x2000>>1]uint16
@@ -78,6 +82,21 @@ func (wf *Wifi) Write16(addr uint32, v uint16) {
     case 0x168:
         wf.BaseBandPower = v
 
+    case 0x03C:
+        wf.PowerState = v & 0b11
+
+    case 0x40:
+        wf.PowerForce = v & 0x8001
+
+        if apply := v & 0x8000 != 0; apply {
+            wf.PowerState |= 0x0200
+
+            wf.WInternal  = 0x0002
+            wf.WTxReqRead = 0x0000
+            wf.WRfPins    = 0x0046 
+            wf.WRfStatus  = 0x0009 
+        }
+
     }
 
     wf.io[addr>>1] = v
@@ -123,6 +142,23 @@ func (wf *Wifi) Read16(addr uint32) uint16 {
     case 0x168:
         return wf.BaseBandPower
 
+    case 0x03C:
+        return wf.PowerState
+
+    case 0x040:
+        return wf.PowerForce
+
+    case 0x034:
+        return wf.WInternal
+
+    case 0x0B0:
+        return wf.WTxReqRead
+
+    case 0x19C:
+        return wf.WRfPins
+
+    case 0x214:
+        return wf.WRfStatus
     }
 
     return wf.io[addr>>1]
