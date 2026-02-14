@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"runtime/pprof"
-	"slices"
 	"time"
 
 	"github.com/aabalke/guac/config"
@@ -138,55 +137,9 @@ func (g *Game) Update() error {
 	keys := inpututil.AppendPressedKeys([]ebiten.Key{})
 	justButtons, buttons := g.GetGamepadButtons()
 
-	keyConfig := config.Conf.KeyboardConfig
-	buttonConfig := config.Conf.ControllerConfig
-
-	for _, key := range justKeys {
-
-		keyStr := key.String()
-
-		switch {
-		case slices.Contains(keyConfig.Fullscreen, keyStr):
-			ebiten.SetFullscreen(!ebiten.IsFullscreen())
-		case slices.Contains(keyConfig.Quit, keyStr):
-			return exit
-		case slices.Contains(keyConfig.Unlimited, keyStr):
-
-            g.unlimitedFPS = !g.unlimitedFPS
-
-            if g.unlimitedFPS {
-                ebiten.SetTPS(UNLIMITED_FPS)
-            } else {
-                ebiten.SetTPS(60)
-            }
-
-		case slices.Contains(keyConfig.Pause, keyStr):
-			g.TogglePause()
-		case slices.Contains(keyConfig.Mute, keyStr):
-			g.ToggleMute()
-			//case slices.Contains([]string{"B"}, keyStr):
-			//    isProfiling = true
-			//    pprof.StartCPUProfile(f)
-		}
-	}
-
-	for _, button := range justButtons {
-
-		buttonStr := int(button)
-
-		switch {
-		case slices.Contains(buttonConfig.Pause, buttonStr):
-			g.TogglePause()
-
-		case slices.Contains(buttonConfig.Mute, buttonStr):
-			g.ToggleMute()
-		}
-	}
-
-	if g.paused {
-		g.pause.InputHandler(g, justKeys, justButtons)
-		return nil
-	}
+    if exitFlag := g.inputHandler(justKeys, justButtons); exitFlag {
+        return exit
+    }
 
 	if g.frame-g.pauseEndFrame < 10 {
 		// pressing select on pause can sometimes input into emulator,
@@ -206,8 +159,8 @@ func (g *Game) Update() error {
 		g.nds.Update()
 
 		t, b := g.nds.GetScreens()
-		g.nds.ImageTop.WritePixels(*t)
-		g.nds.ImageBottom.WritePixels(*b)
+		g.nds.Screen.Top.WritePixels(*t)
+		g.nds.Screen.Bottom.WritePixels(*b)
 
 	case GBA:
 		g.gba.InputHandler(keys, buttons)
@@ -292,8 +245,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	case GB:
 		ImageFillScreen(screen, g.gb.Image)
 	case NDS:
-		//ImageFillScreen(screen, g.nds.ImageTop)
-		g.ImageFillScreenMulti(screen, g.nds.ImageTop, g.nds.ImageBottom, false)
+        g.nds.Screen.FillScreen(screen)
 	}
 
 	if g.paused {
@@ -301,6 +253,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 }
 
+// this should be handled per emulator
 func ImageFillScreen(screen *ebiten.Image, image *ebiten.Image) {
 
 	sw, sh := float64(screen.Bounds().Dx()), float64(screen.Bounds().Dy())
@@ -317,83 +270,6 @@ func ImageFillScreen(screen *ebiten.Image, image *ebiten.Image) {
 	op.GeoM.Scale(scale, scale)
 	op.GeoM.Translate(offsetX, offsetY)
 	screen.DrawImage(image, op)
-}
-
-func (g *Game) ImageFillScreenMulti(screen *ebiten.Image, imageTop, imageBottom *ebiten.Image, setHorizontal bool) {
-
-	sw, sh := float64(screen.Bounds().Dx()), float64(screen.Bounds().Dy())
-	itw, ith := float64(imageTop.Bounds().Dx()), float64(imageTop.Bounds().Dy())
-
-	if setHorizontal {
-
-		scaleX := (sw / 2) / itw
-		scaleY := sh / ith
-		scale := min(scaleX, scaleY)
-
-		offsetX := (sw - (itw * scale))
-		offsetY := (sh - (ith * scale)) / 2
-
-		op := &ebiten.DrawImageOptions{}
-		op.GeoM.Scale(scale, scale)
-		op.GeoM.Translate(0, offsetY)
-		screen.DrawImage(imageTop, op)
-
-		op = &ebiten.DrawImageOptions{}
-		op.GeoM.Scale(scale, scale)
-		op.GeoM.Translate(offsetX, offsetY)
-		screen.DrawImage(imageBottom, op)
-
-		g.nds.BtmAbs = struct {
-			T int
-			B int
-			L int
-			R int
-			W int
-			H int
-		}{
-			T: int(offsetY),
-			B: int(offsetY + (scale * ith)),
-			L: int(offsetX),
-			R: int(offsetX + (scale * itw)),
-			W: int(scale * itw),
-			H: int(scale * ith),
-		}
-
-		return
-	}
-
-	scaleX := sw / itw
-	scaleY := (sh / 2) / ith
-	scale := min(scaleX, scaleY)
-
-	offsetX := (sw - (itw * scale)) / 2
-	offsetY := (sh - (ith * scale))
-
-	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Scale(scale, scale)
-	op.GeoM.Translate(offsetX, 0)
-	screen.DrawImage(imageTop, op)
-
-	op = &ebiten.DrawImageOptions{}
-	op.GeoM.Scale(scale, scale)
-	op.GeoM.Translate(offsetX, offsetY)
-	screen.DrawImage(imageBottom, op)
-
-	g.nds.BtmAbs = struct {
-		T int
-		B int
-		L int
-		R int
-		W int
-		H int
-	}{
-		T: int(offsetY),
-		B: int(offsetY + (scale * ith)),
-		L: int(offsetX),
-		R: int(offsetX + (scale * itw)),
-		W: int(scale * itw),
-		H: int(scale * ith),
-	}
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {

@@ -95,12 +95,14 @@ func (nds *Nds) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 
 func mouseInput(nds *Nds, mouse *input.Mouse, k2 *uint16) {
 
+    abs := nds.Screen.BtmAbs
 	tsc := &nds.mem.Spi.Tsc
 
-	if inBounds := (mouse.X >= nds.BtmAbs.L &&
-		mouse.X < nds.BtmAbs.R &&
-		mouse.Y >= nds.BtmAbs.T &&
-		mouse.Y < nds.BtmAbs.B); !inBounds || !mouse.DraggedLeft {
+	if inBounds := (
+        mouse.X >= abs.L &&
+		mouse.X <  abs.R &&
+		mouse.Y >= abs.T &&
+		mouse.Y <  abs.B); !inBounds || !mouse.DraggedLeft {
 
 		tsc.TouchActive = false
 
@@ -109,9 +111,9 @@ func mouseInput(nds *Nds, mouse *input.Mouse, k2 *uint16) {
 
 	tsc.TouchActive = true
 
-	s := float32(SCREEN_WIDTH) / float32(nds.BtmAbs.W)
+	s := float32(SCREEN_WIDTH) / float32(abs.W)
 
-	tsc.TouchX = uint16(float32(mouse.X-nds.BtmAbs.L) * s)
-	tsc.TouchY = uint16(float32(mouse.Y-nds.BtmAbs.T) * s)
+	tsc.TouchX = uint16(float32(mouse.X-abs.L) * s)
+	tsc.TouchY = uint16(float32(mouse.Y-abs.T) * s)
 	*k2 &^= 0b100_0000
 }

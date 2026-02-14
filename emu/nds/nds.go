@@ -17,7 +17,6 @@ import (
 	"github.com/aabalke/guac/emu/nds/ppu"
 	"github.com/aabalke/guac/emu/nds/snd"
 
-	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
 )
 
@@ -57,13 +56,12 @@ type Nds struct {
 	arm9      *arm9.Cpu
 	ppu       *ppu.PPU
 	Cartridge *cart.Cartridge
+    Screen *Screen
 
 	dma7 [4]dma.DMA
 	dma9 [4]dma.DMA
 
 	Muted, Paused, Drawn  bool
-	ImageTop, ImageBottom *ebiten.Image
-	BtmAbs                struct{ T, B, L, R, W, H int }
 
 	AccCycles   uint32
 	TimerCycles uint8
@@ -74,10 +72,9 @@ type Nds struct {
 
 func NewNds(path string, audioCtx *oto.Context) *Nds {
 
-	nds := Nds{
-		ImageTop:    ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
-		ImageBottom: ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
-	}
+	nds := Nds{}
+
+    nds.Screen = NewScreen()
 
 	irq7 := cpu.Irq{}
 	irq9 := cpu.Irq{}
