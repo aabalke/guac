@@ -138,3 +138,35 @@ func (c *Config) decodeNdsJit() {
 	//	Conf.Nds.NdsJit.PageCount = 0x1024_0000
 	//}
 }
+
+type NdsScreen struct {
+    ConfigLayout   string `toml:"layout"`
+    ConfigSizing   string `toml:"sizing"`
+    ConfigRotation int  `toml:"rotation"`
+
+    OLayout   int
+    OSizing   int
+    ORotation int
+}
+
+func (c *Config) decodeNdsScreen() {
+
+    switch c.Nds.Screen.ConfigLayout {
+    case "horizontal": c.Nds.Screen.OLayout = 1
+    case "hybrid": c.Nds.Screen.OLayout = 2
+    default: c.Nds.Screen.OLayout = 0
+    }
+
+    switch c.Nds.Screen.ConfigSizing {
+    case "only top": c.Nds.Screen.OSizing = 1
+    case "only bottom": c.Nds.Screen.OSizing = 2
+    default: c.Nds.Screen.OSizing = 0
+    }
+
+    switch c.Nds.Screen.ConfigRotation {
+    case 90: c.Nds.Screen.ORotation = 1
+    case 180: c.Nds.Screen.ORotation = 2
+    case 270: c.Nds.Screen.ORotation = 3
+    default: c.Nds.Screen.ORotation = 0
+    }
+}

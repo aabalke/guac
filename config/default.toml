@@ -128,6 +128,16 @@ frame_skip = 2
 # ex. if guac is running at 120 fps, it will only build every other frame
 dynamic_frame_skip = true
 
+[nds.screen]
+
+# Hybrid is special mode showing a large screen and both screens to the side.
+# Hybrid cannot be rotated. If Hybrid and sizing is "only bottom", large screen
+# will be bottom and touch input will be on main screen instead of secondary.
+
+layout = "vertical" # "vertical", "horizontal", "Hybrid"
+sizing = "even"     # "even", "only top", "only bottom"
+rotation = 0        # 0, 90, 180, 270
+
 [nds.keyboard]
 a = ["J"]
 b = ["K"]
@@ -142,6 +152,12 @@ l = ["T"]
 x = ["U"]
 y = ["I"]
 hinge = ["O"]
+debug = ["M"]
+
+# these will increment through selected screen options.
+layout_toggle = ["F1"]
+sizing_toggle = ["F2"]
+rotation_toggle = ["F3"]
 
 [nds.controller]
 a = [1]

@@ -63,6 +63,7 @@ type GbaConfig struct {
 }
 
 type NdsConfig struct {
+	Screen           NdsScreen                `toml:"screen"`
 	KeyboardConfig   EmulatorKeyboardConfig   `toml:"keyboard"`
 	ControllerConfig EmulatorControllerConfig `toml:"controller"`
 	NdsFirmware      NdsFirmware              `toml:"firmware"`
@@ -117,7 +118,11 @@ type EmulatorKeyboardConfig struct {
 	X      []string `toml:"x"`
 	Y      []string `toml:"y"`
 	Hinge  []string `toml:"hinge"`
-    Debug  []string `tom;:"Debug"`
+    Debug  []string `toml:"Debug"`
+
+    LayoutToggle   []string `toml:"layout_toggle"`
+    SizingToggle   []string `toml:"sizing_toggle"`
+    RotationToggle []string `toml:"rotation_toggle"`
 }
 
 type EmulatorControllerConfig struct {
@@ -184,6 +189,7 @@ func (c *Config) Decode() {
 }
 
 func (c *Config) decodeNds() {
+    c.decodeNdsScreen()
 	c.decodeNdsFirmware()
 	c.decodeNdsJit()
 }

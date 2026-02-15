@@ -155,7 +155,7 @@ func (g *Game) Update() error {
 			g.menu = nil
 		}
 	case NDS:
-		g.nds.InputHandler(keys, buttons, g.mouse, g.frame)
+		g.nds.InputHandler(justKeys, keys, buttons, g.mouse, g.frame)
 		g.nds.Update()
 
 		t, b := g.nds.GetScreens()
