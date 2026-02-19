@@ -192,7 +192,7 @@ func (c *Capture) CaptureLine(y uint32, isRenderingB bool) {
 
 		if c.SrcA3D {
 			i := (x + (y * SCREEN_WIDTH))
-			v, alpha := uint32(0), float32(0)
+			v, alpha := uint32(0), uint32(0)
 			pixels := c.Pixels3d
 			if isRenderingB {
 				v, alpha = pixels.PalettesA[i], pixels.AlphaA[i]

@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/aabalke/guac/emu/nds/rast/gl"
-	"github.com/aabalke/guac/emu/nds/utils"
 )
 
 const (
@@ -28,15 +27,15 @@ type Render struct {
 type Pixels struct {
 	PalettesA []uint32
 	PalettesB []uint32
-	AlphaA    []float32
-	AlphaB    []float32
+	AlphaA    []uint32
+	AlphaB    []uint32
 }
 
 func (p *Pixels) InitPixels() {
 	p.PalettesA = make([]uint32, WIDTH*HEIGHT)
 	p.PalettesB = make([]uint32, WIDTH*HEIGHT)
-	p.AlphaA = make([]float32, WIDTH*HEIGHT)
-	p.AlphaB = make([]float32, WIDTH*HEIGHT)
+	p.AlphaA = make([]uint32, WIDTH*HEIGHT)
+	p.AlphaB = make([]uint32, WIDTH*HEIGHT)
 }
 
 func NewRender(rast *Rasterizer, buffers *Buffers, rp *RearPlane) *Render {
@@ -192,6 +191,10 @@ func (r *Render) UpdateRender() {
 		//if !p.valid1DotDepth(r.Rasterizer.Disp1Dot.V) {
 		//    return
 		//}
+
+        //if polygons[i].Texture.param == 0x5923_1094 {
+        //    continue
+        //}
 
 		r.RenderPolygon(&polygons[i])
 	}
@@ -406,22 +409,16 @@ func (r *Render) ImageToPixels(img []gl.Color) {
 			r5 := uint32(min(0x1F, max(0, c.R*0x1F)))
 			g5 := uint32(min(0x1F, max(0, c.G*0x1F)))
 			b5 := uint32(min(0x1F, max(0, c.B*0x1F)))
+			a5 := uint32(min(0x1F, max(0, c.A*0x1F)))
 
 			v := r5 | g5<<5 | b5<<10
 
-			// limit to 5 bit, maybe 6??? rounds things nicely
-			// ex. if value is .99, then will still be slightly not visible on screen - its jarring
-			//alpha := (c.A >> 3)
-			//alpha = (alpha << 3) | (alpha >> 2)
-
-			c.A = utils.FloatRound(c.A, 0.05)
-
 			if r.Rasterizer.Buffers.BisRendering {
 				r.Pixels.PalettesB[i] = v
-				r.Pixels.AlphaB[i] = float32(c.A)
+				r.Pixels.AlphaB[i] = a5
 			} else {
 				r.Pixels.PalettesA[i] = v
-				r.Pixels.AlphaA[i] = float32(c.A)
+				r.Pixels.AlphaA[i] = a5
 			}
 		}
 	}

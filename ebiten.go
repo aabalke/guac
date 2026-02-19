@@ -74,6 +74,9 @@ func NewGame(flags Flags) *Game {
 		g.gb = gameboy.NewGameBoy(flags.RomPath, g.emuCtx)
 	case NDS:
 		g.nds = nds.NewNds(flags.RomPath, g.emuCtx)
+        if g.flags.Muted {
+            g.nds.ToggleMute()
+        }
 	}
 
 	return g

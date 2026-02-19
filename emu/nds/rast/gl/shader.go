@@ -61,19 +61,30 @@ var blendFunc = [...]func(texture *Texture, vColor, tColor Color) Color{
 	func(texture *Texture, vColor, tColor Color) Color {
 		return Modulate(vColor, tColor)
 
-		//con := func(v, t float32) float32 {
-		//	v *= FACTOR
-		//	t *= FACTOR
-		//	return max(0, min(1, ((t)*(v)-1)/(FACTOR*FACTOR)))
-		//}
+		con := func(iv, it float32) float32 {
 
-		//vColor.R = con(vColor.R, tColor.R)
-		//vColor.G = con(vColor.G, tColor.G)
-		//vColor.B = con(vColor.B, tColor.B)
-		//vColor.A = con(vColor.A, tColor.A)
-		//return vColor
+            v := uint32(min(1, max(0, iv)) * 0x1F) << 1
+            t := uint32(min(1, max(0, it)) * 0x1F) << 1
+
+            out := ((t+1)*(v+1)-1) >> 6
+
+            return min(1, max(0, float32(out) / 64))
+
+
+
+			//v *= 0x1F
+			//t *= 0x1F
+			//return max(0, min(1, ((t)*(v)-1)/(FACTOR*FACTOR)))
+		}
+
+		vColor.R = con(vColor.R, tColor.R)
+		vColor.G = con(vColor.G, tColor.G)
+		vColor.B = con(vColor.B, tColor.B)
+		vColor.A = con(vColor.A, tColor.A)
+		return vColor
 	},
 	func(texture *Texture, vColor, tColor Color) Color {
+
 
 		return Decal(vColor, tColor)
 

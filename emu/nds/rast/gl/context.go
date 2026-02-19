@@ -332,17 +332,17 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) {
 				(*depthBuffer)[i] = depth
 			}
 
-			j := &dc.ColorBuffer[i]
+			buf := &dc.ColorBuffer[i]
 
-			if !dc.AlphaBlending || color.A >= 1 || j.A < 0 {
-				dc.ColorBuffer[i] = *color
+			if !dc.AlphaBlending || color.A >= 1 || buf.A <= 0 {
+                *buf = *color
 				continue
 			}
 
-			j.R = min(1, max(0, (color.R*color.A)+(j.R*(1-color.A))))
-			j.G = min(1, max(0, (color.G*color.A)+(j.G*(1-color.A))))
-			j.B = min(1, max(0, (color.B*color.A)+(j.B*(1-color.A))))
-			j.A = min(1, max(0, max(j.A, color.A)))
+			buf.R = min(1, max(0, (color.R*color.A)+(buf.R*(1-color.A))))
+			buf.G = min(1, max(0, (color.G*color.A)+(buf.G*(1-color.A))))
+			buf.B = min(1, max(0, (color.B*color.A)+(buf.B*(1-color.A))))
+			buf.A = min(1, max(0, max(buf.A, color.A)))
 		}
 
 		w00 += b12

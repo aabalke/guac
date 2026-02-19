@@ -1,5 +1,6 @@
 package ppu
 
+
 const (
 	BLD_NONE     = 0
 	BLD_ALPHA    = 1
@@ -14,21 +15,18 @@ type Blend struct {
 	a, b          [6]bool
 	aEv, bEv, yEv uint16
 
-	Blended [SCREEN_WIDTH]uint16
-
-	NoBlendPals [SCREEN_WIDTH]uint16
-	APals       [SCREEN_WIDTH]uint16
-	BPals       [SCREEN_WIDTH]uint16
-	alphas      [SCREEN_WIDTH]uint16
-
+	Blended        [SCREEN_WIDTH]uint16
+	NoBlendPals    [SCREEN_WIDTH]uint16
+	APals          [SCREEN_WIDTH]uint16
+	BPals          [SCREEN_WIDTH]uint16
+	alphas         [SCREEN_WIDTH]uint16
 	hasA           [SCREEN_WIDTH]bool
 	hasB           [SCREEN_WIDTH]bool
 	targetATop     [SCREEN_WIDTH]bool
 	targetA3d      [SCREEN_WIDTH]bool
 	objTransparent [SCREEN_WIDTH]bool
-
-	outWindow [SCREEN_WIDTH]bool
-	modes     [SCREEN_WIDTH]uint32
+	outWindow      [SCREEN_WIDTH]bool
+	modes          [SCREEN_WIDTH]uint32
 
 	// used to only run mode blend only if a pixel in scanline has mode
 	// BLD_NONE == 0, so bit 0 is a flag for bld none
@@ -75,13 +73,13 @@ func (e *Engine) SetBgPals() {
 
 		bld.NoBlendPals[x] = pal
 		bld.targetATop[x] = bld.a[bgIdx]
-		bld.targetA3d[x] = e.Dispcnt.Is3D && bgIdx == 0
+        bld.targetA3d[x] = e.Dispcnt.Is3D && bgIdx == 0
 
 		if bld.a[bgIdx] {
 			bld.APals[x] = pal
 			bld.hasA[x] = true
 			if bld.targetA3d[x] {
-				bld.alphas[x] = min(16, uint16(e.BgAlphas[x]*16))
+                bld.alphas[x] = uint16(e.BgAlphas[x])
 			}
 			continue
 		}
@@ -171,7 +169,7 @@ func BlendAll(bld *Blend, wins *Windows, y uint32) {
 			bld.modes[x] = BLD_ALPHA
 		}
 
-		activeA := bld.hasA[x] && bld.targetATop[x] && bld.alphas[x] < 1
+		activeA := bld.hasA[x] && bld.targetATop[x] && bld.alphas[x] < 32
 		allowWin := !bld.outWindow[x] || (bld.hasB[x] && bld.objTransparent[x])
 		requireB := bld.modes[x] == BLD_ALPHA || (bld.modes[x] == BLD_NONE && bld.objTransparent[x])
 		noBlending := !activeA || !allowWin || (requireB && !bld.hasB[x])
@@ -245,6 +243,7 @@ func BlendAll(bld *Blend, wins *Windows, y uint32) {
 
 		return
 	case 1 << BLD_ALPHA_3D:
+
 		for x := range uint32(SCREEN_WIDTH) {
 			var (
 				pA = bld.APals[x]
@@ -257,17 +256,16 @@ func BlendAll(bld *Blend, wins *Windows, y uint32) {
 				bB = (pB >> 10) & 0x1F
 
 				a  = bld.alphas[x]
-				ai = 1 - a
+				ai = 31 - a
 
-				r = min(31, (rA*a+rB*ai)>>4)
-				g = min(31, (gA*a+gB*ai)>>4)
-				b = min(31, (bA*a+bB*ai)>>4)
+				r = min(31, ((rA*a)+(rB*ai))>>5)
+				g = min(31, ((gA*a)+(gB*ai))>>5)
+				b = min(31, ((bA*a)+(bB*ai))>>5)
 			)
 
 			bld.Blended[x] = r | (g << 5) | (b << 10)
-		}
-
-		return
+        }
+        return
 	}
 
 	for x := range uint32(SCREEN_WIDTH) {
@@ -320,11 +318,11 @@ func BlendAll(bld *Blend, wins *Windows, y uint32) {
 				bB = (pB >> 10) & 0x1F
 
 				a  = bld.alphas[x]
-				ai = 1 - a
+				ai = 31 - a
 
-				r = min(31, (rA*a+rB*ai)>>4)
-				g = min(31, (gA*a+gB*ai)>>4)
-				b = min(31, (bA*a+bB*ai)>>4)
+				r = min(31, ((rA*a)+(rB*ai))>>5)
+				g = min(31, ((gA*a)+(gB*ai))>>5)
+				b = min(31, ((bA*a)+(bB*ai))>>5)
 			)
 
 			bld.Blended[x] = r | (g << 5) | (b << 10)

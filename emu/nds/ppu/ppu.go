@@ -3,10 +3,14 @@ package ppu
 import (
 	"encoding/binary"
 	"fmt"
+	"math/bits"
+	"time"
 
+	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/nds/rast"
 	"github.com/aabalke/guac/emu/nds/utils"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 var _ = fmt.Sprintf
@@ -30,18 +34,20 @@ type PPU struct {
 
 	Vram VRAM
 
-	Capture     Capture
+	Capture Capture
 
 	WHITE_SCANLINE []uint8
+
+	FrameSkipMask uint32
 }
 
 type Engine struct {
 	Pixels []byte
 	IsB    bool
 
-    Pram PRAM
+	Pram PRAM
 
-    Backdrop *uint16 // always first palette in engine pram
+	Backdrop *uint16 // always first palette in engine pram
 
 	Dispcnt Dispcnt
 
@@ -53,28 +59,28 @@ type Engine struct {
 	Blend       *Blend
 	Mosaic      Mosaic
 
-    BgPriorities [4]struct {
-        Idx [4]uint32
-        Cnt int
-    }
-    ObjPriorities [4]struct {
-        Idx [128]uint32
-        Cnt int
-    }
+	BgPriorities [4]struct {
+		Idx [4]uint32
+		Cnt int
+	}
+	ObjPriorities [4]struct {
+		Idx [128]uint32
+		Cnt int
+	}
 
-    ExtBgSlots [4]*[0x2000]uint8
-    ExtObj     *[0x4000]uint8
+	ExtBgSlots [4]*[0x2000]uint8
+	ExtObj     *[0x4000]uint8
 
-    // these values are used per priority (each priority renders and sets
-    // blend before moving to the next ones)
-    BgPals   [SCREEN_WIDTH]uint16
-    BgOks    [SCREEN_WIDTH]bool
-    BgAlphas [SCREEN_WIDTH]float32
-    BgIdx    [SCREEN_WIDTH]uint32
+	// these values are used per priority (each priority renders and sets
+	// blend before moving to the next ones)
+	BgPals   [SCREEN_WIDTH]uint16
+	BgOks    [SCREEN_WIDTH]bool
+	BgAlphas [SCREEN_WIDTH]uint32
+	BgIdx    [SCREEN_WIDTH]uint32
 
-    ObjPals  [SCREEN_WIDTH]uint16
-    ObjOk    [SCREEN_WIDTH]bool
-    ObjMode  [SCREEN_WIDTH]uint32
+	ObjPals [SCREEN_WIDTH]uint16
+	ObjOk   [SCREEN_WIDTH]bool
+	ObjMode [SCREEN_WIDTH]uint32
 }
 
 type Dispcnt struct {
@@ -99,14 +105,13 @@ type Dispcnt struct {
 	ObjExtPal          bool
 }
 
-
 type Windows struct {
 	Enabled            bool
 	Win0, Win1, WinObj Window
 	OutBg              [4]bool
 	OutObj, OutBld     bool
 
-    inObjWindow [SCREEN_WIDTH] bool
+	inObjWindow [SCREEN_WIDTH]bool
 }
 
 type Window struct {
@@ -123,8 +128,8 @@ type Mosaic struct {
 
 type Background struct {
 
-    // used for getPriority -> standard func
-    MasterEnabled      bool
+	// used for getPriority -> standard func
+	MasterEnabled bool
 
 	Enabled            bool
 	W, H               uint32
@@ -159,8 +164,7 @@ const (
 )
 
 type Object struct {
-
-    MasterEnabled  bool
+	MasterEnabled bool
 
 	X, Y, W, H     uint32
 	Pa, Pb, Pc, Pd float32
@@ -190,6 +194,14 @@ func NewPPU(irq *cpu.Irq) *PPU {
 
 	p := &PPU{}
 
+	if config.Conf.Nds.FrameSkip >= 2 {
+		p.FrameSkipMask = config.Conf.Nds.FrameSkip - 1
+	}
+
+	if config.Conf.Nds.DynamicFrameSkip {
+		go p.updateFrameSkip()
+	}
+
 	p.EngineA.Pixels = make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)
 	p.EngineB.Pixels = make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)
 	p.EngineB.IsB = true
@@ -213,17 +225,31 @@ func NewPPU(irq *cpu.Irq) *PPU {
 		p.WHITE_SCANLINE[i] = 0xFF
 	}
 
-    p.EngineA.Backdrop = &p.EngineA.Pram.Bg[0]
-    p.EngineB.Backdrop = &p.EngineB.Pram.Bg[0]
+	p.EngineA.Backdrop = &p.EngineA.Pram.Bg[0]
+	p.EngineB.Backdrop = &p.EngineB.Pram.Bg[0]
 
-    p.EngineA.MasterBright.RebuildLUT()
-    p.EngineB.MasterBright.RebuildLUT()
+	p.EngineA.MasterBright.RebuildLUT()
+	p.EngineB.MasterBright.RebuildLUT()
 
-    p.EngineA.Blend = NewBlend()
-    p.EngineB.Blend = NewBlend()
-
+	p.EngineA.Blend = NewBlend()
+	p.EngineB.Blend = NewBlend()
 
 	return p
+}
+
+func (p *PPU) updateFrameSkip() {
+	t := time.NewTicker(time.Second / 2)
+	for range t.C {
+		tps := NextPow2(uint32(ebiten.ActualTPS()))
+		p.FrameSkipMask = tps - 1
+	}
+}
+
+func NextPow2(n uint32) uint32 {
+	if n == 0 {
+		return 1
+	}
+	return 1 << bits.Len32(n-1)
 }
 
 func (p *PPU) Update(addr, v uint32) {
@@ -277,10 +303,10 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
 		e.Dispcnt.ForcedBlank = (v>>7)&1 != 0
 
 		e.UpdateObjMapping(&e.Dispcnt)
-        e.setBgType(0)
-        e.setBgType(1)
-        e.setBgType(2)
-        e.setBgType(3)
+		e.setBgType(0)
+		e.setBgType(1)
+		e.setBgType(2)
+		e.setBgType(3)
 
 	case 0x1:
 		e.Dispcnt.DisplayObj = (v>>4)&1 != 0
@@ -508,7 +534,7 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 		p.Backgrounds[2].CharBaseBlock = ((v >> 2) & 0xF) * 0x4000
 		p.Backgrounds[2].Mosaic = (v>>6)&1 != 0
 		p.Backgrounds[2].Palette256 = (v>>7)&1 != 0
-        p.setBgType(2)
+		p.setBgType(2)
 	case 0x0D:
 		p.Backgrounds[2].ScreenBaseBlock = (v & 0x1F) * 0x800
 		p.Backgrounds[2].AffineWrap = (v>>5)&1 != 0
@@ -519,7 +545,7 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 		p.Backgrounds[3].CharBaseBlock = ((v >> 2) & 0xF) * 0x4000
 		p.Backgrounds[3].Mosaic = (v>>6)&1 != 0
 		p.Backgrounds[3].Palette256 = (v>>7)&1 != 0
-        p.setBgType(3)
+		p.setBgType(3)
 
 	case 0x0F:
 		p.Backgrounds[3].ScreenBaseBlock = (v & 0x1F) * 0x800
@@ -986,52 +1012,52 @@ func (e *Engine) UpdateObjMapping(d *Dispcnt) {
 
 func (e *Engine) setBgType(bgIdx uint32) {
 
-    bg := &e.Backgrounds[bgIdx]
+	bg := &e.Backgrounds[bgIdx]
 
-    switch bgIdx {
-    case 0:
-        if !e.IsB && e.Dispcnt.Is3D {
-            bg.Type = BG_TYPE_3D
-            return
-        }
+	switch bgIdx {
+	case 0:
+		if !e.IsB && e.Dispcnt.Is3D {
+			bg.Type = BG_TYPE_3D
+			return
+		}
 
-    case 2:
-        switch e.Dispcnt.Mode {
-        case 2, 4:
-            bg.Type = BG_TYPE_AFF
-            return
-        case 5:
-            switch {
-            case !bg.Palette256:
-                bg.Type = BG_TYPE_BGM
-            case (bg.CharBaseBlock>>14)&1 == 1:
-                bg.Type = BG_TYPE_DIR
-            default:
-                bg.Type = BG_TYPE_256
-            }
-            return
-        case 6:
-            bg.Type = BG_TYPE_LAR
-            return
-        }
-    case 3:
-        switch e.Dispcnt.Mode {
-        case 0:
-            bg.Type = BG_TYPE_TEX
-        case 1, 2:
-            bg.Type = BG_TYPE_AFF
-        default:
-            switch {
-            case !bg.Palette256:
-                bg.Type = BG_TYPE_BGM
-            case (bg.CharBaseBlock>>14)&1 == 1:
-                bg.Type = BG_TYPE_DIR
-            default:
-                bg.Type = BG_TYPE_256
-            }
-        }
-        return
-    }
+	case 2:
+		switch e.Dispcnt.Mode {
+		case 2, 4:
+			bg.Type = BG_TYPE_AFF
+			return
+		case 5:
+			switch {
+			case !bg.Palette256:
+				bg.Type = BG_TYPE_BGM
+			case (bg.CharBaseBlock>>14)&1 == 1:
+				bg.Type = BG_TYPE_DIR
+			default:
+				bg.Type = BG_TYPE_256
+			}
+			return
+		case 6:
+			bg.Type = BG_TYPE_LAR
+			return
+		}
+	case 3:
+		switch e.Dispcnt.Mode {
+		case 0:
+			bg.Type = BG_TYPE_TEX
+		case 1, 2:
+			bg.Type = BG_TYPE_AFF
+		default:
+			switch {
+			case !bg.Palette256:
+				bg.Type = BG_TYPE_BGM
+			case (bg.CharBaseBlock>>14)&1 == 1:
+				bg.Type = BG_TYPE_DIR
+			default:
+				bg.Type = BG_TYPE_256
+			}
+		}
+		return
+	}
 
-    bg.Type = BG_TYPE_TEX
+	bg.Type = BG_TYPE_TEX
 }

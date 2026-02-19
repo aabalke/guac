@@ -68,9 +68,7 @@ func (ppu *PPU) threeScanline(e *Engine, bgIdx, y uint32) {
 		}
 
 		r := ppu.Rasterizer.Render
-
-		pal, alpha := uint16(0), float32(0)
-
+		pal, alpha := uint16(0), uint32(0)
 		if r.Rasterizer.Buffers.BisRendering {
 			pal, alpha = uint16(r.Pixels.PalettesA[i]), r.Pixels.AlphaA[i]
 		} else {
@@ -78,17 +76,14 @@ func (ppu *PPU) threeScanline(e *Engine, bgIdx, y uint32) {
 		}
 
 		if noblend := ppu.EngineA.Blend.Mode == 0; noblend {
-
-			// this is only important if the 3d screen is the only one, nothing is behind it, and alpha != 1.
+			// this is only important if the 3d screen is the only one,
+            // nothing is behind it, and alpha != 1.
 			// really only noticed in devkit tests ( nehe/lesson10)
 
-			r := float32(pal&0x1F) * alpha
-			g := float32((pal>>5)&0x1F) * alpha
-			b := float32((pal>>10)&0x1F) * alpha
-
-			pal |= uint16(r) & 0x1F
-			pal |= ((uint16(g) & 0x1F) << 5)
-			pal |= ((uint16(b) & 0x1F) << 10)
+            r := ((((pal>>0)  & 0x1F) * uint16(alpha & 0x1F)) >> 5) & 0x1F
+            g := ((((pal>>5)  & 0x1F) * uint16(alpha & 0x1F)) >> 5) & 0x1F
+            b := ((((pal>>10) & 0x1F) * uint16(alpha & 0x1F)) >> 5) & 0x1F
+            pal = r | (g << 5) | (b << 10)
 		}
 
 		e.BgPals[x] = pal

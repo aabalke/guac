@@ -205,5 +205,5 @@ func (p *Polygon) isAlpha() bool {
 		return true
 	}
 
-	return p.Alpha < 1
+	return p.Alpha > 0 && p.Alpha < 1
 }

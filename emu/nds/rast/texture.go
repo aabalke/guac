@@ -69,7 +69,7 @@ func (tex *Texture) WriteParam(v uint32) {
 	tex.TransformationMode = (v >> 30) & 0b11
 
 	if tex.TransformationMode == 3 {
-		panic("VTX TEXT MODE WHICH I THINK IS GOOD BUT YOU SHOULD CHECK")
+		//panic("VTX TEXT MODE WHICH I THINK IS GOOD BUT YOU SHOULD CHECK")
 	}
 }
 
