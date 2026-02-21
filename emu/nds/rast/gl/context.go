@@ -91,7 +91,7 @@ func NewContext(width, height int) *Context {
 	dc.EdgeBuffer = make([]bool, width*height)
 	dc.PolyIdBuffer = make([]uint32, width*height)
 	dc.ClearColor = Transparent
-	dc.FrontFace = FaceCCW
+	dc.FrontFace = FaceCW
 	dc.Cull = CullNone
 	dc.screenMatrix = Screen(width, height)
 	return dc
@@ -363,12 +363,15 @@ func (dc *Context) drawClippedTriangle(v0, v1, v2 Vertex) {
 		v0, v1, v2 = v2, v1, v0
 		ndc0, ndc1, ndc2 = ndc2, ndc1, ndc0
 	}
+
 	if dc.Cull == CullFront {
 		a = -a
 	}
+
 	if dc.FrontFace == FaceCW {
 		a = -a
 	}
+
 	if dc.Cull != CullNone && a <= 0 {
 		return
 	}
@@ -427,9 +430,8 @@ func (dc *Context) DrawQuad(q *Quad) {
 			dc.drawClippedTriangle(t.V1, t.V2, t.V3)
 		}
 
-		return
-	}
-
-	// no need to clip
-	dc.drawClippedTriangle(v1, v3, v4)
+	} else {
+        // no need to clip
+        dc.drawClippedTriangle(v1, v3, v4)
+    }
 }

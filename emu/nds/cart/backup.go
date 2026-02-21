@@ -198,11 +198,7 @@ func (b *Backup) Transfer(data []uint8) (reply []uint8, stat uint8) {
 
 		return []uint8{v}, STAT_CONT
 
-	case INST_RDHI:
-
-		panic("read hi")
-
-	case INST_READ:
+	case INST_READ, INST_RDHI:
 
 		if b.AutoDetect && !b.Detect(data) {
 			return nil, STAT_CONT

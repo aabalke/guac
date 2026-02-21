@@ -48,9 +48,6 @@ func NewRender(rast *Rasterizer, buffers *Buffers, rp *RearPlane) *Render {
 	}
 
 	r.Pixels.InitPixels()
-
-	//r.Context.Cull = gl.CullFront
-	//r.Context.Cull = gl.CullNone
 	r.Context.Shader = gl.NewShader()
 
 	return r
@@ -157,9 +154,7 @@ func (r *Render) UpdateRender() {
 		minY := func(poly *Polygon) float32 {
 			m := float32(math.MaxFloat32)
 			for i := range len(poly.Vertices) {
-				if n := poly.Vertices[i].Output.Y; n < m {
-					m = n
-				}
+                m = min(poly.Vertices[i].Position.Y, m)
 			}
 
 			return m
@@ -192,7 +187,7 @@ func (r *Render) UpdateRender() {
 		//    return
 		//}
 
-        //if polygons[i].Texture.param == 0x5923_1094 {
+        //if polygons[i].Texture.param != 0x12030400 {
         //    continue
         //}
 
@@ -268,23 +263,13 @@ func (r *Render) RenderPolygon(p *Polygon) {
 		return
 	}
 
+    r.Context.Cull = p.Cull
 	r.Context.PolygonFogEnabled = p.FogEnabled
 	r.Context.DepthEqual = p.DrawEqualDepthPixels
 	r.Context.NewTranslucentDepth = p.SetNewTranslucentDepth
 	r.Context.PolygonId = p.Id
 	r.Context.PolygonOpaque = p.AlphaV == 0x1F || p.AlphaV == 0
 	//r.Context.Wireframe = p.AlphaV == 0
-
-	//switch {
-	//case p.RenderFront && p.RenderBack:
-	//    r.Context.Cull = gl.CullNone
-	//case p.RenderFront && !p.RenderBack:
-	//    r.Context.Cull = gl.CullFront
-	//case !p.RenderFront && p.RenderBack:
-	//    r.Context.Cull = gl.CullBack
-	//default:
-	//    return
-	//}
 
 	switch p.PrimitiveType {
 	case PRIM_SEP_TRI:

@@ -26,12 +26,20 @@ type Polygon struct {
 	Alpha                  float32
 	AlphaV                 uint32
 	Id                     uint32
+    Cull                   gl.Cull
 
 	PrimitiveType uint8
 	Vertices      []gl.Vertex
 
 	Texture Texture
 }
+
+const (
+    RENDER_NONE = iota
+    RENDER_BACK
+    RENDER_FRNT
+    RENDER_BOTH
+)
 
 func (p *Polygon) WriteAttrs(v uint32) {
 	p.v = v
@@ -50,6 +58,13 @@ func (p *Polygon) WriteAttrs(v uint32) {
 	p.Alpha = (float32((v >> 16) & 0x1F)) / 31 // 0 is wireframe
 	p.AlphaV = (v >> 16) & 0x1F
 	p.Id = (v >> 24) & 0x3F
+
+    switch render := (v >> 6) & 3; render {
+    case RENDER_NONE: p.Cull = 0
+    case RENDER_BACK: p.Cull = gl.CullNone //gl.CullFront
+    case RENDER_FRNT: p.Cull = gl.CullNone //gl.CullBack
+    case RENDER_BOTH: p.Cull = gl.CullNone //gl.CullNone
+    }
 }
 
 const (
