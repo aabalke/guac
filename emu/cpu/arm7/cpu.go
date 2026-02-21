@@ -136,6 +136,7 @@ type Cond struct {
 	Mode                   uint32
 }
 
+//go:nosplit
 func (c *Cond) Get() uint32 {
 
 	v := c.Mode
