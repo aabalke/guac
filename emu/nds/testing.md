@@ -99,14 +99,29 @@ graphics/3d/toon_shading
 👍 time/timercallback
 
 # Games (Decrypted)
-
 Animal Crossing
 Chrono Trigger
-Mario and Luigi Bowsers Inside Story
 Mario Kart
-Pokemon Diamond - Save Error
+- Flickering Textures
+- Shadows
+Pokemon Diamond
+- Large 3d meshes
 Pokemon Mystery Dungeon Explorers of Time
 Sonic Chronicles the Dark Brotherhood
+- Edges on transparent (same as zelda?)
 Super Mario 64
 👍 Tetris DS
-Yoshi's Island - minor decompressed sound problem
+Yoshi's Island
+- minor decompressed sound problem
+
+# 0.0.2 Release General Goals
+- Culling
+- Faster Frame rate sound
+- 3d "2d" texture bug - bad timing bug
+- ADMCP decompress error
+- Bug on startup - this goes back very far (pre 0.0.1)
+- Screenshotting
+- Save States
+
+Mario and Luigi Bowsers Inside Story
+- "2d" 3d textures getting corrupted

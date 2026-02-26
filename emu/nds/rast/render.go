@@ -187,10 +187,6 @@ func (r *Render) UpdateRender() {
 		//    return
 		//}
 
-        //if polygons[i].Texture.param != 0x12030400 {
-        //    continue
-        //}
-
 		r.RenderPolygon(&polygons[i])
 	}
 
@@ -203,7 +199,6 @@ func (r *Render) UpdateRender() {
 	}
 
 	r.ImageToPixels(*r.Context.Image())
-	//r.ImageToPixels(r.Context.BufferImage())
 }
 
 func (r *Render) ApplyFog(depthW bool) {

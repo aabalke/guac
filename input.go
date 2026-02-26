@@ -39,6 +39,12 @@ func (g *Game) inputHandler(justKeys []ebiten.Key, justButtons []ebiten.Standard
 			//    isProfiling = true
 			//    pprof.StartCPUProfile(f)
 
+        case slices.Contains([]string{"Numpad4"}, keyStr):
+            ebiten.SetTPS(15)
+            println("setting 15fps")
+        case slices.Contains([]string{"Numpad5"}, keyStr):
+            ebiten.SetTPS(30)
+            println("setting 30fps")
         case slices.Contains([]string{"Numpad1"}, keyStr):
             ebiten.SetTPS(60)
             println("setting 60fps")

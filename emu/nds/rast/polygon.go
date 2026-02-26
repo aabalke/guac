@@ -176,6 +176,7 @@ func (p *Polygon) GetTexture(g *GeoEngine) *gl.Texture {
 			Mode:        p.Mode,
 			ToonTbl:     &g.ToonTbl,
 			IsHighlight: g.Disp3dCnt.HighlightShading,
+            Param: t.param,
 		}
 	}
 
@@ -193,6 +194,7 @@ func (p *Polygon) GetTexture(g *GeoEngine) *gl.Texture {
 		Mode:          p.Mode,
 		ToonTbl:       &g.ToonTbl,
 		IsHighlight:   g.Disp3dCnt.HighlightShading,
+        Param: t.param,
 	}
 }
 
