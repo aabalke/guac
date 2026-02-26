@@ -55,16 +55,16 @@ func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, buttons []ebiten.Stand
 		}
 	}
 
-    for _, key := range justKeys {
+	for _, key := range justKeys {
 		switch keyStr := key.String(); {
-        case slices.Contains(keyCfg.LayoutToggle, keyStr):
-            nds.Screen.inputHandler(SCREEN_LAYOUT)
-        case slices.Contains(keyCfg.SizingToggle, keyStr):
-            nds.Screen.inputHandler(SCREEN_SIZING)
-        case slices.Contains(keyCfg.RotationToggle, keyStr):
-            nds.Screen.inputHandler(SCREEN_ROTATION)
+		case slices.Contains(keyCfg.LayoutToggle, keyStr):
+			nds.Screen.inputHandler(SCREEN_LAYOUT)
+		case slices.Contains(keyCfg.SizingToggle, keyStr):
+			nds.Screen.inputHandler(SCREEN_SIZING)
+		case slices.Contains(keyCfg.RotationToggle, keyStr):
+			nds.Screen.inputHandler(SCREEN_ROTATION)
 		}
-    }
+	}
 
 	for _, button := range buttons {
 		switch buttonStr := int(button); {
@@ -103,77 +103,73 @@ func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, buttons []ebiten.Stand
 
 func mouseInput(nds *Nds, mouse *input.Mouse, k2 *uint16) {
 
-    abs := nds.Screen.BtmAbs
+	abs := nds.Screen.BtmAbs
 	tsc := &nds.mem.Spi.Tsc
 
-    if !mouse.DraggedLeft {
+	if !mouse.DraggedLeft {
 		tsc.TouchActive = false
-        return
-    }
+		return
+	}
 
-    // effectively rot, translate of real mouse coords to rotated bottom screen coords
+	// effectively rot, translate of real mouse coords to rotated bottom screen coords
 
-    switch nds.Screen.Rotation {
-    case ROT_0:
+	switch nds.Screen.Rotation {
+	case ROT_0:
 
-        if inBounds := (
-            mouse.X >= abs.L &&
-            mouse.X <  abs.R &&
-            mouse.Y >= abs.T &&
-            mouse.Y <  abs.B); !inBounds {
-            tsc.TouchActive = false
-            return
-        }
+		if inBounds := (mouse.X >= abs.L &&
+			mouse.X < abs.R &&
+			mouse.Y >= abs.T &&
+			mouse.Y < abs.B); !inBounds {
+			tsc.TouchActive = false
+			return
+		}
 
-        s := float32(SCREEN_WIDTH) / float32(abs.W)
-        tsc.TouchX = uint16(float32(mouse.X-abs.L) * s) - 1
-        tsc.TouchY = uint16(float32(mouse.Y-abs.T) * s) - 1
+		s := float32(SCREEN_WIDTH) / float32(abs.W)
+		tsc.TouchX = uint16(float32(mouse.X-abs.L)*s) - 1
+		tsc.TouchY = uint16(float32(mouse.Y-abs.T)*s) - 1
 
-    case ROT_90:
+	case ROT_90:
 
-        if inBounds := (
-            mouse.X >= abs.B &&
-            mouse.X <  abs.T &&
-            mouse.Y >= abs.L &&
-            mouse.Y <  abs.R); !inBounds {
-            tsc.TouchActive = false
-            return
-        }
+		if inBounds := (mouse.X >= abs.B &&
+			mouse.X < abs.T &&
+			mouse.Y >= abs.L &&
+			mouse.Y < abs.R); !inBounds {
+			tsc.TouchActive = false
+			return
+		}
 
-        s := float32(SCREEN_WIDTH) / float32(abs.H)
-        tsc.TouchX = uint16(float32(mouse.Y-abs.L) * s) - 1
-        tsc.TouchY = uint16(float32(abs.T-mouse.X) * s) - 1
+		s := float32(SCREEN_WIDTH) / float32(abs.H)
+		tsc.TouchX = uint16(float32(mouse.Y-abs.L)*s) - 1
+		tsc.TouchY = uint16(float32(abs.T-mouse.X)*s) - 1
 
-    case ROT_180:
+	case ROT_180:
 
-        if inBounds := (
-            mouse.X >= abs.R &&
-            mouse.X <  abs.L &&
-            mouse.Y >= abs.B &&
-            mouse.Y <  abs.T); !inBounds {
-            tsc.TouchActive = false
-            return
-        }
+		if inBounds := (mouse.X >= abs.R &&
+			mouse.X < abs.L &&
+			mouse.Y >= abs.B &&
+			mouse.Y < abs.T); !inBounds {
+			tsc.TouchActive = false
+			return
+		}
 
-        s := float32(SCREEN_WIDTH) / float32(abs.W)
-        tsc.TouchX = uint16(float32(abs.L-mouse.X) * s) - 1
-        tsc.TouchY = uint16(float32(abs.T-mouse.Y) * s) - 1
+		s := float32(SCREEN_WIDTH) / float32(abs.W)
+		tsc.TouchX = uint16(float32(abs.L-mouse.X)*s) - 1
+		tsc.TouchY = uint16(float32(abs.T-mouse.Y)*s) - 1
 
-    case ROT_270:
+	case ROT_270:
 
-        if inBounds := (
-            mouse.X >= abs.T &&
-            mouse.X <  abs.B &&
-            mouse.Y >= abs.R &&
-            mouse.Y <  abs.L); !inBounds {
-            tsc.TouchActive = false
-            return
-        }
+		if inBounds := (mouse.X >= abs.T &&
+			mouse.X < abs.B &&
+			mouse.Y >= abs.R &&
+			mouse.Y < abs.L); !inBounds {
+			tsc.TouchActive = false
+			return
+		}
 
-        s := float32(SCREEN_WIDTH) / float32(abs.H)
-        tsc.TouchX = uint16(float32(abs.L-mouse.Y) * s) - 1
-        tsc.TouchY = uint16(float32(mouse.X-abs.T) * s) - 1
-    }
+		s := float32(SCREEN_WIDTH) / float32(abs.H)
+		tsc.TouchX = uint16(float32(abs.L-mouse.Y)*s) - 1
+		tsc.TouchY = uint16(float32(mouse.X-abs.T)*s) - 1
+	}
 
 	tsc.TouchActive = true
 	*k2 &^= 0b100_0000

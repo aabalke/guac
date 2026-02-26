@@ -37,7 +37,7 @@ type Mem struct {
 	irq7, irq9       *cpu.Irq
 	dma7, dma9       *[4]dma.DMA
 
-    Wifi *wifi.Wifi
+	Wifi *wifi.Wifi
 
 	arm7Pc *uint32
 
@@ -114,7 +114,7 @@ func NewMemory(
 
 	m.Spi.Init()
 
-    m.Wifi = wifi.NewWifi()
+	m.Wifi = wifi.NewWifi()
 
 	return m
 }
@@ -198,9 +198,9 @@ func (mem *Mem) Read8(addr uint32, arm9 bool) uint32 {
 }
 func (mem *Mem) Read16(addr uint32, arm9 bool) uint32 {
 
-    if !arm9 && addr >= 0x480_0000 && addr < 0x490_0000 {
-        return uint32(mem.Wifi.Read16(addr))
-    }
+	if !arm9 && addr >= 0x480_0000 && addr < 0x490_0000 {
+		return uint32(mem.Wifi.Read16(addr))
+	}
 	if ptr, ok := mem.ReadPtr(addr, arm9); ok {
 		return uint32(binary.LittleEndian.Uint16((*[4]uint8)(ptr)[:]))
 	}
@@ -361,10 +361,10 @@ func (mem *Mem) Write8(addr uint32, v uint8, arm9 bool) {
 }
 func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
 
-    if !arm9 && addr >= 0x480_0000 && addr < 0x490_0000 {
-        mem.Wifi.Write16(addr, v)
-        return
-    }
+	if !arm9 && addr >= 0x480_0000 && addr < 0x490_0000 {
+		mem.Wifi.Write16(addr, v)
+		return
+	}
 
 	if ptr, ok := mem.WritePtr(addr, arm9); ok {
 		binary.LittleEndian.PutUint16((*[4]uint8)(ptr)[:], v)
@@ -523,7 +523,7 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 	case 0x1A2:
 		return mem.Cartridge.ReadAuxSpiData()
 	case 0x1A3:
-        return 0
+		return 0
 	case 0x1A4:
 		return mem.Cartridge.ReadRomCtrl(0)
 	case 0x1A5:
@@ -689,7 +689,7 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 	case 0x1A2:
 		mem.Cartridge.WriteAuxSpiData(v)
 	case 0x1A3:
-        return
+		return
 	case 0x1A4:
 		mem.Cartridge.WriteRomCtrl(v, 0, true)
 	case 0x1A5:
@@ -915,6 +915,12 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 		return mem.Keypad.readCNT(false)
 	case 0x133:
 		return mem.Keypad.readCNT(true)
+
+	case 0x134:
+		return 0x0F
+	case 0x135:
+		return 0x80
+
 	case 0x136:
 		return mem.Keypad.readINPUT2()
 
@@ -1144,7 +1150,7 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 	case 0x1A2:
 		mem.Cartridge.WriteAuxSpiData(v)
 	case 0x1A3:
-        return
+		return
 	case 0x1A4:
 		mem.Cartridge.WriteRomCtrl(v, 0, false)
 	case 0x1A5:

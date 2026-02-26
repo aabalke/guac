@@ -31,7 +31,7 @@ type Header struct {
 
 func NewHeader(c *Cartridge) Header {
 	h := Header{
-		Title: strings.ToUpper(strings.ReplaceAll(string(c.Rom[:0xC]), "\x00", " ")),
+		Title:          strings.ToUpper(strings.ReplaceAll(string(c.Rom[:0xC]), "\x00", " ")),
 		GameCode:       c.Rom[0xC : 0xC+4],
 		UnitCode:       c.Rom[0x12],
 		EncryptionSeed: c.Rom[0x13],

@@ -20,7 +20,7 @@ type Cartridge struct {
 	SavPath string
 	SavLen  int
 
-    //io
+	//io
 	Header  Header
 	ExMem   ExMem
 	AuxSpi  AuxSpi
@@ -30,8 +30,8 @@ type Cartridge struct {
 	dma7, dma9 *[4]dma.DMA
 	Backup     *Backup
 
-    // fields
-    SaveFlag       bool
+	// fields
+	SaveFlag       bool
 	RomTransferIrq bool
 	NDSSlotEnabled bool
 	Status         uint8
@@ -50,18 +50,18 @@ func NewCartridge(romPath, savPath string, irq7, irq9 *cpu.Irq, dma7, dma9 *[4]d
 		dma9:    dma9,
 	}
 
-    var ok bool
-    c.Rom, c.RomLen, ok = readFile(romPath)
-    if !ok {
-        panic("could not read rom path")
-    }
+	var ok bool
+	c.Rom, c.RomLen, ok = readFile(romPath)
+	if !ok {
+		panic("could not read rom path")
+	}
 
 	c.Header = NewHeader(c)
 
 	code := binary.LittleEndian.Uint32(c.Header.GameCode)
-    c.Backup = NewBackup(c)
-    c.readSave(savPath, code)
-    c.Backup.setCartType()
+	c.Backup = NewBackup(c)
+	c.readSave(savPath, code)
+	c.Backup.setCartType()
 
 	// matches no cash nitrofs test
 	c.WriteExMem(0x80, 0)
@@ -76,7 +76,7 @@ func NewCartridge(romPath, savPath string, irq7, irq9 *cpu.Irq, dma7, dma9 *[4]d
 	c.Status = GAMECARD_STAT_KY2
 	c.ChipId = createChipId(c.Backup)
 
-    c.InitSaveLoop()
+	c.InitSaveLoop()
 
 	return c
 }
@@ -90,28 +90,28 @@ func (c *Cartridge) checkAccessRights(arm9 bool) bool {
 
 func (c *Cartridge) readSave(savPath string, gamecode uint32) {
 
-    if romData, ok := roms[gamecode]; ok {
-        // in db
-        c.Backup.Size = romData.Size
-        c.Backup.MemType = romData.BackupType
-    } else {
-        // i believe this are good values
-        c.Backup.Size = 0x80_0000
-        c.Backup.MemType = 0
-    }
+	if romData, ok := roms[gamecode]; ok {
+		// in db
+		c.Backup.Size = romData.Size
+		c.Backup.MemType = romData.BackupType
+	} else {
+		// i believe this are good values
+		c.Backup.Size = 0x80_0000
+		c.Backup.MemType = 0
+	}
 
-    c.Sav = make([]uint8, c.Backup.Size)
-    for i := range c.Sav {
-        c.Sav[i] = 0xFF
-    }
+	c.Sav = make([]uint8, c.Backup.Size)
+	for i := range c.Sav {
+		c.Sav[i] = 0xFF
+	}
 
-    sav, length, ok := readFile(savPath)
-    if ok {
+	sav, length, ok := readFile(savPath)
+	if ok {
 
-        for i := range length {
-            c.Sav[i] = sav[i]
-        }
-    }
+		for i := range length {
+			c.Sav[i] = sav[i]
+		}
+	}
 }
 
 const (
@@ -278,8 +278,8 @@ func (c *Cartridge) InitSaveLoop() {
 	go func() {
 		for range saveTicker {
 			if c.SaveFlag {
-                log.Printf("Saving Game Path: %s\n", c.SavPath)
-                writeFile(c.SavPath, c.Sav[:])
+				log.Printf("Saving Game Path: %s\n", c.SavPath)
+				writeFile(c.SavPath, c.Sav[:])
 				c.SaveFlag = false
 			}
 		}

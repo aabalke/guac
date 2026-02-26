@@ -110,6 +110,13 @@ func (c *Channel) GetSample() (int8, int8) {
 
 	// playbackRate / sndFreq == step
 	playbackRate := BASE_FREQ / float64(-int16(c.TimerValue))
+
+	// not sure if this idicates a bigger proble,
+	// ex spyro sets c.TimerValue = 1; then enables. Would mean pr of -BASE_FREQ
+	if playbackRate < 0 {
+		return 0, 0
+	}
+
 	c.SamplePos += playbackRate / sndFreq
 
 	var sample float64
@@ -195,7 +202,7 @@ func (c *Channel) DecompressADPCM() {
 	length := ((c.SndLength * 4) + uint32(4*(c.StartPosition)) - 4)
 	c.Samples = make([]int16, 0, length)
 
-	head := uint32(c.Snd.Mem.Read32(addr, false))
+	head := c.Snd.Mem.Read32(addr, false)
 
 	addr += 4
 
@@ -255,7 +262,12 @@ func (c *Channel) GetADPCM() float64 {
 		}
 	}
 
-	v := c.Samples[uint32(c.SamplePos)]
+	// required, spyro. May be indicative of larger problem
+	if int(c.SamplePos) < 0 {
+		return 0
+	}
+
+	v := c.Samples[int(c.SamplePos)]
 	return float64(v) / 32768
 }
 

@@ -28,26 +28,26 @@ func (nds *Nds) LogCpu(arm9 bool) {
 		cpsr   uint32
 		ie     uint32
 		ime    bool
-        thumb  bool
+		thumb  bool
 	)
 
 	if arm9 {
-		cpu  := nds.arm9
-		r     = cpu.Reg.R
-		cpsr  = cpu.Reg.CPSR.Get()
-        thumb = cpu.Reg.CPSR.T
+		cpu := nds.arm9
+		r = cpu.Reg.R
+		cpsr = cpu.Reg.CPSR.Get()
+		thumb = cpu.Reg.CPSR.T
 	} else {
-		cpu  := nds.arm7
-		r     = cpu.Reg.R
-		cpsr  = cpu.Reg.CPSR.Get()
-        thumb = cpu.Reg.CPSR.T
+		cpu := nds.arm7
+		r = cpu.Reg.R
+		cpsr = cpu.Reg.CPSR.Get()
+		thumb = cpu.Reg.CPSR.T
 	}
 
-    if thumb {
-        opcode = nds.mem.Read16(r[15], arm9)
-    } else {
-        opcode = nds.mem.Read32(r[15], arm9)
-    }
+	if thumb {
+		opcode = nds.mem.Read16(r[15], arm9)
+	} else {
+		opcode = nds.mem.Read32(r[15], arm9)
+	}
 
 	s := fmt.Sprintf("R %08X ", r)
 	s += fmt.Sprintf("OP %08X ", opcode)

@@ -5,9 +5,9 @@ import (
 )
 
 type Wifi struct {
-	WRxBufBegin   uint16
-	WRxBufEnd     uint16
-	WRxBufRdAddr  uint16
+	WRxBufBegin  uint16
+	WRxBufEnd    uint16
+	WRxBufRdAddr uint16
 
 	WTxBufWrAddr  uint16
 	WTxBufGapTop  uint16
@@ -21,24 +21,24 @@ type Wifi struct {
 	bbRegWritable [256]bool
 	bbRegs        [256]uint8
 
-    PowerState uint16
-    PowerForce uint16
+	PowerState uint16
+	PowerForce uint16
 
-    WInternal  uint16
-    WTxReqRead uint16
-    WRfPins    uint16
-    WRfStatus  uint16
+	WInternal  uint16
+	WTxReqRead uint16
+	WRfPins    uint16
+	WRfStatus  uint16
 
-	rand   *rand.Rand
+	rand *rand.Rand
 
-    ram [0x2000>>1]uint16
+	ram [0x2000 >> 1]uint16
 	//WifiRam hwio.Mem `hwio:"bank=1,offset=0,size=0x2000,rw8=off,rw16,rw32"`
 
-    io [0x8000>>1]uint16
+	io [0x8000 >> 1]uint16
 }
 
 func NewWifi() *Wifi {
-    wf := &Wifi{}
+	wf := &Wifi{}
 	wf.rand = rand.New(rand.NewSource(0))
 	wf.bbInit()
 	return wf
@@ -46,122 +46,122 @@ func NewWifi() *Wifi {
 
 func (wf *Wifi) Write16(addr uint32, v uint16) {
 
-    addr &= 0x7FFF
+	addr &= 0x7FFF
 
-    switch addr {
-    case 0x50:
-        wf.WRxBufBegin = v
+	switch addr {
+	case 0x50:
+		wf.WRxBufBegin = v
 
-    case 0x52:
-        wf.WRxBufEnd = v
+	case 0x52:
+		wf.WRxBufEnd = v
 
-    case 0x58:
-        wf.WRxBufRdAddr = v & 0x1FFF
+	case 0x58:
+		wf.WRxBufRdAddr = v & 0x1FFF
 
-    case 0x68:
-        wf.WTxBufWrAddr = v & 0x1FFF
+	case 0x68:
+		wf.WTxBufWrAddr = v & 0x1FFF
 
-    case 0x70:
-        wf.WriteWTXBUFWRDATA(v)
+	case 0x70:
+		wf.WriteWTXBUFWRDATA(v)
 
-    case 0x74:
-        wf.WTxBufGapTop = v & 0x1FFF
+	case 0x74:
+		wf.WTxBufGapTop = v & 0x1FFF
 
-    case 0x76:
-        wf.WTxBufGapDisp = v & 0xFFF
+	case 0x76:
+		wf.WTxBufGapDisp = v & 0xFFF
 
-    case 0x158:
-        wf.WriteBASEBANDCNT(v)
+	case 0x158:
+		wf.WriteBASEBANDCNT(v)
 
-    case 0x15A:
-        wf.BaseBandWrite = v
+	case 0x15A:
+		wf.BaseBandWrite = v
 
-    case 0x160:
-        wf.BaseBandMode = v
+	case 0x160:
+		wf.BaseBandMode = v
 
-    case 0x168:
-        wf.BaseBandPower = v
+	case 0x168:
+		wf.BaseBandPower = v
 
-    case 0x03C:
-        wf.PowerState = v & 0b11
+	case 0x03C:
+		wf.PowerState = v & 0b11
 
-    case 0x40:
-        wf.PowerForce = v & 0x8001
+	case 0x40:
+		wf.PowerForce = v & 0x8001
 
-        if apply := v & 0x8000 != 0; apply {
-            wf.PowerState |= 0x0200
+		if apply := v&0x8000 != 0; apply {
+			wf.PowerState |= 0x0200
 
-            wf.WInternal  = 0x0002
-            wf.WTxReqRead = 0x0000
-            wf.WRfPins    = 0x0046 
-            wf.WRfStatus  = 0x0009 
-        }
+			wf.WInternal = 0x0002
+			wf.WTxReqRead = 0x0000
+			wf.WRfPins = 0x0046
+			wf.WRfStatus = 0x0009
+		}
 
-    }
+	}
 
-    wf.io[addr>>1] = v
+	wf.io[addr>>1] = v
 }
 
 func (wf *Wifi) Read16(addr uint32) uint16 {
 
-    addr &= 0x7FFF
+	addr &= 0x7FFF
 
-    switch addr {
-    case 0x44:
-        return wf.ReadRANDOM()
+	switch addr {
+	case 0x44:
+		return wf.ReadRANDOM()
 
-    case 0x50:
-        return wf.WRxBufBegin
+	case 0x50:
+		return wf.WRxBufBegin
 
-    case 0x52:
-        return wf.WRxBufEnd
+	case 0x52:
+		return wf.WRxBufEnd
 
-    case 0x58:
-        return wf.WRxBufRdAddr
+	case 0x58:
+		return wf.WRxBufRdAddr
 
-    case 0x60:
-        return wf.ReadWRXBUFRDDATA()
-    case 0x68:
-        return wf.WTxBufWrAddr
+	case 0x60:
+		return wf.ReadWRXBUFRDDATA()
+	case 0x68:
+		return wf.WTxBufWrAddr
 
-    case 0x74:
-        return wf.WTxBufGapTop
+	case 0x74:
+		return wf.WTxBufGapTop
 
-    case 0x76:
-        return wf.WTxBufGapDisp
+	case 0x76:
+		return wf.WTxBufGapDisp
 
-    case 0x15C:
-        return wf.BaseBandRead
+	case 0x15C:
+		return wf.BaseBandRead
 
-    case 0x15E:
-        return wf.BaseBandBusy
+	case 0x15E:
+		return wf.BaseBandBusy
 
-    case 0x160:
-        return wf.BaseBandMode
+	case 0x160:
+		return wf.BaseBandMode
 
-    case 0x168:
-        return wf.BaseBandPower
+	case 0x168:
+		return wf.BaseBandPower
 
-    case 0x03C:
-        return wf.PowerState
+	case 0x03C:
+		return wf.PowerState
 
-    case 0x040:
-        return wf.PowerForce
+	case 0x040:
+		return wf.PowerForce
 
-    case 0x034:
-        return wf.WInternal
+	case 0x034:
+		return wf.WInternal
 
-    case 0x0B0:
-        return wf.WTxReqRead
+	case 0x0B0:
+		return wf.WTxReqRead
 
-    case 0x19C:
-        return wf.WRfPins
+	case 0x19C:
+		return wf.WRfPins
 
-    case 0x214:
-        return wf.WRfStatus
-    }
+	case 0x214:
+		return wf.WRfStatus
+	}
 
-    return wf.io[addr>>1]
+	return wf.io[addr>>1]
 }
 
 func (wf *Wifi) bbInit() {
@@ -183,22 +183,22 @@ func (wf *Wifi) bbInit() {
 func (wf *Wifi) WriteBASEBANDCNT(val uint16) {
 
 	idx := val & 0xFF
-    dir := val >> 12
+	dir := val >> 12
 
-    const (
-        W = 5
-        R = 6
-    )
+	const (
+		W = 5
+		R = 6
+	)
 
-    if dir == R {
+	if dir == R {
 		wf.BaseBandRead = uint16(wf.bbRegs[idx])
-        return
-    }
+		return
+	}
 
-    if dir == W && wf.bbRegWritable[idx] {
-        wf.bbRegs[idx] = uint8(wf.BaseBandWrite & 0xFF)
-        return
-    }
+	if dir == W && wf.bbRegWritable[idx] {
+		wf.bbRegs[idx] = uint8(wf.BaseBandWrite & 0xFF)
+		return
+	}
 }
 
 func (wf *Wifi) ReadRANDOM() uint16 {
@@ -208,7 +208,7 @@ func (wf *Wifi) ReadRANDOM() uint16 {
 func (wf *Wifi) WriteWTXBUFWRDATA(val uint16) {
 	off := wf.WTxBufWrAddr
 
-    wf.ram[off>>1] = val
+	wf.ram[off>>1] = val
 	//binary.LittleEndian.PutUint16(wf.ram[off:off+2], val)
 	off += 2
 	if off == wf.WTxBufGapTop {
@@ -220,7 +220,7 @@ func (wf *Wifi) WriteWTXBUFWRDATA(val uint16) {
 
 func (wf *Wifi) ReadWRXBUFRDDATA() uint16 {
 	off := wf.WRxBufRdAddr
-    val := wf.ram[off>>1]
+	val := wf.ram[off>>1]
 	//val := binary.LittleEndian.Uint16(wf.WifiRam[off : off+2])
 	off += 2
 	if off == wf.WRxBufEnd&0x1FFF {

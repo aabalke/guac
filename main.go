@@ -41,12 +41,12 @@ func main() {
 
 	flags := getFlags()
 
-    switch {
-    case flags.FPS != 60:
+	switch {
+	case flags.FPS != 60:
 
-        ebiten.SetTPS(flags.FPS)
+		ebiten.SetTPS(flags.FPS)
 
-    case flags.Profile:
+	case flags.Profile:
 
 		fi, err := os.Create("cpu.prof")
 		if err != nil {
@@ -57,7 +57,7 @@ func main() {
 
 		ebiten.SetTPS(UNLIMITED_FPS)
 
-    case flags.Unlimited:
+	case flags.Unlimited:
 		ebiten.SetTPS(UNLIMITED_FPS)
 	}
 
@@ -80,11 +80,11 @@ func main() {
 		//InitUnfocused: true,
 	}
 
-    g := NewGame(flags)
+	g := NewGame(flags)
 
-    if flags.Profile || flags.Unlimited {
-        g.unlimitedFPS = true
-    }
+	if flags.Profile || flags.Unlimited {
+		g.unlimitedFPS = true
+	}
 
 	err := ebiten.RunGameWithOptions(g, opts)
 	if err != nil && err != exit {
@@ -113,16 +113,16 @@ type Flags struct {
 	RomPath     string
 	Profile     bool
 	Unlimited   bool
-    FPS         int
-    Muted bool
+	FPS         int
+	Muted       bool
 }
 
 func getFlags() Flags {
 	romPath := flag.String("r", "", "rom path")
 	profile := flag.Bool("p", false, "use profiler")
 	unlimited := flag.Bool("u", false, "unlimited tps")
-    fps := flag.Int("fps", 60, "fps limit")
-    muted := flag.Bool("m", false, "is muted")
+	fps := flag.Int("fps", 60, "fps limit")
+	muted := flag.Bool("m", false, "is muted")
 
 	flag.Parse()
 
@@ -130,8 +130,8 @@ func getFlags() Flags {
 		RomPath:   *romPath,
 		Profile:   *profile,
 		Unlimited: *unlimited,
-        FPS:       *fps,
-        Muted:     *muted,
+		FPS:       *fps,
+		Muted:     *muted,
 	}
 
 	switch {

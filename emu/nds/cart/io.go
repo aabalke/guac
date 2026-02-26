@@ -3,9 +3,9 @@ package cart
 import "log"
 
 type ExMem struct {
-	IsGBAAccessArm7          bool
-	isCartAccessArm7         bool
-	v                        uint16
+	IsGBAAccessArm7  bool
+	isCartAccessArm7 bool
+	v                uint16
 }
 
 // gba values are separate instances on arm7 and arm9
@@ -51,18 +51,18 @@ func (c *Cartridge) ReadAuxSpi(b uint8) uint8 {
 
 		v := uint8(0)
 		if c.AuxSpi.IsBackup {
-            v |= 1 << 5
+			v |= 1 << 5
 		}
 		if c.RomTransferIrq {
-            v |= 1 << 6
+			v |= 1 << 6
 		}
 		if c.NDSSlotEnabled {
-            v |= 1 << 7
+			v |= 1 << 7
 		}
 
 		return v
-    default:
-        panic("unknown byte cnt auxspi")
+	default:
+		panic("unknown byte cnt auxspi")
 	}
 }
 
@@ -114,49 +114,49 @@ func (c *Cartridge) WriteAuxSpi(v uint8, b uint8, arm9 bool) {
 
 func (c *Cartridge) ReadAuxSpiData() uint8 {
 
-    if !c.NDSSlotEnabled {
-        return 0
-    }
+	if !c.NDSSlotEnabled {
+		return 0
+	}
 
-    if !c.AuxSpi.IsBackup {
-        return 0
-    }
+	if !c.AuxSpi.IsBackup {
+		return 0
+	}
 
-    // if busy return 0
+	// if busy return 0
 
-    return c.AuxSpi.Value
+	return c.AuxSpi.Value
 }
 
 var match = [4]uint8{
-    0x02, 0x26, 0xd, 0x74,
+	0x02, 0x26, 0xd, 0x74,
 }
 
 func h(res []uint8) bool {
 
-    if len(res) < 4 {
-        return false
-    }
+	if len(res) < 4 {
+		return false
+	}
 
-    for i := range 4 {
-        if res[i] != match[i] {
-            return false
-        }
-    }
+	for i := range 4 {
+		if res[i] != match[i] {
+			return false
+		}
+	}
 
-    return true
+	return true
 }
 
 func (c *Cartridge) WriteAuxSpiData(v uint8) {
 
-    if !c.NDSSlotEnabled {
-        return
-    }
+	if !c.NDSSlotEnabled {
+		return
+	}
 
-    if !c.AuxSpi.IsBackup {
-        return
-    }
+	if !c.AuxSpi.IsBackup {
+		return
+	}
 
-    // if busy return 0
+	// if busy return 0
 
 	a := &c.AuxSpi
 
@@ -173,9 +173,9 @@ func (c *Cartridge) WriteAuxSpiData(v uint8) {
 
 		a.Res, stat = c.Backup.Transfer(a.Req)
 
-        if h(a.Res) {
-            panic("pulled valid")
-        }
+		if h(a.Res) {
+			panic("pulled valid")
+		}
 
 		if stat == STAT_DONE {
 			a.Req = a.Req[:0]
@@ -225,9 +225,9 @@ func (c *Cartridge) ReadRomCtrl(b uint8) uint8 {
 		v := uint8((r.v) >> (b * 8))
 
 		if r.isReady {
-            v |= 1 << 7
+			v |= 1 << 7
 		} else {
-            v &^= 1 << 7
+			v &^= 1 << 7
 		}
 
 		return v

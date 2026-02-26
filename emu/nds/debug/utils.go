@@ -8,7 +8,7 @@ import (
 func readFile(path string) (buf []uint8, length int, ok bool) {
 	buf, err := os.ReadFile(path)
 	if err != nil {
-        return nil, 0, false
+		return nil, 0, false
 	}
 	return buf, len(buf), true
 }
@@ -17,7 +17,7 @@ func writeFile(path string, buf []uint8) bool {
 
 	f, err := os.Create(path)
 	if err != nil {
-        return false
+		return false
 	}
 	defer f.Close()
 
@@ -25,8 +25,8 @@ func writeFile(path string, buf []uint8) bool {
 
 	_, err = writer.Write(buf)
 	if err != nil {
-        return false
+		return false
 	}
 
-    return true
+	return true
 }

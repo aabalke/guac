@@ -1,7 +1,10 @@
 package mem
 
 import (
+	"fmt"
 	"time"
+
+	"github.com/aabalke/guac/config"
 )
 
 // interrupts not setup
@@ -11,15 +14,18 @@ type Rtc struct {
 	wasClk   bool
 	wasWrite bool
 
+	isWriteData bool
+	isWriteClk  bool
+	isWriteSel  bool
+
 	data uint8
 	cnt  int
 
 	RegStatus1 uint8
 	RegStatus2 uint8
 
-	IsWriting bool
-	Buffer    []uint8
-	Idx       int
+	Buffer []uint8
+	Idx    int
 
 	Alarms [2]Alarm
 }
@@ -34,24 +40,29 @@ const (
 	BIT_CLK_OUT = (1 << 1)
 	BIT_SEL_OUT = (1 << 2)
 	BIT_DAT_DIR = (1 << 4)
+	BIT_CLK_DIR = (1 << 5)
+	BIT_SEL_DIR = (1 << 6)
+)
 
-	CMD_STS1 = 0
-	CMD_ALM1 = 1
-	CMD_DT   = 2
-	CMD_CADJ = 3
-	CMD_STS2 = 4
-	CMD_ALM2 = 5
-	CMD_TIME = 6
-	CMD_FREE = 7
+const (
+	CMD_STS1 = iota
+	CMD_ALM1
+	CMD_DT
+	CMD_CADJ
+	CMD_STS2
+	CMD_ALM2
+	CMD_TIME
+	CMD_FREE
 )
 
 func (r *Rtc) InitRtc() {
-	//r.RegStatus1 = 0x80
-	r.RegStatus1 = 0x00
+	r.RegStatus1 = 0x02
 	r.RegStatus2 = 0x00
 }
 
 func (r *Rtc) Write(v uint8) {
+
+	//r.Print(v, false)
 
 	clk := v&BIT_CLK_OUT != 0
 	cs := v&BIT_SEL_OUT != 0
@@ -59,11 +70,7 @@ func (r *Rtc) Write(v uint8) {
 
 	if init := cs && !r.wasCs; init {
 		r.data = 0
-		if isWrite {
-			r.cnt = 8
-		} else {
-			r.cnt = 0
-		}
+		r.cnt = 0
 	}
 
 	if send := cs && !clk && r.wasClk; send {
@@ -86,10 +93,13 @@ func (r *Rtc) Write(v uint8) {
 	r.wasCs = cs
 	r.wasClk = clk
 	r.wasWrite = isWrite
+	r.isWriteClk = (v>>5)&1 != 0
+	r.isWriteSel = (v>>6)&1 != 0
 }
 
 func (r *Rtc) Read() uint8 {
-	v := uint8(0b0110_0000)
+
+	v := uint8(r.data & 1)
 	if r.wasClk {
 		v |= BIT_CLK_OUT
 	}
@@ -99,14 +109,20 @@ func (r *Rtc) Read() uint8 {
 	if r.wasWrite {
 		v |= BIT_DAT_DIR
 	}
-	v |= (r.data & 1)
+	if r.isWriteClk {
+		v |= BIT_CLK_DIR
+	}
+	if r.isWriteSel {
+		v |= BIT_SEL_DIR
+	}
 
+	//r.Print(v, true)
 	return v
 }
 
 func (r *Rtc) ReadData() uint8 {
 
-	if r.IsWriting {
+	if r.isWriteData {
 		return 0
 	}
 
@@ -137,7 +153,9 @@ func (r *Rtc) writeReg(v uint8) {
 	if needParams := len(r.Buffer) != paramCnts[r.Idx]; needParams {
 		return
 	}
-	r.IsWriting = false
+	r.isWriteData = false
+
+	//fmt.Printf("WRITING PARAM %d V %02X\n", r.Idx, r.Buffer)
 
 	switch r.Idx {
 	case CMD_STS1:
@@ -156,11 +174,13 @@ func (r *Rtc) writeReg(v uint8) {
 		r.Alarms[1].Dow = r.Buffer[0]
 		r.Alarms[1].Hr = r.Buffer[1]
 		r.Alarms[1].MinFreq = r.Buffer[2]
+	default:
+		panic(fmt.Sprintf("bad rtc write reg 0x%X\n", r.Idx))
 	}
 }
 
 func (r *Rtc) WriteData(v uint8) {
-	if r.IsWriting {
+	if r.isWriteData {
 		r.writeReg(v)
 		return
 	}
@@ -172,7 +192,7 @@ func (r *Rtc) WriteData(v uint8) {
 	reg := (v >> 4) & 7
 
 	if write := v&0x80 == 0; write {
-		r.IsWriting = true
+		r.isWriteData = true
 		r.Buffer = nil
 		r.Idx = int(reg)
 		return
@@ -188,7 +208,8 @@ func (r *Rtc) WriteData(v uint8) {
 		r.Buffer = append(r.Buffer, r.RegStatus2)
 
 	case CMD_DT, CMD_TIME:
-		now := time.Now()
+
+		now := time.Now().Add(time.Hour * time.Duration(config.Conf.Nds.NdsRtc.AdditionalHours))
 
 		var hour uint8
 		if hr24 := r.RegStatus1&2 != 0; hr24 {
@@ -235,6 +256,8 @@ func (r *Rtc) WriteData(v uint8) {
 			r.Alarms[1].Hr,
 			r.Alarms[1].MinFreq,
 		)
+	default:
+		panic(fmt.Sprintf("bad rtc read reg 0x%X\n", r.Idx))
 	}
 }
 
@@ -245,4 +268,22 @@ func bcd(v uint) uint8 {
 	}
 
 	return uint8((v/10)*16 + (v % 10))
+}
+
+func (r *Rtc) Print(v uint8, read bool) {
+
+	s := "RTC "
+
+	if read {
+		s += "R "
+	} else {
+		s += "W "
+	}
+
+	s += fmt.Sprintf("V %02X ", v)
+
+	//s += fmt.Sprintf("STAT1 %02X ", r.RegStatus1)
+	//s += fmt.Sprintf("STAT2 %02X ", r.RegStatus2)
+
+	fmt.Printf("%s\n", s)
 }

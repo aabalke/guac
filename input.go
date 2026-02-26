@@ -20,7 +20,7 @@ func (g *Game) inputHandler(justKeys []ebiten.Key, justButtons []ebiten.Standard
 		case slices.Contains(keyConfig.Fullscreen, keyStr):
 			ebiten.SetFullscreen(!ebiten.IsFullscreen())
 		case slices.Contains(keyConfig.Quit, keyStr):
-            return true
+			return true
 		case slices.Contains(keyConfig.Unlimited, keyStr):
 
 			g.unlimitedFPS = !g.unlimitedFPS
@@ -39,21 +39,21 @@ func (g *Game) inputHandler(justKeys []ebiten.Key, justButtons []ebiten.Standard
 			//    isProfiling = true
 			//    pprof.StartCPUProfile(f)
 
-        case slices.Contains([]string{"Numpad4"}, keyStr):
-            ebiten.SetTPS(15)
-            println("setting 15fps")
-        case slices.Contains([]string{"Numpad5"}, keyStr):
-            ebiten.SetTPS(30)
-            println("setting 30fps")
-        case slices.Contains([]string{"Numpad1"}, keyStr):
-            ebiten.SetTPS(60)
-            println("setting 60fps")
-        case slices.Contains([]string{"Numpad2"}, keyStr):
-            ebiten.SetTPS(120)
-            println("setting 120fps")
-        case slices.Contains([]string{"Numpad3"}, keyStr):
-            ebiten.SetTPS(180)
-            println("setting 180fps")
+		case slices.Contains([]string{"Numpad4"}, keyStr):
+			ebiten.SetTPS(15)
+			println("setting 15fps")
+		case slices.Contains([]string{"Numpad5"}, keyStr):
+			ebiten.SetTPS(30)
+			println("setting 30fps")
+		case slices.Contains([]string{"Numpad1"}, keyStr):
+			ebiten.SetTPS(60)
+			println("setting 60fps")
+		case slices.Contains([]string{"Numpad2"}, keyStr):
+			ebiten.SetTPS(120)
+			println("setting 120fps")
+		case slices.Contains([]string{"Numpad3"}, keyStr):
+			ebiten.SetTPS(180)
+			println("setting 180fps")
 		}
 	}
 
@@ -74,5 +74,5 @@ func (g *Game) inputHandler(justKeys []ebiten.Key, justButtons []ebiten.Standard
 		g.pause.InputHandler(g, justKeys, justButtons)
 	}
 
-    return false
+	return false
 }

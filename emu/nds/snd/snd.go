@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/aabalke/guac/config"
+	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
 )
 
@@ -57,6 +58,10 @@ type Snd struct {
 	sampleTime   float64
 	streamLen    int
 	buffSize     uint32
+
+	steamCh chan []uint8
+
+	muted bool
 }
 
 func NewSnd(ctx *oto.Context, freq, rate, cnt int) *Snd {
@@ -71,34 +76,53 @@ func NewSnd(ctx *oto.Context, freq, rate, cnt int) *Snd {
 		sampleTime:   1.0 / float64(rate),
 		streamLen:    (2 * 2 * rate / 60) - (2*2*rate/60)%4,
 		buffSize:     uint32((cnt) * 16 * 2),
+		//steamCh: make(chan []uint8, 10000),
 	}
 
 	s.Stream = make([]byte, s.streamLen)
 	s.SoundBuffer = make([]int16, s.buffSize)
 
 	for i := range 16 {
-		s.Channels[i] = NewChannel(i, s)
-	}
 
-	s.Channels[8].isDuty = true
-	s.Channels[9].isDuty = true
-	s.Channels[10].isDuty = true
-	s.Channels[11].isDuty = true
-	s.Channels[12].isDuty = true
-	s.Channels[13].isDuty = true
-	s.Channels[14].isNoise = true
-	s.Channels[15].isNoise = true
+		s.Channels[i] = NewChannel(i, s)
+
+		switch {
+		case i < 8:
+			continue
+		case i < 14:
+			s.Channels[i].isDuty = true
+		default:
+			s.Channels[i].isNoise = true
+		}
+	}
 
 	s.Capture = NewCaptures(s)
 
 	if !config.Conf.CancelAudioInit {
 		s.player = ctx.NewPlayer()
+		//go s.runCh()
 	}
 
 	return s
 }
 
+func (s *Snd) runCh() {
+	for stream := range s.steamCh {
+		if s.muted {
+			continue
+		}
+
+		if ebiten.ActualTPS() > 130 {
+			continue
+		}
+
+		s.player.Write(stream)
+	}
+}
+
 func (s *Snd) Play(muted bool) {
+
+	s.muted = muted
 
 	s.SoundBufferWrap()
 
@@ -109,6 +133,11 @@ func (s *Snd) Play(muted bool) {
 	s.Mix()
 
 	if muted || s.player == nil {
+		return
+	}
+
+	//s.steamCh <- s.Stream
+	if ebiten.ActualTPS() > 65 {
 		return
 	}
 

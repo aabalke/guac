@@ -68,6 +68,7 @@ type NdsConfig struct {
 	ControllerConfig EmulatorControllerConfig `toml:"controller"`
 	NdsFirmware      NdsFirmware              `toml:"firmware"`
 	NdsJit           NdsJit                   `toml:"jit"`
+	NdsRtc           NdsRtc                   `toml:"rtc"`
 	Threads          int                      `toml:"threads"`
 	DisableSaves     bool                     `toml:"disable_saves"`
 
@@ -118,11 +119,11 @@ type EmulatorKeyboardConfig struct {
 	X      []string `toml:"x"`
 	Y      []string `toml:"y"`
 	Hinge  []string `toml:"hinge"`
-    Debug  []string `toml:"Debug"`
+	Debug  []string `toml:"Debug"`
 
-    LayoutToggle   []string `toml:"layout_toggle"`
-    SizingToggle   []string `toml:"sizing_toggle"`
-    RotationToggle []string `toml:"rotation_toggle"`
+	LayoutToggle   []string `toml:"layout_toggle"`
+	SizingToggle   []string `toml:"sizing_toggle"`
+	RotationToggle []string `toml:"rotation_toggle"`
 }
 
 type EmulatorControllerConfig struct {
@@ -189,7 +190,7 @@ func (c *Config) Decode() {
 }
 
 func (c *Config) decodeNds() {
-    c.decodeNdsScreen()
+	c.decodeNdsScreen()
 	c.decodeNdsFirmware()
 	c.decodeNdsJit()
 }

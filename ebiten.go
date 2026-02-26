@@ -47,7 +47,7 @@ type Game struct {
 	menuCtx *audio.Context
 	emuCtx  *oto.Context
 
-    unlimitedFPS bool
+	unlimitedFPS bool
 }
 
 func NewGame(flags Flags) *Game {
@@ -74,9 +74,9 @@ func NewGame(flags Flags) *Game {
 		g.gb = gameboy.NewGameBoy(flags.RomPath, g.emuCtx)
 	case NDS:
 		g.nds = nds.NewNds(flags.RomPath, g.emuCtx)
-        if g.flags.Muted {
-            g.nds.ToggleMute()
-        }
+		if g.flags.Muted {
+			g.nds.ToggleMute()
+		}
 	}
 
 	return g
@@ -140,9 +140,9 @@ func (g *Game) Update() error {
 	keys := inpututil.AppendPressedKeys([]ebiten.Key{})
 	justButtons, buttons := g.GetGamepadButtons()
 
-    if exitFlag := g.inputHandler(justKeys, justButtons); exitFlag {
-        return exit
-    }
+	if exitFlag := g.inputHandler(justKeys, justButtons); exitFlag {
+		return exit
+	}
 
 	if g.frame-g.pauseEndFrame < 10 {
 		// pressing select on pause can sometimes input into emulator,
@@ -248,7 +248,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	case GB:
 		ImageFillScreen(screen, g.gb.Image)
 	case NDS:
-        g.nds.Screen.FillScreen(screen)
+		g.nds.Screen.FillScreen(screen)
 	}
 
 	if g.paused {

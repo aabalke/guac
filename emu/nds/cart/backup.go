@@ -26,34 +26,34 @@ const (
 )
 
 const (
-    KB = 1024
-    MB = 1024 * 1024
+	KB = 1024
+	MB = 1024 * 1024
 )
 
 var savSize = [...]uint32{
-    0,
-    KB/2,
-    KB*8,
-    KB*64,
-    KB*128,
-    KB*256,
-    KB*512,
-    MB,
-    MB*8,
-    MB*16,
-    MB*64,
+	0,
+	KB / 2,
+	KB * 8,
+	KB * 64,
+	KB * 128,
+	KB * 256,
+	KB * 512,
+	MB,
+	MB * 8,
+	MB * 16,
+	MB * 64,
 }
 
 const (
-    TYPE_NONE = iota
-    TYPE_EEPROM_SM
-    TYPE_EEPROM
-    TYPE_FLASH
-    TYPE_NAND
+	TYPE_NONE = iota
+	TYPE_EEPROM_SM
+	TYPE_EEPROM
+	TYPE_FLASH
+	TYPE_NAND
 )
 
 type Backup struct {
-    Cartridge *Cartridge
+	Cartridge *Cartridge
 
 	Addr         uint32
 	WriteEnabled bool
@@ -64,28 +64,33 @@ type Backup struct {
 
 	WriteProtection uint8
 
-	Size uint32
+	Size    uint32
 	MemType uint32
-    Type uint32
+	Type    uint32
 }
 
 func NewBackup(c *Cartridge) *Backup {
-    return &Backup{
-        Cartridge: c,
-        AutoDetect: true,
-    }
+	return &Backup{
+		Cartridge:  c,
+		AutoDetect: true,
+	}
 }
 
 func (b *Backup) setCartType() {
-    switch b.MemType {
-    case 1: b.Type = TYPE_EEPROM_SM
-    case 2, 3, 4: b.Type = TYPE_EEPROM
-    case 5, 6, 7: b.Type = TYPE_FLASH
-    case 8, 9, 10: b.Type = TYPE_NAND
-    default: b.Type = TYPE_NONE
-    }
+	switch b.MemType {
+	case 1:
+		b.Type = TYPE_EEPROM_SM
+	case 2, 3, 4:
+		b.Type = TYPE_EEPROM
+	case 5, 6, 7:
+		b.Type = TYPE_FLASH
+	case 8, 9, 10:
+		b.Type = TYPE_NAND
+	default:
+		b.Type = TYPE_NONE
+	}
 
-    println("cart type", b.Type)
+	println("cart type", b.Type)
 }
 
 func (b *Backup) Detect(data []uint8) bool {
@@ -166,9 +171,9 @@ func (b *Backup) checkSize() {
 
 func (b *Backup) Transfer(data []uint8) (reply []uint8, stat uint8) {
 
-    //if b.Type == TYPE_FLASH {
-    //    return b.TransferFlash(data)
-    //}
+	//if b.Type == TYPE_FLASH {
+	//    return b.TransferFlash(data)
+	//}
 
 	switch inst := data[0]; inst {
 	case INST_NONE:

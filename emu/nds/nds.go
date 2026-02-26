@@ -56,12 +56,12 @@ type Nds struct {
 	arm9      *arm9.Cpu
 	ppu       *ppu.PPU
 	Cartridge *cart.Cartridge
-    Screen *Screen
+	Screen    *Screen
 
 	dma7 [4]dma.DMA
 	dma9 [4]dma.DMA
 
-	Muted, Paused, Drawn  bool
+	Muted, Paused, Drawn bool
 
 	AccCycles   uint32
 	TimerCycles uint8
@@ -74,7 +74,7 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 
 	nds := Nds{}
 
-    nds.Screen = NewScreen()
+	nds.Screen = NewScreen()
 
 	irq7 := cpu.Irq{}
 	irq9 := cpu.Irq{}
@@ -115,13 +115,13 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 		nds.dma7[i].Init(i, &nds.mem, &irq7, false)
 	}
 
-    nds.Cartridge = cart.NewCartridge(
-        path, path+".save",
-        &irq7, &irq9,
-        &nds.dma7, &nds.dma9,
-    )
+	nds.Cartridge = cart.NewCartridge(
+		path, path+".save",
+		&irq7, &irq9,
+		&nds.dma7, &nds.dma9,
+	)
 
-    nds.mem.Cartridge = nds.Cartridge
+	nds.mem.Cartridge = nds.Cartridge
 
 	nds.DirtyInit()
 

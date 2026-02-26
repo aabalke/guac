@@ -203,3 +203,7 @@ batch_inst = 32
 
 # todo
 # page_size (pageshift / pagemask)
+
+[nds.rtc]
+# real time clock uses your current time, you can add hours to skip to different times of day. ex if real time is 9pm. add 11 hours sets rtc to 8am.
+# additional_hours = 6 
