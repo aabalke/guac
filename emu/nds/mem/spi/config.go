@@ -9,7 +9,7 @@ import (
 
 func FirmwareConfig() {
 
-	f := &config.Conf.Nds.NdsFirmware
+	f := &config.Conf.Nds.Firmware
 
 	const ofs = 0x3FE00
 

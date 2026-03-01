@@ -70,15 +70,15 @@ func NewJit(cpu *Cpu) *Jit {
 		return j
 	}
 
-	conf := config.Conf.Nds.NdsJit
+	conf := config.Conf.Jit
 
 	j := &Jit{
 		Cpu:   cpu,
 		Pages: make([]*Page, ADDRESS_SPACE>>conf.PageShift),
 		BlockCache: InitBlockCache(
-			config.Conf.Nds.NdsJit.BlockCnt,
+			config.Conf.Jit.BlockCnt,
 			PAGE_SIZE),
-		LoopThreshold: config.Conf.Nds.NdsJit.LoopCnt,
+		LoopThreshold: config.Conf.Jit.LoopCnt,
 	}
 
 	j.PageShift = conf.PageShift
@@ -147,6 +147,7 @@ func (j *Jit) SCRATCH(i uint32) gojit.Indirect {
 }
 
 // gets spsr value, using mode and CPU
+//
 //go:nosplit
 func GetSpsr(mode uint32) uint32 {
 	return CpuPointer.Reg.SPSR[BANK_ID[mode]].Get()
@@ -250,7 +251,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 	if thumb {
 		for {
 			op = uint32(*(*uint16)(unsafe.Add(p, i*2)))
-			if length >= config.Conf.Nds.NdsJit.BatchInstA7 {
+			if length >= config.Conf.Jit.BatchInstA7 {
 
 				break
 			}
@@ -293,7 +294,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 		for {
 			op = *(*uint32)(unsafe.Add(p, i*4))
 
-			if length >= config.Conf.Nds.NdsJit.BatchInstA7 {
+			if length >= config.Conf.Jit.BatchInstA7 {
 
 				break
 			}
@@ -712,7 +713,7 @@ var (
 
 func (j *Jit) StartTest(op uint32, compare bool, f func(op uint32)) {
 
-	if config.Conf.Nds.NdsJit.Enabled {
+	if config.Conf.Jit.Enabled {
 		panic("Jit Instruction Test is running with Jit Running")
 	}
 

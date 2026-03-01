@@ -1,9 +1,8 @@
 package config
 
 import (
-	"log"
+	"strings"
 
-	sys "golang.org/x/sys/cpu"
 )
 
 const (
@@ -44,6 +43,26 @@ var clr = map[string]uint8{
 	"Magenta":     FW_CLR_MAGENTA,
 }
 
+
+type NdsConfig struct {
+	Screen           NdsScreen                `toml:"screen"`
+	KeyboardConfig   EmulatorKeyboardConfig   `toml:"keyboard"`
+	ControllerConfig EmulatorControllerConfig `toml:"controller"`
+	Firmware      NdsFirmware                 `toml:"firmware"`
+	Rtc           NdsRtc                      `toml:"rtc"`
+    Export        NdsExport                   `toml:"export"`
+	Threads          int                      `toml:"threads"`
+	DisableSaves     bool                     `toml:"disable_saves"`
+	FrameSkip        uint32                   `toml:"frame_skip"`
+	DynamicFrameSkip bool                     `toml:"dynamic_frame_skip"`
+}
+
+func (c *Config) decodeNds() {
+	c.decodeNdsScreen()
+	c.decodeNdsFirmware()
+    c.decodeNdsExport()
+}
+
 type NdsFirmware struct {
 	Nickname      string `toml:"nickname"`
 	Message       string `toml:"message"`
@@ -55,7 +74,7 @@ type NdsFirmware struct {
 
 func (c *Config) decodeNdsFirmware() {
 
-	f := &c.Nds.NdsFirmware
+	f := &c.Nds.Firmware
 
 	clr, ok := clr[f.FavoriteColor]
 	if !ok {
@@ -97,46 +116,6 @@ func (c *Config) decodeNdsFirmware() {
 	if f.Message == "" {
 		f.Message = "Guac emulator by Aaron Balke!"
 	}
-}
-
-type NdsJit struct {
-	Enabled   bool   `toml:"enabled"`
-	BatchInst uint32 `toml:"batch_inst"`
-
-	LoopCnt   uint32 `toml:"loop_cnt"`
-	BlockCnt  uint32 `toml:"block_cnt"`
-	PageShift uint32 `toml:"page_shift"`
-
-	BatchInstA9 uint32
-	BatchInstA7 uint32
-}
-
-func (c *Config) decodeNdsJit() {
-
-	if Conf.Nds.NdsJit.Enabled && !sys.X86.HasSSE2 {
-
-		errMessageStart := "Invalid Config:"
-		errMessageEnd := "Disabling Jit Compiler."
-		log.Printf("%s %s %s\n", errMessageStart, "native machine not x86 instruction set.", errMessageEnd)
-		//fmt.Printf("Warning)
-		Conf.Nds.NdsJit.Enabled = false
-	}
-
-	if !Conf.Nds.NdsJit.Enabled {
-		Conf.Nds.NdsJit.BatchInst = 1
-
-	}
-
-	Conf.Nds.NdsJit.BatchInstA9 = max(Conf.Nds.NdsJit.BatchInst, 2)
-	Conf.Nds.NdsJit.BatchInstA7 = max(Conf.Nds.NdsJit.BatchInst/2, 1)
-
-	//if Conf.Nds.NdsJit.PageCount == 0 {
-	//	errMessageStart := "Invalid Config:"
-	//	errMessageEnd := "Setting Jit Compiler. Page count to 1024."
-	//	log.Printf("%s %s\n", errMessageStart, errMessageEnd)
-	//	//fmt.Printf("Warning)
-	//	Conf.Nds.NdsJit.PageCount = 0x1024_0000
-	//}
 }
 
 type NdsScreen struct {
@@ -183,4 +162,25 @@ func (c *Config) decodeNdsScreen() {
 
 type NdsRtc struct {
 	AdditionalHours int `toml:"additional_hours"`
+}
+
+const (
+    FORMAT_OBJ = iota
+    FORMAT_GLTF
+)
+
+type NdsExport struct {
+    Directory   string `toml:"directory"`
+    FileType    string  `toml:"file_type"`
+    ShadowPolys bool `toml:"shadow_polygons"`
+    Format      int
+}
+
+func (c *Config) decodeNdsExport() {
+    switch {
+    case strings.Contains(c.Nds.Export.FileType, "glft"):
+        c.Nds.Export.Format = FORMAT_GLTF
+    default:
+        c.Nds.Export.Format = FORMAT_OBJ
+    }
 }

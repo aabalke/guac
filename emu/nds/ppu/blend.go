@@ -1,6 +1,5 @@
 package ppu
 
-
 const (
 	BLD_NONE     = 0
 	BLD_ALPHA    = 1
@@ -73,13 +72,13 @@ func (e *Engine) SetBgPals() {
 
 		bld.NoBlendPals[x] = pal
 		bld.targetATop[x] = bld.a[bgIdx]
-        bld.targetA3d[x] = e.Dispcnt.Is3D && bgIdx == 0
+		bld.targetA3d[x] = e.Dispcnt.Is3D && bgIdx == 0
 
 		if bld.a[bgIdx] {
 			bld.APals[x] = pal
 			bld.hasA[x] = true
 			if bld.targetA3d[x] {
-                bld.alphas[x] = uint16(e.BgAlphas[x])
+				bld.alphas[x] = uint16(e.BgAlphas[x])
 			}
 			continue
 		}
@@ -264,8 +263,8 @@ func BlendAll(bld *Blend, wins *Windows, y uint32) {
 			)
 
 			bld.Blended[x] = r | (g << 5) | (b << 10)
-        }
-        return
+		}
+		return
 	}
 
 	for x := range uint32(SCREEN_WIDTH) {

@@ -189,6 +189,7 @@ var vert Vertex
 
 func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) {
 
+
 	// integer bounding box
 	minValue := s0.Min(s1.Min(s2)).Floor()
 	maxValue := s0.Max(s1.Max(s2)).Ceil()
@@ -335,7 +336,7 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) {
 			buf := &dc.ColorBuffer[i]
 
 			if !dc.AlphaBlending || color.A >= 1 || buf.A <= 0 {
-                *buf = *color
+				*buf = *color
 				continue
 			}
 
@@ -389,17 +390,13 @@ func (dc *Context) DrawTriangle(t *Triangle) {
 	v3 := t.V3
 
 	if v1.Outside() || v2.Outside() || v3.Outside() {
-
-		// clip to viewing volume
 		triangles := ClipTriangle(NewTriangle(v1, v2, v3))
 		for _, t := range triangles {
 			dc.drawClippedTriangle(t.V1, t.V2, t.V3)
 		}
-		return
-	}
-
-	// no need to clip
-	dc.drawClippedTriangle(v1, v2, v3)
+	} else {
+        dc.drawClippedTriangle(v1, v2, v3)
+    }
 }
 
 func (dc *Context) DrawQuad(q *Quad) {
@@ -409,29 +406,20 @@ func (dc *Context) DrawQuad(q *Quad) {
 	v4 := q.V4
 
 	if v1.Outside() || v2.Outside() || v3.Outside() {
-
-		// clip to viewing volume
 		triangles := ClipTriangle(NewTriangle(v1, v2, v3))
 		for _, t := range triangles {
 			dc.drawClippedTriangle(t.V1, t.V2, t.V3)
-			//result = result.Add(info)
 		}
-
 	} else {
-		// no need to clip
 		dc.drawClippedTriangle(v1, v2, v3)
 	}
 
 	if v1.Outside() || v3.Outside() || v4.Outside() {
-
-		// clip to viewing volume
 		triangles := ClipTriangle(NewTriangle(v1, v3, v4))
 		for _, t := range triangles {
 			dc.drawClippedTriangle(t.V1, t.V2, t.V3)
 		}
-
 	} else {
-        // no need to clip
-        dc.drawClippedTriangle(v1, v3, v4)
-    }
+		dc.drawClippedTriangle(v1, v3, v4)
+	}
 }

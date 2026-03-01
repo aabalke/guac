@@ -578,9 +578,9 @@ func (g *GeoEngine) ValidParamCount(fifo bool) bool {
 func (g *GeoEngine) AddPolygon() {
 	g.ActivePoly.Texture = g.Texture
 
-    if g.ActivePoly.Cull != 0 {
-        g.Buffers.Append(g.ActivePoly)
-    }
+	if g.ActivePoly.Cull != 0 {
+		g.Buffers.Append(g.ActivePoly)
+	}
 	g.ActivePoly.Vertices = []gl.Vertex{}
 }
 

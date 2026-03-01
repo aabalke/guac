@@ -77,13 +77,13 @@ func (ppu *PPU) threeScanline(e *Engine, bgIdx, y uint32) {
 
 		if noblend := ppu.EngineA.Blend.Mode == 0; noblend {
 			// this is only important if the 3d screen is the only one,
-            // nothing is behind it, and alpha != 1.
+			// nothing is behind it, and alpha != 1.
 			// really only noticed in devkit tests ( nehe/lesson10)
 
-            r := ((((pal>>0)  & 0x1F) * uint16(alpha & 0x1F)) >> 5) & 0x1F
-            g := ((((pal>>5)  & 0x1F) * uint16(alpha & 0x1F)) >> 5) & 0x1F
-            b := ((((pal>>10) & 0x1F) * uint16(alpha & 0x1F)) >> 5) & 0x1F
-            pal = r | (g << 5) | (b << 10)
+			r := ((((pal >> 0) & 0x1F) * uint16(alpha&0x1F)) >> 5) & 0x1F
+			g := ((((pal >> 5) & 0x1F) * uint16(alpha&0x1F)) >> 5) & 0x1F
+			b := ((((pal >> 10) & 0x1F) * uint16(alpha&0x1F)) >> 5) & 0x1F
+			pal = r | (g << 5) | (b << 10)
 		}
 
 		e.BgPals[x] = pal

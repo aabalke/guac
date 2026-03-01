@@ -209,7 +209,7 @@ func (r *Rtc) WriteData(v uint8) {
 
 	case CMD_DT, CMD_TIME:
 
-		now := time.Now().Add(time.Hour * time.Duration(config.Conf.Nds.NdsRtc.AdditionalHours))
+		now := time.Now().Add(time.Hour * time.Duration(config.Conf.Nds.Rtc.AdditionalHours))
 
 		var hour uint8
 		if hr24 := r.RegStatus1&2 != 0; hr24 {

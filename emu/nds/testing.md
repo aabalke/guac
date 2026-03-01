@@ -100,6 +100,7 @@ graphics/3d/toon_shading
 
 # Games (Decrypted)
 Animal Crossing
+- Windows
 Chrono Trigger
 Mario Kart
 - Flickering Textures

@@ -63,6 +63,8 @@ func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, buttons []ebiten.Stand
 			nds.Screen.inputHandler(SCREEN_SIZING)
 		case slices.Contains(keyCfg.RotationToggle, keyStr):
 			nds.Screen.inputHandler(SCREEN_ROTATION)
+		case slices.Contains(keyCfg.ExportScene, keyStr):
+            nds.ppu.Rasterizer.Export.Export()
 		}
 	}
 

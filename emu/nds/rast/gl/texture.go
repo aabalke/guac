@@ -18,7 +18,7 @@ type Texture struct {
 	ToonTbl          *[32]Color
 	IsHighlight      bool
 
-    Param uint32
+	Param uint32
 }
 
 func (t *Texture) Sample(u, v float32) Color {

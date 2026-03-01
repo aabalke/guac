@@ -161,9 +161,9 @@ func (ppu *PPU) standard(y uint32, e *Engine) {
 			}
 		}
 
-        if objPriority.Cnt != 0 {
-            e.SetObjPals(uint32(priority))
-        }
+		if objPriority.Cnt != 0 {
+			e.SetObjPals(uint32(priority))
+		}
 	}
 
 	BlendAll(e.Blend, &e.Windows, y)

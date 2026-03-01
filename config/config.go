@@ -8,6 +8,7 @@ import (
 
 	_ "embed"
 	"github.com/BurntSushi/toml"
+	sys "golang.org/x/sys/cpu"
 )
 
 //go:embed default.toml
@@ -24,6 +25,7 @@ type Config struct {
 	Backdrop         color.Color
 	CancelAudioInit  bool             `toml:"cancel_audio_init"`
 	Mouse            MouseConfig      `toml:"mouse"`
+	Jit              Jit              `toml:"jit"`
 	Gb               GbConfig         `toml:"gb"`
 	Gba              GbaConfig        `toml:"gba"`
 	Nds              NdsConfig        `toml:"nds"`
@@ -60,24 +62,6 @@ type GbaConfig struct {
 	IdleOptimize           bool `toml:"idle_optimize"`
 	SoundClockUpdateCycles int  `toml:"sound_clock_update_cycles"`
 	DisableSaves           bool `toml:"disable_saves"`
-}
-
-type NdsConfig struct {
-	Screen           NdsScreen                `toml:"screen"`
-	KeyboardConfig   EmulatorKeyboardConfig   `toml:"keyboard"`
-	ControllerConfig EmulatorControllerConfig `toml:"controller"`
-	NdsFirmware      NdsFirmware              `toml:"firmware"`
-	NdsJit           NdsJit                   `toml:"jit"`
-	NdsRtc           NdsRtc                   `toml:"rtc"`
-	Threads          int                      `toml:"threads"`
-	DisableSaves     bool                     `toml:"disable_saves"`
-
-	//SkipHle                bool `toml:"skip_hle"`
-	//IdleOptimize           bool `toml:"idle_optimize"`
-	//SoundClockUpdateCycles int  `toml:"sound_clock_update_cycles"`
-
-	FrameSkip        uint32 `toml:"frame_skip"`
-	DynamicFrameSkip bool   `toml:"dynamic_frame_skip"`
 }
 
 type KeyboardConfig struct {
@@ -124,6 +108,7 @@ type EmulatorKeyboardConfig struct {
 	LayoutToggle   []string `toml:"layout_toggle"`
 	SizingToggle   []string `toml:"sizing_toggle"`
 	RotationToggle []string `toml:"rotation_toggle"`
+	ExportScene    []string `toml:"export_scene"`
 }
 
 type EmulatorControllerConfig struct {
@@ -184,15 +169,10 @@ func (c *Config) Decode() {
 		c.GamesPerRow = 6
 	}
 
+	c.decodeJit()
 	c.decodeGb()
 	c.decodeNds()
 	c.decodeMouse()
-}
-
-func (c *Config) decodeNds() {
-	c.decodeNdsScreen()
-	c.decodeNdsFirmware()
-	c.decodeNdsJit()
 }
 
 func (c *Config) decodeGb() {
@@ -293,4 +273,44 @@ func (c *Config) decodeMouse() {
 			uint8(pal >> 16), uint8(pal >> 8), uint8(pal),
 		}
 	}
+}
+
+type Jit struct {
+	Enabled   bool   `toml:"enabled"`
+	BatchInst uint32 `toml:"batch_inst"`
+
+	LoopCnt   uint32 `toml:"loop_cnt"`
+	BlockCnt  uint32 `toml:"block_cnt"`
+	PageShift uint32 `toml:"page_shift"`
+
+	BatchInstA9 uint32
+	BatchInstA7 uint32
+}
+
+func (c *Config) decodeJit() {
+
+	if Conf.Jit.Enabled && !sys.X86.HasSSE2 {
+
+		errMessageStart := "Invalid Config:"
+		errMessageEnd := "Disabling Jit Compiler."
+		log.Printf("%s %s %s\n", errMessageStart, "native machine not x86 instruction set.", errMessageEnd)
+		//fmt.Printf("Warning)
+		Conf.Jit.Enabled = false
+	}
+
+	if !Conf.Jit.Enabled {
+		Conf.Jit.BatchInst = 1
+
+	}
+
+	Conf.Jit.BatchInstA9 = max(Conf.Jit.BatchInst, 2)
+	Conf.Jit.BatchInstA7 = max(Conf.Jit.BatchInst/2, 1)
+
+	//if Conf.Nds.NdsJit.PageCount == 0 {
+	//	errMessageStart := "Invalid Config:"
+	//	errMessageEnd := "Setting Jit Compiler. Page count to 1024."
+	//	log.Printf("%s %s\n", errMessageStart, errMessageEnd)
+	//	//fmt.Printf("Warning)
+	//	Conf.Nds.NdsJit.PageCount = 0x1024_0000
+	//}
 }

@@ -147,7 +147,7 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 
 	gba.Irq = cpu.Irq{}
 	gba.Mem = NewMemory(&gba)
-	gba.Cpu = arm7.NewCpu(config.Conf.Nds.NdsJit.Enabled, &gba.Mem, &gba.Irq)
+	gba.Cpu = arm7.NewCpu(config.Conf.Jit.Enabled, &gba.Mem, &gba.Irq)
 
 	gba.PPU.gba = &gba
 

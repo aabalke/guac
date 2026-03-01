@@ -63,14 +63,12 @@ var blendFunc = [...]func(texture *Texture, vColor, tColor Color) Color{
 
 		con := func(iv, it float32) float32 {
 
-            v := uint32(min(1, max(0, iv)) * 0x1F) << 1
-            t := uint32(min(1, max(0, it)) * 0x1F) << 1
+			v := uint32(min(1, max(0, iv))*0x1F) << 1
+			t := uint32(min(1, max(0, it))*0x1F) << 1
 
-            out := ((t+1)*(v+1)-1) >> 6
+			out := ((t+1)*(v+1) - 1) >> 6
 
-            return min(1, max(0, float32(out) / 64))
-
-
+			return min(1, max(0, float32(out)/64))
 
 			//v *= 0x1F
 			//t *= 0x1F
@@ -84,7 +82,6 @@ var blendFunc = [...]func(texture *Texture, vColor, tColor Color) Color{
 		return vColor
 	},
 	func(texture *Texture, vColor, tColor Color) Color {
-
 
 		return Decal(vColor, tColor)
 

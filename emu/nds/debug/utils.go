@@ -28,5 +28,7 @@ func writeFile(path string, buf []uint8) bool {
 		return false
 	}
 
+    writer.Flush()
+
 	return true
 }

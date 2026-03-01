@@ -26,7 +26,7 @@ type Polygon struct {
 	Alpha                  float32
 	AlphaV                 uint32
 	Id                     uint32
-    Cull                   gl.Cull
+	Cull                   gl.Cull
 
 	PrimitiveType uint8
 	Vertices      []gl.Vertex
@@ -35,10 +35,10 @@ type Polygon struct {
 }
 
 const (
-    RENDER_NONE = iota
-    RENDER_BACK
-    RENDER_FRNT
-    RENDER_BOTH
+	RENDER_NONE = iota
+	RENDER_BACK
+	RENDER_FRNT
+	RENDER_BOTH
 )
 
 func (p *Polygon) WriteAttrs(v uint32) {
@@ -59,12 +59,18 @@ func (p *Polygon) WriteAttrs(v uint32) {
 	p.AlphaV = (v >> 16) & 0x1F
 	p.Id = (v >> 24) & 0x3F
 
-    switch render := (v >> 6) & 3; render {
-    case RENDER_NONE: p.Cull = 0
-    case RENDER_BACK: p.Cull = gl.CullNone //gl.CullFront
-    case RENDER_FRNT: p.Cull = gl.CullNone //gl.CullBack
-    case RENDER_BOTH: p.Cull = gl.CullNone //gl.CullNone
-    }
+	switch render := (v >> 6) & 3; render {
+	case RENDER_NONE:
+		p.Cull = 0
+	case RENDER_BACK:
+		p.Cull = gl.CullNone
+		//p.Cull = gl.CullFront
+	case RENDER_FRNT:
+		p.Cull = gl.CullNone
+		//p.Cull = gl.CullBack
+	case RENDER_BOTH:
+		p.Cull = gl.CullNone
+	}
 }
 
 const (
@@ -176,7 +182,7 @@ func (p *Polygon) GetTexture(g *GeoEngine) *gl.Texture {
 			Mode:        p.Mode,
 			ToonTbl:     &g.ToonTbl,
 			IsHighlight: g.Disp3dCnt.HighlightShading,
-            Param: t.param,
+			Param:       t.param,
 		}
 	}
 
@@ -194,7 +200,7 @@ func (p *Polygon) GetTexture(g *GeoEngine) *gl.Texture {
 		Mode:          p.Mode,
 		ToonTbl:       &g.ToonTbl,
 		IsHighlight:   g.Disp3dCnt.HighlightShading,
-        Param: t.param,
+		Param:         t.param,
 	}
 }
 

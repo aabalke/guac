@@ -1,6 +1,7 @@
 package rast
 
 import (
+	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 )
@@ -22,6 +23,7 @@ type Rasterizer struct {
 	VRAM       VRAM
 	Disp1Dot   Disp1Dot
 	Edge       Edge
+    Export     *Export
 }
 
 type VRAM interface {
@@ -39,6 +41,13 @@ func NewRasterizer(vram VRAM, irq *cpu.Irq) *Rasterizer {
 	for i := range len(r.Edge.Color) {
 		r.Edge.Color[i] = gl.Color{A: 1}
 	}
+
+    r.Export = NewExport(
+        config.Conf.Nds.Export.Directory,
+        config.Conf.Nds.Export.Format,
+        config.Conf.Nds.Export.ShadowPolys,
+        r,
+    )
 
 	return r
 }

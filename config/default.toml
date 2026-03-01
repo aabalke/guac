@@ -43,6 +43,29 @@ right  = [15]
 up     = [12]
 down   = [13]
 
+[jit]
+
+# jit (just in time compilation) converts emulated machine code into native machine code when loops are detected. This increases the speed significantly but can ruin accuracy.
+# jit only supports amd64 (64 bit x86 instruction set) with BMI2 extension (2013+)
+
+enabled = true
+
+# how many times a loop occurs before jitting
+loop_cnt = 255
+
+# cnt of jit blocks in cache (per cpu)
+block_cnt = 0x1000
+
+page_shift = 16
+
+# how many instructions to batch at a time (use 16, or 32 for best results)
+# to many will cause crashes and artificants by desyncing cpus from sound and graphics
+batch_inst = 32
+
+
+# todo
+# page_size (pageshift / pagemask)
+
 # GB Configuration
 
 [gb]
@@ -159,6 +182,8 @@ layout_toggle = ["F1"]
 sizing_toggle = ["F2"]
 rotation_toggle = ["F3"]
 
+export_scene = ["F4"]
+
 [nds.controller]
 a = [1]
 b = [0]
@@ -181,29 +206,17 @@ y = [2]
 # favorite_color = "Pink"
 
 
-[nds.jit]
-
-# jit (just in time compilation) converts emulated machine code into native machine code when loops are detected. This increases the speed significantly but can ruin accuracy.
-# jit only supports amd64 (64 bit x86 instruction set) with BMI2 extension (2013+)
-
-enabled = true
-
-# how many times a loop occurs before jitting
-loop_cnt = 255
-
-# cnt of jit blocks in cache (per cpu)
-block_cnt = 0x1000
-
-page_shift = 16
-
-# how many instructions to batch at a time (use 16, or 32 for best results)
-# to many will cause crashes and artificants by desyncing cpus from sound and graphics
-batch_inst = 32
-
-
-# todo
-# page_size (pageshift / pagemask)
-
 [nds.rtc]
 # real time clock uses your current time, you can add hours to skip to different times of day. ex if real time is 9pm. add 11 hours sets rtc to 8am.
 # additional_hours = 6 
+
+[nds.export]
+# allows 3d scene to exported to obj/mtl file formats.
+# also exports all textures in active scene as pngs
+# useful for debugging, and preservation.
+
+# Obj export is basic and does not support texture blending, texture clamping,
+# repeat, or flipping. It's mostly for meshes.
+directory = "./export/"
+file_type = "obj"
+shadow_polygons = false
