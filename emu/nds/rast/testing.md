@@ -20,6 +20,7 @@ AlphaTest
 ## Polygon Attributes
 
 Polygon Back Surface, Front Surface - Culling
+- Culling also requires vert / poly counts to be lowered by different culling
 Depth-value for Translucent Pixels
 Far-plane intersecting polygons
 Depth Test, Draw Pixels with Depth

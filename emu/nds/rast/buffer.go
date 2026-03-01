@@ -44,6 +44,7 @@ func (b *Buffers) Swap() {
 	}
 
 	buf.Polys = []Polygon{}
+
 	b.SwapSet = false
 }
 
@@ -57,4 +58,40 @@ func (b *Buffers) SwapCmd(data uint32) {
 	buf.ManualSort = data&1 != 0
 	buf.DepthBufferW = (data>>1)&1 != 0
 	b.SwapSet = true
+}
+
+func (b *Buffer) GetCnts() (int, int) {
+
+    // will need to handle culling as well in cnt
+    // will need box test to remove
+
+    polyCnt, vertCnt := 0, 0
+
+    for i := range len(b.Polys) {
+
+        poly := &b.Polys[i]
+
+        switch poly.PrimitiveType {
+        case PRIM_SEP_TRI:
+            polyCnt += len(poly.Vertices) / 3
+            vertCnt += len(poly.Vertices)
+
+        case PRIM_SEP_QUAD:
+            polyCnt += len(poly.Vertices) / 4
+            vertCnt += len(poly.Vertices)
+
+        case PRIM_TRI_STRIP:
+            polyCnt += len(poly.Vertices) - 2
+            vertCnt += len(poly.Vertices)
+
+        case PRIM_QUAD_STRIP:
+            polyCnt += (len(poly.Vertices) - 2) / 2
+            vertCnt += len(poly.Vertices)
+        }
+    }
+
+    polyCnt = min(2048, polyCnt)
+    vertCnt = min(6144, vertCnt)
+
+    return polyCnt, vertCnt
 }

@@ -45,57 +45,48 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
 		return r.GeoEngine.GxStat.Read(3)
 	case 0x604:
 
+        buf := &r.GeoEngine.Buffers.A
 		if r.GeoEngine.Buffers.BisRendering {
-			return uint8(min(2048, len(r.GeoEngine.Buffers.A.Polys)))
+            buf = &r.GeoEngine.Buffers.B
 		}
 
-		return uint8(min(2048, len(r.GeoEngine.Buffers.B.Polys)))
+        poly, _ := buf.GetCnts()
+        return uint8(poly)
 
 	case 0x605:
 
+        buf := &r.GeoEngine.Buffers.A
 		if r.GeoEngine.Buffers.BisRendering {
-			return uint8(min(2048, len(r.GeoEngine.Buffers.A.Polys)) >> 8)
+            buf = &r.GeoEngine.Buffers.B
 		}
 
-		return uint8(min(2048, len(r.GeoEngine.Buffers.B.Polys)) >> 8)
+        poly, _ := buf.GetCnts()
+        return uint8(poly>>8)
 
 	case 0x606:
 
-		polys := &r.GeoEngine.Buffers.B.Polys
-
+        buf := &r.GeoEngine.Buffers.A
 		if r.GeoEngine.Buffers.BisRendering {
-			polys = &r.GeoEngine.Buffers.A.Polys
+            buf = &r.GeoEngine.Buffers.B
 		}
 
-		vertCnt := 0
-
-		for _, v := range *polys {
-			vertCnt += len(v.Vertices)
-		}
-
-		return uint8(min(6144, vertCnt))
+        _, vert:= buf.GetCnts()
+        return uint8(vert)
 
 	case 0x607:
 
-		polys := &r.GeoEngine.Buffers.B.Polys
-
+        buf := &r.GeoEngine.Buffers.A
 		if r.GeoEngine.Buffers.BisRendering {
-			polys = &r.GeoEngine.Buffers.A.Polys
+            buf = &r.GeoEngine.Buffers.B
 		}
 
-		vertCnt := 0
-
-		for _, v := range *polys {
-			vertCnt += len(v.Vertices)
-		}
-		return uint8(min(6144, vertCnt) >> 8)
+        _, vert:= buf.GetCnts()
+        return uint8(vert>>8)
 	}
 
 	//fmt.Printf("READ UNSETUP 3D IO %08X\n", addr)
-
+	//panic(fmt.Sprintf("READ UNSETUP 3D IO %08X\n", addr))
 	return 0
-
-	panic(fmt.Sprintf("READ UNSETUP 3D IO %08X\n", addr))
 }
 
 func (r *Rasterizer) ReadPosTest(addr uint32) uint8 {

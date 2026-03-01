@@ -30,6 +30,7 @@ filesystem/overlays
 
 graphics/3d/3d_both_screens
 graphics/3d/boxtest
+    culling should effect vert and poly counts, currently does not
 graphics/3d/display_list
 graphics/3d/display_list_2
 graphics/3d/env_mapping
