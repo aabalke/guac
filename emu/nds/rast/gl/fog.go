@@ -46,16 +46,19 @@ func (f *Fog) ApplyFog(c Color, depth float64) Color {
 
 	diff := (depth - b0) / (b1 - b0)
 
+    switch {
+    case math.IsInf(diff, 0):
+        diff = 1
+    case math.IsNaN(diff):
+        diff = 0
+    }
+
 	var den float64
 	if atThreshold := math.IsNaN(diff); atThreshold {
 		den = d0 / 0x7F
 	} else {
 		den = (d0*(1-diff) + d1*diff) / 0x7F
 	}
-
-    if math.IsNaN(float64(den)) {
-        den = 1
-    }
 
 	den = max(0, min(1, den))
 
