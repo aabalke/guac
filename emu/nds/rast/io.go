@@ -442,8 +442,7 @@ func (r *Rasterizer) WriteFog(addr uint32, v uint8) {
 	f := &r.GeoEngine.Fog
 
 	if addr >= 0x360 && addr < 0x380 {
-		addr -= 0x360
-		f.Density[addr] = v & 0b0111_1111
+		f.Density[addr - 0x360] = v & 0x7F
 		return
 	}
 
@@ -461,7 +460,7 @@ func (r *Rasterizer) WriteFog(addr uint32, v uint8) {
 		f.UpdateBoundaries()
 
 	case 0x35D:
-		v &= 0b0111_1111
+		v &= 0x7F
 		f.Offset &^= 0xFF << 8
 		f.Offset |= uint16(v) << 8
 		f.UpdateBoundaries()
@@ -473,8 +472,7 @@ func (r *Rasterizer) ReadFog(addr uint32) uint8 {
 	f := &r.GeoEngine.Fog
 
 	if addr >= 0x360 && addr < 0x380 {
-		addr -= 0x360
-		return f.Density[addr]
+		return f.Density[addr - 0x360]
 	}
 
 	switch addr {

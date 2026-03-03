@@ -373,13 +373,13 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
 		e.Blend.b[5] = (v>>5)&1 != 0
 
 	case 0x52:
-		e.Blend.aEv = uint16(min(16, v&0x1F))
+		e.Blend.aEv = uint16(min(16, v))
 
 	case 0x53:
-		e.Blend.bEv = uint16(min(16, v&0x1F))
+		e.Blend.bEv = uint16(min(16, v))
 
 	case 0x54:
-		e.Blend.yEv = uint16(min(16, v&0x1F))
+		e.Blend.yEv = uint16(min(16, v))
 	case 0x6C:
 		e.MasterBright.Write(uint8(v), 0)
 	case 0x6D:

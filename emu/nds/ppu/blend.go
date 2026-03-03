@@ -159,19 +159,20 @@ func BlendAll(bld *Blend, wins *Windows, y uint32) {
 		for x := range uint32(SCREEN_WIDTH) {
 			bld.outWindow[x] = !wins.inWinBld(x, y)
 		}
-	}
+    }
 
 	for x := range uint32(SCREEN_WIDTH) {
 
 		bld.modes[x] = bld.Mode
-		if bld.outWindow[x] {
+
+		if bld.outWindow[x] && wins.Enabled {
 			bld.modes[x] = BLD_ALPHA
 		}
 
 		activeA := bld.hasA[x] && bld.targetATop[x] && bld.alphas[x] < 32
 		allowWin := !bld.outWindow[x] || (bld.hasB[x] && bld.objTransparent[x])
 		requireB := bld.modes[x] == BLD_ALPHA || (bld.modes[x] == BLD_NONE && bld.objTransparent[x])
-		noBlending := !activeA || !allowWin || (requireB && !bld.hasB[x])
+		noBlending := !activeA || (wins.Enabled && !allowWin) || (requireB && !bld.hasB[x])
 
 		if noBlending {
 			bld.modes[x] = BLD_NONE
@@ -211,6 +212,7 @@ func BlendAll(bld *Blend, wins *Windows, y uint32) {
 				b = min(31, aLut[(pA>>10)&0x1F]+bLut[(pB>>10)&0x1F])
 			)
 
+
 			bld.Blended[x] = r | (g << 5) | (b << 10)
 		}
 		return
@@ -242,6 +244,7 @@ func BlendAll(bld *Blend, wins *Windows, y uint32) {
 
 		return
 	case 1 << BLD_ALPHA_3D:
+
 
 		for x := range uint32(SCREEN_WIDTH) {
 			var (
@@ -305,6 +308,7 @@ func BlendAll(bld *Blend, wins *Windows, y uint32) {
 			bld.Blended[x] = r | (g << 5) | (b << 10)
 
 		case BLD_ALPHA_3D:
+
 
 			var (
 				pA = bld.APals[x]

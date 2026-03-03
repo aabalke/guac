@@ -214,8 +214,6 @@ func (r *Render) ApplyFog(depthW bool) {
 				continue
 			}
 
-			//c := gl.MakeColor(r.Context.Image().At(x, y))
-
 			c := (*r.Context.Image())[x+y*WIDTH]
 
 			var depth float32
@@ -229,8 +227,8 @@ func (r *Render) ApplyFog(depthW bool) {
 
 			depth = max(0, min(depth, 0x7FFF))
 
-			//ca := gl.MakeColorColor(fog.ApplyFog(c, depth))
-			r.Context.SetColor(x, y, fog.ApplyFog(c, depth))
+			r.Context.SetColor(x, y, fog.ApplyFog(c, float64(depth)))
+
 		}
 	}
 }

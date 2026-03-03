@@ -1,6 +1,7 @@
 package rast
 
 import (
+
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/nds/rast/gl"
@@ -91,7 +92,7 @@ func (d *Disp3dCnt) Write(v, b uint8) {
 	d.v &^= 0b0100_1111 << 8
 	d.v |= (uint16(v&0b0100_1111) << 8)
 
-	d.Fog.Step = 0x400 >> (v & 0b1111)
+	d.Fog.Step = 0x400 >> (v & 0xF)
 	d.Fog.UpdateBoundaries()
 
 	if (v>>4)&1 != 0 {
