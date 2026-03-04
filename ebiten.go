@@ -136,9 +136,14 @@ func (g *Game) Update() error {
 
 	g.mouse.Update()
 
-	justKeys := inpututil.AppendJustPressedKeys([]ebiten.Key{})
-	keys := inpututil.AppendPressedKeys([]ebiten.Key{})
-	justButtons, buttons := g.GetGamepadButtons()
+
+    var justKeys, keys []ebiten.Key
+    var justButtons, buttons []ebiten.StandardGamepadButton
+    if ebiten.IsFocused() {
+        justKeys = inpututil.AppendJustPressedKeys([]ebiten.Key{})
+        keys = inpututil.AppendPressedKeys([]ebiten.Key{})
+        justButtons, buttons = g.GetGamepadButtons()
+    }
 
 	if exitFlag := g.inputHandler(justKeys, justButtons); exitFlag {
 		return exit
