@@ -363,72 +363,35 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) {
 	}
 }
 func (dc *Context) drawClippedTriangle(v0, v1, v2 Vertex) {
-    // Normalized device coordinates
+
+    // Normalized coordinates
     ndc0 := v0.Output.DivScalar(v0.Output.W).Vector()
     ndc1 := v1.Output.DivScalar(v1.Output.W).Vector()
     ndc2 := v2.Output.DivScalar(v2.Output.W).Vector()
 
     // Compute signed area — positive = CCW in NDC (standard convention)
     a := (ndc1.X-ndc0.X)*(ndc2.Y-ndc0.Y) - (ndc2.X-ndc0.X)*(ndc1.Y-ndc0.Y)
-
-    // Determine if this triangle is front-facing based on FrontFace convention
-    // If FrontFace == CW, flip our interpretation of the sign
-isFrontFace := a > 0
-if dc.FrontFace == FaceCW {
-    isFrontFace = !isFrontFace
-}
-
-if dc.Cull == CullBack && !isFrontFace {
-    return
-}
-if dc.Cull == CullFront && isFrontFace {
-    return
-}
-
-// Always normalize to CCW for rasterizer
-if a < 0 {
-    v0, v1, v2 = v2, v1, v0
-    ndc0, ndc1, ndc2 = ndc2, ndc1, ndc0
-}
-
-s0 := dc.screenMatrix.MulPosition(ndc0)
-s1 := dc.screenMatrix.MulPosition(ndc1)
-s2 := dc.screenMatrix.MulPosition(ndc2)
-dc.rasterize(v0, v1, v2, s0, s1, s2)
-}
-
-func (dc *Context) _drawClippedTriangle(v0, v1, v2 Vertex) {
-	// normalized device coordinates
-	ndc0 := v0.Output.DivScalar(v0.Output.W).Vector()
-	ndc1 := v1.Output.DivScalar(v1.Output.W).Vector()
-	ndc2 := v2.Output.DivScalar(v2.Output.W).Vector()
-
-	// back face culling
-	a := (ndc1.X-ndc0.X)*(ndc2.Y-ndc0.Y) - (ndc2.X-ndc0.X)*(ndc1.Y-ndc0.Y)
-
     isFrontFace := a > 0
     if dc.FrontFace == FaceCW {
         isFrontFace = !isFrontFace
     }
 
-    if dc.Cull == CullBack && !isFrontFace {
+    switch {
+    case dc.Cull == CullBack && !isFrontFace:
+        return
+    case dc.Cull == CullFront && isFrontFace:
         return
     }
 
-    if dc.Cull == CullFront && isFrontFace {
-        return
+    if a < 0 {
+        v0, v1, v2 = v2, v1, v0
+        ndc0, ndc1, ndc2 = ndc2, ndc1, ndc0
     }
 
-	if isFrontFace {
-		v0, v1, v2 = v2, v1, v0
-		ndc0, ndc1, ndc2 = ndc2, ndc1, ndc0
-	}
-
-	// screen coordinates
-	s0 := dc.screenMatrix.MulPosition(ndc0)
-	s1 := dc.screenMatrix.MulPosition(ndc1)
-	s2 := dc.screenMatrix.MulPosition(ndc2)
-	dc.rasterize(v0, v1, v2, s0, s1, s2)
+    s0 := dc.screenMatrix.MulPosition(ndc0)
+    s1 := dc.screenMatrix.MulPosition(ndc1)
+    s2 := dc.screenMatrix.MulPosition(ndc2)
+    dc.rasterize(v0, v1, v2, s0, s1, s2)
 }
 
 func (dc *Context) DrawTriangle(t *Triangle) {

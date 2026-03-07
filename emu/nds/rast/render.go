@@ -189,12 +189,13 @@ func (r *Render) UpdateRender() {
 		r.RenderPolygon(&polygons[i])
 	}
 
-	if r.Rasterizer.GeoEngine.Fog.Enabled {
-		r.ApplyFog(buffer.DepthBufferW)
-	}
-
 	if r.Rasterizer.GeoEngine.Disp3dCnt.EdgeMarking {
 		r.ApplyEdge(buffer.DepthBufferW)
+	}
+
+
+	if r.Rasterizer.GeoEngine.Fog.Enabled {
+		r.ApplyFog(buffer.DepthBufferW)
 	}
 
 	r.ImageToPixels(*r.Context.Image())
