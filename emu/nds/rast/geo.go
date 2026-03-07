@@ -35,6 +35,7 @@ type GeoEngine struct {
 	PackedIdx  uint8
 
 	ClipMatrix  gl.Matrix
+    WorldMatrix gl.Matrix // just for export
 	PosTestData [4]uint32
 	VecTestData [3]uint16
 	ToonTbl     [32]gl.Color
@@ -543,12 +544,17 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 }
 
 func (g *GeoEngine) UpdateClipMtx() {
+
+    // position is world space transform
+    // perspective is perspecitve space transform
+
 	pos := g.MtxStacks.Stacks[1].CurrMtx
 	per := g.MtxStacks.Stacks[0].CurrMtx
 
 	//fmt.Printf("POS X %.2f PER %.2f CLIP %.2f\n", pos.Col(0), per.Col(0), g.ClipMatrix.Col(0))
 
 	g.ClipMatrix = pos.Mul(per)
+    g.WorldMatrix = pos
 }
 
 func (g *GeoEngine) ValidParamCount(fifo bool) bool {

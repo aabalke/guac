@@ -157,6 +157,7 @@ func (p *Polygon) WriteVertex(data []uint32, g *GeoEngine, method uint8) *gl.Ver
 func (p *Polygon) GetVertex(g *GeoEngine, x, y, z float32) gl.Vertex {
 	pos := gl.VectorW{X: x, Y: y, Z: z, W: 1.0}
 	output := g.ClipMatrix.MulVectorW(pos)
+    world := g.WorldMatrix.MulVectorW(pos)
 	clr := g.Color
 	clr.A = p.Alpha
 
@@ -166,6 +167,7 @@ func (p *Polygon) GetVertex(g *GeoEngine, x, y, z float32) gl.Vertex {
 		S:          g.Texture.S,
 		T:          g.Texture.T,
 		Output:     output,
+        WorldPosition: world,
 		NdsTexture: p.GetTexture(g),
 	}
 }

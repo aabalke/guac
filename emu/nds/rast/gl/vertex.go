@@ -2,6 +2,7 @@ package gl
 
 type Vertex struct {
 	Position   VectorW
+    WorldPosition VectorW
 	Texture    Vector
 	Color      Color
 	Output     VectorW

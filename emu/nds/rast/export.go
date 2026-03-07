@@ -112,7 +112,6 @@ func (e *Export) exportPoly(p *Polygon) {
 
 	case PRIM_SEP_QUAD:
 
-
 		for i := 0; i < len(p.Vertices); i += 4 {
             w := float32(p.Vertices[i].NdsTexture.Width)
             h := float32(p.Vertices[i].NdsTexture.Height)
@@ -154,10 +153,10 @@ func (e *Export) exportPoly(p *Polygon) {
             w := float32(p.Vertices[i].NdsTexture.Width)
             h := float32(p.Vertices[i].NdsTexture.Height)
 
-            e.exportVertex(p.Vertices[i-2], w, h)
-            e.exportVertex(p.Vertices[i-1], w, h)
-            e.exportVertex(p.Vertices[i+1], w, h)
             e.exportVertex(p.Vertices[i+0], w, h)
+            e.exportVertex(p.Vertices[i+1], w, h)
+            e.exportVertex(p.Vertices[i-1], w, h)
+            e.exportVertex(p.Vertices[i-2], w, h)
             e.exportTexture(p.Vertices[i])
             e.exportFace(4)
 		}
@@ -167,13 +166,9 @@ func (e *Export) exportPoly(p *Polygon) {
 func (e *Export) exportVertex(vertex gl.Vertex, w, h float32) {
 
     e.obj += "v "
-    //e.obj += fmt.Sprintf("%f ", vertex.Position.X)
-    //e.obj += fmt.Sprintf("%f ", vertex.Position.Y)
-    //e.obj += fmt.Sprintf("%f ", vertex.Position.Z)
-    //s += fmt.Sprintf("%f ", vertex.Position.W)
-    e.obj += fmt.Sprintf("%f ", vertex.Output.X)
-    e.obj += fmt.Sprintf("%f ", vertex.Output.Y)
-    e.obj += fmt.Sprintf("%f ", vertex.Output.Z)
+    e.obj += fmt.Sprintf("%f ", vertex.WorldPosition.X)
+    e.obj += fmt.Sprintf("%f ", vertex.WorldPosition.Y)
+    e.obj += fmt.Sprintf("%f ", vertex.WorldPosition.Z)
     e.obj += fmt.Sprintf("%f ", vertex.Color.R)
     e.obj += fmt.Sprintf("%f ", vertex.Color.G)
     e.obj += fmt.Sprintf("%f ", vertex.Color.B)
