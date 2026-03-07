@@ -102,12 +102,11 @@ graphics/3d/toon_shading
 # Games (Decrypted)
 Animal Crossing
 - Windows
+- Map only comes up under certain circumstances
 Chrono Trigger
 Mario Kart
-- Flickering Textures
 - Shadows
-Pokemon Diamond
-- Large 3d meshes
+👍 Pokemon Diamond
 Pokemon Mystery Dungeon Explorers of Time
 Sonic Chronicles the Dark Brotherhood
 - Edges on transparent (same as zelda?)

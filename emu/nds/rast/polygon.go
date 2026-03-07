@@ -63,11 +63,9 @@ func (p *Polygon) WriteAttrs(v uint32) {
 	case RENDER_NONE:
 		p.Cull = 0
 	case RENDER_BACK:
-		p.Cull = gl.CullNone
-		//p.Cull = gl.CullFront
+		p.Cull = gl.CullFront
 	case RENDER_FRNT:
-		p.Cull = gl.CullNone
-		//p.Cull = gl.CullBack
+		p.Cull = gl.CullBack
 	case RENDER_BOTH:
 		p.Cull = gl.CullNone
 	}

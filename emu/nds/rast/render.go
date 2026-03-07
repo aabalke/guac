@@ -131,7 +131,6 @@ func (r *Render) UpdateRender() {
 	r.ResetRasterizer()
 
 	buffer := r.Buffers.GetBuffer()
-
 	polygons := buffer.Polys
 
 	r.Context.DepthW = buffer.DepthBufferW
@@ -256,6 +255,10 @@ func (r *Render) RenderPolygon(p *Polygon) {
 		return
 	}
 
+    if p.Cull == 0 {
+        return
+    }
+
     r.Context.Cull = p.Cull
 	r.Context.PolygonFogEnabled = p.FogEnabled
 	r.Context.DepthEqual = p.DrawEqualDepthPixels
@@ -291,6 +294,7 @@ func (r *Render) RenderPolygon(p *Polygon) {
 		}
 
 	case PRIM_SEP_QUAD:
+
 
 		if invalidCnt := len(p.Vertices)%4 != 0; invalidCnt {
 			fmt.Printf("Separate Quad Polygon has invalid vert count.\n")
@@ -366,10 +370,10 @@ func (r *Render) RenderPolygon(p *Polygon) {
 			}
 
 			quad := gl.NewQuad(
-				p.Vertices[i-2],
-				p.Vertices[i-1],
-				p.Vertices[i+1],
 				p.Vertices[i+0],
+				p.Vertices[i+1],
+				p.Vertices[i-1],
+				p.Vertices[i-2],
 			)
 
 			r.Context.DrawQuad(quad)
@@ -378,7 +382,7 @@ func (r *Render) RenderPolygon(p *Polygon) {
 }
 
 func (r *Render) ImageToPixels(img []gl.Color) {
-	r.lock.Lock()
+	//r.lock.Lock()
 
 	for y := range HEIGHT {
 		for x := range WIDTH {
@@ -401,5 +405,5 @@ func (r *Render) ImageToPixels(img []gl.Color) {
 		}
 	}
 
-	r.lock.Unlock()
+	//r.lock.Unlock()
 }

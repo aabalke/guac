@@ -35,6 +35,7 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
 		return 0
 	case 0x63:
 		return 0
+
 	case 0x600:
 		return r.GeoEngine.GxStat.Read(0)
 	case 0x601:

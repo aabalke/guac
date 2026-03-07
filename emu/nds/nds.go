@@ -16,7 +16,6 @@ import (
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/nds/ppu"
 	"github.com/aabalke/guac/emu/nds/snd"
-
 	"github.com/hajimehoshi/oto"
 )
 
@@ -43,6 +42,7 @@ const (
 	TIMER_CYCLE_MASK = 0xF
 	GEO_CYCLE_MASK   = 0xF
 
+    // zelda spirit track needs single threaded for 3d screen switching
 	SINGLE_THREAD = !true // debugging
 )
 
@@ -94,7 +94,7 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 	nds.arm9 = arm9.NewCpu(config.Conf.Jit.Enabled, &nds.mem, &irq9, cp15)
 
 	s := snd.NewSnd(
-		audioCtx,
+        audioCtx,
 		CPU_FREQ_HZ,
 		SND_FREQUENCY,
 		SND_SAMPLES,

@@ -90,6 +90,9 @@ func (b *Buffer) GetCnts() (int, int) {
         }
     }
 
+    // zelda spirit tracks checks for vertices to be below amount that is not the case, need to figure out why
+    return 0, 0
+
     polyCnt = min(2048, polyCnt)
     vertCnt = min(6144, vertCnt)
 
