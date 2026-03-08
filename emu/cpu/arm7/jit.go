@@ -147,7 +147,6 @@ func (j *Jit) SCRATCH(i uint32) gojit.Indirect {
 }
 
 // gets spsr value, using mode and CPU
-//
 //go:nosplit
 func GetSpsr(mode uint32) uint32 {
 	return CpuPointer.Reg.SPSR[BANK_ID[mode]].Get()

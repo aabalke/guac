@@ -9,6 +9,7 @@ import (
 	"github.com/aabalke/guac/config"
 
 	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
+	sys_cpu "golang.org/x/sys/cpu"
 )
 
 const (
@@ -149,7 +150,6 @@ func (j *Jit) SCRATCH(i uint32) gojit.Indirect {
 }
 
 // gets spsr value, using mode and CPU
-//
 //go:nosplit
 func GetSpsr(mode uint32) uint32 {
 	return CpuPointer.Reg.SPSR[BANK_ID[mode]].Get()
@@ -523,6 +523,10 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 		jit.emitMul(op)
 		return true
 	case isCLZ(op):
+		if !sys_cpu.X86.HasBMI1 {
+			return false
+		}
+
 		jit.emitClz(op)
 		return true
 	case isQAlu(op):

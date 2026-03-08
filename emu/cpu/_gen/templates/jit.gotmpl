@@ -9,6 +9,7 @@ import (
 	"github.com/aabalke/guac/config"
 
     {{if .A9 -}}
+    sys_cpu "golang.org/x/sys/cpu"
 	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
     {{end}}
 )
@@ -536,6 +537,10 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 		return true
     {{ if .A9 -}}
 	case isCLZ(op):
+        if !sys_cpu.X86.HasBMI1 {
+            return false
+        }
+
 		jit.emitClz(op)
 		return true
 	case isQAlu(op):
