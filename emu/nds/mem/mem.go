@@ -130,7 +130,7 @@ func (mem *Mem) LoadBios() {
 
 	for i := range len(arm7Bios) {
 		mem.Arm7Bios[i] = arm7Bios[i]
-	}
+    }
 
 	for i := range len(arm9Bios) {
 		mem.Arm9Bios[i] = arm9Bios[i]
