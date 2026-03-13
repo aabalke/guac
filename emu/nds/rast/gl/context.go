@@ -189,7 +189,6 @@ var vert Vertex
 
 func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) {
 
-
 	// integer bounding box
 	minValue := s0.Min(s1.Min(s2)).Floor()
 	maxValue := s0.Max(s1.Max(s2)).Ceil()
@@ -278,35 +277,33 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) {
 			b := VectorW{b0 * r0, b1 * r1, b2 * r2, 0}
 			b.W = 1 / (b.X + b.Y + b.Z)
 
-            var depthBuffer *[]float32
-            var depth float32
+			var depthBuffer *[]float32
+			var depth float32
 			if dc.DepthW {
 				depthBuffer = &dc.DepthBufferW
 				depth = b.W
 
-                bot := 1 / (b.X + b.Y + b.Z - 0x200)
-                top := 1 / (b.X + b.Y + b.Z + 0x200)
+				bot := 1 / (b.X + b.Y + b.Z - 0x200)
+				top := 1 / (b.X + b.Y + b.Z + 0x200)
 
-                if dc.DepthEqual && (
-                    bot < (*depthBuffer)[i] ||
-                    top > (*depthBuffer)[i]) {
-                        continue
-                    }
+				if dc.DepthEqual && (bot < (*depthBuffer)[i] ||
+					top > (*depthBuffer)[i]) {
+					continue
+				}
 
 			} else {
-                depthBuffer = &dc.DepthBuffer
-                depth = z
+				depthBuffer = &dc.DepthBuffer
+				depth = z
 
-                if dc.DepthEqual && (
-                    depth < (*depthBuffer)[i] - 0x200 ||
-                    depth > (*depthBuffer)[i] + 0x200) {
-                        continue
-                }
-            }
+				if dc.DepthEqual && (depth < (*depthBuffer)[i]-0x200 ||
+					depth > (*depthBuffer)[i]+0x200) {
+					continue
+				}
+			}
 
-            if !dc.DepthEqual && depth >= (*depthBuffer)[i] {
-                continue
-            }
+			if !dc.DepthEqual && depth >= (*depthBuffer)[i] {
+				continue
+			}
 
 			vert.InterpolateVertexes(&v0, &v1, &v2, &b)
 			dc.Shader.Fragment(&vert)
@@ -364,34 +361,34 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) {
 }
 func (dc *Context) drawClippedTriangle(v0, v1, v2 Vertex) {
 
-    // Normalized coordinates
-    ndc0 := v0.Output.DivScalar(v0.Output.W).Vector()
-    ndc1 := v1.Output.DivScalar(v1.Output.W).Vector()
-    ndc2 := v2.Output.DivScalar(v2.Output.W).Vector()
+	// Normalized coordinates
+	ndc0 := v0.Output.DivScalar(v0.Output.W).Vector()
+	ndc1 := v1.Output.DivScalar(v1.Output.W).Vector()
+	ndc2 := v2.Output.DivScalar(v2.Output.W).Vector()
 
-    // Compute signed area — positive = CCW in NDC (standard convention)
-    a := (ndc1.X-ndc0.X)*(ndc2.Y-ndc0.Y) - (ndc2.X-ndc0.X)*(ndc1.Y-ndc0.Y)
-    isFrontFace := a > 0
-    if dc.FrontFace == FaceCW {
-        isFrontFace = !isFrontFace
-    }
+	// Compute signed area — positive = CCW in NDC (standard convention)
+	a := (ndc1.X-ndc0.X)*(ndc2.Y-ndc0.Y) - (ndc2.X-ndc0.X)*(ndc1.Y-ndc0.Y)
+	isFrontFace := a > 0
+	if dc.FrontFace == FaceCW {
+		isFrontFace = !isFrontFace
+	}
 
-    switch {
-    case dc.Cull == CullBack && !isFrontFace:
-        return
-    case dc.Cull == CullFront && isFrontFace:
-        return
-    }
+	switch {
+	case dc.Cull == CullBack && !isFrontFace:
+		return
+	case dc.Cull == CullFront && isFrontFace:
+		return
+	}
 
-    if a < 0 {
-        v0, v1, v2 = v2, v1, v0
-        ndc0, ndc1, ndc2 = ndc2, ndc1, ndc0
-    }
+	if a < 0 {
+		v0, v1, v2 = v2, v1, v0
+		ndc0, ndc1, ndc2 = ndc2, ndc1, ndc0
+	}
 
-    s0 := dc.screenMatrix.MulPosition(ndc0)
-    s1 := dc.screenMatrix.MulPosition(ndc1)
-    s2 := dc.screenMatrix.MulPosition(ndc2)
-    dc.rasterize(v0, v1, v2, s0, s1, s2)
+	s0 := dc.screenMatrix.MulPosition(ndc0)
+	s1 := dc.screenMatrix.MulPosition(ndc1)
+	s2 := dc.screenMatrix.MulPosition(ndc2)
+	dc.rasterize(v0, v1, v2, s0, s1, s2)
 }
 
 func (dc *Context) DrawTriangle(t *Triangle) {
@@ -405,8 +402,8 @@ func (dc *Context) DrawTriangle(t *Triangle) {
 			dc.drawClippedTriangle(t.V1, t.V2, t.V3)
 		}
 	} else {
-        dc.drawClippedTriangle(v1, v2, v3)
-    }
+		dc.drawClippedTriangle(v1, v2, v3)
+	}
 }
 
 func (dc *Context) DrawQuad(q *Quad) {
@@ -414,7 +411,6 @@ func (dc *Context) DrawQuad(q *Quad) {
 	v2 := q.V2
 	v3 := q.V3
 	v4 := q.V4
-
 
 	if v1.Outside() || v2.Outside() || v3.Outside() {
 		triangles := ClipTriangle(NewTriangle(v1, v2, v3))

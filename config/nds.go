@@ -1,8 +1,9 @@
 package config
 
 import (
+	"fmt"
+	"os"
 	"strings"
-
 )
 
 const (
@@ -43,24 +44,58 @@ var clr = map[string]uint8{
 	"Magenta":     FW_CLR_MAGENTA,
 }
 
-
 type NdsConfig struct {
 	Screen           NdsScreen                `toml:"screen"`
 	KeyboardConfig   EmulatorKeyboardConfig   `toml:"keyboard"`
 	ControllerConfig EmulatorControllerConfig `toml:"controller"`
-	Firmware      NdsFirmware                 `toml:"firmware"`
-	Rtc           NdsRtc                      `toml:"rtc"`
-    Export        NdsExport                   `toml:"export"`
+	Firmware         NdsFirmware              `toml:"firmware"`
+	Rtc              NdsRtc                   `toml:"rtc"`
+	Export           NdsExport                `toml:"export"`
 	Threads          int                      `toml:"threads"`
 	DisableSaves     bool                     `toml:"disable_saves"`
 	FrameSkip        uint32                   `toml:"frame_skip"`
 	DynamicFrameSkip bool                     `toml:"dynamic_frame_skip"`
+	Bios             NdsBios                  `toml:"bios"`
 }
 
 func (c *Config) decodeNds() {
 	c.decodeNdsScreen()
+	c.decodeNdsBios()
 	c.decodeNdsFirmware()
-    c.decodeNdsExport()
+	c.decodeNdsExport()
+}
+
+type NdsBios struct {
+	Arm7Path string `toml:"arm7_path"`
+	Arm9Path string `toml:"arm9_path"`
+}
+
+func (c *Config) decodeNdsBios() {
+
+	if !isFile(c.Nds.Bios.Arm7Path) {
+		fmt.Printf("Nds Arm7 Bios not provided, using built-in\n")
+		c.Nds.Bios.Arm7Path = ""
+	} else {
+		fmt.Printf("Nds Arm7 Bios provided.\n")
+	}
+
+	if !isFile(c.Nds.Bios.Arm9Path) {
+		fmt.Printf("Nds Arm9 Bios not provided, using built-in\n")
+		c.Nds.Bios.Arm9Path = ""
+	} else {
+		fmt.Printf("Nds Arm9 Bios provided.\n")
+	}
+}
+
+func isFile(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false
+		}
+		return false
+	}
+	return !info.IsDir()
 }
 
 type NdsFirmware struct {
@@ -165,22 +200,22 @@ type NdsRtc struct {
 }
 
 const (
-    FORMAT_OBJ = iota
-    FORMAT_GLTF
+	FORMAT_OBJ = iota
+	FORMAT_GLTF
 )
 
 type NdsExport struct {
-    Directory   string `toml:"directory"`
-    FileType    string  `toml:"file_type"`
-    ShadowPolys bool `toml:"shadow_polygons"`
-    Format      int
+	Directory   string `toml:"directory"`
+	FileType    string `toml:"file_type"`
+	ShadowPolys bool   `toml:"shadow_polygons"`
+	Format      int
 }
 
 func (c *Config) decodeNdsExport() {
-    switch {
-    case strings.Contains(c.Nds.Export.FileType, "glft"):
-        c.Nds.Export.Format = FORMAT_GLTF
-    default:
-        c.Nds.Export.Format = FORMAT_OBJ
-    }
+	switch {
+	case strings.Contains(c.Nds.Export.FileType, "glft"):
+		c.Nds.Export.Format = FORMAT_GLTF
+	default:
+		c.Nds.Export.Format = FORMAT_OBJ
+	}
 }

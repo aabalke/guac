@@ -39,7 +39,7 @@ type Cartridge struct {
 	ChipId         [4]uint8
 }
 
-func NewCartridge(romPath, savPath string, bios *[0x4000]uint8, irq7, irq9 *cpu.Irq, dma7, dma9 *[4]dma.DMA) *Cartridge {
+func NewCartridge(romPath, savPath string, bios *[]uint8, irq7, irq9 *cpu.Irq, dma7, dma9 *[4]dma.DMA) *Cartridge {
 
 	c := &Cartridge{
 		RomPath: romPath,
@@ -58,9 +58,9 @@ func NewCartridge(romPath, savPath string, bios *[0x4000]uint8, irq7, irq9 *cpu.
 
 	c.Header = NewHeader(c)
 
-    if !c.Header.Decrypted {
-        NewKey1(bios, &c.Rom).DecryptCard()
-    }
+	if !c.Header.Decrypted {
+		NewKey1(bios, &c.Rom).DecryptCard()
+	}
 
 	code := binary.LittleEndian.Uint32(c.Header.GameCode)
 	c.Backup = NewBackup(c)

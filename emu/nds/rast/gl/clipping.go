@@ -28,27 +28,27 @@ package gl
 //}
 
 var clipPlanes = []clipPlane{
-    { 1, 0, 0, 1},  // x + w >= 0
-    {-1, 0, 0, 1},  // -x + w >= 0
-    { 0, 1, 0, 1},  // y + w >= 0
-    { 0,-1, 0, 1},  // -y + w >= 0
-    { 0, 0, 1, 1},  // z + w >= 0   (OpenGL style)
-    { 0, 0,-1, 1},  // -z + w >= 0
+	{1, 0, 0, 1},  // x + w >= 0
+	{-1, 0, 0, 1}, // -x + w >= 0
+	{0, 1, 0, 1},  // y + w >= 0
+	{0, -1, 0, 1}, // -y + w >= 0
+	{0, 0, 1, 1},  // z + w >= 0   (OpenGL style)
+	{0, 0, -1, 1}, // -z + w >= 0
 }
 
 type clipPlane struct {
-    A, B, C, D float32
+	A, B, C, D float32
 }
 
 func (p clipPlane) pointInFront(v VectorW) bool {
-    return p.A*v.X + p.B*v.Y + p.C*v.Z + p.D*v.W >= 0
+	return p.A*v.X+p.B*v.Y+p.C*v.Z+p.D*v.W >= 0
 }
 
 func (p clipPlane) intersectSegment(v0, v1 VectorW) VectorW {
-    d0 := p.A*v0.X + p.B*v0.Y + p.C*v0.Z + p.D*v0.W
-    d1 := p.A*v1.X + p.B*v1.Y + p.C*v1.Z + p.D*v1.W
-    t := d0 / (d0 - d1)
-    return v0.Add(v1.Sub(v0).MulScalar(t))
+	d0 := p.A*v0.X + p.B*v0.Y + p.C*v0.Z + p.D*v0.W
+	d1 := p.A*v1.X + p.B*v1.Y + p.C*v1.Z + p.D*v1.W
+	t := d0 / (d0 - d1)
+	return v0.Add(v1.Sub(v0).MulScalar(t))
 }
 
 func sutherlandHodgman(points []VectorW, planes []clipPlane) []VectorW {
@@ -95,7 +95,7 @@ func ClipTriangle(t *Triangle) []*Triangle {
 		b2 := Barycentric(p1, p2, p3, newPoints[i-1].Vector())
 		b3 := Barycentric(p1, p2, p3, newPoints[i].Vector())
 
-        var v1, v2, v3 Vertex
+		var v1, v2, v3 Vertex
 		v1.InterpolateVertexes(&t.V1, &t.V2, &t.V3, &b1)
 		v2.InterpolateVertexes(&t.V1, &t.V2, &t.V3, &b2)
 		v3.InterpolateVertexes(&t.V1, &t.V2, &t.V3, &b3)

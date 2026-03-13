@@ -1,4 +1,4 @@
-package debug
+package mem
 
 import (
 	"bufio"
@@ -27,8 +27,6 @@ func writeFile(path string, buf []uint8) bool {
 	if err != nil {
 		return false
 	}
-
-	writer.Flush()
 
 	return true
 }

@@ -29,8 +29,8 @@ type Header struct {
 	Arm7RamAddr   uint32
 	Arm7Size      uint32
 
-    SecureAreaId  []uint8
-    Decrypted     bool
+	SecureAreaId []uint8
+	Decrypted    bool
 }
 
 func NewHeader(c *Cartridge) Header {
@@ -51,7 +51,7 @@ func NewHeader(c *Cartridge) Header {
 		Arm7RamAddr:   binary.LittleEndian.Uint32(c.Rom[0x38:]),
 		Arm7Size:      binary.LittleEndian.Uint32(c.Rom[0x3C:]),
 
-        SecureAreaId: []uint8(c.Rom[0x4000: 0x4000 + 8]),
+		SecureAreaId: []uint8(c.Rom[0x4000 : 0x4000+8]),
 	}
 
 	h.validate()
@@ -60,9 +60,9 @@ func NewHeader(c *Cartridge) Header {
 
 	fmt.Printf("TITLE %s CODE %s UNIT %d\n", h.Title, gamecodestring, h.UnitCode)
 
-    destroyedId := []uint8{0xFF, 0xDE, 0xFF, 0xE7, 0xFF, 0xDE, 0xFF, 0xE7}
+	destroyedId := []uint8{0xFF, 0xDE, 0xFF, 0xE7, 0xFF, 0xDE, 0xFF, 0xE7}
 
-    h.Decrypted = bytes.Equal(h.SecureAreaId, destroyedId)
+	h.Decrypted = bytes.Equal(h.SecureAreaId, destroyedId)
 
 	//fmt.Printf("ARM9 OFF %08X\n", h.Arm9Offset)
 	//fmt.Printf("ARM9 ENT %08X\n", h.Arm9EntryAddr)

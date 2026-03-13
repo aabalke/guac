@@ -46,43 +46,43 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
 		return r.GeoEngine.GxStat.Read(3)
 	case 0x604:
 
-        buf := &r.GeoEngine.Buffers.A
+		buf := &r.GeoEngine.Buffers.A
 		if r.GeoEngine.Buffers.BisRendering {
-            buf = &r.GeoEngine.Buffers.B
+			buf = &r.GeoEngine.Buffers.B
 		}
 
-        poly, _ := buf.GetCnts()
-        return uint8(poly)
+		poly, _ := buf.GetCnts()
+		return uint8(poly)
 
 	case 0x605:
 
-        buf := &r.GeoEngine.Buffers.A
+		buf := &r.GeoEngine.Buffers.A
 		if r.GeoEngine.Buffers.BisRendering {
-            buf = &r.GeoEngine.Buffers.B
+			buf = &r.GeoEngine.Buffers.B
 		}
 
-        poly, _ := buf.GetCnts()
-        return uint8(poly>>8)
+		poly, _ := buf.GetCnts()
+		return uint8(poly >> 8)
 
 	case 0x606:
 
-        buf := &r.GeoEngine.Buffers.A
+		buf := &r.GeoEngine.Buffers.A
 		if r.GeoEngine.Buffers.BisRendering {
-            buf = &r.GeoEngine.Buffers.B
+			buf = &r.GeoEngine.Buffers.B
 		}
 
-        _, vert:= buf.GetCnts()
-        return uint8(vert)
+		_, vert := buf.GetCnts()
+		return uint8(vert)
 
 	case 0x607:
 
-        buf := &r.GeoEngine.Buffers.A
+		buf := &r.GeoEngine.Buffers.A
 		if r.GeoEngine.Buffers.BisRendering {
-            buf = &r.GeoEngine.Buffers.B
+			buf = &r.GeoEngine.Buffers.B
 		}
 
-        _, vert:= buf.GetCnts()
-        return uint8(vert>>8)
+		_, vert := buf.GetCnts()
+		return uint8(vert >> 8)
 	}
 
 	//fmt.Printf("READ UNSETUP 3D IO %08X\n", addr)
@@ -443,7 +443,7 @@ func (r *Rasterizer) WriteFog(addr uint32, v uint8) {
 	f := &r.GeoEngine.Fog
 
 	if addr >= 0x360 && addr < 0x380 {
-		f.Density[addr - 0x360] = v & 0x7F
+		f.Density[addr-0x360] = v & 0x7F
 		return
 	}
 
@@ -473,7 +473,7 @@ func (r *Rasterizer) ReadFog(addr uint32) uint8 {
 	f := &r.GeoEngine.Fog
 
 	if addr >= 0x360 && addr < 0x380 {
-		return f.Density[addr - 0x360]
+		return f.Density[addr-0x360]
 	}
 
 	switch addr {

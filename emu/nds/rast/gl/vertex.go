@@ -1,13 +1,13 @@
 package gl
 
 type Vertex struct {
-	Position   VectorW
-    WorldPosition VectorW
-	Texture    Vector
-	Color      Color
-	Output     VectorW
-	S, T       float32
-	NdsTexture *Texture
+	Position      VectorW
+	WorldPosition VectorW
+	Texture       Vector
+	Color         Color
+	Output        VectorW
+	S, T          float32
+	NdsTexture    *Texture
 }
 
 func (a Vertex) Outside() bool {

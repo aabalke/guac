@@ -42,7 +42,7 @@ const (
 	TIMER_CYCLE_MASK = 0xF
 	GEO_CYCLE_MASK   = 0xF
 
-    // zelda spirit track needs single threaded for 3d screen switching
+	// zelda spirit track needs single threaded for 3d screen switching
 	SINGLE_THREAD = !true // debugging
 )
 
@@ -94,7 +94,7 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 	nds.arm9 = arm9.NewCpu(config.Conf.Jit.Enabled, &nds.mem, &irq9, cp15)
 
 	s := snd.NewSnd(
-        audioCtx,
+		audioCtx,
 		CPU_FREQ_HZ,
 		SND_FREQUENCY,
 		SND_SAMPLES,
@@ -117,14 +117,14 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 
 	nds.Cartridge = cart.NewCartridge(
 		path, path+".save",
-        &nds.mem.Arm7Bios,
+		nds.mem.Arm7Bios,
 		&irq7, &irq9,
 		&nds.dma7, &nds.dma9,
 	)
 
 	nds.mem.Cartridge = nds.Cartridge
 
-	nds.DirtyInit()
+	nds.DirectBoot()
 
 	debug.Init("./log.csv")
 
@@ -299,9 +299,9 @@ func (nds *Nds) Close() {
 	nds.arm9.Jit.Close()
 }
 
-func (nds *Nds) DirtyInit() {
+func (nds *Nds) DirectBoot() {
 
-	nds.mem.DirtyTransfer()
+	nds.mem.DirectBootMemory()
 
 	nds.arm9.Reg.R[12] = nds.Cartridge.Header.Arm9EntryAddr
 	nds.arm9.Reg.R[13] = 0x3002F7C

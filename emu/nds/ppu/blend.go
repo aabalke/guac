@@ -159,7 +159,7 @@ func BlendAll(bld *Blend, wins *Windows, y uint32) {
 		for x := range uint32(SCREEN_WIDTH) {
 			bld.outWindow[x] = !wins.inWinBld(x, y)
 		}
-    }
+	}
 
 	for x := range uint32(SCREEN_WIDTH) {
 
@@ -212,7 +212,6 @@ func BlendAll(bld *Blend, wins *Windows, y uint32) {
 				b = min(31, aLut[(pA>>10)&0x1F]+bLut[(pB>>10)&0x1F])
 			)
 
-
 			bld.Blended[x] = r | (g << 5) | (b << 10)
 		}
 		return
@@ -244,7 +243,6 @@ func BlendAll(bld *Blend, wins *Windows, y uint32) {
 
 		return
 	case 1 << BLD_ALPHA_3D:
-
 
 		for x := range uint32(SCREEN_WIDTH) {
 			var (
@@ -308,7 +306,6 @@ func BlendAll(bld *Blend, wins *Windows, y uint32) {
 			bld.Blended[x] = r | (g << 5) | (b << 10)
 
 		case BLD_ALPHA_3D:
-
 
 			var (
 				pA = bld.APals[x]

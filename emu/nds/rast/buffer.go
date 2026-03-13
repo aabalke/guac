@@ -62,39 +62,39 @@ func (b *Buffers) SwapCmd(data uint32) {
 
 func (b *Buffer) GetCnts() (int, int) {
 
-    // will need to handle culling as well in cnt
-    // will need box test to remove
+	// will need to handle culling as well in cnt
+	// will need box test to remove
 
-    polyCnt, vertCnt := 0, 0
+	polyCnt, vertCnt := 0, 0
 
-    for i := range len(b.Polys) {
+	for i := range len(b.Polys) {
 
-        poly := &b.Polys[i]
+		poly := &b.Polys[i]
 
-        switch poly.PrimitiveType {
-        case PRIM_SEP_TRI:
-            polyCnt += len(poly.Vertices) / 3
-            vertCnt += len(poly.Vertices)
+		switch poly.PrimitiveType {
+		case PRIM_SEP_TRI:
+			polyCnt += len(poly.Vertices) / 3
+			vertCnt += len(poly.Vertices)
 
-        case PRIM_SEP_QUAD:
-            polyCnt += len(poly.Vertices) / 4
-            vertCnt += len(poly.Vertices)
+		case PRIM_SEP_QUAD:
+			polyCnt += len(poly.Vertices) / 4
+			vertCnt += len(poly.Vertices)
 
-        case PRIM_TRI_STRIP:
-            polyCnt += len(poly.Vertices) - 2
-            vertCnt += len(poly.Vertices)
+		case PRIM_TRI_STRIP:
+			polyCnt += len(poly.Vertices) - 2
+			vertCnt += len(poly.Vertices)
 
-        case PRIM_QUAD_STRIP:
-            polyCnt += (len(poly.Vertices) - 2) / 2
-            vertCnt += len(poly.Vertices)
-        }
-    }
+		case PRIM_QUAD_STRIP:
+			polyCnt += (len(poly.Vertices) - 2) / 2
+			vertCnt += len(poly.Vertices)
+		}
+	}
 
-    // zelda spirit tracks checks for vertices to be below amount that is not the case, need to figure out why
-    return 0, 0
+	// zelda spirit tracks checks for vertices to be below amount that is not the case, need to figure out why
+	return 0, 0
 
-    polyCnt = min(2048, polyCnt)
-    vertCnt = min(6144, vertCnt)
+	polyCnt = min(2048, polyCnt)
+	vertCnt = min(6144, vertCnt)
 
-    return polyCnt, vertCnt
+	return polyCnt, vertCnt
 }

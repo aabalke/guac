@@ -46,12 +46,12 @@ func (f *Fog) ApplyFog(c Color, depth float64) Color {
 
 	diff := (depth - b0) / (b1 - b0)
 
-    switch {
-    case math.IsInf(diff, 0):
-        diff = 1
-    case math.IsNaN(diff):
-        diff = 0
-    }
+	switch {
+	case math.IsInf(diff, 0):
+		diff = 1
+	case math.IsNaN(diff):
+		diff = 0
+	}
 
 	var den float64
 	if atThreshold := math.IsNaN(diff); atThreshold {
@@ -62,20 +62,20 @@ func (f *Fog) ApplyFog(c Color, depth float64) Color {
 
 	den = max(0, min(1, den))
 
-    den32 := float32(den)
+	den32 := float32(den)
 
 	if !f.AlphaOnly {
 		c.R = (f.Color.R*den32 + c.R*(1-den32))
 		c.G = (f.Color.G*den32 + c.G*(1-den32))
 		c.B = (f.Color.B*den32 + c.B*(1-den32))
 
-        c.R = min(1, max(0, c.R))
-        c.G = min(1, max(0, c.G))
-        c.B = min(1, max(0, c.B))
+		c.R = min(1, max(0, c.R))
+		c.G = min(1, max(0, c.G))
+		c.B = min(1, max(0, c.B))
 	}
 
 	c.A = (f.Color.A*den32 + c.A*(1-den32))
-    c.A = min(1, max(0, c.A))
+	c.A = min(1, max(0, c.A))
 
 	return c
 }

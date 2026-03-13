@@ -153,7 +153,7 @@ func (r *Render) UpdateRender() {
 		minY := func(poly *Polygon) float32 {
 			m := float32(math.MaxFloat32)
 			for i := range len(poly.Vertices) {
-                m = min(poly.Vertices[i].Position.Y, m)
+				m = min(poly.Vertices[i].Position.Y, m)
 			}
 
 			return m
@@ -192,7 +192,6 @@ func (r *Render) UpdateRender() {
 	if r.Rasterizer.GeoEngine.Disp3dCnt.EdgeMarking {
 		r.ApplyEdge(buffer.DepthBufferW)
 	}
-
 
 	if r.Rasterizer.GeoEngine.Fog.Enabled {
 		r.ApplyFog(buffer.DepthBufferW)
@@ -256,11 +255,11 @@ func (r *Render) RenderPolygon(p *Polygon) {
 		return
 	}
 
-    if p.Cull == 0 {
-        return
-    }
+	if p.Cull == 0 {
+		return
+	}
 
-    r.Context.Cull = p.Cull
+	r.Context.Cull = p.Cull
 	r.Context.PolygonFogEnabled = p.FogEnabled
 	r.Context.DepthEqual = p.DrawEqualDepthPixels
 	r.Context.NewTranslucentDepth = p.SetNewTranslucentDepth
@@ -295,7 +294,6 @@ func (r *Render) RenderPolygon(p *Polygon) {
 		}
 
 	case PRIM_SEP_QUAD:
-
 
 		if invalidCnt := len(p.Vertices)%4 != 0; invalidCnt {
 			fmt.Printf("Separate Quad Polygon has invalid vert count.\n")

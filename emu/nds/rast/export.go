@@ -15,134 +15,134 @@ import (
 )
 
 const (
-    FORMAT_OBJ = iota
-    FORMAT_GLTF
+	FORMAT_OBJ = iota
+	FORMAT_GLTF
 )
 
 type Export struct {
-    Format      int
-    Directory    string
-    Rasterizer  *Rasterizer
-    ShadowPolys bool
+	Format      int
+	Directory   string
+	Rasterizer  *Rasterizer
+	ShadowPolys bool
 
-    obj string
-    mtl string
+	obj string
+	mtl string
 
-    face      int
-    mesh      int
-    material  int
+	face     int
+	mesh     int
+	material int
 
-    usedTextures map[uintptr]int
+	usedTextures map[uintptr]int
 }
 
 func NewExport(dir string, format int, shadowPolys bool, rast *Rasterizer) *Export {
-    return &Export{
-        Directory:   dir,
-        Format:      format,
-        ShadowPolys: shadowPolys,
-        Rasterizer:  rast,
-    }
+	return &Export{
+		Directory:   dir,
+		Format:      format,
+		ShadowPolys: shadowPolys,
+		Rasterizer:  rast,
+	}
 }
 
 func (e *Export) Export() {
-    fmt.Printf("Preparing Scene\n")
+	fmt.Printf("Preparing Scene\n")
 
-    polys := e.Rasterizer.Buffers.GetBuffer().Polys
+	polys := e.Rasterizer.Buffers.GetBuffer().Polys
 
-    switch e.Format {
-    case FORMAT_GLTF:
-        panic("unsupported export type gltf")
-    default:
-        e.ExportObj(polys)
-    }
+	switch e.Format {
+	case FORMAT_GLTF:
+		panic("unsupported export type gltf")
+	default:
+		e.ExportObj(polys)
+	}
 
-    fmt.Printf("Exported Scene\n")
+	fmt.Printf("Exported Scene\n")
 }
 
 func (e *Export) ExportObj(polys []Polygon) {
 
-    if err := os.MkdirAll(e.Directory, 0755); err != nil {
-        panic(err)
-    }
+	if err := os.MkdirAll(e.Directory, 0755); err != nil {
+		panic(err)
+	}
 
-    e.obj = fmt.Sprintf("# Guac Emulator Export. %v\n", time.Now())
-    e.obj += fmt.Sprintf("mtllib guac.mtl\n")
+	e.obj = fmt.Sprintf("# Guac Emulator Export. %v\n", time.Now())
+	e.obj += fmt.Sprintf("mtllib guac.mtl\n")
 
-    e.mtl = fmt.Sprintf("# Guac Emulator Export. %v\n", time.Now())
-    e.face = 1
-    e.mesh = 1
-    e.material = 1
-    e.usedTextures = make(map[uintptr]int)
+	e.mtl = fmt.Sprintf("# Guac Emulator Export. %v\n", time.Now())
+	e.face = 1
+	e.mesh = 1
+	e.material = 1
+	e.usedTextures = make(map[uintptr]int)
 
-    for i := range len(polys) {
-        e.exportPoly(&polys[i])
-    }
+	for i := range len(polys) {
+		e.exportPoly(&polys[i])
+	}
 
-    if ok := writeFile(e.Directory + "guac.obj", e.obj); !ok {
-        panic("Failed to write export scene file obj")
-    }
+	if ok := writeFile(e.Directory+"guac.obj", e.obj); !ok {
+		panic("Failed to write export scene file obj")
+	}
 
-    if ok := writeFile(e.Directory + "guac.mtl", e.mtl); !ok {
-        panic("Failed to write export scene file mtl")
-    }
+	if ok := writeFile(e.Directory+"guac.mtl", e.mtl); !ok {
+		panic("Failed to write export scene file mtl")
+	}
 }
 
 func (e *Export) exportPoly(p *Polygon) {
 
 	if len(p.Vertices) == 0 {
-        return
+		return
 	} else if shadow := p.Mode == 3; shadow && !e.ShadowPolys {
-        return
-    }
+		return
+	}
 
-    e.exportMesh()
+	e.exportMesh()
 
 	switch p.PrimitiveType {
 	case PRIM_SEP_TRI:
 
 		for i := 0; i < len(p.Vertices); i += 3 {
-            w := float32(p.Vertices[i].NdsTexture.Width)
-            h := float32(p.Vertices[i].NdsTexture.Height)
-            e.exportVertex(p.Vertices[i+2], w, h)
-            e.exportVertex(p.Vertices[i+1], w, h)
-            e.exportVertex(p.Vertices[i+0], w, h)
-            e.exportTexture(p.Vertices[i])
-            e.exportFace(3)
+			w := float32(p.Vertices[i].NdsTexture.Width)
+			h := float32(p.Vertices[i].NdsTexture.Height)
+			e.exportVertex(p.Vertices[i+2], w, h)
+			e.exportVertex(p.Vertices[i+1], w, h)
+			e.exportVertex(p.Vertices[i+0], w, h)
+			e.exportTexture(p.Vertices[i])
+			e.exportFace(3)
 		}
 
 	case PRIM_SEP_QUAD:
 
 		for i := 0; i < len(p.Vertices); i += 4 {
-            w := float32(p.Vertices[i].NdsTexture.Width)
-            h := float32(p.Vertices[i].NdsTexture.Height)
-            e.exportVertex(p.Vertices[i+3], w, h)
-            e.exportVertex(p.Vertices[i+2], w, h)
-            e.exportVertex(p.Vertices[i+1], w, h)
-            e.exportVertex(p.Vertices[i+0], w, h)
-            e.exportTexture(p.Vertices[i])
-            e.exportFace(4)
+			w := float32(p.Vertices[i].NdsTexture.Width)
+			h := float32(p.Vertices[i].NdsTexture.Height)
+			e.exportVertex(p.Vertices[i+3], w, h)
+			e.exportVertex(p.Vertices[i+2], w, h)
+			e.exportVertex(p.Vertices[i+1], w, h)
+			e.exportVertex(p.Vertices[i+0], w, h)
+			e.exportTexture(p.Vertices[i])
+			e.exportFace(4)
 		}
 
 	case PRIM_TRI_STRIP:
 
 		for i := 2; i < len(p.Vertices); i++ {
-            w := float32(p.Vertices[i].NdsTexture.Width)
-            h := float32(p.Vertices[i].NdsTexture.Height)
+			w := float32(p.Vertices[i].NdsTexture.Width)
+			h := float32(p.Vertices[i].NdsTexture.Height)
 
 			if clockwise := i&1 == 1; clockwise {
-                e.exportVertex(p.Vertices[i-2], w, h)
-                e.exportVertex(p.Vertices[i-1], w, h)
-                e.exportVertex(p.Vertices[i-0], w, h)
-                e.exportTexture(p.Vertices[i])
-                e.exportFace(3)
+				e.exportVertex(p.Vertices[i-2], w, h)
+				e.exportVertex(p.Vertices[i-1], w, h)
+				e.exportVertex(p.Vertices[i-0], w, h)
+				e.exportTexture(p.Vertices[i])
+				e.exportFace(3)
 				continue
 			}
 
-            e.exportVertex(p.Vertices[i-0], w, h)
-            e.exportVertex(p.Vertices[i-1], w, h)
-            e.exportVertex(p.Vertices[i-2], w, h)
-            e.exportTexture(p.Vertices[i])
-            e.exportFace(3)
+			e.exportVertex(p.Vertices[i-0], w, h)
+			e.exportVertex(p.Vertices[i-1], w, h)
+			e.exportVertex(p.Vertices[i-2], w, h)
+			e.exportTexture(p.Vertices[i])
+			e.exportFace(3)
 
 		}
 
@@ -150,86 +150,86 @@ func (e *Export) exportPoly(p *Polygon) {
 
 		for i := 2; i+1 < len(p.Vertices); i += 2 {
 
-            w := float32(p.Vertices[i].NdsTexture.Width)
-            h := float32(p.Vertices[i].NdsTexture.Height)
+			w := float32(p.Vertices[i].NdsTexture.Width)
+			h := float32(p.Vertices[i].NdsTexture.Height)
 
-            e.exportVertex(p.Vertices[i+0], w, h)
-            e.exportVertex(p.Vertices[i+1], w, h)
-            e.exportVertex(p.Vertices[i-1], w, h)
-            e.exportVertex(p.Vertices[i-2], w, h)
-            e.exportTexture(p.Vertices[i])
-            e.exportFace(4)
+			e.exportVertex(p.Vertices[i+0], w, h)
+			e.exportVertex(p.Vertices[i+1], w, h)
+			e.exportVertex(p.Vertices[i-1], w, h)
+			e.exportVertex(p.Vertices[i-2], w, h)
+			e.exportTexture(p.Vertices[i])
+			e.exportFace(4)
 		}
 	}
 }
 
 func (e *Export) exportVertex(vertex gl.Vertex, w, h float32) {
 
-    e.obj += "v "
-    e.obj += fmt.Sprintf("%f ", vertex.WorldPosition.X)
-    e.obj += fmt.Sprintf("%f ", vertex.WorldPosition.Y)
-    e.obj += fmt.Sprintf("%f ", vertex.WorldPosition.Z)
-    e.obj += fmt.Sprintf("%f ", vertex.Color.R)
-    e.obj += fmt.Sprintf("%f ", vertex.Color.G)
-    e.obj += fmt.Sprintf("%f ", vertex.Color.B)
+	e.obj += "v "
+	e.obj += fmt.Sprintf("%f ", vertex.WorldPosition.X)
+	e.obj += fmt.Sprintf("%f ", vertex.WorldPosition.Y)
+	e.obj += fmt.Sprintf("%f ", vertex.WorldPosition.Z)
+	e.obj += fmt.Sprintf("%f ", vertex.Color.R)
+	e.obj += fmt.Sprintf("%f ", vertex.Color.G)
+	e.obj += fmt.Sprintf("%f ", vertex.Color.B)
 
-    if vertex.NdsTexture == nil {
-        e.obj += "vt 0 0\n"
-        return
-    }
+	if vertex.NdsTexture == nil {
+		e.obj += "vt 0 0\n"
+		return
+	}
 
-    e.obj += "\nvt "
-    e.obj += fmt.Sprintf("%f ", vertex.S / w)
-    e.obj += fmt.Sprintf("%f ", vertex.T / h)
-    e.obj += "\n"
+	e.obj += "\nvt "
+	e.obj += fmt.Sprintf("%f ", vertex.S/w)
+	e.obj += fmt.Sprintf("%f ", vertex.T/h)
+	e.obj += "\n"
 }
 
 func (e *Export) exportTexture(vertex gl.Vertex) {
 
-    texture := vertex.NdsTexture
+	texture := vertex.NdsTexture
 
-    if texture == nil {
-        return
-    }
+	if texture == nil {
+		return
+	}
 
-    key := uintptr(unsafe.Pointer(texture.CachedTexture))
+	key := uintptr(unsafe.Pointer(texture.CachedTexture))
 
-    if material, ok := e.usedTextures[key]; ok {
-        e.obj += fmt.Sprintf("usemtl Material%d\n", material)
-        return
-    }
+	if material, ok := e.usedTextures[key]; ok {
+		e.obj += fmt.Sprintf("usemtl Material%d\n", material)
+		return
+	}
 
-    e.obj += fmt.Sprintf("usemtl Material%d\n", e.material)
+	e.obj += fmt.Sprintf("usemtl Material%d\n", e.material)
 
-    e.mtl += fmt.Sprintf("newmtl Material%d\n", e.material)
-    e.mtl += fmt.Sprintf("Kd 1 1 1\n")
-    e.mtl += fmt.Sprintf("map_Kd texture%05d.png\n", e.material)
+	e.mtl += fmt.Sprintf("newmtl Material%d\n", e.material)
+	e.mtl += fmt.Sprintf("Kd 1 1 1\n")
+	e.mtl += fmt.Sprintf("map_Kd texture%05d.png\n", e.material)
 
-    SavePNG(
-        fmt.Sprintf(e.Directory + "texture%05d.png", e.material),
-        texture.Width,
-        texture.Height,
-        texture.CachedTexture,
-    )
+	SavePNG(
+		fmt.Sprintf(e.Directory+"texture%05d.png", e.material),
+		texture.Width,
+		texture.Height,
+		texture.CachedTexture,
+	)
 
-    e.usedTextures[key] = e.material
-    e.material++
+	e.usedTextures[key] = e.material
+	e.material++
 }
 
 func (e *Export) exportFace(cnt int) {
-    e.obj += "f "
+	e.obj += "f "
 
-    for range cnt {
-        e.obj += fmt.Sprintf("%d/%d ", e.face, e.face)
-        e.face++
-    }
+	for range cnt {
+		e.obj += fmt.Sprintf("%d/%d ", e.face, e.face)
+		e.face++
+	}
 
-    e.obj += "\n"
+	e.obj += "\n"
 }
 
 func (e *Export) exportMesh() {
-    e.obj += fmt.Sprintf("o mesh_%d\n", e.mesh)
-    e.mesh++
+	e.obj += fmt.Sprintf("o mesh_%d\n", e.mesh)
+	e.mesh++
 }
 
 func writeFile(path, s string) bool {
@@ -241,12 +241,12 @@ func writeFile(path, s string) bool {
 	defer f.Close()
 
 	writer := bufio.NewWriter(f)
-    _, err = writer.Write([]byte(s))
+	_, err = writer.Write([]byte(s))
 	if err != nil {
 		return false
 	}
 
-    writer.Flush()
+	writer.Flush()
 
 	return true
 }

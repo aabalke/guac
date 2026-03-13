@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"unsafe"
 
+	"github.com/aabalke/guac/config"
+	"github.com/aabalke/guac/emu/bios"
 	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
@@ -15,20 +17,14 @@ import (
 	"github.com/aabalke/guac/emu/nds/snd"
 )
 
-//go:embed res_/bios7.bin
-var arm7Bios []byte
-
-//go:embed res_/bios9.bin
-var arm9Bios []byte
-
 type Mem struct {
 	Tcm     Tcm
 	MainRam [0x40_0000]uint8
 	WRAM    WRAM
 	Oam     [0x800]uint8
 
-	Arm7Bios [0x4000]uint8
-	Arm9Bios [0x1000]uint8
+	Arm7Bios *[]uint8
+	Arm9Bios *[]uint8
 
 	// this size is temp
 	IO [0x100_0000]uint8
@@ -37,12 +33,12 @@ type Mem struct {
 	irq7, irq9       *cpu.Irq
 	dma7, dma9       *[4]dma.DMA
 
-	Wifi *wifi.Wifi
-
 	arm7Pc *uint32
 
 	Ppu       *ppu.PPU
 	Cartridge *cart.Cartridge
+	Wifi      *wifi.Wifi
+	Snd       *snd.Snd
 
 	Vcount      uint32
 	Dispstat    Dispstat
@@ -57,8 +53,6 @@ type Mem struct {
 	BiosProt    BiosProt
 	WifiWaitCnt WifiWaitCnt
 	Timers      [8]Timer
-
-	Snd *snd.Snd
 
 	Jit7, Jit9 Jit
 }
@@ -121,19 +115,24 @@ func NewMemory(
 
 var lockWrites bool
 
-func (mem *Mem) DirtyTransfer() {
+func (mem *Mem) DirectBootMemory() {
 	setBiosRam(mem, mem.Cartridge.ChipId)
 	lockWrites = true
 }
 
 func (mem *Mem) LoadBios() {
+	mem.Arm7Bios = &bios.BiosNtrArm7
+	mem.Arm9Bios = &bios.BiosNtrArm9
+	b := &config.Conf.Nds.Bios
 
-	for i := range len(arm7Bios) {
-		mem.Arm7Bios[i] = arm7Bios[i]
-    }
+	if b.Arm7Path != "" {
+		buf, _, _ := readFile(b.Arm7Path)
+		mem.Arm7Bios = &buf
+	}
 
-	for i := range len(arm9Bios) {
-		mem.Arm9Bios[i] = arm9Bios[i]
+	if b.Arm9Path != "" {
+		buf, _, _ := readFile(b.Arm9Path)
+		mem.Arm9Bios = &buf
 	}
 }
 
@@ -164,7 +163,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 		case 0x8, 0x9, 0xA:
 			return mem.Cartridge.ReadGbaSlot(addr, arm9)
 		case 0xFF:
-			return mem.Arm9Bios[addr&0x0FFF]
+			return (*mem.Arm9Bios)[addr&0x0FFF]
 		default:
 			return 0
 		}
@@ -173,7 +172,8 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 	case 0x0, 0x1:
 
 		if addr < 0x4000 && (*mem.arm7Pc) < 0x4000 {
-			return mem.Arm7Bios[addr]
+
+			return (*mem.Arm7Bios)[addr]
 		}
 
 		return 0xFF
@@ -284,7 +284,7 @@ func (mem *Mem) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
 		case 0x7:
 			return unsafe.Add(unsafe.Pointer(&mem.Oam), addr&0x7FF), true
 		case 0xFF:
-			return unsafe.Add(unsafe.Pointer(&mem.Arm9Bios), addr&0x0FFF), true
+			return unsafe.Add(unsafe.Pointer(&(*mem.Arm9Bios)[0]), addr&0x0FFF), true
 		}
 
 		return nil, false
@@ -294,7 +294,7 @@ func (mem *Mem) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
 	case 0x0:
 
 		if addr < 0x4000 { // do not limit based on pc, messes up jit arm7
-			return unsafe.Add(unsafe.Pointer(&mem.Arm7Bios), addr), true
+			return unsafe.Add(unsafe.Pointer(&(*mem.Arm7Bios)[0]), addr), true
 		}
 
 		return nil, false
