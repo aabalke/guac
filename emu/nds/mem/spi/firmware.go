@@ -4,10 +4,9 @@ import (
 	_ "embed"
 	"fmt"
 	"log"
-)
 
-//go:embed res/firmware.bin
-var FirmwareData []byte
+	"github.com/aabalke/guac/config"
+)
 
 const (
 	INST_NONE = 0x00
@@ -22,11 +21,26 @@ const (
 )
 
 type Firmware struct {
-	Idx uint32
-
+	Data         []uint8
+	Idx          uint32
 	Addr         uint32
 	WriteEnabled bool
 	WriteBuffer  []uint8
+}
+
+func (f *Firmware) Load() {
+
+	f.Data = make([]uint8, 0x4_0000)
+
+	if path := config.Conf.Nds.Firmware.FilePath; path == "" {
+		FirmwareSetHeader(&f.Data)
+		FirmwareSetAccessPoints(&f.Data)
+	} else {
+		f.Data, _, _ = readFile(path)
+	}
+
+	// user settings come from config and should override firmware file
+	FirmwareSetUserSettings(&f.Data)
 }
 
 func (f *Firmware) Transfer(data []uint8) (reply []uint8, stat uint8) {
@@ -83,12 +97,12 @@ func (f *Firmware) Transfer(data []uint8) (reply []uint8, stat uint8) {
 
 		for i = range BUF_SIZE {
 
-			if f.Addr+i >= uint32(len(FirmwareData)) {
+			if f.Addr+i >= uint32(len(f.Data)) {
 				buffer = append(buffer, 0)
 				continue
 			}
 
-			buffer = append(buffer, FirmwareData[f.Addr+i])
+			buffer = append(buffer, f.Data[f.Addr+i])
 		}
 
 		f.Addr += BUF_SIZE

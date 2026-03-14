@@ -99,6 +99,7 @@ func isFile(path string) bool {
 }
 
 type NdsFirmware struct {
+	FilePath      string `toml:"file_path"`
 	Nickname      string `toml:"nickname"`
 	Message       string `toml:"message"`
 	FavoriteColor string `toml:"favorite_color"`
@@ -110,6 +111,12 @@ type NdsFirmware struct {
 func (c *Config) decodeNdsFirmware() {
 
 	f := &c.Nds.Firmware
+
+	if !isFile(f.FilePath) {
+		fmt.Printf("Nds Firmware not provided.\n")
+	} else {
+		fmt.Printf("Nds Firmware provided.\n")
+	}
 
 	clr, ok := clr[f.FavoriteColor]
 	if !ok {

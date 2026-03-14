@@ -3,8 +3,6 @@ package mem
 import (
 	"encoding/binary"
 	"fmt"
-
-	"github.com/aabalke/guac/emu/nds/mem/spi"
 )
 
 // this sets the post bios ram usage
@@ -44,9 +42,12 @@ func setBiosRam(mem *Mem, chipId [4]uint8) {
 
 	chip := binary.LittleEndian.Uint32(chipId[:])
 
-	c := mem.Cartridge.Rom[:0x1000]
-	f := &spi.FirmwareData
+	c := &mem.Cartridge.Rom
+	f := &mem.Spi.Firmware.Data
 	h := &mem.Cartridge.Header
+
+	mem.Spi.Firmware.Load()
+	mem.Spi.Tsc.Firmware = &mem.Spi.Firmware
 
 	for i := range h.Arm9Size {
 		v := mem.Cartridge.Rom[h.Arm9Offset+i]
@@ -65,12 +66,12 @@ func setBiosRam(mem *Mem, chipId [4]uint8) {
 	mem.Write32(0x27FF804, chip, true)
 
 	//27FF808h 2     NDS Cart Header CRC (verified)            ;hdr[15Eh]
-	mem.Write(RAM_CART_HDR_CRC, c[0x15E], true)
-	mem.Write(RAM_CART_HDR_CRC+1, c[0x15F], true)
+	mem.Write(RAM_CART_HDR_CRC, (*c)[0x15E], true)
+	mem.Write(RAM_CART_HDR_CRC+1, (*c)[0x15F], true)
 
 	//27FF80Ah 2     NDS Cart Secure Area CRC (not verified ?) ;hdr[06Ch]
-	mem.Write(RAM_CART_SEC_CRC, c[0x6C], true)
-	mem.Write(RAM_CART_SEC_CRC+1, c[0x6D], true)
+	mem.Write(RAM_CART_SEC_CRC, (*c)[0x6C], true)
+	mem.Write(RAM_CART_SEC_CRC+1, (*c)[0x6D], true)
 
 	//27FF810h 2     Boot handler task number (usually FFFFh at cart boot time)
 	mem.Write(RAM_BOOT_HANDLER, 0xFF, true)
@@ -108,12 +109,12 @@ func setBiosRam(mem *Mem, chipId [4]uint8) {
 	mem.Write32(0x27FFC04, chip, true)
 
 	//27FFC08h 2     NDS Cart Header CRC      (copy of 27FF808h)
-	mem.Write(0x027FFC08, c[0x15E], true)
-	mem.Write(0x027FFC08+1, c[0x15F], true)
+	mem.Write(0x027FFC08, (*c)[0x15E], true)
+	mem.Write(0x027FFC08+1, (*c)[0x15F], true)
 
 	//27FFC0Ah 2     NDS Cart Secure Area CRC (copy of 27FF80Ah)
-	mem.Write(0x27FFC0A, c[0x6C], true)
-	mem.Write(0x27FFC0A+1, c[0x6D], true)
+	mem.Write(0x27FFC0A, (*c)[0x6C], true)
+	mem.Write(0x27FFC0A+1, (*c)[0x6D], true)
 
 	//27FFC0Ch 2     NDS Cart Missing/Bad CRC (copy of 27FF80Ch)
 	//27FFC0Eh 2     NDS Cart Secure Area Bad (copy of 27FF80Eh)
@@ -136,10 +137,8 @@ func setBiosRam(mem *Mem, chipId [4]uint8) {
 		USER_SETTING_0   = 0x3FE00
 	)
 
-	spi.FirmwareConfig()
-
 	for i := range uint32(0x100) {
-		v := spi.FirmwareData[USER_SETTING_0+i]
+		v := (*f)[USER_SETTING_0+i]
 		mem.Write(USER_SETTING_RAM+i, v, true)
 	}
 

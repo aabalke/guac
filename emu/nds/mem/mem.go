@@ -1,7 +1,6 @@
 package mem
 
 import (
-	_ "embed"
 	"encoding/binary"
 	"fmt"
 	"unsafe"

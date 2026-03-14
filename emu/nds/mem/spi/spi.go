@@ -26,10 +26,8 @@ type Spi struct {
 }
 
 func (s *Spi) Init() {
-
 	s.Pmd = &Pmd{}
 	s.Pmd.Init()
-
 	s.TransferDevice = nil
 	//FirmwareConfig()
 }

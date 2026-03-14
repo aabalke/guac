@@ -20,6 +20,8 @@ const (
 )
 
 type Tsc struct {
+	Firmware *Firmware
+
 	Control uint8
 
 	//Temp0 uint16
@@ -56,10 +58,10 @@ func (t *Tsc) Transfer(data []uint8) (reply []uint8, stat uint8) {
 	case CH_TOUCHY:
 
 		if t.TouchActive {
-			adcY1 := binary.LittleEndian.Uint16(FirmwareData[0x3FE00+0x5A:])
-			scrY1 := FirmwareData[0x3FE00+0x5D]
-			adcY2 := binary.LittleEndian.Uint16(FirmwareData[0x3FE00+0x60:])
-			scrY2 := FirmwareData[0x3FE00+0x63]
+			adcY1 := binary.LittleEndian.Uint16(t.Firmware.Data[0x3FE00+0x5A:])
+			scrY1 := t.Firmware.Data[0x3FE00+0x5D]
+			adcY2 := binary.LittleEndian.Uint16(t.Firmware.Data[0x3FE00+0x60:])
+			scrY2 := t.Firmware.Data[0x3FE00+0x63]
 			out = uint16((int(t.TouchY)-int(scrY1)+1)*int(adcY2-adcY1)/int(scrY2-scrY1) + int(adcY1))
 		} else {
 			out = 0xFFF
@@ -67,10 +69,10 @@ func (t *Tsc) Transfer(data []uint8) (reply []uint8, stat uint8) {
 
 	case CH_TOUCHX:
 		if t.TouchActive {
-			adcX1 := binary.LittleEndian.Uint16(FirmwareData[0x3FE00+0x58:])
-			scrX1 := FirmwareData[0x3FE00+0x5C]
-			adcX2 := binary.LittleEndian.Uint16(FirmwareData[0x3FE00+0x5E:])
-			scrX2 := FirmwareData[0x3FE00+0x62]
+			adcX1 := binary.LittleEndian.Uint16(t.Firmware.Data[0x3FE00+0x58:])
+			scrX1 := t.Firmware.Data[0x3FE00+0x5C]
+			adcX2 := binary.LittleEndian.Uint16(t.Firmware.Data[0x3FE00+0x5E:])
+			scrX2 := t.Firmware.Data[0x3FE00+0x62]
 			out = uint16((int(t.TouchX)-int(scrX1)+1)*int(adcX2-adcX1)/int(scrX2-scrX1) + int(adcX1))
 		} else {
 			out = 0x0
