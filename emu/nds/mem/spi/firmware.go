@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/aabalke/guac/config"
+	"github.com/aabalke/guac/utils"
 )
 
 const (
@@ -36,7 +37,7 @@ func (f *Firmware) Load() {
 		FirmwareSetHeader(&f.Data)
 		FirmwareSetAccessPoints(&f.Data)
 	} else {
-		f.Data, _, _ = readFile(path)
+		f.Data, _, _ = utils.ReadFile(path)
 	}
 
 	// user settings come from config and should override firmware file

@@ -9,6 +9,7 @@ import (
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
+	"github.com/aabalke/guac/utils"
 )
 
 type Cartridge struct {
@@ -51,7 +52,7 @@ func NewCartridge(romPath, savPath string, bios *[]uint8, irq7, irq9 *cpu.Irq, d
 	}
 
 	var ok bool
-	c.Rom, c.RomLen, ok = readFile(romPath)
+	c.Rom, c.RomLen, ok = utils.ReadFile(romPath)
 	if !ok {
 		panic("could not read rom path")
 	}
@@ -109,7 +110,7 @@ func (c *Cartridge) readSave(savPath string, gamecode uint32) {
 		c.Sav[i] = 0xFF
 	}
 
-	sav, length, ok := readFile(savPath)
+	sav, length, ok := utils.ReadFile(savPath)
 	if ok {
 
 		for i := range length {
@@ -283,7 +284,7 @@ func (c *Cartridge) InitSaveLoop() {
 		for range saveTicker {
 			if c.SaveFlag {
 				log.Printf("Saving Game Path: %s\n", c.SavPath)
-				writeFile(c.SavPath, c.Sav[:])
+				utils.WriteFile(c.SavPath, c.Sav[:])
 				c.SaveFlag = false
 			}
 		}

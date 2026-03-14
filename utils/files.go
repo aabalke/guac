@@ -1,11 +1,11 @@
-package mem
+package utils
 
 import (
 	"bufio"
 	"os"
 )
 
-func readFile(path string) (buf []uint8, length int, ok bool) {
+func ReadFile(path string) (buf []uint8, length int, ok bool) {
 	buf, err := os.ReadFile(path)
 	if err != nil {
 		return nil, 0, false
@@ -13,7 +13,7 @@ func readFile(path string) (buf []uint8, length int, ok bool) {
 	return buf, len(buf), true
 }
 
-func writeFile(path string, buf []uint8) bool {
+func WriteFile(path string, buf []uint8) bool {
 
 	f, err := os.Create(path)
 	if err != nil {

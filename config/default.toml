@@ -155,8 +155,8 @@ dynamic_frame_skip = true
 
 # Nds bios is not necessary. The Drastic ARM7/ARM9 BIOS Replacements are provided. If you have your own bios files you can include them here.
 
-arm7_path = "./rom/bios/bios7.bin"
-arm9_path = "./rom/bios/bios9.bin"
+#arm7_path = "./rom/bios/bios7.bin"
+#arm9_path = "./rom/bios/bios9.bin"
 
 [nds.screen]
 
@@ -206,6 +206,9 @@ x = [3]
 y = [2]
 
 [nds.firmware]
+
+#file_path = "./rom/bios/firmware.bin"
+
 # nickname = "guac"
 # message = "This is a message."
 # Gray, Brown, Red, Pink, Orange, Yellow, LimeGreen, Green, DarkGreen, SeaGreen,
