@@ -20,9 +20,6 @@ const (
 	OCPS = 0xFF6A
 	OCPD = 0xFF6B
 
-	InterruptVBlank = 0b1
-	InterruptLCD    = 0b10
-
 	SpritePriorityOffset = 100
 )
 
@@ -63,7 +60,7 @@ func (gb *GameBoy) UpdateGraphics() {
 	}
 
 	if currentLine == height {
-		gb.RequestInterrupt(InterruptVBlank)
+		gb.RequestInterrupt(IRQ_VBL)
 	}
 }
 
@@ -126,14 +123,14 @@ func (gb *GameBoy) setLCDStatus() {
 
 	enteredNewMode := modeSelected && (currMode != newMode)
 	if enteredNewMode {
-		gb.RequestInterrupt(InterruptLCD)
+		gb.RequestInterrupt(IRQ_LCD)
 	}
 
 	currentLineCoin := gb.MemoryBus.Memory[LYC]
 	if currentLine == currentLineCoin {
 		stat |= 0b100
 		if gb.flagEnabled(stat, 6) {
-			gb.RequestInterrupt(InterruptLCD)
+			gb.RequestInterrupt(IRQ_LCD)
 		}
 
 		gb.MemoryBus.Memory[STAT] = stat
@@ -307,7 +304,7 @@ func (gb *GameBoy) renderTiles() {
 
 func (gb *GameBoy) renderSprites(scanline int32) {
 
-	lcdControl, _ := gb.ReadByte(LCDC)
+	lcdControl := gb.Read(LCDC)
 
 	var ySize int32 = 8
 	if gb.flagEnabled(lcdControl, 2) {
@@ -319,7 +316,7 @@ func (gb *GameBoy) renderSprites(scanline int32) {
 	for sprite := uint16(0); sprite < 40; sprite++ {
 		index := sprite * 4
 
-		yP, _ := gb.ReadByte(0xFE00 + index)
+		yP := gb.Read(0xFE00 + index)
 		yPos := int32(yP) - 16
 
 		if scanline < yPos || scanline >= (yPos+ySize) {
@@ -332,10 +329,10 @@ func (gb *GameBoy) renderSprites(scanline int32) {
 		}
 		lineSprites++
 
-		xP, _ := gb.ReadByte(uint16(0xFE00 + index + 1))
+		xP := gb.Read(uint16(0xFE00 + index + 1))
 		xPos := int32(xP) - 8
-		tileLocation, _ := gb.ReadByte(uint16(0xFE00 + index + 2))
-		attributes, _ := gb.ReadByte(uint16(0xFE00 + index + 3))
+		tileLocation := gb.Read(uint16(0xFE00 + index + 2))
+		attributes := gb.Read(uint16(0xFE00 + index + 3))
 
 		yFlip := gb.flagEnabled(attributes, 6)
 		xFlip := gb.flagEnabled(attributes, 5)

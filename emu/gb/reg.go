@@ -1,143 +1,106 @@
 package gameboy
 
-type Registers struct {
-	a uint8
-	b uint8
-	c uint8
-	d uint8
-	e uint8
-	g uint8
-	h uint8
-	l uint8
-	f Flags
-}
-
 type Flags struct {
-	Zero        bool
-	Subtraction bool
-	HalfCarry   bool
-	Carry       bool
+    Z, S, H, C bool
 }
 
 const (
-	RegisterAf = iota
-	RegisterBc
-	RegisterDe
-	RegisterHl
+	AF = iota
+	BC
+	DE
+	HL
 )
 
-func (r *Registers) setHl(v uint16) {
-	r.h = uint8(v & 0xFF00 >> 8)
-	r.l = uint8(v & 0xFF)
+func (c *Cpu) setHl(v uint16) {
+	c.h = uint8(v>>8)
+	c.l = uint8(v)
 }
 
-func (r *Registers) setDe(v uint16) {
-	r.d = uint8(v & 0xFF00 >> 8)
-	r.e = uint8(v & 0xFF)
+func (c *Cpu) setDe(v uint16) {
+	c.d = uint8(v>>8)
+	c.e = uint8(v)
 }
 
-func (r *Registers) setBc(v uint16) {
-	r.b = uint8(v & 0xFF00 >> 8)
-	r.c = uint8(v & 0xFF)
+func (c *Cpu) setBc(v uint16) {
+	c.b = uint8(v>>8)
+	c.c = uint8(v)
 }
 
-func (r *Registers) setAf(v uint16) {
-	r.a = uint8(v & 0xFF00 >> 8)
-	r.f.setFlags(uint8(v & 0xFF))
+func (c *Cpu) setAf(v uint16) {
+	c.a = uint8(v>>8)
+	c.f.Set(uint8(v))
 }
 
-func (r *Registers) af() uint16 {
-	return uint16(r.a)<<8 | uint16(r.f.getBits())
+func (c *Cpu) af() uint16 {
+	return uint16(c.a)<<8 | uint16(c.f.Get())
 }
 
-func (r *Registers) bc() uint16 {
-	return uint16(r.b)<<8 | uint16(r.c)
+func (c *Cpu) bc() uint16 {
+	return uint16(c.b)<<8 | uint16(c.c)
 }
 
-func (r *Registers) de() uint16 {
-	return uint16(r.d)<<8 | uint16(r.e)
+func (c *Cpu) de() uint16 {
+	return uint16(c.d)<<8 | uint16(c.e)
 }
 
-func (r *Registers) hl() uint16 {
-	return uint16(r.h)<<8 | uint16(r.l)
+func (c *Cpu) hl() uint16 {
+	return uint16(c.h)<<8 | uint16(c.l)
 }
 
-func (r *Registers) setCombinedRegister(v uint16, register int) {
+func (c *Cpu) setCombinedRegister(v uint16, register int) {
 
 	switch register {
-	case RegisterAf:
-		r.setAf(v)
-	case RegisterBc:
-		r.setBc(v)
-	case RegisterDe:
-		r.setDe(v)
-	case RegisterHl:
-		r.setHl(v)
+	case AF:
+		c.setAf(v)
+	case BC:
+		c.setBc(v)
+	case DE:
+		c.setDe(v)
+	case HL:
+		c.setHl(v)
 	}
 }
 
-func (r *Registers) getCombinedRegister(register int) uint16 {
+func (c *Cpu) getCombinedRegister(register int) uint16 {
 	switch register {
-	case RegisterAf:
-		return r.af()
-	case RegisterBc:
-		return r.bc()
-	case RegisterDe:
-		return r.de()
-	case RegisterHl:
-		return r.hl()
+	case AF:
+		return c.af()
+	case BC:
+		return c.bc()
+	case DE:
+		return c.de()
+	case HL:
+		return c.hl()
 	}
 	return 0
 }
 
-func (fr *Flags) getBits() uint8 {
+func (f *Flags) Get() uint8 {
 
 	var v uint8
 
-	if fr.Zero {
-		v += 1 << 7
+	if f.Z {
+		v |= 1 << 7
 	}
 
-	if fr.Subtraction {
-		v += 1 << 6
+	if f.S {
+		v |= 1 << 6
 	}
 
-	if fr.HalfCarry {
-		v += 1 << 5
+	if f.H {
+		v |= 1 << 5
 	}
 
-	if fr.Carry {
-		v += 1 << 4
+	if f.C {
+		v |= 1 << 4
 	}
 
 	return v
 }
 
-func (fr *Flags) setFlags(bits uint8) {
-
-	var zero bool = false
-	var sub bool = false
-	var half bool = false
-	var carry bool = false
-
-	if (bits>>7)&1 != 0 {
-		zero = true
-	}
-
-	if (bits>>6)&1 != 0 {
-		sub = true
-	}
-
-	if (bits>>5)&1 != 0 {
-		half = true
-	}
-
-	if (bits>>4)&1 != 0 {
-		carry = true
-	}
-
-	fr.Zero = zero
-	fr.Subtraction = sub
-	fr.HalfCarry = half
-	fr.Carry = carry
+func (f *Flags) Set(v uint8) {
+	f.Z = (v>>7)&1 != 0
+	f.S = (v>>6)&1 != 0
+	f.H = (v>>5)&1 != 0
+    f.C = (v>>4)&1 != 0
 }

@@ -39,21 +39,21 @@ func (l *Logger) WriteLog(i int, opcode uint8) {
 
 	gb := l.gb
 
-	pc0, _ := gb.ReadByte(gb.Cpu.PC)
-	pc1, _ := gb.ReadByte(gb.Cpu.PC + 1)
-	pc2, _ := gb.ReadByte(gb.Cpu.PC + 2)
-	pc3, _ := gb.ReadByte(gb.Cpu.PC + 3)
+	pc0 := gb.Read(gb.Cpu.PC)
+	pc1 := gb.Read(gb.Cpu.PC + 1)
+	pc2 := gb.Read(gb.Cpu.PC + 2)
+	pc3 := gb.Read(gb.Cpu.PC + 3)
 
 	s := fmt.Sprintf(
 		"A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X",
-		gb.Cpu.Registers.a,
-		gb.Cpu.Registers.f.getBits(),
-		gb.Cpu.Registers.b,
-		gb.Cpu.Registers.c,
-		gb.Cpu.Registers.d,
-		gb.Cpu.Registers.e,
-		gb.Cpu.Registers.h,
-		gb.Cpu.Registers.l,
+		gb.Cpu.a,
+		gb.Cpu.f.Get(),
+		gb.Cpu.b,
+		gb.Cpu.c,
+		gb.Cpu.d,
+		gb.Cpu.e,
+		gb.Cpu.h,
+		gb.Cpu.l,
 		gb.Cpu.SP,
 		gb.Cpu.PC,
 		pc0,

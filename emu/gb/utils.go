@@ -28,29 +28,29 @@ func LoadLine(gb *GameBoy, line int) {
 			case 2:
 			case 3:
 			case 4:
-				gb.Cpu.Registers.a = uint8(z)
+				gb.Cpu.a = uint8(z)
 			case 5:
-				gb.Cpu.Registers.b = uint8(z)
+				gb.Cpu.b = uint8(z)
 			case 6:
-				gb.Cpu.Registers.c = uint8(z)
+				gb.Cpu.c = uint8(z)
 			case 7:
-				gb.Cpu.Registers.d = uint8(z)
+				gb.Cpu.d = uint8(z)
 			case 8:
-				gb.Cpu.Registers.e = uint8(z)
+				gb.Cpu.e = uint8(z)
 			case 9:
-				gb.Cpu.Registers.g = uint8(z)
+				gb.Cpu.g = uint8(z)
 			case 10:
-				gb.Cpu.Registers.h = uint8(z)
+				gb.Cpu.h = uint8(z)
 			case 11:
-				gb.Cpu.Registers.l = uint8(z)
+				gb.Cpu.l = uint8(z)
 			case 12:
-				gb.Cpu.Registers.f.Zero = v[0] == 't'
+				gb.Cpu.f.Z = v[0] == 't'
 			case 13:
-				gb.Cpu.Registers.f.Subtraction = v[0] == 't'
+				gb.Cpu.f.S = v[0] == 't'
 			case 14:
-				gb.Cpu.Registers.f.HalfCarry = v[0] == 't'
+				gb.Cpu.f.H = v[0] == 't'
 			case 15:
-				gb.Cpu.Registers.f.Carry = v[0] == 't'
+				gb.Cpu.f.C = v[0] == 't'
 			case 16:
 				gb.Cpu.InterruptMaster = v[0] == 't'
 			case 17:
@@ -79,18 +79,18 @@ func DumpLine(gb *GameBoy, line int) {
 	o += fmt.Sprintf("%d\n", gb.Cpu.SP)
 	o += fmt.Sprintf("%d\n", 0)
 	o += fmt.Sprintf("%d\n", 0)
-	o += fmt.Sprintf("%d\n", gb.Cpu.Registers.a)
-	o += fmt.Sprintf("%d\n", gb.Cpu.Registers.b)
-	o += fmt.Sprintf("%d\n", gb.Cpu.Registers.c)
-	o += fmt.Sprintf("%d\n", gb.Cpu.Registers.d)
-	o += fmt.Sprintf("%d\n", gb.Cpu.Registers.e)
-	o += fmt.Sprintf("%d\n", gb.Cpu.Registers.g)
-	o += fmt.Sprintf("%d\n", gb.Cpu.Registers.h)
-	o += fmt.Sprintf("%d\n", gb.Cpu.Registers.l)
-	o += fmt.Sprintf("%t\n", gb.Cpu.Registers.f.Zero)
-	o += fmt.Sprintf("%t\n", gb.Cpu.Registers.f.Subtraction)
-	o += fmt.Sprintf("%t\n", gb.Cpu.Registers.f.HalfCarry)
-	o += fmt.Sprintf("%t\n", gb.Cpu.Registers.f.Carry)
+	o += fmt.Sprintf("%d\n", gb.Cpu.a)
+	o += fmt.Sprintf("%d\n", gb.Cpu.b)
+	o += fmt.Sprintf("%d\n", gb.Cpu.c)
+	o += fmt.Sprintf("%d\n", gb.Cpu.d)
+	o += fmt.Sprintf("%d\n", gb.Cpu.e)
+	o += fmt.Sprintf("%d\n", gb.Cpu.g)
+	o += fmt.Sprintf("%d\n", gb.Cpu.h)
+	o += fmt.Sprintf("%d\n", gb.Cpu.l)
+	o += fmt.Sprintf("%t\n", gb.Cpu.f.Z)
+	o += fmt.Sprintf("%t\n", gb.Cpu.f.S)
+	o += fmt.Sprintf("%t\n", gb.Cpu.f.H)
+	o += fmt.Sprintf("%t\n", gb.Cpu.f.C)
 	o += fmt.Sprintf("%t\n", gb.Cpu.InterruptMaster)
 	o += fmt.Sprintf("%t\n", gb.Cpu.PendingInterrupt)
 
@@ -119,17 +119,8 @@ type SerialOutput struct {
 func (s *SerialOutput) DebugSerialOutput(gb *GameBoy) {
 	// blarggs tests output to serial port if sc byte is 0x81, read prev byte
 
-	sc, err := gb.ReadByte(uint16(0xFF02))
-	if err != nil {
-		panic(err)
-	}
-
-	if sc == 0x81 {
-		sb, err := gb.ReadByte(uint16(0xFF01))
-		if err != nil {
-			panic(err)
-		}
-
+	if sc := gb.Read(uint16(0xFF02)); sc == 0x81 {
+		sb := gb.Read(uint16(0xFF01))
 		s.output = append(s.output, sb)
 		gb.MemoryBus.Memory[0xFF02] = 0x80
 	}
@@ -180,21 +171,21 @@ func InitializeLog(filename string) (*os.File, *bufio.Writer) {
 
 func WriteLog(i int, gb GameBoy, opcode uint8, bufWriter *bufio.Writer) {
 
-	pc0, _ := gb.ReadByte(gb.Cpu.PC)
-	pc1, _ := gb.ReadByte(gb.Cpu.PC + 1)
-	pc2, _ := gb.ReadByte(gb.Cpu.PC + 2)
-	pc3, _ := gb.ReadByte(gb.Cpu.PC + 3)
+	pc0 := gb.Read(gb.Cpu.PC)
+	pc1 := gb.Read(gb.Cpu.PC + 1)
+	pc2 := gb.Read(gb.Cpu.PC + 2)
+	pc3 := gb.Read(gb.Cpu.PC + 3)
 
 	s := fmt.Sprintf(
 		"A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X",
-		gb.Cpu.Registers.a,
-		gb.Cpu.Registers.f.getBits(),
-		gb.Cpu.Registers.b,
-		gb.Cpu.Registers.c,
-		gb.Cpu.Registers.d,
-		gb.Cpu.Registers.e,
-		gb.Cpu.Registers.h,
-		gb.Cpu.Registers.l,
+		gb.Cpu.a,
+		gb.Cpu.f.Get(),
+		gb.Cpu.b,
+		gb.Cpu.c,
+		gb.Cpu.d,
+		gb.Cpu.e,
+		gb.Cpu.h,
+		gb.Cpu.l,
 		gb.Cpu.SP,
 		gb.Cpu.PC,
 		pc0,

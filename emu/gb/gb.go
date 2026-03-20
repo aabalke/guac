@@ -21,6 +21,12 @@ const (
 	tileWidth = 8
 	width     = 160
 	height    = 144
+
+    IRQ_VBL = 1 << 0
+    IRQ_LCD = 1 << 1
+    IRQ_TMR = 1 << 2
+    IRQ_SER = 1 << 3
+    IRQ_JPD = 1 << 4
 )
 
 type GameBoy struct {
@@ -117,11 +123,7 @@ func (gb *GameBoy) Update() {
 		gb.Cycles = 0
 		cycles := 4
 
-		opcode, err := gb.ReadByte(gb.Cpu.PC)
-
-		if err != nil {
-			panic(err)
-		}
+		opcode := gb.Read(gb.Cpu.PC)
 
 		if !gb.Cpu.Halted {
 			cycles = gb.Execute(opcode)
@@ -189,7 +191,7 @@ func (gb *GameBoy) loadCartridge() {
 	}
 
 	if gb.Color {
-		gb.Cpu.Registers.a = 0x11
+		gb.Cpu.a = 0x11
 		log.Printf("Color mode: GBC")
 	} else {
 		log.Printf("Color mode: DMG")
@@ -290,10 +292,7 @@ func (gb *GameBoy) UpdateInterrupt() (cycles int) {
 
 		req := gb.MemoryBus.Memory[0xFF0F]
 		newFlag := req & ^(1 << i)
-		err := gb.WriteByte(0xFF0F, newFlag)
-		if err != nil {
-			panic(err)
-		}
+	    gb.Write(0xFF0F, newFlag)
 
 		gb.StackPush(gb.Cpu.PC)
 
@@ -357,7 +356,7 @@ func (gb *GameBoy) UpdateTimers() {
 
 	if t.InterruptPending {
 		Mem[TIMA] = Mem[TMA]
-		gb.RequestInterrupt(0b100)
+		gb.RequestInterrupt(IRQ_TMR)
 		t.InterruptPending = false
 	}
 }
@@ -386,14 +385,9 @@ func (gb *GameBoy) SelectCycleFreq() int {
 }
 
 func (gb *GameBoy) RequestInterrupt(mask uint8) {
-
 	interruptFlag := gb.MemoryBus.Memory[0xFF0F] | 0xE0
-
 	newFlag := interruptFlag | mask // may need ^
-	err := gb.WriteByte(0xFF0F, newFlag)
-	if err != nil {
-		panic(err)
-	}
+	gb.Write(0xFF0F, newFlag)
 }
 
 func (gb *GameBoy) toggleDoubleSpeed() {
@@ -407,9 +401,8 @@ func (gb *GameBoy) toggleDoubleSpeed() {
 	gb.Cpu.Halted = false
 
 	var v uint8 = 0
-
 	if gb.DoubleSpeed {
-		v = 0b10000000
+		v |= 1 << 7
 	}
 
 	gb.MemoryBus.Memory[0xFF4D] = v

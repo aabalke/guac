@@ -7,11 +7,21 @@ import (
 // 4 cycles per m clock (if inst/opcode take 4 cycles, inc m by 1, 8 cycles, by 2
 
 type Cpu struct {
-	Registers Registers
+	//Registers Registers
 
 	InterruptMaster  bool
 	PendingInterrupt bool
 	Halted           bool
+
+	a uint8
+	b uint8
+	c uint8
+	d uint8
+	e uint8
+	g uint8
+	h uint8
+	l uint8
+	f Flags
 
 	PC uint16
 	SP uint16
@@ -19,24 +29,23 @@ type Cpu struct {
 
 func NewCpu() *Cpu {
 	c := Cpu{
-		Registers: Registers{
-			a: 0x01,
-			b: 0x00,
-			c: 0x13,
-			d: 0x00,
-			e: 0xD8,
-			h: 0x01,
-			l: 0x4D,
-			f: Flags{
-				Zero:        true,
-				Subtraction: false,
-				HalfCarry:   true,
-				Carry:       true,
-			},
-		},
-		InterruptMaster:  false,
+        a: 0x01,
+        b: 0x00,
+        c: 0x13,
+        d: 0x00,
+        e: 0xD8,
+        h: 0x01,
+        l: 0x4D,
+        f: Flags{
+            Z: true,
+            S: false,
+            H: true,
+            C: true,
+        },
+
+        InterruptMaster:  false,
 		PendingInterrupt: false,
-		PC:               0x100,
+		PC:               0x0100,
 		SP:               0xFFFE,
 	}
 
@@ -45,21 +54,21 @@ func NewCpu() *Cpu {
 
 func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 
-	reg := &gb.Cpu.Registers
+	reg := &gb.Cpu
 
 	cycles = 1
 	pc := gb.Cpu.PC + 1
 
-	hl := gb.Cpu.Registers.hl()
+	hl := gb.Cpu.hl()
 	d8, d16 := gb.getImmediateData()
-	hlValue, _ := gb.ReadByte(hl)
+	hlValue := gb.Read(hl)
 
 	switch opcode {
 	case 0x00: // nop
 	case 0x10: // stop / toggle speed
 
 		if gb.Color && gb.PrepareSpeedToggle {
-			gb.WriteByte(0xFF26, 0)
+			gb.Write(0xFF26, 0)
 			gb.toggleDoubleSpeed()
 		} else {
 			gb.Cpu.Halted = true
@@ -177,15 +186,15 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 		gb.execLd(&reg.l, reg.a)
 
 	case 0x01:
-		gb.execLd(RegisterBc, d16)
+		gb.execLd(BC, d16)
 		pc = pc + 2
 		cycles = 3
 	case 0x11:
-		gb.execLd(RegisterDe, d16)
+		gb.execLd(DE, d16)
 		pc = pc + 2
 		cycles = 3
 	case 0x21:
-		gb.execLd(RegisterHl, d16)
+		gb.execLd(HL, d16)
 		pc = pc + 2
 		cycles = 3
 	case 0x31:
@@ -272,16 +281,16 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 		gb.execAdd(&reg.a, reg.a)
 
 	case 0x09:
-		gb.execAdd(RegisterHl, reg.bc())
+		gb.execAdd(HL, reg.bc())
 		cycles = 2
 	case 0x19:
-		gb.execAdd(RegisterHl, reg.de())
+		gb.execAdd(HL, reg.de())
 		cycles = 2
 	case 0x29:
-		gb.execAdd(RegisterHl, reg.hl())
+		gb.execAdd(HL, reg.hl())
 		cycles = 2
 	case 0x39:
-		gb.execAdd(RegisterHl, gb.Cpu.SP)
+		gb.execAdd(HL, gb.Cpu.SP)
 		cycles = 2
 
 	case 0x88:
@@ -417,7 +426,7 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 	case 0x24:
 		gb.execInc(&reg.h)
 	case 0x34:
-		gb.execIncDecHl(RegisterHl, false)
+		gb.execIncDecHl(HL, false)
 		cycles = 3
 	case 0x0C:
 		gb.execInc(&reg.c)
@@ -428,13 +437,13 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 	case 0x3C:
 		gb.execInc(&reg.a)
 	case 0x03:
-		gb.execInc(RegisterBc)
+		gb.execInc(BC)
 		cycles = 2
 	case 0x13:
-		gb.execInc(RegisterDe)
+		gb.execInc(DE)
 		cycles = 2
 	case 0x23:
-		gb.execInc(RegisterHl)
+		gb.execInc(HL)
 		cycles = 2
 	case 0x33:
 		gb.Cpu.SP += 1
@@ -447,7 +456,7 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 	case 0x25:
 		gb.execDec(&reg.h)
 	case 0x35:
-		gb.execIncDecHl(RegisterHl, true)
+		gb.execIncDecHl(HL, true)
 		cycles = 3
 	case 0x0D:
 		gb.execDec(&reg.c)
@@ -458,13 +467,13 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 	case 0x3D:
 		gb.execDec(&reg.a)
 	case 0x0B:
-		gb.execDec(RegisterBc)
+		gb.execDec(BC)
 		cycles = 2
 	case 0x1B:
-		gb.execDec(RegisterDe)
+		gb.execDec(DE)
 		cycles = 2
 	case 0x2B:
-		gb.execDec(RegisterHl)
+		gb.execDec(HL)
 		cycles = 2
 	case 0x3B:
 		gb.Cpu.SP -= 1
@@ -521,26 +530,20 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 		cycles = 3
 
 	case 0x0A:
-		bcValue, err := gb.ReadByte(reg.bc())
-		if err != nil {
-			panic(err)
-		}
+		bcValue := gb.Read(reg.bc())
 		gb.execLd(&reg.a, bcValue)
 		cycles = 2
 	case 0x1A:
-		deValue, err := gb.ReadByte(reg.de())
-		if err != nil {
-			panic(err)
-		}
+		deValue := gb.Read(reg.de())
 		gb.execLd(&reg.a, deValue)
 		cycles = 2
 	case 0x2A:
 		gb.execLd(&reg.a, hlValue)
-		gb.execInc(RegisterHl)
+		gb.execInc(HL)
 		cycles = 2
 	case 0x3A:
 		gb.execLd(&reg.a, hlValue)
-		gb.execDec(RegisterHl)
+		gb.execDec(HL)
 		cycles = 2
 
 	case 0x02:
@@ -550,12 +553,12 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 		gb.execLdMem(reg.de(), reg.a, false)
 		cycles = 2
 	case 0x22:
-		gb.WriteByte(hl, reg.a)
+		gb.Write(hl, reg.a)
 		reg.setHl(hl + 1)
 		cycles = 2
 
 	case 0x32:
-		gb.WriteByte(hl, reg.a)
+		gb.Write(hl, reg.a)
 		reg.setHl(hl - 1)
 		cycles = 2
 
@@ -586,29 +589,29 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 
 	// jump abs
 	case 0xC2:
-		cycles, pc = gb.execJP(d16, !reg.f.Zero, 4, 3)
+		cycles, pc = gb.execJP(d16, !reg.f.Z, 4, 3)
 	case 0xD2:
-		cycles, pc = gb.execJP(d16, !reg.f.Carry, 4, 3)
+		cycles, pc = gb.execJP(d16, !reg.f.C, 4, 3)
 	case 0xC3:
 		cycles, pc = gb.execJP(d16, true, 4, 4)
 	case 0xCA:
-		cycles, pc = gb.execJP(d16, reg.f.Zero, 4, 3)
+		cycles, pc = gb.execJP(d16, reg.f.Z, 4, 3)
 	case 0xDA:
-		cycles, pc = gb.execJP(d16, reg.f.Carry, 4, 3)
+		cycles, pc = gb.execJP(d16, reg.f.C, 4, 3)
 	case 0xE9:
 		cycles, pc = gb.execJP(hl, true, 1, 1)
 
 	// jump relative
 	case 0x20:
-		cycles, pc = gb.execJR(d8, !reg.f.Zero, 3, 2)
+		cycles, pc = gb.execJR(d8, !reg.f.Z, 3, 2)
 	case 0x30:
-		cycles, pc = gb.execJR(d8, !reg.f.Carry, 3, 2)
+		cycles, pc = gb.execJR(d8, !reg.f.C, 3, 2)
 	case 0x18:
 		cycles, pc = gb.execJR(d8, true, 3, 3)
 	case 0x28:
-		cycles, pc = gb.execJR(d8, reg.f.Zero, 3, 2)
+		cycles, pc = gb.execJR(d8, reg.f.Z, 3, 2)
 	case 0x38:
-		cycles, pc = gb.execJR(d8, reg.f.Carry, 3, 2)
+		cycles, pc = gb.execJR(d8, reg.f.C, 3, 2)
 
 	// Interrupts
 	case 0xF3:
@@ -689,25 +692,25 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 
 	// call
 	case 0xC4:
-		cycles, pc = gb.execCall(d16, !reg.f.Zero, 6, 3)
+		cycles, pc = gb.execCall(d16, !reg.f.Z, 6, 3)
 	case 0xD4:
-		cycles, pc = gb.execCall(d16, !reg.f.Carry, 6, 3)
+		cycles, pc = gb.execCall(d16, !reg.f.C, 6, 3)
 	case 0xCC:
-		cycles, pc = gb.execCall(d16, reg.f.Zero, 6, 3)
+		cycles, pc = gb.execCall(d16, reg.f.Z, 6, 3)
 	case 0xDC:
-		cycles, pc = gb.execCall(d16, reg.f.Carry, 6, 3)
+		cycles, pc = gb.execCall(d16, reg.f.C, 6, 3)
 	case 0xCD:
 		cycles, pc = gb.execCall(d16, true, 6, 6)
 
 	// ret
 	case 0xC0:
-		cycles, pc = gb.execRet(!reg.f.Zero, 5, 2)
+		cycles, pc = gb.execRet(!reg.f.Z, 5, 2)
 	case 0xD0:
-		cycles, pc = gb.execRet(!reg.f.Carry, 5, 2)
+		cycles, pc = gb.execRet(!reg.f.C, 5, 2)
 	case 0xC8:
-		cycles, pc = gb.execRet(reg.f.Zero, 5, 2)
+		cycles, pc = gb.execRet(reg.f.Z, 5, 2)
 	case 0xD8:
-		cycles, pc = gb.execRet(reg.f.Carry, 5, 2)
+		cycles, pc = gb.execRet(reg.f.C, 5, 2)
 	case 0xC9:
 		cycles, pc = gb.execRet(true, 4, 4)
 	case 0xD9:
@@ -750,11 +753,13 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 
 func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 
-	right := true
-	throughCarry := true
+    var (
+        right = true
+        throughCarry = true
+        reg = &gb.Cpu
+    )
 
-	cycles = 2
-	reg := &gb.Cpu.Registers
+    cycles = 2
 
 	switch cbOpcode {
 	case 0x00:
@@ -770,7 +775,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x05:
 		gb.execRot(&reg.l, !right, !throughCarry)
 	case 0x06:
-		gb.execRot(RegisterHl, !right, !throughCarry)
+		gb.execRot(HL, !right, !throughCarry)
 		cycles = 4
 	case 0x07:
 		gb.execRot(&reg.a, !right, !throughCarry)
@@ -788,7 +793,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x15:
 		gb.execRot(&reg.l, !right, throughCarry)
 	case 0x16:
-		gb.execRot(RegisterHl, !right, throughCarry)
+		gb.execRot(HL, !right, throughCarry)
 		cycles = 4
 	case 0x17:
 		gb.execRot(&reg.a, !right, throughCarry)
@@ -806,7 +811,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x0D:
 		gb.execRot(&reg.l, right, !throughCarry)
 	case 0x0E:
-		gb.execRot(RegisterHl, right, !throughCarry)
+		gb.execRot(HL, right, !throughCarry)
 		cycles = 4
 	case 0x0F:
 		gb.execRot(&reg.a, right, !throughCarry)
@@ -824,7 +829,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x1D:
 		gb.execRot(&reg.l, right, throughCarry)
 	case 0x1E:
-		gb.execRot(RegisterHl, right, throughCarry)
+		gb.execRot(HL, right, throughCarry)
 		cycles = 4
 	case 0x1F:
 		gb.execRot(&reg.a, right, throughCarry)
@@ -842,7 +847,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x25:
 		gb.execSLA(&reg.l)
 	case 0x26:
-		gb.execSLA(RegisterHl)
+		gb.execSLA(HL)
 		cycles = 4
 	case 0x27:
 		gb.execSLA(&reg.a)
@@ -860,7 +865,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x2D:
 		gb.execSRA(&reg.l)
 	case 0x2E:
-		gb.execSRA(RegisterHl)
+		gb.execSRA(HL)
 		cycles = 4
 	case 0x2F:
 		gb.execSRA(&reg.a)
@@ -878,7 +883,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x35:
 		gb.execSWAP(&reg.l)
 	case 0x36:
-		gb.execSWAP(RegisterHl)
+		gb.execSWAP(HL)
 		cycles = 4
 	case 0x37:
 		gb.execSWAP(&reg.a)
@@ -896,7 +901,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x3D:
 		gb.execSRL(&reg.l)
 	case 0x3E:
-		gb.execSRL(RegisterHl)
+		gb.execSRL(HL)
 		cycles = 4
 	case 0x3F:
 		gb.execSRL(&reg.a)
@@ -914,7 +919,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x45:
 		gb.execBIT(&reg.l, 0)
 	case 0x46:
-		gb.execBIT(RegisterHl, 0)
+		gb.execBIT(HL, 0)
 		cycles = 3
 	case 0x47:
 		gb.execBIT(&reg.a, 0)
@@ -932,7 +937,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x4D:
 		gb.execBIT(&reg.l, 1)
 	case 0x4E:
-		gb.execBIT(RegisterHl, 1)
+		gb.execBIT(HL, 1)
 		cycles = 3
 	case 0x4F:
 		gb.execBIT(&reg.a, 1)
@@ -950,7 +955,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x55:
 		gb.execBIT(&reg.l, 2)
 	case 0x56:
-		gb.execBIT(RegisterHl, 2)
+		gb.execBIT(HL, 2)
 		cycles = 3
 	case 0x57:
 		gb.execBIT(&reg.a, 2)
@@ -968,7 +973,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x5D:
 		gb.execBIT(&reg.l, 3)
 	case 0x5E:
-		gb.execBIT(RegisterHl, 3)
+		gb.execBIT(HL, 3)
 		cycles = 3
 	case 0x5F:
 		gb.execBIT(&reg.a, 3)
@@ -986,7 +991,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x65:
 		gb.execBIT(&reg.l, 4)
 	case 0x66:
-		gb.execBIT(RegisterHl, 4)
+		gb.execBIT(HL, 4)
 		cycles = 3
 	case 0x67:
 		gb.execBIT(&reg.a, 4)
@@ -1004,7 +1009,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x6D:
 		gb.execBIT(&reg.l, 5)
 	case 0x6E:
-		gb.execBIT(RegisterHl, 5)
+		gb.execBIT(HL, 5)
 		cycles = 3
 	case 0x6F:
 		gb.execBIT(&reg.a, 5)
@@ -1022,7 +1027,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x75:
 		gb.execBIT(&reg.l, 6)
 	case 0x76:
-		gb.execBIT(RegisterHl, 6)
+		gb.execBIT(HL, 6)
 		cycles = 3
 	case 0x77:
 		gb.execBIT(&reg.a, 6)
@@ -1040,7 +1045,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x7D:
 		gb.execBIT(&reg.l, 7)
 	case 0x7E:
-		gb.execBIT(RegisterHl, 7)
+		gb.execBIT(HL, 7)
 		cycles = 3
 	case 0x7F:
 		gb.execBIT(&reg.a, 7)
@@ -1058,7 +1063,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x85:
 		gb.execRES(&reg.l, 0)
 	case 0x86:
-		gb.execRES(RegisterHl, 0)
+		gb.execRES(HL, 0)
 		cycles = 4
 	case 0x87:
 		gb.execRES(&reg.a, 0)
@@ -1076,7 +1081,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x8D:
 		gb.execRES(&reg.l, 1)
 	case 0x8E:
-		gb.execRES(RegisterHl, 1)
+		gb.execRES(HL, 1)
 		cycles = 4
 	case 0x8F:
 		gb.execRES(&reg.a, 1)
@@ -1094,7 +1099,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x95:
 		gb.execRES(&reg.l, 2)
 	case 0x96:
-		gb.execRES(RegisterHl, 2)
+		gb.execRES(HL, 2)
 		cycles = 4
 	case 0x97:
 		gb.execRES(&reg.a, 2)
@@ -1112,7 +1117,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0x9D:
 		gb.execRES(&reg.l, 3)
 	case 0x9E:
-		gb.execRES(RegisterHl, 3)
+		gb.execRES(HL, 3)
 		cycles = 4
 	case 0x9F:
 		gb.execRES(&reg.a, 3)
@@ -1130,7 +1135,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0xA5:
 		gb.execRES(&reg.l, 4)
 	case 0xA6:
-		gb.execRES(RegisterHl, 4)
+		gb.execRES(HL, 4)
 		cycles = 4
 	case 0xA7:
 		gb.execRES(&reg.a, 4)
@@ -1148,7 +1153,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0xAD:
 		gb.execRES(&reg.l, 5)
 	case 0xAE:
-		gb.execRES(RegisterHl, 5)
+		gb.execRES(HL, 5)
 		cycles = 4
 	case 0xAF:
 		gb.execRES(&reg.a, 5)
@@ -1166,7 +1171,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0xB5:
 		gb.execRES(&reg.l, 6)
 	case 0xB6:
-		gb.execRES(RegisterHl, 6)
+		gb.execRES(HL, 6)
 		cycles = 4
 	case 0xB7:
 		gb.execRES(&reg.a, 6)
@@ -1184,7 +1189,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0xBD:
 		gb.execRES(&reg.l, 7)
 	case 0xBE:
-		gb.execRES(RegisterHl, 7)
+		gb.execRES(HL, 7)
 		cycles = 4
 	case 0xBF:
 		gb.execRES(&reg.a, 7)
@@ -1202,7 +1207,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0xC5:
 		gb.execSET(&reg.l, 0)
 	case 0xC6:
-		gb.execSET(RegisterHl, 0)
+		gb.execSET(HL, 0)
 		cycles = 4
 	case 0xC7:
 		gb.execSET(&reg.a, 0)
@@ -1220,7 +1225,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0xCD:
 		gb.execSET(&reg.l, 1)
 	case 0xCE:
-		gb.execSET(RegisterHl, 1)
+		gb.execSET(HL, 1)
 		cycles = 4
 	case 0xCF:
 		gb.execSET(&reg.a, 1)
@@ -1238,7 +1243,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0xD5:
 		gb.execSET(&reg.l, 2)
 	case 0xD6:
-		gb.execSET(RegisterHl, 2)
+		gb.execSET(HL, 2)
 		cycles = 4
 	case 0xD7:
 		gb.execSET(&reg.a, 2)
@@ -1256,7 +1261,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0xDD:
 		gb.execSET(&reg.l, 3)
 	case 0xDE:
-		gb.execSET(RegisterHl, 3)
+		gb.execSET(HL, 3)
 		cycles = 4
 	case 0xDF:
 		gb.execSET(&reg.a, 3)
@@ -1274,7 +1279,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0xE5:
 		gb.execSET(&reg.l, 4)
 	case 0xE6:
-		gb.execSET(RegisterHl, 4)
+		gb.execSET(HL, 4)
 		cycles = 4
 	case 0xE7:
 		gb.execSET(&reg.a, 4)
@@ -1292,7 +1297,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0xED:
 		gb.execSET(&reg.l, 5)
 	case 0xEE:
-		gb.execSET(RegisterHl, 5)
+		gb.execSET(HL, 5)
 		cycles = 4
 	case 0xEF:
 		gb.execSET(&reg.a, 5)
@@ -1310,7 +1315,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0xF5:
 		gb.execSET(&reg.l, 6)
 	case 0xF6:
-		gb.execSET(RegisterHl, 6)
+		gb.execSET(HL, 6)
 		cycles = 4
 	case 0xF7:
 		gb.execSET(&reg.a, 6)
@@ -1328,7 +1333,7 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 	case 0xFD:
 		gb.execSET(&reg.l, 7)
 	case 0xFE:
-		gb.execSET(RegisterHl, 7)
+		gb.execSET(HL, 7)
 		cycles = 4
 	case 0xFF:
 		gb.execSET(&reg.a, 7)
@@ -1339,8 +1344,8 @@ func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
 
 func (gb *GameBoy) getImmediateData() (d8 uint8, d16 uint16) {
 	// first byte is lower (0-7) and second is higher (8-15)
-	d8, _ = gb.ReadByte(gb.Cpu.PC + 1)
-	d8b, _ := gb.ReadByte(gb.Cpu.PC + 2)
+	d8 = gb.Read(gb.Cpu.PC + 1)
+	d8b := gb.Read(gb.Cpu.PC + 2)
 	return d8, uint16(d8b)<<8 + uint16(d8)
 }
 
@@ -1348,7 +1353,7 @@ func (gb *GameBoy) execRotAcc(target *uint8, right bool, throughCarry bool) {
 
 	var (
 		v   = gb.getCbValue(target)
-		reg = &gb.Cpu.Registers
+		reg = &gb.Cpu
 
 		res        uint8
 		carry      uint8
@@ -1361,7 +1366,7 @@ func (gb *GameBoy) execRotAcc(target *uint8, right bool, throughCarry bool) {
 		res = (v >> 1) | ((v & 1) << 7)
 
 	case right && throughCarry:
-		if reg.f.Carry {
+		if reg.f.C {
 			carry = 0x80
 		}
 
@@ -1374,7 +1379,7 @@ func (gb *GameBoy) execRotAcc(target *uint8, right bool, throughCarry bool) {
 
 	case !right && throughCarry:
 		var carry uint8 = 0
-		if reg.f.Carry {
+		if reg.f.C {
 			carry = 1
 		}
 
@@ -1388,19 +1393,21 @@ func (gb *GameBoy) execRotAcc(target *uint8, right bool, throughCarry bool) {
 		carryValue = *target > 0x7F
 	}
 
-	reg.f.Carry = carryValue
-	reg.f.Zero = false
-	reg.f.Subtraction = false
-	reg.f.HalfCarry = false
+	reg.f.C = carryValue
+	reg.f.Z = false
+	reg.f.S = false
+	reg.f.H = false
 }
 
 func (gb *GameBoy) execRot(target any, right bool, throughCarry bool) {
 
-	v := gb.getCbValue(target)
-	reg := &gb.Cpu.Registers
-	var res uint8
-	var carry uint8 = 0
-	var carryValue = false
+    var (
+        v = gb.getCbValue(target)
+        reg = &gb.Cpu
+
+        res, carry uint8
+        carryValue bool
+    )
 
 	switch {
 	case right && !throughCarry:
@@ -1409,7 +1416,7 @@ func (gb *GameBoy) execRot(target any, right bool, throughCarry bool) {
 		carryValue = v&1 == 1
 
 	case right && throughCarry:
-		if reg.f.Carry {
+		if reg.f.C {
 			carry = 0x80
 		}
 
@@ -1421,7 +1428,7 @@ func (gb *GameBoy) execRot(target any, right bool, throughCarry bool) {
 		carryValue = v > 0x7F
 
 	case !right && throughCarry:
-		if reg.f.Carry {
+		if reg.f.C {
 			carry = 1
 		}
 
@@ -1430,10 +1437,10 @@ func (gb *GameBoy) execRot(target any, right bool, throughCarry bool) {
 	}
 
 	gb.setCbValue(target, res)
-	reg.f.Carry = carryValue
-	reg.f.Zero = res == 0
-	reg.f.Subtraction = false
-	reg.f.HalfCarry = false
+	reg.f.C = carryValue
+	reg.f.Z = res == 0
+	reg.f.S = false
+	reg.f.H = false
 }
 
 func (gb *GameBoy) execSLA(target any) {
@@ -1443,10 +1450,10 @@ func (gb *GameBoy) execSLA(target any) {
 	res := (v << 1) & 0xFF
 	gb.setCbValue(target, res)
 
-	gb.Cpu.Registers.f.Zero = res == 0
-	gb.Cpu.Registers.f.Subtraction = false
-	gb.Cpu.Registers.f.HalfCarry = false
-	gb.Cpu.Registers.f.Carry = carry == 1
+	gb.Cpu.f.Z = res == 0
+	gb.Cpu.f.S = false
+	gb.Cpu.f.H = false
+	gb.Cpu.f.C = carry == 1
 }
 
 func (gb *GameBoy) execSRA(target any) {
@@ -1455,10 +1462,10 @@ func (gb *GameBoy) execSRA(target any) {
 	res := (v & 128) | (v >> 1)
 	gb.setCbValue(target, res)
 
-	gb.Cpu.Registers.f.Carry = (v & 1) == 1
-	gb.Cpu.Registers.f.Zero = res == 0
-	gb.Cpu.Registers.f.Subtraction = false
-	gb.Cpu.Registers.f.HalfCarry = false
+	gb.Cpu.f.C = (v & 1) == 1
+	gb.Cpu.f.Z = res == 0
+	gb.Cpu.f.S = false
+	gb.Cpu.f.H = false
 }
 
 func (gb *GameBoy) execSRL(target any) {
@@ -1470,10 +1477,10 @@ func (gb *GameBoy) execSRL(target any) {
 	res := uint8(res16)
 	gb.setCbValue(target, res)
 
-	gb.Cpu.Registers.f.Carry = carry == 1
-	gb.Cpu.Registers.f.Zero = res16 == 0
-	gb.Cpu.Registers.f.Subtraction = false
-	gb.Cpu.Registers.f.HalfCarry = false
+	gb.Cpu.f.C = carry == 1
+	gb.Cpu.f.Z = res16 == 0
+	gb.Cpu.f.S = false
+	gb.Cpu.f.H = false
 }
 
 func (gb *GameBoy) execSWAP(target any) {
@@ -1484,29 +1491,27 @@ func (gb *GameBoy) execSWAP(target any) {
 	res := uint8(uint16(a | b))
 	gb.setCbValue(target, res)
 
-	gb.Cpu.Registers.f.Zero = res == 0
-	gb.Cpu.Registers.f.Subtraction = false
-	gb.Cpu.Registers.f.HalfCarry = false
-	gb.Cpu.Registers.f.Carry = false
+	gb.Cpu.f.Z = res == 0
+	gb.Cpu.f.S = false
+	gb.Cpu.f.H = false
+	gb.Cpu.f.C = false
 }
 
 func (gb *GameBoy) execBIT(target any, bit int) {
 
 	v := gb.getCbValue(target)
-	gb.Cpu.Registers.f.Zero = (v>>bit)&1 == 0
-	gb.Cpu.Registers.f.Subtraction = false
-	gb.Cpu.Registers.f.HalfCarry = true
+	gb.Cpu.f.Z = (v>>bit)&1 == 0
+	gb.Cpu.f.S = false
+	gb.Cpu.f.H = true
 }
 
 func (gb *GameBoy) execRES(target any, bit int) {
-
 	v := gb.getCbValue(target)
 	res := v &^ (0b1 << bit)
 	gb.setCbValue(target, res)
 }
 
 func (gb *GameBoy) execSET(target any, bit int) {
-
 	v := gb.getCbValue(target)
 	res := v | (0b1 << bit)
 	gb.setCbValue(target, res)
@@ -1514,97 +1519,86 @@ func (gb *GameBoy) execSET(target any, bit int) {
 
 func (gb *GameBoy) execDAA() {
 
-	reg := &gb.Cpu.Registers
+	reg := &gb.Cpu
 
-	if !reg.f.Subtraction {
-		if reg.f.Carry || reg.a > 0x99 {
+	if !reg.f.S {
+		if reg.f.C || reg.a > 0x99 {
 			reg.a = reg.a + 0x60
-			reg.f.Carry = true
+			reg.f.C = true
 		}
 
-		if reg.f.HalfCarry || reg.a&0xF > 0x9 {
+		if reg.f.H || reg.a&0xF > 0x9 {
 			reg.a = reg.a + 0x06
-			reg.f.HalfCarry = false
+			reg.f.H = false
 		}
 
-		reg.f.Zero = reg.a == 0
+		reg.f.Z = reg.a == 0
 		return
 	}
 
-	if reg.f.Carry && reg.f.HalfCarry {
+	if reg.f.C && reg.f.H {
 		reg.a += 0x9A
-		reg.f.HalfCarry = false
+		reg.f.H = false
 
-		reg.f.Zero = reg.a == 0
+		reg.f.Z = reg.a == 0
 		return
 	}
 
-	if reg.f.Carry {
+	if reg.f.C {
 		reg.a += 0xA0
-		reg.f.Zero = reg.a == 0
+		reg.f.Z = reg.a == 0
 		return
 	}
 
-	if reg.f.HalfCarry {
+	if reg.f.H {
 		reg.a += 0xFA
-		reg.f.HalfCarry = false
-		reg.f.Zero = reg.a == 0
+		reg.f.H = false
+		reg.f.Z = reg.a == 0
 		return
 	}
 
-	reg.f.Zero = reg.a == 0
+	reg.f.Z = reg.a == 0
 }
 
 func (gb *GameBoy) execSCF() {
 
 	// set carry flag
-	gb.Cpu.Registers.f.Subtraction = false
-	gb.Cpu.Registers.f.HalfCarry = false
-	gb.Cpu.Registers.f.Carry = true
+	gb.Cpu.f.S = false
+	gb.Cpu.f.H = false
+	gb.Cpu.f.C = true
 }
 
 func (gb *GameBoy) execCCF() {
 
 	// compliment (invert) carry flag
-	gb.Cpu.Registers.f.Subtraction = false
-	gb.Cpu.Registers.f.HalfCarry = false
-	gb.Cpu.Registers.f.Carry = !gb.Cpu.Registers.f.Carry
+	gb.Cpu.f.S = false
+	gb.Cpu.f.H = false
+	gb.Cpu.f.C = !gb.Cpu.f.C
 }
 
 func (gb *GameBoy) execCPL() {
-	gb.Cpu.Registers.a = 0xFF ^ gb.Cpu.Registers.a
-	gb.Cpu.Registers.f.Subtraction = true
-	gb.Cpu.Registers.f.HalfCarry = true
+	gb.Cpu.a = 0xFF ^ gb.Cpu.a
+	gb.Cpu.f.S = true
+	gb.Cpu.f.H = true
 }
 
 func (gb *GameBoy) execLdh(target *uint8, from uint16) {
-
-	f := 0xFF00 + from
-	v, err := gb.ReadByte(f)
-
-	if err != nil {
-		panic(err)
-	}
-
-	*target = v
+	*target = gb.Read(0xFF00 + from)
 }
 
 func (gb *GameBoy) execLd(target any, from any) {
 
 	switch f := from.(type) {
 	case uint8:
-		switch t := target.(type) {
-		case *uint8:
-			*t = f
-		default:
-			panic("execLD target from combo unknown from = uint8")
-		}
+
+        *target.(*uint8) = f
+
 	case uint16:
 		switch t := target.(type) {
 		case *uint16:
 			*t = f
 		case int:
-			gb.Cpu.Registers.setCombinedRegister(f, t)
+			gb.Cpu.setCombinedRegister(f, t)
 		default:
 			panic("execLD target from combo unknown from = uint16")
 		}
@@ -1620,20 +1614,14 @@ func (gb *GameBoy) execLdSp(setter func(uint16), sp *uint16, d8 uint8) {
 
 	setter(uint16(newValue))
 
-	gb.Cpu.Registers.f.Zero = false
-	gb.Cpu.Registers.f.Subtraction = false
-	gb.Cpu.Registers.f.HalfCarry = (temp & 0x10) == 0x10
-	gb.Cpu.Registers.f.Carry = (temp & 0x100) == 0x100
+	gb.Cpu.f.Z = false
+	gb.Cpu.f.S = false
+	gb.Cpu.f.H = (temp & 0x10) == 0x10
+	gb.Cpu.f.C = (temp & 0x100) == 0x100
 }
 
 func (gb *GameBoy) execLdFromMem(target *uint8, fromAddr uint16) {
-
-	v, err := gb.ReadByte(fromAddr)
-	if err != nil {
-		panic(err)
-	}
-
-	*target = v
+	*target = gb.Read(fromAddr)
 }
 
 func (gb *GameBoy) execLdMem(addr uint16, from any, half bool) {
@@ -1646,10 +1634,10 @@ func (gb *GameBoy) execLdMem(addr uint16, from any, half bool) {
 
 	switch f := from.(type) {
 	case uint8:
-		gb.WriteByte(v, f)
+		gb.Write(v, f)
 	case uint16:
-		gb.WriteByte(v, uint8(f&0xFF))
-		gb.WriteByte(v+1, uint8((f&0xFF00)>>8))
+		gb.Write(v, uint8(f))
+		gb.Write(v+1, uint8(f>>8))
 	default:
 		panic("execLDMem from type unknown")
 	}
@@ -1665,10 +1653,10 @@ func (gb *GameBoy) execAdd(target any, from any) {
 			b := uint16(f)
 			newValue := a + b
 
-			*t = uint8(newValue & 0xFF)
-			gb.Cpu.Registers.f.HalfCarry = ((a & 0xF) + (b & 0xF)) > 0xF
-			gb.Cpu.Registers.f.Zero = uint8(newValue) == 0
-			gb.Cpu.Registers.f.Carry = newValue > 0xFF
+			*t = uint8(newValue)
+			gb.Cpu.f.H = ((a & 0xF) + (b & 0xF)) > 0xF
+			gb.Cpu.f.Z = uint8(newValue) == 0
+			gb.Cpu.f.C = newValue > 0xFF
 
 		case *uint16: //gb.Cpu.SP, s8
 			a := *t
@@ -1677,23 +1665,21 @@ func (gb *GameBoy) execAdd(target any, from any) {
 			tmp := a ^ uint16(b) ^ newValue
 
 			*t = newValue
-			gb.Cpu.Registers.f.HalfCarry = (tmp & 0x10) == 0x10
-			gb.Cpu.Registers.f.Zero = false
-			gb.Cpu.Registers.f.Carry = (tmp & 0x100) == 0x100
+			gb.Cpu.f.H = (tmp & 0x10) == 0x10
+			gb.Cpu.f.Z = false
+			gb.Cpu.f.C = (tmp & 0x100) == 0x100
 		}
 
 	case uint16:
-		switch t := target.(type) {
-		case int:
-			a := gb.Cpu.Registers.getCombinedRegister(t)
-			newValue := int32(a) + int32(f)
-			gb.Cpu.Registers.setCombinedRegister(uint16(newValue), t)
-			gb.Cpu.Registers.f.HalfCarry = int32(a&0xFFF) > (newValue & 0xFFF)
-			gb.Cpu.Registers.f.Carry = newValue > 0xFFFF
-		}
-	}
+        t := target.(int)
+        a := gb.Cpu.getCombinedRegister(t)
+        newValue := int32(a) + int32(f)
+        gb.Cpu.setCombinedRegister(uint16(newValue), t)
+        gb.Cpu.f.H = int32(a&0xFFF) > (newValue & 0xFFF)
+        gb.Cpu.f.C = newValue > 0xFFFF
+    }
 
-	gb.Cpu.Registers.f.Subtraction = false
+	gb.Cpu.f.S = false
 }
 
 func (gb *GameBoy) execAdc(to *uint8, from uint8) {
@@ -1703,16 +1689,16 @@ func (gb *GameBoy) execAdc(to *uint8, from uint8) {
 
 	halfCarry := (a & 0xF) + (b & 0xF)
 
-	if gb.Cpu.Registers.f.Carry {
+	if gb.Cpu.f.C {
 		newValue++
 		halfCarry++
 	}
 
-	*to = uint8(newValue & 0xFF)
-	gb.Cpu.Registers.f.HalfCarry = halfCarry > 0xF
-	gb.Cpu.Registers.f.Zero = uint8(newValue) == 0
-	gb.Cpu.Registers.f.Carry = newValue > 0xFF
-	gb.Cpu.Registers.f.Subtraction = false
+	*to = uint8(newValue)
+	gb.Cpu.f.H = halfCarry > 0xF
+	gb.Cpu.f.Z = uint8(newValue) == 0
+	gb.Cpu.f.C = newValue > 0xFF
+	gb.Cpu.f.S = false
 }
 
 func (gb *GameBoy) execSub(to *uint8, from uint8) {
@@ -1720,11 +1706,11 @@ func (gb *GameBoy) execSub(to *uint8, from uint8) {
 	b := uint16(from)
 	newValue := int16(a) - int16(b)
 
-	*to = uint8(newValue & 0xFF)
-	gb.Cpu.Registers.f.Zero = uint8(newValue) == 0
-	gb.Cpu.Registers.f.Subtraction = true
-	gb.Cpu.Registers.f.HalfCarry = int16(a&0x0F)-int16(b&0xF) < 0
-	gb.Cpu.Registers.f.Carry = newValue < 0
+	*to = uint8(newValue)
+	gb.Cpu.f.Z = uint8(newValue) == 0
+	gb.Cpu.f.S = true
+	gb.Cpu.f.H = int16(a&0x0F)-int16(b&0xF) < 0
+	gb.Cpu.f.C = newValue < 0
 }
 
 func (gb *GameBoy) execSbc(to *uint8, from uint8) {
@@ -1733,60 +1719,60 @@ func (gb *GameBoy) execSbc(to *uint8, from uint8) {
 	newValue := int16(a) - int16(b)
 	halfCarry := int16(a&0xF) - int16(b&0xF)
 
-	if gb.Cpu.Registers.f.Carry {
+	if gb.Cpu.f.C {
 		newValue--
 		halfCarry--
 	}
 
-	*to = uint8(newValue & 0xFF)
+	*to = uint8(newValue)
 
-	gb.Cpu.Registers.f.Zero = uint8(newValue) == 0
-	gb.Cpu.Registers.f.Subtraction = true
-	gb.Cpu.Registers.f.HalfCarry = halfCarry < 0
-	gb.Cpu.Registers.f.Carry = newValue < 0
+	gb.Cpu.f.Z = uint8(newValue) == 0
+	gb.Cpu.f.S = true
+	gb.Cpu.f.H = halfCarry < 0
+	gb.Cpu.f.C = newValue < 0
 }
 
 func (gb *GameBoy) execAnd(to *uint8, from uint8) {
 
 	newValue := *to & from
 
-	*to = uint8(newValue & 0xFF)
-	gb.Cpu.Registers.f.Zero = newValue == 0
-	gb.Cpu.Registers.f.Subtraction = false
-	gb.Cpu.Registers.f.HalfCarry = true
-	gb.Cpu.Registers.f.Carry = false
+	*to = uint8(newValue)
+	gb.Cpu.f.Z = newValue == 0
+	gb.Cpu.f.S = false
+	gb.Cpu.f.H = true
+	gb.Cpu.f.C = false
 }
 
 func (gb *GameBoy) execXor(to *uint8, from uint8) {
 
 	newValue := *to ^ from
 
-	*to = uint8(newValue & 0xFF)
-	gb.Cpu.Registers.f.Zero = newValue == 0
-	gb.Cpu.Registers.f.Subtraction = false
-	gb.Cpu.Registers.f.HalfCarry = false
-	gb.Cpu.Registers.f.Carry = false
+	*to = uint8(newValue)
+	gb.Cpu.f.Z = newValue == 0
+	gb.Cpu.f.S = false
+	gb.Cpu.f.H = false
+	gb.Cpu.f.C = false
 }
 
 func (gb *GameBoy) execOr(to *uint8, from uint8) {
 
 	newValue := *to | from
 
-	*to = uint8(newValue & 0xFF)
-	gb.Cpu.Registers.f.Zero = newValue == 0
-	gb.Cpu.Registers.f.Subtraction = false
-	gb.Cpu.Registers.f.HalfCarry = false
-	gb.Cpu.Registers.f.Carry = false
+	*to = uint8(newValue)
+	gb.Cpu.f.Z = newValue == 0
+	gb.Cpu.f.S = false
+	gb.Cpu.f.H = false
+	gb.Cpu.f.C = false
 }
 
 func (gb *GameBoy) execCp(to *uint8, from uint8) {
 
 	newValue := *to - from
 
-	gb.Cpu.Registers.f.Zero = newValue == 0
-	gb.Cpu.Registers.f.Subtraction = true
-	gb.Cpu.Registers.f.HalfCarry = ((from & 0xF) > (*to & 0xF))
-	gb.Cpu.Registers.f.Carry = from > *to
+	gb.Cpu.f.Z = newValue == 0
+	gb.Cpu.f.S = true
+	gb.Cpu.f.H = ((from & 0xF) > (*to & 0xF))
+	gb.Cpu.f.C = from > *to
 }
 
 func (gb *GameBoy) execInc(target any) {
@@ -1794,15 +1780,15 @@ func (gb *GameBoy) execInc(target any) {
 	switch t := target.(type) {
 	case *uint8:
 		var v uint16 = uint16(*t)
-		newValue := uint8(v + 1&0xFF)
+		newValue := uint8(v + 1)
 		*t = newValue
-		gb.Cpu.Registers.f.Zero = newValue == 0
-		gb.Cpu.Registers.f.Subtraction = false
-		gb.Cpu.Registers.f.HalfCarry = ((v&0xF)+(1&0xF) > 0xF)
+		gb.Cpu.f.Z = newValue == 0
+		gb.Cpu.f.S = false
+		gb.Cpu.f.H = ((v&0xF)+(1&0xF) > 0xF)
 	case int:
-		v := gb.Cpu.Registers.getCombinedRegister(t)
-		newValue := v + 1
-		gb.Cpu.Registers.setCombinedRegister(newValue, t)
+		v := gb.Cpu.getCombinedRegister(t)
+        v++
+		gb.Cpu.setCombinedRegister(v, t)
 	}
 }
 
@@ -1811,15 +1797,15 @@ func (gb *GameBoy) execDec(target any) {
 	switch t := target.(type) {
 	case *uint8:
 		var v uint16 = uint16(*t)
-		newValue := uint8(v - 1&0xFF)
+		newValue := uint8(v - 1)
 		*t = newValue
-		gb.Cpu.Registers.f.Zero = newValue == 0
-		gb.Cpu.Registers.f.Subtraction = true
-		gb.Cpu.Registers.f.HalfCarry = ((v&0xF)-(1&0xF) > 0xF)
+		gb.Cpu.f.Z = newValue == 0
+		gb.Cpu.f.S = true
+		gb.Cpu.f.H = ((v&0xF)-(1&0xF) > 0xF)
 	case int:
-		v := gb.Cpu.Registers.getCombinedRegister(t)
+		v := gb.Cpu.getCombinedRegister(t)
 		newValue := v - 1
-		gb.Cpu.Registers.setCombinedRegister(uint16(newValue&0xFFFF), t)
+		gb.Cpu.setCombinedRegister(uint16(newValue&0xFFFF), t)
 	}
 }
 
@@ -1827,18 +1813,18 @@ func (gb *GameBoy) execIncDecHl(register int, decrement bool) {
 
 	v := gb.getCbValue(register)
 
-	res := v + 1
+    gb.Cpu.f.S = decrement
+
 	if decrement {
-		gb.Cpu.Registers.f.Subtraction = true
-		gb.Cpu.Registers.f.HalfCarry = (v & 0x0F) == 0
-		res = v - 1
+		gb.Cpu.f.H = (v & 0x0F) == 0
+        v--
 	} else {
-		gb.Cpu.Registers.f.Subtraction = false
-		gb.Cpu.Registers.f.HalfCarry = (v&0xF)+(1&0xF) > 0xF
+		gb.Cpu.f.H = (v&0xF)+(1&0xF) > 0xF
+        v++
 	}
 
-	gb.setCbValue(register, res)
-	gb.Cpu.Registers.f.Zero = res == 0
+	gb.setCbValue(register, v)
+	gb.Cpu.f.Z = v == 0
 }
 
 func (gb *GameBoy) execJP(addr uint16, condition bool, cyclesIf int, cycles int) (c int, pc uint16) {
@@ -1850,9 +1836,9 @@ func (gb *GameBoy) execJP(addr uint16, condition bool, cyclesIf int, cycles int)
 	return cycles, gb.Cpu.PC + 3
 }
 
-func (gb *GameBoy) execJR(addr uint8, condition bool, cyclesIf int, cycles int) (c int, pc uint16) {
+func (gb *GameBoy) execJR(addr uint8, cond bool, cyclesIf, cycles int) (c int, pc uint16) {
 
-	if condition {
+	if cond {
 		return cyclesIf, uint16(int32(gb.Cpu.PC)+int32(int8(addr))) + 2
 	}
 
@@ -1860,23 +1846,18 @@ func (gb *GameBoy) execJR(addr uint8, condition bool, cyclesIf int, cycles int) 
 }
 
 func (gb *GameBoy) StackPop() uint16 {
-
-	lo, _ := gb.ReadByte(gb.Cpu.SP)
+	v := uint16(gb.Read(gb.Cpu.SP))
 	gb.Cpu.SP++
-	hi, _ := gb.ReadByte(gb.Cpu.SP)
+	v |= uint16(gb.Read(gb.Cpu.SP)) << 8
 	gb.Cpu.SP++
-	return uint16(lo) | (uint16(hi) << 8)
+    return v
 }
 
-func (gb *GameBoy) StackPush(value uint16) {
-
-	hi := uint8(value >> 8 & 0xFF)
-	lo := uint8(value & 0xFF)
-
+func (gb *GameBoy) StackPush(v uint16) {
 	gb.Cpu.SP--
-	gb.WriteByte(gb.Cpu.SP, hi)
+	gb.Write(gb.Cpu.SP, uint8(v>>8))
 	gb.Cpu.SP--
-	gb.WriteByte(gb.Cpu.SP, lo)
+	gb.Write(gb.Cpu.SP, uint8(v))
 }
 
 func (gb *GameBoy) execRst(addr uint16) (pc uint16) {
@@ -1884,8 +1865,8 @@ func (gb *GameBoy) execRst(addr uint16) (pc uint16) {
 	return addr
 }
 
-func (gb *GameBoy) execCall(addr uint16, condition bool, cyclesIf int, cycles int) (c int, pc uint16) {
-	if condition {
+func (gb *GameBoy) execCall(addr uint16, cond bool, cyclesIf int, cycles int) (c int, pc uint16) {
+	if cond {
 		gb.StackPush(gb.Cpu.PC + 3)
 		return cyclesIf, addr
 	}
@@ -1893,9 +1874,9 @@ func (gb *GameBoy) execCall(addr uint16, condition bool, cyclesIf int, cycles in
 	return cycles, gb.Cpu.PC + 3
 }
 
-func (gb *GameBoy) execRet(condition bool, cyclesIf int, cycles int) (c int, pc uint16) {
+func (gb *GameBoy) execRet(cond bool, cyclesIf int, cycles int) (c int, pc uint16) {
 
-	if condition {
+	if cond {
 		return cyclesIf, gb.StackPop()
 	}
 
@@ -1906,21 +1887,14 @@ func (gb *GameBoy) getCbValue(target any) uint8 {
 
 	//Cb only needs register or hlvalue memory location
 
-	var v uint8
-
 	switch t := target.(type) {
 	case *uint8:
-		v = *t
+		return *t
 	case int:
-		var hlValue uint16 = gb.Cpu.Registers.getCombinedRegister(t)
-		var err error
-		v, err = gb.ReadByte(hlValue)
-		if err != nil {
-			panic(err)
-		}
+		return gb.Read(gb.Cpu.getCombinedRegister(t))
+    default:
+        panic("unknown target get cb value")
 	}
-
-	return v
 }
 
 func (gb *GameBoy) setCbValue(target any, res uint8) {
@@ -1931,7 +1905,7 @@ func (gb *GameBoy) setCbValue(target any, res uint8) {
 	case *uint8:
 		*t = res
 	case int:
-		var hlValue uint16 = gb.Cpu.Registers.getCombinedRegister(t)
-		gb.WriteByte(hlValue, uint8(res))
+		var hlValue uint16 = gb.Cpu.getCombinedRegister(t)
+		gb.Write(hlValue, uint8(res))
 	}
 }
