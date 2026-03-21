@@ -1,5 +1,9 @@
 package gameboy
 
+import (
+	"unsafe"
+)
+
 const (
 	LCDC        = 0xFF40
 	STAT        = 0xFF41
@@ -21,31 +25,20 @@ const (
 	OCPD = 0xFF6B
 
 	SpritePriorityOffset = 100
+
+    UNPACKED_BG   = 0
+    UNPACKED_OBJ0 = 1
+    UNPACKED_OBJ1 = 2
 )
 
 func (gb *GameBoy) UpdateDisplay() {
-	i := 0
 	for y := range height {
-		for x := range width {
-
-			v := gb.Screen[x][y]
-
-			if !gb.Color {
-				(gb.Pixels)[i+0] = gb.Palette[v][0]
-				(gb.Pixels)[i+1] = gb.Palette[v][1]
-				(gb.Pixels)[i+2] = gb.Palette[v][2]
-			} else {
-				(gb.Pixels)[i+0] = uint8(v >> 16)
-				(gb.Pixels)[i+1] = uint8(v >> 8)
-				(gb.Pixels)[i+2] = uint8(v)
-			}
-
-			i += 4
-		}
+        p32 := (*[width]uint32)(unsafe.Pointer(&gb.Pixels[(y*width)*4]))
+        for x := range uint32(width) {
+            p32[x] = gb.Screen[x][y]
+        }
 	}
 }
-
-var tileScanline [width]uint8
 
 func (gb *GameBoy) UpdateGraphics() {
 
@@ -172,8 +165,6 @@ func (gb *GameBoy) drawScanline(scanline int32) {
 
 func (gb *GameBoy) renderTiles() {
 
-	//Mem := &gb.MemoryBus.Memory
-
 	scrollY := (gb.MemoryBus.Memory[0xFF42])
 	scrollX := (gb.MemoryBus.Memory[0xFF43])
 	windowY := (gb.MemoryBus.Memory[0xFF4A])
@@ -181,34 +172,23 @@ func (gb *GameBoy) renderTiles() {
 	lcdc := gb.MemoryBus.Memory[LCDC]
 	scanline := (gb.MemoryBus.Memory[LY])
 
-	winAddr := (lcdc>>6)&1 != 0
-	winEnabled := (lcdc>>5)&1 != 0
 	signedTiles := !((lcdc>>4)&1 != 0)
-	bgAddr := (lcdc>>3)&1 != 0
-
-	useWindow := false
 	scanLineInWindow := windowY <= (scanline)
-	if winEnabled && scanLineInWindow {
-		useWindow = true
-	}
+	winEnabled := (lcdc>>5)&1 != 0
+    useWindow := winEnabled && scanLineInWindow
 
-	var tileData uint16 = 0x8000
+    tileData := uint16(0x8000)
 	if signedTiles {
 		tileData = 0x8800
 	}
 
-	//var bgMemory uint16 = 0x9800
-	//if (!useWindow && bgAddr) || (useWindow && winAddr) {
-	//	bgMemory = 0x9C00
-	//}
-
-	var winMemory uint16 = 0x9800
-	if winAddr {
+    winMemory := uint16(0x9800)
+	if winAddr := (lcdc>>6)&1 != 0; winAddr {
 		winMemory = 0x9C00
 	}
 
-	var bgMemory uint16 = 0x9800
-	if bgAddr {
+    bgMemory := uint16(0x9800)
+	if bgAddr := (lcdc>>3)&1 != 0; bgAddr {
 		bgMemory = 0x9C00
 	}
 
@@ -223,7 +203,6 @@ func (gb *GameBoy) renderTiles() {
 	// which of the 8 vertical pixels of the current tile is the scanline on?
 	var tileRow = uint16(yPos/8) * 32
 
-	tileScanline = [width]uint8{}
 	for pixel := range width {
 		xPos := (uint8(pixel) + scrollX)
 
@@ -270,48 +249,43 @@ func (gb *GameBoy) renderTiles() {
 		priority := (tileAttr>>7)&1 != 0
 
 		var line byte
-		if gb.Color && (tileAttr>>6)&1 != 0 {
+        if vFlip := gb.Color && (tileAttr>>6)&1 != 0; vFlip {
 			// Vertical flip
-			line = ((7 - yPos) % 8) * 2
+			line = ((7 - yPos) & 7) * 2
 		} else {
-			line = (yPos % 8) * 2
+			line = (yPos & 7) * 2
 		}
 		// Get the tile data from memory
 		data1 := gb.MemoryBus.VRAM[tileLocation+uint16(line)-bankOffset]
 		data2 := gb.MemoryBus.VRAM[tileLocation+uint16(line)+1-bankOffset]
 
-		if gb.Color && (tileAttr>>5)&1 != 0 {
-			// Horizontal flip
+        if hFlip := gb.Color && (tileAttr>>5)&1 != 0; hFlip {
 			xPos = 7 - xPos
 		}
 
-		colorBit := -(int(xPos%8) - 7)
+		colorBit := 7 - (xPos & 7)
 
-		colorNum := getVal(data2, uint8(colorBit))
-		colorNum <<= 1
-		colorNum |= getVal(data1, uint8(colorBit))
-
-		var color uint32
-		if gb.Color {
-			cgbPalette := tileAttr & 0x7
-			color = gb.bgPalette.get(cgbPalette, colorNum)
-		} else {
-			color = uint32(gb.getColor(colorNum, BGPALETTE))
-		}
-
-		if outOfBounds := (scanline > 143 || pixel < 0 || pixel > 159); outOfBounds {
-			continue
-		}
-
-		if !gb.bgPriority[pixel][scanline] || tileScanline[scanline] == 0 {
-			gb.Screen[pixel][scanline] = color
-		}
+		//colorNum := getVal(data2, uint8(colorBit))
+		//colorNum <<= 1
+		//colorNum |= getVal(data1, uint8(colorBit))
+        colorNum := getColorVal(data2, data1, colorBit, colorBit)
 
 		if gb.Color {
+            if draw := !gb.bgPriority[pixel][scanline]; draw {
+                cgbPalette := tileAttr & 0x7
+                color := gb.bgPalette.get(cgbPalette, colorNum) | 0xFF00_0000
+                gb.Screen[pixel][scanline] = color
+            }
+
 			gb.bgPriority[pixel][scanline] = priority
+
+		} else {
+            if draw := !gb.bgPriority[pixel][scanline]; draw {
+                gb.Screen[pixel][scanline] = gb.UnpackedMonoPals[0][colorNum]
+            }
 		}
 
-		tileScanline[pixel] = colorNum
+		gb.pixelDrawn[pixel] = colorNum != 0
 	}
 }
 
@@ -329,7 +303,7 @@ func (gb *GameBoy) renderSprites(scanline int32) {
 	for sprite := range uint16(40) {
 		index := sprite * 4
 
-		yP := gb.Read(0xFE00 + index)
+		yP := gb.MemoryBus.OAM[index]
 		yPos := int32(yP) - 16
 
 		if scanline < yPos || scanline >= (yPos+ySize) {
@@ -342,10 +316,10 @@ func (gb *GameBoy) renderSprites(scanline int32) {
 		}
 		lineSprites++
 
-		xP := gb.Read(uint16(0xFE00 + index + 1))
+		xP := gb.MemoryBus.OAM[index + 1]
 		xPos := int32(xP) - 8
-		tileLocation := gb.Read(uint16(0xFE00 + index + 2))
-		attributes := gb.Read(uint16(0xFE00 + index + 3))
+		tileLocation := gb.MemoryBus.OAM[index + 2]
+		attributes := gb.MemoryBus.OAM[index + 3]
 
 		yFlip := (attributes>>6)&1 != 0
 		xFlip := (attributes>>5)&1 != 0
@@ -384,47 +358,44 @@ func (gb *GameBoy) renderSprites(scanline int32) {
 
 			// Find the colour value by combining the data bits
 
-			colorNum := getVal(data2, uint8(colorBit))
-			colorNum <<= 1
-			colorNum |= getVal(data1, uint8(colorBit))
+			//colorNum := getVal(data2, uint8(colorBit))
+			//colorNum <<= 1
+			//colorNum |= getVal(data1, uint8(colorBit))
+            colorNum := getColorVal(data2, data1, colorBit, colorBit)
 
 			// Colour 0 is transparent for sprites
 			if colorNum == 0 {
 				continue
 			}
 
-			var color uint32
-			if gb.Color {
-				cgbPalette := attributes & 0x7
-				color = gb.spPalette.get(cgbPalette, colorNum)
+            if gb.Color {
+                cgbPalette := attributes & 0x7
+                color := gb.spPalette.get(cgbPalette, colorNum) | 0xFF00_0000
 
-			} else {
-				colorAddr := uint16(OBJ0PALETTE)
-				if (attributes>>4)&1 != 0 {
-					colorAddr = OBJ1PALETTE
-				}
+                drawPixel := (priority && !gb.bgPriority[pixel][scanline]) || !gb.pixelDrawn[pixel]
+                if drawPixel {
+                    gb.Screen[pixel][scanline] = color
+                }
 
-				color = uint32(gb.getColor(colorNum, colorAddr))
-			}
+            } else {
 
-			drawPixel := (priority && !gb.bgPriority[pixel][scanline]) || tileScanline[pixel] == 0
-			if drawPixel {
-				gb.Screen[pixel][scanline] = color
-			}
+                pal := UNPACKED_OBJ0
+                if (attributes>>4)&1 != 0 {
+                    pal = UNPACKED_OBJ1
+                }
 
-			minx[pixel] = int32(xPos) + SpritePriorityOffset
+                drawPixel := (priority && !gb.bgPriority[pixel][scanline]) || !gb.pixelDrawn[pixel]
+                if drawPixel {
+                    gb.Screen[pixel][scanline] = gb.UnpackedMonoPals[pal][colorNum]
+                }
+            }
+
+            minx[pixel] = int32(xPos) + SpritePriorityOffset
 		}
 	}
 }
 
-func (gb *GameBoy) getColor(colorNum uint8, addr uint16) uint8 {
-	pal := gb.MemoryBus.Memory[addr]
-	hi, lo := uint8(colorNum*2+1), uint8(colorNum*2)
-	color := getVal(pal, hi) << 1
-	color |= getVal(pal, lo)
-	return color
+func getColorVal(val1, val2, pos1, pos2 uint8) uint8 {
+	return ((val1 >> pos1) & 1) << 1 | ((val2 >> pos2) & 1)
 }
 
-func getVal(val uint8, pos uint8) uint8 {
-	return (val >> pos) & 1
-}

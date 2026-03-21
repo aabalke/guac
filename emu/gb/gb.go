@@ -37,6 +37,8 @@ type GameBoy struct {
 	bgPalette ColorPalette
 	spPalette ColorPalette
 
+    UnpackedMonoPals [3][4]uint32
+
 	Cartridge cartridge.Cartridge
 	Cpu       *Cpu
 	MemoryBus MemoryBus
@@ -52,6 +54,7 @@ type GameBoy struct {
 	Image      *ebiten.Image
 	Screen     [width][height]uint32
 	bgPriority [width][height]bool
+    pixelDrawn [width]bool
 
 	Cycles int
 

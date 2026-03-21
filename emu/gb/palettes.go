@@ -12,14 +12,14 @@ func (p *ColorPalette) Init() {
 	}
 }
 
-func (cp *ColorPalette) get(pal uint8, num uint8) uint32 {
+func (p *ColorPalette) get(pal uint8, num uint8) uint32 {
 
-	idx := (pal * 8) + (num * 2)
-	color := uint16(cp.Palette[idx]) | uint16(cp.Palette[idx+1])<<8
+	idx := (pal << 3) + (num << 1)
+	color := uint16(p.Palette[idx]) | uint16(p.Palette[idx+1])<<8
 
-	return (uint32(colArr[color&0x1F])<<16 |
+	return (uint32(colArr[color&0x1F]) |
 		uint32(colArr[(color>>5)&0x1F])<<8 |
-		uint32(colArr[(color>>10)&0x1F]))
+		uint32(colArr[(color>>10)&0x1F]<<16))
 }
 
 // Mapping of the 5 bit colour value to a 8 bit value.
