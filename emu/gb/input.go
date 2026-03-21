@@ -9,13 +9,13 @@ import (
 
 func (gb *GameBoy) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadButton) {
 
-    var (
-        keyConfig = config.Conf.Gb.KeyboardConfig
-        buttonConfig = config.Conf.Gba.ControllerConfig
-        k = &gb.Joypad
-        reqIrqKey = true
-        reqIrqBut = true
-    )
+	var (
+		keyConfig    = config.Conf.Gb.KeyboardConfig
+		buttonConfig = config.Conf.Gba.ControllerConfig
+		k            = &gb.Joypad
+		reqIrqKey    = true
+		reqIrqBut    = true
+	)
 
 	*k = 0xFF
 
@@ -37,8 +37,8 @@ func (gb *GameBoy) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGame
 			*k &^= 1 << 2
 		case slices.Contains(keyConfig.Down, keyStr):
 			*k &^= 1 << 3
-        default:
-            reqIrqKey = false
+		default:
+			reqIrqKey = false
 		}
 	}
 
@@ -60,8 +60,8 @@ func (gb *GameBoy) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGame
 			*k &^= 1 << 2
 		case slices.Contains(buttonConfig.Down, buttonStr):
 			*k &^= 1 << 3
-        default:
-            reqIrqBut = false
+		default:
+			reqIrqBut = false
 		}
 	}
 

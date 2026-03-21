@@ -159,8 +159,8 @@ func (gb *GameBoy) Read(addr uint16) uint8 {
 		return gb.Cartridge.Mbc.ReadRom(gb.Cartridge, addr)
 	case addr < 0xA000:
 		if gb.Color {
-            offset := uint16(gb.MemoryBus.VRAMBank) * 0x2000
-            return gb.MemoryBus.VRAM[addr-0x8000+offset]
+			offset := uint16(gb.MemoryBus.VRAMBank) * 0x2000
+			return gb.MemoryBus.VRAM[addr-0x8000+offset]
 		}
 		return gb.MemoryBus.VRAM[addr-0x8000]
 
@@ -194,7 +194,7 @@ func (gb *GameBoy) Write(addr uint16, byte uint8) {
 	mem := &gb.MemoryBus.Memory
 
 	if int(addr) > len(mem) {
-        return
+		return
 	}
 
 	switch addr {
@@ -202,13 +202,13 @@ func (gb *GameBoy) Write(addr uint16, byte uint8) {
 		gb.Timer.Counter = 0
 		gb.Timer.DivReg = 0
 		mem[0xFF04] = 0
-		
+
 	case 0xFF05:
 		mem[0xFF05] = byte
-		
+
 	case 0xFF06:
 		mem[0xFF06] = byte
-		
+
 	case 0xFF07:
 		currFreq := mem[0xFF07] & 0x03
 		mem[0xFF07] = byte | 0xF8
@@ -217,7 +217,7 @@ func (gb *GameBoy) Write(addr uint16, byte uint8) {
 		if currFreq != newFreq {
 			gb.Timer.Counter = 0
 		}
-		
+
 	case 0xFF26:
 
 		// Only bit 7 of master volume is writeable
@@ -228,7 +228,7 @@ func (gb *GameBoy) Write(addr uint16, byte uint8) {
 
 	case 0xFF44:
 		mem[0xFF44] = 0
-		
+
 	case 0xFF46: // DMA
 		address := uint16(byte) << 8
 
@@ -238,34 +238,28 @@ func (gb *GameBoy) Write(addr uint16, byte uint8) {
 			gb.Write(0xFE00+i, a)
 		}
 
-		
-
 	case 0xFF4D:
 		if gb.Color {
-			gb.PrepareSpeedToggle = gb.flagEnabled(byte, 0)
+			gb.PrepareSpeedToggle = (byte>>0)&1 != 0
 			mem[0xFF4D] = mem[0xFF4D]*0x80 | (byte & 0x1)
 		}
-
-		
 
 	case 0xFF4F:
 		if gb.Color && !gb.MemoryBus.HdmaActive {
 			gb.MemoryBus.VRAMBank = byte & 0x1
 		}
 
-		
-
 	case 0xFF55:
 		if gb.Color {
 			gb.cgbDMATransfer(byte)
 		}
-		
+
 	case 0xFF68:
 		if gb.Color {
 			gb.bgPalette.Idx = byte & 0b111111
-			gb.bgPalette.Inc = gb.flagEnabled(byte, 7)
+			gb.bgPalette.Inc = (byte>>7)&1 != 0
 		}
-		
+
 	case 0xFF69:
 		if gb.Color {
 			gb.bgPalette.Palette[gb.bgPalette.Idx] = byte
@@ -274,13 +268,13 @@ func (gb *GameBoy) Write(addr uint16, byte uint8) {
 				gb.bgPalette.Idx = (gb.bgPalette.Idx + 1) & 0b111111
 			}
 		}
-		
+
 	case 0xFF6A:
 		if gb.Color {
 			gb.spPalette.Idx = byte & 0b111111
-			gb.spPalette.Inc = gb.flagEnabled(byte, 7)
+			gb.spPalette.Inc = (byte>>7)&1 != 0
 		}
-		
+
 	case 0xFF6B:
 		if gb.Color {
 			gb.spPalette.Palette[gb.spPalette.Idx] = byte
@@ -289,7 +283,7 @@ func (gb *GameBoy) Write(addr uint16, byte uint8) {
 				gb.spPalette.Idx = (gb.spPalette.Idx + 1) & 0b111111
 			}
 		}
-		
+
 	case 0xFF70:
 		if gb.Color {
 			gb.MemoryBus.WRAMBank = byte & 0x7
@@ -298,7 +292,7 @@ func (gb *GameBoy) Write(addr uint16, byte uint8) {
 				gb.MemoryBus.WRAMBank = 1
 			}
 		}
-		
+
 	}
 
 	switch {
@@ -342,7 +336,7 @@ func (gb *GameBoy) Write(addr uint16, byte uint8) {
 
 func (gb *GameBoy) cgbDMATransfer(byte uint8) {
 
-	if gb.MemoryBus.HdmaActive && !gb.flagEnabled(byte, 7) {
+	if gb.MemoryBus.HdmaActive && !((byte>>7)&1 != 0) {
 		gb.MemoryBus.HdmaActive = false
 		gb.MemoryBus.Memory[0xFF55] |= 0x80
 		return
@@ -350,7 +344,7 @@ func (gb *GameBoy) cgbDMATransfer(byte uint8) {
 
 	length := ((uint16(byte) & 0x7F) + 1) * 0x10
 
-	if !gb.flagEnabled(byte, 7) {
+	if !((byte>>7)&1 != 0) {
 
 		gb.performDMATransfer(length)
 		gb.MemoryBus.Memory[0xFF55] = 0xFF

@@ -23,12 +23,29 @@ const (
 	SpritePriorityOffset = 100
 )
 
-var tileScanline [width]uint8
+func (gb *GameBoy) UpdateDisplay() {
+	i := 0
+	for y := range height {
+		for x := range width {
 
-func (gb *GameBoy) flagEnabled(reg uint8, bit uint8) bool {
-	mask := uint8(0b1) << bit
-	return reg&mask == mask
+			v := gb.Screen[x][y]
+
+			if !gb.Color {
+				(gb.Pixels)[i+0] = gb.Palette[v][0]
+				(gb.Pixels)[i+1] = gb.Palette[v][1]
+				(gb.Pixels)[i+2] = gb.Palette[v][2]
+			} else {
+				(gb.Pixels)[i+0] = uint8(v >> 16)
+				(gb.Pixels)[i+1] = uint8(v >> 8)
+				(gb.Pixels)[i+2] = uint8(v)
+			}
+
+			i += 4
+		}
+	}
 }
+
+var tileScanline [width]uint8
 
 func (gb *GameBoy) UpdateGraphics() {
 
@@ -65,8 +82,7 @@ func (gb *GameBoy) UpdateGraphics() {
 }
 
 func (gb *GameBoy) enableLCD() bool {
-	reg := gb.MemoryBus.Memory[LCDC]
-	return gb.flagEnabled(reg, 7)
+	return (gb.MemoryBus.Memory[LCDC]>>7)&1 != 0
 }
 
 func (gb *GameBoy) setLCDStatus() {
@@ -98,11 +114,11 @@ func (gb *GameBoy) setLCDStatus() {
 	case vBlank:
 		newMode = 1
 		stat = setStat(stat, newMode)
-		modeSelected = gb.flagEnabled(stat, 4)
+		modeSelected = (stat>>4)&1 != 0
 	case oam:
 		newMode = 2
 		stat = setStat(stat, newMode)
-		modeSelected = gb.flagEnabled(stat, 5)
+		modeSelected = (stat>>5)&1 != 0
 	case drawing:
 		newMode = 3
 		stat = setStat(stat, newMode)
@@ -114,7 +130,7 @@ func (gb *GameBoy) setLCDStatus() {
 	default:
 		newMode = 0
 		stat = setStat(stat, newMode)
-		modeSelected = gb.flagEnabled(stat, 3)
+		modeSelected = (stat>>3)&1 != 0
 
 		if currMode != newMode {
 			gb.hdmaTransfer()
@@ -129,7 +145,7 @@ func (gb *GameBoy) setLCDStatus() {
 	currentLineCoin := gb.MemoryBus.Memory[LYC]
 	if currentLine == currentLineCoin {
 		stat |= 0b100
-		if gb.flagEnabled(stat, 6) {
+		if (stat>>6)&1 != 0 {
 			gb.RequestInterrupt(IRQ_LCD)
 		}
 
@@ -145,11 +161,11 @@ func (gb *GameBoy) drawScanline(scanline int32) {
 
 	lcdc := gb.MemoryBus.Memory[LCDC]
 
-	if bgEnabled := gb.flagEnabled(lcdc, 0); bgEnabled || gb.Color {
+	if bgEnabled := (lcdc>>0)&1 != 0; bgEnabled || gb.Color {
 		gb.renderTiles()
 	}
 
-	if objEnabled := gb.flagEnabled(lcdc, 1); objEnabled {
+	if objEnabled := (lcdc>>1)&1 != 0; objEnabled {
 		gb.renderSprites(scanline)
 	}
 }
@@ -165,10 +181,10 @@ func (gb *GameBoy) renderTiles() {
 	lcdc := gb.MemoryBus.Memory[LCDC]
 	scanline := (gb.MemoryBus.Memory[LY])
 
-	winAddr := gb.flagEnabled(lcdc, 6)
-	winEnabled := gb.flagEnabled(lcdc, 5)
-	signedTiles := !gb.flagEnabled(lcdc, 4)
-	bgAddr := gb.flagEnabled(lcdc, 3)
+	winAddr := (lcdc>>6)&1 != 0
+	winEnabled := (lcdc>>5)&1 != 0
+	signedTiles := !((lcdc>>4)&1 != 0)
+	bgAddr := (lcdc>>3)&1 != 0
 
 	useWindow := false
 	scanLineInWindow := windowY <= (scanline)
@@ -248,13 +264,13 @@ func (gb *GameBoy) renderTiles() {
 		//    Bit 7    BG-to-OAM Priority         (0=Use OAM priority bit, 1=BG Priority)
 		//
 		tileAttr := gb.MemoryBus.VRAM[tileAddress-0x6000]
-		if gb.Color && gb.flagEnabled(tileAttr, 3) {
+		if gb.Color && (tileAttr>>3)&1 != 0 {
 			bankOffset = 0x6000
 		}
-		priority := gb.flagEnabled(tileAttr, 7)
+		priority := (tileAttr>>7)&1 != 0
 
 		var line byte
-		if gb.Color && gb.flagEnabled(tileAttr, 6) {
+		if gb.Color && (tileAttr>>6)&1 != 0 {
 			// Vertical flip
 			line = ((7 - yPos) % 8) * 2
 		} else {
@@ -264,7 +280,7 @@ func (gb *GameBoy) renderTiles() {
 		data1 := gb.MemoryBus.VRAM[tileLocation+uint16(line)-bankOffset]
 		data2 := gb.MemoryBus.VRAM[tileLocation+uint16(line)+1-bankOffset]
 
-		if gb.Color && gb.flagEnabled(tileAttr, 5) {
+		if gb.Color && (tileAttr>>5)&1 != 0 {
 			// Horizontal flip
 			xPos = 7 - xPos
 		}
@@ -283,10 +299,7 @@ func (gb *GameBoy) renderTiles() {
 			color = uint32(gb.getColor(colorNum, BGPALETTE))
 		}
 
-		if outOfBounds := (scanline < 0 ||
-			scanline > 143 ||
-			pixel < 0 ||
-			pixel > 159); outOfBounds {
+		if outOfBounds := (scanline > 143 || pixel < 0 || pixel > 159); outOfBounds {
 			continue
 		}
 
@@ -307,13 +320,13 @@ func (gb *GameBoy) renderSprites(scanline int32) {
 	lcdControl := gb.Read(LCDC)
 
 	var ySize int32 = 8
-	if gb.flagEnabled(lcdControl, 2) {
+	if (lcdControl>>2)&1 != 0 {
 		ySize = 16
 	}
 
 	var minx [width]int32
 	var lineSprites = 0
-	for sprite := uint16(0); sprite < 40; sprite++ {
+	for sprite := range uint16(40) {
 		index := sprite * 4
 
 		yP := gb.Read(0xFE00 + index)
@@ -334,13 +347,13 @@ func (gb *GameBoy) renderSprites(scanline int32) {
 		tileLocation := gb.Read(uint16(0xFE00 + index + 2))
 		attributes := gb.Read(uint16(0xFE00 + index + 3))
 
-		yFlip := gb.flagEnabled(attributes, 6)
-		xFlip := gb.flagEnabled(attributes, 5)
-		priority := !gb.flagEnabled(attributes, 7)
+		yFlip := (attributes>>6)&1 != 0
+		xFlip := (attributes>>5)&1 != 0
+		priority := !((attributes>>7)&1 != 0)
 
 		// Bank the sprite data in is (CGB only)
 		var bank uint16 = 0
-		if gb.Color && gb.flagEnabled(attributes, 3) {
+		if gb.Color && (attributes>>3)&1 != 0 {
 			bank = 1
 		}
 
@@ -354,7 +367,7 @@ func (gb *GameBoy) renderSprites(scanline int32) {
 		data1 := gb.MemoryBus.VRAM[dataAddress]
 		data2 := gb.MemoryBus.VRAM[dataAddress+1]
 
-		for tilePixel := byte(0); tilePixel < 8; tilePixel++ {
+		for tilePixel := range uint8(8) {
 			pixel := int16(xPos) + 7 - int16(tilePixel)
 			if pixel < 0 || pixel >= width {
 				continue
@@ -387,7 +400,7 @@ func (gb *GameBoy) renderSprites(scanline int32) {
 
 			} else {
 				colorAddr := uint16(OBJ0PALETTE)
-				if gb.flagEnabled(attributes, 4) {
+				if (attributes>>4)&1 != 0 {
 					colorAddr = OBJ1PALETTE
 				}
 
@@ -405,28 +418,10 @@ func (gb *GameBoy) renderSprites(scanline int32) {
 }
 
 func (gb *GameBoy) getColor(colorNum uint8, addr uint16) uint8 {
-
-	palette := gb.MemoryBus.Memory[addr]
-
-	var hi uint8 = 1
-	var lo uint8 = 0
-	switch colorNum {
-	case 0:
-		hi = 1
-		lo = 0
-	case 1:
-		hi = 3
-		lo = 2
-	case 2:
-		hi = 5
-		lo = 4
-	case 3:
-		hi = 7
-		lo = 6
-	}
-
-	var color uint8 = getVal(palette, hi) << 1
-	color |= getVal(palette, lo)
+	pal := gb.MemoryBus.Memory[addr]
+	hi, lo := uint8(colorNum*2+1), uint8(colorNum*2)
+	color := getVal(pal, hi) << 1
+	color |= getVal(pal, lo)
 	return color
 }
 

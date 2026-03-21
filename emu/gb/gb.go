@@ -22,24 +22,23 @@ const (
 	width     = 160
 	height    = 144
 
-    IRQ_VBL = 1 << 0
-    IRQ_LCD = 1 << 1
-    IRQ_TMR = 1 << 2
-    IRQ_SER = 1 << 3
-    IRQ_JPD = 1 << 4
+	IRQ_VBL = 1 << 0
+	IRQ_LCD = 1 << 1
+	IRQ_TMR = 1 << 2
+	IRQ_SER = 1 << 3
+	IRQ_JPD = 1 << 4
 )
 
 type GameBoy struct {
 	Palette [][]uint8
-	Pixels  *[]byte
+	Pixels  []byte
 
 	Color     bool
-	bgPalette *ColorPalette
-	spPalette *ColorPalette
+	bgPalette ColorPalette
+	spPalette ColorPalette
 
 	Cartridge cartridge.Cartridge
 	Cpu       *Cpu
-	//Apu       APU
 	MemoryBus MemoryBus
 	FPS       int
 
@@ -84,13 +83,17 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 			RomPath: path,
 			SavPath: path + ".save",
 		},
-		Palette:   config.Conf.Gb.Palette,
-		bgPalette: NewColorPalette(),
-		spPalette: NewColorPalette(),
+		Palette: config.Conf.Gb.Palette,
 	}
 
-	pixels := make([]byte, width*height*4)
-	gb.Pixels = &pixels
+	gb.bgPalette.Init()
+	gb.spPalette.Init()
+	gb.Pixels = make([]byte, width*height*4)
+
+	for i := range len(gb.Pixels) {
+		// ensures alpha is always 0xFF
+		gb.Pixels[i] = 0xFF
+	}
 
 	const (
 		SND_FREQUENCY = 48000 // sample rate
@@ -105,6 +108,10 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 
 func (gb *GameBoy) GetSize() (int32, int32) {
 	return height, width
+}
+
+func (gb *GameBoy) GetPixels() []byte {
+	return gb.Pixels
 }
 
 func (gb *GameBoy) Update() {
@@ -123,10 +130,8 @@ func (gb *GameBoy) Update() {
 		gb.Cycles = 0
 		cycles := 4
 
-		opcode := gb.Read(gb.Cpu.PC)
-
 		if !gb.Cpu.Halted {
-			cycles = gb.Execute(opcode)
+			cycles = gb.Execute()
 		}
 
 		if gb.DoubleSpeed {
@@ -275,8 +280,8 @@ func (gb *GameBoy) UpdateInterrupt() (cycles int) {
 
 	// interrupts are servered by priority, see above const
 	for i := range 5 {
-		handlerAvailable := gb.flagEnabled(interruptFlag, uint8(i))
-		handlerRequested := gb.flagEnabled(interruptEnabled, uint8(i))
+		handlerAvailable := (interruptFlag>>i)&1 != 0
+		handlerRequested := (interruptEnabled>>i)&1 != 0
 
 		if !(handlerAvailable && handlerRequested) {
 			continue
@@ -291,8 +296,8 @@ func (gb *GameBoy) UpdateInterrupt() (cycles int) {
 		gb.Cpu.Halted = false
 
 		req := gb.MemoryBus.Memory[0xFF0F]
-		newFlag := req & ^(1 << i)
-	    gb.Write(0xFF0F, newFlag)
+		newFlag := req &^ (1 << i)
+		gb.Write(0xFF0F, newFlag)
 
 		gb.StackPush(gb.Cpu.PC)
 
@@ -363,7 +368,7 @@ func (gb *GameBoy) UpdateTimers() {
 
 func (gb *GameBoy) EnableClock() bool {
 	tac := gb.MemoryBus.Memory[TAC]
-	return gb.flagEnabled(tac, 2)
+	return (tac>>2)&1 != 0
 }
 
 func (gb *GameBoy) SelectCycleFreq() int {
