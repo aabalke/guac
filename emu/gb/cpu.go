@@ -7,6 +7,10 @@ import (
 
 // 4 cycles per m clock (if inst/opcode take 4 cycles, inc m by 1, 8 cycles, by 2
 
+const (
+    right, throughCarry, acc = true, true ,true
+)
+
 type Cpu struct {
 
 	InterruptMaster  bool
@@ -103,8 +107,6 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 
 	cycles = 1
 	pc := gb.Cpu.PC + 1
-
-	d8, d16 := gb.getImmediateData()
 
 	switch opcode {
 	case 0x00: // nop
@@ -227,19 +229,19 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 	case 0x6F:
 		reg.l = reg.a
 	case 0x01:
-        *reg.BC = d16
+        *reg.BC = gb.getImm16()
 		pc = pc + 2
 		cycles = 3
 	case 0x11:
-        *reg.DE = d16
+        *reg.DE = gb.getImm16()
 		pc = pc + 2
 		cycles = 3
 	case 0x21:
-        *reg.HL = d16
+        *reg.HL = gb.getImm16()
 		pc = pc + 2
 		cycles = 3
 	case 0x31:
-        reg.SP = d16
+        reg.SP = gb.getImm16()
 		pc = pc + 2
 		cycles = 3
 
@@ -270,19 +272,19 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 		cycles = 2
 
 	case 0x0E:
-		reg.c = d8
+		reg.c = gb.getImm8()
 		pc++
 		cycles = 2
 	case 0x1E:
-		reg.e = d8
+		reg.e = gb.getImm8()
 		pc++
 		cycles = 2
 	case 0x2E:
-		reg.l = d8
+		reg.l = gb.getImm8()
 		pc++
 		cycles = 2
 	case 0x3E:
-		reg.a = d8
+		reg.a = gb.getImm8()
 		pc++
 		cycles = 2
 
@@ -305,179 +307,179 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 		reg.a = reg.a
 
 	case 0x80:
-		gb.execAdd(&reg.a, reg.b)
+		reg.a = gb.execAdd(reg.a, reg.b)
 	case 0x81:
-		gb.execAdd(&reg.a, reg.c)
+		reg.a = gb.execAdd(reg.a, reg.c)
 	case 0x82:
-		gb.execAdd(&reg.a, reg.d)
+		reg.a = gb.execAdd(reg.a, reg.d)
 	case 0x83:
-		gb.execAdd(&reg.a, reg.e)
+		reg.a = gb.execAdd(reg.a, reg.e)
 	case 0x84:
-		gb.execAdd(&reg.a, reg.h)
+		reg.a = gb.execAdd(reg.a, reg.h)
 	case 0x85:
-		gb.execAdd(&reg.a, reg.l)
+		reg.a = gb.execAdd(reg.a, reg.l)
 	case 0x86:
-		gb.execAdd(&reg.a, gb.Read(*reg.HL))
+		reg.a = gb.execAdd(reg.a, gb.Read(*reg.HL))
 		cycles = 2
 	case 0x87:
-		gb.execAdd(&reg.a, reg.a)
+		reg.a = gb.execAdd(reg.a, reg.a)
 
 	case 0x09:
-		gb.execAddHl(reg.BC)
+		*reg.HL = gb.execAddHl(*reg.HL, *reg.BC)
 		cycles = 2
 	case 0x19:
-		gb.execAddHl(reg.DE)
+		*reg.HL = gb.execAddHl(*reg.HL, *reg.DE)
 		cycles = 2
 	case 0x29:
-		gb.execAddHl(reg.HL)
+		*reg.HL = gb.execAddHl(*reg.HL, *reg.HL)
 		cycles = 2
 	case 0x39:
-		gb.execAddHl(&gb.Cpu.SP)
+		*reg.HL = gb.execAddHl(*reg.HL, gb.Cpu.SP)
 		cycles = 2
 
 	case 0x88:
-		gb.execAdc(&reg.a, reg.b)
+		reg.a = gb.execAdc(reg.a, reg.b)
 	case 0x89:
-		gb.execAdc(&reg.a, reg.c)
+		reg.a = gb.execAdc(reg.a, reg.c)
 	case 0x8A:
-		gb.execAdc(&reg.a, reg.d)
+		reg.a = gb.execAdc(reg.a, reg.d)
 	case 0x8B:
-		gb.execAdc(&reg.a, reg.e)
+		reg.a = gb.execAdc(reg.a, reg.e)
 	case 0x8C:
-		gb.execAdc(&reg.a, reg.h)
+		reg.a = gb.execAdc(reg.a, reg.h)
 	case 0x8D:
-		gb.execAdc(&reg.a, reg.l)
+		reg.a = gb.execAdc(reg.a, reg.l)
 	case 0x8E:
-		gb.execAdc(&reg.a, gb.Read(*reg.HL))
+		reg.a = gb.execAdc(reg.a, gb.Read(*reg.HL))
 		cycles = 2
 	case 0x8F:
-		gb.execAdc(&reg.a, reg.a)
+		reg.a = gb.execAdc(reg.a, reg.a)
 
 	case 0x90:
-		gb.execSub(&reg.a, reg.b)
+		reg.a = gb.execSub(reg.a, reg.b)
 	case 0x91:
-		gb.execSub(&reg.a, reg.c)
+		reg.a = gb.execSub(reg.a, reg.c)
 	case 0x92:
-		gb.execSub(&reg.a, reg.d)
+		reg.a = gb.execSub(reg.a, reg.d)
 	case 0x93:
-		gb.execSub(&reg.a, reg.e)
+		reg.a = gb.execSub(reg.a, reg.e)
 	case 0x94:
-		gb.execSub(&reg.a, reg.h)
+		reg.a = gb.execSub(reg.a, reg.h)
 	case 0x95:
-		gb.execSub(&reg.a, reg.l)
+		reg.a = gb.execSub(reg.a, reg.l)
 	case 0x96:
-		gb.execSub(&reg.a, gb.Read(*reg.HL))
+		reg.a = gb.execSub(reg.a, gb.Read(*reg.HL))
 		cycles = 2
 	case 0x97:
-		gb.execSub(&reg.a, reg.a)
+		reg.a = gb.execSub(reg.a, reg.a)
 
 	case 0x98:
-		gb.execSbc(&reg.a, reg.b)
+		reg.a = gb.execSbc(reg.a, reg.b)
 	case 0x99:
-		gb.execSbc(&reg.a, reg.c)
+		reg.a = gb.execSbc(reg.a, reg.c)
 	case 0x9A:
-		gb.execSbc(&reg.a, reg.d)
+		reg.a = gb.execSbc(reg.a, reg.d)
 	case 0x9B:
-		gb.execSbc(&reg.a, reg.e)
+		reg.a = gb.execSbc(reg.a, reg.e)
 	case 0x9C:
-		gb.execSbc(&reg.a, reg.h)
+		reg.a = gb.execSbc(reg.a, reg.h)
 	case 0x9D:
-		gb.execSbc(&reg.a, reg.l)
+		reg.a = gb.execSbc(reg.a, reg.l)
 	case 0x9E:
-		gb.execSbc(&reg.a, gb.Read(*reg.HL))
+		reg.a = gb.execSbc(reg.a, gb.Read(*reg.HL))
 		cycles = 2
 	case 0x9F:
-		gb.execSbc(&reg.a, reg.a)
+		reg.a = gb.execSbc(reg.a, reg.a)
 
 	case 0xA0:
-		gb.execAnd(&reg.a, reg.b)
+		reg.a = gb.execAnd(reg.a, reg.b)
 	case 0xA1:
-		gb.execAnd(&reg.a, reg.c)
+		reg.a = gb.execAnd(reg.a, reg.c)
 	case 0xA2:
-		gb.execAnd(&reg.a, reg.d)
+		reg.a = gb.execAnd(reg.a, reg.d)
 	case 0xA3:
-		gb.execAnd(&reg.a, reg.e)
+		reg.a = gb.execAnd(reg.a, reg.e)
 	case 0xA4:
-		gb.execAnd(&reg.a, reg.h)
+		reg.a = gb.execAnd(reg.a, reg.h)
 	case 0xA5:
-		gb.execAnd(&reg.a, reg.l)
+		reg.a = gb.execAnd(reg.a, reg.l)
 	case 0xA6:
-		gb.execAnd(&reg.a, gb.Read(*reg.HL))
+		reg.a = gb.execAnd(reg.a, gb.Read(*reg.HL))
 		cycles = 2
 	case 0xA7:
-		gb.execAnd(&reg.a, reg.a)
+		reg.a = gb.execAnd(reg.a, reg.a)
 
 	case 0xA8:
-		gb.execXor(&reg.a, reg.b)
+		reg.a = gb.execXor(reg.a, reg.b)
 	case 0xA9:
-		gb.execXor(&reg.a, reg.c)
+		reg.a = gb.execXor(reg.a, reg.c)
 	case 0xAA:
-		gb.execXor(&reg.a, reg.d)
+		reg.a = gb.execXor(reg.a, reg.d)
 	case 0xAB:
-		gb.execXor(&reg.a, reg.e)
+		reg.a = gb.execXor(reg.a, reg.e)
 	case 0xAC:
-		gb.execXor(&reg.a, reg.h)
+		reg.a = gb.execXor(reg.a, reg.h)
 	case 0xAD:
-		gb.execXor(&reg.a, reg.l)
+		reg.a = gb.execXor(reg.a, reg.l)
 	case 0xAE:
-		gb.execXor(&reg.a, gb.Read(*reg.HL))
+		reg.a = gb.execXor(reg.a, gb.Read(*reg.HL))
 		cycles = 2
 	case 0xAF:
-		gb.execXor(&reg.a, reg.a)
+		reg.a = gb.execXor(reg.a, reg.a)
 
 	case 0xB0:
-		gb.execOr(&reg.a, reg.b)
+		reg.a = gb.execOr(reg.a, reg.b)
 	case 0xB1:
-		gb.execOr(&reg.a, reg.c)
+		reg.a = gb.execOr(reg.a, reg.c)
 	case 0xB2:
-		gb.execOr(&reg.a, reg.d)
+		reg.a = gb.execOr(reg.a, reg.d)
 	case 0xB3:
-		gb.execOr(&reg.a, reg.e)
+		reg.a = gb.execOr(reg.a, reg.e)
 	case 0xB4:
-		gb.execOr(&reg.a, reg.h)
+		reg.a = gb.execOr(reg.a, reg.h)
 	case 0xB5:
-		gb.execOr(&reg.a, reg.l)
+		reg.a = gb.execOr(reg.a, reg.l)
 	case 0xB6:
-		gb.execOr(&reg.a, gb.Read(*reg.HL))
+		reg.a = gb.execOr(reg.a, gb.Read(*reg.HL))
 		cycles = 2
 	case 0xB7:
-		gb.execOr(&reg.a, reg.a)
+		reg.a = gb.execOr(reg.a, reg.a)
 
 	case 0xB8:
-		gb.execCp(&reg.a, reg.b)
+		gb.execCp(reg.a, reg.b)
 	case 0xB9:
-		gb.execCp(&reg.a, reg.c)
+		gb.execCp(reg.a, reg.c)
 	case 0xBA:
-		gb.execCp(&reg.a, reg.d)
+		gb.execCp(reg.a, reg.d)
 	case 0xBB:
-		gb.execCp(&reg.a, reg.e)
+		gb.execCp(reg.a, reg.e)
 	case 0xBC:
-		gb.execCp(&reg.a, reg.h)
+		gb.execCp(reg.a, reg.h)
 	case 0xBD:
-		gb.execCp(&reg.a, reg.l)
+		gb.execCp(reg.a, reg.l)
 	case 0xBE:
-		gb.execCp(&reg.a, gb.Read(*reg.HL))
+		gb.execCp(reg.a, gb.Read(*reg.HL))
 		cycles = 2
 	case 0xBF:
-		gb.execCp(&reg.a, reg.a)
+		gb.execCp(reg.a, reg.a)
 
 	case 0x04:
-		gb.execInc(&reg.b)
+		reg.b = gb.execInc(reg.b)
 	case 0x14:
-		gb.execInc(&reg.d)
+		reg.d = gb.execInc(reg.d)
 	case 0x24:
-		gb.execInc(&reg.h)
+		reg.h = gb.execInc(reg.h)
 	case 0x34:
-		gb.execIncHl()
+        gb.Write(*reg.HL, gb.execInc(gb.Read(*reg.HL)))
 		cycles = 3
 	case 0x0C:
-		gb.execInc(&reg.c)
+		reg.c = gb.execInc(reg.c)
 	case 0x1C:
-		gb.execInc(&reg.e)
+		reg.e = gb.execInc(reg.e)
 	case 0x2C:
-		gb.execInc(&reg.l)
+		reg.l = gb.execInc(reg.l)
 	case 0x3C:
-		gb.execInc(&reg.a)
+		reg.a = gb.execInc(reg.a)
 	case 0x03:
         *reg.BC++
 		cycles = 2
@@ -492,22 +494,22 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 		cycles = 2
 
 	case 0x05:
-		gb.execDec(&reg.b)
+		reg.b = gb.execDec(reg.b)
 	case 0x15:
-		gb.execDec(&reg.d)
+		reg.d = gb.execDec(reg.d)
 	case 0x25:
-		gb.execDec(&reg.h)
+		reg.h = gb.execDec(reg.h)
 	case 0x35:
-		gb.execDecHl()
+        gb.Write(*reg.HL, gb.execDec(gb.Read(*reg.HL)))
 		cycles = 3
 	case 0x0D:
-		gb.execDec(&reg.c)
+		reg.c = gb.execDec(reg.c)
 	case 0x1D:
-		gb.execDec(&reg.e)
+		reg.e = gb.execDec(reg.e)
 	case 0x2D:
-		gb.execDec(&reg.l)
+		reg.l = gb.execDec(reg.l)
 	case 0x3D:
-		gb.execDec(&reg.a)
+		reg.a = gb.execDec(reg.a)
 	case 0x0B:
         *reg.BC--
 		cycles = 2
@@ -521,53 +523,52 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 		gb.Cpu.SP -= 1
 		cycles = 2
 
-	//d8 arth
 	case 0xC6:
-		gb.execAdd(&reg.a, d8)
+		reg.a = gb.execAdd(reg.a, gb.getImm8())
 		pc++
 		cycles = 2
 	case 0xD6:
-		gb.execSub(&reg.a, d8)
+		reg.a = gb.execSub(reg.a, gb.getImm8())
 		pc++
 		cycles = 2
 	case 0xE6:
-		gb.execAnd(&reg.a, d8)
+		reg.a = gb.execAnd(reg.a, gb.getImm8())
 		pc++
 		cycles = 2
 	case 0xF6:
-		gb.execOr(&reg.a, d8)
+		reg.a = gb.execOr(reg.a, gb.getImm8())
 		pc++
 		cycles = 2
 	case 0xCE:
-		gb.execAdc(&reg.a, d8)
+		reg.a = gb.execAdc(reg.a, gb.getImm8())
 		pc++
 		cycles = 2
 	case 0xDE:
-		gb.execSbc(&reg.a, d8)
+		reg.a = gb.execSbc(reg.a, gb.getImm8())
 		pc++
 		cycles = 2
 	case 0xEE:
-		gb.execXor(&reg.a, d8)
+		reg.a = gb.execXor(reg.a, gb.getImm8())
 		pc++
 		cycles = 2
 	case 0xFE:
-		gb.execCp(&reg.a, d8)
+		gb.execCp(reg.a, gb.getImm8())
 		pc++
 		cycles = 2
 	case 0x06:
-		reg.b = d8
+		reg.b = gb.getImm8()
 		pc++
 		cycles = 2
 	case 0x16:
-		reg.d = d8
+		reg.d = gb.getImm8()
 		pc++
 		cycles = 2
 	case 0x26:
-		reg.h = d8
+		reg.h = gb.getImm8()
 		pc++
 		cycles = 2
 	case 0x36:
-        gb.Write(*reg.HL, d8)
+        gb.Write(*reg.HL, gb.getImm8())
 		pc++
 		cycles = 3
 
@@ -614,44 +615,44 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 
 	// Register A Rotations
 	case 0x07:
-		gb.execRotAcc(&reg.a, false, false)
+		reg.a = gb.execRot(reg.a, acc, !right, !throughCarry)
 	case 0x17:
-		gb.execRotAcc(&reg.a, false, true)
+		reg.a = gb.execRot(reg.a, acc, !right, throughCarry)
 	case 0x0F:
-		gb.execRotAcc(&reg.a, true, false)
+		reg.a = gb.execRot(reg.a, acc, right, !throughCarry)
 	case 0x1F:
-		gb.execRotAcc(&reg.a, true, true)
+		reg.a = gb.execRot(reg.a, acc, right, throughCarry)
 
 	// CB
 	case 0xCB:
-		cycles = gb.execCB(d8)
+		cycles = gb.execCB(gb.getImm8())
 		pc++
 
 	// jump abs
 	case 0xC2:
-		cycles, pc = gb.execJP(d16, !reg.f.Z, 4, 3)
+		cycles, pc = gb.execJP(gb.getImm16(), !reg.f.Z, 4, 3)
 	case 0xD2:
-		cycles, pc = gb.execJP(d16, !reg.f.C, 4, 3)
+		cycles, pc = gb.execJP(gb.getImm16(), !reg.f.C, 4, 3)
 	case 0xC3:
-		cycles, pc = gb.execJP(d16, true, 4, 4)
+		cycles, pc = gb.execJP(gb.getImm16(), true, 4, 4)
 	case 0xCA:
-		cycles, pc = gb.execJP(d16, reg.f.Z, 4, 3)
+		cycles, pc = gb.execJP(gb.getImm16(), reg.f.Z, 4, 3)
 	case 0xDA:
-		cycles, pc = gb.execJP(d16, reg.f.C, 4, 3)
+		cycles, pc = gb.execJP(gb.getImm16(), reg.f.C, 4, 3)
 	case 0xE9:
 		cycles, pc = gb.execJP(*reg.HL, true, 1, 1)
 
 	// jump relative
 	case 0x20:
-		cycles, pc = gb.execJR(d8, !reg.f.Z, 3, 2)
+		cycles, pc = gb.execJR(gb.getImm8(), !reg.f.Z, 3, 2)
 	case 0x30:
-		cycles, pc = gb.execJR(d8, !reg.f.C, 3, 2)
+		cycles, pc = gb.execJR(gb.getImm8(), !reg.f.C, 3, 2)
 	case 0x18:
-		cycles, pc = gb.execJR(d8, true, 3, 3)
+		cycles, pc = gb.execJR(gb.getImm8(), true, 3, 3)
 	case 0x28:
-		cycles, pc = gb.execJR(d8, reg.f.Z, 3, 2)
+		cycles, pc = gb.execJR(gb.getImm8(), reg.f.Z, 3, 2)
 	case 0x38:
-		cycles, pc = gb.execJR(d8, reg.f.C, 3, 2)
+		cycles, pc = gb.execJR(gb.getImm8(), reg.f.C, 3, 2)
 
 	// Interrupts
 	case 0xF3:
@@ -661,16 +662,16 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 
 	// misc ld
 	case 0x08:
-        gb.Write(d16+0, uint8(gb.Cpu.SP))
-        gb.Write(d16+1, uint8(gb.Cpu.SP>>8))
+        gb.Write(gb.getImm16()+0, uint8(gb.Cpu.SP))
+        gb.Write(gb.getImm16()+1, uint8(gb.Cpu.SP>>8))
 		pc = pc + 2
 		cycles = 5
 	case 0xFA:
-        reg.a = gb.Read(d16)
+        reg.a = gb.Read(gb.getImm16())
 		pc = pc + 2
 		cycles = 4
 	case 0xEA:
-        gb.Write(d16, reg.a)
+        gb.Write(gb.getImm16(), reg.a)
 		pc = pc + 2
 		cycles = 4
 	case 0xF9:
@@ -743,15 +744,15 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 
 	// call
 	case 0xC4:
-		cycles, pc = gb.execCall(d16, !reg.f.Z, 6, 3)
+		cycles, pc = gb.execCall(gb.getImm16(), !reg.f.Z, 6, 3)
 	case 0xD4:
-		cycles, pc = gb.execCall(d16, !reg.f.C, 6, 3)
+		cycles, pc = gb.execCall(gb.getImm16(), !reg.f.C, 6, 3)
 	case 0xCC:
-		cycles, pc = gb.execCall(d16, reg.f.Z, 6, 3)
+		cycles, pc = gb.execCall(gb.getImm16(), reg.f.Z, 6, 3)
 	case 0xDC:
-		cycles, pc = gb.execCall(d16, reg.f.C, 6, 3)
+		cycles, pc = gb.execCall(gb.getImm16(), reg.f.C, 6, 3)
 	case 0xCD:
-		cycles, pc = gb.execCall(d16, true, 6, 6)
+		cycles, pc = gb.execCall(gb.getImm16(), true, 6, 6)
 
 	// ret
 	case 0xC0:
@@ -771,21 +772,21 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 		cycles = 4
 
 	case 0xE0:
-        gb.Write(0xFF00 + uint16(d8), reg.a)
+        gb.Write(0xFF00 + uint16(gb.getImm8()), reg.a)
 		pc++
 		cycles = 3
 	case 0xF0:
-        reg.a = gb.Read(0xFF00 | uint16(d8))
+        reg.a = gb.Read(0xFF00 | uint16(gb.getImm8()))
 		pc++
 		cycles = 3
 	case 0xE8:
-		gb.execAdd(&gb.Cpu.SP, d8)
+		gb.Cpu.SP = gb.execAddSp(gb.Cpu.SP, uint16(gb.getImm8()))
 		pc++
 		cycles = 4
 	case 0xF8:
 
         a := int32(gb.Cpu.SP)
-        b := int32(int8(d8))
+        b := int32(int8(gb.getImm8()))
         newValue := a + b
         temp := a ^ b ^ newValue
         *gb.Cpu.HL = uint16(newValue)
@@ -813,870 +814,691 @@ func (gb *GameBoy) Execute(opcode uint8) (cycles int) {
 	return cycles * 4
 }
 
-func (gb *GameBoy) execCB(cbOpcode uint8) (cycles int) {
+func (gb *GameBoy) execCB(op uint8) (cycles int) {
 
-    var (
-        right = true
-        throughCarry = true
-        reg = gb.Cpu
-    )
-
+    reg := gb.Cpu
     cycles = 2
 
-	switch cbOpcode {
+	switch op {
 	case 0x00:
-		gb.execRot(&reg.b, !right, !throughCarry)
+		reg.b = gb.execRot(reg.b, !acc, !right, !throughCarry)
 	case 0x01:
-		gb.execRot(&reg.c, !right, !throughCarry)
+		reg.c = gb.execRot(reg.c, !acc, !right, !throughCarry)
 	case 0x02:
-		gb.execRot(&reg.d, !right, !throughCarry)
+		reg.d = gb.execRot(reg.d, !acc, !right, !throughCarry)
 	case 0x03:
-		gb.execRot(&reg.e, !right, !throughCarry)
+		reg.e = gb.execRot(reg.e, !acc, !right, !throughCarry)
 	case 0x04:
-		gb.execRot(&reg.h, !right, !throughCarry)
+		reg.h = gb.execRot(reg.h, !acc, !right, !throughCarry)
 	case 0x05:
-		gb.execRot(&reg.l, !right, !throughCarry)
+		reg.l = gb.execRot(reg.l, !acc, !right, !throughCarry)
 	case 0x06:
-		gb.execRotHl(!right, !throughCarry)
+        gb.Write(*reg.HL, gb.execRot(gb.Read(*reg.HL), !acc, !right, !throughCarry))
 		cycles = 4
 	case 0x07:
-		gb.execRot(&reg.a, !right, !throughCarry)
+		reg.a = gb.execRot(reg.a, !acc, !right, !throughCarry)
 
 	case 0x10:
-		gb.execRot(&reg.b, !right, throughCarry)
+		reg.b = gb.execRot(reg.b, !acc, !right, throughCarry)
 	case 0x11:
-		gb.execRot(&reg.c, !right, throughCarry)
+		reg.c = gb.execRot(reg.c, !acc, !right, throughCarry)
 	case 0x12:
-		gb.execRot(&reg.d, !right, throughCarry)
+		reg.d = gb.execRot(reg.d, !acc, !right, throughCarry)
 	case 0x13:
-		gb.execRot(&reg.e, !right, throughCarry)
+		reg.e = gb.execRot(reg.e, !acc, !right, throughCarry)
 	case 0x14:
-		gb.execRot(&reg.h, !right, throughCarry)
+		reg.h = gb.execRot(reg.h, !acc, !right, throughCarry)
 	case 0x15:
-		gb.execRot(&reg.l, !right, throughCarry)
+		reg.l = gb.execRot(reg.l, !acc, !right, throughCarry)
 	case 0x16:
-		gb.execRotHl(!right, throughCarry)
+        gb.Write(*reg.HL, gb.execRot(gb.Read(*reg.HL), !acc, !right, throughCarry))
 		cycles = 4
 	case 0x17:
-		gb.execRot(&reg.a, !right, throughCarry)
+		reg.a = gb.execRot(reg.a, !acc, !right, throughCarry)
 
 	case 0x08:
-		gb.execRot(&reg.b, right, !throughCarry)
+		reg.b = gb.execRot(reg.b, !acc, right, !throughCarry)
 	case 0x09:
-		gb.execRot(&reg.c, right, !throughCarry)
+		reg.c = gb.execRot(reg.c, !acc, right, !throughCarry)
 	case 0x0A:
-		gb.execRot(&reg.d, right, !throughCarry)
+		reg.d = gb.execRot(reg.d, !acc, right, !throughCarry)
 	case 0x0B:
-		gb.execRot(&reg.e, right, !throughCarry)
+		reg.e = gb.execRot(reg.e, !acc, right, !throughCarry)
 	case 0x0C:
-		gb.execRot(&reg.h, right, !throughCarry)
+		reg.h = gb.execRot(reg.h, !acc, right, !throughCarry)
 	case 0x0D:
-		gb.execRot(&reg.l, right, !throughCarry)
+		reg.l = gb.execRot(reg.l, !acc, right, !throughCarry)
 	case 0x0E:
-		gb.execRotHl(right, !throughCarry)
+        gb.Write(*reg.HL, gb.execRot(gb.Read(*reg.HL), !acc, right, !throughCarry))
 		cycles = 4
 	case 0x0F:
-		gb.execRot(&reg.a, right, !throughCarry)
+		reg.a = gb.execRot(reg.a, !acc, right, !throughCarry)
 
 	case 0x18:
-		gb.execRot(&reg.b, right, throughCarry)
+		reg.b = gb.execRot(reg.b, !acc, right, throughCarry)
 	case 0x19:
-		gb.execRot(&reg.c, right, throughCarry)
+		reg.c = gb.execRot(reg.c, !acc, right, throughCarry)
 	case 0x1A:
-		gb.execRot(&reg.d, right, throughCarry)
+		reg.d = gb.execRot(reg.d, !acc, right, throughCarry)
 	case 0x1B:
-		gb.execRot(&reg.e, right, throughCarry)
+		reg.e = gb.execRot(reg.e, !acc, right, throughCarry)
 	case 0x1C:
-		gb.execRot(&reg.h, right, throughCarry)
+		reg.h = gb.execRot(reg.h, !acc, right, throughCarry)
 	case 0x1D:
-		gb.execRot(&reg.l, right, throughCarry)
+		reg.l = gb.execRot(reg.l, !acc, right, throughCarry)
 	case 0x1E:
-		gb.execRotHl(right, throughCarry)
+        gb.Write(*reg.HL, gb.execRot(gb.Read(*reg.HL), !acc, right, throughCarry))
 		cycles = 4
 	case 0x1F:
-		gb.execRot(&reg.a, right, throughCarry)
+		reg.a = gb.execRot(reg.a, !acc, right, throughCarry)
 
 	case 0x20:
-		gb.execSLA(&reg.b)
+		reg.b = gb.execSLA(reg.b)
 	case 0x21:
-		gb.execSLA(&reg.c)
+		reg.c = gb.execSLA(reg.c)
 	case 0x22:
-		gb.execSLA(&reg.d)
+		reg.d = gb.execSLA(reg.d)
 	case 0x23:
-		gb.execSLA(&reg.e)
+		reg.e = gb.execSLA(reg.e)
 	case 0x24:
-		gb.execSLA(&reg.h)
+		reg.h = gb.execSLA(reg.h)
 	case 0x25:
-		gb.execSLA(&reg.l)
+		reg.l = gb.execSLA(reg.l)
 	case 0x26:
-		gb.execSLAHl()
+        gb.Write(*reg.HL, gb.execSLA(gb.Read(*reg.HL)))
 		cycles = 4
 	case 0x27:
-		gb.execSLA(&reg.a)
+		reg.a = gb.execSLA(reg.a)
 
 	case 0x28:
-		gb.execSRA(&reg.b)
+		reg.b = gb.execSRA(reg.b)
 	case 0x29:
-		gb.execSRA(&reg.c)
+		reg.c = gb.execSRA(reg.c)
 	case 0x2A:
-		gb.execSRA(&reg.d)
+		reg.d = gb.execSRA(reg.d)
 	case 0x2B:
-		gb.execSRA(&reg.e)
+		reg.e = gb.execSRA(reg.e)
 	case 0x2C:
-		gb.execSRA(&reg.h)
+		reg.h = gb.execSRA(reg.h)
 	case 0x2D:
-		gb.execSRA(&reg.l)
+		reg.l = gb.execSRA(reg.l)
 	case 0x2E:
-		gb.execSRAHl()
+        gb.Write(*reg.HL, gb.execSRA(gb.Read(*reg.HL)))
 		cycles = 4
 	case 0x2F:
-		gb.execSRA(&reg.a)
+		reg.a = gb.execSRA(reg.a)
 
 	case 0x30:
-		gb.execSWAP(&reg.b)
+		reg.b = gb.execSWAP(reg.b)
 	case 0x31:
-		gb.execSWAP(&reg.c)
+		reg.c = gb.execSWAP(reg.c)
 	case 0x32:
-		gb.execSWAP(&reg.d)
+		reg.d = gb.execSWAP(reg.d)
 	case 0x33:
-		gb.execSWAP(&reg.e)
+		reg.e = gb.execSWAP(reg.e)
 	case 0x34:
-		gb.execSWAP(&reg.h)
+		reg.h = gb.execSWAP(reg.h)
 	case 0x35:
-		gb.execSWAP(&reg.l)
+		reg.l = gb.execSWAP(reg.l)
 	case 0x36:
-        v := gb.Read(*reg.HL)
-        res := uint8((v >> 4) | ((v << 4) & 0xF0))
-        gb.Write(*reg.HL, res)
-
-        gb.Cpu.f.Z = res == 0
-        gb.Cpu.f.S = false
-        gb.Cpu.f.H = false
-        gb.Cpu.f.C = false
+        gb.Write(*reg.HL, gb.execSWAP(gb.Read(*reg.HL)))
 		cycles = 4
 	case 0x37:
-		gb.execSWAP(&reg.a)
+		reg.a = gb.execSWAP(reg.a)
 
 	case 0x38:
-		gb.execSRL(&reg.b)
+		reg.b = gb.execSRL(reg.b)
 	case 0x39:
-		gb.execSRL(&reg.c)
+		reg.c = gb.execSRL(reg.c)
 	case 0x3A:
-		gb.execSRL(&reg.d)
+		reg.d = gb.execSRL(reg.d)
 	case 0x3B:
-		gb.execSRL(&reg.e)
+		reg.e = gb.execSRL(reg.e)
 	case 0x3C:
-		gb.execSRL(&reg.h)
+		reg.h = gb.execSRL(reg.h)
 	case 0x3D:
-		gb.execSRL(&reg.l)
+		reg.l = gb.execSRL(reg.l)
 	case 0x3E:
-		gb.execSRLHL()
+        gb.Write(*reg.HL, gb.execSRL(gb.Read(*reg.HL)))
 		cycles = 4
 	case 0x3F:
-		gb.execSRL(&reg.a)
+		reg.a = gb.execSRL(reg.a)
 
 	case 0x40:
-		gb.execBIT(&reg.b, 0)
+		gb.execBIT(reg.b, 0)
 	case 0x41:
-		gb.execBIT(&reg.c, 0)
+		gb.execBIT(reg.c, 0)
 	case 0x42:
-		gb.execBIT(&reg.d, 0)
+		gb.execBIT(reg.d, 0)
 	case 0x43:
-		gb.execBIT(&reg.e, 0)
+		gb.execBIT(reg.e, 0)
 	case 0x44:
-		gb.execBIT(&reg.h, 0)
+		gb.execBIT(reg.h, 0)
 	case 0x45:
-		gb.execBIT(&reg.l, 0)
+		gb.execBIT(reg.l, 0)
 	case 0x46:
-		gb.execBITHl(0)
+		gb.execBIT(gb.Read(*reg.HL), 0)
 		cycles = 3
 	case 0x47:
-		gb.execBIT(&reg.a, 0)
+		gb.execBIT(reg.a, 0)
 
 	case 0x48:
-		gb.execBIT(&reg.b, 1)
+		gb.execBIT(reg.b, 1)
 	case 0x49:
-		gb.execBIT(&reg.c, 1)
+		gb.execBIT(reg.c, 1)
 	case 0x4A:
-		gb.execBIT(&reg.d, 1)
+		gb.execBIT(reg.d, 1)
 	case 0x4B:
-		gb.execBIT(&reg.e, 1)
+		gb.execBIT(reg.e, 1)
 	case 0x4C:
-		gb.execBIT(&reg.h, 1)
+		gb.execBIT(reg.h, 1)
 	case 0x4D:
-		gb.execBIT(&reg.l, 1)
+		gb.execBIT(reg.l, 1)
 	case 0x4E:
-		gb.execBITHl(1)
+		gb.execBIT(gb.Read(*reg.HL), 1)
 		cycles = 3
 	case 0x4F:
-		gb.execBIT(&reg.a, 1)
+		gb.execBIT(reg.a, 1)
 
 	case 0x50:
-		gb.execBIT(&reg.b, 2)
+		gb.execBIT(reg.b, 2)
 	case 0x51:
-		gb.execBIT(&reg.c, 2)
+		gb.execBIT(reg.c, 2)
 	case 0x52:
-		gb.execBIT(&reg.d, 2)
+		gb.execBIT(reg.d, 2)
 	case 0x53:
-		gb.execBIT(&reg.e, 2)
+		gb.execBIT(reg.e, 2)
 	case 0x54:
-		gb.execBIT(&reg.h, 2)
+		gb.execBIT(reg.h, 2)
 	case 0x55:
-		gb.execBIT(&reg.l, 2)
+		gb.execBIT(reg.l, 2)
 	case 0x56:
-		gb.execBITHl(2)
+		gb.execBIT(gb.Read(*reg.HL), 2)
 		cycles = 3
 	case 0x57:
-		gb.execBIT(&reg.a, 2)
+		gb.execBIT(reg.a, 2)
 
 	case 0x58:
-		gb.execBIT(&reg.b, 3)
+		gb.execBIT(reg.b, 3)
 	case 0x59:
-		gb.execBIT(&reg.c, 3)
+		gb.execBIT(reg.c, 3)
 	case 0x5A:
-		gb.execBIT(&reg.d, 3)
+		gb.execBIT(reg.d, 3)
 	case 0x5B:
-		gb.execBIT(&reg.e, 3)
+		gb.execBIT(reg.e, 3)
 	case 0x5C:
-		gb.execBIT(&reg.h, 3)
+		gb.execBIT(reg.h, 3)
 	case 0x5D:
-		gb.execBIT(&reg.l, 3)
+		gb.execBIT(reg.l, 3)
 	case 0x5E:
-		gb.execBITHl(3)
+		gb.execBIT(gb.Read(*reg.HL), 3)
 		cycles = 3
 	case 0x5F:
-		gb.execBIT(&reg.a, 3)
+		gb.execBIT(reg.a, 3)
 
 	case 0x60:
-		gb.execBIT(&reg.b, 4)
+		gb.execBIT(reg.b, 4)
 	case 0x61:
-		gb.execBIT(&reg.c, 4)
+		gb.execBIT(reg.c, 4)
 	case 0x62:
-		gb.execBIT(&reg.d, 4)
+		gb.execBIT(reg.d, 4)
 	case 0x63:
-		gb.execBIT(&reg.e, 4)
+		gb.execBIT(reg.e, 4)
 	case 0x64:
-		gb.execBIT(&reg.h, 4)
+		gb.execBIT(reg.h, 4)
 	case 0x65:
-		gb.execBIT(&reg.l, 4)
+		gb.execBIT(reg.l, 4)
 	case 0x66:
-		gb.execBITHl(4)
+		gb.execBIT(gb.Read(*reg.HL), 4)
 		cycles = 3
 	case 0x67:
-		gb.execBIT(&reg.a, 4)
+		gb.execBIT(reg.a, 4)
 
 	case 0x68:
-		gb.execBIT(&reg.b, 5)
+		gb.execBIT(reg.b, 5)
 	case 0x69:
-		gb.execBIT(&reg.c, 5)
+		gb.execBIT(reg.c, 5)
 	case 0x6A:
-		gb.execBIT(&reg.d, 5)
+		gb.execBIT(reg.d, 5)
 	case 0x6B:
-		gb.execBIT(&reg.e, 5)
+		gb.execBIT(reg.e, 5)
 	case 0x6C:
-		gb.execBIT(&reg.h, 5)
+		gb.execBIT(reg.h, 5)
 	case 0x6D:
-		gb.execBIT(&reg.l, 5)
+		gb.execBIT(reg.l, 5)
 	case 0x6E:
-		gb.execBITHl(5)
+		gb.execBIT(gb.Read(*reg.HL), 5)
 		cycles = 3
 	case 0x6F:
-		gb.execBIT(&reg.a, 5)
+		gb.execBIT(reg.a, 5)
 
 	case 0x70:
-		gb.execBIT(&reg.b, 6)
+		gb.execBIT(reg.b, 6)
 	case 0x71:
-		gb.execBIT(&reg.c, 6)
+		gb.execBIT(reg.c, 6)
 	case 0x72:
-		gb.execBIT(&reg.d, 6)
+		gb.execBIT(reg.d, 6)
 	case 0x73:
-		gb.execBIT(&reg.e, 6)
+		gb.execBIT(reg.e, 6)
 	case 0x74:
-		gb.execBIT(&reg.h, 6)
+		gb.execBIT(reg.h, 6)
 	case 0x75:
-		gb.execBIT(&reg.l, 6)
+		gb.execBIT(reg.l, 6)
 	case 0x76:
-		gb.execBITHl(6)
+		gb.execBIT(gb.Read(*reg.HL), 6)
 		cycles = 3
 	case 0x77:
-		gb.execBIT(&reg.a, 6)
+		gb.execBIT(reg.a, 6)
 
 	case 0x78:
-		gb.execBIT(&reg.b, 7)
+		gb.execBIT(reg.b, 7)
 	case 0x79:
-		gb.execBIT(&reg.c, 7)
+		gb.execBIT(reg.c, 7)
 	case 0x7A:
-		gb.execBIT(&reg.d, 7)
+		gb.execBIT(reg.d, 7)
 	case 0x7B:
-		gb.execBIT(&reg.e, 7)
+		gb.execBIT(reg.e, 7)
 	case 0x7C:
-		gb.execBIT(&reg.h, 7)
+		gb.execBIT(reg.h, 7)
 	case 0x7D:
-		gb.execBIT(&reg.l, 7)
+		gb.execBIT(reg.l, 7)
 	case 0x7E:
-		gb.execBITHl(7)
+		gb.execBIT(gb.Read(*reg.HL), 7)
 		cycles = 3
 	case 0x7F:
-		gb.execBIT(&reg.a, 7)
+		gb.execBIT(reg.a, 7)
 
 	case 0x80:
-		gb.execRES(&reg.b, 0)
+		reg.b = gb.execRES(reg.b, 0)
 	case 0x81:
-		gb.execRES(&reg.c, 0)
+		reg.c = gb.execRES(reg.c, 0)
 	case 0x82:
-		gb.execRES(&reg.d, 0)
+		reg.d = gb.execRES(reg.d, 0)
 	case 0x83:
-		gb.execRES(&reg.e, 0)
+		reg.e = gb.execRES(reg.e, 0)
 	case 0x84:
-		gb.execRES(&reg.h, 0)
+		reg.h = gb.execRES(reg.h, 0)
 	case 0x85:
-		gb.execRES(&reg.l, 0)
+		reg.l = gb.execRES(reg.l, 0)
 	case 0x86:
-		gb.execRESHl(0)
+		gb.Write(*reg.HL, gb.execRES(gb.Read(*reg.HL), 0))
 		cycles = 4
 	case 0x87:
-		gb.execRES(&reg.a, 0)
+		reg.a = gb.execRES(reg.a, 0)
 
 	case 0x88:
-		gb.execRES(&reg.b, 1)
+		reg.b = gb.execRES(reg.b, 1)
 	case 0x89:
-		gb.execRES(&reg.c, 1)
+		reg.c = gb.execRES(reg.c, 1)
 	case 0x8A:
-		gb.execRES(&reg.d, 1)
+		reg.d = gb.execRES(reg.d, 1)
 	case 0x8B:
-		gb.execRES(&reg.e, 1)
+		reg.e = gb.execRES(reg.e, 1)
 	case 0x8C:
-		gb.execRES(&reg.h, 1)
+		reg.h = gb.execRES(reg.h, 1)
 	case 0x8D:
-		gb.execRES(&reg.l, 1)
+		reg.l = gb.execRES(reg.l, 1)
 	case 0x8E:
-		gb.execRESHl(1)
+		gb.Write(*reg.HL, gb.execRES(gb.Read(*reg.HL), 1))
 		cycles = 4
 	case 0x8F:
-		gb.execRES(&reg.a, 1)
+		reg.a = gb.execRES(reg.a, 1)
 
 	case 0x90:
-		gb.execRES(&reg.b, 2)
+		reg.b = gb.execRES(reg.b, 2)
 	case 0x91:
-		gb.execRES(&reg.c, 2)
+		reg.c = gb.execRES(reg.c, 2)
 	case 0x92:
-		gb.execRES(&reg.d, 2)
+		reg.d = gb.execRES(reg.d, 2)
 	case 0x93:
-		gb.execRES(&reg.e, 2)
+		reg.e = gb.execRES(reg.e, 2)
 	case 0x94:
-		gb.execRES(&reg.h, 2)
+		reg.h = gb.execRES(reg.h, 2)
 	case 0x95:
-		gb.execRES(&reg.l, 2)
+		reg.l = gb.execRES(reg.l, 2)
 	case 0x96:
-		gb.execRESHl(2)
+		gb.Write(*reg.HL, gb.execRES(gb.Read(*reg.HL), 2))
 		cycles = 4
 	case 0x97:
-		gb.execRES(&reg.a, 2)
+		reg.a = gb.execRES(reg.a, 2)
 
 	case 0x98:
-		gb.execRES(&reg.b, 3)
+		reg.b = gb.execRES(reg.b, 3)
 	case 0x99:
-		gb.execRES(&reg.c, 3)
+		reg.c = gb.execRES(reg.c, 3)
 	case 0x9A:
-		gb.execRES(&reg.d, 3)
+		reg.d = gb.execRES(reg.d, 3)
 	case 0x9B:
-		gb.execRES(&reg.e, 3)
+		reg.e = gb.execRES(reg.e, 3)
 	case 0x9C:
-		gb.execRES(&reg.h, 3)
+		reg.h = gb.execRES(reg.h, 3)
 	case 0x9D:
-		gb.execRES(&reg.l, 3)
+		reg.l = gb.execRES(reg.l, 3)
 	case 0x9E:
-		gb.execRESHl(3)
+		gb.Write(*reg.HL, gb.execRES(gb.Read(*reg.HL), 3))
 		cycles = 4
 	case 0x9F:
-		gb.execRES(&reg.a, 3)
+		reg.a = gb.execRES(reg.a, 3)
 
 	case 0xA0:
-		gb.execRES(&reg.b, 4)
+		reg.b = gb.execRES(reg.b, 4)
 	case 0xA1:
-		gb.execRES(&reg.c, 4)
+		reg.c = gb.execRES(reg.c, 4)
 	case 0xA2:
-		gb.execRES(&reg.d, 4)
+		reg.d = gb.execRES(reg.d, 4)
 	case 0xA3:
-		gb.execRES(&reg.e, 4)
+		reg.e = gb.execRES(reg.e, 4)
 	case 0xA4:
-		gb.execRES(&reg.h, 4)
+		reg.h = gb.execRES(reg.h, 4)
 	case 0xA5:
-		gb.execRES(&reg.l, 4)
+		reg.l = gb.execRES(reg.l, 4)
 	case 0xA6:
-		gb.execRESHl(4)
+		gb.Write(*reg.HL, gb.execRES(gb.Read(*reg.HL), 4))
 		cycles = 4
 	case 0xA7:
-		gb.execRES(&reg.a, 4)
+		reg.a = gb.execRES(reg.a, 4)
 
 	case 0xA8:
-		gb.execRES(&reg.b, 5)
+		reg.b = gb.execRES(reg.b, 5)
 	case 0xA9:
-		gb.execRES(&reg.c, 5)
+		reg.c = gb.execRES(reg.c, 5)
 	case 0xAA:
-		gb.execRES(&reg.d, 5)
+		reg.d = gb.execRES(reg.d, 5)
 	case 0xAB:
-		gb.execRES(&reg.e, 5)
+		reg.e = gb.execRES(reg.e, 5)
 	case 0xAC:
-		gb.execRES(&reg.h, 5)
+		reg.h = gb.execRES(reg.h, 5)
 	case 0xAD:
-		gb.execRES(&reg.l, 5)
+		reg.l = gb.execRES(reg.l, 5)
 	case 0xAE:
-		gb.execRESHl(5)
+		gb.Write(*reg.HL, gb.execRES(gb.Read(*reg.HL), 5))
 		cycles = 4
 	case 0xAF:
-		gb.execRES(&reg.a, 5)
+		reg.a = gb.execRES(reg.a, 5)
 
 	case 0xB0:
-		gb.execRES(&reg.b, 6)
+		reg.b = gb.execRES(reg.b, 6)
 	case 0xB1:
-		gb.execRES(&reg.c, 6)
+		reg.c = gb.execRES(reg.c, 6)
 	case 0xB2:
-		gb.execRES(&reg.d, 6)
+		reg.d = gb.execRES(reg.d, 6)
 	case 0xB3:
-		gb.execRES(&reg.e, 6)
+		reg.e = gb.execRES(reg.e, 6)
 	case 0xB4:
-		gb.execRES(&reg.h, 6)
+		reg.h = gb.execRES(reg.h, 6)
 	case 0xB5:
-		gb.execRES(&reg.l, 6)
+		reg.l = gb.execRES(reg.l, 6)
 	case 0xB6:
-		gb.execRESHl(6)
+		gb.Write(*reg.HL, gb.execRES(gb.Read(*reg.HL), 6))
 		cycles = 4
 	case 0xB7:
-		gb.execRES(&reg.a, 6)
+		reg.a = gb.execRES(reg.a, 6)
 
 	case 0xB8:
-		gb.execRES(&reg.b, 7)
+		reg.b = gb.execRES(reg.b, 7)
 	case 0xB9:
-		gb.execRES(&reg.c, 7)
+		reg.c = gb.execRES(reg.c, 7)
 	case 0xBA:
-		gb.execRES(&reg.d, 7)
+		reg.d = gb.execRES(reg.d, 7)
 	case 0xBB:
-		gb.execRES(&reg.e, 7)
+		reg.e = gb.execRES(reg.e, 7)
 	case 0xBC:
-		gb.execRES(&reg.h, 7)
+		reg.h = gb.execRES(reg.h, 7)
 	case 0xBD:
-		gb.execRES(&reg.l, 7)
+		reg.l = gb.execRES(reg.l, 7)
 	case 0xBE:
-		gb.execRESHl(7)
+		gb.Write(*reg.HL, gb.execRES(gb.Read(*reg.HL), 7))
 		cycles = 4
 	case 0xBF:
-		gb.execRES(&reg.a, 7)
+		reg.a = gb.execRES(reg.a, 7)
 
 	case 0xC0:
-		gb.execSET(&reg.b, 0)
+		reg.b = gb.execSET(reg.b, 0)
 	case 0xC1:
-		gb.execSET(&reg.c, 0)
+		reg.c = gb.execSET(reg.c, 0)
 	case 0xC2:
-		gb.execSET(&reg.d, 0)
+		reg.d = gb.execSET(reg.d, 0)
 	case 0xC3:
-		gb.execSET(&reg.e, 0)
+		reg.e = gb.execSET(reg.e, 0)
 	case 0xC4:
-		gb.execSET(&reg.h, 0)
+		reg.h = gb.execSET(reg.h, 0)
 	case 0xC5:
-		gb.execSET(&reg.l, 0)
+		reg.l = gb.execSET(reg.l, 0)
 	case 0xC6:
-		gb.execSETHl(0)
+		gb.Write(*reg.HL, gb.execSET(gb.Read(*reg.HL), 0))
 		cycles = 4
 	case 0xC7:
-		gb.execSET(&reg.a, 0)
+		reg.a = gb.execSET(reg.a, 0)
 
 	case 0xC8:
-		gb.execSET(&reg.b, 1)
+		reg.b = gb.execSET(reg.b, 1)
 	case 0xC9:
-		gb.execSET(&reg.c, 1)
+		reg.c = gb.execSET(reg.c, 1)
 	case 0xCA:
-		gb.execSET(&reg.d, 1)
+		reg.d = gb.execSET(reg.d, 1)
 	case 0xCB:
-		gb.execSET(&reg.e, 1)
+		reg.e = gb.execSET(reg.e, 1)
 	case 0xCC:
-		gb.execSET(&reg.h, 1)
+		reg.h = gb.execSET(reg.h, 1)
 	case 0xCD:
-		gb.execSET(&reg.l, 1)
+		reg.l = gb.execSET(reg.l, 1)
 	case 0xCE:
-		gb.execSETHl(1)
+		gb.Write(*reg.HL, gb.execSET(gb.Read(*reg.HL), 1))
 		cycles = 4
 	case 0xCF:
-		gb.execSET(&reg.a, 1)
+		reg.a = gb.execSET(reg.a, 1)
 
 	case 0xD0:
-		gb.execSET(&reg.b, 2)
+		reg.b = gb.execSET(reg.b, 2)
 	case 0xD1:
-		gb.execSET(&reg.c, 2)
+		reg.c = gb.execSET(reg.c, 2)
 	case 0xD2:
-		gb.execSET(&reg.d, 2)
+		reg.d = gb.execSET(reg.d, 2)
 	case 0xD3:
-		gb.execSET(&reg.e, 2)
+		reg.e = gb.execSET(reg.e, 2)
 	case 0xD4:
-		gb.execSET(&reg.h, 2)
+		reg.h = gb.execSET(reg.h, 2)
 	case 0xD5:
-		gb.execSET(&reg.l, 2)
+		reg.l = gb.execSET(reg.l, 2)
 	case 0xD6:
-		gb.execSETHl(2)
+		gb.Write(*reg.HL, gb.execSET(gb.Read(*reg.HL), 2))
 		cycles = 4
 	case 0xD7:
-		gb.execSET(&reg.a, 2)
+		reg.a = gb.execSET(reg.a, 2)
 
 	case 0xD8:
-		gb.execSET(&reg.b, 3)
+		reg.b = gb.execSET(reg.b, 3)
 	case 0xD9:
-		gb.execSET(&reg.c, 3)
+		reg.c = gb.execSET(reg.c, 3)
 	case 0xDA:
-		gb.execSET(&reg.d, 3)
+		reg.d = gb.execSET(reg.d, 3)
 	case 0xDB:
-		gb.execSET(&reg.e, 3)
+		reg.e = gb.execSET(reg.e, 3)
 	case 0xDC:
-		gb.execSET(&reg.h, 3)
+		reg.h = gb.execSET(reg.h, 3)
 	case 0xDD:
-		gb.execSET(&reg.l, 3)
+		reg.l = gb.execSET(reg.l, 3)
 	case 0xDE:
-		gb.execSETHl(3)
+		gb.Write(*reg.HL, gb.execSET(gb.Read(*reg.HL), 3))
 		cycles = 4
 	case 0xDF:
-		gb.execSET(&reg.a, 3)
+		reg.a = gb.execSET(reg.a, 3)
 
 	case 0xE0:
-		gb.execSET(&reg.b, 4)
+		reg.b = gb.execSET(reg.b, 4)
 	case 0xE1:
-		gb.execSET(&reg.c, 4)
+		reg.c = gb.execSET(reg.c, 4)
 	case 0xE2:
-		gb.execSET(&reg.d, 4)
+		reg.d = gb.execSET(reg.d, 4)
 	case 0xE3:
-		gb.execSET(&reg.e, 4)
+		reg.e = gb.execSET(reg.e, 4)
 	case 0xE4:
-		gb.execSET(&reg.h, 4)
+		reg.h = gb.execSET(reg.h, 4)
 	case 0xE5:
-		gb.execSET(&reg.l, 4)
+		reg.l = gb.execSET(reg.l, 4)
 	case 0xE6:
-		gb.execSETHl(4)
+		gb.Write(*reg.HL, gb.execSET(gb.Read(*reg.HL), 4))
 		cycles = 4
 	case 0xE7:
-		gb.execSET(&reg.a, 4)
+		reg.a = gb.execSET(reg.a, 4)
 
 	case 0xE8:
-		gb.execSET(&reg.b, 5)
+		reg.b = gb.execSET(reg.b, 5)
 	case 0xE9:
-		gb.execSET(&reg.c, 5)
+		reg.c = gb.execSET(reg.c, 5)
 	case 0xEA:
-		gb.execSET(&reg.d, 5)
+		reg.d = gb.execSET(reg.d, 5)
 	case 0xEB:
-		gb.execSET(&reg.e, 5)
+		reg.e = gb.execSET(reg.e, 5)
 	case 0xEC:
-		gb.execSET(&reg.h, 5)
+		reg.h = gb.execSET(reg.h, 5)
 	case 0xED:
-		gb.execSET(&reg.l, 5)
+		reg.l = gb.execSET(reg.l, 5)
 	case 0xEE:
-		gb.execSETHl(5)
+		gb.Write(*reg.HL, gb.execSET(gb.Read(*reg.HL), 5))
 		cycles = 4
 	case 0xEF:
-		gb.execSET(&reg.a, 5)
+		reg.a = gb.execSET(reg.a, 5)
 
 	case 0xF0:
-		gb.execSET(&reg.b, 6)
+		reg.b = gb.execSET(reg.b, 6)
 	case 0xF1:
-		gb.execSET(&reg.c, 6)
+		reg.c = gb.execSET(reg.c, 6)
 	case 0xF2:
-		gb.execSET(&reg.d, 6)
+		reg.d = gb.execSET(reg.d, 6)
 	case 0xF3:
-		gb.execSET(&reg.e, 6)
+		reg.e = gb.execSET(reg.e, 6)
 	case 0xF4:
-		gb.execSET(&reg.h, 6)
+		reg.h = gb.execSET(reg.h, 6)
 	case 0xF5:
-		gb.execSET(&reg.l, 6)
+		reg.l = gb.execSET(reg.l, 6)
 	case 0xF6:
-		gb.execSETHl(6)
+		gb.Write(*reg.HL, gb.execSET(gb.Read(*reg.HL), 6))
 		cycles = 4
 	case 0xF7:
-		gb.execSET(&reg.a, 6)
+		reg.a = gb.execSET(reg.a, 6)
 
 	case 0xF8:
-		gb.execSET(&reg.b, 7)
+		reg.b = gb.execSET(reg.b, 7)
 	case 0xF9:
-		gb.execSET(&reg.c, 7)
+		reg.c = gb.execSET(reg.c, 7)
 	case 0xFA:
-		gb.execSET(&reg.d, 7)
+		reg.d = gb.execSET(reg.d, 7)
 	case 0xFB:
-		gb.execSET(&reg.e, 7)
+		reg.e = gb.execSET(reg.e, 7)
 	case 0xFC:
-		gb.execSET(&reg.h, 7)
+		reg.h = gb.execSET(reg.h, 7)
 	case 0xFD:
-		gb.execSET(&reg.l, 7)
+		reg.l = gb.execSET(reg.l, 7)
 	case 0xFE:
-		gb.execSETHl(7)
+		gb.Write(*reg.HL, gb.execSET(gb.Read(*reg.HL), 7))
 		cycles = 4
 	case 0xFF:
-		gb.execSET(&reg.a, 7)
+		reg.a = gb.execSET(reg.a, 7)
 	}
 
 	return cycles
 }
 
-func (gb *GameBoy) getImmediateData() (d8 uint8, d16 uint16) {
-	// first byte is lower (0-7) and second is higher (8-15)
-	d8 = gb.Read(gb.Cpu.PC + 1)
-	d8b := gb.Read(gb.Cpu.PC + 2)
-	return d8, uint16(d8b)<<8 + uint16(d8)
+func (gb *GameBoy) getImm8() uint8 {
+	return gb.Read(gb.Cpu.PC + 1)
 }
 
-func (gb *GameBoy) execRotAcc(target *uint8, right bool, throughCarry bool) {
-
-	var (
-		v   = gb.getCbValue(target)
-		reg = gb.Cpu
-
-		res        uint8
-		carry      uint8
-		carryValue bool
-	)
-
-	switch {
-	case right && !throughCarry:
-		//res = bits.RotateLeft8(v, -1)
-		res = (v >> 1) | ((v & 1) << 7)
-
-	case right && throughCarry:
-		if reg.f.C {
-			carry = 0x80
-		}
-
-		res = (v >> 1) | carry
-		carryValue = (1 & v) == 1
-
-	case !right && !throughCarry:
-		res = (v << 1) | (v >> 7)
-		carryValue = v > 0x7F
-
-	case !right && throughCarry:
-		var carry uint8 = 0
-		if reg.f.C {
-			carry = 1
-		}
-
-		res = (v<<1)&0xFF | carry
-		carryValue = (v & 0x80) == 0x80
-	}
-
-	gb.setCbValue(target, res)
-
-	if right && !throughCarry {
-		carryValue = *target > 0x7F
-	}
-
-	reg.f.C = carryValue
-	reg.f.Z = false
-	reg.f.S = false
-	reg.f.H = false
+func (gb *GameBoy) getImm16() uint16 {
+	return uint16(gb.Read(gb.Cpu.PC + 2))<<8 | uint16(gb.Read(gb.Cpu.PC + 1))
 }
 
-func (gb *GameBoy) execRotHl(right, throughCarry bool) {
+func (gb *GameBoy) execRot(v uint8, acc, right, throughCarry bool) uint8 {
 
-    var (
-        v = gb.Read(*gb.Cpu.HL)
-        reg = gb.Cpu
-
-        res, carry uint8
-        carryValue bool
-    )
+    reg := gb.Cpu
 
 	switch {
 	case right && !throughCarry:
 
-		res = (v >> 1) | ((v & 1) << 7)
-		carryValue = v&1 == 1
+        reg.f.C = v & 1 != 0
+		v = (v >> 1) | ((v & 1) << 7)
 
 	case right && throughCarry:
+
+        carry := uint8(0)
 		if reg.f.C {
 			carry = 0x80
 		}
 
-		res = (v >> 1) | carry
-		carryValue = v&1 == 1
+        reg.f.C = v & 1 != 0
+
+		v = (v >> 1) | carry
 
 	case !right && !throughCarry:
-		res = (v << 1) | (v >> 7)
-		carryValue = v > 0x7F
+        reg.f.C = v & 0x80 != 0
+		v = (v << 1) | (v >> 7)
 
 	case !right && throughCarry:
+
+        carry := uint8(0)
 		if reg.f.C {
 			carry = 1
 		}
 
-		res = (v<<1)&0xFF | carry
-		carryValue = (v & 0x80) == 0x80
+        reg.f.C = v & 0x80 != 0
+
+		v = (v<<1)&0xFF | carry
 	}
 
-    gb.Write(*reg.HL, res)
-	reg.f.C = carryValue
-	reg.f.Z = res == 0
+	reg.f.Z = v == 0 && !acc
 	reg.f.S = false
 	reg.f.H = false
+    return v
 }
 
-func (gb *GameBoy) execRot(target *uint8, right bool, throughCarry bool) {
-
-    var (
-        v = *target
-        reg = gb.Cpu
-
-        res, carry uint8
-        carryValue bool
-    )
-
-	switch {
-	case right && !throughCarry:
-
-		res = (v >> 1) | ((v & 1) << 7)
-		carryValue = v&1 == 1
-
-	case right && throughCarry:
-		if reg.f.C {
-			carry = 0x80
-		}
-
-		res = (v >> 1) | carry
-		carryValue = v&1 == 1
-
-	case !right && !throughCarry:
-		res = (v << 1) | (v >> 7)
-		carryValue = v > 0x7F
-
-	case !right && throughCarry:
-		if reg.f.C {
-			carry = 1
-		}
-
-		res = (v<<1)&0xFF | carry
-		carryValue = (v & 0x80) == 0x80
-	}
-
-    *target = res
-
-	reg.f.C = carryValue
-	reg.f.Z = res == 0
-	reg.f.S = false
-	reg.f.H = false
-}
-
-func (gb *GameBoy) execSLAHl() {
-
-    v := gb.Read(*gb.Cpu.HL)
+func (gb *GameBoy) execSLA(v uint8) uint8 {
 	gb.Cpu.f.C = v & 0x80 != 0
-
     v <<= 1
-
-    gb.Write(*gb.Cpu.HL, v)
-
 	gb.Cpu.f.Z = v == 0
 	gb.Cpu.f.S = false
 	gb.Cpu.f.H = false
+    return v
 }
 
-func (gb *GameBoy) execSLA(reg *uint8) {
-
-    v := *reg
-	gb.Cpu.f.C = v & 0x80 != 0
-
-    v <<= 1
-
-    *reg = v
-
-	gb.Cpu.f.Z = v == 0
-	gb.Cpu.f.S = false
-	gb.Cpu.f.H = false
-}
-
-func (gb *GameBoy) execSRAHl() {
-
-    v := gb.Read(*gb.Cpu.HL)
-	res := (v & 128) | (v >> 1)
-    gb.Write(*gb.Cpu.HL, res)
-
-
-	gb.Cpu.f.C = (v & 1) == 1
-	gb.Cpu.f.Z = res == 0
-	gb.Cpu.f.S = false
-	gb.Cpu.f.H = false
-}
-
-func (gb *GameBoy) execSRA(reg *uint8) {
-
-    v := *reg
-    *reg = (v & 128) | (v >> 1)
-
-	gb.Cpu.f.C = (v & 1) == 1
-	gb.Cpu.f.Z = *reg == 0
-	gb.Cpu.f.S = false
-	gb.Cpu.f.H = false
-}
-
-func (gb *GameBoy) execSRL(reg *uint8) {
-
-	v := uint16(*reg)
-
+func (gb *GameBoy) execSRA(v uint8) uint8 {
 	gb.Cpu.f.C = v & 1 != 0
-
-    v >>= 1
-
-    *reg = uint8(v)
-
+    v = (v & 128) | (v >> 1)
 	gb.Cpu.f.Z = v == 0
 	gb.Cpu.f.S = false
 	gb.Cpu.f.H = false
+    return v
 }
 
-func (gb *GameBoy) execSRLHL() {
-
-    v := uint16(gb.Read(*gb.Cpu.HL))
+func (gb *GameBoy) execSRL(v uint8) uint8 {
 	gb.Cpu.f.C = v & 1 != 0
-
     v >>= 1
-
-    gb.Write(*gb.Cpu.HL, uint8(v))
-
 	gb.Cpu.f.Z = v == 0
 	gb.Cpu.f.S = false
 	gb.Cpu.f.H = false
+    return v
 }
 
-func (gb *GameBoy) execSWAP(reg *uint8) {
-
-	v := *reg
-	res := uint8((v>>4) | ((v<<4) & 0xF0))
-    *reg = res
-
-	gb.Cpu.f.Z = res == 0
+func (gb *GameBoy) execSWAP(v uint8) uint8 {
+	v = uint8((v>>4) | ((v<<4) & 0xF0))
+	gb.Cpu.f.Z = v == 0
 	gb.Cpu.f.S = false
 	gb.Cpu.f.H = false
 	gb.Cpu.f.C = false
+    return v
 }
 
-func (gb *GameBoy) execBITHl(bit int) {
-    v := gb.Read(*gb.Cpu.HL)
+func (gb *GameBoy) execBIT(v, bit uint8) {
 	gb.Cpu.f.Z = (v>>bit)&1 == 0
 	gb.Cpu.f.S = false
 	gb.Cpu.f.H = true
 }
 
-func (gb *GameBoy) execBIT(reg *uint8, bit int) {
-	gb.Cpu.f.Z = (*reg>>bit)&1 == 0
-	gb.Cpu.f.S = false
-	gb.Cpu.f.H = true
+func (gb *GameBoy) execRES(v, bit uint8) uint8 {
+    return v &^ (1 << bit)
 }
 
-func (gb *GameBoy) execRESHl(bit int) {
-    gb.Write(*gb.Cpu.HL, gb.Read(*gb.Cpu.HL) &^ (1 << bit))
-}
-
-func (gb *GameBoy) execRES(reg *uint8, bit int) {
-	*reg &^= 1 << bit
-}
-
-func (gb *GameBoy) execSETHl(bit int) {
-    gb.Write(*gb.Cpu.HL, gb.Read(*gb.Cpu.HL) | (1 << bit))
-}
-
-func (gb *GameBoy) execSET(reg *uint8, bit int) {
-	*reg |= 1 << bit
+func (gb *GameBoy) execSET(v, bit uint8) uint8 {
+    return v | (1 << bit)
 }
 
 func (gb *GameBoy) execDAA() {
@@ -1723,7 +1545,6 @@ func (gb *GameBoy) execDAA() {
 }
 
 func (gb *GameBoy) execSCF() {
-
 	// set carry flag
 	gb.Cpu.f.S = false
 	gb.Cpu.f.H = false
@@ -1731,7 +1552,6 @@ func (gb *GameBoy) execSCF() {
 }
 
 func (gb *GameBoy) execCCF() {
-
 	// compliment (invert) carry flag
 	gb.Cpu.f.S = false
 	gb.Cpu.f.H = false
@@ -1744,184 +1564,120 @@ func (gb *GameBoy) execCPL() {
 	gb.Cpu.f.H = true
 }
 
-func (gb *GameBoy) execAddHl(reg *uint16) {
-
-    a := *gb.Cpu.HL
-    newValue := int32(a) + int32(*reg)
-    *gb.Cpu.HL = uint16(newValue)
-
-    gb.Cpu.f.H = int32(a&0xFFF) > (newValue & 0xFFF)
-    gb.Cpu.f.C = newValue > 0xFFFF
+func (gb *GameBoy) execAddHl(a, b uint16) uint16 {
+    res := a + b
+    gb.Cpu.f.H = (a&0xFFF) > (res & 0xFFF)
+    gb.Cpu.f.C = uint(a) + uint(b) > 0xFFFF
 	gb.Cpu.f.S = false
+    return res
 }
 
-func (gb *GameBoy) execAdd(target any, f uint8) {
+func (gb *GameBoy) execAddSp(a, b uint16) uint16 {
+    res := uint16(int(a) + int(int8(b)))
+    tmp := a ^ uint16(int8(b)) ^ res
+    gb.Cpu.f.H = (tmp & 0x10) != 0
+    gb.Cpu.f.Z = false
+    gb.Cpu.f.C = (tmp & 0x100) != 0
+	gb.Cpu.f.S = false
+    return res
+}
 
-    switch t := target.(type) {
-    case *uint8:
-        a := uint16(*t)
-        b := uint16(f)
-        newValue := a + b
+func (gb *GameBoy) execAdd(a, b uint8) uint8 {
+    res := a + b
+    gb.Cpu.f.H = (a&0xF)+(b&0xF) > 0xF
+    gb.Cpu.f.Z = res == 0
+    gb.Cpu.f.C = uint(a)+uint(b) > 0xFF
+    gb.Cpu.f.S = false
+    return res
+}
 
-        *t = uint8(newValue)
-        gb.Cpu.f.H = ((a & 0xF) + (b & 0xF)) > 0xF
-        gb.Cpu.f.Z = uint8(newValue) == 0
-        gb.Cpu.f.C = newValue > 0xFF
+func (gb *GameBoy) execAdc(a, b uint8) uint8 {
+    carry := uint8(0)
+	if gb.Cpu.f.C {
+        carry = 1
+	}
 
-        case *uint16: //gb.Cpu.SP, s8
-        a := *t
-        b := int8(f)
-        newValue := uint16(int32(a) + int32(b))
-        tmp := a ^ uint16(b) ^ newValue
+	res := a + b + carry
+	gb.Cpu.f.H = (a & 0xF) + (b & 0xF) + carry > 0xF
+	gb.Cpu.f.Z = res == 0
+	gb.Cpu.f.C = uint16(a) + uint16(b) + uint16(carry) > 0xFF
+	gb.Cpu.f.S = false
+    return res
+}
 
-        *t = newValue
-        gb.Cpu.f.H = (tmp & 0x10) == 0x10
-        gb.Cpu.f.Z = false
-        gb.Cpu.f.C = (tmp & 0x100) == 0x100
+func (gb *GameBoy) execSub(a, b uint8) uint8 {
+	res := a - b
+	gb.Cpu.f.Z = res == 0
+	gb.Cpu.f.S = true
+    gb.Cpu.f.H = a & 0xF < b & 0xF
+	gb.Cpu.f.C = a < b
+    return res
+}
+
+func (gb *GameBoy) execSbc(a, b uint8) uint8 {
+    carry := uint8(0)
+    if gb.Cpu.f.C {
+        carry = 1
     }
 
-
-	gb.Cpu.f.S = false
+    res := a - b - carry
+    gb.Cpu.f.Z = res == 0
+    gb.Cpu.f.S = true
+    gb.Cpu.f.H = a&0xF < b&0xF + carry
+    gb.Cpu.f.C = uint(a) < uint(b)+uint(carry)
+    return res
 }
 
-func (gb *GameBoy) execAdc(to *uint8, from uint8) {
-	a := uint16(*to)
-	b := uint16(from)
-	newValue := a + b
-
-	halfCarry := (a & 0xF) + (b & 0xF)
-
-	if gb.Cpu.f.C {
-		newValue++
-		halfCarry++
-	}
-
-	*to = uint8(newValue)
-	gb.Cpu.f.H = halfCarry > 0xF
-	gb.Cpu.f.Z = uint8(newValue) == 0
-	gb.Cpu.f.C = newValue > 0xFF
-	gb.Cpu.f.S = false
-}
-
-func (gb *GameBoy) execSub(to *uint8, from uint8) {
-	a := uint16(*to)
-	b := uint16(from)
-	newValue := int16(a) - int16(b)
-
-	*to = uint8(newValue)
-	gb.Cpu.f.Z = uint8(newValue) == 0
-	gb.Cpu.f.S = true
-	gb.Cpu.f.H = int16(a&0x0F)-int16(b&0xF) < 0
-	gb.Cpu.f.C = newValue < 0
-}
-
-func (gb *GameBoy) execSbc(to *uint8, from uint8) {
-	a := uint16(*to)
-	b := uint16(from)
-	newValue := int16(a) - int16(b)
-	halfCarry := int16(a&0xF) - int16(b&0xF)
-
-	if gb.Cpu.f.C {
-		newValue--
-		halfCarry--
-	}
-
-	*to = uint8(newValue)
-
-	gb.Cpu.f.Z = uint8(newValue) == 0
-	gb.Cpu.f.S = true
-	gb.Cpu.f.H = halfCarry < 0
-	gb.Cpu.f.C = newValue < 0
-}
-
-func (gb *GameBoy) execAnd(to *uint8, from uint8) {
-
-	newValue := *to & from
-
-	*to = uint8(newValue)
-	gb.Cpu.f.Z = newValue == 0
+func (gb *GameBoy) execAnd(a, b uint8) uint8 {
+	gb.Cpu.f.Z = a & b == 0
 	gb.Cpu.f.S = false
 	gb.Cpu.f.H = true
 	gb.Cpu.f.C = false
+    return a & b
 }
 
-func (gb *GameBoy) execXor(to *uint8, from uint8) {
-
-	newValue := *to ^ from
-
-	*to = uint8(newValue)
-	gb.Cpu.f.Z = newValue == 0
+func (gb *GameBoy) execXor(a, b uint8) uint8 {
+	gb.Cpu.f.Z = a ^ b == 0
 	gb.Cpu.f.S = false
 	gb.Cpu.f.H = false
 	gb.Cpu.f.C = false
+    return a ^ b
 }
 
-func (gb *GameBoy) execOr(to *uint8, from uint8) {
-
-	newValue := *to | from
-
-	*to = uint8(newValue)
-	gb.Cpu.f.Z = newValue == 0
+func (gb *GameBoy) execOr(a, b uint8) uint8 {
+	gb.Cpu.f.Z = a | b == 0
 	gb.Cpu.f.S = false
 	gb.Cpu.f.H = false
 	gb.Cpu.f.C = false
+    return a | b
 }
 
-func (gb *GameBoy) execCp(to *uint8, from uint8) {
-
-	newValue := *to - from
-
-	gb.Cpu.f.Z = newValue == 0
+func (gb *GameBoy) execCp(a, b uint8) {
+	gb.Cpu.f.Z = a - b == 0
 	gb.Cpu.f.S = true
-	gb.Cpu.f.H = ((from & 0xF) > (*to & 0xF))
-	gb.Cpu.f.C = from > *to
+	gb.Cpu.f.H = (b & 0xF) > (a & 0xF)
+	gb.Cpu.f.C = b > a
 }
 
-func (gb *GameBoy) execInc(reg *uint8) {
-    v := uint16(*reg)
-    *reg++
-    gb.Cpu.f.Z = *reg == 0
-    gb.Cpu.f.S = false
-    gb.Cpu.f.H = ((v&0xF)+(1&0xF) > 0xF)
-}
-
-func (gb *GameBoy) execDec(reg *uint8) {
-    v := uint16(*reg)
-    *reg--
-    gb.Cpu.f.Z = *reg == 0
-    gb.Cpu.f.S = true
-    gb.Cpu.f.H = ((v&0xF)-(1&0xF) > 0xF)
-}
-
-func (gb *GameBoy) execIncHl() {
-
-    v := gb.Read(*gb.Cpu.HL)
-
-    gb.Cpu.f.S = false
-    gb.Cpu.f.H = (v&0xF)+(1&0xF) > 0xF
+func (gb *GameBoy) execInc(v uint8) uint8 {
+    gb.Cpu.f.H = v & 0xF == 0xF
     v++
-
-    gb.Write(*gb.Cpu.HL, v)
-
-	gb.Cpu.f.Z = v == 0
+    gb.Cpu.f.Z = v == 0
+    gb.Cpu.f.S = false
+    return v
 }
 
-func (gb *GameBoy) execDecHl() {
-
-    v := gb.Read(*gb.Cpu.HL)
-
-    gb.Cpu.f.S = true
-    gb.Cpu.f.H = (v & 0x0F) == 0
+func (gb *GameBoy) execDec(v uint8) uint8 {
+    gb.Cpu.f.H = v & 0xF == 0
     v--
-
-    gb.Write(*gb.Cpu.HL, v)
-
-	gb.Cpu.f.Z = v == 0
+    gb.Cpu.f.Z = v == 0
+    gb.Cpu.f.S = true
+    return v
 }
 
-func (gb *GameBoy) execJP(addr uint16, condition bool, cyclesIf int, cycles int) (c int, pc uint16) {
+func (gb *GameBoy) execJP(addr uint16, cond bool, cyclesIf, cycles int) (c int, pc uint16) {
 
-	if condition {
+	if cond {
 		return cyclesIf, addr
 	}
 
@@ -1952,7 +1708,7 @@ func (gb *GameBoy) StackPush(v uint16) {
 	gb.Write(gb.Cpu.SP, uint8(v))
 }
 
-func (gb *GameBoy) execCall(addr uint16, cond bool, cyclesIf int, cycles int) (c int, pc uint16) {
+func (gb *GameBoy) execCall(addr uint16, cond bool, cyclesIf, cycles int) (c int, pc uint16) {
 	if cond {
 		gb.StackPush(gb.Cpu.PC + 3)
 		return cyclesIf, addr
@@ -1961,31 +1717,11 @@ func (gb *GameBoy) execCall(addr uint16, cond bool, cyclesIf int, cycles int) (c
 	return cycles, gb.Cpu.PC + 3
 }
 
-func (gb *GameBoy) execRet(cond bool, cyclesIf int, cycles int) (c int, pc uint16) {
+func (gb *GameBoy) execRet(cond bool, cyclesIf, cycles int) (c int, pc uint16) {
 
 	if cond {
 		return cyclesIf, gb.StackPop()
 	}
 
 	return cycles, gb.Cpu.PC + 1
-}
-
-func (gb *GameBoy) getCbValue(target any) uint8 {
-	switch t := target.(type) {
-	case *uint8:
-		return *t
-	case int:
-        return gb.Read(*gb.Cpu.HL)
-    default:
-        panic("unknown target get cb value")
-	}
-}
-
-func (gb *GameBoy) setCbValue(target any, res uint8) {
-	switch t := target.(type) {
-	case *uint8:
-		*t = res
-	case int:
-        gb.Write(*gb.Cpu.HL, res)
-	}
 }
