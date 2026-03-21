@@ -38,7 +38,7 @@ type GameBoy struct {
 	spPalette *ColorPalette
 
 	Cartridge cartridge.Cartridge
-	Cpu       Cpu
+	Cpu       *Cpu
 	//Apu       APU
 	MemoryBus MemoryBus
 	FPS       int
@@ -75,7 +75,7 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 
 	gb := GameBoy{
 		Image:  img,
-		Cpu:    *NewCpu(),
+		Cpu:    NewCpu(),
 		FPS:    60,
 		Clock:  4194304,
 		Joypad: 0xFF,

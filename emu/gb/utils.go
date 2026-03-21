@@ -38,7 +38,7 @@ func LoadLine(gb *GameBoy, line int) {
 			case 8:
 				gb.Cpu.e = uint8(z)
 			case 9:
-				gb.Cpu.g = uint8(z)
+				//gb.Cpu.g = uint8(z)
 			case 10:
 				gb.Cpu.h = uint8(z)
 			case 11:
@@ -84,7 +84,7 @@ func DumpLine(gb *GameBoy, line int) {
 	o += fmt.Sprintf("%d\n", gb.Cpu.c)
 	o += fmt.Sprintf("%d\n", gb.Cpu.d)
 	o += fmt.Sprintf("%d\n", gb.Cpu.e)
-	o += fmt.Sprintf("%d\n", gb.Cpu.g)
+	//o += fmt.Sprintf("%d\n", gb.Cpu.g)
 	o += fmt.Sprintf("%d\n", gb.Cpu.h)
 	o += fmt.Sprintf("%d\n", gb.Cpu.l)
 	o += fmt.Sprintf("%t\n", gb.Cpu.f.Z)
