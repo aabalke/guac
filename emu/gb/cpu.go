@@ -1601,11 +1601,10 @@ func (gb *GameBoy) execSRAHl() {
 func (gb *GameBoy) execSRA(reg *uint8) {
 
     v := *reg
-	res := (v & 128) | (v >> 1)
-    *reg = v
+    *reg = (v & 128) | (v >> 1)
 
 	gb.Cpu.f.C = (v & 1) == 1
-	gb.Cpu.f.Z = res == 0
+	gb.Cpu.f.Z = *reg == 0
 	gb.Cpu.f.S = false
 	gb.Cpu.f.H = false
 }
@@ -1896,26 +1895,26 @@ func (gb *GameBoy) execDec(reg *uint8) {
 
 func (gb *GameBoy) execIncHl() {
 
-    v := *gb.Cpu.HL
+    v := gb.Read(*gb.Cpu.HL)
 
     gb.Cpu.f.S = false
     gb.Cpu.f.H = (v&0xF)+(1&0xF) > 0xF
     v++
 
-    *gb.Cpu.HL = v
+    gb.Write(*gb.Cpu.HL, v)
 
 	gb.Cpu.f.Z = v == 0
 }
 
 func (gb *GameBoy) execDecHl() {
 
-    v := *gb.Cpu.HL
+    v := gb.Read(*gb.Cpu.HL)
 
     gb.Cpu.f.S = true
     gb.Cpu.f.H = (v & 0x0F) == 0
     v--
 
-    *gb.Cpu.HL = v
+    gb.Write(*gb.Cpu.HL, v)
 
 	gb.Cpu.f.Z = v == 0
 }
