@@ -44,6 +44,9 @@ type GameBoy struct {
 	MemoryBus MemoryBus
 	FPS       int
 
+    // cycles are tcycles, 1/4 mcycles
+    frameCycles int
+	Cycles int
 	Clock              int
 	DoubleSpeed        bool
 	PrepareSpeedToggle bool
@@ -56,8 +59,6 @@ type GameBoy struct {
 	bgPriority [width][height]bool
 	spMinx     [width]int32
 	pixelDrawn [width]bool
-
-	Cycles int
 
 	Paused bool
 	Muted  bool
@@ -115,48 +116,83 @@ func (gb *GameBoy) GetPixels() []byte {
 	return gb.Pixels
 }
 
+//func (gb *GameBoy) Update() {
+//
+//	if gb.Paused {
+//		return
+//	}
+//
+//	multiplier := 1
+//	if gb.DoubleSpeed {
+//		multiplier = 2
+//	}
+//
+//	for updateCycles := 0; updateCycles < (gb.Clock / gb.FPS * multiplier); {
+//
+//		gb.Cycles = 0
+//		cycles := 4
+//
+//		if !gb.Cpu.Halted {
+//			cycles = gb.Execute()
+//		}
+//
+//		if gb.DoubleSpeed {
+//			cycles /= 2
+//		}
+//
+//		updateCycles += cycles
+//		gb.Cycles = cycles
+//
+//		gb.UpdateGraphics()
+//
+//		interruptCycles := gb.UpdateInterrupt()
+//		if gb.DoubleSpeed {
+//			interruptCycles /= 2
+//		}
+//		updateCycles += interruptCycles
+//		gb.Cycles += interruptCycles
+//		gb.Apu.SoundClock(uint32(gb.Cycles), gb.DoubleSpeed)
+//
+//		gb.UpdateTimers()
+//	}
+//
+//	gb.UpdateDisplay()
+//	gb.Apu.Play(gb.Muted)
+//}
 func (gb *GameBoy) Update() {
+    if gb.Paused {
+        return
+    }
+    multiplier := 1
+    if gb.DoubleSpeed {
+        multiplier = 2
+    }
+    targetCycles := gb.Clock / gb.FPS * multiplier
+    for gb.frameCycles < targetCycles {
+        if gb.Cpu.Halted {
+            gb.Tick(4) // halted still burns cycles
+        } else {
+            gb.Execute() // ticking happens inside here now
+        }
+    }
+    gb.frameCycles -= targetCycles // carry over, don't reset to 0
 
-	if gb.Paused {
-		return
-	}
+    gb.UpdateDisplay()
+    gb.Apu.Play(gb.Muted)
+}
 
-	multiplier := 1
-	if gb.DoubleSpeed {
-		multiplier = 2
-	}
+func (gb *GameBoy) Tick(tCycles int) {
+    if gb.DoubleSpeed {
+        tCycles /= 2
+    }
+    gb.frameCycles += tCycles
+    gb.Cycles = tCycles // keep if anything still reads this
 
-	for updateCycles := 0; updateCycles < (gb.Clock / gb.FPS * multiplier); {
+    gb.UpdateGraphics()   // was: gb.UpdateGraphics() after Execute()
+    gb.UpdateTimers()     // was: gb.UpdateTimers() after Execute()
 
-		gb.Cycles = 0
-		cycles := 4
-
-		if !gb.Cpu.Halted {
-			cycles = gb.Execute()
-		}
-
-		if gb.DoubleSpeed {
-			cycles /= 2
-		}
-
-		updateCycles += cycles
-		gb.Cycles = cycles
-
-		gb.UpdateGraphics()
-
-		interruptCycles := gb.UpdateInterrupt()
-		if gb.DoubleSpeed {
-			interruptCycles /= 2
-		}
-		updateCycles += interruptCycles
-		gb.Cycles += interruptCycles
-		gb.Apu.SoundClock(uint32(gb.Cycles), gb.DoubleSpeed)
-
-		gb.UpdateTimers()
-	}
-
-	gb.UpdateDisplay()
-	gb.Apu.Play(gb.Muted)
+    interruptCycles := gb.UpdateInterrupt()
+    gb.Apu.SoundClock(uint32(tCycles + interruptCycles), gb.DoubleSpeed)
 }
 
 func (gb *GameBoy) ToggleMute() bool {

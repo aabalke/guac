@@ -172,12 +172,13 @@ func (gb *GameBoy) getImm16() uint16 {
 	return uint16(gb.Read(gb.Cpu.PC+2))<<8 | uint16(gb.Read(gb.Cpu.PC+1))
 }
 
-func (gb *GameBoy) Execute() (cycles int) {
+func (gb *GameBoy) Execute() {
 
-	cycles = 1
+    cycles := 0
 	pc := gb.Cpu.PC + 1
 	reg := gb.Cpu
 
+    gb.Tick(4)
 	op := gb.GetOp()
 	//op := gb.Read(gb.Cpu.PC)
 
@@ -209,8 +210,8 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0x45:
 		reg.b = reg.l
 	case 0x46:
+        gb.Tick(4)
 		reg.b = gb.Read(*reg.HL)
-		cycles = 2
 	case 0x47:
 		reg.b = reg.a
 	case 0x48:
@@ -226,8 +227,8 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0x4D:
 		reg.c = reg.l
 	case 0x4E:
+        gb.Tick(4)
 		reg.c = gb.Read(*reg.HL)
-		cycles = 2
 	case 0x4F:
 		reg.c = reg.a
 
@@ -244,8 +245,8 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0x55:
 		reg.d = reg.l
 	case 0x56:
+        gb.Tick(4)
 		reg.d = gb.Read(*reg.HL)
-		cycles = 2
 	case 0x57:
 		reg.d = reg.a
 
@@ -262,8 +263,8 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0x5D:
 		reg.e = reg.l
 	case 0x5E:
+        gb.Tick(4)
 		reg.e = gb.Read(*reg.HL)
-		cycles = 2
 	case 0x5F:
 		reg.e = reg.a
 
@@ -280,8 +281,8 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0x65:
 		reg.h = reg.l
 	case 0x66:
+        gb.Tick(4)
 		reg.h = gb.Read(*reg.HL)
-		cycles = 2
 	case 0x67:
 		reg.h = reg.a
 
@@ -298,77 +299,77 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0x6D:
 		reg.l = reg.l
 	case 0x6E:
+        gb.Tick(4)
 		reg.l = gb.Read(*reg.HL)
-		cycles = 2
 	case 0x6F:
 		reg.l = reg.a
 	case 0x01:
+        gb.Tick(8)
 		*reg.BC = gb.getImm16()
 		pc = pc + 2
 		reg.PcOff += 2
-		cycles = 3
 	case 0x11:
+        gb.Tick(8)
 		*reg.DE = gb.getImm16()
 		pc = pc + 2
 		reg.PcOff += 2
-		cycles = 3
 	case 0x21:
+        gb.Tick(8)
 		*reg.HL = gb.getImm16()
 		pc = pc + 2
 		reg.PcOff += 2
-		cycles = 3
 	case 0x31:
+        gb.Tick(8)
 		reg.SP = gb.getImm16()
 		pc = pc + 2
 		reg.PcOff += 2
-		cycles = 3
 
 	case 0x70:
 
+        gb.Tick(4)
 		gb.Write(*reg.HL, reg.b)
-		cycles = 2
 	case 0x71:
+        gb.Tick(4)
 		gb.Write(*reg.HL, reg.c)
-		cycles = 2
 	case 0x72:
+        gb.Tick(4)
 		gb.Write(*reg.HL, reg.d)
-		cycles = 2
 	case 0x73:
+        gb.Tick(4)
 		gb.Write(*reg.HL, reg.e)
-		cycles = 2
 	case 0x74:
+        gb.Tick(4)
 		gb.Write(*reg.HL, reg.h)
-		cycles = 2
 	case 0x75:
+        gb.Tick(4)
 		gb.Write(*reg.HL, reg.l)
-		cycles = 2
 	case 0x76:
 		gb.Cpu.Halted = true
 
 	case 0x77:
+        gb.Tick(4)
 		gb.Write(*reg.HL, reg.a)
-		cycles = 2
 
 	case 0x0E:
+        gb.Tick(4)
 		reg.c = gb.getImm8()
 		pc++
 		reg.PcOff++
-		cycles = 2
 	case 0x1E:
+        gb.Tick(4)
 		reg.e = gb.getImm8()
 		pc++
 		reg.PcOff++
-		cycles = 2
 	case 0x2E:
+        gb.Tick(4)
 		reg.l = gb.getImm8()
 		pc++
 		reg.PcOff++
-		cycles = 2
 	case 0x3E:
+        gb.Tick(4)
 		reg.a = gb.getImm8()
 		pc++
 		reg.PcOff++
-		cycles = 2
 
 	case 0x78:
 		reg.a = reg.b
@@ -383,8 +384,8 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0x7D:
 		reg.a = reg.l
 	case 0x7E:
+        gb.Tick(4)
 		reg.a = gb.Read(*reg.HL)
-		cycles = 2
 	case 0x7F:
 		reg.a = reg.a
 
@@ -401,23 +402,23 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0x85:
 		reg.a = gb.execAdd(reg.a, reg.l)
 	case 0x86:
+        gb.Tick(4)
 		reg.a = gb.execAdd(reg.a, gb.Read(*reg.HL))
-		cycles = 2
 	case 0x87:
 		reg.a = gb.execAdd(reg.a, reg.a)
 
 	case 0x09:
+        gb.Tick(4)
 		*reg.HL = gb.execAddHl(*reg.HL, *reg.BC)
-		cycles = 2
 	case 0x19:
+        gb.Tick(4)
 		*reg.HL = gb.execAddHl(*reg.HL, *reg.DE)
-		cycles = 2
 	case 0x29:
+        gb.Tick(4)
 		*reg.HL = gb.execAddHl(*reg.HL, *reg.HL)
-		cycles = 2
 	case 0x39:
+        gb.Tick(4)
 		*reg.HL = gb.execAddHl(*reg.HL, gb.Cpu.SP)
-		cycles = 2
 
 	case 0x88:
 		reg.a = gb.execAdc(reg.a, reg.b)
@@ -432,8 +433,8 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0x8D:
 		reg.a = gb.execAdc(reg.a, reg.l)
 	case 0x8E:
+        gb.Tick(4)
 		reg.a = gb.execAdc(reg.a, gb.Read(*reg.HL))
-		cycles = 2
 	case 0x8F:
 		reg.a = gb.execAdc(reg.a, reg.a)
 
@@ -450,8 +451,8 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0x95:
 		reg.a = gb.execSub(reg.a, reg.l)
 	case 0x96:
+        gb.Tick(4)
 		reg.a = gb.execSub(reg.a, gb.Read(*reg.HL))
-		cycles = 2
 	case 0x97:
 		reg.a = gb.execSub(reg.a, reg.a)
 
@@ -468,8 +469,8 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0x9D:
 		reg.a = gb.execSbc(reg.a, reg.l)
 	case 0x9E:
+        gb.Tick(4)
 		reg.a = gb.execSbc(reg.a, gb.Read(*reg.HL))
-		cycles = 2
 	case 0x9F:
 		reg.a = gb.execSbc(reg.a, reg.a)
 
@@ -486,8 +487,8 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0xA5:
 		reg.a = gb.execAnd(reg.a, reg.l)
 	case 0xA6:
+        gb.Tick(4)
 		reg.a = gb.execAnd(reg.a, gb.Read(*reg.HL))
-		cycles = 2
 	case 0xA7:
 		reg.a = gb.execAnd(reg.a, reg.a)
 
@@ -504,8 +505,8 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0xAD:
 		reg.a = gb.execXor(reg.a, reg.l)
 	case 0xAE:
+        gb.Tick(4)
 		reg.a = gb.execXor(reg.a, gb.Read(*reg.HL))
-		cycles = 2
 	case 0xAF:
 		reg.a = gb.execXor(reg.a, reg.a)
 
@@ -522,8 +523,8 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0xB5:
 		reg.a = gb.execOr(reg.a, reg.l)
 	case 0xB6:
+        gb.Tick(4)
 		reg.a = gb.execOr(reg.a, gb.Read(*reg.HL))
-		cycles = 2
 	case 0xB7:
 		reg.a = gb.execOr(reg.a, reg.a)
 
@@ -540,8 +541,8 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0xBD:
 		gb.execCp(reg.a, reg.l)
 	case 0xBE:
+        gb.Tick(4)
 		gb.execCp(reg.a, gb.Read(*reg.HL))
-		cycles = 2
 	case 0xBF:
 		gb.execCp(reg.a, reg.a)
 
@@ -552,8 +553,10 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0x24:
 		reg.h = gb.execInc(reg.h)
 	case 0x34:
-		gb.Write(*reg.HL, gb.execInc(gb.Read(*reg.HL)))
-		cycles = 3
+        gb.Tick(4)
+        v := gb.execInc(gb.Read(*reg.HL))
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
 	case 0x0C:
 		reg.c = gb.execInc(reg.c)
 	case 0x1C:
@@ -563,17 +566,17 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0x3C:
 		reg.a = gb.execInc(reg.a)
 	case 0x03:
+        gb.Tick(4)
 		*reg.BC++
-		cycles = 2
 	case 0x13:
+        gb.Tick(4)
 		*reg.DE++
-		cycles = 2
 	case 0x23:
+        gb.Tick(4)
 		*reg.HL++
-		cycles = 2
 	case 0x33:
+        gb.Tick(4)
 		gb.Cpu.SP += 1
-		cycles = 2
 
 	case 0x05:
 		reg.b = gb.execDec(reg.b)
@@ -582,8 +585,10 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0x25:
 		reg.h = gb.execDec(reg.h)
 	case 0x35:
-		gb.Write(*reg.HL, gb.execDec(gb.Read(*reg.HL)))
-		cycles = 3
+        gb.Tick(4)
+        v := gb.execDec(gb.Read(*reg.HL))
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
 	case 0x0D:
 		reg.c = gb.execDec(reg.c)
 	case 0x1D:
@@ -593,109 +598,109 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0x3D:
 		reg.a = gb.execDec(reg.a)
 	case 0x0B:
+        gb.Tick(4)
 		*reg.BC--
-		cycles = 2
 	case 0x1B:
+        gb.Tick(4)
 		*reg.DE--
-		cycles = 2
 	case 0x2B:
+        gb.Tick(4)
 		*reg.HL--
-		cycles = 2
 	case 0x3B:
+        gb.Tick(4)
 		gb.Cpu.SP -= 1
-		cycles = 2
 
 	case 0xC6:
+        gb.Tick(4)
 		reg.a = gb.execAdd(reg.a, gb.getImm8())
 		pc++
 		reg.PcOff++
-		cycles = 2
 	case 0xD6:
+        gb.Tick(4)
 		reg.a = gb.execSub(reg.a, gb.getImm8())
 		pc++
 		reg.PcOff++
-		cycles = 2
 	case 0xE6:
+        gb.Tick(4)
 		reg.a = gb.execAnd(reg.a, gb.getImm8())
 		pc++
 		reg.PcOff++
-		cycles = 2
 	case 0xF6:
+        gb.Tick(4)
 		reg.a = gb.execOr(reg.a, gb.getImm8())
 		pc++
 		reg.PcOff++
-		cycles = 2
 	case 0xCE:
+        gb.Tick(4)
 		reg.a = gb.execAdc(reg.a, gb.getImm8())
 		pc++
 		reg.PcOff++
-		cycles = 2
 	case 0xDE:
+        gb.Tick(4)
 		reg.a = gb.execSbc(reg.a, gb.getImm8())
 		pc++
 		reg.PcOff++
-		cycles = 2
 	case 0xEE:
+        gb.Tick(4)
 		reg.a = gb.execXor(reg.a, gb.getImm8())
 		pc++
 		reg.PcOff++
-		cycles = 2
 	case 0xFE:
+        gb.Tick(4)
 		gb.execCp(reg.a, gb.getImm8())
 		pc++
 		reg.PcOff++
-		cycles = 2
 	case 0x06:
+        gb.Tick(4)
 		reg.b = gb.getImm8()
 		pc++
 		reg.PcOff++
-		cycles = 2
 	case 0x16:
+        gb.Tick(4)
 		reg.d = gb.getImm8()
 		pc++
 		reg.PcOff++
-		cycles = 2
 	case 0x26:
+        gb.Tick(4)
 		reg.h = gb.getImm8()
 		pc++
 		reg.PcOff++
-		cycles = 2
 	case 0x36:
+        gb.Tick(8)
 		gb.Write(*reg.HL, gb.getImm8())
 		pc++
 		reg.PcOff++
-		cycles = 3
 
 	case 0x0A:
+        gb.Tick(4)
 		reg.a = gb.Read(*reg.BC)
-		cycles = 2
 	case 0x1A:
+        gb.Tick(4)
 		reg.a = gb.Read(*reg.DE)
-		cycles = 2
 	case 0x2A:
+        gb.Tick(4)
 		reg.a = gb.Read(*reg.HL)
 		*reg.HL++
-		cycles = 2
 	case 0x3A:
+        gb.Tick(4)
 		reg.a = gb.Read(*reg.HL)
 		*reg.HL--
-		cycles = 2
 
 	case 0x02:
+        gb.Tick(4)
 		gb.Write(*reg.BC, reg.a)
-		cycles = 2
 	case 0x12:
+        gb.Tick(4)
 		gb.Write(*reg.DE, reg.a)
-		cycles = 2
 	case 0x22:
+        gb.Tick(4)
 		gb.Write(*reg.HL, reg.a)
 		*reg.HL++
-		cycles = 2
 
 	case 0x32:
+        gb.Tick(4)
 		gb.Write(*reg.HL, reg.a)
 		*reg.HL--
-		cycles = 2
 
 	//other misc arth
 	case 0x27:
@@ -719,34 +724,47 @@ func (gb *GameBoy) Execute() (cycles int) {
 
 	// CB
 	case 0xCB:
-		cycles = gb.execCB(gb.getImm8())
+        // 8 ticks 1 op 1 cb
+        gb.Tick(4)
+        gb.execCB(gb.getImm8())
 		pc++
 
 	// jump abs
 	case 0xC2:
 		cycles, pc = gb.execJP(gb.getImm16(), !reg.f.Z, 4, 3)
+        gb.Tick((cycles - 1) * 4)
 	case 0xD2:
 		cycles, pc = gb.execJP(gb.getImm16(), !reg.f.C, 4, 3)
+        gb.Tick((cycles - 1) * 4)
 	case 0xC3:
 		cycles, pc = gb.execJP(gb.getImm16(), true, 4, 4)
+        gb.Tick((cycles - 1) * 4)
 	case 0xCA:
 		cycles, pc = gb.execJP(gb.getImm16(), reg.f.Z, 4, 3)
+        gb.Tick((cycles - 1) * 4)
 	case 0xDA:
 		cycles, pc = gb.execJP(gb.getImm16(), reg.f.C, 4, 3)
+        gb.Tick((cycles - 1) * 4)
 	case 0xE9:
 		cycles, pc = gb.execJP(*reg.HL, true, 1, 1)
+        gb.Tick((cycles - 1) * 4)
 
 	// jump relative
 	case 0x20:
 		cycles, pc = gb.execJR(gb.getImm8(), !reg.f.Z, 3, 2)
+        gb.Tick((cycles - 1) * 4)
 	case 0x30:
 		cycles, pc = gb.execJR(gb.getImm8(), !reg.f.C, 3, 2)
+        gb.Tick((cycles - 1) * 4)
 	case 0x18:
 		cycles, pc = gb.execJR(gb.getImm8(), true, 3, 3)
+        gb.Tick((cycles - 1) * 4)
 	case 0x28:
 		cycles, pc = gb.execJR(gb.getImm8(), reg.f.Z, 3, 2)
+        gb.Tick((cycles - 1) * 4)
 	case 0x38:
 		cycles, pc = gb.execJR(gb.getImm8(), reg.f.C, 3, 2)
+        gb.Tick((cycles - 1) * 4)
 
 	// Interrupts
 	case 0xF3:
@@ -756,135 +774,147 @@ func (gb *GameBoy) Execute() (cycles int) {
 
 	// misc ld
 	case 0x08:
+        gb.Tick(4 * 4)
 		gb.Write(gb.getImm16()+0, uint8(gb.Cpu.SP))
 		gb.Write(gb.getImm16()+1, uint8(gb.Cpu.SP>>8))
 		pc = pc + 2
 		reg.PcOff += 2
-		cycles = 5
 	case 0xFA:
+        gb.Tick(4 * 3)
 		reg.a = gb.Read(gb.getImm16())
 		pc = pc + 2
 		reg.PcOff += 2
-		cycles = 4
 	case 0xEA:
+        gb.Tick(4 * 3)
 		gb.Write(gb.getImm16(), reg.a)
 		pc = pc + 2
 		reg.PcOff += 2
-		cycles = 4
 	case 0xF9:
+        gb.Tick(4)
 		reg.SP = *reg.HL
-		cycles = 2
 
 	// push
 	case 0xC5:
+        gb.Tick(4 * 3)
 		gb.StackPush(*reg.BC)
-		cycles = 4
 	case 0xD5:
+        gb.Tick(4 * 3)
 		gb.StackPush(*reg.DE)
-		cycles = 4
 	case 0xE5:
+        gb.Tick(4 * 3)
 		gb.StackPush(*reg.HL)
-		cycles = 4
 	case 0xF5:
+        gb.Tick(4 * 3)
 		gb.StackPush(uint16(reg.a)<<8 | uint16(reg.f.Get()))
-		cycles = 4
 
 	// pop
 	case 0xC1:
+        gb.Tick(8)
 		*reg.BC = gb.StackPop()
-		cycles = 3
 	case 0xD1:
+        gb.Tick(8)
 		*reg.DE = gb.StackPop()
-		cycles = 3
 	case 0xE1:
+        gb.Tick(8)
 		*reg.HL = gb.StackPop()
-		cycles = 3
 	case 0xF1:
+        gb.Tick(8)
 		v := gb.StackPop() & 0xFFF0
 		reg.a = uint8(v >> 8)
 		reg.f.Set(uint8(v))
-		cycles = 3
 
 		// rst
 	case 0xC7:
+        gb.Tick(3 * 4)
 		gb.StackPush(gb.Cpu.PC + 1)
 		pc = 0x00
-		cycles = 4
 	case 0xD7:
+        gb.Tick(3 * 4)
 		gb.StackPush(gb.Cpu.PC + 1)
 		pc = 0x10
-		cycles = 4
 	case 0xE7:
+        gb.Tick(3 * 4)
 		gb.StackPush(gb.Cpu.PC + 1)
 		pc = 0x20
-		cycles = 4
 	case 0xF7:
+        gb.Tick(3 * 4)
 		gb.StackPush(gb.Cpu.PC + 1)
 		pc = 0x30
-		cycles = 4
 	case 0xCF:
+        gb.Tick(3 * 4)
 		gb.StackPush(gb.Cpu.PC + 1)
 		pc = 0x08
-		cycles = 4
 	case 0xDF:
+        gb.Tick(3 * 4)
 		gb.StackPush(gb.Cpu.PC + 1)
 		pc = 0x18
-		cycles = 4
 	case 0xEF:
+        gb.Tick(3 * 4)
 		gb.StackPush(gb.Cpu.PC + 1)
 		pc = 0x28
-		cycles = 4
 	case 0xFF:
+        gb.Tick(3 * 4)
 		gb.StackPush(gb.Cpu.PC + 1)
 		pc = 0x38
-		cycles = 4
 
 	// call
 	case 0xC4:
 		cycles, pc = gb.execCall(gb.getImm16(), !reg.f.Z, 6, 3)
+        gb.Tick((cycles - 1) * 4)
 	case 0xD4:
 		cycles, pc = gb.execCall(gb.getImm16(), !reg.f.C, 6, 3)
+        gb.Tick((cycles - 1) * 4)
 	case 0xCC:
 		cycles, pc = gb.execCall(gb.getImm16(), reg.f.Z, 6, 3)
+        gb.Tick((cycles - 1) * 4)
 	case 0xDC:
 		cycles, pc = gb.execCall(gb.getImm16(), reg.f.C, 6, 3)
+        gb.Tick((cycles - 1) * 4)
 	case 0xCD:
 		cycles, pc = gb.execCall(gb.getImm16(), true, 6, 6)
+        gb.Tick((cycles - 1) * 4)
 
 	// ret
 	case 0xC0:
 		cycles, pc = gb.execRet(!reg.f.Z, 5, 2)
+        gb.Tick((cycles - 1) * 4)
 	case 0xD0:
 		cycles, pc = gb.execRet(!reg.f.C, 5, 2)
+        gb.Tick((cycles - 1) * 4)
 	case 0xC8:
 		cycles, pc = gb.execRet(reg.f.Z, 5, 2)
+        gb.Tick((cycles - 1) * 4)
 	case 0xD8:
 		cycles, pc = gb.execRet(reg.f.C, 5, 2)
+        gb.Tick((cycles - 1) * 4)
 	case 0xC9:
 		cycles, pc = gb.execRet(true, 4, 4)
+        gb.Tick((cycles - 1) * 4)
 	case 0xD9:
+        gb.Tick(3 * 4)
 		pc = gb.StackPop()
 		gb.Cpu.IME = true
 		//gb.Cpu.PendingInterrupt = true
-		cycles = 4
 
 	case 0xE0:
+        gb.Tick(2 * 4)
 		gb.Write(0xFF00+uint16(gb.getImm8()), reg.a)
 		pc++
 		reg.PcOff++
-		cycles = 3
 	case 0xF0:
+        gb.Tick(8)
 		reg.a = gb.Read(0xFF00 | uint16(gb.getImm8()))
 		pc++
 		reg.PcOff++
-		cycles = 3
+
 	case 0xE8:
+        gb.Tick(3 * 4)
 		gb.Cpu.SP = gb.execAddSp(gb.Cpu.SP, uint16(gb.getImm8()))
 		pc++
 		reg.PcOff++
-		cycles = 4
 	case 0xF8:
 
+        gb.Tick(8)
 		a := int32(gb.Cpu.SP)
 		b := int32(int8(gb.getImm8()))
 		newValue := a + b
@@ -898,13 +928,12 @@ func (gb *GameBoy) Execute() (cycles int) {
 
 		pc++
 		reg.PcOff++
-		cycles = 3
 	case 0xE2:
+        gb.Tick(4)
 		gb.Write(0xFF00+uint16(reg.c), reg.a)
-		cycles = 2
 	case 0xF2:
+        gb.Tick(4)
 		reg.a = gb.Read(0xFF00 | uint16(reg.c))
-		cycles = 2
 
 	// empty opcode
 	case 0xD3, 0xE3, 0xE4, 0xF4, 0xDB, 0xEB, 0xEC, 0xFC, 0xDD, 0xED, 0xFD:
@@ -912,13 +941,12 @@ func (gb *GameBoy) Execute() (cycles int) {
 	}
 
 	gb.Cpu.PC = pc
-	return cycles * 4
 }
 
-func (gb *GameBoy) execCB(op uint8) (cycles int) {
+func (gb *GameBoy) execCB(op uint8) {
 
 	reg := gb.Cpu
-	cycles = 2
+	//cycles = 2
 
 	switch op {
 	case 0x00:
@@ -934,8 +962,10 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x05:
 		reg.l = gb.execRot(reg.l, !acc, !right, !throughCarry)
 	case 0x06:
-		gb.Write(*reg.HL, gb.execRot(gb.Read(*reg.HL), !acc, !right, !throughCarry))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execRot(gb.Read(*reg.HL), !acc, !right, !throughCarry)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
 	case 0x07:
 		reg.a = gb.execRot(reg.a, !acc, !right, !throughCarry)
 
@@ -952,8 +982,11 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x15:
 		reg.l = gb.execRot(reg.l, !acc, !right, throughCarry)
 	case 0x16:
-		gb.Write(*reg.HL, gb.execRot(gb.Read(*reg.HL), !acc, !right, throughCarry))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execRot(gb.Read(*reg.HL), !acc, !right, throughCarry)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
+
 	case 0x17:
 		reg.a = gb.execRot(reg.a, !acc, !right, throughCarry)
 
@@ -970,8 +1003,11 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x0D:
 		reg.l = gb.execRot(reg.l, !acc, right, !throughCarry)
 	case 0x0E:
-		gb.Write(*reg.HL, gb.execRot(gb.Read(*reg.HL), !acc, right, !throughCarry))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execRot(gb.Read(*reg.HL), !acc, right, !throughCarry)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
+
 	case 0x0F:
 		reg.a = gb.execRot(reg.a, !acc, right, !throughCarry)
 
@@ -988,8 +1024,11 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x1D:
 		reg.l = gb.execRot(reg.l, !acc, right, throughCarry)
 	case 0x1E:
-		gb.Write(*reg.HL, gb.execRot(gb.Read(*reg.HL), !acc, right, throughCarry))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execRot(gb.Read(*reg.HL), !acc, right, throughCarry)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
+
 	case 0x1F:
 		reg.a = gb.execRot(reg.a, !acc, right, throughCarry)
 
@@ -1006,8 +1045,11 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x25:
 		reg.l = gb.execSLA(reg.l)
 	case 0x26:
-		gb.Write(*reg.HL, gb.execSLA(gb.Read(*reg.HL)))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execSLA(gb.Read(*reg.HL))
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
+
 	case 0x27:
 		reg.a = gb.execSLA(reg.a)
 
@@ -1024,8 +1066,11 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x2D:
 		reg.l = gb.execSRA(reg.l)
 	case 0x2E:
-		gb.Write(*reg.HL, gb.execSRA(gb.Read(*reg.HL)))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execSRA(gb.Read(*reg.HL))
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
+
 	case 0x2F:
 		reg.a = gb.execSRA(reg.a)
 
@@ -1042,8 +1087,11 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x35:
 		reg.l = gb.execSWAP(reg.l)
 	case 0x36:
-		gb.Write(*reg.HL, gb.execSWAP(gb.Read(*reg.HL)))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execSWAP(gb.Read(*reg.HL))
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
+
 	case 0x37:
 		reg.a = gb.execSWAP(reg.a)
 
@@ -1060,8 +1108,11 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x3D:
 		reg.l = gb.execSRL(reg.l)
 	case 0x3E:
-		gb.Write(*reg.HL, gb.execSRL(gb.Read(*reg.HL)))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execSRL(gb.Read(*reg.HL))
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
+
 	case 0x3F:
 		reg.a = gb.execSRL(reg.a)
 
@@ -1078,8 +1129,8 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x45:
 		gb.execBIT(reg.l, 0)
 	case 0x46:
+        gb.Tick(4)
 		gb.execBIT(gb.Read(*reg.HL), 0)
-		cycles = 3
 	case 0x47:
 		gb.execBIT(reg.a, 0)
 
@@ -1096,8 +1147,8 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x4D:
 		gb.execBIT(reg.l, 1)
 	case 0x4E:
+        gb.Tick(4)
 		gb.execBIT(gb.Read(*reg.HL), 1)
-		cycles = 3
 	case 0x4F:
 		gb.execBIT(reg.a, 1)
 
@@ -1114,8 +1165,8 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x55:
 		gb.execBIT(reg.l, 2)
 	case 0x56:
+        gb.Tick(4 * 1)
 		gb.execBIT(gb.Read(*reg.HL), 2)
-		cycles = 3
 	case 0x57:
 		gb.execBIT(reg.a, 2)
 
@@ -1132,8 +1183,8 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x5D:
 		gb.execBIT(reg.l, 3)
 	case 0x5E:
+        gb.Tick(4 * 1)
 		gb.execBIT(gb.Read(*reg.HL), 3)
-		cycles = 3
 	case 0x5F:
 		gb.execBIT(reg.a, 3)
 
@@ -1150,8 +1201,8 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x65:
 		gb.execBIT(reg.l, 4)
 	case 0x66:
+        gb.Tick(4 * 1)
 		gb.execBIT(gb.Read(*reg.HL), 4)
-		cycles = 3
 	case 0x67:
 		gb.execBIT(reg.a, 4)
 
@@ -1168,8 +1219,8 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x6D:
 		gb.execBIT(reg.l, 5)
 	case 0x6E:
+        gb.Tick(4 * 1)
 		gb.execBIT(gb.Read(*reg.HL), 5)
-		cycles = 3
 	case 0x6F:
 		gb.execBIT(reg.a, 5)
 
@@ -1186,8 +1237,8 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x75:
 		gb.execBIT(reg.l, 6)
 	case 0x76:
+        gb.Tick(4 * 1)
 		gb.execBIT(gb.Read(*reg.HL), 6)
-		cycles = 3
 	case 0x77:
 		gb.execBIT(reg.a, 6)
 
@@ -1204,8 +1255,8 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x7D:
 		gb.execBIT(reg.l, 7)
 	case 0x7E:
+        gb.Tick(4 * 1)
 		gb.execBIT(gb.Read(*reg.HL), 7)
-		cycles = 3
 	case 0x7F:
 		gb.execBIT(reg.a, 7)
 
@@ -1222,8 +1273,11 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x85:
 		reg.l = gb.execRES(reg.l, 0)
 	case 0x86:
-		gb.Write(*reg.HL, gb.execRES(gb.Read(*reg.HL), 0))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execRES(gb.Read(*reg.HL), 0)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
+
 	case 0x87:
 		reg.a = gb.execRES(reg.a, 0)
 
@@ -1240,8 +1294,10 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x8D:
 		reg.l = gb.execRES(reg.l, 1)
 	case 0x8E:
-		gb.Write(*reg.HL, gb.execRES(gb.Read(*reg.HL), 1))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execRES(gb.Read(*reg.HL), 1)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
 	case 0x8F:
 		reg.a = gb.execRES(reg.a, 1)
 
@@ -1258,8 +1314,10 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x95:
 		reg.l = gb.execRES(reg.l, 2)
 	case 0x96:
-		gb.Write(*reg.HL, gb.execRES(gb.Read(*reg.HL), 2))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execRES(gb.Read(*reg.HL), 2)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
 	case 0x97:
 		reg.a = gb.execRES(reg.a, 2)
 
@@ -1276,8 +1334,10 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0x9D:
 		reg.l = gb.execRES(reg.l, 3)
 	case 0x9E:
-		gb.Write(*reg.HL, gb.execRES(gb.Read(*reg.HL), 3))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execRES(gb.Read(*reg.HL), 3)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
 	case 0x9F:
 		reg.a = gb.execRES(reg.a, 3)
 
@@ -1294,8 +1354,10 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0xA5:
 		reg.l = gb.execRES(reg.l, 4)
 	case 0xA6:
-		gb.Write(*reg.HL, gb.execRES(gb.Read(*reg.HL), 4))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execRES(gb.Read(*reg.HL), 4)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
 	case 0xA7:
 		reg.a = gb.execRES(reg.a, 4)
 
@@ -1312,8 +1374,10 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0xAD:
 		reg.l = gb.execRES(reg.l, 5)
 	case 0xAE:
-		gb.Write(*reg.HL, gb.execRES(gb.Read(*reg.HL), 5))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execRES(gb.Read(*reg.HL), 5)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
 	case 0xAF:
 		reg.a = gb.execRES(reg.a, 5)
 
@@ -1330,8 +1394,10 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0xB5:
 		reg.l = gb.execRES(reg.l, 6)
 	case 0xB6:
-		gb.Write(*reg.HL, gb.execRES(gb.Read(*reg.HL), 6))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execRES(gb.Read(*reg.HL), 6)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
 	case 0xB7:
 		reg.a = gb.execRES(reg.a, 6)
 
@@ -1348,8 +1414,10 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0xBD:
 		reg.l = gb.execRES(reg.l, 7)
 	case 0xBE:
-		gb.Write(*reg.HL, gb.execRES(gb.Read(*reg.HL), 7))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execRES(gb.Read(*reg.HL), 7)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
 	case 0xBF:
 		reg.a = gb.execRES(reg.a, 7)
 
@@ -1366,8 +1434,11 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0xC5:
 		reg.l = gb.execSET(reg.l, 0)
 	case 0xC6:
-		gb.Write(*reg.HL, gb.execSET(gb.Read(*reg.HL), 0))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execSET(gb.Read(*reg.HL), 0)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
+
 	case 0xC7:
 		reg.a = gb.execSET(reg.a, 0)
 
@@ -1384,8 +1455,10 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0xCD:
 		reg.l = gb.execSET(reg.l, 1)
 	case 0xCE:
-		gb.Write(*reg.HL, gb.execSET(gb.Read(*reg.HL), 1))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execSET(gb.Read(*reg.HL), 1)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
 	case 0xCF:
 		reg.a = gb.execSET(reg.a, 1)
 
@@ -1402,8 +1475,10 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0xD5:
 		reg.l = gb.execSET(reg.l, 2)
 	case 0xD6:
-		gb.Write(*reg.HL, gb.execSET(gb.Read(*reg.HL), 2))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execSET(gb.Read(*reg.HL), 2)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
 	case 0xD7:
 		reg.a = gb.execSET(reg.a, 2)
 
@@ -1420,8 +1495,10 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0xDD:
 		reg.l = gb.execSET(reg.l, 3)
 	case 0xDE:
-		gb.Write(*reg.HL, gb.execSET(gb.Read(*reg.HL), 3))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execSET(gb.Read(*reg.HL), 3)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
 	case 0xDF:
 		reg.a = gb.execSET(reg.a, 3)
 
@@ -1438,8 +1515,10 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0xE5:
 		reg.l = gb.execSET(reg.l, 4)
 	case 0xE6:
-		gb.Write(*reg.HL, gb.execSET(gb.Read(*reg.HL), 4))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execSET(gb.Read(*reg.HL), 4)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
 	case 0xE7:
 		reg.a = gb.execSET(reg.a, 4)
 
@@ -1456,8 +1535,10 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0xED:
 		reg.l = gb.execSET(reg.l, 5)
 	case 0xEE:
-		gb.Write(*reg.HL, gb.execSET(gb.Read(*reg.HL), 5))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execSET(gb.Read(*reg.HL), 5)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
 	case 0xEF:
 		reg.a = gb.execSET(reg.a, 5)
 
@@ -1474,8 +1555,10 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0xF5:
 		reg.l = gb.execSET(reg.l, 6)
 	case 0xF6:
-		gb.Write(*reg.HL, gb.execSET(gb.Read(*reg.HL), 6))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execSET(gb.Read(*reg.HL), 6)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
 	case 0xF7:
 		reg.a = gb.execSET(reg.a, 6)
 
@@ -1492,13 +1575,13 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	case 0xFD:
 		reg.l = gb.execSET(reg.l, 7)
 	case 0xFE:
-		gb.Write(*reg.HL, gb.execSET(gb.Read(*reg.HL), 7))
-		cycles = 4
+        gb.Tick(4)
+        v := gb.execSET(gb.Read(*reg.HL), 7)
+        gb.Tick(4)
+		gb.Write(*reg.HL, v)
 	case 0xFF:
 		reg.a = gb.execSET(reg.a, 7)
 	}
-
-	return cycles
 }
 
 func (gb *GameBoy) execRot(v uint8, acc, right, throughCarry bool) uint8 {

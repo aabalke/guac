@@ -5,7 +5,8 @@
 👍 Cpu Instructions
 👍 Instruction Timings
 ❌ Interrupt Timings
-❌ Memory Timings 2
+👍 Memory Timings
+👍 Memory Timings 2
 ❌ DMG Sound 2
 ❌ CGB Sound 2
 
