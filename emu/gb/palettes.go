@@ -1,9 +1,10 @@
 package gameboy
 
 type ColorPalette struct {
-	Palette [0x40]uint8
-	Idx     uint8
-	Inc     bool
+	Palette  [0x40]uint8
+	Unpacked [0x40 / 2]uint32
+	Idx      uint8
+	Inc      bool
 }
 
 func (p *ColorPalette) Init() {
@@ -12,18 +13,19 @@ func (p *ColorPalette) Init() {
 	}
 }
 
-func (p *ColorPalette) get(pal uint8, num uint8) uint32 {
+func (p *ColorPalette) update(idx uint8) {
 
-	idx := (pal << 3) + (num << 1)
+	idx &^= 1
+
 	color := uint16(p.Palette[idx]) | uint16(p.Palette[idx+1])<<8
 
-	return (uint32(colArr[color&0x1F]) |
+	p.Unpacked[idx/2] = (uint32(colArr[color&0x1F]) |
 		uint32(colArr[(color>>5)&0x1F])<<8 |
 		uint32(colArr[(color>>10)&0x1F]<<16))
 }
 
 // Mapping of the 5 bit colour value to a 8 bit value.
-var colArr = []uint32{
+var colArr = [...]uint32{
 	0x0,
 	0x8,
 	0x10,

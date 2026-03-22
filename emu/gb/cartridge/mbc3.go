@@ -1,5 +1,9 @@
 package cartridge
 
+import (
+	"unsafe"
+)
+
 type Mbc3 struct {
 	RamEnabled bool
 	RomBank    uint8
@@ -83,7 +87,7 @@ func (m *Mbc3) enableRam(v uint8) {
 func (m *Mbc3) setRomBank1(v uint8) {
 	m.RomBank = v & 0b1111111
 	if m.RomBank == 0 {
-		m.RomBank++
+		m.RomBank = 1
 	}
 }
 func (m *Mbc3) setRomBank2(v uint8) {
@@ -100,4 +104,29 @@ func (m *Mbc3) setAdvBanking(v uint8) {
 	}
 
 	m.Rtc.RtcEnabled = false
+}
+
+func (m *Mbc3) ReadPtr(c Cartridge, addr uint16) unsafe.Pointer {
+
+	if uint64(addr)+2 >= uint64(len(c.Data)) {
+		return nil
+	}
+
+	return unsafe.Pointer(&c.Data[addr])
+}
+
+func (m *Mbc3) ReadRomPtr(c Cartridge, addr uint16) unsafe.Pointer {
+
+	if m.RomBank == 0 {
+		panic("ROM BANK 0")
+	}
+
+	a := uint64(addr - 0x4000)
+	a = a + uint64(m.RomBank)*0x4000
+
+	if a+2 >= uint64(len(c.Data)) {
+		return nil
+	}
+
+	return unsafe.Pointer(&c.Data[a])
 }

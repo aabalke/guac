@@ -6,6 +6,8 @@ import (
 	"os"
 )
 
+var L *Logger
+
 type Logger struct {
 	Instruction    int
 	MaxInstruction int
@@ -17,7 +19,7 @@ type Logger struct {
 
 func NewLogger(path string, gb *GameBoy) *Logger {
 
-	l := Logger{}
+	l := &Logger{}
 	f, err := os.Create(path)
 	if err != nil {
 		panic(err)
@@ -27,7 +29,7 @@ func NewLogger(path string, gb *GameBoy) *Logger {
 	l.bufWriter = bufio.NewWriter(f)
 	l.gb = gb
 
-	return &l
+	return l
 }
 
 func (l *Logger) Close() {

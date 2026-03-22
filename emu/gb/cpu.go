@@ -7,12 +7,29 @@ import (
 
 // 4 cycles per m clock (if inst/opcode take 4 cycles, inc m by 1, 8 cycles, by 2
 
-const (
-	right, throughCarry, acc = true, true, true
-)
+const right, throughCarry, acc = true, true, true
+
+var branchingOps [256 / 8]uint8 // 32 bytes = 256 bits
+
+func init() {
+	for _, op := range []uint8{
+		0xC2, 0xD2, 0xC3, 0xCA, 0xDA, 0xE9,
+		0x18, 0x20, 0x28, 0x30, 0x38,
+		0xC7, 0xD7, 0xE7, 0xF7, 0xCF, 0xDF, 0xEF, 0xFF,
+		0xC4, 0xD4, 0xCC, 0xDC, 0xCD,
+		0xC0, 0xD0, 0xC8, 0xD8, 0xC9, 0xD9, 0xCB,
+	} {
+		branchingOps[op/8] |= 1 << (op % 8)
+	}
+}
+
+func isBranching(op uint8) bool {
+	return branchingOps[op>>3]&(1<<(op&7)) != 0
+}
 
 type Cpu struct {
-	InterruptMaster  bool
+	IME              bool
+	IE, IF           uint8
 	PendingInterrupt bool
 	Halted           bool
 
@@ -35,6 +52,12 @@ type Cpu struct {
 
 	PC uint16
 	SP uint16
+
+	// optimizations
+	isBranching bool
+	PcPtr       unsafe.Pointer
+	PcOff       int
+	BranchPc    uint16
 }
 
 type Flags struct {
@@ -87,7 +110,7 @@ func NewCpu() *Cpu {
 			C: true,
 		},
 
-		InterruptMaster:  false,
+		IME:              false,
 		PendingInterrupt: false,
 		PC:               0x0100,
 		SP:               0xFFFE,
@@ -100,13 +123,65 @@ func NewCpu() *Cpu {
 	return c
 }
 
+func (gb *GameBoy) GetOp() uint8 {
+
+	cpu := gb.Cpu
+
+	if cpu.isBranching {
+		cpu.isBranching = false
+		cpu.PcOff = 0
+
+		if cpu.PC != cpu.BranchPc {
+			cpu.PcPtr = nil
+		}
+	}
+
+	if sequential := cpu.PcPtr == nil; sequential {
+		cpu.BranchPc = cpu.PC
+		if p := gb.ReadPtr(cpu.PC); p != nil {
+			cpu.PcPtr = p
+		} else {
+			//cpu.isBranching = true
+			return gb.Read(cpu.PC)
+		}
+	}
+
+	op := *(*uint8)(unsafe.Add(cpu.PcPtr, cpu.PcOff))
+	cpu.PcOff++
+
+	cpu.isBranching = isBranching(op)
+
+	return op
+}
+
+func (gb *GameBoy) getImm8() uint8 {
+
+	if gb.Cpu.PcPtr != nil {
+		return *(*uint8)(unsafe.Add(gb.Cpu.PcPtr, gb.Cpu.PcOff))
+	}
+
+	return gb.Read(gb.Cpu.PC + 1)
+}
+
+func (gb *GameBoy) getImm16() uint16 {
+
+	if gb.Cpu.PcPtr != nil {
+		return *(*uint16)(unsafe.Add(gb.Cpu.PcPtr, gb.Cpu.PcOff))
+	}
+
+	return uint16(gb.Read(gb.Cpu.PC+2))<<8 | uint16(gb.Read(gb.Cpu.PC+1))
+}
+
 func (gb *GameBoy) Execute() (cycles int) {
 
 	cycles = 1
 	pc := gb.Cpu.PC + 1
 	reg := gb.Cpu
 
-	switch op := gb.Read(gb.Cpu.PC); op {
+	op := gb.GetOp()
+	//op := gb.Read(gb.Cpu.PC)
+
+	switch op {
 	case 0x00: // nop
 	case 0x10: // stop / toggle speed
 
@@ -118,6 +193,7 @@ func (gb *GameBoy) Execute() (cycles int) {
 		}
 
 		pc++
+		reg.PcOff++
 
 	// Load State Move
 	case 0x40:
@@ -229,18 +305,22 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0x01:
 		*reg.BC = gb.getImm16()
 		pc = pc + 2
+		reg.PcOff += 2
 		cycles = 3
 	case 0x11:
 		*reg.DE = gb.getImm16()
 		pc = pc + 2
+		reg.PcOff += 2
 		cycles = 3
 	case 0x21:
 		*reg.HL = gb.getImm16()
 		pc = pc + 2
+		reg.PcOff += 2
 		cycles = 3
 	case 0x31:
 		reg.SP = gb.getImm16()
 		pc = pc + 2
+		reg.PcOff += 2
 		cycles = 3
 
 	case 0x70:
@@ -272,18 +352,22 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0x0E:
 		reg.c = gb.getImm8()
 		pc++
+		reg.PcOff++
 		cycles = 2
 	case 0x1E:
 		reg.e = gb.getImm8()
 		pc++
+		reg.PcOff++
 		cycles = 2
 	case 0x2E:
 		reg.l = gb.getImm8()
 		pc++
+		reg.PcOff++
 		cycles = 2
 	case 0x3E:
 		reg.a = gb.getImm8()
 		pc++
+		reg.PcOff++
 		cycles = 2
 
 	case 0x78:
@@ -524,50 +608,62 @@ func (gb *GameBoy) Execute() (cycles int) {
 	case 0xC6:
 		reg.a = gb.execAdd(reg.a, gb.getImm8())
 		pc++
+		reg.PcOff++
 		cycles = 2
 	case 0xD6:
 		reg.a = gb.execSub(reg.a, gb.getImm8())
 		pc++
+		reg.PcOff++
 		cycles = 2
 	case 0xE6:
 		reg.a = gb.execAnd(reg.a, gb.getImm8())
 		pc++
+		reg.PcOff++
 		cycles = 2
 	case 0xF6:
 		reg.a = gb.execOr(reg.a, gb.getImm8())
 		pc++
+		reg.PcOff++
 		cycles = 2
 	case 0xCE:
 		reg.a = gb.execAdc(reg.a, gb.getImm8())
 		pc++
+		reg.PcOff++
 		cycles = 2
 	case 0xDE:
 		reg.a = gb.execSbc(reg.a, gb.getImm8())
 		pc++
+		reg.PcOff++
 		cycles = 2
 	case 0xEE:
 		reg.a = gb.execXor(reg.a, gb.getImm8())
 		pc++
+		reg.PcOff++
 		cycles = 2
 	case 0xFE:
 		gb.execCp(reg.a, gb.getImm8())
 		pc++
+		reg.PcOff++
 		cycles = 2
 	case 0x06:
 		reg.b = gb.getImm8()
 		pc++
+		reg.PcOff++
 		cycles = 2
 	case 0x16:
 		reg.d = gb.getImm8()
 		pc++
+		reg.PcOff++
 		cycles = 2
 	case 0x26:
 		reg.h = gb.getImm8()
 		pc++
+		reg.PcOff++
 		cycles = 2
 	case 0x36:
 		gb.Write(*reg.HL, gb.getImm8())
 		pc++
+		reg.PcOff++
 		cycles = 3
 
 	case 0x0A:
@@ -654,7 +750,7 @@ func (gb *GameBoy) Execute() (cycles int) {
 
 	// Interrupts
 	case 0xF3:
-		gb.Cpu.InterruptMaster = false
+		gb.Cpu.IME = false
 	case 0xFB:
 		gb.Cpu.PendingInterrupt = true
 
@@ -663,14 +759,17 @@ func (gb *GameBoy) Execute() (cycles int) {
 		gb.Write(gb.getImm16()+0, uint8(gb.Cpu.SP))
 		gb.Write(gb.getImm16()+1, uint8(gb.Cpu.SP>>8))
 		pc = pc + 2
+		reg.PcOff += 2
 		cycles = 5
 	case 0xFA:
 		reg.a = gb.Read(gb.getImm16())
 		pc = pc + 2
+		reg.PcOff += 2
 		cycles = 4
 	case 0xEA:
 		gb.Write(gb.getImm16(), reg.a)
 		pc = pc + 2
+		reg.PcOff += 2
 		cycles = 4
 	case 0xF9:
 		reg.SP = *reg.HL
@@ -765,21 +864,24 @@ func (gb *GameBoy) Execute() (cycles int) {
 		cycles, pc = gb.execRet(true, 4, 4)
 	case 0xD9:
 		pc = gb.StackPop()
-		gb.Cpu.InterruptMaster = true
+		gb.Cpu.IME = true
 		//gb.Cpu.PendingInterrupt = true
 		cycles = 4
 
 	case 0xE0:
 		gb.Write(0xFF00+uint16(gb.getImm8()), reg.a)
 		pc++
+		reg.PcOff++
 		cycles = 3
 	case 0xF0:
 		reg.a = gb.Read(0xFF00 | uint16(gb.getImm8()))
 		pc++
+		reg.PcOff++
 		cycles = 3
 	case 0xE8:
 		gb.Cpu.SP = gb.execAddSp(gb.Cpu.SP, uint16(gb.getImm8()))
 		pc++
+		reg.PcOff++
 		cycles = 4
 	case 0xF8:
 
@@ -795,6 +897,7 @@ func (gb *GameBoy) Execute() (cycles int) {
 		gb.Cpu.f.C = (temp & 0x100) != 0
 
 		pc++
+		reg.PcOff++
 		cycles = 3
 	case 0xE2:
 		gb.Write(0xFF00+uint16(reg.c), reg.a)
@@ -1396,14 +1499,6 @@ func (gb *GameBoy) execCB(op uint8) (cycles int) {
 	}
 
 	return cycles
-}
-
-func (gb *GameBoy) getImm8() uint8 {
-	return gb.Read(gb.Cpu.PC + 1)
-}
-
-func (gb *GameBoy) getImm16() uint16 {
-	return uint16(gb.Read(gb.Cpu.PC+2))<<8 | uint16(gb.Read(gb.Cpu.PC+1))
 }
 
 func (gb *GameBoy) execRot(v uint8, acc, right, throughCarry bool) uint8 {

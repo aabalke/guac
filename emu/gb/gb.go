@@ -37,7 +37,7 @@ type GameBoy struct {
 	bgPalette ColorPalette
 	spPalette ColorPalette
 
-    UnpackedMonoPals [3][4]uint32
+	UnpackedMonoPals [3][4]uint32
 
 	Cartridge cartridge.Cartridge
 	Cpu       *Cpu
@@ -54,7 +54,8 @@ type GameBoy struct {
 	Image      *ebiten.Image
 	Screen     [width][height]uint32
 	bgPriority [width][height]bool
-    pixelDrawn [width]bool
+	spMinx     [width]int32
+	pixelDrawn [width]bool
 
 	Cycles int
 
@@ -75,7 +76,7 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 
 	img := ebiten.NewImage(width, height)
 
-	gb := GameBoy{
+	gb := &GameBoy{
 		Image:  img,
 		Cpu:    NewCpu(),
 		FPS:    60,
@@ -93,11 +94,6 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 	gb.spPalette.Init()
 	gb.Pixels = make([]byte, width*height*4)
 
-	for i := range len(gb.Pixels) {
-		// ensures alpha is always 0xFF
-		gb.Pixels[i] = 0xFF
-	}
-
 	const (
 		SND_FREQUENCY = 48000 // sample rate
 		SND_SAMPLES   = 512
@@ -106,7 +102,9 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 
 	gb.LoadGame(path)
 
-	return &gb
+	L = NewLogger("./loggy", gb)
+
+	return gb
 }
 
 func (gb *GameBoy) GetSize() (int32, int32) {
@@ -257,71 +255,44 @@ func (gb *GameBoy) loadCartridge() {
 func (gb *GameBoy) UpdateInterrupt() (cycles int) {
 
 	if gb.Cpu.PendingInterrupt {
-		gb.Cpu.InterruptMaster = true
+		gb.Cpu.IME = true
 		gb.Cpu.PendingInterrupt = false
 		return 0
 	}
 
-	if !gb.Cpu.InterruptMaster && !gb.Cpu.Halted {
+	if !gb.Cpu.IME && !gb.Cpu.Halted {
 		return 0
 	}
 
-	interruptFlag := gb.MemoryBus.Memory[0xFF0F]
-	interruptEnabled := gb.MemoryBus.Memory[0xFFFF]
+	if !gb.Cpu.IME && gb.Cpu.Halted {
+		gb.Cpu.Halted = false
+		return 20
+	}
 
-	if interruptFlag == 0 {
+	handling := gb.Cpu.IF & gb.Cpu.IE & 0x1F
+	if noIRQ := handling == 0; noIRQ {
 		return 0
 	}
 
-	const (
-		VBLANK = iota
-		STAT   //LCD
-		TIMER
-		SERIAL
-		JOYPAD
-	)
-
-	// interrupts are servered by priority, see above const
 	for i := range 5 {
-		handlerAvailable := (interruptFlag>>i)&1 != 0
-		handlerRequested := (interruptEnabled>>i)&1 != 0
 
-		if !(handlerAvailable && handlerRequested) {
+		if (handling>>i)&1 == 0 {
 			continue
 		}
 
-		if !gb.Cpu.InterruptMaster && gb.Cpu.Halted {
-			gb.Cpu.Halted = false
-			return 20
-		}
-
-		gb.Cpu.InterruptMaster = false
+		gb.Cpu.IME = false
 		gb.Cpu.Halted = false
-
-		req := gb.MemoryBus.Memory[0xFF0F]
-		newFlag := req &^ (1 << i)
-		gb.Write(0xFF0F, newFlag)
-
+		gb.Cpu.IF &^= (1 << i)
 		gb.StackPush(gb.Cpu.PC)
-
-		switch i {
-		case VBLANK:
-			gb.Cpu.PC = 0x40
-		case STAT:
-			gb.Cpu.PC = 0x48
-		case TIMER:
-			gb.Cpu.PC = 0x50
-		case SERIAL:
-			gb.Cpu.PC = 0x58
-		case JOYPAD:
-			gb.Cpu.PC = 0x60
-		}
-
+		gb.Cpu.PC = IRQ_SRC[i]
+		gb.Cpu.isBranching = true
 		return 20
 	}
 
 	return 0
 }
+
+var IRQ_SRC = [...]uint16{0x40, 0x48, 0x50, 0x58, 0x60}
 
 func (gb *GameBoy) UpdateTimers() {
 
@@ -342,19 +313,20 @@ func (gb *GameBoy) UpdateTimers() {
 		Mem[DIV]++
 	}
 
-	if !gb.EnableClock() {
+	if disabled := gb.MemoryBus.Memory[TAC]&0b100 == 0; disabled {
 		return
 	}
 
-	//t.Counter += gb.Cycles
 	t.Counter += cycles
 
-	freq := gb.SelectCycleFreq()
+	// is tma handled properly?
+
+	freq := freqs[Mem[TAC]&3]
 
 	for t.Counter >= freq {
 		t.Counter -= freq
 		tima := Mem[TIMA]
-		if tima == 0xFF {
+		if overflow := tima == 0xFF; overflow {
 			Mem[TIMA] = 0
 			t.InterruptPending = true
 		} else {
@@ -369,33 +341,10 @@ func (gb *GameBoy) UpdateTimers() {
 	}
 }
 
-func (gb *GameBoy) EnableClock() bool {
-	tac := gb.MemoryBus.Memory[TAC]
-	return (tac>>2)&1 != 0
-}
-
-func (gb *GameBoy) SelectCycleFreq() int {
-
-	tac := gb.MemoryBus.Memory[TAC]
-
-	switch clock := tac & 0b11; clock {
-	case 0b00:
-		return 1024
-	case 0b01:
-		return 16
-	case 0b10:
-		return 64
-	case 0b11:
-		return 256
-	default:
-		return 1024
-	}
-}
+var freqs = [...]int{1024, 16, 64, 256, 1024}
 
 func (gb *GameBoy) RequestInterrupt(mask uint8) {
-	interruptFlag := gb.MemoryBus.Memory[0xFF0F] | 0xE0
-	newFlag := interruptFlag | mask // may need ^
-	gb.Write(0xFF0F, newFlag)
+	gb.Cpu.IF |= mask | 0xE0
 }
 
 func (gb *GameBoy) toggleDoubleSpeed() {
@@ -420,4 +369,6 @@ func (gb *GameBoy) Close() {
 	gb.Muted = true
 	gb.Paused = true
 	gb.Apu.Close()
+
+	L.Close()
 }

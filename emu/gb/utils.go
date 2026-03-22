@@ -52,7 +52,7 @@ func LoadLine(gb *GameBoy, line int) {
 			case 15:
 				gb.Cpu.f.C = v[0] == 't'
 			case 16:
-				gb.Cpu.InterruptMaster = v[0] == 't'
+				gb.Cpu.IME = v[0] == 't'
 			case 17:
 				gb.Cpu.PendingInterrupt = v[0] == 't'
 			case 18:
@@ -91,7 +91,7 @@ func DumpLine(gb *GameBoy, line int) {
 	o += fmt.Sprintf("%t\n", gb.Cpu.f.S)
 	o += fmt.Sprintf("%t\n", gb.Cpu.f.H)
 	o += fmt.Sprintf("%t\n", gb.Cpu.f.C)
-	o += fmt.Sprintf("%t\n", gb.Cpu.InterruptMaster)
+	o += fmt.Sprintf("%t\n", gb.Cpu.IME)
 	o += fmt.Sprintf("%t\n", gb.Cpu.PendingInterrupt)
 
 	err := os.WriteFile(fmt.Sprintf("linedump_%d_01", line), []byte(o), 0644)

@@ -1,5 +1,7 @@
 package cartridge
 
+import "unsafe"
+
 type Mbc0 struct {
 	RamEnabled     bool
 	RomBank        uint8
@@ -24,4 +26,16 @@ func (m *Mbc0) Read(c Cartridge, addr uint16) uint8 {
 }
 
 func (m *Mbc0) Handle(addr uint16, v uint8) {
+}
+
+func (m *Mbc0) ReadPtr(c Cartridge, addr uint16) unsafe.Pointer {
+	panic("setup readptr cart")
+	return nil
+	//return c.Data[addr]
+}
+
+func (m *Mbc0) ReadRomPtr(c Cartridge, addr uint16) unsafe.Pointer {
+	panic("setup readptr cart")
+	return nil
+	//return c.Data[addr]
 }

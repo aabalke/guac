@@ -24,19 +24,19 @@ const (
 	OCPS = 0xFF6A
 	OCPD = 0xFF6B
 
-	SpritePriorityOffset = 100
+	SpritePriorityOffset = 100 // random to distiguish uninitialized from valid 0
 
-    UNPACKED_BG   = 0
-    UNPACKED_OBJ0 = 1
-    UNPACKED_OBJ1 = 2
+	UNPACKED_BG   = 0
+	UNPACKED_OBJ0 = 1
+	UNPACKED_OBJ1 = 2
 )
 
 func (gb *GameBoy) UpdateDisplay() {
 	for y := range height {
-        p32 := (*[width]uint32)(unsafe.Pointer(&gb.Pixels[(y*width)*4]))
-        for x := range uint32(width) {
-            p32[x] = gb.Screen[x][y]
-        }
+		p32 := (*[width]uint32)(unsafe.Pointer(&gb.Pixels[(y*width)*4]))
+		for x := range uint32(width) {
+			p32[x] = gb.Screen[x][y]
+		}
 	}
 }
 
@@ -175,19 +175,19 @@ func (gb *GameBoy) renderTiles() {
 	signedTiles := !((lcdc>>4)&1 != 0)
 	scanLineInWindow := windowY <= (scanline)
 	winEnabled := (lcdc>>5)&1 != 0
-    useWindow := winEnabled && scanLineInWindow
+	useWindow := winEnabled && scanLineInWindow
 
-    tileData := uint16(0x8000)
+	tileData := uint16(0x8000)
 	if signedTiles {
 		tileData = 0x8800
 	}
 
-    winMemory := uint16(0x9800)
+	winMemory := uint16(0x9800)
 	if winAddr := (lcdc>>6)&1 != 0; winAddr {
 		winMemory = 0x9C00
 	}
 
-    bgMemory := uint16(0x9800)
+	bgMemory := uint16(0x9800)
 	if bgAddr := (lcdc>>3)&1 != 0; bgAddr {
 		bgMemory = 0x9C00
 	}
@@ -203,6 +203,12 @@ func (gb *GameBoy) renderTiles() {
 	// which of the 8 vertical pixels of the current tile is the scanline on?
 	var tileRow = uint16(yPos/8) * 32
 
+	lastTileCol := uint16(0xFFFF)
+	var data1, data2, colorBit uint8
+	var priority bool
+	var cgbPalBase uint8
+	var tileAttr uint8
+
 	for pixel := range width {
 		xPos := (uint8(pixel) + scrollX)
 
@@ -214,75 +220,81 @@ func (gb *GameBoy) renderTiles() {
 		// Which of the 32 horizontal tiles does this x_pox fall within?
 		tileCol := uint16(xPos / 8)
 
-		// Get the tile identity number
+		if tileCol != lastTileCol {
+			lastTileCol = tileCol
 
-		// PER PIXEL OF SCAN LINE, NEED TO CHECK IF PIXEL >= WX AS WELL TO CHOOSE TILE ADDR (BG VS WIN)
-		tileAddress := bgMemory + tileRow + tileCol
-		if useWindow && pixel >= windowX {
-			tileAddress = winMemory + tileRow + tileCol
+			// Get the tile identity number
+
+			// PER PIXEL OF SCAN LINE, NEED TO CHECK IF PIXEL >= WX AS WELL TO CHOOSE TILE ADDR (BG VS WIN)
+			tileAddress := bgMemory + tileRow + tileCol
+			if useWindow && pixel >= windowX {
+				tileAddress = winMemory + tileRow + tileCol
+			}
+
+			// Deduce where this tile id is in memory
+			tileLocation := tileData
+			if !signedTiles {
+				tileNum := int16(gb.MemoryBus.VRAM[tileAddress-0x8000])
+				tileLocation = tileLocation + uint16(tileNum*16)
+			} else {
+				tileNum := int16(int8(gb.MemoryBus.VRAM[tileAddress-0x8000]))
+				tileLocation = uint16(int32(tileLocation) + int32((tileNum+128)*16))
+			}
+
+			bankOffset := uint16(0x8000)
+
+			// Attributes used in CGB mode TODO: check in CGB mode
+			//
+			//    Bit 0-2  Background Palette number  (BGP0-7)
+			//    Bit 3    Tile VRAM Bank number      (0=Bank 0, 1=Bank 1)
+			//    Bit 5    Horizontal Flip            (0=Normal, 1=Mirror horizontally)
+			//    Bit 6    Vertical Flip              (0=Normal, 1=Mirror vertically)
+			//    Bit 7    BG-to-OAM Priority         (0=Use OAM priority bit, 1=BG Priority)
+			//
+			tileAttr = gb.MemoryBus.VRAM[tileAddress-0x6000]
+			if gb.Color && (tileAttr>>3)&1 != 0 {
+				bankOffset = 0x6000
+			}
+			priority = (tileAttr>>7)&1 != 0
+
+			var line byte
+			if vFlip := gb.Color && (tileAttr>>6)&1 != 0; vFlip {
+				// Vertical flip
+				line = ((7 - yPos) & 7) * 2
+			} else {
+				line = (yPos & 7) * 2
+			}
+			// Get the tile data from memory
+			data1 = gb.MemoryBus.VRAM[tileLocation+uint16(line)+0-bankOffset]
+			data2 = gb.MemoryBus.VRAM[tileLocation+uint16(line)+1-bankOffset]
+
+			if gb.Color {
+				cgbPalBase = (tileAttr & 7) << 2
+			}
 		}
 
-		// Deduce where this tile id is in memory
-		tileLocation := tileData
-		if !signedTiles {
-			tileNum := int16(gb.MemoryBus.VRAM[tileAddress-0x8000])
-			tileLocation = tileLocation + uint16(tileNum*16)
+		if gb.Color && (tileAttr>>5)&1 != 0 {
+			colorBit = xPos & 7
 		} else {
-			tileNum := int16(int8(gb.MemoryBus.VRAM[tileAddress-0x8000]))
-			tileLocation = uint16(int32(tileLocation) + int32((tileNum+128)*16))
+			colorBit = uint8(7 - (xPos & 7))
 		}
-
-		bankOffset := uint16(0x8000)
-
-		// Attributes used in CGB mode TODO: check in CGB mode
-		//
-		//    Bit 0-2  Background Palette number  (BGP0-7)
-		//    Bit 3    Tile VRAM Bank number      (0=Bank 0, 1=Bank 1)
-		//    Bit 5    Horizontal Flip            (0=Normal, 1=Mirror horizontally)
-		//    Bit 6    Vertical Flip              (0=Normal, 1=Mirror vertically)
-		//    Bit 7    BG-to-OAM Priority         (0=Use OAM priority bit, 1=BG Priority)
-		//
-		tileAttr := gb.MemoryBus.VRAM[tileAddress-0x6000]
-		if gb.Color && (tileAttr>>3)&1 != 0 {
-			bankOffset = 0x6000
-		}
-		priority := (tileAttr>>7)&1 != 0
-
-		var line byte
-        if vFlip := gb.Color && (tileAttr>>6)&1 != 0; vFlip {
-			// Vertical flip
-			line = ((7 - yPos) & 7) * 2
-		} else {
-			line = (yPos & 7) * 2
-		}
-		// Get the tile data from memory
-		data1 := gb.MemoryBus.VRAM[tileLocation+uint16(line)-bankOffset]
-		data2 := gb.MemoryBus.VRAM[tileLocation+uint16(line)+1-bankOffset]
-
-        if hFlip := gb.Color && (tileAttr>>5)&1 != 0; hFlip {
-			xPos = 7 - xPos
-		}
-
-		colorBit := 7 - (xPos & 7)
-
 		//colorNum := getVal(data2, uint8(colorBit))
 		//colorNum <<= 1
 		//colorNum |= getVal(data1, uint8(colorBit))
-        colorNum := getColorVal(data2, data1, colorBit, colorBit)
+		colorNum := getColorVal(data2, data1, colorBit, colorBit)
 
 		if gb.Color {
-            if draw := !gb.bgPriority[pixel][scanline]; draw {
-                cgbPalette := tileAttr & 0x7
-                color := gb.bgPalette.get(cgbPalette, colorNum) | 0xFF00_0000
-                gb.Screen[pixel][scanline] = color
-            }
+			if draw := !gb.bgPriority[pixel][scanline]; draw {
+				color := gb.bgPalette.Unpacked[cgbPalBase+colorNum]
+				gb.Screen[pixel][scanline] = color
+			}
 
 			gb.bgPriority[pixel][scanline] = priority
 
 		} else {
-            if draw := !gb.bgPriority[pixel][scanline]; draw {
-                gb.Screen[pixel][scanline] = gb.UnpackedMonoPals[0][colorNum]
-            }
+			if draw := !gb.bgPriority[pixel][scanline]; draw {
+				gb.Screen[pixel][scanline] = gb.UnpackedMonoPals[0][colorNum]
+			}
 		}
 
 		gb.pixelDrawn[pixel] = colorNum != 0
@@ -298,7 +310,7 @@ func (gb *GameBoy) renderSprites(scanline int32) {
 		ySize = 16
 	}
 
-	var minx [width]int32
+	gb.spMinx = [width]int32{}
 	var lineSprites = 0
 	for sprite := range uint16(40) {
 		index := sprite * 4
@@ -316,10 +328,10 @@ func (gb *GameBoy) renderSprites(scanline int32) {
 		}
 		lineSprites++
 
-		xP := gb.MemoryBus.OAM[index + 1]
+		xP := gb.MemoryBus.OAM[index+1]
 		xPos := int32(xP) - 8
-		tileLocation := gb.MemoryBus.OAM[index + 2]
-		attributes := gb.MemoryBus.OAM[index + 3]
+		tileLocation := gb.MemoryBus.OAM[index+2]
+		attributes := gb.MemoryBus.OAM[index+3]
 
 		yFlip := (attributes>>6)&1 != 0
 		xFlip := (attributes>>5)&1 != 0
@@ -347,7 +359,7 @@ func (gb *GameBoy) renderSprites(scanline int32) {
 				continue
 			}
 
-			if minx[pixel] != 0 && (gb.Color || minx[pixel] <= int32(xPos)+SpritePriorityOffset) {
+			if gb.spMinx[pixel] != 0 && (gb.Color || gb.spMinx[pixel] <= int32(xPos)+SpritePriorityOffset) {
 				continue
 			}
 
@@ -356,46 +368,38 @@ func (gb *GameBoy) renderSprites(scanline int32) {
 				colorBit = byte(int8(colorBit-7) * -1)
 			}
 
-			// Find the colour value by combining the data bits
-
 			//colorNum := getVal(data2, uint8(colorBit))
 			//colorNum <<= 1
 			//colorNum |= getVal(data1, uint8(colorBit))
-            colorNum := getColorVal(data2, data1, colorBit, colorBit)
+			colorNum := getColorVal(data2, data1, colorBit, colorBit)
 
-			// Colour 0 is transparent for sprites
-			if colorNum == 0 {
+			if transparent := colorNum == 0; transparent {
 				continue
 			}
 
-            if gb.Color {
-                cgbPalette := attributes & 0x7
-                color := gb.spPalette.get(cgbPalette, colorNum) | 0xFF00_0000
+			drawPixel := (priority && !gb.bgPriority[pixel][scanline]) || !gb.pixelDrawn[pixel]
+			if drawPixel {
+				if gb.Color {
+					cgbPalette := attributes & 0x7
+					color := gb.spPalette.Unpacked[(cgbPalette<<2)+(colorNum)]
+					gb.Screen[pixel][scanline] = color
 
-                drawPixel := (priority && !gb.bgPriority[pixel][scanline]) || !gb.pixelDrawn[pixel]
-                if drawPixel {
-                    gb.Screen[pixel][scanline] = color
-                }
+				} else {
 
-            } else {
+					pal := UNPACKED_OBJ0
+					if (attributes>>4)&1 != 0 {
+						pal = UNPACKED_OBJ1
+					}
 
-                pal := UNPACKED_OBJ0
-                if (attributes>>4)&1 != 0 {
-                    pal = UNPACKED_OBJ1
-                }
+					gb.Screen[pixel][scanline] = gb.UnpackedMonoPals[pal][colorNum]
+				}
+			}
 
-                drawPixel := (priority && !gb.bgPriority[pixel][scanline]) || !gb.pixelDrawn[pixel]
-                if drawPixel {
-                    gb.Screen[pixel][scanline] = gb.UnpackedMonoPals[pal][colorNum]
-                }
-            }
-
-            minx[pixel] = int32(xPos) + SpritePriorityOffset
+			gb.spMinx[pixel] = int32(xPos) + SpritePriorityOffset
 		}
 	}
 }
 
 func getColorVal(val1, val2, pos1, pos2 uint8) uint8 {
-	return ((val1 >> pos1) & 1) << 1 | ((val2 >> pos2) & 1)
+	return ((val1>>pos1)&1)<<1 | ((val2 >> pos2) & 1)
 }
-
