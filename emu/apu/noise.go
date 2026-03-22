@@ -29,7 +29,7 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 	soundLength := GetVarData(uint32(ch.CntL), 0, 5)
 	length := (maxTimer - float64(soundLength)) * divApuRate
 
-	if stopAtLength := BitEnabled(uint32(ch.CntH), 14); stopAtLength {
+	if stopAtLength := (ch.CntH >> 14) & 1 != 0; stopAtLength {
 
 		ch.lengthTime += ch.Apu.sampleTime
 
@@ -49,7 +49,7 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 		if ch.envTime >= envelopeInterval {
 			ch.envTime -= envelopeInterval
 
-			if BitEnabled(uint32(ch.CntL), 11) {
+			if (ch.CntL >> 11) & 1 != 0 {
 				if envelope < 0xf {
 					envelope++
 				}
@@ -80,7 +80,7 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 		ch.lfsr >>= 1
 
 		if carry > 0 {
-			if BitEnabled(uint32(ch.CntH), 3) { // R/W Counter Step/Width
+			if (ch.CntH >> 3) & 1 != 0 { // R/W Counter Step/Width
 				ch.lfsr ^= 0x60 // 1: 7bits
 			} else {
 				ch.lfsr ^= 0x6000 // 0: 15bits

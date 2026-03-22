@@ -16,9 +16,9 @@ func clip(v int32) int16 {
 	return int16(v)
 }
 
-func BitEnabled(v uint32, bit uint8) bool {
-	return v&(1<<bit) != 0
-}
+//func BitEnabled(v uint32, bit uint8) bool {
+//	return v&(1<<bit) != 0
+//}
 
 func GetByte(i uint32, offsetBit uint8) uint32 {
 	return GetVarData(i, offsetBit, offsetBit+3)

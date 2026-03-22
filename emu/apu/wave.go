@@ -18,7 +18,7 @@ func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
 		return 0
 	}
 
-	if !BitEnabled(uint32(ch.CntL), 7) {
+	if (ch.CntL>>7) & 1 == 0 {
 		return 0
 	}
 
@@ -32,7 +32,7 @@ func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
 	soundLength := GetVarData(uint32(ch.CntH), 0, 7)
 	length := (maxTimer - float64(soundLength)) * divApuRate
 
-	if stopAtLength := BitEnabled(uint32(ch.CntX), 14); stopAtLength {
+	if stopAtLength := (ch.CntX >> 14) & 1 != 0; stopAtLength {
 		ch.lengthTime += ch.Apu.sampleTime
 		if stop := ch.lengthTime >= length; stop {
 			ch.Apu.enableSoundChan(int(ch.Idx), false)
@@ -59,7 +59,7 @@ func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
 	wavedata := ch.WaveRam[(uint32(ch.WavePosition)>>1)&0x1f]
 	sample := (float64((wavedata>>((ch.WavePosition&1)<<2))&0xf) - 0x8) / 8
 
-	if forceVolume := BitEnabled(uint32(ch.CntH), 15); forceVolume {
+	if forceVolume := (ch.CntH >> 15) & 1 != 0; forceVolume {
 
 		sample *= 0.75
 	} else {
@@ -87,7 +87,7 @@ func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
 
 func (ch *WaveChannel) Reset() {
 
-	if twoBanks := BitEnabled(uint32(ch.CntL), 5); twoBanks {
+	if twoBanks := (ch.CntL >> 5) & 1 != 0; twoBanks {
 		ch.WavePosition = 0
 		ch.WaveSamples = 64
 		return

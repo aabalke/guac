@@ -48,7 +48,7 @@ func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 
 	// Length reached check (if so, just disable the channel and return silence)
 
-	if lenFlag := BitEnabled(uint32(ch.CntX), 14); lenFlag {
+	if lenFlag := (ch.CntX >> 14) & 1 != 0; lenFlag {
 		ch.lengthTime += ch.Apu.sampleTime
 		if ch.lengthTime >= length {
 			ch.Apu.enableSoundChan(int(ch.Idx), false)
@@ -71,7 +71,7 @@ func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 			if sweepShift != 0 {
 				// X(t) = X(t-1) ± X(t-1)/2^n
 				disp := freqHz >> sweepShift // X(t-1)/2^n
-				if decrease := BitEnabled(uint32(ch.CntL), 3); decrease {
+				if decrease := (ch.CntL >> 3) & 1 != 0; decrease {
 					freqHz -= disp
 				} else {
 					freqHz += disp
@@ -97,7 +97,7 @@ func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 		if ch.envTime >= envelopeInterval {
 			ch.envTime -= envelopeInterval
 
-			if increment := BitEnabled(uint32(ch.CntH), 11); increment {
+			if increment := (ch.CntH >> 11) & 1 != 0; increment {
 				if envelope < 0xf {
 					envelope++
 				}

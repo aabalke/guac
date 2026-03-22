@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/aabalke/guac/config"
+	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
 )
 
@@ -63,8 +64,7 @@ func (a *Apu) Disable() {
 }
 
 func (a *Apu) isSoundChanEnable(ch uint8) bool {
-	cntx := uint32(a.SoundCntX)
-	return BitEnabled(cntx, ch)
+    return (a.SoundCntX >> ch) & 1 != 0
 }
 
 func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu {
@@ -121,6 +121,11 @@ func (a *Apu) Play(muted bool) {
 		return
 	}
 
+	if ebiten.ActualTPS() > 65 {
+		return
+	}
+
+
 	a.player.Write(a.Stream)
 }
 
@@ -150,7 +155,7 @@ func (a *Apu) soundMix() {
 }
 
 func (a *Apu) IsSoundEnabled() bool {
-	return BitEnabled(uint32(a.SoundCntX), 7)
+	return (a.SoundCntX >> 7) & 1 != 0
 }
 
 func (a *Apu) GetSample() (int16, int16) {
@@ -270,14 +275,14 @@ func IsResetSoundChan(addr uint32, isGB bool) bool {
 
 func (a *Apu) ResetSoundChan(addr uint32, b byte, isGB bool) {
 	if isGB {
-		a._resetSoundChan(resetSoundChanMapGB[addr], BitEnabled(uint32(b), 7))
+		a._resetSoundChan(resetSoundChanMapGB[addr], (b >> 7) & 1 != 0)
 		return
 	}
-	a._resetSoundChan(resetSoundChanMapGBA[addr], BitEnabled(uint32(b), 7))
+	a._resetSoundChan(resetSoundChanMapGBA[addr], (b >> 7) & 1 != 0)
 }
 
 var resetSoundChanMapGBA = map[uint32]int{0x65: 0, 0x6d: 1, 0x75: 2, 0x7d: 3}
-var resetSoundChanMapGB = map[uint32]int{0x14: 0, 0x19: 1, 0x1E: 2, 0x23: 3}
+var resetSoundChanMapGB  = map[uint32]int{0x14: 0, 0x19: 1, 0x1E: 2, 0x23: 3}
 
 func (a *Apu) _resetSoundChan(ch int, enable bool) {
 	if enable {
@@ -308,7 +313,7 @@ func (a *Apu) _resetSoundChan(ch int, enable bool) {
 			a.NoiseChannel.lengthTime = 0
 			a.NoiseChannel.envTime = 0
 
-			if BitEnabled(uint32(a.NoiseChannel.CntH), 3) {
+			if (a.NoiseChannel.CntH >> 3) & 1 != 0 {
 				a.NoiseChannel.lfsr = 0x0040 // 7bit
 			} else {
 				a.NoiseChannel.lfsr = 0x4000 // 15bit
