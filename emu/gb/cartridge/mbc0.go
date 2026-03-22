@@ -29,13 +29,20 @@ func (m *Mbc0) Handle(addr uint16, v uint8) {
 }
 
 func (m *Mbc0) ReadPtr(c Cartridge, addr uint16) unsafe.Pointer {
-	panic("setup readptr cart")
-	return nil
-	//return c.Data[addr]
+
+	if uint64(addr)+2 >= uint64(len(c.Data)) {
+		return nil
+	}
+
+	return unsafe.Pointer(&c.Data[addr])
 }
 
 func (m *Mbc0) ReadRomPtr(c Cartridge, addr uint16) unsafe.Pointer {
-	panic("setup readptr cart")
-	return nil
-	//return c.Data[addr]
+
+	if uint64(addr)+2 >= uint64(len(c.Data)) {
+		return nil
+	}
+
+	return unsafe.Pointer(&c.Data[addr])
+
 }

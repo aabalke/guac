@@ -104,13 +104,26 @@ func (m *Mbc1) setAdvBanking(v uint8) {
 }
 
 func (m *Mbc1) ReadPtr(c Cartridge, addr uint16) unsafe.Pointer {
-	panic("setup readptr cart")
-	return nil
-	//return c.Data[addr]
+
+	if uint64(addr)+2 >= uint64(len(c.Data)) {
+		return nil
+	}
+
+	return unsafe.Pointer(&c.Data[addr])
 }
 
 func (m *Mbc1) ReadRomPtr(c Cartridge, addr uint16) unsafe.Pointer {
-	panic("setup readptr cart")
-	return nil
-	//return c.Data[addr]
+
+	if m.RomBank == 0 {
+		panic("ROM BANK 0")
+	}
+
+	a := uint64(addr - 0x4000)
+	a = a + uint64(m.RomBank)*0x4000
+
+	if a+2 >= uint64(len(c.Data)) {
+		return nil
+	}
+
+	return unsafe.Pointer(&c.Data[a])
 }
