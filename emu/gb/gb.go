@@ -116,49 +116,6 @@ func (gb *GameBoy) GetPixels() []byte {
 	return gb.Pixels
 }
 
-//func (gb *GameBoy) Update() {
-//
-//	if gb.Paused {
-//		return
-//	}
-//
-//	multiplier := 1
-//	if gb.DoubleSpeed {
-//		multiplier = 2
-//	}
-//
-//	for updateCycles := 0; updateCycles < (gb.Clock / gb.FPS * multiplier); {
-//
-//		gb.Cycles = 0
-//		cycles := 4
-//
-//		if !gb.Cpu.Halted {
-//			cycles = gb.Execute()
-//		}
-//
-//		if gb.DoubleSpeed {
-//			cycles /= 2
-//		}
-//
-//		updateCycles += cycles
-//		gb.Cycles = cycles
-//
-//		gb.UpdateGraphics()
-//
-//		interruptCycles := gb.UpdateInterrupt()
-//		if gb.DoubleSpeed {
-//			interruptCycles /= 2
-//		}
-//		updateCycles += interruptCycles
-//		gb.Cycles += interruptCycles
-//		gb.Apu.SoundClock(uint32(gb.Cycles), gb.DoubleSpeed)
-//
-//		gb.UpdateTimers()
-//	}
-//
-//	gb.UpdateDisplay()
-//	gb.Apu.Play(gb.Muted)
-//}
 func (gb *GameBoy) Update() {
     if gb.Paused {
         return
@@ -174,25 +131,29 @@ func (gb *GameBoy) Update() {
         } else {
             gb.Execute() // ticking happens inside here now
         }
+
+        gb.Tick(gb.UpdateInterrupt())
     }
     gb.frameCycles -= targetCycles // carry over, don't reset to 0
 
-    gb.UpdateDisplay()
     gb.Apu.Play(gb.Muted)
 }
 
 func (gb *GameBoy) Tick(tCycles int) {
+
+    if tCycles == 0 {
+        return
+    }
     if gb.DoubleSpeed {
         tCycles /= 2
     }
     gb.frameCycles += tCycles
-    gb.Cycles = tCycles // keep if anything still reads this
+    gb.Cycles = tCycles
 
-    gb.UpdateGraphics()   // was: gb.UpdateGraphics() after Execute()
-    gb.UpdateTimers()     // was: gb.UpdateTimers() after Execute()
+    gb.UpdateGraphics()
+    gb.UpdateTimers()
 
-    interruptCycles := gb.UpdateInterrupt()
-    gb.Apu.SoundClock(uint32(tCycles + interruptCycles), gb.DoubleSpeed)
+    gb.Apu.SoundClock(uint32(tCycles), gb.DoubleSpeed)
 }
 
 func (gb *GameBoy) ToggleMute() bool {
@@ -292,7 +253,7 @@ func (gb *GameBoy) loadCartridge() {
 
 }
 
-func (gb *GameBoy) UpdateInterrupt() (cycles int) {
+func (gb *GameBoy) UpdateInterrupt() int {
 
 	if gb.Cpu.PendingInterrupt {
 		gb.Cpu.IME = true
@@ -304,15 +265,19 @@ func (gb *GameBoy) UpdateInterrupt() (cycles int) {
 		return 0
 	}
 
-
 	handling := gb.Cpu.IF & gb.Cpu.IE & 0x1F
 	if noIRQ := handling == 0; noIRQ {
 		return 0
 	}
 
+    cycles := 20
+    if gb.DoubleSpeed {
+        cycles = 10
+    }
+
     if !gb.Cpu.IME && gb.Cpu.Halted {
         gb.Cpu.Halted = false
-        return 20
+        return cycles
     }
 
 	for i := range 5 {
@@ -327,7 +292,7 @@ func (gb *GameBoy) UpdateInterrupt() (cycles int) {
 		gb.StackPush(gb.Cpu.PC)
 		gb.Cpu.PC = IRQ_SRC[i]
 		gb.Cpu.isBranching = true
-		return 20
+		return cycles
 	}
 
 	return 0
