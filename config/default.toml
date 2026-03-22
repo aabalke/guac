@@ -74,6 +74,9 @@ batch_inst = 32
 # if invalid input, will fall back to greyscale
 # dmg_palette = [ 0xE0F8D0, 0x88C070, 0x346856, 0x081820 ]
 
+# forces "dmg", "gbc" or "auto" version for reading rom
+type = "auto"
+
 [gb.keyboard]
 
 a = ["J"]

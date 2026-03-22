@@ -189,8 +189,12 @@ func (gb *GameBoy) loadCartridge() {
 
 	log.Printf("Title: %s\n", gb.Cartridge.Title)
 
-	// Debug DMG mode
-	//gb.Cartridge.ColorMode = false
+    switch {
+    case config.Conf.Gb.ForceGBC:
+        gb.Cartridge.ColorMode = true
+    case config.Conf.Gb.ForceDMG:
+        gb.Cartridge.ColorMode = false
+    }
 
 	if gb.Cartridge.ColorMode {
 		gb.Color = true
@@ -264,15 +268,16 @@ func (gb *GameBoy) UpdateInterrupt() (cycles int) {
 		return 0
 	}
 
-	if !gb.Cpu.IME && gb.Cpu.Halted {
-		gb.Cpu.Halted = false
-		return 20
-	}
 
 	handling := gb.Cpu.IF & gb.Cpu.IE & 0x1F
 	if noIRQ := handling == 0; noIRQ {
 		return 0
 	}
+
+    if !gb.Cpu.IME && gb.Cpu.Halted {
+        gb.Cpu.Halted = false
+        return 20
+    }
 
 	for i := range 5 {
 
@@ -370,5 +375,7 @@ func (gb *GameBoy) Close() {
 	gb.Paused = true
 	gb.Apu.Close()
 
-	L.Close()
+    if L != nil {
+        L.Close()
+    }
 }
