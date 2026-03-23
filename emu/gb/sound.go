@@ -1,6 +1,7 @@
 package gameboy
 
 import (
+
 	"github.com/aabalke/guac/emu/apu"
 )
 
@@ -12,9 +13,8 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 
 	if addr == 0x26 {
 
-		//v &= 0x8F // should be 0x80 but setting channel bit does not work rn
-
-		a.SoundCntX = uint16((uint8(a.SoundCntX) & 0x0F) | (v & 0x80))
+        a.SoundCntX &^= 0x80
+        a.SoundCntX |= uint16(v & 0x80)
 
 		if disabled := (a.SoundCntX>>7)&1 == 0; disabled {
 			return
@@ -219,6 +219,7 @@ func ReadSound(addr uint32, a *apu.Apu) uint8 {
 	//case 0x82: return uint8(a.SoundCntH) & 0x0F
 	//case 0x83: return uint8(a.SoundCntH >> 8) & 0x77
 	case 0x26:
+
 		return uint8(a.SoundCntX) & 0x8F
 	//case 0x85: return 0
 	//case 0x86: return 0

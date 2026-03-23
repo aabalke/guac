@@ -139,12 +139,6 @@ func (gb *GameBoy) ReadPtr(addr uint16) unsafe.Pointer {
 
 func (gb *GameBoy) Read(addr uint16) uint8 {
 
-	if addr == 0xFF26 {
-
-		return 0xFA
-
-	}
-
 	mem := &gb.MemoryBus.Memory
 
 	if int(addr) > len(mem) {
@@ -241,7 +235,9 @@ func (gb *GameBoy) Read(addr uint16) uint8 {
 	case addr < 0xFF10:
 		return mem[addr]
 	case addr < 0xFF40:
-		return mem[addr]
+		// Sound IO
+		return ReadSound(uint32(addr&0xFF), gb.Apu)
+		//gb.Apu.Update(addr, v, gb)
 	case addr < 0xFF80:
 
 		return mem[addr]
@@ -254,10 +250,6 @@ func (gb *GameBoy) Read(addr uint16) uint8 {
 }
 
 func (gb *GameBoy) Write(addr uint16, v uint8) {
-
-	//if addr == 0xFF26 {
-	//    fmt.Printf("Wrote %X to %X\n", byte, addr)
-	//}
 
 	mem := &gb.MemoryBus.Memory
 
@@ -294,11 +286,7 @@ func (gb *GameBoy) Write(addr uint16, v uint8) {
 
 	case 0xFF26:
 
-		// Only bit 7 of master volume is writeable
-		bit := v & 0x80
-		v := (mem[0xFF26] & 0x7F) | bit
 		WriteSound(uint32(addr&0xFF), v, gb.Apu)
-		//gb.Apu.Update(addr, v, gb)
 
 	case 0xFF44:
 		mem[0xFF44] = 0
@@ -341,8 +329,9 @@ func (gb *GameBoy) Write(addr uint16, v uint8) {
 
 	case 0xFF4D:
 		if gb.Color {
-			gb.PrepareSpeedToggle = (v>>0)&1 != 0
-			mem[0xFF4D] = mem[0xFF4D]*0x80 | (v & 0x1)
+			gb.PrepareSpeedToggle = v & 1 != 0
+            mem[0xFF4D] &= 0x80
+            mem[0xFF4D] |= v & 1
 		}
 
 	case 0xFF4F:

@@ -271,9 +271,6 @@ func (gb *GameBoy) UpdateInterrupt() int {
 	}
 
     cycles := 20
-    if gb.DoubleSpeed {
-        cycles = 10
-    }
 
     if !gb.Cpu.IME && gb.Cpu.Halted {
         gb.Cpu.Halted = false
@@ -363,10 +360,10 @@ func (gb *GameBoy) toggleDoubleSpeed() {
 	gb.DoubleSpeed = !gb.DoubleSpeed
 	gb.Cpu.Halted = false
 
-	var v uint8 = 0
+    v := uint8(0)
 	if gb.DoubleSpeed {
 		v |= 1 << 7
-	}
+    }
 
 	gb.MemoryBus.Memory[0xFF4D] = v
 }

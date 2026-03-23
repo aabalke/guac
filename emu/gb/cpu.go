@@ -182,12 +182,15 @@ func (gb *GameBoy) Execute() {
 	op := gb.GetOp()
 	//op := gb.Read(gb.Cpu.PC)
 
+    //L.WriteLog(cnt, op)
+    //cnt++
+
 	switch op {
 	case 0x00: // nop
 	case 0x10: // stop / toggle speed
 
 		if gb.Color && gb.PrepareSpeedToggle {
-			gb.Write(0xFF26, 0)
+            gb.Tick(8200)
 			gb.toggleDoubleSpeed()
 		} else {
 			gb.Cpu.Halted = true
