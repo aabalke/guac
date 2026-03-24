@@ -15,11 +15,14 @@ type ToneChannel struct {
 
 	phase                                   bool
 	samples, lengthTime, sweepTime, envTime float64
+
+    DACEnabled bool
+    ChannelEnabled bool
 }
 
 func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 
-	if !ch.Apu.isSoundChanEnable(uint8(ch.Idx)) {
+    if !ch.ChannelEnabled {
 		return 0
 	}
 
@@ -51,7 +54,7 @@ func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 	if lenFlag := (ch.CntX >> 14) & 1 != 0; lenFlag {
 		ch.lengthTime += ch.Apu.sampleTime
 		if ch.lengthTime >= length {
-			ch.Apu.enableSoundChan(int(ch.Idx), false)
+            ch.ChannelEnabled = false
 			return 0
 		}
 	}
@@ -83,7 +86,9 @@ func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 					ch.CntX = cntx
 
 				} else {
-					ch.Apu.enableSoundChan(int(ch.Idx), false)
+                    if ch.Idx == 0 {
+                        ch.ChannelEnabled = false
+                    }
 				}
 			}
 		}

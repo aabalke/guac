@@ -11,11 +11,14 @@ type NoiseChannel struct {
 
 	lfsr                         uint16
 	samples, lengthTime, envTime float64
+
+    DACEnabled bool
+    ChannelEnabled bool
 }
 
 func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 
-	if !ch.Apu.isSoundChanEnable(uint8(ch.Idx)) {
+    if !ch.ChannelEnabled {
 		return 0
 	}
 
@@ -34,7 +37,7 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 		ch.lengthTime += ch.Apu.sampleTime
 
 		if stop := ch.lengthTime >= length; stop {
-			ch.Apu.enableSoundChan(int(ch.Idx), false)
+            ch.ChannelEnabled = false
 			return 0
 		}
 	}

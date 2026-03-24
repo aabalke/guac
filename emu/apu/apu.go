@@ -63,10 +63,6 @@ func (a *Apu) Disable() {
 	//a.SoundCntX = 0
 }
 
-func (a *Apu) isSoundChanEnable(ch uint8) bool {
-    return (a.SoundCntX >> ch) & 1 != 0
-}
-
 func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu {
 
 	a := &Apu{
@@ -253,16 +249,6 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 	}
 }
 
-func (a *Apu) enableSoundChan(ch int, enable bool) {
-
-	if enable {
-		a.SoundCntX |= (1 << ch)
-		return
-	}
-
-	a.SoundCntX &^= (1 << ch)
-}
-
 func IsResetSoundChan(addr uint32, isGB bool) bool {
 
 	if isGB {
@@ -289,25 +275,46 @@ func (a *Apu) _resetSoundChan(ch int, enable bool) {
 		switch ch {
 		case 0:
 
+            if !a.ToneChannel1.DACEnabled { 
+                return
+            }
+
 			a.ToneChannel1.phase = false
 			a.ToneChannel1.samples = 0
 			a.ToneChannel1.lengthTime = 0
 			a.ToneChannel1.sweepTime = 0
 			a.ToneChannel1.envTime = 0
 
+            a.ToneChannel1.ChannelEnabled = true
+
 		case 1:
+            if !a.ToneChannel2.DACEnabled { 
+                return
+            }
+
 
 			a.ToneChannel2.phase = false
 			a.ToneChannel2.samples = 0
 			a.ToneChannel2.lengthTime = 0
 			a.ToneChannel2.sweepTime = 0
 			a.ToneChannel2.envTime = 0
+            a.ToneChannel2.ChannelEnabled = true
 
 		case 2:
+
+            if !a.WaveChannel.DACEnabled { 
+                return
+            }
+
 			a.WaveChannel.samples = 0
 			a.WaveChannel.lengthTime = 0
 			a.WaveChannel.Reset()
+            a.WaveChannel.ChannelEnabled = true
 		case 3:
+            if !a.NoiseChannel.DACEnabled { 
+                return
+            }
+
 
 			a.NoiseChannel.samples = 0
 			a.NoiseChannel.lengthTime = 0
@@ -318,8 +325,17 @@ func (a *Apu) _resetSoundChan(ch int, enable bool) {
 			} else {
 				a.NoiseChannel.lfsr = 0x4000 // 15bit
 			}
+            a.NoiseChannel.ChannelEnabled = true
 		}
-
-		a.enableSoundChan(ch, true)
 	}
+}
+
+func (a *Apu) PowerOff() {
+    a.ToneChannel1 = ToneChannel{Idx: 0, Apu: a}
+    a.ToneChannel2 = ToneChannel{Idx: 1, Apu: a}
+    a.WaveChannel  = WaveChannel{Idx: 2, Apu: a, WaveRam: a.WaveChannel.WaveRam}
+    a.NoiseChannel = NoiseChannel{Idx: 3, Apu: a}
+    a.SoundCntL = 0
+    a.SoundCntH = 0
+    a.SoundCntX = 0
 }
