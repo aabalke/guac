@@ -11,7 +11,7 @@ import (
 // akatsuki105/magia MIT License
 
 type Apu struct {
-	Enable bool
+	Enabled bool
 
 	FifoA, FifoB                    Fifo
 	SoundCntL, SoundCntH, SoundCntX uint16
@@ -102,8 +102,6 @@ func (a *Apu) Play(muted bool) {
 
 	a.SoundBufferWrap()
 
-	a.Enable = true
-
 	if a.Stream == nil {
 		return
 	}
@@ -125,7 +123,6 @@ func (a *Apu) Play(muted bool) {
 	if ebiten.ActualTPS() > 65 {
 		return
 	}
-
 
 	a.player.Write(a.Stream)
 }
@@ -153,10 +150,6 @@ func (a *Apu) soundMix() {
 	} else {
 		a.ReadPointer -= uint32(delta)
 	}
-}
-
-func (a *Apu) IsSoundEnabled() bool {
-	return (a.SoundCntX >> 7) & 1 != 0
 }
 
 func (a *Apu) GetSample() (int16, int16) {
@@ -254,60 +247,11 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 	}
 }
 
-func IsResetSoundChan(addr uint32, isGB bool) bool {
-
-	if isGB {
-		_, ok := resetSoundChanMapGB[addr]
-		return ok
-	}
-	_, ok := resetSoundChanMapGBA[addr]
-	return ok
-}
-
-func (a *Apu) ResetSoundChan(addr uint32, b byte, isGB bool) {
-	if isGB {
-		a._resetSoundChan(resetSoundChanMapGB[addr], (b >> 7) & 1 != 0)
-		return
-	}
-	a._resetSoundChan(resetSoundChanMapGBA[addr], (b >> 7) & 1 != 0)
-}
-
-var resetSoundChanMapGBA = map[uint32]int{0x65: 0, 0x6d: 1, 0x75: 2, 0x7d: 3}
-var resetSoundChanMapGB  = map[uint32]int{0x14: 0, 0x19: 1, 0x1E: 2, 0x23: 3}
-
-func (a *Apu) _resetSoundChan(ch int, enable bool) {
-
-    if !enable {
-        return
-    }
-
-    switch ch {
-    case 0, 1, 2:
-        panic("should not be called")
-
-    case 3:
-        if !a.NoiseChannel.DACEnabled { 
-            return
-        }
-
-        a.NoiseChannel.samples = 0
-        a.NoiseChannel.lengthTime = 0
-        a.NoiseChannel.envTime = 0
-
-        if (a.NoiseChannel.CntH >> 3) & 1 != 0 {
-            a.NoiseChannel.lfsr = 0x0040 // 7bit
-        } else {
-            a.NoiseChannel.lfsr = 0x4000 // 15bit
-        }
-        a.NoiseChannel.ChannelEnabled = true
-    }
-}
-
 func (a *Apu) PowerOff() {
     a.ToneChannel1 = ToneChannel{Idx: 0, Apu: a}
     a.ToneChannel2 = ToneChannel{Idx: 1, Apu: a}
     a.WaveChannel  = WaveChannel{Idx: 2, Apu: a, WaveRam: a.WaveChannel.WaveRam}
-    a.NoiseChannel = NoiseChannel{Idx: 3, Apu: a}
+    a.NoiseChannel = NoiseChannel{Idx: 3, Apu: a, lfsr: a.NoiseChannel.lfsr}
     a.SoundCntL = 0
     a.SoundCntH = 0
     a.SoundCntX = 0

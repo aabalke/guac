@@ -12,34 +12,55 @@ type NoiseChannel struct {
 	lfsr                         uint16
 	samples, lengthTime, envTime float64
 
+    LenEnabled bool
     DACEnabled bool
     ChannelEnabled bool
 }
 
+func (ch *NoiseChannel) Trigger() {
+
+    if !ch.DACEnabled { 
+        return
+    }
+
+    if ch.lengthTime <= 0 {
+        ch.ResetLength(0, false)
+    }
+
+    ch.lfsr = 0//
+    ch.samples = 0
+    ch.envTime = 0
+    ch.ChannelEnabled = true
+}
+
+func (ch *NoiseChannel) ResetLength(initLength uint8, doubleSpeed bool) {
+    multipler := uint16(1)
+    if doubleSpeed {
+        multipler = 2
+    }
+    maxTimer := 64.0 * float64(multipler)
+    divApuRate := float64(multipler) / 256.0
+
+    if initLength == 0 {
+        ch.lengthTime = maxTimer * divApuRate
+        return
+    }
+
+    ch.lengthTime = (maxTimer - float64(initLength)) * divApuRate
+}
+
 func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
+
+    if ch.LenEnabled {
+        ch.lengthTime -= ch.Apu.sampleTime
+        if ch.lengthTime <= 0 {
+            ch.ChannelEnabled = false
+            return 0
+        }
+    }
 
     if !ch.ChannelEnabled {
 		return 0
-	}
-
-	multipler := uint16(1)
-	if doubleSpeed {
-		multipler = 2
-	}
-	maxTimer := float64(64 * multipler)
-	divApuRate := float64(multipler) / 256.0
-
-	soundLength := GetVarData(uint32(ch.CntL), 0, 5)
-	length := (maxTimer - float64(soundLength)) * divApuRate
-
-	if stopAtLength := (ch.CntH >> 14) & 1 != 0; stopAtLength {
-
-		ch.lengthTime += ch.Apu.sampleTime
-
-		if stop := ch.lengthTime >= length; stop {
-            ch.ChannelEnabled = false
-			return 0
-		}
 	}
 
 	envStep := float64(GetVarData(uint32(ch.CntL), 8, 10))
