@@ -5,24 +5,24 @@ import (
 )
 
 const (
-	LCDC        = 0xFF40
-	STAT        = 0xFF41
-	SCY         = 0xFF42
-	SCX         = 0xFF43
-	LY          = 0xFF44
-	LYC         = 0xFF45
-	DMA         = 0xFF46
-	BGPALETTE   = 0xFF47
-	OBJ0PALETTE = 0xFF48
-	OBJ1PALETTE = 0xFF49
-	WY          = 0xFF4A
-	WX          = 0xFF4B
+	LCDC        = 0x40
+	STAT        = 0x41
+	SCY         = 0x42
+	SCX         = 0x43
+	LY          = 0x44
+	LYC         = 0x45
+	DMA         = 0x46
+	BGPALETTE   = 0x47
+	OBJ0PALETTE = 0x48
+	OBJ1PALETTE = 0x49
+	WY          = 0x4A
+	WX          = 0x4B
 
 	//GBC
-	BCPS = 0xFF68
-	BCPD = 0xFF69
-	OCPS = 0xFF6A
-	OCPD = 0xFF6B
+	BCPS = 0x68
+	BCPD = 0x69
+	OCPS = 0x6A
+	OCPD = 0x6B
 
 	SpritePriorityOffset = 100 // random to distiguish uninitialized from valid 0
 
@@ -54,8 +54,8 @@ func (gb *GameBoy) UpdateGraphics() {
 		return
 	}
 
-	gb.MemoryBus.Memory[LY]++
-	currentLine := gb.MemoryBus.Memory[LY]
+	gb.MemoryBus.IO[LY]++
+	currentLine := gb.MemoryBus.IO[LY]
 
 	speedMultipler := 1
 	if gb.DoubleSpeed {
@@ -66,7 +66,7 @@ func (gb *GameBoy) UpdateGraphics() {
 
 	if currentLine > 153 {
 		gb.bgPriority = [width][height]bool{}
-		gb.MemoryBus.Memory[LY] = 0
+		gb.MemoryBus.IO[LY] = 0
 	}
 
 	if currentLine == height {
@@ -76,21 +76,21 @@ func (gb *GameBoy) UpdateGraphics() {
 }
 
 func (gb *GameBoy) enableLCD() bool {
-	return (gb.MemoryBus.Memory[LCDC]>>7)&1 != 0
+	return (gb.MemoryBus.IO[LCDC]>>7)&1 != 0
 }
 
 func (gb *GameBoy) setLCDStatus() {
 
-	stat := gb.MemoryBus.Memory[STAT]
+	stat := gb.MemoryBus.IO[STAT]
 
 	if !gb.enableLCD() {
 		gb.Timer.ScanlineCounter = 456
-		gb.MemoryBus.Memory[LY] = 0              // set y line
-		gb.MemoryBus.Memory[STAT] = stat &^ 0b11 // clear ppu mode
+		gb.MemoryBus.IO[LY] = 0              // set y line
+		gb.MemoryBus.IO[STAT] = stat &^ 0b11 // clear ppu mode
 		return
 	}
 
-	currentLine := gb.MemoryBus.Memory[LY]
+	currentLine := gb.MemoryBus.IO[LY]
 
 	currMode := stat & 0b11
 	var newMode uint8 = 0
@@ -136,24 +136,24 @@ func (gb *GameBoy) setLCDStatus() {
 		gb.RequestInterrupt(IRQ_LCD)
 	}
 
-	currentLineCoin := gb.MemoryBus.Memory[LYC]
+	currentLineCoin := gb.MemoryBus.IO[LYC]
 	if currentLine == currentLineCoin {
 		stat |= 0b100
 		if (stat>>6)&1 != 0 {
 			gb.RequestInterrupt(IRQ_LCD)
 		}
 
-		gb.MemoryBus.Memory[STAT] = stat
+		gb.MemoryBus.IO[STAT] = stat
 		return
 	}
 
 	stat &^= 0b100
-	gb.MemoryBus.Memory[STAT] = stat
+	gb.MemoryBus.IO[STAT] = stat
 }
 
 func (gb *GameBoy) drawScanline(scanline int32) {
 
-	lcdc := gb.MemoryBus.Memory[LCDC]
+	lcdc := gb.MemoryBus.IO[LCDC]
 
 	if gb.Color {
 		gb.renderTilesGBC()

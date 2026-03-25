@@ -2,7 +2,7 @@ package gameboy
 
 func (gb *GameBoy) getJoypad() uint8 {
 
-	joyp := gb.MemoryBus.Memory[0xFF00]
+	joyp := gb.MemoryBus.IO[0x00]
 
 	// 1 is off, and 0 is on, need to negate
 	joyp = joyp ^ 0xFF

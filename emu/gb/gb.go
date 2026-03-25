@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	DIV  = 0xFF04
-	TIMA = 0xFF05
-	TMA  = 0xFF06
-	TAC  = 0xFF07
+	DIV  = 0x04
+	TIMA = 0x05
+	TMA  = 0x06
+	TAC  = 0x07
 
 	tileWidth = 8
 	width     = 160
@@ -305,7 +305,7 @@ func (gb *GameBoy) UpdateTimers() {
 		cycles *= 2
 	}
 
-	Mem := &gb.MemoryBus.Memory
+	io := &gb.MemoryBus.IO
 	t := &gb.Timer
 
 	//t.DivReg += gb.Cycles
@@ -313,10 +313,10 @@ func (gb *GameBoy) UpdateTimers() {
 
 	if t.DivReg >= 0xFF {
 		t.DivReg -= 0xFF
-		Mem[DIV]++
+		io[DIV]++
 	}
 
-	if disabled := gb.MemoryBus.Memory[TAC]&0b100 == 0; disabled {
+	if disabled := io[TAC]&0b100 == 0; disabled {
 		return
 	}
 
@@ -324,21 +324,21 @@ func (gb *GameBoy) UpdateTimers() {
 
 	// is tma handled properly?
 
-	freq := freqs[Mem[TAC]&3]
+	freq := freqs[io[TAC]&3]
 
 	for t.Counter >= freq {
 		t.Counter -= freq
-		tima := Mem[TIMA]
+		tima := io[TIMA]
 		if overflow := tima == 0xFF; overflow {
-			Mem[TIMA] = 0
+			io[TIMA] = 0
 			t.InterruptPending = true
 		} else {
-			Mem[TIMA] = tima + 1
+			io[TIMA] = tima + 1
 		}
 	}
 
 	if t.InterruptPending {
-		Mem[TIMA] = Mem[TMA]
+		io[TIMA] = io[TMA]
 		gb.RequestInterrupt(IRQ_TMR)
 		t.InterruptPending = false
 	}
@@ -365,7 +365,7 @@ func (gb *GameBoy) toggleDoubleSpeed() {
 		v |= 1 << 7
     }
 
-	gb.MemoryBus.Memory[0xFF4D] = v
+	gb.MemoryBus.IO[0x4D] = v
 }
 
 func (gb *GameBoy) Close() {

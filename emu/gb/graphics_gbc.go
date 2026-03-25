@@ -5,12 +5,12 @@ package gameboy
 func (gb *GameBoy) renderTilesGBC() {
 
 	var (
-		scrollY  = gb.MemoryBus.Memory[0xFF42]
-		scrollX  = gb.MemoryBus.Memory[0xFF43]
-		windowY  = gb.MemoryBus.Memory[0xFF4A]
-		windowX  = int(gb.MemoryBus.Memory[0xFF4B]) - 7
-		lcdc     = gb.MemoryBus.Memory[LCDC]
-		scanline = (gb.MemoryBus.Memory[LY])
+		scrollY  = gb.MemoryBus.IO[0x42]
+		scrollX  = gb.MemoryBus.IO[0x43]
+		windowY  = gb.MemoryBus.IO[0x4A]
+		windowX  = int(gb.MemoryBus.IO[0x4B]) - 7
+		lcdc     = gb.MemoryBus.IO[LCDC]
+		scanline = (gb.MemoryBus.IO[LY])
 
 		signedTiles      = !((lcdc>>4)&1 != 0)
 		scanLineInWindow = windowY <= scanline
@@ -130,7 +130,7 @@ func (gb *GameBoy) renderTilesGBC() {
 
 func (gb *GameBoy) renderSpritesGBC(scanline int32) {
 
-	lcdc := gb.MemoryBus.Memory[LCDC]
+	lcdc := gb.MemoryBus.IO[LCDC]
 
 	var ySize int32 = 8
 	if (lcdc>>2)&1 != 0 {
