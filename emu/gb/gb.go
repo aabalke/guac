@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/aabalke/guac/config"
-	"github.com/aabalke/guac/emu/apu"
+	"github.com/aabalke/guac/emu/gb/apu"
 	"github.com/aabalke/guac/emu/gb/cartridge"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"

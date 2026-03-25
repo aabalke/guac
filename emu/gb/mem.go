@@ -236,7 +236,7 @@ func (gb *GameBoy) Read(addr uint16) uint8 {
 		return mem[addr]
 	case addr < 0xFF40:
 		// Sound IO
-		return ReadSound(uint32(addr&0xFF), gb.Apu)
+		return gb.ReadSound(uint32(addr&0xFF), gb.Apu)
 		//gb.Apu.Update(addr, v, gb)
 	case addr < 0xFF80:
 
@@ -286,7 +286,7 @@ func (gb *GameBoy) Write(addr uint16, v uint8) {
 
 	case 0xFF26:
 
-		WriteSound(uint32(addr&0xFF), v, gb.Apu)
+		gb.WriteSound(uint32(addr&0xFF), v, gb.Apu)
 
 	case 0xFF44:
 		mem[0xFF44] = 0
@@ -419,7 +419,7 @@ func (gb *GameBoy) Write(addr uint16, v uint8) {
 	case addr < 0xFF40:
 		// Sound IO
 		mem[addr] = v
-		WriteSound(uint32(addr&0xFF), v, gb.Apu)
+		gb.WriteSound(uint32(addr&0xFF), v, gb.Apu)
 		//gb.Apu.Update(addr, v, gb)
 
 	case addr < 0xFF80:
