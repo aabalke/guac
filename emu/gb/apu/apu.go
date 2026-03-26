@@ -39,33 +39,79 @@ type Apu struct {
 	sampleTime   float64
 	streamLen    int
 	buffSize     uint32
+
+    fsCounter uint32
+    fsStep    uint8
+}
+
+const FS_PERIOD = 8291
+
+func (a *Apu) clockFrameSequencer() {
+
+    // frame sequencer runs at 512hz
+    // length ctr at 256hz
+    // sweep at 128hz
+    // vol at 64hz
+
+    if a.fsStep & 1 == 0 {
+        a.clockLengthCounters()
+    }
+
+    if a.fsStep & 7 == 2 || a.fsStep & 7 == 6 {
+        a.ToneChannel1.clockSweep()
+    }
+
+    if a.fsStep & 7 == 7 {
+        a.clockEnvelopes()
+    }
+
+    a.fsStep = (a.fsStep + 1) & 7
+}
+
+func (a *Apu) clockLengthCounters() {
+    a.ToneChannel1.clockLength()
+    a.ToneChannel2.clockLength()
+    //a.WaveChannel.clockLength()
+    //a.NoiseChannel.clockLength()
+}
+
+func (a *Apu) clockEnvelopes() {
+    a.ToneChannel1.clockEnvelope()
+    a.ToneChannel2.clockEnvelope()
+    //a.NoiseChannel.clockEnvelope()
+    // Wave has no envelope
 }
 
 func (a *Apu) Disable() {
 
-	a.ToneChannel1.CntL = 0
 	a.ToneChannel1.Duty = 0
-    a.ToneChannel1.VolumeRegister = 0
+    a.ToneChannel1.InitVolume = 0
+    a.ToneChannel1.EnvEnabled = false
+    a.ToneChannel1.EnvIncrement = false
+    a.ToneChannel1.EnvPace = 0
 	a.ToneChannel1.Period = 0
 	a.ToneChannel1.LenEnabled = false
+    a.ToneChannel1.SweepPace = 0
+    a.ToneChannel1.SweepDecrease = false
+    a.ToneChannel1.SweepStep = 0
+    a.ToneChannel1.SweepTimer = 0
 
-	a.ToneChannel2.CntL = 0
 	a.ToneChannel2.Duty = 0
-    a.ToneChannel2.VolumeRegister = 0
+    a.ToneChannel2.InitVolume = 0
+    a.ToneChannel2.EnvEnabled = false
+    a.ToneChannel2.EnvIncrement = false
+    a.ToneChannel2.EnvPace = 0
 	a.ToneChannel2.Period = 0
 	a.ToneChannel2.LenEnabled = false
 
-	//a.WaveChannel.CntL = 0
 	a.WaveChannel.CntH = 0
 	a.WaveChannel.Period = 0
 	a.WaveChannel.LenEnabled = false
 
-	a.NoiseChannel.CntL = 0
-	a.NoiseChannel.CntH = 0
+    a.NoiseChannel.RandomRegister = 0
+    a.NoiseChannel.VolumeRegister = 0
 
 	a.SoundCntL = 0
-	//a.SoundCntH = 0
-	//a.SoundCntX = 0
 }
 
 func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu {
@@ -85,10 +131,10 @@ func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu 
 	}
 
 	a.Stream = make([]byte, a.streamLen)
-	a.SoundBuffer = make([]int16, a.buffSize)
+	a.SoundBuffer  = make([]int16, a.buffSize)
 	a.ToneChannel1 = ToneChannel{Apu: a, Idx: 0}
 	a.ToneChannel2 = ToneChannel{Apu: a, Idx: 1}
-	a.WaveChannel = WaveChannel{Apu: a, Idx: 2}
+	a.WaveChannel  = WaveChannel{Apu: a, Idx: 2}
 	a.NoiseChannel = NoiseChannel{Apu: a, Idx: 3}
 
 	if !config.Conf.CancelAudioInit {
@@ -195,6 +241,17 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 
 	a.sndCycles += cycles
 
+    // --- Frame Sequencer ---
+    fsCycles := uint32(FS_PERIOD)
+    if doubleSpeed {
+        fsCycles <<= 1
+    }
+    a.fsCounter += cycles
+    for a.fsCounter >= fsCycles {
+        a.fsCounter -= fsCycles
+        a.clockFrameSequencer()
+    }
+
 	shift0 := int32(a.SoundCntH>>2) & 1
 	shift1 := int32(a.SoundCntH>>3) & 1
 	lpan0 := int32(a.SoundCntH>>9) & 1
@@ -224,6 +281,7 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 		ch2 := int32(a.ToneChannel2.GetSample(doubleSpeed))
 		ch3 := int32(a.WaveChannel.GetSample(doubleSpeed))
 		ch4 := int32(a.NoiseChannel.GetSample(doubleSpeed))
+        ch2, ch3, ch4 = 0, 0, 0
 
 		psgL := ch1*int32((cntL>>12)&1) +
 			ch2*int32((cntL>>13)&1) +

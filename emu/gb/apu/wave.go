@@ -43,7 +43,7 @@ func (ch *WaveChannel) ResetLength(initLength uint8, doubleSpeed bool) {
     divApuRate := float64(multipler) / 256.0
 
     if initLength == 0 {
-        ch.LengthTime = (maxTimer + 1.13) * divApuRate // 1 is required currently to pass blarg dmg_sound 2, not sure if indicative of larger problem, + range 0.13 ... 1.13 passes
+        ch.LengthTime = (maxTimer + 1) * divApuRate // 1 is required currently to pass blarg dmg_sound 2, not sure if indicative of larger problem, + range 0.13 ... 1.13 passes
         return
     }
 
@@ -51,11 +51,6 @@ func (ch *WaveChannel) ResetLength(initLength uint8, doubleSpeed bool) {
 }
 
 func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
-
-    if ch.LenEnabled && ch.LengthTime <= 0 && ch.ChannelEnabled {
-        ch.ChannelEnabled = false
-        return 0
-    }
 
     if ch.LenEnabled {
         ch.LengthTime -= ch.Apu.sampleTime
@@ -70,7 +65,7 @@ func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
 		return 0
 	}
 
-	freq := 2097152 / (2048 - float64(ch.Period))
+	freq := 2097152 / float64(2048 - ch.Period)
 	cycleSamples := float64(ch.Apu.sndFrequency) / freq
 
 	ch.samples++
@@ -78,7 +73,7 @@ func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
 		ch.samples -= cycleSamples
 
 		ch.WaveSamples--
-		if ch.WaveSamples != 0 {
+		if ch.WaveSamples > 0 {
 			ch.WavePosition = (ch.WavePosition + 1) & 0x3F
 		} else {
 			ch.Reset()
@@ -92,7 +87,7 @@ func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
 
 		sample *= 0.75
 	} else {
-		switch vol := GetVarData(uint32(ch.CntH), 13, 14); vol {
+        switch vol := (ch.CntH >> 13) & 3; vol {
 		case 0:
 			sample = 0
 		case 1:

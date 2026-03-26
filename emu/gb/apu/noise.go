@@ -7,11 +7,12 @@ import (
 type NoiseChannel struct {
 	Apu        *Apu
 	Idx        uint32
-	CntL, CntH uint16
 
 	lfsr                         uint16
 	samples, lengthTime, envTime float64
 
+    RandomRegister uint8
+    VolumeRegister uint8
     LenEnabled bool
     DACEnabled bool
     ChannelEnabled bool
@@ -63,32 +64,30 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 		return 0
 	}
 
-	envStep := float64(GetVarData(uint32(ch.CntL), 8, 10))
-	envelope := uint16(GetVarData(uint32(ch.CntL), 12, 15))
+	vol := ch.VolumeRegister >> 4
 
-	if envStep != 0 {
+	if envStep := ch.VolumeRegister & 7; envStep > 0 {
+
+        envelopeInterval := float64(envStep) / float64(64)
 		ch.envTime += ch.Apu.sampleTime
-		envelopeInterval := envStep / 64
 
 		if ch.envTime >= envelopeInterval {
 			ch.envTime -= envelopeInterval
 
-			if (ch.CntL >> 11) & 1 != 0 {
-				if envelope < 0xf {
-					envelope++
+			if increment := (ch.VolumeRegister >> 3) & 1 != 0; increment {
+				if vol < 0xf {
+					vol++
 				}
 			} else {
-				if envelope > 0x0 {
-					envelope--
+				if vol > 0 {
+					vol--
 				}
 			}
-
-			ch.CntL = (ch.CntL & ^uint16(0xf000)) | (envelope << 12)
 		}
 	}
 
-	r := float64(GetVarData(uint32(ch.CntH), 0, 2))
-	s := float64(GetVarData(uint32(ch.CntH), 4, 7))
+    r := float64(ch.RandomRegister & 7)
+    s := float64((ch.RandomRegister >>4) & 0xF)
 
 	if r == 0 {
 		r = 0.5
@@ -97,14 +96,14 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 	frequency := (524288 / r) / math.Pow(2, s+1)
 	cycleSamples := float64(ch.Apu.sndFrequency) / frequency
 
-	carry := byte(ch.lfsr & 0b1)
+	carry := byte(ch.lfsr & 1)
 	ch.samples++
 	if ch.samples >= cycleSamples {
 		ch.samples -= cycleSamples
 		ch.lfsr >>= 1
 
 		if carry > 0 {
-			if (ch.CntH >> 3) & 1 != 0 { // R/W Counter Step/Width
+			if (ch.RandomRegister >> 3) & 1 != 0 {
 				ch.lfsr ^= 0x60 // 1: 7bits
 			} else {
 				ch.lfsr ^= 0x6000 // 0: 15bits
@@ -113,7 +112,7 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 	}
 
 	if carry != 0 {
-		return int8((float64(envelope) / 15) * PSG_MAX) // Out=HIGH
+		return int8((float64(vol) / 15) * PSG_MAX) // Out=HIGH
 	}
-	return int8((float64(envelope) / 15) * PSG_MIN) // Out=LOW
+	return int8((float64(vol) / 15) * PSG_MIN) // Out=LOW
 }

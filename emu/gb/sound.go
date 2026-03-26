@@ -38,13 +38,14 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
         switch addr {
         case 0x10:
 
-            ch.CntL &^= 0x00FF
-            ch.CntL |= uint16(v)
+            ch.SweepStep = v & 7
+            ch.SweepDecrease = (v >> 3) & 1 != 0
+            ch.SweepPace = (v >> 4) & 7
 
         case 0x11:
 
             ch.Duty = v >> 6
-            ch.ResetLength(v & 0x3F, false)
+            //ch.ResetLength(v & 0x3F, false)
 
         case 0x12:
 
@@ -54,19 +55,23 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
                 ch.ChannelEnabled = false
             }
 
-            ch.VolumeRegister = v
+            ch.InitVolume = v >> 4
+            ch.EnvEnabled = v & 7 != 0
+            ch.EnvIncrement  = (v >> 3) & 1 != 0
+            ch.EnvPace  = v & 7
+
+            //fmt.Printf("W INIT VOL %X, PACE %X\n", ch.InitVolume, v & 7)
 
         case 0x13:
             ch.Period &^= 0x00FF
             ch.Period |= uint16(v)
 
         case 0x14:
-
             ch.Period &^= 0xFF00
             ch.Period |= uint16(v & 7) << 8
             ch.LenEnabled = (v >> 6) & 1 != 0
-
-            if v & 0x80 != 0 {
+            ch.ChannelEnabled = (v >> 7) & 1 != 0
+            if ch.ChannelEnabled {
                 ch.Trigger()
             }
         }
@@ -82,7 +87,7 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
         case 0x16:
 
             ch.Duty = v >> 6
-            ch.ResetLength(v & 0x3F, false)
+            //ch.ResetLength(v & 0x3F, false)
 
         case 0x17:
 
@@ -92,7 +97,10 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
                 ch.ChannelEnabled = false
             }
 
-            ch.VolumeRegister = v
+            ch.InitVolume = v >> 4
+            ch.EnvEnabled = v & 7 != 0
+            ch.EnvIncrement  = (v >> 3) & 1 != 0
+            ch.EnvPace  = v & 7
 
         case 0x18:
             ch.Period &^= 0x00FF
@@ -165,12 +173,10 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
                 ch.ChannelEnabled = false
             }
 
-            ch.CntL &= 0x00FF
-            ch.CntL |= uint16(v) << 8
+            ch.VolumeRegister = v
 
         case 0x22:
-            ch.CntH &^= 0x00FF
-            ch.CntH |= uint16(v)
+            ch.RandomRegister = v
         case 0x23:
             ch.LenEnabled = (v >> 6) & 1 != 0
 
@@ -210,13 +216,31 @@ func (gb *GameBoy) ReadSound(addr uint32, a *apu.Apu) uint8 {
 
         switch addr {
         case 0x10:
-            return uint8(ch.CntL) | 0x80
+
+            v := ch.SweepStep
+
+            if ch.SweepDecrease {
+                v |= 1 << 3
+            }
+
+            v |= ch.SweepPace << 4
+
+            return v | 0x80
 
         case 0x11:
             return (ch.Duty << 6) | 0x3F
 
         case 0x12:
-            return ch.VolumeRegister
+
+            v := ch.EnvPace
+
+            if ch.EnvIncrement {
+                v |= 1 << 3
+            }
+
+            v |= ch.InitVolume << 4
+
+            return v
 
         case 0x14:
 
@@ -240,7 +264,16 @@ func (gb *GameBoy) ReadSound(addr uint32, a *apu.Apu) uint8 {
             return (ch.Duty << 6) | 0x3F
 
         case 0x17:
-            return ch.VolumeRegister
+
+            v := ch.EnvPace
+
+            if ch.EnvIncrement {
+                v |= 1 << 3
+            }
+
+            v |= ch.InitVolume << 4
+
+            return v
 
         case 0x19:
 
@@ -289,10 +322,11 @@ func (gb *GameBoy) ReadSound(addr uint32, a *apu.Apu) uint8 {
 
         switch addr {
         case 0x21:
-            return uint8(ch.CntL >> 8)
+            return ch.VolumeRegister
 
         case 0x22:
-            return uint8(ch.CntH)
+            return ch.RandomRegister
+
         case 0x23:
 
             if ch.LenEnabled {
