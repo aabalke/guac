@@ -22,20 +22,25 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
 		return
 	}
 
-    if tone1 := addr < 0x16; tone1 {
-        switch ch := &a.ToneChannel1; addr {
+    if tone := addr < 0x1A; tone {
+        ch := &a.ToneChannel1
+        if addr >= 0x16 {
+            ch = &a.ToneChannel2
+        }
+
+        switch addr {
         case 0x10:
 
             ch.SweepStep = v & 7
             ch.SweepDecrease = (v >> 3) & 1 != 0
             ch.SweepPace = (v >> 4) & 7
 
-        case 0x11:
+        case 0x11, 0x16:
 
             ch.Duty = v >> 6
             ch.ResetLength(v & 0x3F)
 
-        case 0x12:
+        case 0x12, 0x17:
 
             wasEnabled := ch.DACEnabled
             ch.DACEnabled = v & 0xF8 != 0
@@ -48,11 +53,11 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
             ch.EnvIncrement  = (v >> 3) & 1 != 0
             ch.EnvPace  = v & 7
 
-        case 0x13:
+        case 0x13, 0x18:
             ch.Period &^= 0x00FF
             ch.Period |= uint16(v)
 
-        case 0x14:
+        case 0x14, 0x19:
 
             ch.Period &^= 0xFF00
             ch.Period |= uint16(v & 7) << 8
@@ -64,45 +69,6 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
                 ch.LengthTrigger()
             }
 
-
-            if (v & 0x80) != 0 {
-                ch.Trigger()
-            }
-        }
-
-        return
-    }
-
-    if tone2 := addr < 0x1A; tone2 {
-        switch ch := &a.ToneChannel2; addr {
-        case 0x16:
-
-            ch.Duty = v >> 6
-            ch.ResetLength(v & 0x3F)
-
-        case 0x17:
-
-            wasEnabled := ch.DACEnabled
-            ch.DACEnabled = v & 0xF8 != 0
-            if wasEnabled && !ch.DACEnabled {
-                ch.ChannelEnabled = false
-            }
-
-            ch.InitVolume = v >> 4
-            ch.EnvEnabled = v & 7 != 0
-            ch.EnvIncrement  = (v >> 3) & 1 != 0
-            ch.EnvPace  = v & 7
-
-
-        case 0x18:
-            ch.Period &^= 0x00FF
-            ch.Period |= uint16(v)
-
-        case 0x19:
-
-            ch.Period &^= 0xFF00
-            ch.Period |= uint16(v & 7) << 8
-            ch.LenEnabled = (v >> 6) & 1 != 0
             if (v & 0x80) != 0 {
                 ch.Trigger()
             }
@@ -136,7 +102,13 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
 
             ch.Period &^= 0xFF00
             ch.Period |= uint16(v & 7) << 8
+
+            prev := ch.LenEnabled
             ch.LenEnabled = (v >> 6) & 1 != 0
+
+            if !prev && ch.LenEnabled {
+                ch.LengthTrigger()
+            }
 
             if v & 0x80 != 0 {
                 ch.Trigger()
@@ -164,7 +136,13 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
         case 0x22:
             ch.RandomRegister = v
         case 0x23:
+
+            prev := ch.LenEnabled
             ch.LenEnabled = (v >> 6) & 1 != 0
+
+            if !prev && ch.LenEnabled {
+                ch.LengthTrigger()
+            }
 
             if v & 0x80 != 0 {
                 ch.Trigger()
@@ -209,9 +187,14 @@ func (gb *GameBoy) ReadSound(addr uint32, a *apu.Apu) uint8 {
         return 0xFF
     }
 
-    if tone1 := addr >= 0x10 && addr < 0x16; tone1 {
+    if tone := addr >= 0x10 && addr < 0x1A; tone {
 
-        switch ch := &a.ToneChannel1; addr {
+        ch := &a.ToneChannel1
+        if addr >= 0x16 {
+            ch = &a.ToneChannel2
+        }
+
+        switch addr {
         case 0x10:
 
             v := ch.SweepStep
@@ -224,10 +207,10 @@ func (gb *GameBoy) ReadSound(addr uint32, a *apu.Apu) uint8 {
 
             return v | 0x80
 
-        case 0x11:
+        case 0x11, 0x16:
             return (ch.Duty << 6) | 0x3F
 
-        case 0x12:
+        case 0x12, 0x17:
 
             v := ch.EnvPace
 
@@ -239,38 +222,7 @@ func (gb *GameBoy) ReadSound(addr uint32, a *apu.Apu) uint8 {
 
             return v
 
-        case 0x14:
-
-            if ch.LenEnabled {
-                return 0xFF
-            }
-
-            return 0xBF
-
-        default:
-            return 0xFF
-        }
-    }
-
-    if tone2 := addr >= 0x16 && addr < 0x1A; tone2 {
-
-        switch ch := &a.ToneChannel2; addr {
-        case 0x16:
-            return (ch.Duty << 6) | 0x3F
-
-        case 0x17:
-
-            v := ch.EnvPace
-
-            if ch.EnvIncrement {
-                v |= 1 << 3
-            }
-
-            v |= ch.InitVolume << 4
-
-            return v
-
-        case 0x19:
+        case 0x14, 0x19:
 
             if ch.LenEnabled {
                 return 0xFF

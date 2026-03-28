@@ -19,21 +19,32 @@ type WaveChannel struct {
     EnvPace      uint8
     EnvIncrement bool
 
-
     DACEnabled     bool
     EnvEnabled     bool
     LenEnabled     bool
     ChannelEnabled bool
 }
 
-func (ch *WaveChannel) Trigger() {
+func (ch *WaveChannel) LengthTrigger() {
 
-    if !ch.DACEnabled { 
+    if ch.LengthCounter == 0 {
         return
     }
 
+    if ch.Apu.fsStep & 1 != 0 {
+        ch.clockLength()
+    }
+}
+
+func (ch *WaveChannel) Trigger() {
+
     if ch.LengthCounter == 0 {
         ch.ResetLength(0)
+        ch.LengthTrigger()
+    }
+
+    if !ch.DACEnabled { 
+        return
     }
 
     ch.samples = 0

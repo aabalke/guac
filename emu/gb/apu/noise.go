@@ -29,14 +29,26 @@ type NoiseChannel struct {
     ChannelEnabled bool
 }
 
-func (ch *NoiseChannel) Trigger() {
+func (ch *NoiseChannel) LengthTrigger() {
 
-    if !ch.DACEnabled { 
+    if ch.LengthCounter == 0 {
         return
     }
 
+    if ch.Apu.fsStep & 1 != 0 {
+        ch.clockLength()
+    }
+}
+
+func (ch *NoiseChannel) Trigger() {
+
     if ch.LengthCounter == 0 {
         ch.ResetLength(0)
+        ch.LengthTrigger()
+    }
+
+    if !ch.DACEnabled { 
+        return
     }
 
     ch.lfsr = 0

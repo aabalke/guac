@@ -1,7 +1,5 @@
 package apu
 
-import "fmt"
-
 var DutyLookUp = [4]float64{0.125, 0.25, 0.5, 0.75}
 var DutyLookUpi = [4]float64{0.875, 0.75, 0.5, 0.25}
 
@@ -42,8 +40,6 @@ type ToneChannel struct {
     ChannelEnabled bool
 }
 
-var Cnt bool
-
 func (ch *ToneChannel) LengthTrigger() {
 
     if ch.LengthCounter == 0 {
@@ -53,27 +49,18 @@ func (ch *ToneChannel) LengthTrigger() {
     if ch.Apu.fsStep & 1 != 0 {
         ch.clockLength()
     }
-    //fmt.Printf("LEN Triggered. STEP %d\n", ch.Apu.fsStep)
 }
 
 func (ch *ToneChannel) Trigger() {
 
+    if ch.LengthCounter == 0 {
+        ch.ResetLength(0)
+        ch.LengthTrigger()
+    }
+
     if !ch.DACEnabled { 
         return
     }
-
-    if Cnt {
-        fmt.Printf("Triggered. IsFirstHalf %X fsCounter %04X, fsStep %04X\n", ch.Apu.fsStep & 1, ch.Apu.fsCounter, ch.Apu.fsStep)
-        Cnt = false
-    }
-
-    if ch.LengthCounter == 0 {
-        ch.ResetLength(0)
-    }
-
-    //if ch.InFirstHalf {
-    //    ch.clockLength()
-    //}
 
     ch.phase = false
     ch.samples = 0
@@ -104,10 +91,6 @@ func (ch *ToneChannel) clockLength() {
 
 func (ch *ToneChannel) ResetLength(initLength uint8) {
     ch.LengthCounter = 64 - initLength
-
-    if ch.LengthCounter == 2 {
-        Cnt = true
-    }
 }
 
 func (ch *ToneChannel) clockEnvelope() {
