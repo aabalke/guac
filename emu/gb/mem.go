@@ -284,6 +284,11 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 	case 0xFF00:
 		return gb.getJoypad()
 
+	case 0xFF04: // DIV
+
+        return uint8(gb.Timer.Div>>8)
+
+
 	case 0xFF0F:
 		return gb.Cpu.IF
 
@@ -353,8 +358,17 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 	switch addr {
 	case 0xFF04: // DIV
 		gb.Timer.Counter = 0
-		gb.Timer.DivReg = 0
-		io[0x04] = 0
+        prev := gb.Timer.Div
+		gb.Timer.Div = 0
+
+        mask := uint16(1<<12)
+        if gb.DoubleSpeed {
+            mask = uint16(1<<13)
+        }
+
+        if prev & mask != 0 {
+            gb.Apu.ClockFrameSequencer()
+        } 
 
 	case 0xFF07:
 		currFreq := io[0x07] & 0x03

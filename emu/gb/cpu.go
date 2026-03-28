@@ -194,6 +194,7 @@ func (gb *GameBoy) Execute() {
 			gb.toggleDoubleSpeed()
 		} else {
 			gb.Cpu.Halted = true
+            gb.Timer.Div = 0
 		}
 
 		pc++

@@ -8,8 +8,6 @@ import (
 	"github.com/hajimehoshi/oto"
 )
 
-// akatsuki105/magia MIT License
-
 type Apu struct {
 	Enabled bool
 
@@ -44,14 +42,19 @@ type Apu struct {
     fsStep    uint8
 }
 
-const FS_PERIOD = 8291
+const FS_PERIOD = 8192 // cpu clock / 512hz (4,194,304 Hz ÷ 512 Hz = 8,192 T-cycles)
+const FS_PERIOD_MASK = 8191
 
-func (a *Apu) clockFrameSequencer() {
+func (a *Apu) ClockFrameSequencer() {
+
+    a.fsCounter++
 
     // frame sequencer runs at 512hz
     // length ctr at 256hz
     // sweep at 128hz
     // vol at 64hz
+
+    //a.ToneChannel1.InFirstHalf = a.fsStep & 1 != 0
 
     if a.fsStep & 1 == 0 {
         a.clockLengthCounters()
@@ -71,47 +74,14 @@ func (a *Apu) clockFrameSequencer() {
 func (a *Apu) clockLengthCounters() {
     a.ToneChannel1.clockLength()
     a.ToneChannel2.clockLength()
-    //a.WaveChannel.clockLength()
-    //a.NoiseChannel.clockLength()
+    a.WaveChannel.clockLength()
+    a.NoiseChannel.clockLength()
 }
 
 func (a *Apu) clockEnvelopes() {
     a.ToneChannel1.clockEnvelope()
     a.ToneChannel2.clockEnvelope()
-    //a.NoiseChannel.clockEnvelope()
-    // Wave has no envelope
-}
-
-func (a *Apu) Disable() {
-
-	a.ToneChannel1.Duty = 0
-    a.ToneChannel1.InitVolume = 0
-    a.ToneChannel1.EnvEnabled = false
-    a.ToneChannel1.EnvIncrement = false
-    a.ToneChannel1.EnvPace = 0
-	a.ToneChannel1.Period = 0
-	a.ToneChannel1.LenEnabled = false
-    a.ToneChannel1.SweepPace = 0
-    a.ToneChannel1.SweepDecrease = false
-    a.ToneChannel1.SweepStep = 0
-    a.ToneChannel1.SweepTimer = 0
-
-	a.ToneChannel2.Duty = 0
-    a.ToneChannel2.InitVolume = 0
-    a.ToneChannel2.EnvEnabled = false
-    a.ToneChannel2.EnvIncrement = false
-    a.ToneChannel2.EnvPace = 0
-	a.ToneChannel2.Period = 0
-	a.ToneChannel2.LenEnabled = false
-
-	a.WaveChannel.CntH = 0
-	a.WaveChannel.Period = 0
-	a.WaveChannel.LenEnabled = false
-
-    a.NoiseChannel.RandomRegister = 0
-    a.NoiseChannel.VolumeRegister = 0
-
-	a.SoundCntL = 0
+    a.NoiseChannel.clockEnvelope()
 }
 
 func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu {
@@ -241,34 +211,22 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 
 	a.sndCycles += cycles
 
-    // --- Frame Sequencer ---
-    fsCycles := uint32(FS_PERIOD)
-    if doubleSpeed {
-        fsCycles <<= 1
-    }
-    a.fsCounter += cycles
-    for a.fsCounter >= fsCycles {
-        a.fsCounter -= fsCycles
-        a.clockFrameSequencer()
-    }
-
-	shift0 := int32(a.SoundCntH>>2) & 1
-	shift1 := int32(a.SoundCntH>>3) & 1
-	lpan0 := int32(a.SoundCntH>>9) & 1
-	rpan0 := int32(a.SoundCntH>>8) & 1
-	lpan1 := int32(a.SoundCntH>>13) & 1
-	rpan1 := int32(a.SoundCntH>>12) & 1
-
-	sampleA := int32(a.FifoA.Sample) << (1 - shift0)
-	sampleB := int32(a.FifoB.Sample) << (1 - shift1)
-
-	sampleLeft := sampleA*lpan0 + sampleB*lpan1
-	sampleRight := sampleA*rpan0 + sampleB*rpan1
-
-	cntL := uint32(a.SoundCntL)
-	volL := volLut[(cntL>>4)&0b111]
-	volR := volLut[(cntL>>0)&0b111]
-	shift := rshLut[(a.SoundCntH)&0b11]
+    var (
+        shift0 = int32(a.SoundCntH>>2) & 1
+        shift1 = int32(a.SoundCntH>>3) & 1
+        lpan0 = int32(a.SoundCntH>>9) & 1
+        rpan0 = int32(a.SoundCntH>>8) & 1
+        lpan1 = int32(a.SoundCntH>>13) & 1
+        rpan1 = int32(a.SoundCntH>>12) & 1
+        sampleA = int32(a.FifoA.Sample) << (1 - shift0)
+        sampleB = int32(a.FifoB.Sample) << (1 - shift1)
+        sampleLeft = sampleA*lpan0 + sampleB*lpan1
+        sampleRight = sampleA*rpan0 + sampleB*rpan1
+        cntL = a.SoundCntL
+        volL = volLut[(cntL>>4)&7]
+        volR = volLut[(cntL>>0)&7]
+        shift = rshLut[(a.SoundCntH)&3]
+    )
 
 	clockCycles := uint32(a.sampCycles)
 	if doubleSpeed {
@@ -281,7 +239,8 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 		ch2 := int32(a.ToneChannel2.GetSample(doubleSpeed))
 		ch3 := int32(a.WaveChannel.GetSample(doubleSpeed))
 		ch4 := int32(a.NoiseChannel.GetSample(doubleSpeed))
-        ch2, ch3, ch4 = 0, 0, 0
+        //ch2, ch3, ch4 = 0, 0, 0
+        ch3, ch4 = 0, 0
 
 		psgL := ch1*int32((cntL>>12)&1) +
 			ch2*int32((cntL>>13)&1) +
@@ -314,4 +273,3 @@ func (a *Apu) PowerOff() {
     a.SoundCntH = 0
     a.SoundCntX = 0
 }
-

@@ -67,7 +67,7 @@ type GameBoy struct {
 }
 
 type Timer struct {
-	DivReg           int
+    Div              uint16
 	Counter          int
 	ScanlineCounter  int
 	InterruptPending bool
@@ -127,14 +127,14 @@ func (gb *GameBoy) Update() {
     targetCycles := gb.Clock / gb.FPS * multiplier
     for gb.frameCycles < targetCycles {
         if gb.Cpu.Halted {
-            gb.Tick(4) // halted still burns cycles
+            gb.Tick(4)
         } else {
-            gb.Execute() // ticking happens inside here now
+            gb.Execute()
         }
 
         gb.Tick(gb.UpdateInterrupt())
     }
-    gb.frameCycles -= targetCycles // carry over, don't reset to 0
+    gb.frameCycles -= targetCycles
 
     gb.Apu.Play(gb.Muted)
 }
@@ -144,14 +144,15 @@ func (gb *GameBoy) Tick(tCycles int) {
     if tCycles == 0 {
         return
     }
+
     if gb.DoubleSpeed {
-        tCycles /= 2
+        tCycles >>= 1
     }
     gb.frameCycles += tCycles
     gb.Cycles = tCycles
 
     gb.UpdateGraphics()
-    gb.UpdateTimers()
+    gb.UpdateTimers(tCycles)
 
     gb.Apu.SoundClock(uint32(tCycles), gb.DoubleSpeed)
 }
@@ -297,9 +298,7 @@ func (gb *GameBoy) UpdateInterrupt() int {
 
 var IRQ_SRC = [...]uint16{0x40, 0x48, 0x50, 0x58, 0x60}
 
-func (gb *GameBoy) UpdateTimers() {
-
-	cycles := gb.Cycles
+func (gb *GameBoy) UpdateTimers(cycles int) {
 
 	if gb.DoubleSpeed {
 		cycles *= 2
@@ -308,21 +307,23 @@ func (gb *GameBoy) UpdateTimers() {
 	io := &gb.MemoryBus.IO
 	t := &gb.Timer
 
-	//t.DivReg += gb.Cycles
-	t.DivReg += cycles
+    prev := t.Div
+	t.Div += uint16(cycles)
 
-	if t.DivReg >= 0xFF {
-		t.DivReg -= 0xFF
-		io[DIV]++
-	}
+    mask := uint16(1<<12)
+    if gb.DoubleSpeed {
+        mask = uint16(1<<13)
+    }
+
+    if prev & mask != 0 && t.Div & mask == 0 {
+        gb.Apu.ClockFrameSequencer()
+    } 
 
 	if disabled := io[TAC]&0b100 == 0; disabled {
 		return
 	}
 
 	t.Counter += cycles
-
-	// is tma handled properly?
 
 	freq := freqs[io[TAC]&3]
 

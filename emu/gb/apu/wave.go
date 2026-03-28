@@ -4,16 +4,25 @@ type WaveChannel struct {
 	Apu *Apu
 	Idx uint32
 
-	CntH uint16
-	WaveRam          [0x20]uint8
+	CntH    uint16
+	WaveRam [0x20]uint8
 
-	samples, LengthTime float64
+	samples float64
 
 	WaveSamples, WavePosition uint8
 
-    Period     uint16
-    DACEnabled bool
-    LenEnabled bool
+    LengthCounter uint16
+
+    Period uint16
+
+    InitVolume   uint8
+    EnvPace      uint8
+    EnvIncrement bool
+
+
+    DACEnabled     bool
+    EnvEnabled     bool
+    LenEnabled     bool
     ChannelEnabled bool
 }
 
@@ -23,8 +32,8 @@ func (ch *WaveChannel) Trigger() {
         return
     }
 
-    if ch.LengthTime <= 0 {
-        ch.ResetLength(0, false)
+    if ch.LengthCounter == 0 {
+        ch.ResetLength(0)
     }
 
     ch.samples = 0
@@ -32,34 +41,26 @@ func (ch *WaveChannel) Trigger() {
     ch.ChannelEnabled = true
 }
 
-func (ch *WaveChannel) ResetLength(initLength uint8, doubleSpeed bool) {
+func (ch *WaveChannel) clockLength() {
 
-    multipler := uint16(1)
-    if doubleSpeed {
-        multipler = 2
-    }
-
-    maxTimer := 256.0 * float64(multipler)
-    divApuRate := float64(multipler) / 256.0
-
-    if initLength == 0 {
-        ch.LengthTime = (maxTimer + 1) * divApuRate // 1 is required currently to pass blarg dmg_sound 2, not sure if indicative of larger problem, + range 0.13 ... 1.13 passes
+    if !ch.LenEnabled {
         return
     }
 
-    ch.LengthTime = (maxTimer - float64(initLength)) * divApuRate
+    ch.LengthCounter--
+
+    if ch.LengthCounter != 0 {
+        return
+    }
+
+    ch.ChannelEnabled = false
+}
+
+func (ch *WaveChannel) ResetLength(initLength uint8) {
+    ch.LengthCounter = 256 - uint16(initLength)
 }
 
 func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
-
-    if ch.LenEnabled {
-        ch.LengthTime -= ch.Apu.sampleTime
-        if ch.LengthTime <= 0 {
-
-            ch.ChannelEnabled = false
-            return 0
-        }
-    }
 
     if !ch.ChannelEnabled {
 		return 0
@@ -80,8 +81,8 @@ func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
 		}
 	}
 
-	wavedata := ch.WaveRam[(uint32(ch.WavePosition)>>1)&0x1f]
-	sample := (float64((wavedata>>((ch.WavePosition&1)<<2))&0xf) - 0x8) / 8
+	wavedata := ch.WaveRam[(uint32(ch.WavePosition)>>1)&0x1F]
+	sample := (float64((wavedata>>((ch.WavePosition&1)<<2))&0xF) - 0x8) / 8
 
 	if forceVolume := (ch.CntH >> 15) & 1 != 0; forceVolume {
 
