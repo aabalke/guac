@@ -6,16 +6,16 @@ import (
 	"github.com/hajimehoshi/oto"
 )
 
+const (
+	SAMP_MAX = 0x1ff
+	SAMP_MIN = -0x200
+)
+
 type Apu struct {
 	Enabled bool
 
-	FifoA, FifoB                    Fifo
-
     PanReg uint8
     Master uint8
-
-
-	SoundBias                       uint16
 
 	SoundBuffer               []int16
 	ReadPointer, WritePointer uint32
@@ -68,43 +68,30 @@ func (a *Apu) ClockFrameSequencer() {
     // sweep at 128hz
     // vol at 64hz
 
-    //a.ToneChannel1.InFirstHalf = a.fsStep & 1 != 0
-
     if a.fsStep & 1 == 0 {
-        a.clockLengthCounters()
+        a.ToneChannel1.clockLength()
+        a.ToneChannel2.clockLength()
+        a.WaveChannel.clockLength()
+        a.NoiseChannel.clockLength()
     }
 
     if a.fsStep & 7 == 2 || a.fsStep & 7 == 6 {
-        //a.ToneChannel1.clockSweep2()
         a.ToneChannel1.clockSweep()
     }
 
     if a.fsStep & 7 == 7 {
-        a.clockEnvelopes()
+        a.ToneChannel1.clockEnvelope()
+        a.ToneChannel2.clockEnvelope()
+        a.NoiseChannel.clockEnvelope()
     }
 
     a.fsStep = (a.fsStep + 1) & 7
-}
-
-func (a *Apu) clockLengthCounters() {
-    a.ToneChannel1.clockLength()
-    a.ToneChannel2.clockLength()
-    a.WaveChannel.clockLength()
-    a.NoiseChannel.clockLength()
-}
-
-func (a *Apu) clockEnvelopes() {
-    a.ToneChannel1.clockEnvelope()
-    a.ToneChannel2.clockEnvelope()
-    a.NoiseChannel.clockEnvelope()
 }
 
 func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu {
 
 	a := &Apu{
 		WritePointer: 0x200,
-		FifoA:        Fifo{},
-		FifoB:        Fifo{},
 		cpuFreqHz:    cpuFreq,
 		sndFrequency: sampleRate,
 		sndSamples:   sampleCnt,
@@ -205,8 +192,22 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 
     var (
         pan  = a.PanReg
-        volL = (a.Master>>4)&7
-        volR = (a.Master>>0)&7
+        volL = int32((a.Master>>4)&7) + 1
+        volR = int32((a.Master>>0)&7) + 1
+
+        ch1L = (pan & 0x10) != 0
+        ch1R = (pan & 0x01) != 0
+        ch2L = (pan & 0x20) != 0
+        ch2R = (pan & 0x02) != 0
+        ch3L = (pan & 0x40) != 0
+        ch3R = (pan & 0x04) != 0
+        ch4L = (pan & 0x80) != 0
+        ch4R = (pan & 0x08) != 0
+
+        ch1 = a.ToneChannel1.ChannelEnabled && (pan & 0x11 != 0)
+        ch2 = a.ToneChannel2.ChannelEnabled && (pan & 0x22 != 0)
+        ch3 = a.WaveChannel.ChannelEnabled  && (pan & 0x44 != 0)
+        ch4 = a.NoiseChannel.ChannelEnabled && (pan & 0x88 != 0)
     )
 
 	clockCycles := uint32(a.sampCycles)
@@ -218,45 +219,32 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 
         psgL, psgR := int32(0), int32(0)
 
-        if a.ToneChannel1.ChannelEnabled && (pan & 0x11 != 0) {
+        if ch1 {
             ch := int32(a.ToneChannel1.GetSample(doubleSpeed))
-            if pan & 0x10 != 0 {
-                psgL += ch
-            }
-            if pan & 0x01 != 0 {
-                psgR += ch
-            }
-        }
-        if a.ToneChannel2.ChannelEnabled && (pan & 0x22 != 0) {
-            ch := int32(a.ToneChannel2.GetSample(doubleSpeed))
-            if pan & 0x20 != 0 {
-                psgL += ch
-            }
-            if pan & 0x02 != 0 {
-                psgR += ch
-            }
-        }
-        if a.WaveChannel.ChannelEnabled && (pan & 0x44 != 0) {
-            ch := int32(a.WaveChannel.GetSample(doubleSpeed))
-            if pan & 0x40 != 0 {
-                psgL += ch
-            }
-            if pan & 0x04 != 0 {
-                psgR += ch
-            }
-        }
-        if a.NoiseChannel.ChannelEnabled && (pan & 0x88 != 0) {
-            ch := int32(a.NoiseChannel.GetSample(doubleSpeed))
-            if pan & 0x80 != 0 {
-                psgL += ch
-            }
-            if pan & 0x08 != 0 {
-                psgR += ch
-            }
+            if ch1L { psgL += ch }
+            if ch1R { psgR += ch }
         }
 
-		psgL = ((psgL * int32(volL+1)) >> 3) >> 2
-		psgR = ((psgR * int32(volR+1)) >> 3) >> 2
+        if ch2 {
+            ch := int32(a.ToneChannel2.GetSample(doubleSpeed))
+            if ch2L { psgL += ch }
+            if ch2R { psgR += ch }
+        }
+
+        if ch3 {
+            ch := int32(a.WaveChannel.GetSample(doubleSpeed))
+            if ch3L { psgL += ch }
+            if ch3R { psgR += ch }
+        }
+
+        if ch4 {
+            ch := int32(a.NoiseChannel.GetSample(doubleSpeed))
+            if ch4L { psgL += ch }
+            if ch4R { psgR += ch }
+        }
+
+		psgL = ((psgL * volL) >> 3) >> 2
+		psgR = ((psgR * volR) >> 3) >> 2
 
 		a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(psgL)
 		a.WritePointer++
@@ -271,7 +259,7 @@ func (a *Apu) PowerOff() {
     a.ToneChannel1 = ToneChannel{Idx: 0, Apu: a}
     a.ToneChannel2 = ToneChannel{Idx: 1, Apu: a}
     a.WaveChannel  = WaveChannel{Idx: 2, Apu: a, WaveRam: a.WaveChannel.WaveRam}
-    a.NoiseChannel = NoiseChannel{Idx: 3, Apu: a, lfsr: a.NoiseChannel.lfsr}
+    a.NoiseChannel = NoiseChannel{Idx: 3, Apu: a}
     a.Master = 0
     a.PanReg = 0 
     a.pendingPowerOff = true
@@ -281,4 +269,15 @@ func (a *Apu) PowerOff() {
 func (a *Apu) PowerOn() {
     a.pendingPowerOn = true
     //fmt.Printf("Power On\n")
+}
+
+//go:inline
+func clip(v int32) int16 {
+	if v > SAMP_MAX {
+		return SAMP_MAX
+	}
+	if v < SAMP_MIN {
+		return SAMP_MIN
+	}
+	return int16(v)
 }

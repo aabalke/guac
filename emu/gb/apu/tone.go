@@ -3,11 +3,6 @@ package apu
 var DutyLookUp = [4]float64{0.125, 0.25, 0.5, 0.75}
 var DutyLookUpi = [4]float64{0.875, 0.75, 0.5, 0.25}
 
-const (
-	PSG_MAX = 0x7f
-	PSG_MIN = -0x80
-)
-
 type ToneChannel struct {
 	Apu              *Apu
 	Idx              uint32
