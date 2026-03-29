@@ -61,6 +61,7 @@ func (a *Apu) ClockFrameSequencer() {
     }
 
     if a.fsStep & 7 == 2 || a.fsStep & 7 == 6 {
+        //a.ToneChannel1.clockSweep2()
         a.ToneChannel1.clockSweep()
     }
 

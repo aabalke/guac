@@ -21,9 +21,13 @@ type ToneChannel struct {
     SweepPace uint8
     SweepDecrease bool
     SweepStep uint8
+
+    SweepStoredPace uint8
+
     SweepTimer uint8
 
     Period uint16
+    Shadow uint16
 
     LengthCounter uint8
     EnvTimer      uint8
@@ -66,12 +70,17 @@ func (ch *ToneChannel) Trigger() {
     ch.samples = 0
 
     ch.SweepTimer = ch.SweepPace
+    ch.SweepStoredPace = ch.SweepPace
     ch.SweepEnabled = ch.SweepStep != 0 || ch.SweepPace != 0
     ch.EnvTimer = ch.EnvPace
     ch.EnvVolume = ch.InitVolume
     ch.ChannelEnabled = true
+    ch.Shadow = ch.Period
 
-    //ch.clockSweep()
+    if ch.SweepStep > 0 && ch.SweepEnabled {
+
+        ch.sweepCalculate(false)
+    }
 }
 
 func (ch *ToneChannel) clockLength() {
@@ -117,37 +126,166 @@ func (ch *ToneChannel) clockEnvelope() {
     }
 }
 
-func (ch *ToneChannel) clockSweep() {
-
-    if !ch.ChannelEnabled {
+func (ch *ToneChannel) sweepCalculate(writeback bool) {
+    disp := ch.Shadow >> ch.SweepStep
+    var newPeriod uint16
+    if ch.SweepDecrease {
+        newPeriod = ch.Shadow - disp
+    } else {
+        newPeriod = ch.Shadow + disp
+    }
+    if newPeriod > 0x7FF {
+        ch.ChannelEnabled = false
         return
     }
+    if writeback {
 
+        ch.Shadow = newPeriod
+        ch.Period = newPeriod
+
+        disp2 := ch.Shadow >> ch.SweepStep
+        var newPeriod2 uint16
+        if ch.SweepDecrease {
+            newPeriod2 = ch.Shadow - disp2
+        } else {
+            newPeriod2 = ch.Shadow + disp2
+        }
+        if newPeriod2 > 0x7FF {
+            ch.ChannelEnabled = false
+        }
+    }
+}
+
+func (ch *ToneChannel) clockSweep() {
+    //if !ch.ChannelEnabled {
+    //    return
+    //}
     if !ch.SweepEnabled {
         return
     }
-
-    ch.SweepTimer--
-
-    if ch.SweepTimer != 0 {
+    if ch.SweepPace == 0 {
         return
     }
 
-    ch.SweepTimer = ch.SweepPace
-
-    // X(t) = X(t-1) ± X(t-1)/2^n
-    disp := ch.Period >> ch.SweepStep // X(t-1)/2^n
-    if ch.SweepDecrease {
-        ch.Period -= disp
-    } else {
-        ch.Period += disp
+    if ch.SweepTimer != 0 {
+        ch.SweepTimer--
+        if ch.SweepTimer != 0 {
+            return
+        }
     }
 
-    if ch.Period >= 0x7FF {
-        ch.Period = 0
-        ch.ChannelEnabled = false
+    ch.SweepStoredPace = ch.SweepPace
+    ch.SweepTimer = ch.SweepStoredPace
+
+    if ch.SweepTimer == 0 {
+        ch.SweepTimer = 8
     }
+
+    ch.sweepCalculate(ch.SweepStep != 0)
 }
+
+//func (ch *ToneChannel) clockSweep() {
+//
+//    if !ch.ChannelEnabled {
+//        return
+//    }
+//
+//    if !ch.SweepEnabled {
+//        return
+//    }
+//
+//    // X(t) = X(t-1) ± X(t-1)/2^n
+//    disp := ch.Shadow >> ch.SweepStep
+//    newPeriod := uint16(0)
+//    if ch.SweepDecrease {
+//        newPeriod = ch.Shadow - disp
+//    } else {
+//        newPeriod = ch.Shadow + disp
+//    }
+//
+//    if debug.B[0] {
+//        fmt.Printf("triggered. newPeriod %03X Shadow %03X PeriodReg %03X\n", newPeriod, ch.Shadow, ch.Period)
+//    }
+//
+//    if ch.SweepStoredPace != 0 {
+//        ch.Shadow = newPeriod
+//        ch.Period = newPeriod
+//    }
+//
+//    if newPeriod > 0x7FF {
+//        if debug.B[0] { fmt.Printf("triggered. disabling call\n")}
+//        ch.Shadow = 0
+//        ch.Period = 0
+//        ch.ChannelEnabled = false
+//        ch.SweepEnabled = false
+//    }
+//}
+//
+//func (ch *ToneChannel) clockSweep2() {
+//
+//    if !ch.SweepEnabled {
+//        return
+//    }
+//
+//    if ch.SweepPace == 0 {
+//        return
+//    }
+//
+//    if ch.SweepTimer != 0 { // handled if pace init 0 but clocked on trigger
+//        ch.SweepTimer--
+//        if ch.SweepTimer != 0 {
+//            return
+//        }
+//    }
+//
+//    ch.SweepTimer = ch.SweepStoredPace
+//    if ch.SweepTimer == 0 {
+//        fmt.Printf("HERE\n")
+//        ch.SweepTimer = 8
+//    }
+//
+//    if debug.B[0] {
+//        fmt.Printf("clocked. timer=%d pace=%d storedpace=%d\n", ch.SweepTimer, ch.SweepPace, ch.SweepStoredPace)
+//    }
+//
+//
+//    // X(t) = X(t-1) ± X(t-1)/2^n
+//    disp := ch.Shadow >> ch.SweepStep
+//    newPeriod := uint16(0)
+//    if ch.SweepDecrease {
+//        newPeriod = ch.Shadow - disp
+//    } else {
+//        newPeriod = ch.Shadow + disp
+//    }
+//
+//    if debug.B[0] {
+//        fmt.Printf("clocked. newPeriod %03X Shadow %03X PeriodReg %03X\n", newPeriod, ch.Shadow, ch.Period)
+//    }
+//
+//    if newPeriod > 0x7FF {
+//        ch.ChannelEnabled = false
+//        if debug.B[0] { fmt.Printf("clocked. disabling 1st call\n")}
+//    } else {
+//        if ch.SweepStep != 0 {
+//            ch.Shadow = newPeriod
+//            ch.Period = newPeriod
+//
+//            // X(t) = X(t-1) ± X(t-1)/2^n
+//            disp := ch.Shadow >> ch.SweepStep
+//            newPeriod := uint16(0)
+//            if ch.SweepDecrease {
+//                newPeriod = ch.Shadow - disp
+//            } else {
+//                newPeriod = ch.Shadow + disp
+//            }
+//
+//            if newPeriod > 0x7FF {
+//                ch.ChannelEnabled = false
+//                if debug.B[0] { fmt.Printf("clocked. disabling 2nd call\n")}
+//            }
+//        }
+//    }
+//}
 
 func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 
@@ -155,7 +293,7 @@ func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 		return 0
 	}
 
-	freq := 131072 / float64(2048-ch.Period)
+	freq := 131072 / float64(2048-ch.Shadow)
 	cycleSamples := float64(ch.Apu.sndFrequency) / freq
 
     ch.samples++

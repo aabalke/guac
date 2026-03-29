@@ -4,20 +4,14 @@ type WaveChannel struct {
 	Apu *Apu
 	Idx uint32
 
-	CntH    uint16
 	WaveRam [0x20]uint8
+    OutputLevel uint8
 
 	samples float64
 
 	WaveSamples, WavePosition uint8
-
     LengthCounter uint16
-
     Period uint16
-
-    InitVolume   uint8
-    EnvPace      uint8
-    EnvIncrement bool
 
     DACEnabled     bool
     EnvEnabled     bool
@@ -92,28 +86,20 @@ func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
 		}
 	}
 
-	wavedata := ch.WaveRam[(uint32(ch.WavePosition)>>1)&0x1F]
-	sample := (float64((wavedata>>((ch.WavePosition&1)<<2))&0xF) - 0x8) / 8
+	wavedata := ch.WaveRam[(ch.WavePosition>>1)&0x1F]
+    nibble := int8((wavedata>>((ch.WavePosition&1)<<2))&0xF) - 8
 
-	if forceVolume := (ch.CntH >> 15) & 1 != 0; forceVolume {
+    switch ch.OutputLevel {
+    case 0:
+        return 0
+    case 1:
+    case 2:
+        nibble >>= 1
+    case 3:
+        nibble >>= 2
+    }
 
-		sample *= 0.75
-	} else {
-        switch vol := (ch.CntH >> 13) & 3; vol {
-		case 0:
-			sample = 0
-		case 1:
-		case 2:
-			sample *= 0.5
-		case 3:
-			sample *= 0.25
-		}
-	}
-
-	if sample >= 0 {
-		return int8(sample / 7 * PSG_MAX)
-	}
-	return int8(sample / (-8) * PSG_MIN)
+    return nibble * 8
 }
 
 func (ch *WaveChannel) Reset() {

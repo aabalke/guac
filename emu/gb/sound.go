@@ -4,11 +4,14 @@ import (
 	"fmt"
 
 	"github.com/aabalke/guac/emu/gb/apu"
+	"github.com/aabalke/guac/emu/gb/debug"
 )
 
 func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
 
-    //fmt.Printf("W ADDR %02X V %02X\n", addr, v)
+    if debug.B[0] {
+        fmt.Printf("W ADDR %02X V %02X\n", addr, v)
+    }
 
 	if addr == 0x26 {
         a.Enabled = v & 0x80 != 0
@@ -17,6 +20,11 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
         }
 		return
 	}
+
+    if addr == 0x20 {
+        a.NoiseChannel.ResetLength(v & 0x3F)
+        return
+    }
 
     if !gb.Apu.Enabled {
 		return
@@ -34,6 +42,10 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
             ch.SweepStep = v & 7
             ch.SweepDecrease = (v >> 3) & 1 != 0
             ch.SweepPace = (v >> 4) & 7
+
+            if ch.SweepPace == 0 {
+                ch.SweepEnabled = false
+            }
 
         case 0x11, 0x16:
 
@@ -57,6 +69,10 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
             ch.Period &^= 0x00FF
             ch.Period |= uint16(v)
 
+            //if v == 0x67 {
+            //    debug.B[0] = true
+            //}
+
         case 0x14, 0x19:
 
             ch.Period &^= 0xFF00
@@ -71,6 +87,10 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
 
             if (v & 0x80) != 0 {
                 ch.Trigger()
+            }
+
+            if debug.B[1] && v == 0x40 {
+                debug.B[0] = true
             }
         }
 
@@ -92,8 +112,7 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
             ch.ResetLength(v)
 
         case 0x1C:
-            ch.CntH &= 0x00FF
-            ch.CntH |= uint16(v) << 8
+            ch.OutputLevel = (v >>5) & 3
         case 0x1D:
             ch.Period &^= 0x00FF
             ch.Period |= uint16(v)
@@ -176,6 +195,10 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
 
 func (gb *GameBoy) ReadSound(addr uint32, a *apu.Apu) uint8 {
 
+    //if debug.B[0] {
+    //    fmt.Printf("R ADDR %02X\n", addr)
+    //}
+
     //fmt.Printf("R ADDR %02X\n", addr)
 
 	if wave := addr >= 0x30 && addr < 0x40; wave {
@@ -247,7 +270,7 @@ func (gb *GameBoy) ReadSound(addr uint32, a *apu.Apu) uint8 {
             return 0x7F
 
         case 0x1C:
-            return uint8(ch.CntH>>8) | 0x9F
+            return (ch.OutputLevel << 5) | 0x9F
 
         case 0x1E:
 
@@ -312,8 +335,20 @@ func (gb *GameBoy) ReadSound(addr uint32, a *apu.Apu) uint8 {
             v |= 1 << 3
         }
 
+        if debug.B[0] {
+            fmt.Printf("NR52 %02X\n", v)
+            cnt++
+
+            if cnt == 2 {
+                debug.B[1] = false
+                debug.B[0] = false
+            }
+        }
+
         return v
 	}
 
     panic(fmt.Sprintf("not possible read sound %04X", addr))
 }
+
+var cnt uint

@@ -137,7 +137,7 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
         vol = ch.EnvVolume
     }
 
-    vol <<= 3
+    vol <<= 3 // original range 0...15, need 0..127 for int8
 
 	if carry {
 		return int8(vol)
