@@ -15,7 +15,7 @@
     👍 04
     ❌ 05
     👍 06
-    ❌ 07
+    👍 07
     ❌ 08
     ❌ 09
     ❌ 10
@@ -26,15 +26,15 @@
     ❌ 12
 ❌ CGB Sound 2
 
-## OAM Bug 2
-❌ Lcd Sync
-❌ Causes
-👍 Non Causes
-❌ Scanline Timing
-❌ Timing Bug
-👍 Timing No Bug
-❌ Timing Effect
-❌ Inst Timing
+Oam Bug 2
+    ❌ Lcd Sync
+    ❌ Causes
+    👍 Non Causes
+    ❌ Scanline Timing
+    ❌ Timing Bug
+    👍 Timing No Bug
+    ❌ Timing Effect
+    ❌ Inst Timing
 
 # Mooneye Acceptance Test
 

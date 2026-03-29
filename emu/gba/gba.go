@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/aabalke/guac/config"
-	"github.com/aabalke/guac/emu/apu"
+	"github.com/aabalke/guac/emu/gba/apu"
 	"github.com/aabalke/guac/emu/cpu"
 	arm7 "github.com/aabalke/guac/emu/cpu/arm7"
 	"github.com/aabalke/guac/emu/gba/cart"
@@ -147,7 +147,8 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 
 	gba.Irq = cpu.Irq{}
 	gba.Mem = NewMemory(&gba)
-	gba.Cpu = arm7.NewCpu(config.Conf.Jit.Enabled, &gba.Mem, &gba.Irq)
+	//gba.Cpu = arm7.NewCpu(config.Conf.Jit.Enabled, &gba.Mem, &gba.Irq)
+	gba.Cpu = arm7.NewCpu(false, &gba.Mem, &gba.Irq)
 
 	gba.PPU.gba = &gba
 

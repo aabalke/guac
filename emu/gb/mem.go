@@ -1,12 +1,10 @@
 package gameboy
 
 import (
-	"fmt"
 	"time"
 	"unsafe"
 
 	"github.com/aabalke/guac/emu/gb/cartridge"
-	"github.com/aabalke/guac/emu/gb/debug"
 )
 
 type MemoryBus struct {
@@ -180,10 +178,10 @@ func (gb *GameBoy) Read(addr uint16) uint8 {
 
 func (gb *GameBoy) Write(addr uint16, v uint8) {
 
-    if addr == 0xD880 && v == 3 {
-        debug.B[1] = true
-        fmt.Printf("Test %02d started...\n", v)
-    }
+    //if addr == 0xD880 && v == 5 {
+    //    //debug.B[1] = true
+    //    fmt.Printf("Test %02d started...\n", v)
+    //}
 
 	switch {
 	case addr < 0x8000:

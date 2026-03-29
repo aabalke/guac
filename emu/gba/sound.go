@@ -1,7 +1,7 @@
 package gba
 
 import (
-	"github.com/aabalke/guac/emu/apu"
+	"github.com/aabalke/guac/emu/gba/apu"
 )
 
 func WriteSound(addr uint32, v uint8, a *apu.Apu) {

@@ -60,6 +60,12 @@ const (
 
 func (gba *GBA) LoadBios() {
 	for i := range len(biosFile) {
+
+        if i >= len(gba.Mem.BIOS) {
+            break
+        }
+
+
 		gba.Mem.BIOS[i] = uint8(biosFile[i])
 	}
 }

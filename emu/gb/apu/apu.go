@@ -1,7 +1,6 @@
 package apu
 
 import (
-
 	"github.com/aabalke/guac/config"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
@@ -11,7 +10,11 @@ type Apu struct {
 	Enabled bool
 
 	FifoA, FifoB                    Fifo
-	SoundCntL, SoundCntH, SoundCntX uint16
+
+    PanReg uint8
+    Master uint8
+
+
 	SoundBias                       uint16
 
 	SoundBuffer               []int16
@@ -39,12 +42,24 @@ type Apu struct {
 
     fsCounter uint32
     fsStep    uint8
+
+    pendingPowerOff bool
+    pendingPowerOn  bool
+    suppress bool
 }
 
-const FS_PERIOD = 8192 // cpu clock / 512hz (4,194,304 Hz ÷ 512 Hz = 8,192 T-cycles)
-const FS_PERIOD_MASK = 8191
-
 func (a *Apu) ClockFrameSequencer() {
+
+    if a.pendingPowerOff {
+        a.fsStep = 0
+        a.pendingPowerOff = false
+    }
+
+    if a.pendingPowerOn {
+        a.fsStep = 0
+        a.pendingPowerOn = false
+        a.suppress = true
+    }
 
     a.fsCounter++
 
@@ -104,7 +119,14 @@ func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu 
 	a.SoundBuffer  = make([]int16, a.buffSize)
 	a.ToneChannel1 = ToneChannel{Apu: a, Idx: 0}
 	a.ToneChannel2 = ToneChannel{Apu: a, Idx: 1}
-	a.WaveChannel  = WaveChannel{Apu: a, Idx: 2}
+	a.WaveChannel  = WaveChannel{
+        Apu: a,
+        Idx: 2,
+        WaveRam: [32]uint8{
+            0x84, 0x40, 0x43, 0xAA, 0x2D, 0x78, 0x92, 0x3C,
+            0x60, 0x59, 0x59, 0xB0, 0x34, 0xB8, 0x2E, 0xDA,
+        },
+    }
 	a.NoiseChannel = NoiseChannel{Apu: a, Idx: 3}
 
 	if !config.Conf.CancelAudioInit {
@@ -177,30 +199,14 @@ func (a *Apu) SoundBufferWrap() {
 	}
 }
 
-var (
-	volLut = [8]int32{0x000, 0x024, 0x049, 0x06d, 0x092, 0x0b6, 0x0db, 0x100}
-	rshLut = [4]int32{0xa, 0x9, 0x8, 0x7}
-)
-
 func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 
 	a.sndCycles += cycles
 
     var (
-        shift0 = (a.SoundCntH>>2) & 1
-        shift1 = (a.SoundCntH>>3) & 1
-        lpan0 = int32(a.SoundCntH>>9) & 1
-        rpan0 = int32(a.SoundCntH>>8) & 1
-        lpan1 = int32(a.SoundCntH>>13) & 1
-        rpan1 = int32(a.SoundCntH>>12) & 1
-        sampleA = int32(a.FifoA.Sample) << (1 - shift0)
-        sampleB = int32(a.FifoB.Sample) << (1 - shift1)
-        sampleLeft = sampleA*lpan0 + sampleB*lpan1
-        sampleRight = sampleA*rpan0 + sampleB*rpan1
-        cntL = a.SoundCntL
-        volL = volLut[(cntL>>4)&7]
-        volR = volLut[(cntL>>0)&7]
-        shift = rshLut[(a.SoundCntH)&3]
+        pan  = a.PanReg
+        volL = (a.Master>>4)&7
+        volR = (a.Master>>0)&7
     )
 
 	clockCycles := uint32(a.sampCycles)
@@ -210,27 +216,51 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 
 	for a.sndCycles >= clockCycles {
 
-		ch1 := int32(a.ToneChannel1.GetSample(doubleSpeed))
-		ch2 := int32(a.ToneChannel2.GetSample(doubleSpeed))
-		ch3 := int32(a.WaveChannel.GetSample(doubleSpeed))
-		ch4 := int32(a.NoiseChannel.GetSample(doubleSpeed))
+        psgL, psgR := int32(0), int32(0)
 
-		psgL := ch1*int32((cntL>>12)&1) +
-			ch2*int32((cntL>>13)&1) +
-			ch3*int32((cntL>>14)&1) +
-			ch4*int32((cntL>>15)&1)
+        if a.ToneChannel1.ChannelEnabled && (pan & 0x11 != 0) {
+            ch := int32(a.ToneChannel1.GetSample(doubleSpeed))
+            if pan & 0x10 != 0 {
+                psgL += ch
+            }
+            if pan & 0x01 != 0 {
+                psgR += ch
+            }
+        }
+        if a.ToneChannel2.ChannelEnabled && (pan & 0x22 != 0) {
+            ch := int32(a.ToneChannel2.GetSample(doubleSpeed))
+            if pan & 0x20 != 0 {
+                psgL += ch
+            }
+            if pan & 0x02 != 0 {
+                psgR += ch
+            }
+        }
+        if a.WaveChannel.ChannelEnabled && (pan & 0x44 != 0) {
+            ch := int32(a.WaveChannel.GetSample(doubleSpeed))
+            if pan & 0x40 != 0 {
+                psgL += ch
+            }
+            if pan & 0x04 != 0 {
+                psgR += ch
+            }
+        }
+        if a.NoiseChannel.ChannelEnabled && (pan & 0x88 != 0) {
+            ch := int32(a.NoiseChannel.GetSample(doubleSpeed))
+            if pan & 0x80 != 0 {
+                psgL += ch
+            }
+            if pan & 0x08 != 0 {
+                psgR += ch
+            }
+        }
 
-		psgR := ch1*int32((cntL>>8)&1) +
-			ch2*int32((cntL>>9)&1) +
-			ch3*int32((cntL>>10)&1) +
-			ch4*int32((cntL>>11)&1)
+		psgL = ((psgL * int32(volL+1)) >> 3) >> 2
+		psgR = ((psgR * int32(volR+1)) >> 3) >> 2
 
-		psgL = (psgL * volL) >> shift
-		psgR = (psgR * volR) >> shift
-
-		a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(sampleLeft + psgL)
+		a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(psgL)
 		a.WritePointer++
-		a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(sampleRight + psgR)
+		a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(psgR)
 		a.WritePointer++
 
 		a.sndCycles -= clockCycles
@@ -242,7 +272,13 @@ func (a *Apu) PowerOff() {
     a.ToneChannel2 = ToneChannel{Idx: 1, Apu: a}
     a.WaveChannel  = WaveChannel{Idx: 2, Apu: a, WaveRam: a.WaveChannel.WaveRam}
     a.NoiseChannel = NoiseChannel{Idx: 3, Apu: a, lfsr: a.NoiseChannel.lfsr}
-    a.SoundCntL = 0
-    a.SoundCntH = 0
-    a.SoundCntX = 0
+    a.Master = 0
+    a.PanReg = 0 
+    a.pendingPowerOff = true
+    //fmt.Printf("Power Off\n")
+}
+
+func (a *Apu) PowerOn() {
+    a.pendingPowerOn = true
+    //fmt.Printf("Power On\n")
 }
