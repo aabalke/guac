@@ -1,7 +1,6 @@
 package apu
 
 import (
-	"fmt"
 
 	"github.com/aabalke/guac/config"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -169,31 +168,6 @@ func (a *Apu) soundMix() {
 	}
 }
 
-func (a *Apu) GetSample() (int16, int16) {
-
-	if a.WritePointer == a.ReadPointer {
-		fmt.Printf("WRITE AND READ OVERLAP\n")
-	}
-
-	l := a.SoundBuffer[a.ReadPointer&uint32(a.buffSize-1)] << 6
-	a.ReadPointer++
-
-	r := a.SoundBuffer[a.ReadPointer&uint32(a.buffSize-1)] << 6
-	a.ReadPointer++
-
-	return l, r
-}
-
-func (a *Apu) Sync() {
-
-	delta := (int32(a.WritePointer-a.ReadPointer) >> 8) - (int32(a.WritePointer-a.ReadPointer)>>8)%4
-	if delta > 0 {
-		a.ReadPointer += uint32(delta)
-	} else {
-		a.ReadPointer -= uint32(delta)
-	}
-}
-
 func (a *Apu) SoundBufferWrap() {
 	l := a.ReadPointer / uint32(a.buffSize)
 	r := a.WritePointer / uint32(a.buffSize)
@@ -213,8 +187,8 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 	a.sndCycles += cycles
 
     var (
-        shift0 = int32(a.SoundCntH>>2) & 1
-        shift1 = int32(a.SoundCntH>>3) & 1
+        shift0 = (a.SoundCntH>>2) & 1
+        shift1 = (a.SoundCntH>>3) & 1
         lpan0 = int32(a.SoundCntH>>9) & 1
         rpan0 = int32(a.SoundCntH>>8) & 1
         lpan1 = int32(a.SoundCntH>>13) & 1
@@ -240,8 +214,6 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 		ch2 := int32(a.ToneChannel2.GetSample(doubleSpeed))
 		ch3 := int32(a.WaveChannel.GetSample(doubleSpeed))
 		ch4 := int32(a.NoiseChannel.GetSample(doubleSpeed))
-        //ch2, ch3, ch4 = 0, 0, 0
-        ch3, ch4 = 0, 0
 
 		psgL := ch1*int32((cntL>>12)&1) +
 			ch2*int32((cntL>>13)&1) +

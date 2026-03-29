@@ -11,9 +11,9 @@ type NoiseChannel struct {
 	lfsr                         uint16
 	samples  float64
 
-    RandomRegister uint8
-    VolumeRegister uint8
-
+    S, R uint8
+    Width7 bool
+    
 
     LengthCounter uint8
     EnvTimer      uint8
@@ -51,7 +51,11 @@ func (ch *NoiseChannel) Trigger() {
         return
     }
 
-    ch.lfsr = 0
+    if ch.Width7 {
+        ch.lfsr ^= 0x60
+    } else {
+        ch.lfsr ^= 0x6000
+    }
     ch.samples = 0
     ch.ChannelEnabled = true
     ch.EnvTimer = ch.EnvPace
@@ -107,8 +111,8 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 		return 0
 	}
 
-    r := float64(ch.RandomRegister & 7)
-    s := float64((ch.RandomRegister >>4) & 0xF)
+    r := float64(ch.R)
+    s := float64(ch.S)
 
 	if r == 0 {
 		r = 0.5
@@ -124,15 +128,15 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 		ch.lfsr >>= 1
 
 		if carry {
-			if (ch.RandomRegister >> 3) & 1 != 0 {
-				ch.lfsr ^= 0x60 // 1: 7bits
+            if ch.Width7 {
+				ch.lfsr ^= 0x60
 			} else {
-				ch.lfsr ^= 0x6000 // 0: 15bits
+				ch.lfsr ^= 0x6000
 			}
 		}
 	}
 
-	vol := ch.VolumeRegister >> 4
+	vol := ch.InitVolume
     if ch.EnvEnabled {
         vol = ch.EnvVolume
     }

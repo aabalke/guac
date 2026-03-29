@@ -140,20 +140,29 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
     if noise := addr < 0x24; noise {
 
         switch ch := &a.NoiseChannel; addr {
-        case 0x20:
+        case 0x20: // 41
             ch.ResetLength(v & 0x3F)
 
-        case 0x21:
+        case 0x21: //42
+
             wasEnabled := ch.DACEnabled
             ch.DACEnabled = v & 0xF8 != 0
             if wasEnabled && !ch.DACEnabled {
                 ch.ChannelEnabled = false
             }
 
-            ch.VolumeRegister = v
+            ch.InitVolume = v >> 4
+            ch.EnvEnabled = v & 7 != 0
+            ch.EnvIncrement  = (v >> 3) & 1 != 0
+            ch.EnvPace  = v & 7
+
 
         case 0x22:
-            ch.RandomRegister = v
+
+            ch.S = v >> 4
+            ch.R = v & 7
+            ch.Width7 = v & 0x80 != 0
+
         case 0x23:
 
             prev := ch.LenEnabled
@@ -288,10 +297,16 @@ func (gb *GameBoy) ReadSound(addr uint32, a *apu.Apu) uint8 {
 
         switch ch := &a.NoiseChannel; addr {
         case 0x21:
-            return ch.VolumeRegister
+            return 0xFF
 
         case 0x22:
-            return ch.RandomRegister
+            v := ch.R
+            v |= (ch.S) << 4
+            if ch.Width7 {
+                v |= 1<< 3
+            }
+
+            return v
 
         case 0x23:
 
