@@ -71,7 +71,7 @@ func (gb *GameBoy) UpdateGraphics() {
 
 	if currentLine == height {
 		gb.RequestInterrupt(IRQ_VBL)
-        gb.UpdateDisplay()
+		gb.UpdateDisplay()
 	}
 }
 

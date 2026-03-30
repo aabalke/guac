@@ -18,9 +18,8 @@ const (
 	TMA  = 0x06
 	TAC  = 0x07
 
-	tileWidth = 8
-	width     = 160
-	height    = 144
+	width  = 160
+	height = 144
 
 	IRQ_VBL = 1 << 0
 	IRQ_LCD = 1 << 1
@@ -44,9 +43,9 @@ type GameBoy struct {
 	MemoryBus MemoryBus
 	FPS       int
 
-    // cycles are tcycles, 1/4 mcycles
-    frameCycles int
-	Cycles int
+	// cycles are tcycles, 1/4 mcycles
+	frameCycles        int
+	Cycles             int
 	Clock              int
 	DoubleSpeed        bool
 	PrepareSpeedToggle bool
@@ -67,7 +66,7 @@ type GameBoy struct {
 }
 
 type Timer struct {
-    Div              uint16
+	Div              uint16
 	Counter          int
 	ScanlineCounter  int
 	InterruptPending bool
@@ -117,44 +116,43 @@ func (gb *GameBoy) GetPixels() []byte {
 }
 
 func (gb *GameBoy) Update() {
-    if gb.Paused {
-        return
-    }
-    multiplier := 1
-    if gb.DoubleSpeed {
-        multiplier = 2
-    }
-    targetCycles := gb.Clock / gb.FPS * multiplier
-    for gb.frameCycles < targetCycles {
-        if gb.Cpu.Halted {
-            gb.Tick(4)
-        } else {
-            gb.Execute()
-        }
+	if gb.Paused {
+		return
+	}
+	multiplier := 1
+	if gb.DoubleSpeed {
+		multiplier = 2
+	}
+	targetCycles := gb.Clock / gb.FPS * multiplier
+	for gb.frameCycles < targetCycles {
+		if gb.Cpu.Halted {
+			gb.Tick(4)
+		} else {
+			gb.Execute()
+		}
 
-        gb.Tick(gb.UpdateInterrupt())
-    }
-    gb.frameCycles -= targetCycles
+		gb.Tick(gb.UpdateInterrupt())
+	}
+	gb.frameCycles -= targetCycles
 
-    gb.Apu.Play(gb.Muted)
+	gb.Apu.Play(gb.Muted)
 }
 
 func (gb *GameBoy) Tick(tCycles int) {
 
-    if tCycles == 0 {
-        return
-    }
+	if tCycles == 0 {
+		return
+	}
 
-    if gb.DoubleSpeed {
-        tCycles >>= 1
-    }
-    gb.frameCycles += tCycles
-    gb.Cycles = tCycles
+	if gb.DoubleSpeed {
+		tCycles >>= 1
+	}
+	gb.frameCycles += tCycles
+	gb.Cycles = tCycles
 
-    gb.UpdateGraphics()
-    gb.UpdateTimers(tCycles)
-
-    gb.Apu.SoundClock(uint32(tCycles), gb.DoubleSpeed)
+	gb.UpdateGraphics()
+	gb.UpdateTimers(tCycles) // frame sequencer is here since div apu is controlled by div
+	gb.Apu.SoundClock(uint32(tCycles), gb.DoubleSpeed)
 }
 
 func (gb *GameBoy) ToggleMute() bool {
@@ -187,12 +185,12 @@ func (gb *GameBoy) loadCartridge() {
 
 	log.Printf("Title: %s\n", gb.Cartridge.Title)
 
-    switch {
-    case config.Conf.Gb.ForceGBC:
-        gb.Cartridge.ColorMode = true
-    case config.Conf.Gb.ForceDMG:
-        gb.Cartridge.ColorMode = false
-    }
+	switch {
+	case config.Conf.Gb.ForceGBC:
+		gb.Cartridge.ColorMode = true
+	case config.Conf.Gb.ForceDMG:
+		gb.Cartridge.ColorMode = false
+	}
 
 	if gb.Cartridge.ColorMode {
 		gb.Color = true
@@ -271,12 +269,12 @@ func (gb *GameBoy) UpdateInterrupt() int {
 		return 0
 	}
 
-    cycles := 20
+	cycles := 20
 
-    if !gb.Cpu.IME && gb.Cpu.Halted {
-        gb.Cpu.Halted = false
-        return cycles
-    }
+	if !gb.Cpu.IME && gb.Cpu.Halted {
+		gb.Cpu.Halted = false
+		return cycles
+	}
 
 	for i := range 5 {
 
@@ -307,17 +305,17 @@ func (gb *GameBoy) UpdateTimers(cycles int) {
 	io := &gb.MemoryBus.IO
 	t := &gb.Timer
 
-    prev := t.Div
+	prev := t.Div
 	t.Div += uint16(cycles)
 
-    mask := uint16(1<<12)
-    if gb.DoubleSpeed {
-        mask = uint16(1<<13)
-    }
+	mask := uint16(1 << 12)
+	if gb.DoubleSpeed {
+		mask = uint16(1 << 13)
+	}
 
-    if prev & mask != 0 && t.Div & mask == 0 {
-        gb.Apu.ClockFrameSequencer()
-    } 
+	if prev&mask != 0 && t.Div&mask == 0 {
+		gb.Apu.ClockFrameSequencer()
+	}
 
 	if disabled := io[TAC]&0b100 == 0; disabled {
 		return
@@ -361,10 +359,10 @@ func (gb *GameBoy) toggleDoubleSpeed() {
 	gb.DoubleSpeed = !gb.DoubleSpeed
 	gb.Cpu.Halted = false
 
-    v := uint8(0)
+	v := uint8(0)
 	if gb.DoubleSpeed {
 		v |= 1 << 7
-    }
+	}
 
 	gb.MemoryBus.IO[0x4D] = v
 }
@@ -374,7 +372,7 @@ func (gb *GameBoy) Close() {
 	gb.Paused = true
 	gb.Apu.Close()
 
-    if L != nil {
-        L.Close()
-    }
+	if L != nil {
+		L.Close()
+	}
 }

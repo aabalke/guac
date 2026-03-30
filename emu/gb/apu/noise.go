@@ -5,114 +5,113 @@ import (
 )
 
 type NoiseChannel struct {
-	Apu        *Apu
-	Idx        uint32
+	Apu *Apu
+	Idx uint32
 
-	lfsr                         uint16
-	samples  float64
+	lfsr    uint16
+	samples float64
 
-    S, R uint8
-    Width7 bool
-    
+	S, R   uint8
+	Width7 bool
 
-    LengthCounter uint8
-    EnvTimer      uint8
-    EnvVolume     uint8
+	LengthCounter uint8
+	EnvTimer      uint8
+	EnvVolume     uint8
 
-    InitVolume     uint8
-    EnvPace      uint8
-    EnvIncrement   bool
+	InitVolume   uint8
+	EnvPace      uint8
+	EnvIncrement bool
 
-    DACEnabled     bool
-    EnvEnabled     bool
-    LenEnabled     bool
-    ChannelEnabled bool
+	DACEnabled     bool
+	EnvEnabled     bool
+	LenEnabled     bool
+	ChannelEnabled bool
 }
 
 func (ch *NoiseChannel) LengthTrigger() {
 
-    if ch.LengthCounter == 0 {
-        return
-    }
+	if ch.LengthCounter == 0 {
+		return
+	}
 
-    if ch.Apu.fsStep & 1 != 0 {
-        ch.clockLength()
-    }
+	if ch.Apu.fsStep&1 != 0 {
+		ch.clockLength()
+	}
 }
 
 func (ch *NoiseChannel) Trigger() {
 
-    if ch.LengthCounter == 0 {
-        ch.ResetLength(0)
-        ch.LengthTrigger()
-    }
+	if ch.LengthCounter == 0 {
+		ch.ResetLength(0)
+		ch.LengthTrigger()
+	}
 
-    if !ch.DACEnabled { 
-        return
-    }
+	if !ch.DACEnabled {
+		return
+	}
 
-    if ch.Width7 {
-        ch.lfsr ^= 0x60
-    } else {
-        ch.lfsr ^= 0x6000
-    }
-    ch.samples = 0
-    ch.ChannelEnabled = true
-    ch.EnvTimer = ch.EnvPace
-    ch.EnvVolume = ch.InitVolume
+	if ch.Width7 {
+		ch.lfsr ^= 0x60
+	} else {
+		ch.lfsr ^= 0x6000
+	}
+	ch.samples = 0
+	ch.ChannelEnabled = true
+	ch.EnvTimer = ch.EnvPace
+	ch.EnvVolume = ch.InitVolume
 }
 
 func (ch *NoiseChannel) clockLength() {
 
-    if !ch.LenEnabled {
-        return
-    }
+	if !ch.LenEnabled {
+		return
+	}
 
-    ch.LengthCounter--
+	ch.LengthCounter--
 
-    if ch.LengthCounter != 0 {
-        return
-    }
+	if ch.LengthCounter != 0 {
+		return
+	}
 
-    ch.ChannelEnabled = false
+	ch.ChannelEnabled = false
 }
 
 func (ch *NoiseChannel) ResetLength(initLength uint8) {
-    ch.LengthCounter = 64 - initLength
+	ch.LengthCounter = 64 - initLength
 }
 
 func (ch *NoiseChannel) clockEnvelope() {
 
-    if !ch.ChannelEnabled {
-        return
-    }
+	if !ch.ChannelEnabled {
+		return
+	}
 
-    if !ch.EnvEnabled {
-        return
-    }
+	if !ch.EnvEnabled {
+		return
+	}
 
-    ch.EnvTimer--
+	ch.EnvTimer--
 
-    if ch.EnvTimer != 0 {
-        return
-    }
+	if ch.EnvTimer != 0 {
+		return
+	}
 
-    ch.EnvTimer = ch.EnvPace
-    if ch.EnvIncrement && ch.EnvVolume < 15 {
-        ch.EnvVolume++
-    } else if !ch.EnvIncrement && ch.EnvVolume > 0 {
-        ch.EnvVolume--
-    }
+	ch.EnvTimer = ch.EnvPace
+	if ch.EnvIncrement && ch.EnvVolume < 15 {
+		ch.EnvVolume++
+	} else if !ch.EnvIncrement && ch.EnvVolume > 0 {
+		ch.EnvVolume--
+	}
 }
 
 func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 
-    if !ch.ChannelEnabled {
+	if !ch.ChannelEnabled {
 		return 0
 	}
 
-    r := float64(ch.R)
-    s := float64(ch.S)
+	r := float64(ch.R)
+	s := float64(ch.S)
 
 	if r == 0 {
 		r = 0.5
@@ -121,14 +120,14 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 	frequency := (524288 / r) / math.Pow(2, s+1)
 	cycleSamples := float64(ch.Apu.sndFrequency) / frequency
 
-	carry := ch.lfsr & 1 != 0
+	carry := ch.lfsr&1 != 0
 	ch.samples++
 	if ch.samples >= cycleSamples {
 		ch.samples -= cycleSamples
 		ch.lfsr >>= 1
 
 		if carry {
-            if ch.Width7 {
+			if ch.Width7 {
 				ch.lfsr ^= 0x60
 			} else {
 				ch.lfsr ^= 0x6000
@@ -137,11 +136,11 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 	}
 
 	vol := ch.InitVolume
-    if ch.EnvEnabled {
-        vol = ch.EnvVolume
-    }
+	if ch.EnvEnabled {
+		vol = ch.EnvVolume
+	}
 
-    vol <<= 3 // original range 0...15, need 0..127 for int8
+	vol <<= 3 // original range 0...15, need 0..127 for int8
 
 	if carry {
 		return int8(vol)

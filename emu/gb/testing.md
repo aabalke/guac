@@ -16,7 +16,7 @@
     ❌ 05
     👍 06
     👍 07
-    ❌ 08
+    ❌ 08 - 21 not 22, otherwise good
     ❌ 09
     ❌ 10
     👍 11 - regs after power
