@@ -51,6 +51,10 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
 			ch.SweepDecrease = (v>>3)&1 != 0
 			ch.SweepPace = (v >> 4) & 7
 
+            if ch.NegateLatch && !ch.SweepDecrease {
+                ch.ChannelEnabled = false
+            }
+
 		case 0x11, 0x16:
 
 			ch.Duty = v >> 6

@@ -22,6 +22,8 @@ type ToneChannel struct {
 	SweepTimer    uint8
 	Shadow uint16
 
+    NegateLatch bool
+
 	Period uint16
 
 	LengthCounter uint8
@@ -73,6 +75,7 @@ func (ch *ToneChannel) Trigger() {
 	ch.EnvTimer  = ch.EnvPace
 	ch.EnvVolume = ch.InitVolume
 	ch.ChannelEnabled = true
+    ch.NegateLatch = false
 
 	if ch.SweepStep != 0 {
 		ch.calcFreq()
@@ -117,6 +120,8 @@ func (ch *ToneChannel) calcFreq() uint16 {
 
     if ch.SweepDecrease {
         newPeriod = ch.Shadow - newPeriod
+        ch.NegateLatch = true
+
     } else {
         newPeriod = ch.Shadow + newPeriod
     }
