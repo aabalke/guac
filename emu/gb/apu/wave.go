@@ -61,6 +61,10 @@ func (ch *WaveChannel) clockLength() {
 		return
 	}
 
+    if ch.LengthCounter == 0 {
+        return
+    }
+
 	ch.LengthCounter--
 
 	if ch.LengthCounter != 0 {

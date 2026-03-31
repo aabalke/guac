@@ -285,6 +285,8 @@ func (a *Apu) PowerOff() {
 
 func (a *Apu) PowerOn() {
 	a.pendingPowerOn = true
+    a.fsStep = 0
+    a.fsCounter = 0
 	//fmt.Printf("Power On\n")
 }
 

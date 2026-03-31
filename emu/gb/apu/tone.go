@@ -139,13 +139,16 @@ func (ch *ToneChannel) clockLength() {
 		return
 	}
 
+    if ch.LengthCounter == 0 {
+        return
+    }
+
 	ch.LengthCounter--
 
 	if ch.LengthCounter != 0 {
 		return
 	}
 
-    //if debug.B[1] {fmt.Printf("length Disabled\n"); os.Exit(0)}
 	ch.ChannelEnabled = false
 }
 
