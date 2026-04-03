@@ -182,10 +182,6 @@ func (ch *ToneChannel) clockEnvelope() {
 
 func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 
-	if !ch.ChannelEnabled {
-		return 0
-	}
-
 	freq := 131072 / float64(2048-ch.Shadow)
 	cycleSamples := float64(ch.Apu.sndFrequency) / freq
 

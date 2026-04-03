@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/aabalke/guac/emu/gb/apu"
+	"github.com/aabalke/guac/emu/gb/debug"
 )
 
 func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
@@ -117,6 +118,10 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
 			ch.Period &^= 0x00FF
 			ch.Period |= uint16(v)
 
+            if int8(v) == -2 {
+                fmt.Printf("Write Period -2\n")
+            }
+
 		case 0x1E:
 
 			ch.Period &^= 0xFF00
@@ -193,11 +198,23 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
 	}
 
 	if wave := addr < 0x40; wave {
-        a.WaveChannel.Ram[(addr - 0x30) & 0xF] = v
-        a.WaveChannel.UpdateCachedRam(addr, v)
-		return
+
+        ch := &a.WaveChannel
+        if !ch.ChannelEnabled {
+            a.WaveChannel.Ram[(addr - 0x30) & 0xF] = v
+            return
+        }
+
+        //if ch.ReadLatch {
+        //    a.WaveChannel.Ram[(addr - 0x30) & 0xF] = v
+        //    return
+        //}
+
+        return
 	}
 }
+
+var cnt int
 
 func (gb *GameBoy) ReadSound(addr uint32, a *apu.Apu) uint8 {
 
@@ -205,26 +222,24 @@ func (gb *GameBoy) ReadSound(addr uint32, a *apu.Apu) uint8 {
 
 	if wave := addr >= 0x30 && addr < 0x40; wave {
 
-        return a.WaveChannel.Ram[(addr - 0x30)&0xF]
-        //return 0xFF
         ch := &a.WaveChannel
 
-        ////if ch.WavRamAccessClock <= 0 || !ch.ChannelEnabled {
-        ////    return 0xFF
-        ////}
+        if !ch.ChannelEnabled {
+            return ch.Ram[(addr - 0x30)&0xF]
+        }
 
-        //return 0x00
-        //return 0xDE
+        delta := int(gb.frameCycles) - int(ch.LastReadCycle)
 
-        addr -= 0x30
-        addr >>= 1
+        fmt.Printf("Read Wave Ram 0x30. Enabled %t Latch %08d Frame %08d Delta %02d Latched %t CNT %03d V %02X\n\n", ch.ChannelEnabled, ch.LastReadCycle, gb.frameCycles, delta, delta != 0, cnt, ch.SampleByte)
 
-        a := ch.Buffer[addr+0]
-        b := ch.Buffer[addr+1] << 4
-        return a | b
+        debug.B[3] = false
+        cnt++
 
-		////bank := (a.WaveChannel.CntL >> 2) & 0x10
-        //return a.WaveChannel.WaveRam[((a.WaveChannel.WavePosition>>1)&0x1F)+0x40-addr]
+        if delta != 0 {
+            return 0xFF
+        }
+
+        return ch.SampleByte
 	}
 
 	if addr >= 0x27 && addr < 0x30 {

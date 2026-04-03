@@ -1,31 +1,36 @@
 package apu
 
+import (
+	"fmt"
+
+	"github.com/aabalke/guac/emu/gb/debug"
+)
+
 type WaveChannel struct {
 	Apu *Apu
 	Idx uint32
 
-    Ram     [0x20]uint8
-    Buffer  [0x40]uint8 // this is waveram but ind nibbles up
+	Ram [0x10]uint8
 
 	OutputLevel uint8
 
-	samples float64
+	WavePosition  uint8
+	LengthCounter uint16
+	Period        uint16
+	ActivePeriod  uint16
 
-	WaveSamples, WavePosition uint8
-	LengthCounter             uint16
-	Period                    uint16
+	LastReadCycle uint32
+	Sample    uint8
+    SampleByte uint8
+
+
+	cyclesPerSample uint32
+	accCycles       uint32
 
 	DACEnabled     bool
 	EnvEnabled     bool
 	LenEnabled     bool
 	ChannelEnabled bool
-}
-
-func (ch *WaveChannel) UpdateCachedRam(addr uint32, v uint8) {
-    addr -= 0x30
-    addr <<= 1
-    ch.Buffer[addr+0] = v & 0xF
-    ch.Buffer[addr+1] = (v >> 4)
 }
 
 func (ch *WaveChannel) LengthTrigger() {
@@ -50,9 +55,14 @@ func (ch *WaveChannel) Trigger() {
 		return
 	}
 
-	ch.samples = 0
-	ch.Reset()
+	// bank
+	ch.WavePosition = 0
 	ch.ChannelEnabled = true
+	ch.ActivePeriod = ch.Period
+	ch.accCycles = 0
+
+    fmt.Printf("Trigger. Active Period is %04d tcycles\n", (2048 - ch.ActivePeriod)<<1)
+    debug.B[3] = true
 }
 
 func (ch *WaveChannel) clockLength() {
@@ -61,9 +71,9 @@ func (ch *WaveChannel) clockLength() {
 		return
 	}
 
-    if ch.LengthCounter == 0 {
-        return
-    }
+	if ch.LengthCounter == 0 {
+		return
+	}
 
 	ch.LengthCounter--
 
@@ -78,57 +88,77 @@ func (ch *WaveChannel) ResetLength(initLength uint8) {
 	ch.LengthCounter = 256 - uint16(initLength)
 }
 
-func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
+// wave channel period divider is 1/2 cpu speed (2097152hz)
+// relative to cpu cycles, clocked at CPU_CYCLE / (2 * (2048 - period))
+func (ch *WaveChannel) ClockWave(tCycles, frameCycles uint32) {
 
 	if !ch.ChannelEnabled {
-		return 0
+		return
 	}
 
-	freq := 2097152 / float64(2048-ch.Period)
-	cycleSamples := float64(ch.Apu.sndFrequency) / freq
+	ch.cyclesPerSample = uint32(2048-ch.ActivePeriod) << 1
+	ch.accCycles += tCycles
 
-	ch.samples++
-	if ch.samples >= cycleSamples {
-		ch.samples -= cycleSamples
+    for i := 0; ch.accCycles >= ch.cyclesPerSample; i++ {
+		// need to set bank as well
+		ch.accCycles -= ch.cyclesPerSample
 
-		ch.WaveSamples--
-		if ch.WaveSamples > 0 {
-			ch.WavePosition++
+		ch.WavePosition = (ch.WavePosition + 1) & 0x1F
+        //ch.ReadLatch = ch.accCycles == 0
+
+        // instead of read latch, have read latch cycle cnt
+
+        ch.LastReadCycle = frameCycles - ch.accCycles
+
+        if debug.B[3] {
+            fmt.Printf("Enabling Latch Acc Cycles %04d FrameCycle %08d lastRead %08d New Wave Position %02d BYTE VALUE %02X\n", ch.accCycles, frameCycles, ch.LastReadCycle, ch.WavePosition, ch.SampleByte)
+        }
+
+		if ch.WavePosition&1 == 0 {
+			ch.Sample = ch.SampleByte >> 4
 		} else {
-			ch.Reset()
+            ch.ActivePeriod = ch.Period
+            ch.cyclesPerSample = uint32(2048-ch.ActivePeriod) << 1
+            b := ch.Ram[ch.WavePosition>>1]
+            ch.SampleByte = b
+			ch.Sample = ch.SampleByte & 0xF
 		}
 	}
+}
 
-    // -8 changes the wave to be signed 0...15 to -8...7
-    vol := int8(ch.Buffer[ch.WavePosition & 0x1F]) - 8
+func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
+
+	// -8 changes the wave to be signed 0...15 to -8...7
+	//vol := int8(ch.Buffer[ch.WavePosition & 0x1F]) - 8
+	vol := int8(ch.Sample) - 8
 
 	switch ch.OutputLevel {
 	case 0:
 		//vol >>= 4
-        vol = 0
+		vol = 0
 	case 1:
-        //vol >>= 0
+		//vol >>= 0
 	case 2:
 		vol >>= 1
 	case 3:
 		vol >>= 2
 	}
 
-    vol <<= 3
+	vol <<= 3
 
 	return vol
 }
 
-func (ch *WaveChannel) Reset() {
-
-	//if twoBanks := (ch.CntL >> 5) & 1 != 0; twoBanks {
-	//	ch.WavePosition = 0
-	//	ch.WaveSamples = 64
-	//	return
-	//}
-
-	//bankIdx := (ch.CntL >> 6) & 0b1
-	bankIdx := 0
-	ch.WavePosition = uint8(32 * bankIdx)
-	ch.WaveSamples = 32
-}
+//func (ch *WaveChannel) Reset() {
+//
+//	//if twoBanks := (ch.CntL >> 5) & 1 != 0; twoBanks {
+//	//	ch.WavePosition = 0
+//	//	ch.WaveSamples = 64
+//	//	return
+//	//}
+//
+//	//bankIdx := (ch.CntL >> 6) & 0b1
+//	bankIdx := 0
+//	ch.WavePosition = uint8(32 * bankIdx)
+//	ch.WaveSamples = 32
+//}

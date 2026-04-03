@@ -110,18 +110,12 @@ func (ch *NoiseChannel) clockEnvelope() {
 
 func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 
-	if !ch.ChannelEnabled {
-		return 0
-	}
-
 	r := float64(ch.R)
-	s := float64(ch.S)
-
 	if r == 0 {
 		r = 0.5
 	}
 
-	frequency := (524288 / r) / math.Pow(2, s+1)
+	frequency := (524288 / r) / math.Pow(2, float64(ch.S)+1)
 	cycleSamples := float64(ch.Apu.sndFrequency) / frequency
 
 	carry := ch.lfsr&1 != 0

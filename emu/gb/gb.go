@@ -80,7 +80,7 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 		Image:  img,
 		Cpu:    NewCpu(),
 		FPS:    60,
-		Clock:  4194304,
+		Clock:  4194304, // t cycle count
 		Joypad: 0xFF,
 		Cartridge: cartridge.Cartridge{
 			Data:    make([]uint8, 0),
@@ -133,6 +133,7 @@ func (gb *GameBoy) Update() {
 
 		gb.Tick(gb.UpdateInterrupt())
 	}
+
 	gb.frameCycles -= targetCycles
 
 	gb.Apu.Play(gb.Muted)
@@ -152,6 +153,9 @@ func (gb *GameBoy) Tick(tCycles int) {
 
 	gb.UpdateGraphics()
 	gb.UpdateTimers(tCycles) // frame sequencer is here since div apu is controlled by div
+
+    gb.Apu.WaveChannel.ClockWave(uint32(tCycles), uint32(gb.frameCycles))
+
 	gb.Apu.SoundClock(uint32(tCycles), gb.DoubleSpeed)
 }
 
@@ -343,7 +347,7 @@ func (gb *GameBoy) UpdateTimers(cycles int) {
 	}
 }
 
-var freqs = [...]int{1024, 16, 64, 256, 1024}
+var freqs = [...]int{256 * 4, 4 * 4, 16 * 4, 64 * 4} // * 4 to get t cycles
 
 func (gb *GameBoy) RequestInterrupt(mask uint8) {
 	gb.Cpu.IF |= mask | 0xE0

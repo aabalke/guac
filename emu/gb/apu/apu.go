@@ -205,11 +205,10 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 		ch4L = (pan & 0x80) != 0
 		ch4R = (pan & 0x08) != 0
 
-		ch1 = a.ToneChannel1.ChannelEnabled //&& (pan&0x11 != 0)
-		ch2 = a.ToneChannel2.ChannelEnabled //&& (pan&0x22 != 0)
-		ch3 = a.WaveChannel.ChannelEnabled  //&& (pan&0x44 != 0)
-		ch4 = a.NoiseChannel.ChannelEnabled //&& (pan&0x88 != 0)
-
+		ch1 = a.ToneChannel1.ChannelEnabled
+		ch2 = a.ToneChannel2.ChannelEnabled
+		ch3 = a.WaveChannel.ChannelEnabled
+		ch4 = a.NoiseChannel.ChannelEnabled
 	)
 
 	clockCycles := uint32(a.sampCycles)
@@ -275,7 +274,7 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 func (a *Apu) PowerOff() {
 	a.ToneChannel1 = ToneChannel{Idx: 0, Apu: a}
 	a.ToneChannel2 = ToneChannel{Idx: 1, Apu: a}
-	a.WaveChannel = WaveChannel{Idx: 2, Apu: a, Buffer: a.WaveChannel.Buffer, Ram: a.WaveChannel.Ram}
+	a.WaveChannel = WaveChannel{Idx: 2, Apu: a, Ram: a.WaveChannel.Ram}
 	a.NoiseChannel = NoiseChannel{Idx: 3, Apu: a}
 	a.Master = 0
 	a.PanReg = 0
