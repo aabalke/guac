@@ -18,11 +18,11 @@ type ToneChannel struct {
 	SweepPace     uint8
 	SweepDecrease bool
 	SweepStep     uint8
-    SweepEnabled  bool
+	SweepEnabled  bool
 	SweepTimer    uint8
-	Shadow uint16
+	Shadow        uint16
 
-    NegateLatch bool
+	NegateLatch bool
 
 	Period uint16
 
@@ -66,16 +66,16 @@ func (ch *ToneChannel) Trigger() {
 	ch.samples = 0
 
 	ch.Shadow = ch.Period
-    ch.SweepTimer = ch.SweepPace
-    if ch.SweepTimer == 0 {
-        ch.SweepTimer = 8
-    }
+	ch.SweepTimer = ch.SweepPace
+	if ch.SweepTimer == 0 {
+		ch.SweepTimer = 8
+	}
 	ch.SweepEnabled = ch.SweepStep != 0 || ch.SweepPace != 0
 
-	ch.EnvTimer  = ch.EnvPace
+	ch.EnvTimer = ch.EnvPace
 	ch.EnvVolume = ch.InitVolume
 	ch.ChannelEnabled = true
-    ch.NegateLatch = false
+	ch.NegateLatch = false
 
 	if ch.SweepStep != 0 {
 		ch.calcFreq()
@@ -84,53 +84,53 @@ func (ch *ToneChannel) Trigger() {
 
 func (ch *ToneChannel) clockSweep() {
 
-    if ch.SweepTimer > 0 {
-        ch.SweepTimer -= 1
-    }
+	if ch.SweepTimer > 0 {
+		ch.SweepTimer -= 1
+	}
 
-    if ch.SweepTimer != 0 {
-        return
-    }
+	if ch.SweepTimer != 0 {
+		return
+	}
 
-    if ch.SweepPace != 0 {
-        ch.SweepTimer = ch.SweepPace
-    } else {
-        ch.SweepTimer = 8
-    }
+	if ch.SweepPace != 0 {
+		ch.SweepTimer = ch.SweepPace
+	} else {
+		ch.SweepTimer = 8
+	}
 
-    if !ch.SweepEnabled {
-        return
-    }
+	if !ch.SweepEnabled {
+		return
+	}
 
-    if  ch.SweepPace == 0 {
-        return
-    }
+	if ch.SweepPace == 0 {
+		return
+	}
 
-    newPeriod := ch.calcFreq()
-    if newPeriod <= 2047 && ch.SweepStep > 0 {
-        ch.Period = newPeriod
-        ch.Shadow = newPeriod
-        ch.calcFreq()
-    }
+	newPeriod := ch.calcFreq()
+	if newPeriod <= 2047 && ch.SweepStep > 0 {
+		ch.Period = newPeriod
+		ch.Shadow = newPeriod
+		ch.calcFreq()
+	}
 }
 
 func (ch *ToneChannel) calcFreq() uint16 {
 
-    newPeriod := ch.Shadow >> ch.SweepStep
+	newPeriod := ch.Shadow >> ch.SweepStep
 
-    if ch.SweepDecrease {
-        newPeriod = ch.Shadow - newPeriod
-        ch.NegateLatch = true
+	if ch.SweepDecrease {
+		newPeriod = ch.Shadow - newPeriod
+		ch.NegateLatch = true
 
-    } else {
-        newPeriod = ch.Shadow + newPeriod
-    }
+	} else {
+		newPeriod = ch.Shadow + newPeriod
+	}
 
-    if newPeriod > 2047 {
-        ch.ChannelEnabled = false
-    }
+	if newPeriod > 2047 {
+		ch.ChannelEnabled = false
+	}
 
-    return newPeriod
+	return newPeriod
 }
 
 func (ch *ToneChannel) clockLength() {
@@ -139,9 +139,9 @@ func (ch *ToneChannel) clockLength() {
 		return
 	}
 
-    if ch.LengthCounter == 0 {
-        return
-    }
+	if ch.LengthCounter == 0 {
+		return
+	}
 
 	ch.LengthCounter--
 

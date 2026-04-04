@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/aabalke/guac/emu/gb/apu"
-	"github.com/aabalke/guac/emu/gb/debug"
 )
 
 func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
@@ -52,9 +51,9 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
 			ch.SweepDecrease = (v>>3)&1 != 0
 			ch.SweepPace = (v >> 4) & 7
 
-            if ch.NegateLatch && !ch.SweepDecrease {
-                ch.ChannelEnabled = false
-            }
+			if ch.NegateLatch && !ch.SweepDecrease {
+				ch.ChannelEnabled = false
+			}
 
 		case 0x11, 0x16:
 
@@ -118,9 +117,9 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
 			ch.Period &^= 0x00FF
 			ch.Period |= uint16(v)
 
-            if int8(v) == -2 {
-                fmt.Printf("Write Period -2\n")
-            }
+			//if int8(v) == -2 {
+			//	fmt.Printf("Write Period -2\n")
+			//}
 
 		case 0x1E:
 
@@ -199,18 +198,18 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
 
 	if wave := addr < 0x40; wave {
 
-        ch := &a.WaveChannel
-        if !ch.ChannelEnabled {
-            a.WaveChannel.Ram[(addr - 0x30) & 0xF] = v
-            return
-        }
+		ch := &a.WaveChannel
+		if !ch.ChannelEnabled {
+			a.WaveChannel.Ram[(addr-0x30)&0xF] = v
+			return
+		}
 
-        //if ch.ReadLatch {
-        //    a.WaveChannel.Ram[(addr - 0x30) & 0xF] = v
-        //    return
-        //}
+		//if ch.ReadLatch {
+		//    a.WaveChannel.Ram[(addr - 0x30) & 0xF] = v
+		//    return
+		//}
 
-        return
+		return
 	}
 }
 
@@ -222,24 +221,24 @@ func (gb *GameBoy) ReadSound(addr uint32, a *apu.Apu) uint8 {
 
 	if wave := addr >= 0x30 && addr < 0x40; wave {
 
-        ch := &a.WaveChannel
+		ch := &a.WaveChannel
 
-        if !ch.ChannelEnabled {
-            return ch.Ram[(addr - 0x30)&0xF]
-        }
+		if !ch.ChannelEnabled {
+			return ch.Ram[(addr-0x30)&0xF]
+		}
 
-        delta := int(gb.frameCycles) - int(ch.LastReadCycle)
+		delta := int(gb.frameCycles) - int(ch.LastReadCycle)
 
-        fmt.Printf("Read Wave Ram 0x30. Enabled %t Latch %08d Frame %08d Delta %02d Latched %t CNT %03d V %02X\n\n", ch.ChannelEnabled, ch.LastReadCycle, gb.frameCycles, delta, delta != 0, cnt, ch.SampleByte)
+		//fmt.Printf("Read Wave Ram 0x30. Enabled %t Latch %08d Frame %08d Delta %02d Latched %t CNT %03d V %02X\n\n", ch.ChannelEnabled, ch.LastReadCycle, gb.frameCycles, delta, delta != 0, cnt, ch.SampleByte)
 
-        debug.B[3] = false
-        cnt++
+		//debug.B[3] = false
+		//cnt++
 
-        if delta != 0 {
-            return 0xFF
-        }
+		if delta != 0 {
+			return 0xFF
+		}
 
-        return ch.SampleByte
+		return ch.SampleByte
 	}
 
 	if addr >= 0x27 && addr < 0x30 {

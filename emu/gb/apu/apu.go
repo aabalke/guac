@@ -61,7 +61,6 @@ func (a *Apu) ClockFrameSequencer() {
 		a.suppress = true
 	}
 
-
 	a.fsCounter++
 
 	// frame sequencer runs at 512hz
@@ -284,8 +283,8 @@ func (a *Apu) PowerOff() {
 
 func (a *Apu) PowerOn() {
 	a.pendingPowerOn = true
-    a.fsStep = 0
-    a.fsCounter = 0
+	a.fsStep = 0
+	a.fsCounter = 0
 	//fmt.Printf("Power On\n")
 }
 

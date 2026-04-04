@@ -66,6 +66,6 @@ func (gb *GameBoy) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGame
 	}
 
 	if reqIrqBut || reqIrqKey {
-		gb.RequestInterrupt(IRQ_JPD)
+		gb.SetIrq(IRQ_JPD)
 	}
 }

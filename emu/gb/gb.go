@@ -43,6 +43,8 @@ type GameBoy struct {
 	MemoryBus MemoryBus
 	FPS       int
 
+	Stat Stat
+
 	// cycles are tcycles, 1/4 mcycles
 	frameCycles        int
 	Cycles             int
@@ -154,7 +156,7 @@ func (gb *GameBoy) Tick(tCycles int) {
 	gb.UpdateGraphics()
 	gb.UpdateTimers(tCycles) // frame sequencer is here since div apu is controlled by div
 
-    gb.Apu.WaveChannel.ClockWave(uint32(tCycles), uint32(gb.frameCycles))
+	gb.Apu.WaveChannel.ClockWave(uint32(tCycles), uint32(gb.frameCycles))
 
 	gb.Apu.SoundClock(uint32(tCycles), gb.DoubleSpeed)
 }
@@ -342,14 +344,14 @@ func (gb *GameBoy) UpdateTimers(cycles int) {
 
 	if t.InterruptPending {
 		io[TIMA] = io[TMA]
-		gb.RequestInterrupt(IRQ_TMR)
+		gb.SetIrq(IRQ_TMR)
 		t.InterruptPending = false
 	}
 }
 
 var freqs = [...]int{256 * 4, 4 * 4, 16 * 4, 64 * 4} // * 4 to get t cycles
 
-func (gb *GameBoy) RequestInterrupt(mask uint8) {
+func (gb *GameBoy) SetIrq(mask uint8) {
 	gb.Cpu.IF |= mask | 0xE0
 }
 

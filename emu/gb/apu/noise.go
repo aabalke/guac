@@ -67,9 +67,9 @@ func (ch *NoiseChannel) clockLength() {
 		return
 	}
 
-    if ch.LengthCounter == 0 {
-        return
-    }
+	if ch.LengthCounter == 0 {
+		return
+	}
 
 	ch.LengthCounter--
 

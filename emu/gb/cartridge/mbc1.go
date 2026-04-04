@@ -22,12 +22,11 @@ func (m *Mbc1) ReadRom(c Cartridge, addr uint16) uint8 {
 	newAddr := uint32(addr - 0x4000)
 	a := newAddr + uint32(m.RomBank)*0x4000
 
-    if int(a) >= len(c.Data) {
-        fmt.Printf("A %08X LEN %08X\n", a, len(c.Data))
-    }
+	if int(a) >= len(c.Data) {
+		fmt.Printf("A %08X LEN %08X\n", a, len(c.Data))
+	}
 
-
-	return c.Data[a % uint32(len(c.Data))]
+	return c.Data[a%uint32(len(c.Data))]
 }
 
 func (m *Mbc1) ReadRam(c Cartridge, addr uint16) uint8 {

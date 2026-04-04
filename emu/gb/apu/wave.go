@@ -1,11 +1,5 @@
 package apu
 
-import (
-	"fmt"
-
-	"github.com/aabalke/guac/emu/gb/debug"
-)
-
 type WaveChannel struct {
 	Apu *Apu
 	Idx uint32
@@ -20,9 +14,8 @@ type WaveChannel struct {
 	ActivePeriod  uint16
 
 	LastReadCycle uint32
-	Sample    uint8
-    SampleByte uint8
-
+	Sample        uint8
+	SampleByte    uint8
 
 	cyclesPerSample uint32
 	accCycles       uint32
@@ -61,8 +54,8 @@ func (ch *WaveChannel) Trigger() {
 	ch.ActivePeriod = ch.Period
 	ch.accCycles = 0
 
-    fmt.Printf("Trigger. Active Period is %04d tcycles\n", (2048 - ch.ActivePeriod)<<1)
-    debug.B[3] = true
+	//fmt.Printf("Trigger. Active Period is %04d tcycles\n", (2048-ch.ActivePeriod)<<1)
+	//debug.B[3] = true
 }
 
 func (ch *WaveChannel) clockLength() {
@@ -99,28 +92,28 @@ func (ch *WaveChannel) ClockWave(tCycles, frameCycles uint32) {
 	ch.cyclesPerSample = uint32(2048-ch.ActivePeriod) << 1
 	ch.accCycles += tCycles
 
-    for i := 0; ch.accCycles >= ch.cyclesPerSample; i++ {
+	for i := 0; ch.accCycles >= ch.cyclesPerSample; i++ {
 		// need to set bank as well
 		ch.accCycles -= ch.cyclesPerSample
 
 		ch.WavePosition = (ch.WavePosition + 1) & 0x1F
-        //ch.ReadLatch = ch.accCycles == 0
+		//ch.ReadLatch = ch.accCycles == 0
 
-        // instead of read latch, have read latch cycle cnt
+		// instead of read latch, have read latch cycle cnt
 
-        ch.LastReadCycle = frameCycles - ch.accCycles
+		ch.LastReadCycle = frameCycles - ch.accCycles
 
-        if debug.B[3] {
-            fmt.Printf("Enabling Latch Acc Cycles %04d FrameCycle %08d lastRead %08d New Wave Position %02d BYTE VALUE %02X\n", ch.accCycles, frameCycles, ch.LastReadCycle, ch.WavePosition, ch.SampleByte)
-        }
+		//if debug.B[3] {
+		//	fmt.Printf("Enabling Latch Acc Cycles %04d FrameCycle %08d lastRead %08d New Wave Position %02d BYTE VALUE %02X\n", ch.accCycles, frameCycles, ch.LastReadCycle, ch.WavePosition, ch.SampleByte)
+		//}
 
 		if ch.WavePosition&1 == 0 {
 			ch.Sample = ch.SampleByte >> 4
 		} else {
-            ch.ActivePeriod = ch.Period
-            ch.cyclesPerSample = uint32(2048-ch.ActivePeriod) << 1
-            b := ch.Ram[ch.WavePosition>>1]
-            ch.SampleByte = b
+			ch.ActivePeriod = ch.Period
+			ch.cyclesPerSample = uint32(2048-ch.ActivePeriod) << 1
+			b := ch.Ram[ch.WavePosition>>1]
+			ch.SampleByte = b
 			ch.Sample = ch.SampleByte & 0xF
 		}
 	}
