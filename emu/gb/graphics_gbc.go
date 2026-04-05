@@ -5,40 +5,35 @@ package gameboy
 func (gb *GameBoy) renderTilesGBC() {
 
 	var (
-		scrollY  = gb.MemoryBus.IO[0x42]
-		scrollX  = gb.MemoryBus.IO[0x43]
-		windowY  = gb.MemoryBus.IO[0x4A]
-		windowX  = int(gb.MemoryBus.IO[0x4B]) - 7
-		lcdc     = gb.MemoryBus.IO[LCDC]
-		scanline = (gb.MemoryBus.IO[LY])
-
-		signedTiles      = !((lcdc>>4)&1 != 0)
-		scanLineInWindow = windowY <= scanline
-		winEnabled       = (lcdc>>5)&1 != 0
-		useWindow        = winEnabled && scanLineInWindow
+		scrollY   = gb.MemoryBus.IO[0x42]
+		scrollX   = gb.MemoryBus.IO[0x43]
+		windowY   = gb.MemoryBus.IO[0x4A]
+		windowX   = int(gb.MemoryBus.IO[0x4B]) - 7
+		scanline  = gb.MemoryBus.IO[LY]
+		useWindow = gb.Lcdc.WindowEnabled && windowY <= scanline
 	)
 
 	tileData := uint16(0x8000)
-	if signedTiles {
+	if !gb.Lcdc.UnsignedTiles {
 		tileData = 0x8800
 	}
 
 	winMemory := uint16(0x9800)
-	if winAddr := (lcdc>>6)&1 != 0; winAddr {
+	if gb.Lcdc.AltWinMap {
 		winMemory = 0x9C00
 	}
 
 	bgMemory := uint16(0x9800)
-	if bgAddr := (lcdc>>3)&1 != 0; bgAddr {
+	if gb.Lcdc.AltBgMap {
 		bgMemory = 0x9C00
 	}
 
 	// yPos is used to calc which of 32 v-lines the current scanline is drawing
 	var yPos uint8
 	if useWindow {
-		yPos = uint8((scanline - windowY))
+		yPos = uint8(scanline - windowY)
 	} else {
-		yPos = uint8((scrollY + scanline))
+		yPos = uint8(scrollY + scanline)
 	}
 
 	var (
@@ -73,7 +68,7 @@ func (gb *GameBoy) renderTilesGBC() {
 			}
 
 			tileLocation := tileData
-			if !signedTiles {
+			if gb.Lcdc.UnsignedTiles {
 				tileNum := int16(gb.MemoryBus.VRAM[tileAddress-0x8000])
 				tileLocation = tileLocation + uint16(tileNum*16)
 			} else {
@@ -130,10 +125,8 @@ func (gb *GameBoy) renderTilesGBC() {
 
 func (gb *GameBoy) renderSpritesGBC(scanline int32) {
 
-	lcdc := gb.MemoryBus.IO[LCDC]
-
 	var ySize int32 = 8
-	if (lcdc>>2)&1 != 0 {
+	if gb.Lcdc.DoubleHeight {
 		ySize = 16
 	}
 
@@ -155,14 +148,14 @@ func (gb *GameBoy) renderSpritesGBC(scanline int32) {
 		}
 		lineSprites++
 
-		xP := gb.MemoryBus.OAM[index+1]
-		xPos := int32(xP) - 8
-		tileLocation := gb.MemoryBus.OAM[index+2]
-		attributes := gb.MemoryBus.OAM[index+3]
-
-		yFlip := (attributes>>6)&1 != 0
-		xFlip := (attributes>>5)&1 != 0
-		priority := !((attributes>>7)&1 != 0)
+		var (
+			xPos         = int32(gb.MemoryBus.OAM[index+1]) - 8
+			tileLocation = gb.MemoryBus.OAM[index+2]
+			attributes   = gb.MemoryBus.OAM[index+3]
+			yFlip        = (attributes>>6)&1 != 0
+			xFlip        = (attributes>>5)&1 != 0
+			priority     = !((attributes>>7)&1 != 0)
+		)
 
 		// Set the line to draw based on if the sprite is flipped on the y
 		line := scanline - yPos

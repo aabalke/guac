@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	LCDC = 0x40
+	//LCDC = 0x40
 	//STAT        = 0x41
 	SCY         = 0x42
 	SCX         = 0x43
@@ -30,6 +30,60 @@ const (
 	UNPACKED_OBJ0 = 1
 	UNPACKED_OBJ1 = 2
 )
+
+type Lcdc struct {
+	Enabled       bool
+	AltWinMap     bool
+	WindowEnabled bool
+	UnsignedTiles bool
+	AltBgMap      bool
+	DoubleHeight  bool
+	ObjEnabled    bool
+	BgMaster      bool
+}
+
+func (l *Lcdc) Read() uint8 {
+
+	v := uint8(0)
+
+	if l.BgMaster {
+		v |= 1 << 0
+	}
+	if l.ObjEnabled {
+		v |= 1 << 1
+	}
+	if l.DoubleHeight {
+		v |= 1 << 2
+	}
+	if l.AltBgMap {
+		v |= 1 << 3
+	}
+	if l.UnsignedTiles {
+		v |= 1 << 4
+	}
+	if l.WindowEnabled {
+		v |= 1 << 5
+	}
+	if l.AltWinMap {
+		v |= 1 << 6
+	}
+	if l.Enabled {
+		v |= 1 << 7
+	}
+
+	return v
+}
+
+func (l *Lcdc) Write(v uint8) {
+	l.BgMaster = (v>>0)&1 != 0
+	l.ObjEnabled = (v>>1)&1 != 0
+	l.DoubleHeight = (v>>2)&1 != 0
+	l.AltBgMap = (v>>3)&1 != 0
+	l.UnsignedTiles = (v>>4)&1 != 0
+	l.WindowEnabled = (v>>5)&1 != 0
+	l.AltWinMap = (v>>6)&1 != 0
+	l.Enabled = (v>>7)&1 != 0
+}
 
 const (
 	PPU_HBLANK = iota
@@ -85,7 +139,7 @@ func (gb *GameBoy) UpdateDisplay() {
 
 func (gb *GameBoy) UpdateGraphics() {
 
-	if lcdDisabled := (gb.MemoryBus.IO[LCDC]>>7)&1 == 0; lcdDisabled {
+	if !gb.Lcdc.Enabled {
 		gb.Timer.ScanlineCounter = 456
 		gb.MemoryBus.IO[LY] = 0
 		gb.Stat.Mode = 0
@@ -96,7 +150,7 @@ func (gb *GameBoy) UpdateGraphics() {
 		dot         = &gb.Timer.ScanlineCounter
 		stat        = &gb.Stat
 		currentLine = gb.MemoryBus.IO[LY]
-	    prevMode    = gb.Stat.Mode
+		prevMode    = gb.Stat.Mode
 	)
 
 	if vblank := currentLine >= height; vblank {
@@ -131,6 +185,8 @@ func (gb *GameBoy) UpdateGraphics() {
 		return
 	}
 
+	// new scanline
+
 	gb.MemoryBus.IO[LY]++
 
 	speedMultipler := 1
@@ -152,15 +208,13 @@ func (gb *GameBoy) UpdateGraphics() {
 
 func (gb *GameBoy) drawScanline(scanline int32) {
 
-	lcdc := gb.MemoryBus.IO[LCDC]
-
 	if gb.Color {
 		gb.renderTilesGBC()
-	} else if bgEnabled := (lcdc>>0)&1 != 0; bgEnabled {
+	} else if gb.Lcdc.BgMaster {
 		gb.renderTilesDMG()
 	}
 
-	if objEnabled := (lcdc>>1)&1 != 0; objEnabled {
+	if gb.Lcdc.ObjEnabled {
 		if gb.Color {
 			gb.renderSpritesGBC(scanline)
 		} else {

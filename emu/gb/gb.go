@@ -44,6 +44,7 @@ type GameBoy struct {
 	FPS       int
 
 	Stat Stat
+	Lcdc Lcdc
 
 	// cycles are tcycles, 1/4 mcycles
 	frameCycles        int

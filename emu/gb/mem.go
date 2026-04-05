@@ -292,6 +292,10 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 	case 0xFF04: // DIV
 
 		return uint8(gb.Timer.Div >> 8)
+
+	case 0xFF40:
+		return gb.Lcdc.Read()
+
 	case 0xFF41:
 		return gb.Stat.Read()
 
@@ -389,6 +393,9 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 	case 0xFF0F:
 		gb.Cpu.IF = v
 		io[addr-0xFF00] = v
+
+	case 0xFF40:
+		gb.Lcdc.Write(v)
 
 	case 0xFF41:
 		gb.Stat.Write(v)
