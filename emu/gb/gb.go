@@ -71,7 +71,7 @@ type GameBoy struct {
 type Timer struct {
 	Div              uint16
 	Counter          int
-	ScanlineCounter  int
+	DotCounter  int
 	InterruptPending bool
 }
 
@@ -92,6 +92,8 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 		},
 		Palette: config.Conf.Gb.Palette,
 	}
+
+    gb.Lcdc.gb = gb
 
 	gb.bgPalette.Init()
 	gb.spPalette.Init()
@@ -154,11 +156,12 @@ func (gb *GameBoy) Tick(tCycles int) {
 	gb.frameCycles += tCycles
 	gb.Cycles = tCycles
 
-	gb.UpdateGraphics()
+    if gb.Lcdc.Enabled {
+        gb.UpdateGraphics()
+    }
+
 	gb.UpdateTimers(tCycles) // frame sequencer is here since div apu is controlled by div
-
 	gb.Apu.WaveChannel.ClockWave(uint32(tCycles), uint32(gb.frameCycles))
-
 	gb.Apu.SoundClock(uint32(tCycles), gb.DoubleSpeed)
 }
 
@@ -256,7 +259,6 @@ func (gb *GameBoy) loadCartridge() {
 	default:
 		panic(fmt.Sprintf("UNSUPPORTED TYPE %X", gb.Cartridge.Type))
 	}
-
 }
 
 func (gb *GameBoy) UpdateInterrupt() int {

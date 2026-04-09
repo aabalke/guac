@@ -6,7 +6,7 @@ import (
 	"github.com/aabalke/guac/emu/gb/apu"
 )
 
-func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
+func (gb *GameBoy) WriteSound(addr, v uint8, a *apu.Apu) {
 
 	if addr == 0x26 {
 		wasEnabled := a.Enabled
@@ -213,9 +213,7 @@ func (gb *GameBoy) WriteSound(addr uint32, v uint8, a *apu.Apu) {
 	}
 }
 
-var cnt int
-
-func (gb *GameBoy) ReadSound(addr uint32, a *apu.Apu) uint8 {
+func (gb *GameBoy) ReadSound(addr uint8, a *apu.Apu) uint8 {
 
 	//fmt.Printf("R ADDR %02X\n", addr)
 

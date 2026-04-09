@@ -147,6 +147,11 @@ func (gb *GameBoy) Read(addr uint16) uint8 {
 	case addr < 0x8000:
 		return gb.Cartridge.Mbc.ReadRom(gb.Cartridge, addr)
 	case addr < 0xA000:
+
+        if drawing := gb.Stat.Mode == 3; drawing {
+            return 0xFF
+        }
+
 		if gb.Color {
 			offset := uint16(gb.MemoryBus.VRAMBank) * 0x2000
 			return gb.MemoryBus.VRAM[addr-0x8000+offset]
@@ -162,6 +167,11 @@ func (gb *GameBoy) Read(addr uint16) uint8 {
 	case addr < 0xFE00:
 		return gb.Cartridge.Mbc.ReadRam(gb.Cartridge, addr-0x2000)
 	case addr < 0xFEA0:
+
+        if notAvailable := gb.Stat.Mode & 0b10 != 0; notAvailable {
+            return 0xFF
+        }
+
 		return gb.MemoryBus.OAM[addr-0xFE00]
 	case addr < 0xFF00:
 		return gb.MemoryBus.PROHIBITED[addr-0xFEA0]
@@ -178,9 +188,9 @@ func (gb *GameBoy) Read(addr uint16) uint8 {
 
 func (gb *GameBoy) Write(addr uint16, v uint8) {
 
-	//if addr == 0xD880 && v == 5 {
-	//    //debug.B[1] = true
-	//    fmt.Printf("Test %02d started...\n", v)
+	//if addr == 0xD880 { // test addr for blargg
+	//    fmt.Printf("\nTest %02d started...\n", v)
+    //    debug.B[4] = true
 	//}
 
 	switch {
@@ -188,11 +198,18 @@ func (gb *GameBoy) Write(addr uint16, v uint8) {
 		gb.Cartridge.Mbc.Handle(addr, v)
 		gb.Cpu.isBranching = true
 	case addr < 0xA000:
-		var offset uint16
+
+        if drawing := gb.Stat.Mode == 3; drawing {
+            return
+        }
+
 		if gb.Color {
-			offset = uint16(gb.MemoryBus.VRAMBank) * 0x2000
+            offset := uint16(gb.MemoryBus.VRAMBank) * 0x2000
+            gb.MemoryBus.VRAM[addr-0x8000+offset] = v
 		}
-		gb.MemoryBus.VRAM[addr-0x8000+offset] = v
+
+		gb.MemoryBus.VRAM[addr-0x8000] = v
+
 	case addr < 0xC000:
 		gb.Cartridge.Mbc.WriteRam(gb.Cartridge, addr, v)
 		gb.MemoryBus.ramSaved = false
@@ -203,6 +220,10 @@ func (gb *GameBoy) Write(addr uint16, v uint8) {
 	case addr < 0xFE00:
 		gb.MemoryBus.WRAM[addr-0xE000] = v
 	case addr < 0xFEA0:
+        if notAvailable := gb.Stat.Mode & 0b10 != 0; notAvailable {
+            return
+        }
+
 		gb.MemoryBus.OAM[addr-0xFE00] = v
 	case addr < 0xFF00:
 		gb.MemoryBus.PROHIBITED[addr-0xFEA0] = v
@@ -282,7 +303,7 @@ func (gb *GameBoy) performDMATransfer(length uint16) {
 func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 
 	if addr >= 0xFF10 && addr < 0xFF40 {
-		return gb.ReadSound(uint32(addr&0xFF), gb.Apu)
+		return gb.ReadSound(uint8(addr), gb.Apu)
 	}
 
 	switch addr {
@@ -298,6 +319,9 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 
 	case 0xFF41:
 		return gb.Stat.Read()
+
+    case 0xFF44:
+		return gb.MemoryBus.IO[addr&0xFF]
 
 	case 0xFF0F:
 		return gb.Cpu.IF
@@ -352,7 +376,7 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 	case 0xFF70:
 		return gb.MemoryBus.WRAMBank
 	default:
-		return gb.MemoryBus.IO[addr-0xFF00]
+		return gb.MemoryBus.IO[addr&0xFF]
 	}
 }
 
@@ -361,7 +385,7 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 	io := &gb.MemoryBus.IO
 
 	if addr >= 0xFF10 && addr < 0xFF40 {
-		gb.WriteSound(uint32(addr&0xFF), v, gb.Apu)
+		gb.WriteSound(uint8(addr), v, gb.Apu)
 		return
 	}
 
@@ -395,21 +419,25 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		io[addr-0xFF00] = v
 
 	case 0xFF40:
+        //fmt.Printf("Write LCDC %02X\n", v)
 		gb.Lcdc.Write(v)
 
 	case 0xFF41:
 		gb.Stat.Write(v)
 
 	case 0xFF44:
-		io[0x44] = 0
-		io[addr-0xFF00] = v
+		io[uint8(addr)] = v
 
 	case 0xFF46: // DMA
-		address := uint16(v) << 8
+
+        if gb.Stat.Mode & 0b10 != 0 {
+            return
+        }
+
+		addr := uint16(v) << 8
 		for i := range uint16(0xA0) {
 			gb.Tick(4) // 160 m cycles = 4 tcycles per transfer
-			a := gb.Read(address + i)
-
+			a := gb.Read(addr + i)
 			gb.MemoryBus.OAM[i] = a
 		}
 		//io[addr-0xFF00] = v
@@ -504,6 +532,6 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		}
 		io[addr-0xFF00] = v
 	default:
-		io[addr-0xFF00] = v
+		io[addr&0xFF] = v
 	}
 }
