@@ -47,14 +47,14 @@ type MouseConfig struct {
 }
 
 type GbConfig struct {
-	TomlPalette      []int `toml:"dmg_palette"`
+	TomlPalette      []int                    `toml:"dmg_palette"`
 	KeyboardConfig   EmulatorKeyboardConfig   `toml:"keyboard"`
 	ControllerConfig EmulatorControllerConfig `toml:"controller"`
-    ConsoleType      string `toml:"type"`
+	ConsoleType      string                   `toml:"type"`
 
 	Palette  [][]uint8
-    ForceDMG bool
-    ForceGBC bool
+	ForceDMG bool
+	ForceGBC bool
 }
 
 type GbaConfig struct {
@@ -185,10 +185,12 @@ func (c *Config) decodeGb() {
 
 	invalid := false
 
-    switch c.Gb.ConsoleType {
-    case "dmg": c.Gb.ForceDMG = true
-    case "gbc": c.Gb.ForceGBC = true
-    }
+	switch c.Gb.ConsoleType {
+	case "dmg":
+		c.Gb.ForceDMG = true
+	case "gbc":
+		c.Gb.ForceGBC = true
+	}
 
 	errMessageStart := "Invalid Config:"
 	errMessageEnd := "Using default palette."

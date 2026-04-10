@@ -189,17 +189,14 @@ func (gb *GameBoy) UpdateGraphics() {
 
 	*dot += gb.Cycles
 
-	speedMultipler := 1
-	if gb.DoubleSpeed {
-		speedMultipler = 2
-	}
+    dotScanline := 456 << gb.DoubleSpeedFlag
 
-	if *dot >= 456 * speedMultipler { 
+	if *dot >= dotScanline { 
 
         // new scanline
         gb.MemoryBus.IO[LY]++
 
-        *dot -= 456 * speedMultipler
+        *dot -= dotScanline
 
         switch currentLine {
         case height: // vblank

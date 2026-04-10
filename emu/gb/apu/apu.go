@@ -186,7 +186,7 @@ func (a *Apu) SoundBufferWrap() {
 	}
 }
 
-func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
+func (a *Apu) SoundClock(cycles, doubleSpeedFlag uint32) {
 
 	a.sndCycles += cycles
 
@@ -210,16 +210,13 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 		ch4 = a.NoiseChannel.ChannelEnabled
 	)
 
-	clockCycles := uint32(a.sampCycles)
-	if doubleSpeed {
-		clockCycles <<= 1
-	}
+	clockCycles := uint32(a.sampCycles) << doubleSpeedFlag
 
 	for a.sndCycles >= clockCycles {
 		psgL, psgR := int32(0), int32(0)
 
 		if ch1 {
-			ch := int32(a.ToneChannel1.GetSample(doubleSpeed))
+			ch := int32(a.ToneChannel1.GetSample())
 			if ch1L {
 				psgL += ch
 			}
@@ -229,7 +226,7 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 		}
 
 		if ch2 {
-			ch := int32(a.ToneChannel2.GetSample(doubleSpeed))
+			ch := int32(a.ToneChannel2.GetSample())
 			if ch2L {
 				psgL += ch
 			}
@@ -239,7 +236,7 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 		}
 
 		if ch3 {
-			ch := int32(a.WaveChannel.GetSample(doubleSpeed))
+			ch := int32(a.WaveChannel.GetSample())
 			if ch3L {
 				psgL += ch
 			}
@@ -249,7 +246,7 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 		}
 
 		if ch4 {
-			ch := int32(a.NoiseChannel.GetSample(doubleSpeed))
+			ch := int32(a.NoiseChannel.GetSample())
 			if ch4L {
 				psgL += ch
 			}

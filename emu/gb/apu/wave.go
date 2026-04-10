@@ -119,7 +119,7 @@ func (ch *WaveChannel) ClockWave(tCycles, frameCycles uint32) {
 	}
 }
 
-func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
+func (ch *WaveChannel) GetSample() int8 {
 
 	// -8 changes the wave to be signed 0...15 to -8...7
 	//vol := int8(ch.Buffer[ch.WavePosition & 0x1F]) - 8

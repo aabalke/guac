@@ -359,11 +359,7 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 
 	case 0xFF4D:
 
-		var b uint8 = 0
-
-		if gb.DoubleSpeed {
-			b |= 1 << 7
-		}
+        b := uint8(gb.DoubleSpeedFlag << 7)
 
 		if gb.PrepareSpeedToggle {
 			b |= 1
@@ -396,9 +392,7 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		gb.Timer.Div = 0
 
 		mask := uint16(1 << 12)
-		if gb.DoubleSpeed {
-			mask = uint16(1 << 13)
-		}
+        mask <<= uint16(gb.DoubleSpeedFlag)
 
 		if prev&mask != 0 {
 			gb.Apu.ClockFrameSequencer()

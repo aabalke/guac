@@ -21,7 +21,7 @@ import (
 	"github.com/hajimehoshi/oto"
 )
 
-const UNLIMITED_FPS = 1200
+const UNLIMITED_FPS = 0x10000
 
 var (
 	exit = errors.New("Exit")
@@ -70,8 +70,14 @@ func NewGame(flags Flags) *Game {
 
 	case GBA:
 		g.gba = gba.NewGBA(flags.RomPath, g.emuCtx)
+		if g.flags.Muted {
+			g.gba.ToggleMute()
+		}
 	case GB:
 		g.gb = gameboy.NewGameBoy(flags.RomPath, g.emuCtx)
+		if g.flags.Muted {
+			g.gb.ToggleMute()
+		}
 	case NDS:
 		g.nds = nds.NewNds(flags.RomPath, g.emuCtx)
 		if g.flags.Muted {
@@ -107,7 +113,7 @@ const (
 	//PRF_START = 1200
 	//PRF_END   = PRF_START + 2000
 	PRF_START = 0
-	PRF_END   = 1000
+	PRF_END   = 10000
 )
 
 var t time.Time
@@ -176,7 +182,7 @@ func (g *Game) Update() error {
 	case GB:
 		g.gb.InputHandler(keys, buttons)
 		g.gb.Update()
-		g.gb.Image.WritePixels(*g.gb.Pixels)
+		g.gb.Image.WritePixels(g.gb.Pixels)
 	}
 
 	return nil

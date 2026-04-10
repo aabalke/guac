@@ -50,7 +50,7 @@ type GameBoy struct {
 	frameCycles        int
 	Cycles             int
 	Clock              int
-	DoubleSpeed        bool
+	DoubleSpeedFlag    uint8
 	PrepareSpeedToggle bool
 	Timer              Timer
 
@@ -124,11 +124,8 @@ func (gb *GameBoy) Update() {
 	if gb.Paused {
 		return
 	}
-	multiplier := 1
-	if gb.DoubleSpeed {
-		multiplier = 2
-	}
-	targetCycles := gb.Clock / gb.FPS * multiplier
+
+	targetCycles := gb.Clock / gb.FPS << int(gb.DoubleSpeedFlag)
 	for gb.frameCycles < targetCycles {
 		if gb.Cpu.Halted {
 			gb.Tick(4)
@@ -150,9 +147,8 @@ func (gb *GameBoy) Tick(tCycles int) {
 		return
 	}
 
-	if gb.DoubleSpeed {
-		tCycles >>= 1
-	}
+    tCycles >>= int(gb.DoubleSpeedFlag)
+
 	gb.frameCycles += tCycles
 	gb.Cycles = tCycles
 
@@ -162,7 +158,7 @@ func (gb *GameBoy) Tick(tCycles int) {
 
 	gb.UpdateTimers(tCycles) // frame sequencer is here since div apu is controlled by div
 	gb.Apu.WaveChannel.ClockWave(uint32(tCycles), uint32(gb.frameCycles))
-	gb.Apu.SoundClock(uint32(tCycles), gb.DoubleSpeed)
+	gb.Apu.SoundClock(uint32(tCycles), uint32(gb.DoubleSpeedFlag))
 }
 
 func (gb *GameBoy) ToggleMute() bool {
@@ -307,9 +303,7 @@ var IRQ_SRC = [...]uint16{0x40, 0x48, 0x50, 0x58, 0x60}
 
 func (gb *GameBoy) UpdateTimers(cycles int) {
 
-	if gb.DoubleSpeed {
-		cycles *= 2
-	}
+    cycles <<= int(gb.DoubleSpeedFlag)
 
 	io := &gb.MemoryBus.IO
 	t := &gb.Timer
@@ -318,10 +312,7 @@ func (gb *GameBoy) UpdateTimers(cycles int) {
 	t.Div += uint16(cycles)
 
 	mask := uint16(1 << 12)
-	if gb.DoubleSpeed {
-		mask = uint16(1 << 13)
-	}
-
+    mask <<= uint16(gb.DoubleSpeedFlag)
 	if prev&mask != 0 && t.Div&mask == 0 {
 		gb.Apu.ClockFrameSequencer()
 	}
@@ -365,15 +356,15 @@ func (gb *GameBoy) toggleDoubleSpeed() {
 	}
 
 	gb.PrepareSpeedToggle = false
-	gb.DoubleSpeed = !gb.DoubleSpeed
+    if gb.DoubleSpeedFlag != 0 {
+        gb.DoubleSpeedFlag = 0
+    } else {
+        gb.DoubleSpeedFlag = 1
+    }
+
 	gb.Cpu.Halted = false
 
-	v := uint8(0)
-	if gb.DoubleSpeed {
-		v |= 1 << 7
-	}
-
-	gb.MemoryBus.IO[0x4D] = v
+	gb.MemoryBus.IO[0x4D] = uint8(gb.DoubleSpeedFlag << 7)
 }
 
 func (gb *GameBoy) Close() {

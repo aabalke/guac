@@ -1,12 +1,12 @@
 module github.com/aabalke/guac
 
-replace github.com/aabalke/gojit => C:\dev\repos\jit\gojit
+//replace github.com/aabalke/gojit => C:\dev\repos\jit\gojit
 
 go 1.26.0
 
 require (
 	github.com/BurntSushi/toml v1.5.0
-	github.com/aabalke/gojit v0.0.0-00010101000000-000000000000
+	github.com/aabalke/gojit v0.0.0-20260308010726-39b348b38c78
 	github.com/hajimehoshi/ebiten/v2 v2.9.7
 	github.com/hajimehoshi/oto v1.0.1
 	golang.org/x/sys v0.39.0

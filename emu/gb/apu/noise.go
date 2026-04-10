@@ -108,7 +108,7 @@ func (ch *NoiseChannel) clockEnvelope() {
 	}
 }
 
-func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
+func (ch *NoiseChannel) GetSample() int8 {
 
 	r := float64(ch.R)
 	if r == 0 {
