@@ -156,11 +156,11 @@ func (gb *GameBoy) UpdateGraphics() {
 	var (
 		dot         = &gb.Timer.DotCounter
 		stat        = &gb.Stat
-		currentLine = gb.MemoryBus.IO[LY]
+		ly          = &gb.MemoryBus.IO[LY]
 		prevMode    = gb.Stat.Mode
 	)
 
-	if vblank := currentLine >= height; vblank {
+	if vblank := *ly >= height; vblank {
 		stat.Mode = PPU_VBLANK
 		if stat.IrqVBlank && prevMode != PPU_VBLANK {
 			gb.SetIrq(IRQ_LCD)
@@ -173,16 +173,19 @@ func (gb *GameBoy) UpdateGraphics() {
 	} else if drawing := *dot < 80+172; drawing {
 		stat.Mode = PPU_DRAW
 		if PPU_DRAW != prevMode {
-			gb.drawScanline(int32(currentLine))
+			gb.drawScanline(int32(*ly))
 		}
-	} else if hblank := prevMode != PPU_HBLANK; hblank {
-		gb.hdmaTransfer()
-		if stat.IrqHBlank {
-			gb.SetIrq(IRQ_LCD)
-		}
+    } else {
+        stat.Mode = PPU_HBLANK
+	    if hblank := prevMode != PPU_HBLANK; hblank {
+            gb.hdmaTransfer()
+            if stat.IrqHBlank {
+                gb.SetIrq(IRQ_LCD)
+            }
+        }
 	}
 
-	stat.Match = currentLine == gb.MemoryBus.IO[LYC]
+	stat.Match = *ly == gb.MemoryBus.IO[LYC]
 	if stat.Match && stat.IrqLyc {
 		gb.SetIrq(IRQ_LCD)
 	}
@@ -191,22 +194,23 @@ func (gb *GameBoy) UpdateGraphics() {
 
     dotScanline := 456 << gb.DoubleSpeedFlag
 
-	if *dot >= dotScanline { 
+    if *dot < dotScanline {
+        return
+    }
 
-        // new scanline
-        gb.MemoryBus.IO[LY]++
+    // new scanline
+    *ly++
 
-        *dot -= dotScanline
+    *dot -= dotScanline
 
-        switch currentLine {
-        case height: // vblank
-            gb.SetIrq(IRQ_VBL)
-            gb.UpdateDisplay()
-        case 153: // new frame
-            gb.bgPriority = [width][height]bool{}
-            gb.MemoryBus.IO[LY] = 0
-        }
-	}
+    switch *ly {
+    case height: // vblank
+        gb.SetIrq(IRQ_VBL)
+        gb.UpdateDisplay()
+    case 153: // new frame
+        gb.bgPriority = [width][height]bool{}
+        gb.MemoryBus.IO[LY] = 0
+    }
 }
 
 func (gb *GameBoy) drawScanline(scanline int32) {

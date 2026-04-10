@@ -27,7 +27,7 @@
 ❌ CGB Sound 2
 
 Oam Bug 2
-    ❌ Lcd Sync
+    👍 Lcd Sync
     ❌ Causes
     👍 Non Causes
     ❌ Scanline Timing
