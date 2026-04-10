@@ -153,7 +153,7 @@ func (gb *GameBoy) Tick(tCycles int) {
 	gb.Cycles = tCycles
 
     if gb.Lcdc.Enabled {
-        gb.UpdateGraphics()
+        gb.UpdateGraphics(tCycles)
     }
 
 	gb.UpdateTimers(tCycles) // frame sequencer is here since div apu is controlled by div

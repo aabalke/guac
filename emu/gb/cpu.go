@@ -180,6 +180,30 @@ func (gb *GameBoy) getImm16() uint16 {
     return a | b
 }
 
+const (
+    R8_B = iota
+    R8_C
+    R8_D
+    R8_E
+    R8_H
+    R8_L
+    R8_HL
+    R8_A
+)
+
+func (gb *GameBoy) getR8(i uint8) *uint8 {
+    switch i {
+    case R8_B:  return &gb.Cpu.b
+    case R8_C:  return &gb.Cpu.c
+    case R8_D:  return &gb.Cpu.d
+    case R8_E:  return &gb.Cpu.e
+    case R8_H:  return &gb.Cpu.h
+    case R8_L:  return &gb.Cpu.l
+    case R8_A:  return &gb.Cpu.a
+    default:    return nil
+    }
+}
+
 func (gb *GameBoy) Block0(op uint8, pc uint16) uint16 {
 
 	cycles := 0
@@ -199,15 +223,6 @@ func (gb *GameBoy) Block0(op uint8, pc uint16) uint16 {
         switch inst {
         case 0x3:
             gb.Tick(4)
-
-            //if debug.B[4] && o == gb.Cpu.DE && *o == 0xFE00 {
-            //    fmt.Printf("Calling Inc DE\n")
-            //}
-
-            //if *o >= 0xFE00 && *o < 0xFEA0 {
-            //    gb.OamWriteCorruption(*o)
-            //}
-
             *o++
 
         case 0xB:
@@ -223,40 +238,42 @@ func (gb *GameBoy) Block0(op uint8, pc uint16) uint16 {
 
     if inst := (op & 0x7); inst == 0x4 || inst == 0x5 {
 
-        var o *uint8
+        v := uint8(0)
+        o := gb.getR8((op>>3)&7)
+        if o == nil {
+            gb.Tick(4)
+            v = gb.Read(*reg.HL)
+        } else {
+            v = *o
+        }
 
-        switch (op >> 3) & 7 {
-        case R8_B:  o = &reg.b
-        case R8_C:  o = &reg.c
-        case R8_D:  o = &reg.d
-        case R8_E:  o = &reg.e
-        case R8_H:  o = &reg.h
-        case R8_L:  o = &reg.l
-        case R8_HL: o = nil
-        case R8_A:  o = &reg.a
+        if dec := inst & 1 != 0; dec {
+            v = gb.execDec(v)
+        } else {
+            v = gb.execInc(v)
         }
 
         if o == nil {
             gb.Tick(4)
-            v := gb.Read(*reg.HL)
-
-            if dec := inst & 1 != 0; dec {
-                v = gb.execDec(v)
-            } else {
-                v = gb.execInc(v)
-            }
-
-            gb.Tick(4)
             gb.Write(*reg.HL, v)
-            return pc
-        }
-
-        if dec := inst & 1 != 0; dec {
-            *o = gb.execDec(*o)
         } else {
-            *o = gb.execInc(*o)
+            *o = v
         }
 
+        return pc
+    }
+
+    if imm8:= op & 0b11000111 == 0b00000110; imm8 {
+
+        if o := gb.getR8((op>>3)&7); o == nil {
+            gb.Tick(4)
+            gb.Write(*reg.HL, gb.getImm8())
+        } else {
+            *o = gb.getImm8()
+        }
+
+		pc++
+		reg.PcOff++
         return pc
     }
 
@@ -292,40 +309,6 @@ func (gb *GameBoy) Block0(op uint8, pc uint16) uint16 {
 		pc = pc + 2
 		reg.PcOff += 2
 
-	case 0x0E:
-		reg.c = gb.getImm8()
-		pc++
-		reg.PcOff++
-	case 0x1E:
-		reg.e = gb.getImm8()
-		pc++
-		reg.PcOff++
-	case 0x2E:
-		reg.l = gb.getImm8()
-		pc++
-		reg.PcOff++
-	case 0x3E:
-		reg.a = gb.getImm8()
-		pc++
-		reg.PcOff++
-	case 0x06:
-		reg.b = gb.getImm8()
-		pc++
-		reg.PcOff++
-	case 0x16:
-		reg.d = gb.getImm8()
-		pc++
-		reg.PcOff++
-	case 0x26:
-		reg.h = gb.getImm8()
-		pc++
-		reg.PcOff++
-	case 0x36:
-		gb.Tick(4)
-		gb.Write(*reg.HL, gb.getImm8())
-		pc++
-		reg.PcOff++
-
 	case 0x0A:
 		gb.Tick(4)
 		reg.a = gb.Read(*reg.BC)
@@ -351,7 +334,6 @@ func (gb *GameBoy) Block0(op uint8, pc uint16) uint16 {
 		gb.Tick(4)
 		gb.Write(*reg.HL, reg.a)
 		*reg.HL++
-
 	case 0x32:
 		gb.Tick(4)
 		gb.Write(*reg.HL, reg.a)
@@ -445,56 +427,31 @@ func (gb *GameBoy) Block0(op uint8, pc uint16) uint16 {
     return pc
 }
 
-const (
-    R8_B = iota
-    R8_C
-    R8_D
-    R8_E
-    R8_H
-    R8_L
-    R8_HL
-    R8_A
-)
-
 func (gb *GameBoy) Block1(op uint8) {
-	reg := gb.Cpu
-    var dst *uint8
-    var src uint8
 
-    switch (op >> 3) & 7 {
-    case R8_B:  dst = &reg.b
-    case R8_C:  dst = &reg.c
-    case R8_D:  dst = &reg.d
-    case R8_E:  dst = &reg.e
-    case R8_H:  dst = &reg.h
-    case R8_L:  dst = &reg.l
-    case R8_HL: dst = nil
-    case R8_A:  dst = &reg.a
-    }
-
-    switch op & 7 {
-    case R8_B:  src = reg.b
-    case R8_C:  src = reg.c
-    case R8_D:  src = reg.d
-    case R8_E:  src = reg.e
-    case R8_H:  src = reg.h
-    case R8_L:  src = reg.l
-    case R8_HL: gb.Tick(4); src = gb.Read(*reg.HL)
-    case R8_A:  src = reg.a
-    }
-
-    if hl := dst == nil; hl {
-        if op == 0x76 {
-            gb.Cpu.Halted = true
-            return
-        }
-
-        gb.Tick(4)
-        gb.Write(*reg.HL, src)
+    if op == 0x76 {
+        gb.Cpu.Halted = true
         return
     }
 
-    *dst = src
+	reg := gb.Cpu
+    dst := gb.getR8((op>>3)&7)
+
+    var v uint8
+    if src := gb.getR8(op & 7); src == nil {
+        gb.Tick(4)
+        v = gb.Read(*reg.HL)
+    } else {
+        v = *src
+    }
+
+    if hl := dst == nil; hl {
+        gb.Tick(4)
+        gb.Write(*reg.HL, v)
+        return
+    }
+
+    *dst = v
 }
 
 const (
@@ -511,28 +468,24 @@ const (
 func (gb * GameBoy) Block2(op uint8) {
 
 	reg := gb.Cpu
-    var src uint8
 
-    switch op & 7 {
-    case R8_B:      src = reg.b
-    case R8_C:      src = reg.c
-    case R8_D:      src = reg.d
-    case R8_E:      src = reg.e
-    case R8_H:      src = reg.h
-    case R8_L:      src = reg.l
-    case R8_HL:     gb.Tick(4); src = gb.Read(*reg.HL)
-    case R8_A:      src = reg.a
+    v := uint8(0)
+    if src := gb.getR8(op & 7); src == nil {
+        gb.Tick(4)
+        v = gb.Read(*reg.HL)
+    } else {
+        v = *src
     }
 
     switch (op >> 3) & 0xF {
-    case ARTH_ADD: reg.a = gb.execAdd(reg.a, src)
-    case ARTH_ADC: reg.a = gb.execAdc(reg.a, src)
-    case ARTH_SUB: reg.a = gb.execSub(reg.a, src)
-    case ARTH_SBC: reg.a = gb.execSbc(reg.a, src)
-    case ARTH_AND: reg.a = gb.execAnd(reg.a, src)
-    case ARTH_XOR: reg.a = gb.execXor(reg.a, src)
-    case ARTH_OR:  reg.a = gb.execOr(reg.a, src)
-    case ARTH_CP:  gb.execCp(reg.a, src)
+    case ARTH_ADD: reg.a = gb.execAdd(reg.a, v)
+    case ARTH_ADC: reg.a = gb.execAdc(reg.a, v)
+    case ARTH_SUB: reg.a = gb.execSub(reg.a, v)
+    case ARTH_SBC: reg.a = gb.execSbc(reg.a, v)
+    case ARTH_AND: reg.a = gb.execAnd(reg.a, v)
+    case ARTH_XOR: reg.a = gb.execXor(reg.a, v)
+    case ARTH_OR:  reg.a = gb.execOr(reg.a, v)
+    case ARTH_CP:  gb.execCp(reg.a, v)
     }
 }
 
