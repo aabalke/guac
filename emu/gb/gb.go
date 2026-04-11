@@ -94,6 +94,7 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 	}
 
     gb.Lcdc.gb = gb
+    gb.MemoryBus.Hdma.gb = gb
 
 	gb.bgPalette.Init()
 	gb.spPalette.Init()

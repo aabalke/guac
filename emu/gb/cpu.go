@@ -492,8 +492,7 @@ func (gb *GameBoy) Execute() {
 	gb.Tick(4)
 	op := gb.GetOp()
 	//op := gb.Read(gb.Cpu.PC)
-	//L.WriteLog(cnt, op)
-	//cnt++
+    //L.WriteLog(cnt, op)
 
     if block0 := op & 0xC0 == 0x00; block0 {
         pc := gb.Block0(op, pc)
@@ -692,8 +691,8 @@ func (gb *GameBoy) Execute() {
 	case 0xD9:
 		gb.Tick(3 * 4)
 		pc = gb.StackPop()
-		gb.Cpu.IME = true
-		//gb.Cpu.PendingInterrupt = true
+		//gb.Cpu.IME = true
+		gb.Cpu.PendingInterrupt = true
 
 	case 0xE0:
         addr := uint16(gb.getImm8())

@@ -8,8 +8,8 @@ import (
 )
 
 type MemoryBus struct {
-	WRAM [0x9000]uint8
-	VRAM [0x4000]uint8
+	WRAM [9][0x1000]uint8
+	VRAM [2][0x2000]uint8
 	OAM  [0x100]uint8
 
 	PROHIBITED [0x60]uint8
@@ -18,11 +18,83 @@ type MemoryBus struct {
 
 	ramSaved bool
 
-	VRAMBank uint8
-	WRAMBank uint8
+	VRAMBank   uint8
+	WRAMBank   uint8
+	WRAMBankV  uint8
+    WRAMOffset uint16
 
-	HdmaLength uint8
-	HdmaActive bool
+    Hdma Hdma
+}
+
+type Hdma struct {
+    gb      *GameBoy
+    Halted  bool
+    Enabled bool
+    Length  int
+    Src     uint16
+    Dst     uint16
+    v       uint8
+}
+
+func (h *Hdma) Write(v uint8) {
+
+    if terminate := h.Enabled && v & 0x80 == 0; terminate {
+        h.Enabled = false
+        h.v = uint8(h.Length / 0x10) - 1
+        return
+    }
+
+    length := ((uint16(v) & 0x7F) + 1) * 0x10
+
+    if hblank := v & 0x80 != 0; hblank {
+        h.Length = int(length)
+        h.Enabled = true
+        return
+    }
+
+    //~ 8 normal m cycles per 0x10 transfers
+    tcycles := ((8 << h.gb.DoubleSpeedFlag) << 2)
+
+    h.gb.Tick(int(length) * tcycles / 0x10)
+
+    h.Transfer(length)
+    h.Length = 0
+    h.v = 0xFF
+    h.Enabled = false
+}
+
+func (h *Hdma) HblankTransfer() {
+    // should only be called from enabled check
+
+    tcycles := (8 << h.gb.DoubleSpeedFlag) << 2
+    h.gb.Tick(tcycles)
+
+    h.Transfer(0x10)
+    if h.Length > 0 {
+        h.Length -= 0x10
+        h.v = uint8(h.Length / 0x10) - 1
+        return
+    }
+
+    h.Length = 0
+    h.v = 0xFF
+    h.Enabled = false
+}
+
+func (h *Hdma) Transfer(length uint16) {
+
+    src := h.Src & 0xFFF0
+    dst := (h.Dst & 0x1FF0) | 0x8000
+
+	for range length {
+		b := h.gb.Read(src)
+		h.gb.Write(dst, b)
+		dst++
+		src++
+	}
+
+    h.Src = src
+    h.Dst = dst
 }
 
 func initMemory(gb *GameBoy) {
@@ -53,8 +125,10 @@ func initMemory(gb *GameBoy) {
 	gb.Write(0xFF26, 0xF1)
 
 	gb.Write(0xFF40, 0x91)
+	gb.Write(0xFF41, 0x81)
 	gb.Write(0xFF42, 0x00)
 	gb.Write(0xFF43, 0x00)
+	gb.Write(0xFF44, 0x90)
 	gb.Write(0xFF45, 0x00)
 	gb.Write(0xFF47, 0xFC)
 	gb.Write(0xFF48, 0xFF)
@@ -110,23 +184,23 @@ func (gb *GameBoy) ReadPtr(addr uint16) unsafe.Pointer {
 		return nil
 	case addr < 0xD000:
 
-		addr -= 0xC000
+        addr &= 0xFFF
 
-		if addr+3 >= uint16(len(gb.MemoryBus.WRAM)) {
+		if addr+3 >= uint16(len(gb.MemoryBus.WRAM[0])) {
 			return nil
 		}
 
-		return unsafe.Add(unsafe.Pointer(&gb.MemoryBus.WRAM), addr)
+		return unsafe.Add(unsafe.Pointer(&gb.MemoryBus.WRAM[0]), addr)
 
 	case addr < 0xE000:
 
-		addr = (addr - 0xC000) + (uint16(gb.MemoryBus.WRAMBank) * 0x1000)
+        addr &= 0xFFF
 
-		if addr+3 >= uint16(len(gb.MemoryBus.WRAM)) {
+		if addr+3 >= uint16(len(gb.MemoryBus.WRAM[gb.MemoryBus.WRAMBank])) {
 			return nil
 		}
 
-		return unsafe.Add(unsafe.Pointer(&gb.MemoryBus.WRAM), addr)
+		return unsafe.Add(unsafe.Pointer(&gb.MemoryBus.WRAM[gb.MemoryBus.WRAMBank]), addr)
 
 	case addr < 0xFF80:
 		return nil
@@ -152,20 +226,16 @@ func (gb *GameBoy) Read(addr uint16) uint8 {
             return 0xFF
         }
 
-		if gb.Color {
-			offset := uint16(gb.MemoryBus.VRAMBank) * 0x2000
-			return gb.MemoryBus.VRAM[addr-0x8000+offset]
-		}
-		return gb.MemoryBus.VRAM[addr-0x8000]
+        return gb.MemoryBus.VRAM[gb.MemoryBus.VRAMBank][addr&0x1FFF]
 
 	case addr < 0xC000:
 		return gb.Cartridge.Mbc.ReadRam(gb.Cartridge, addr)
 	case addr < 0xD000:
-		return gb.MemoryBus.WRAM[addr-0xC000]
+		return gb.MemoryBus.WRAM[0][addr& 0xFFF]
 	case addr < 0xE000:
-		return gb.MemoryBus.WRAM[(addr-0xC000)+(uint16(gb.MemoryBus.WRAMBank)*0x1000)]
+		return gb.MemoryBus.WRAM[gb.MemoryBus.WRAMBank][addr& 0xFFF]
 	case addr < 0xFE00:
-		return gb.Cartridge.Mbc.ReadRam(gb.Cartridge, addr-0x2000)
+		return gb.MemoryBus.WRAM[0][addr& 0xFFF]
 	case addr < 0xFEA0:
 
         if notAvailable := gb.Stat.Mode & 0b10 != 0; notAvailable {
@@ -203,22 +273,17 @@ func (gb *GameBoy) Write(addr uint16, v uint8) {
             return
         }
 
-		if gb.Color {
-            offset := uint16(gb.MemoryBus.VRAMBank) * 0x2000
-            gb.MemoryBus.VRAM[addr-0x8000+offset] = v
-		}
-
-		gb.MemoryBus.VRAM[addr-0x8000] = v
+        gb.MemoryBus.VRAM[gb.MemoryBus.VRAMBank][addr&0x1FFF] = v
 
 	case addr < 0xC000:
 		gb.Cartridge.Mbc.WriteRam(gb.Cartridge, addr, v)
 		gb.MemoryBus.ramSaved = false
 	case addr < 0xD000:
-		gb.MemoryBus.WRAM[addr-0xC000] = v
+		gb.MemoryBus.WRAM[0][addr&0xFFF] = v
 	case addr < 0xE000:
-		gb.MemoryBus.WRAM[(addr-0xC000)+(uint16(gb.MemoryBus.WRAMBank)*0x1000)] = v
+        gb.MemoryBus.WRAM[gb.MemoryBus.WRAMBank][addr & 0xFFF] = v
 	case addr < 0xFE00:
-		gb.MemoryBus.WRAM[addr-0xE000] = v
+		gb.MemoryBus.WRAM[0][addr&0xFFF] = v
 	case addr < 0xFEA0:
         if notAvailable := gb.Stat.Mode & 0b10 != 0; notAvailable {
             return
@@ -239,67 +304,6 @@ func (gb *GameBoy) Write(addr uint16, v uint8) {
 	}
 }
 
-func (gb *GameBoy) cgbDMATransfer(byte uint8) {
-
-	if gb.MemoryBus.HdmaActive && !((byte>>7)&1 != 0) {
-		gb.MemoryBus.HdmaActive = false
-		gb.MemoryBus.IO[0x55] |= 0x80
-		return
-	}
-
-	length := ((uint16(byte) & 0x7F) + 1) * 0x10
-
-	if !((byte>>7)&1 != 0) {
-
-		gb.performDMATransfer(length)
-		gb.MemoryBus.IO[0x55] = 0xFF
-		return
-	}
-
-	gb.MemoryBus.HdmaLength = byte
-	gb.MemoryBus.HdmaActive = true
-}
-
-func (gb *GameBoy) hdmaTransfer() {
-
-	MemBus := &gb.MemoryBus
-
-	if !MemBus.HdmaActive {
-		return
-	}
-
-	gb.performDMATransfer(0x10)
-	if MemBus.HdmaLength > 0 {
-		MemBus.HdmaLength--
-		MemBus.IO[0x55] = MemBus.HdmaLength
-		return
-	}
-
-	MemBus.IO[0x55] = 0xFF
-	MemBus.HdmaActive = false
-}
-
-func (gb *GameBoy) performDMATransfer(length uint16) {
-
-	io := &gb.MemoryBus.IO
-
-	src := (uint16(io[0x51])<<8 | uint16(io[0x52])) & 0xFFF0
-	dst := (uint16(io[0x53])<<8 | uint16(io[0x54])) & 0x1FF0
-	dst += 0x8000
-
-	for range length {
-		b := gb.Read(src)
-		gb.Write(dst, b)
-		dst++
-		src++
-	}
-
-	io[0x51] = uint8(src >> 8)
-	io[0x52] = uint8(src & 0xFF)
-	io[0x53] = uint8(dst >> 8)
-	io[0x54] = uint8(dst & 0xF0)
-}
-
 func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 
 	if addr >= 0xFF10 && addr < 0xFF40 {
@@ -311,8 +315,10 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 		return gb.getJoypad()
 
 	case 0xFF04: // DIV
-
 		return uint8(gb.Timer.Div >> 8)
+
+	case 0xFF0F:
+		return gb.Cpu.IF
 
 	case 0xFF40:
 		return gb.Lcdc.Read()
@@ -321,10 +327,13 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 		return gb.Stat.Read()
 
     case 0xFF44:
-		return gb.MemoryBus.IO[addr&0xFF]
+		return gb.MemoryBus.IO[uint8(addr)]
 
-	case 0xFF0F:
-		return gb.Cpu.IF
+	case 0xFF4F:
+		return gb.MemoryBus.VRAMBank | 0xFE
+
+    case 0xFF55:
+        return gb.MemoryBus.Hdma.v
 
 	case 0xFF68:
 
@@ -367,12 +376,11 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 
 		return b
 
-	case 0xFF4F:
-		return gb.MemoryBus.VRAMBank
 	case 0xFF70:
 		return gb.MemoryBus.WRAMBank
 	default:
-		return gb.MemoryBus.IO[addr&0xFF]
+
+		return gb.MemoryBus.IO[uint8(addr)]
 	}
 }
 
@@ -406,14 +414,13 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		if currFreq != newFreq {
 			gb.Timer.Counter = 0
 		}
-		io[addr-0xFF00] = v
+		io[uint8(addr)] = v
 
 	case 0xFF0F:
 		gb.Cpu.IF = v
-		io[addr-0xFF00] = v
+		io[uint8(addr)] = v
 
 	case 0xFF40:
-        //fmt.Printf("Write LCDC %02X\n", v)
 		gb.Lcdc.Write(v)
 
 	case 0xFF41:
@@ -434,7 +441,7 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 			a := gb.Read(addr + i)
 			gb.MemoryBus.OAM[i] = a
 		}
-		//io[addr-0xFF00] = v
+		//io[uint8(addr)] = v
 
 	case 0xFF47: // bgpalette mono
 
@@ -442,7 +449,7 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		gb.UnpackedMonoPals[0][1] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>2)&3][0])) | 0xFF00_0000
 		gb.UnpackedMonoPals[0][2] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>4)&3][0])) | 0xFF00_0000
 		gb.UnpackedMonoPals[0][3] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>6)&3][0])) | 0xFF00_0000
-		io[addr-0xFF00] = v
+		io[uint8(addr)] = v
 
 	case 0xFF48: // objpalette mono
 
@@ -450,7 +457,7 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		gb.UnpackedMonoPals[1][1] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>2)&3][0])) | 0xFF00_0000
 		gb.UnpackedMonoPals[1][2] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>4)&3][0])) | 0xFF00_0000
 		gb.UnpackedMonoPals[1][3] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>6)&3][0])) | 0xFF00_0000
-		io[addr-0xFF00] = v
+		io[uint8(addr)] = v
 
 	case 0xFF49: // objpalette mono
 
@@ -458,7 +465,7 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		gb.UnpackedMonoPals[2][1] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>2)&3][0])) | 0xFF00_0000
 		gb.UnpackedMonoPals[2][2] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>4)&3][0])) | 0xFF00_0000
 		gb.UnpackedMonoPals[2][3] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>6)&3][0])) | 0xFF00_0000
-		io[addr-0xFF00] = v
+		io[uint8(addr)] = v
 
 	case 0xFF4D:
 		if gb.Color {
@@ -466,26 +473,51 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 			io[0x4D] &= 0x80
 			io[0x4D] |= v & 1
 		}
-		io[addr-0xFF00] = v
+		io[uint8(addr)] = v
 
 	case 0xFF4F:
-		if gb.Color && !gb.MemoryBus.HdmaActive {
+		if gb.Color && !gb.MemoryBus.Hdma.Enabled {
 			gb.MemoryBus.VRAMBank = v & 0x1
+            return
 		}
-		io[addr-0xFF00] = v
+		io[uint8(addr)] = v
+
+    case 0xFF51:
+        if gb.Color {
+            gb.MemoryBus.Hdma.Src &= 0xFF
+            gb.MemoryBus.Hdma.Src |= uint16(v) << 8
+        }
+
+    case 0xFF52:
+        if gb.Color {
+            gb.MemoryBus.Hdma.Src &^= 0xFF
+            gb.MemoryBus.Hdma.Src |= uint16(v)
+        }
+
+    case 0xFF53:
+        if gb.Color {
+            gb.MemoryBus.Hdma.Dst &= 0xFF
+            gb.MemoryBus.Hdma.Dst |= uint16(v) << 8
+        }
+
+    case 0xFF54:
+        if gb.Color {
+            gb.MemoryBus.Hdma.Dst &^= 0xFF
+            gb.MemoryBus.Hdma.Dst |= uint16(v)
+        }
 
 	case 0xFF55:
 		if gb.Color {
-			gb.cgbDMATransfer(v)
+			gb.MemoryBus.Hdma.Write(v)
 		}
-		io[addr-0xFF00] = v
+		io[uint8(addr)] = v
 
 	case 0xFF68:
 		if gb.Color {
 			gb.bgPalette.Idx = v & 0b111111
 			gb.bgPalette.Inc = (v>>7)&1 != 0
 		}
-		io[addr-0xFF00] = v
+		io[uint8(addr)] = v
 
 	case 0xFF69:
 		if gb.Color {
@@ -496,14 +528,14 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 				gb.bgPalette.Idx = (gb.bgPalette.Idx + 1) & 0b111111
 			}
 		}
-		io[addr-0xFF00] = v
+		io[uint8(addr)] = v
 
 	case 0xFF6A:
 		if gb.Color {
 			gb.spPalette.Idx = v & 0b111111
 			gb.spPalette.Inc = (v>>7)&1 != 0
 		}
-		io[addr-0xFF00] = v
+		io[uint8(addr)] = v
 
 	case 0xFF6B:
 		if gb.Color {
@@ -514,18 +546,22 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 				gb.spPalette.Idx = (gb.spPalette.Idx + 1) & 0b111111
 			}
 		}
-		io[addr-0xFF00] = v
+
+		io[uint8(addr)] = v
 
 	case 0xFF70:
 		if gb.Color {
-			gb.MemoryBus.WRAMBank = v & 0x7
+			gb.MemoryBus.WRAMBank = v & 7
+            if v & 7 == 0 {
+                gb.MemoryBus.WRAMBank = 1
+            }
 
-			if gb.MemoryBus.WRAMBank == 0 {
-				gb.MemoryBus.WRAMBank = 1
-			}
+            gb.MemoryBus.WRAMBankV = v & 7
 		}
-		io[addr-0xFF00] = v
+
+		io[uint8(addr)] = v
 	default:
-		io[addr&0xFF] = v
+
+		io[uint8(addr)] = v
 	}
 }

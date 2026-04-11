@@ -58,27 +58,28 @@ func (gb *GameBoy) renderTilesDMG() {
 			lastTileCol = tileCol
 
 			// PER PIXEL OF SCAN LINE, NEED TO CHECK IF PIXEL >= WX AS WELL TO CHOOSE TILE ADDR (BG VS WIN)
-			tileAddress := bgMemory + tileRow + tileCol
+			tileAddr := tileRow + tileCol
 			if useWindow && pixel >= windowX {
-				tileAddress = winMemory + tileRow + tileCol
+				tileAddr += winMemory - 0x8000
+			} else {
+				tileAddr += bgMemory - 0x8000
 			}
 
-			tileLocation := tileData
+			tileLocation := tileData - 0x8000
 			if gb.Lcdc.UnsignedTiles {
-				tileNum := int16(gb.MemoryBus.VRAM[tileAddress-0x8000])
+				tileNum := int16(gb.MemoryBus.VRAM[0][tileAddr])
 				tileLocation = tileLocation + uint16(tileNum*16)
 			} else {
-				tileNum := int16(int8(gb.MemoryBus.VRAM[tileAddress-0x8000]))
-				tileLocation = uint16(int32(tileLocation) + int32((tileNum+128)*16))
+				tileNum := int(int8(gb.MemoryBus.VRAM[0][tileAddr]))
+				tileLocation = uint16(int(tileLocation) + int((tileNum+128)*16))
 			}
-
-			bankOffset := uint16(0x8000)
 
 			line := (yPos & 7)
 
-			addr := tileLocation + uint16(line<<1) - bankOffset
-			data1 = gb.MemoryBus.VRAM[addr+0]
-			data2 = gb.MemoryBus.VRAM[addr+1]
+			addr := tileLocation + uint16(line<<1)
+
+			data1 = gb.MemoryBus.VRAM[0][addr+0]
+			data2 = gb.MemoryBus.VRAM[0][addr+1]
 
 		}
 
@@ -139,8 +140,8 @@ func (gb *GameBoy) renderSpritesDMG(scanline int32) {
 
 		dataAddress := (uint16(tileLocation) * 0x10) + uint16(line*2)
 
-		data1 := gb.MemoryBus.VRAM[dataAddress]
-		data2 := gb.MemoryBus.VRAM[dataAddress+1]
+		data1 := gb.MemoryBus.VRAM[0][dataAddress]
+		data2 := gb.MemoryBus.VRAM[0][dataAddress+1]
 
 		for tilePixel := range uint8(8) {
 			pixel := int16(xPos) + 7 - int16(tilePixel)

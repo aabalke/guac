@@ -36,6 +36,14 @@ Oam Bug 2
     ❌ Timing Effect
     ❌ Inst Timing
 
+# alloncm / MagenTests v5
+❌ ColorBgOamPriority
+❌ ColorOamInternalPriority
+👍 Vram DMA HBlank mode
+👍 KEY0 (CPU mode register) Lock After Boot
+👍 STAT register PPU mode upon PPU disabled
+❌ MBC1/3/5 out of bounds RAM access
+
 # Mooneye Acceptance Test
 
 ## General

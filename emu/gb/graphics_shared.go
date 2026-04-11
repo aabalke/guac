@@ -175,7 +175,11 @@ func (gb *GameBoy) UpdateGraphics(tcycles int) {
     } else {
         stat.Mode = PPU_HBLANK
 	    if prevMode != PPU_HBLANK {
-            gb.hdmaTransfer()
+
+            if gb.Color && gb.MemoryBus.Hdma.Enabled && !gb.Cpu.Halted {
+                gb.MemoryBus.Hdma.HblankTransfer()
+            }
+
             if stat.IrqHBlank {
                 gb.SetIrq(IRQ_LCD)
             }

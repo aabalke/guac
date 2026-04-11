@@ -62,28 +62,23 @@ func (gb *GameBoy) renderTilesGBC() {
 			lastTileCol = tileCol
 
 			// PER PIXEL OF SCAN LINE, NEED TO CHECK IF PIXEL >= WX AS WELL TO CHOOSE TILE ADDR (BG VS WIN)
-			tileAddress := bgMemory + tileRow + tileCol
+			tileAddr := tileRow + tileCol
 			if useWindow && pixel >= windowX {
-				tileAddress = winMemory + tileRow + tileCol
+				tileAddr += winMemory - 0x8000
+			} else {
+				tileAddr += bgMemory - 0x8000
 			}
 
-			tileLocation := tileData
+			tileLocation := tileData - 0x8000
 			if gb.Lcdc.UnsignedTiles {
-				tileNum := int16(gb.MemoryBus.VRAM[tileAddress-0x8000])
+				tileNum := int16(gb.MemoryBus.VRAM[0][tileAddr])
 				tileLocation = tileLocation + uint16(tileNum*16)
 			} else {
-				tileNum := int16(int8(gb.MemoryBus.VRAM[tileAddress-0x8000]))
-				tileLocation = uint16(int32(tileLocation) + int32((tileNum+128)*16))
+				tileNum := int(int8(gb.MemoryBus.VRAM[0][tileAddr]))
+				tileLocation = uint16(int(tileLocation) + int((tileNum+128)*16))
 			}
 
-			bankOffset := uint16(0x8000)
-
-			tileAttr = gb.MemoryBus.VRAM[tileAddress-0x6000]
-
-			if (tileAttr>>3)&1 != 0 {
-				bankOffset = 0x6000
-			}
-
+			tileAttr = gb.MemoryBus.VRAM[1][tileAddr]
 			priority = (tileAttr>>7)&1 != 0
 
 			var line byte
@@ -93,11 +88,11 @@ func (gb *GameBoy) renderTilesGBC() {
 				line = (yPos & 7)
 			}
 
-			addr := tileLocation + uint16(line<<1) - bankOffset
-			data1 = gb.MemoryBus.VRAM[addr+0]
-			data2 = gb.MemoryBus.VRAM[addr+1]
+			addr := tileLocation + uint16(line<<1)
 
 			cgbPalBase = (tileAttr & 7) << 2
+			data1 = gb.MemoryBus.VRAM[(tileAttr>>3)&1][addr+0]
+			data2 = gb.MemoryBus.VRAM[(tileAttr>>3)&1][addr+1]
 
 		}
 
@@ -163,15 +158,10 @@ func (gb *GameBoy) renderSpritesGBC(scanline int32) {
 			line = ySize - line - 1
 		}
 
-		// Bank the sprite data in is (CGB only)
-		var bank uint16 = 0
-		if (attributes>>3)&1 != 0 {
-			bank = 1
-		}
-		dataAddress := (uint16(tileLocation) * 0x10) + uint16(line*2) + (bank * 0x2000)
+		dataAddress := (uint16(tileLocation) * 0x10) + uint16(line*2)
 
-		data1 := gb.MemoryBus.VRAM[dataAddress]
-		data2 := gb.MemoryBus.VRAM[dataAddress+1]
+		data1 := gb.MemoryBus.VRAM[(attributes>>3)&1][dataAddress]
+		data2 := gb.MemoryBus.VRAM[(attributes>>3)&1][dataAddress+1]
 
 		for tilePixel := range uint8(8) {
 			pixel := int16(xPos) + 7 - int16(tilePixel)
