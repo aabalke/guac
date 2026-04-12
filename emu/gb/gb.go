@@ -13,11 +13,6 @@ import (
 )
 
 const (
-	DIV  = 0x04
-	TIMA = 0x05
-	TMA  = 0x06
-	TAC  = 0x07
-
 	width  = 160
 	height = 144
 
@@ -58,8 +53,11 @@ type GameBoy struct {
 
 	Image      *ebiten.Image
 	Screen     [width][height]uint32
-	bgPriority [width][height]bool
 	spMinx     [width]int32
+	bgPriority [width][height]bool
+
+	bgPriorityFlags [width]bool
+
 	pixelDrawn [width]bool
 
 	Paused bool
@@ -69,10 +67,13 @@ type GameBoy struct {
 }
 
 type Timer struct {
-	Div              uint16
-	Counter          int
-	DotCounter  int
-	InterruptPending bool
+	DotCounter int // should this be seperate?
+
+	Div      uint16
+	TIMA     uint8
+	TMA      uint8
+	Enabled  bool
+	FreqBits uint8
 }
 
 func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
@@ -93,8 +94,8 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 		Palette: config.Conf.Gb.Palette,
 	}
 
-    gb.Lcdc.gb = gb
-    gb.MemoryBus.Hdma.gb = gb
+	gb.Lcdc.gb = gb
+	gb.MemoryBus.Hdma.gb = gb
 
 	gb.bgPalette.Init()
 	gb.spPalette.Init()
@@ -148,14 +149,14 @@ func (gb *GameBoy) Tick(tCycles int) {
 		return
 	}
 
-    tCycles >>= int(gb.DoubleSpeedFlag)
+	tCycles >>= int(gb.DoubleSpeedFlag)
 
 	gb.frameCycles += tCycles
 	gb.Cycles = tCycles
 
-    if gb.Lcdc.Enabled {
-        gb.UpdateGraphics(tCycles)
-    }
+	if gb.Lcdc.Enabled {
+		gb.UpdateGraphics(tCycles)
+	}
 
 	gb.UpdateTimers(tCycles) // frame sequencer is here since div apu is controlled by div
 	gb.Apu.WaveChannel.ClockWave(uint32(tCycles), uint32(gb.frameCycles))
@@ -258,6 +259,10 @@ func (gb *GameBoy) loadCartridge() {
 	}
 }
 
+func (gb *GameBoy) SetIrq(bit uint8) {
+	gb.Cpu.IF |= bit
+}
+
 func (gb *GameBoy) UpdateInterrupt() int {
 
 	if gb.Cpu.PendingInterrupt {
@@ -275,11 +280,9 @@ func (gb *GameBoy) UpdateInterrupt() int {
 		return 0
 	}
 
-	cycles := 20
-
 	if !gb.Cpu.IME && gb.Cpu.Halted {
 		gb.Cpu.Halted = false
-		return cycles
+		return 20
 	}
 
 	for i := range 5 {
@@ -294,7 +297,7 @@ func (gb *GameBoy) UpdateInterrupt() int {
 		gb.StackPush(gb.Cpu.PC)
 		gb.Cpu.PC = IRQ_SRC[i]
 		gb.Cpu.isBranching = true
-		return cycles
+		return 20
 	}
 
 	return 0
@@ -304,51 +307,44 @@ var IRQ_SRC = [...]uint16{0x40, 0x48, 0x50, 0x58, 0x60}
 
 func (gb *GameBoy) UpdateTimers(cycles int) {
 
-    cycles <<= int(gb.DoubleSpeedFlag)
-
-	io := &gb.MemoryBus.IO
 	t := &gb.Timer
+
+	cycles <<= int(gb.DoubleSpeedFlag)
 
 	prev := t.Div
 	t.Div += uint16(cycles)
 
+	// should this be 1 << 15 and 1 << 16? TCAGBD doc
+	// originally had 12 and 13
 	mask := uint16(1 << 12)
-    mask <<= uint16(gb.DoubleSpeedFlag)
+	mask <<= uint16(gb.DoubleSpeedFlag)
 	if prev&mask != 0 && t.Div&mask == 0 {
 		gb.Apu.ClockFrameSequencer()
 	}
 
-	if disabled := io[TAC]&0b100 == 0; disabled {
+	if !t.Enabled {
 		return
 	}
 
-	t.Counter += cycles
+	// instead of keeping separate counter, use falling edge to inc
+	// requires figuring out count of edges first
 
-	freq := freqs[io[TAC]&3]
-
-	for t.Counter >= freq {
-		t.Counter -= freq
-		tima := io[TIMA]
-		if overflow := tima == 0xFF; overflow {
-			io[TIMA] = 0
-			t.InterruptPending = true
-		} else {
-			io[TIMA] = tima + 1
+	period := fallingEdgeBits[t.FreqBits] << 1
+	edgeCnt := (t.Div / period) - (prev / period)
+	for range edgeCnt {
+		if overflow := t.TIMA == 0xFF; overflow {
+			t.TIMA = t.TMA
+			gb.SetIrq(IRQ_TMR)
+			continue
 		}
-	}
 
-	if t.InterruptPending {
-		io[TIMA] = io[TMA]
-		gb.SetIrq(IRQ_TMR)
-		t.InterruptPending = false
+		t.TIMA++
 	}
 }
 
-var freqs = [...]int{256 * 4, 4 * 4, 16 * 4, 64 * 4} // * 4 to get t cycles
+var fallingEdgeBits = [...]uint16{1 << 9, 1 << 3, 1 << 5, 1 << 7}
 
-func (gb *GameBoy) SetIrq(mask uint8) {
-	gb.Cpu.IF |= mask | 0xE0
-}
+//var freqs = [...]int{256 * 4, 4 * 4, 16 * 4, 64 * 4} // * 4 to get t cycles
 
 func (gb *GameBoy) toggleDoubleSpeed() {
 
@@ -357,11 +353,11 @@ func (gb *GameBoy) toggleDoubleSpeed() {
 	}
 
 	gb.PrepareSpeedToggle = false
-    if gb.DoubleSpeedFlag != 0 {
-        gb.DoubleSpeedFlag = 0
-    } else {
-        gb.DoubleSpeedFlag = 1
-    }
+	if gb.DoubleSpeedFlag != 0 {
+		gb.DoubleSpeedFlag = 0
+	} else {
+		gb.DoubleSpeedFlag = 1
+	}
 
 	gb.Cpu.Halted = false
 

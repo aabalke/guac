@@ -42,7 +42,10 @@ Oam Bug 2
 👍 Vram DMA HBlank mode
 👍 KEY0 (CPU mode register) Lock After Boot
 👍 STAT register PPU mode upon PPU disabled
-❌ MBC1/3/5 out of bounds RAM access
+❌ MBC out of bounds RAM access
+    ❌ MBC1 
+    ❌ MBC3 
+    ❌ MBC5 
 
 # Mooneye Acceptance Test
 
@@ -100,13 +103,13 @@ Oam Bug 2
 
 👍 div write
 ❌ rapid toggle
-❌ tim00 div trigger
+👍 tim00 div trigger
 👍 tim00
-❌ tim01 div trigger
+👍 tim01 div trigger
 👍 tim01 
-❌ tim10 div trigger
+👍 tim10 div trigger
 👍 tim10
-❌ tim11 div trigger
+👍 tim11 div trigger
 👍 tim11
 ❌ tima reload
 ❌ tima write reloading

@@ -155,71 +155,83 @@ func (gb *GameBoy) GetOp() uint8 {
 func (gb *GameBoy) getImm8() uint8 {
 
 	if gb.Cpu.PcPtr != nil {
-        gb.Tick(4)
-        v := *(*uint8)(unsafe.Add(gb.Cpu.PcPtr, gb.Cpu.PcOff))
-        return v
+		gb.Tick(4)
+		v := *(*uint8)(unsafe.Add(gb.Cpu.PcPtr, gb.Cpu.PcOff))
+		return v
 	}
 
-    gb.Tick(4)
-    v := gb.Read(gb.Cpu.PC + 1)
-    return v
+	gb.Tick(4)
+	v := gb.Read(gb.Cpu.PC + 1)
+	return v
 }
 
 func (gb *GameBoy) getImm16() uint16 {
 
 	if gb.Cpu.PcPtr != nil {
-        gb.Tick(4)
-        gb.Tick(4)
+		gb.Tick(4)
+		gb.Tick(4)
 		return *(*uint16)(unsafe.Add(gb.Cpu.PcPtr, gb.Cpu.PcOff))
 	}
 
-    gb.Tick(4)
-    a := uint16(gb.Read(gb.Cpu.PC+2))<<8
-    gb.Tick(4)
-    b := uint16(gb.Read(gb.Cpu.PC+1))
-    return a | b
+	gb.Tick(4)
+	a := uint16(gb.Read(gb.Cpu.PC+2)) << 8
+	gb.Tick(4)
+	b := uint16(gb.Read(gb.Cpu.PC + 1))
+	return a | b
 }
 
 const (
-    R8_B = iota
-    R8_C
-    R8_D
-    R8_E
-    R8_H
-    R8_L
-    R8_HL
-    R8_A
+	R8_B = iota
+	R8_C
+	R8_D
+	R8_E
+	R8_H
+	R8_L
+	R8_HL
+	R8_A
 )
 
 func (gb *GameBoy) getR8(i uint8) *uint8 {
-    switch i {
-    case R8_B:  return &gb.Cpu.b
-    case R8_C:  return &gb.Cpu.c
-    case R8_D:  return &gb.Cpu.d
-    case R8_E:  return &gb.Cpu.e
-    case R8_H:  return &gb.Cpu.h
-    case R8_L:  return &gb.Cpu.l
-    case R8_A:  return &gb.Cpu.a
-    default:    return nil
-    }
+	switch i {
+	case R8_B:
+		return &gb.Cpu.b
+	case R8_C:
+		return &gb.Cpu.c
+	case R8_D:
+		return &gb.Cpu.d
+	case R8_E:
+		return &gb.Cpu.e
+	case R8_H:
+		return &gb.Cpu.h
+	case R8_L:
+		return &gb.Cpu.l
+	case R8_A:
+		return &gb.Cpu.a
+	default:
+		return nil
+	}
 }
 
 const (
-    R16_BC = iota
-    R16_DE
-    R16_HL
-    R16_SP
+	R16_BC = iota
+	R16_DE
+	R16_HL
+	R16_SP
 )
 
 func (gb *GameBoy) getR16(i uint8) *uint16 {
-    switch i {
-    case R16_BC: return gb.Cpu.BC
-    case R16_DE: return gb.Cpu.DE
-    case R16_HL: return gb.Cpu.HL
-    case R16_SP: return &gb.Cpu.SP
-    default:
-        return nil
-    }
+	switch i {
+	case R16_BC:
+		return gb.Cpu.BC
+	case R16_DE:
+		return gb.Cpu.DE
+	case R16_HL:
+		return gb.Cpu.HL
+	case R16_SP:
+		return &gb.Cpu.SP
+	default:
+		return nil
+	}
 }
 
 func (gb *GameBoy) Block0(op uint8, pc uint16) uint16 {
@@ -227,69 +239,69 @@ func (gb *GameBoy) Block0(op uint8, pc uint16) uint16 {
 	cycles := 0
 	reg := gb.Cpu
 
-    switch inst := op & 0x7; inst {
-    case 0x4:
+	switch inst := op & 0x7; inst {
+	case 0x4:
 
-        if o := gb.getR8((op>>3)&7); o == nil {
-            gb.Tick(4)
-            v := gb.execInc(gb.Read(*reg.HL))
-            gb.Tick(4)
-            gb.Write(*reg.HL, v)
-        } else {
-            *o = gb.execInc(*o)
-        }
+		if o := gb.getR8((op >> 3) & 7); o == nil {
+			gb.Tick(4)
+			v := gb.execInc(gb.Read(*reg.HL))
+			gb.Tick(4)
+			gb.Write(*reg.HL, v)
+		} else {
+			*o = gb.execInc(*o)
+		}
 
-        return pc
-    case 0x5:
+		return pc
+	case 0x5:
 
-        if o := gb.getR8((op>>3)&7); o == nil {
-            gb.Tick(4)
-            v := gb.execDec(gb.Read(*reg.HL))
-            gb.Tick(4)
-            gb.Write(*reg.HL, v)
-        } else {
-            *o = gb.execDec(*o)
-        }
+		if o := gb.getR8((op >> 3) & 7); o == nil {
+			gb.Tick(4)
+			v := gb.execDec(gb.Read(*reg.HL))
+			gb.Tick(4)
+			gb.Write(*reg.HL, v)
+		} else {
+			*o = gb.execDec(*o)
+		}
 
-        return pc
-    case 0x6:
-        if o := gb.getR8(op>>3); o == nil {
-            gb.Tick(4)
-            gb.Write(*reg.HL, gb.getImm8())
-        } else {
-            *o = gb.getImm8()
-        }
+		return pc
+	case 0x6:
+		if o := gb.getR8(op >> 3); o == nil {
+			gb.Tick(4)
+			gb.Write(*reg.HL, gb.getImm8())
+		} else {
+			*o = gb.getImm8()
+		}
 
 		pc++
 		reg.PcOff++
-        return pc
-    }
+		return pc
+	}
 
-    switch inst := op & 0xF; inst {
-    case 0x1:
-        o := gb.getR16(op>>4)
-        *o = gb.getImm16()
+	switch inst := op & 0xF; inst {
+	case 0x1:
+		o := gb.getR16(op >> 4)
+		*o = gb.getImm16()
 		pc += 2
 		reg.PcOff += 2
-        return pc
-    case 0x3:
-        o := gb.getR16(op>>4)
-        gb.Tick(4)
-        *o++
-        return pc
-    case 0x9:
-        o := gb.getR16(op>>4)
-        gb.Tick(4)
-        *reg.HL = gb.execAddHl(*reg.HL, *o)
-        return pc
-    case 0xB:
-        o := gb.getR16(op>>4)
-        gb.Tick(4)
-        *o--
-        return pc
-    }
+		return pc
+	case 0x3:
+		o := gb.getR16(op >> 4)
+		gb.Tick(4)
+		*o++
+		return pc
+	case 0x9:
+		o := gb.getR16(op >> 4)
+		gb.Tick(4)
+		*reg.HL = gb.execAddHl(*reg.HL, *o)
+		return pc
+	case 0xB:
+		o := gb.getR16(op >> 4)
+		gb.Tick(4)
+		*o--
+		return pc
+	}
 
-    switch op {
+	switch op {
 	case 0x00: // nop
 	case 0x10: // stop / toggle speed
 
@@ -347,16 +359,16 @@ func (gb *GameBoy) Block0(op uint8, pc uint16) uint16 {
 	// Register A Rotations
 	case 0x07:
 
-        v := reg.a
+		v := reg.a
 		reg.f.C = v&0x80 != 0
 		reg.a = (v << 1) | (v >> 7)
-        reg.f.Z = false
-        reg.f.S = false
-        reg.f.H = false
+		reg.f.Z = false
+		reg.f.S = false
+		reg.f.H = false
 
 	case 0x17:
 
-        v := reg.a
+		v := reg.a
 
 		carry := uint8(0)
 		if reg.f.C {
@@ -365,21 +377,21 @@ func (gb *GameBoy) Block0(op uint8, pc uint16) uint16 {
 
 		reg.f.C = v&0x80 != 0
 		reg.a = (v<<1)&0xFF | carry
-        reg.f.Z = false
-        reg.f.S = false
-        reg.f.H = false
+		reg.f.Z = false
+		reg.f.S = false
+		reg.f.H = false
 
 	case 0x0F:
-        v := reg.a
+		v := reg.a
 		reg.f.C = v&1 != 0
 		reg.a = (v >> 1) | ((v & 1) << 7)
 
-        reg.f.Z = false
-        reg.f.S = false
-        reg.f.H = false
+		reg.f.Z = false
+		reg.f.S = false
+		reg.f.H = false
 
 	case 0x1F:
-        v := reg.a
+		v := reg.a
 
 		carry := uint8(0)
 		if reg.f.C {
@@ -390,9 +402,9 @@ func (gb *GameBoy) Block0(op uint8, pc uint16) uint16 {
 
 		reg.a = (v >> 1) | carry
 
-        reg.f.Z = false
-        reg.f.S = false
-        reg.f.H = false
+		reg.f.Z = false
+		reg.f.S = false
+		reg.f.H = false
 
 	// jump relative
 	case 0x20:
@@ -417,70 +429,78 @@ func (gb *GameBoy) Block0(op uint8, pc uint16) uint16 {
 		gb.Write(gb.getImm16()+1, uint8(gb.Cpu.SP>>8))
 		pc = pc + 2
 		reg.PcOff += 2
-    }
+	}
 
-    return pc
+	return pc
 }
 
 func (gb *GameBoy) Block1(op uint8) {
 
-    if op == 0x76 {
-        gb.Cpu.Halted = true
-        return
-    }
+	if op == 0x76 {
+		gb.Cpu.Halted = true
+		return
+	}
 
 	reg := gb.Cpu
-    dst := gb.getR8((op>>3)&7)
+	dst := gb.getR8((op >> 3) & 7)
 
-    var v uint8
-    if src := gb.getR8(op & 7); src == nil {
-        gb.Tick(4)
-        v = gb.Read(*reg.HL)
-    } else {
-        v = *src
-    }
+	var v uint8
+	if src := gb.getR8(op & 7); src == nil {
+		gb.Tick(4)
+		v = gb.Read(*reg.HL)
+	} else {
+		v = *src
+	}
 
-    if hl := dst == nil; hl {
-        gb.Tick(4)
-        gb.Write(*reg.HL, v)
-        return
-    }
+	if hl := dst == nil; hl {
+		gb.Tick(4)
+		gb.Write(*reg.HL, v)
+		return
+	}
 
-    *dst = v
+	*dst = v
 }
 
 const (
-    ARTH_ADD = iota
-    ARTH_ADC
-    ARTH_SUB
-    ARTH_SBC
-    ARTH_AND
-    ARTH_XOR
-    ARTH_OR
-    ARTH_CP
+	ARTH_ADD = iota
+	ARTH_ADC
+	ARTH_SUB
+	ARTH_SBC
+	ARTH_AND
+	ARTH_XOR
+	ARTH_OR
+	ARTH_CP
 )
 
-func (gb * GameBoy) Block2(op uint8) {
+func (gb *GameBoy) Block2(op uint8) {
 
 	reg := gb.Cpu
-    v := uint8(0)
-    if src := gb.getR8(op & 7); src == nil {
-        gb.Tick(4)
-        v = gb.Read(*reg.HL)
-    } else {
-        v = *src
-    }
+	v := uint8(0)
+	if src := gb.getR8(op & 7); src == nil {
+		gb.Tick(4)
+		v = gb.Read(*reg.HL)
+	} else {
+		v = *src
+	}
 
-    switch (op >> 3) & 0xF {
-    case ARTH_ADD: reg.a = gb.execAdd(reg.a, v)
-    case ARTH_ADC: reg.a = gb.execAdc(reg.a, v)
-    case ARTH_SUB: reg.a = gb.execSub(reg.a, v)
-    case ARTH_SBC: reg.a = gb.execSbc(reg.a, v)
-    case ARTH_AND: reg.a = gb.execAnd(reg.a, v)
-    case ARTH_XOR: reg.a = gb.execXor(reg.a, v)
-    case ARTH_OR:  reg.a = gb.execOr(reg.a, v)
-    case ARTH_CP:  gb.execCp(reg.a, v)
-    }
+	switch (op >> 3) & 0xF {
+	case ARTH_ADD:
+		reg.a = gb.execAdd(reg.a, v)
+	case ARTH_ADC:
+		reg.a = gb.execAdc(reg.a, v)
+	case ARTH_SUB:
+		reg.a = gb.execSub(reg.a, v)
+	case ARTH_SBC:
+		reg.a = gb.execSbc(reg.a, v)
+	case ARTH_AND:
+		reg.a = gb.execAnd(reg.a, v)
+	case ARTH_XOR:
+		reg.a = gb.execXor(reg.a, v)
+	case ARTH_OR:
+		reg.a = gb.execOr(reg.a, v)
+	case ARTH_CP:
+		gb.execCp(reg.a, v)
+	}
 }
 
 func (gb *GameBoy) Execute() {
@@ -492,24 +512,24 @@ func (gb *GameBoy) Execute() {
 	gb.Tick(4)
 	op := gb.GetOp()
 	//op := gb.Read(gb.Cpu.PC)
-    //L.WriteLog(cnt, op)
+	//L.WriteLog(cnt, op)
 
-    if block0 := op & 0xC0 == 0x00; block0 {
-        pc := gb.Block0(op, pc)
+	if block0 := op&0xC0 == 0x00; block0 {
+		pc := gb.Block0(op, pc)
 		reg.PC = pc
-        return
+		return
 	}
 
-    if block1 := op & 0xC0 == 0x40; block1 {
+	if block1 := op&0xC0 == 0x40; block1 {
 		gb.Block1(op)
 		reg.PC = pc
-        return
+		return
 	}
 
-    if block2 := op & 0xC0 == 0x80; block2 {
+	if block2 := op&0xC0 == 0x80; block2 {
 		gb.Block2(op)
 		reg.PC = pc
-        return
+		return
 	}
 
 	switch op {
@@ -695,14 +715,14 @@ func (gb *GameBoy) Execute() {
 		gb.Cpu.PendingInterrupt = true
 
 	case 0xE0:
-        addr := uint16(gb.getImm8())
+		addr := uint16(gb.getImm8())
 		gb.Tick(4)
 		gb.Write(0xFF00+addr, reg.a)
 		pc++
 		reg.PcOff++
 
 	case 0xF0:
-        addr := uint16(gb.getImm8())
+		addr := uint16(gb.getImm8())
 		gb.Tick(4)
 		reg.a = gb.Read(0xFF00 | addr)
 		pc++
@@ -745,76 +765,92 @@ func (gb *GameBoy) Execute() {
 }
 
 const (
-    CB_OTR = 0b00
-    CB_BIT = 0b01
-    CB_RES = 0b10
-    CB_SET = 0b11
+	CB_OTR = 0b00
+	CB_BIT = 0b01
+	CB_RES = 0b10
+	CB_SET = 0b11
 )
 
 func (gb *GameBoy) execCB(op uint8) {
 
-    reg := gb.Cpu
-    src := gb.getR8(op & 7)
-    bit := (op >> 3) & 7
+	reg := gb.Cpu
+	src := gb.getR8(op & 7)
+	bit := (op >> 3) & 7
 
-    if src == nil {
-        gb.Tick(4)
-        v := gb.Read(*reg.HL)
+	if src == nil {
+		gb.Tick(4)
+		v := gb.Read(*reg.HL)
 
-        switch op >> 6 {
-        case 0:
-            switch inst := (op >> 3); inst {
-            case 0: v = gb.execRlc(v)
-            case 1: v = gb.execRrc(v)
-            case 2: v = gb.execRl(v)
-            case 3: v = gb.execRr(v)
-            case 4: v = gb.execSLA(v)
-            case 5: v = gb.execSRA(v)
-            case 6: v = gb.execSWAP(v)
-            case 7: v = gb.execSRL(v)
-            }
+		switch op >> 6 {
+		case 0:
+			switch inst := (op >> 3); inst {
+			case 0:
+				v = gb.execRlc(v)
+			case 1:
+				v = gb.execRrc(v)
+			case 2:
+				v = gb.execRl(v)
+			case 3:
+				v = gb.execRr(v)
+			case 4:
+				v = gb.execSLA(v)
+			case 5:
+				v = gb.execSRA(v)
+			case 6:
+				v = gb.execSWAP(v)
+			case 7:
+				v = gb.execSRL(v)
+			}
 
-            gb.Tick(4)
-            gb.Write(*reg.HL, v)
+			gb.Tick(4)
+			gb.Write(*reg.HL, v)
 
-        case 1:
-            gb.execBIT(v, bit)
-        case 2:
-            v = gb.execRES(v, bit)
-            gb.Tick(4)
-            gb.Write(*reg.HL, v)
-        case 3:
-            v = gb.execSET(v, bit)
-            gb.Tick(4)
-            gb.Write(*reg.HL, v)
-        }
-        return
-    }
+		case 1:
+			gb.execBIT(v, bit)
+		case 2:
+			v = gb.execRES(v, bit)
+			gb.Tick(4)
+			gb.Write(*reg.HL, v)
+		case 3:
+			v = gb.execSET(v, bit)
+			gb.Tick(4)
+			gb.Write(*reg.HL, v)
+		}
+		return
+	}
 
-    switch op >> 6 {
-    case 0:
-        switch inst := (op >> 3); inst {
-        case 0: *src = gb.execRlc(*src)
-        case 1: *src = gb.execRrc(*src)
-        case 2: *src = gb.execRl(*src)
-        case 3: *src = gb.execRr(*src)
-        case 4: *src = gb.execSLA(*src)
-        case 5: *src = gb.execSRA(*src)
-        case 6: *src = gb.execSWAP(*src)
-        case 7: *src = gb.execSRL(*src)
-        }
-    case 1:
-        gb.execBIT(*src, bit)
-    case 2:
-        *src = gb.execRES(*src, bit)
-    case 3:
-        *src = gb.execSET(*src, bit)
-    }
+	switch op >> 6 {
+	case 0:
+		switch inst := (op >> 3); inst {
+		case 0:
+			*src = gb.execRlc(*src)
+		case 1:
+			*src = gb.execRrc(*src)
+		case 2:
+			*src = gb.execRl(*src)
+		case 3:
+			*src = gb.execRr(*src)
+		case 4:
+			*src = gb.execSLA(*src)
+		case 5:
+			*src = gb.execSRA(*src)
+		case 6:
+			*src = gb.execSWAP(*src)
+		case 7:
+			*src = gb.execSRL(*src)
+		}
+	case 1:
+		gb.execBIT(*src, bit)
+	case 2:
+		*src = gb.execRES(*src, bit)
+	case 3:
+		*src = gb.execSET(*src, bit)
+	}
 }
 
 func (gb *GameBoy) execRrc(v uint8) uint8 {
-    gb.Cpu.f.C = v&1 != 0
-    v = (v >> 1) | ((v & 1) << 7)
+	gb.Cpu.f.C = v&1 != 0
+	v = (v >> 1) | ((v & 1) << 7)
 	gb.Cpu.f.Z = v == 0
 	gb.Cpu.f.S = false
 	gb.Cpu.f.H = false
@@ -822,8 +858,8 @@ func (gb *GameBoy) execRrc(v uint8) uint8 {
 }
 
 func (gb *GameBoy) execRlc(v uint8) uint8 {
-    gb.Cpu.f.C = v&0x80 != 0
-    v = (v << 1) | (v >> 7)
+	gb.Cpu.f.C = v&0x80 != 0
+	v = (v << 1) | (v >> 7)
 	gb.Cpu.f.Z = v == 0
 	gb.Cpu.f.S = false
 	gb.Cpu.f.H = false
@@ -832,15 +868,15 @@ func (gb *GameBoy) execRlc(v uint8) uint8 {
 
 func (gb *GameBoy) execRl(v uint8) uint8 {
 
-    carry := uint8(0)
-    if gb.Cpu.f.C {
-        carry = 1
-    }
+	carry := uint8(0)
+	if gb.Cpu.f.C {
+		carry = 1
+	}
 
-    gb.Cpu.f.C = v&0x80 != 0
+	gb.Cpu.f.C = v&0x80 != 0
 
-    v = (v<<1)&0xFF | carry
-    gb.Cpu.f.Z = v == 0
+	v = (v<<1)&0xFF | carry
+	gb.Cpu.f.Z = v == 0
 	gb.Cpu.f.S = false
 	gb.Cpu.f.H = false
 	return v
@@ -848,15 +884,15 @@ func (gb *GameBoy) execRl(v uint8) uint8 {
 
 func (gb *GameBoy) execRr(v uint8) uint8 {
 
-    carry := uint8(0)
-    if gb.Cpu.f.C {
-        carry = 0x80
-    }
+	carry := uint8(0)
+	if gb.Cpu.f.C {
+		carry = 0x80
+	}
 
-    gb.Cpu.f.C = v&1 != 0
+	gb.Cpu.f.C = v&1 != 0
 
-    v = (v >> 1) | carry
-    gb.Cpu.f.Z = v == 0
+	v = (v >> 1) | carry
+	gb.Cpu.f.Z = v == 0
 	gb.Cpu.f.S = false
 	gb.Cpu.f.H = false
 	return v

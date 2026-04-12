@@ -29,7 +29,7 @@ const (
 )
 
 type Lcdc struct {
-    gb *GameBoy
+	gb *GameBoy
 
 	Enabled       bool
 	AltWinMap     bool
@@ -75,7 +75,7 @@ func (l *Lcdc) Read() uint8 {
 
 func (l *Lcdc) Write(v uint8) {
 
-    wasEnabled := l.Enabled
+	wasEnabled := l.Enabled
 	l.BgMaster = (v>>0)&1 != 0
 	l.ObjEnabled = (v>>1)&1 != 0
 	l.DoubleHeight = (v>>2)&1 != 0
@@ -85,15 +85,15 @@ func (l *Lcdc) Write(v uint8) {
 	l.AltWinMap = (v>>6)&1 != 0
 	l.Enabled = (v>>7)&1 != 0
 
-    if wasEnabled && !l.Enabled {
-        // why does dot need to be set to 4 to pass? has to do with dot count being 4 short in test
-        // fingers crossed skyemu figured this out lol
-        // skyemu has similar problem, could not find similar offset on sameboy
-        // required to pass 1-lcd_sync.gb
+	if wasEnabled && !l.Enabled {
+		// why does dot need to be set to 4 to pass? has to do with dot count being 4 short in test
+		// fingers crossed skyemu figured this out lol
+		// skyemu has similar problem, could not find similar offset on sameboy
+		// required to pass 1-lcd_sync.gb
 		l.gb.Timer.DotCounter = 4
 		l.gb.MemoryBus.IO[LY] = 0
 		l.gb.Stat.Mode = PPU_HBLANK
-    }
+	}
 }
 
 const (
@@ -172,18 +172,18 @@ func (gb *GameBoy) UpdateGraphics(tcycles int) {
 		if prevMode != PPU_DRAW {
 			gb.drawScanline(int32(*ly))
 		}
-    } else {
-        stat.Mode = PPU_HBLANK
-	    if prevMode != PPU_HBLANK {
+	} else {
+		stat.Mode = PPU_HBLANK
+		if prevMode != PPU_HBLANK {
 
-            if gb.Color && gb.MemoryBus.Hdma.Enabled && !gb.Cpu.Halted {
-                gb.MemoryBus.Hdma.HblankTransfer()
-            }
+			if gb.Color && gb.MemoryBus.Hdma.Enabled && !gb.Cpu.Halted {
+				gb.MemoryBus.Hdma.HblankTransfer()
+			}
 
-            if stat.IrqHBlank {
-                gb.SetIrq(IRQ_LCD)
-            }
-        }
+			if stat.IrqHBlank {
+				gb.SetIrq(IRQ_LCD)
+			}
+		}
 	}
 
 	stat.Match = *ly == gb.MemoryBus.IO[LYC]
@@ -192,23 +192,23 @@ func (gb *GameBoy) UpdateGraphics(tcycles int) {
 	}
 
 	*dot += tcycles
-    dotScanline := 456 << gb.DoubleSpeedFlag
-    if *dot < dotScanline {
-        return
-    }
+	dotScanline := 456 << gb.DoubleSpeedFlag
+	if *dot < dotScanline {
+		return
+	}
 
-    *ly++
+	*ly++
 
-    *dot -= dotScanline
+	*dot -= dotScanline
 
-    switch *ly {
-    case height: // vblank
-        gb.SetIrq(IRQ_VBL)
-        gb.UpdateDisplay()
-    case 154: // new frame
-        gb.bgPriority = [width][height]bool{}
-        *ly = 0
-    }
+	switch *ly {
+	case height: // vblank
+		gb.SetIrq(IRQ_VBL)
+		gb.UpdateDisplay()
+	case 154: // new frame
+		gb.bgPriority = [width][height]bool{}
+		*ly = 0
+	}
 }
 
 func (gb *GameBoy) drawScanline(scanline int32) {
