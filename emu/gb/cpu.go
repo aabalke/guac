@@ -613,66 +613,50 @@ func (gb *GameBoy) Execute() {
 
 	// push
 	case 0xC5:
-		gb.Tick(4 * 3)
-		gb.StackPush(*reg.BC)
+		gb.StackPushTicked(*reg.BC)
 	case 0xD5:
-		gb.Tick(4 * 3)
-		gb.StackPush(*reg.DE)
+		gb.StackPushTicked(*reg.DE)
 	case 0xE5:
-		gb.Tick(4 * 3)
-		gb.StackPush(*reg.HL)
+		gb.StackPushTicked(*reg.HL)
 	case 0xF5:
-		gb.Tick(4 * 3)
-		gb.StackPush(uint16(reg.a)<<8 | uint16(reg.f.Get()))
+		gb.StackPushTicked(uint16(reg.a)<<8 | uint16(reg.f.Get()))
 
 	// pop
 	case 0xC1:
-		gb.Tick(8)
-		*reg.BC = gb.StackPop()
+		*reg.BC = gb.StackPopTicked()
 	case 0xD1:
-		gb.Tick(8)
-		*reg.DE = gb.StackPop()
+		*reg.DE = gb.StackPopTicked()
 	case 0xE1:
-		gb.Tick(8)
-		*reg.HL = gb.StackPop()
+		*reg.HL = gb.StackPopTicked()
 	case 0xF1:
-		gb.Tick(8)
-		v := gb.StackPop() & 0xFFF0
+		v := gb.StackPopTicked() & 0xFFF0
 		reg.a = uint8(v >> 8)
 		reg.f.Set(uint8(v))
 
 		// rst
 	case 0xC7:
-		gb.Tick(3 * 4)
-		gb.StackPush(gb.Cpu.PC + 1)
+		gb.StackPushTicked(gb.Cpu.PC + 1)
 		pc = 0x00
 	case 0xD7:
-		gb.Tick(3 * 4)
-		gb.StackPush(gb.Cpu.PC + 1)
+		gb.StackPushTicked(gb.Cpu.PC + 1)
 		pc = 0x10
 	case 0xE7:
-		gb.Tick(3 * 4)
-		gb.StackPush(gb.Cpu.PC + 1)
+		gb.StackPushTicked(gb.Cpu.PC + 1)
 		pc = 0x20
 	case 0xF7:
-		gb.Tick(3 * 4)
-		gb.StackPush(gb.Cpu.PC + 1)
+		gb.StackPushTicked(gb.Cpu.PC + 1)
 		pc = 0x30
 	case 0xCF:
-		gb.Tick(3 * 4)
-		gb.StackPush(gb.Cpu.PC + 1)
+		gb.StackPushTicked(gb.Cpu.PC + 1)
 		pc = 0x08
 	case 0xDF:
-		gb.Tick(3 * 4)
-		gb.StackPush(gb.Cpu.PC + 1)
+		gb.StackPushTicked(gb.Cpu.PC + 1)
 		pc = 0x18
 	case 0xEF:
-		gb.Tick(3 * 4)
-		gb.StackPush(gb.Cpu.PC + 1)
+		gb.StackPushTicked(gb.Cpu.PC + 1)
 		pc = 0x28
 	case 0xFF:
-		gb.Tick(3 * 4)
-		gb.StackPush(gb.Cpu.PC + 1)
+		gb.StackPushTicked(gb.Cpu.PC + 1)
 		pc = 0x38
 
 	// call
@@ -711,8 +695,8 @@ func (gb *GameBoy) Execute() {
 	case 0xD9:
 		gb.Tick(3 * 4)
 		pc = gb.StackPop()
-		//gb.Cpu.IME = true
-		gb.Cpu.PendingInterrupt = true
+		gb.Cpu.IME = true // why ime for mooneye/reti_intr_timing?
+		//gb.Cpu.PendingInterrupt = true
 
 	case 0xE0:
 		addr := uint16(gb.getImm8())
@@ -729,8 +713,20 @@ func (gb *GameBoy) Execute() {
 		reg.PcOff++
 
 	case 0xE8:
-		gb.Tick(2 * 4)
-		gb.Cpu.SP = gb.execAddSp(gb.Cpu.SP, uint16(gb.getImm8()))
+
+        sp := gb.Cpu.SP
+		gb.Tick(4)
+        e := uint16(gb.getImm8())
+
+		gb.Tick(4)
+        res := uint16(int(sp) + int(int8(e)))
+        tmp := sp ^ uint16(int8(e)) ^ res
+        gb.Cpu.f.H = (tmp & 0x10) != 0
+        gb.Cpu.f.Z = false
+        gb.Cpu.f.C = (tmp & 0x100) != 0
+        gb.Cpu.f.S = false
+        gb.Cpu.SP = res
+
 		pc++
 		reg.PcOff++
 	case 0xF8:
@@ -1019,16 +1015,6 @@ func (gb *GameBoy) execAddHl(a, b uint16) uint16 {
 	return res
 }
 
-func (gb *GameBoy) execAddSp(a, b uint16) uint16 {
-	res := uint16(int(a) + int(int8(b)))
-	tmp := a ^ uint16(int8(b)) ^ res
-	gb.Cpu.f.H = (tmp & 0x10) != 0
-	gb.Cpu.f.Z = false
-	gb.Cpu.f.C = (tmp & 0x100) != 0
-	gb.Cpu.f.S = false
-	return res
-}
-
 func (gb *GameBoy) execAdd(a, b uint8) uint8 {
 	res := a + b
 	gb.Cpu.f.H = (a&0xF)+(b&0xF) > 0xF
@@ -1140,12 +1126,32 @@ func (gb *GameBoy) execJR(addr uint8, cond bool, cyclesIf, cycles int) (c int, p
 	return cycles, gb.Cpu.PC + 2
 }
 
+func (gb *GameBoy) StackPopTicked() uint16 {
+    gb.Tick(4)
+	v := uint16(gb.Read(gb.Cpu.SP))
+	gb.Cpu.SP++
+    gb.Tick(4)
+	v |= uint16(gb.Read(gb.Cpu.SP)) << 8
+	gb.Cpu.SP++
+	return v
+}
+
 func (gb *GameBoy) StackPop() uint16 {
 	v := uint16(gb.Read(gb.Cpu.SP))
 	gb.Cpu.SP++
 	v |= uint16(gb.Read(gb.Cpu.SP)) << 8
 	gb.Cpu.SP++
 	return v
+}
+
+func (gb *GameBoy) StackPushTicked(v uint16) {
+    gb.Tick(4)
+    gb.Tick(4)
+	gb.Cpu.SP--
+	gb.Write(gb.Cpu.SP, uint8(v>>8))
+    gb.Tick(4)
+	gb.Cpu.SP--
+	gb.Write(gb.Cpu.SP, uint8(v))
 }
 
 func (gb *GameBoy) StackPush(v uint16) {

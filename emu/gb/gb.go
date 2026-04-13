@@ -55,9 +55,6 @@ type GameBoy struct {
 	Screen     [width][height]uint32
 	spMinx     [width]int32
 	bgPriority [width][height]bool
-
-	bgPriorityFlags [width]bool
-
 	pixelDrawn [width]bool
 
 	Paused bool
@@ -74,6 +71,11 @@ type Timer struct {
 	TMA      uint8
 	Enabled  bool
 	FreqBits uint8
+
+    // for 8 cycles after overflow there is odd behavior
+    // Pending Overflow 0-4 cycles after, BCycle 4-8 after
+    PendingOverflow bool
+    BCycle bool
 }
 
 func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
@@ -314,8 +316,6 @@ func (gb *GameBoy) UpdateTimers(cycles int) {
 	prev := t.Div
 	t.Div += uint16(cycles)
 
-	// should this be 1 << 15 and 1 << 16? TCAGBD doc
-	// originally had 12 and 13
 	mask := uint16(1 << 12)
 	mask <<= uint16(gb.DoubleSpeedFlag)
 	if prev&mask != 0 && t.Div&mask == 0 {
@@ -326,15 +326,38 @@ func (gb *GameBoy) UpdateTimers(cycles int) {
 		return
 	}
 
+    if t.BCycle && cycles >= 4 {
+        t.BCycle = false
+    }
+
+    if t.PendingOverflow && cycles >= 4 {
+        t.TIMA = t.TMA
+        gb.SetIrq(IRQ_TMR)
+        t.PendingOverflow = false
+        t.BCycle = true
+    }
+
 	// instead of keeping separate counter, use falling edge to inc
 	// requires figuring out count of edges first
 
 	period := fallingEdgeBits[t.FreqBits] << 1
 	edgeCnt := (t.Div / period) - (prev / period)
 	for range edgeCnt {
+
+        if t.BCycle {
+            t.BCycle = false
+        }
+
+        if t.PendingOverflow {
+            t.TIMA = t.TMA
+            gb.SetIrq(IRQ_TMR)
+            t.PendingOverflow = false
+            t.BCycle = true
+        }
+
 		if overflow := t.TIMA == 0xFF; overflow {
-			t.TIMA = t.TMA
-			gb.SetIrq(IRQ_TMR)
+            t.TIMA = 0
+            t.PendingOverflow = true
 			continue
 		}
 
@@ -343,8 +366,6 @@ func (gb *GameBoy) UpdateTimers(cycles int) {
 }
 
 var fallingEdgeBits = [...]uint16{1 << 9, 1 << 3, 1 << 5, 1 << 7}
-
-//var freqs = [...]int{256 * 4, 4 * 4, 16 * 4, 64 * 4} // * 4 to get t cycles
 
 func (gb *GameBoy) toggleDoubleSpeed() {
 

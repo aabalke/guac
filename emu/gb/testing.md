@@ -68,15 +68,15 @@ Oam Bug 2
 ❌ call timing2
 ❌ call cc_timing
 ❌ call cc_timing2
-❌ di timing GS
+👍 di timing GS
 👍 div timing
 ❌ ei sequence
 👍 ei timing
 👍 halt ime0 ei
-❌ halt ime0 nointr_timing
+❌ halt ime0 nointr_timing // halt bug
 👍 halt ime1 timing
-❌ halt ime1 timing2 GS
-❌ if ie registers
+👍 halt ime1 timing2 GS
+👍 if ie registers
 👍 inst timings
 ❌ jp timing
 ❌ jp cc timing
@@ -84,7 +84,7 @@ Oam Bug 2
 ❌ oam dma_restart
 ❌ oam dma start
 ❌ oam dma timing
-❌ pop timing
+👍 pop timing
 ❌ push timing
 👍 rapid di ei
 ❌ ret timing
@@ -102,7 +102,7 @@ Oam Bug 2
 ## Timer
 
 👍 div write
-❌ rapid toggle
+👍 rapid toggle
 👍 tim00 div trigger
 👍 tim00
 👍 tim01 div trigger
@@ -111,9 +111,9 @@ Oam Bug 2
 👍 tim10
 👍 tim11 div trigger
 👍 tim11
-❌ tima reload
-❌ tima write reloading
-❌ tma write reloading
+👍 tima reload
+👍 tima write reloading
+👍 tma write reloading
 
 ## Misc Tests
 

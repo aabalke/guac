@@ -1,7 +1,6 @@
 package gameboy
 
 import (
-	"fmt"
 	"time"
 	"unsafe"
 
@@ -314,7 +313,7 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 
 	switch addr {
 	case 0xFF00:
-		return gb.getJoypad()
+		return gb.getJoypad() | 0xC0
 
 	case 0xFF04: // DIV
 		return uint8(gb.Timer.Div >> 8)
@@ -326,7 +325,12 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 		return gb.Timer.TMA
 
 	case 0xFF07:
-		return gb.Timer.FreqBits | 0xF8
+        v := gb.Timer.FreqBits | 0xF8
+        if gb.Timer.Enabled {
+            v |= 4
+        }
+
+        return v
 
 	case 0xFF0F:
 		return gb.Cpu.IF | 0xE0
@@ -408,14 +412,9 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 	case 0xFF04: // DIV
 
 		t := &gb.Timer
-
-		fmt.Printf("WRITE DIV PC %04X, Div %04X\n", gb.Cpu.PC, t.Div)
-
 		prevDiv := t.Div
 		t.Div = 0
 
-		// should this be 1 << 15 and 1 << 16? TCAGBD doc
-		// originally had 12 and 13
 		mask := uint16(1 << 12)
 		mask <<= uint16(gb.DoubleSpeedFlag)
 
@@ -438,17 +437,42 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		}
 
 	case 0xFF05:
-		gb.Timer.TIMA = v
+
+        gb.Timer.PendingOverflow = false
+        if !gb.Timer.BCycle {
+            gb.Timer.TIMA = v
+        }
 
 	case 0xFF06:
 		gb.Timer.TMA = v
 
+        if gb.Timer.BCycle {
+            gb.Timer.TIMA = v
+        }
+
 	case 0xFF07:
+		t := &gb.Timer
+
 		if gb.Timer.FreqBits != v&3 {
 			gb.Timer.FreqBits = v & 3
 		}
 
+        wasEnabled := gb.Timer.Enabled
 		gb.Timer.Enabled = v&4 != 0
+
+        if !wasEnabled || gb.Timer.Enabled {
+            return
+        }
+
+        if gb.Timer.Div&fallingEdgeBits[t.FreqBits] != 0 {
+            if overflow := t.TIMA == 0xFF; overflow {
+                t.TIMA = t.TMA
+                gb.SetIrq(IRQ_TMR)
+                return
+            }
+
+            t.TIMA++
+        }
 
 	case 0xFF0F:
 		gb.Cpu.IF = v
