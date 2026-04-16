@@ -226,17 +226,18 @@ func (gb *GameBoy) loadCartridge() {
 		println("ROM")
 
 		gb.Cartridge.Mbc = &cartridge.Mbc0{
-			RomBank: 1,
-			RamBank: 1,
+            Cartridge: &gb.Cartridge,
 		}
 
 	case 0x01, 0x02, 0x03:
 		println("MBC1")
 
 		gb.Cartridge.Mbc = &cartridge.Mbc1{
-			RomBank: 1,
-			RamBank: 0,
+			Bank1: 1,
+            Cartridge: &gb.Cartridge,
 		}
+
+
 	case 0x0F, 0x10, 0x11, 0x12, 0x13:
 		println("MBC3")
 
@@ -247,6 +248,7 @@ func (gb *GameBoy) loadCartridge() {
 				Rtc:  make([]uint8, 0x10),
 				Temp: make([]uint8, 0x10),
 			},
+            Cartridge: &gb.Cartridge,
 		}
 	case 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E:
 		println("MBC5")
@@ -254,6 +256,7 @@ func (gb *GameBoy) loadCartridge() {
 		gb.Cartridge.Mbc = &cartridge.Mbc5{
 			RomBank: 1,
 			RamBank: 0,
+            Cartridge: &gb.Cartridge,
 		}
 
 	default:

@@ -1,10 +1,7 @@
 package cartridge
 
-import (
-	"unsafe"
-)
-
 type Mbc3 struct {
+    Cartridge      *Cartridge
 	RamEnabled bool
 	RomBank    uint8
 	RamBank    uint8
@@ -17,62 +14,64 @@ type Rtc struct {
 	Temp       []uint8
 }
 
-func (m *Mbc3) ReadRom(c Cartridge, addr uint16) uint8 {
 
-	if m.RomBank == 0 {
-		panic("ROM BANK 0")
-	}
+func (m *Mbc3) Read(addr uint16) uint8 {
+    switch {
+    case addr < 0x4000:
+        return m.Cartridge.Data[addr]
+    case addr < 0x8000:
 
-	newAddr := uint32(addr - 0x4000)
-	a := newAddr + uint32(m.RomBank)*0x4000
-	return c.Data[a]
+        if m.RomBank == 0 {
+            panic("ROM BANK 0")
+        }
+
+        newAddr := uint32(addr - 0x4000)
+        a := newAddr + uint32(m.RomBank)*0x4000
+        return m.Cartridge.Data[a]
+
+    default:
+
+        switch {
+        case m.RamBank >= 0x4 && m.Rtc.RtcEnabled:
+            return m.Rtc.Temp[m.RamBank]
+        case m.RamBank >= 0x4 && !m.Rtc.RtcEnabled:
+            return m.Rtc.Rtc[m.RamBank]
+        }
+
+        newAddr := uint32(addr - 0xA000)
+        a := newAddr + (uint32(m.RamBank) * 0x2000)
+        return m.Cartridge.RamData[a]
+    }
 }
 
-func (m *Mbc3) ReadRam(c Cartridge, addr uint16) uint8 {
+func (m *Mbc3) Write(addr uint16, v uint8) {
+    switch {
+    case addr < 0x8000:
+        switch {
+        case addr < 0x2000:
+            m.enableRam(v)
+        case addr < 0x4000:
+            m.setRomBank1(v)
+        case addr < 0x6000:
+            m.setRamBank(v)
+        case addr < 0x8000:
+            m.setAdvBanking(v)
+        }
+    default:
 
-	switch {
-	case m.RamBank >= 0x4 && m.Rtc.RtcEnabled:
-		return m.Rtc.Temp[m.RamBank]
-	case m.RamBank >= 0x4 && !m.Rtc.RtcEnabled:
-		return m.Rtc.Rtc[m.RamBank]
-	}
+        if !m.RamEnabled {
+            return
+        }
 
-	newAddr := uint32(addr - 0xA000)
-	a := newAddr + (uint32(m.RamBank) * 0x2000)
-	return c.RamData[a]
-}
+        if m.RamBank >= 0x4 {
+            m.Rtc.Rtc[m.RamBank] = v
+            return
+        }
 
-func (m *Mbc3) WriteRam(c Cartridge, addr uint16, data uint8) {
-
-	if !m.RamEnabled {
-		return
-	}
-
-	if m.RamBank >= 0x4 {
-		m.Rtc.Rtc[m.RamBank] = data
-		return
-	}
-
-	newAddr := uint32(addr - 0xA000)
-	a := newAddr + (uint32(m.RamBank) * 0x2000)
-	c.RamData[a] = data
-}
-
-func (m *Mbc3) Read(c Cartridge, addr uint16) uint8 {
-	return c.Data[addr]
-}
-
-func (m *Mbc3) Handle(addr uint16, v uint8) {
-	switch {
-	case addr < 0x2000:
-		m.enableRam(v)
-	case addr < 0x4000:
-		m.setRomBank1(v)
-	case addr < 0x6000:
-		m.setRamBank(v)
-	case addr < 0x8000:
-		m.setAdvBanking(v)
-	}
+        newAddr := uint32(addr - 0xA000)
+        a := newAddr + (uint32(m.RamBank) * 0x2000)
+        m.Cartridge.RamData[a] = v
+    }
 }
 
 func (m *Mbc3) enableRam(v uint8) {
@@ -90,8 +89,6 @@ func (m *Mbc3) setRomBank1(v uint8) {
 		m.RomBank = 1
 	}
 }
-func (m *Mbc3) setRomBank2(v uint8) {
-}
 func (m *Mbc3) setRamBank(v uint8) {
 	m.RamBank = v
 }
@@ -104,29 +101,4 @@ func (m *Mbc3) setAdvBanking(v uint8) {
 	}
 
 	m.Rtc.RtcEnabled = false
-}
-
-func (m *Mbc3) ReadPtr(c Cartridge, addr uint16) unsafe.Pointer {
-
-	if uint64(addr)+2 >= uint64(len(c.Data)) {
-		return nil
-	}
-
-	return unsafe.Pointer(&c.Data[addr])
-}
-
-func (m *Mbc3) ReadRomPtr(c Cartridge, addr uint16) unsafe.Pointer {
-
-	if m.RomBank == 0 {
-		panic("ROM BANK 0")
-	}
-
-	a := uint64(addr - 0x4000)
-	a = a + uint64(m.RomBank)*0x4000
-
-	if a+2 >= uint64(len(c.Data)) {
-		return nil
-	}
-
-	return unsafe.Pointer(&c.Data[a])
 }

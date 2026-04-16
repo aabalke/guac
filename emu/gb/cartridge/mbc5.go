@@ -3,44 +3,45 @@ package cartridge
 import "unsafe"
 
 type Mbc5 struct {
+    Cartridge  *Cartridge
 	RamEnabled bool
 	RomBank    uint32
 	RamBank    uint32
 }
 
-func (m *Mbc5) Read(c Cartridge, addr uint16) uint8 {
-	return c.Data[addr]
+func (m *Mbc5) Read(addr uint16) uint8 {
+    switch {
+    case addr < 0x4000:
+        return m.Cartridge.Data[addr]
+    case addr < 0x8000:
+        return m.Cartridge.Data[uint32(addr-0x4000)+(m.RomBank*0x4000)]
+    default:
+        idx := (0x2000 * m.RamBank) + uint32(addr-0xA000)
+        return m.Cartridge.RamData[idx]
+    }
 }
 
-func (m *Mbc5) ReadRom(c Cartridge, addr uint16) uint8 {
-	return c.Data[uint32(addr-0x4000)+(m.RomBank*0x4000)]
-}
+func (m *Mbc5) Write(addr uint16, v uint8) {
+    switch {
+    case addr < 0x8000:
+        switch {
+        case addr < 0x2000:
+            m.enableRam(v)
+        case addr < 0x3000:
+            m.RomBank = (m.RomBank & 0x100) | uint32(v)
+        case addr < 0x4000:
+            m.RomBank = (m.RomBank & 0xFF) | uint32(v&0x1)<<8
+        case addr < 0x6000:
+            m.RamBank = uint32(v & 0xF)
+        }
+    default:
+        if !m.RamEnabled {
+            return
+        }
 
-func (m *Mbc5) ReadRam(c Cartridge, addr uint16) uint8 {
-	idx := (0x2000 * m.RamBank) + uint32(addr-0xA000)
-	return c.RamData[idx]
-}
-
-func (m *Mbc5) Handle(addr uint16, v uint8) {
-	switch {
-	case addr < 0x2000:
-		m.enableRam(v)
-	case addr < 0x3000:
-		m.RomBank = (m.RomBank & 0x100) | uint32(v)
-	case addr < 0x4000:
-		m.RomBank = (m.RomBank & 0xFF) | uint32(v&0x1)<<8
-	case addr < 0x6000:
-		m.RamBank = uint32(v & 0xF)
-	}
-}
-
-func (m *Mbc5) WriteRam(c Cartridge, addr uint16, data uint8) {
-	if !m.RamEnabled {
-		return
-	}
-
-	idx := (0x2000 * m.RamBank) + uint32(addr-0xA000)
-	c.RamData[idx] = data
+        idx := (0x2000 * m.RamBank) + uint32(addr-0xA000)
+        m.Cartridge.RamData[idx] = v
+    }
 }
 
 func (m *Mbc5) enableRam(v uint8) {

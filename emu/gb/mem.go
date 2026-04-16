@@ -165,9 +165,11 @@ func (gb *GameBoy) ReadPtr(addr uint16) unsafe.Pointer {
 	switch {
 	case addr < 0x4000:
 		//return gb.Cartridge.Mbc.Read(gb.Cartridge, addr)
-		return gb.Cartridge.Mbc.ReadPtr(gb.Cartridge, addr)
+		//return gb.Cartridge.Mbc.ReadPtr(gb.Cartridge, addr)
+        return nil
 	case addr < 0x8000:
-		return gb.Cartridge.Mbc.ReadRomPtr(gb.Cartridge, addr)
+		//return gb.Cartridge.Mbc.ReadRomPtr(gb.Cartridge, addr)
+        return nil
 		//return gb.Cartridge.Mbc.ReadRom(gb.Cartridge, addr)
 	case addr < 0xA000:
 
@@ -217,10 +219,10 @@ func (gb *GameBoy) Read(addr uint16) uint8 {
 
 	switch {
 	case addr < 0x4000:
-		return gb.Cartridge.Mbc.Read(gb.Cartridge, addr)
+		return gb.Cartridge.Mbc.Read(addr)
 	case addr < 0x8000:
 
-		return gb.Cartridge.Mbc.ReadRom(gb.Cartridge, addr)
+		return gb.Cartridge.Mbc.Read(addr)
 	case addr < 0xA000:
 
 		if drawing := gb.Stat.Mode == 3; drawing {
@@ -230,7 +232,7 @@ func (gb *GameBoy) Read(addr uint16) uint8 {
 		return gb.MemoryBus.VRAM[gb.MemoryBus.VRAMBank][addr&0x1FFF]
 
 	case addr < 0xC000:
-		return gb.Cartridge.Mbc.ReadRam(gb.Cartridge, addr)
+		return gb.Cartridge.Mbc.Read(addr)
 	case addr < 0xD000:
 		return gb.MemoryBus.WRAM[0][addr&0xFFF]
 	case addr < 0xE000:
@@ -266,7 +268,7 @@ func (gb *GameBoy) Write(addr uint16, v uint8) {
 
 	switch {
 	case addr < 0x8000:
-		gb.Cartridge.Mbc.Handle(addr, v)
+		gb.Cartridge.Mbc.Write(addr, v)
 		gb.Cpu.isBranching = true
 	case addr < 0xA000:
 
@@ -277,7 +279,7 @@ func (gb *GameBoy) Write(addr uint16, v uint8) {
 		gb.MemoryBus.VRAM[gb.MemoryBus.VRAMBank][addr&0x1FFF] = v
 
 	case addr < 0xC000:
-		gb.Cartridge.Mbc.WriteRam(gb.Cartridge, addr, v)
+		gb.Cartridge.Mbc.Write(addr, v)
 		gb.MemoryBus.ramSaved = false
 	case addr < 0xD000:
 		gb.MemoryBus.WRAM[0][addr&0xFFF] = v

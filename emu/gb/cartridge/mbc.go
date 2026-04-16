@@ -4,18 +4,11 @@ import (
 	"bufio"
 	"errors"
 	"os"
-	"unsafe"
 )
 
 type Mbc interface {
-	ReadRom(Cartridge, uint16) uint8
-	ReadRam(Cartridge, uint16) uint8
-	WriteRam(Cartridge, uint16, uint8)
-	Read(Cartridge, uint16) uint8
-	Handle(uint16, uint8)
-
-	ReadPtr(Cartridge, uint16) unsafe.Pointer
-	ReadRomPtr(Cartridge, uint16) unsafe.Pointer
+	Read(uint16) uint8
+	Write(uint16, uint8)
 }
 
 func ReadRam(path string) ([]uint8, error) {

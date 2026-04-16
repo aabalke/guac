@@ -139,7 +139,7 @@ func (gb *GameBoy) GetOp() uint8 {
 		if p := gb.ReadPtr(cpu.PC); p != nil {
 			cpu.PcPtr = p
 		} else {
-			//cpu.isBranching = true
+			cpu.isBranching = true
 			return gb.Read(cpu.PC)
 		}
 	}

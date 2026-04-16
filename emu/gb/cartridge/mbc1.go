@@ -1,137 +1,68 @@
 package cartridge
 
-import (
-	"fmt"
-	"unsafe"
-)
-
 type Mbc1 struct {
-	RamEnabled     bool
-	RomBank        uint8
-	RamBank        uint8
-	AdvBankingMode bool
-	Latched        bool
+    Cartridge      *Cartridge
+
+	RamEnabled, AdvMode    bool
+    Bank1, Bank2 uint8
+    RomBase, RomBase2, RamBase uint32
 }
 
-func (m *Mbc1) ReadRom(c Cartridge, addr uint16) uint8 {
+func (m *Mbc1) Read(addr uint16) uint8 {
+    switch {
+    case addr < 0x4000:
+        return m.Cartridge.Data[m.RomBase + uint32(addr)]
+    case addr < 0x8000:
+        return m.Cartridge.Data[m.RomBase2 + uint32(addr - 0x4000)]
 
-	if m.RomBank == 0 {
-		panic("ROM BANK 0")
-	}
+    default:
 
-	newAddr := uint32(addr - 0x4000)
-	a := newAddr + uint32(m.RomBank)*0x4000
+        if !m.RamEnabled {
+            return 0xFF
+        }
 
-	if int(a) >= len(c.Data) {
-		fmt.Printf("A %08X LEN %08X\n", a, len(c.Data))
-	}
-
-	return c.Data[a%uint32(len(c.Data))]
+        return m.Cartridge.RamData[m.RamBase + uint32(addr - 0xA000)]
+    }
 }
 
-func (m *Mbc1) ReadRam(c Cartridge, addr uint16) uint8 {
+func (m *Mbc1) Write(addr uint16, v uint8) {
+    switch {
+    case addr < 0x2000:
+        m.RamEnabled = v == 0xA
 
-	if !m.RamEnabled {
-		return 0xFF
-	}
+    case addr < 0x4000:
+        m.Bank1 = v & 0x1F
+        if m.Bank1 == 0 {
+            m.Bank1 = 1
+        }
+        m.UpdateAddrs()
 
-	newAddr := uint32(addr - 0xA000)
-	a := newAddr + (uint32(m.RamBank) * 0x2000)
-	return c.RamData[a]
+    case addr < 0x6000:
+        m.Bank2 = v & 0x3
+        m.UpdateAddrs()
+
+    case addr < 0x8000:
+        m.AdvMode = v & 1 != 0
+        m.UpdateAddrs()
+
+    default:
+        if !m.RamEnabled {
+            return
+        }
+
+        m.Cartridge.RamData[m.RamBase + uint32(addr - 0xA000)] = v
+    }
 }
 
-func (m *Mbc1) WriteRam(c Cartridge, addr uint16, data uint8) {
-	if !m.RamEnabled {
-		return
-	}
+func (m *Mbc1) UpdateAddrs() {
 
-	newAddr := uint32(addr - 0xA000)
-	a := newAddr + (uint32(m.RamBank) * 0x2000)
-	c.RamData[a] = data
-}
+    m.RomBase2 = (uint32(m.Bank2)<<19) | (uint32(m.Bank1) << 14)
 
-func (m *Mbc1) Read(c Cartridge, addr uint16) uint8 {
-	return c.Data[addr]
-}
-
-func (m *Mbc1) Handle(addr uint16, v uint8) {
-	switch {
-	case addr < 0x2000:
-		m.enableRam(v)
-	case addr < 0x4000:
-		m.setRomBank1(v)
-	case addr < 0x6000:
-		if m.AdvBankingMode {
-			m.setRamBank(v)
-			return
-		}
-
-		m.setRomBank2(v)
-
-	case addr < 0x8000:
-		m.setAdvBanking(v)
-	}
-}
-
-func (m *Mbc1) enableRam(v uint8) {
-
-	switch v & 0xF {
-	case 0xA:
-		m.RamEnabled = true
-	case 0x0:
-		m.RamEnabled = false
-	}
-}
-
-func (m *Mbc1) setRomBank1(v uint8) {
-	m.RomBank &= 0b11100000
-	m.RomBank |= (v & 0b11111)
-	if m.RomBank == 0 {
-		m.RomBank++
-	}
-}
-func (m *Mbc1) setRomBank2(v uint8) {
-	m.RomBank &= 0b11111
-	m.RomBank |= (v & 0b11100000)
-	if m.RomBank == 0 {
-		m.RomBank++
-	}
-}
-func (m *Mbc1) setRamBank(v uint8) {
-	m.RamBank = v & 0b11
-}
-func (m *Mbc1) setAdvBanking(v uint8) {
-
-	if adv := v&0b1 == 1; adv {
-		m.AdvBankingMode = true
-		return
-	}
-
-	m.AdvBankingMode = false
-	m.RamBank = 0
-}
-
-func (m *Mbc1) ReadPtr(c Cartridge, addr uint16) unsafe.Pointer {
-
-	if uint64(addr)+2 >= uint64(len(c.Data)) {
-		return nil
-	}
-
-	return unsafe.Pointer(&c.Data[addr])
-}
-
-func (m *Mbc1) ReadRomPtr(c Cartridge, addr uint16) unsafe.Pointer {
-
-	if m.RomBank == 0 {
-		panic("ROM BANK 0")
-	}
-
-	a := uint64(addr - 0x4000)
-	a = a + uint64(m.RomBank)*0x4000
-
-	if a+2 >= uint64(len(c.Data)) {
-		return nil
-	}
-
-	return unsafe.Pointer(&c.Data[a])
+    if m.AdvMode {
+        m.RomBase = uint32(m.Bank2)<<19
+        m.RamBase = uint32(m.Bank2)<<13
+    } else {
+        m.RomBase = 0
+        m.RamBase = 0
+    }
 }

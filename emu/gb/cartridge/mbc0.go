@@ -1,48 +1,16 @@
 package cartridge
 
-import "unsafe"
-
 type Mbc0 struct {
-	RamEnabled     bool
-	RomBank        uint8
-	RamBank        uint8
-	AdvBankingMode bool
-	Latched        bool
+    Cartridge      *Cartridge
 }
 
-func (m *Mbc0) ReadRom(c Cartridge, addr uint16) uint8 {
-	return c.Data[addr]
+func (m *Mbc0) Read(addr uint16) uint8 {
+    switch {
+    case addr < 0x8000:
+        return m.Cartridge.Data[addr]
+    default:
+        return m.Cartridge.RamData[addr - 0xA000]
+    }
 }
 
-func (m *Mbc0) ReadRam(c Cartridge, addr uint16) uint8 {
-	return uint8(0)
-}
-
-func (m *Mbc0) WriteRam(c Cartridge, addr uint16, data uint8) {
-}
-
-func (m *Mbc0) Read(c Cartridge, addr uint16) uint8 {
-	return c.Data[addr]
-}
-
-func (m *Mbc0) Handle(addr uint16, v uint8) {
-}
-
-func (m *Mbc0) ReadPtr(c Cartridge, addr uint16) unsafe.Pointer {
-
-	if uint64(addr)+2 >= uint64(len(c.Data)) {
-		return nil
-	}
-
-	return unsafe.Pointer(&c.Data[addr])
-}
-
-func (m *Mbc0) ReadRomPtr(c Cartridge, addr uint16) unsafe.Pointer {
-
-	if uint64(addr)+2 >= uint64(len(c.Data)) {
-		return nil
-	}
-
-	return unsafe.Pointer(&c.Data[addr])
-
-}
+func (m *Mbc0) Write(addr uint16, v uint8) {}
