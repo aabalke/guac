@@ -1,9 +1,7 @@
 package gameboy
 
 import (
-	"fmt"
 	"log"
-	"os"
 
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gb/apu"
@@ -33,7 +31,7 @@ type GameBoy struct {
 
 	UnpackedMonoPals [3][4]uint32
 
-	Cartridge cartridge.Cartridge
+	Cartridge *cartridge.Cartridge
 	Cpu       *Cpu
 	MemoryBus MemoryBus
 	FPS       int
@@ -72,10 +70,10 @@ type Timer struct {
 	Enabled  bool
 	FreqBits uint8
 
-    // for 8 cycles after overflow there is odd behavior
-    // Pending Overflow 0-4 cycles after, BCycle 4-8 after
-    PendingOverflow bool
-    BCycle bool
+	// for 8 cycles after overflow there is odd behavior
+	// Pending Overflow 0-4 cycles after, BCycle 4-8 after
+	PendingOverflow bool
+	BCycle          bool
 }
 
 func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
@@ -83,17 +81,13 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 	img := ebiten.NewImage(width, height)
 
 	gb := &GameBoy{
-		Image:  img,
-		Cpu:    NewCpu(),
-		FPS:    60,
-		Clock:  4194304, // t cycle count
-		Joypad: 0xFF,
-		Cartridge: cartridge.Cartridge{
-			Data:    make([]uint8, 0),
-			RomPath: path,
-			SavPath: path + ".save",
-		},
-		Palette: config.Conf.Gb.Palette,
+		Image:     img,
+		Cpu:       NewCpu(),
+		FPS:       60,
+		Clock:     4194304, // t cycle count
+		Joypad:    0xFF,
+		Cartridge: cartridge.NewCartridge(path, path+".save"),
+		Palette:   config.Conf.Gb.Palette,
 	}
 
 	gb.Lcdc.gb = gb
@@ -109,7 +103,18 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 	)
 	gb.Apu = apu.NewApu(ctx, gb.Clock, SND_FREQUENCY, SND_SAMPLES)
 
-	gb.LoadGame(path)
+	if gb.Cartridge.ColorMode {
+		gb.Color = true
+	}
+
+	if gb.Color {
+		gb.Cpu.a = 0x11
+		log.Printf("Color mode: GBC")
+	} else {
+		log.Printf("Color mode: DMG")
+	}
+
+	initMemory(gb)
 
 	L = NewLogger("./loggy", gb)
 
@@ -173,95 +178,6 @@ func (gb *GameBoy) ToggleMute() bool {
 func (gb *GameBoy) TogglePause() bool {
 	gb.Paused = !gb.Paused
 	return gb.Paused
-}
-
-func (gb *GameBoy) LoadGame(filepath string) {
-
-	buffer, err := os.ReadFile(filepath)
-	if err != nil {
-		panic(err)
-	}
-
-	for i := range len(buffer) {
-		gb.Cartridge.Data = append(gb.Cartridge.Data, uint8(buffer[i]))
-	}
-
-	gb.Cartridge.ParseHeader()
-	gb.loadCartridge()
-	initMemory(gb)
-}
-
-func (gb *GameBoy) loadCartridge() {
-
-	log.Printf("Title: %s\n", gb.Cartridge.Title)
-
-	switch {
-	case config.Conf.Gb.ForceGBC:
-		gb.Cartridge.ColorMode = true
-	case config.Conf.Gb.ForceDMG:
-		gb.Cartridge.ColorMode = false
-	}
-
-	if gb.Cartridge.ColorMode {
-		gb.Color = true
-	}
-
-	if gb.Color {
-		gb.Cpu.a = 0x11
-		log.Printf("Color mode: GBC")
-	} else {
-		log.Printf("Color mode: DMG")
-	}
-
-	ramData, err := cartridge.ReadRam(gb.Cartridge.SavPath)
-
-	if err != nil {
-		ramData = make([]uint8, 0x8000)
-	}
-
-	gb.Cartridge.RamData = ramData
-
-	switch gb.Cartridge.Type {
-	case 0x00, 0x08, 0x09:
-		println("ROM")
-
-		gb.Cartridge.Mbc = &cartridge.Mbc0{
-            Cartridge: &gb.Cartridge,
-		}
-
-	case 0x01, 0x02, 0x03:
-		println("MBC1")
-
-		gb.Cartridge.Mbc = &cartridge.Mbc1{
-			Bank1: 1,
-            Cartridge: &gb.Cartridge,
-		}
-
-
-	case 0x0F, 0x10, 0x11, 0x12, 0x13:
-		println("MBC3")
-
-		gb.Cartridge.Mbc = &cartridge.Mbc3{
-			RomBank: 1,
-			RamBank: 0,
-			Rtc: cartridge.Rtc{
-				Rtc:  make([]uint8, 0x10),
-				Temp: make([]uint8, 0x10),
-			},
-            Cartridge: &gb.Cartridge,
-		}
-	case 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E:
-		println("MBC5")
-
-		gb.Cartridge.Mbc = &cartridge.Mbc5{
-			RomBank: 1,
-			RamBank: 0,
-            Cartridge: &gb.Cartridge,
-		}
-
-	default:
-		panic(fmt.Sprintf("UNSUPPORTED TYPE %X", gb.Cartridge.Type))
-	}
 }
 
 func (gb *GameBoy) SetIrq(bit uint8) {
@@ -329,16 +245,16 @@ func (gb *GameBoy) UpdateTimers(cycles int) {
 		return
 	}
 
-    if t.BCycle && cycles >= 4 {
-        t.BCycle = false
-    }
+	if t.BCycle && cycles >= 4 {
+		t.BCycle = false
+	}
 
-    if t.PendingOverflow && cycles >= 4 {
-        t.TIMA = t.TMA
-        gb.SetIrq(IRQ_TMR)
-        t.PendingOverflow = false
-        t.BCycle = true
-    }
+	if t.PendingOverflow && cycles >= 4 {
+		t.TIMA = t.TMA
+		gb.SetIrq(IRQ_TMR)
+		t.PendingOverflow = false
+		t.BCycle = true
+	}
 
 	// instead of keeping separate counter, use falling edge to inc
 	// requires figuring out count of edges first
@@ -347,20 +263,20 @@ func (gb *GameBoy) UpdateTimers(cycles int) {
 	edgeCnt := (t.Div / period) - (prev / period)
 	for range edgeCnt {
 
-        if t.BCycle {
-            t.BCycle = false
-        }
+		if t.BCycle {
+			t.BCycle = false
+		}
 
-        if t.PendingOverflow {
-            t.TIMA = t.TMA
-            gb.SetIrq(IRQ_TMR)
-            t.PendingOverflow = false
-            t.BCycle = true
-        }
+		if t.PendingOverflow {
+			t.TIMA = t.TMA
+			gb.SetIrq(IRQ_TMR)
+			t.PendingOverflow = false
+			t.BCycle = true
+		}
 
 		if overflow := t.TIMA == 0xFF; overflow {
-            t.TIMA = 0
-            t.PendingOverflow = true
+			t.TIMA = 0
+			t.PendingOverflow = true
 			continue
 		}
 

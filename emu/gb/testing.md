@@ -43,9 +43,9 @@ Oam Bug 2
 👍 KEY0 (CPU mode register) Lock After Boot
 👍 STAT register PPU mode upon PPU disabled
 ❌ MBC out of bounds RAM access
-    ❌ MBC1 
+    👍 MBC1 
     ❌ MBC3 
-    ❌ MBC5 
+    👍 MBC5 
 
 # Mooneye Acceptance Test
 
@@ -149,20 +149,37 @@ Oam Bug 2
 
 👍 bits bank1
 👍 bits bank2
-❌ bits mode
+👍 bits mode
 👍 bits ramg
-❌ rom 512kb
-❌ rom 1Mb
-❌ rom 2Mb
-❌ rom 4Mb
-❌ rom 8Mb
-❌ rom 16Mb
-❌ ram 64kb
-❌ ram 256kb
+👍 rom 512kb
+👍 rom 1Mb
+👍 rom 2Mb
+👍 rom 4Mb
+👍 rom 8Mb
+👍 rom 16Mb
+👍 ram 64kb
+👍 ram 256kb
 ❌ multicart rom 8Mb
 
 ### MBC2
 
-### MBC3
+👍 bits_ramg
+👍 bits_romb
+👍 bits_unused
+👍 ram
+👍 rom1
+👍 rom2
+👍 rom512
+
+### MBC5
+
+👍 rom1mb
+👍 rom2mb
+👍 rom4mb
+👍 rom8mb
+👍 rom16mb
+👍 rom32mb
+👍 rom64mb
+👍 rom512kb
 
 ## Misc Tests

@@ -503,6 +503,8 @@ func (gb *GameBoy) Block2(op uint8) {
 	}
 }
 
+var cnt int
+
 func (gb *GameBoy) Execute() {
 
 	cycles := 0
@@ -510,9 +512,15 @@ func (gb *GameBoy) Execute() {
 	reg := gb.Cpu
 
 	gb.Tick(4)
-	op := gb.GetOp()
-	//op := gb.Read(gb.Cpu.PC)
+	//op := gb.GetOp()
+	op := gb.Read(gb.Cpu.PC)
 	//L.WriteLog(cnt, op)
+    //cnt++
+
+    //if cnt >= 0x10 {
+    //    L.Close()
+    //    os.Exit(0)
+    //}
 
 	if block0 := op&0xC0 == 0x00; block0 {
 		pc := gb.Block0(op, pc)
@@ -714,18 +722,18 @@ func (gb *GameBoy) Execute() {
 
 	case 0xE8:
 
-        sp := gb.Cpu.SP
+		sp := gb.Cpu.SP
 		gb.Tick(4)
-        e := uint16(gb.getImm8())
+		e := uint16(gb.getImm8())
 
 		gb.Tick(4)
-        res := uint16(int(sp) + int(int8(e)))
-        tmp := sp ^ uint16(int8(e)) ^ res
-        gb.Cpu.f.H = (tmp & 0x10) != 0
-        gb.Cpu.f.Z = false
-        gb.Cpu.f.C = (tmp & 0x100) != 0
-        gb.Cpu.f.S = false
-        gb.Cpu.SP = res
+		res := uint16(int(sp) + int(int8(e)))
+		tmp := sp ^ uint16(int8(e)) ^ res
+		gb.Cpu.f.H = (tmp & 0x10) != 0
+		gb.Cpu.f.Z = false
+		gb.Cpu.f.C = (tmp & 0x100) != 0
+		gb.Cpu.f.S = false
+		gb.Cpu.SP = res
 
 		pc++
 		reg.PcOff++
@@ -1127,10 +1135,10 @@ func (gb *GameBoy) execJR(addr uint8, cond bool, cyclesIf, cycles int) (c int, p
 }
 
 func (gb *GameBoy) StackPopTicked() uint16 {
-    gb.Tick(4)
+	gb.Tick(4)
 	v := uint16(gb.Read(gb.Cpu.SP))
 	gb.Cpu.SP++
-    gb.Tick(4)
+	gb.Tick(4)
 	v |= uint16(gb.Read(gb.Cpu.SP)) << 8
 	gb.Cpu.SP++
 	return v
@@ -1145,11 +1153,11 @@ func (gb *GameBoy) StackPop() uint16 {
 }
 
 func (gb *GameBoy) StackPushTicked(v uint16) {
-    gb.Tick(4)
-    gb.Tick(4)
+	gb.Tick(4)
+	gb.Tick(4)
 	gb.Cpu.SP--
 	gb.Write(gb.Cpu.SP, uint8(v>>8))
-    gb.Tick(4)
+	gb.Tick(4)
 	gb.Cpu.SP--
 	gb.Write(gb.Cpu.SP, uint8(v))
 }

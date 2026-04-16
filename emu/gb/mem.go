@@ -166,10 +166,10 @@ func (gb *GameBoy) ReadPtr(addr uint16) unsafe.Pointer {
 	case addr < 0x4000:
 		//return gb.Cartridge.Mbc.Read(gb.Cartridge, addr)
 		//return gb.Cartridge.Mbc.ReadPtr(gb.Cartridge, addr)
-        return nil
+		return nil
 	case addr < 0x8000:
 		//return gb.Cartridge.Mbc.ReadRomPtr(gb.Cartridge, addr)
-        return nil
+		return nil
 		//return gb.Cartridge.Mbc.ReadRom(gb.Cartridge, addr)
 	case addr < 0xA000:
 
@@ -327,12 +327,12 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 		return gb.Timer.TMA
 
 	case 0xFF07:
-        v := gb.Timer.FreqBits | 0xF8
-        if gb.Timer.Enabled {
-            v |= 4
-        }
+		v := gb.Timer.FreqBits | 0xF8
+		if gb.Timer.Enabled {
+			v |= 4
+		}
 
-        return v
+		return v
 
 	case 0xFF0F:
 		return gb.Cpu.IF | 0xE0
@@ -440,17 +440,17 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 
 	case 0xFF05:
 
-        gb.Timer.PendingOverflow = false
-        if !gb.Timer.BCycle {
-            gb.Timer.TIMA = v
-        }
+		gb.Timer.PendingOverflow = false
+		if !gb.Timer.BCycle {
+			gb.Timer.TIMA = v
+		}
 
 	case 0xFF06:
 		gb.Timer.TMA = v
 
-        if gb.Timer.BCycle {
-            gb.Timer.TIMA = v
-        }
+		if gb.Timer.BCycle {
+			gb.Timer.TIMA = v
+		}
 
 	case 0xFF07:
 		t := &gb.Timer
@@ -459,22 +459,22 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 			gb.Timer.FreqBits = v & 3
 		}
 
-        wasEnabled := gb.Timer.Enabled
+		wasEnabled := gb.Timer.Enabled
 		gb.Timer.Enabled = v&4 != 0
 
-        if !wasEnabled || gb.Timer.Enabled {
-            return
-        }
+		if !wasEnabled || gb.Timer.Enabled {
+			return
+		}
 
-        if gb.Timer.Div&fallingEdgeBits[t.FreqBits] != 0 {
-            if overflow := t.TIMA == 0xFF; overflow {
-                t.TIMA = t.TMA
-                gb.SetIrq(IRQ_TMR)
-                return
-            }
+		if gb.Timer.Div&fallingEdgeBits[t.FreqBits] != 0 {
+			if overflow := t.TIMA == 0xFF; overflow {
+				t.TIMA = t.TMA
+				gb.SetIrq(IRQ_TMR)
+				return
+			}
 
-            t.TIMA++
-        }
+			t.TIMA++
+		}
 
 	case 0xFF0F:
 		gb.Cpu.IF = v
