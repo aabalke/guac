@@ -24,6 +24,8 @@ type MemoryBus struct {
 	WRAMOffset uint16
 
 	Hdma Hdma
+
+    OamValue uint8
 }
 
 type Hdma struct {
@@ -347,6 +349,9 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 	case 0xFF44:
 		return gb.MemoryBus.IO[uint8(addr)]
 
+    case 0xFF46:
+        return gb.MemoryBus.OamValue
+
 	case 0xFF4F:
 		return gb.MemoryBus.VRAMBank | 0xFE
 
@@ -495,13 +500,24 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 			return
 		}
 
-		addr := uint16(v) << 8
+        gb.MemoryBus.OamValue = v
+        addr := uint16(v) << 8
+
+        // src of this behavior is sameboy - do not see any other ref
+        if v >= 0xE0 {
+            for i := range uint16(0xA0) {
+                gb.Tick(4) // 160 m cycles = 4 tcycles per transfer
+                a := gb.Read((addr + i) &^ 0x2000)
+                gb.MemoryBus.OAM[i] = a
+            }
+            return
+        }
+
 		for i := range uint16(0xA0) {
 			gb.Tick(4) // 160 m cycles = 4 tcycles per transfer
-			a := gb.Read(addr + i)
+            a := gb.Read(addr + i)
 			gb.MemoryBus.OAM[i] = a
 		}
-		//io[uint8(addr)] = v
 
 	case 0xFF47: // bgpalette mono
 

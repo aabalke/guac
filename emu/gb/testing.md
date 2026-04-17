@@ -124,9 +124,9 @@ Oam Bug 2
  
 ## OAM DMA
  
-👍  basic
-❌ reg_read
-❌ sources GS
+👍 basic
+👍 reg_read
+👍 sources GS
  
 ## PPU
  

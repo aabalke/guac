@@ -27,8 +27,6 @@ type Mbc3 struct {
 
     PendingLatch bool
     Latched bool
-
-    rtcpath string
 }
 
 var bitMask = [...]uint8{0x3F, 0x3F, 0x1F, 0xFF, 0xFF}
