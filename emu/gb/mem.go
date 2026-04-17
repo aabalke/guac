@@ -145,6 +145,7 @@ func initMemory(gb *GameBoy) {
 func (gb *GameBoy) SaveRam() {
 	if !gb.MemoryBus.ramSaved {
 		cartridge.WriteRam(gb.Cartridge.SavPath, gb.Cartridge.RamData)
+        gb.Cartridge.Mbc.Save()
 		gb.MemoryBus.ramSaved = true
 	}
 }

@@ -42,9 +42,9 @@ Oam Bug 2
 👍 Vram DMA HBlank mode
 👍 KEY0 (CPU mode register) Lock After Boot
 👍 STAT register PPU mode upon PPU disabled
-❌ MBC out of bounds RAM access
+👍 MBC out of bounds RAM access
     👍 MBC1 
-    ❌ MBC3 
+    👍 MBC3 
     👍 MBC5 
 
 # Mooneye Acceptance Test
@@ -183,3 +183,15 @@ Oam Bug 2
 👍 rom512kb
 
 ## Misc Tests
+
+
+
+# Other tests
+
+👍 EricKirschenmann/MBC3-Tester-gb
+
+## aaaaaa123456789/rtc3test
+👍 basic
+❌ range
+❌ sub second
+

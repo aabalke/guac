@@ -29,3 +29,4 @@ func (m *Mbc0) Read(addr uint16) uint8 {
 }
 
 func (m *Mbc0) Write(addr uint16, v uint8) {}
+func (m *Mbc0) Save() {}

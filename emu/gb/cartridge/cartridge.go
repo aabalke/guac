@@ -25,16 +25,11 @@ type Cartridge struct {
 
 	RomBank uint8
 	RamBank uint8
-
     RomMask uint32
     RamMask uint32
 }
 
 const (
-	// bytes
-	//MiB = 1<<20
-
-	// Header Addrs
 	TYPE = 0x147
 	ROM  = 0x148
 	RAM  = 0x149
@@ -78,7 +73,20 @@ func NewCartridge(rompath, savpath string) *Cartridge {
 		c.ColorMode = false
 	}
 
-	c.setMbc()
+	switch c.Type {
+	case 0x00, 0x08, 0x09:
+		c.Mbc = NewMbc0(c)
+	case 0x01, 0x02, 0x03:
+        c.Mbc = NewMbc1(c)
+    case 0x05, 0x06:
+		c.Mbc = NewMbc2(c)
+	case 0x0F, 0x10, 0x11, 0x12, 0x13:
+        c.Mbc = NewMbc3(c)
+	case 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E:
+        c.Mbc = NewMbc5(c)
+	default:
+		panic(fmt.Sprintf("UNSUPPORTED CART MAP TYPE %X", c.Type))
+	}
 
 	return c
 }
@@ -157,36 +165,4 @@ func (c *Cartridge) ParseHeader(buf []uint8) {
 	}
 
 	c.Valid = check == buf[SUM]
-}
-
-func (c *Cartridge) setMbc() {
-
-	switch c.Type {
-	case 0x00, 0x08, 0x09:
-		c.Mbc = NewMbc0(c)
-
-	case 0x01, 0x02, 0x03:
-        c.Mbc = NewMbc1(c)
-
-    case 0x05, 0x06:
-		c.Mbc = NewMbc2(c)
-
-	case 0x0F, 0x10, 0x11, 0x12, 0x13:
-		println("MBC3")
-
-		c.Mbc = &Mbc3{
-			RomBank: 1,
-			RamBank: 0,
-			Rtc: Rtc{
-				Rtc:  make([]uint8, 0x10),
-				Temp: make([]uint8, 0x10),
-			},
-			Cartridge: c,
-		}
-	case 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E:
-        c.Mbc = NewMbc5(c)
-
-	default:
-		panic(fmt.Sprintf("UNSUPPORTED TYPE %X", c.Type))
-	}
 }

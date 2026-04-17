@@ -76,3 +76,4 @@ func (m *Mbc1) UpdateAddrs() {
 		m.RamBase = 0
 	}
 }
+func (m *Mbc1) Save() {}

@@ -72,3 +72,5 @@ func (m *Mbc5) UpdateAddrs() {
 	m.RomBase2 = (uint32(m.Bank2) << (14 + 8)) | (uint32(m.Bank1) << 14)
     m.RamBase = uint32(m.Bank3) << 13
 }
+
+func (m *Mbc5) Save() {}

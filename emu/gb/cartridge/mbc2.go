@@ -63,3 +63,4 @@ func (m *Mbc2) Write(addr uint16, v uint8) {
 func (m *Mbc2) UpdateAddrs() {
 	m.RomBase2 = uint32(m.Bank1) << 14
 }
+func (m *Mbc2) Save() {}
