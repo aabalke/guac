@@ -236,7 +236,6 @@ func (gb *GameBoy) getR16(i uint8) *uint16 {
 
 func (gb *GameBoy) Block0(op uint8, pc uint16) uint16 {
 
-	cycles := 0
 	reg := gb.Cpu
 
 	switch inst := op & 0x7; inst {
@@ -408,20 +407,15 @@ func (gb *GameBoy) Block0(op uint8, pc uint16) uint16 {
 
 	// jump relative
 	case 0x20:
-		cycles, pc = gb.execJR(gb.getImm8(), !reg.f.Z, 3, 2)
-		gb.Tick((cycles - 2) * 4)
+		pc = gb.execJR(!reg.f.Z)
 	case 0x30:
-		cycles, pc = gb.execJR(gb.getImm8(), !reg.f.C, 3, 2)
-		gb.Tick((cycles - 2) * 4)
+		pc = gb.execJR(!reg.f.C)
 	case 0x18:
-		cycles, pc = gb.execJR(gb.getImm8(), true, 3, 3)
-		gb.Tick((cycles - 2) * 4)
+		pc = gb.execJR(true)
 	case 0x28:
-		cycles, pc = gb.execJR(gb.getImm8(), reg.f.Z, 3, 2)
-		gb.Tick((cycles - 2) * 4)
+		pc = gb.execJR(reg.f.Z)
 	case 0x38:
-		cycles, pc = gb.execJR(gb.getImm8(), reg.f.C, 3, 2)
-		gb.Tick((cycles - 2) * 4)
+		pc = gb.execJR(reg.f.C)
 
 	// misc ld
 	case 0x08:
@@ -504,20 +498,29 @@ func (gb *GameBoy) Block2(op uint8) {
 }
 
 var cnt int
+var b bool
 
 func (gb *GameBoy) Execute() {
 
-	cycles := 0
 	pc := gb.Cpu.PC + 1
 	reg := gb.Cpu
 
 	gb.Tick(4)
 	//op := gb.GetOp()
 	op := gb.Read(gb.Cpu.PC)
-	//L.WriteLog(cnt, op)
-    //cnt++
 
-    //if cnt >= 0x10 {
+    //if gb.Cpu.PC == 0x16B {
+    //if gb.Cpu.PC == 0x4B {
+    //if gb.Cpu.PC == 0x17F {
+    //    b = true
+    //}
+
+    //if b {
+    //    L.WriteLog(cnt, op)
+    //    cnt++
+    //}
+
+    //if cnt >= 25 {
     //    L.Close()
     //    os.Exit(0)
     //}
@@ -582,23 +585,17 @@ func (gb *GameBoy) Execute() {
 
 	// jump abs
 	case 0xC2:
-		cycles, pc = gb.execJP(gb.getImm16(), !reg.f.Z, 4, 3)
-		gb.Tick((cycles - 3) * 4)
+		pc = gb.execJP(!reg.f.Z)
 	case 0xD2:
-		cycles, pc = gb.execJP(gb.getImm16(), !reg.f.C, 4, 3)
-		gb.Tick((cycles - 3) * 4)
+		pc = gb.execJP(!reg.f.C)
 	case 0xC3:
-		cycles, pc = gb.execJP(gb.getImm16(), true, 4, 4)
-		gb.Tick((cycles - 3) * 4)
+		pc = gb.execJP(true)
 	case 0xCA:
-		cycles, pc = gb.execJP(gb.getImm16(), reg.f.Z, 4, 3)
-		gb.Tick((cycles - 3) * 4)
+		pc = gb.execJP(reg.f.Z)
 	case 0xDA:
-		cycles, pc = gb.execJP(gb.getImm16(), reg.f.C, 4, 3)
-		gb.Tick((cycles - 3) * 4)
+		pc = gb.execJP(reg.f.C)
 	case 0xE9:
-		cycles, pc = gb.execJP(*reg.HL, true, 1, 1)
-		gb.Tick((cycles - 1) * 4)
+        pc = *reg.HL
 
 	// Interrupts
 	case 0xF3:
@@ -621,89 +618,82 @@ func (gb *GameBoy) Execute() {
 
 	// push
 	case 0xC5:
-		gb.StackPushTicked(*reg.BC)
+		gb.StackPush(*reg.BC)
 	case 0xD5:
-		gb.StackPushTicked(*reg.DE)
+		gb.StackPush(*reg.DE)
 	case 0xE5:
-		gb.StackPushTicked(*reg.HL)
+		gb.StackPush(*reg.HL)
 	case 0xF5:
-		gb.StackPushTicked(uint16(reg.a)<<8 | uint16(reg.f.Get()))
+		gb.StackPush(uint16(reg.a)<<8 | uint16(reg.f.Get()))
 
 	// pop
 	case 0xC1:
-		*reg.BC = gb.StackPopTicked()
+		*reg.BC = gb.StackPop()
 	case 0xD1:
-		*reg.DE = gb.StackPopTicked()
+		*reg.DE = gb.StackPop()
 	case 0xE1:
-		*reg.HL = gb.StackPopTicked()
+		*reg.HL = gb.StackPop()
 	case 0xF1:
-		v := gb.StackPopTicked() & 0xFFF0
+		v := gb.StackPop() & 0xFFF0
 		reg.a = uint8(v >> 8)
 		reg.f.Set(uint8(v))
 
 		// rst
 	case 0xC7:
-		gb.StackPushTicked(gb.Cpu.PC + 1)
+		gb.StackPush(gb.Cpu.PC + 1)
 		pc = 0x00
 	case 0xD7:
-		gb.StackPushTicked(gb.Cpu.PC + 1)
+		gb.StackPush(gb.Cpu.PC + 1)
 		pc = 0x10
 	case 0xE7:
-		gb.StackPushTicked(gb.Cpu.PC + 1)
+		gb.StackPush(gb.Cpu.PC + 1)
 		pc = 0x20
 	case 0xF7:
-		gb.StackPushTicked(gb.Cpu.PC + 1)
+		gb.StackPush(gb.Cpu.PC + 1)
 		pc = 0x30
 	case 0xCF:
-		gb.StackPushTicked(gb.Cpu.PC + 1)
+		gb.StackPush(gb.Cpu.PC + 1)
 		pc = 0x08
 	case 0xDF:
-		gb.StackPushTicked(gb.Cpu.PC + 1)
+		gb.StackPush(gb.Cpu.PC + 1)
 		pc = 0x18
 	case 0xEF:
-		gb.StackPushTicked(gb.Cpu.PC + 1)
+		gb.StackPush(gb.Cpu.PC + 1)
 		pc = 0x28
 	case 0xFF:
-		gb.StackPushTicked(gb.Cpu.PC + 1)
+		gb.StackPush(gb.Cpu.PC + 1)
 		pc = 0x38
 
 	// call
 	case 0xC4:
-		cycles, pc = gb.execCall(gb.getImm16(), !reg.f.Z, 6, 3)
-		gb.Tick((cycles - 3) * 4)
+		pc = gb.execCall(!reg.f.Z)
 	case 0xD4:
-		cycles, pc = gb.execCall(gb.getImm16(), !reg.f.C, 6, 3)
-		gb.Tick((cycles - 3) * 4)
+		pc = gb.execCall(!reg.f.C)
 	case 0xCC:
-		cycles, pc = gb.execCall(gb.getImm16(), reg.f.Z, 6, 3)
-		gb.Tick((cycles - 3) * 4)
+		pc = gb.execCall(reg.f.Z)
 	case 0xDC:
-		cycles, pc = gb.execCall(gb.getImm16(), reg.f.C, 6, 3)
-		gb.Tick((cycles - 3) * 4)
+		pc = gb.execCall(reg.f.C)
 	case 0xCD:
-		cycles, pc = gb.execCall(gb.getImm16(), true, 6, 6)
-		gb.Tick((cycles - 3) * 4)
+		pc = gb.execCall(true)
 
 	// ret
 	case 0xC0:
-		cycles, pc = gb.execRet(!reg.f.Z, 5, 2)
-		gb.Tick((cycles - 1) * 4)
+		pc = gb.execRet(!reg.f.Z)
 	case 0xD0:
-		cycles, pc = gb.execRet(!reg.f.C, 5, 2)
-		gb.Tick((cycles - 1) * 4)
+		pc = gb.execRet(!reg.f.C)
 	case 0xC8:
-		cycles, pc = gb.execRet(reg.f.Z, 5, 2)
-		gb.Tick((cycles - 1) * 4)
+		pc = gb.execRet(reg.f.Z)
 	case 0xD8:
-		cycles, pc = gb.execRet(reg.f.C, 5, 2)
-		gb.Tick((cycles - 1) * 4)
+		pc = gb.execRet(reg.f.C)
 	case 0xC9:
-		cycles, pc = gb.execRet(true, 4, 4)
-		gb.Tick((cycles - 1) * 4)
+		pc = gb.StackPop()
+        gb.Tick(4)
+
 	case 0xD9:
-		gb.Tick(3 * 4)
+		gb.Tick(4)
 		pc = gb.StackPop()
 		gb.Cpu.IME = true // why ime for mooneye/reti_intr_timing?
+
 		//gb.Cpu.PendingInterrupt = true
 
 	case 0xE0:
@@ -723,9 +713,9 @@ func (gb *GameBoy) Execute() {
 	case 0xE8:
 
 		sp := gb.Cpu.SP
-		gb.Tick(4)
 		e := uint16(gb.getImm8())
 
+		gb.Tick(4)
 		gb.Tick(4)
 		res := uint16(int(sp) + int(int8(e)))
 		tmp := sp ^ uint16(int8(e)) ^ res
@@ -1116,73 +1106,67 @@ func (gb *GameBoy) execDec(v uint8) uint8 {
 	return v
 }
 
-func (gb *GameBoy) execJP(addr uint16, cond bool, cyclesIf, cycles int) (c int, pc uint16) {
+func (gb *GameBoy) execJP(cond bool) uint16 {
 
 	if cond {
-		return cyclesIf, addr
+        gb.Tick(4)
+		return gb.getImm16()
 	}
 
-	return cycles, gb.Cpu.PC + 3
+    gb.Tick(8)
+	return gb.Cpu.PC + 3
 }
 
-func (gb *GameBoy) execJR(addr uint8, cond bool, cyclesIf, cycles int) (c int, pc uint16) {
+func (gb *GameBoy) execJR(cond bool) uint16 {
+
+	gb.Tick(4)
 
 	if cond {
-		return cyclesIf, uint16(int32(gb.Cpu.PC)+int32(int8(addr))) + 2
+		return uint16(int32(gb.Cpu.PC)+int32(int8(gb.getImm8()))) + 2
 	}
 
-	return cycles, gb.Cpu.PC + 2
-}
-
-func (gb *GameBoy) StackPopTicked() uint16 {
-	gb.Tick(4)
-	v := uint16(gb.Read(gb.Cpu.SP))
-	gb.Cpu.SP++
-	gb.Tick(4)
-	v |= uint16(gb.Read(gb.Cpu.SP)) << 8
-	gb.Cpu.SP++
-	return v
+	return gb.Cpu.PC + 2
 }
 
 func (gb *GameBoy) StackPop() uint16 {
+	gb.Tick(4)
 	v := uint16(gb.Read(gb.Cpu.SP))
 	gb.Cpu.SP++
+	gb.Tick(4)
 	v |= uint16(gb.Read(gb.Cpu.SP)) << 8
 	gb.Cpu.SP++
 	return v
 }
 
-func (gb *GameBoy) StackPushTicked(v uint16) {
-	gb.Tick(4)
-	gb.Tick(4)
-	gb.Cpu.SP--
-	gb.Write(gb.Cpu.SP, uint8(v>>8))
-	gb.Tick(4)
-	gb.Cpu.SP--
-	gb.Write(gb.Cpu.SP, uint8(v))
-}
-
 func (gb *GameBoy) StackPush(v uint16) {
+	gb.Tick(4)
+	gb.Tick(4)
 	gb.Cpu.SP--
 	gb.Write(gb.Cpu.SP, uint8(v>>8))
+	gb.Tick(4)
 	gb.Cpu.SP--
 	gb.Write(gb.Cpu.SP, uint8(v))
 }
 
-func (gb *GameBoy) execCall(addr uint16, cond bool, cyclesIf, cycles int) (c int, pc uint16) {
+func (gb *GameBoy) execCall(cond bool) uint16 {
+
+    addr := gb.getImm16()
+
 	if cond {
 		gb.StackPush(gb.Cpu.PC + 3)
-		return cyclesIf, addr
+		return addr
 	}
 
-	return cycles, gb.Cpu.PC + 3
+	return gb.Cpu.PC + 3
 }
 
-func (gb *GameBoy) execRet(cond bool, cyclesIf, cycles int) (c int, pc uint16) {
+func (gb *GameBoy) execRet(cond bool) uint16 {
 
 	if cond {
-		return cyclesIf, gb.StackPop()
+        gb.Tick(8)
+        return gb.StackPop()
 	}
 
-	return cycles, gb.Cpu.PC + 1
+    gb.Tick(4)
+    return gb.Cpu.PC + 1
 }

@@ -46,8 +46,24 @@ func (l *Logger) WriteLog(i int, opcode uint8) {
 	pc2 := gb.Read(gb.Cpu.PC + 2)
 	pc3 := gb.Read(gb.Cpu.PC + 3)
 
+	//s := fmt.Sprintf(
+	//	"FFFC %02X %02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X SCX %02X LY %02X IF %003X IE %03X",
+    //    gb.Read(0xFFFC),
+    //    gb.Read(0xFFFD),
+	//	gb.Cpu.SP,
+	//	gb.Cpu.PC,
+	//	pc0,
+	//	pc1,
+	//	pc2,
+	//	pc3,
+    //    gb.MemoryBus.IO[0x43],
+    //    gb.MemoryBus.IO[0x44],
+    //    gb.Cpu.IF,
+    //    gb.Cpu.IE,
+	//)
+
 	s := fmt.Sprintf(
-		"A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X",
+		"A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X SCX %02X LY %02X IF %003X IE %03X",
 		gb.Cpu.a,
 		gb.Cpu.f.Get(),
 		gb.Cpu.b,
@@ -62,9 +78,15 @@ func (l *Logger) WriteLog(i int, opcode uint8) {
 		pc1,
 		pc2,
 		pc3,
+        gb.MemoryBus.IO[0x43],
+        gb.MemoryBus.IO[0x44],
+        gb.Cpu.IF,
+        gb.Cpu.IE,
 	)
 
 	fmt.Fprintf(l.bufWriter, "%s\n", s)
+
+    fmt.Printf("%s\n", s)
 
 	BUF_SIZE := 10_000
 

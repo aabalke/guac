@@ -2,14 +2,13 @@
 
 package gameboy
 
-func (gb *GameBoy) renderTilesDMG() {
+func (gb *GameBoy) renderTilesDMG(scanline uint8) {
 
 	var (
 		scrollY   = gb.MemoryBus.IO[0x42]
 		scrollX   = gb.MemoryBus.IO[0x43]
 		windowY   = gb.MemoryBus.IO[0x4A]
 		windowX   = int(gb.MemoryBus.IO[0x4B]) - 7
-		scanline  = gb.MemoryBus.IO[LY]
 		useWindow = gb.Lcdc.WindowEnabled && windowY <= scanline
 	)
 

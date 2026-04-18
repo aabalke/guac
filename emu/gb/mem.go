@@ -24,8 +24,63 @@ type MemoryBus struct {
 	WRAMOffset uint16
 
 	Hdma Hdma
+    Oam OamDma
 
+}
+
+type OamDma struct {
+    IsActive bool
+    Pending, Pending2  bool
     OamValue uint8
+    Idx uint16
+    Base uint16
+}
+
+func (o *OamDma) Read() uint8 {
+    return o.OamValue
+}
+
+func (o *OamDma) Write(gb *GameBoy, v uint8) {
+    o.OamValue = v
+    o.Base = uint16(v) << 8
+    o.Idx = 0
+    o.Pending = true
+}
+
+func (o *OamDma) Tick(gb *GameBoy, tcycles int) {
+
+    for range tcycles / 4 {
+
+        if o.Pending {
+            o.Pending = false
+            o.IsActive = true
+            continue
+        }
+
+        if !o.IsActive {
+            continue
+        }
+
+        a := uint8(0)
+
+        // src of this behavior is sameboy - do not see any other ref
+        // req mooneye source dma test
+        if o.Base >= 0xE000 {
+            a = gb.Read((o.Base + o.Idx) &^ 0x2000)
+        } else {
+            a = gb.Read(o.Base + o.Idx)
+        }
+
+        gb.MemoryBus.OAM[o.Idx] = a
+
+        o.Idx++
+
+        if o.Idx >= 0xA0 {
+            o.IsActive = false
+            o.Pending = false
+            return
+        }
+    }
 }
 
 type Hdma struct {
@@ -105,7 +160,7 @@ func initMemory(gb *GameBoy) {
 	gb.Write(0xFF05, 0x00)
 	gb.Write(0xFF06, 0x00)
 	gb.Write(0xFF07, 0x00)
-	gb.Write(0xFF0F, 0xE1)
+    gb.Cpu.IF = 0xE1
 	gb.Write(0xFF10, 0x80)
 	gb.Write(0xFF11, 0xBF)
 	gb.Write(0xFF12, 0xF3)
@@ -130,7 +185,7 @@ func initMemory(gb *GameBoy) {
 	gb.Write(0xFF41, 0x81)
 	gb.Write(0xFF42, 0x00)
 	gb.Write(0xFF43, 0x00)
-	gb.Write(0xFF44, 0x90)
+	//gb.Write(0xFF44, 0x90)
 	gb.Write(0xFF45, 0x00)
 	gb.Write(0xFF47, 0xFC)
 	gb.Write(0xFF48, 0xFF)
@@ -248,6 +303,10 @@ func (gb *GameBoy) Read(addr uint16) uint8 {
 			return 0xFF
 		}
 
+        if dma := gb.MemoryBus.Oam.IsActive; dma {
+			return 0xFF
+        }
+
 		return gb.MemoryBus.OAM[addr-0xFE00]
 	case addr < 0xFF00:
 		return gb.MemoryBus.PROHIBITED[addr-0xFEA0]
@@ -350,7 +409,7 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 		return gb.MemoryBus.IO[uint8(addr)]
 
     case 0xFF46:
-        return gb.MemoryBus.OamValue
+        return gb.MemoryBus.Oam.Read()
 
 	case 0xFF4F:
 		return gb.MemoryBus.VRAMBank | 0xFE
@@ -483,7 +542,7 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		}
 
 	case 0xFF0F:
-		gb.Cpu.IF = v
+		gb.Cpu.IF = v & 0x1F
 
 	case 0xFF40:
 		gb.Lcdc.Write(v)
@@ -500,24 +559,7 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 			return
 		}
 
-        gb.MemoryBus.OamValue = v
-        addr := uint16(v) << 8
-
-        // src of this behavior is sameboy - do not see any other ref
-        if v >= 0xE0 {
-            for i := range uint16(0xA0) {
-                gb.Tick(4) // 160 m cycles = 4 tcycles per transfer
-                a := gb.Read((addr + i) &^ 0x2000)
-                gb.MemoryBus.OAM[i] = a
-            }
-            return
-        }
-
-		for i := range uint16(0xA0) {
-			gb.Tick(4) // 160 m cycles = 4 tcycles per transfer
-            a := gb.Read(addr + i)
-			gb.MemoryBus.OAM[i] = a
-		}
+        gb.MemoryBus.Oam.Write(gb, v)
 
 	case 0xFF47: // bgpalette mono
 

@@ -134,7 +134,7 @@ func (gb *GameBoy) Update() {
 		return
 	}
 
-	targetCycles := gb.Clock / gb.FPS << int(gb.DoubleSpeedFlag)
+	targetCycles := gb.Clock / gb.FPS << gb.DoubleSpeedFlag
 	for gb.frameCycles < targetCycles {
 		if gb.Cpu.Halted {
 			gb.Tick(4)
@@ -143,6 +143,8 @@ func (gb *GameBoy) Update() {
 		}
 
 		gb.Tick(gb.UpdateInterrupt())
+
+        targetCycles = gb.Clock / gb.FPS << gb.DoubleSpeedFlag
 	}
 
 	gb.frameCycles -= targetCycles
@@ -166,6 +168,9 @@ func (gb *GameBoy) Tick(tCycles int) {
 	}
 
 	gb.UpdateTimers(tCycles) // frame sequencer is here since div apu is controlled by div
+
+    gb.MemoryBus.Oam.Tick(gb, tCycles)
+
 	gb.Apu.WaveChannel.ClockWave(uint32(tCycles), uint32(gb.frameCycles))
 	gb.Apu.SoundClock(uint32(tCycles), uint32(gb.DoubleSpeedFlag))
 }
@@ -215,9 +220,16 @@ func (gb *GameBoy) UpdateInterrupt() int {
 		gb.Cpu.IME = false
 		gb.Cpu.Halted = false
 		gb.Cpu.IF &^= (1 << i)
-		gb.StackPush(gb.Cpu.PC)
+
+        // stack push
+        gb.Cpu.SP--
+        gb.Write(gb.Cpu.SP, uint8(gb.Cpu.PC>>8))
+        gb.Cpu.SP--
+        gb.Write(gb.Cpu.SP, uint8(gb.Cpu.PC))
+
 		gb.Cpu.PC = IRQ_SRC[i]
 		gb.Cpu.isBranching = true
+
 		return 20
 	}
 
@@ -230,13 +242,13 @@ func (gb *GameBoy) UpdateTimers(cycles int) {
 
 	t := &gb.Timer
 
-	cycles <<= int(gb.DoubleSpeedFlag)
+	cycles <<= gb.DoubleSpeedFlag
 
 	prev := t.Div
 	t.Div += uint16(cycles)
 
 	mask := uint16(1 << 12)
-	mask <<= uint16(gb.DoubleSpeedFlag)
+	mask <<= gb.DoubleSpeedFlag
 	if prev&mask != 0 && t.Div&mask == 0 {
 		gb.Apu.ClockFrameSequencer()
 	}
@@ -301,7 +313,7 @@ func (gb *GameBoy) toggleDoubleSpeed() {
 
 	gb.Cpu.Halted = false
 
-	gb.MemoryBus.IO[0x4D] = uint8(gb.DoubleSpeedFlag << 7)
+	gb.MemoryBus.IO[0x4D] = gb.DoubleSpeedFlag << 7
 }
 
 func (gb *GameBoy) Close() {

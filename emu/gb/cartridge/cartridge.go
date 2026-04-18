@@ -150,6 +150,11 @@ func (c *Cartridge) ParseHeader(buf []uint8) {
         c.RamMask = ramMask[buf[RAM]]
 	}
 
+    if c.RamSize == 0 && c.Type == 0x02 || c.Type == 0x03 {
+        c.RamSize = ramSize[4]
+        c.RamMask = ramMask[4]
+    }
+
     if mbc2 := c.Type == 0x5 || c.Type == 0x6; mbc2 {
         c.RamSize = 1 << 18
         c.RamMask = (1 << 18) - 1
