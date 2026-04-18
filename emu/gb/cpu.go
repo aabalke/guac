@@ -498,7 +498,6 @@ func (gb *GameBoy) Block2(op uint8) {
 }
 
 var cnt int
-var b bool
 
 func (gb *GameBoy) Execute() {
 
@@ -509,18 +508,12 @@ func (gb *GameBoy) Execute() {
 	//op := gb.GetOp()
 	op := gb.Read(gb.Cpu.PC)
 
-    //if gb.Cpu.PC == 0x16B {
-    //if gb.Cpu.PC == 0x4B {
-    //if gb.Cpu.PC == 0x17F {
-    //    b = true
-    //}
-
-    //if b {
+    //if debug.B[0] {
     //    L.WriteLog(cnt, op)
     //    cnt++
     //}
 
-    //if cnt >= 25 {
+    //if cnt >= 10000 {
     //    L.Close()
     //    os.Exit(0)
     //}
@@ -1139,8 +1132,7 @@ func (gb *GameBoy) StackPop() uint16 {
 }
 
 func (gb *GameBoy) StackPush(v uint16) {
-	gb.Tick(4)
-	gb.Tick(4)
+	gb.Tick(8)
 	gb.Cpu.SP--
 	gb.Write(gb.Cpu.SP, uint8(v>>8))
 	gb.Tick(4)

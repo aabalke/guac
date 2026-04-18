@@ -2,7 +2,6 @@ package gameboy
 
 import (
 	"slices"
-
 	"github.com/aabalke/guac/config"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -13,8 +12,6 @@ func (gb *GameBoy) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGame
 		keyConfig    = config.Conf.Gb.KeyboardConfig
 		buttonConfig = config.Conf.Gba.ControllerConfig
 		k            = &gb.Joypad
-        noKeys = true
-        noButs = true
 	)
 
 	*k = 0xFF
@@ -37,8 +34,6 @@ func (gb *GameBoy) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGame
 			*k &^= 1 << 2
 		case slices.Contains(keyConfig.Down, keyStr):
 			*k &^= 1 << 3
-		default:
-            noKeys = true
 		}
 	}
 
@@ -60,14 +55,21 @@ func (gb *GameBoy) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGame
 			*k &^= 1 << 2
 		case slices.Contains(buttonConfig.Down, buttonStr):
 			*k &^= 1 << 3
-		default:
-            noButs = true
 		}
 	}
 
-    if noKeys && noButs {
-        return
+    if *k != 0xFF {
+        gb.SetIrq(IRQ_JPD)
     }
+}
 
-    gb.SetIrq(IRQ_JPD)
+func (gb *GameBoy) getJoypad() uint8 {
+    joyp := gb.MemoryBus.JoypadReg
+    if dpad := (joyp >> 4) & 1 == 0; dpad {
+        return (joyp & 0x30) | (gb.Joypad & 0xF) | 0xC0
+    } else if ssba := (joyp >> 5) & 1 == 0; ssba {
+        return (joyp & 0x30) | (gb.Joypad >> 4) | 0xC0
+    } else {
+        return joyp | 0xCF // all released
+    }
 }

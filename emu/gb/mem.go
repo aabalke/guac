@@ -26,6 +26,7 @@ type MemoryBus struct {
 	Hdma Hdma
     Oam OamDma
 
+    JoypadReg uint8
 }
 
 type OamDma struct {
@@ -341,6 +342,8 @@ func (gb *GameBoy) Write(addr uint16, v uint8) {
 		gb.MemoryBus.VRAM[gb.MemoryBus.VRAMBank][addr&0x1FFF] = v
 
 	case addr < 0xC000:
+
+
 		gb.Cartridge.Mbc.Write(addr, v)
 		gb.MemoryBus.ramSaved = false
 	case addr < 0xD000:
@@ -377,7 +380,7 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 
 	switch addr {
 	case 0xFF00:
-		return gb.getJoypad() | 0xC0
+		return gb.getJoypad()
 
 	case 0xFF04: // DIV
 		return uint8(gb.Timer.Div >> 8)
@@ -476,6 +479,11 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 	}
 
 	switch addr {
+    case 0xFF00:
+
+        gb.MemoryBus.JoypadReg &^= 0x30
+        gb.MemoryBus.JoypadReg |= v & 0x30
+
 	case 0xFF04: // DIV
 
 		t := &gb.Timer

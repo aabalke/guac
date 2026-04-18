@@ -190,8 +190,16 @@ Oam Bug 2
 
 👍 EricKirschenmann/MBC3-Tester-gb
 
-## aaaaaa123456789/rtc3test
+# aaaaaa123456789/rtc3test
 👍 basic
 ❌ range
 ❌ sub second
 
+# Ashiepaws/scribbltests
+❌ fairylake
+👍 lycscx
+👍 lycscy
+❌ palettely
+👍 scxly
+❌ statcount
+❌ winpos
