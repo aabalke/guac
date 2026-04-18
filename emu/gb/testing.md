@@ -184,8 +184,6 @@ Oam Bug 2
 
 ## Misc Tests
 
-
-
 # Other tests
 
 👍 EricKirschenmann/MBC3-Tester-gb
@@ -199,7 +197,7 @@ Oam Bug 2
 ❌ fairylake
 👍 lycscx
 👍 lycscy
-❌ palettely
+👍 palettely
 👍 scxly
-❌ statcount
+❌ statcount // need lcd enabled timing accurate
 ❌ winpos

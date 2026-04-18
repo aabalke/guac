@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"errors"
 	"os"
+	"unsafe"
 )
 
 type Mbc interface {
+	ReadPtr(uint16) unsafe.Pointer
 	Read(uint16) uint8
 	Write(uint16, uint8)
 	Save()

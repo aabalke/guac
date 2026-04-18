@@ -90,6 +90,7 @@ func (l *Lcdc) Write(v uint8) {
 		// fingers crossed skyemu figured this out lol
 		// skyemu has similar problem, could not find similar offset on sameboy
 		// required to pass 1-lcd_sync.gb
+		//l.gb.Timer.DotCounter = 4
 		l.gb.Timer.DotCounter = 4
 		l.gb.MemoryBus.IO[LY] = 0
 		l.gb.Stat.Mode = PPU_HBLANK
@@ -110,6 +111,8 @@ type Stat struct {
 	IrqVBlank bool
 	IrqOam    bool
 	IrqLyc    bool
+
+
 }
 
 func (s *Stat) Read() uint8 {
@@ -129,7 +132,8 @@ func (s *Stat) Read() uint8 {
 	if s.IrqLyc {
 		v |= 1 << 6
 	}
-	return v
+
+	return v | 0x80
 }
 
 func (s *Stat) Write(v uint8) {

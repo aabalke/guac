@@ -169,7 +169,7 @@ func (gb *GameBoy) Tick(tCycles int) {
 
 	gb.UpdateTimers(tCycles) // frame sequencer is here since div apu is controlled by div
 
-	gb.MemoryBus.Oam.Tick(gb, tCycles)
+	//gb.MemoryBus.Oam.Tick(gb, tCycles)
 
 	gb.Apu.WaveChannel.ClockWave(uint32(tCycles), uint32(gb.frameCycles))
 	gb.Apu.SoundClock(uint32(tCycles), uint32(gb.DoubleSpeedFlag))

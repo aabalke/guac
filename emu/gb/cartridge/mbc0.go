@@ -1,6 +1,9 @@
 package cartridge
 
-import "fmt"
+import (
+	"fmt"
+	"unsafe"
+)
 
 type Mbc0 struct {
 	Cartridge *Cartridge
@@ -26,6 +29,15 @@ func (m *Mbc0) Read(addr uint16) uint8 {
 	}
 
 	return 0
+}
+
+func (m *Mbc0) ReadPtr(addr uint16) unsafe.Pointer {
+
+	if addr < 0x8000 {
+		return unsafe.Pointer(&m.Cartridge.Data[addr])
+	}
+
+	return nil
 }
 
 func (m *Mbc0) Write(addr uint16, v uint8) {}

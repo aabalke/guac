@@ -2,6 +2,7 @@ package cartridge
 
 import (
 	"fmt"
+	"unsafe"
 )
 
 type Mbc1 struct {
@@ -38,6 +39,19 @@ func (m *Mbc1) Read(addr uint16) uint8 {
 		return m.Cartridge.RamData[(m.RamBase|uint32(addr-0xA000))&m.Cartridge.RamMask]
 	default:
 		return 0xFF
+	}
+}
+
+func (m *Mbc1) ReadPtr(addr uint16) unsafe.Pointer {
+	switch {
+	case addr < 0x4000:
+		return unsafe.Pointer(&m.Cartridge.Data[(m.RomBase|uint32(addr))&m.Cartridge.RomMask])
+	case addr < 0x8000:
+		return unsafe.Pointer(&m.Cartridge.Data[(m.RomBase2|uint32(addr-0x4000))&m.Cartridge.RomMask])
+	case m.RamEnabled:
+		return unsafe.Pointer(&m.Cartridge.RamData[(m.RamBase|uint32(addr-0xA000))&m.Cartridge.RamMask])
+	default:
+		return nil
 	}
 }
 

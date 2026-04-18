@@ -497,16 +497,13 @@ func (gb *GameBoy) Block2(op uint8) {
 	}
 }
 
-var cnt int
-
 func (gb *GameBoy) Execute() {
 
 	pc := gb.Cpu.PC + 1
 	reg := gb.Cpu
 
 	gb.Tick(4)
-	//op := gb.GetOp()
-	op := gb.Read(gb.Cpu.PC)
+	op := gb.GetOp()
 
 	//if debug.B[0] {
 	//    L.WriteLog(cnt, op)

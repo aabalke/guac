@@ -46,6 +46,11 @@ func (o *OamDma) Write(gb *GameBoy, v uint8) {
 	o.Base = uint16(v) << 8
 	o.Idx = 0
 	o.Pending = true
+
+    // currently skipping accurate timing (causes problems)
+    // I believe other things need to be emulated properly prior to getting this acc
+    // or it may be restart oams need to be proper
+    o.Tick(gb, 200 << 2)
 }
 
 func (o *OamDma) Tick(gb *GameBoy, tcycles int) {
@@ -222,27 +227,15 @@ func (gb *GameBoy) InitSaveLoop() {
 func (gb *GameBoy) ReadPtr(addr uint16) unsafe.Pointer {
 
 	switch {
-	case addr < 0x4000:
-		//return gb.Cartridge.Mbc.Read(gb.Cartridge, addr)
-		//return gb.Cartridge.Mbc.ReadPtr(gb.Cartridge, addr)
-		return nil
 	case addr < 0x8000:
-		//return gb.Cartridge.Mbc.ReadRomPtr(gb.Cartridge, addr)
-		return nil
-		//return gb.Cartridge.Mbc.ReadRom(gb.Cartridge, addr)
+		return gb.Cartridge.Mbc.ReadPtr(addr)
+
 	case addr < 0xA000:
-
-		//if gb.Color {
-		//	offset := uint16(gb.MemoryBus.VRAMBank) * 0x2000
-		//	return gb.MemoryBus.VRAM[addr-0x8000+offset]
-		//}
-		//return gb.MemoryBus.VRAM[addr-0x8000]
-
 		return nil
 
 	case addr < 0xC000:
-		//return gb.Cartridge.Mbc.ReadRam(gb.Cartridge, addr)
-		return nil
+		return gb.Cartridge.Mbc.ReadPtr(addr)
+
 	case addr < 0xD000:
 
 		addr &= 0xFFF
@@ -405,6 +398,7 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 		return gb.Lcdc.Read()
 
 	case 0xFF41:
+
 		return gb.Stat.Read()
 
 	case 0xFF44:
