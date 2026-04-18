@@ -26,6 +26,8 @@ type MemoryBus struct {
 	Hdma Hdma
 	Oam  OamDma
 
+    Serial Serial
+
 	JoypadReg uint8
 }
 
@@ -370,9 +372,22 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 		return gb.ReadSound(uint8(addr), gb.Apu)
 	}
 
+    if addr >= 0xFF4C && addr < 0xFF80 {
+        return 0xFF
+    }
+
 	switch addr {
 	case 0xFF00:
 		return gb.getJoypad()
+
+    case 0xFF01:
+        return gb.MemoryBus.Serial.sb
+
+    case 0xFF02:
+        return gb.MemoryBus.Serial.ReadSb()
+
+    case 0xFF03:
+        return 0xFF
 
 	case 0xFF04: // DIV
 		return uint8(gb.Timer.Div >> 8)
@@ -391,6 +406,9 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 
 		return v
 
+    case 0xFF08, 0xFF09, 0xFF0A, 0xFF0B, 0xFF0C, 0xFF0D, 0xFF0E:
+        return 0xFF
+
 	case 0xFF0F:
 		return gb.Cpu.IF | 0xE0
 
@@ -398,7 +416,6 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 		return gb.Lcdc.Read()
 
 	case 0xFF41:
-
 		return gb.Stat.Read()
 
 	case 0xFF44:
@@ -476,6 +493,12 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 
 		gb.MemoryBus.JoypadReg &^= 0x30
 		gb.MemoryBus.JoypadReg |= v & 0x30
+
+    case 0xFF01:
+        gb.MemoryBus.Serial.sb = v
+
+    case 0xFF02:
+        gb.MemoryBus.Serial.WriteSb(v)
 
 	case 0xFF04: // DIV
 

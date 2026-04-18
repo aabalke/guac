@@ -97,7 +97,7 @@ Oam Bug 2
 
 👍 mem oam
 👍 reg f
-❌ unused_hwio_GS
+👍 unused_hwio_GS
 
 ## Timer
 
