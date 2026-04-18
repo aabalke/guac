@@ -144,7 +144,7 @@ func (gb *GameBoy) Update() {
 
 		gb.Tick(gb.UpdateInterrupt())
 
-        targetCycles = gb.Clock / gb.FPS << gb.DoubleSpeedFlag
+		targetCycles = gb.Clock / gb.FPS << gb.DoubleSpeedFlag
 	}
 
 	gb.frameCycles -= targetCycles
@@ -169,7 +169,7 @@ func (gb *GameBoy) Tick(tCycles int) {
 
 	gb.UpdateTimers(tCycles) // frame sequencer is here since div apu is controlled by div
 
-    gb.MemoryBus.Oam.Tick(gb, tCycles)
+	gb.MemoryBus.Oam.Tick(gb, tCycles)
 
 	gb.Apu.WaveChannel.ClockWave(uint32(tCycles), uint32(gb.frameCycles))
 	gb.Apu.SoundClock(uint32(tCycles), uint32(gb.DoubleSpeedFlag))
@@ -221,11 +221,11 @@ func (gb *GameBoy) UpdateInterrupt() int {
 		gb.Cpu.Halted = false
 		gb.Cpu.IF &^= (1 << i)
 
-        // stack push
-        gb.Cpu.SP--
-        gb.Write(gb.Cpu.SP, uint8(gb.Cpu.PC>>8))
-        gb.Cpu.SP--
-        gb.Write(gb.Cpu.SP, uint8(gb.Cpu.PC))
+		// stack push
+		gb.Cpu.SP--
+		gb.Write(gb.Cpu.SP, uint8(gb.Cpu.PC>>8))
+		gb.Cpu.SP--
+		gb.Write(gb.Cpu.SP, uint8(gb.Cpu.PC))
 
 		gb.Cpu.PC = IRQ_SRC[i]
 		gb.Cpu.isBranching = true

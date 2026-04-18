@@ -508,15 +508,15 @@ func (gb *GameBoy) Execute() {
 	//op := gb.GetOp()
 	op := gb.Read(gb.Cpu.PC)
 
-    //if debug.B[0] {
-    //    L.WriteLog(cnt, op)
-    //    cnt++
-    //}
+	//if debug.B[0] {
+	//    L.WriteLog(cnt, op)
+	//    cnt++
+	//}
 
-    //if cnt >= 10000 {
-    //    L.Close()
-    //    os.Exit(0)
-    //}
+	//if cnt >= 10000 {
+	//    L.Close()
+	//    os.Exit(0)
+	//}
 
 	if block0 := op&0xC0 == 0x00; block0 {
 		pc := gb.Block0(op, pc)
@@ -588,7 +588,7 @@ func (gb *GameBoy) Execute() {
 	case 0xDA:
 		pc = gb.execJP(reg.f.C)
 	case 0xE9:
-        pc = *reg.HL
+		pc = *reg.HL
 
 	// Interrupts
 	case 0xF3:
@@ -680,7 +680,7 @@ func (gb *GameBoy) Execute() {
 		pc = gb.execRet(reg.f.C)
 	case 0xC9:
 		pc = gb.StackPop()
-        gb.Tick(4)
+		gb.Tick(4)
 
 	case 0xD9:
 		gb.Tick(4)
@@ -1102,11 +1102,11 @@ func (gb *GameBoy) execDec(v uint8) uint8 {
 func (gb *GameBoy) execJP(cond bool) uint16 {
 
 	if cond {
-        gb.Tick(4)
+		gb.Tick(4)
 		return gb.getImm16()
 	}
 
-    gb.Tick(8)
+	gb.Tick(8)
 	return gb.Cpu.PC + 3
 }
 
@@ -1142,7 +1142,7 @@ func (gb *GameBoy) StackPush(v uint16) {
 
 func (gb *GameBoy) execCall(cond bool) uint16 {
 
-    addr := gb.getImm16()
+	addr := gb.getImm16()
 
 	if cond {
 		gb.StackPush(gb.Cpu.PC + 3)
@@ -1155,10 +1155,10 @@ func (gb *GameBoy) execCall(cond bool) uint16 {
 func (gb *GameBoy) execRet(cond bool) uint16 {
 
 	if cond {
-        gb.Tick(8)
-        return gb.StackPop()
+		gb.Tick(8)
+		return gb.StackPop()
 	}
 
-    gb.Tick(4)
-    return gb.Cpu.PC + 1
+	gb.Tick(4)
+	return gb.Cpu.PC + 1
 }

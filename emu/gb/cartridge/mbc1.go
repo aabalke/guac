@@ -18,24 +18,24 @@ func NewMbc1(c *Cartridge) *Mbc1 {
 
 	fmt.Printf("Cartridge MBC1\n")
 
-    m := &Mbc1{
-        Cartridge: c,
-        Bank1: 1,
-    }
+	m := &Mbc1{
+		Cartridge: c,
+		Bank1:     1,
+	}
 
-    m.UpdateAddrs()
+	m.UpdateAddrs()
 
-    return m
+	return m
 }
 
 func (m *Mbc1) Read(addr uint16) uint8 {
 	switch {
 	case addr < 0x4000:
-		return m.Cartridge.Data[(m.RomBase|uint32(addr)) & m.Cartridge.RomMask]
+		return m.Cartridge.Data[(m.RomBase|uint32(addr))&m.Cartridge.RomMask]
 	case addr < 0x8000:
-		return m.Cartridge.Data[(m.RomBase2|uint32(addr-0x4000)) & m.Cartridge.RomMask]
+		return m.Cartridge.Data[(m.RomBase2|uint32(addr-0x4000))&m.Cartridge.RomMask]
 	case m.RamEnabled:
-		return m.Cartridge.RamData[(m.RamBase|uint32(addr-0xA000))& m.Cartridge.RamMask]
+		return m.Cartridge.RamData[(m.RamBase|uint32(addr-0xA000))&m.Cartridge.RamMask]
 	default:
 		return 0xFF
 	}
@@ -45,7 +45,7 @@ func (m *Mbc1) Write(addr uint16, v uint8) {
 
 	switch {
 	case addr < 0x2000:
-		m.RamEnabled = v & 0xF == 0xA
+		m.RamEnabled = v&0xF == 0xA
 
 	case addr < 0x4000:
 		m.Bank1 = max(1, v&0x1F)
@@ -59,8 +59,8 @@ func (m *Mbc1) Write(addr uint16, v uint8) {
 		m.AdvMode = v&1 != 0
 		m.UpdateAddrs()
 
-    case m.RamEnabled:
-        m.Cartridge.RamData[(m.RamBase|uint32(addr-0xA000))&m.Cartridge.RamMask] = v
+	case m.RamEnabled:
+		m.Cartridge.RamData[(m.RamBase|uint32(addr-0xA000))&m.Cartridge.RamMask] = v
 	}
 }
 

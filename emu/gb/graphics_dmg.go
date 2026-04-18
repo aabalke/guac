@@ -27,62 +27,44 @@ func (gb *GameBoy) renderTilesDMG(scanline uint8) {
 		bgMemory = 0x9C00
 	}
 
-	// yPos is used to calc which of 32 v-lines the current scanline is drawing
-	var yPos uint8
-	if useWindow {
-		yPos = uint8(scanline - windowY)
-	} else {
-		yPos = uint8(scrollY + scanline)
-	}
-
-	var (
-		// which of the 8 vertical pixels of the current tile is the scanline on?
-		tileRow = uint16(yPos/8) * 32
-
-		lastTileCol            = uint16(0xFFFF)
-		data1, data2, colorBit uint8
-	)
-
 	for pixel := range width {
 
+		var yPos uint8
 		var xPos uint8
 		if winSpace := useWindow && pixel >= windowX; winSpace {
 			xPos = uint8((int(pixel) - windowX))
+			yPos = uint8(scanline - windowY)
 		} else {
 			xPos = (uint8(pixel) + scrollX)
+			yPos = uint8(scrollY + scanline)
 		}
 
-		// Which of the 32 horizontal tiles does this x_pox fall within?
-		if tileCol := uint16(xPos / 8); tileCol != lastTileCol {
-			lastTileCol = tileCol
-
-			// PER PIXEL OF SCAN LINE, NEED TO CHECK IF PIXEL >= WX AS WELL TO CHOOSE TILE ADDR (BG VS WIN)
-			tileAddr := tileRow + tileCol
-			if useWindow && pixel >= windowX {
-				tileAddr += winMemory - 0x8000
-			} else {
-				tileAddr += bgMemory - 0x8000
-			}
-
-			tileLocation := tileData - 0x8000
-			if gb.Lcdc.UnsignedTiles {
-				tileNum := int16(gb.MemoryBus.VRAM[0][tileAddr])
-				tileLocation = tileLocation + uint16(tileNum*16)
-			} else {
-				tileNum := int(int8(gb.MemoryBus.VRAM[0][tileAddr]))
-				tileLocation = uint16(int(tileLocation) + int((tileNum+128)*16))
-			}
-
-			line := (yPos & 7)
-
-			addr := tileLocation + uint16(line<<1)
-
-			data1 = gb.MemoryBus.VRAM[0][addr+0]
-			data2 = gb.MemoryBus.VRAM[0][addr+1]
-
+		tileRow := uint16(yPos/8) * 32
+		tileCol := uint16(xPos / 8)
+		tileAddr := tileRow + tileCol
+		if useWindow && pixel >= windowX {
+			tileAddr += winMemory - 0x8000
+		} else {
+			tileAddr += bgMemory - 0x8000
 		}
 
-		colorBit = 7 - (xPos & 7)
+		tileLocation := tileData - 0x8000
+		if gb.Lcdc.UnsignedTiles {
+			tileNum := int16(gb.MemoryBus.VRAM[0][tileAddr])
+			tileLocation = tileLocation + uint16(tileNum*16)
+		} else {
+			tileNum := int(int8(gb.MemoryBus.VRAM[0][tileAddr]))
+			tileLocation = uint16(int(tileLocation) + int((tileNum+128)*16))
+		}
+
+		line := (yPos & 7)
+
+		addr := tileLocation + uint16(line<<1)
+
+		data1 := gb.MemoryBus.VRAM[0][addr+0]
+		data2 := gb.MemoryBus.VRAM[0][addr+1]
+
+		colorBit := 7 - (xPos & 7)
 
 		//colorNum := getVal(data2, uint8(colorBit))
 		//colorNum <<= 1

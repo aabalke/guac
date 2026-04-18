@@ -9,7 +9,7 @@ import (
 type Mbc interface {
 	Read(uint16) uint8
 	Write(uint16, uint8)
-    Save()
+	Save()
 }
 
 func ReadRam(path string) ([]uint8, error) {
@@ -63,5 +63,5 @@ func WriteRam(path string, data []uint8) {
 		panic(err)
 	}
 
-    writer.Flush()
+	writer.Flush()
 }

@@ -186,7 +186,7 @@ func (gb *GameBoy) UpdateGraphics(tcycles int) {
 		}
 	}
 
-    prevMatch := stat.Match
+	prevMatch := stat.Match
 	stat.Match = *ly == gb.MemoryBus.IO[LYC]
 	if !prevMatch && stat.Match && stat.IrqLyc {
 		gb.SetIrq(IRQ_LCD)
@@ -214,7 +214,7 @@ func (gb *GameBoy) UpdateGraphics(tcycles int) {
 func (gb *GameBoy) drawScanline(scanline int32) {
 
 	if gb.Color {
-		gb.renderTilesGBC()
+		gb.renderTilesGBC(uint8(scanline))
 	} else if gb.Lcdc.BgMaster {
 		gb.renderTilesDMG(uint8(scanline))
 	}

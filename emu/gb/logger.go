@@ -48,18 +48,18 @@ func (l *Logger) WriteLog(i int, opcode uint8) {
 
 	//s := fmt.Sprintf(
 	//	"FFFC %02X %02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X SCX %02X LY %02X IF %003X IE %03X",
-    //    gb.Read(0xFFFC),
-    //    gb.Read(0xFFFD),
+	//    gb.Read(0xFFFC),
+	//    gb.Read(0xFFFD),
 	//	gb.Cpu.SP,
 	//	gb.Cpu.PC,
 	//	pc0,
 	//	pc1,
 	//	pc2,
 	//	pc3,
-    //    gb.MemoryBus.IO[0x43],
-    //    gb.MemoryBus.IO[0x44],
-    //    gb.Cpu.IF,
-    //    gb.Cpu.IE,
+	//    gb.MemoryBus.IO[0x43],
+	//    gb.MemoryBus.IO[0x44],
+	//    gb.Cpu.IF,
+	//    gb.Cpu.IE,
 	//)
 
 	s := fmt.Sprintf(
@@ -73,13 +73,13 @@ func (l *Logger) WriteLog(i int, opcode uint8) {
 		gb.Cpu.PC,
 		pc0,
 		pc1,
-        gb.Cpu.IF,
-        gb.Cpu.IE,
+		gb.Cpu.IF,
+		gb.Cpu.IE,
 	)
 
 	fmt.Fprintf(l.bufWriter, "%s\n", s)
 
-    fmt.Printf("%s\n", s)
+	fmt.Printf("%s\n", s)
 
 	BUF_SIZE := 10_000
 

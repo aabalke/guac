@@ -2,14 +2,13 @@
 
 package gameboy
 
-func (gb *GameBoy) renderTilesGBC() {
+func (gb *GameBoy) renderTilesGBC(scanline uint8) {
 
 	var (
 		scrollY   = gb.MemoryBus.IO[0x42]
 		scrollX   = gb.MemoryBus.IO[0x43]
 		windowY   = gb.MemoryBus.IO[0x4A]
 		windowX   = int(gb.MemoryBus.IO[0x4B]) - 7
-		scanline  = gb.MemoryBus.IO[LY]
 		useWindow = gb.Lcdc.WindowEnabled && windowY <= scanline
 	)
 
@@ -28,74 +27,53 @@ func (gb *GameBoy) renderTilesGBC() {
 		bgMemory = 0x9C00
 	}
 
-	// yPos is used to calc which of 32 v-lines the current scanline is drawing
-	var yPos uint8
-	if useWindow {
-		yPos = uint8(scanline - windowY)
-	} else {
-		yPos = uint8(scrollY + scanline)
-	}
-
-	var (
-		// which of the 8 vertical pixels of the current tile is the scanline on?
-		tileRow = uint16(yPos/8) * 32
-
-		lastTileCol            = uint16(0xFFFF)
-		data1, data2, colorBit uint8
-
-		priority   bool
-		cgbPalBase uint8
-		tileAttr   uint8
-	)
-
 	for pixel := range width {
 
+		var yPos uint8
 		var xPos uint8
 		if winSpace := useWindow && pixel >= windowX; winSpace {
 			xPos = uint8((int(pixel) - windowX))
+			yPos = uint8(scanline - windowY)
 		} else {
 			xPos = (uint8(pixel) + scrollX)
+			yPos = uint8(scrollY + scanline)
 		}
 
-		// Which of the 32 horizontal tiles does this x_pox fall within?
-		if tileCol := uint16(xPos / 8); tileCol != lastTileCol {
-			lastTileCol = tileCol
-
-			// PER PIXEL OF SCAN LINE, NEED TO CHECK IF PIXEL >= WX AS WELL TO CHOOSE TILE ADDR (BG VS WIN)
-			tileAddr := tileRow + tileCol
-			if useWindow && pixel >= windowX {
-				tileAddr += winMemory - 0x8000
-			} else {
-				tileAddr += bgMemory - 0x8000
-			}
-
-			tileLocation := tileData - 0x8000
-			if gb.Lcdc.UnsignedTiles {
-				tileNum := int16(gb.MemoryBus.VRAM[0][tileAddr])
-				tileLocation = tileLocation + uint16(tileNum*16)
-			} else {
-				tileNum := int(int8(gb.MemoryBus.VRAM[0][tileAddr]))
-				tileLocation = uint16(int(tileLocation) + int((tileNum+128)*16))
-			}
-
-			tileAttr = gb.MemoryBus.VRAM[1][tileAddr]
-			priority = (tileAttr>>7)&1 != 0
-
-			var line byte
-			if vFlip := (tileAttr>>6)&1 != 0; vFlip {
-				line = ((7 - yPos) & 7)
-			} else {
-				line = (yPos & 7)
-			}
-
-			addr := tileLocation + uint16(line<<1)
-
-			cgbPalBase = (tileAttr & 7) << 2
-			data1 = gb.MemoryBus.VRAM[(tileAttr>>3)&1][addr+0]
-			data2 = gb.MemoryBus.VRAM[(tileAttr>>3)&1][addr+1]
-
+		tileRow := uint16(yPos/8) * 32
+		tileCol := uint16(xPos / 8)
+		tileAddr := tileRow + tileCol
+		if useWindow && pixel >= windowX {
+			tileAddr += winMemory - 0x8000
+		} else {
+			tileAddr += bgMemory - 0x8000
 		}
 
+		tileLocation := tileData - 0x8000
+		if gb.Lcdc.UnsignedTiles {
+			tileNum := int16(gb.MemoryBus.VRAM[0][tileAddr])
+			tileLocation = tileLocation + uint16(tileNum*16)
+		} else {
+			tileNum := int(int8(gb.MemoryBus.VRAM[0][tileAddr]))
+			tileLocation = uint16(int(tileLocation) + int((tileNum+128)*16))
+		}
+
+		tileAttr := gb.MemoryBus.VRAM[1][tileAddr]
+		priority := (tileAttr>>7)&1 != 0
+
+		var line byte
+		if vFlip := (tileAttr>>6)&1 != 0; vFlip {
+			line = ((7 - yPos) & 7)
+		} else {
+			line = (yPos & 7)
+		}
+
+		addr := tileLocation + uint16(line<<1)
+
+		cgbPalBase := (tileAttr & 7) << 2
+		data1 := gb.MemoryBus.VRAM[(tileAttr>>3)&1][addr+0]
+		data2 := gb.MemoryBus.VRAM[(tileAttr>>3)&1][addr+1]
+
+		var colorBit uint8
 		if (tileAttr>>5)&1 != 0 {
 			colorBit = xPos & 7
 		} else {
