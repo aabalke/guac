@@ -103,26 +103,10 @@ graphics/3d/toon_shading
 Animal Crossing
 - Windows
 - Map only comes up under certain circumstances
-Chrono Trigger
 Mario Kart
 - Shadows
-👍 Pokemon Diamond
-Pokemon Mystery Dungeon Explorers of Time
-Sonic Chronicles the Dark Brotherhood
-- Edges on transparent (same as zelda?)
+- Emblem Blending
+Pokemon Diamond / Pearl
+- Blend Capture at Legendary Reveal
+New Super Mario Bros
 Super Mario 64
-👍 Tetris DS
-Yoshi's Island
-- minor decompressed sound problem
-
-# 0.0.2 Release General Goals
-- Culling
-- Faster Frame rate sound
-- 3d "2d" texture bug - bad timing bug
-- ADMCP decompress error
-- Bug on startup - this goes back very far (pre 0.0.1)
-- Screenshotting
-- Save States
-
-Mario and Luigi Bowsers Inside Story
-- "2d" 3d textures getting corrupted

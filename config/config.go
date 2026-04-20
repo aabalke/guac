@@ -79,6 +79,12 @@ type KeyboardConfig struct {
 	Fullscreen []string `toml:"fullscreen"`
 	Quit       []string `toml:"quit"`
 	Unlimited  []string `toml:"unlimited"`
+    Fps15      []string `toml:"fps15"`
+    Fps30      []string `toml:"fps30"`
+    Fps60      []string `toml:"fps60"`
+    Fps120     []string `toml:"fps120"`
+    Fps180     []string `toml:"fps180"`
+    Fps240     []string `toml:"fps240"`
 }
 
 type ControllerConfig struct {

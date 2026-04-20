@@ -5,9 +5,9 @@ import (
 	"os"
 
 	"github.com/aabalke/guac/config"
-	"github.com/aabalke/guac/emu/gba/apu"
 	"github.com/aabalke/guac/emu/cpu"
 	arm7 "github.com/aabalke/guac/emu/cpu/arm7"
+	"github.com/aabalke/guac/emu/gba/apu"
 	"github.com/aabalke/guac/emu/gba/cart"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
@@ -59,7 +59,7 @@ type GBA struct {
 	Frame uint64
 }
 
-func (gba *GBA) Update() {
+func (gba *GBA) Update(stdFps bool) {
 
 	gba.AccCycles = 0
 
@@ -110,7 +110,7 @@ func (gba *GBA) Update() {
 		}
 	}
 
-	gba.Apu.Play(gba.Muted)
+	gba.Apu.Play(gba.Muted, stdFps)
 	gba.Frame++
 }
 

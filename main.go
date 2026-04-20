@@ -35,15 +35,17 @@ var f *os.File
 func main() {
 
 	//go debugMemoryErrors()
-	go printTPS()
 
 	config.Conf.Decode()
 
 	flags := getFlags()
 
+    if flags.PrintFps {
+        go printTPS()
+    }
+
 	switch {
 	case flags.FPS != 60:
-
 		ebiten.SetTPS(flags.FPS)
 
 	case flags.Profile:
@@ -115,6 +117,7 @@ type Flags struct {
 	Unlimited   bool
 	FPS         int
 	Muted       bool
+    PrintFps    bool
 }
 
 func getFlags() Flags {
@@ -123,6 +126,7 @@ func getFlags() Flags {
 	unlimited := flag.Bool("u", false, "unlimited tps")
 	fps := flag.Int("fps", 60, "fps limit")
 	muted := flag.Bool("m", false, "is muted")
+	printfps := flag.Bool("print", false, "print fps")
 
 	flag.Parse()
 
@@ -132,6 +136,7 @@ func getFlags() Flags {
 		Unlimited: *unlimited,
 		FPS:       *fps,
 		Muted:     *muted,
+        PrintFps : *printfps,
 	}
 
 	switch {

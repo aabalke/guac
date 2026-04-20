@@ -114,6 +114,11 @@ func (p *Pause) handleSelection(g *Game) {
 
 		g.flags.Type = NONE
 
+		if g.nds != nil {
+			g.nds.Close()
+			g.nds = nil
+		}
+
 		if g.gba != nil {
 			g.gba.Close()
 			g.gba = nil
@@ -125,6 +130,7 @@ func (p *Pause) handleSelection(g *Game) {
 		}
 
 		g.menu = menu.NewMenu(g.menuCtx)
+        println("exiting")
 
 		g.paused = false
 		g.pause = NewPause()

@@ -2,7 +2,6 @@ package apu
 
 import (
 	"github.com/aabalke/guac/config"
-	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
 )
 
@@ -123,7 +122,7 @@ func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu 
 	return a
 }
 
-func (a *Apu) Play(muted bool) {
+func (a *Apu) Play(muted bool, stdFps bool) {
 
 	a.SoundBufferWrap()
 
@@ -145,7 +144,7 @@ func (a *Apu) Play(muted bool) {
 		return
 	}
 
-	if ebiten.ActualTPS() > 65 {
+	if !stdFps {
 		return
 	}
 

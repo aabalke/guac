@@ -1,6 +1,5 @@
 This project includes code adapted from third party code under the following licenses:
 
-
 GBA
 
 - APU and HLE Bios from akatsuki105/magia 005c616 (MIT License)
@@ -8,7 +7,7 @@ GBA
 
 NDS
 
-- Bios MelonDS
+- Bios files Copyright (c) 2013, Gilead Kutnick "Drastic" (MIT License)
 - Serial Interfaces and Other Perpheral implimentations from rasky/ndsemu (MIT License)
 
 All other code is @ 2025 Aaron Balke, licensed under a BSD-3 Clause License
@@ -20,5 +19,3 @@ Pause Menu icons are sourced from Google Material Symbols, licensed under
 Apache License Version 2.0
 
 https://fonts.google.com/icons?selected=Material+Symbols+Outlined:resume:FILL@1;wght@700;GRAD@0;opsz@48&icon.size=1000&icon.color=%23FFFFFF&icon.platform=web
-
-The packaged bios file does not include copyrighted logos.

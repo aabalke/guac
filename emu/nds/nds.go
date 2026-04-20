@@ -131,19 +131,19 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 	return &nds
 }
 
-func (nds *Nds) Update() {
+func (nds *Nds) Update(stdFps bool) {
 
 	if nds.Paused {
 		return
 	}
 
 	if !nds.ppu.EngineA.Dispcnt.Is3D {
-		nds.UpdateFrame()
+		nds.UpdateFrame(stdFps)
 		return
 	}
 
 	if SINGLE_THREAD {
-		nds.UpdateFrame()
+		nds.UpdateFrame(stdFps)
 		nds.ppu.Rasterizer.Render.UpdateRender()
 		return
 	}
@@ -157,13 +157,13 @@ func (nds *Nds) Update() {
 
 	go func() {
 		defer RASTERIZE_WG.Done()
-		nds.UpdateFrame()
+		nds.UpdateFrame(stdFps)
 	}()
 
 	RASTERIZE_WG.Wait()
 }
 
-func (nds *Nds) UpdateFrame() {
+func (nds *Nds) UpdateFrame(stdFps bool) {
 
 	for nds.Drawn = false; !nds.Drawn; {
 
@@ -207,7 +207,7 @@ func (nds *Nds) UpdateFrame() {
 		nds.arm9.Jit.DeletePages()
 	}
 
-	nds.mem.Snd.Play(nds.Muted)
+	nds.mem.Snd.Play(nds.Muted, stdFps)
 	nds.Frame++
 }
 

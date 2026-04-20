@@ -129,7 +129,7 @@ func (gb *GameBoy) GetPixels() []byte {
 	return gb.Pixels
 }
 
-func (gb *GameBoy) Update() {
+func (gb *GameBoy) Update(stdFps bool) {
 	if gb.Paused {
 		return
 	}
@@ -149,7 +149,7 @@ func (gb *GameBoy) Update() {
 
 	gb.frameCycles -= targetCycles
 
-	gb.Apu.Play(gb.Muted)
+	gb.Apu.Play(gb.Muted, stdFps)
 }
 
 func (gb *GameBoy) Tick(tCycles int) {

@@ -48,6 +48,7 @@ type Game struct {
 	emuCtx  *oto.Context
 
 	unlimitedFPS bool
+    StdFPS bool
 }
 
 func NewGame(flags Flags) *Game {
@@ -56,6 +57,7 @@ func NewGame(flags Flags) *Game {
 		flags:  flags,
 		emuCtx: NewAudioContext(),
 		mouse:  input.NewMouse(),
+        StdFPS: flags.FPS == 60 && !flags.Unlimited,
 	}
 
 	if !config.Conf.CancelAudioInit {
@@ -154,6 +156,11 @@ func (g *Game) Update() error {
 		return exit
 	}
 
+	if g.paused {
+		g.pause.InputHandler(g, justKeys, justButtons)
+        return nil
+	}
+
 	if g.frame-g.pauseEndFrame < 10 {
 		// pressing select on pause can sometimes input into emulator,
 		// this gives time from the pause and emulator starting again
@@ -169,7 +176,7 @@ func (g *Game) Update() error {
 		}
 	case NDS:
 		g.nds.InputHandler(justKeys, keys, buttons, g.mouse, g.frame)
-		g.nds.Update()
+		g.nds.Update(g.StdFPS)
 
 		t, b := g.nds.GetScreens()
 		g.nds.Screen.Top.WritePixels(*t)
@@ -177,11 +184,11 @@ func (g *Game) Update() error {
 
 	case GBA:
 		g.gba.InputHandler(keys, buttons)
-		g.gba.Update()
+		g.gba.Update(g.StdFPS)
 		g.gba.Image.WritePixels(g.gba.Pixels)
 	case GB:
 		g.gb.InputHandler(keys, buttons)
-		g.gb.Update()
+		g.gb.Update(g.StdFPS)
 		g.gb.Image.WritePixels(g.gb.Pixels)
 	}
 

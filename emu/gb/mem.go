@@ -507,7 +507,7 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		t.Div = 0
 
 		mask := uint16(1 << 12)
-		mask <<= uint16(gb.DoubleSpeedFlag)
+		mask <<= gb.DoubleSpeedFlag
 
 		if prevDiv&mask != 0 {
 			gb.Apu.ClockFrameSequencer()

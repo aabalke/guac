@@ -25,10 +25,14 @@ func (g *Game) inputHandler(justKeys []ebiten.Key, justButtons []ebiten.Standard
 
 			g.unlimitedFPS = !g.unlimitedFPS
 
+            g.StdFPS = !g.unlimitedFPS
+
 			if g.unlimitedFPS {
 				ebiten.SetTPS(UNLIMITED_FPS)
+                println("setting unlimited fps")
 			} else {
 				ebiten.SetTPS(60)
+                println("setting 60fps")
 			}
 
 		case slices.Contains(keyConfig.Pause, keyStr):
@@ -39,21 +43,30 @@ func (g *Game) inputHandler(justKeys []ebiten.Key, justButtons []ebiten.Standard
 			//    isProfiling = true
 			//    pprof.StartCPUProfile(f)
 
-		case slices.Contains([]string{"Numpad4"}, keyStr):
-			ebiten.SetTPS(15)
+        case slices.Contains(keyConfig.Fps15, keyStr):
+            ebiten.SetTPS(15)
 			println("setting 15fps")
-		case slices.Contains([]string{"Numpad5"}, keyStr):
-			ebiten.SetTPS(30)
+            g.StdFPS = false
+        case slices.Contains(keyConfig.Fps30, keyStr):
+            ebiten.SetTPS(30)
 			println("setting 30fps")
-		case slices.Contains([]string{"Numpad1"}, keyStr):
-			ebiten.SetTPS(60)
+            g.StdFPS = false
+        case slices.Contains(keyConfig.Fps60, keyStr):
+            ebiten.SetTPS(60)
 			println("setting 60fps")
-		case slices.Contains([]string{"Numpad2"}, keyStr):
-			ebiten.SetTPS(120)
+            g.StdFPS = true
+        case slices.Contains(keyConfig.Fps120, keyStr):
+            ebiten.SetTPS(120)
 			println("setting 120fps")
-		case slices.Contains([]string{"Numpad3"}, keyStr):
-			ebiten.SetTPS(180)
+            g.StdFPS = false
+        case slices.Contains(keyConfig.Fps180, keyStr):
+            ebiten.SetTPS(180)
 			println("setting 180fps")
+            g.StdFPS = false
+        case slices.Contains(keyConfig.Fps240, keyStr):
+            ebiten.SetTPS(240)
+			println("setting 240fps")
+            g.StdFPS = false
 		}
 	}
 
@@ -68,10 +81,6 @@ func (g *Game) inputHandler(justKeys []ebiten.Key, justButtons []ebiten.Standard
 		case slices.Contains(buttonConfig.Mute, buttonStr):
 			g.ToggleMute()
 		}
-	}
-
-	if g.paused {
-		g.pause.InputHandler(g, justKeys, justButtons)
 	}
 
 	return false

@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/aabalke/guac/config"
-	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
 )
 
@@ -93,7 +92,7 @@ func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu 
 	return a
 }
 
-func (a *Apu) Play(muted bool) {
+func (a *Apu) Play(muted, stdFps bool) {
 
 	a.SoundBufferWrap()
 
@@ -117,10 +116,9 @@ func (a *Apu) Play(muted bool) {
 		return
 	}
 
-	if ebiten.ActualTPS() > 65 {
+	if !stdFps {
 		return
 	}
-
 
 	a.player.Write(a.Stream)
 }
@@ -151,7 +149,7 @@ func (a *Apu) soundMix() {
 }
 
 func (a *Apu) IsSoundEnabled() bool {
-	return (a.SoundCntX >> 7) & 1 != 0
+	return (a.SoundCntX>>7)&1 != 0
 }
 
 func (a *Apu) GetSample() (int16, int16) {
@@ -261,23 +259,23 @@ func IsResetSoundChan(addr uint32, isGB bool) bool {
 
 func (a *Apu) ResetSoundChan(addr uint32, b byte, isGB bool) {
 	if isGB {
-		a._resetSoundChan(resetSoundChanMapGB[addr], (b >> 7) & 1 != 0)
+		a._resetSoundChan(resetSoundChanMapGB[addr], (b>>7)&1 != 0)
 		return
 	}
-	a._resetSoundChan(resetSoundChanMapGBA[addr], (b >> 7) & 1 != 0)
+	a._resetSoundChan(resetSoundChanMapGBA[addr], (b>>7)&1 != 0)
 }
 
 var resetSoundChanMapGBA = map[uint32]int{0x65: 0, 0x6d: 1, 0x75: 2, 0x7d: 3}
-var resetSoundChanMapGB  = map[uint32]int{0x14: 0, 0x19: 1, 0x1E: 2, 0x23: 3}
+var resetSoundChanMapGB = map[uint32]int{0x14: 0, 0x19: 1, 0x1E: 2, 0x23: 3}
 
 func (a *Apu) _resetSoundChan(ch int, enable bool) {
 	if enable {
 		switch ch {
 		case 0:
 
-            if !a.ToneChannel1.DACEnabled { 
-                return
-            }
+			if !a.ToneChannel1.DACEnabled {
+				return
+			}
 
 			a.ToneChannel1.phase = false
 			a.ToneChannel1.samples = 0
@@ -285,57 +283,55 @@ func (a *Apu) _resetSoundChan(ch int, enable bool) {
 			a.ToneChannel1.sweepTime = 0
 			a.ToneChannel1.envTime = 0
 
-            a.ToneChannel1.ChannelEnabled = true
+			a.ToneChannel1.ChannelEnabled = true
 
 		case 1:
-            if !a.ToneChannel2.DACEnabled { 
-                return
-            }
-
+			if !a.ToneChannel2.DACEnabled {
+				return
+			}
 
 			a.ToneChannel2.phase = false
 			a.ToneChannel2.samples = 0
 			a.ToneChannel2.lengthTime = 0
 			a.ToneChannel2.sweepTime = 0
 			a.ToneChannel2.envTime = 0
-            a.ToneChannel2.ChannelEnabled = true
+			a.ToneChannel2.ChannelEnabled = true
 
 		case 2:
 
-            if !a.WaveChannel.DACEnabled { 
-                return
-            }
+			if !a.WaveChannel.DACEnabled {
+				return
+			}
 
 			a.WaveChannel.samples = 0
 			a.WaveChannel.lengthTime = 0
 			a.WaveChannel.Reset()
-            a.WaveChannel.ChannelEnabled = true
+			a.WaveChannel.ChannelEnabled = true
 		case 3:
-            if !a.NoiseChannel.DACEnabled { 
-                return
-            }
-
+			if !a.NoiseChannel.DACEnabled {
+				return
+			}
 
 			a.NoiseChannel.samples = 0
 			a.NoiseChannel.lengthTime = 0
 			a.NoiseChannel.envTime = 0
 
-			if (a.NoiseChannel.CntH >> 3) & 1 != 0 {
+			if (a.NoiseChannel.CntH>>3)&1 != 0 {
 				a.NoiseChannel.lfsr = 0x0040 // 7bit
 			} else {
 				a.NoiseChannel.lfsr = 0x4000 // 15bit
 			}
-            a.NoiseChannel.ChannelEnabled = true
+			a.NoiseChannel.ChannelEnabled = true
 		}
 	}
 }
 
 func (a *Apu) PowerOff() {
-    a.ToneChannel1 = ToneChannel{Idx: 0, Apu: a}
-    a.ToneChannel2 = ToneChannel{Idx: 1, Apu: a}
-    a.WaveChannel  = WaveChannel{Idx: 2, Apu: a, WaveRam: a.WaveChannel.WaveRam}
-    a.NoiseChannel = NoiseChannel{Idx: 3, Apu: a}
-    a.SoundCntL = 0
-    a.SoundCntH = 0
-    a.SoundCntX = 0
+	a.ToneChannel1 = ToneChannel{Idx: 0, Apu: a}
+	a.ToneChannel2 = ToneChannel{Idx: 1, Apu: a}
+	a.WaveChannel = WaveChannel{Idx: 2, Apu: a, WaveRam: a.WaveChannel.WaveRam}
+	a.NoiseChannel = NoiseChannel{Idx: 3, Apu: a}
+	a.SoundCntL = 0
+	a.SoundCntH = 0
+	a.SoundCntX = 0
 }

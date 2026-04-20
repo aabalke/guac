@@ -123,6 +123,8 @@ func (c *Capture) Read(addr uint32) uint8 {
 
 func (c *Capture) TempLimiter() {
 
+	return
+
 	if c.EVA != 0 && c.EVA != 16 {
 		panic("UNSETUP CAPTURE SETTING BLEND A")
 	}

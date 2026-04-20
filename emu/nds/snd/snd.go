@@ -120,7 +120,7 @@ func (s *Snd) runCh() {
 	}
 }
 
-func (s *Snd) Play(muted bool) {
+func (s *Snd) Play(muted, stdFps bool) {
 
 	s.muted = muted
 
@@ -136,8 +136,7 @@ func (s *Snd) Play(muted bool) {
 		return
 	}
 
-	//s.steamCh <- s.Stream
-	if ebiten.ActualTPS() > 65 {
+    if !stdFps {
 		return
 	}
 

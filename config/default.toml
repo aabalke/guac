@@ -32,7 +32,16 @@ left       = ["A", "ArrowLeft"]
 right      = ["D", "ArrowRight"]
 up         = ["W", "ArrowUp"]
 down       = ["S", "ArrowDown"]
+
+# unlimited is limited to 65536 fps
+# Buttons used to toggle different fps
 unlimited  = ["U"]
+fps15      = ["Numpad1"]
+fps30      = ["Numpad2"]
+fps60      = ["Numpad3"]
+fps120     = ["Numpad4"]
+fps180     = ["Numpad5"]
+fps240     = ["Numpad6"]
 
 [controller]
 select = [1]
@@ -46,7 +55,8 @@ down   = [13]
 [jit]
 
 # jit (just in time compilation) converts emulated machine code into native machine code when loops are detected. This increases the speed significantly but can ruin accuracy.
-# jit only supports amd64 (64 bit x86 instruction set) with BMI2 extension (2013+)
+# jit only supports amd64 (64 bit x86 instruction set)
+# jit only works for nds, gba is too time sensitive at this time
 
 enabled = true
 
@@ -61,10 +71,6 @@ page_shift = 16
 # how many instructions to batch at a time (use 16, or 32 for best results)
 # to many will cause crashes and artificants by desyncing cpus from sound and graphics
 batch_inst = 32
-
-
-# todo
-# page_size (pageshift / pagemask)
 
 # GB Configuration
 
@@ -141,18 +147,6 @@ l = [4]
 # NDS Configuration
 
 [nds]
-
-#multithread_3d = true
-#threads = 8
-#disable_saves = true
-
-# only skip frames in ratios of 2. 2, 4, 8, 16 etc.
-frame_skip = 2
-
-# will override frame skip, run unlimited fps, and attempt to match
-# the number of frames built to 60 fps.
-# ex. if guac is running at 120 fps, it will only build every other frame
-dynamic_frame_skip = true
 
 [nds.bios]
 
