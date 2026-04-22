@@ -1,9 +1,10 @@
-name: Automated Build and Release
+name: Automated Release
 
 on:
   push:
     branches:
       - main
+      - master # Added master just in case that's your default branch
   workflow_dispatch:
 
 permissions:
@@ -17,14 +18,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Crucial: Fetches all history and tags
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
 
-      # Automatically creates a tag like v0.1.0, v0.1.1 based on commits
       - name: Bump version and push tag
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.2
@@ -32,13 +32,17 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           default_bump: patch
 
-      # Runs GoReleaser to build all binaries and upload them to the tag created above
+      # This step ensures the local runner "knows" about the tag created above
+      - name: Fetch new tags
+        run: git fetch --tags --force
+
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: latest
+          version: "~> v2"
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Explicitly tell GoReleaser which tag to use
           GORELEASER_CURRENT_TAG: ${{ steps.tag_version.outputs.new_tag }}
