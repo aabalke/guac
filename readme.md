@@ -20,6 +20,7 @@ Advance, and Nintendo DS handheld consoles.
 - [X] 3D Scene Export
 - [X] Real Time Clock Adjustments
 - [X] BIOS and Firmware Options
+- [ ] Pictochat
 
 
 # Installation / Building
