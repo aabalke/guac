@@ -1,4 +1,4 @@
-version: 2
+version: 1
 builds:
   - env: [CGO_ENABLED=0]
     goos: [linux, windows, darwin]
