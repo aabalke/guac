@@ -32,11 +32,7 @@ jobs:
 
       # Build for Linux (Standard AMD64)
       - name: Build Linux
-        run: GOOS=linux GOARCH=amd64 go build -o guac-linux-amd64 .
-
-      # Build for Windows (Standard AMD64)
-      - name: Build Windows
-        run: GOOS=windows GOARCH=amd64 go build -o guac-windows-x64.exe .
+        run: go build .
 
       # The release action that i hope works
       - name: Create GitHub Release
