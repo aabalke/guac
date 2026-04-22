@@ -33,8 +33,8 @@ jobs:
       - name: Update by Sudo
         run: sudo apt update
 
-      - name: Install Alsa
-        run: sudo apt install libasound2-dev
+      - name: Install packages by Sudo
+        run: sudo apt-get install libc6-dev libglu1-mesa-dev libx11-dev libxcursor-dev libxi-dev libxinerama-dev libxrandr-dev libxxf86vm-dev libasound2-dev pkg-config
 
       - name: Verify configs
         run: export PKG_CONFIG_PATH=/usr/lib/pkgconfig:/usr/share/pkgconfig
