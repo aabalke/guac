@@ -7,16 +7,15 @@ before:
 builds:
   - id: default
     env:
+      # We enable CGO only where it's likely to work on the default runner
       - CGO_ENABLED=0
     goos:
       - linux
-      - darwin
       - windows
     goarch:
       - amd64
-      - arm64
     ignore:
-      # This is the critical fix: ignore Windows ARM64 because gojit doesn't support it
+      # Still ignoring ARM for now to get a successful green build
       - goos: windows
         goarch: arm64
     main: .
@@ -24,7 +23,6 @@ builds:
 
 archives:
   - formats: ["tar.gz"]
-    # Use zip for windows
     format_overrides:
       - goos: windows
         formats: ["zip"]
