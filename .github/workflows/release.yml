@@ -53,7 +53,6 @@ jobs:
             Automated build for GUAC.
             ${{ steps.tag_version.outputs.changelog }}
           files: |
-            guac-linux-amd64
-            guac-windows-x64.exe
+            ./guac
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
