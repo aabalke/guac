@@ -30,6 +30,15 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Update by Sudo
+        run: sudo apt update
+
+      - name: Install Alsa
+        run: sudo apt install libasound2-dev
+
+      - name: Verify configs
+        run: export PKG_CONFIG_PATH=/usr/lib/pkgconfig:/usr/share/pkgconfig
+
       # Build for Linux (Standard AMD64)
       - name: Build Linux
         run: go build .
