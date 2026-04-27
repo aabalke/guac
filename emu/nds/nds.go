@@ -139,12 +139,18 @@ func (nds *Nds) Update(stdFps bool) {
 
 	if !nds.ppu.EngineA.Dispcnt.Is3D {
 		nds.UpdateFrame(stdFps)
+		t, b := nds.GetScreens()
+		nds.Screen.Top.WritePixels(*t)
+		nds.Screen.Bottom.WritePixels(*b)
 		return
 	}
 
 	if SINGLE_THREAD {
 		nds.UpdateFrame(stdFps)
 		nds.ppu.Rasterizer.Render.UpdateRender()
+		t, b := nds.GetScreens()
+		nds.Screen.Top.WritePixels(*t)
+		nds.Screen.Bottom.WritePixels(*b)
 		return
 	}
 
@@ -161,6 +167,10 @@ func (nds *Nds) Update(stdFps bool) {
 	}()
 
 	RASTERIZE_WG.Wait()
+
+	t, b := nds.GetScreens()
+	nds.Screen.Top.WritePixels(*t)
+	nds.Screen.Bottom.WritePixels(*b)
 }
 
 func (nds *Nds) UpdateFrame(stdFps bool) {
@@ -291,6 +301,9 @@ func (nds *Nds) GetScreens() (t, b *[]byte) {
 }
 
 func (nds *Nds) Close() {
+
+	RASTERIZE_WG.Wait()
+
 	nds.Muted = true
 	nds.Paused = true
 

@@ -45,6 +45,7 @@ var clr = map[string]uint8{
 }
 
 type NdsConfig struct {
+	Jit              Jit                      `toml:"jit"`
 	Screen           NdsScreen                `toml:"screen"`
 	KeyboardConfig   EmulatorKeyboardConfig   `toml:"keyboard"`
 	ControllerConfig EmulatorControllerConfig `toml:"controller"`

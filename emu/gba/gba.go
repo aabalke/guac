@@ -112,6 +112,7 @@ func (gba *GBA) Update(stdFps bool) {
 
 	gba.Apu.Play(gba.Muted, stdFps)
 	gba.Frame++
+	gba.Image.WritePixels(gba.Pixels)
 }
 
 func (gba *GBA) Tick(cycles uint32) {
@@ -314,4 +315,22 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 	if currFrameCycles < prevFrameCycles {
 		gba.Drawn = true
 	}
+}
+
+func (gba *GBA) Draw(screen *ebiten.Image) {
+
+	sw, sh := float64(screen.Bounds().Dx()), float64(screen.Bounds().Dy())
+	iw, ih := float64(gba.Image.Bounds().Dx()), float64(gba.Image.Bounds().Dy())
+
+	scaleX := sw / iw
+	scaleY := sh / ih
+	scale := min(scaleX, scaleY)
+
+	offsetX := (sw - (iw * scale)) / 2
+	offsetY := (sh - (ih * scale)) / 2
+
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(scale, scale)
+	op.GeoM.Translate(offsetX, offsetY)
+	screen.DrawImage(gba.Image, op)
 }

@@ -30,6 +30,10 @@ func NewMouse() *Mouse {
 
 	mouse := config.Conf.Mouse
 
+	if mouse.CursorSize == 0 {
+		panic("uhhhhh")
+	}
+
 	m := &Mouse{
 		X:           x,
 		Y:           y,

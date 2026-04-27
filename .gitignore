@@ -3,6 +3,7 @@ sav
 rom
 .git
 art
+scripts
 
 # dev dependencies
 *.exe

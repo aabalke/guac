@@ -111,8 +111,6 @@ type Stat struct {
 	IrqVBlank bool
 	IrqOam    bool
 	IrqLyc    bool
-
-
 }
 
 func (s *Stat) Read() uint8 {

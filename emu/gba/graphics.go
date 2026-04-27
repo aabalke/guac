@@ -141,7 +141,7 @@ func (gba *GBA) renderTilePixel(x, y uint32) {
 			continue
 		}
 
-	//ObjectLoop:
+		//ObjectLoop:
 		for j := len(objPriorities[i]) - 1; j >= 0; j-- {
 			objIdx := objPriorities[i][j]
 			obj := &gba.PPU.Objects[objIdx]

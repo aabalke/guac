@@ -3,6 +3,8 @@ package utils
 import (
 	"bufio"
 	"os"
+
+	"github.com/sqweek/dialog"
 )
 
 func ReadFile(path string) (buf []uint8, length int, ok bool) {
@@ -29,4 +31,28 @@ func WriteFile(path string, buf []uint8) bool {
 	}
 
 	return true
+}
+
+func OpenFile(title, desc string, extensions ...string) string {
+
+	if len(extensions) == 0 {
+		extensions = append(extensions, "*")
+	}
+
+	file, err := dialog.File().Title(title).Filter(desc, extensions...).Load()
+	if err != nil {
+		return ""
+	}
+
+	return file
+}
+
+func OpenDirectory(title, defaultPath string) string {
+
+	directory, err := dialog.Directory().Title(title).Browse()
+	if err != nil {
+		return defaultPath
+	}
+
+	return directory
 }

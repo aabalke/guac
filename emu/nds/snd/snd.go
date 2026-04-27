@@ -98,7 +98,7 @@ func NewSnd(ctx *oto.Context, freq, rate, cnt int) *Snd {
 
 	s.Capture = NewCaptures(s)
 
-	if !config.Conf.CancelAudioInit {
+	if !config.Conf.CancelAudioInit && ctx != nil {
 		s.player = ctx.NewPlayer()
 		//go s.runCh()
 	}
@@ -136,7 +136,7 @@ func (s *Snd) Play(muted, stdFps bool) {
 		return
 	}
 
-    if !stdFps {
+	if !stdFps {
 		return
 	}
 

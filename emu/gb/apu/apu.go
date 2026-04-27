@@ -115,7 +115,7 @@ func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu 
 	}
 	a.NoiseChannel = NoiseChannel{Apu: a, Idx: 3}
 
-	if !config.Conf.CancelAudioInit {
+	if !config.Conf.CancelAudioInit && audioContext != nil {
 		a.player = audioContext.NewPlayer()
 	}
 

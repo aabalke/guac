@@ -1,11 +1,13 @@
 package gameboy
 
 import (
+	"image/color"
 	"log"
 
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gb/apu"
 	"github.com/aabalke/guac/emu/gb/cartridge"
+	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
 )
@@ -22,7 +24,8 @@ const (
 )
 
 type GameBoy struct {
-	Palette [][]uint8
+	//Palette [][]uint8
+	Palette *[4]color.Color
 	Pixels  []byte
 
 	Color     bool
@@ -87,7 +90,7 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 		Clock:     4194304, // t cycle count
 		Joypad:    0xFF,
 		Cartridge: cartridge.NewCartridge(path, path+".save"),
-		Palette:   config.Conf.Gb.Palette,
+		Palette:   &config.Conf.Gb.Palette,
 	}
 
 	gb.Lcdc.gb = gb
@@ -121,6 +124,26 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 	return gb
 }
 
+func (gb *GameBoy) UpdateFromConfig() {
+
+	v := gb.MemoryBus.IO[0x47]
+	gb.UnpackedMonoPals[0][0] = utils.ColorToUint32(gb.Palette[(v>>0)&3])
+	gb.UnpackedMonoPals[0][1] = utils.ColorToUint32(gb.Palette[(v>>2)&3])
+	gb.UnpackedMonoPals[0][2] = utils.ColorToUint32(gb.Palette[(v>>4)&3])
+	gb.UnpackedMonoPals[0][3] = utils.ColorToUint32(gb.Palette[(v>>6)&3])
+
+	v = gb.MemoryBus.IO[0x48]
+	gb.UnpackedMonoPals[1][1] = utils.ColorToUint32(gb.Palette[(v>>2)&3])
+	gb.UnpackedMonoPals[1][2] = utils.ColorToUint32(gb.Palette[(v>>4)&3])
+	gb.UnpackedMonoPals[1][3] = utils.ColorToUint32(gb.Palette[(v>>6)&3])
+
+	v = gb.MemoryBus.IO[0x49]
+	gb.UnpackedMonoPals[2][1] = utils.ColorToUint32(gb.Palette[(v>>2)&3])
+	gb.UnpackedMonoPals[2][2] = utils.ColorToUint32(gb.Palette[(v>>4)&3])
+	gb.UnpackedMonoPals[2][3] = utils.ColorToUint32(gb.Palette[(v>>6)&3])
+
+}
+
 func (gb *GameBoy) GetSize() (int32, int32) {
 	return height, width
 }
@@ -150,6 +173,7 @@ func (gb *GameBoy) Update(stdFps bool) {
 	gb.frameCycles -= targetCycles
 
 	gb.Apu.Play(gb.Muted, stdFps)
+	gb.Image.WritePixels(gb.Pixels)
 }
 
 func (gb *GameBoy) Tick(tCycles int) {
@@ -324,4 +348,22 @@ func (gb *GameBoy) Close() {
 	if L != nil {
 		L.Close()
 	}
+}
+
+func (gb *GameBoy) Draw(screen *ebiten.Image) {
+
+	sw, sh := float64(screen.Bounds().Dx()), float64(screen.Bounds().Dy())
+	iw, ih := float64(gb.Image.Bounds().Dx()), float64(gb.Image.Bounds().Dy())
+
+	scaleX := sw / iw
+	scaleY := sh / ih
+	scale := min(scaleX, scaleY)
+
+	offsetX := (sw - (iw * scale)) / 2
+	offsetY := (sh - (ih * scale)) / 2
+
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(scale, scale)
+	op.GeoM.Translate(offsetX, offsetY)
+	screen.DrawImage(gb.Image, op)
 }

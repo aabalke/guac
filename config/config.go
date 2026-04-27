@@ -18,20 +18,46 @@ const CONFIG_PATH = "./config.toml"
 
 var Conf Config
 
+//type Profiler struct {
+//	Enabled    bool
+//	StartFrame int
+//	EndFrame   int
+//}
+//
+
 type Config struct {
-	Fullscreen       bool `toml:"fullscreen"`
-	TomlBackdrop     int  `toml:"backdrop_color"`
-	GamesPerRow      int  `toml:"games_per_row"`
-	Backdrop         color.Color
-	CancelAudioInit  bool             `toml:"cancel_audio_init"`
-	Mouse            MouseConfig      `toml:"mouse"`
-	Jit              Jit              `toml:"jit"`
-	Gb               GbConfig         `toml:"gb"`
-	Gba              GbaConfig        `toml:"gba"`
-	Nds              NdsConfig        `toml:"nds"`
+	Ui              Ui          `toml:"ui"`
+	General         General     `toml:"general"`
+	CancelAudioInit bool        `toml:"cancel_audio_init"`
+	Mouse           MouseConfig `toml:"mouse"`
+	Jit             Jit         `toml:"jit"`
+	Gb              GbConfig    `toml:"gb"`
+	Gba             GbaConfig   `toml:"gba"`
+	Nds             NdsConfig   `toml:"nds"`
+}
+
+type Ui struct {
+	//GamesPerRow      int  `toml:"games_per_row"`
+	TomlBackdrop        int `toml:"backdrop_color"`
+	TomlBackground      int `toml:"menu_background_color"`
+	TomlForeground      int `toml:"menu_foreground_color"`
+	TomlSecondary       int `toml:"menu_secondary_color"`
+	Backdrop            color.Color
+	MenuBackgroundColor color.Color
+	MenuForegroundColor color.Color
+	MenuSecondaryColor  color.Color
+	//MenuFontFace        text.Face
+}
+
+type General struct {
+	Muted          bool `toml:"muted"`
+	TargetFps      int  `toml:"target_fps"`
+	ShowFps        bool `toml:"show_fps"`
+	VsyncDisabled  bool `toml:"vsync_disabled"`
+	InitFullscreen bool `toml:"fullscreen"`
+
 	KeyboardConfig   KeyboardConfig   `toml:"keyboard"`
 	ControllerConfig ControllerConfig `toml:"controller"`
-	VsyncDisabled    bool             `coml:"vsync_disabled"`
 }
 
 type MouseConfig struct {
@@ -52,7 +78,8 @@ type GbConfig struct {
 	ControllerConfig EmulatorControllerConfig `toml:"controller"`
 	ConsoleType      string                   `toml:"type"`
 
-	Palette  [][]uint8
+	//Palette  [][]uint8
+	Palette  [4]color.Color
 	ForceDMG bool
 	ForceGBC bool
 }
@@ -78,13 +105,6 @@ type KeyboardConfig struct {
 	Down       []string `toml:"down"`
 	Fullscreen []string `toml:"fullscreen"`
 	Quit       []string `toml:"quit"`
-	Unlimited  []string `toml:"unlimited"`
-    Fps15      []string `toml:"fps15"`
-    Fps30      []string `toml:"fps30"`
-    Fps60      []string `toml:"fps60"`
-    Fps120     []string `toml:"fps120"`
-    Fps180     []string `toml:"fps180"`
-    Fps240     []string `toml:"fps240"`
 }
 
 type ControllerConfig struct {
@@ -165,19 +185,38 @@ func (c *Config) Decode() {
 		panic(err)
 	}
 
-	c.Backdrop = color.RGBA{
-		R: uint8(c.TomlBackdrop >> 16),
-		G: uint8(c.TomlBackdrop >> 8),
-		B: uint8(c.TomlBackdrop),
+	c.Ui.Backdrop = color.RGBA{
+		R: uint8(c.Ui.TomlBackdrop >> 16),
+		G: uint8(c.Ui.TomlBackdrop >> 8),
+		B: uint8(c.Ui.TomlBackdrop),
 		A: 0xFF,
 	}
 
-	if c.GamesPerRow == 0 {
-		errMessageStart := "Invalid Config:"
-		errMessageEnd := "Using 6 games per row in menu."
-		log.Printf("%s %s %s\n", errMessageStart, "GamesPerRow == 0.", errMessageEnd)
-		c.GamesPerRow = 6
+	c.Ui.MenuBackgroundColor = color.RGBA{
+		R: uint8(c.Ui.TomlBackground >> 16),
+		G: uint8(c.Ui.TomlBackground >> 8),
+		B: uint8(c.Ui.TomlBackground),
+		A: 0xFF,
 	}
+	c.Ui.MenuForegroundColor = color.RGBA{
+		R: uint8(c.Ui.TomlForeground >> 16),
+		G: uint8(c.Ui.TomlForeground >> 8),
+		B: uint8(c.Ui.TomlForeground),
+		A: 0xFF,
+	}
+	c.Ui.MenuSecondaryColor = color.RGBA{
+		R: uint8(c.Ui.TomlSecondary >> 16),
+		G: uint8(c.Ui.TomlSecondary >> 8),
+		B: uint8(c.Ui.TomlSecondary),
+		A: 0xFF,
+	}
+
+	//if c.Ui.GamesPerRow == 0 {
+	//	errMessageStart := "Invalid Config:"
+	//	errMessageEnd := "Using 6 games per row in menu."
+	//	log.Printf("%s %s %s\n", errMessageStart, "GamesPerRow == 0.", errMessageEnd)
+	//	c.Ui.GamesPerRow = 6
+	//}
 
 	c.decodeJit()
 	c.decodeGb()
@@ -223,18 +262,19 @@ func (c *Config) decodeGb() {
 
 	if invalid {
 		// greyscale palette
-		c.Gb.Palette = [][]uint8{
-			{0xFF, 0xFF, 0xFF},
-			{0xCC, 0xCC, 0xCC},
-			{0x77, 0x77, 0x77},
-			{0x00, 0x00, 0x00},
+		c.Gb.Palette = [4]color.Color{
+			color.RGBA{0xFF, 0xFF, 0xFF, 0xFF},
+			color.RGBA{0xCC, 0xCC, 0xCC, 0xFF},
+			color.RGBA{0x77, 0x77, 0x77, 0xFF},
+			color.RGBA{0x00, 0x00, 0x00, 0xFF},
 		}
 	} else {
-		c.Gb.Palette = [][]uint8{
-			{uint8(pal[0] >> 16), uint8(pal[0] >> 8), uint8(pal[0])},
-			{uint8(pal[1] >> 16), uint8(pal[1] >> 8), uint8(pal[1])},
-			{uint8(pal[2] >> 16), uint8(pal[2] >> 8), uint8(pal[2])},
-			{uint8(pal[3] >> 16), uint8(pal[3] >> 8), uint8(pal[3])},
+
+		c.Gb.Palette = [4]color.Color{
+			color.RGBA{uint8(pal[0] >> 16), uint8(pal[0] >> 8), uint8(pal[0]), 0xFF},
+			color.RGBA{uint8(pal[1] >> 16), uint8(pal[1] >> 8), uint8(pal[1]), 0xFF},
+			color.RGBA{uint8(pal[2] >> 16), uint8(pal[2] >> 8), uint8(pal[2]), 0xFF},
+			color.RGBA{uint8(pal[3] >> 16), uint8(pal[3] >> 8), uint8(pal[3]), 0xFF},
 		}
 	}
 }

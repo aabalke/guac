@@ -1,17 +1,6 @@
 # keyboard ids come from ebitengine string values.
 # gamepad / controller ids: https://www.w3.org/TR/gamepad/#remapping
 
-# only cancel audio init for profiling / benchmarking
-# cancel_audio_init = true
-
-vsync_disabled = true
-
-#fullscreen = true
-backdrop_color = 0x0A0A0A
-
-# Define how many games appear per row on game select screen
-games_per_row = 6
-
 [mouse]
 
 fill = true
@@ -22,7 +11,26 @@ stroke_width = 2
 fill_color = 0xFFFFFF
 stroke_color = 0x000000
 
-[keyboard]
+[general]
+
+# only cancel audio init for profiling / benchmarking
+# cancel_audio_init = true
+
+vsync_disabled = true
+
+
+target_fps = 60
+show_fps = false
+init_fullscreen = false
+
+[ui]
+#fullscreen = true
+backdrop_color = 0x0A0A0A
+menu_background_color = 0x000000
+menu_foreground_color = 0xFFFFFF
+menu_secondary_color  = 0xCCCCCC
+
+[general.keyboard]
 select     = ["J", "Enter"]
 mute       = ["M"]
 pause      = ["P"]
@@ -43,7 +51,7 @@ fps120     = ["Numpad4"]
 fps180     = ["Numpad5"]
 fps240     = ["Numpad6"]
 
-[controller]
+[general.controller]
 select = [1]
 mute   = [8]
 pause  = [9]
@@ -78,7 +86,7 @@ batch_inst = 32
 # Define a 4 color palette to replace greyscale using hex values
 # From lightest -> darkest
 # if invalid input, will fall back to greyscale
-# dmg_palette = [ 0xE0F8D0, 0x88C070, 0x346856, 0x081820 ]
+#dmg_palette = [ 0xE0F8D0, 0x88C070, 0x346856, 0x081820 ]
 
 # forces "dmg", "gbc" or "auto" version for reading rom
 type = "auto"

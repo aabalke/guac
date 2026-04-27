@@ -5,6 +5,7 @@ import (
 	"unsafe"
 
 	"github.com/aabalke/guac/emu/gb/cartridge"
+	"github.com/aabalke/guac/utils"
 )
 
 type MemoryBus struct {
@@ -26,7 +27,7 @@ type MemoryBus struct {
 	Hdma Hdma
 	Oam  OamDma
 
-    Serial Serial
+	Serial Serial
 
 	JoypadReg uint8
 }
@@ -49,10 +50,10 @@ func (o *OamDma) Write(gb *GameBoy, v uint8) {
 	o.Idx = 0
 	o.Pending = true
 
-    // currently skipping accurate timing (causes problems)
-    // I believe other things need to be emulated properly prior to getting this acc
-    // or it may be restart oams need to be proper
-    o.Tick(gb, 200 << 2)
+	// currently skipping accurate timing (causes problems)
+	// I believe other things need to be emulated properly prior to getting this acc
+	// or it may be restart oams need to be proper
+	o.Tick(gb, 200<<2)
 }
 
 func (o *OamDma) Tick(gb *GameBoy, tcycles int) {
@@ -372,22 +373,22 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 		return gb.ReadSound(uint8(addr), gb.Apu)
 	}
 
-    if addr >= 0xFF4C && addr < 0xFF80 {
-        return 0xFF
-    }
+	if addr >= 0xFF4C && addr < 0xFF80 {
+		return 0xFF
+	}
 
 	switch addr {
 	case 0xFF00:
 		return gb.getJoypad()
 
-    case 0xFF01:
-        return gb.MemoryBus.Serial.sb
+	case 0xFF01:
+		return gb.MemoryBus.Serial.sb
 
-    case 0xFF02:
-        return gb.MemoryBus.Serial.ReadSb()
+	case 0xFF02:
+		return gb.MemoryBus.Serial.ReadSb()
 
-    case 0xFF03:
-        return 0xFF
+	case 0xFF03:
+		return 0xFF
 
 	case 0xFF04: // DIV
 		return uint8(gb.Timer.Div >> 8)
@@ -406,8 +407,8 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 
 		return v
 
-    case 0xFF08, 0xFF09, 0xFF0A, 0xFF0B, 0xFF0C, 0xFF0D, 0xFF0E:
-        return 0xFF
+	case 0xFF08, 0xFF09, 0xFF0A, 0xFF0B, 0xFF0C, 0xFF0D, 0xFF0E:
+		return 0xFF
 
 	case 0xFF0F:
 		return gb.Cpu.IF | 0xE0
@@ -494,11 +495,11 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		gb.MemoryBus.JoypadReg &^= 0x30
 		gb.MemoryBus.JoypadReg |= v & 0x30
 
-    case 0xFF01:
-        gb.MemoryBus.Serial.sb = v
+	case 0xFF01:
+		gb.MemoryBus.Serial.sb = v
 
-    case 0xFF02:
-        gb.MemoryBus.Serial.WriteSb(v)
+	case 0xFF02:
+		gb.MemoryBus.Serial.WriteSb(v)
 
 	case 0xFF04: // DIV
 
@@ -587,26 +588,26 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 
 	case 0xFF47: // bgpalette mono
 
-		gb.UnpackedMonoPals[0][0] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>0)&3][0])) | 0xFF00_0000
-		gb.UnpackedMonoPals[0][1] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>2)&3][0])) | 0xFF00_0000
-		gb.UnpackedMonoPals[0][2] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>4)&3][0])) | 0xFF00_0000
-		gb.UnpackedMonoPals[0][3] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>6)&3][0])) | 0xFF00_0000
+		gb.UnpackedMonoPals[0][0] = utils.ColorToUint32(gb.Palette[(v>>0)&3])
+		gb.UnpackedMonoPals[0][1] = utils.ColorToUint32(gb.Palette[(v>>2)&3])
+		gb.UnpackedMonoPals[0][2] = utils.ColorToUint32(gb.Palette[(v>>4)&3])
+		gb.UnpackedMonoPals[0][3] = utils.ColorToUint32(gb.Palette[(v>>6)&3])
 		io[uint8(addr)] = v
 
 	case 0xFF48: // objpalette mono
 
-		//gb.UnpackedMonoPals[1][0] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>0) & 3][0])) | 0xFF00_0000
-		gb.UnpackedMonoPals[1][1] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>2)&3][0])) | 0xFF00_0000
-		gb.UnpackedMonoPals[1][2] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>4)&3][0])) | 0xFF00_0000
-		gb.UnpackedMonoPals[1][3] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>6)&3][0])) | 0xFF00_0000
+		//gb.UnpackedMonoPals[1][0] = utils.ColorToUint32(gb.Palette[(v>>0)&3])
+		gb.UnpackedMonoPals[1][1] = utils.ColorToUint32(gb.Palette[(v>>2)&3])
+		gb.UnpackedMonoPals[1][2] = utils.ColorToUint32(gb.Palette[(v>>4)&3])
+		gb.UnpackedMonoPals[1][3] = utils.ColorToUint32(gb.Palette[(v>>6)&3])
 		io[uint8(addr)] = v
 
 	case 0xFF49: // objpalette mono
 
-		//gb.UnpackedMonoPals[2][0] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>0) & 3][0])) | 0xFF00_0000
-		gb.UnpackedMonoPals[2][1] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>2)&3][0])) | 0xFF00_0000
-		gb.UnpackedMonoPals[2][2] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>4)&3][0])) | 0xFF00_0000
-		gb.UnpackedMonoPals[2][3] = *(*uint32)(unsafe.Pointer(&gb.Palette[(v>>6)&3][0])) | 0xFF00_0000
+		//gb.UnpackedMonoPals[2][0] = utils.ColorToUint32(gb.Palette[(v>>0)&3])
+		gb.UnpackedMonoPals[2][1] = utils.ColorToUint32(gb.Palette[(v>>2)&3])
+		gb.UnpackedMonoPals[2][2] = utils.ColorToUint32(gb.Palette[(v>>4)&3])
+		gb.UnpackedMonoPals[2][3] = utils.ColorToUint32(gb.Palette[(v>>6)&3])
 		io[uint8(addr)] = v
 
 	case 0xFF4D:

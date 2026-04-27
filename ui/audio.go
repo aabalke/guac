@@ -1,4 +1,4 @@
-package main
+package ui
 
 import (
 	"github.com/aabalke/guac/config"
@@ -15,8 +15,6 @@ func NewAudioContext() *oto.Context {
 	if config.Conf.CancelAudioInit {
 		return nil
 	}
-
-	//return nil
 
 	c, err := oto.NewContext(SND_FREQUENCY, 2, 2, STREAM_LEN*3)
 	if err != nil {

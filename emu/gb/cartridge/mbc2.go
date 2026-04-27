@@ -46,8 +46,8 @@ func (m *Mbc2) ReadPtr(addr uint16) unsafe.Pointer {
 		return unsafe.Pointer(&m.Cartridge.Data[uint32(addr)&m.Cartridge.RomMask])
 	case addr < 0x8000:
 		return unsafe.Pointer(&m.Cartridge.Data[(m.RomBase2|uint32(addr-0x4000))&m.Cartridge.RomMask])
-    default:
-        return nil
+	default:
+		return nil
 	}
 }
 
