@@ -46,28 +46,26 @@ func (gba *GBA) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 
 	for _, button := range buttons {
 
-		buttonStr := int(button)
-
 		switch {
-		case slices.Contains(buttonConfig.A, buttonStr):
+		case slices.Contains(buttonConfig.A, button):
 			*k &^= 0b1
-		case slices.Contains(buttonConfig.B, buttonStr):
+		case slices.Contains(buttonConfig.B, button):
 			*k &^= 0b10
-		case slices.Contains(buttonConfig.Select, buttonStr):
+		case slices.Contains(buttonConfig.Select, button):
 			*k &^= 0b100
-		case slices.Contains(buttonConfig.Start, buttonStr):
+		case slices.Contains(buttonConfig.Start, button):
 			*k &^= 0b1000
-		case slices.Contains(buttonConfig.Right, buttonStr):
+		case slices.Contains(buttonConfig.Right, button):
 			*k &^= 0b10000
-		case slices.Contains(buttonConfig.Left, buttonStr):
+		case slices.Contains(buttonConfig.Left, button):
 			*k &^= 0b100000
-		case slices.Contains(buttonConfig.Up, buttonStr):
+		case slices.Contains(buttonConfig.Up, button):
 			*k &^= 0b1000000
-		case slices.Contains(buttonConfig.Down, buttonStr):
+		case slices.Contains(buttonConfig.Down, button):
 			*k &^= 0b10000000
-		case slices.Contains(buttonConfig.R, buttonStr):
+		case slices.Contains(buttonConfig.R, button):
 			*k &^= 0b100000000
-		case slices.Contains(buttonConfig.L, buttonStr):
+		case slices.Contains(buttonConfig.L, button):
 			*k &^= 0b1000000000
 		}
 	}

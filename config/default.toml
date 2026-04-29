@@ -1,6 +1,25 @@
 # keyboard ids come from ebitengine string values.
 # gamepad / controller ids: https://www.w3.org/TR/gamepad/#remapping
 
+# Available Gamepad Button Names
+# RightBottom      
+# RightRight       
+# RightLeft        
+# RightTop         
+# FrontTopLeft     
+# FrontTopRight    
+# FrontBottomLeft  
+# FrontBottomRight 
+# CenterLeft       
+# CenterRight      
+# LeftStick        
+# RightStick       
+# LeftTop          
+# LeftBottom       
+# LeftLeft         
+# LeftRight        
+# CenterCenter     
+
 [mouse]
 
 fill = true
@@ -17,7 +36,6 @@ stroke_color = 0x000000
 # cancel_audio_init = true
 
 vsync_disabled = true
-
 
 target_fps = 60
 show_fps = false
@@ -52,13 +70,13 @@ fps180     = ["Numpad5"]
 fps240     = ["Numpad6"]
 
 [general.controller]
-select = [1]
-mute   = [8]
-pause  = [9]
-left   = [14]
-right  = [15]
-up     = [12]
-down   = [13]
+select = ["RightRight"]
+mute   = ["CenterLeft"]
+pause  = ["CenterRight"]
+left   = ["LeftLeft"]
+right  = ["LeftRight"]
+up     = ["LeftTop"]
+down   = ["LeftBottom"]
 
 [jit]
 
@@ -103,30 +121,27 @@ up = ["W"]
 down = ["S"]
 
 [gb.controller]
-a = [1]
-b = [0]
-select = [2]
-start = [3]
-left = [14]
-right = [15]
-up = [12]
-down = [13]
+a      = ["RightRight"]
+b      = ["RightBottom"]
+select = ["RightLeft"]
+start  = ["RightTop"]
+left   = ["LeftLeft"]
+right  = ["LeftRight"]
+up     = ["LeftTop"]
+down   = ["LeftBottom"]
 
 # GBA Configuration
 
 [gba]
 
-# Experimental options which may cause crashes or glitches
-#skip_hle = true 
-#threads = 8
+# many gba games will idle loop until the end of a frame, this optimization
+# replaces these cpu instructions with a halt, leading to a performance increase
 idle_optimize = true
 
 # set between 0x100 - 0x400 to set how often the sound clock is updated
 # lower is more often, which is great for quality
 # higher is better for lower end systems that cannot render sound fast enough
 sound_clock_update_cycles = 0x100
-
-#disable_saves = true
 
 [gba.keyboard]
 a = ["J"]
@@ -141,16 +156,16 @@ r = ["Y"]
 l = ["T"]
 
 [gba.controller]
-a = [1]
-b = [0]
-select = [2]
-start = [3]
-left = [14]
-right = [15]
-up = [12]
-down = [13]
-r = [5]
-l = [4]
+a      = ["RightRight"]
+b      = ["RightBottom"]
+select = ["RightLeft"]
+start  = ["RightTop"]
+left   = ["LeftLeft"]
+right  = ["LeftRight"]
+up     = ["LeftTop"]
+down   = ["LeftBottom"]
+r = ["FrontTopRight", "FrontBottomRight"]
+l = ["FrontTopLeft", "FrontBottomLeft"]
 
 # NDS Configuration
 
@@ -197,18 +212,18 @@ rotation_toggle = ["F3"]
 export_scene = ["F4"]
 
 [nds.controller]
-a = [1]
-b = [0]
-select = [10]
-start = [11]
-left = [14]
-right = [15]
-up = [12]
-down = [13]
-r = [5]
-l = [4]
-x = [3]
-y = [2]
+a      = ["RightRight"]
+b      = ["RightBottom"]
+select = ["LeftStick"]
+start  = ["RightStick"]
+left   = ["LeftLeft"]
+right  = ["LeftRight"]
+up     = ["LeftTop"]
+down   = ["LeftBottom"]
+r      = ["FrontTopRight", "FrontBottomRight"]
+l      = ["FrontTopLeft", "FrontBottomLeft"]
+x      = ["RightTop"]
+y      = ["RightLeft"]
 
 [nds.firmware]
 
@@ -219,7 +234,6 @@ y = [2]
 # Gray, Brown, Red, Pink, Orange, Yellow, LimeGreen, Green, DarkGreen, SeaGreen,
 # Turquoise, Blue, DarkBlue, DarkPurple, Violet, Magenta
 # favorite_color = "Pink"
-
 
 [nds.rtc]
 # real time clock uses your current time, you can add hours to skip to different times of day. ex if real time is 9pm. add 11 hours sets rtc to 8am.

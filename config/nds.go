@@ -60,6 +60,7 @@ type NdsConfig struct {
 }
 
 func (c *Config) decodeNds() {
+	DecodeController(&c.Nds.ControllerConfig)
 	c.decodeNdsScreen()
 	c.decodeNdsBios()
 	c.decodeNdsFirmware()

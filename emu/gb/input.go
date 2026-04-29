@@ -10,7 +10,7 @@ func (gb *GameBoy) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGame
 
 	var (
 		keyConfig    = config.Conf.Gb.KeyboardConfig
-		buttonConfig = config.Conf.Gba.ControllerConfig
+		buttonConfig = config.Conf.Gb.ControllerConfig
 		k            = &gb.Joypad
 	)
 
@@ -38,22 +38,22 @@ func (gb *GameBoy) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGame
 	}
 
 	for _, button := range buttons {
-		switch buttonStr := int(button); {
-		case slices.Contains(buttonConfig.A, buttonStr):
+		switch {
+		case slices.Contains(buttonConfig.A, button):
 			*k &^= 1 << 4
-		case slices.Contains(buttonConfig.B, buttonStr):
+		case slices.Contains(buttonConfig.B, button):
 			*k &^= 1 << 5
-		case slices.Contains(buttonConfig.Select, buttonStr):
+		case slices.Contains(buttonConfig.Select, button):
 			*k &^= 1 << 6
-		case slices.Contains(buttonConfig.Start, buttonStr):
+		case slices.Contains(buttonConfig.Start, button):
 			*k &^= 1 << 7
-		case slices.Contains(buttonConfig.Right, buttonStr):
+		case slices.Contains(buttonConfig.Right, button):
 			*k &^= 1 << 0
-		case slices.Contains(buttonConfig.Left, buttonStr):
+		case slices.Contains(buttonConfig.Left, button):
 			*k &^= 1 << 1
-		case slices.Contains(buttonConfig.Up, buttonStr):
+		case slices.Contains(buttonConfig.Up, button):
 			*k &^= 1 << 2
-		case slices.Contains(buttonConfig.Down, buttonStr):
+		case slices.Contains(buttonConfig.Down, button):
 			*k &^= 1 << 3
 		}
 	}

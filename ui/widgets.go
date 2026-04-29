@@ -10,6 +10,7 @@ import (
 	"github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/utilities/mobile"
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
@@ -84,10 +85,7 @@ func NewTextBoxInput(value any, face *text.Face, validation func(s string) (bool
 			Caret: clr,
 		}),
 
-		widget.TextInputOpts.Padding(&widget.Insets{
-			Left:  4,
-			Right: 4,
-		}),
+		widget.TextInputOpts.Padding(&paddingInset),
 
 		widget.TextInputOpts.Validation(validation),
 
@@ -111,6 +109,15 @@ func NewTextBoxInput(value any, face *text.Face, validation func(s string) (bool
 				}
 
 				*v = nums
+
+			case *[]ebiten.StandardGamepadButton:
+				strs := strings.Split(strings.ReplaceAll(args.InputText, " ", ""), ",")
+
+				*v = []ebiten.StandardGamepadButton{}
+				for i := range strs {
+					*v = append(*v, utils.StringToGamepadButton(strs[i]))
+				}
+
 			default:
 				panic("not supported text box input")
 			}
@@ -144,6 +151,18 @@ func NewTextBoxInput(value any, face *text.Face, validation func(s string) (bool
 				combined += ", "
 			}
 			combined += strconv.Itoa(s)
+		}
+
+		input.SetText(combined)
+
+	case *[]ebiten.StandardGamepadButton:
+
+		combined := ""
+		for i, s := range *v {
+			if i > 0 && i < len(*v) {
+				combined += ", "
+			}
+			combined += utils.GamepadButtonToString(s)
 		}
 
 		input.SetText(combined)
@@ -204,12 +223,7 @@ func NewSaveButton(face *text.Face, img *widget.ButtonImage, f func(args *widget
 			},
 		),
 
-		widget.ButtonOpts.TextPadding(&widget.Insets{
-			Left:   32,
-			Right:  32,
-			Top:    4,
-			Bottom: 4,
-		}),
+		widget.ButtonOpts.TextPadding(&buttonInset),
 
 		widget.ButtonOpts.ClickedHandler(f),
 	)
@@ -244,10 +258,7 @@ func NewColorInput(v *color.Color, face *text.Face, validation func(s string) (b
 			Caret: clr,
 		}),
 
-		widget.TextInputOpts.Padding(&widget.Insets{
-			Left:  4,
-			Right: 4,
-		}),
+		widget.TextInputOpts.Padding(&paddingInset),
 
 		widget.TextInputOpts.Validation(validation),
 
@@ -266,7 +277,7 @@ func NewColorInput(v *color.Color, face *text.Face, validation func(s string) (b
 	return container
 }
 
-func NewApplyPalettesMenu(pals map[string][4]string, clrInputs [4]widget.PreferredSizeLocateableWidget, face *text.Face, img *widget.ButtonImage) widget.PreferredSizeLocateableWidget {
+func NewApplyPalettesMenu(focusGroups *[][]widget.Focuser, pals map[string][4]string, clrInputs [4]widget.PreferredSizeLocateableWidget, face *text.Face, img *widget.ButtonImage) widget.PreferredSizeLocateableWidget {
 	clr := config.Conf.Ui.MenuForegroundColor
 
 	c := widget.NewContainer(
@@ -275,8 +286,10 @@ func NewApplyPalettesMenu(pals map[string][4]string, clrInputs [4]widget.Preferr
 		)),
 	)
 
+	focusRadio := []widget.Focuser{}
+
 	for label, pal := range pals {
-		c.AddChild(widget.NewButton(
+		b := widget.NewButton(
 			widget.ButtonOpts.WidgetOpts(
 				widget.WidgetOpts.LayoutData(widget.RowLayoutData{
 					Position: widget.RowLayoutPositionCenter,
@@ -295,12 +308,7 @@ func NewApplyPalettesMenu(pals map[string][4]string, clrInputs [4]widget.Preferr
 				},
 			),
 
-			widget.ButtonOpts.TextPadding(&widget.Insets{
-				Left:   32,
-				Right:  32,
-				Top:    4,
-				Bottom: 4,
-			}),
+			widget.ButtonOpts.TextPadding(&buttonInset),
 
 			widget.ButtonOpts.TextPosition(
 				widget.TextPositionCenter,
@@ -315,8 +323,12 @@ func NewApplyPalettesMenu(pals map[string][4]string, clrInputs [4]widget.Preferr
 					c[1].(*widget.Container).SetBackgroundImage(clr)
 				}
 			}),
-		))
+		)
+		focusRadio = append(focusRadio, b)
+		c.AddChild(b)
 	}
+
+	*focusGroups = append(*focusGroups, focusRadio)
 
 	return c
 }
@@ -327,7 +339,7 @@ func NewFileInput(v *string, face *text.Face) widget.PreferredSizeLocateableWidg
 
 	var input *widget.TextInput
 
-	onClick := func(args *widget.WidgetMouseButtonClickedEventArgs) {
+	onClick := func() {
 		f := utils.OpenFile("Open", "All Files")
 
 		*v = f
@@ -355,14 +367,18 @@ func NewFileInput(v *string, face *text.Face) widget.PreferredSizeLocateableWidg
 			Caret: clr,
 		}),
 
-		widget.TextInputOpts.Padding(&widget.Insets{
-			Left:  4,
-			Right: 4,
-		}),
+		widget.TextInputOpts.Padding(&paddingInset),
 
 		widget.TextInputOpts.WidgetOpts(
-			widget.WidgetOpts.MouseButtonClickedHandler(onClick),
+			widget.WidgetOpts.MouseButtonClickedHandler(func(args *widget.WidgetMouseButtonClickedEventArgs) {
+				onClick()
+			}),
 		),
+
+		// used for button input
+		widget.TextInputOpts.SubmitHandler(func(args *widget.TextInputChangedEventArgs) {
+			onClick()
+		}),
 
 		widget.TextInputOpts.CaretWidth(0),
 	)
@@ -406,10 +422,7 @@ func NewDirectoryInput(v *string, face *text.Face, defaultPath string) widget.Pr
 			Caret: clr,
 		}),
 
-		widget.TextInputOpts.Padding(&widget.Insets{
-			Left:  4,
-			Right: 4,
-		}),
+		widget.TextInputOpts.Padding(&paddingInset),
 
 		widget.TextInputOpts.WidgetOpts(
 			widget.WidgetOpts.MouseButtonClickedHandler(onClick),
@@ -423,30 +436,36 @@ func NewDirectoryInput(v *string, face *text.Face, defaultPath string) widget.Pr
 	return input
 }
 
-func NewRadioInput(v *string, face *text.Face, img *widget.ButtonImage) widget.PreferredSizeLocateableWidget {
+func NewRadioInput(focusRadios *[][]widget.Focuser, v *int, values []string, face *text.Face, img *widget.ButtonImage) widget.PreferredSizeLocateableWidget {
 
 	radio := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(24)),
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
 		)),
 	)
 
 	bs := []widget.RadioGroupElement{}
 
-	b1 := NewRadioButton(v, "here", face, img)
-	radio.AddChild(b1)
-	bs = append(bs, b1)
+	focusRadio := []widget.Focuser{}
+
+	for i := range values {
+		b := NewRadioButton(v, values[i], i, face, img)
+		radio.AddChild(b)
+		bs = append(bs, b)
+		focusRadio = append(focusRadio, b)
+	}
+
+	*focusRadios = append(*focusRadios, focusRadio)
 
 	widget.NewRadioGroup(
 		widget.RadioGroupOpts.Elements(bs...),
-		//widget.RadioGroupOpts.InitialElement(bs[init]),
+		widget.RadioGroupOpts.InitialElement(bs[*v]),
 	)
 
 	return radio
 }
 
-func NewRadioButton(v *string, label string, face *text.Face, img *widget.ButtonImage) *widget.Button {
+func NewRadioButton(v *int, label string, value int, face *text.Face, img *widget.ButtonImage) *widget.Button {
 	return widget.NewButton(
 		widget.ButtonOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
@@ -466,8 +485,8 @@ func NewRadioButton(v *string, label string, face *text.Face, img *widget.Button
 		),
 
 		widget.ButtonOpts.TextPadding(&widget.Insets{
-			Left:   32,
-			Right:  32,
+			Left:   16,
+			Right:  16,
 			Top:    4,
 			Bottom: 4,
 		}),
@@ -479,7 +498,7 @@ func NewRadioButton(v *string, label string, face *text.Face, img *widget.Button
 
 		widget.ButtonOpts.ClickedHandler(
 			func(*widget.ButtonClickedEventArgs) {
-				*v = label
+				*v = value
 			},
 		),
 	)

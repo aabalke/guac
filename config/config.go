@@ -7,7 +7,10 @@ import (
 	"os"
 
 	_ "embed"
+
 	"github.com/BurntSushi/toml"
+	"github.com/aabalke/guac/utils"
+	"github.com/hajimehoshi/ebiten/v2"
 	sys "golang.org/x/sys/cpu"
 )
 
@@ -108,15 +111,25 @@ type KeyboardConfig struct {
 }
 
 type ControllerConfig struct {
-	Select     []int `toml:"select"`
-	Mute       []int `toml:"mute"`
-	Pause      []int `toml:"pause"`
-	Left       []int `toml:"left"`
-	Right      []int `toml:"right"`
-	Up         []int `toml:"up"`
-	Down       []int `toml:"down"`
-	Fullscreen []int `toml:"fullscreen"`
-	Quit       []int `toml:"quit"`
+	Select     []ebiten.StandardGamepadButton
+	Mute       []ebiten.StandardGamepadButton
+	Pause      []ebiten.StandardGamepadButton
+	Left       []ebiten.StandardGamepadButton
+	Right      []ebiten.StandardGamepadButton
+	Up         []ebiten.StandardGamepadButton
+	Down       []ebiten.StandardGamepadButton
+	Fullscreen []ebiten.StandardGamepadButton
+	Quit       []ebiten.StandardGamepadButton
+
+	TomlSelect     []string `toml:"select"`
+	TomlMute       []string `toml:"mute"`
+	TomlPause      []string `toml:"pause"`
+	TomlLeft       []string `toml:"left"`
+	TomlRight      []string `toml:"right"`
+	TomlUp         []string `toml:"up"`
+	TomlDown       []string `toml:"down"`
+	TomlFullscreen []string `toml:"fullscreen"`
+	TomlQuit       []string `toml:"quit"`
 }
 
 type EmulatorKeyboardConfig struct {
@@ -142,19 +155,33 @@ type EmulatorKeyboardConfig struct {
 }
 
 type EmulatorControllerConfig struct {
-	A      []int `toml:"a"`
-	B      []int `toml:"b"`
-	Select []int `toml:"select"`
-	Start  []int `toml:"start"`
-	Left   []int `toml:"left"`
-	Right  []int `toml:"right"`
-	Up     []int `toml:"up"`
-	Down   []int `toml:"down"`
-	R      []int `toml:"r"`
-	L      []int `toml:"l"`
-	X      []int `toml:"x"`
-	Y      []int `toml:"y"`
-	Hinge  []int `toml:"hinge"`
+	TomlA      []string `toml:"a"`
+	TomlB      []string `toml:"b"`
+	TomlSelect []string `toml:"select"`
+	TomlStart  []string `toml:"start"`
+	TomlLeft   []string `toml:"left"`
+	TomlRight  []string `toml:"right"`
+	TomlUp     []string `toml:"up"`
+	TomlDown   []string `toml:"down"`
+	TomlR      []string `toml:"r"`
+	TomlL      []string `toml:"l"`
+	TomlX      []string `toml:"x"`
+	TomlY      []string `toml:"y"`
+	TomlHinge  []string `toml:"hinge"`
+
+	A      []ebiten.StandardGamepadButton
+	B      []ebiten.StandardGamepadButton
+	Select []ebiten.StandardGamepadButton
+	Start  []ebiten.StandardGamepadButton
+	Left   []ebiten.StandardGamepadButton
+	Right  []ebiten.StandardGamepadButton
+	Up     []ebiten.StandardGamepadButton
+	Down   []ebiten.StandardGamepadButton
+	R      []ebiten.StandardGamepadButton
+	L      []ebiten.StandardGamepadButton
+	X      []ebiten.StandardGamepadButton
+	Y      []ebiten.StandardGamepadButton
+	Hinge  []ebiten.StandardGamepadButton
 }
 
 func (c *Config) Decode() {
@@ -218,13 +245,98 @@ func (c *Config) Decode() {
 	//	c.Ui.GamesPerRow = 6
 	//}
 
+	c.DecodeGeneralController()
+
 	c.decodeJit()
+
 	c.decodeGb()
+
+	DecodeController(&c.Gba.ControllerConfig)
+
 	c.decodeNds()
+
 	c.decodeMouse()
 }
 
+func (c *Config) DecodeGeneralController() {
+
+	conf := &c.General.ControllerConfig
+
+	configs := []*[]string{
+		&conf.TomlSelect,
+		&conf.TomlMute,
+		&conf.TomlPause,
+		&conf.TomlLeft,
+		&conf.TomlRight,
+		&conf.TomlUp,
+		&conf.TomlDown,
+		&conf.TomlFullscreen,
+		&conf.TomlQuit,
+	}
+
+	outputs := []*[]ebiten.StandardGamepadButton{
+		&conf.Select,
+		&conf.Mute,
+		&conf.Pause,
+		&conf.Left,
+		&conf.Right,
+		&conf.Up,
+		&conf.Down,
+		&conf.Fullscreen,
+		&conf.Quit,
+	}
+
+	for i := range len(configs) {
+		for j := range len(*configs[i]) {
+			*outputs[i] = append(*outputs[i], utils.StringToGamepadButton((*configs[i])[j]))
+		}
+	}
+}
+
+func DecodeController(conf *EmulatorControllerConfig) {
+
+	configs := []*[]string{
+		&conf.TomlA,
+		&conf.TomlB,
+		&conf.TomlSelect,
+		&conf.TomlStart,
+		&conf.TomlLeft,
+		&conf.TomlRight,
+		&conf.TomlUp,
+		&conf.TomlDown,
+		&conf.TomlR,
+		&conf.TomlL,
+		&conf.TomlX,
+		&conf.TomlY,
+		&conf.TomlHinge,
+	}
+
+	outputs := []*[]ebiten.StandardGamepadButton{
+		&conf.A,
+		&conf.B,
+		&conf.Select,
+		&conf.Start,
+		&conf.Left,
+		&conf.Right,
+		&conf.Up,
+		&conf.Down,
+		&conf.R,
+		&conf.L,
+		&conf.X,
+		&conf.Y,
+		&conf.Hinge,
+	}
+
+	for i := range len(configs) {
+		for j := range len(*configs[i]) {
+			*outputs[i] = append(*outputs[i], utils.StringToGamepadButton((*configs[i])[j]))
+		}
+	}
+}
+
 func (c *Config) decodeGb() {
+
+	DecodeController(&c.Gb.ControllerConfig)
 
 	pal := c.Gb.TomlPalette
 

@@ -48,9 +48,9 @@ const (
 )
 
 type Screen struct {
-	Layout   int
-	Sizing   int
-	Rotation int
+	Layout   *int
+	Sizing   *int
+	Rotation *int
 
 	Top, Bottom *ebiten.Image
 	BtmAbs      BtmAbs
@@ -67,9 +67,9 @@ func NewScreen() *Screen {
 	s := &Screen{
 		Top:      ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 		Bottom:   ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
-		Layout:   config.Conf.Nds.Screen.OLayout,
-		Sizing:   config.Conf.Nds.Screen.OSizing,
-		Rotation: config.Conf.Nds.Screen.ORotation,
+		Layout:   &config.Conf.Nds.Screen.OLayout,
+		Sizing:   &config.Conf.Nds.Screen.OSizing,
+		Rotation: &config.Conf.Nds.Screen.ORotation,
 	}
 
 	return s
@@ -77,26 +77,26 @@ func NewScreen() *Screen {
 
 func (s *Screen) FillScreen(screen *ebiten.Image) {
 	switch {
-	case s.Layout == LAYOUT_HYBRID:
+	case *s.Layout == LAYOUT_HYBRID:
 		s.FillHybrid(screen)
 		return
-	case s.Sizing == SIZING_ONLY_TOP:
+	case *s.Sizing == SIZING_ONLY_TOP:
 		s.FillOnly(screen, false)
 		return
-	case s.Sizing == SIZING_ONLY_BOTTOM:
+	case *s.Sizing == SIZING_ONLY_BOTTOM:
 		s.FillOnly(screen, true)
 		return
-	case s.Layout == LAYOUT_VERTICAL:
+	case *s.Layout == LAYOUT_VERTICAL:
 		s.FillEvenVertical(screen)
 		return
-	case s.Layout == LAYOUT_HORZONTAL:
+	case *s.Layout == LAYOUT_HORZONTAL:
 		s.FillEvenHorizontal(screen)
 		return
 	}
 }
 
 func (s *Screen) ApplyTouchPositions(x, y, w, h int) {
-	switch s.Rotation {
+	switch *s.Rotation {
 	case ROT_0:
 		s.BtmAbs = BtmAbs{T: y, B: y + h, L: x, R: x + w, W: w, H: h}
 	case ROT_90:
@@ -125,7 +125,7 @@ func (s *Screen) FillOnly(screen *ebiten.Image, bottom bool) {
 		rotX, rotY float64
 	)
 
-	switch s.Rotation {
+	switch *s.Rotation {
 	case ROT_0: // skip
 		rotRadians = RAD_0
 	case ROT_90:
@@ -218,7 +218,7 @@ func (s *Screen) FillHybrid(screen *ebiten.Image) {
 	s.Options.GeoM.Translate(offsetX, offsetY)
 	screen.DrawImage(s.Bottom, &s.Options)
 
-	if s.Sizing == SIZING_ONLY_BOTTOM {
+	if *s.Sizing == SIZING_ONLY_BOTTOM {
 
 		s.Options = ebiten.DrawImageOptions{}
 		s.Options.GeoM.Scale(scale, scale)
@@ -277,7 +277,7 @@ func (s *Screen) FillEvenVertical(screen *ebiten.Image) {
 		canvasH    float64
 	)
 
-	switch s.Rotation {
+	switch *s.Rotation {
 	case ROT_0: // skip
 		botOff = SCREEN_HEIGHT
 		rotRadians = RAD_0
@@ -360,7 +360,7 @@ func (s *Screen) FillEvenHorizontal(screen *ebiten.Image) {
 		canvasH    float64
 	)
 
-	switch s.Rotation {
+	switch *s.Rotation {
 	case ROT_0:
 		botOff = SCREEN_WIDTH
 		rotRadians = RAD_0
@@ -433,10 +433,10 @@ func (s *Screen) inputHandler(field int) {
 
 	switch field {
 	case SCREEN_LAYOUT:
-		s.Layout = (s.Layout + 1) % 3
+		*s.Layout = (*s.Layout + 1) % 3
 	case SCREEN_SIZING:
-		s.Sizing = (s.Sizing + 1) % 3
+		*s.Sizing = (*s.Sizing + 1) % 3
 	case SCREEN_ROTATION:
-		s.Rotation = (s.Rotation + 1) % 4
+		*s.Rotation = (*s.Rotation + 1) % 4
 	}
 }

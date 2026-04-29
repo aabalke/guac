@@ -3,6 +3,8 @@ package ui
 import (
 	"log"
 
+	"github.com/ebitenui/ebitenui"
+	"github.com/ebitenui/ebitenui/widget"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
 
@@ -18,12 +20,19 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
+type PageId int
+
+const (
+	PAGE_HOME PageId = iota
+	PAGE_PAUSE
+	PAGE_SETTINGS
+)
+
 type Game struct {
 
 	// flags
 
-	res   *UiResources
-	ui    *UiPage
+	ui    *Ui
 	nds   *nds.Nds
 	gba   *gba.GBA
 	gb    *gameboy.GameBoy
@@ -31,8 +40,8 @@ type Game struct {
 
 	pauseEndFrame uint64
 
-	gamepad          ebiten.GamepadID
-	gamepadConnected bool
+	gamepadIdBuf []ebiten.GamepadID
+	gamepadIds   map[ebiten.GamepadID]struct{}
 
 	menuCtx *audio.Context
 	emuCtx  *oto.Context
@@ -47,6 +56,21 @@ type Game struct {
 	paused bool
 	muted  bool
 	quit   bool
+}
+
+type Ui struct {
+	res   *Resources
+	focus *Focus
+
+	PageId     PageId
+	PrevPageId PageId
+
+	ui *ebitenui.UI
+
+	sidebar    *widget.Container
+	scrollable *widget.ScrollContainer
+	content    *widget.Container
+	slider     *widget.Slider
 }
 
 func StartEngine() {
@@ -68,10 +92,11 @@ func StartEngine() {
 		ebiten.SetFullscreen(true)
 	}
 
-	g := NewGame(res)
+	g := NewGame()
+	g.ui = NewUi(res)
 
 	// switch based on flags
-	g.ui = NewHome(g)
+	NewHome(g)
 
 	err = ebiten.RunGame(g)
 	if err != nil {
@@ -79,14 +104,22 @@ func StartEngine() {
 	}
 }
 
-func NewGame(res *UiResources) *Game {
+func NewUi(res *Resources) *Ui {
+	return &Ui{
+		res:   res,
+		focus: &Focus{},
+	}
+}
+
+func NewGame() *Game {
 
 	g := &Game{
 		//flags
-		emuCtx: NewAudioContext(),
-		mouse:  input.NewMouse(),
-		res:    res,
-		StdFPS: config.Conf.General.TargetFps == 60,
+		emuCtx:       NewAudioContext(),
+		mouse:        input.NewMouse(),
+		StdFPS:       config.Conf.General.TargetFps == 60,
+		gamepadIds:   make(map[ebiten.GamepadID]struct{}),
+		gamepadIdBuf: make([]ebiten.GamepadID, 0),
 	}
 
 	if !config.Conf.CancelAudioInit {
@@ -110,8 +143,6 @@ func (g *Game) Update() error {
 
 	g.Profile()
 
-	g.frame++
-
 	justKeys, keys, _, buttons := g.GetInput()
 
 	if g.quit {
@@ -120,6 +151,10 @@ func (g *Game) Update() error {
 
 	switch {
 	case g.ui != nil:
+
+		if init := g.frame < 1; init && len(g.gamepadIds) != 0 {
+			g.ui.ui.SetFocusedWidget(g.ui.ui.Container.GetFocusers()[0])
+		}
 
 		if g.paused && g.frame-g.pauseEndFrame < 10 {
 			// pressing select on pause can sometimes input into emulator,
@@ -142,6 +177,8 @@ func (g *Game) Update() error {
 		g.gb.Update(g.StdFPS)
 
 	}
+
+	g.frame++
 
 	return nil
 }
@@ -186,7 +223,7 @@ func (g *Game) TogglePause() {
 	}
 
 	if g.paused && g.ui == nil {
-		g.ui = NewPause(g)
+		NewPause(g)
 	}
 
 	if !g.paused && (g.nds != nil || g.gba != nil || g.gb != nil) {

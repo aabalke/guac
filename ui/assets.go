@@ -32,12 +32,24 @@ var theme_palettes = map[string][4]string{
 	"bgb":    {"142C38", "142C38", "ACD490", "548C70"},
 }
 
+var paddingInset = widget.Insets{
+	Left:  4,
+	Right: 4,
+}
+
+var buttonInset = widget.Insets{
+	Left:   32,
+	Right:  32,
+	Top:    4,
+	Bottom: 4,
+}
+
 var transparentNine = image.NewNineSliceColor(color.Transparent)
 
 //go:embed assets
 var embeddedAssets embed.FS
 
-type UiResources struct {
+type Resources struct {
 	bg, fg, sec          *image.NineSlice
 	bgClr, fgClr, secClr *color.Color
 	fonts                *fonts
@@ -49,7 +61,7 @@ type UiResources struct {
 	ui *ebitenui.UI
 }
 
-func NewUIResources() (*UiResources, error) {
+func NewUIResources() (*Resources, error) {
 
 	var (
 		conf = &config.Conf.Ui
@@ -79,12 +91,13 @@ func NewUIResources() (*UiResources, error) {
 	}
 
 	buttonImage := &widget.ButtonImage{
-		Idle:    transparentNine,
-		Hover:   sec,
-		Pressed: sec,
+		Idle:         transparentNine,
+		Hover:        sec,
+		Pressed:      sec,
+		PressedHover: sec,
 	}
 
-	return &UiResources{
+	return &Resources{
 		icon:        []img.Image{icon},
 		fonts:       fonts,
 		bg:          bg,
@@ -98,7 +111,7 @@ func NewUIResources() (*UiResources, error) {
 	}, nil
 }
 
-func (u *UiResources) Update() {
+func (u *Resources) Update() {
 
 	conf := &config.Conf.Ui
 	u.bg = image.NewNineSliceColor(conf.MenuBackgroundColor)
@@ -106,6 +119,7 @@ func (u *UiResources) Update() {
 	u.sec = image.NewNineSliceColor(conf.MenuSecondaryColor)
 	u.buttonImage.Hover = u.sec
 	u.buttonImage.Pressed = u.sec
+	u.buttonImage.PressedHover = u.sec
 
 	checkboxImage, err := loadCheckboxImage(conf.MenuForegroundColor)
 	if err != nil {
@@ -168,7 +182,7 @@ func newImageFromFile(path string) (*ebiten.Image, error) {
 	return i, err
 }
 
-func loadImageNineSlice(path string, centerWidth int, centerHeight int) (*image.NineSlice, error) {
+func loadImageNineSlice(path string, centerWidth, centerHeight int) (*image.NineSlice, error) {
 	i, err := newImageFromFile(path)
 	if err != nil {
 		return nil, err
@@ -182,58 +196,49 @@ func loadImageNineSlice(path string, centerWidth int, centerHeight int) (*image.
 }
 
 func loadCheckboxImage(clr color.Color) (*widget.CheckboxImage, error) {
-	f1, err := embeddedAssets.Open("assets/graphics/checkbox_idle.png")
-	if err != nil {
-		return nil, err
-	}
-	defer f1.Close()
-	unchecked, _, _ := ebitenutil.NewImageFromReader(f1)
 
-	f2, err := embeddedAssets.Open("assets/graphics/checkbox_checked.png")
-	if err != nil {
-		return nil, err
-	}
-	defer f2.Close()
-	checked, _, _ := ebitenutil.NewImageFromReader(f2)
+	imgs := make([]*ebiten.Image, 4)
 
-	unchecked = TintImage(unchecked, clr)
-	checked = TintImage(checked, clr)
+	for i, v := range []string{
+		"assets/graphics/checkbox_idle.png",
+		"assets/graphics/checkbox_checked.png",
+		"assets/graphics/checkbox_idle_hover.png",
+		"assets/graphics/checkbox_checked_hover.png",
+	} {
+
+		f, err := embeddedAssets.Open(v)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+		imgs[i], _, _ = ebitenutil.NewImageFromReader(f)
+		imgs[i] = TintImage(imgs[i], clr)
+	}
 
 	s := [3]int{32, 0, 0}
 
 	return &widget.CheckboxImage{
-		Unchecked: image.NewNineSlice(unchecked, s, s),
-		Checked:   image.NewNineSlice(checked, s, s),
+		Unchecked:        image.NewNineSlice(imgs[0], s, s),
+		Checked:          image.NewNineSlice(imgs[1], s, s),
+		UncheckedHovered: image.NewNineSlice(imgs[2], s, s),
+		CheckedHovered:   image.NewNineSlice(imgs[3], s, s),
 	}, nil
 }
 
 func TintImage(src *ebiten.Image, c color.Color) *ebiten.Image {
 
-	r, g, b, a := c.RGBA()
+	r, g, b, _ := c.RGBA()
 	rf := float32(r) / 0xFFFF
 	gf := float32(g) / 0xFFFF
 	bf := float32(b) / 0xFFFF
-	af := float32(a) / 0xFFFF
+	//af := float32(a) / 0xFFFF
 
 	w, h := src.Bounds().Size().X, src.Bounds().Size().Y
 	dst := ebiten.NewImage(w, h)
 
 	op := &ebiten.DrawImageOptions{}
-	op.ColorScale.Scale(rf, gf, bf, af)
+	op.ColorScale.Scale(rf, gf, bf, 1)
 
 	dst.DrawImage(src, op)
 	return dst
-}
-
-type PageId int
-
-const (
-	PAGE_HOME PageId = iota
-	PAGE_PAUSE
-	PAGE_SETTINGS
-)
-
-type UiPage struct {
-	Id PageId
-	ui *ebitenui.UI
 }

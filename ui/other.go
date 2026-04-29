@@ -9,42 +9,56 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
-func NewHome(g *Game) *UiPage {
+func NewHome(g *Game) {
 
-	face := g.res.fonts.face
-	img := g.res.buttonImage
+	g.ui.focus.ClearFocus()
 
-	b1 := NewCenteredButton("open a rom", face, img, func(*widget.ButtonClickedEventArgs) {
-		file := utils.OpenFile("Open", "Roms (*.gb, *.gbc, *.gba, *.nds)", "gb", "gbc", "gba", "nds")
+	res := g.ui.res
+	face := res.fonts.face
+	img := res.buttonImage
+
+	b1 := NewCenteredButton("open a rom", face, img, func() {
+		file := utils.OpenFile(
+			"Open",
+			"Roms (*.gb, *.gbc, *.gba, *.nds)",
+			"gb", "gbc", "gba", "nds",
+		)
+
 		g.InitConsole(file)
 	})
 
-	b2 := NewCenteredButton("settings", face, img, func(*widget.ButtonClickedEventArgs) {
-		g.ui = NewSettings(g, g.ui.Id, "general")
+	b2 := NewCenteredButton("settings", face, img, func() {
+		NewSettings(g, g.ui.PageId, MENU_GENERAL)
 	})
 
-	b3 := NewCenteredButton("quit", face, img, func(*widget.ButtonClickedEventArgs) {
+	b3 := NewCenteredButton("quit", face, img, func() {
 		g.quit = true
 	})
 
-	return NewCenteredPage(PAGE_HOME, g.res.bg, b1, b2, b3)
+	root := NewCenteredPage(res.bg, b1, b2, b3)
+	g.ui.PageId = PAGE_HOME
+	g.ui.ui = &ebitenui.UI{Container: root}
+	g.ui.focus.other = g.ui.ui.Container.GetFocusers()
+	g.ui.focus.BuildFocus(g.ui.ui)
 }
 
-func NewPause(g *Game) *UiPage {
+func NewPause(g *Game) {
+	g.ui.focus.ClearFocus()
 
-	face := g.res.fonts.face
-	img := g.res.buttonImage
+	res := g.ui.res
+	face := res.fonts.face
+	img := res.buttonImage
 
-	b1 := NewCenteredButton("resume", face, img, func(*widget.ButtonClickedEventArgs) {
+	b1 := NewCenteredButton("resume", face, img, func() {
 		g.TogglePause()
 	})
 
-	b2 := NewCenteredButton("settings", face, img, func(*widget.ButtonClickedEventArgs) {
-		g.ui = NewSettings(g, g.ui.Id, "general")
+	b2 := NewCenteredButton("settings", face, img, func() {
+		NewSettings(g, g.ui.PageId, MENU_GENERAL)
 	})
 
-	b3 := NewCenteredButton("main menu", face, img, func(*widget.ButtonClickedEventArgs) {
-		g.ui = NewHome(g)
+	b3 := NewCenteredButton("main menu", face, img, func() {
+		NewHome(g)
 
 		if g.nds != nil {
 			g.nds.Close()
@@ -62,10 +76,14 @@ func NewPause(g *Game) *UiPage {
 		g.paused = false
 	})
 
-	return NewCenteredPage(PAGE_PAUSE, g.res.bg, b1, b2, b3)
+	root := NewCenteredPage(res.bg, b1, b2, b3)
+	g.ui.PageId = PAGE_PAUSE
+	g.ui.ui = &ebitenui.UI{Container: root}
+	g.ui.focus.other = g.ui.ui.Container.GetFocusers()
+	g.ui.focus.BuildFocus(g.ui.ui)
 }
 
-func NewCenteredPage(id PageId, bg *image.NineSlice, buttons ...*widget.Button) *UiPage {
+func NewCenteredPage(bg *image.NineSlice, buttons ...*widget.Button) *widget.Container {
 
 	root := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(bg),
@@ -93,40 +111,29 @@ func NewCenteredPage(id PageId, bg *image.NineSlice, buttons ...*widget.Button) 
 
 	root.AddChild(c)
 
-	return &UiPage{
-		Id: id,
-		ui: &ebitenui.UI{
-			Container: root,
-		}}
+	return root
 }
 
-func NewCenteredButton(text string, face *text.Face, img *widget.ButtonImage, f func(*widget.ButtonClickedEventArgs)) *widget.Button {
+func NewCenteredButton(text string, face *text.Face, img *widget.ButtonImage, f func()) *widget.Button {
 
 	return widget.NewButton(
 		widget.ButtonOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-				MaxWidth: 256,
+				MaxWidth: BUTTON_WIDTH,
 				Stretch:  true,
 			}),
 		),
 
 		widget.ButtonOpts.Image(img),
 
-		widget.ButtonOpts.Text(
-			text,
-			face,
-			&widget.ButtonTextColor{
-				Idle: config.Conf.Ui.MenuForegroundColor,
-			},
-		),
-
-		widget.ButtonOpts.TextPadding(&widget.Insets{
-			Left:   32,
-			Right:  32,
-			Top:    4,
-			Bottom: 4,
+		widget.ButtonOpts.Text(text, face, &widget.ButtonTextColor{
+			Idle: config.Conf.Ui.MenuForegroundColor,
 		}),
 
-		widget.ButtonOpts.ClickedHandler(f),
+		widget.ButtonOpts.TextPadding(&buttonInset),
+
+		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+			f()
+		}),
 	)
 }
