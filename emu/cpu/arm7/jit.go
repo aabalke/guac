@@ -88,7 +88,9 @@ func NewJit(cpu *Cpu) *Jit {
 }
 
 func (j *Jit) Close() {
-	j.BlockCache.Close()
+	if j.BlockCache != nil {
+		j.BlockCache.Close()
+    }
 }
 
 func (j *Jit) UserBankReg(reg uint32) gojit.Indirect {
@@ -147,7 +149,6 @@ func (j *Jit) SCRATCH(i uint32) gojit.Indirect {
 }
 
 // gets spsr value, using mode and CPU
-//
 //go:nosplit
 func GetSpsr(mode uint32) uint32 {
 	return CpuPointer.Reg.SPSR[BANK_ID[mode]].Get()

@@ -93,7 +93,9 @@ func NewJit(cpu *Cpu) *Jit {
 }
 
 func (j *Jit) Close() {
-    j.BlockCache.Close()
+    if j.BlockCache != nil {
+        j.BlockCache.Close()
+    }
 }
 
 func (j *Jit) UserBankReg(reg uint32) gojit.Indirect {
