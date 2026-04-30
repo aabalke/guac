@@ -157,6 +157,8 @@ func NewGeneralMenu(g *Game, parent *widget.Container) {
 				g.ui.focus.FocusLastSubMenu()
 			}
 
+			g.ui.toast.AddMessage("saved")
+
 		}),
 	)
 }
@@ -207,6 +209,7 @@ func NewUiMenu(g *Game, parent *widget.Container) {
 			if len(g.gamepadIds) != 0 {
 				g.ui.focus.FocusLastSubMenu()
 			}
+			g.ui.toast.AddMessage("saved")
 		}),
 	)
 }
@@ -295,6 +298,7 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 			if len(g.gamepadIds) != 0 {
 				g.ui.focus.FocusLastSubMenu()
 			}
+			g.ui.toast.AddMessage("saved")
 		}),
 	)
 }
@@ -376,6 +380,7 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 			if len(g.gamepadIds) != 0 {
 				g.ui.focus.FocusLastSubMenu()
 			}
+			g.ui.toast.AddMessage("saved")
 		}),
 	)
 }
@@ -536,6 +541,7 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 			if len(g.gamepadIds) != 0 {
 				g.ui.focus.FocusLastSubMenu()
 			}
+			g.ui.toast.AddMessage("saved")
 		}),
 	)
 }

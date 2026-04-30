@@ -137,12 +137,17 @@ func (f *Focus) FocusSubmenu() {
 }
 
 func (f *Focus) DeFocus() {
-	f.ui.ClearFocus()
+	if f.ui != nil {
+		f.ui.ClearFocus()
+	}
 }
 
 func (f *Focus) KeepFocusedInView(slider *widget.Slider) {
 
-	if len(f.submenu) == 0 || slider == nil || f.ui == nil || f.ui.GetFocusedWidget() == nil {
+	if len(f.submenu) == 0 ||
+		slider == nil ||
+		f.ui == nil ||
+		f.ui.GetFocusedWidget() == nil {
 		return
 	}
 

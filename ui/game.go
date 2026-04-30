@@ -65,7 +65,8 @@ type Ui struct {
 	PageId     PageId
 	PrevPageId PageId
 
-	ui *ebitenui.UI
+	ui    *ebitenui.UI
+	toast *Toast
 
 	sidebar    *widget.Container
 	scrollable *widget.ScrollContainer
@@ -108,6 +109,7 @@ func NewUi(res *Resources) *Ui {
 	return &Ui{
 		res:   res,
 		focus: &Focus{},
+		toast: NewToast(res),
 	}
 }
 
@@ -134,6 +136,8 @@ func (g *Game) Layout(outsideWidth int, outsideHeight int) (int, int) {
 }
 
 func (g *Game) Update() error {
+
+	g.ui.toast.Update()
 
 	if config.Conf.General.TargetFps != g.TargetFps {
 		g.TargetFps = config.Conf.General.TargetFps
@@ -203,6 +207,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.gb.Draw(screen)
 	}
 
+	if g.ui.toast.enabled {
+		g.ui.toast.ui.Draw(screen)
+	}
+
 	if config.Conf.General.ShowFps {
 		ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %.2f, TPS: %.2f", ebiten.ActualFPS(), ebiten.ActualTPS()))
 	}
@@ -251,6 +259,12 @@ func (g *Game) ToggleMute() {
 		g.gba.ToggleMute()
 	case g.gb != nil:
 		g.gb.ToggleMute()
+	}
+
+	if g.muted {
+		g.ui.toast.AddMessage("muted")
+	} else {
+		g.ui.toast.AddMessage("unmuted")
 	}
 }
 

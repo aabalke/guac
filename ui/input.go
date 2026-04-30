@@ -16,6 +16,7 @@ func (g *Game) GetGamepadButtons() (justButtons, buttons []ebiten.StandardGamepa
 
 	for _, id := range g.gamepadIdBuf {
 		fmt.Printf("Gamepad Connected id %d\n", id)
+		g.ui.toast.AddMessage("controller connected")
 		g.gamepadIds[id] = struct{}{}
 
 		g.ui.focus.FocusSidebar(0)
@@ -24,6 +25,7 @@ func (g *Game) GetGamepadButtons() (justButtons, buttons []ebiten.StandardGamepa
 	for id := range g.gamepadIds {
 		if inpututil.IsGamepadJustDisconnected(id) {
 			fmt.Printf("Gamepad Disconnected id %d\n", id)
+			g.ui.toast.AddMessage("controller disconnected")
 			delete(g.gamepadIds, id)
 
 			if len(g.gamepadIds) == 0 {
@@ -90,7 +92,7 @@ func (g *Game) GetInput() (justKeys, keys []ebiten.Key, justButtons, buttons []e
 		}
 	}
 
-	if g.ui != nil {
+	if g.ui.ui != nil {
 		g.ButtonInput(justButtons, buttons)
 	}
 
