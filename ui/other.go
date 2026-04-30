@@ -43,6 +43,7 @@ func NewHome(g *Game) {
 }
 
 func NewPause(g *Game) {
+
 	g.ui.focus.ClearFocus()
 
 	res := g.ui.res

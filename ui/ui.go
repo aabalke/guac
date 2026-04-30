@@ -150,7 +150,7 @@ func (g *Game) Update() error {
 	}
 
 	switch {
-	case g.ui != nil:
+	case g.ui.ui != nil:
 
 		if init := g.frame < 1; init && len(g.gamepadIds) != 0 {
 			g.ui.ui.SetFocusedWidget(g.ui.ui.Container.GetFocusers()[0])
@@ -160,6 +160,10 @@ func (g *Game) Update() error {
 			// pressing select on pause can sometimes input into emulator,
 			// this gives time from the pause and emulator starting again
 			return nil
+		}
+
+		if g.ui.scrollable != nil && len(g.gamepadIds) != 0 {
+			g.ui.focus.KeepFocusedInView(g.ui.slider)
 		}
 
 		g.ui.ui.Update()
@@ -175,7 +179,6 @@ func (g *Game) Update() error {
 	case g.gb != nil:
 		g.gb.InputHandler(keys, buttons)
 		g.gb.Update(g.StdFPS)
-
 	}
 
 	g.frame++
@@ -190,7 +193,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	defer g.mouse.Draw(screen)
 
 	switch {
-	case g.ui != nil:
+	case g.ui.ui != nil:
 		g.ui.ui.Draw(screen)
 	case g.nds != nil:
 		g.nds.Screen.FillScreen(screen)
@@ -222,7 +225,7 @@ func (g *Game) TogglePause() {
 		g.gb.TogglePause()
 	}
 
-	if g.paused && g.ui == nil {
+	if g.paused && g.ui.ui == nil {
 		NewPause(g)
 	}
 
@@ -233,7 +236,7 @@ func (g *Game) TogglePause() {
 		}
 
 		g.pauseEndFrame = g.frame
-		g.ui = nil
+		g.ui.ui = nil
 	}
 }
 
@@ -286,21 +289,21 @@ func (g *Game) InitConsole(file string) {
 
 	case utils.GB:
 		g.gb = gameboy.NewGameBoy(file, g.emuCtx)
-		g.ui = nil
+		g.ui.ui = nil
 		if g.muted {
 			g.gb.ToggleMute()
 		}
 
 	case utils.GBA:
 		g.gba = gba.NewGBA(file, g.emuCtx)
-		g.ui = nil
+		g.ui.ui = nil
 		if g.muted {
 			g.gba.ToggleMute()
 		}
 
 	case utils.NDS:
 		g.nds = nds.NewNds(file, g.emuCtx)
-		g.ui = nil
+		g.ui.ui = nil
 		if g.muted {
 			g.nds.ToggleMute()
 		}

@@ -153,7 +153,9 @@ func NewGeneralMenu(g *Game, parent *widget.Container) {
 		NewSaveButton(res.fonts.face, res.buttonImage, func(*widget.ButtonClickedEventArgs) {
 			config.Conf.General = tmp
 			config.Conf.DecodeGeneralController()
-			g.ui.focus.FocusLastSubMenu()
+			if len(g.gamepadIds) != 0 {
+				g.ui.focus.FocusLastSubMenu()
+			}
 
 		}),
 	)
@@ -202,7 +204,9 @@ func NewUiMenu(g *Game, parent *widget.Container) {
 			res.Update()
 			NewSettings(g, oldId, MENU_UI)
 
-			g.ui.focus.FocusLastSubMenu()
+			if len(g.gamepadIds) != 0 {
+				g.ui.focus.FocusLastSubMenu()
+			}
 		}),
 	)
 }
@@ -288,9 +292,8 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 
 			config.DecodeController(&config.Conf.Gb.ControllerConfig)
 
-			focusers := g.ui.ui.Container.GetFocusers()
-			if len(focusers) != 0 {
-				g.ui.ui.SetFocusedWidget(focusers[len(focusers)-1])
+			if len(g.gamepadIds) != 0 {
+				g.ui.focus.FocusLastSubMenu()
 			}
 		}),
 	)
@@ -370,10 +373,8 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 		NewSaveButton(res.fonts.face, res.buttonImage, func(*widget.ButtonClickedEventArgs) {
 			config.Conf.Gba = tmp
 			config.DecodeController(&config.Conf.Gba.ControllerConfig)
-
-			focusers := g.ui.ui.Container.GetFocusers()
-			if len(focusers) != 0 {
-				g.ui.ui.SetFocusedWidget(focusers[len(focusers)-1])
+			if len(g.gamepadIds) != 0 {
+				g.ui.focus.FocusLastSubMenu()
 			}
 		}),
 	)
@@ -532,9 +533,8 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 			config.Conf.Nds = tmp
 			config.DecodeController(&config.Conf.Nds.ControllerConfig)
 
-			focusers := g.ui.ui.Container.GetFocusers()
-			if len(focusers) != 0 {
-				g.ui.ui.SetFocusedWidget(focusers[len(focusers)-1])
+			if len(g.gamepadIds) != 0 {
+				g.ui.focus.FocusLastSubMenu()
 			}
 		}),
 	)

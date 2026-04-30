@@ -114,7 +114,8 @@ func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) 
 
 	buttonConfig := config.Conf.General.ControllerConfig
 
-	if g.ui.PageId != PAGE_SETTINGS {
+	switch g.ui.PageId {
+	case PAGE_HOME, PAGE_PAUSE:
 		for _, button := range justButtons {
 			switch {
 			case slices.Contains(buttonConfig.Up, button):
@@ -129,32 +130,60 @@ func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) 
 				}
 			}
 		}
-		return
-	}
 
-	for _, button := range justButtons {
-		switch {
-		case slices.Contains(buttonConfig.Up, button):
-			g.ui.ui.ChangeFocus(widget.FOCUS_NORTH)
+	case PAGE_SETTINGS:
 
-		case slices.Contains(buttonConfig.Down, button):
-			g.ui.ui.ChangeFocus(widget.FOCUS_SOUTH)
+		// this set is for scrolling through options quickly with the controller
+		// kicks in after x number of ticks
+		for gp := range g.gamepadIds {
+			for _, button := range buttons {
+				if inpututil.StandardGamepadButtonPressDuration(gp, button) > 20 {
+					switch {
+					case slices.Contains(buttonConfig.Up, button):
+						g.ui.ui.ChangeFocus(widget.FOCUS_NORTH)
 
-		case slices.Contains(buttonConfig.Right, button):
-			g.ui.ui.ChangeFocus(widget.FOCUS_EAST)
+					case slices.Contains(buttonConfig.Down, button):
+						g.ui.ui.ChangeFocus(widget.FOCUS_SOUTH)
+					}
 
-		case slices.Contains(buttonConfig.Left, button):
-			g.ui.ui.ChangeFocus(widget.FOCUS_WEST)
-
-		case slices.Contains(buttonConfig.Select, button):
-			switch w := g.ui.ui.GetFocusedWidget().(type) {
-			case *widget.Button:
-				w.Click()
-			case *widget.Checkbox:
-				w.Click()
-			case *widget.TextInput:
-				w.Submit()
+				}
 			}
 		}
+
+		for _, button := range justButtons {
+
+			switch {
+			case slices.Contains(buttonConfig.Up, button):
+				g.ui.ui.ChangeFocus(widget.FOCUS_NORTH)
+
+			case slices.Contains(buttonConfig.Down, button):
+				g.ui.ui.ChangeFocus(widget.FOCUS_SOUTH)
+
+			case slices.Contains(buttonConfig.Right, button):
+				g.ui.ui.ChangeFocus(widget.FOCUS_EAST)
+
+			case slices.Contains(buttonConfig.Left, button):
+				g.ui.ui.ChangeFocus(widget.FOCUS_WEST)
+
+			//case slices.Contains(buttonConfig., button):
+			//switch g.ui.PrevPageId {
+			//case PAGE_HOME:
+			//	NewHome(g)
+			//case PAGE_PAUSE:
+			//	NewPause(g)
+			//}
+
+			case slices.Contains(buttonConfig.Select, button):
+				switch w := g.ui.ui.GetFocusedWidget().(type) {
+				case *widget.Button:
+					w.Click()
+				case *widget.Checkbox:
+					w.Click()
+				case *widget.TextInput:
+					w.Submit()
+				}
+			}
+		}
+
 	}
 }

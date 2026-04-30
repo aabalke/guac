@@ -44,8 +44,8 @@ init_fullscreen = false
 [ui]
 #fullscreen = true
 backdrop_color = 0x0A0A0A
-menu_background_color = 0x000000
-menu_foreground_color = 0xFFFFFF
+menu_background_color = 0xFFFFFF
+menu_foreground_color = 0x000000
 menu_secondary_color  = 0xCCCCCC
 
 [general.keyboard]

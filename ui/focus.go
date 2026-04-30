@@ -139,3 +139,33 @@ func (f *Focus) FocusSubmenu() {
 func (f *Focus) DeFocus() {
 	f.ui.ClearFocus()
 }
+
+func (f *Focus) KeepFocusedInView(slider *widget.Slider) {
+
+	if len(f.submenu) == 0 || slider == nil || f.ui == nil || f.ui.GetFocusedWidget() == nil {
+		return
+	}
+
+	var (
+		currMax = f.ui.GetFocusedWidget().GetWidget().Rect.Max.Y
+		currMin = f.ui.GetFocusedWidget().GetWidget().Rect.Min.Y
+		rootMax = f.ui.Container.GetWidget().Rect.Max.Y
+		rootMin = f.ui.Container.GetWidget().Rect.Min.Y
+	)
+
+	switch f.ui.GetFocusedWidget() {
+	case f.submenu[0]:
+		slider.Current = slider.Min
+		return
+	case f.submenu[len(f.submenu)-1]:
+		slider.Current = slider.Max
+		return
+	}
+
+	switch {
+	case currMax > rootMax:
+		slider.Current += currMax - rootMax
+	case currMin < rootMin:
+		slider.Current -= rootMin - currMin
+	}
+}
