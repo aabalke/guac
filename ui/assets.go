@@ -80,16 +80,6 @@ func NewUIResources() (*Resources, error) {
 		panic(err)
 	}
 
-	fonts, err := loadFonts()
-	if err != nil {
-		return nil, err
-	}
-
-	checkboxImage, err := loadCheckboxImage(conf.MenuForegroundColor)
-	if err != nil {
-		panic(err)
-	}
-
 	buttonImage := &widget.ButtonImage{
 		Idle:         transparentNine,
 		Hover:        sec,
@@ -97,9 +87,9 @@ func NewUIResources() (*Resources, error) {
 		PressedHover: sec,
 	}
 
-	return &Resources{
+	r := &Resources{
 		icon:        []img.Image{icon},
-		fonts:       fonts,
+		fonts:       loadFonts(),
 		bg:          bg,
 		fg:          fg,
 		sec:         sec,
@@ -107,8 +97,10 @@ func NewUIResources() (*Resources, error) {
 		fgClr:       &conf.MenuForegroundColor,
 		secClr:      &conf.MenuSecondaryColor,
 		buttonImage: buttonImage,
-		checkbox:    checkboxImage,
-	}, nil
+		checkbox:    loadCheckboxImage(conf.MenuForegroundColor),
+	}
+
+	return r, nil
 }
 
 func (u *Resources) Update() {
@@ -121,12 +113,7 @@ func (u *Resources) Update() {
 	u.buttonImage.Pressed = u.sec
 	u.buttonImage.PressedHover = u.sec
 
-	checkboxImage, err := loadCheckboxImage(conf.MenuForegroundColor)
-	if err != nil {
-		panic(err)
-	}
-
-	u.checkbox = checkboxImage
+	u.checkbox = loadCheckboxImage(conf.MenuForegroundColor)
 }
 
 type fonts struct {
@@ -134,24 +121,24 @@ type fonts struct {
 	smallFace *text.Face
 }
 
-func loadFonts() (*fonts, error) {
+func loadFonts() *fonts {
 
 	fontFaceRegular := "assets/fonts/museo_slab_500.otf"
 
 	face, err := loadFont(fontFaceRegular, 36)
 	if err != nil {
-		return nil, err
+		panic("could not load embedded font")
 	}
 
 	smallFace, err := loadFont(fontFaceRegular, 24)
 	if err != nil {
-		return nil, err
+		panic("could not load embedded font")
 	}
 
 	return &fonts{
 		face:      &face,
 		smallFace: &smallFace,
-	}, nil
+	}
 }
 
 func loadFont(path string, size float64) (text.Face, error) {
@@ -172,30 +159,7 @@ func loadFont(path string, size float64) (text.Face, error) {
 	}, nil
 }
 
-func newImageFromFile(path string) (*ebiten.Image, error) {
-	f, err := embeddedAssets.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	i, _, err := ebitenutil.NewImageFromReader(f)
-	return i, err
-}
-
-func loadImageNineSlice(path string, centerWidth, centerHeight int) (*image.NineSlice, error) {
-	i, err := newImageFromFile(path)
-	if err != nil {
-		return nil, err
-	}
-	w := i.Bounds().Dx()
-	h := i.Bounds().Dy()
-	return image.NewNineSlice(i,
-			[3]int{(w - centerWidth) / 2, centerWidth, w - (w-centerWidth)/2 - centerWidth},
-			[3]int{(h - centerHeight) / 2, centerHeight, h - (h-centerHeight)/2 - centerHeight}),
-		nil
-}
-
-func loadCheckboxImage(clr color.Color) (*widget.CheckboxImage, error) {
+func loadCheckboxImage(clr color.Color) *widget.CheckboxImage {
 
 	imgs := make([]*ebiten.Image, 4)
 
@@ -208,8 +172,9 @@ func loadCheckboxImage(clr color.Color) (*widget.CheckboxImage, error) {
 
 		f, err := embeddedAssets.Open(v)
 		if err != nil {
-			return nil, err
+			panic("could not load checkbox from embedded assets")
 		}
+
 		defer f.Close()
 		imgs[i], _, _ = ebitenutil.NewImageFromReader(f)
 		imgs[i] = TintImage(imgs[i], clr)
@@ -222,7 +187,7 @@ func loadCheckboxImage(clr color.Color) (*widget.CheckboxImage, error) {
 		Checked:          image.NewNineSlice(imgs[1], s, s),
 		UncheckedHovered: image.NewNineSlice(imgs[2], s, s),
 		CheckedHovered:   image.NewNineSlice(imgs[3], s, s),
-	}, nil
+	}
 }
 
 func TintImage(src *ebiten.Image, c color.Color) *ebiten.Image {
@@ -241,4 +206,56 @@ func TintImage(src *ebiten.Image, c color.Color) *ebiten.Image {
 
 	dst.DrawImage(src, op)
 	return dst
+}
+
+func NewTheme(r *Resources) *widget.Theme {
+	return &widget.Theme{
+		DefaultFace:      r.fonts.face,
+		DefaultTextColor: *r.fgClr,
+		ButtonTheme: &widget.ButtonParams{
+			TextColor: &widget.ButtonTextColor{
+				Idle:    *r.fgClr,
+				Hover:   *r.fgClr,
+				Pressed: *r.fgClr,
+			},
+			TextFace:    r.fonts.face,
+			Image:       r.buttonImage,
+			TextPadding: &buttonInset,
+			TextPosition: &widget.TextPositioning{
+				VTextPosition: widget.TextPositionCenter,
+				HTextPosition: widget.TextPositionCenter,
+			},
+		},
+		TextTheme: &widget.TextParams{
+			Face:  r.fonts.smallFace,
+			Color: *r.fgClr,
+		},
+
+		TextInputTheme: &widget.TextInputParams{
+			Face: r.fonts.smallFace,
+			Image: &widget.TextInputImage{
+				Idle:  image.NewBorderedNineSliceColor(color.Transparent, *r.fgClr, 2),
+				Hover: image.NewBorderedNineSliceColor(*r.secClr, *r.fgClr, 2),
+			},
+			Color: &widget.TextInputColor{
+				Idle:  *r.fgClr,
+				Caret: *r.fgClr,
+			},
+			Padding: &paddingInset,
+		},
+		SliderTheme: &widget.SliderParams{
+			TrackImage: &widget.SliderTrackImage{
+				Idle:  transparentNine,
+				Hover: transparentNine,
+			},
+			HandleImage: &widget.ButtonImage{
+				Idle:    r.sec,
+				Hover:   r.fg,
+				Pressed: r.fg,
+			},
+		},
+		CheckboxTheme: &widget.CheckboxParams{
+			Image: r.checkbox,
+		},
+	}
 }

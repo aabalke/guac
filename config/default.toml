@@ -50,6 +50,7 @@ menu_secondary_color  = 0xCCCCCC
 
 [general.keyboard]
 select     = ["J", "Enter"]
+return     = ["Backspace"]
 mute       = ["M"]
 pause      = ["P"]
 quit       = ["Q"]
@@ -71,6 +72,7 @@ fps240     = ["Numpad6"]
 
 [general.controller]
 select = ["RightRight"]
+return = ["RightBottom"]
 mute   = ["CenterLeft"]
 pause  = ["CenterRight"]
 left   = ["LeftLeft"]

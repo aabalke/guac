@@ -5,13 +5,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/utils"
 	"github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/utilities/mobile"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
 const (
@@ -19,21 +17,25 @@ const (
 	BUTTON_WIDTH = 256
 )
 
-func NewLabel(text string, face *text.Face, clr color.Color) *widget.Text {
+func NewHeader(text string, res *Resources) *widget.Text {
 	return widget.NewText(
-		widget.TextOpts.Text(text, face, clr),
-		widget.TextOpts.WidgetOpts(),
+		widget.TextOpts.Text(text, res.fonts.face, *res.fgClr),
 	)
 }
 
-func NewLinkText(text string, face *text.Face, clr color.Color) *widget.Text {
-	return widget.NewText(
+func NewLabel(text string) *widget.Text {
+	t := widget.NewText()
+	t.Label = text
+	return t
+}
+
+func NewLinkText(text string) *widget.Text {
+	t := widget.NewText(
 		widget.TextOpts.LinkClickedHandler(func(args *widget.LinkEventArgs) {
 			utils.OpenLink(args.Id)
 		}),
 		widget.TextOpts.ProcessBBCode(true),
 
-		widget.TextOpts.Text(text, face, clr),
 		widget.TextOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 				HorizontalPosition: widget.AnchorLayoutPositionCenter,
@@ -43,13 +45,17 @@ func NewLinkText(text string, face *text.Face, clr color.Color) *widget.Text {
 			}),
 		),
 	)
+
+	t.Label = text
+
+	return t
 }
 
 func NewSeparator() *widget.Container {
 	return widget.NewContainer()
 }
 
-func NewCheckbox(value *bool, img *widget.CheckboxImage) widget.PreferredSizeLocateableWidget {
+func NewCheckbox(value *bool) widget.PreferredSizeLocateableWidget {
 
 	state := widget.WidgetUnchecked
 	if *value {
@@ -57,7 +63,6 @@ func NewCheckbox(value *bool, img *widget.CheckboxImage) widget.PreferredSizeLoc
 	}
 
 	return widget.NewCheckbox(
-		widget.CheckboxOpts.Image(img),
 
 		widget.CheckboxOpts.StateChangedHandler(func(args *widget.CheckboxChangedEventArgs) {
 			*value = args.State == widget.WidgetChecked
@@ -67,31 +72,12 @@ func NewCheckbox(value *bool, img *widget.CheckboxImage) widget.PreferredSizeLoc
 	)
 }
 
-func NewTextBoxInput(value any, face *text.Face, validation func(s string) (bool, *string)) widget.PreferredSizeLocateableWidget {
+func NewTextBoxInput(value any, validation func(s string) (bool, *string)) widget.PreferredSizeLocateableWidget {
 
-	clr := config.Conf.Ui.MenuForegroundColor
 	input := widget.NewTextInput(
-
 		widget.TextInputOpts.MobileInputMode(mobile.TEXT),
-
-		widget.TextInputOpts.Image(&widget.TextInputImage{
-			Idle: image.NewBorderedNineSliceColor(color.Transparent, clr, 2),
-		}),
-
-		widget.TextInputOpts.Face(face),
-
-		widget.TextInputOpts.Color(&widget.TextInputColor{
-			Idle:  clr,
-			Caret: clr,
-		}),
-
-		widget.TextInputOpts.Padding(&paddingInset),
-
 		widget.TextInputOpts.Validation(validation),
-
 		widget.TextInputOpts.ChangedHandler(func(args *widget.TextInputChangedEventArgs) {
-			// when "changed"
-
 			switch v := value.(type) {
 			case *int:
 				*v, _ = strconv.Atoi(args.InputText)
@@ -130,48 +116,27 @@ func NewTextBoxInput(value any, face *text.Face, validation func(s string) (bool
 	case *string:
 		input.SetText(*v)
 	case *[]string:
-
-		combined := ""
-
-		for i, s := range *v {
-			if i > 0 && i < len(*v) {
-				combined += ", "
-			}
-			combined += s
-		}
-
-		input.SetText(combined)
+		input.SetText(join(*v, ", ", func(s string) string { return s }))
 
 	case *[]int:
-
-		combined := ""
-
-		for i, s := range *v {
-			if i > 0 && i < len(*v) {
-				combined += ", "
-			}
-			combined += strconv.Itoa(s)
-		}
-
-		input.SetText(combined)
+		input.SetText(join(*v, ", ", strconv.Itoa))
 
 	case *[]ebiten.StandardGamepadButton:
-
-		combined := ""
-		for i, s := range *v {
-			if i > 0 && i < len(*v) {
-				combined += ", "
-			}
-			combined += utils.GamepadButtonToString(s)
-		}
-
-		input.SetText(combined)
+		input.SetText(join(*v, ", ", utils.GamepadButtonToString))
 
 	default:
 		panic("not supported text box input")
 	}
 
 	return input
+}
+
+func join[T any](vals []T, sep string, f func(T) string) string {
+	out := make([]string, len(vals))
+	for i, v := range vals {
+		out[i] = f(v)
+	}
+	return strings.Join(out, sep)
 }
 
 func NumberValidation(maxValue int) func(string) (bool, *string) {
@@ -203,35 +168,24 @@ func NoValidation() func(string) (bool, *string) {
 	}
 }
 
-func NewSaveButton(face *text.Face, img *widget.ButtonImage, f func(args *widget.ButtonClickedEventArgs)) widget.PreferredSizeLocateableWidget {
-	clr := config.Conf.Ui.MenuForegroundColor
+func NewSaveButton(f func(args *widget.ButtonClickedEventArgs)) widget.PreferredSizeLocateableWidget {
 
-	return widget.NewButton(
+	b := widget.NewButton(
 		widget.ButtonOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
 				Stretch: true,
 			}),
 		),
 
-		widget.ButtonOpts.Image(img),
-
-		widget.ButtonOpts.Text(
-			"save",
-			face,
-			&widget.ButtonTextColor{
-				Idle: clr,
-			},
-		),
-
-		widget.ButtonOpts.TextPadding(&buttonInset),
-
 		widget.ButtonOpts.ClickedHandler(f),
 	)
+
+	b.SetText("save")
+
+	return b
 }
 
-func NewColorInput(v *color.Color, face *text.Face, validation func(s string) (bool, *string)) widget.PreferredSizeLocateableWidget {
-
-	clr := config.Conf.Ui.MenuForegroundColor
+func NewColorInput(v *color.Color, validation func(s string) (bool, *string)) widget.PreferredSizeLocateableWidget {
 
 	colorBox := widget.NewContainer()
 
@@ -244,24 +198,8 @@ func NewColorInput(v *color.Color, face *text.Face, validation func(s string) (b
 	)
 
 	input := widget.NewTextInput(
-
 		widget.TextInputOpts.MobileInputMode(mobile.TEXT),
-
-		widget.TextInputOpts.Image(&widget.TextInputImage{
-			Idle: image.NewBorderedNineSliceColor(color.Transparent, clr, 2),
-		}),
-
-		widget.TextInputOpts.Face(face),
-
-		widget.TextInputOpts.Color(&widget.TextInputColor{
-			Idle:  clr,
-			Caret: clr,
-		}),
-
-		widget.TextInputOpts.Padding(&paddingInset),
-
 		widget.TextInputOpts.Validation(validation),
-
 		widget.TextInputOpts.ChangedHandler(func(args *widget.TextInputChangedEventArgs) {
 			*v = utils.HexToColor(args.InputText)
 			colorBox.SetBackgroundImage(image.NewNineSliceColor(*v))
@@ -277,8 +215,7 @@ func NewColorInput(v *color.Color, face *text.Face, validation func(s string) (b
 	return container
 }
 
-func NewApplyPalettesMenu(focusGroups *[][]widget.Focuser, pals map[string][4]string, clrInputs [4]widget.PreferredSizeLocateableWidget, face *text.Face, img *widget.ButtonImage) widget.PreferredSizeLocateableWidget {
-	clr := config.Conf.Ui.MenuForegroundColor
+func NewApplyPalettesMenu(focusGroups *[][]widget.Focuser, pals map[string][4]string, clrInputs [4]widget.PreferredSizeLocateableWidget, res *Resources) widget.PreferredSizeLocateableWidget {
 
 	c := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -298,21 +235,12 @@ func NewApplyPalettesMenu(focusGroups *[][]widget.Focuser, pals map[string][4]st
 				}),
 			),
 
-			widget.ButtonOpts.Image(img),
-
 			widget.ButtonOpts.Text(
 				label,
-				face,
+				res.fonts.smallFace,
 				&widget.ButtonTextColor{
-					Idle: clr,
+					Idle: *res.fgClr,
 				},
-			),
-
-			widget.ButtonOpts.TextPadding(&buttonInset),
-
-			widget.ButtonOpts.TextPosition(
-				widget.TextPositionCenter,
-				widget.TextPositionCenter,
 			),
 
 			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
@@ -324,6 +252,7 @@ func NewApplyPalettesMenu(focusGroups *[][]widget.Focuser, pals map[string][4]st
 				}
 			}),
 		)
+
 		focusRadio = append(focusRadio, b)
 		c.AddChild(b)
 	}
@@ -333,110 +262,61 @@ func NewApplyPalettesMenu(focusGroups *[][]widget.Focuser, pals map[string][4]st
 	return c
 }
 
-func NewFileInput(v *string, face *text.Face) widget.PreferredSizeLocateableWidget {
+const MAX_DIALOG_LEN = 24
 
-	clr := config.Conf.Ui.MenuForegroundColor
+func trim(s string, max int) string {
+	r := []rune(s)
+
+	if len(r) <= max {
+		return s
+	}
+
+	return "..." + string(r[len(r)-(max-len([]rune("..."))):])
+}
+
+func dialogInput(v *string, dialogFunc func() string) widget.PreferredSizeLocateableWidget {
 
 	var input *widget.TextInput
 
-	onClick := func() {
-		f := utils.OpenFile("Open", "All Files")
-
+	onClick := func(input *widget.TextInput) {
+		f := dialogFunc()
 		*v = f
-
-		if max := 24; len(f) >= max {
-			f = "..." + f[len(f)-max-3:]
-		}
-
-		input.SetText(f)
+		input.SetText(trim(f, MAX_DIALOG_LEN))
 		input.CursorMoveStart()
 	}
 
 	input = widget.NewTextInput(
 
+		widget.TextInputOpts.CaretWidth(0),
+
 		widget.TextInputOpts.MobileInputMode(mobile.TEXT),
 
-		widget.TextInputOpts.Image(&widget.TextInputImage{
-			Idle: image.NewBorderedNineSliceColor(color.Transparent, clr, 2),
-		}),
-
-		widget.TextInputOpts.Face(face),
-
-		widget.TextInputOpts.Color(&widget.TextInputColor{
-			Idle:  clr,
-			Caret: clr,
-		}),
-
-		widget.TextInputOpts.Padding(&paddingInset),
-
 		widget.TextInputOpts.WidgetOpts(
-			widget.WidgetOpts.MouseButtonClickedHandler(func(args *widget.WidgetMouseButtonClickedEventArgs) {
-				onClick()
+			widget.WidgetOpts.MouseButtonClickedHandler(func(*widget.WidgetMouseButtonClickedEventArgs) {
+				onClick(input)
 			}),
 		),
 
 		// used for button input
-		widget.TextInputOpts.SubmitHandler(func(args *widget.TextInputChangedEventArgs) {
-			onClick()
+		widget.TextInputOpts.SubmitHandler(func(*widget.TextInputChangedEventArgs) {
+			onClick(input)
 		}),
-
-		widget.TextInputOpts.CaretWidth(0),
 	)
 
-	input.SetText(*v)
+	input.SetText(trim(*v, MAX_DIALOG_LEN))
 
 	return input
 }
 
-func NewDirectoryInput(v *string, face *text.Face, defaultPath string) widget.PreferredSizeLocateableWidget {
-
-	clr := config.Conf.Ui.MenuForegroundColor
-
-	var input *widget.TextInput
-
-	onClick := func(args *widget.WidgetMouseButtonClickedEventArgs) {
-		f := utils.OpenDirectory("Choose", defaultPath)
-
-		*v = f
-
-		if max := 12; len(f) >= max {
-			f = "..." + f[len(f)-max-3:]
-		}
-
-		input.SetText(f)
-		input.CursorMoveStart()
-	}
-
-	input = widget.NewTextInput(
-
-		widget.TextInputOpts.MobileInputMode(mobile.TEXT),
-
-		widget.TextInputOpts.Image(&widget.TextInputImage{
-			Idle: image.NewBorderedNineSliceColor(color.Transparent, clr, 2),
-		}),
-
-		widget.TextInputOpts.Face(face),
-
-		widget.TextInputOpts.Color(&widget.TextInputColor{
-			Idle:  clr,
-			Caret: clr,
-		}),
-
-		widget.TextInputOpts.Padding(&paddingInset),
-
-		widget.TextInputOpts.WidgetOpts(
-			widget.WidgetOpts.MouseButtonClickedHandler(onClick),
-		),
-
-		widget.TextInputOpts.CaretWidth(0),
-	)
-
-	input.SetText(*v)
-
-	return input
+func NewFileInput(v *string) widget.PreferredSizeLocateableWidget {
+	return dialogInput(v, func() string { return utils.OpenFile("Open", "All Files") })
 }
 
-func NewRadioInput(focusRadios *[][]widget.Focuser, v *int, values []string, face *text.Face, img *widget.ButtonImage) widget.PreferredSizeLocateableWidget {
+func NewDirectoryInput(v *string, defaultPath string) widget.PreferredSizeLocateableWidget {
+	return dialogInput(v, func() string { return utils.OpenDirectory("Choose", defaultPath) })
+}
+
+func NewRadioInput(focusRadios *[][]widget.Focuser, v *int, values []string, res *Resources) widget.PreferredSizeLocateableWidget {
 
 	radio := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -445,11 +325,9 @@ func NewRadioInput(focusRadios *[][]widget.Focuser, v *int, values []string, fac
 	)
 
 	bs := []widget.RadioGroupElement{}
-
 	focusRadio := []widget.Focuser{}
-
 	for i := range values {
-		b := NewRadioButton(v, values[i], i, face, img)
+		b := NewRadioButton(v, values[i], i, res)
 		radio.AddChild(b)
 		bs = append(bs, b)
 		focusRadio = append(focusRadio, b)
@@ -465,7 +343,7 @@ func NewRadioInput(focusRadios *[][]widget.Focuser, v *int, values []string, fac
 	return radio
 }
 
-func NewRadioButton(v *int, label string, value int, face *text.Face, img *widget.ButtonImage) *widget.Button {
+func NewRadioButton(v *int, label string, value int, res *Resources) *widget.Button {
 	return widget.NewButton(
 		widget.ButtonOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
@@ -474,13 +352,11 @@ func NewRadioButton(v *int, label string, value int, face *text.Face, img *widge
 			}),
 		),
 
-		widget.ButtonOpts.Image(img),
-
 		widget.ButtonOpts.Text(
 			label,
-			face,
+			res.fonts.smallFace,
 			&widget.ButtonTextColor{
-				Idle: config.Conf.Ui.MenuForegroundColor,
+				Idle: *res.fgClr,
 			},
 		),
 
@@ -491,15 +367,8 @@ func NewRadioButton(v *int, label string, value int, face *text.Face, img *widge
 			Bottom: 4,
 		}),
 
-		widget.ButtonOpts.TextPosition(
-			widget.TextPositionStart,
-			widget.TextPositionCenter,
-		),
-
-		widget.ButtonOpts.ClickedHandler(
-			func(*widget.ButtonClickedEventArgs) {
-				*v = value
-			},
-		),
+		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+			*v = value
+		}),
 	)
 }

@@ -304,7 +304,7 @@ func (nds *Nds) Close() {
 
 	RASTERIZE_WG.Wait()
 
-	nds.Muted  = true
+	nds.Muted = true
 	nds.Paused = true
 
 	nds.mem.Snd.Close()

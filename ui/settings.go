@@ -4,7 +4,6 @@ import (
 	"image/color"
 	"math"
 
-	"github.com/aabalke/guac/config"
 	"github.com/ebitenui/ebitenui"
 	"github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
@@ -58,7 +57,10 @@ func NewSettings(g *Game, oldId PageId, initMenu int) {
 	root.AddChild(c)
 
 	g.ui.PageId = PAGE_SETTINGS
-	g.ui.ui = &ebitenui.UI{Container: root}
+	g.ui.ui = &ebitenui.UI{
+		Container:    root,
+		PrimaryTheme: NewTheme(g.ui.res),
+	}
 
 	//ui.SetDebugMode(true)
 
@@ -68,8 +70,6 @@ func NewSettings(g *Game, oldId PageId, initMenu int) {
 }
 
 func NewScrollableContainer(ui *Ui) *widget.Container {
-
-	clr := image.NewNineSliceColor(config.Conf.Ui.MenuForegroundColor)
 
 	root := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
@@ -113,17 +113,6 @@ func NewScrollableContainer(ui *Ui) *widget.Container {
 		widget.SliderOpts.ChangedHandler(func(args *widget.SliderChangedEventArgs) {
 			ui.scrollable.ScrollTop = float64(args.Slider.Current) / 1000
 		}),
-		widget.SliderOpts.Images(
-			&widget.SliderTrackImage{
-				Idle:  transparentNine,
-				Hover: transparentNine,
-			},
-			&widget.ButtonImage{
-				Idle:    ui.res.sec,
-				Hover:   clr,
-				Pressed: clr,
-			},
-		),
 
 		widget.SliderOpts.WidgetOpts(
 			widget.WidgetOpts.OnUpdate(func(widget.HasWidget) {
@@ -159,9 +148,7 @@ func NewScrollableContainer(ui *Ui) *widget.Container {
 
 func NewSidebar(g *Game, initMenu int) {
 
-	ui := g.ui
-
-	ui.sidebar = widget.NewContainer(
+	g.ui.sidebar = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(24)),
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
@@ -172,7 +159,7 @@ func NewSidebar(g *Game, initMenu int) {
 	var initButton *widget.Button
 	for i, field := range fields {
 		b := NewSidebarButton(g, field)
-		ui.sidebar.AddChild(b)
+		g.ui.sidebar.AddChild(b)
 		radios = append(radios, b)
 
 		if i == initMenu {
@@ -193,11 +180,7 @@ func NewSidebar(g *Game, initMenu int) {
 
 func NewSidebarButton(g *Game, sf SidebarField) *widget.Button {
 
-	ui := g.ui
-	face := ui.res.fonts.face
-	img := ui.res.buttonImage
-
-	return widget.NewButton(
+	b := widget.NewButton(
 		widget.ButtonOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
 				MaxWidth: BUTTON_WIDTH,
@@ -205,31 +188,21 @@ func NewSidebarButton(g *Game, sf SidebarField) *widget.Button {
 			}),
 		),
 
-		widget.ButtonOpts.Image(img),
-
-		widget.ButtonOpts.Text(
-			sf.label,
-			face,
-			&widget.ButtonTextColor{
-				Idle: config.Conf.Ui.MenuForegroundColor,
-			},
-		),
-
-		widget.ButtonOpts.TextPadding(&buttonInset),
-
 		widget.ButtonOpts.TextPosition(
 			widget.TextPositionStart,
 			widget.TextPositionCenter,
 		),
 
-		widget.ButtonOpts.ClickedHandler(
-			func(*widget.ButtonClickedEventArgs) {
-				sf.f(g)
-				ui.scrollable.ScrollTop = 0
-				ui.slider.Current = 0
-			},
-		),
+		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+			sf.f(g)
+			g.ui.scrollable.ScrollTop = 0
+			g.ui.slider.Current = 0
+		}),
 	)
+
+	b.SetText(sf.label)
+
+	return b
 }
 
 func createSubMenu(parent *widget.Container, children ...widget.PreferredSizeLocateableWidget) {

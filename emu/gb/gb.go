@@ -1,4 +1,4 @@
-package gameboy
+package gb
 
 import (
 	"image/color"

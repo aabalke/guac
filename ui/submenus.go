@@ -80,77 +80,77 @@ func init() {
 func NewGeneralMenu(g *Game, parent *widget.Container) {
 
 	var (
-		res     = g.ui.res
-		tmp     = config.Conf.General
-		k       = &tmp.KeyboardConfig
-		c       = &tmp.ControllerConfig
-		face    = res.fonts.smallFace
-		bigFace = res.fonts.face
-
-		clr = config.Conf.Ui.MenuForegroundColor
+		res = g.ui.res
+		tmp = config.Conf.General
+		k   = &tmp.KeyboardConfig
+		c   = &tmp.ControllerConfig
 	)
 
 	createSubMenu(parent,
-		NewLabel("general", bigFace, clr),
+		NewHeader("general", res),
 		NewSeparator(),
 
-		NewLabel("muted", face, clr),
-		NewCheckbox(&tmp.Muted, res.checkbox),
+		NewLabel("muted"),
+		NewCheckbox(&tmp.Muted),
 
-		NewLabel("show fps", face, clr),
-		NewCheckbox(&tmp.ShowFps, res.checkbox),
+		NewLabel("show fps"),
+		NewCheckbox(&tmp.ShowFps),
 
-		NewLabel("initialize fullscreen", face, clr),
-		NewCheckbox(&tmp.InitFullscreen, res.checkbox),
+		NewLabel("initialize fullscreen"),
+		NewCheckbox(&tmp.InitFullscreen),
 
-		NewLabel("target fps", face, clr),
-		NewTextBoxInput(&tmp.TargetFps, face, NumberValidation(100_000)),
+		NewLabel("target fps"),
+		NewTextBoxInput(&tmp.TargetFps, NumberValidation(100_000)),
 
-		NewLabel("keyboard", bigFace, clr),
+		NewHeader("keyboard", res),
 		NewSeparator(),
 
-		NewLabel("select", face, clr),
-		NewTextBoxInput(&k.Select, face, NoValidation()),
-		NewLabel("mute", face, clr),
-		NewTextBoxInput(&k.Mute, face, NoValidation()),
-		NewLabel("pause", face, clr),
-		NewTextBoxInput(&k.Pause, face, NoValidation()),
-		NewLabel("left", face, clr),
-		NewTextBoxInput(&k.Left, face, NoValidation()),
-		NewLabel("right", face, clr),
-		NewTextBoxInput(&k.Right, face, NoValidation()),
-		NewLabel("up", face, clr),
-		NewTextBoxInput(&k.Up, face, NoValidation()),
-		NewLabel("down", face, clr),
-		NewTextBoxInput(&k.Down, face, NoValidation()),
-		NewLabel("fullscreen", face, clr),
-		NewTextBoxInput(&k.Fullscreen, face, NoValidation()),
-		NewLabel("quit", face, clr),
-		NewTextBoxInput(&k.Quit, face, NoValidation()),
+		NewLabel("select"),
+		NewTextBoxInput(&k.Select, NoValidation()),
+		NewLabel("return"),
+		NewTextBoxInput(&k.Return, NoValidation()),
+		NewLabel("mute"),
+		NewTextBoxInput(&k.Mute, NoValidation()),
+		NewLabel("pause"),
+		NewTextBoxInput(&k.Pause, NoValidation()),
+		NewLabel("left"),
+		NewTextBoxInput(&k.Left, NoValidation()),
+		NewLabel("right"),
+		NewTextBoxInput(&k.Right, NoValidation()),
+		NewLabel("up"),
+		NewTextBoxInput(&k.Up, NoValidation()),
+		NewLabel("down"),
+		NewTextBoxInput(&k.Down, NoValidation()),
+		NewLabel("fullscreen"),
+		NewTextBoxInput(&k.Fullscreen, NoValidation()),
+		NewLabel("quit"),
+		NewTextBoxInput(&k.Quit, NoValidation()),
 
-		NewLabel("controller", bigFace, clr),
+		NewHeader("controller", res),
 		NewSeparator(),
 
-		NewLabel("select", face, clr),
-		NewTextBoxInput(&c.Select, face, NoValidation()),
-		NewLabel("mute", face, clr),
-		NewTextBoxInput(&c.Mute, face, NoValidation()),
-		NewLabel("pause", face, clr),
-		NewTextBoxInput(&c.Pause, face, NoValidation()),
-		NewLabel("left", face, clr),
-		NewTextBoxInput(&c.Left, face, NoValidation()),
-		NewLabel("right", face, clr),
-		NewTextBoxInput(&c.Right, face, NoValidation()),
-		NewLabel("up", face, clr),
-		NewTextBoxInput(&c.Up, face, NoValidation()),
-		NewLabel("down", face, clr),
-		NewTextBoxInput(&c.Down, face, NoValidation()),
-		NewLabel("fullscreen", face, clr),
-		NewTextBoxInput(&c.Fullscreen, face, NoValidation()),
-		NewLabel("quit", face, clr),
-		NewTextBoxInput(&c.Quit, face, NoValidation()),
+		NewLabel("select"),
+		NewTextBoxInput(&c.Select, NoValidation()),
+		NewLabel("return"),
+		NewTextBoxInput(&c.Return, NoValidation()),
+		NewLabel("mute"),
+		NewTextBoxInput(&c.Mute, NoValidation()),
+		NewLabel("pause"),
+		NewTextBoxInput(&c.Pause, NoValidation()),
+		NewLabel("left"),
+		NewTextBoxInput(&c.Left, NoValidation()),
+		NewLabel("right"),
+		NewTextBoxInput(&c.Right, NoValidation()),
+		NewLabel("up"),
+		NewTextBoxInput(&c.Up, NoValidation()),
+		NewLabel("down"),
+		NewTextBoxInput(&c.Down, NoValidation()),
+		NewLabel("fullscreen"),
+		NewTextBoxInput(&c.Fullscreen, NoValidation()),
+		NewLabel("quit"),
+		NewTextBoxInput(&c.Quit, NoValidation()),
 
-		NewSaveButton(res.fonts.face, res.buttonImage, func(*widget.ButtonClickedEventArgs) {
+		NewSaveButton(func(*widget.ButtonClickedEventArgs) {
 			config.Conf.General = tmp
 			config.Conf.DecodeGeneralController()
 			if len(g.gamepadIds) != 0 {
@@ -166,42 +166,39 @@ func NewGeneralMenu(g *Game, parent *widget.Container) {
 func NewUiMenu(g *Game, parent *widget.Container) {
 
 	var (
-		res     = g.ui.res
-		tmp     = config.Conf.Ui
-		face    = res.fonts.smallFace
-		bigFace = res.fonts.face
-		clr     = config.Conf.Ui.MenuForegroundColor
+		res = g.ui.res
+		tmp = config.Conf.Ui
 
 		oldId = g.ui.PrevPageId
 
 		clrInputs = [4]widget.PreferredSizeLocateableWidget{
-			NewColorInput(&tmp.Backdrop, face, NoValidation()),
-			NewColorInput(&tmp.MenuBackgroundColor, face, NoValidation()),
-			NewColorInput(&tmp.MenuForegroundColor, face, NoValidation()),
-			NewColorInput(&tmp.MenuSecondaryColor, face, NoValidation()),
+			NewColorInput(&tmp.Backdrop, NoValidation()),
+			NewColorInput(&tmp.MenuBackgroundColor, NoValidation()),
+			NewColorInput(&tmp.MenuForegroundColor, NoValidation()),
+			NewColorInput(&tmp.MenuSecondaryColor, NoValidation()),
 		}
 	)
 
 	createSubMenu(parent,
-		NewLabel("ui", bigFace, clr),
+		NewHeader("ui", res),
 		NewSeparator(),
 
-		NewLabel("backdrop", face, clr),
+		NewLabel("backdrop"),
 		clrInputs[0],
 
-		NewLabel("bg color", face, clr),
+		NewLabel("bg color"),
 		clrInputs[1],
 
-		NewLabel("fg color", face, clr),
+		NewLabel("fg color"),
 		clrInputs[2],
 
-		NewLabel("accent color", face, clr),
+		NewLabel("accent color"),
 		clrInputs[3],
 
-		NewLabel("apply theme", face, clr),
-		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, theme_palettes, clrInputs, face, res.buttonImage),
+		NewLabel("apply theme"),
+		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, theme_palettes, clrInputs, res),
 
-		NewSaveButton(res.fonts.face, res.buttonImage, func(*widget.ButtonClickedEventArgs) {
+		NewSaveButton(func(*widget.ButtonClickedEventArgs) {
 			config.Conf.Ui = tmp
 			res.Update()
 			NewSettings(g, oldId, MENU_UI)
@@ -217,80 +214,76 @@ func NewUiMenu(g *Game, parent *widget.Container) {
 func NewGbMenu(g *Game, parent *widget.Container) {
 
 	var (
-		res     = g.ui.res
-		tmp     = config.Conf.Gb
-		key     = &tmp.KeyboardConfig
-		con     = &tmp.ControllerConfig
-		pal     = &tmp.Palette
-		face    = res.fonts.smallFace
-		bigFace = res.fonts.face
+		res = g.ui.res
+		tmp = config.Conf.Gb
+		key = &tmp.KeyboardConfig
+		con = &tmp.ControllerConfig
+		pal = &tmp.Palette
 
 		clrInputs = [4]widget.PreferredSizeLocateableWidget{
-			NewColorInput(&pal[0], face, NoValidation()),
-			NewColorInput(&pal[1], face, NoValidation()),
-			NewColorInput(&pal[2], face, NoValidation()),
-			NewColorInput(&pal[3], face, NoValidation()),
+			NewColorInput(&pal[0], NoValidation()),
+			NewColorInput(&pal[1], NoValidation()),
+			NewColorInput(&pal[2], NoValidation()),
+			NewColorInput(&pal[3], NoValidation()),
 		}
-
-		clr = config.Conf.Ui.MenuForegroundColor
 	)
 
 	createSubMenu(parent,
-		NewLabel("dmg palette", bigFace, clr),
+		NewHeader("dmg palette", res),
 		NewSeparator(),
 
-		NewLabel("lightest", face, clr),
+		NewLabel("lightest"),
 		clrInputs[0],
-		NewLabel("light", face, clr),
+		NewLabel("light"),
 		clrInputs[1],
-		NewLabel("dark", face, clr),
+		NewLabel("dark"),
 		clrInputs[2],
-		NewLabel("darkest", face, clr),
+		NewLabel("darkest"),
 		clrInputs[3],
 
-		NewLabel("apply palette", face, clr),
-		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, dmg_palettes, clrInputs, face, res.buttonImage),
+		NewLabel("apply palette"),
+		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, dmg_palettes, clrInputs, res),
 
-		NewLabel("keyboard", bigFace, clr),
+		NewHeader("keyboard", res),
 		NewSeparator(),
 
-		NewLabel("a", face, clr),
-		NewTextBoxInput(&key.A, face, NoValidation()),
-		NewLabel("b", face, clr),
-		NewTextBoxInput(&key.B, face, NoValidation()),
-		NewLabel("select", face, clr),
-		NewTextBoxInput(&key.Select, face, NoValidation()),
-		NewLabel("start", face, clr),
-		NewTextBoxInput(&key.Start, face, NoValidation()),
-		NewLabel("left", face, clr),
-		NewTextBoxInput(&key.Left, face, NoValidation()),
-		NewLabel("right", face, clr),
-		NewTextBoxInput(&key.Right, face, NoValidation()),
-		NewLabel("up", face, clr),
-		NewTextBoxInput(&key.Up, face, NoValidation()),
-		NewLabel("down", face, clr),
-		NewTextBoxInput(&key.Down, face, NoValidation()),
+		NewLabel("a"),
+		NewTextBoxInput(&key.A, NoValidation()),
+		NewLabel("b"),
+		NewTextBoxInput(&key.B, NoValidation()),
+		NewLabel("select"),
+		NewTextBoxInput(&key.Select, NoValidation()),
+		NewLabel("start"),
+		NewTextBoxInput(&key.Start, NoValidation()),
+		NewLabel("left"),
+		NewTextBoxInput(&key.Left, NoValidation()),
+		NewLabel("right"),
+		NewTextBoxInput(&key.Right, NoValidation()),
+		NewLabel("up"),
+		NewTextBoxInput(&key.Up, NoValidation()),
+		NewLabel("down"),
+		NewTextBoxInput(&key.Down, NoValidation()),
 
-		NewLabel("controller", bigFace, clr),
+		NewHeader("controller", res),
 		NewSeparator(),
 
-		NewLabel("a", face, clr),
-		NewTextBoxInput(&con.A, face, NoValidation()),
-		NewLabel("b", face, clr),
-		NewTextBoxInput(&con.B, face, NoValidation()),
-		NewLabel("select", face, clr),
-		NewTextBoxInput(&con.Select, face, NoValidation()),
-		NewLabel("start", face, clr),
-		NewTextBoxInput(&con.Start, face, NoValidation()),
-		NewLabel("left", face, clr),
-		NewTextBoxInput(&con.Left, face, NoValidation()),
-		NewLabel("right", face, clr),
-		NewTextBoxInput(&con.Right, face, NoValidation()),
-		NewLabel("up", face, clr),
-		NewTextBoxInput(&con.Up, face, NoValidation()),
-		NewLabel("down", face, clr),
-		NewTextBoxInput(&con.Down, face, NoValidation()),
-		NewSaveButton(res.fonts.face, res.buttonImage, func(*widget.ButtonClickedEventArgs) {
+		NewLabel("a"),
+		NewTextBoxInput(&con.A, NoValidation()),
+		NewLabel("b"),
+		NewTextBoxInput(&con.B, NoValidation()),
+		NewLabel("select"),
+		NewTextBoxInput(&con.Select, NoValidation()),
+		NewLabel("start"),
+		NewTextBoxInput(&con.Start, NoValidation()),
+		NewLabel("left"),
+		NewTextBoxInput(&con.Left, NoValidation()),
+		NewLabel("right"),
+		NewTextBoxInput(&con.Right, NoValidation()),
+		NewLabel("up"),
+		NewTextBoxInput(&con.Up, NoValidation()),
+		NewLabel("down"),
+		NewTextBoxInput(&con.Down, NoValidation()),
+		NewSaveButton(func(*widget.ButtonClickedEventArgs) {
 			config.Conf.Gb = tmp
 
 			config.DecodeController(&config.Conf.Gb.ControllerConfig)
@@ -306,75 +299,72 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 func NewGbaMenu(g *Game, parent *widget.Container) {
 
 	var (
-		res     = g.ui.res
-		tmp     = config.Conf.Gba
-		key     = &tmp.KeyboardConfig
-		con     = &tmp.ControllerConfig
-		face    = res.fonts.smallFace
-		bigFace = res.fonts.face
-		clr     = config.Conf.Ui.MenuForegroundColor
+		res = g.ui.res
+		tmp = config.Conf.Gba
+		key = &tmp.KeyboardConfig
+		con = &tmp.ControllerConfig
 	)
 
 	createSubMenu(parent,
 
-		NewLabel("general", bigFace, clr),
+		NewHeader("general", res),
 		NewSeparator(),
 
-		NewLabel("optimize idle loops", face, clr),
-		NewCheckbox(&tmp.IdleOptimize, res.checkbox),
+		NewLabel("optimize idle loops"),
+		NewCheckbox(&tmp.IdleOptimize),
 
-		NewLabel("snd clk cycles", face, clr),
-		NewTextBoxInput(&tmp.SoundClockUpdateCycles, face, NoValidation()),
+		NewLabel("snd clk cycles"),
+		NewTextBoxInput(&tmp.SoundClockUpdateCycles, NoValidation()),
 
-		NewLabel("keyboard", bigFace, clr),
+		NewHeader("keyboard", res),
 		NewSeparator(),
 
-		NewLabel("a", face, clr),
-		NewTextBoxInput(&key.A, face, NoValidation()),
-		NewLabel("b", face, clr),
-		NewTextBoxInput(&key.B, face, NoValidation()),
-		NewLabel("select", face, clr),
-		NewTextBoxInput(&key.Select, face, NoValidation()),
-		NewLabel("start", face, clr),
-		NewTextBoxInput(&key.Start, face, NoValidation()),
-		NewLabel("left", face, clr),
-		NewTextBoxInput(&key.Left, face, NoValidation()),
-		NewLabel("right", face, clr),
-		NewTextBoxInput(&key.Right, face, NoValidation()),
-		NewLabel("up", face, clr),
-		NewTextBoxInput(&key.Up, face, NoValidation()),
-		NewLabel("down", face, clr),
-		NewTextBoxInput(&key.Down, face, NoValidation()),
+		NewLabel("a"),
+		NewTextBoxInput(&key.A, NoValidation()),
+		NewLabel("b"),
+		NewTextBoxInput(&key.B, NoValidation()),
+		NewLabel("select"),
+		NewTextBoxInput(&key.Select, NoValidation()),
+		NewLabel("start"),
+		NewTextBoxInput(&key.Start, NoValidation()),
+		NewLabel("left"),
+		NewTextBoxInput(&key.Left, NoValidation()),
+		NewLabel("right"),
+		NewTextBoxInput(&key.Right, NoValidation()),
+		NewLabel("up"),
+		NewTextBoxInput(&key.Up, NoValidation()),
+		NewLabel("down"),
+		NewTextBoxInput(&key.Down, NoValidation()),
 
-		NewLabel("l", face, clr),
-		NewTextBoxInput(&key.L, face, NoValidation()),
-		NewLabel("r", face, clr),
-		NewTextBoxInput(&key.R, face, NoValidation()),
+		NewLabel("l"),
+		NewTextBoxInput(&key.L, NoValidation()),
+		NewLabel("r"),
+		NewTextBoxInput(&key.R, NoValidation()),
 
-		NewLabel("controller", bigFace, clr),
+		NewHeader("controller", res),
 		NewSeparator(),
 
-		NewLabel("a", face, clr),
-		NewTextBoxInput(&con.A, face, NoValidation()),
-		NewLabel("b", face, clr),
-		NewTextBoxInput(&con.B, face, NoValidation()),
-		NewLabel("select", face, clr),
-		NewTextBoxInput(&con.Select, face, NoValidation()),
-		NewLabel("start", face, clr),
-		NewTextBoxInput(&con.Start, face, NoValidation()),
-		NewLabel("left", face, clr),
-		NewTextBoxInput(&con.Left, face, NoValidation()),
-		NewLabel("right", face, clr),
-		NewTextBoxInput(&con.Right, face, NoValidation()),
-		NewLabel("up", face, clr),
-		NewTextBoxInput(&con.Up, face, NoValidation()),
-		NewLabel("down", face, clr),
-		NewTextBoxInput(&con.Down, face, NoValidation()),
-		NewLabel("l", face, clr),
-		NewTextBoxInput(&con.L, face, NoValidation()),
-		NewLabel("r", face, clr),
-		NewTextBoxInput(&con.R, face, NoValidation()),
-		NewSaveButton(res.fonts.face, res.buttonImage, func(*widget.ButtonClickedEventArgs) {
+		NewLabel("a"),
+		NewTextBoxInput(&con.A, NoValidation()),
+		NewLabel("b"),
+		NewTextBoxInput(&con.B, NoValidation()),
+		NewLabel("select"),
+		NewTextBoxInput(&con.Select, NoValidation()),
+		NewLabel("start"),
+		NewTextBoxInput(&con.Start, NoValidation()),
+		NewLabel("left"),
+		NewTextBoxInput(&con.Left, NoValidation()),
+		NewLabel("right"),
+		NewTextBoxInput(&con.Right, NoValidation()),
+		NewLabel("up"),
+		NewTextBoxInput(&con.Up, NoValidation()),
+		NewLabel("down"),
+		NewTextBoxInput(&con.Down, NoValidation()),
+		NewLabel("l"),
+		NewTextBoxInput(&con.L, NoValidation()),
+		NewLabel("r"),
+		NewTextBoxInput(&con.R, NoValidation()),
+		NewSaveButton(func(*widget.ButtonClickedEventArgs) {
 			config.Conf.Gba = tmp
 			config.DecodeController(&config.Conf.Gba.ControllerConfig)
 			if len(g.gamepadIds) != 0 {
@@ -388,40 +378,36 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 func NewNdsMenu(g *Game, parent *widget.Container) {
 
 	var (
-		res     = g.ui.res
-		tmp     = config.Conf.Nds
-		key     = &tmp.KeyboardConfig
-		con     = &tmp.ControllerConfig
-		face    = res.fonts.smallFace
-		bigFace = res.fonts.face
-		clr     = config.Conf.Ui.MenuForegroundColor
+		res = g.ui.res
+		tmp = config.Conf.Nds
+		key = &tmp.KeyboardConfig
+		con = &tmp.ControllerConfig
 	)
 
 	createSubMenu(parent,
 
-		NewLabel("screen", bigFace, clr),
+		NewHeader("screen", res),
 		NewSeparator(),
 
-		NewLabel("layout", face, clr),
+		NewLabel("layout"),
 		NewRadioInput(
 			&g.ui.focus.horizontalGroup,
-			&tmp.Screen.OLayout,
-			[]string{
+			&tmp.Screen.OLayout, []string{
 				"vertical",
 				"horizontal",
 				"hybrid",
-			}, face, res.buttonImage),
+			}, res),
 
-		NewLabel("sizing", face, clr),
+		NewLabel("sizing"),
 		NewRadioInput(
 			&g.ui.focus.horizontalGroup,
 			&tmp.Screen.OSizing, []string{
 				"even",
 				"only top",
 				"only bottom",
-			}, face, res.buttonImage),
+			}, res),
 
-		NewLabel("rotation", face, clr),
+		NewLabel("rotation"),
 		NewRadioInput(
 			&g.ui.focus.horizontalGroup,
 			&tmp.Screen.ORotation, []string{
@@ -429,112 +415,112 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 				"90",
 				"180",
 				"270",
-			}, face, res.buttonImage),
+			}, res),
 
-		NewLabel("rtc", bigFace, clr),
+		NewHeader("rtc", res),
 		NewSeparator(),
 
-		NewLabel("additional hours", face, clr),
-		NewTextBoxInput(&tmp.Rtc.AdditionalHours, face, NoValidation()),
+		NewLabel("additional hours"),
+		NewTextBoxInput(&tmp.Rtc.AdditionalHours, NoValidation()),
 
-		NewLabel("bios", bigFace, clr),
+		NewHeader("bios", res),
 		NewSeparator(),
 
-		NewLabel("arm7 path", face, clr),
-		NewFileInput(&tmp.Bios.Arm7Path, face),
-		NewLabel("arm9 path", face, clr),
-		NewFileInput(&tmp.Bios.Arm9Path, face),
+		NewLabel("arm7 path"),
+		NewFileInput(&tmp.Bios.Arm7Path),
+		NewLabel("arm9 path"),
+		NewFileInput(&tmp.Bios.Arm9Path),
 
-		NewLabel("firmware", bigFace, clr),
+		NewHeader("firmware", res),
 		NewSeparator(),
 
-		NewLabel("file path", face, clr),
-		NewFileInput(&tmp.Firmware.FilePath, face),
-		NewLabel("nickname", face, clr),
-		NewTextBoxInput(&tmp.Firmware.Nickname, face, NoValidation()),
-		NewLabel("message", face, clr),
-		NewTextBoxInput(&tmp.Firmware.Message, face, NoValidation()),
-		NewLabel("favorite color", face, clr),
-		NewTextBoxInput(&tmp.Firmware.FavoriteColor, face, NoValidation()),
+		NewLabel("file path"),
+		NewFileInput(&tmp.Firmware.FilePath),
+		NewLabel("nickname"),
+		NewTextBoxInput(&tmp.Firmware.Nickname, NoValidation()),
+		NewLabel("message"),
+		NewTextBoxInput(&tmp.Firmware.Message, NoValidation()),
+		NewLabel("favorite color"),
+		NewTextBoxInput(&tmp.Firmware.FavoriteColor, NoValidation()),
 
-		NewLabel("scene export", bigFace, clr),
+		NewHeader("scene export", res),
 		NewSeparator(),
 
-		NewLabel("output directory", face, clr),
-		NewDirectoryInput(&tmp.Export.Directory, face, "./export"),
-		NewLabel("shadow polygons", face, clr),
-		NewCheckbox(&tmp.Export.ShadowPolys, res.checkbox),
+		NewLabel("output directory"),
+		NewDirectoryInput(&tmp.Export.Directory, "./export"),
+		NewLabel("shadow polygons"),
+		NewCheckbox(&tmp.Export.ShadowPolys),
 
-		NewLabel("keyboard", bigFace, clr),
+		NewHeader("keyboard", res),
 		NewSeparator(),
 
-		NewLabel("a", face, clr),
-		NewTextBoxInput(&key.A, face, NoValidation()),
-		NewLabel("b", face, clr),
-		NewTextBoxInput(&key.B, face, NoValidation()),
-		NewLabel("select", face, clr),
-		NewTextBoxInput(&key.Select, face, NoValidation()),
-		NewLabel("start", face, clr),
-		NewTextBoxInput(&key.Start, face, NoValidation()),
-		NewLabel("left", face, clr),
-		NewTextBoxInput(&key.Left, face, NoValidation()),
-		NewLabel("right", face, clr),
-		NewTextBoxInput(&key.Right, face, NoValidation()),
-		NewLabel("up", face, clr),
-		NewTextBoxInput(&key.Up, face, NoValidation()),
-		NewLabel("down", face, clr),
-		NewTextBoxInput(&key.Down, face, NoValidation()),
-		NewLabel("l", face, clr),
-		NewTextBoxInput(&key.L, face, NoValidation()),
-		NewLabel("r", face, clr),
-		NewTextBoxInput(&key.R, face, NoValidation()),
+		NewLabel("a"),
+		NewTextBoxInput(&key.A, NoValidation()),
+		NewLabel("b"),
+		NewTextBoxInput(&key.B, NoValidation()),
+		NewLabel("select"),
+		NewTextBoxInput(&key.Select, NoValidation()),
+		NewLabel("start"),
+		NewTextBoxInput(&key.Start, NoValidation()),
+		NewLabel("left"),
+		NewTextBoxInput(&key.Left, NoValidation()),
+		NewLabel("right"),
+		NewTextBoxInput(&key.Right, NoValidation()),
+		NewLabel("up"),
+		NewTextBoxInput(&key.Up, NoValidation()),
+		NewLabel("down"),
+		NewTextBoxInput(&key.Down, NoValidation()),
+		NewLabel("l"),
+		NewTextBoxInput(&key.L, NoValidation()),
+		NewLabel("r"),
+		NewTextBoxInput(&key.R, NoValidation()),
 
-		NewLabel("x", face, clr),
-		NewTextBoxInput(&key.X, face, NoValidation()),
-		NewLabel("y", face, clr),
-		NewTextBoxInput(&key.Y, face, NoValidation()),
-		NewLabel("hinge", face, clr),
-		NewTextBoxInput(&key.Hinge, face, NoValidation()),
-		NewLabel("debug", face, clr),
-		NewTextBoxInput(&key.Debug, face, NoValidation()),
-		NewLabel("layout toggle", face, clr),
-		NewTextBoxInput(&key.LayoutToggle, face, NoValidation()),
-		NewLabel("sizing toggle", face, clr),
-		NewTextBoxInput(&key.SizingToggle, face, NoValidation()),
-		NewLabel("rotation toggle", face, clr),
-		NewTextBoxInput(&key.RotationToggle, face, NoValidation()),
-		NewLabel("export toggle", face, clr),
-		NewTextBoxInput(&key.ExportScene, face, NoValidation()),
+		NewLabel("x"),
+		NewTextBoxInput(&key.X, NoValidation()),
+		NewLabel("y"),
+		NewTextBoxInput(&key.Y, NoValidation()),
+		NewLabel("hinge"),
+		NewTextBoxInput(&key.Hinge, NoValidation()),
+		NewLabel("debug"),
+		NewTextBoxInput(&key.Debug, NoValidation()),
+		NewLabel("layout toggle"),
+		NewTextBoxInput(&key.LayoutToggle, NoValidation()),
+		NewLabel("sizing toggle"),
+		NewTextBoxInput(&key.SizingToggle, NoValidation()),
+		NewLabel("rotation toggle"),
+		NewTextBoxInput(&key.RotationToggle, NoValidation()),
+		NewLabel("export toggle"),
+		NewTextBoxInput(&key.ExportScene, NoValidation()),
 
-		NewLabel("controller", bigFace, clr),
+		NewHeader("controller", res),
 		NewSeparator(),
 
-		NewLabel("a", face, clr),
-		NewTextBoxInput(&con.A, face, NoValidation()),
-		NewLabel("b", face, clr),
-		NewTextBoxInput(&con.B, face, NoValidation()),
-		NewLabel("select", face, clr),
-		NewTextBoxInput(&con.Select, face, NoValidation()),
-		NewLabel("start", face, clr),
-		NewTextBoxInput(&con.Start, face, NoValidation()),
-		NewLabel("left", face, clr),
-		NewTextBoxInput(&con.Left, face, NoValidation()),
-		NewLabel("right", face, clr),
-		NewTextBoxInput(&con.Right, face, NoValidation()),
-		NewLabel("up", face, clr),
-		NewTextBoxInput(&con.Up, face, NoValidation()),
-		NewLabel("down", face, clr),
-		NewTextBoxInput(&con.Down, face, NoValidation()),
-		NewLabel("l", face, clr),
-		NewTextBoxInput(&con.L, face, NoValidation()),
-		NewLabel("r", face, clr),
-		NewTextBoxInput(&con.R, face, NoValidation()),
-		NewLabel("x", face, clr),
-		NewTextBoxInput(&con.X, face, NoValidation()),
-		NewLabel("y", face, clr),
-		NewTextBoxInput(&con.Y, face, NoValidation()),
+		NewLabel("a"),
+		NewTextBoxInput(&con.A, NoValidation()),
+		NewLabel("b"),
+		NewTextBoxInput(&con.B, NoValidation()),
+		NewLabel("select"),
+		NewTextBoxInput(&con.Select, NoValidation()),
+		NewLabel("start"),
+		NewTextBoxInput(&con.Start, NoValidation()),
+		NewLabel("left"),
+		NewTextBoxInput(&con.Left, NoValidation()),
+		NewLabel("right"),
+		NewTextBoxInput(&con.Right, NoValidation()),
+		NewLabel("up"),
+		NewTextBoxInput(&con.Up, NoValidation()),
+		NewLabel("down"),
+		NewTextBoxInput(&con.Down, NoValidation()),
+		NewLabel("l"),
+		NewTextBoxInput(&con.L, NoValidation()),
+		NewLabel("r"),
+		NewTextBoxInput(&con.R, NoValidation()),
+		NewLabel("x"),
+		NewTextBoxInput(&con.X, NoValidation()),
+		NewLabel("y"),
+		NewTextBoxInput(&con.Y, NoValidation()),
 
-		NewSaveButton(res.fonts.face, res.buttonImage, func(*widget.ButtonClickedEventArgs) {
+		NewSaveButton(func(*widget.ButtonClickedEventArgs) {
 			config.Conf.Nds = tmp
 			config.DecodeController(&config.Conf.Nds.ControllerConfig)
 

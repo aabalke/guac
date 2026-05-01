@@ -1,4 +1,4 @@
-package gameboy
+package gb
 
 type Serial struct {
 	sb uint8

@@ -100,6 +100,7 @@ type GbaConfig struct {
 
 type KeyboardConfig struct {
 	Select     []string `toml:"select"`
+	Return     []string `toml:"return"`
 	Mute       []string `toml:"mute"`
 	Pause      []string `toml:"pause"`
 	Left       []string `toml:"left"`
@@ -112,6 +113,7 @@ type KeyboardConfig struct {
 
 type ControllerConfig struct {
 	Select     []ebiten.StandardGamepadButton
+	Return     []ebiten.StandardGamepadButton
 	Mute       []ebiten.StandardGamepadButton
 	Pause      []ebiten.StandardGamepadButton
 	Left       []ebiten.StandardGamepadButton
@@ -122,6 +124,7 @@ type ControllerConfig struct {
 	Quit       []ebiten.StandardGamepadButton
 
 	TomlSelect     []string `toml:"select"`
+	TomlReturn     []string `toml:"return"`
 	TomlMute       []string `toml:"mute"`
 	TomlPause      []string `toml:"pause"`
 	TomlLeft       []string `toml:"left"`
@@ -264,6 +267,7 @@ func (c *Config) DecodeGeneralController() {
 
 	configs := []*[]string{
 		&conf.TomlSelect,
+		&conf.TomlReturn,
 		&conf.TomlMute,
 		&conf.TomlPause,
 		&conf.TomlLeft,
@@ -276,6 +280,7 @@ func (c *Config) DecodeGeneralController() {
 
 	outputs := []*[]ebiten.StandardGamepadButton{
 		&conf.Select,
+		&conf.Return,
 		&conf.Mute,
 		&conf.Pause,
 		&conf.Left,
@@ -325,6 +330,10 @@ func DecodeController(conf *EmulatorControllerConfig) {
 		&conf.X,
 		&conf.Y,
 		&conf.Hinge,
+	}
+
+	if len(outputs) != len(configs) {
+		panic("decode controller has different lens")
 	}
 
 	for i := range len(configs) {

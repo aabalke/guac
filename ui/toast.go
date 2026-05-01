@@ -21,6 +21,7 @@ func NewToast(res *Resources) *Toast {
 			Container: widget.NewContainer(
 				widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 			),
+			PrimaryTheme: NewTheme(res),
 		},
 	}
 }

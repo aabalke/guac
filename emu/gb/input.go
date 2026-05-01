@@ -1,4 +1,4 @@
-package gameboy
+package gb
 
 import (
 	"github.com/aabalke/guac/config"

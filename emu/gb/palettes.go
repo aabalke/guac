@@ -1,4 +1,4 @@
-package gameboy
+package gb
 
 type ColorPalette struct {
 	Palette  [0x40]uint8

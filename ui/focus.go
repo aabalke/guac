@@ -124,6 +124,12 @@ func (f *Focus) FocusLastSubMenu() {
 	}
 }
 
+func (f *Focus) FocusLastSidebar() {
+	if len(f.sidebar) > 0 {
+		f.ui.SetFocusedWidget(f.sidebar[len(f.sidebar)-1])
+	}
+}
+
 func (f *Focus) FocusSidebar(idx int) {
 	if len(f.sidebar) > idx {
 		f.ui.SetFocusedWidget(f.sidebar[idx])

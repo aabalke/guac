@@ -11,7 +11,7 @@ import (
 	"fmt"
 
 	"github.com/aabalke/guac/config"
-	gameboy "github.com/aabalke/guac/emu/gb"
+	"github.com/aabalke/guac/emu/gb"
 	"github.com/aabalke/guac/emu/gba"
 	"github.com/aabalke/guac/emu/nds"
 	"github.com/aabalke/guac/input"
@@ -35,7 +35,7 @@ type Game struct {
 	ui    *Ui
 	nds   *nds.Nds
 	gba   *gba.GBA
-	gb    *gameboy.GameBoy
+	gb    *gb.GameBoy
 	mouse *input.Mouse
 
 	pauseEndFrame uint64
@@ -302,7 +302,7 @@ func (g *Game) InitConsole(file string) {
 	switch romType := utils.GetRomType(file); romType {
 
 	case utils.GB:
-		g.gb = gameboy.NewGameBoy(file, g.emuCtx)
+		g.gb = gb.NewGameBoy(file, g.emuCtx)
 		g.ui.ui = nil
 		if g.muted {
 			g.gb.ToggleMute()
