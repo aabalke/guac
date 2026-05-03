@@ -118,6 +118,12 @@ func (f *Focus) buildHorizontalGroupOverride() {
 	}
 }
 
+func (f *Focus) FocusLast() {
+	if len(f.other) > 0 {
+		f.ui.SetFocusedWidget(f.other[len(f.other)-1])
+	}
+}
+
 func (f *Focus) FocusLastSubMenu() {
 	if len(f.submenu) > 0 {
 		f.ui.SetFocusedWidget(f.submenu[len(f.submenu)-1])

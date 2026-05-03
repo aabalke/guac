@@ -130,10 +130,12 @@ func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) 
 				if b, ok := g.ui.ui.GetFocusedWidget().(*widget.Button); ok {
 					b.Click()
 				}
+			case slices.Contains(buttonConfig.Return, button):
+				g.ui.focus.FocusLast()
 			}
 		}
 
-	case PAGE_SETTINGS:
+	case PAGE_SETTINGS, PAGE_KEYBOARD:
 
 		// this set is for scrolling through options quickly with the controller
 		// kicks in after x number of ticks
@@ -146,8 +148,13 @@ func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) 
 
 					case slices.Contains(buttonConfig.Down, button):
 						g.ui.ui.ChangeFocus(widget.FOCUS_SOUTH)
-					}
 
+					case slices.Contains(buttonConfig.Right, button):
+						g.ui.ui.ChangeFocus(widget.FOCUS_EAST)
+
+					case slices.Contains(buttonConfig.Left, button):
+						g.ui.ui.ChangeFocus(widget.FOCUS_WEST)
+					}
 				}
 			}
 		}
@@ -176,7 +183,6 @@ func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) 
 				//}
 
 			case slices.Contains(buttonConfig.Return, button):
-				println("returning")
 				g.ui.focus.FocusLastSidebar()
 
 			case slices.Contains(buttonConfig.Select, button):
@@ -190,6 +196,5 @@ func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) 
 				}
 			}
 		}
-
 	}
 }

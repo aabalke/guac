@@ -157,7 +157,7 @@ func NewSidebar(g *Game, initMenu int) {
 
 	radios := []widget.RadioGroupElement{}
 	var initButton *widget.Button
-	for i, field := range fields {
+	for i, field := range sidebarFields {
 		b := NewSidebarButton(g, field)
 		g.ui.sidebar.AddChild(b)
 		radios = append(radios, b)
@@ -173,7 +173,7 @@ func NewSidebar(g *Game, initMenu int) {
 	)
 
 	// initialize first menu
-	fields[initMenu].f(g)
+	sidebarFields[initMenu].f(g)
 	g.ui.focus.submenu = g.ui.content.GetFocusers()
 	g.ui.focus.BuildFocus(g.ui.ui)
 }
@@ -203,11 +203,4 @@ func NewSidebarButton(g *Game, sf SidebarField) *widget.Button {
 	b.SetText(sf.label)
 
 	return b
-}
-
-func createSubMenu(parent *widget.Container, children ...widget.PreferredSizeLocateableWidget) {
-	parent.RemoveChildren()
-	for _, child := range children {
-		parent.AddChild(child)
-	}
 }

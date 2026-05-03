@@ -1,15 +1,11 @@
 package ui
 
 import (
-	"image/color"
-	"strconv"
-	"strings"
-
 	"github.com/aabalke/guac/utils"
 	"github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/utilities/mobile"
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/hajimehoshi/ebiten/v2"
+	"image/color"
 )
 
 const (
@@ -17,10 +13,20 @@ const (
 	BUTTON_WIDTH = 256
 )
 
+const (
+	WIDGET_HDR = iota //header
+	WIDGET_CBX        //checkbox
+	WIDGET_KEY        //keybinding
+	WIDGET_DEC        //decimal
+	WIDGET_HEX        //hexadecimal
+	WIDGET_FLE        //file
+	WIDGET_DIR        //directory
+	WIDGET_TXT        //text
+	WIDGET_RAD        //radio
+)
+
 func NewHeader(text string, res *Resources) *widget.Text {
-	return widget.NewText(
-		widget.TextOpts.Text(text, res.fonts.face, *res.fgClr),
-	)
+	return widget.NewText(widget.TextOpts.Text(text, res.fonts.face, *res.fgClr))
 }
 
 func NewLabel(text string) *widget.Text {
@@ -72,100 +78,44 @@ func NewCheckbox(value *bool) widget.PreferredSizeLocateableWidget {
 	)
 }
 
-func NewTextBoxInput(value any, validation func(s string) (bool, *string)) widget.PreferredSizeLocateableWidget {
+func NewKeybindInput(ui *Ui, label string, value any) *widget.TextInput {
+	return NewTextBoxInput(ui, BOARD_KEYBIND, label, value, NoValidation())
+}
 
-	input := widget.NewTextInput(
+func NewDecimalInput(ui *Ui, label string, value any, maxValue int) *widget.TextInput {
+	return NewTextBoxInput(ui, BOARD_DEC, label, value, NumberValidation(maxValue))
+}
+
+func NewHexInput(ui *Ui, label string, value any, maxValue int) *widget.TextInput {
+	return NewTextBoxInput(ui, BOARD_HEX, label, value, NumberValidation(maxValue))
+}
+
+func NewTextInput(ui *Ui, label string, value any) *widget.TextInput {
+	return NewTextBoxInput(ui, BOARD_ALPHA, label, value, NoValidation())
+}
+
+func NewTextBoxInput(ui *Ui, board int, label string, value any, validation func(s string) (bool, *string)) *widget.TextInput {
+
+	var input *widget.TextInput
+
+	input = widget.NewTextInput(
 		widget.TextInputOpts.MobileInputMode(mobile.TEXT),
 		widget.TextInputOpts.Validation(validation),
+
+		widget.TextInputOpts.SubmitOnEnter(false),
+		widget.TextInputOpts.AllowDuplicateSubmit(true),
+
+		widget.TextInputOpts.SubmitHandler(func(args *widget.TextInputChangedEventArgs) {
+			ui.keyboard.Open(ui, input, board, label, value)
+		}),
 		widget.TextInputOpts.ChangedHandler(func(args *widget.TextInputChangedEventArgs) {
-			switch v := value.(type) {
-			case *int:
-				*v, _ = strconv.Atoi(args.InputText)
-			case *string:
-				*v = args.InputText
-			case *[]string:
-				*v = strings.Split(strings.ReplaceAll(args.InputText, " ", ""), ",")
-			case *[]int:
-				a := strings.Split(strings.ReplaceAll(args.InputText, " ", ""), ",")
-				nums := []int{}
-
-				for _, num := range a {
-					n, _ := strconv.Atoi(num)
-					nums = append(nums, n)
-				}
-
-				*v = nums
-
-			case *[]ebiten.StandardGamepadButton:
-				strs := strings.Split(strings.ReplaceAll(args.InputText, " ", ""), ",")
-
-				*v = []ebiten.StandardGamepadButton{}
-				for i := range strs {
-					*v = append(*v, utils.StringToGamepadButton(strs[i]))
-				}
-
-			default:
-				panic("not supported text box input")
-			}
+			fromString(value, args.InputText)
 		}),
 	)
 
-	switch v := value.(type) {
-	case *int:
-		input.SetText(strconv.Itoa(*v))
-	case *string:
-		input.SetText(*v)
-	case *[]string:
-		input.SetText(join(*v, ", ", func(s string) string { return s }))
-
-	case *[]int:
-		input.SetText(join(*v, ", ", strconv.Itoa))
-
-	case *[]ebiten.StandardGamepadButton:
-		input.SetText(join(*v, ", ", utils.GamepadButtonToString))
-
-	default:
-		panic("not supported text box input")
-	}
+	input.SetText(toString(value))
 
 	return input
-}
-
-func join[T any](vals []T, sep string, f func(T) string) string {
-	out := make([]string, len(vals))
-	for i, v := range vals {
-		out[i] = f(v)
-	}
-	return strings.Join(out, sep)
-}
-
-func NumberValidation(maxValue int) func(string) (bool, *string) {
-	return func(s string) (bool, *string) {
-
-		var b strings.Builder
-		for _, r := range s {
-			if r >= '0' && r <= '9' {
-				b.WriteRune(r)
-			}
-		}
-
-		digits := b.String()
-
-		v, _ := strconv.Atoi(digits)
-
-		if v >= maxValue {
-			digits = strconv.Itoa(maxValue)
-			return false, &digits
-		}
-
-		return false, &digits
-	}
-}
-
-func NoValidation() func(string) (bool, *string) {
-	return func(s string) (bool, *string) {
-		return true, &s
-	}
 }
 
 func NewSaveButton(f func(args *widget.ButtonClickedEventArgs)) widget.PreferredSizeLocateableWidget {
@@ -260,18 +210,6 @@ func NewApplyPalettesMenu(focusGroups *[][]widget.Focuser, pals map[string][4]st
 	*focusGroups = append(*focusGroups, focusRadio)
 
 	return c
-}
-
-const MAX_DIALOG_LEN = 24
-
-func trim(s string, max int) string {
-	r := []rune(s)
-
-	if len(r) <= max {
-		return s
-	}
-
-	return "..." + string(r[len(r)-(max-len([]rune("..."))):])
 }
 
 func dialogInput(v *string, dialogFunc func() string) widget.PreferredSizeLocateableWidget {

@@ -55,6 +55,7 @@ type Resources struct {
 	fonts                *fonts
 	checkbox             *widget.CheckboxImage
 	buttonImage          *widget.ButtonImage
+	buttonBorderedImage  *widget.ButtonImage
 
 	icon []img.Image
 
@@ -68,6 +69,7 @@ func NewUIResources() (*Resources, error) {
 		bg   = image.NewNineSliceColor(conf.MenuBackgroundColor)
 		fg   = image.NewNineSliceColor(conf.MenuForegroundColor)
 		sec  = image.NewNineSliceColor(conf.MenuSecondaryColor)
+		secb = image.NewBorderedNineSliceColor(conf.MenuSecondaryColor, conf.MenuForegroundColor, 2)
 	)
 
 	f, err := embeddedAssets.Open("assets/graphics/icon.png")
@@ -87,17 +89,25 @@ func NewUIResources() (*Resources, error) {
 		PressedHover: sec,
 	}
 
+	buttonBorderedImage := &widget.ButtonImage{
+		Idle:         image.NewBorderedNineSliceColor(color.Transparent, conf.MenuForegroundColor, 2),
+		Hover:        secb,
+		Pressed:      secb,
+		PressedHover: secb,
+	}
+
 	r := &Resources{
-		icon:        []img.Image{icon},
-		fonts:       loadFonts(),
-		bg:          bg,
-		fg:          fg,
-		sec:         sec,
-		bgClr:       &conf.MenuBackgroundColor,
-		fgClr:       &conf.MenuForegroundColor,
-		secClr:      &conf.MenuSecondaryColor,
-		buttonImage: buttonImage,
-		checkbox:    loadCheckboxImage(conf.MenuForegroundColor),
+		icon:                []img.Image{icon},
+		fonts:               loadFonts(),
+		bg:                  bg,
+		fg:                  fg,
+		sec:                 sec,
+		bgClr:               &conf.MenuBackgroundColor,
+		fgClr:               &conf.MenuForegroundColor,
+		secClr:              &conf.MenuSecondaryColor,
+		buttonImage:         buttonImage,
+		buttonBorderedImage: buttonBorderedImage,
+		checkbox:            loadCheckboxImage(conf.MenuForegroundColor),
 	}
 
 	return r, nil
@@ -109,9 +119,17 @@ func (u *Resources) Update() {
 	u.bg = image.NewNineSliceColor(conf.MenuBackgroundColor)
 	u.fg = image.NewNineSliceColor(conf.MenuForegroundColor)
 	u.sec = image.NewNineSliceColor(conf.MenuSecondaryColor)
-	u.buttonImage.Hover = u.sec
-	u.buttonImage.Pressed = u.sec
-	u.buttonImage.PressedHover = u.sec
+	secb := image.NewBorderedNineSliceColor(conf.MenuSecondaryColor, conf.MenuBackgroundColor, 2)
+	u.buttonImage.Hover = secb
+	u.buttonImage.Pressed = secb
+	u.buttonImage.PressedHover = secb
+
+	u.buttonBorderedImage = &widget.ButtonImage{
+		Idle:         image.NewBorderedNineSliceColor(color.Transparent, conf.MenuForegroundColor, 2),
+		Hover:        secb,
+		Pressed:      secb,
+		PressedHover: secb,
+	}
 
 	u.checkbox = loadCheckboxImage(conf.MenuForegroundColor)
 }

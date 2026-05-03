@@ -14,16 +14,23 @@ const (
 	MENU_RETURN
 )
 
+type Field struct {
+	widgettype int
+	label      string
+	sublabel   string
+	ptr        any
+	other      any
+}
+
 type SidebarField struct {
 	label string
 	f     func(g *Game)
 }
 
-var fields = []SidebarField{}
+var sidebarFields = []SidebarField{}
 
 func init() {
-
-	fields = []SidebarField{
+	sidebarFields = []SidebarField{
 		{
 			"general",
 			func(g *Game) {
@@ -77,457 +84,314 @@ func init() {
 	}
 }
 
+func buildSubMenu(g *Game, parent *widget.Container, fields []Field) {
+	for _, field := range fields {
+		switch field.widgettype {
+		case WIDGET_HDR:
+			parent.AddChild(NewHeader(field.label, g.ui.res), NewSeparator())
+		case WIDGET_CBX:
+			parent.AddChild(NewLabel(field.label), NewCheckbox(field.ptr.(*bool)))
+		case WIDGET_KEY:
+			parent.AddChild(NewLabel(field.label), NewKeybindInput(g.ui, field.sublabel, field.ptr))
+		case WIDGET_DEC:
+			parent.AddChild(NewLabel(field.label), NewDecimalInput(g.ui, field.sublabel, field.ptr, field.other.(int)))
+		case WIDGET_HEX:
+			parent.AddChild(NewLabel(field.label), NewHexInput(g.ui, field.sublabel, field.ptr, field.other.(int)))
+		case WIDGET_FLE:
+			parent.AddChild(NewLabel(field.label), NewFileInput(field.ptr.(*string)))
+		case WIDGET_DIR:
+			parent.AddChild(NewLabel(field.label), NewDirectoryInput(field.ptr.(*string), field.other.(string)))
+		case WIDGET_TXT:
+			parent.AddChild(NewLabel(field.label), NewTextBoxInput(g.ui, BOARD_ALPHA, field.sublabel, field.ptr, NoValidation()))
+		case WIDGET_RAD:
+			parent.AddChild(NewLabel(field.label), NewRadioInput(
+				&g.ui.focus.horizontalGroup,
+				field.ptr.(*int),
+				field.other.([]string),
+				g.ui.res,
+			))
+		}
+	}
+}
+
 func NewGeneralMenu(g *Game, parent *widget.Container) {
 
 	var (
-		res = g.ui.res
 		tmp = config.Conf.General
 		k   = &tmp.KeyboardConfig
 		c   = &tmp.ControllerConfig
 	)
 
-	createSubMenu(parent,
-		NewHeader("general", res),
-		NewSeparator(),
+	fields := []Field{
+		{WIDGET_HDR, "general", "", nil, nil},
+		{WIDGET_CBX, "muted", "", &tmp.Muted, nil},
+		{WIDGET_CBX, "show fps", "", &tmp.ShowFps, nil},
+		{WIDGET_CBX, "init fullscreen", "", &tmp.InitFullscreen, nil},
+		{WIDGET_DEC, "target fps", "target fps", &tmp.TargetFps, 1000000},
 
-		NewLabel("muted"),
-		NewCheckbox(&tmp.Muted),
+		{WIDGET_HDR, "keyboard", "", nil, nil},
+		{WIDGET_KEY, "select", "keyboard select", &k.Select, nil},
+		{WIDGET_KEY, "return", "keyboard return", &k.Return, nil},
+		{WIDGET_KEY, "mute", "keyboard mute", &k.Mute, nil},
+		{WIDGET_KEY, "pause", "keyboard pause", &k.Pause, nil},
+		{WIDGET_KEY, "left", "keyboard left", &k.Left, nil},
+		{WIDGET_KEY, "right", "keyboard right", &k.Right, nil},
+		{WIDGET_KEY, "up", "keyboard up", &k.Up, nil},
+		{WIDGET_KEY, "down", "keyboard down", &k.Down, nil},
+		{WIDGET_KEY, "fullscreen", "keyboard fullscreen", &k.Fullscreen, nil},
+		{WIDGET_KEY, "quit", "keyboard quit", &k.Quit, nil},
 
-		NewLabel("show fps"),
-		NewCheckbox(&tmp.ShowFps),
+		{WIDGET_HDR, "controller", "", nil, nil},
+		{WIDGET_KEY, "select", "controller select", &c.Select, nil},
+		{WIDGET_KEY, "return", "controller return", &c.Return, nil},
+		{WIDGET_KEY, "mute", "controller mute", &c.Mute, nil},
+		{WIDGET_KEY, "pause", "controller pause", &c.Pause, nil},
+		{WIDGET_KEY, "left", "controller left", &c.Left, nil},
+		{WIDGET_KEY, "right", "controller right", &c.Right, nil},
+		{WIDGET_KEY, "up", "controller up", &c.Up, nil},
+		{WIDGET_KEY, "down", "controller down", &c.Down, nil},
+		{WIDGET_KEY, "fullscreen", "controller fullscreen", &c.Fullscreen, nil},
+		{WIDGET_KEY, "quit", "controller quit", &c.Quit, nil},
+	}
 
-		NewLabel("initialize fullscreen"),
-		NewCheckbox(&tmp.InitFullscreen),
+	parent.RemoveChildren()
+	buildSubMenu(g, parent, fields)
 
-		NewLabel("target fps"),
-		NewTextBoxInput(&tmp.TargetFps, NumberValidation(100_000)),
+	parent.AddChild(NewSaveButton(func(*widget.ButtonClickedEventArgs) {
+		config.Conf.General = tmp
 
-		NewHeader("keyboard", res),
-		NewSeparator(),
+		if len(g.gamepadIds) != 0 {
+			g.ui.focus.FocusLastSubMenu()
+		}
 
-		NewLabel("select"),
-		NewTextBoxInput(&k.Select, NoValidation()),
-		NewLabel("return"),
-		NewTextBoxInput(&k.Return, NoValidation()),
-		NewLabel("mute"),
-		NewTextBoxInput(&k.Mute, NoValidation()),
-		NewLabel("pause"),
-		NewTextBoxInput(&k.Pause, NoValidation()),
-		NewLabel("left"),
-		NewTextBoxInput(&k.Left, NoValidation()),
-		NewLabel("right"),
-		NewTextBoxInput(&k.Right, NoValidation()),
-		NewLabel("up"),
-		NewTextBoxInput(&k.Up, NoValidation()),
-		NewLabel("down"),
-		NewTextBoxInput(&k.Down, NoValidation()),
-		NewLabel("fullscreen"),
-		NewTextBoxInput(&k.Fullscreen, NoValidation()),
-		NewLabel("quit"),
-		NewTextBoxInput(&k.Quit, NoValidation()),
-
-		NewHeader("controller", res),
-		NewSeparator(),
-
-		NewLabel("select"),
-		NewTextBoxInput(&c.Select, NoValidation()),
-		NewLabel("return"),
-		NewTextBoxInput(&c.Return, NoValidation()),
-		NewLabel("mute"),
-		NewTextBoxInput(&c.Mute, NoValidation()),
-		NewLabel("pause"),
-		NewTextBoxInput(&c.Pause, NoValidation()),
-		NewLabel("left"),
-		NewTextBoxInput(&c.Left, NoValidation()),
-		NewLabel("right"),
-		NewTextBoxInput(&c.Right, NoValidation()),
-		NewLabel("up"),
-		NewTextBoxInput(&c.Up, NoValidation()),
-		NewLabel("down"),
-		NewTextBoxInput(&c.Down, NoValidation()),
-		NewLabel("fullscreen"),
-		NewTextBoxInput(&c.Fullscreen, NoValidation()),
-		NewLabel("quit"),
-		NewTextBoxInput(&c.Quit, NoValidation()),
-
-		NewSaveButton(func(*widget.ButtonClickedEventArgs) {
-			config.Conf.General = tmp
-			config.Conf.DecodeGeneralController()
-			if len(g.gamepadIds) != 0 {
-				g.ui.focus.FocusLastSubMenu()
-			}
-
-			g.ui.toast.AddMessage("saved")
-
-		}),
-	)
+		g.ui.toast.AddMessage("saved")
+	}))
 }
 
 func NewUiMenu(g *Game, parent *widget.Container) {
 
 	var (
-		res = g.ui.res
-		tmp = config.Conf.Ui
-
+		res   = g.ui.res
+		tmp   = config.Conf.Ui
 		oldId = g.ui.PrevPageId
 
 		clrInputs = [4]widget.PreferredSizeLocateableWidget{
-			NewColorInput(&tmp.Backdrop, NoValidation()),
-			NewColorInput(&tmp.MenuBackgroundColor, NoValidation()),
-			NewColorInput(&tmp.MenuForegroundColor, NoValidation()),
-			NewColorInput(&tmp.MenuSecondaryColor, NoValidation()),
+			NewColorInput(&tmp.Backdrop, HexValidation(0xFFFFFF)),
+			NewColorInput(&tmp.MenuBackgroundColor, HexValidation(0xFFFFFF)),
+			NewColorInput(&tmp.MenuForegroundColor, HexValidation(0xFFFFFF)),
+			NewColorInput(&tmp.MenuSecondaryColor, HexValidation(0xFFFFFF)),
 		}
 	)
+	parent.RemoveChildren()
 
-	createSubMenu(parent,
-		NewHeader("ui", res),
-		NewSeparator(),
-
-		NewLabel("backdrop"),
-		clrInputs[0],
-
-		NewLabel("bg color"),
-		clrInputs[1],
-
-		NewLabel("fg color"),
-		clrInputs[2],
-
-		NewLabel("accent color"),
-		clrInputs[3],
-
+	parent.AddChild(
+		NewHeader("ui", res), NewSeparator(),
+		NewLabel("backdrop"), clrInputs[0],
+		NewLabel("bg color"), clrInputs[1],
+		NewLabel("fg color"), clrInputs[2],
+		NewLabel("accent color"), clrInputs[3],
 		NewLabel("apply theme"),
 		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, theme_palettes, clrInputs, res),
-
 		NewSaveButton(func(*widget.ButtonClickedEventArgs) {
 			config.Conf.Ui = tmp
 			res.Update()
 			NewSettings(g, oldId, MENU_UI)
+			// should this be somewhere else?
+			g.ui.keyboard = NewKeyboard(g.ui.res)
 
 			if len(g.gamepadIds) != 0 {
 				g.ui.focus.FocusLastSubMenu()
 			}
+
 			g.ui.toast.AddMessage("saved")
-		}),
-	)
+		}))
 }
 
 func NewGbMenu(g *Game, parent *widget.Container) {
 
 	var (
-		res = g.ui.res
 		tmp = config.Conf.Gb
-		key = &tmp.KeyboardConfig
-		con = &tmp.ControllerConfig
+		k   = &tmp.KeyboardConfig
+		c   = &tmp.ControllerConfig
 		pal = &tmp.Palette
 
 		clrInputs = [4]widget.PreferredSizeLocateableWidget{
-			NewColorInput(&pal[0], NoValidation()),
-			NewColorInput(&pal[1], NoValidation()),
-			NewColorInput(&pal[2], NoValidation()),
-			NewColorInput(&pal[3], NoValidation()),
+			NewColorInput(&pal[0], HexValidation(0xFFFFFF)),
+			NewColorInput(&pal[1], HexValidation(0xFFFFFF)),
+			NewColorInput(&pal[2], HexValidation(0xFFFFFF)),
+			NewColorInput(&pal[3], HexValidation(0xFFFFFF)),
 		}
 	)
 
-	createSubMenu(parent,
-		NewHeader("dmg palette", res),
-		NewSeparator(),
+	fields := []Field{
+		{WIDGET_HDR, "keyboard", "", nil, nil},
+		{WIDGET_KEY, "a", "gb keyboard a", &k.A, nil},
+		{WIDGET_KEY, "b", "gb keyboard b", &k.B, nil},
+		{WIDGET_KEY, "select", "gb keyboard select", &k.Select, nil},
+		{WIDGET_KEY, "start", "gb keyboard start", &k.Start, nil},
+		{WIDGET_KEY, "left", "gb keyboard left", &k.Left, nil},
+		{WIDGET_KEY, "right", "gb keyboard right", &k.Right, nil},
+		{WIDGET_KEY, "up", "gb keyboard up", &k.Up, nil},
+		{WIDGET_KEY, "down", "gb keyboard down", &k.Down, nil},
 
-		NewLabel("lightest"),
-		clrInputs[0],
-		NewLabel("light"),
-		clrInputs[1],
-		NewLabel("dark"),
-		clrInputs[2],
-		NewLabel("darkest"),
-		clrInputs[3],
+		{WIDGET_HDR, "controller", "", nil, nil},
+		{WIDGET_KEY, "a", "gb controller a", &c.A, nil},
+		{WIDGET_KEY, "b", "gb controller b", &c.B, nil},
+		{WIDGET_KEY, "select", "gb controller select", &c.Select, nil},
+		{WIDGET_KEY, "start", "gb controller start", &c.Start, nil},
+		{WIDGET_KEY, "left", "gb controller left", &c.Left, nil},
+		{WIDGET_KEY, "right", "gb controller right", &c.Right, nil},
+		{WIDGET_KEY, "up", "gb controller up", &c.Up, nil},
+		{WIDGET_KEY, "down", "gb controller down", &c.Down, nil},
+	}
 
+	parent.RemoveChildren()
+
+	parent.AddChild(
+		NewHeader("dmg palette", g.ui.res), NewSeparator(),
+		NewLabel("lightest"), clrInputs[0],
+		NewLabel("light"), clrInputs[1],
+		NewLabel("dark"), clrInputs[2],
+		NewLabel("darkest"), clrInputs[3],
 		NewLabel("apply palette"),
-		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, dmg_palettes, clrInputs, res),
-
-		NewHeader("keyboard", res),
-		NewSeparator(),
-
-		NewLabel("a"),
-		NewTextBoxInput(&key.A, NoValidation()),
-		NewLabel("b"),
-		NewTextBoxInput(&key.B, NoValidation()),
-		NewLabel("select"),
-		NewTextBoxInput(&key.Select, NoValidation()),
-		NewLabel("start"),
-		NewTextBoxInput(&key.Start, NoValidation()),
-		NewLabel("left"),
-		NewTextBoxInput(&key.Left, NoValidation()),
-		NewLabel("right"),
-		NewTextBoxInput(&key.Right, NoValidation()),
-		NewLabel("up"),
-		NewTextBoxInput(&key.Up, NoValidation()),
-		NewLabel("down"),
-		NewTextBoxInput(&key.Down, NoValidation()),
-
-		NewHeader("controller", res),
-		NewSeparator(),
-
-		NewLabel("a"),
-		NewTextBoxInput(&con.A, NoValidation()),
-		NewLabel("b"),
-		NewTextBoxInput(&con.B, NoValidation()),
-		NewLabel("select"),
-		NewTextBoxInput(&con.Select, NoValidation()),
-		NewLabel("start"),
-		NewTextBoxInput(&con.Start, NoValidation()),
-		NewLabel("left"),
-		NewTextBoxInput(&con.Left, NoValidation()),
-		NewLabel("right"),
-		NewTextBoxInput(&con.Right, NoValidation()),
-		NewLabel("up"),
-		NewTextBoxInput(&con.Up, NoValidation()),
-		NewLabel("down"),
-		NewTextBoxInput(&con.Down, NoValidation()),
-		NewSaveButton(func(*widget.ButtonClickedEventArgs) {
-			config.Conf.Gb = tmp
-
-			config.DecodeController(&config.Conf.Gb.ControllerConfig)
-
-			if len(g.gamepadIds) != 0 {
-				g.ui.focus.FocusLastSubMenu()
-			}
-			g.ui.toast.AddMessage("saved")
-		}),
+		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, dmg_palettes, clrInputs, g.ui.res),
 	)
+
+	buildSubMenu(g, parent, fields)
+
+	parent.AddChild(NewSaveButton(func(*widget.ButtonClickedEventArgs) {
+		config.Conf.Gb = tmp
+		if len(g.gamepadIds) != 0 {
+			g.ui.focus.FocusLastSubMenu()
+		}
+		g.ui.toast.AddMessage("saved")
+	}))
 }
 
 func NewGbaMenu(g *Game, parent *widget.Container) {
 
 	var (
-		res = g.ui.res
 		tmp = config.Conf.Gba
-		key = &tmp.KeyboardConfig
-		con = &tmp.ControllerConfig
+		k   = &tmp.KeyboardConfig
+		c   = &tmp.ControllerConfig
 	)
 
-	createSubMenu(parent,
+	fields := []Field{
+		{WIDGET_HDR, "general", "", nil, nil},
+		{WIDGET_CBX, "optimize idle loops", "", &tmp.IdleOptimize, nil},
+		{WIDGET_HEX, "snd clk cycles", "snd clk cycles", &tmp.SoundClockUpdateCycles, 1000},
 
-		NewHeader("general", res),
-		NewSeparator(),
+		{WIDGET_HDR, "keyboard", "", nil, nil},
+		{WIDGET_KEY, "a", "gba keyboard a", &k.A, nil},
+		{WIDGET_KEY, "b", "gba keyboard b", &k.B, nil},
+		{WIDGET_KEY, "select", "gba keyboard select", &k.Select, nil},
+		{WIDGET_KEY, "start", "gba keyboard start", &k.Start, nil},
+		{WIDGET_KEY, "left", "gba keyboard left", &k.Left, nil},
+		{WIDGET_KEY, "right", "gba keyboard right", &k.Right, nil},
+		{WIDGET_KEY, "up", "gba keyboard up", &k.Up, nil},
+		{WIDGET_KEY, "down", "gba keyboard down", &k.Down, nil},
+		{WIDGET_KEY, "l", "gba keyboard l", &k.L, nil},
+		{WIDGET_KEY, "r", "gba keyboard r", &k.R, nil},
 
-		NewLabel("optimize idle loops"),
-		NewCheckbox(&tmp.IdleOptimize),
+		{WIDGET_HDR, "controller", "", nil, nil},
+		{WIDGET_KEY, "a", "gba controller a", &c.A, nil},
+		{WIDGET_KEY, "b", "gba controller b", &c.B, nil},
+		{WIDGET_KEY, "select", "gba controller select", &c.Select, nil},
+		{WIDGET_KEY, "start", "gba controller start", &c.Start, nil},
+		{WIDGET_KEY, "left", "gba controller left", &c.Left, nil},
+		{WIDGET_KEY, "right", "gba controller right", &c.Right, nil},
+		{WIDGET_KEY, "up", "gba controller up", &c.Up, nil},
+		{WIDGET_KEY, "down", "gba controller down", &c.Down, nil},
+		{WIDGET_KEY, "l", "gba controller l", &c.L, nil},
+		{WIDGET_KEY, "r", "gba controller r", &c.R, nil},
+	}
 
-		NewLabel("snd clk cycles"),
-		NewTextBoxInput(&tmp.SoundClockUpdateCycles, NoValidation()),
+	parent.RemoveChildren()
+	buildSubMenu(g, parent, fields)
 
-		NewHeader("keyboard", res),
-		NewSeparator(),
-
-		NewLabel("a"),
-		NewTextBoxInput(&key.A, NoValidation()),
-		NewLabel("b"),
-		NewTextBoxInput(&key.B, NoValidation()),
-		NewLabel("select"),
-		NewTextBoxInput(&key.Select, NoValidation()),
-		NewLabel("start"),
-		NewTextBoxInput(&key.Start, NoValidation()),
-		NewLabel("left"),
-		NewTextBoxInput(&key.Left, NoValidation()),
-		NewLabel("right"),
-		NewTextBoxInput(&key.Right, NoValidation()),
-		NewLabel("up"),
-		NewTextBoxInput(&key.Up, NoValidation()),
-		NewLabel("down"),
-		NewTextBoxInput(&key.Down, NoValidation()),
-
-		NewLabel("l"),
-		NewTextBoxInput(&key.L, NoValidation()),
-		NewLabel("r"),
-		NewTextBoxInput(&key.R, NoValidation()),
-
-		NewHeader("controller", res),
-		NewSeparator(),
-
-		NewLabel("a"),
-		NewTextBoxInput(&con.A, NoValidation()),
-		NewLabel("b"),
-		NewTextBoxInput(&con.B, NoValidation()),
-		NewLabel("select"),
-		NewTextBoxInput(&con.Select, NoValidation()),
-		NewLabel("start"),
-		NewTextBoxInput(&con.Start, NoValidation()),
-		NewLabel("left"),
-		NewTextBoxInput(&con.Left, NoValidation()),
-		NewLabel("right"),
-		NewTextBoxInput(&con.Right, NoValidation()),
-		NewLabel("up"),
-		NewTextBoxInput(&con.Up, NoValidation()),
-		NewLabel("down"),
-		NewTextBoxInput(&con.Down, NoValidation()),
-		NewLabel("l"),
-		NewTextBoxInput(&con.L, NoValidation()),
-		NewLabel("r"),
-		NewTextBoxInput(&con.R, NoValidation()),
-		NewSaveButton(func(*widget.ButtonClickedEventArgs) {
-			config.Conf.Gba = tmp
-			config.DecodeController(&config.Conf.Gba.ControllerConfig)
-			if len(g.gamepadIds) != 0 {
-				g.ui.focus.FocusLastSubMenu()
-			}
-			g.ui.toast.AddMessage("saved")
-		}),
-	)
+	parent.AddChild(NewSaveButton(func(*widget.ButtonClickedEventArgs) {
+		config.Conf.Gba = tmp
+		if len(g.gamepadIds) != 0 {
+			g.ui.focus.FocusLastSubMenu()
+		}
+		g.ui.toast.AddMessage("saved")
+	}))
 }
 
 func NewNdsMenu(g *Game, parent *widget.Container) {
 
 	var (
-		res = g.ui.res
 		tmp = config.Conf.Nds
-		key = &tmp.KeyboardConfig
-		con = &tmp.ControllerConfig
+		k   = &tmp.KeyboardConfig
+		c   = &tmp.ControllerConfig
 	)
 
-	createSubMenu(parent,
+	fields := []Field{
+		{WIDGET_HDR, "screen", "", nil, nil},
+		{WIDGET_RAD, "layout", "", &tmp.Screen.OLayout, []string{"vertical", "horizontal", "hybrid"}},
+		{WIDGET_RAD, "sizing", "", &tmp.Screen.OSizing, []string{"even", "only top", "only bottom"}},
+		{WIDGET_RAD, "rotation", "", &tmp.Screen.ORotation, []string{"0", "90", "180", "270"}},
 
-		NewHeader("screen", res),
-		NewSeparator(),
+		{WIDGET_HDR, "rtc", "", nil, nil},
+		{WIDGET_DEC, "additional hours", "additional hours", &tmp.Rtc.AdditionalHours, 24},
 
-		NewLabel("layout"),
-		NewRadioInput(
-			&g.ui.focus.horizontalGroup,
-			&tmp.Screen.OLayout, []string{
-				"vertical",
-				"horizontal",
-				"hybrid",
-			}, res),
+		{WIDGET_HDR, "bios", "", nil, nil},
+		{WIDGET_FLE, "arm7 path", "", &tmp.Bios.Arm7Path, nil},
+		{WIDGET_FLE, "arm9 path", "", &tmp.Bios.Arm9Path, nil},
 
-		NewLabel("sizing"),
-		NewRadioInput(
-			&g.ui.focus.horizontalGroup,
-			&tmp.Screen.OSizing, []string{
-				"even",
-				"only top",
-				"only bottom",
-			}, res),
+		{WIDGET_HDR, "firmware", "", nil, nil},
+		{WIDGET_FLE, "file path", "", &tmp.Firmware.FilePath, nil},
+		{WIDGET_TXT, "nickname", "nickname", &tmp.Firmware.Nickname, nil},
+		{WIDGET_TXT, "message", "message", &tmp.Firmware.Message, nil},
+		{WIDGET_TXT, "favorite color", "favorite color", &tmp.Firmware.FavoriteColor, nil},
 
-		NewLabel("rotation"),
-		NewRadioInput(
-			&g.ui.focus.horizontalGroup,
-			&tmp.Screen.ORotation, []string{
-				"0",
-				"90",
-				"180",
-				"270",
-			}, res),
+		{WIDGET_HDR, "scene export", "", nil, nil},
+		{WIDGET_DIR, "output directory", "", &tmp.Export.Directory, "./export"},
+		{WIDGET_CBX, "shadow polygons", "", &tmp.Export.ShadowPolys, nil},
 
-		NewHeader("rtc", res),
-		NewSeparator(),
+		{WIDGET_HDR, "keyboard", "", nil, nil},
+		{WIDGET_KEY, "a", "nds keyboard a", &k.A, nil},
+		{WIDGET_KEY, "b", "nds keyboard b", &k.B, nil},
+		{WIDGET_KEY, "select", "nds keyboard select", &k.Select, nil},
+		{WIDGET_KEY, "start", "nds keyboard start", &k.Start, nil},
+		{WIDGET_KEY, "left", "nds keyboard left", &k.Left, nil},
+		{WIDGET_KEY, "right", "nds keyboard right", &k.Right, nil},
+		{WIDGET_KEY, "up", "nds keyboard up", &k.Up, nil},
+		{WIDGET_KEY, "down", "nds keyboard down", &k.Down, nil},
+		{WIDGET_KEY, "l", "nds keyboard l", &k.L, nil},
+		{WIDGET_KEY, "r", "nds keyboard r", &k.R, nil},
+		{WIDGET_KEY, "x", "nds keyboard x", &k.X, nil},
+		{WIDGET_KEY, "y", "nds keyboard y", &k.Y, nil},
+		{WIDGET_KEY, "hinge", "nds keyboard hinge", &k.Hinge, nil},
+		{WIDGET_KEY, "debug", "nds keyboard debug", &k.Debug, nil},
+		{WIDGET_KEY, "layout toggle", "nds keyboard layout toggle", &k.LayoutToggle, nil},
+		{WIDGET_KEY, "sizing toggle", "nds keyboard sizing toggle", &k.SizingToggle, nil},
+		{WIDGET_KEY, "rotation toggle", "nds keyboard rotation toggle", &k.RotationToggle, nil},
+		{WIDGET_KEY, "export toggle", "nds keyboard export toggle", &k.ExportScene, nil},
 
-		NewLabel("additional hours"),
-		NewTextBoxInput(&tmp.Rtc.AdditionalHours, NoValidation()),
+		{WIDGET_HDR, "controller", "", nil, nil},
+		{WIDGET_KEY, "a", "nds controller a", &c.A, nil},
+		{WIDGET_KEY, "b", "nds controller b", &c.B, nil},
+		{WIDGET_KEY, "select", "nds controller select", &c.Select, nil},
+		{WIDGET_KEY, "start", "nds controller start", &c.Start, nil},
+		{WIDGET_KEY, "left", "nds controller left", &c.Left, nil},
+		{WIDGET_KEY, "right", "nds controller right", &c.Right, nil},
+		{WIDGET_KEY, "up", "nds controller up", &c.Up, nil},
+		{WIDGET_KEY, "down", "nds controller down", &c.Down, nil},
+		{WIDGET_KEY, "l", "nds controller l", &c.L, nil},
+		{WIDGET_KEY, "r", "nds controller r", &c.R, nil},
+		{WIDGET_KEY, "x", "nds controller x", &c.X, nil},
+		{WIDGET_KEY, "y", "nds controller y", &c.Y, nil},
+	}
 
-		NewHeader("bios", res),
-		NewSeparator(),
+	parent.RemoveChildren()
+	buildSubMenu(g, parent, fields)
 
-		NewLabel("arm7 path"),
-		NewFileInput(&tmp.Bios.Arm7Path),
-		NewLabel("arm9 path"),
-		NewFileInput(&tmp.Bios.Arm9Path),
-
-		NewHeader("firmware", res),
-		NewSeparator(),
-
-		NewLabel("file path"),
-		NewFileInput(&tmp.Firmware.FilePath),
-		NewLabel("nickname"),
-		NewTextBoxInput(&tmp.Firmware.Nickname, NoValidation()),
-		NewLabel("message"),
-		NewTextBoxInput(&tmp.Firmware.Message, NoValidation()),
-		NewLabel("favorite color"),
-		NewTextBoxInput(&tmp.Firmware.FavoriteColor, NoValidation()),
-
-		NewHeader("scene export", res),
-		NewSeparator(),
-
-		NewLabel("output directory"),
-		NewDirectoryInput(&tmp.Export.Directory, "./export"),
-		NewLabel("shadow polygons"),
-		NewCheckbox(&tmp.Export.ShadowPolys),
-
-		NewHeader("keyboard", res),
-		NewSeparator(),
-
-		NewLabel("a"),
-		NewTextBoxInput(&key.A, NoValidation()),
-		NewLabel("b"),
-		NewTextBoxInput(&key.B, NoValidation()),
-		NewLabel("select"),
-		NewTextBoxInput(&key.Select, NoValidation()),
-		NewLabel("start"),
-		NewTextBoxInput(&key.Start, NoValidation()),
-		NewLabel("left"),
-		NewTextBoxInput(&key.Left, NoValidation()),
-		NewLabel("right"),
-		NewTextBoxInput(&key.Right, NoValidation()),
-		NewLabel("up"),
-		NewTextBoxInput(&key.Up, NoValidation()),
-		NewLabel("down"),
-		NewTextBoxInput(&key.Down, NoValidation()),
-		NewLabel("l"),
-		NewTextBoxInput(&key.L, NoValidation()),
-		NewLabel("r"),
-		NewTextBoxInput(&key.R, NoValidation()),
-
-		NewLabel("x"),
-		NewTextBoxInput(&key.X, NoValidation()),
-		NewLabel("y"),
-		NewTextBoxInput(&key.Y, NoValidation()),
-		NewLabel("hinge"),
-		NewTextBoxInput(&key.Hinge, NoValidation()),
-		NewLabel("debug"),
-		NewTextBoxInput(&key.Debug, NoValidation()),
-		NewLabel("layout toggle"),
-		NewTextBoxInput(&key.LayoutToggle, NoValidation()),
-		NewLabel("sizing toggle"),
-		NewTextBoxInput(&key.SizingToggle, NoValidation()),
-		NewLabel("rotation toggle"),
-		NewTextBoxInput(&key.RotationToggle, NoValidation()),
-		NewLabel("export toggle"),
-		NewTextBoxInput(&key.ExportScene, NoValidation()),
-
-		NewHeader("controller", res),
-		NewSeparator(),
-
-		NewLabel("a"),
-		NewTextBoxInput(&con.A, NoValidation()),
-		NewLabel("b"),
-		NewTextBoxInput(&con.B, NoValidation()),
-		NewLabel("select"),
-		NewTextBoxInput(&con.Select, NoValidation()),
-		NewLabel("start"),
-		NewTextBoxInput(&con.Start, NoValidation()),
-		NewLabel("left"),
-		NewTextBoxInput(&con.Left, NoValidation()),
-		NewLabel("right"),
-		NewTextBoxInput(&con.Right, NoValidation()),
-		NewLabel("up"),
-		NewTextBoxInput(&con.Up, NoValidation()),
-		NewLabel("down"),
-		NewTextBoxInput(&con.Down, NoValidation()),
-		NewLabel("l"),
-		NewTextBoxInput(&con.L, NoValidation()),
-		NewLabel("r"),
-		NewTextBoxInput(&con.R, NoValidation()),
-		NewLabel("x"),
-		NewTextBoxInput(&con.X, NoValidation()),
-		NewLabel("y"),
-		NewTextBoxInput(&con.Y, NoValidation()),
-
-		NewSaveButton(func(*widget.ButtonClickedEventArgs) {
-			config.Conf.Nds = tmp
-			config.DecodeController(&config.Conf.Nds.ControllerConfig)
-
-			if len(g.gamepadIds) != 0 {
-				g.ui.focus.FocusLastSubMenu()
-			}
-			g.ui.toast.AddMessage("saved")
-		}),
-	)
+	parent.AddChild(NewSaveButton(func(*widget.ButtonClickedEventArgs) {
+		config.Conf.Nds = tmp
+		if len(g.gamepadIds) != 0 {
+			g.ui.focus.FocusLastSubMenu()
+		}
+		g.ui.toast.AddMessage("saved")
+	}))
 }

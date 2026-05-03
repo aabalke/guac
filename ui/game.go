@@ -26,6 +26,7 @@ const (
 	PAGE_HOME PageId = iota
 	PAGE_PAUSE
 	PAGE_SETTINGS
+	PAGE_KEYBOARD
 )
 
 type Game struct {
@@ -72,6 +73,7 @@ type Ui struct {
 	scrollable *widget.ScrollContainer
 	content    *widget.Container
 	slider     *widget.Slider
+	keyboard   *Keyboard
 }
 
 func StartEngine() {
@@ -98,6 +100,8 @@ func StartEngine() {
 
 	// switch based on flags
 	NewHome(g)
+
+	g.ui.keyboard = NewKeyboard(res)
 
 	err = ebiten.RunGame(g)
 	if err != nil {
@@ -156,7 +160,10 @@ func (g *Game) Update() error {
 	switch {
 	case g.ui.ui != nil:
 
-		if init := g.frame < 1; init && len(g.gamepadIds) != 0 {
+		if g.frame < 1 &&
+			len(g.gamepadIds) != 0 &&
+			g.ui.ui != nil && g.ui.ui.Container != nil &&
+			len(g.ui.ui.Container.GetFocusers()) != 0 {
 			g.ui.ui.SetFocusedWidget(g.ui.ui.Container.GetFocusers()[0])
 		}
 
