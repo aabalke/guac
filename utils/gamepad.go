@@ -1,6 +1,10 @@
 package utils
 
-import "github.com/hajimehoshi/ebiten/v2"
+import (
+	"strings"
+
+	"github.com/hajimehoshi/ebiten/v2"
+)
 
 func GamepadButtonToString(v ebiten.StandardGamepadButton) string {
 	switch v {
@@ -44,40 +48,43 @@ func GamepadButtonToString(v ebiten.StandardGamepadButton) string {
 }
 
 func StringToGamepadButton(v string) ebiten.StandardGamepadButton {
+
+	v = strings.ToLower(v)
+
 	switch v {
-	case "RightBottom":
+	case "rightbottom":
 		return ebiten.StandardGamepadButtonRightBottom
-	case "RightRight":
+	case "rightright":
 		return ebiten.StandardGamepadButtonRightRight
-	case "RightLeft":
+	case "rightleft":
 		return ebiten.StandardGamepadButtonRightLeft
-	case "RightTop":
+	case "righttop":
 		return ebiten.StandardGamepadButtonRightTop
-	case "FrontTopLeft":
+	case "fronttopleft":
 		return ebiten.StandardGamepadButtonFrontTopLeft
-	case "FrontTopRight":
+	case "fronttopright":
 		return ebiten.StandardGamepadButtonFrontTopRight
-	case "FrontBottomLeft":
+	case "frontbottomleft":
 		return ebiten.StandardGamepadButtonFrontBottomLeft
-	case "FrontBottomRight":
+	case "frontbottomright":
 		return ebiten.StandardGamepadButtonFrontBottomRight
-	case "CenterLeft":
+	case "centerleft":
 		return ebiten.StandardGamepadButtonCenterLeft
-	case "CenterRight":
+	case "centerright":
 		return ebiten.StandardGamepadButtonCenterRight
-	case "LeftStick":
+	case "leftstick":
 		return ebiten.StandardGamepadButtonLeftStick
-	case "RightStick":
+	case "rightstick":
 		return ebiten.StandardGamepadButtonRightStick
-	case "LeftTop":
+	case "lefttop":
 		return ebiten.StandardGamepadButtonLeftTop
-	case "LeftBottom":
+	case "leftbottom":
 		return ebiten.StandardGamepadButtonLeftBottom
-	case "LeftLeft":
+	case "leftleft":
 		return ebiten.StandardGamepadButtonLeftLeft
-	case "LeftRight":
+	case "leftright":
 		return ebiten.StandardGamepadButtonLeftRight
-	case "CenterCenter":
+	case "centercenter":
 		return ebiten.StandardGamepadButtonCenterCenter
 	}
 

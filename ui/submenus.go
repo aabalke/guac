@@ -27,7 +27,7 @@ type SidebarField struct {
 	f     func(g *Game)
 }
 
-var sidebarFields = []SidebarField{}
+var sidebarFields []SidebarField
 
 func init() {
 	sidebarFields = []SidebarField{
@@ -176,10 +176,10 @@ func NewUiMenu(g *Game, parent *widget.Container) {
 		oldId = g.ui.PrevPageId
 
 		clrInputs = [4]widget.PreferredSizeLocateableWidget{
-			NewColorInput(&tmp.Backdrop, HexValidation(0xFFFFFF)),
-			NewColorInput(&tmp.MenuBackgroundColor, HexValidation(0xFFFFFF)),
-			NewColorInput(&tmp.MenuForegroundColor, HexValidation(0xFFFFFF)),
-			NewColorInput(&tmp.MenuSecondaryColor, HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, "ui backdrop", &tmp.Backdrop, HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, "ui bg color", &tmp.MenuBackgroundColor, HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, "ui fg color", &tmp.MenuForegroundColor, HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, "ui accent color", &tmp.MenuSecondaryColor, HexValidation(0xFFFFFF)),
 		}
 	)
 	parent.RemoveChildren()
@@ -216,10 +216,10 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 		pal = &tmp.Palette
 
 		clrInputs = [4]widget.PreferredSizeLocateableWidget{
-			NewColorInput(&pal[0], HexValidation(0xFFFFFF)),
-			NewColorInput(&pal[1], HexValidation(0xFFFFFF)),
-			NewColorInput(&pal[2], HexValidation(0xFFFFFF)),
-			NewColorInput(&pal[3], HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, "dmg lightest", &pal[0], HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, "dmg light", &pal[1], HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, "dmg dark", &pal[2], HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, "dmg darkest", &pal[3], HexValidation(0xFFFFFF)),
 		}
 	)
 

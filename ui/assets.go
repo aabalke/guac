@@ -119,11 +119,11 @@ func (u *Resources) Update() {
 	u.bg = image.NewNineSliceColor(conf.MenuBackgroundColor)
 	u.fg = image.NewNineSliceColor(conf.MenuForegroundColor)
 	u.sec = image.NewNineSliceColor(conf.MenuSecondaryColor)
-	secb := image.NewBorderedNineSliceColor(conf.MenuSecondaryColor, conf.MenuBackgroundColor, 2)
-	u.buttonImage.Hover = secb
-	u.buttonImage.Pressed = secb
-	u.buttonImage.PressedHover = secb
+	u.buttonImage.Hover = u.sec
+	u.buttonImage.Pressed = u.sec
+	u.buttonImage.PressedHover = u.sec
 
+	secb := image.NewBorderedNineSliceColor(conf.MenuSecondaryColor, conf.MenuForegroundColor, 2)
 	u.buttonBorderedImage = &widget.ButtonImage{
 		Idle:         image.NewBorderedNineSliceColor(color.Transparent, conf.MenuForegroundColor, 2),
 		Hover:        secb,

@@ -78,22 +78,6 @@ func NewCheckbox(value *bool) widget.PreferredSizeLocateableWidget {
 	)
 }
 
-func NewKeybindInput(ui *Ui, label string, value any) *widget.TextInput {
-	return NewTextBoxInput(ui, BOARD_KEYBIND, label, value, NoValidation())
-}
-
-func NewDecimalInput(ui *Ui, label string, value any, maxValue int) *widget.TextInput {
-	return NewTextBoxInput(ui, BOARD_DEC, label, value, NumberValidation(maxValue))
-}
-
-func NewHexInput(ui *Ui, label string, value any, maxValue int) *widget.TextInput {
-	return NewTextBoxInput(ui, BOARD_HEX, label, value, NumberValidation(maxValue))
-}
-
-func NewTextInput(ui *Ui, label string, value any) *widget.TextInput {
-	return NewTextBoxInput(ui, BOARD_ALPHA, label, value, NoValidation())
-}
-
 func NewTextBoxInput(ui *Ui, board int, label string, value any, validation func(s string) (bool, *string)) *widget.TextInput {
 
 	var input *widget.TextInput
@@ -118,6 +102,22 @@ func NewTextBoxInput(ui *Ui, board int, label string, value any, validation func
 	return input
 }
 
+func NewKeybindInput(ui *Ui, label string, value any) *widget.TextInput {
+	return NewTextBoxInput(ui, BOARD_KEYBIND, label, value, NoValidation())
+}
+
+func NewDecimalInput(ui *Ui, label string, value any, maxValue int) *widget.TextInput {
+	return NewTextBoxInput(ui, BOARD_DEC, label, value, NumberValidation(maxValue))
+}
+
+func NewHexInput(ui *Ui, label string, value any, maxValue int) *widget.TextInput {
+	return NewTextBoxInput(ui, BOARD_HEX, label, value, NumberValidation(maxValue))
+}
+
+func NewTextInput(ui *Ui, label string, value any) *widget.TextInput {
+	return NewTextBoxInput(ui, BOARD_ALPHA, label, value, NoValidation())
+}
+
 func NewSaveButton(f func(args *widget.ButtonClickedEventArgs)) widget.PreferredSizeLocateableWidget {
 
 	b := widget.NewButton(
@@ -135,7 +135,7 @@ func NewSaveButton(f func(args *widget.ButtonClickedEventArgs)) widget.Preferred
 	return b
 }
 
-func NewColorInput(v *color.Color, validation func(s string) (bool, *string)) widget.PreferredSizeLocateableWidget {
+func NewColorInput(ui *Ui, label string, v *color.Color, validation func(s string) (bool, *string)) widget.PreferredSizeLocateableWidget {
 
 	colorBox := widget.NewContainer()
 
@@ -143,15 +143,20 @@ func NewColorInput(v *color.Color, validation func(s string) (bool, *string)) wi
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(2),
 			widget.GridLayoutOpts.Stretch([]bool{true, true}, []bool{true, true}),
-			widget.GridLayoutOpts.Spacing(10, 0),
+			widget.GridLayoutOpts.Spacing(8, 0),
 		)),
 	)
 
-	input := widget.NewTextInput(
+	var input *widget.TextInput
+
+	input = widget.NewTextInput(
 		widget.TextInputOpts.MobileInputMode(mobile.TEXT),
 		widget.TextInputOpts.Validation(validation),
-		widget.TextInputOpts.ChangedHandler(func(args *widget.TextInputChangedEventArgs) {
-			*v = utils.HexToColor(args.InputText)
+		widget.TextInputOpts.SubmitHandler(func(*widget.TextInputChangedEventArgs) {
+			ui.keyboard.Open(ui, input, BOARD_HEX, label, v)
+		}),
+		widget.TextInputOpts.ChangedHandler(func(a *widget.TextInputChangedEventArgs) {
+			*v = utils.HexToColor(a.InputText)
 			colorBox.SetBackgroundImage(image.NewNineSliceColor(*v))
 		}),
 	)
