@@ -19,7 +19,7 @@ const (
 var (
 	DEC_KEYS = []string{
 		"0", "1", "2", "3", "4",
-        "5", "6", "7", "8", "9",
+		"5", "6", "7", "8", "9",
 	}
 
 	HEX_KEYS = []string{
@@ -48,8 +48,11 @@ type Keyboard struct {
 	alpha  *widget.Container
 	dec    *widget.Container
 	hex    *widget.Container
-	Keys   []string
-	res    *Resources
+
+	cancelButton widget.Focuser
+
+	Keys []string
+	res  *Resources
 }
 
 func NewKeyboard(res *Resources) *Keyboard {
@@ -171,7 +174,6 @@ func (k *Keyboard) buildBoard(columns int, keys []string) *widget.Container {
 			case *widget.TextInput:
 				input.SetText(input.GetText() + key)
 			case *widget.Container: // color
-
 				children := input.Children()
 				text := children[0].(*widget.TextInput)
 				v := text.GetText() + key
@@ -233,6 +235,8 @@ func (k *Keyboard) buildBoard(columns int, keys []string) *widget.Container {
 	keyFocusers[(columns*3)-1].AddFocus(widget.FOCUS_EAST, enter)
 	enter.AddFocus(widget.FOCUS_WEST, keyFocusers[(columns*3)-1])
 	enter.AddFocus(widget.FOCUS_NORTH, cancel)
+
+	k.cancelButton = cancel
 
 	r.AddChild(backspace, cancel, enter)
 	board.AddChild(l, r)
@@ -337,21 +341,19 @@ func _newTextBoxInput(value any) *widget.TextInput {
 
 func _newColorInput(value *color.Color) widget.PreferredSizeLocateableWidget {
 
-	colorBox := widget.NewContainer()
-
 	container := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(2),
-			widget.GridLayoutOpts.Stretch([]bool{true, true}, []bool{true, true}),
+			widget.GridLayoutOpts.Stretch([]bool{true, true}, []bool{true}),
 			widget.GridLayoutOpts.Spacing(8, 0),
 		)),
 	)
 
 	input := widget.NewTextInput()
-
-	colorBox.SetBackgroundImage(image.NewNineSliceColor(*value))
-
 	input.SetText(utils.ColorToHex(*value))
+
+	colorBox := widget.NewContainer()
+	colorBox.SetBackgroundImage(image.NewNineSliceColor(*value))
 
 	container.AddChild(input, colorBox)
 

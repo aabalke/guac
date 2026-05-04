@@ -118,20 +118,9 @@ func NewTextInput(ui *Ui, label string, value any) *widget.TextInput {
 	return NewTextBoxInput(ui, BOARD_ALPHA, label, value, NoValidation())
 }
 
-func NewSaveButton(f func(args *widget.ButtonClickedEventArgs)) widget.PreferredSizeLocateableWidget {
-
-	b := widget.NewButton(
-		widget.ButtonOpts.WidgetOpts(
-			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-				Stretch: true,
-			}),
-		),
-
-		widget.ButtonOpts.ClickedHandler(f),
-	)
-
-	b.SetText("save")
-
+func NewSaveButton(text string, f func(args *widget.ButtonClickedEventArgs)) widget.PreferredSizeLocateableWidget {
+	b := widget.NewButton(widget.ButtonOpts.ClickedHandler(f))
+	b.SetText(text)
 	return b
 }
 
@@ -152,6 +141,8 @@ func NewColorInput(ui *Ui, label string, v *color.Color, validation func(s strin
 	input = widget.NewTextInput(
 		widget.TextInputOpts.MobileInputMode(mobile.TEXT),
 		widget.TextInputOpts.Validation(validation),
+		widget.TextInputOpts.SubmitOnEnter(false),
+		widget.TextInputOpts.AllowDuplicateSubmit(true),
 		widget.TextInputOpts.SubmitHandler(func(*widget.TextInputChangedEventArgs) {
 			ui.keyboard.Open(ui, input, BOARD_HEX, label, v)
 		}),
@@ -287,6 +278,68 @@ func NewRadioInput(focusRadios *[][]widget.Focuser, v *int, values []string, res
 }
 
 func NewRadioButton(v *int, label string, value int, res *Resources) *widget.Button {
+	return widget.NewButton(
+		widget.ButtonOpts.WidgetOpts(
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+				MaxWidth: BUTTON_WIDTH,
+				Stretch:  true,
+			}),
+		),
+
+		widget.ButtonOpts.Text(
+			label,
+			res.fonts.smallFace,
+			&widget.ButtonTextColor{
+				Idle: *res.fgClr,
+			},
+		),
+
+		widget.ButtonOpts.TextPadding(&widget.Insets{
+			Left:   16,
+			Right:  16,
+			Top:    4,
+			Bottom: 4,
+		}),
+
+		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+			*v = value
+		}),
+	)
+}
+
+func NewRadioStringInput(focusRadios *[][]widget.Focuser, v *string, values []string, res *Resources) widget.PreferredSizeLocateableWidget {
+
+	radio := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+		)),
+	)
+
+	bs := []widget.RadioGroupElement{}
+	focusRadio := []widget.Focuser{}
+	init := 0
+	for i, value := range values {
+		b := NewRadioStringButton(v, values[i], value, res)
+		radio.AddChild(b)
+		bs = append(bs, b)
+		focusRadio = append(focusRadio, b)
+
+		if value == *v {
+			init = i
+		}
+	}
+
+	*focusRadios = append(*focusRadios, focusRadio)
+
+	widget.NewRadioGroup(
+		widget.RadioGroupOpts.Elements(bs...),
+		widget.RadioGroupOpts.InitialElement(bs[init]),
+	)
+
+	return radio
+}
+
+func NewRadioStringButton(v *string, label string, value string, res *Resources) *widget.Button {
 	return widget.NewButton(
 		widget.ButtonOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{

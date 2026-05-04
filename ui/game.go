@@ -16,7 +16,6 @@ import (
 	"github.com/aabalke/guac/emu/nds"
 	"github.com/aabalke/guac/input"
 	"github.com/aabalke/guac/utils"
-	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
@@ -33,26 +32,18 @@ type Game struct {
 
 	// flags
 
-	ui    *Ui
-	nds   *nds.Nds
-	gba   *gba.GBA
-	gb    *gb.GameBoy
-	mouse *input.Mouse
-
-	pauseEndFrame uint64
+	ui       *Ui
+	nds      *nds.Nds
+	gba      *gba.GBA
+	gb       *gb.GameBoy
+	mouse    *input.Mouse
+	audioCtx *oto.Context
 
 	gamepadIdBuf []ebiten.GamepadID
 	gamepadIds   map[ebiten.GamepadID]struct{}
 
-	menuCtx *audio.Context
-	emuCtx  *oto.Context
-
-	TargetFps int
-
-	unlimitedFPS bool
-	StdFPS       bool
-
-	frame uint64
+	pauseEndTick int64
+	TargetFps    int
 
 	paused bool
 	muted  bool
@@ -121,15 +112,11 @@ func NewGame() *Game {
 
 	g := &Game{
 		//flags
-		emuCtx:       NewAudioContext(),
+		audioCtx:     NewAudioContext(),
 		mouse:        input.NewMouse(),
-		StdFPS:       config.Conf.General.TargetFps == 60,
+		TargetFps:    config.Conf.General.TargetFps,
 		gamepadIds:   make(map[ebiten.GamepadID]struct{}),
 		gamepadIdBuf: make([]ebiten.GamepadID, 0),
-	}
-
-	if !config.Conf.CancelAudioInit {
-		g.menuCtx = audio.NewContext(SND_FREQUENCY)
 	}
 
 	return g
@@ -146,7 +133,6 @@ func (g *Game) Update() error {
 	if config.Conf.General.TargetFps != g.TargetFps {
 		g.TargetFps = config.Conf.General.TargetFps
 		ebiten.SetTPS(g.TargetFps)
-		g.StdFPS = g.TargetFps == 60
 	}
 
 	g.Profile()
@@ -160,14 +146,14 @@ func (g *Game) Update() error {
 	switch {
 	case g.ui.ui != nil:
 
-		if g.frame < 1 &&
+		if ebiten.Tick() < 1 &&
 			len(g.gamepadIds) != 0 &&
 			g.ui.ui != nil && g.ui.ui.Container != nil &&
 			len(g.ui.ui.Container.GetFocusers()) != 0 {
 			g.ui.ui.SetFocusedWidget(g.ui.ui.Container.GetFocusers()[0])
 		}
 
-		if g.paused && g.frame-g.pauseEndFrame < 10 {
+		if g.paused && ebiten.Tick()-g.pauseEndTick < 10 {
 			// pressing select on pause can sometimes input into emulator,
 			// this gives time from the pause and emulator starting again
 			return nil
@@ -180,19 +166,17 @@ func (g *Game) Update() error {
 		g.ui.ui.Update()
 
 	case g.nds != nil:
-		g.nds.InputHandler(justKeys, keys, buttons, g.mouse, g.frame)
-		g.nds.Update(g.StdFPS)
+		g.nds.InputHandler(justKeys, keys, buttons, g.mouse, uint64(ebiten.Tick()))
+		g.nds.Update(g.TargetFps == 60)
 
 	case g.gba != nil:
 		g.gba.InputHandler(keys, buttons)
-		g.gba.Update(g.StdFPS)
+		g.gba.Update(g.TargetFps == 60)
 
 	case g.gb != nil:
 		g.gb.InputHandler(keys, buttons)
-		g.gb.Update(g.StdFPS)
+		g.gb.Update(g.TargetFps == 60)
 	}
-
-	g.frame++
 
 	return nil
 }
@@ -250,7 +234,7 @@ func (g *Game) TogglePause() {
 			g.gb.UpdateFromConfig() // this will get called every pause, better method?
 		}
 
-		g.pauseEndFrame = g.frame
+		g.pauseEndTick = ebiten.Tick()
 		g.ui.ui = nil
 	}
 }
@@ -269,9 +253,9 @@ func (g *Game) ToggleMute() {
 	}
 
 	if g.muted {
-		g.ui.toast.AddMessage("muted")
+		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Muted)
 	} else {
-		g.ui.toast.AddMessage("unmuted")
+		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Unmuted)
 	}
 }
 
@@ -309,21 +293,21 @@ func (g *Game) InitConsole(file string) {
 	switch romType := utils.GetRomType(file); romType {
 
 	case utils.GB:
-		g.gb = gb.NewGameBoy(file, g.emuCtx)
+		g.gb = gb.NewGameBoy(file, g.audioCtx)
 		g.ui.ui = nil
 		if g.muted {
 			g.gb.ToggleMute()
 		}
 
 	case utils.GBA:
-		g.gba = gba.NewGBA(file, g.emuCtx)
+		g.gba = gba.NewGBA(file, g.audioCtx)
 		g.ui.ui = nil
 		if g.muted {
 			g.gba.ToggleMute()
 		}
 
 	case utils.NDS:
-		g.nds = nds.NewNds(file, g.emuCtx)
+		g.nds = nds.NewNds(file, g.audioCtx)
 		g.ui.ui = nil
 		if g.muted {
 			g.nds.ToggleMute()

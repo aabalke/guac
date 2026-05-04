@@ -1,0 +1,264 @@
+[main]
+open     = "open a rom"
+settings = "settings"
+quit     = "quit"
+dialog_title = "Open"
+dialog_desc = "Roms (*.gb, *.gbc, *.gba, *.nds)"
+
+[pause]
+
+resume   = "resume"
+settings = "settings"
+main     = "main menu"
+
+[toast]
+
+saved = "saved"
+muted = "muted"
+unmuted = "unmuted"
+controller_connected = "controller connected"
+controller_unconnected = "controller unconnected"
+
+[settings]
+
+[settings.sidebar]
+general = "general"
+ui      = "ui"
+gb      = "gb"
+gba     = "gba"
+nds     = "nds"
+return  = "return"
+
+[settings.general]
+
+general         = "general"
+muted           = "muted"
+show_fps        = "show fps"
+init_fullscreen = "init fullscreen"
+target_fps      = "target fps"
+
+keyboard        = "keyboard"
+controller      = "controller"
+
+select          = "select"
+return          = "return"
+mute            = "mute"
+pause           = "pause"
+left            = "left"
+right           = "right"
+up              = "up"
+down            = "down"
+fullscreen      = "fullscreen"
+quit            = "quit"
+
+keyboard_select          = "keyboard select"
+keyboard_return          = "keyboard return"
+keyboard_mute            = "keyboard mute"
+keyboard_pause           = "keyboard pause"
+keyboard_left            = "keyboard left"
+keyboard_right           = "keyboard right"
+keyboard_up              = "keyboard up"
+keyboard_down            = "keyboard down"
+keyboard_fullscreen      = "keyboard fullscreen"
+keyboard_quit            = "keyboard quit"
+
+controller_select          = "controller select"
+controller_return          = "controller return"
+controller_mute            = "controller mute"
+controller_pause           = "controller pause"
+controller_left            = "controller left"
+controller_right           = "controller right"
+controller_up              = "controller up"
+controller_down            = "controller down"
+controller_fullscreen      = "controller fullscreen"
+controller_quit            = "controller quit"
+
+save = "save"
+
+[settings.ui]
+
+ui              = "ui"
+language        = "language"
+backdrop        = "backdrop"
+bg_color        = "bg color"
+fg_color        = "fg color"
+accent_color    = "accent color"
+apply_theme     = "apply theme"
+ui_backdrop     = "ui backdrop"
+ui_bg_color     = "ui bg color"
+ui_fg_color     = "ui fg color"
+ui_accent_color = "ui accent color"
+save           = "save"
+
+[settings.gb]
+
+dmg_palette   = "dmg palette"
+lightest      = "lightest"
+light         = "light"
+dark          = "dark"
+darkest       = "darkest"
+dmg_lightest  = "dmg lightest"
+dmg_light     = "dmg light"
+dmg_dark      = "dmg dark"
+dmg_darkest   = "dmg darkest"
+apply_palette = "apply palette"
+
+keyboard = "keyboard"
+controller = "controller"
+
+a      = "a"
+b      = "b"
+select = "select"
+start  = "start"
+left   = "left"
+right  = "right"
+up     = "up"
+down   = "down"
+
+keyboard_a      = "gb keyboard a"
+keyboard_b      = "gb keyboard b"
+keyboard_select = "gb keyboard select"
+keyboard_start  = "gb keyboard start"
+keyboard_left   = "gb keyboard left"
+keyboard_right  = "gb keyboard right"
+keyboard_up     = "gb keyboard up"
+keyboard_down   = "gb keyboard down"
+
+controller_a      = "gb controller a"
+controller_b      = "gb controller b"
+controller_select = "gb controller select"
+controller_start  = "gb controller start"
+controller_left   = "gb controller left"
+controller_right  = "gb controller right"
+controller_up     = "gb controller up"
+controller_down   = "gb controller down"
+
+save = "save"
+
+[settings.gba]
+
+general = "general"
+optimize_idle_loops = "optimize idle loops"
+sound_clock_cycles = "sound clock cycles"
+
+keyboard = "keyboard"
+controller = "controller"
+
+a      = "a"
+b      = "b"
+select = "select"
+start  = "start"
+left   = "left"
+right  = "right"
+up     = "up"
+down   = "down"
+l      = "l"
+r      = "r"
+
+keyboard_a      = "gba keyboard a"
+keyboard_b      = "gba keyboard b"
+keyboard_select = "gba keyboard select"
+keyboard_start  = "gba keyboard start"
+keyboard_left   = "gba keyboard left"
+keyboard_right  = "gba keyboard right"
+keyboard_up     = "gba keyboard up"
+keyboard_down   = "gba keyboard down"
+keyboard_l      = "gba keyboard l"
+keyboard_r      = "gba keyboard r"
+
+controller_a      = "gba controller a"
+controller_b      = "gba controller b"
+controller_select = "gba controller select"
+controller_start  = "gba controller start"
+controller_left   = "gba controller left"
+controller_right  = "gba controller right"
+controller_up     = "gba controller up"
+controller_down   = "gba controller down"
+controller_l      = "gba controller l"
+controller_r      = "gba controller r"
+
+save = "save"
+
+[settings.nds]
+
+screen = "screen"
+layout = "layout"
+sizing = "sizing"
+rotation = "rotation"
+
+layouts = ["vertical", "horizontal", "hybrid"]
+sizings = ["even", "only top", "only bottom"]
+rotations = ["0", "90", "180", "270"]
+
+rtc = "rtc"
+additional_hours = "additional hours"
+
+bios = "bios"
+arm7_path = "arm7 path"
+arm9_path = "arm9 path"
+
+firmware = "firmware"
+file_path = "file path"
+nickname = "nickname"
+message = "message"
+favorite_color = "favorite color"
+
+scene_export = "scene export"
+output_directory = "output directory"
+shadow_polygons = "shadow polygons"
+
+keyboard   = "keyboard"
+controller = "controller"
+
+a               = "a"
+b               = "b"
+select          = "select"
+start           = "start"
+left            = "left"
+right           = "right"
+up              = "up"
+down            = "down"
+l               = "l"
+r               = "r"
+x               = "x"
+y               = "y"
+hinge           = "hinge"
+debug           = "debug"
+layout_toggle   = "layout toggle"
+sizing_toggle   = "sizing toggle"
+rotation_toggle = "rotation toggle"
+export_toggle   = "export toggle"
+
+keyboard_a      = "nds keyboard a"
+keyboard_b      = "nds keyboard b"
+keyboard_select = "nds keyboard select"
+keyboard_start  = "nds keyboard start"
+keyboard_left   = "nds keyboard left"
+keyboard_right  = "nds keyboard right"
+keyboard_up     = "nds keyboard up"
+keyboard_down   = "nds keyboard down"
+keyboard_l      = "nds keyboard l"
+keyboard_r      = "nds keyboard r"
+keyboard_x      = "nds keyboard x"
+keyboard_y      = "nds keyboard y"
+keyboard_hinge           = "nds keyboard hinge"
+keyboard_debug           = "nds keyboard debug"
+keyboard_layout_toggle   = "nds keyboard layout toggle"
+keyboard_sizing_toggle   = "nds keyboard sizing toggle"
+keyboard_rotation_toggle = "nds keyboard rotation toggle"
+keyboard_export_toggle   = "nds keyboard export toggle"
+
+controller_a      = "nds controller a"
+controller_b      = "nds controller b"
+controller_select = "nds controller select"
+controller_start  = "nds controller start"
+controller_left   = "nds controller left"
+controller_right  = "nds controller right"
+controller_up     = "nds controller up"
+controller_down   = "nds controller down"
+controller_l      = "nds controller l"
+controller_r      = "nds controller r"
+controller_x      = "nds controller x"
+controller_y      = "nds controller y"
+
+save = "save"

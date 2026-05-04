@@ -50,6 +50,8 @@ type Ui struct {
 	MenuForegroundColor color.Color
 	MenuSecondaryColor  color.Color
 	//MenuFontFace        text.Face
+
+	Language string `toml:"language"`
 }
 
 type General struct {

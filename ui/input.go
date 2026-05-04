@@ -16,7 +16,7 @@ func (g *Game) GetGamepadButtons() (justButtons, buttons []ebiten.StandardGamepa
 
 	for _, id := range g.gamepadIdBuf {
 		fmt.Printf("Gamepad Connected id %d\n", id)
-		g.ui.toast.AddMessage("controller connected")
+		g.ui.toast.AddMessage(g.ui.res.localization.Toast.ControllerConnected)
 		g.gamepadIds[id] = struct{}{}
 
 		g.ui.focus.FocusSidebar(0)
@@ -25,7 +25,7 @@ func (g *Game) GetGamepadButtons() (justButtons, buttons []ebiten.StandardGamepa
 	for id := range g.gamepadIds {
 		if inpututil.IsGamepadJustDisconnected(id) {
 			fmt.Printf("Gamepad Disconnected id %d\n", id)
-			g.ui.toast.AddMessage("controller disconnected")
+			g.ui.toast.AddMessage(g.ui.res.localization.Toast.ControllerDisconnected)
 			delete(g.gamepadIds, id)
 
 			if len(g.gamepadIds) == 0 {
@@ -183,7 +183,12 @@ func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) 
 				//}
 
 			case slices.Contains(buttonConfig.Return, button):
-				g.ui.focus.FocusLastSidebar()
+
+				if g.ui.PageId == PAGE_SETTINGS {
+					g.ui.focus.FocusLastSidebar()
+				} else {
+					g.ui.ui.SetFocusedWidget(g.ui.keyboard.cancelButton)
+				}
 
 			case slices.Contains(buttonConfig.Select, button):
 				switch w := g.ui.ui.GetFocusedWidget().(type) {

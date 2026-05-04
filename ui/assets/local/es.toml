@@ -1,0 +1,263 @@
+[main]
+open     = "abrir una rom"
+settings = "configuración"
+quit     = "salir"
+dialog_title = "Abrir"
+dialog_desc  = "Roms (*.gb, *.gbc, *.gba, *.nds)"
+
+[pause]
+resume   = "reanudar"
+settings = "configuración"
+main     = "menú principal"
+
+[toast]
+saved = "guardado"
+muted = "silenciado"
+unmuted = "con sonido"
+controller_connected = "controlador conectado"
+controller_disconnected = "controlador desconectado"
+
+[settings]
+
+[settings.sidebar]
+general = "general"
+ui      = "interfaz"
+gb      = "gb"
+gba     = "gba"
+nds     = "nds"
+return  = "volver"
+
+[settings.general]
+
+general         = "general"
+muted           = "silenciado"
+
+show_fps        = "mostrar FPS"
+init_fullscreen = "iniciar en pantalla completa"
+target_fps      = "FPS objetivo"
+
+keyboard        = "teclado"
+controller      = "controlador"
+
+select          = "seleccionar"
+return          = "volver"
+mute            = "silenciar"
+pause           = "pausar"
+left            = "izquierda"
+right           = "derecha"
+up              = "arriba"
+down            = "abajo"
+fullscreen      = "pantalla completa"
+quit            = "salir"
+
+keyboard_select       = "seleccionar (teclado)"
+keyboard_return       = "volver (teclado)"
+keyboard_mute         = "silenciar (teclado)"
+keyboard_pause        = "pausar (teclado)"
+keyboard_left         = "izquierda (teclado)"
+keyboard_right        = "derecha (teclado)"
+keyboard_up           = "arriba (teclado)"
+keyboard_down         = "abajo (teclado)"
+keyboard_fullscreen   = "pantalla completa (teclado)"
+keyboard_quit         = "salir (teclado)"
+
+controller_select     = "seleccionar (controlador)"
+controller_return     = "volver (controlador)"
+controller_mute       = "silenciar (controlador)"
+controller_pause      = "pausar (controlador)"
+controller_left       = "izquierda (controlador)"
+controller_right      = "derecha (controlador)"
+controller_up         = "arriba (controlador)"
+controller_down       = "abajo (controlador)"
+controller_fullscreen = "pantalla completa (controlador)"
+controller_quit       = "salir (controlador)"
+
+save = "guardar"
+
+[settings.ui]
+
+ui              = "interfaz"
+language        = "idioma"
+backdrop        = "fondo"
+bg_color        = "color de fondo"
+fg_color        = "color de texto"
+accent_color    = "color de acento"
+apply_theme     = "aplicar tema"
+ui_backdrop     = "fondo de la interfaz"
+ui_bg_color     = "color de fondo de la interfaz"
+ui_fg_color     = "color de texto de la interfaz"
+ui_accent_color = "color de acento de la interfaz"
+save = "guardar"
+
+[settings.gb]
+
+dmg_palette   = "paleta DMG"
+lightest      = "más claro"
+light         = "claro"
+dark          = "oscuro"
+darkest       = "más oscuro"
+dmg_lightest  = "dmg más claro"
+dmg_light     = "dmg claro"
+dmg_dark      = "dmg oscuro"
+dmg_darkest   = "dmg más oscuro"
+apply_palette = "aplicar paleta"
+
+keyboard   = "teclado"
+controller = "controlador"
+
+a      = "a"
+b      = "b"
+select = "seleccionar"
+start  = "iniciar"
+left   = "izquierda"
+right  = "derecha"
+up     = "arriba"
+down   = "abajo"
+
+keyboard_a      = "gb teclado a"
+keyboard_b      = "gb teclado b"
+keyboard_select = "gb teclado seleccionar"
+keyboard_start  = "gb teclado iniciar"
+keyboard_left   = "gb teclado izquierda"
+keyboard_right  = "gb teclado derecha"
+keyboard_up     = "gb teclado arriba"
+keyboard_down   = "gb teclado abajo"
+
+controller_a      = "gb controlador a"
+controller_b      = "gb controlador b"
+controller_select = "gb controlador seleccionar"
+controller_start  = "gb controlador iniciar"
+controller_left   = "gb controlador izquierda"
+controller_right  = "gb controlador derecha"
+controller_up     = "gb controlador arriba"
+controller_down   = "gb controlador abajo"
+
+save = "guardar"
+
+[settings.gba]
+
+general = "general"
+optimize_idle_loops = "optimizar bucles inactivos"
+sound_clock_cycles  = "ciclos de reloj de sonido"
+
+keyboard   = "teclado"
+controller = "controlador"
+
+a      = "a"
+b      = "b"
+select = "seleccionar"
+start  = "iniciar"
+left   = "izquierda"
+right  = "derecha"
+up     = "arriba"
+down   = "abajo"
+l      = "l"
+r      = "r"
+
+keyboard_a      = "gba teclado a"
+keyboard_b      = "gba teclado b"
+keyboard_select = "gba teclado seleccionar"
+keyboard_start  = "gba teclado iniciar"
+keyboard_left   = "gba teclado izquierda"
+keyboard_right  = "gba teclado derecha"
+keyboard_up     = "gba teclado arriba"
+keyboard_down   = "gba teclado abajo"
+keyboard_l      = "gba teclado l"
+keyboard_r      = "gba teclado r"
+
+controller_a      = "gba controlador a"
+controller_b      = "gba controlador b"
+controller_select = "gba controlador seleccionar"
+controller_start  = "gba controlador iniciar"
+controller_left   = "gba controlador izquierda"
+controller_right  = "gba controlador derecha"
+controller_up     = "gba controlador arriba"
+controller_down   = "gba controlador abajo"
+controller_l      = "gba controlador l"
+controller_r      = "gba controlador r"
+
+save = "guardar"
+
+[settings.nds]
+
+screen   = "pantalla"
+layout   = "disposición"
+sizing   = "tamaño"
+rotation = "rotación"
+
+layouts   = ["vertical", "horizontal", "híbrido"]
+sizings   = ["igual", "solo arriba", "solo abajo"]
+rotations = ["0", "90", "180", "270"]
+
+rtc              = "rtc"
+additional_hours = "horas adicionales"
+
+bios      = "bios"
+arm7_path = "ruta de arm7"
+arm9_path = "ruta de arm9"
+
+firmware       = "firmware"
+file_path      = "ruta del archivo"
+nickname       = "apodo"
+message        = "mensaje"
+favorite_color = "color favorito"
+
+scene_export     = "exportar escena"
+output_directory = "directorio de salida"
+shadow_polygons  = "polígonos de sombra"
+
+keyboard   = "teclado"
+controller = "controlador"
+
+a               = "a"
+b               = "b"
+select          = "seleccionar"
+start           = "iniciar"
+left            = "izquierda"
+right           = "derecha"
+up              = "arriba"
+down            = "abajo"
+l               = "l"
+r               = "r"
+x               = "x"
+y               = "y"
+hinge           = "bisagra"
+debug           = "depuración"
+layout_toggle   = "cambiar disposición"
+sizing_toggle   = "cambiar tamaño"
+rotation_toggle = "cambiar rotación"
+export_toggle   = "alternar exportación"
+
+keyboard_a      = "nds teclado a"
+keyboard_b      = "nds teclado b"
+keyboard_select = "nds teclado seleccionar"
+keyboard_start  = "nds teclado iniciar"
+keyboard_left   = "nds teclado izquierda"
+keyboard_right  = "nds teclado derecha"
+keyboard_up     = "nds teclado arriba"
+keyboard_down   = "nds teclado abajo"
+keyboard_l      = "nds teclado l"
+keyboard_r      = "nds teclado r"
+keyboard_x      = "nds teclado x"
+keyboard_y      = "nds teclado y"
+keyboard_hinge           = "nds teclado bisagra"
+keyboard_debug           = "nds teclado depuración"
+keyboard_layout_toggle   = "nds teclado cambiar disposición"
+keyboard_sizing_toggle   = "nds teclado cambiar tamaño"
+keyboard_rotation_toggle = "nds teclado cambiar rotación"
+keyboard_export_toggle   = "nds teclado alternar exportación"
+
+controller_a      = "nds controlador a"
+controller_b      = "nds controlador b"
+controller_select = "nds controlador seleccionar"
+controller_start  = "nds controlador iniciar"
+controller_left   = "nds controlador izquierda"
+controller_right  = "nds controlador derecha"
+controller_up     = "nds controlador arriba"
+controller_down   = "nds controlador abajo"
+controller_l      = "nds controlador l"
+controller_r      = "nds controlador r"
+controller_x      = "nds controlador x"
+controller_y      = "nds controlador y"
+
+save = "guardar"

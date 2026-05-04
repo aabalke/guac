@@ -164,25 +164,21 @@ func (f *Focus) KeepFocusedInView(slider *widget.Slider) {
 	}
 
 	var (
-		currMax = f.ui.GetFocusedWidget().GetWidget().Rect.Max.Y
-		currMin = f.ui.GetFocusedWidget().GetWidget().Rect.Min.Y
-		rootMax = f.ui.Container.GetWidget().Rect.Max.Y
-		rootMin = f.ui.Container.GetWidget().Rect.Min.Y
+		focusedTop    = f.ui.GetFocusedWidget().GetWidget().Rect.Min.Y
+		focusedBottom = f.ui.GetFocusedWidget().GetWidget().Rect.Max.Y
+		rootTop       = f.ui.Container.GetWidget().Rect.Min.Y
+		rootBottom    = f.ui.Container.GetWidget().Rect.Max.Y
+		firstTop      = f.submenu[0].GetWidget().Rect.Min.Y
+		//bottom  = f.submenu[len(f.submenu)-1].GetWidget().Rect.Max.Y
+		// I don't believe bottom is possible / important
 	)
 
-	switch f.ui.GetFocusedWidget() {
-	case f.submenu[0]:
-		slider.Current = slider.Min
-		return
-	case f.submenu[len(f.submenu)-1]:
-		slider.Current = slider.Max
-		return
-	}
-
 	switch {
-	case currMax > rootMax:
-		slider.Current += currMax - rootMax
-	case currMin < rootMin:
-		slider.Current -= rootMin - currMin
+	case focusedTop <= firstTop:
+		slider.Current = slider.Min
+	case focusedTop < rootTop:
+		slider.Current -= rootTop - focusedTop
+	case focusedBottom > rootBottom:
+		slider.Current += focusedBottom - rootBottom
 	}
 }

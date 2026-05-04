@@ -11,21 +11,23 @@ func NewHome(g *Game) {
 
 	g.ui.focus.ClearFocus()
 
-	b1 := NewCenteredButton("open a rom", func() {
+	l := g.ui.res.localization.Main
+
+	b1 := NewCenteredButton(l.Open, func() {
 		file := utils.OpenFile(
-			"Open",
-			"Roms (*.gb, *.gbc, *.gba, *.nds)",
+			l.DialogTitle,
+			l.DialogDesc,
 			"gb", "gbc", "gba", "nds",
 		)
 
 		g.InitConsole(file)
 	})
 
-	b2 := NewCenteredButton("settings", func() {
+	b2 := NewCenteredButton(l.Settings, func() {
 		NewSettings(g, g.ui.PageId, MENU_GENERAL)
 	})
 
-	b3 := NewCenteredButton("quit", func() {
+	b3 := NewCenteredButton(l.Quit, func() {
 		g.quit = true
 	})
 
@@ -44,15 +46,17 @@ func NewPause(g *Game) {
 
 	g.ui.focus.ClearFocus()
 
-	b1 := NewCenteredButton("resume", func() {
+	l := g.ui.res.localization.Pause
+
+	b1 := NewCenteredButton(l.Resume, func() {
 		g.TogglePause()
 	})
 
-	b2 := NewCenteredButton("settings", func() {
+	b2 := NewCenteredButton(l.Settings, func() {
 		NewSettings(g, g.ui.PageId, MENU_GENERAL)
 	})
 
-	b3 := NewCenteredButton("main menu", func() {
+	b3 := NewCenteredButton(l.Main, func() {
 		NewHome(g)
 
 		if g.nds != nil {
@@ -99,7 +103,7 @@ func NewCenteredPage(bg *image.NineSlice, buttons ...*widget.Button) *widget.Con
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(50)),
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Spacing(5),
+			widget.RowLayoutOpts.Spacing(4),
 		)),
 	)
 
@@ -117,9 +121,11 @@ func NewCenteredButton(text string, f func()) *widget.Button {
 	b := widget.NewButton(
 		widget.ButtonOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-				MaxWidth: BUTTON_WIDTH,
-				Stretch:  true,
+				//MaxWidth: BUTTON_WIDTH,
+				Stretch: true,
 			}),
+
+			widget.WidgetOpts.MinSize(BUTTON_WIDTH, 0),
 		),
 
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {

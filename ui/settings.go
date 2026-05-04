@@ -12,13 +12,10 @@ import (
 func NewSettings(g *Game, oldId PageId, initMenu int) {
 
 	g.ui.focus.ClearFocus()
-
 	g.ui.PrevPageId = oldId
 
-	res := g.ui.res
-
 	root := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(res.bg),
+		widget.ContainerOpts.BackgroundImage(g.ui.res.bg),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 
@@ -92,7 +89,6 @@ func NewScrollableContainer(ui *Ui) *widget.Container {
 
 		scrollableHeight := ui.scrollable.ViewRect().Dy()
 		contentHeight := ui.content.GetWidget().Rect.Dy()
-
 		if scrollableHeight >= contentHeight {
 			ui.scrollable.ScrollTop = 0
 			ui.slider.Current = 0
@@ -111,11 +107,17 @@ func NewScrollableContainer(ui *Ui) *widget.Container {
 		widget.SliderOpts.MinMax(0, 1000),
 		widget.SliderOpts.PageSizeFunc(pageSizeFunc),
 		widget.SliderOpts.ChangedHandler(func(args *widget.SliderChangedEventArgs) {
+
+			if args.Dragging {
+				ui.focus.DeFocus()
+			}
+
 			ui.scrollable.ScrollTop = float64(args.Slider.Current) / 1000
 		}),
 
 		widget.SliderOpts.WidgetOpts(
-			widget.WidgetOpts.OnUpdate(func(widget.HasWidget) {
+			widget.WidgetOpts.OnUpdate(func(args widget.HasWidget) {
+
 				scrollableHeight := ui.scrollable.ViewRect().Dy()
 				contentHeight := ui.content.GetWidget().Rect.Dy()
 
@@ -130,7 +132,11 @@ func NewScrollableContainer(ui *Ui) *widget.Container {
 
 	ui.scrollable.GetWidget().ScrolledEvent.AddHandler(func(args any) {
 
-		if ui.scrollable.ViewRect().Dy() >= ui.content.GetWidget().Rect.Dy() {
+		ui.focus.DeFocus()
+
+		scrollableHeight := ui.scrollable.ViewRect().Dy()
+		contentHeight := ui.content.GetWidget().Rect.Dy()
+		if scrollableHeight >= contentHeight {
 			ui.scrollable.ScrollTop = 0
 			ui.slider.Current = 0
 			return
@@ -157,6 +163,7 @@ func NewSidebar(g *Game, initMenu int) {
 
 	radios := []widget.RadioGroupElement{}
 	var initButton *widget.Button
+	sidebarFields := NewSidebarFields(g.ui.res)
 	for i, field := range sidebarFields {
 		b := NewSidebarButton(g, field)
 		g.ui.sidebar.AddChild(b)
@@ -183,8 +190,7 @@ func NewSidebarButton(g *Game, sf SidebarField) *widget.Button {
 	b := widget.NewButton(
 		widget.ButtonOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-				MaxWidth: BUTTON_WIDTH,
-				Stretch:  true,
+				Stretch: true,
 			}),
 		),
 

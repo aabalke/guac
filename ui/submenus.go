@@ -27,12 +27,13 @@ type SidebarField struct {
 	f     func(g *Game)
 }
 
-var sidebarFields []SidebarField
+func NewSidebarFields(res *Resources) []SidebarField {
 
-func init() {
-	sidebarFields = []SidebarField{
+	l := res.localization.Settings.Sidebar
+
+	return []SidebarField{
 		{
-			"general",
+			l.General,
 			func(g *Game) {
 				sub := g.ui.content
 				NewGeneralMenu(g, sub)
@@ -40,7 +41,7 @@ func init() {
 				g.ui.focus.BuildFocus(g.ui.ui)
 			}},
 		{
-			"ui",
+			l.Ui,
 			func(g *Game) {
 				sub := g.ui.content
 				NewUiMenu(g, sub)
@@ -48,7 +49,7 @@ func init() {
 				g.ui.focus.BuildFocus(g.ui.ui)
 			}},
 		{
-			"gb",
+			l.Gb,
 			func(g *Game) {
 				sub := g.ui.content
 				NewGbMenu(g, sub)
@@ -56,7 +57,7 @@ func init() {
 				g.ui.focus.BuildFocus(g.ui.ui)
 			}},
 		{
-			"gba",
+			l.Gba,
 			func(g *Game) {
 				sub := g.ui.content
 				NewGbaMenu(g, sub)
@@ -64,7 +65,7 @@ func init() {
 				g.ui.focus.BuildFocus(g.ui.ui)
 			}},
 		{
-			"nds",
+			l.Nds,
 			func(g *Game) {
 				sub := g.ui.content
 				NewNdsMenu(g, sub)
@@ -72,7 +73,7 @@ func init() {
 				g.ui.focus.BuildFocus(g.ui.ui)
 			}},
 		{
-			"return",
+			l.Return,
 			func(g *Game) {
 				switch g.ui.PrevPageId {
 				case PAGE_HOME:
@@ -120,51 +121,54 @@ func NewGeneralMenu(g *Game, parent *widget.Container) {
 		tmp = config.Conf.General
 		k   = &tmp.KeyboardConfig
 		c   = &tmp.ControllerConfig
+
+		l = g.ui.res.localization.Settings.General
 	)
 
 	fields := []Field{
-		{WIDGET_HDR, "general", "", nil, nil},
-		{WIDGET_CBX, "muted", "", &tmp.Muted, nil},
-		{WIDGET_CBX, "show fps", "", &tmp.ShowFps, nil},
-		{WIDGET_CBX, "init fullscreen", "", &tmp.InitFullscreen, nil},
-		{WIDGET_DEC, "target fps", "target fps", &tmp.TargetFps, 1000000},
+		{WIDGET_HDR, l.General, "", nil, nil},
+		{WIDGET_CBX, l.Muted, "", &tmp.Muted, nil},
+		{WIDGET_CBX, l.ShowFps, "", &tmp.ShowFps, nil},
+		{WIDGET_CBX, l.InitFullscreen, "", &tmp.InitFullscreen, nil},
+		{WIDGET_DEC, l.TargetFps, l.TargetFps, &tmp.TargetFps, 1000000},
 
-		{WIDGET_HDR, "keyboard", "", nil, nil},
-		{WIDGET_KEY, "select", "keyboard select", &k.Select, nil},
-		{WIDGET_KEY, "return", "keyboard return", &k.Return, nil},
-		{WIDGET_KEY, "mute", "keyboard mute", &k.Mute, nil},
-		{WIDGET_KEY, "pause", "keyboard pause", &k.Pause, nil},
-		{WIDGET_KEY, "left", "keyboard left", &k.Left, nil},
-		{WIDGET_KEY, "right", "keyboard right", &k.Right, nil},
-		{WIDGET_KEY, "up", "keyboard up", &k.Up, nil},
-		{WIDGET_KEY, "down", "keyboard down", &k.Down, nil},
-		{WIDGET_KEY, "fullscreen", "keyboard fullscreen", &k.Fullscreen, nil},
-		{WIDGET_KEY, "quit", "keyboard quit", &k.Quit, nil},
+		{WIDGET_HDR, l.Keyboard, "", nil, nil},
+		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, nil},
+		{WIDGET_KEY, l.Return, l.KeyboardReturn, &k.Return, nil},
+		{WIDGET_KEY, l.Mute, l.KeyboardMute, &k.Mute, nil},
+		{WIDGET_KEY, l.Pause, l.KeyboardPause, &k.Pause, nil},
+		{WIDGET_KEY, l.Left, l.KeyboardLeft, &k.Left, nil},
+		{WIDGET_KEY, l.Right, l.KeyboardRight, &k.Right, nil},
+		{WIDGET_KEY, l.Up, l.KeyboardUp, &k.Up, nil},
+		{WIDGET_KEY, l.Down, l.KeyboardDown, &k.Down, nil},
+		{WIDGET_KEY, l.Fullscreen, l.KeyboardFullscreen, &k.Fullscreen, nil},
+		{WIDGET_KEY, l.Quit, l.KeyboardQuit, &k.Quit, nil},
 
-		{WIDGET_HDR, "controller", "", nil, nil},
-		{WIDGET_KEY, "select", "controller select", &c.Select, nil},
-		{WIDGET_KEY, "return", "controller return", &c.Return, nil},
-		{WIDGET_KEY, "mute", "controller mute", &c.Mute, nil},
-		{WIDGET_KEY, "pause", "controller pause", &c.Pause, nil},
-		{WIDGET_KEY, "left", "controller left", &c.Left, nil},
-		{WIDGET_KEY, "right", "controller right", &c.Right, nil},
-		{WIDGET_KEY, "up", "controller up", &c.Up, nil},
-		{WIDGET_KEY, "down", "controller down", &c.Down, nil},
-		{WIDGET_KEY, "fullscreen", "controller fullscreen", &c.Fullscreen, nil},
-		{WIDGET_KEY, "quit", "controller quit", &c.Quit, nil},
+		{WIDGET_HDR, l.Controller, "", nil, nil},
+		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, nil},
+		{WIDGET_KEY, l.Return, l.ControllerReturn, &c.Return, nil},
+		{WIDGET_KEY, l.Mute, l.ControllerMute, &c.Mute, nil},
+		{WIDGET_KEY, l.Pause, l.ControllerPause, &c.Pause, nil},
+		{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, nil},
+		{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, nil},
+		{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, nil},
+		{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, nil},
+		{WIDGET_KEY, l.Fullscreen, l.ControllerFullscreen, &c.Fullscreen, nil},
+		{WIDGET_KEY, l.Quit, l.ControllerQuit, &c.Quit, nil},
 	}
 
 	parent.RemoveChildren()
 	buildSubMenu(g, parent, fields)
 
-	parent.AddChild(NewSaveButton(func(*widget.ButtonClickedEventArgs) {
+	parent.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
+
 		config.Conf.General = tmp
 
 		if len(g.gamepadIds) != 0 {
 			g.ui.focus.FocusLastSubMenu()
 		}
 
-		g.ui.toast.AddMessage("saved")
+		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
 }
 
@@ -175,25 +179,34 @@ func NewUiMenu(g *Game, parent *widget.Container) {
 		tmp   = config.Conf.Ui
 		oldId = g.ui.PrevPageId
 
+		l = g.ui.res.localization.Settings.Ui
+
 		clrInputs = [4]widget.PreferredSizeLocateableWidget{
-			NewColorInput(g.ui, "ui backdrop", &tmp.Backdrop, HexValidation(0xFFFFFF)),
-			NewColorInput(g.ui, "ui bg color", &tmp.MenuBackgroundColor, HexValidation(0xFFFFFF)),
-			NewColorInput(g.ui, "ui fg color", &tmp.MenuForegroundColor, HexValidation(0xFFFFFF)),
-			NewColorInput(g.ui, "ui accent color", &tmp.MenuSecondaryColor, HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, l.UiBackdrop, &tmp.Backdrop, HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, l.UiBgColor, &tmp.MenuBackgroundColor, HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, l.UiFgColor, &tmp.MenuForegroundColor, HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, l.UiAccentColor, &tmp.MenuSecondaryColor, HexValidation(0xFFFFFF)),
 		}
 	)
 	parent.RemoveChildren()
 
 	parent.AddChild(
-		NewHeader("ui", res), NewSeparator(),
-		NewLabel("backdrop"), clrInputs[0],
-		NewLabel("bg color"), clrInputs[1],
-		NewLabel("fg color"), clrInputs[2],
-		NewLabel("accent color"), clrInputs[3],
-		NewLabel("apply theme"),
+		NewHeader(l.Ui, res), NewSeparator(),
+		//language
+		//{WIDGET_RAD, "language", "", &tmp.Language, []string{"en", "es"}},
+		NewLabel(l.Language), NewRadioStringInput(&g.ui.focus.horizontalGroup, &tmp.Language, []string{"en", "es", "jp"}, res),
+		NewLabel(l.Backdrop), clrInputs[0],
+		NewLabel(l.BgColor), clrInputs[1],
+		NewLabel(l.FgColor), clrInputs[2],
+		NewLabel(l.AccentColor), clrInputs[3],
+		NewLabel(l.ApplyTheme),
 		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, theme_palettes, clrInputs, res),
-		NewSaveButton(func(*widget.ButtonClickedEventArgs) {
+		NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
+			//newLocal := tmp.Language != config.Conf.Ui.Language
 			config.Conf.Ui = tmp
+
+			g.ui.res.localization = NewLocalization(config.Conf.Ui.Language)
+
 			res.Update()
 			NewSettings(g, oldId, MENU_UI)
 			// should this be somewhere else?
@@ -203,7 +216,7 @@ func NewUiMenu(g *Game, parent *widget.Container) {
 				g.ui.focus.FocusLastSubMenu()
 			}
 
-			g.ui.toast.AddMessage("saved")
+			g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 		}))
 }
 
@@ -215,56 +228,58 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 		c   = &tmp.ControllerConfig
 		pal = &tmp.Palette
 
+		l = g.ui.res.localization.Settings.Gb
+
 		clrInputs = [4]widget.PreferredSizeLocateableWidget{
-			NewColorInput(g.ui, "dmg lightest", &pal[0], HexValidation(0xFFFFFF)),
-			NewColorInput(g.ui, "dmg light", &pal[1], HexValidation(0xFFFFFF)),
-			NewColorInput(g.ui, "dmg dark", &pal[2], HexValidation(0xFFFFFF)),
-			NewColorInput(g.ui, "dmg darkest", &pal[3], HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, l.DmgLightest, &pal[0], HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, l.DmgLight, &pal[1], HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, l.DmgDark, &pal[2], HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, l.DmgDarkest, &pal[3], HexValidation(0xFFFFFF)),
 		}
 	)
 
 	fields := []Field{
-		{WIDGET_HDR, "keyboard", "", nil, nil},
-		{WIDGET_KEY, "a", "gb keyboard a", &k.A, nil},
-		{WIDGET_KEY, "b", "gb keyboard b", &k.B, nil},
-		{WIDGET_KEY, "select", "gb keyboard select", &k.Select, nil},
-		{WIDGET_KEY, "start", "gb keyboard start", &k.Start, nil},
-		{WIDGET_KEY, "left", "gb keyboard left", &k.Left, nil},
-		{WIDGET_KEY, "right", "gb keyboard right", &k.Right, nil},
-		{WIDGET_KEY, "up", "gb keyboard up", &k.Up, nil},
-		{WIDGET_KEY, "down", "gb keyboard down", &k.Down, nil},
+		{WIDGET_HDR, l.Keyboard, "", nil, nil},
+		{WIDGET_KEY, l.A, l.KeyboardA, &k.A, nil},
+		{WIDGET_KEY, l.B, l.KeyboardB, &k.B, nil},
+		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, nil},
+		{WIDGET_KEY, l.Start, l.KeyboardStart, &k.Start, nil},
+		{WIDGET_KEY, l.Left, l.KeyboardLeft, &k.Left, nil},
+		{WIDGET_KEY, l.Right, l.KeyboardRight, &k.Right, nil},
+		{WIDGET_KEY, l.Up, l.KeyboardUp, &k.Up, nil},
+		{WIDGET_KEY, l.Down, l.KeyboardDown, &k.Down, nil},
 
-		{WIDGET_HDR, "controller", "", nil, nil},
-		{WIDGET_KEY, "a", "gb controller a", &c.A, nil},
-		{WIDGET_KEY, "b", "gb controller b", &c.B, nil},
-		{WIDGET_KEY, "select", "gb controller select", &c.Select, nil},
-		{WIDGET_KEY, "start", "gb controller start", &c.Start, nil},
-		{WIDGET_KEY, "left", "gb controller left", &c.Left, nil},
-		{WIDGET_KEY, "right", "gb controller right", &c.Right, nil},
-		{WIDGET_KEY, "up", "gb controller up", &c.Up, nil},
-		{WIDGET_KEY, "down", "gb controller down", &c.Down, nil},
+		{WIDGET_HDR, l.Controller, "", nil, nil},
+		{WIDGET_KEY, l.A, l.ControllerA, &c.A, nil},
+		{WIDGET_KEY, l.B, l.ControllerB, &c.B, nil},
+		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, nil},
+		{WIDGET_KEY, l.Start, l.ControllerStart, &c.Start, nil},
+		{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, nil},
+		{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, nil},
+		{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, nil},
+		{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, nil},
 	}
 
 	parent.RemoveChildren()
 
 	parent.AddChild(
-		NewHeader("dmg palette", g.ui.res), NewSeparator(),
-		NewLabel("lightest"), clrInputs[0],
-		NewLabel("light"), clrInputs[1],
-		NewLabel("dark"), clrInputs[2],
-		NewLabel("darkest"), clrInputs[3],
-		NewLabel("apply palette"),
+		NewHeader(l.DmgPalette, g.ui.res), NewSeparator(),
+		NewLabel(l.Lightest), clrInputs[0],
+		NewLabel(l.Light), clrInputs[1],
+		NewLabel(l.Dark), clrInputs[2],
+		NewLabel(l.Darkest), clrInputs[3],
+		NewLabel(l.ApplyPalette),
 		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, dmg_palettes, clrInputs, g.ui.res),
 	)
 
 	buildSubMenu(g, parent, fields)
 
-	parent.AddChild(NewSaveButton(func(*widget.ButtonClickedEventArgs) {
+	parent.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Gb = tmp
 		if len(g.gamepadIds) != 0 {
 			g.ui.focus.FocusLastSubMenu()
 		}
-		g.ui.toast.AddMessage("saved")
+		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
 }
 
@@ -274,47 +289,49 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 		tmp = config.Conf.Gba
 		k   = &tmp.KeyboardConfig
 		c   = &tmp.ControllerConfig
+
+		l = g.ui.res.localization.Settings.Gba
 	)
 
 	fields := []Field{
-		{WIDGET_HDR, "general", "", nil, nil},
-		{WIDGET_CBX, "optimize idle loops", "", &tmp.IdleOptimize, nil},
-		{WIDGET_HEX, "snd clk cycles", "snd clk cycles", &tmp.SoundClockUpdateCycles, 1000},
+		{WIDGET_HDR, l.General, "", nil, nil},
+		{WIDGET_CBX, l.OptmizeIdleLoops, "", &tmp.IdleOptimize, nil},
+		{WIDGET_HEX, l.SoundClockCycles, l.SoundClockCycles, &tmp.SoundClockUpdateCycles, 1000},
 
-		{WIDGET_HDR, "keyboard", "", nil, nil},
-		{WIDGET_KEY, "a", "gba keyboard a", &k.A, nil},
-		{WIDGET_KEY, "b", "gba keyboard b", &k.B, nil},
-		{WIDGET_KEY, "select", "gba keyboard select", &k.Select, nil},
-		{WIDGET_KEY, "start", "gba keyboard start", &k.Start, nil},
-		{WIDGET_KEY, "left", "gba keyboard left", &k.Left, nil},
-		{WIDGET_KEY, "right", "gba keyboard right", &k.Right, nil},
-		{WIDGET_KEY, "up", "gba keyboard up", &k.Up, nil},
-		{WIDGET_KEY, "down", "gba keyboard down", &k.Down, nil},
-		{WIDGET_KEY, "l", "gba keyboard l", &k.L, nil},
-		{WIDGET_KEY, "r", "gba keyboard r", &k.R, nil},
+		{WIDGET_HDR, l.Keyboard, "", nil, nil},
+		{WIDGET_KEY, l.A, l.KeyboardA, &k.A, nil},
+		{WIDGET_KEY, l.B, l.KeyboardB, &k.B, nil},
+		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, nil},
+		{WIDGET_KEY, l.Start, l.KeyboardStart, &k.Start, nil},
+		{WIDGET_KEY, l.Left, l.KeyboardLeft, &k.Left, nil},
+		{WIDGET_KEY, l.Right, l.KeyboardRight, &k.Right, nil},
+		{WIDGET_KEY, l.Up, l.KeyboardUp, &k.Up, nil},
+		{WIDGET_KEY, l.Down, l.KeyboardDown, &k.Down, nil},
+		{WIDGET_KEY, l.L, l.KeyboardL, &k.L, nil},
+		{WIDGET_KEY, l.R, l.KeyboardR, &k.R, nil},
 
-		{WIDGET_HDR, "controller", "", nil, nil},
-		{WIDGET_KEY, "a", "gba controller a", &c.A, nil},
-		{WIDGET_KEY, "b", "gba controller b", &c.B, nil},
-		{WIDGET_KEY, "select", "gba controller select", &c.Select, nil},
-		{WIDGET_KEY, "start", "gba controller start", &c.Start, nil},
-		{WIDGET_KEY, "left", "gba controller left", &c.Left, nil},
-		{WIDGET_KEY, "right", "gba controller right", &c.Right, nil},
-		{WIDGET_KEY, "up", "gba controller up", &c.Up, nil},
-		{WIDGET_KEY, "down", "gba controller down", &c.Down, nil},
-		{WIDGET_KEY, "l", "gba controller l", &c.L, nil},
-		{WIDGET_KEY, "r", "gba controller r", &c.R, nil},
+		{WIDGET_HDR, l.Controller, "", nil, nil},
+		{WIDGET_KEY, l.A, l.ControllerA, &c.A, nil},
+		{WIDGET_KEY, l.B, l.ControllerB, &c.B, nil},
+		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, nil},
+		{WIDGET_KEY, l.Start, l.ControllerStart, &c.Start, nil},
+		{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, nil},
+		{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, nil},
+		{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, nil},
+		{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, nil},
+		{WIDGET_KEY, l.L, l.ControllerL, &k.L, nil},
+		{WIDGET_KEY, l.R, l.ControllerR, &k.R, nil},
 	}
 
 	parent.RemoveChildren()
 	buildSubMenu(g, parent, fields)
 
-	parent.AddChild(NewSaveButton(func(*widget.ButtonClickedEventArgs) {
+	parent.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Gba = tmp
 		if len(g.gamepadIds) != 0 {
 			g.ui.focus.FocusLastSubMenu()
 		}
-		g.ui.toast.AddMessage("saved")
+		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
 }
 
@@ -324,74 +341,76 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 		tmp = config.Conf.Nds
 		k   = &tmp.KeyboardConfig
 		c   = &tmp.ControllerConfig
+
+		l = g.ui.res.localization.Settings.Nds
 	)
 
 	fields := []Field{
-		{WIDGET_HDR, "screen", "", nil, nil},
-		{WIDGET_RAD, "layout", "", &tmp.Screen.OLayout, []string{"vertical", "horizontal", "hybrid"}},
-		{WIDGET_RAD, "sizing", "", &tmp.Screen.OSizing, []string{"even", "only top", "only bottom"}},
-		{WIDGET_RAD, "rotation", "", &tmp.Screen.ORotation, []string{"0", "90", "180", "270"}},
+		{WIDGET_HDR, l.Screen, "", nil, nil},
+		{WIDGET_RAD, l.Layout, "", &tmp.Screen.OLayout, l.Layouts},
+		{WIDGET_RAD, l.Sizing, "", &tmp.Screen.OSizing, l.Sizings},
+		{WIDGET_RAD, l.Rotation, "", &tmp.Screen.ORotation, l.Rotations},
 
-		{WIDGET_HDR, "rtc", "", nil, nil},
-		{WIDGET_DEC, "additional hours", "additional hours", &tmp.Rtc.AdditionalHours, 24},
+		{WIDGET_HDR, l.Rtc, "", nil, nil},
+		{WIDGET_DEC, l.AdditionalHours, l.AdditionalHours, &tmp.Rtc.AdditionalHours, 24},
 
-		{WIDGET_HDR, "bios", "", nil, nil},
-		{WIDGET_FLE, "arm7 path", "", &tmp.Bios.Arm7Path, nil},
-		{WIDGET_FLE, "arm9 path", "", &tmp.Bios.Arm9Path, nil},
+		{WIDGET_HDR, l.Bios, "", nil, nil},
+		{WIDGET_FLE, l.Arm7Path, "", &tmp.Bios.Arm7Path, nil},
+		{WIDGET_FLE, l.Arm9Path, "", &tmp.Bios.Arm9Path, nil},
 
-		{WIDGET_HDR, "firmware", "", nil, nil},
-		{WIDGET_FLE, "file path", "", &tmp.Firmware.FilePath, nil},
-		{WIDGET_TXT, "nickname", "nickname", &tmp.Firmware.Nickname, nil},
-		{WIDGET_TXT, "message", "message", &tmp.Firmware.Message, nil},
-		{WIDGET_TXT, "favorite color", "favorite color", &tmp.Firmware.FavoriteColor, nil},
+		{WIDGET_HDR, l.Firmware, "", nil, nil},
+		{WIDGET_FLE, l.FilePath, "", &tmp.Firmware.FilePath, nil},
+		{WIDGET_TXT, l.Nickname, l.Nickname, &tmp.Firmware.Nickname, nil},
+		{WIDGET_TXT, l.Message, l.Message, &tmp.Firmware.Message, nil},
+		{WIDGET_TXT, l.FavoriteColor, l.FavoriteColor, &tmp.Firmware.FavoriteColor, nil},
 
-		{WIDGET_HDR, "scene export", "", nil, nil},
-		{WIDGET_DIR, "output directory", "", &tmp.Export.Directory, "./export"},
-		{WIDGET_CBX, "shadow polygons", "", &tmp.Export.ShadowPolys, nil},
+		{WIDGET_HDR, l.SceneExport, "", nil, nil},
+		{WIDGET_DIR, l.OutputDirectory, "", &tmp.Export.Directory, "./export"},
+		{WIDGET_CBX, l.ShadowPolygons, "", &tmp.Export.ShadowPolys, nil},
 
-		{WIDGET_HDR, "keyboard", "", nil, nil},
-		{WIDGET_KEY, "a", "nds keyboard a", &k.A, nil},
-		{WIDGET_KEY, "b", "nds keyboard b", &k.B, nil},
-		{WIDGET_KEY, "select", "nds keyboard select", &k.Select, nil},
-		{WIDGET_KEY, "start", "nds keyboard start", &k.Start, nil},
-		{WIDGET_KEY, "left", "nds keyboard left", &k.Left, nil},
-		{WIDGET_KEY, "right", "nds keyboard right", &k.Right, nil},
-		{WIDGET_KEY, "up", "nds keyboard up", &k.Up, nil},
-		{WIDGET_KEY, "down", "nds keyboard down", &k.Down, nil},
-		{WIDGET_KEY, "l", "nds keyboard l", &k.L, nil},
-		{WIDGET_KEY, "r", "nds keyboard r", &k.R, nil},
-		{WIDGET_KEY, "x", "nds keyboard x", &k.X, nil},
-		{WIDGET_KEY, "y", "nds keyboard y", &k.Y, nil},
-		{WIDGET_KEY, "hinge", "nds keyboard hinge", &k.Hinge, nil},
-		{WIDGET_KEY, "debug", "nds keyboard debug", &k.Debug, nil},
-		{WIDGET_KEY, "layout toggle", "nds keyboard layout toggle", &k.LayoutToggle, nil},
-		{WIDGET_KEY, "sizing toggle", "nds keyboard sizing toggle", &k.SizingToggle, nil},
-		{WIDGET_KEY, "rotation toggle", "nds keyboard rotation toggle", &k.RotationToggle, nil},
-		{WIDGET_KEY, "export toggle", "nds keyboard export toggle", &k.ExportScene, nil},
+		{WIDGET_HDR, l.Keyboard, "", nil, nil},
+		{WIDGET_KEY, l.A, l.KeyboardA, &k.A, nil},
+		{WIDGET_KEY, l.B, l.KeyboardB, &k.B, nil},
+		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, nil},
+		{WIDGET_KEY, l.Start, l.KeyboardStart, &k.Start, nil},
+		{WIDGET_KEY, l.Left, l.KeyboardLeft, &k.Left, nil},
+		{WIDGET_KEY, l.Right, l.KeyboardRight, &k.Right, nil},
+		{WIDGET_KEY, l.Up, l.KeyboardUp, &k.Up, nil},
+		{WIDGET_KEY, l.Down, l.KeyboardDown, &k.Down, nil},
+		{WIDGET_KEY, l.L, l.KeyboardL, &k.L, nil},
+		{WIDGET_KEY, l.R, l.KeyboardR, &k.R, nil},
+		{WIDGET_KEY, l.X, l.KeyboardX, &k.X, nil},
+		{WIDGET_KEY, l.Y, l.KeyboardY, &k.Y, nil},
+		{WIDGET_KEY, l.Hinge, l.KeyboardHinge, &k.Hinge, nil},
+		{WIDGET_KEY, l.Debug, l.KeyboardDebug, &k.Debug, nil},
+		{WIDGET_KEY, l.LayoutToggle, l.KeyboardLayoutToggle, &k.LayoutToggle, nil},
+		{WIDGET_KEY, l.SizingToggle, l.KeyboardSizingToggle, &k.SizingToggle, nil},
+		{WIDGET_KEY, l.RotationToggle, l.KeyboardRotationToggle, &k.RotationToggle, nil},
+		{WIDGET_KEY, l.ExportToggle, l.KeyboardExportToggle, &k.ExportScene, nil},
 
-		{WIDGET_HDR, "controller", "", nil, nil},
-		{WIDGET_KEY, "a", "nds controller a", &c.A, nil},
-		{WIDGET_KEY, "b", "nds controller b", &c.B, nil},
-		{WIDGET_KEY, "select", "nds controller select", &c.Select, nil},
-		{WIDGET_KEY, "start", "nds controller start", &c.Start, nil},
-		{WIDGET_KEY, "left", "nds controller left", &c.Left, nil},
-		{WIDGET_KEY, "right", "nds controller right", &c.Right, nil},
-		{WIDGET_KEY, "up", "nds controller up", &c.Up, nil},
-		{WIDGET_KEY, "down", "nds controller down", &c.Down, nil},
-		{WIDGET_KEY, "l", "nds controller l", &c.L, nil},
-		{WIDGET_KEY, "r", "nds controller r", &c.R, nil},
-		{WIDGET_KEY, "x", "nds controller x", &c.X, nil},
-		{WIDGET_KEY, "y", "nds controller y", &c.Y, nil},
+		{WIDGET_HDR, l.Controller, "", nil, nil},
+		{WIDGET_KEY, l.A, l.ControllerA, &c.A, nil},
+		{WIDGET_KEY, l.B, l.ControllerB, &c.B, nil},
+		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, nil},
+		{WIDGET_KEY, l.Start, l.ControllerStart, &c.Start, nil},
+		{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, nil},
+		{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, nil},
+		{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, nil},
+		{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, nil},
+		{WIDGET_KEY, l.L, l.ControllerL, &k.L, nil},
+		{WIDGET_KEY, l.R, l.ControllerR, &k.R, nil},
+		{WIDGET_KEY, l.X, l.ControllerX, &k.X, nil},
+		{WIDGET_KEY, l.Y, l.ControllerY, &k.Y, nil},
 	}
 
 	parent.RemoveChildren()
 	buildSubMenu(g, parent, fields)
 
-	parent.AddChild(NewSaveButton(func(*widget.ButtonClickedEventArgs) {
+	parent.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Nds = tmp
 		if len(g.gamepadIds) != 0 {
 			g.ui.focus.FocusLastSubMenu()
 		}
-		g.ui.toast.AddMessage("saved")
+		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
 }

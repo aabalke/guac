@@ -59,6 +59,8 @@ type Resources struct {
 
 	icon []img.Image
 
+	localization *Localization
+
 	ui *ebitenui.UI
 }
 
@@ -84,9 +86,9 @@ func NewUIResources() (*Resources, error) {
 
 	buttonImage := &widget.ButtonImage{
 		Idle:         transparentNine,
-		Hover:        sec,
+		Hover:        secb,
 		Pressed:      sec,
-		PressedHover: sec,
+		PressedHover: secb,
 	}
 
 	buttonBorderedImage := &widget.ButtonImage{
@@ -108,6 +110,7 @@ func NewUIResources() (*Resources, error) {
 		buttonImage:         buttonImage,
 		buttonBorderedImage: buttonBorderedImage,
 		checkbox:            loadCheckboxImage(conf.MenuForegroundColor),
+		localization:        NewLocalization(config.Conf.Ui.Language),
 	}
 
 	return r, nil
@@ -119,11 +122,12 @@ func (u *Resources) Update() {
 	u.bg = image.NewNineSliceColor(conf.MenuBackgroundColor)
 	u.fg = image.NewNineSliceColor(conf.MenuForegroundColor)
 	u.sec = image.NewNineSliceColor(conf.MenuSecondaryColor)
-	u.buttonImage.Hover = u.sec
-	u.buttonImage.Pressed = u.sec
-	u.buttonImage.PressedHover = u.sec
-
 	secb := image.NewBorderedNineSliceColor(conf.MenuSecondaryColor, conf.MenuForegroundColor, 2)
+
+	u.buttonImage.Hover = secb
+	u.buttonImage.Pressed = u.sec
+	u.buttonImage.PressedHover = secb
+
 	u.buttonBorderedImage = &widget.ButtonImage{
 		Idle:         image.NewBorderedNineSliceColor(color.Transparent, conf.MenuForegroundColor, 2),
 		Hover:        secb,
@@ -132,6 +136,7 @@ func (u *Resources) Update() {
 	}
 
 	u.checkbox = loadCheckboxImage(conf.MenuForegroundColor)
+
 }
 
 type fonts struct {
@@ -142,6 +147,7 @@ type fonts struct {
 func loadFonts() *fonts {
 
 	fontFaceRegular := "assets/fonts/museo_slab_500.otf"
+	//fontFaceRegular := "assets/fonts/noto_sana_jp_reg.ttf"
 
 	face, err := loadFont(fontFaceRegular, 36)
 	if err != nil {
