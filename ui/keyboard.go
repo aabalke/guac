@@ -45,9 +45,7 @@ type Keyboard struct {
 	root   *widget.Container
 	main   *widget.Container
 	top    *widget.Container
-	alpha  *widget.Container
-	dec    *widget.Container
-	hex    *widget.Container
+    boards [4]*widget.Container
 
 	cancelButton widget.Focuser
 
@@ -74,40 +72,31 @@ func NewKeyboard(res *Resources) *Keyboard {
 			}),
 		),
 
-		widget.ContainerOpts.BackgroundImage(k.res.bg),
-		widget.ContainerOpts.Layout(widget.NewGridLayout(
-			widget.GridLayoutOpts.Columns(1),
-			widget.GridLayoutOpts.Spacing(4, 16),
-			widget.GridLayoutOpts.Stretch(
-				[]bool{},
-				[]bool{},
-			),
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+			widget.RowLayoutOpts.Spacing(4),
 		)),
 	)
 
 	k.top = widget.NewContainer(
 		widget.ContainerOpts.WidgetOpts(
-			widget.WidgetOpts.LayoutData(widget.GridLayoutData{
-				HorizontalPosition: widget.GridLayoutPositionCenter,
-				VerticalPosition:   widget.GridLayoutPositionCenter,
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+                Position: widget.RowLayoutPositionCenter,
 			}),
 		),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(2),
-			widget.GridLayoutOpts.Spacing(4, 4),
-			widget.GridLayoutOpts.Stretch(
-				[]bool{false, true},
-				[]bool{},
-			),
+			widget.GridLayoutOpts.Spacing(16, 0),
 		)),
 	)
 
 	k.main.AddChild(k.top)
 	k.root.AddChild(k.main)
 
-	k.alpha = k.buildBoard(8, KEYS_KEY_CONTROLLER)
-	k.dec = k.buildBoard(3, DEC_KEYS)
-	k.hex = k.buildBoard(4, HEX_KEYS)
+	k.boards[BOARD_ALPHA] = k.buildBoard(8, KEYS_KEY_CONTROLLER) // will need to update based on lang
+	k.boards[BOARD_DEC] = k.buildBoard(3, DEC_KEYS)
+	k.boards[BOARD_HEX] = k.buildBoard(4, HEX_KEYS)
+	k.boards[BOARD_KEYBIND] = k.buildBoard(8, KEYS_KEY_CONTROLLER)
 
 	return k
 }
@@ -120,26 +109,17 @@ func (k *Keyboard) buildBoard(columns int, keys []string) *widget.Container {
 
 	board := widget.NewContainer(
 		widget.ContainerOpts.WidgetOpts(
-			widget.WidgetOpts.LayoutData(widget.GridLayoutData{
-				HorizontalPosition: widget.GridLayoutPositionCenter,
-				VerticalPosition:   widget.GridLayoutPositionCenter,
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+                Position: widget.RowLayoutPositionCenter,
 			}),
 		),
 
-		widget.ContainerOpts.Layout(widget.NewGridLayout(
-			widget.GridLayoutOpts.Columns(2),
-			widget.GridLayoutOpts.Spacing(4, 4),
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Spacing(4),
 		)),
 	)
 
 	l := widget.NewContainer(
-		widget.ContainerOpts.WidgetOpts(
-			widget.WidgetOpts.LayoutData(widget.GridLayoutData{
-				HorizontalPosition: widget.GridLayoutPositionCenter,
-				VerticalPosition:   widget.GridLayoutPositionCenter,
-			}),
-		),
-
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(columns),
 			widget.GridLayoutOpts.Spacing(4, 4),
@@ -151,13 +131,6 @@ func (k *Keyboard) buildBoard(columns int, keys []string) *widget.Container {
 	)
 
 	r := widget.NewContainer(
-		widget.ContainerOpts.WidgetOpts(
-			widget.WidgetOpts.LayoutData(widget.GridLayoutData{
-				HorizontalPosition: widget.GridLayoutPositionCenter,
-				VerticalPosition:   widget.GridLayoutPositionCenter,
-			}),
-		),
-
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Spacing(4, 4),
@@ -170,6 +143,7 @@ func (k *Keyboard) buildBoard(columns int, keys []string) *widget.Container {
 
 	for _, key := range keys {
 		l.AddChild(k.buildKey(key, 64, func() {
+
 			switch input := k.widget.(type) {
 			case *widget.TextInput:
 				input.SetText(input.GetText() + key)
@@ -179,7 +153,8 @@ func (k *Keyboard) buildBoard(columns int, keys []string) *widget.Container {
 				v := text.GetText() + key
 				text.SetText(v)
 				colorBox := children[1].(*widget.Container)
-				colorBox.SetBackgroundImage(image.NewNineSliceColor(utils.HexToColor(v)))
+                clr := image.NewBorderedNineSliceColor(utils.HexToColor(v), *k.res.fgClr, 2)
+				colorBox.SetBackgroundImage(clr)
 			}
 		}))
 	}
@@ -215,13 +190,13 @@ func (k *Keyboard) buildBoard(columns int, keys []string) *widget.Container {
 				text.SetText(s[:len(s)-1])
 			}
 
-			v := image.NewNineSliceColor(utils.HexToColor(text.GetText()))
+            clr := image.NewBorderedNineSliceColor(utils.HexToColor(text.GetText()), *k.res.fgClr, 2)
 			colorBox := children[1].(*widget.Container)
-			colorBox.SetBackgroundImage(v)
+			colorBox.SetBackgroundImage(clr)
 		}
 	})
 	cancel := k.buildKey("cancel", 160, func() { k.Close(false) })
-	enter := k.buildKey("enter", 160, func() { k.Close(true) })
+	enter  := k.buildKey("enter", 160, func() { k.Close(true) })
 
 	keyFocusers[columns-1].AddFocus(widget.FOCUS_EAST, backspace)
 	backspace.AddFocus(widget.FOCUS_WEST, keyFocusers[columns-1])
@@ -282,19 +257,15 @@ func (k *Keyboard) Open(ui *Ui, caller *widget.TextInput, board int, label strin
 	k.caller = caller
 
 	k.label = widget.NewText(
-		widget.TextOpts.Padding(&widget.Insets{Right: 16}),
 		widget.TextOpts.Text(
 			label,
 			k.res.fonts.smallFace,
 			*k.res.fgClr,
 		),
-		widget.TextOpts.Position(
-			widget.TextPositionStart,
-			widget.TextPositionCenter,
-		))
+    )
 
 	if color, ok := v.(*color.Color); ok {
-		k.widget = _newColorInput(color)
+		k.widget = _newColorInput(ui.res.fgClr, color)
 	} else {
 		k.widget = _newTextBoxInput(v)
 	}
@@ -303,18 +274,7 @@ func (k *Keyboard) Open(ui *Ui, caller *widget.TextInput, board int, label strin
 	k.top.AddChild(k.label, k.widget)
 
 	k.main.RemoveChildren()
-	k.main.AddChild(k.top)
-
-	switch board {
-	case BOARD_ALPHA:
-		k.main.AddChild(k.alpha)
-	case BOARD_DEC:
-		k.main.AddChild(k.dec)
-	case BOARD_HEX:
-		k.main.AddChild(k.hex)
-	case BOARD_KEYBIND:
-		k.main.AddChild(k.alpha)
-	}
+	k.main.AddChild(k.top, k.boards[board])
 
 	k.ui.SetFocusedWidget(k.ui.Container.GetFocusers()[1])
 }
@@ -334,26 +294,35 @@ func (k *Keyboard) Close(save bool) {
 }
 
 func _newTextBoxInput(value any) *widget.TextInput {
-	input := widget.NewTextInput()
+	input := widget.NewTextInput(
+        widget.TextInputOpts.WidgetOpts(
+            widget.WidgetOpts.MinSize(128,0),
+        ),
+    )
 	input.SetText(toString(value))
 	return input
 }
 
-func _newColorInput(value *color.Color) widget.PreferredSizeLocateableWidget {
+func _newColorInput(fgClr, value *color.Color) widget.PreferredSizeLocateableWidget {
 
 	container := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(2),
-			widget.GridLayoutOpts.Stretch([]bool{true, true}, []bool{true}),
-			widget.GridLayoutOpts.Spacing(8, 0),
+			widget.GridLayoutOpts.Stretch([]bool{}, []bool{true}),
+			widget.GridLayoutOpts.Spacing(4, 0),
 		)),
 	)
 
-	input := widget.NewTextInput()
-	input.SetText(utils.ColorToHex(*value))
+    input := _newTextBoxInput(value)
+    clr := image.NewBorderedNineSliceColor(*value, *fgClr, 2)
 
-	colorBox := widget.NewContainer()
-	colorBox.SetBackgroundImage(image.NewNineSliceColor(*value))
+	colorBox := widget.NewContainer(
+        widget.ContainerOpts.WidgetOpts(
+            widget.WidgetOpts.MinSize(128,0),
+        ),
+
+        widget.ContainerOpts.BackgroundImage(clr),
+    )
 
 	container.AddChild(input, colorBox)
 

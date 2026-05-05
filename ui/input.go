@@ -174,14 +174,6 @@ func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) 
 			case slices.Contains(buttonConfig.Left, button):
 				g.ui.ui.ChangeFocus(widget.FOCUS_WEST)
 
-				//case slices.Contains(buttonConfig., button):
-				//switch g.ui.PrevPageId {
-				//case PAGE_HOME:
-				//	NewHome(g)
-				//case PAGE_PAUSE:
-				//	NewPause(g)
-				//}
-
 			case slices.Contains(buttonConfig.Return, button):
 
 				if g.ui.PageId == PAGE_SETTINGS {

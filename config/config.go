@@ -51,7 +51,8 @@ type Ui struct {
 	MenuSecondaryColor  color.Color
 	//MenuFontFace        text.Face
 
-	Language string `toml:"language"`
+	TomlLanguage string `toml:"language"`
+	Language     int
 }
 
 type General struct {
@@ -217,6 +218,23 @@ func (c *Config) Decode() {
 		panic(err)
 	}
 
+	c.DecodeUi()
+
+	c.DecodeGeneralController()
+
+	c.decodeJit()
+
+	c.decodeGb()
+
+	DecodeController(&c.Gba.ControllerConfig)
+
+	c.decodeNds()
+
+	c.decodeMouse()
+}
+
+func (c *Config) DecodeUi() {
+
 	c.Ui.Backdrop = color.RGBA{
 		R: uint8(c.Ui.TomlBackdrop >> 16),
 		G: uint8(c.Ui.TomlBackdrop >> 8),
@@ -243,24 +261,13 @@ func (c *Config) Decode() {
 		A: 0xFF,
 	}
 
-	//if c.Ui.GamesPerRow == 0 {
-	//	errMessageStart := "Invalid Config:"
-	//	errMessageEnd := "Using 6 games per row in menu."
-	//	log.Printf("%s %s %s\n", errMessageStart, "GamesPerRow == 0.", errMessageEnd)
-	//	c.Ui.GamesPerRow = 6
-	//}
+	switch c.Ui.TomlLanguage {
+	case "spanish", "es": // english
+		c.Ui.Language = 1
+	default:
+		c.Ui.Language = 0
+	}
 
-	c.DecodeGeneralController()
-
-	c.decodeJit()
-
-	c.decodeGb()
-
-	DecodeController(&c.Gba.ControllerConfig)
-
-	c.decodeNds()
-
-	c.decodeMouse()
 }
 
 func (c *Config) DecodeGeneralController() {

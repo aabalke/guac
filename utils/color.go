@@ -10,6 +10,7 @@ import (
 func HexToColor(h string) color.Color {
 	h, _ = strings.CutPrefix(h, "#")
 	h, _ = strings.CutPrefix(h, "0x")
+
 	u, err := strconv.ParseUint(h, 16, 0)
 	if err != nil {
 		return color.NRGBA{
@@ -30,7 +31,7 @@ func HexToColor(h string) color.Color {
 
 func ColorToHex(c color.Color) string {
 	n := color.NRGBAModel.Convert(c).(color.NRGBA)
-	return fmt.Sprintf("#%02X%02X%02X", n.R, n.G, n.B)
+	return fmt.Sprintf("%02X%02X%02X", n.R, n.G, n.B)
 }
 
 func ColorToUint32(c color.Color) uint32 {

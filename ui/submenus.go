@@ -104,6 +104,8 @@ func buildSubMenu(g *Game, parent *widget.Container, fields []Field) {
 			parent.AddChild(NewLabel(field.label), NewDirectoryInput(field.ptr.(*string), field.other.(string)))
 		case WIDGET_TXT:
 			parent.AddChild(NewLabel(field.label), NewTextBoxInput(g.ui, BOARD_ALPHA, field.sublabel, field.ptr, NoValidation()))
+		case WIDGET_LNK:
+			parent.AddChild(NewSeparator(), NewLinkText(field.other.(string)))
 		case WIDGET_RAD:
 			parent.AddChild(NewLabel(field.label), NewRadioInput(
 				&g.ui.focus.horizontalGroup,
@@ -192,20 +194,17 @@ func NewUiMenu(g *Game, parent *widget.Container) {
 
 	parent.AddChild(
 		NewHeader(l.Ui, res), NewSeparator(),
-		//language
-		//{WIDGET_RAD, "language", "", &tmp.Language, []string{"en", "es"}},
-		NewLabel(l.Language), NewRadioStringInput(&g.ui.focus.horizontalGroup, &tmp.Language, []string{"en", "es", "jp"}, res),
+		NewLabel(l.Language), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.Language, l.Languages, res),
 		NewLabel(l.Backdrop), clrInputs[0],
-		NewLabel(l.BgColor), clrInputs[1],
-		NewLabel(l.FgColor), clrInputs[2],
+		NewLabel(l.BgColor),  clrInputs[1],
+		NewLabel(l.FgColor),  clrInputs[2],
 		NewLabel(l.AccentColor), clrInputs[3],
 		NewLabel(l.ApplyTheme),
 		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, theme_palettes, clrInputs, res),
 		NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
-			//newLocal := tmp.Language != config.Conf.Ui.Language
-			config.Conf.Ui = tmp
 
-			g.ui.res.localization = NewLocalization(config.Conf.Ui.Language)
+			config.Conf.Ui = tmp
+			g.ui.res.localization = NewLocalization(LangOptions(config.Conf.Ui.Language))
 
 			res.Update()
 			NewSettings(g, oldId, MENU_UI)

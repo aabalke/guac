@@ -44,6 +44,13 @@ var buttonInset = widget.Insets{
 	Bottom: 4,
 }
 
+var radioInset = widget.Insets{
+	Left:   16,
+	Right:  16,
+	Top:    4,
+	Bottom: 4,
+}
+
 var transparentNine = image.NewNineSliceColor(color.Transparent)
 
 //go:embed assets
@@ -110,7 +117,7 @@ func NewUIResources() (*Resources, error) {
 		buttonImage:         buttonImage,
 		buttonBorderedImage: buttonBorderedImage,
 		checkbox:            loadCheckboxImage(conf.MenuForegroundColor),
-		localization:        NewLocalization(config.Conf.Ui.Language),
+		localization:        NewLocalization(LangOptions(config.Conf.Ui.Language)),
 	}
 
 	return r, nil

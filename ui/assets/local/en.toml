@@ -79,6 +79,7 @@ save = "save"
 
 ui              = "ui"
 language        = "language"
+languages       = ["english", "spanish"]
 backdrop        = "backdrop"
 bg_color        = "bg color"
 fg_color        = "fg color"

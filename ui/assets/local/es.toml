@@ -78,6 +78,7 @@ save = "guardar"
 
 ui              = "interfaz"
 language        = "idioma"
+languages       = ["inglés", "español"]
 backdrop        = "fondo"
 bg_color        = "color de fondo"
 fg_color        = "color de texto"

@@ -22,6 +22,7 @@ const (
 	WIDGET_FLE        //file
 	WIDGET_DIR        //directory
 	WIDGET_TXT        //text
+    WIDGET_LNK        //link
 	WIDGET_RAD        //radio
 )
 
@@ -148,13 +149,13 @@ func NewColorInput(ui *Ui, label string, v *color.Color, validation func(s strin
 		}),
 		widget.TextInputOpts.ChangedHandler(func(a *widget.TextInputChangedEventArgs) {
 			*v = utils.HexToColor(a.InputText)
-			colorBox.SetBackgroundImage(image.NewNineSliceColor(*v))
+            colorBox.SetBackgroundImage(image.NewBorderedNineSliceColor(*v, *ui.res.fgClr, 2))
 		}),
 	)
 
-	colorBox.SetBackgroundImage(image.NewNineSliceColor(*v))
-
 	input.SetText(utils.ColorToHex(*v))
+
+	colorBox.SetBackgroundImage(image.NewBorderedNineSliceColor(*v, *ui.res.fgClr, 2))
 
 	container.AddChild(input, colorBox)
 
@@ -192,8 +193,8 @@ func NewApplyPalettesMenu(focusGroups *[][]widget.Focuser, pals map[string][4]st
 			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
 				for j := range 4 {
 					c := clrInputs[j].(*widget.Container).Children()
-					c[0].(*widget.TextInput).SetText("#" + pal[j])
-					clr := image.NewNineSliceColor(utils.HexToColor(pal[j]))
+					c[0].(*widget.TextInput).SetText(pal[j])
+					clr := image.NewBorderedNineSliceColor(utils.HexToColor(pal[j]), *res.fgClr, 2)
 					c[1].(*widget.Container).SetBackgroundImage(clr)
 				}
 			}),
@@ -206,6 +207,15 @@ func NewApplyPalettesMenu(focusGroups *[][]widget.Focuser, pals map[string][4]st
 	*focusGroups = append(*focusGroups, focusRadio)
 
 	return c
+}
+
+
+func NewFileInput(v *string) widget.PreferredSizeLocateableWidget {
+	return dialogInput(v, func() string { return utils.OpenFile("Open", "All Files") })
+}
+
+func NewDirectoryInput(v *string, defaultPath string) widget.PreferredSizeLocateableWidget {
+	return dialogInput(v, func() string { return utils.OpenDirectory("Choose", defaultPath) })
 }
 
 func dialogInput(v *string, dialogFunc func() string) widget.PreferredSizeLocateableWidget {
@@ -242,15 +252,7 @@ func dialogInput(v *string, dialogFunc func() string) widget.PreferredSizeLocate
 	return input
 }
 
-func NewFileInput(v *string) widget.PreferredSizeLocateableWidget {
-	return dialogInput(v, func() string { return utils.OpenFile("Open", "All Files") })
-}
-
-func NewDirectoryInput(v *string, defaultPath string) widget.PreferredSizeLocateableWidget {
-	return dialogInput(v, func() string { return utils.OpenDirectory("Choose", defaultPath) })
-}
-
-func NewRadioInput(focusRadios *[][]widget.Focuser, v *int, values []string, res *Resources) widget.PreferredSizeLocateableWidget {
+func NewRadioInput(focusRadios *[][]widget.Focuser, ptr *int, values []string, res *Resources) widget.PreferredSizeLocateableWidget {
 
 	radio := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -261,7 +263,7 @@ func NewRadioInput(focusRadios *[][]widget.Focuser, v *int, values []string, res
 	bs := []widget.RadioGroupElement{}
 	focusRadio := []widget.Focuser{}
 	for i := range values {
-		b := NewRadioButton(v, values[i], i, res)
+		b := NewRadioButton(values[i], ptr, i, res)
 		radio.AddChild(b)
 		bs = append(bs, b)
 		focusRadio = append(focusRadio, b)
@@ -271,20 +273,14 @@ func NewRadioInput(focusRadios *[][]widget.Focuser, v *int, values []string, res
 
 	widget.NewRadioGroup(
 		widget.RadioGroupOpts.Elements(bs...),
-		widget.RadioGroupOpts.InitialElement(bs[*v]),
+		widget.RadioGroupOpts.InitialElement(bs[*ptr]),
 	)
 
 	return radio
 }
 
-func NewRadioButton(v *int, label string, value int, res *Resources) *widget.Button {
+func NewRadioButton(label string, ptr *int, value int, res *Resources) *widget.Button {
 	return widget.NewButton(
-		widget.ButtonOpts.WidgetOpts(
-			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-				MaxWidth: BUTTON_WIDTH,
-				Stretch:  true,
-			}),
-		),
 
 		widget.ButtonOpts.Text(
 			label,
@@ -294,77 +290,10 @@ func NewRadioButton(v *int, label string, value int, res *Resources) *widget.But
 			},
 		),
 
-		widget.ButtonOpts.TextPadding(&widget.Insets{
-			Left:   16,
-			Right:  16,
-			Top:    4,
-			Bottom: 4,
-		}),
+		widget.ButtonOpts.TextPadding(&radioInset),
 
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
-			*v = value
-		}),
-	)
-}
-
-func NewRadioStringInput(focusRadios *[][]widget.Focuser, v *string, values []string, res *Resources) widget.PreferredSizeLocateableWidget {
-
-	radio := widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-		)),
-	)
-
-	bs := []widget.RadioGroupElement{}
-	focusRadio := []widget.Focuser{}
-	init := 0
-	for i, value := range values {
-		b := NewRadioStringButton(v, values[i], value, res)
-		radio.AddChild(b)
-		bs = append(bs, b)
-		focusRadio = append(focusRadio, b)
-
-		if value == *v {
-			init = i
-		}
-	}
-
-	*focusRadios = append(*focusRadios, focusRadio)
-
-	widget.NewRadioGroup(
-		widget.RadioGroupOpts.Elements(bs...),
-		widget.RadioGroupOpts.InitialElement(bs[init]),
-	)
-
-	return radio
-}
-
-func NewRadioStringButton(v *string, label string, value string, res *Resources) *widget.Button {
-	return widget.NewButton(
-		widget.ButtonOpts.WidgetOpts(
-			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-				MaxWidth: BUTTON_WIDTH,
-				Stretch:  true,
-			}),
-		),
-
-		widget.ButtonOpts.Text(
-			label,
-			res.fonts.smallFace,
-			&widget.ButtonTextColor{
-				Idle: *res.fgClr,
-			},
-		),
-
-		widget.ButtonOpts.TextPadding(&widget.Insets{
-			Left:   16,
-			Right:  16,
-			Top:    4,
-			Bottom: 4,
-		}),
-
-		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
-			*v = value
+			*ptr = value
 		}),
 	)
 }

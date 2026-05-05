@@ -6,13 +6,26 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-func NewLocalization(lang string) *Localization {
+type LangOptions int
 
-	if lang == "" {
-		lang = "en"
+const (
+	ENGLISH LangOptions = iota
+	SPANISH
+)
+
+var langAbbreviations = map[LangOptions]string{
+	ENGLISH: "en",
+	SPANISH: "es",
+}
+
+func NewLocalization(lang LangOptions) *Localization {
+
+	abb, ok := langAbbreviations[lang]
+	if !ok {
+		abb = "en"
 	}
 
-	path := "assets/local/" + lang + ".toml"
+	path := "assets/local/" + abb + ".toml"
 
 	f, err := embeddedAssets.Open(path)
 	if err != nil {
@@ -123,8 +136,9 @@ type GeneralLocalization struct {
 }
 
 type UiLocalization struct {
-	Ui       string `toml:"ui"`
-	Language string `toml:"language"`
+	Ui        string   `toml:"ui"`
+	Language  string   `toml:"language"`
+	Languages []string `toml:"languages"`
 
 	Backdrop    string `toml:"backdrop"`
 	BgColor     string `toml:"bg_color"`
