@@ -44,7 +44,6 @@ func NewRasterizer(vram VRAM, irq *cpu.Irq) *Rasterizer {
 
 	r.Export = NewExport(
 		config.Conf.Nds.Export.Directory,
-		config.Conf.Nds.Export.Format,
 		config.Conf.Nds.Export.ShadowPolys,
 		r,
 	)

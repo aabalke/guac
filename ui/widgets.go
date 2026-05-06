@@ -22,7 +22,7 @@ const (
 	WIDGET_FLE        //file
 	WIDGET_DIR        //directory
 	WIDGET_TXT        //text
-    WIDGET_LNK        //link
+	WIDGET_LNK        //link
 	WIDGET_RAD        //radio
 )
 
@@ -149,7 +149,7 @@ func NewColorInput(ui *Ui, label string, v *color.Color, validation func(s strin
 		}),
 		widget.TextInputOpts.ChangedHandler(func(a *widget.TextInputChangedEventArgs) {
 			*v = utils.HexToColor(a.InputText)
-            colorBox.SetBackgroundImage(image.NewBorderedNineSliceColor(*v, *ui.res.fgClr, 2))
+			colorBox.SetBackgroundImage(image.NewBorderedNineSliceColor(*v, *ui.res.fgClr, 2))
 		}),
 	)
 
@@ -208,7 +208,6 @@ func NewApplyPalettesMenu(focusGroups *[][]widget.Focuser, pals map[string][4]st
 
 	return c
 }
-
 
 func NewFileInput(v *string) widget.PreferredSizeLocateableWidget {
 	return dialogInput(v, func() string { return utils.OpenFile("Open", "All Files") })

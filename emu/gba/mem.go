@@ -5,8 +5,6 @@ import (
 	"math/bits"
 	"time"
 	"unsafe"
-
-	"github.com/aabalke/guac/config"
 )
 
 type Memory struct {
@@ -44,10 +42,6 @@ func NewMemory(gba *GBA) Memory {
 }
 
 func (m *Memory) InitSaveLoop() {
-
-	if config.Conf.Gba.DisableSaves {
-		return
-	}
 
 	saveTicker := time.Tick(time.Second)
 

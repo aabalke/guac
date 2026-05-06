@@ -108,7 +108,7 @@ func mouseInput(nds *Nds, mouse *input.Mouse, k2 *uint16) {
 	abs := nds.Screen.BtmAbs
 	tsc := &nds.mem.Spi.Tsc
 
-	if !mouse.DraggedLeft {
+	if !mouse.Dragged {
 		tsc.TouchActive = false
 		return
 	}

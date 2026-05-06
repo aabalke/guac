@@ -45,7 +45,7 @@ type Keyboard struct {
 	root   *widget.Container
 	main   *widget.Container
 	top    *widget.Container
-    boards [4]*widget.Container
+	boards [4]*widget.Container
 
 	cancelButton widget.Focuser
 
@@ -81,7 +81,7 @@ func NewKeyboard(res *Resources) *Keyboard {
 	k.top = widget.NewContainer(
 		widget.ContainerOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-                Position: widget.RowLayoutPositionCenter,
+				Position: widget.RowLayoutPositionCenter,
 			}),
 		),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
@@ -110,7 +110,7 @@ func (k *Keyboard) buildBoard(columns int, keys []string) *widget.Container {
 	board := widget.NewContainer(
 		widget.ContainerOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-                Position: widget.RowLayoutPositionCenter,
+				Position: widget.RowLayoutPositionCenter,
 			}),
 		),
 
@@ -153,7 +153,7 @@ func (k *Keyboard) buildBoard(columns int, keys []string) *widget.Container {
 				v := text.GetText() + key
 				text.SetText(v)
 				colorBox := children[1].(*widget.Container)
-                clr := image.NewBorderedNineSliceColor(utils.HexToColor(v), *k.res.fgClr, 2)
+				clr := image.NewBorderedNineSliceColor(utils.HexToColor(v), *k.res.fgClr, 2)
 				colorBox.SetBackgroundImage(clr)
 			}
 		}))
@@ -190,13 +190,13 @@ func (k *Keyboard) buildBoard(columns int, keys []string) *widget.Container {
 				text.SetText(s[:len(s)-1])
 			}
 
-            clr := image.NewBorderedNineSliceColor(utils.HexToColor(text.GetText()), *k.res.fgClr, 2)
+			clr := image.NewBorderedNineSliceColor(utils.HexToColor(text.GetText()), *k.res.fgClr, 2)
 			colorBox := children[1].(*widget.Container)
 			colorBox.SetBackgroundImage(clr)
 		}
 	})
 	cancel := k.buildKey("cancel", 160, func() { k.Close(false) })
-	enter  := k.buildKey("enter", 160, func() { k.Close(true) })
+	enter := k.buildKey("enter", 160, func() { k.Close(true) })
 
 	keyFocusers[columns-1].AddFocus(widget.FOCUS_EAST, backspace)
 	backspace.AddFocus(widget.FOCUS_WEST, keyFocusers[columns-1])
@@ -262,7 +262,7 @@ func (k *Keyboard) Open(ui *Ui, caller *widget.TextInput, board int, label strin
 			k.res.fonts.smallFace,
 			*k.res.fgClr,
 		),
-    )
+	)
 
 	if color, ok := v.(*color.Color); ok {
 		k.widget = _newColorInput(ui.res.fgClr, color)
@@ -295,10 +295,10 @@ func (k *Keyboard) Close(save bool) {
 
 func _newTextBoxInput(value any) *widget.TextInput {
 	input := widget.NewTextInput(
-        widget.TextInputOpts.WidgetOpts(
-            widget.WidgetOpts.MinSize(128,0),
-        ),
-    )
+		widget.TextInputOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(128, 0),
+		),
+	)
 	input.SetText(toString(value))
 	return input
 }
@@ -313,16 +313,16 @@ func _newColorInput(fgClr, value *color.Color) widget.PreferredSizeLocateableWid
 		)),
 	)
 
-    input := _newTextBoxInput(value)
-    clr := image.NewBorderedNineSliceColor(*value, *fgClr, 2)
+	input := _newTextBoxInput(value)
+	clr := image.NewBorderedNineSliceColor(*value, *fgClr, 2)
 
 	colorBox := widget.NewContainer(
-        widget.ContainerOpts.WidgetOpts(
-            widget.WidgetOpts.MinSize(128,0),
-        ),
+		widget.ContainerOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(128, 0),
+		),
 
-        widget.ContainerOpts.BackgroundImage(clr),
-    )
+		widget.ContainerOpts.BackgroundImage(clr),
+	)
 
 	container.AddChild(input, colorBox)
 

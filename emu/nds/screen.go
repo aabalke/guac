@@ -67,9 +67,9 @@ func NewScreen() *Screen {
 	s := &Screen{
 		Top:      ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 		Bottom:   ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
-		Layout:   &config.Conf.Nds.Screen.OLayout,
-		Sizing:   &config.Conf.Nds.Screen.OSizing,
-		Rotation: &config.Conf.Nds.Screen.ORotation,
+		Layout:   &config.Conf.Nds.Screen.Layout,
+		Sizing:   &config.Conf.Nds.Screen.Sizing,
+		Rotation: &config.Conf.Nds.Screen.Rotation,
 	}
 
 	return s

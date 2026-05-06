@@ -20,33 +20,19 @@
 # LeftRight        
 # CenterCenter     
 
-[mouse]
-
-fill = true
-stroke = true
-unselected_alpha = 0.5
-cursor_diameter = 8
-stroke_width = 2
-fill_color = 0xFFFFFF
-stroke_color = 0x000000
-
 [general]
 
 # only cancel audio init for profiling / benchmarking
 # cancel_audio_init = true
 
-vsync_disabled = true
-
+muted = false
 target_fps = 60
 show_fps = false
 init_fullscreen = false
 
-
 [ui]
-#language = "en"
-language = "es"
+language = "en"
 
-#fullscreen = true
 backdrop_color = 0x0A0A0A
 menu_background_color = 0xFFFFFF
 menu_foreground_color = 0x000000
@@ -64,16 +50,6 @@ right      = ["D", "ArrowRight"]
 up         = ["W", "ArrowUp"]
 down       = ["S", "ArrowDown"]
 
-# unlimited is limited to 65536 fps
-# Buttons used to toggle different fps
-unlimited  = ["U"]
-fps15      = ["Numpad1"]
-fps30      = ["Numpad2"]
-fps60      = ["Numpad3"]
-fps120     = ["Numpad4"]
-fps180     = ["Numpad5"]
-fps240     = ["Numpad6"]
-
 [general.controller]
 select = ["RightRight"]
 return = ["RightBottom"]
@@ -84,36 +60,10 @@ right  = ["LeftRight"]
 up     = ["LeftTop"]
 down   = ["LeftBottom"]
 
-[jit]
-
-# jit (just in time compilation) converts emulated machine code into native machine code when loops are detected. This increases the speed significantly but can ruin accuracy.
-# jit only supports amd64 (64 bit x86 instruction set)
-# jit only works for nds, gba is too time sensitive at this time
-
-enabled = true
-
-# how many times a loop occurs before jitting
-loop_cnt = 255
-
-# cnt of jit blocks in cache (per cpu)
-block_cnt = 0x1000
-
-page_shift = 16
-
-# how many instructions to batch at a time (use 16, or 32 for best results)
-# to many will cause crashes and artificants by desyncing cpus from sound and graphics
-batch_inst = 32
-
-# GB Configuration
-
 [gb]
-# Define a 4 color palette to replace greyscale using hex values
-# From lightest -> darkest
+# Define a 4 color palette to replace greyscale using hex values [lightest...darkest]
 # if invalid input, will fall back to greyscale
 #dmg_palette = [ 0xE0F8D0, 0x88C070, 0x346856, 0x081820 ]
-
-# forces "dmg", "gbc" or "auto" version for reading rom
-type = "auto"
 
 [gb.keyboard]
 
@@ -135,8 +85,6 @@ left   = ["LeftLeft"]
 right  = ["LeftRight"]
 up     = ["LeftTop"]
 down   = ["LeftBottom"]
-
-# GBA Configuration
 
 [gba]
 
@@ -172,8 +120,6 @@ up     = ["LeftTop"]
 down   = ["LeftBottom"]
 r = ["FrontTopRight", "FrontBottomRight"]
 l = ["FrontTopLeft", "FrontBottomLeft"]
-
-# NDS Configuration
 
 [nds]
 
@@ -253,5 +199,22 @@ y      = ["RightLeft"]
 # Obj export is basic and does not support texture blending, texture clamping,
 # repeat, or flipping. It's mostly for meshes.
 directory = "./export/"
-file_type = "obj"
 shadow_polygons = false
+
+[nds.jit]
+
+# jit (just in time compilation) converts emulated machine code into native machine code when loops are detected. This increases the speed significantly but can ruin accuracy.
+# jit only supports amd64 (64 bit x86 instruction set)
+# jit only works for nds, gba is too time sensitive at this time
+
+enabled = true
+
+# how many times a loop occurs before jitting
+loop_cnt = 255
+
+# cnt of jit blocks in cache (per cpu)
+block_cnt = 0x1000
+
+# how many instructions to batch at a time (use 16, or 32 for best results)
+# to many will cause crashes and artificants by desyncing cpus from sound and graphics
+batch_inst = 32

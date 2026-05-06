@@ -3,7 +3,6 @@ package snd
 import (
 	"fmt"
 
-	"github.com/aabalke/guac/config"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
 )
@@ -98,7 +97,7 @@ func NewSnd(ctx *oto.Context, freq, rate, cnt int) *Snd {
 
 	s.Capture = NewCaptures(s)
 
-	if !config.Conf.CancelAudioInit && ctx != nil {
+	if ctx != nil {
 		s.player = ctx.NewPlayer()
 		//go s.runCh()
 	}

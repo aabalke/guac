@@ -121,8 +121,8 @@ func NewGeneralMenu(g *Game, parent *widget.Container) {
 
 	var (
 		tmp = config.Conf.General
-		k   = &tmp.KeyboardConfig
-		c   = &tmp.ControllerConfig
+		k   = &tmp.Keyboard
+		c   = &tmp.Controller
 
 		l = g.ui.res.localization.Settings.General
 	)
@@ -196,8 +196,8 @@ func NewUiMenu(g *Game, parent *widget.Container) {
 		NewHeader(l.Ui, res), NewSeparator(),
 		NewLabel(l.Language), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.Language, l.Languages, res),
 		NewLabel(l.Backdrop), clrInputs[0],
-		NewLabel(l.BgColor),  clrInputs[1],
-		NewLabel(l.FgColor),  clrInputs[2],
+		NewLabel(l.BgColor), clrInputs[1],
+		NewLabel(l.FgColor), clrInputs[2],
 		NewLabel(l.AccentColor), clrInputs[3],
 		NewLabel(l.ApplyTheme),
 		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, theme_palettes, clrInputs, res),
@@ -342,13 +342,15 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 		c   = &tmp.ControllerConfig
 
 		l = g.ui.res.localization.Settings.Nds
+
+		favColor = config.ColorNames[tmp.Firmware.Color]
 	)
 
 	fields := []Field{
 		{WIDGET_HDR, l.Screen, "", nil, nil},
-		{WIDGET_RAD, l.Layout, "", &tmp.Screen.OLayout, l.Layouts},
-		{WIDGET_RAD, l.Sizing, "", &tmp.Screen.OSizing, l.Sizings},
-		{WIDGET_RAD, l.Rotation, "", &tmp.Screen.ORotation, l.Rotations},
+		{WIDGET_RAD, l.Layout, "", &tmp.Screen.Layout, l.Layouts},
+		{WIDGET_RAD, l.Sizing, "", &tmp.Screen.Sizing, l.Sizings},
+		{WIDGET_RAD, l.Rotation, "", &tmp.Screen.Rotation, l.Rotations},
 
 		{WIDGET_HDR, l.Rtc, "", nil, nil},
 		{WIDGET_DEC, l.AdditionalHours, l.AdditionalHours, &tmp.Rtc.AdditionalHours, 24},
@@ -361,7 +363,7 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 		{WIDGET_FLE, l.FilePath, "", &tmp.Firmware.FilePath, nil},
 		{WIDGET_TXT, l.Nickname, l.Nickname, &tmp.Firmware.Nickname, nil},
 		{WIDGET_TXT, l.Message, l.Message, &tmp.Firmware.Message, nil},
-		{WIDGET_TXT, l.FavoriteColor, l.FavoriteColor, &tmp.Firmware.FavoriteColor, nil},
+		{WIDGET_TXT, l.FavoriteColor, l.FavoriteColor, &favColor, nil},
 
 		{WIDGET_HDR, l.SceneExport, "", nil, nil},
 		{WIDGET_DIR, l.OutputDirectory, "", &tmp.Export.Directory, "./export"},
@@ -407,6 +409,9 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 
 	parent.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Nds = tmp
+
+		config.Conf.Nds.Firmware.Color = config.ColorNameToId[favColor]
+
 		if len(g.gamepadIds) != 0 {
 			g.ui.focus.FocusLastSubMenu()
 		}

@@ -4,8 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"sync"
-
-	"github.com/aabalke/guac/config"
 )
 
 var wg = sync.WaitGroup{}
@@ -66,9 +64,11 @@ func (gba *GBA) scanlineGraphics(y uint32) {
 	}
 }
 
+const THREADS = 0
+
 func (gba *GBA) scanlineTileMode(y uint32) {
 
-	if config.Conf.Gba.Threads == 0 {
+	if THREADS == 0 {
 
 		x := uint32(0)
 		for x = range SCREEN_WIDTH {
@@ -78,7 +78,7 @@ func (gba *GBA) scanlineTileMode(y uint32) {
 		return
 	}
 
-	WAIT_GROUPS := config.Conf.Gba.Threads
+	WAIT_GROUPS := THREADS
 	dx := SCREEN_WIDTH / WAIT_GROUPS
 
 	wg.Add(WAIT_GROUPS)
@@ -328,7 +328,7 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 		gba.applyColor(finalPalData, uint32(index))
 	}
 
-	if config.Conf.Gba.Threads == 0 {
+	if THREADS == 0 {
 
 		x := uint32(0)
 		for x = range SCREEN_WIDTH {
@@ -338,7 +338,7 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 		return
 	}
 
-	WAIT_GROUPS := config.Conf.Gba.Threads
+	WAIT_GROUPS := THREADS
 	dx := SCREEN_WIDTH / WAIT_GROUPS
 
 	wg.Add(WAIT_GROUPS)

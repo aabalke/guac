@@ -24,9 +24,9 @@ func toString(value any) string {
 
 	case *[]ebiten.StandardGamepadButton:
 		return join(*v, ", ", utils.GamepadButtonToString)
-    
-    case *color.Color:
-        return utils.ColorToHex(*v)
+
+	case *color.Color:
+		return utils.ColorToHex(*v)
 
 	default:
 		panic("not supported text box input")

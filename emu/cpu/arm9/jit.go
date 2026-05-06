@@ -63,7 +63,9 @@ type Page struct {
 func NewJit(cpu *Cpu) *Jit {
 
 	const (
-		PAGE_SIZE = 0x10000
+		PAGE_SIZE  = 0x10000
+		PAGE_SHIFT = 16
+		PAGE_MASK  = (1 << PAGE_SHIFT) - 1
 	)
 
 	CpuPointer = cpu
@@ -73,21 +75,16 @@ func NewJit(cpu *Cpu) *Jit {
 		return j
 	}
 
-	conf := config.Conf.Jit
-
-	j := &Jit{
+	return &Jit{
 		Cpu:   cpu,
-		Pages: make([]*Page, ADDRESS_SPACE>>conf.PageShift),
+		Pages: make([]*Page, ADDRESS_SPACE>>PAGE_SHIFT),
 		BlockCache: InitBlockCache(
-			config.Conf.Jit.BlockCnt,
+			config.Conf.Nds.Jit.BlockCnt,
 			PAGE_SIZE),
-		LoopThreshold: config.Conf.Jit.LoopCnt,
+		LoopThreshold: config.Conf.Nds.Jit.LoopCnt,
+		PageShift:     PAGE_SHIFT,
+		PageMask:      PAGE_MASK,
 	}
-
-	j.PageShift = conf.PageShift
-	j.PageMask = (1 << conf.PageShift) - 1
-
-	return j
 }
 
 func (j *Jit) Close() {
@@ -256,7 +253,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 	if thumb {
 		for {
 			op = uint32(*(*uint16)(unsafe.Add(p, i*2)))
-			if length >= config.Conf.Jit.BatchInstA9 {
+			if length >= config.Conf.Nds.Jit.BatchInstA9 {
 
 				break
 			}
@@ -299,7 +296,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 		for {
 			op = *(*uint32)(unsafe.Add(p, i*4))
 
-			if length >= config.Conf.Jit.BatchInstA9 {
+			if length >= config.Conf.Nds.Jit.BatchInstA9 {
 
 				break
 			}
@@ -756,7 +753,7 @@ var (
 
 func (j *Jit) StartTest(op uint32, compare bool, f func(op uint32)) {
 
-	if config.Conf.Jit.Enabled {
+	if config.Conf.Nds.Jit.Enabled {
 		panic("Jit Instruction Test is running with Jit Running")
 	}
 

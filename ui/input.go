@@ -50,8 +50,8 @@ func (g *Game) GetGamepadButtons() (justButtons, buttons []ebiten.StandardGamepa
 }
 
 func uniqueButtons(in *[]ebiten.StandardGamepadButton) []ebiten.StandardGamepadButton {
-	set := make(map[ebiten.StandardGamepadButton]struct{}, len(*in))
 
+	set := make(map[ebiten.StandardGamepadButton]struct{}, len(*in))
 	for _, b := range *in {
 		set[b] = struct{}{}
 	}
@@ -76,8 +76,8 @@ func (g *Game) GetInput() (justKeys, keys []ebiten.Key, justButtons, buttons []e
 		return
 	}
 
-	keyConfig := config.Conf.General.KeyboardConfig
-	buttonConfig := config.Conf.General.ControllerConfig
+	keyConfig := config.Conf.General.Keyboard
+	buttonConfig := config.Conf.General.Controller
 
 	for _, key := range justKeys {
 		switch keyStr := key.String(); {
@@ -114,7 +114,7 @@ func (g *Game) GetInput() (justKeys, keys []ebiten.Key, justButtons, buttons []e
 
 func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) {
 
-	buttonConfig := config.Conf.General.ControllerConfig
+	buttonConfig := config.Conf.General.Controller
 
 	switch g.ui.PageId {
 	case PAGE_HOME, PAGE_PAUSE:

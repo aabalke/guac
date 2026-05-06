@@ -1,7 +1,6 @@
 package apu
 
 import (
-	"github.com/aabalke/guac/config"
 	"github.com/hajimehoshi/oto"
 )
 
@@ -115,7 +114,7 @@ func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu 
 	}
 	a.NoiseChannel = NoiseChannel{Apu: a, Idx: 3}
 
-	if !config.Conf.CancelAudioInit && audioContext != nil {
+	if audioContext != nil {
 		a.player = audioContext.NewPlayer()
 	}
 

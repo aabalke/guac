@@ -53,6 +53,11 @@ var radioInset = widget.Insets{
 
 var transparentNine = image.NewNineSliceColor(color.Transparent)
 
+var scrollContainerImage = widget.ScrollContainerImage{
+    Mask: image.NewNineSliceColor(color.Black),
+    Idle: transparentNine,
+}
+
 //go:embed assets
 var embeddedAssets embed.FS
 

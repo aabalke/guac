@@ -1,11 +1,9 @@
 package ui
 
 import (
-	"image/color"
 	"math"
 
 	"github.com/ebitenui/ebitenui"
-	"github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
 )
 
@@ -79,10 +77,7 @@ func NewScrollableContainer(ui *Ui) *widget.Container {
 	ui.scrollable = widget.NewScrollContainer(
 		widget.ScrollContainerOpts.Content(ui.content),
 		widget.ScrollContainerOpts.StretchContentWidth(),
-		widget.ScrollContainerOpts.Image(&widget.ScrollContainerImage{
-			Mask: image.NewNineSliceColor(color.Black),
-			Idle: transparentNine,
-		}),
+		widget.ScrollContainerOpts.Image(&scrollContainerImage),
 	)
 
 	pageSizeFunc := func() int {

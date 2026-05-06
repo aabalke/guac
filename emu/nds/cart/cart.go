@@ -6,7 +6,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/utils"
@@ -273,10 +272,6 @@ func (c *Cartridge) RomTransfer(initial bool, arm9 bool) {
 }
 
 func (c *Cartridge) InitSaveLoop() {
-
-	if config.Conf.Nds.DisableSaves {
-		return
-	}
 
 	saveTicker := time.Tick(time.Second)
 

@@ -5,8 +5,6 @@ import (
 	"os"
 	"slices"
 	"strings"
-
-	"github.com/aabalke/guac/config"
 )
 
 type Cartridge struct {
@@ -65,13 +63,6 @@ func NewCartridge(rompath, savpath string) *Cartridge {
 	}
 
 	fmt.Printf("Title: %s\n", c.Title)
-
-	switch {
-	case config.Conf.Gb.ForceGBC:
-		c.ColorMode = true
-	case config.Conf.Gb.ForceDMG:
-		c.ColorMode = false
-	}
 
 	switch c.Type {
 	case 0x00, 0x08, 0x09:

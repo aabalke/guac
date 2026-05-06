@@ -6,7 +6,6 @@ import (
 	"math/bits"
 	"time"
 
-	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/nds/rast"
 	"github.com/aabalke/guac/emu/nds/utils"
@@ -193,14 +192,6 @@ type Object struct {
 func NewPPU(irq *cpu.Irq) *PPU {
 
 	p := &PPU{}
-
-	if config.Conf.Nds.FrameSkip >= 2 {
-		p.FrameSkipMask = config.Conf.Nds.FrameSkip - 1
-	}
-
-	if config.Conf.Nds.DynamicFrameSkip {
-		go p.updateFrameSkip()
-	}
 
 	p.EngineA.Pixels = make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)
 	p.EngineB.Pixels = make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)

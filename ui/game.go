@@ -185,8 +185,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	screen.Fill(config.Conf.Ui.Backdrop)
 
-	defer g.mouse.Draw(screen)
-
 	switch {
 	case g.ui.ui != nil:
 		g.ui.ui.Draw(screen)

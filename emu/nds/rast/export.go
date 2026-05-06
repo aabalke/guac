@@ -14,13 +14,7 @@ import (
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 )
 
-const (
-	FORMAT_OBJ = iota
-	FORMAT_GLTF
-)
-
 type Export struct {
-	Format      int
 	Directory   string
 	Rasterizer  *Rasterizer
 	ShadowPolys bool
@@ -35,10 +29,9 @@ type Export struct {
 	usedTextures map[uintptr]int
 }
 
-func NewExport(dir string, format int, shadowPolys bool, rast *Rasterizer) *Export {
+func NewExport(dir string, shadowPolys bool, rast *Rasterizer) *Export {
 	return &Export{
 		Directory:   dir,
-		Format:      format,
 		ShadowPolys: shadowPolys,
 		Rasterizer:  rast,
 	}
@@ -49,12 +42,7 @@ func (e *Export) Export() {
 
 	polys := e.Rasterizer.Buffers.GetBuffer().Polys
 
-	switch e.Format {
-	case FORMAT_GLTF:
-		panic("unsupported export type gltf")
-	default:
-		e.ExportObj(polys)
-	}
+	e.ExportObj(polys)
 
 	fmt.Printf("Exported Scene\n")
 }

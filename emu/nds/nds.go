@@ -90,8 +90,8 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 	cp15 := &cp15.Cp15{}
 	cp15.Init(&nds.mem)
 
-	nds.arm7 = arm7.NewCpu(config.Conf.Jit.Enabled, &nds.mem, &irq7)
-	nds.arm9 = arm9.NewCpu(config.Conf.Jit.Enabled, &nds.mem, &irq9, cp15)
+	nds.arm7 = arm7.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem, &irq7)
+	nds.arm9 = arm9.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem, &irq9, cp15)
 
 	s := snd.NewSnd(
 		audioCtx,
@@ -177,19 +177,19 @@ func (nds *Nds) UpdateFrame(stdFps bool) {
 
 	for nds.Drawn = false; !nds.Drawn; {
 
-		if config.Conf.Jit.Enabled {
+		if config.Conf.Nds.Jit.Enabled {
 
-			for c := uint32(0); c < config.Conf.Jit.BatchInstA9; {
+			for c := uint32(0); c < config.Conf.Nds.Jit.BatchInstA9; {
 				c += nds.StepArm9()
 			}
 
-			for c := uint32(0); c < config.Conf.Jit.BatchInstA7; {
+			for c := uint32(0); c < config.Conf.Nds.Jit.BatchInstA7; {
 				c += nds.StepArm7()
 			}
 
-			nds.VideoUpdate(config.Conf.Jit.BatchInstA7)
+			nds.VideoUpdate(config.Conf.Nds.Jit.BatchInstA7)
 
-			for c := uint32(0); c < config.Conf.Jit.BatchInstA7; {
+			for c := uint32(0); c < config.Conf.Nds.Jit.BatchInstA7; {
 				nds.StepOther()
 				c++
 			}
@@ -212,7 +212,7 @@ func (nds *Nds) UpdateFrame(stdFps bool) {
 		}
 	}
 
-	if config.Conf.Jit.Enabled {
+	if config.Conf.Nds.Jit.Enabled {
 		nds.arm7.Jit.DeletePages()
 		nds.arm9.Jit.DeletePages()
 	}
