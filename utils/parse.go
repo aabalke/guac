@@ -15,7 +15,7 @@ func GetRomType(path string) RomType {
 
 	switch {
 	case strings.HasSuffix(path, ".gb"),
-	     strings.HasSuffix(path, ".gbc"):
+		strings.HasSuffix(path, ".gbc"):
 		return GB
 	case strings.HasSuffix(path, ".gba"):
 		return GBA

@@ -22,13 +22,16 @@
 
 [general]
 
-# only cancel audio init for profiling / benchmarking
-# cancel_audio_init = true
-
-muted = false
-target_fps = 60
-show_fps = false
+muted           = false
+target_fps      = 60
+show_fps        = false
 init_fullscreen = false
+vsync_enabled   = true
+disable_saves   = false
+
+# only use this if you load the same game constantly
+# otherwise it would be better to use the cli flags or gui
+# rom_path = "./rom/gb/path.gb"
 
 [general.keyboard]
 select     = ["J", "Enter"]
@@ -64,6 +67,7 @@ menu_secondary_color  = 0xCCCCCC
 # used for performance profiling. Uses go pprof
 # cmd: go tool pprof profile.prof
 # usually 60 ticks per second
+# profiler ignores target fps and runs "unlimited" 
 enabled = false
 file_path = "./profile.prof"
 start_tick = 0

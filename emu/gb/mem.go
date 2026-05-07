@@ -4,6 +4,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gb/cartridge"
 	"github.com/aabalke/guac/utils"
 )
@@ -209,6 +210,11 @@ func initMemory(gb *GameBoy) {
 }
 
 func (gb *GameBoy) SaveRam() {
+
+	if config.Conf.General.DisableSaves {
+		return
+	}
+
 	if !gb.MemoryBus.ramSaved {
 		cartridge.WriteRam(gb.Cartridge.SavPath, gb.Cartridge.RamData)
 		gb.Cartridge.Mbc.Save()

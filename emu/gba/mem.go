@@ -5,6 +5,8 @@ import (
 	"math/bits"
 	"time"
 	"unsafe"
+
+	"github.com/aabalke/guac/config"
 )
 
 type Memory struct {
@@ -47,6 +49,11 @@ func (m *Memory) InitSaveLoop() {
 
 	go func() {
 		for range saveTicker {
+
+			if config.Conf.General.DisableSaves {
+				continue
+			}
+
 			if m.GBA.Save {
 				m.GBA.Cartridge.Save()
 				m.GBA.Save = false

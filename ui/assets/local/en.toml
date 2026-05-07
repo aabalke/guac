@@ -36,6 +36,8 @@ muted           = "muted"
 show_fps        = "show fps"
 init_fullscreen = "init fullscreen"
 target_fps      = "target fps"
+vsync_enabled   = "vsync enabled"
+disable_saves   = "disable saves"
 
 keyboard        = "keyboard"
 controller      = "controller"

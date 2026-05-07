@@ -70,18 +70,20 @@ var ColorNameToId = map[string]FirmwareColor{
 type Config struct {
 	General General
 	Ui      Ui
-    Profile Profile
+	Profile Profile
 	Gb      Gb
 	Gba     Gba
 	Nds     NdsConfig
 }
 
 type General struct {
-    RomPath        string
+	RomPath        string
 	Muted          bool
 	TargetFps      int
 	ShowFps        bool
 	InitFullscreen bool
+	Vsync          bool
+	DisableSaves   bool
 	Keyboard       GeneralKeyboard
 	Controller     GeneralController
 }
@@ -121,10 +123,10 @@ type Ui struct {
 }
 
 type Profile struct {
-    Enabled   bool
-    FilePath  string
-    StartTick int64
-    EndTick   int64
+	Enabled   bool
+	FilePath  string
+	StartTick int64
+	EndTick   int64
 }
 
 type Gb struct {

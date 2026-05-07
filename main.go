@@ -8,6 +8,6 @@ import (
 
 func main() {
 	file.Decode()
-    flags.Decode()
+	flags.Decode()
 	ui.StartEngine()
 }

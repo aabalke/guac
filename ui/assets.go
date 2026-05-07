@@ -56,8 +56,8 @@ var keybindsLink = "see [link=https://guacemulator.com]guacemulator.com[/link] f
 var transparentNine = image.NewNineSliceColor(color.Transparent)
 
 var scrollContainerImage = widget.ScrollContainerImage{
-    Mask: image.NewNineSliceColor(color.Black),
-    Idle: transparentNine,
+	Mask: image.NewNineSliceColor(color.Black),
+	Idle: transparentNine,
 }
 
 //go:embed assets
@@ -267,10 +267,10 @@ func NewTheme(r *Resources) *widget.Theme {
 		TextTheme: &widget.TextParams{
 			Face:  r.fonts.smallFace,
 			Color: *r.fgClr,
-            LinkColor: &widget.TextLinkColor{
-                Idle: *r.secClr,
-                Hover: *r.fgClr,
-            },
+			LinkColor: &widget.TextLinkColor{
+				Idle:  *r.secClr,
+				Hover: *r.fgClr,
+			},
 		},
 
 		TextInputTheme: &widget.TextInputParams{

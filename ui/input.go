@@ -44,8 +44,8 @@ func (g *Game) GetGamepadButtons() (justButtons, buttons []ebiten.StandardGamepa
 		buttons = inpututil.AppendPressedStandardGamepadButtons(id, buttons)
 	}
 
-    utils.MakeUnique(&justButtons)
-    utils.MakeUnique(&buttons)
+	utils.MakeUnique(&justButtons)
+	utils.MakeUnique(&buttons)
 
 	return justButtons, buttons
 }

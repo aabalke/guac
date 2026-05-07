@@ -47,6 +47,7 @@ type Game struct {
 
 	pauseEndTick int64
 	TargetFps    int
+	vsync        bool
 
 	paused bool
 	muted  bool
@@ -81,19 +82,18 @@ func StartEngine() {
 	ebiten.SetWindowTitle("guac emulator")
 	ebiten.SetWindowIcon(res.icon)
 	ebiten.SetWindowSize(256*4, 192*4)
-	//ebiten.SetVsyncEnabled(!config.Conf.VsyncDisabled)
-	ebiten.SetVsyncEnabled(true)
 
-	ebiten.SetCursorMode(ebiten.CursorModeHidden)
+	ebiten.SetVsyncEnabled(config.Conf.General.Vsync)
+
 	if config.Conf.General.InitFullscreen {
 		ebiten.SetFullscreen(true)
 	}
 
 	g := NewGame(res)
 
-    if ok := g.InitConsole(config.Conf.General.RomPath); !ok {
-        NewHome(g)
-    }
+	if ok := g.InitConsole(config.Conf.General.RomPath); !ok {
+		NewHome(g)
+	}
 
 	err = ebiten.RunGame(g)
 	if err != nil {
@@ -107,17 +107,18 @@ func NewGame(res *Resources) *Game {
 		audioCtx:     NewAudioContext(),
 		mouse:        input.NewMouse(),
 		TargetFps:    config.Conf.General.TargetFps,
+		vsync:        config.Conf.General.Vsync,
 		gamepadIds:   make(map[ebiten.GamepadID]struct{}),
 		gamepadIdBuf: make([]ebiten.GamepadID, 0),
-        ui: &Ui{
-            res:   res,
-            focus: &Focus{},
-            toast: NewToast(res),
-            keyboard: NewKeyboard(res),
-        },
-    }
+		ui: &Ui{
+			res:      res,
+			focus:    &Focus{},
+			toast:    NewToast(res),
+			keyboard: NewKeyboard(res),
+		},
+	}
 
-    return g
+	return g
 }
 
 func (g *Game) Layout(outsideWidth int, outsideHeight int) (int, int) {
@@ -133,15 +134,18 @@ func (g *Game) Update() error {
 		ebiten.SetTPS(g.TargetFps)
 	}
 
+	if config.Conf.General.Vsync != g.vsync {
+		g.vsync = config.Conf.General.Vsync
+		ebiten.SetVsyncEnabled(g.vsync)
+	}
+
 	g.Profile()
 
 	justKeys, keys, _, buttons := g.GetInput()
 
-	if g.quit {
-		return ebiten.Termination
-	}
-
 	switch {
+	case g.quit:
+		return ebiten.Termination
 	case g.ui.ui != nil:
 
 		if ebiten.Tick() < 1 &&
@@ -256,59 +260,59 @@ func (g *Game) ToggleMute() {
 }
 
 var (
-    t time.Time
-    f *os.File
+	t time.Time
+	f *os.File
 )
 
-const UNLIMITED_FPS = 0x10000
+const UNLIMITED_FPS = 0x1000
 
 func (g *Game) Profile() {
 
-    p := &config.Conf.Profile
+	p := &config.Conf.Profile
 
-    if !p.Enabled {
-        return
-    }
+	if !p.Enabled {
+		return
+	}
 
-    if ebiten.Tick() == p.StartTick {
+	if ebiten.Tick() == p.StartTick {
 
-        if g.gb != nil {
-            g.gb.Muted = true
-        }
-        if g.gba != nil {
-            g.gba.Muted = true
-        }
-        if g.nds != nil {
-            g.nds.Muted = true
-        }
+		if g.gb != nil {
+			g.gb.Muted = true
+		}
+		if g.gba != nil {
+			g.gba.Muted = true
+		}
+		if g.nds != nil {
+			g.nds.Muted = true
+		}
 
-        ebiten.SetTPS(UNLIMITED_FPS)
+		ebiten.SetTPS(UNLIMITED_FPS)
 
-        var err error
-        f, err = os.Create(p.FilePath)
-        if err != nil {
-            panic(err)
-        }
+		var err error
+		f, err = os.Create(p.FilePath)
+		if err != nil {
+			panic(err)
+		}
 
-        println("starting profiler")
+		println("starting profiler")
 
-        pprof.StartCPUProfile(f)
-        t = time.Now()
-    }
+		pprof.StartCPUProfile(f)
+		t = time.Now()
+	}
 
-    if ebiten.Tick() >= p.EndTick {
+	if ebiten.Tick() >= p.EndTick {
 		dur := time.Since(t).Seconds()
 
 		reqDur := (float64(p.EndTick-p.StartTick) / 60.0)
 
 		fmt.Printf("DURATION %.2f seconds. %.2fx faster.\n", time.Since(t).Seconds(), reqDur/dur)
 
-        pprof.StopCPUProfile()
+		pprof.StopCPUProfile()
 		f.Close()
 
 		println("ending profiling")
-        g.quit = true
-    }
+		g.quit = true
+	}
 }
 
 func (g *Game) InitConsole(file string) bool {
@@ -319,7 +323,7 @@ func (g *Game) InitConsole(file string) bool {
 		if g.muted {
 			g.gb.ToggleMute()
 		}
-        return true
+		return true
 
 	case utils.GBA:
 		g.gba = gba.NewGBA(file, g.audioCtx)
@@ -327,7 +331,7 @@ func (g *Game) InitConsole(file string) bool {
 		if g.muted {
 			g.gba.ToggleMute()
 		}
-        return true
+		return true
 
 	case utils.NDS:
 		g.nds = nds.NewNds(file, g.audioCtx)
@@ -335,8 +339,8 @@ func (g *Game) InitConsole(file string) bool {
 		if g.muted {
 			g.nds.ToggleMute()
 		}
-        return true
-    default:
-        return false
+		return true
+	default:
+		return false
 	}
 }

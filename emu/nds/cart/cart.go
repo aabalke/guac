@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/utils"
@@ -277,6 +278,11 @@ func (c *Cartridge) InitSaveLoop() {
 
 	go func() {
 		for range saveTicker {
+
+			if config.Conf.General.DisableSaves {
+				continue
+			}
+
 			if c.SaveFlag {
 				log.Printf("Saving Game Path: %s\n", c.SavPath)
 				utils.WriteFile(c.SavPath, c.Sav[:])

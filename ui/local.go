@@ -100,6 +100,8 @@ type GeneralLocalization struct {
 	ShowFps              string `toml:"show_fps"`
 	InitFullscreen       string `toml:"init_fullscreen"`
 	TargetFps            string `toml:"target_fps"`
+	VsyncEnabled         string `toml:"vsync_enabled"`
+	DisableSaves         string `toml:"disable_saves"`
 	Keyboard             string `toml:"keyboard"`
 	Controller           string `toml:"controller"`
 	Select               string `toml:"select"`

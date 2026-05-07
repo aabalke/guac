@@ -133,9 +133,11 @@ func NewGeneralMenu(g *Game, parent *widget.Container) {
 		{WIDGET_CBX, l.ShowFps, "", &tmp.ShowFps, nil},
 		{WIDGET_CBX, l.InitFullscreen, "", &tmp.InitFullscreen, nil},
 		{WIDGET_DEC, l.TargetFps, l.TargetFps, &tmp.TargetFps, 1000000},
+		{WIDGET_CBX, l.VsyncEnabled, "", &tmp.Vsync, nil},
+		{WIDGET_CBX, l.DisableSaves, "", &tmp.DisableSaves, nil},
 
 		{WIDGET_HDR, l.Keyboard, "", nil, nil},
-        {WIDGET_LNK, "", "", nil, keybindsLink},
+		{WIDGET_LNK, "", "", nil, keybindsLink},
 		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, nil},
 		{WIDGET_KEY, l.Return, l.KeyboardReturn, &k.Return, nil},
 		{WIDGET_KEY, l.Mute, l.KeyboardMute, &k.Mute, nil},
@@ -148,7 +150,7 @@ func NewGeneralMenu(g *Game, parent *widget.Container) {
 		{WIDGET_KEY, l.Quit, l.KeyboardQuit, &k.Quit, nil},
 
 		{WIDGET_HDR, l.Controller, "", nil, nil},
-        {WIDGET_LNK, "", "", nil, keybindsLink},
+		{WIDGET_LNK, "", "", nil, keybindsLink},
 		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, nil},
 		{WIDGET_KEY, l.Return, l.ControllerReturn, &c.Return, nil},
 		{WIDGET_KEY, l.Mute, l.ControllerMute, &c.Mute, nil},
@@ -241,7 +243,7 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 
 	fields := []Field{
 		{WIDGET_HDR, l.Keyboard, "", nil, nil},
-        {WIDGET_LNK, "", "", nil, keybindsLink},
+		{WIDGET_LNK, "", "", nil, keybindsLink},
 		{WIDGET_KEY, l.A, l.KeyboardA, &k.A, nil},
 		{WIDGET_KEY, l.B, l.KeyboardB, &k.B, nil},
 		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, nil},
@@ -252,7 +254,7 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 		{WIDGET_KEY, l.Down, l.KeyboardDown, &k.Down, nil},
 
 		{WIDGET_HDR, l.Controller, "", nil, nil},
-        {WIDGET_LNK, "", "", nil, keybindsLink},
+		{WIDGET_LNK, "", "", nil, keybindsLink},
 		{WIDGET_KEY, l.A, l.ControllerA, &c.A, nil},
 		{WIDGET_KEY, l.B, l.ControllerB, &c.B, nil},
 		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, nil},
@@ -302,7 +304,7 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 		{WIDGET_HEX, l.SoundClockCycles, l.SoundClockCycles, &tmp.SoundClockUpdateCycles, 1000},
 
 		{WIDGET_HDR, l.Keyboard, "", nil, nil},
-        {WIDGET_LNK, "", "", nil, keybindsLink},
+		{WIDGET_LNK, "", "", nil, keybindsLink},
 		{WIDGET_KEY, l.A, l.KeyboardA, &k.A, nil},
 		{WIDGET_KEY, l.B, l.KeyboardB, &k.B, nil},
 		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, nil},
@@ -315,7 +317,7 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 		{WIDGET_KEY, l.R, l.KeyboardR, &k.R, nil},
 
 		{WIDGET_HDR, l.Controller, "", nil, nil},
-        {WIDGET_LNK, "", "", nil, keybindsLink},
+		{WIDGET_LNK, "", "", nil, keybindsLink},
 		{WIDGET_KEY, l.A, l.ControllerA, &c.A, nil},
 		{WIDGET_KEY, l.B, l.ControllerB, &c.B, nil},
 		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, nil},
@@ -376,7 +378,7 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 		{WIDGET_CBX, l.ShadowPolygons, "", &tmp.Export.ShadowPolys, nil},
 
 		{WIDGET_HDR, l.Keyboard, "", nil, nil},
-        {WIDGET_LNK, "", "", nil, keybindsLink},
+		{WIDGET_LNK, "", "", nil, keybindsLink},
 		{WIDGET_KEY, l.A, l.KeyboardA, &k.A, nil},
 		{WIDGET_KEY, l.B, l.KeyboardB, &k.B, nil},
 		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, nil},
@@ -397,7 +399,7 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 		{WIDGET_KEY, l.ExportToggle, l.KeyboardExportToggle, &k.ExportScene, nil},
 
 		{WIDGET_HDR, l.Controller, "", nil, nil},
-        {WIDGET_LNK, "", "", nil, keybindsLink},
+		{WIDGET_LNK, "", "", nil, keybindsLink},
 		{WIDGET_KEY, l.A, l.ControllerA, &c.A, nil},
 		{WIDGET_KEY, l.B, l.ControllerB, &c.B, nil},
 		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, nil},

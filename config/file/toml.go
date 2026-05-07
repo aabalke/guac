@@ -33,6 +33,9 @@ type General struct {
 	TargetFps      int          `toml:"target_fps"`
 	ShowFps        bool         `toml:"show_fps"`
 	InitFullscreen bool         `toml:"fullscreen"`
+	Vsync          bool         `toml:"vsync_enabled"`
+	RomPath        string       `toml:"rom_path"`
+	DisableSaves   bool         `toml:"disable_saves"`
 	Keyboard       GeneralInput `toml:"keyboard"`
 	Controller     GeneralInput `toml:"controller"`
 }
@@ -59,10 +62,10 @@ type Ui struct {
 }
 
 type Profile struct {
-    Enabled   bool   `toml:"enabled"`
-    FilePath  string `toml:"file_path"`
-    StartTick int64  `toml:"start_tick"`
-    EndTick   int64  `toml:"end_tick"`
+	Enabled   bool   `toml:"enabled"`
+	FilePath  string `toml:"file_path"`
+	StartTick int64  `toml:"start_tick"`
+	EndTick   int64  `toml:"end_tick"`
 }
 
 type Gb struct {
@@ -151,7 +154,7 @@ func Decode() {
 	c.open()
 	c.decodeGeneral()
 	c.decodeUi()
-    c.decodeProfile()
+	c.decodeProfile()
 	c.decodeGb()
 	c.decodeGba()
 	c.decodeNds()
@@ -192,6 +195,9 @@ func (c *Config) decodeGeneral() {
 	c.config.General.TargetFps = c.General.TargetFps
 	c.config.General.ShowFps = c.General.ShowFps
 	c.config.General.InitFullscreen = c.General.InitFullscreen
+	c.config.General.Vsync = c.General.Vsync
+	c.config.General.RomPath = c.General.RomPath
+	c.config.General.DisableSaves = c.General.DisableSaves
 
 	in := &c.General.Keyboard
 	confKey := &c.config.General.Keyboard
@@ -299,14 +305,14 @@ func (c *Config) decodeUi() {
 }
 
 func (c *Config) decodeProfile() {
-    c.config.Profile.Enabled = c.Profile.Enabled
-    c.config.Profile.FilePath = c.Profile.FilePath
-    c.config.Profile.StartTick = c.Profile.StartTick
-    c.config.Profile.EndTick = c.Profile.EndTick
+	c.config.Profile.Enabled = c.Profile.Enabled
+	c.config.Profile.FilePath = c.Profile.FilePath
+	c.config.Profile.StartTick = c.Profile.StartTick
+	c.config.Profile.EndTick = c.Profile.EndTick
 
-    if c.Profile.StartTick >= c.Profile.EndTick {
-        panic("profile config invalid, provided Start >= End")
-    }
+	if c.Profile.StartTick >= c.Profile.EndTick {
+		panic("profile config invalid, provided Start >= End")
+	}
 
 }
 
@@ -461,23 +467,23 @@ func (c *Config) decodeNdsFirmware() {
 
 func (c *Config) decodeNdsJit() {
 
-	c.config.Nds.Jit.Enabled = c.Nds.Jit.Enabled && sys.X86.HasSSE2
+	c.config.Nds.Jit.Enabled = c.Nds.Jit.Enabled && sys.X86.HasBMI2
 
-	if c.config.Nds.Jit.Enabled {
+	if !c.config.Nds.Jit.Enabled {
 		c.Nds.Jit.BatchInst = 1
 	}
 
-    if c.Nds.Jit.LoopCnt != 0 {
-        c.config.Nds.Jit.LoopCnt = c.Nds.Jit.LoopCnt
-    } else {
-        c.config.Nds.Jit.LoopCnt = 255
-    }
+	if c.Nds.Jit.LoopCnt != 0 {
+		c.config.Nds.Jit.LoopCnt = c.Nds.Jit.LoopCnt
+	} else {
+		c.config.Nds.Jit.LoopCnt = 255
+	}
 
-    if c.Nds.Jit.BlockCnt != 0 {
-        c.config.Nds.Jit.BlockCnt = c.Nds.Jit.BlockCnt
-    } else {
-        c.config.Nds.Jit.BlockCnt = 0x1000
-    }
+	if c.Nds.Jit.BlockCnt != 0 {
+		c.config.Nds.Jit.BlockCnt = c.Nds.Jit.BlockCnt
+	} else {
+		c.config.Nds.Jit.BlockCnt = 0x1000
+	}
 
 	c.config.Nds.Jit.BatchInstA9 = max(c.Nds.Jit.BatchInst, 2)
 	c.config.Nds.Jit.BatchInstA7 = max(c.Nds.Jit.BatchInst/2, 1)

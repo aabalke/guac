@@ -3,12 +3,12 @@ package utils
 type Set[T comparable] map[T]struct{}
 
 func (s Set[T]) add(t T) {
-    s[t] = struct{}{}
+	s[t] = struct{}{}
 }
 
 func (s Set[T]) has(t T) bool {
-    _, ok := s[t]
-    return ok
+	_, ok := s[t]
+	return ok
 }
 
 func MakeUnique[T comparable](in *[]T) {
@@ -23,5 +23,5 @@ func MakeUnique[T comparable](in *[]T) {
 		out = append(out, b)
 	}
 
-    *in = out
+	*in = out
 }
