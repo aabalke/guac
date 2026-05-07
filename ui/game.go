@@ -2,6 +2,9 @@ package ui
 
 import (
 	"log"
+	"os"
+	"runtime/pprof"
+	"time"
 
 	"github.com/ebitenui/ebitenui"
 	"github.com/ebitenui/ebitenui/widget"
@@ -86,13 +89,11 @@ func StartEngine() {
 		ebiten.SetFullscreen(true)
 	}
 
-	g := NewGame()
-	g.ui = NewUi(res)
+	g := NewGame(res)
 
-	// switch based on flags
-	NewHome(g)
-
-	g.ui.keyboard = NewKeyboard(res)
+    if ok := g.InitConsole(config.Conf.General.RomPath); !ok {
+        NewHome(g)
+    }
 
 	err = ebiten.RunGame(g)
 	if err != nil {
@@ -100,26 +101,23 @@ func StartEngine() {
 	}
 }
 
-func NewUi(res *Resources) *Ui {
-	return &Ui{
-		res:   res,
-		focus: &Focus{},
-		toast: NewToast(res),
-	}
-}
-
-func NewGame() *Game {
+func NewGame(res *Resources) *Game {
 
 	g := &Game{
-		//flags
 		audioCtx:     NewAudioContext(),
 		mouse:        input.NewMouse(),
 		TargetFps:    config.Conf.General.TargetFps,
 		gamepadIds:   make(map[ebiten.GamepadID]struct{}),
 		gamepadIdBuf: make([]ebiten.GamepadID, 0),
-	}
+        ui: &Ui{
+            res:   res,
+            focus: &Focus{},
+            toast: NewToast(res),
+            keyboard: NewKeyboard(res),
+        },
+    }
 
-	return g
+    return g
 }
 
 func (g *Game) Layout(outsideWidth int, outsideHeight int) (int, int) {
@@ -257,45 +255,71 @@ func (g *Game) ToggleMute() {
 	}
 }
 
-//const (
-//	//PRF_START = 1200
-//	//PRF_END   = PRF_START + 2000
-//	PRF_START = 0
-//	PRF_END   = 10000
-//)
-//
-//var t time.Time
+var (
+    t time.Time
+    f *os.File
+)
+
+const UNLIMITED_FPS = 0x10000
 
 func (g *Game) Profile() {
 
-	//if g.flags.Profile && g.frame == PRF_START {
-	//	println("starting profiling")
-	//	//isProfiling = true
-	//	t = time.Now()
-	//	pprof.StartCPUProfile(f)
+    p := &config.Conf.Profile
 
-	//}
+    if !p.Enabled {
+        return
+    }
 
-	//if g.flags.Profile && g.frame >= PRF_END {
-	//	dur := time.Since(t).Seconds()
+    if ebiten.Tick() == p.StartTick {
 
-	//	reqDur := (float64(PRF_END-PRF_START) / 60.0)
+        if g.gb != nil {
+            g.gb.Muted = true
+        }
+        if g.gba != nil {
+            g.gba.Muted = true
+        }
+        if g.nds != nil {
+            g.nds.Muted = true
+        }
 
-	//	fmt.Printf("DURATION %.2f seconds. %.2fx faster.\n", time.Since(t).Seconds(), reqDur/dur)
-	//	println("ending profiling")
-	//	return exit
-	//}
+        ebiten.SetTPS(UNLIMITED_FPS)
+
+        var err error
+        f, err = os.Create(p.FilePath)
+        if err != nil {
+            panic(err)
+        }
+
+        println("starting profiler")
+
+        pprof.StartCPUProfile(f)
+        t = time.Now()
+    }
+
+    if ebiten.Tick() >= p.EndTick {
+		dur := time.Since(t).Seconds()
+
+		reqDur := (float64(p.EndTick-p.StartTick) / 60.0)
+
+		fmt.Printf("DURATION %.2f seconds. %.2fx faster.\n", time.Since(t).Seconds(), reqDur/dur)
+
+        pprof.StopCPUProfile()
+		f.Close()
+
+		println("ending profiling")
+        g.quit = true
+    }
 }
 
-func (g *Game) InitConsole(file string) {
+func (g *Game) InitConsole(file string) bool {
 	switch romType := utils.GetRomType(file); romType {
-
 	case utils.GB:
 		g.gb = gb.NewGameBoy(file, g.audioCtx)
 		g.ui.ui = nil
 		if g.muted {
 			g.gb.ToggleMute()
 		}
+        return true
 
 	case utils.GBA:
 		g.gba = gba.NewGBA(file, g.audioCtx)
@@ -303,6 +327,7 @@ func (g *Game) InitConsole(file string) {
 		if g.muted {
 			g.gba.ToggleMute()
 		}
+        return true
 
 	case utils.NDS:
 		g.nds = nds.NewNds(file, g.audioCtx)
@@ -310,5 +335,8 @@ func (g *Game) InitConsole(file string) {
 		if g.muted {
 			g.nds.ToggleMute()
 		}
+        return true
+    default:
+        return false
 	}
 }

@@ -22,6 +22,7 @@ type Config struct {
 	config  *config.Config
 	General General `toml:"general"`
 	Ui      Ui      `toml:"ui"`
+	Profile Profile `toml:"profile"`
 	Gb      Gb      `toml:"gb"`
 	Gba     Gba     `toml:"gba"`
 	Nds     Nds     `toml:"nds"`
@@ -55,6 +56,13 @@ type Ui struct {
 	Foreground int    `toml:"menu_foreground_color"`
 	Secondary  int    `toml:"menu_secondary_color"`
 	Language   string `toml:"language"`
+}
+
+type Profile struct {
+    Enabled   bool   `toml:"enabled"`
+    FilePath  string `toml:"file_path"`
+    StartTick int64  `toml:"start_tick"`
+    EndTick   int64  `toml:"end_tick"`
 }
 
 type Gb struct {
@@ -143,6 +151,7 @@ func Decode() {
 	c.open()
 	c.decodeGeneral()
 	c.decodeUi()
+    c.decodeProfile()
 	c.decodeGb()
 	c.decodeGba()
 	c.decodeNds()
@@ -287,6 +296,18 @@ func (c *Config) decodeUi() {
 	default:
 		c.config.Ui.Language = 0
 	}
+}
+
+func (c *Config) decodeProfile() {
+    c.config.Profile.Enabled = c.Profile.Enabled
+    c.config.Profile.FilePath = c.Profile.FilePath
+    c.config.Profile.StartTick = c.Profile.StartTick
+    c.config.Profile.EndTick = c.Profile.EndTick
+
+    if c.Profile.StartTick >= c.Profile.EndTick {
+        panic("profile config invalid, provided Start >= End")
+    }
+
 }
 
 func (c *Config) decodeGb() {
