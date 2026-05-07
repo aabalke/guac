@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/aabalke/guac/config"
+	"github.com/aabalke/guac/utils"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -43,25 +44,10 @@ func (g *Game) GetGamepadButtons() (justButtons, buttons []ebiten.StandardGamepa
 		buttons = inpututil.AppendPressedStandardGamepadButtons(id, buttons)
 	}
 
-	justButtons = uniqueButtons(&justButtons)
-	buttons = uniqueButtons(&buttons)
+    utils.MakeUnique(&justButtons)
+    utils.MakeUnique(&buttons)
 
 	return justButtons, buttons
-}
-
-func uniqueButtons(in *[]ebiten.StandardGamepadButton) []ebiten.StandardGamepadButton {
-
-	set := make(map[ebiten.StandardGamepadButton]struct{}, len(*in))
-	for _, b := range *in {
-		set[b] = struct{}{}
-	}
-
-	out := make([]ebiten.StandardGamepadButton, 0, len(set))
-	for b := range set {
-		out = append(out, b)
-	}
-
-	return out
 }
 
 func (g *Game) GetInput() (justKeys, keys []ebiten.Key, justButtons, buttons []ebiten.StandardGamepadButton) {

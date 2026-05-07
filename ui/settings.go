@@ -142,7 +142,14 @@ func NewScrollableContainer(ui *Ui) *widget.Container {
 		}
 	})
 
-	root.AddChild(ui.scrollable, ui.slider)
+    if ui.scrollable != nil {
+        root.AddChild(ui.scrollable)
+    }
+
+
+    if ui.slider != nil {
+        root.AddChild(ui.slider)
+    }
 
 	return root
 }

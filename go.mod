@@ -1,8 +1,6 @@
 module github.com/aabalke/guac
 
 //replace github.com/aabalke/gojit => C:\dev\repos\jit\gojit
-
-//replace github.com/ebitenui/ebitenui => C:\dev\repos\emulators\ebitenui
 replace github.com/ebitenui/ebitenui => C:\dev\repos\emulators\ebitenui
 
 go 1.26.0
