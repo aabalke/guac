@@ -12,6 +12,10 @@ Advance, and Nintendo DS handheld consoles.
 
 See Releases for Windows and Linux precompiled binaries.
 
+Available on the Snap Store. Make sure to connect the listed plugs.
+
+[![Snap](https://snapcraft.io/en/dark/install.svg)](https://snapcraft.io/guac-tsugu)
+
 Building from source is possible with golang > 1.26.0, using:
 
 ```
