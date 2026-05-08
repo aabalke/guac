@@ -4,13 +4,13 @@ import (
 	_ "embed"
 	"image/color"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2"
-	sys "golang.org/x/sys/cpu"
 )
 
 //go:embed default.toml
@@ -467,7 +467,9 @@ func (c *Config) decodeNdsFirmware() {
 
 func (c *Config) decodeNdsJit() {
 
-	c.config.Nds.Jit.Enabled = c.Nds.Jit.Enabled && sys.X86.HasBMI2
+	isX86 := runtime.GOARCH == "amd64" || runtime.GOARCH == "386"
+
+	c.config.Nds.Jit.Enabled = c.Nds.Jit.Enabled && isX86
 
 	if !c.config.Nds.Jit.Enabled {
 		c.Nds.Jit.BatchInst = 1
