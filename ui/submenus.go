@@ -140,6 +140,9 @@ func NewGeneralMenu(g *Game, parent *widget.Container) {
 		{WIDGET_DEC, l.TargetFps, l.TargetFps, &tmp.TargetFps, 1000000},
 		{WIDGET_CBX, l.VsyncEnabled, "", &tmp.Vsync, nil},
 		{WIDGET_CBX, l.DisableSaves, "", &tmp.DisableSaves, nil},
+		{WIDGET_CBX, l.IntegerScaling, "", &tmp.IntegerScaling, nil},
+		{WIDGET_LNK, "", "", nil, "a ratio of zero is dynamic"},
+		{WIDGET_DEC, l.IntegerScalingRatio, "", &tmp.IntegerScalingRatio, 10},
 
 		{WIDGET_HDR, l.Keyboard, "", nil, nil},
 		{WIDGET_LNK, "", "", nil, keybindsLink},

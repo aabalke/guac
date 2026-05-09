@@ -38,6 +38,8 @@ init_fullscreen = "init fullscreen"
 target_fps      = "target fps"
 vsync_enabled   = "vsync enabled"
 disable_saves   = "disable saves"
+integer_scaling = "integer scaling"
+integer_scaling_ratio = "integer scaling ratio"
 
 keyboard        = "keyboard"
 controller      = "controller"

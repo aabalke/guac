@@ -28,6 +28,8 @@ type GameBoy struct {
 	Palette *[4]color.Color
 	Pixels  []byte
 
+	DrawOptions ebiten.DrawImageOptions
+
 	Color     bool
 	bgPalette ColorPalette
 	spPalette ColorPalette
@@ -346,18 +348,19 @@ func (gb *GameBoy) Close() {
 }
 
 func (gb *GameBoy) Draw(screen *ebiten.Image) {
-	sw, sh := float64(screen.Bounds().Dx()), float64(screen.Bounds().Dy())
-	iw, ih := float64(gb.Image.Bounds().Dx()), float64(gb.Image.Bounds().Dy())
+	var (
+		sw = float64(screen.Bounds().Dx())
+		sh = float64(screen.Bounds().Dy())
+	)
 
-	scaleX := sw / iw
-	scaleY := sh / ih
-	scale := min(scaleX, scaleY)
+	gb.DrawOptions.GeoM.Reset()
 
-	offsetX := (sw - (iw * scale)) / 2
-	offsetY := (sh - (ih * scale)) / 2
+	scale := utils.ScaleImage(sw, sh, width, height)
 
-	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Scale(scale, scale)
-	op.GeoM.Translate(offsetX, offsetY)
-	screen.DrawImage(gb.Image, op)
+	offsetX := (sw - (width * scale)) / 2
+	offsetY := (sh - (height * scale)) / 2
+
+	gb.DrawOptions.GeoM.Scale(scale, scale)
+	gb.DrawOptions.GeoM.Translate(offsetX, offsetY)
+	screen.DrawImage(gb.Image, &gb.DrawOptions)
 }

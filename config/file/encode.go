@@ -42,11 +42,13 @@ func Encode() {
 
 func (c *Config) encodeGeneral() {
 	c.General = General{
-		Muted:          c.config.General.Muted,
-		TargetFps:      c.config.General.TargetFps,
-		ShowFps:        c.config.General.ShowFps,
-		InitFullscreen: c.config.General.InitFullscreen,
-		Vsync:          c.config.General.Vsync,
+		Muted:               c.config.General.Muted,
+		TargetFps:           c.config.General.TargetFps,
+		ShowFps:             c.config.General.ShowFps,
+		InitFullscreen:      c.config.General.InitFullscreen,
+		Vsync:               c.config.General.Vsync,
+		IntegerScaling:      c.config.General.IntegerScaling,
+		IntegerScalingRatio: c.config.General.IntegerScalingRatio,
 		// rompath
 		DisableSaves: c.config.General.DisableSaves,
 	}

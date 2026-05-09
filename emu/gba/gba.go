@@ -1,20 +1,15 @@
 package gba
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/cpu"
-	arm7 "github.com/aabalke/guac/emu/cpu/arm7"
+	"github.com/aabalke/guac/emu/cpu/arm7"
 	"github.com/aabalke/guac/emu/gba/apu"
 	"github.com/aabalke/guac/emu/gba/cart"
+	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
 )
-
-var _ = fmt.Sprintf
-var _ = os.Exit
 
 const (
 	PC            = 15
@@ -53,14 +48,14 @@ type GBA struct {
 
 	vsyncAddr uint32
 
-	Pixels []byte
-	Image  *ebiten.Image
+	Pixels      []byte
+	Image       *ebiten.Image
+	DrawOptions ebiten.DrawImageOptions
 
 	Frame uint64
 }
 
 func (gba *GBA) Update(stdFps bool) {
-
 	gba.AccCycles = 0
 
 	if gba.Paused {
@@ -116,7 +111,6 @@ func (gba *GBA) Update(stdFps bool) {
 }
 
 func (gba *GBA) Tick(cycles uint32) {
-
 	gba.SoundCycles += cycles
 
 	if gba.SoundCycles >= gba.SoundCyclesMask {
@@ -129,7 +123,6 @@ func (gba *GBA) Tick(cycles uint32) {
 }
 
 func NewGBA(path string, ctx *oto.Context) *GBA {
-
 	const (
 		CPU_FREQ_HZ   = 16777216
 		SND_FREQUENCY = 48000 // sample rate
@@ -239,7 +232,6 @@ func (gba *GBA) LoadGame(path string) {
 
 // RidgeX/ygba BSD3
 func (gba *GBA) VideoUpdate(cycles uint32) {
-
 	dispstat := &gba.Mem.Dispstat
 	vcount := gba.Mem.IO[0x6]
 
@@ -276,7 +268,7 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 	if newScanline := currScanlineCycles < prevScanlineCycles; newScanline {
 
 		// this 1232 cycle count is estimate, should replace with actual
-		//gba.Apu.SoundClock(1232, false)
+		// gba.Apu.SoundClock(1232, false)
 
 		dispstat.SetHBlank(false)
 
@@ -317,20 +309,20 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 	}
 }
 
-func (gba *GBA) Draw(screen *ebiten.Image) {
+func (gb *GBA) Draw(screen *ebiten.Image) {
+	var (
+		sw = float64(screen.Bounds().Dx())
+		sh = float64(screen.Bounds().Dy())
+	)
 
-	sw, sh := float64(screen.Bounds().Dx()), float64(screen.Bounds().Dy())
-	iw, ih := float64(gba.Image.Bounds().Dx()), float64(gba.Image.Bounds().Dy())
+	gb.DrawOptions.GeoM.Reset()
 
-	scaleX := sw / iw
-	scaleY := sh / ih
-	scale := min(scaleX, scaleY)
+	scale := utils.ScaleImage(sw, sh, SCREEN_WIDTH, SCREEN_HEIGHT)
 
-	offsetX := (sw - (iw * scale)) / 2
-	offsetY := (sh - (ih * scale)) / 2
+	offsetX := (sw - (SCREEN_WIDTH * scale)) / 2
+	offsetY := (sh - (SCREEN_HEIGHT * scale)) / 2
 
-	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Scale(scale, scale)
-	op.GeoM.Translate(offsetX, offsetY)
-	screen.DrawImage(gba.Image, op)
+	gb.DrawOptions.GeoM.Scale(scale, scale)
+	gb.DrawOptions.GeoM.Translate(offsetX, offsetY)
+	screen.DrawImage(gb.Image, &gb.DrawOptions)
 }

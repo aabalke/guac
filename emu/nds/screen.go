@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/aabalke/guac/config"
+	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -63,35 +64,29 @@ type BtmAbs struct {
 }
 
 func NewScreen() *Screen {
-
-	s := &Screen{
+	return &Screen{
 		Top:      ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 		Bottom:   ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 		Layout:   &config.Conf.Nds.Screen.Layout,
 		Sizing:   &config.Conf.Nds.Screen.Sizing,
 		Rotation: &config.Conf.Nds.Screen.Rotation,
 	}
-
-	return s
 }
 
 func (s *Screen) FillScreen(screen *ebiten.Image) {
 	switch {
 	case *s.Layout == LAYOUT_HYBRID:
 		s.FillHybrid(screen)
-		return
 	case *s.Sizing == SIZING_ONLY_TOP:
-		s.FillOnly(screen, false)
-		return
+		s.FillOnly(screen, s.Top, false)
 	case *s.Sizing == SIZING_ONLY_BOTTOM:
-		s.FillOnly(screen, true)
-		return
+		s.FillOnly(screen, s.Bottom, true)
 	case *s.Layout == LAYOUT_VERTICAL:
 		s.FillEvenVertical(screen)
-		return
 	case *s.Layout == LAYOUT_HORZONTAL:
 		s.FillEvenHorizontal(screen)
-		return
+	default:
+		panic("nds screen fill not possible")
 	}
 }
 
@@ -110,15 +105,7 @@ func (s *Screen) ApplyTouchPositions(x, y, w, h int) {
 	}
 }
 
-func (s *Screen) FillOnly(screen *ebiten.Image, bottom bool) {
-
-	var image *ebiten.Image
-	if bottom {
-		image = s.Bottom
-	} else {
-		image = s.Top
-	}
-
+func (s *Screen) FillOnly(screen, image *ebiten.Image, bottom bool) {
 	var (
 		rot        bool
 		rotRadians float64
@@ -145,20 +132,17 @@ func (s *Screen) FillOnly(screen *ebiten.Image, bottom bool) {
 	}
 
 	var (
-		screenW        = float64(screen.Bounds().Dx())
-		screenH        = float64(screen.Bounds().Dy())
-		canvasW        = float64(image.Bounds().Dx())
-		canvasH        = float64(image.Bounds().Dy())
-		scaleX, scaleY float64
+		screenW = float64(screen.Bounds().Dx())
+		screenH = float64(screen.Bounds().Dy())
+		canvasW = float64(SCREEN_WIDTH)
+		canvasH = float64(SCREEN_HEIGHT)
 	)
 
 	if rot {
 		screenH, screenW = screenW, screenH
 	}
 
-	scaleX = screenW / canvasW
-	scaleY = screenH / canvasH
-	scale := min(scaleX, scaleY)
+	scale := utils.ScaleImage(screenW, screenH, canvasW, canvasH)
 	offsetX := (screenW - (canvasW * scale)) / 2
 	offsetY := (screenH - (canvasH * scale)) / 2
 
@@ -166,7 +150,7 @@ func (s *Screen) FillOnly(screen *ebiten.Image, bottom bool) {
 		offsetX, offsetY = offsetY, offsetX
 	}
 
-	s.Options = ebiten.DrawImageOptions{}
+	s.Options.GeoM.Reset()
 	s.Options.GeoM.Rotate(rotRadians)
 	s.Options.GeoM.Translate(rotX, rotY)
 	s.Options.GeoM.Scale(scale, scale)
@@ -189,29 +173,28 @@ func (s *Screen) FillOnly(screen *ebiten.Image, bottom bool) {
 }
 
 func (s *Screen) FillHybrid(screen *ebiten.Image) {
-
 	var (
-		bottomW = float64(s.Top.Bounds().Dx())
-		bottomH = float64(s.Top.Bounds().Dy())
-		canvasW = float64(s.Top.Bounds().Dx()) * 1.5
-		canvasH = float64(s.Top.Bounds().Dy())
+		bottomW = float64(SCREEN_WIDTH)
+		bottomH = float64(SCREEN_HEIGHT)
+		canvasW = float64(SCREEN_WIDTH) * 1.5
+		canvasH = float64(SCREEN_HEIGHT)
 		screenW = float64(screen.Bounds().Dx())
 		screenH = float64(screen.Bounds().Dy())
-		scale   = min(screenW/canvasW, screenH/canvasH)
+		scale   = utils.ScaleImage(screenW, screenH, canvasW, canvasH)
 		scaledH = scale * SCREEN_HEIGHT
 		scaledW = scale * SCREEN_WIDTH
 		offsetX = (screenW - (canvasW * scale)) / 2
 		offsetY = (screenH - (canvasH * scale)) / 2
 	)
 
-	s.Options = ebiten.DrawImageOptions{}
+	s.Options.GeoM.Reset()
 	s.Options.GeoM.Scale(0.5, 0.5)
 	s.Options.GeoM.Translate(SCREEN_WIDTH, 0)
 	s.Options.GeoM.Scale(scale, scale)
 	s.Options.GeoM.Translate(offsetX, offsetY)
 	screen.DrawImage(s.Top, &s.Options)
 
-	s.Options = ebiten.DrawImageOptions{}
+	s.Options.GeoM.Reset()
 	s.Options.GeoM.Scale(0.5, 0.5)
 	s.Options.GeoM.Translate(SCREEN_WIDTH, SCREEN_HEIGHT/2)
 	s.Options.GeoM.Scale(scale, scale)
@@ -220,7 +203,7 @@ func (s *Screen) FillHybrid(screen *ebiten.Image) {
 
 	if *s.Sizing == SIZING_ONLY_BOTTOM {
 
-		s.Options = ebiten.DrawImageOptions{}
+		s.Options.GeoM.Reset()
 		s.Options.GeoM.Scale(scale, scale)
 		s.Options.GeoM.Translate(offsetX, offsetY)
 		screen.DrawImage(s.Bottom, &s.Options)
@@ -242,7 +225,7 @@ func (s *Screen) FillHybrid(screen *ebiten.Image) {
 		return
 	}
 
-	s.Options = ebiten.DrawImageOptions{}
+	s.Options.GeoM.Reset()
 	s.Options.GeoM.Scale(scale, scale)
 	s.Options.GeoM.Translate(offsetX, offsetY)
 	screen.DrawImage(s.Top, &s.Options)
@@ -264,8 +247,8 @@ func (s *Screen) FillEvenVertical(screen *ebiten.Image) {
 	var (
 		screenW = float64(screen.Bounds().Dx())
 		screenH = float64(screen.Bounds().Dy())
-		bottomW = float64(s.Bottom.Bounds().Dx())
-		bottomH = float64(s.Bottom.Bounds().Dy())
+		bottomW = float64(SCREEN_WIDTH)
+		bottomH = float64(SCREEN_HEIGHT)
 
 		rotRadians float64
 		rotX       float64
@@ -309,7 +292,7 @@ func (s *Screen) FillEvenVertical(screen *ebiten.Image) {
 		canvasW = bottomW
 	}
 
-	scale := min(screenW/canvasW, screenH/canvasH)
+	scale := utils.ScaleImage(screenW, screenH, canvasW, canvasH)
 	offsetX := (screenW - (canvasW * scale)) / 2
 	offsetY := (screenH - (canvasH * scale)) / 2
 
@@ -317,7 +300,7 @@ func (s *Screen) FillEvenVertical(screen *ebiten.Image) {
 		offsetX, offsetY = offsetY, offsetX
 	}
 
-	s.Options = ebiten.DrawImageOptions{}
+	s.Options.GeoM.Reset()
 	s.Options.GeoM.Rotate(rotRadians)
 	s.Options.GeoM.Translate(rotX, rotY)
 	s.Options.GeoM.Translate(0, topOff)
@@ -325,7 +308,7 @@ func (s *Screen) FillEvenVertical(screen *ebiten.Image) {
 	s.Options.GeoM.Translate(offsetX, offsetY)
 	screen.DrawImage(s.Top, &s.Options)
 
-	s.Options = ebiten.DrawImageOptions{}
+	s.Options.GeoM.Reset()
 	s.Options.GeoM.Rotate(rotRadians)
 	s.Options.GeoM.Translate(rotX, rotY)
 	s.Options.GeoM.Translate(0, botOff)
@@ -347,8 +330,8 @@ func (s *Screen) FillEvenHorizontal(screen *ebiten.Image) {
 	var (
 		screenW = float64(screen.Bounds().Dx())
 		screenH = float64(screen.Bounds().Dy())
-		bottomW = float64(s.Bottom.Bounds().Dx())
-		bottomH = float64(s.Bottom.Bounds().Dy())
+		bottomW = float64(SCREEN_WIDTH)
+		bottomH = float64(SCREEN_HEIGHT)
 
 		rotRadians float64
 		rotX       float64
@@ -395,7 +378,7 @@ func (s *Screen) FillEvenHorizontal(screen *ebiten.Image) {
 		canvasW = bottomW * 2
 	}
 
-	scale := min(screenW/canvasW, screenH/canvasH)
+	scale := utils.ScaleImage(screenW, screenH, canvasW, canvasH)
 	offsetX := (screenW - (canvasW * scale)) / 2
 	offsetY := (screenH - (canvasH * scale)) / 2
 
@@ -403,7 +386,7 @@ func (s *Screen) FillEvenHorizontal(screen *ebiten.Image) {
 		offsetX, offsetY = offsetY, offsetX
 	}
 
-	s.Options = ebiten.DrawImageOptions{}
+	s.Options.GeoM.Reset()
 	s.Options.GeoM.Rotate(rotRadians)
 	s.Options.GeoM.Translate(rotX, rotY)
 	s.Options.GeoM.Translate(topOff, 0)
@@ -411,7 +394,7 @@ func (s *Screen) FillEvenHorizontal(screen *ebiten.Image) {
 	s.Options.GeoM.Translate(offsetX, offsetY)
 	screen.DrawImage(s.Top, &s.Options)
 
-	s.Options = ebiten.DrawImageOptions{}
+	s.Options.GeoM.Reset()
 	s.Options.GeoM.Rotate(rotRadians)
 	s.Options.GeoM.Translate(rotX, rotY)
 	s.Options.GeoM.Translate(botOff, 0)
@@ -430,7 +413,6 @@ func (s *Screen) FillEvenHorizontal(screen *ebiten.Image) {
 }
 
 func (s *Screen) inputHandler(field int) {
-
 	switch field {
 	case SCREEN_LAYOUT:
 		*s.Layout = (*s.Layout + 1) % 3

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"runtime/pprof"
@@ -10,8 +11,6 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
-
-	"fmt"
 
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gb"
@@ -32,7 +31,6 @@ const (
 )
 
 type Game struct {
-
 	// flags
 
 	ui       *Ui
@@ -72,7 +70,6 @@ type Ui struct {
 }
 
 func StartEngine() {
-
 	res, err := NewUIResources()
 	if err != nil {
 		log.Fatal(err)
@@ -102,11 +99,9 @@ func StartEngine() {
 }
 
 func NewGame(res *Resources) *Game {
-
 	g := &Game{
 		audioCtx:     NewAudioContext(),
 		mouse:        input.NewMouse(),
-		TargetFps:    config.Conf.General.TargetFps,
 		vsync:        config.Conf.General.Vsync,
 		gamepadIds:   make(map[ebiten.GamepadID]struct{}),
 		gamepadIdBuf: make([]ebiten.GamepadID, 0),
@@ -126,7 +121,6 @@ func (g *Game) Layout(outsideWidth int, outsideHeight int) (int, int) {
 }
 
 func (g *Game) Update() error {
-
 	g.ui.toast.Update()
 
 	if config.Conf.General.TargetFps != g.TargetFps {
@@ -184,18 +178,17 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-
 	screen.Fill(config.Conf.Ui.Backdrop)
 
 	switch {
 	case g.ui.ui != nil:
 		g.ui.ui.Draw(screen)
-	case g.nds != nil:
-		g.nds.Screen.FillScreen(screen)
-	case g.gba != nil:
-		g.gba.Draw(screen)
 	case g.gb != nil:
 		g.gb.Draw(screen)
+	case g.gba != nil:
+		g.gba.Draw(screen)
+	case g.nds != nil:
+		g.nds.Screen.FillScreen(screen)
 	}
 
 	if g.ui.toast.enabled {
@@ -208,7 +201,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 }
 
 func (g *Game) TogglePause() {
-
 	if !g.paused && (g.nds == nil && g.gba == nil && g.gb == nil) {
 		return
 	}
@@ -240,7 +232,6 @@ func (g *Game) TogglePause() {
 }
 
 func (g *Game) ToggleMute() {
-
 	g.muted = !g.muted
 
 	switch {
@@ -267,7 +258,6 @@ var (
 const UNLIMITED_FPS = 0x1000
 
 func (g *Game) Profile() {
-
 	p := &config.Conf.Profile
 
 	if !p.Enabled {

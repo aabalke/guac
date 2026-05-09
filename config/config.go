@@ -8,6 +8,8 @@ import (
 
 var Conf Config
 
+const DYNAMIC_INT_SCALING = 0
+
 type FirmwareColor = int
 
 const (
@@ -77,16 +79,18 @@ type Config struct {
 }
 
 type General struct {
-	RomPath        string
-	Muted          bool
-	TargetFps      int
-	ShowFps        bool
-	InitFullscreen bool
-	Vsync          bool
-	DisableSaves   bool
-	Logger         bool
-	Keyboard       GeneralKeyboard
-	Controller     GeneralController
+	RomPath             string
+	Muted               bool
+	TargetFps           int
+	ShowFps             bool
+	InitFullscreen      bool
+	Vsync               bool
+	DisableSaves        bool
+	Logger              bool
+	IntegerScaling      bool
+	IntegerScalingRatio int
+	Keyboard            GeneralKeyboard
+	Controller          GeneralController
 }
 
 type GeneralKeyboard struct {

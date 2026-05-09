@@ -37,6 +37,8 @@ init_fullscreen = "iniciar en pantalla completa"
 target_fps      = "FPS objetivo"
 vsync_enabled   = "vsync activado"
 disable_saves   = "desactivar guardado"
+integer_scaling = "escalado entero"
+integer_scaling_ratio = "proporción de escalado entero"
 
 keyboard        = "teclado"
 controller      = "controlador"

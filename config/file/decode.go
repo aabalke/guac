@@ -57,6 +57,8 @@ func (c *Config) decodeGeneral() {
 	c.config.General.Vsync = c.General.Vsync
 	c.config.General.RomPath = c.General.RomPath
 	c.config.General.DisableSaves = c.General.DisableSaves
+	c.config.General.IntegerScaling = c.General.IntegerScaling
+	c.config.General.IntegerScalingRatio = c.General.IntegerScalingRatio
 
 	in := &c.General.Keyboard
 	confKey := &c.config.General.Keyboard

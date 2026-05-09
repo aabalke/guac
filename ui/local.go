@@ -19,7 +19,6 @@ var langAbbreviations = map[LangOptions]string{
 }
 
 func NewLocalization(lang LangOptions) *Localization {
-
 	abb, ok := langAbbreviations[lang]
 	if !ok {
 		abb = "en"
@@ -102,6 +101,8 @@ type GeneralLocalization struct {
 	TargetFps            string `toml:"target_fps"`
 	VsyncEnabled         string `toml:"vsync_enabled"`
 	DisableSaves         string `toml:"disable_saves"`
+	IntegerScaling       string `toml:"integer_scaling"`
+	IntegerScalingRatio  string `toml:"integer_scaling_ratio"`
 	Keyboard             string `toml:"keyboard"`
 	Controller           string `toml:"controller"`
 	Select               string `toml:"select"`

@@ -22,15 +22,17 @@ type Config struct {
 }
 
 type General struct {
-	Muted          bool         `toml:"muted"`
-	TargetFps      int          `toml:"target_fps"`
-	ShowFps        bool         `toml:"show_fps"`
-	InitFullscreen bool         `toml:"fullscreen"`
-	Vsync          bool         `toml:"vsync_enabled"`
-	RomPath        string       `toml:"rom_path"`
-	DisableSaves   bool         `toml:"disable_saves"`
-	Keyboard       GeneralInput `toml:"keyboard"`
-	Controller     GeneralInput `toml:"controller"`
+	Muted               bool         `toml:"muted"`
+	TargetFps           int          `toml:"target_fps"`
+	ShowFps             bool         `toml:"show_fps"`
+	InitFullscreen      bool         `toml:"fullscreen"`
+	Vsync               bool         `toml:"vsync_enabled"`
+	RomPath             string       `toml:"rom_path"`
+	IntegerScaling      bool         `toml:"integer_scaling"`
+	IntegerScalingRatio int          `toml:"integer_scaling_ratio"`
+	DisableSaves        bool         `toml:"disable_saves"`
+	Keyboard            GeneralInput `toml:"keyboard"`
+	Controller          GeneralInput `toml:"controller"`
 }
 
 type GeneralInput struct {

@@ -9,6 +9,8 @@ show_fps        = false
 init_fullscreen = false
 vsync_enabled   = true
 disable_saves   = false
+integer_scaling = false
+integer_scaling_ratio = 0
 
 # only use this if you load the same game constantly
 # otherwise it would be better to use the cli flags or gui
