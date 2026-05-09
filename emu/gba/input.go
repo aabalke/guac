@@ -8,7 +8,6 @@ import (
 )
 
 func (gba *GBA) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadButton) {
-
 	keyConfig := config.Conf.Gba.KeyboardConfig
 	buttonConfig := config.Conf.Gba.ControllerConfig
 
@@ -17,35 +16,31 @@ func (gba *GBA) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 	*k = 0b11_1111_1111
 
 	for _, key := range keys {
-
-		keyStr := key.String()
-
 		switch {
-		case slices.Contains(keyConfig.A, keyStr):
+		case slices.Contains(keyConfig.A, key):
 			*k &^= 0b1
-		case slices.Contains(keyConfig.B, keyStr):
+		case slices.Contains(keyConfig.B, key):
 			*k &^= 0b10
-		case slices.Contains(keyConfig.Select, keyStr):
+		case slices.Contains(keyConfig.Select, key):
 			*k &^= 0b100
-		case slices.Contains(keyConfig.Start, keyStr):
+		case slices.Contains(keyConfig.Start, key):
 			*k &^= 0b1000
-		case slices.Contains(keyConfig.Right, keyStr):
+		case slices.Contains(keyConfig.Right, key):
 			*k &^= 0b10000
-		case slices.Contains(keyConfig.Left, keyStr):
+		case slices.Contains(keyConfig.Left, key):
 			*k &^= 0b100000
-		case slices.Contains(keyConfig.Up, keyStr):
+		case slices.Contains(keyConfig.Up, key):
 			*k &^= 0b1000000
-		case slices.Contains(keyConfig.Down, keyStr):
+		case slices.Contains(keyConfig.Down, key):
 			*k &^= 0b10000000
-		case slices.Contains(keyConfig.R, keyStr):
+		case slices.Contains(keyConfig.R, key):
 			*k &^= 0b100000000
-		case slices.Contains(keyConfig.L, keyStr):
+		case slices.Contains(keyConfig.L, key):
 			*k &^= 0b1000000000
 		}
 	}
 
 	for _, button := range buttons {
-
 		switch {
 		case slices.Contains(buttonConfig.A, button):
 			*k &^= 0b1

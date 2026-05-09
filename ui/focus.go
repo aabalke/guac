@@ -38,7 +38,6 @@ func (f *Focus) BuildFocus(ui *ebitenui.UI) {
 }
 
 func (f *Focus) buildFocusGroup(group *[]widget.Focuser) {
-
 	if len(*group) <= 0 {
 		return
 	}
@@ -89,8 +88,7 @@ func (f *Focus) buildSubFocus() {
 // since radio groups are [button1][button2][button3]
 // using identical functionality to other elements will cause l, r == up, down
 func (f *Focus) buildHorizontalGroupOverride() {
-
-	if f.sidebar == nil || len(f.sidebar) == 0 {
+	if len(f.sidebar) == 0 {
 		return
 	}
 
@@ -155,7 +153,6 @@ func (f *Focus) DeFocus() {
 }
 
 func (f *Focus) KeepFocusedInView(slider *widget.Slider) {
-
 	if len(f.submenu) == 0 ||
 		slider == nil ||
 		f.ui == nil ||
@@ -169,7 +166,7 @@ func (f *Focus) KeepFocusedInView(slider *widget.Slider) {
 		rootTop       = f.ui.Container.GetWidget().Rect.Min.Y
 		rootBottom    = f.ui.Container.GetWidget().Rect.Max.Y
 		firstTop      = f.submenu[0].GetWidget().Rect.Min.Y
-		//bottom  = f.submenu[len(f.submenu)-1].GetWidget().Rect.Max.Y
+		// bottom  = f.submenu[len(f.submenu)-1].GetWidget().Rect.Max.Y
 		// I don't believe bottom is possible / important
 	)
 

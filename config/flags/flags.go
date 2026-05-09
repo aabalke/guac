@@ -7,12 +7,12 @@ import (
 )
 
 func Decode() {
-
 	var (
 		romPath = flag.String("r", "", "rom path")
 		profile = flag.Bool("p", false, "use profiler")
 		fps     = flag.Int("fps", 60, "target fps")
 		mute    = flag.Bool("m", false, "mute")
+		logger  = flag.Bool("l", false, "logger")
 		showfps = flag.Bool("show-fps", false, "show fps")
 	)
 
@@ -28,6 +28,8 @@ func Decode() {
 			config.Conf.General.TargetFps = *fps
 		case "m":
 			config.Conf.General.Muted = *mute
+		case "l":
+			config.Conf.General.Logger = *logger
 		case "show-fps":
 			config.Conf.General.ShowFps = *showfps
 		}

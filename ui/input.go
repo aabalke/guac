@@ -12,7 +12,6 @@ import (
 )
 
 func (g *Game) GetGamepadButtons() (justButtons, buttons []ebiten.StandardGamepadButton) {
-
 	g.gamepadIdBuf = inpututil.AppendJustConnectedGamepadIDs(g.gamepadIdBuf[:0])
 
 	for _, id := range g.gamepadIdBuf {
@@ -51,7 +50,6 @@ func (g *Game) GetGamepadButtons() (justButtons, buttons []ebiten.StandardGamepa
 }
 
 func (g *Game) GetInput() (justKeys, keys []ebiten.Key, justButtons, buttons []ebiten.StandardGamepadButton) {
-
 	g.mouse.Update()
 
 	justKeys = inpututil.AppendJustPressedKeys(justKeys)
@@ -66,14 +64,14 @@ func (g *Game) GetInput() (justKeys, keys []ebiten.Key, justButtons, buttons []e
 	buttonConfig := config.Conf.General.Controller
 
 	for _, key := range justKeys {
-		switch keyStr := key.String(); {
-		case slices.Contains(keyConfig.Fullscreen, keyStr):
+		switch {
+		case slices.Contains(keyConfig.Fullscreen, key):
 			ebiten.SetFullscreen(!ebiten.IsFullscreen())
-		case slices.Contains(keyConfig.Quit, keyStr):
+		case slices.Contains(keyConfig.Quit, key):
 			g.quit = true
-		case slices.Contains(keyConfig.Pause, keyStr):
+		case slices.Contains(keyConfig.Pause, key):
 			g.TogglePause()
-		case slices.Contains(keyConfig.Mute, keyStr):
+		case slices.Contains(keyConfig.Mute, key):
 			g.ToggleMute()
 		}
 	}
@@ -99,7 +97,6 @@ func (g *Game) GetInput() (justKeys, keys []ebiten.Key, justButtons, buttons []e
 }
 
 func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) {
-
 	buttonConfig := config.Conf.General.Controller
 
 	switch g.ui.PageId {
@@ -146,7 +143,6 @@ func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) 
 		}
 
 		for _, button := range justButtons {
-
 			switch {
 			case slices.Contains(buttonConfig.Up, button):
 				g.ui.ui.ChangeFocus(widget.FOCUS_NORTH)

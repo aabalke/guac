@@ -28,7 +28,6 @@ type SidebarField struct {
 }
 
 func NewSidebarFields(res *Resources) []SidebarField {
-
 	l := res.localization.Settings.Sidebar
 
 	return []SidebarField{
@@ -39,7 +38,8 @@ func NewSidebarFields(res *Resources) []SidebarField {
 				NewGeneralMenu(g, sub)
 				g.ui.focus.submenu = sub.GetFocusers()
 				g.ui.focus.BuildFocus(g.ui.ui)
-			}},
+			},
+		},
 		{
 			l.Ui,
 			func(g *Game) {
@@ -47,7 +47,8 @@ func NewSidebarFields(res *Resources) []SidebarField {
 				NewUiMenu(g, sub)
 				g.ui.focus.submenu = sub.GetFocusers()
 				g.ui.focus.BuildFocus(g.ui.ui)
-			}},
+			},
+		},
 		{
 			l.Gb,
 			func(g *Game) {
@@ -55,7 +56,8 @@ func NewSidebarFields(res *Resources) []SidebarField {
 				NewGbMenu(g, sub)
 				g.ui.focus.submenu = sub.GetFocusers()
 				g.ui.focus.BuildFocus(g.ui.ui)
-			}},
+			},
+		},
 		{
 			l.Gba,
 			func(g *Game) {
@@ -63,7 +65,8 @@ func NewSidebarFields(res *Resources) []SidebarField {
 				NewGbaMenu(g, sub)
 				g.ui.focus.submenu = sub.GetFocusers()
 				g.ui.focus.BuildFocus(g.ui.ui)
-			}},
+			},
+		},
 		{
 			l.Nds,
 			func(g *Game) {
@@ -71,7 +74,8 @@ func NewSidebarFields(res *Resources) []SidebarField {
 				NewNdsMenu(g, sub)
 				g.ui.focus.submenu = sub.GetFocusers()
 				g.ui.focus.BuildFocus(g.ui.ui)
-			}},
+			},
+		},
 		{
 			l.Return,
 			func(g *Game) {
@@ -81,7 +85,8 @@ func NewSidebarFields(res *Resources) []SidebarField {
 				case PAGE_PAUSE:
 					NewPause(g)
 				}
-			}},
+			},
+		},
 	}
 }
 
@@ -118,7 +123,6 @@ func buildSubMenu(g *Game, parent *widget.Container, fields []Field) {
 }
 
 func NewGeneralMenu(g *Game, parent *widget.Container) {
-
 	var (
 		tmp = config.Conf.General
 		k   = &tmp.Keyboard
@@ -167,8 +171,10 @@ func NewGeneralMenu(g *Game, parent *widget.Container) {
 	buildSubMenu(g, parent, fields)
 
 	parent.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
-
 		config.Conf.General = tmp
+
+		parent.RemoveChildren()
+		NewGeneralMenu(g, parent)
 
 		if len(g.gamepadIds) != 0 {
 			g.ui.focus.FocusLastSubMenu()
@@ -179,7 +185,6 @@ func NewGeneralMenu(g *Game, parent *widget.Container) {
 }
 
 func NewUiMenu(g *Game, parent *widget.Container) {
-
 	var (
 		res   = g.ui.res
 		tmp   = config.Conf.Ui
@@ -206,7 +211,6 @@ func NewUiMenu(g *Game, parent *widget.Container) {
 		NewLabel(l.ApplyTheme),
 		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, theme_palettes, clrInputs, res),
 		NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
-
 			config.Conf.Ui = tmp
 			g.ui.res.localization = NewLocalization(LangOptions(config.Conf.Ui.Language))
 
@@ -220,11 +224,11 @@ func NewUiMenu(g *Game, parent *widget.Container) {
 			}
 
 			g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
-		}))
+		}),
+	)
 }
 
 func NewGbMenu(g *Game, parent *widget.Container) {
-
 	var (
 		tmp = config.Conf.Gb
 		k   = &tmp.KeyboardConfig
@@ -281,6 +285,10 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 
 	parent.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Gb = tmp
+
+		parent.RemoveChildren()
+		NewGbMenu(g, parent)
+
 		if len(g.gamepadIds) != 0 {
 			g.ui.focus.FocusLastSubMenu()
 		}
@@ -289,7 +297,6 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 }
 
 func NewGbaMenu(g *Game, parent *widget.Container) {
-
 	var (
 		tmp = config.Conf.Gba
 		k   = &tmp.KeyboardConfig
@@ -335,6 +342,10 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 
 	parent.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Gba = tmp
+
+		parent.RemoveChildren()
+		NewGbaMenu(g, parent)
+
 		if len(g.gamepadIds) != 0 {
 			g.ui.focus.FocusLastSubMenu()
 		}
@@ -343,7 +354,6 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 }
 
 func NewNdsMenu(g *Game, parent *widget.Container) {
-
 	var (
 		tmp = config.Conf.Nds
 		k   = &tmp.KeyboardConfig
@@ -419,6 +429,9 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 
 	parent.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Nds = tmp
+
+		parent.RemoveChildren()
+		NewNdsMenu(g, parent)
 
 		config.Conf.Nds.Firmware.Color = config.ColorNameToId[favColor]
 

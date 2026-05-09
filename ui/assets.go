@@ -79,7 +79,6 @@ type Resources struct {
 }
 
 func NewUIResources() (*Resources, error) {
-
 	var (
 		conf = &config.Conf.Ui
 		bg   = image.NewNineSliceColor(conf.MenuBackgroundColor)
@@ -131,7 +130,6 @@ func NewUIResources() (*Resources, error) {
 }
 
 func (u *Resources) Update() {
-
 	conf := &config.Conf.Ui
 	u.bg = image.NewNineSliceColor(conf.MenuBackgroundColor)
 	u.fg = image.NewNineSliceColor(conf.MenuForegroundColor)
@@ -150,7 +148,6 @@ func (u *Resources) Update() {
 	}
 
 	u.checkbox = loadCheckboxImage(conf.MenuForegroundColor)
-
 }
 
 type fonts struct {
@@ -159,7 +156,6 @@ type fonts struct {
 }
 
 func loadFonts() *fonts {
-
 	fontFaceRegular := "assets/fonts/museo_slab_500.otf"
 	//fontFaceRegular := "assets/fonts/noto_sana_jp_reg.ttf"
 
@@ -198,7 +194,6 @@ func loadFont(path string, size float64) (text.Face, error) {
 }
 
 func loadCheckboxImage(clr color.Color) *widget.CheckboxImage {
-
 	imgs := make([]*ebiten.Image, 4)
 
 	for i, v := range []string{
@@ -229,7 +224,6 @@ func loadCheckboxImage(clr color.Color) *widget.CheckboxImage {
 }
 
 func TintImage(src *ebiten.Image, c color.Color) *ebiten.Image {
-
 	r, g, b, _ := c.RGBA()
 	rf := float32(r) / 0xFFFF
 	gf := float32(g) / 0xFFFF
@@ -247,6 +241,9 @@ func TintImage(src *ebiten.Image, c color.Color) *ebiten.Image {
 }
 
 func NewTheme(r *Resources) *widget.Theme {
+	borderedFg := image.NewBorderedNineSliceColor(color.Transparent, *r.fgClr, 2)
+	borderedSec := image.NewBorderedNineSliceColor(*r.secClr, *r.fgClr, 2)
+
 	return &widget.Theme{
 		DefaultFace:      r.fonts.face,
 		DefaultTextColor: *r.fgClr,
@@ -276,8 +273,8 @@ func NewTheme(r *Resources) *widget.Theme {
 		TextInputTheme: &widget.TextInputParams{
 			Face: r.fonts.smallFace,
 			Image: &widget.TextInputImage{
-				Idle:  image.NewBorderedNineSliceColor(color.Transparent, *r.fgClr, 2),
-				Hover: image.NewBorderedNineSliceColor(*r.secClr, *r.fgClr, 2),
+				Idle:  borderedFg,
+				Hover: borderedSec,
 			},
 			Color: &widget.TextInputColor{
 				Idle:  *r.fgClr,
@@ -291,9 +288,9 @@ func NewTheme(r *Resources) *widget.Theme {
 				Hover: transparentNine,
 			},
 			HandleImage: &widget.ButtonImage{
-				Idle:    r.sec,
-				Hover:   r.fg,
-				Pressed: r.fg,
+				Idle:    image.NewBorderedNineSliceColor(color.Transparent, *r.secClr, 2),
+				Hover:   image.NewBorderedNineSliceColor(color.Transparent, *r.fgClr, 2),
+				Pressed: image.NewBorderedNineSliceColor(color.Transparent, *r.fgClr, 2),
 			},
 		},
 		CheckboxTheme: &widget.CheckboxParams{

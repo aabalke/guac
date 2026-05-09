@@ -7,7 +7,7 @@ import (
 	"os/exec"
 )
 
-var L Logger
+var L *Logger
 
 const (
 	BUF_SIZE = 0xFFF
@@ -22,7 +22,6 @@ type Logger struct {
 }
 
 func Init(path string) *Logger {
-
 	if L.started {
 		panic("STARTED LOGGER WHICH WAS ALREADY STARTED")
 	}
@@ -36,11 +35,10 @@ func Init(path string) *Logger {
 	L.file = f
 	L.bufWriter = bufio.NewWriter(f)
 
-	return &L
+	return L
 }
 
 func (l *Logger) Close() {
-
 	l.bufWriter.Flush()
 	l.file.Close()
 
@@ -59,7 +57,6 @@ func (l *Logger) Close() {
 }
 
 func (l *Logger) Write(s string) {
-
 	fmt.Fprintf(l.bufWriter, "%s\n", s)
 
 	if l.cnt&BUF_SIZE == 0 {

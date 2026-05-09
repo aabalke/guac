@@ -48,7 +48,6 @@ func GamepadButtonToString(v ebiten.StandardGamepadButton) string {
 }
 
 func StringToGamepadButton(v string) ebiten.StandardGamepadButton {
-
 	v = strings.ToLower(v)
 
 	switch v {
@@ -89,4 +88,18 @@ func StringToGamepadButton(v string) ebiten.StandardGamepadButton {
 	}
 
 	return -1
+}
+
+func StringToKey(v string) (ebiten.Key, bool) {
+	var k ebiten.Key
+
+	if err := k.UnmarshalText([]byte(v)); err != nil {
+		return 0, false
+	}
+
+	return k, true
+}
+
+func KeyToString(k ebiten.Key) string {
+	return k.String()
 }

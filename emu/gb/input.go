@@ -1,13 +1,13 @@
 package gb
 
 import (
+	"slices"
+
 	"github.com/aabalke/guac/config"
 	"github.com/hajimehoshi/ebiten/v2"
-	"slices"
 )
 
 func (gb *GameBoy) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadButton) {
-
 	var (
 		keyConfig    = config.Conf.Gb.KeyboardConfig
 		buttonConfig = config.Conf.Gb.ControllerConfig
@@ -17,22 +17,22 @@ func (gb *GameBoy) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGame
 	*k = 0xFF
 
 	for _, key := range keys {
-		switch keyStr := key.String(); {
-		case slices.Contains(keyConfig.A, keyStr):
+		switch {
+		case slices.Contains(keyConfig.A, key):
 			*k &^= 1 << 4
-		case slices.Contains(keyConfig.B, keyStr):
+		case slices.Contains(keyConfig.B, key):
 			*k &^= 1 << 5
-		case slices.Contains(keyConfig.Select, keyStr):
+		case slices.Contains(keyConfig.Select, key):
 			*k &^= 1 << 6
-		case slices.Contains(keyConfig.Start, keyStr):
+		case slices.Contains(keyConfig.Start, key):
 			*k &^= 1 << 7
-		case slices.Contains(keyConfig.Right, keyStr):
+		case slices.Contains(keyConfig.Right, key):
 			*k &^= 1 << 0
-		case slices.Contains(keyConfig.Left, keyStr):
+		case slices.Contains(keyConfig.Left, key):
 			*k &^= 1 << 1
-		case slices.Contains(keyConfig.Up, keyStr):
+		case slices.Contains(keyConfig.Up, key):
 			*k &^= 1 << 2
-		case slices.Contains(keyConfig.Down, keyStr):
+		case slices.Contains(keyConfig.Down, key):
 			*k &^= 1 << 3
 		}
 	}

@@ -161,7 +161,6 @@ func Decode() {
 }
 
 func (c *Config) open() {
-
 	b, err := os.ReadFile(CONFIG_PATH)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -190,7 +189,6 @@ func (c *Config) open() {
 }
 
 func (c *Config) decodeGeneral() {
-
 	c.config.General.Muted = c.General.Muted
 	c.config.General.TargetFps = c.General.TargetFps
 	c.config.General.ShowFps = c.General.ShowFps
@@ -215,7 +213,7 @@ func (c *Config) decodeGeneral() {
 		&in.Quit,
 	}
 
-	outputsKeys := []*[]string{
+	outputsKeys := []*[]ebiten.Key{
 		&confKey.Select,
 		&confKey.Return,
 		&confKey.Mute,
@@ -229,7 +227,11 @@ func (c *Config) decodeGeneral() {
 	}
 
 	for i := range len(tomls) {
-		*outputsKeys[i] = *tomls[i]
+		for j := range *tomls[i] {
+			if str, ok := utils.StringToKey((*tomls[i])[j]); ok {
+				*outputsKeys[i] = append(*outputsKeys[i], str)
+			}
+		}
 	}
 
 	in = &c.General.Controller
@@ -269,7 +271,6 @@ func (c *Config) decodeGeneral() {
 }
 
 func (c *Config) decodeUi() {
-
 	c.config.Ui.Backdrop = color.RGBA{
 		R: uint8(c.Ui.Backdrop >> 16),
 		G: uint8(c.Ui.Backdrop >> 8),
@@ -313,11 +314,9 @@ func (c *Config) decodeProfile() {
 	if c.Profile.StartTick >= c.Profile.EndTick {
 		panic("profile config invalid, provided Start >= End")
 	}
-
 }
 
 func (c *Config) decodeGb() {
-
 	c.decodeKeyboard(&c.Gb.Keyboard, &c.config.Gb.KeyboardConfig)
 	c.decodeController(&c.Gb.Controller, &c.config.Gb.ControllerConfig)
 
@@ -340,7 +339,6 @@ func (c *Config) decodeGb() {
 			color.RGBA{0x00, 0x00, 0x00, 0xFF},
 		}
 	} else {
-
 		c.config.Gb.Palette = [4]color.Color{
 			color.RGBA{uint8(pal[0] >> 16), uint8(pal[0] >> 8), uint8(pal[0]), 0xFF},
 			color.RGBA{uint8(pal[1] >> 16), uint8(pal[1] >> 8), uint8(pal[1]), 0xFF},
@@ -351,7 +349,6 @@ func (c *Config) decodeGb() {
 }
 
 func (c *Config) decodeGba() {
-
 	c.decodeKeyboard(&c.Gba.Keyboard, &c.config.Gba.KeyboardConfig)
 	c.decodeController(&c.Gba.Controller, &c.config.Gba.ControllerConfig)
 
@@ -360,7 +357,6 @@ func (c *Config) decodeGba() {
 }
 
 func (c *Config) decodeNds() {
-
 	c.decodeKeyboard(&c.Nds.Keyboard, &c.config.Nds.KeyboardConfig)
 	c.decodeController(&c.Nds.Controller, &c.config.Nds.ControllerConfig)
 
@@ -415,7 +411,6 @@ func (c *Config) decodeNds() {
 }
 
 func (c *Config) decodeNdsFirmware() {
-
 	f := &c.Nds.Firmware
 	conf := &c.config.Nds.Firmware
 
@@ -466,7 +461,6 @@ func (c *Config) decodeNdsFirmware() {
 }
 
 func (c *Config) decodeNdsJit() {
-
 	isX86 := runtime.GOARCH == "amd64" || runtime.GOARCH == "386"
 
 	c.config.Nds.Jit.Enabled = c.Nds.Jit.Enabled && isX86
@@ -492,7 +486,6 @@ func (c *Config) decodeNdsJit() {
 }
 
 func (c *Config) decodeKeyboard(in *EmulatorInput, conf *config.EmulatorKeyboard) {
-
 	tomls := []*[]string{
 		&in.A,
 		&in.B,
@@ -514,7 +507,7 @@ func (c *Config) decodeKeyboard(in *EmulatorInput, conf *config.EmulatorKeyboard
 		&in.ExportScene,
 	}
 
-	outputs := []*[]string{
+	outputs := []*[]ebiten.Key{
 		&conf.A,
 		&conf.B,
 		&conf.Select,
@@ -536,12 +529,15 @@ func (c *Config) decodeKeyboard(in *EmulatorInput, conf *config.EmulatorKeyboard
 	}
 
 	for i := range len(tomls) {
-		*outputs[i] = *tomls[i]
+		for j := range *tomls[i] {
+			if str, ok := utils.StringToKey((*tomls[i])[j]); ok {
+				*outputs[i] = append(*outputs[i], str)
+			}
+		}
 	}
 }
 
 func (c *Config) decodeController(in *EmulatorInput, conf *config.EmulatorController) {
-
 	tomls := []*[]string{
 		&in.A,
 		&in.B,

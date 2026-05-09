@@ -10,7 +10,6 @@ import (
 )
 
 func toString(value any) string {
-
 	switch v := value.(type) {
 	case *int:
 		return strconv.Itoa(*v)
@@ -21,6 +20,9 @@ func toString(value any) string {
 
 	case *[]int:
 		return join(*v, ", ", strconv.Itoa)
+
+	case *[]ebiten.Key:
+		return join(*v, ", ", utils.KeyToString)
 
 	case *[]ebiten.StandardGamepadButton:
 		return join(*v, ", ", utils.GamepadButtonToString)
@@ -51,6 +53,16 @@ func fromString(original any, value string) {
 		}
 
 		*v = nums
+
+	case *[]ebiten.Key:
+		strs := strings.Split(strings.ReplaceAll(value, " ", ""), ",")
+
+		*v = []ebiten.Key{}
+		for i := range strs {
+			if str, ok := utils.StringToKey(strs[i]); ok {
+				*v = append(*v, str)
+			}
+		}
 
 	case *[]ebiten.StandardGamepadButton:
 		strs := strings.Split(strings.ReplaceAll(value, " ", ""), ",")

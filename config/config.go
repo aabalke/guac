@@ -84,21 +84,22 @@ type General struct {
 	InitFullscreen bool
 	Vsync          bool
 	DisableSaves   bool
+	Logger         bool
 	Keyboard       GeneralKeyboard
 	Controller     GeneralController
 }
 
 type GeneralKeyboard struct {
-	Select     []string
-	Return     []string
-	Mute       []string
-	Pause      []string
-	Left       []string
-	Right      []string
-	Up         []string
-	Down       []string
-	Fullscreen []string
-	Quit       []string
+	Select     []ebiten.Key
+	Return     []ebiten.Key
+	Mute       []ebiten.Key
+	Pause      []ebiten.Key
+	Left       []ebiten.Key
+	Right      []ebiten.Key
+	Up         []ebiten.Key
+	Down       []ebiten.Key
+	Fullscreen []ebiten.Key
+	Quit       []ebiten.Key
 }
 
 type GeneralController struct {
@@ -191,24 +192,24 @@ type NdsJit struct {
 }
 
 type EmulatorKeyboard struct {
-	A              []string
-	B              []string
-	Select         []string
-	Start          []string
-	Left           []string
-	Right          []string
-	Up             []string
-	Down           []string
-	R              []string
-	L              []string
-	X              []string
-	Y              []string
-	Hinge          []string
-	Debug          []string
-	LayoutToggle   []string
-	SizingToggle   []string
-	RotationToggle []string
-	ExportScene    []string
+	A              []ebiten.Key
+	B              []ebiten.Key
+	Select         []ebiten.Key
+	Start          []ebiten.Key
+	Left           []ebiten.Key
+	Right          []ebiten.Key
+	Up             []ebiten.Key
+	Down           []ebiten.Key
+	R              []ebiten.Key
+	L              []ebiten.Key
+	X              []ebiten.Key
+	Y              []ebiten.Key
+	Hinge          []ebiten.Key
+	Debug          []ebiten.Key
+	LayoutToggle   []ebiten.Key
+	SizingToggle   []ebiten.Key
+	RotationToggle []ebiten.Key
+	ExportScene    []ebiten.Key
 }
 
 type EmulatorController struct {

@@ -1,11 +1,12 @@
 package ui
 
 import (
+	"image/color"
+
 	"github.com/aabalke/guac/utils"
 	"github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/utilities/mobile"
 	"github.com/ebitenui/ebitenui/widget"
-	"image/color"
 )
 
 const (
@@ -14,16 +15,16 @@ const (
 )
 
 const (
-	WIDGET_HDR = iota //header
-	WIDGET_CBX        //checkbox
-	WIDGET_KEY        //keybinding
-	WIDGET_DEC        //decimal
-	WIDGET_HEX        //hexadecimal
-	WIDGET_FLE        //file
-	WIDGET_DIR        //directory
-	WIDGET_TXT        //text
-	WIDGET_LNK        //link
-	WIDGET_RAD        //radio
+	WIDGET_HDR = iota // header
+	WIDGET_CBX        // checkbox
+	WIDGET_KEY        // keybinding
+	WIDGET_DEC        // decimal
+	WIDGET_HEX        // hexadecimal
+	WIDGET_FLE        // file
+	WIDGET_DIR        // directory
+	WIDGET_TXT        // text
+	WIDGET_LNK        // link
+	WIDGET_RAD        // radio
 )
 
 func NewHeader(text string, res *Resources) *widget.Text {
@@ -63,7 +64,6 @@ func NewSeparator() *widget.Container {
 }
 
 func NewCheckbox(value *bool) widget.PreferredSizeLocateableWidget {
-
 	state := widget.WidgetUnchecked
 	if *value {
 		state = widget.WidgetChecked
@@ -80,7 +80,6 @@ func NewCheckbox(value *bool) widget.PreferredSizeLocateableWidget {
 }
 
 func NewTextBoxInput(ui *Ui, board int, label string, value any, validation func(s string) (bool, *string)) *widget.TextInput {
-
 	var input *widget.TextInput
 
 	input = widget.NewTextInput(
@@ -126,7 +125,6 @@ func NewSaveButton(text string, f func(args *widget.ButtonClickedEventArgs)) wid
 }
 
 func NewColorInput(ui *Ui, label string, v *color.Color, validation func(s string) (bool, *string)) widget.PreferredSizeLocateableWidget {
-
 	colorBox := widget.NewContainer()
 
 	container := widget.NewContainer(
@@ -163,7 +161,6 @@ func NewColorInput(ui *Ui, label string, v *color.Color, validation func(s strin
 }
 
 func NewApplyPalettesMenu(focusGroups *[][]widget.Focuser, pals map[string][4]string, clrInputs [4]widget.PreferredSizeLocateableWidget, res *Resources) widget.PreferredSizeLocateableWidget {
-
 	c := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
@@ -218,7 +215,6 @@ func NewDirectoryInput(v *string, defaultPath string) widget.PreferredSizeLocate
 }
 
 func dialogInput(v *string, dialogFunc func() string) widget.PreferredSizeLocateableWidget {
-
 	var input *widget.TextInput
 
 	onClick := func(input *widget.TextInput) {
@@ -252,7 +248,6 @@ func dialogInput(v *string, dialogFunc func() string) widget.PreferredSizeLocate
 }
 
 func NewRadioInput(focusRadios *[][]widget.Focuser, ptr *int, values []string, res *Resources) widget.PreferredSizeLocateableWidget {
-
 	radio := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),

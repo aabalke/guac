@@ -12,7 +12,6 @@ import (
 var _ = fmt.Sprint
 
 func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, buttons []ebiten.StandardGamepadButton, mouse *input.Mouse, frame uint64) {
-
 	var (
 		keyCfg    = config.Conf.Nds.KeyboardConfig
 		buttonCfg = config.Conf.Nds.ControllerConfig
@@ -27,43 +26,43 @@ func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, buttons []ebiten.Stand
 	mouseInput(nds, mouse, k2)
 
 	for _, key := range keys {
-		switch keyStr := key.String(); {
-		case slices.Contains(keyCfg.A, keyStr):
+		switch {
+		case slices.Contains(keyCfg.A, key):
 			*k &^= 1 << 0
-		case slices.Contains(keyCfg.B, keyStr):
+		case slices.Contains(keyCfg.B, key):
 			*k &^= 1 << 1
-		case slices.Contains(keyCfg.Select, keyStr):
+		case slices.Contains(keyCfg.Select, key):
 			*k &^= 1 << 2
-		case slices.Contains(keyCfg.Start, keyStr):
+		case slices.Contains(keyCfg.Start, key):
 			*k &^= 1 << 3
-		case slices.Contains(keyCfg.Right, keyStr):
+		case slices.Contains(keyCfg.Right, key):
 			*k &^= 1 << 4
-		case slices.Contains(keyCfg.Left, keyStr):
+		case slices.Contains(keyCfg.Left, key):
 			*k &^= 1 << 5
-		case slices.Contains(keyCfg.Up, keyStr):
+		case slices.Contains(keyCfg.Up, key):
 			*k &^= 1 << 6
-		case slices.Contains(keyCfg.Down, keyStr):
+		case slices.Contains(keyCfg.Down, key):
 			*k &^= 1 << 7
-		case slices.Contains(keyCfg.R, keyStr):
+		case slices.Contains(keyCfg.R, key):
 			*k &^= 1 << 8
-		case slices.Contains(keyCfg.L, keyStr):
+		case slices.Contains(keyCfg.L, key):
 			*k &^= 1 << 9
-		case slices.Contains(keyCfg.X, keyStr):
+		case slices.Contains(keyCfg.X, key):
 			*k2 &^= 1 << 0
-		case slices.Contains(keyCfg.Y, keyStr):
+		case slices.Contains(keyCfg.Y, key):
 			*k2 &^= 1 << 1
 		}
 	}
 
 	for _, key := range justKeys {
-		switch keyStr := key.String(); {
-		case slices.Contains(keyCfg.LayoutToggle, keyStr):
+		switch {
+		case slices.Contains(keyCfg.LayoutToggle, key):
 			nds.Screen.inputHandler(SCREEN_LAYOUT)
-		case slices.Contains(keyCfg.SizingToggle, keyStr):
+		case slices.Contains(keyCfg.SizingToggle, key):
 			nds.Screen.inputHandler(SCREEN_SIZING)
-		case slices.Contains(keyCfg.RotationToggle, keyStr):
+		case slices.Contains(keyCfg.RotationToggle, key):
 			nds.Screen.inputHandler(SCREEN_ROTATION)
-		case slices.Contains(keyCfg.ExportScene, keyStr):
+		case slices.Contains(keyCfg.ExportScene, key):
 			nds.ppu.Rasterizer.Export.Export()
 		}
 	}
@@ -104,7 +103,6 @@ func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, buttons []ebiten.Stand
 }
 
 func mouseInput(nds *Nds, mouse *input.Mouse, k2 *uint16) {
-
 	abs := nds.Screen.BtmAbs
 	tsc := &nds.mem.Spi.Tsc
 

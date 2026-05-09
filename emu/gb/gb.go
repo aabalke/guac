@@ -24,7 +24,7 @@ const (
 )
 
 type GameBoy struct {
-	//Palette [][]uint8
+	// Palette [][]uint8
 	Palette *[4]color.Color
 	Pixels  []byte
 
@@ -80,7 +80,6 @@ type Timer struct {
 }
 
 func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
-
 	img := ebiten.NewImage(width, height)
 
 	gb := &GameBoy{
@@ -119,13 +118,14 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 
 	initMemory(gb)
 
-	L = NewLogger("./loggy", gb)
+	if config.Conf.General.Logger {
+		L = NewLogger("./loggy", gb)
+	}
 
 	return gb
 }
 
 func (gb *GameBoy) UpdateFromConfig() {
-
 	v := gb.MemoryBus.IO[0x47]
 	gb.UnpackedMonoPals[0][0] = utils.ColorToUint32(gb.Palette[(v>>0)&3])
 	gb.UnpackedMonoPals[0][1] = utils.ColorToUint32(gb.Palette[(v>>2)&3])
@@ -141,7 +141,6 @@ func (gb *GameBoy) UpdateFromConfig() {
 	gb.UnpackedMonoPals[2][1] = utils.ColorToUint32(gb.Palette[(v>>2)&3])
 	gb.UnpackedMonoPals[2][2] = utils.ColorToUint32(gb.Palette[(v>>4)&3])
 	gb.UnpackedMonoPals[2][3] = utils.ColorToUint32(gb.Palette[(v>>6)&3])
-
 }
 
 func (gb *GameBoy) GetSize() (int32, int32) {
@@ -177,7 +176,6 @@ func (gb *GameBoy) Update(stdFps bool) {
 }
 
 func (gb *GameBoy) Tick(tCycles int) {
-
 	if tCycles == 0 {
 		return
 	}
@@ -214,7 +212,6 @@ func (gb *GameBoy) SetIrq(bit uint8) {
 }
 
 func (gb *GameBoy) UpdateInterrupt() int {
-
 	if gb.Cpu.PendingInterrupt {
 		gb.Cpu.IME = true
 		gb.Cpu.PendingInterrupt = false
@@ -263,7 +260,6 @@ func (gb *GameBoy) UpdateInterrupt() int {
 var IRQ_SRC = [...]uint16{0x40, 0x48, 0x50, 0x58, 0x60}
 
 func (gb *GameBoy) UpdateTimers(cycles int) {
-
 	t := &gb.Timer
 
 	cycles <<= gb.DoubleSpeedFlag
@@ -323,7 +319,6 @@ func (gb *GameBoy) UpdateTimers(cycles int) {
 var fallingEdgeBits = [...]uint16{1 << 9, 1 << 3, 1 << 5, 1 << 7}
 
 func (gb *GameBoy) toggleDoubleSpeed() {
-
 	if !gb.PrepareSpeedToggle {
 		return
 	}
@@ -351,7 +346,6 @@ func (gb *GameBoy) Close() {
 }
 
 func (gb *GameBoy) Draw(screen *ebiten.Image) {
-
 	sw, sh := float64(screen.Bounds().Dx()), float64(screen.Bounds().Dy())
 	iw, ih := float64(gb.Image.Bounds().Dx()), float64(gb.Image.Bounds().Dy())
 
