@@ -2,6 +2,7 @@ package ui
 
 import (
 	"github.com/aabalke/guac/config"
+	"github.com/aabalke/guac/config/file"
 	"github.com/ebitenui/ebitenui/widget"
 )
 
@@ -175,6 +176,7 @@ func NewGeneralMenu(g *Game, parent *widget.Container) {
 
 		parent.RemoveChildren()
 		NewGeneralMenu(g, parent)
+		file.Encode()
 
 		if len(g.gamepadIds) != 0 {
 			g.ui.focus.FocusLastSubMenu()
@@ -218,6 +220,8 @@ func NewUiMenu(g *Game, parent *widget.Container) {
 			NewSettings(g, oldId, MENU_UI)
 			// should this be somewhere else?
 			g.ui.keyboard = NewKeyboard(g.ui.res)
+
+			file.Encode()
 
 			if len(g.gamepadIds) != 0 {
 				g.ui.focus.FocusLastSubMenu()
@@ -288,6 +292,7 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 
 		parent.RemoveChildren()
 		NewGbMenu(g, parent)
+		file.Encode()
 
 		if len(g.gamepadIds) != 0 {
 			g.ui.focus.FocusLastSubMenu()
@@ -345,6 +350,7 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 
 		parent.RemoveChildren()
 		NewGbaMenu(g, parent)
+		file.Encode()
 
 		if len(g.gamepadIds) != 0 {
 			g.ui.focus.FocusLastSubMenu()
@@ -429,11 +435,12 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 
 	parent.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Nds = tmp
+		config.Conf.Nds.Firmware.Color = config.ColorNameToId[favColor]
 
 		parent.RemoveChildren()
 		NewNdsMenu(g, parent)
 
-		config.Conf.Nds.Firmware.Color = config.ColorNameToId[favColor]
+		file.Encode()
 
 		if len(g.gamepadIds) != 0 {
 			g.ui.focus.FocusLastSubMenu()

@@ -1,25 +1,6 @@
 # keyboard ids come from ebitengine string values.
 # gamepad / controller ids: https://www.w3.org/TR/gamepad/#remapping
 
-# Available Gamepad Button Names
-# RightBottom      
-# RightRight       
-# RightLeft        
-# RightTop         
-# FrontTopLeft     
-# FrontTopRight    
-# FrontBottomLeft  
-# FrontBottomRight 
-# CenterLeft       
-# CenterRight      
-# LeftStick        
-# RightStick       
-# LeftTop          
-# LeftBottom       
-# LeftLeft         
-# LeftRight        
-# CenterCenter     
-
 [general]
 
 muted           = false
@@ -58,10 +39,10 @@ down   = ["LeftBottom"]
 [ui]
 language = "en"
 
-backdrop_color = 0x0A0A0A
-menu_background_color = 0xFFFFFF
-menu_foreground_color = 0x000000
-menu_secondary_color  = 0xCCCCCC
+backdrop_color = "0x0A0A0A"
+menu_background_color = "0xFFFFFF"
+menu_foreground_color = "0x000000"
+menu_secondary_color  = "0xCCCCCC"
 
 [profile]
 # used for performance profiling. Uses go pprof
@@ -76,7 +57,7 @@ end_tick = 1000
 [gb]
 # Define a 4 color palette to replace greyscale using hex values [lightest...darkest]
 # if invalid input, will fall back to greyscale
-#dmg_palette = [ 0xE0F8D0, 0x88C070, 0x346856, 0x081820 ]
+dmg_palette = [ "0xE0F8D0", "0x88C070", "0x346856", "0x081820" ]
 
 [gb.keyboard]
 
