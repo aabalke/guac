@@ -58,18 +58,42 @@ func fromString(original any, value string) {
 		strs := strings.Split(strings.ReplaceAll(value, " ", ""), ",")
 
 		*v = []ebiten.Key{}
+
+	StrKeys:
 		for i := range strs {
-			if str, ok := utils.StringToKey(strs[i]); ok {
-				*v = append(*v, str)
+			str, ok := utils.StringToKey(strs[i])
+			if !ok {
+				continue
 			}
+
+			for i := range len(*v) {
+				if str == (*v)[i] {
+					continue StrKeys
+				}
+			}
+
+			*v = append(*v, str)
 		}
 
 	case *[]ebiten.StandardGamepadButton:
 		strs := strings.Split(strings.ReplaceAll(value, " ", ""), ",")
 
 		*v = []ebiten.StandardGamepadButton{}
+
+	StrController:
 		for i := range strs {
-			*v = append(*v, utils.StringToGamepadButton(strs[i]))
+			str, ok := utils.StringToGamepadButton(strs[i])
+			if !ok {
+				continue
+			}
+
+			for i := range len(*v) {
+				if str == (*v)[i] {
+					continue StrController
+				}
+			}
+
+			*v = append(*v, str)
 		}
 
 	default:

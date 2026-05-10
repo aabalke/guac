@@ -102,8 +102,8 @@ func NewTextBoxInput(ui *Ui, board int, label string, value any, validation func
 	return input
 }
 
-func NewKeybindInput(ui *Ui, label string, value any) *widget.TextInput {
-	return NewTextBoxInput(ui, BOARD_KEYBIND, label, value, NoValidation())
+func NewKeybindInput(ui *Ui, label string, value any, validation func(string) (bool, *string)) *widget.TextInput {
+	return NewTextBoxInput(ui, BOARD_KEYBIND, label, value, validation)
 }
 
 func NewDecimalInput(ui *Ui, label string, value any, maxValue int) *widget.TextInput {

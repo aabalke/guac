@@ -95,30 +95,42 @@ func buildSubMenu(g *Game, parent *widget.Container, fields []Field) {
 	for _, field := range fields {
 		switch field.widgettype {
 		case WIDGET_HDR:
-			parent.AddChild(NewHeader(field.label, g.ui.res), NewSeparator())
+			parent.AddChild(NewHeader(field.label, g.ui.res),
+				NewSeparator())
 		case WIDGET_CBX:
-			parent.AddChild(NewLabel(field.label), NewCheckbox(field.ptr.(*bool)))
+			parent.AddChild(NewLabel(field.label),
+				NewCheckbox(field.ptr.(*bool)))
 		case WIDGET_KEY:
-			parent.AddChild(NewLabel(field.label), NewKeybindInput(g.ui, field.sublabel, field.ptr))
+			parent.AddChild(NewLabel(field.label),
+				NewKeybindInput(g.ui, field.sublabel, field.ptr, field.other.(func(string) (bool, *string))))
 		case WIDGET_DEC:
-			parent.AddChild(NewLabel(field.label), NewDecimalInput(g.ui, field.sublabel, field.ptr, field.other.(int)))
+			parent.AddChild(NewLabel(field.label),
+				NewDecimalInput(g.ui, field.sublabel, field.ptr, field.other.(int)))
 		case WIDGET_HEX:
-			parent.AddChild(NewLabel(field.label), NewHexInput(g.ui, field.sublabel, field.ptr, field.other.(int)))
+			parent.AddChild(NewLabel(field.label),
+				NewHexInput(g.ui, field.sublabel, field.ptr, field.other.(int)))
 		case WIDGET_FLE:
-			parent.AddChild(NewLabel(field.label), NewFileInput(field.ptr.(*string)))
+			parent.AddChild(NewLabel(field.label),
+				NewFileInput(field.ptr.(*string)))
 		case WIDGET_DIR:
-			parent.AddChild(NewLabel(field.label), NewDirectoryInput(field.ptr.(*string), field.other.(string)))
+			parent.AddChild(NewLabel(field.label),
+				NewDirectoryInput(field.ptr.(*string), field.other.(string)))
 		case WIDGET_TXT:
-			parent.AddChild(NewLabel(field.label), NewTextBoxInput(g.ui, BOARD_ALPHA, field.sublabel, field.ptr, NoValidation()))
+			parent.AddChild(NewLabel(field.label),
+				NewTextBoxInput(g.ui, BOARD_ALPHA, field.sublabel, field.ptr, field.other.(func(s string) (bool, *string))))
 		case WIDGET_LNK:
-			parent.AddChild(NewSeparator(), NewLinkText(field.other.(string)))
+			parent.AddChild(NewSeparator(),
+				NewLinkText(field.other.(string)))
 		case WIDGET_RAD:
-			parent.AddChild(NewLabel(field.label), NewRadioInput(
-				&g.ui.focus.horizontalGroup,
-				field.ptr.(*int),
-				field.other.([]string),
-				g.ui.res,
-			))
+			parent.AddChild(
+				NewLabel(field.label),
+				NewRadioInput(
+					&g.ui.focus.horizontalGroup,
+					field.ptr.(*int),
+					field.other.([]string),
+					g.ui.res,
+				),
+			)
 		}
 	}
 }
@@ -137,7 +149,7 @@ func NewGeneralMenu(g *Game, parent *widget.Container) {
 		{WIDGET_CBX, l.Muted, "", &tmp.Muted, nil},
 		{WIDGET_CBX, l.ShowFps, "", &tmp.ShowFps, nil},
 		{WIDGET_CBX, l.InitFullscreen, "", &tmp.InitFullscreen, nil},
-		{WIDGET_DEC, l.TargetFps, l.TargetFps, &tmp.TargetFps, 1000000},
+		{WIDGET_DEC, l.TargetFps, l.TargetFps, &tmp.TargetFps, 1_000_000},
 		{WIDGET_CBX, l.VsyncEnabled, "", &tmp.Vsync, nil},
 		{WIDGET_CBX, l.DisableSaves, "", &tmp.DisableSaves, nil},
 		{WIDGET_CBX, l.IntegerScaling, "", &tmp.IntegerScaling, nil},
@@ -146,29 +158,29 @@ func NewGeneralMenu(g *Game, parent *widget.Container) {
 
 		{WIDGET_HDR, l.Keyboard, "", nil, nil},
 		{WIDGET_LNK, "", "", nil, keybindsLink},
-		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, nil},
-		{WIDGET_KEY, l.Return, l.KeyboardReturn, &k.Return, nil},
-		{WIDGET_KEY, l.Mute, l.KeyboardMute, &k.Mute, nil},
-		{WIDGET_KEY, l.Pause, l.KeyboardPause, &k.Pause, nil},
-		{WIDGET_KEY, l.Left, l.KeyboardLeft, &k.Left, nil},
-		{WIDGET_KEY, l.Right, l.KeyboardRight, &k.Right, nil},
-		{WIDGET_KEY, l.Up, l.KeyboardUp, &k.Up, nil},
-		{WIDGET_KEY, l.Down, l.KeyboardDown, &k.Down, nil},
-		{WIDGET_KEY, l.Fullscreen, l.KeyboardFullscreen, &k.Fullscreen, nil},
-		{WIDGET_KEY, l.Quit, l.KeyboardQuit, &k.Quit, nil},
+		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, KeyValidation()},
+		{WIDGET_KEY, l.Return, l.KeyboardReturn, &k.Return, KeyValidation()},
+		{WIDGET_KEY, l.Mute, l.KeyboardMute, &k.Mute, KeyValidation()},
+		{WIDGET_KEY, l.Pause, l.KeyboardPause, &k.Pause, KeyValidation()},
+		{WIDGET_KEY, l.Left, l.KeyboardLeft, &k.Left, KeyValidation()},
+		{WIDGET_KEY, l.Right, l.KeyboardRight, &k.Right, KeyValidation()},
+		{WIDGET_KEY, l.Up, l.KeyboardUp, &k.Up, KeyValidation()},
+		{WIDGET_KEY, l.Down, l.KeyboardDown, &k.Down, KeyValidation()},
+		{WIDGET_KEY, l.Fullscreen, l.KeyboardFullscreen, &k.Fullscreen, KeyValidation()},
+		{WIDGET_KEY, l.Quit, l.KeyboardQuit, &k.Quit, KeyValidation()},
 
 		{WIDGET_HDR, l.Controller, "", nil, nil},
 		{WIDGET_LNK, "", "", nil, keybindsLink},
-		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, nil},
-		{WIDGET_KEY, l.Return, l.ControllerReturn, &c.Return, nil},
-		{WIDGET_KEY, l.Mute, l.ControllerMute, &c.Mute, nil},
-		{WIDGET_KEY, l.Pause, l.ControllerPause, &c.Pause, nil},
-		{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, nil},
-		{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, nil},
-		{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, nil},
-		{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, nil},
-		{WIDGET_KEY, l.Fullscreen, l.ControllerFullscreen, &c.Fullscreen, nil},
-		{WIDGET_KEY, l.Quit, l.ControllerQuit, &c.Quit, nil},
+		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, ControllerValidation()},
+		{WIDGET_KEY, l.Return, l.ControllerReturn, &c.Return, ControllerValidation()},
+		{WIDGET_KEY, l.Mute, l.ControllerMute, &c.Mute, ControllerValidation()},
+		{WIDGET_KEY, l.Pause, l.ControllerPause, &c.Pause, ControllerValidation()},
+		{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, ControllerValidation()},
+		{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, ControllerValidation()},
+		{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, ControllerValidation()},
+		{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, ControllerValidation()},
+		{WIDGET_KEY, l.Fullscreen, l.ControllerFullscreen, &c.Fullscreen, ControllerValidation()},
+		{WIDGET_KEY, l.Quit, l.ControllerQuit, &c.Quit, ControllerValidation()},
 	}
 
 	parent.RemoveChildren()
@@ -255,25 +267,25 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 	fields := []Field{
 		{WIDGET_HDR, l.Keyboard, "", nil, nil},
 		{WIDGET_LNK, "", "", nil, keybindsLink},
-		{WIDGET_KEY, l.A, l.KeyboardA, &k.A, nil},
-		{WIDGET_KEY, l.B, l.KeyboardB, &k.B, nil},
-		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, nil},
-		{WIDGET_KEY, l.Start, l.KeyboardStart, &k.Start, nil},
-		{WIDGET_KEY, l.Left, l.KeyboardLeft, &k.Left, nil},
-		{WIDGET_KEY, l.Right, l.KeyboardRight, &k.Right, nil},
-		{WIDGET_KEY, l.Up, l.KeyboardUp, &k.Up, nil},
-		{WIDGET_KEY, l.Down, l.KeyboardDown, &k.Down, nil},
+		{WIDGET_KEY, l.A, l.KeyboardA, &k.A, KeyValidation()},
+		{WIDGET_KEY, l.B, l.KeyboardB, &k.B, KeyValidation()},
+		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, KeyValidation()},
+		{WIDGET_KEY, l.Start, l.KeyboardStart, &k.Start, KeyValidation()},
+		{WIDGET_KEY, l.Left, l.KeyboardLeft, &k.Left, KeyValidation()},
+		{WIDGET_KEY, l.Right, l.KeyboardRight, &k.Right, KeyValidation()},
+		{WIDGET_KEY, l.Up, l.KeyboardUp, &k.Up, KeyValidation()},
+		{WIDGET_KEY, l.Down, l.KeyboardDown, &k.Down, KeyValidation()},
 
 		{WIDGET_HDR, l.Controller, "", nil, nil},
 		{WIDGET_LNK, "", "", nil, keybindsLink},
-		{WIDGET_KEY, l.A, l.ControllerA, &c.A, nil},
-		{WIDGET_KEY, l.B, l.ControllerB, &c.B, nil},
-		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, nil},
-		{WIDGET_KEY, l.Start, l.ControllerStart, &c.Start, nil},
-		{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, nil},
-		{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, nil},
-		{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, nil},
-		{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, nil},
+		{WIDGET_KEY, l.A, l.ControllerA, &c.A, ControllerValidation()},
+		{WIDGET_KEY, l.B, l.ControllerB, &c.B, ControllerValidation()},
+		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, ControllerValidation()},
+		{WIDGET_KEY, l.Start, l.ControllerStart, &c.Start, ControllerValidation()},
+		{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, ControllerValidation()},
+		{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, ControllerValidation()},
+		{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, ControllerValidation()},
+		{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, ControllerValidation()},
 	}
 
 	parent.RemoveChildren()
@@ -320,29 +332,29 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 
 		{WIDGET_HDR, l.Keyboard, "", nil, nil},
 		{WIDGET_LNK, "", "", nil, keybindsLink},
-		{WIDGET_KEY, l.A, l.KeyboardA, &k.A, nil},
-		{WIDGET_KEY, l.B, l.KeyboardB, &k.B, nil},
-		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, nil},
-		{WIDGET_KEY, l.Start, l.KeyboardStart, &k.Start, nil},
-		{WIDGET_KEY, l.Left, l.KeyboardLeft, &k.Left, nil},
-		{WIDGET_KEY, l.Right, l.KeyboardRight, &k.Right, nil},
-		{WIDGET_KEY, l.Up, l.KeyboardUp, &k.Up, nil},
-		{WIDGET_KEY, l.Down, l.KeyboardDown, &k.Down, nil},
-		{WIDGET_KEY, l.L, l.KeyboardL, &k.L, nil},
-		{WIDGET_KEY, l.R, l.KeyboardR, &k.R, nil},
+		{WIDGET_KEY, l.A, l.KeyboardA, &k.A, KeyValidation()},
+		{WIDGET_KEY, l.B, l.KeyboardB, &k.B, KeyValidation()},
+		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, KeyValidation()},
+		{WIDGET_KEY, l.Start, l.KeyboardStart, &k.Start, KeyValidation()},
+		{WIDGET_KEY, l.Left, l.KeyboardLeft, &k.Left, KeyValidation()},
+		{WIDGET_KEY, l.Right, l.KeyboardRight, &k.Right, KeyValidation()},
+		{WIDGET_KEY, l.Up, l.KeyboardUp, &k.Up, KeyValidation()},
+		{WIDGET_KEY, l.Down, l.KeyboardDown, &k.Down, KeyValidation()},
+		{WIDGET_KEY, l.L, l.KeyboardL, &k.L, KeyValidation()},
+		{WIDGET_KEY, l.R, l.KeyboardR, &k.R, KeyValidation()},
 
 		{WIDGET_HDR, l.Controller, "", nil, nil},
 		{WIDGET_LNK, "", "", nil, keybindsLink},
-		{WIDGET_KEY, l.A, l.ControllerA, &c.A, nil},
-		{WIDGET_KEY, l.B, l.ControllerB, &c.B, nil},
-		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, nil},
-		{WIDGET_KEY, l.Start, l.ControllerStart, &c.Start, nil},
-		{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, nil},
-		{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, nil},
-		{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, nil},
-		{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, nil},
-		{WIDGET_KEY, l.L, l.ControllerL, &k.L, nil},
-		{WIDGET_KEY, l.R, l.ControllerR, &k.R, nil},
+		{WIDGET_KEY, l.A, l.ControllerA, &c.A, ControllerValidation()},
+		{WIDGET_KEY, l.B, l.ControllerB, &c.B, ControllerValidation()},
+		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, ControllerValidation()},
+		{WIDGET_KEY, l.Start, l.ControllerStart, &c.Start, ControllerValidation()},
+		{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, ControllerValidation()},
+		{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, ControllerValidation()},
+		{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, ControllerValidation()},
+		{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, ControllerValidation()},
+		{WIDGET_KEY, l.L, l.ControllerL, &k.L, ControllerValidation()},
+		{WIDGET_KEY, l.R, l.ControllerR, &k.R, ControllerValidation()},
 	}
 
 	parent.RemoveChildren()
@@ -388,9 +400,9 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 
 		{WIDGET_HDR, l.Firmware, "", nil, nil},
 		{WIDGET_FLE, l.FilePath, "", &tmp.Firmware.FilePath, nil},
-		{WIDGET_TXT, l.Nickname, l.Nickname, &tmp.Firmware.Nickname, nil},
-		{WIDGET_TXT, l.Message, l.Message, &tmp.Firmware.Message, nil},
-		{WIDGET_TXT, l.FavoriteColor, l.FavoriteColor, &favColor, nil},
+		{WIDGET_TXT, l.Nickname, l.Nickname, &tmp.Firmware.Nickname, StringValidation(10)},
+		{WIDGET_TXT, l.Message, l.Message, &tmp.Firmware.Message, StringValidation(26)},
+		{WIDGET_TXT, l.FavoriteColor, l.FavoriteColor, &favColor, ColorNdsValidation()},
 
 		{WIDGET_HDR, l.SceneExport, "", nil, nil},
 		{WIDGET_DIR, l.OutputDirectory, "", &tmp.Export.Directory, "./export"},
@@ -398,39 +410,39 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 
 		{WIDGET_HDR, l.Keyboard, "", nil, nil},
 		{WIDGET_LNK, "", "", nil, keybindsLink},
-		{WIDGET_KEY, l.A, l.KeyboardA, &k.A, nil},
-		{WIDGET_KEY, l.B, l.KeyboardB, &k.B, nil},
-		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, nil},
-		{WIDGET_KEY, l.Start, l.KeyboardStart, &k.Start, nil},
-		{WIDGET_KEY, l.Left, l.KeyboardLeft, &k.Left, nil},
-		{WIDGET_KEY, l.Right, l.KeyboardRight, &k.Right, nil},
-		{WIDGET_KEY, l.Up, l.KeyboardUp, &k.Up, nil},
-		{WIDGET_KEY, l.Down, l.KeyboardDown, &k.Down, nil},
-		{WIDGET_KEY, l.L, l.KeyboardL, &k.L, nil},
-		{WIDGET_KEY, l.R, l.KeyboardR, &k.R, nil},
-		{WIDGET_KEY, l.X, l.KeyboardX, &k.X, nil},
-		{WIDGET_KEY, l.Y, l.KeyboardY, &k.Y, nil},
-		{WIDGET_KEY, l.Hinge, l.KeyboardHinge, &k.Hinge, nil},
-		{WIDGET_KEY, l.Debug, l.KeyboardDebug, &k.Debug, nil},
-		{WIDGET_KEY, l.LayoutToggle, l.KeyboardLayoutToggle, &k.LayoutToggle, nil},
-		{WIDGET_KEY, l.SizingToggle, l.KeyboardSizingToggle, &k.SizingToggle, nil},
-		{WIDGET_KEY, l.RotationToggle, l.KeyboardRotationToggle, &k.RotationToggle, nil},
-		{WIDGET_KEY, l.ExportToggle, l.KeyboardExportToggle, &k.ExportScene, nil},
+		{WIDGET_KEY, l.A, l.KeyboardA, &k.A, KeyValidation()},
+		{WIDGET_KEY, l.B, l.KeyboardB, &k.B, KeyValidation()},
+		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, KeyValidation()},
+		{WIDGET_KEY, l.Start, l.KeyboardStart, &k.Start, KeyValidation()},
+		{WIDGET_KEY, l.Left, l.KeyboardLeft, &k.Left, KeyValidation()},
+		{WIDGET_KEY, l.Right, l.KeyboardRight, &k.Right, KeyValidation()},
+		{WIDGET_KEY, l.Up, l.KeyboardUp, &k.Up, KeyValidation()},
+		{WIDGET_KEY, l.Down, l.KeyboardDown, &k.Down, KeyValidation()},
+		{WIDGET_KEY, l.L, l.KeyboardL, &k.L, KeyValidation()},
+		{WIDGET_KEY, l.R, l.KeyboardR, &k.R, KeyValidation()},
+		{WIDGET_KEY, l.X, l.KeyboardX, &k.X, KeyValidation()},
+		{WIDGET_KEY, l.Y, l.KeyboardY, &k.Y, KeyValidation()},
+		{WIDGET_KEY, l.Hinge, l.KeyboardHinge, &k.Hinge, KeyValidation()},
+		{WIDGET_KEY, l.Debug, l.KeyboardDebug, &k.Debug, KeyValidation()},
+		{WIDGET_KEY, l.LayoutToggle, l.KeyboardLayoutToggle, &k.LayoutToggle, KeyValidation()},
+		{WIDGET_KEY, l.SizingToggle, l.KeyboardSizingToggle, &k.SizingToggle, KeyValidation()},
+		{WIDGET_KEY, l.RotationToggle, l.KeyboardRotationToggle, &k.RotationToggle, KeyValidation()},
+		{WIDGET_KEY, l.ExportToggle, l.KeyboardExportToggle, &k.ExportScene, KeyValidation()},
 
 		{WIDGET_HDR, l.Controller, "", nil, nil},
 		{WIDGET_LNK, "", "", nil, keybindsLink},
-		{WIDGET_KEY, l.A, l.ControllerA, &c.A, nil},
-		{WIDGET_KEY, l.B, l.ControllerB, &c.B, nil},
-		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, nil},
-		{WIDGET_KEY, l.Start, l.ControllerStart, &c.Start, nil},
-		{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, nil},
-		{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, nil},
-		{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, nil},
-		{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, nil},
-		{WIDGET_KEY, l.L, l.ControllerL, &k.L, nil},
-		{WIDGET_KEY, l.R, l.ControllerR, &k.R, nil},
-		{WIDGET_KEY, l.X, l.ControllerX, &k.X, nil},
-		{WIDGET_KEY, l.Y, l.ControllerY, &k.Y, nil},
+		{WIDGET_KEY, l.A, l.ControllerA, &c.A, ControllerValidation()},
+		{WIDGET_KEY, l.B, l.ControllerB, &c.B, ControllerValidation()},
+		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, ControllerValidation()},
+		{WIDGET_KEY, l.Start, l.ControllerStart, &c.Start, ControllerValidation()},
+		{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, ControllerValidation()},
+		{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, ControllerValidation()},
+		{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, ControllerValidation()},
+		{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, ControllerValidation()},
+		{WIDGET_KEY, l.L, l.ControllerL, &k.L, ControllerValidation()},
+		{WIDGET_KEY, l.R, l.ControllerR, &k.R, ControllerValidation()},
+		{WIDGET_KEY, l.X, l.ControllerX, &k.X, ControllerValidation()},
+		{WIDGET_KEY, l.Y, l.ControllerY, &k.Y, ControllerValidation()},
 	}
 
 	parent.RemoveChildren()

@@ -128,7 +128,9 @@ func (c *Config) decodeGeneral() {
 
 	for i := range len(tomls) {
 		for j := range len(*tomls[i]) {
-			*outputs[i] = append(*outputs[i], utils.StringToGamepadButton((*tomls[i])[j]))
+			if str, ok := utils.StringToGamepadButton((*tomls[i])[j]); ok {
+				*outputs[i] = append(*outputs[i], str)
+			}
 		}
 	}
 }
@@ -408,7 +410,9 @@ func (c *Config) decodeController(in *EmulatorInput, conf *config.EmulatorContro
 
 	for i := range len(tomls) {
 		for j := range len(*tomls[i]) {
-			*outputs[i] = append(*outputs[i], utils.StringToGamepadButton((*tomls[i])[j]))
+			if str, ok := utils.StringToGamepadButton((*tomls[i])[j]); ok {
+				*outputs[i] = append(*outputs[i], str)
+			}
 		}
 	}
 }

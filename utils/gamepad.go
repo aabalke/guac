@@ -7,87 +7,48 @@ import (
 )
 
 func GamepadButtonToString(v ebiten.StandardGamepadButton) string {
-	switch v {
-	case ebiten.StandardGamepadButtonRightBottom:
-		return "RightBottom"
-	case ebiten.StandardGamepadButtonRightRight:
-		return "RightRight"
-	case ebiten.StandardGamepadButtonRightLeft:
-		return "RightLeft"
-	case ebiten.StandardGamepadButtonRightTop:
-		return "RightTop"
-	case ebiten.StandardGamepadButtonFrontTopLeft:
-		return "FrontTopLeft"
-	case ebiten.StandardGamepadButtonFrontTopRight:
-		return "FrontTopRight"
-	case ebiten.StandardGamepadButtonFrontBottomLeft:
-		return "FrontBottomLeft"
-	case ebiten.StandardGamepadButtonFrontBottomRight:
-		return "FrontBottomRight"
-	case ebiten.StandardGamepadButtonCenterLeft:
-		return "CenterLeft"
-	case ebiten.StandardGamepadButtonCenterRight:
-		return "CenterRight"
-	case ebiten.StandardGamepadButtonLeftStick:
-		return "LeftStick"
-	case ebiten.StandardGamepadButtonRightStick:
-		return "RightStick"
-	case ebiten.StandardGamepadButtonLeftTop:
-		return "LeftTop"
-	case ebiten.StandardGamepadButtonLeftBottom:
-		return "LeftBottom"
-	case ebiten.StandardGamepadButtonLeftLeft:
-		return "LeftLeft"
-	case ebiten.StandardGamepadButtonLeftRight:
-		return "LeftRight"
-	case ebiten.StandardGamepadButtonCenterCenter:
-		return "CenterCenter"
-	}
-
-	return ""
+	return StdGamepadButtonStrings[v]
 }
 
-func StringToGamepadButton(v string) ebiten.StandardGamepadButton {
-	v = strings.ToLower(v)
-
-	switch v {
+func StringToGamepadButton(v string) (ebiten.StandardGamepadButton, bool) {
+	switch v := strings.ToLower(v); v {
 	case "rightbottom":
-		return ebiten.StandardGamepadButtonRightBottom
+		return ebiten.StandardGamepadButtonRightBottom, true
 	case "rightright":
-		return ebiten.StandardGamepadButtonRightRight
+		return ebiten.StandardGamepadButtonRightRight, true
 	case "rightleft":
-		return ebiten.StandardGamepadButtonRightLeft
+		return ebiten.StandardGamepadButtonRightLeft, true
 	case "righttop":
-		return ebiten.StandardGamepadButtonRightTop
+		return ebiten.StandardGamepadButtonRightTop, true
 	case "fronttopleft":
-		return ebiten.StandardGamepadButtonFrontTopLeft
+		return ebiten.StandardGamepadButtonFrontTopLeft, true
 	case "fronttopright":
-		return ebiten.StandardGamepadButtonFrontTopRight
+		return ebiten.StandardGamepadButtonFrontTopRight, true
 	case "frontbottomleft":
-		return ebiten.StandardGamepadButtonFrontBottomLeft
+		return ebiten.StandardGamepadButtonFrontBottomLeft, true
 	case "frontbottomright":
-		return ebiten.StandardGamepadButtonFrontBottomRight
+		return ebiten.StandardGamepadButtonFrontBottomRight, true
 	case "centerleft":
-		return ebiten.StandardGamepadButtonCenterLeft
+		return ebiten.StandardGamepadButtonCenterLeft, true
 	case "centerright":
-		return ebiten.StandardGamepadButtonCenterRight
+		return ebiten.StandardGamepadButtonCenterRight, true
 	case "leftstick":
-		return ebiten.StandardGamepadButtonLeftStick
+		return ebiten.StandardGamepadButtonLeftStick, true
 	case "rightstick":
-		return ebiten.StandardGamepadButtonRightStick
+		return ebiten.StandardGamepadButtonRightStick, true
 	case "lefttop":
-		return ebiten.StandardGamepadButtonLeftTop
+		return ebiten.StandardGamepadButtonLeftTop, true
 	case "leftbottom":
-		return ebiten.StandardGamepadButtonLeftBottom
+		return ebiten.StandardGamepadButtonLeftBottom, true
 	case "leftleft":
-		return ebiten.StandardGamepadButtonLeftLeft
+		return ebiten.StandardGamepadButtonLeftLeft, true
 	case "leftright":
-		return ebiten.StandardGamepadButtonLeftRight
+		return ebiten.StandardGamepadButtonLeftRight, true
 	case "centercenter":
-		return ebiten.StandardGamepadButtonCenterCenter
+		return ebiten.StandardGamepadButtonCenterCenter, true
 	}
 
-	return -1
+	return -1, false
 }
 
 func StringToKey(v string) (ebiten.Key, bool) {
@@ -102,4 +63,149 @@ func StringToKey(v string) (ebiten.Key, bool) {
 
 func KeyToString(k ebiten.Key) string {
 	return k.String()
+}
+
+var StdGamepadButtonStrings = []string{
+	"RightBottom",
+	"RightRight",
+	"RightLeft",
+	"RightTop",
+	"FrontTopLeft",
+	"FrontTopRight",
+	"FrontBottomLeft",
+	"FrontBottomRight",
+	"CenterLeft",
+	"CenterRight",
+	"LeftStick",
+	"RightStick",
+	"LeftTop",
+	"LeftBottom",
+	"LeftLeft",
+	"LeftRight",
+	"CenterCenter",
+}
+
+var KeyStrings = []string{
+	"A",
+	"B",
+	"C",
+	"D",
+	"E",
+	"F",
+	"G",
+	"H",
+	"I",
+	"J",
+	"K",
+	"L",
+	"M",
+	"N",
+	"O",
+	"P",
+	"Q",
+	"R",
+	"S",
+	"T",
+	"U",
+	"V",
+	"W",
+	"X",
+	"Y",
+	"Z",
+	"Alt",
+	"AltLeft",
+	"AltRight",
+	"ArrowDown",
+	"ArrowLeft",
+	"ArrowRight",
+	"ArrowUp",
+	"Backquote",
+	"Backslash",
+	"Backspace",
+	"BracketLeft",
+	"BracketRight",
+	"CapsLock",
+	"Comma",
+	"ContextMenu",
+	"Control",
+	"ControlLeft",
+	"ControlRight",
+	"Delete",
+	"Digit0",
+	"Digit1",
+	"Digit2",
+	"Digit3",
+	"Digit4",
+	"Digit5",
+	"Digit6",
+	"Digit7",
+	"Digit8",
+	"Digit9",
+	"End",
+	"Enter",
+	"Equal",
+	"Escape",
+	"F1",
+	"F2",
+	"F3",
+	"F4",
+	"F5",
+	"F6",
+	"F7",
+	"F8",
+	"F9",
+	"F10",
+	"F11",
+	"F12",
+	"F13",
+	"F14",
+	"F15",
+	"F16",
+	"F17",
+	"F18",
+	"F19",
+	"F20",
+	"F21",
+	"F22",
+	"F23",
+	"F24",
+	"Home",
+	"Insert",
+	"IntlBackslash",
+	"Meta",
+	"MetaLeft",
+	"MetaRight",
+	"Minus",
+	"NumLock",
+	"Numpad0",
+	"Numpad1",
+	"Numpad2",
+	"Numpad3",
+	"Numpad4",
+	"Numpad5",
+	"Numpad6",
+	"Numpad7",
+	"Numpad8",
+	"Numpad9",
+	"NumpadAdd",
+	"NumpadDecimal",
+	"NumpadDivide",
+	"NumpadEnter",
+	"NumpadEqual",
+	"NumpadMultiply",
+	"NumpadSubtract",
+	"PageDown",
+	"PageUp",
+	"Pause",
+	"Period",
+	"PrintScreen",
+	"Quote",
+	"ScrollLock",
+	"Semicolon",
+	"Shift",
+	"ShiftLeft",
+	"ShiftRight",
+	"Slash",
+	"Space",
+	"Tab",
 }
