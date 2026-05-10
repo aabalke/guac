@@ -94,6 +94,16 @@ ui_fg_color     = "color de texto de la interfaz"
 ui_accent_color = "color de acento de la interfaz"
 save = "guardar"
 
+alphabet = [
+    "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
+    "N", "Ñ", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
+    "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
+    "n", "ñ", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
+    "Á", "É", "Í", "Ó", "Ú", "Ü", "á", "é", "í", "ó", "ú", "ü",
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+    ",", " ", "¿", "?", "¡", "!"
+]
+
 [settings.gb]
 
 dmg_palette   = "paleta DMG"

@@ -52,11 +52,10 @@ type Keyboard struct {
 	cancelButtons [4]widget.Focuser
 	currBoard     int
 
-	Keys []string
-	res  *Resources
+	res *Resources
 }
 
-func NewKeyboard(res *Resources) *Keyboard {
+func NewKeyboard(res *Resources, alphaKeys []string) *Keyboard {
 	k := &Keyboard{
 		res: res,
 	}
@@ -95,7 +94,7 @@ func NewKeyboard(res *Resources) *Keyboard {
 	k.main.AddChild(k.top)
 	k.root.AddChild(k.main)
 
-	k.buildBoard(BOARD_ALPHA, 8, KEYS_KEY_CONTROLLER) // will need to update based on lang
+	k.buildBoard(BOARD_ALPHA, 8, alphaKeys) // will need to update based on lang
 	k.buildBoard(BOARD_DEC, 3, DEC_KEYS)
 	k.buildBoard(BOARD_HEX, 4, HEX_KEYS)
 	k.buildBoard(BOARD_KEYBIND, 8, KEYS_KEY_CONTROLLER)
@@ -267,7 +266,7 @@ func (k *Keyboard) Open(ui *Ui, caller *widget.TextInput, board int, label strin
 	if color, ok := v.(*color.Color); ok {
 		k.widget = _newColorInput(ui.res.fgClr, color, validation)
 	} else {
-		k.widget = _newTextBoxInput(v, 256, validation)
+		k.widget = _newTextBoxInput(v, 128*3, validation)
 	}
 
 	k.top.RemoveChildren()

@@ -154,6 +154,8 @@ type UiLocalization struct {
 	UiFgColor     string `toml:"ui_fg_color"`
 	UiAccentColor string `toml:"ui_accent_color"`
 	Save          string `toml:"save"`
+
+	Alphabet []string `toml:"alphabet"`
 }
 
 type GbLocalization struct {

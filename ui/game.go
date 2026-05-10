@@ -109,7 +109,7 @@ func NewGame(res *Resources) *Game {
 			res:      res,
 			focus:    &Focus{},
 			toast:    NewToast(res),
-			keyboard: NewKeyboard(res),
+			keyboard: NewKeyboard(res, res.localization.Settings.Ui.Alphabet),
 		},
 	}
 

@@ -195,9 +195,10 @@ func NewUiMenu(g *Game, parent *widget.Container) {
 			g.ui.res.localization = NewLocalization(LangOptions(config.Conf.Ui.Language))
 
 			res.Update()
+			g.ui.keyboard = NewKeyboard(g.ui.res, g.ui.res.localization.Settings.Ui.Alphabet)
+
 			NewSettings(g, oldId, MENU_UI)
 			// should this be somewhere else?
-			g.ui.keyboard = NewKeyboard(g.ui.res)
 
 			file.Encode()
 
