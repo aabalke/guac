@@ -89,8 +89,8 @@ func NewTextBoxInput(ui *Ui, board int, label string, value any, validation func
 		widget.TextInputOpts.SubmitOnEnter(false),
 		widget.TextInputOpts.AllowDuplicateSubmit(true),
 
-		widget.TextInputOpts.SubmitHandler(func(args *widget.TextInputChangedEventArgs) {
-			ui.keyboard.Open(ui, input, board, label, value)
+		widget.TextInputOpts.SubmitHandler(func(*widget.TextInputChangedEventArgs) {
+			ui.keyboard.Open(ui, input, board, label, value, validation)
 		}),
 		widget.TextInputOpts.ChangedHandler(func(args *widget.TextInputChangedEventArgs) {
 			fromString(value, args.InputText)
@@ -143,7 +143,7 @@ func NewColorInput(ui *Ui, label string, v *color.Color, validation func(s strin
 		widget.TextInputOpts.SubmitOnEnter(false),
 		widget.TextInputOpts.AllowDuplicateSubmit(true),
 		widget.TextInputOpts.SubmitHandler(func(*widget.TextInputChangedEventArgs) {
-			ui.keyboard.Open(ui, input, BOARD_HEX, label, v)
+			ui.keyboard.Open(ui, input, BOARD_HEX, label, v, validation)
 		}),
 		widget.TextInputOpts.ChangedHandler(func(a *widget.TextInputChangedEventArgs) {
 			*v = utils.HexToColor(a.InputText)

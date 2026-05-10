@@ -120,27 +120,7 @@ func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) 
 
 	case PAGE_SETTINGS, PAGE_KEYBOARD:
 
-		// this set is for scrolling through options quickly with the controller
-		// kicks in after x number of ticks
-		for gp := range g.gamepadIds {
-			for _, button := range buttons {
-				if inpututil.StandardGamepadButtonPressDuration(gp, button) > 20 {
-					switch {
-					case slices.Contains(buttonConfig.Up, button):
-						g.ui.ui.ChangeFocus(widget.FOCUS_NORTH)
-
-					case slices.Contains(buttonConfig.Down, button):
-						g.ui.ui.ChangeFocus(widget.FOCUS_SOUTH)
-
-					case slices.Contains(buttonConfig.Right, button):
-						g.ui.ui.ChangeFocus(widget.FOCUS_EAST)
-
-					case slices.Contains(buttonConfig.Left, button):
-						g.ui.ui.ChangeFocus(widget.FOCUS_WEST)
-					}
-				}
-			}
-		}
+		g.getFastFocus(buttons)
 
 		for _, button := range justButtons {
 			switch {
@@ -157,11 +137,10 @@ func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) 
 				g.ui.ui.ChangeFocus(widget.FOCUS_WEST)
 
 			case slices.Contains(buttonConfig.Return, button):
-
 				if g.ui.PageId == PAGE_SETTINGS {
 					g.ui.focus.FocusLastSidebar()
 				} else {
-					g.ui.ui.SetFocusedWidget(g.ui.keyboard.cancelButton)
+					g.ui.ui.SetFocusedWidget(g.ui.keyboard.cancelButtons[g.ui.keyboard.currBoard])
 				}
 
 			case slices.Contains(buttonConfig.Select, button):
@@ -173,6 +152,46 @@ func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) 
 				case *widget.TextInput:
 					w.Submit()
 				}
+			}
+		}
+	}
+}
+
+var (
+	inputAcc float64
+	inputHz  = 1.0 / 60
+)
+
+func (g *Game) getFastFocus(buttons []ebiten.StandardGamepadButton) {
+	// this set is for scrolling through options quickly with the controller
+
+	buttonConfig := config.Conf.General.Controller
+	dt := 1.0 / float64(ebiten.ActualTPS())
+	inputAcc += dt
+
+	if inputAcc < inputHz {
+		return
+	}
+
+	inputAcc -= inputHz
+
+	for gp := range g.gamepadIds {
+		for _, button := range buttons {
+			if inpututil.StandardGamepadButtonPressDuration(gp, button) < int(60) {
+				continue
+			}
+			switch {
+			case slices.Contains(buttonConfig.Up, button):
+				g.ui.ui.ChangeFocus(widget.FOCUS_NORTH)
+
+			case slices.Contains(buttonConfig.Down, button):
+				g.ui.ui.ChangeFocus(widget.FOCUS_SOUTH)
+
+			case slices.Contains(buttonConfig.Right, button):
+				g.ui.ui.ChangeFocus(widget.FOCUS_EAST)
+
+			case slices.Contains(buttonConfig.Left, button):
+				g.ui.ui.ChangeFocus(widget.FOCUS_WEST)
 			}
 		}
 	}

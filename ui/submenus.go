@@ -32,54 +32,13 @@ func NewSidebarFields(res *Resources) []SidebarField {
 	l := res.localization.Settings.Sidebar
 
 	return []SidebarField{
+		{l.General, func(g *Game) { NewGeneralMenu(g, g.ui.content) }},
+		{l.Ui, func(g *Game) { NewUiMenu(g, g.ui.content) }},
+		{l.Gb, func(g *Game) { NewGbMenu(g, g.ui.content) }},
+		{l.Gba, func(g *Game) { NewGbaMenu(g, g.ui.content) }},
+		{l.Nds, func(g *Game) { NewNdsMenu(g, g.ui.content) }},
 		{
-			l.General,
-			func(g *Game) {
-				sub := g.ui.content
-				NewGeneralMenu(g, sub)
-				g.ui.focus.submenu = sub.GetFocusers()
-				g.ui.focus.BuildFocus(g.ui.ui)
-			},
-		},
-		{
-			l.Ui,
-			func(g *Game) {
-				sub := g.ui.content
-				NewUiMenu(g, sub)
-				g.ui.focus.submenu = sub.GetFocusers()
-				g.ui.focus.BuildFocus(g.ui.ui)
-			},
-		},
-		{
-			l.Gb,
-			func(g *Game) {
-				sub := g.ui.content
-				NewGbMenu(g, sub)
-				g.ui.focus.submenu = sub.GetFocusers()
-				g.ui.focus.BuildFocus(g.ui.ui)
-			},
-		},
-		{
-			l.Gba,
-			func(g *Game) {
-				sub := g.ui.content
-				NewGbaMenu(g, sub)
-				g.ui.focus.submenu = sub.GetFocusers()
-				g.ui.focus.BuildFocus(g.ui.ui)
-			},
-		},
-		{
-			l.Nds,
-			func(g *Game) {
-				sub := g.ui.content
-				NewNdsMenu(g, sub)
-				g.ui.focus.submenu = sub.GetFocusers()
-				g.ui.focus.BuildFocus(g.ui.ui)
-			},
-		},
-		{
-			l.Return,
-			func(g *Game) {
+			l.Return, func(g *Game) {
 				switch g.ui.PrevPageId {
 				case PAGE_HOME:
 					NewHome(g)
@@ -191,6 +150,7 @@ func NewGeneralMenu(g *Game, parent *widget.Container) {
 
 		parent.RemoveChildren()
 		NewGeneralMenu(g, parent)
+
 		file.Encode()
 
 		if len(g.gamepadIds) != 0 {
@@ -199,6 +159,9 @@ func NewGeneralMenu(g *Game, parent *widget.Container) {
 
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
+
+	g.ui.focus.submenu = parent.GetFocusers()
+	g.ui.focus.BuildFocus(g.ui.ui)
 }
 
 func NewUiMenu(g *Game, parent *widget.Container) {
@@ -245,6 +208,8 @@ func NewUiMenu(g *Game, parent *widget.Container) {
 			g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 		}),
 	)
+	g.ui.focus.submenu = parent.GetFocusers()
+	g.ui.focus.BuildFocus(g.ui.ui)
 }
 
 func NewGbMenu(g *Game, parent *widget.Container) {
@@ -314,6 +279,8 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 		}
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
+	g.ui.focus.submenu = parent.GetFocusers()
+	g.ui.focus.BuildFocus(g.ui.ui)
 }
 
 func NewGbaMenu(g *Game, parent *widget.Container) {
@@ -372,6 +339,8 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 		}
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
+	g.ui.focus.submenu = parent.GetFocusers()
+	g.ui.focus.BuildFocus(g.ui.ui)
 }
 
 func NewNdsMenu(g *Game, parent *widget.Container) {
@@ -462,4 +431,7 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 		}
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
+
+	g.ui.focus.submenu = parent.GetFocusers()
+	g.ui.focus.BuildFocus(g.ui.ui)
 }
