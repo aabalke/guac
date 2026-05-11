@@ -15,7 +15,6 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
 var dmg_palettes = map[string][4]string{
@@ -122,7 +121,7 @@ func NewUIResources() (*Resources, error) {
 		secClr:              &conf.MenuSecondaryColor,
 		buttonImage:         buttonImage,
 		buttonBorderedImage: buttonBorderedImage,
-		checkbox:            loadCheckboxImage(conf.MenuForegroundColor),
+		checkbox:            loadCheckboxImage(conf.MenuForegroundColor, conf.MenuSecondaryColor),
 		localization:        NewLocalization(LangOptions(config.Conf.Ui.Language)),
 	}
 
@@ -147,7 +146,7 @@ func (u *Resources) Update() {
 		PressedHover: secb,
 	}
 
-	u.checkbox = loadCheckboxImage(conf.MenuForegroundColor)
+	u.checkbox = loadCheckboxImage(conf.MenuForegroundColor, conf.MenuSecondaryColor)
 }
 
 type fonts struct {
@@ -193,7 +192,7 @@ func loadFont(path string, size float64) (text.Face, error) {
 	}, nil
 }
 
-func loadCheckboxImage(clr color.Color) *widget.CheckboxImage {
+func loadCheckboxImage(clr, clr2 color.Color) *widget.CheckboxImage {
 	imgs := make([]*ebiten.Image, 4)
 
 	for i, v := range []string{
@@ -209,8 +208,10 @@ func loadCheckboxImage(clr color.Color) *widget.CheckboxImage {
 		}
 
 		defer f.Close()
-		imgs[i], _, _ = ebitenutil.NewImageFromReader(f)
-		imgs[i] = TintImage(imgs[i], clr)
+
+		image, _, _ := img.Decode(f)
+		recolored := MaskedColorTint(image, clr, clr2)
+		imgs[i] = ebiten.NewImageFromImage(recolored)
 	}
 
 	s := [3]int{32, 0, 0}
@@ -237,6 +238,49 @@ func TintImage(src *ebiten.Image, c color.Color) *ebiten.Image {
 	op.ColorScale.Scale(rf, gf, bf, 1)
 
 	dst.DrawImage(src, op)
+	return dst
+}
+
+func MaskedColorTint(src img.Image, clrWhite, clrBlack color.Color) *img.RGBA {
+	bounds := src.Bounds()
+	dst := img.NewRGBA(bounds)
+
+	wr, wg, wb, wa := clrWhite.RGBA()
+	br, bg, bb, ba := clrBlack.RGBA()
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, a := src.At(x, y).RGBA()
+
+			if transparent := a == 0; transparent {
+				dst.SetRGBA(x, y, color.RGBA{0, 0, 0, 0})
+				continue
+			}
+
+			rf := float64(r) / 65535.0
+			gf := float64(g) / 65535.0
+			bf := float64(b) / 65535.0
+			af := float64(a) / 65535.0
+
+			// mask brightness (0=black, 1=white)
+			mask := (rf + gf + bf) / 3.0
+
+			rr := float64(br)*(1-mask) + float64(wr)*mask
+			gg := float64(bg)*(1-mask) + float64(wg)*mask
+			bb := float64(bb)*(1-mask) + float64(wb)*mask
+
+			// blend alpha too, but preserve original alpha multiplier
+			aa := (float64(ba)*(1-mask) + float64(wa)*mask) * af
+
+			dst.SetRGBA(x, y, color.RGBA{
+				R: uint8((rr / 65535.0) * 255),
+				G: uint8((gg / 65535.0) * 255),
+				B: uint8((bb / 65535.0) * 255),
+				A: uint8((aa / 65535.0) * 255),
+			})
+		}
+	}
+
 	return dst
 }
 
