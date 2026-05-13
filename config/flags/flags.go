@@ -8,18 +8,21 @@ import (
 
 func Decode() {
 	var (
-		romPath = flag.String("r", "", "rom path")
-		profile = flag.Bool("p", false, "use profiler")
-		fps     = flag.Int("fps", 60, "target fps")
-		mute    = flag.Bool("m", false, "mute")
-		logger  = flag.Bool("l", false, "logger")
-		showfps = flag.Bool("show-fps", false, "show fps")
+		romPath  = flag.String("r", "", "rom path")
+		profile  = flag.Bool("p", false, "use profiler")
+		fps      = flag.Int("fps", 60, "target fps")
+		mute     = flag.Bool("m", false, "mute")
+		logger   = flag.Bool("l", false, "logger")
+		showfps  = flag.Bool("show-fps", false, "show fps")
+		headless = flag.Bool("headless", false, "headless")
 	)
 
 	flag.Parse()
 
 	flag.Visit(func(f *flag.Flag) {
 		switch f.Name {
+		case "headless":
+			config.Conf.General.Headless = *headless
 		case "r":
 			config.Conf.General.RomPath = *romPath
 		case "p":
