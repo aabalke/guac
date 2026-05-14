@@ -215,32 +215,32 @@ func (cpu *Cpu) CheckIrq() {
 	}
 }
 
-//go:inline
-func (cpu *Cpu) jitFunction(pc uint32, thumb bool) (uint32, int, bool) {
-	pageIdx := pc >> cpu.Jit.PageShift
-	blockIdx := (pc & cpu.Jit.PageMask) >> 1
-
-	page := cpu.Jit.Pages[pageIdx]
-
-	if page == nil || page.dead {
-		return 0, 0, false
-	}
-
-	block := page.Blocks[blockIdx]
-
-	if block == nil || block.Skip || block.f == nil {
-		return 0, 0, false
-	}
-
-	//if block.Thumb != thumb {
-	//    panic(fmt.Sprintf("called thumb block %t from %t\n", block.Thumb, thumb))
-	//}
-
-	block.f()
-	cpu.isBranching = true
-	cpu.Jit.BlockCache.TouchBlock(block)
-	return block.finalOp, int(block.Length), true
-}
+////go:inline
+//func (cpu *Cpu) jitFunction(pc uint32, thumb bool) (uint32, int, bool) {
+//	pageIdx := pc >> cpu.Jit.PageShift
+//	blockIdx := (pc & cpu.Jit.PageMask) >> 1
+//
+//	page := cpu.Jit.Pages[pageIdx]
+//
+//	if page == nil || page.dead {
+//		return 0, 0, false
+//	}
+//
+//	block := page.Blocks[blockIdx]
+//
+//	if block == nil || block.Skip || block.f == nil {
+//		return 0, 0, false
+//	}
+//
+//	//if block.Thumb != thumb {
+//	//    panic(fmt.Sprintf("called thumb block %t from %t\n", block.Thumb, thumb))
+//	//}
+//
+//	block.f()
+//	cpu.isBranching = true
+//	cpu.Jit.BlockCache.TouchBlock(block)
+//	return block.finalOp, int(block.Length), true
+//}
 
 func (cpu *Cpu) GetOpArm() (uint32, int) {
 
@@ -250,14 +250,14 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 		cpu.isBranching = false
 		cpu.PcOff = 0
 
-		if cpu.jitEnabled {
-			pc := r[PC]
-			if finalOp, length, ok := cpu.jitFunction(pc, false); ok {
-				return finalOp, length
-			}
+		//if cpu.jitEnabled {
+		//	pc := r[PC]
+		//	if finalOp, length, ok := cpu.jitFunction(pc, false); ok {
+		//		return finalOp, length
+		//	}
 
-			cpu.Jit.UpdateMetrics(pc, false)
-		}
+		//	cpu.Jit.UpdateMetrics(pc, false)
+		//}
 
 		if r[PC] != cpu.BranchPc {
 			cpu.PcPtr = nil
@@ -288,14 +288,14 @@ func (cpu *Cpu) GetOpThumb() (uint16, int) {
 	if cpu.isBranching {
 		cpu.isBranching = false
 		cpu.PcOff = 0
-		if cpu.jitEnabled {
-			pc := r[PC]
-			if finalOp, length, ok := cpu.jitFunction(pc, true); ok {
-				return uint16(finalOp), length
-			}
+		//if cpu.jitEnabled {
+		//	pc := r[PC]
+		//	if finalOp, length, ok := cpu.jitFunction(pc, true); ok {
+		//		return uint16(finalOp), length
+		//	}
 
-			cpu.Jit.UpdateMetrics(pc, true)
-		}
+		//	cpu.Jit.UpdateMetrics(pc, true)
+		//}
 		if r[PC] != cpu.BranchPc {
 			cpu.PcPtr = nil
 		}
