@@ -3,7 +3,7 @@ package arm7
 
 import (
 	"math/bits"
-	"unsafe"
+	//"unsafe"
 
 	amd64 "github.com/aabalke/gojit"
 )
@@ -136,16 +136,16 @@ func (j *Jit) emitSwp(op uint32) {
 	j.Movl(j.REG(rn), amd64.Eax)
 	j.Movl(j.REG(rm), amd64.Ebx)
 
-	j.Movl(amd64.Eax, j.SCRATCH(0))
-	j.Movl(amd64.Ebx, j.SCRATCH(1))
+	j.Movl(amd64.Eax, amd64.R8d)
+	j.Movl(amd64.Ebx, amd64.Esi)
 
 	if isByte {
 
 		j.CallFunc(Read)
 		j.Movl(amd64.Eax, j.REG(rd))
 
-		j.Movl(j.SCRATCH(0), amd64.Eax)
-		j.Movl(j.SCRATCH(1), amd64.Ebx)
+		j.Movl(amd64.R8d, amd64.Eax)
+		j.Movl(amd64.Esi, amd64.Ebx)
 
 		j.And(amd64.Imm(0xFF), amd64.Rbx)
 		j.CallFunc(Write)
@@ -155,15 +155,15 @@ func (j *Jit) emitSwp(op uint32) {
 	j.And(amd64.Imm(^0b11), amd64.Rax)
 	j.CallFunc(Read32)
 
-	j.Movl(j.SCRATCH(0), amd64.Ecx)
+	j.Movl(amd64.R8d, amd64.Ecx)
 	j.And(amd64.Imm(0b11), amd64.Ecx)
 	j.Shl(amd64.Imm(0b11), amd64.Ecx)
 	j.And(amd64.Imm(31), amd64.Ecx)
 	j.RorCl(amd64.Eax)
 	j.Movl(amd64.Eax, j.REG(rd))
 
-	j.Movl(j.SCRATCH(0), amd64.Eax)
-	j.Movl(j.SCRATCH(1), amd64.Ebx)
+	j.Movl(amd64.R8d, amd64.Eax)
+	j.Movl(amd64.Esi, amd64.Ebx)
 	j.CallFunc(Write32)
 }
 
@@ -245,13 +245,13 @@ func (j *Jit) emitHalf(op uint32) {
 
 		switch inst {
 		case LDRH:
-			j.Movl(amd64.Eax, j.SCRATCH(0))
+			j.Movl(amd64.Eax, amd64.R8d)
 			j.And(amd64.Imm(^1), amd64.Rax)
 			j.CallFunc(Read16)
 
 			//  LDRH Rd,[odd]   -->  LDRH Rd,[odd-1] ROR 8  ;read to bit0-7 and bit24-31
 
-			j.Movl(j.SCRATCH(0), amd64.Ecx)
+			j.Movl(amd64.R8d, amd64.Ecx)
 			j.And(amd64.Imm(1), amd64.Ecx)
 			j.Shl(amd64.Imm(3), amd64.Ecx)
 			j.RorCl(amd64.Eax)
@@ -300,8 +300,8 @@ func (j *Jit) emitSdt(op uint32) {
 	// offset
 	if reg {
 		j.emitSdtRegShift(op)
-		CpuPointer = j.Cpu
-		j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
+		//CpuPointer = j.Cpu
+		//j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
 
 		j.Mov(amd64.Rbx, amd64.Rcx)
 	} else {
@@ -339,12 +339,12 @@ func (j *Jit) emitSdt(op uint32) {
 		if byte {
 			j.CallFunc(Read)
 		} else {
-			j.Movl(amd64.Eax, j.SCRATCH(0))
+			j.Movl(amd64.Eax, amd64.R8d)
 
 			j.And(amd64.Imm(^0b11), amd64.Eax)
 			j.CallFunc(Read32)
 
-			j.Movl(j.SCRATCH(0), amd64.Ecx)
+			j.Movl(amd64.R8d, amd64.Ecx)
 			j.And(amd64.Imm(0b11), amd64.Ecx)
 			j.Shl(amd64.Imm(0b11), amd64.Ecx)
 			j.RorCl(amd64.Eax)
@@ -699,8 +699,8 @@ func (j *Jit) emitAlu(op uint32) {
 		j.Mov(amd64.R8, amd64.Rcx)
 	}
 
-	CpuPointer = j.Cpu
-	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
+	//CpuPointer = j.Cpu
+	//j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
 
 	aluInstJit[inst](j, op, rd)
 
@@ -972,7 +972,7 @@ func (j *Jit) emitBlock(op uint32) {
 		j.Sub(amd64.Imm(regCount<<2), amd64.Ebx)
 	}
 
-	j.Movl(amd64.Ebx, j.SCRATCH(1))
+	j.Movl(amd64.Ebx, amd64.Esi)
 
 	// rnv Scratch 2
 	j.Movl(j.REG(rn), amd64.Ebx)
@@ -1024,7 +1024,7 @@ func (j *Jit) emitBlock(op uint32) {
 			}
 		}
 
-		j.Movl(amd64.Eax, j.SCRATCH(0))
+		j.Movl(amd64.Eax, amd64.R8d)
 
 		if load {
 
@@ -1077,7 +1077,7 @@ func (j *Jit) emitBlock(op uint32) {
 				if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
 					j.Movl(j.SCRATCH(2), amd64.Ebx)
 				} else {
-					j.Movl(j.SCRATCH(1), amd64.Ebx)
+					j.Movl(amd64.Esi, amd64.Ebx)
 				}
 
 				j.CallFunc(Write32)
@@ -1124,7 +1124,7 @@ func (j *Jit) emitBlock(op uint32) {
 			}
 		}
 
-		j.Movl(j.SCRATCH(0), amd64.Eax)
+		j.Movl(amd64.R8d, amd64.Eax)
 
 		if !pre {
 			if up {
@@ -1143,7 +1143,7 @@ func (j *Jit) emitBlock(op uint32) {
 
 	if !load {
 		if wb {
-			j.Movl(j.SCRATCH(1), amd64.Eax)
+			j.Movl(amd64.Esi, amd64.Eax)
 			j.Movl(amd64.Eax, j.REG(rn))
 		}
 
@@ -1151,7 +1151,7 @@ func (j *Jit) emitBlock(op uint32) {
 	}
 
 	if wb && !rnIncluded {
-		j.Movl(j.SCRATCH(1), amd64.Eax)
+		j.Movl(amd64.Esi, amd64.Eax)
 		j.Movl(amd64.Eax, j.REG(rn))
 	}
 
@@ -1159,7 +1159,7 @@ func (j *Jit) emitBlock(op uint32) {
 
 func (j *Jit) emitPsr(op uint32) {
 
-	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
+	//j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
 
 	if msr := (op>>21)&1 != 0; msr {
 		panic("unsetup jit msr")

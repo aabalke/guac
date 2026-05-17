@@ -15,11 +15,11 @@ func (j *Jit) emitThumbLSSP(op uint32) {
 
 	if ldr := (op>>11)&1 != 0; ldr {
 
-		j.Movl(amd64.Eax, j.SCRATCH(0))
+		j.Movl(amd64.Eax, amd64.R8d)
 		j.And(amd64.Imm(^0b11), amd64.Eax)
 		j.CallFunc(Read32)
 
-		j.Movl(j.SCRATCH(0), amd64.Ecx)
+		j.Movl(amd64.R8d, amd64.Ecx)
 		j.And(amd64.Imm(0b11), amd64.Ecx)
 		j.Shl(amd64.Imm(3), amd64.Ecx)
 		j.RorCl(amd64.Eax)
@@ -117,11 +117,11 @@ func (j *Jit) emitThumbLSImm(op uint32) {
 
 	case THUMB_LDR_IMM:
 
-		j.Movl(amd64.Eax, j.SCRATCH(0))
+		j.Movl(amd64.Eax, amd64.R8d)
 		j.And(amd64.Imm(^0b11), amd64.Eax)
 		j.CallFunc(Read32)
 
-		j.Movl(j.SCRATCH(0), amd64.Ecx)
+		j.Movl(amd64.R8d, amd64.Ecx)
 		j.And(amd64.Imm(0b11), amd64.Ecx)
 		j.Shl(amd64.Imm(3), amd64.Ecx)
 		j.RorCl(amd64.Eax)
@@ -169,11 +169,11 @@ func (j *Jit) emitThumbSdt(op uint32) {
 
 		case THUMB_LDRH:
 
-			j.Movl(amd64.Eax, j.SCRATCH(0))
+			j.Movl(amd64.Eax, amd64.R8d)
 			j.And(amd64.Imm(^1), amd64.Eax)
 			j.CallFunc(Read16)
 
-			j.Movl(j.SCRATCH(0), amd64.Ecx)
+			j.Movl(amd64.R8d, amd64.Ecx)
 			j.And(amd64.Imm(1), amd64.Ecx)
 			j.Shl(amd64.Imm(3), amd64.Ecx)
 			j.RorCl(amd64.Eax)
@@ -211,11 +211,11 @@ func (j *Jit) emitThumbSdt(op uint32) {
 		j.CallFunc(Write32)
 	case THUMB_LDR_REG:
 
-		j.Movl(amd64.Eax, j.SCRATCH(0))
+		j.Movl(amd64.Eax, amd64.R8d)
 		j.And(amd64.Imm(^0b11), amd64.Eax)
 		j.CallFunc(Read32)
 
-		j.Movl(j.SCRATCH(0), amd64.Ecx)
+		j.Movl(amd64.R8d, amd64.Ecx)
 		j.And(amd64.Imm(0b11), amd64.Ecx)
 		j.Shl(amd64.Imm(3), amd64.Ecx)
 		j.RorCl(amd64.Eax)
@@ -242,11 +242,11 @@ func (j *Jit) emitThumbLSHalf(op uint32) {
 
 	if ldr := (op>>11)&1 != 0; ldr {
 
-		j.Movl(amd64.Eax, j.SCRATCH(0))
+		j.Movl(amd64.Eax, amd64.R8d)
 		j.And(amd64.Imm(^1), amd64.Eax)
 		j.CallFunc(Read16)
 
-		j.Movl(j.SCRATCH(0), amd64.Ecx)
+		j.Movl(amd64.R8d, amd64.Ecx)
 		j.And(amd64.Imm(1), amd64.Ecx)
 		j.Shl(amd64.Imm(3), amd64.Ecx)
 		j.RorCl(amd64.Eax)
@@ -911,7 +911,7 @@ func (j *Jit) emitThumbBlock(op uint32) {
 
 		// addr eax, rbvalue sc 1
 		j.Movl(j.REG(rb), amd64.Eax)
-		j.Movl(amd64.Eax, j.SCRATCH(1))
+		j.Movl(amd64.Eax, amd64.Esi)
 		j.And(amd64.Imm(^0b11), amd64.Eax)
 
 		for reg := range uint32(8) {
@@ -920,10 +920,10 @@ func (j *Jit) emitThumbBlock(op uint32) {
 			}
 
 			if reg == rb {
-				j.Movl(amd64.Eax, j.SCRATCH(0))
+				j.Movl(amd64.Eax, amd64.R8d)
 				j.Movl(j.REG(reg), amd64.Ebx)
 				j.CallFunc(Write32)
-				j.Movl(j.SCRATCH(0), amd64.Eax)
+				j.Movl(amd64.R8d, amd64.Eax)
 
 				j.Movl(amd64.Eax, j.SCRATCH(2))
 
@@ -937,10 +937,10 @@ func (j *Jit) emitThumbBlock(op uint32) {
 				continue
 			}
 
-			j.Movl(amd64.Eax, j.SCRATCH(0))
+			j.Movl(amd64.Eax, amd64.R8d)
 			j.Movl(j.REG(reg), amd64.Ebx)
 			j.CallFunc(Write32)
-			j.Movl(j.SCRATCH(0), amd64.Eax)
+			j.Movl(amd64.R8d, amd64.Eax)
 
 			j.Add(amd64.Imm(4), j.REG(rb))
 			j.Add(amd64.Imm(4), amd64.Eax)
@@ -967,7 +967,7 @@ func (j *Jit) emitThumbBlock(op uint32) {
 	}
 	// addr eax, rbvalue ebx
 	j.Movl(j.REG(rb), amd64.Ebx)
-	j.Movl(amd64.Ebx, j.SCRATCH(1))
+	j.Movl(amd64.Ebx, amd64.Esi)
 	j.Movl(amd64.Ebx, amd64.Eax)
 	j.And(amd64.Imm(^0b11), amd64.Eax)
 
@@ -983,17 +983,17 @@ func (j *Jit) emitThumbBlock(op uint32) {
 			continue
 		}
 
-		j.Movl(amd64.Eax, j.SCRATCH(0))
+		j.Movl(amd64.Eax, amd64.R8d)
 		j.CallFunc(Read32)
 		j.Movl(amd64.Eax, j.REG(reg))
 
-		j.Movl(j.SCRATCH(0), amd64.Eax)
+		j.Movl(amd64.R8d, amd64.Eax)
 
 		if reg == rb {
 			matchingRb = true
 			// do not remove this, needed for golden sun and others
 			j.Movl(j.REG(rb), amd64.Edi)
-			j.Movl(amd64.Edi, j.SCRATCH(1))
+			j.Movl(amd64.Edi, amd64.Esi)
 		}
 
 		j.Add(amd64.Imm(4), j.REG(rb))
@@ -1001,7 +1001,7 @@ func (j *Jit) emitThumbBlock(op uint32) {
 	}
 
 	if matchingRb {
-		j.Movl(j.SCRATCH(1), amd64.Eax)
+		j.Movl(amd64.Esi, amd64.Eax)
 		j.Movl(amd64.Eax, j.REG(rb))
 	}
 }

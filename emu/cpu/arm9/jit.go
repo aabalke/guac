@@ -149,7 +149,6 @@ func (j *Jit) SCRATCH(i uint32) gojit.Indirect {
 }
 
 // gets spsr value, using mode and CPU
-//
 //go:nosplit
 func GetSpsr(mode uint32) uint32 {
 	return CpuPointer.Reg.SPSR[BANK_ID[mode]].Get()
@@ -723,9 +722,9 @@ func WriteCp15(op, cn, pn, cp, cm uint8, v uint32) {
 }
 
 func (j *Jit) CallFunc(f any) {
-	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
+	//j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
 	j.InternalCallFunc(f)
-	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
+	//j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
 }
 
 func (j *Jit) UpdateMetrics(pc uint32, thumb bool) {

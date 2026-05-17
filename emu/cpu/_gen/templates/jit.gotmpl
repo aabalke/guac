@@ -739,9 +739,9 @@ func WriteCp15(op, cn, pn, cp, cm uint8, v uint32) {
 {{end}}
 
 func (j *Jit) CallFunc(f any) {
-	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
+	//j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
 	j.InternalCallFunc(f)
-	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
+	//j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
 }
 
 func (j *Jit) UpdateMetrics(pc uint32, thumb bool) {
