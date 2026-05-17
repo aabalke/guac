@@ -5,8 +5,9 @@ import (
 	"math/bits"
 	"unsafe"
 
-	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
 	"math"
+
+	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
 )
 
 const (
@@ -486,8 +487,8 @@ func (cpu *Cpu) Mul(op uint32) {
 		r[rd] = res
 
 		if set {
-			cpsr.N = (uint32(res)>>31)&1 != 0
-			cpsr.Z = uint32(res) == 0
+			cpsr.N = (res>>31)&1 != 0
+			cpsr.Z = res == 0
 			// FLAG_C "destroyed" ARM <5, ignored ARM >=5
 			//cpsr.C = false
 		}
@@ -563,6 +564,8 @@ func (cpu *Cpu) Mul(op uint32) {
 			cpsr.Q = true
 		}
 
+		println("correct output", uint32(res))
+
 	case SMLAWySMLALWy:
 
 		rsV := int64(int16((r[rs] >> (16 * y) & 0xFFFF)))
@@ -597,14 +600,11 @@ func (cpu *Cpu) Mul(op uint32) {
 
 		rmV := int64(int16((r[rm] >> (16 * x)) & 0xFFFF))
 		rsV := int64(int16((r[rs] >> (16 * y)) & 0xFFFF))
-
 		res := rmV * rsV
-
 		r[rd] = uint32(res)
 	}
 
 	r[PC] += 4
-
 }
 
 const (
@@ -1142,8 +1142,10 @@ func (cpu *Cpu) Clz(op uint32) {
 
 	r := &cpu.Reg.R
 	rm := op & 0xF
+
 	rd := (op >> 12) & 0xF
 	r[rd] = uint32(bits.LeadingZeros32(r[rm]))
+
 	r[PC] += 4
 }
 
