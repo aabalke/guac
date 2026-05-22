@@ -240,6 +240,11 @@ func (dc *Context) rasterize(v0, v1, v2 Vertex, s0, s1, s2 Vector) {
 		if w02 < 0 && d2 > d {
 			d = d2
 		}
+
+		if math.IsInf(float64(d), 1) {
+			d = 0
+		}
+
 		d = float32(int(d))
 		// occurs in pathological cases
 		d = max(0, d)

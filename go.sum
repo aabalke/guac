@@ -2,8 +2,8 @@ github.com/BurntSushi/toml v1.5.0 h1:W5quZX/G/csjUnuI8SUYlsHs9M38FC7znL0lIO+DvMg
 github.com/BurntSushi/toml v1.5.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/TheTitanrain/w32 v0.0.0-20180517000239-4f5cfb03fabf h1:FPsprx82rdrX2jiKyS17BH6IrTmUBYqZa/CXT4uvb+I=
 github.com/TheTitanrain/w32 v0.0.0-20180517000239-4f5cfb03fabf/go.mod h1:peYoMncQljjNS6tZwI9WVyQB3qZS6u79/N3mBOcnd3I=
-github.com/aabalke/gojit v0.0.0-20260308010726-39b348b38c78 h1:AgW86XVB1xs0GS3pG3gryMvMhxa4HJPd249dE8FySw4=
-github.com/aabalke/gojit v0.0.0-20260308010726-39b348b38c78/go.mod h1:P7evXgI5F4VNEsPRGRZzSVRwCusTHeeusaky51jjlSo=
+github.com/aabalke/gojit v0.0.0-20260508030348-14e750bc9cc5 h1:X9JtmaInUna8wYfTjsqnOEXKW4+KVCqk8ypVnLm7vBo=
+github.com/aabalke/gojit v0.0.0-20260508030348-14e750bc9cc5/go.mod h1:a3aV2k/V2EsIHj57b2DJh5J2B993BL5TtH1HdHTj+PU=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/ebitengine/gomobile v0.0.0-20250923094054-ea854a63cce1 h1:+kz5iTT3L7uU+VhlMfTb8hHcxLO3TlaELlX8wa4XjA0=

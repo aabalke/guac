@@ -299,9 +299,9 @@ func (c *Config) decodeNdsFirmware() {
 }
 
 func (c *Config) decodeNdsJit() {
-	isX86 := runtime.GOARCH == "amd64" || runtime.GOARCH == "386"
+	jitable := runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64"
 
-	c.config.Nds.Jit.Enabled = c.Nds.Jit.Enabled && isX86
+	c.config.Nds.Jit.Enabled = c.Nds.Jit.Enabled && jitable
 
 	if !c.config.Nds.Jit.Enabled {
 		c.Nds.Jit.BatchInst = 1

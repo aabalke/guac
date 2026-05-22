@@ -1,13 +1,15 @@
 module github.com/aabalke/guac
 
-//replace github.com/aabalke/gojit => C:\dev\repos\jit\gojit
-replace github.com/ebitenui/ebitenui => C:\dev\repos\emulators\ebitenui
+replace github.com/ebitenui/ebitenui => ../ebitenui
 
-go 1.26.0
+replace github.com/aabalke/gojit => ../gojit
+
+go 1.26.2
 
 require (
 	github.com/BurntSushi/toml v1.5.0
-	github.com/aabalke/gojit v0.0.0-20260308010726-39b348b38c78
+	github.com/aabalke/gojit v0.0.0-20260508030348-14e750bc9cc5
+	github.com/aabalke/gojit/arm64 v0.0.0-20260513001811-c3a1d6d0b875
 	github.com/ebitenui/ebitenui v0.7.3
 	github.com/hajimehoshi/ebiten/v2 v2.9.7
 	github.com/hajimehoshi/oto v1.0.1

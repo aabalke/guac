@@ -69,6 +69,7 @@ type Nds struct {
 }
 
 func NewNds(path string, audioCtx *oto.Context) *Nds {
+
 	nds := Nds{}
 
 	nds.Screen = NewScreen()
