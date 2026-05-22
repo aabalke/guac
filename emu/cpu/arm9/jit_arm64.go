@@ -2,22 +2,24 @@
 package arm9
 
 import (
-	"fmt"
-	"os"
 	"unsafe"
 
-	a "github.com/aabalke/gojit/arm64"
-	"github.com/aabalke/gojit/arm64/cache"
+	"github.com/aabalke/gojit"
 	"github.com/aabalke/guac/config"
 )
 
 var (
-	CpuPtr      *Cpu
-	CPU         = a.R15
+	IMM_1           = gojit.EncodeImm(1, false)
+	IMM_0xFFFF_FFFC = gojit.EncodeImm(0xFFFF_FFFC, false)
+	IMM_0x8000_0000 = gojit.EncodeImm(0x8000_0000, false)
+	IMM_3           = gojit.EncodeImm(3, false)
+)
+
+var (
+	CPU         = gojit.R12
 	REG         = uint32(unsafe.Offsetof(Cpu{}.Reg))
 	R           = REG + uint32(unsafe.Offsetof(Reg{}.R))
 	CPSR        = REG + uint32(unsafe.Offsetof(Reg{}.CPSR))
-	SCRATCH     = uint32(unsafe.Offsetof(Cpu{}.Scratch))
 	HALTED_FLAG = uint32(unsafe.Offsetof(Cpu{}.Halted))
 
 	MODE = CPSR + uint32(unsafe.Offsetof(Cond{}.Mode))
@@ -31,72 +33,60 @@ var (
 	T    = CPSR + uint32(unsafe.Offsetof(Cond{}.T))
 )
 
-type Jit struct {
-	*a.Assembler
-	Cpu *Cpu
-
-	// used for testing individual instructions
-	testFunc func()
-}
-
-func NewJit(cpu *Cpu) *Jit {
-
-	const (
-		PAGE_SIZE  = 0x10000
-		PAGE_SHIFT = 16
-		PAGE_MASK  = (1 << PAGE_SHIFT) - 1
-	)
-
-	CpuPtr = cpu
-
-	if !cpu.jitEnabled {
-		j := &Jit{Cpu: cpu}
-		return j
-	}
-
-	return &Jit{
-		Cpu: cpu,
-	}
-}
-
-func (j *Jit) Close() {}
-
-func (j *Jit) InvalidatePage(addr uint32) {}
-
-func (j *Jit) DeletePages() {}
-
+type ImmSize = uint32
 
 const (
-	IMM_BYTE = 4
-	IMM_HALF = 2
-	IMM_WORD = 1
-	IMM_DWRD = 0.5
+	IMM_BYTE ImmSize = 4
+	IMM_HALF ImmSize = 2
+	IMM_WORD ImmSize = 1
+	// IMM_DWRD ImmSize = 0.5 // uint32 uint32 uint32
 )
 
-func (j *Jit) RegOffset(i, size uint32) uint32 {
+func (j *Jit) RegOffset(i uint32, size ImmSize) uint32 {
 	// 1 bytes, 2 half, 4 word, 8 double 16 q
-	return R + i * size
+	return R + i*size
 }
 
-func (j *Jit) LdrReg(reg a.Reg, emuReg uint32) {
-	j.LdrImm(reg, CPU, j.RegOffset(emuReg, IMM_WORD), a.SIZE_WORD, false, true)
+func (j *Jit) LdrUserReg(reg gojit.Reg, emuReg uint32) {
+	switch emuReg {
+	case 13:
+		j.LdrImm(reg, CPU, (REG+uint32(unsafe.Offsetof(Reg{}.SP)))/4, gojit.SIZE_WORD, false, true)
+	case 14:
+		j.LdrImm(reg, CPU, (REG+uint32(unsafe.Offsetof(Reg{}.LR)))/4, gojit.SIZE_WORD, false, true)
+	default:
+		j.LdrImm(reg, CPU, (REG+uint32(unsafe.Offsetof(Reg{}.USR))/4)+(emuReg-8), gojit.SIZE_WORD, false, true)
+	}
 }
 
-func (j *Jit) StrReg(reg a.Reg, emuReg uint32) {
-	j.StrImm(reg, CPU, j.RegOffset(emuReg, IMM_WORD), a.SIZE_WORD, false, true)
+func (j *Jit) StrUserReg(reg gojit.Reg, emuReg uint32) {
+	switch emuReg {
+	case 13:
+		j.StrImm(reg, CPU, (REG+uint32(unsafe.Offsetof(Reg{}.SP)))/4, gojit.SIZE_WORD, false, true)
+	case 14:
+		j.StrImm(reg, CPU, (REG+uint32(unsafe.Offsetof(Reg{}.LR)))/4, gojit.SIZE_WORD, false, true)
+	default:
+		j.StrImm(reg, CPU, (REG+uint32(unsafe.Offsetof(Reg{}.USR))/4)+(emuReg-8), gojit.SIZE_WORD, false, true)
+	}
 }
 
-func (j *Jit) LdrFlag(reg a.Reg, emuFlag uint32) {
-	j.LdrImm(reg, CPU, emuFlag, a.SIZE_BYTE, false, true)
+func (j *Jit) LdrReg(reg gojit.Reg, emuReg uint32) {
+	j.LdrImm(reg, CPU, j.RegOffset(emuReg, IMM_WORD), gojit.SIZE_WORD, false, true)
 }
 
-func (j *Jit) StrFlag(reg a.Reg, emuFlag uint32) {
-	j.StrImm(reg, CPU, emuFlag, a.SIZE_BYTE, false, true)
+func (j *Jit) StrReg(reg gojit.Reg, emuReg uint32) {
+	j.StrImm(reg, CPU, j.RegOffset(emuReg, IMM_WORD), gojit.SIZE_WORD, false, true)
+}
+
+func (j *Jit) LdrFlag(reg gojit.Reg, emuFlag uint32) {
+	j.LdrImm(reg, CPU, emuFlag, gojit.SIZE_BYTE, false, true)
+}
+
+func (j *Jit) StrFlag(reg gojit.Reg, emuFlag uint32) {
+	j.StrImm(reg, CPU, emuFlag, gojit.SIZE_BYTE, false, true)
 }
 
 func (j *Jit) TestInst(op uint32, f func(op uint32)) {
-
-	asm, err := a.New(a.PageSize)
+	asm, err := gojit.New(gojit.PageSize)
 	if err != nil {
 		panic(err)
 	}
@@ -107,66 +97,391 @@ func (j *Jit) TestInst(op uint32, f func(op uint32)) {
 
 	f(op)
 
-	j.Ret()
+	// pc += 4
+	j.LdrReg(gojit.R00, PC)
+	j.ADDImm(gojit.R00, gojit.R00, 4, false, false, false)
+	j.StrReg(gojit.R00, PC)
 
-	if err := asm.Error(); err != nil {
-		panic(err)
-	}
+	asm.Exit()
 
-	cache.ClearICache(asm.Buf)
-
-	a.CallJit(uintptr(unsafe.Pointer(&asm.Buf[0])))
+	gojit.CallJit(uintptr(unsafe.Pointer(&asm.Buf[0])))
 
 	asm.Release()
 }
 
-var (
-	rpc uint32
-	sav Reg
-	sta Reg
-)
+func (j *Jit) CreateBlock(pc uint32, thumb bool) {
+	pageIdx := pc >> j.PageShift
+	blockIdx := (pc & j.PageMask) >> 1
 
-func (j *Jit) StartTest(op uint32, compare bool, f func(op uint32)) {
+	page := j.Pages[pageIdx]
 
-	if config.Conf.Nds.Jit.Enabled {
-		panic("Jit Instruction Test is running with Jit Running")
-	}
+	if page == nil {
+		page = &Page{
+			id:     pageIdx,
+			Blocks: make([]*JitBlock, (1<<j.PageShift)>>1),
+		}
 
-	if !compare {
+		j.Pages[pageIdx] = page
+
+	} else if page.dead {
+		println("page dead, block not created")
 		return
 	}
 
-	fmt.Printf("starting test %08X\n", op)
-
-	cpu := j.Cpu
-	rpc = cpu.Reg.R[15]
-	sta = cpu.Reg
-
-	cpu.Jit.TestInst(op, f)
-
-	sav = cpu.Reg
-
-	cpu.Reg = sta
-}
-
-func (j *Jit) EndTest(op uint32, compare bool) {
-
-	cpu := j.Cpu
-
-	sav.R[15] += 4
-
-	if !(compare && cpu.Reg != sav) {
+	if block := page.Blocks[blockIdx]; block != nil && block.Skip {
 		return
 	}
 
-	fmt.Printf("STA REG %08X CPSR %08X\n", sta.R, sta.CPSR.Get())
-	fmt.Printf("JIT REG %08X CPSR %08X\n", sav.R, sav.CPSR.Get())
-	fmt.Printf("COR REG %08X CPSR %08X\n", cpu.Reg.R, cpu.Reg.CPSR.Get())
-	fmt.Sprintf("Bad Compare %08X %08X", rpc, op)
-	os.Exit(0)
+	newBlock := j.BlockCache.AssignBlock(j)
+	if newBlock == nil {
+		return
+	}
+
+	j.Assembler = newBlock.assembler
+
+	j.Mov64(CPU, uint64(uintptr(unsafe.Pointer(CpuPtr))))
+
+	tempPc := pc
+	var length, op, i uint32
+
+	p, ok := j.Cpu.mem.ReadPtr(tempPc, true)
+	if !ok {
+
+		if tempPc&0xF00_0000 == 0x600_0000 {
+			panic("need to setup VRAM as work ram")
+		}
+
+		//panic(fmt.Sprintf("read ptr bad jit arm9 ADDR %08X", tempPc))
+		j.BlockCache.PushTail(newBlock)
+		page.Blocks[blockIdx] = j.BlockCache.SkipBlock
+		return
+	}
+
+	if thumb {
+		// for {
+		//	op = uint32(*(*uint16)(unsafe.Add(p, i*2)))
+		//	if length >= config.Conf.Nds.Jit.BatchInstA9 {
+
+		//		break
+		//	}
+
+		//	if isThumbB(uint16(op)) {
+
+		//		if immLoop := op == 0xE7FE; immLoop {
+		//			j.Cpu.Halted = true
+		//			j.BlockCache.PushTail(newBlock)
+		//			page.Blocks[blockIdx] = j.BlockCache.SkipBlock
+		//			return
+		//		}
+
+		//		const shift = 32 - 11 // int32 - offset size
+		//		nn := (int32(op<<shift) >> shift) << 1
+		//		tempPc = uint32(int32(tempPc) + 4 + nn)
+		//		j.Movl(gojit.Imm(tempPc), j.REG(PC))
+
+		//		i = 0
+
+		//		p, ok = j.Cpu.mem.ReadPtr(tempPc, true)
+		//		if !ok {
+		//			j.BlockCache.PushTail(newBlock)
+		//			page.Blocks[blockIdx] = j.BlockCache.SkipBlock
+		//			return
+		//		}
+		//		continue
+		//	}
+
+		//	if ok := j.emitOpThumb(uint16(op)); !ok {
+		//		break
+		//	}
+
+		//	i++
+		//	length++
+		//	tempPc += 2
+		//}
+
+		panic("arm jit thumb")
+	} else {
+		for {
+			op = *(*uint32)(unsafe.Add(p, i*4))
+
+			if length >= config.Conf.Nds.Jit.BatchInstA9 {
+				break
+			}
+
+			if isB(op) && op>>28 == 0xE {
+
+				if immLoop := op == 0xEAFFFFFE; immLoop {
+					j.Cpu.Halted = true
+					j.BlockCache.PushTail(newBlock)
+					page.Blocks[blockIdx] = j.BlockCache.SkipBlock
+					return
+				}
+
+				tempPc += uint32((int32(op)<<8)>>6) + 8
+
+				if link := (op>>24)&1 != 0; link {
+					j.LdrReg(gojit.R00, PC)
+					j.ADDImm(gojit.R00, gojit.R00, 4, false, false, false)
+					j.StrReg(gojit.R00, 14)
+				}
+
+				j.Mov32(gojit.R00, tempPc)
+				j.StrReg(gojit.R00, PC)
+
+				i = 0
+
+				p, ok = j.Cpu.mem.ReadPtr(tempPc, true)
+				if !ok {
+					j.BlockCache.PushTail(newBlock)
+					page.Blocks[blockIdx] = j.BlockCache.SkipBlock
+					return
+				}
+				continue
+			}
+
+			if ok := j.emitOp(op); !ok {
+				break
+			}
+
+			i++
+			length++
+			tempPc += 4
+		}
+	}
+
+	if length == 0 {
+		j.BlockCache.PushTail(newBlock)
+		page.Blocks[blockIdx] = j.BlockCache.SkipBlock
+		return
+	}
+
+	j.Exit()
+
+	if err := j.Error(); err != nil {
+		panic(err)
+	}
+
+	newBlock.initPc = pc
+	newBlock.Length = length
+	newBlock.finalOp = op
+	newBlock.f = func() {
+		gojit.CallJit(uintptr(unsafe.Pointer(&newBlock.assembler.Buf[0])))
+	}
+
+	page.Blocks[blockIdx] = newBlock
 }
 
+func (j *Jit) emitOp(op uint32) bool {
+	jcctargets := j.emitCond(op)
 
-//compare := true
-//cpu.Jit.StartTest(op, compare, cpu.Jit.emitClz)
-//defer cpu.Jit.EndTest(op, compare)
+	ok := j.DecodeARM(op)
+
+	for _, tgt := range jcctargets {
+		tgt()
+	}
+
+	if ok {
+		j.LdrReg(gojit.R00, PC)
+		j.ADDImm(gojit.R00, gojit.R00, 4, false, false, false)
+		j.StrReg(gojit.R00, PC)
+	}
+
+	return ok
+}
+
+//func (j *Jit) emitOpThumb(op uint16) bool {
+//
+//	ok := j.DecodeTHUMB(op)
+//
+//	if ok {
+//		j.Add(gojit.Imm(2), j.REG(PC))
+//	}
+//
+//	return ok
+//}
+
+//go:inline
+func (j *Jit) emitCond(op uint32) []func() {
+	// jump if cond is NOT TRUE (Z has branch if ldr flag z is empty
+
+	cond := op >> 28
+	var jcctargets []func()
+
+	switch cond {
+	case 0xE, 0xF:
+		// nothing to do, always executed
+	case 0x0: // Z
+		j.LdrFlag(gojit.R00, Z)
+		j.TstImm(gojit.R00, IMM_1, false)
+		jcctargets = append(jcctargets, j.BCond(gojit.Z))
+	case 0x1: // !Z
+		j.LdrFlag(gojit.R00, Z)
+		j.TstImm(gojit.R00, IMM_1, false)
+		jcctargets = append(jcctargets, j.BCond(gojit.NZ))
+	case 0x2: // C
+		j.LdrFlag(gojit.R00, C)
+		j.TstImm(gojit.R00, IMM_1, false)
+		jcctargets = append(jcctargets, j.BCond(gojit.Z))
+	case 0x3: // !C
+		j.LdrFlag(gojit.R00, C)
+		j.TstImm(gojit.R00, IMM_1, false)
+		jcctargets = append(jcctargets, j.BCond(gojit.NZ))
+	case 0x4: // N
+		j.LdrFlag(gojit.R00, N)
+		j.TstImm(gojit.R00, IMM_1, false)
+		jcctargets = append(jcctargets, j.BCond(gojit.Z))
+	case 0x5: // !N
+		j.LdrFlag(gojit.R00, N)
+		j.TstImm(gojit.R00, IMM_1, false)
+		jcctargets = append(jcctargets, j.BCond(gojit.NZ))
+	case 0x6: // V
+		j.LdrFlag(gojit.R00, V)
+		j.TstImm(gojit.R00, IMM_1, false)
+		jcctargets = append(jcctargets, j.BCond(gojit.Z))
+	case 0x7: // !V
+		j.LdrFlag(gojit.R00, V)
+		j.TstImm(gojit.R00, IMM_1, false)
+		jcctargets = append(jcctargets, j.BCond(gojit.NZ))
+	case 0x8: // C && !Z
+
+		j.LdrFlag(gojit.R00, C)
+		j.TstImm(gojit.R00, IMM_1, false)
+		jcctargets = append(jcctargets, j.BCond(gojit.Z))
+
+		j.LdrFlag(gojit.R00, Z)
+		j.TstImm(gojit.R00, IMM_1, false)
+		jcctargets = append(jcctargets, j.BCond(gojit.NZ))
+	case 0x9: // !C || Z
+
+		j.LdrFlag(gojit.R00, C)
+		j.EorImm(gojit.R00, gojit.R00, IMM_1, false) // flip for !C
+
+		j.LdrFlag(gojit.R01, Z)
+		j.OrrReg(gojit.R00, gojit.R00, gojit.R01, 0, 0, false)
+
+		j.TstImm(gojit.R00, IMM_1, false)
+
+		jcctargets = append(jcctargets, j.BCond(gojit.Z))
+	case 0xC: // !Z && N==V
+		j.LdrFlag(gojit.R00, Z)
+		j.TstImm(gojit.R00, IMM_1, false)
+		jcctargets = append(jcctargets, j.BCond(gojit.NZ))
+		fallthrough
+	case 0xA, 0xB: // N==V / N!=V
+
+		j.LdrFlag(gojit.R00, N)
+		j.LdrFlag(gojit.R01, V)
+
+		j.EorReg(gojit.R00, gojit.R00, gojit.R01, 0, 0, false)
+		j.TstImm(gojit.R00, IMM_1, false)
+
+		if cond == 0xA || cond == 0xC {
+			jcctargets = append(jcctargets, j.BCond(gojit.NZ))
+		} else {
+			jcctargets = append(jcctargets, j.BCond(gojit.Z))
+		}
+	case 0xD: // Z || N!=V
+
+		j.LdrFlag(gojit.R00, N)
+		j.LdrFlag(gojit.R01, V)
+		j.LdrFlag(gojit.R02, Z)
+
+		j.EorReg(gojit.R00, gojit.R00, gojit.R01, 0, 0, false)
+		j.OrrReg(gojit.R00, gojit.R00, gojit.R02, 0, 0, false)
+		j.TstImm(gojit.R00, IMM_1, false)
+
+		jcctargets = append(jcctargets, j.BCond(gojit.Z))
+	default:
+		panic("unreachable")
+	}
+
+	return jcctargets
+}
+
+//go:inline
+func (jit *Jit) DecodeARM(op uint32) bool {
+	if swi := op&0xF00_0000 == 0xF00_0000; swi {
+		return false
+	}
+
+	switch {
+	case isBkpt(op):
+	case isB(op):
+	case isBX(op):
+	case isSDT(op):
+
+		load := (op>>20)&1 != 0
+		if rdpc := op&0xF000 == 0xF000; rdpc && load {
+			// also covers pld
+			return false
+		}
+
+		jit.emitSdt(op)
+		return true
+	case isBlock(op):
+
+		load := (op>>20)&1 != 0
+		pcIncluded := op&0x8000 != 0
+
+		if pcIncluded && load {
+			return false
+		}
+
+		jit.emitBlock(op)
+		return true
+
+	case isHalf(op):
+
+		load := (op>>20)&1 != 0
+		if rdpc := op&0xF000 == 0xF000; rdpc && load {
+			return false
+		}
+
+		jit.emitHalf(op)
+		return true
+	case isUD(op):
+		return false
+	case isPSR(op):
+
+		if msr := (op>>21)&1 != 0; msr {
+			return false
+		}
+
+		jit.emitPsr(op)
+
+		return true
+
+	case isSWP(op):
+		jit.emitSWP(op)
+		return true
+	case isM(op):
+		jit.emitMul(op)
+		return true
+	case isCLZ(op):
+		jit.emitClz(op)
+		return true
+	case isQAlu(op):
+		jit.emitQalu(op)
+		return true
+
+	case isALU(op):
+
+		if rdpc := op&0xF000 == 0xF000; rdpc {
+			return false
+		}
+
+		if swiExit := op&0x3F0_000F == 0x3F0_000F; swiExit {
+			return false
+		}
+
+		jit.emitAlu(op)
+
+		return true
+
+	case isCoDataReg(op):
+		jit.emitCo(op)
+		return true
+	}
+
+	return false
+}

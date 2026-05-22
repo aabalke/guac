@@ -1,0 +1,1380 @@
+package arm9
+
+import (
+	"math"
+	"math/bits"
+
+	a "github.com/aabalke/gojit"
+	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
+)
+
+func (j *Jit) emitClz(op uint32) {
+	j.LdrReg(a.R00, op&0xF)
+	j.Clz(a.R00, a.R00, false)
+	j.StrReg(a.R00, (op>>12)&0xF)
+}
+
+func (j *Jit) emitMul(op uint32) {
+	var (
+		inst = (op >> 21) & 0xF
+		set  = (op>>20)&1 != 0
+		rd   = (op >> 16) & 0xF
+		rn   = (op >> 12) & 0xF
+		rs   = (op >> 8) & 0xF
+		rm   = op & 0xF
+	)
+
+	switch inst {
+	case MUL, MLA:
+
+		j.LdrReg(a.R00, rs)
+		j.LdrReg(a.R01, rm)
+
+		acc := a.RZR
+
+		if inst == MLA {
+			j.LdrReg(a.R02, rn)
+			acc = a.R02
+		}
+
+		j.MAdd(a.R00, a.R00, a.R01, acc, false)
+
+		j.StrReg(a.R00, rd)
+
+		if set {
+			j.TstReg(a.R00, a.R00, 0, 0, false)
+			j.Cset(a.R00, a.N, false)
+			j.StrFlag(a.R00, N)
+
+			j.Cset(a.R01, a.Z, false)
+			j.StrFlag(a.R01, Z)
+		}
+
+		return
+
+	case UMULL, UMLAL, SMULL, SMLAL:
+
+		j.LdrReg(a.R00, rs)
+		j.LdrReg(a.R01, rm)
+
+		acc := a.RZR
+
+		if inst == UMLAL || inst == SMLAL {
+			j.LdrReg(a.R02, rn)
+			j.LdrReg(a.R03, rd)
+			j.Bfi(a.R02, a.R03, 32, 32, true)
+			acc = a.R02
+		}
+
+		if inst == SMLAL || inst == SMULL {
+			j.Smaddl(a.R00, a.R00, a.R01, acc)
+		} else {
+			j.Umaddl(a.R00, a.R00, a.R01, acc)
+		}
+
+		if set {
+			j.TstReg(a.R00, a.R00, 0, 0, true)
+			j.Cset(a.R01, a.N, false)
+			j.Cset(a.R02, a.Z, false)
+			j.Movz(a.R03, 0, 0, false)
+			j.StrFlag(a.R01, N)
+			j.StrFlag(a.R02, Z)
+			j.StrFlag(a.R03, C)
+		}
+
+		j.LsrImm(a.R01, a.R00, 32, true)
+		j.StrReg(a.R00, rn)
+		j.StrReg(a.R01, rd)
+
+		return
+	}
+
+	x := (op>>5)&1 != 0
+	y := (op>>6)&1 != 0
+
+	switch inst {
+	case SMLAxy:
+
+		// 32 bit rm and rs -> 32/16 bit signed
+		j.LdrReg(a.R00, rm)
+
+		if x {
+			j.AsrImm(a.R00, a.R00, 16, false)
+		}
+		j.Sxth(a.R00, a.R00, false)
+
+		j.LdrReg(a.R01, rs)
+
+		if y {
+			j.AsrImm(a.R01, a.R01, 16, false)
+		}
+		j.Sxth(a.R01, a.R01, false)
+
+		// 32 bit rn -> 64 bit signed
+		j.LdrReg(a.R02, rn)
+		j.Sxtw(a.R02, a.R02)
+
+		j.Smaddl(a.R00, a.R00, a.R01, a.R02)
+
+		// to check overflow, check if signed 64bit version == signed 32 bit version
+		// if not equal, has to be overflow
+
+		j.Sxtw(a.R01, a.R00)
+		j.CmpReg(a.R00, a.R01, 0, 0, false, true)
+
+		j.Cset(a.R01, a.NE, false)
+		j.LdrFlag(a.R02, Q)
+		j.OrrReg(a.R01, a.R01, a.R02, 0, 0, false)
+		j.StrFlag(a.R01, Q)
+
+		j.StrReg(a.R00, rd)
+
+	case SMLAWySMLALWy:
+
+		j.LdrReg(a.R00, rm)
+
+		j.LdrReg(a.R01, rs)
+		if y {
+			j.AsrImm(a.R01, a.R01, 16, false)
+		}
+
+		j.Sxth(a.R01, a.R01, false)
+
+		j.Smaddl(a.R00, a.R00, a.R01, a.RZR)
+
+		j.AsrImm(a.R00, a.R00, 16, false)
+
+		if smulwa := !x; smulwa {
+			j.LdrReg(a.R01, rn)
+			j.ADDReg(a.R00, a.R00, a.R01, 0, 0, true, false, false)
+
+			j.Cset(a.R01, a.V, false)
+			j.LdrFlag(a.R02, Q)
+			j.OrrReg(a.R01, a.R01, a.R02, 0, 0, false)
+			j.StrFlag(a.R01, Q)
+		}
+
+		j.StrReg(a.R00, rd)
+
+	case SMLALxy:
+
+		j.LdrReg(a.R00, rm)
+		if x {
+			j.AsrImm(a.R00, a.R00, 16, false)
+		}
+
+		j.Sxth(a.R00, a.R00, false)
+
+		j.LdrReg(a.R01, rs)
+		if y {
+			j.AsrImm(a.R01, a.R01, 16, false)
+		}
+
+		j.Sxth(a.R01, a.R01, false)
+
+		j.LdrReg(a.R02, rn)
+		j.LdrReg(a.R03, rd)
+		j.Bfi(a.R02, a.R03, 32, 32, true)
+
+		j.Smaddl(a.R00, a.R00, a.R01, a.R02)
+
+		j.LsrImm(a.R01, a.R00, 32, true)
+		j.StrReg(a.R00, rn)
+		j.StrReg(a.R01, rd)
+
+	case SMULxy:
+
+		j.LdrReg(a.R00, rm)
+		if x {
+			j.AsrImm(a.R00, a.R00, 16, false)
+		}
+
+		j.LdrReg(a.R01, rs)
+		if y {
+			j.AsrImm(a.R01, a.R01, 16, false)
+		}
+
+		j.Smaddl(a.R00, a.R00, a.R01, a.RZR)
+
+		j.StrReg(a.R00, rd)
+	}
+}
+
+func (j *Jit) emitQalu(op uint32) {
+	var (
+		inst = (op >> 20) & 0xF
+		rn   = (op >> 16) & 0xF
+		rm   = op & 0xF
+		rd   = (op >> 12) & 0xF
+	)
+
+	j.LdrReg(a.R00, rn)
+	j.LdrReg(a.R01, rm)
+
+	j.Movz(a.R02, math.MaxInt32&0xFFFF, 0, true)
+	j.Movk(a.R02, (math.MaxInt32>>16)&0xFFFF, 1, true)
+
+	j.Movz(a.R03, math.MinInt32&0xFFFF, 0, true)
+	j.Movk(a.R03, (math.MinInt32>>16)&0xFFFF, 1, true)
+
+	j.LdrFlag(a.R04, Q)
+
+	if double := inst >= 4; double {
+
+		j.ADDReg(a.R00, a.R00, a.R00, 0, 0, true, false, false)
+
+		j.Csel(a.R05, a.R02, a.R03, a.N, false)
+		j.Csel(a.R00, a.R05, a.R00, a.V, false)
+		j.Cset(a.R05, a.V, false)
+		j.OrrReg(a.R04, a.R04, a.R05, 0, 0, false)
+	}
+
+	if inst == QADD || inst == QDADD {
+		j.ADDReg(a.R00, a.R01, a.R00, 0, 0, true, false, false)
+	} else {
+		j.SUBReg(a.R00, a.R01, a.R00, 0, 0, true, false, false)
+	}
+
+	j.Csel(a.R02, a.R02, a.R03, a.N, false)
+	j.Csel(a.R00, a.R02, a.R00, a.V, false)
+	j.Cset(a.R05, a.V, false)
+	j.OrrReg(a.R04, a.R04, a.R05, 0, 0, false)
+
+	j.StrReg(a.R00, rd)
+	j.StrFlag(a.R04, Q)
+}
+
+func (j *Jit) emitSWP(op uint32) {
+	var (
+		isByte = (op>>22)&1 != 0
+		rn     = (op >> 16) & 0xF
+		rd     = (op >> 12) & 0xF
+		rm     = op & 0xF
+	)
+
+	j.LdrReg(a.R00, rn)
+	j.LdrReg(a.R09, rm)
+	j.MovReg(a.R08, a.R00, true)
+
+	if isByte {
+
+		j.CallFunc(Read)
+		j.StrReg(a.R00, rd)
+
+		j.MovReg(a.R00, a.R08, true)
+		j.MovReg(a.R01, a.R09, true)
+		j.CallFunc(Write)
+
+		return
+	}
+
+	j.AndImm(a.R00, a.R00, IMM_0xFFFF_FFFC, false, false)
+	j.CallFunc(Read32)
+	j.MovReg(a.R01, a.R08, true)
+	j.AndImm(a.R01, a.R01, IMM_3, false, false)
+	j.LslImm(a.R01, a.R01, 3, false)
+	j.RorReg(a.R00, a.R00, a.R01, false)
+	j.StrReg(a.R00, rd)
+
+	j.MovReg(a.R00, a.R08, true)
+
+	j.AndImm(a.R00, a.R00, IMM_0xFFFF_FFFC, false, false)
+
+	j.MovReg(a.R01, a.R09, true)
+
+	j.CallFunc(Write32)
+}
+
+func (j *Jit) emitSdt(op uint32) {
+	if pld := op&
+		0b1111_1101_0111_0000_1111_0000_0000_0000 ==
+		0b1111_0101_0101_0000_1111_0000_0000_0000; pld {
+		panic("pld")
+	}
+
+	if valid := (op>>26)&0b11 == 0b01; !valid {
+		panic("Malformed Sdt Instruction")
+	}
+
+	var (
+		reg  = (op>>25)&1 != 0
+		pre  = (op>>24)&1 != 0
+		up   = (op>>23)&1 != 0
+		byte = (op>>22)&1 != 0
+		wb   = (op>>21)&1 != 0 || !pre
+		load = (op>>20)&1 != 0
+		rn   = (op >> 16) & 0xF
+		rd   = (op >> 12) & 0xF
+	)
+
+	// post = r8
+	// prev = r0
+	// offset = r3
+
+	if reg {
+
+		if (op>>4)&1 != 0 {
+			panic("Malformed Single Data Transfer O_o")
+		}
+
+		shift := (op >> 7) & 0x1F
+		sType := (op >> 5) & 0b11
+		rm := op & 0xF
+
+		j.LdrReg(a.R03, rm)
+
+		switch sType {
+		case LSL:
+			j.LslImm(a.R03, a.R03, shift, false)
+
+		case LSR:
+
+			if shift == 0 {
+				j.Movz(a.R03, 0, 0, false)
+			} else {
+				j.LsrImm(a.R03, a.R03, shift, false)
+			}
+
+		case ASR:
+
+			if shift == 0 {
+				j.AsrImm(a.R03, a.R03, 31, false)
+			} else {
+				j.AsrImm(a.R03, a.R03, shift, false)
+			}
+
+		case ROR:
+
+			if shift == 0 {
+				j.LsrImm(a.R03, a.R03, 1, false)
+				j.LdrFlag(a.R02, C)
+				j.OrrReg(a.R03, a.R03, a.R02, 31, a.SHIFT_LSL, false)
+
+			} else {
+				j.RorImm(a.R03, a.R03, shift, false)
+			}
+		}
+
+	} else {
+		j.Movz(a.R03, op&0xFFF, 0, true)
+	}
+
+	j.LdrReg(a.R08, rn)
+	if rn == PC {
+		j.ADDImm(a.R08, a.R08, 8, false, false, false)
+	}
+
+	if up {
+		j.ADDReg(a.R08, a.R08, a.R03, 0, 0, false, false, false)
+	} else {
+		j.SUBReg(a.R08, a.R08, a.R03, 0, 0, false, false, false)
+	}
+
+	if pre {
+		j.MovReg(a.R00, a.R08, true)
+	} else {
+		j.LdrReg(a.R00, rn)
+	}
+
+	if load {
+		if byte {
+			j.CallFunc(Read)
+			j.StrReg(a.R00, rd)
+
+		} else {
+
+			j.MovReg(a.R09, a.R00, false)
+
+			j.AndImm(a.R00, a.R00, IMM_0xFFFF_FFFC, false, false)
+			j.CallFunc(Read32)
+			j.MovReg(a.R01, a.R09, true)
+			j.AndImm(a.R01, a.R01, IMM_3, false, false)
+			j.LslImm(a.R01, a.R01, 3, false)
+			j.RorReg(a.R00, a.R00, a.R01, false)
+			j.StrReg(a.R00, rd)
+
+			if rd == PC {
+				panic("ldr word rd == PC in arm jit")
+				//	c.toggleThumb() // this is arm9 - not sure if arm7
+				//	r[rd] -= 4
+			}
+		}
+	} else {
+
+		j.LdrReg(a.R01, rd)
+
+		if rd == PC {
+			j.ADDImm(a.R01, a.R01, 12, false, false, false)
+		}
+
+		if byte {
+			j.CallFunc(Write)
+		} else {
+			j.AndImm(a.R00, a.R00, IMM_0xFFFF_FFFC, false, false)
+			j.CallFunc(Write32)
+		}
+	}
+
+	if wb && !(load && rn == rd) {
+		j.StrReg(a.R08, rn)
+	}
+}
+
+func (j *Jit) emitHalf(op uint32) {
+	var (
+		rn      = (op >> 16) & 0xF
+		rd      = (op >> 12) & 0xF
+		preFlag = (op>>24)&1 != 0
+		load    = (op>>20)&1 != 0
+		inst    = (op >> 5) & 0b11
+		wb      = (op>>21)&1 != 0 || !preFlag
+	)
+
+	// post = r8
+	// rnv = r9, rd2v = r9 later
+	// pre = r0
+	// offset = r3
+
+	j.LdrReg(a.R08, rn)
+	j.MovReg(a.R09, a.R08, false)
+
+	if imm := (op>>22)&1 != 0; imm {
+		j.Movz(a.R03, (op&0xF)|((op>>4)&0xF0), 0, false)
+	} else {
+		j.LdrReg(a.R03, op&0xF)
+	}
+
+	if up := (op>>23)&1 != 0; up {
+		j.ADDReg(a.R08, a.R08, a.R03, 0, 0, false, false, false)
+	} else {
+		j.SUBReg(a.R08, a.R08, a.R03, 0, 0, false, false, false)
+	}
+
+	if preFlag {
+		j.MovReg(a.R00, a.R08, false)
+	} else {
+		j.MovReg(a.R00, a.R09, false)
+		if rn == PC {
+			j.ADDImm(a.R08, a.R08, 8, false, false, false)
+		}
+	}
+
+	if inst == RESERVED {
+		panic("unsupported half (reserved)")
+	}
+
+	if !load {
+
+		j.LdrReg(a.R01, rd)
+		if rd == PC {
+			j.ADDImm(a.R01, a.R01, 12, false, false, false)
+		}
+
+		if inst == STRD {
+			j.LdrReg(a.R09, rd+1)
+			if rd+1 == PC {
+				j.ADDImm(a.R09, a.R09, 12, false, false, false)
+			}
+		}
+
+		if wb {
+			j.StrReg(a.R08, rn)
+		}
+
+		switch inst {
+		case STRH:
+			j.AndImm(a.R00, a.R00, a.EncodeImm(0xFFFF_FFFF&^1, false), false, false)
+			j.CallFunc(Write16)
+
+		case LDRD:
+			j.AndImm(a.R00, a.R00, a.EncodeImm(0xFFFF_FFFF&^0b111, false), false, false)
+			j.MovReg(a.R08, a.R00, false)
+			j.CallFunc(Read32)
+			j.StrReg(a.R00, rd)
+			j.MovReg(a.R00, a.R08, false)
+			j.ADDImm(a.R00, a.R00, 4, false, false, false)
+			j.CallFunc(Read32)
+			j.StrReg(a.R00, rd+1)
+
+		case STRD:
+			j.AndImm(a.R00, a.R00, a.EncodeImm(0xFFFF_FFFF&^0b111, false), false, false)
+			j.MovReg(a.R08, a.R00, false)
+			j.CallFunc(Write32)
+
+			j.MovReg(a.R00, a.R08, false)
+			j.MovReg(a.R01, a.R09, false)
+			j.ADDImm(a.R00, a.R00, 4, false, false, false)
+			j.CallFunc(Write32)
+		}
+		return
+	}
+
+	if wb {
+		j.StrReg(a.R08, rn)
+	}
+
+	switch inst {
+	case LDRH:
+		//  LDRH Rd,[odd]   -->  LDRH Rd,[odd-1]        ;forced align
+		j.AndImm(a.R00, a.R00, a.EncodeImm(0xFFFF_FFFF&^1, false), false, false)
+		j.CallFunc(Read16)
+
+	case LDRSB:
+		// sign-expand byte value
+		j.CallFunc(Read)
+		j.Sxtb(a.R00, a.R00, false)
+
+	case LDRSH:
+		// sign-expand half value
+		j.AndImm(a.R00, a.R00, a.EncodeImm(0xFFFF_FFFF&^1, false), false, false)
+		j.CallFunc(Read16)
+		j.Sxth(a.R00, a.R00, false)
+	}
+
+	j.StrReg(a.R00, rd)
+}
+
+func (j *Jit) emitAlu(op uint32) {
+	var (
+		rd   = (op >> 12) & 0xF
+		rn   = (op >> 16) & 0xF
+		imm  = (op>>25)&1 != 0
+		inst = (op >> 21) & 0xF
+	)
+
+	// rn == r0
+	// op2 == r1
+	// carry == r2
+
+	j.LdrReg(a.R00, rn)
+	j.LdrFlag(a.R08, C)
+
+	if imm {
+
+		ro := ((op >> 8) & 0xF) << 1
+		op2 := bits.RotateLeft32(op&0xFF, -int(ro))
+		j.Movz(a.R01, op2&0xFFFF, 0, true)
+		j.Movk(a.R01, op2>>16, 1, false)
+
+		if setCarry := ro != 0 && (op>>20)&1 != 0; setCarry {
+			j.Movz(a.R02, (op2>>31)&1, 0, false)
+			j.StrFlag(a.R02, C)
+		}
+
+		if rn == PC {
+			j.ADDImm(a.R00, a.R00, 8, false, false, false)
+		}
+
+	} else {
+
+		j.getShiftedAluOp2(op)
+
+		if rn == PC {
+			if regShift := (op>>4)&1 != 0; regShift {
+				j.ADDImm(a.R00, a.R00, 12, false, false, false)
+			} else {
+				j.ADDImm(a.R00, a.R00, 8, false, false, false)
+			}
+		}
+	}
+
+	switch {
+	case inst == MOV:
+		j.StrReg(a.R01, rd)
+
+		if rd == PC {
+			panic("mov rd == PC arm jit")
+		}
+
+		if set := (op>>20)&1 != 0; set {
+
+			rm := op & 0xF
+
+			if swiExit := !imm && rd == PC && rm == LR; swiExit {
+				panic("swi exit arm jit")
+			} else {
+				j.TstReg(a.R01, a.R01, 0, 0, false)
+
+				j.Cset(a.R00, a.N, false)
+				j.StrFlag(a.R00, N)
+
+				j.Cset(a.R00, a.Z, false)
+				j.StrFlag(a.R00, Z)
+			}
+		}
+
+	case inst == SUB:
+
+		j.SUBReg(a.R00, a.R00, a.R01, 0, 0, true, false, false)
+		j.StrReg(a.R00, rd)
+
+		if set := (op>>20)&1 != 0; set {
+			if rd == PC {
+				panic("sub rd == PC arm jit")
+			}
+
+			j.Cset(a.R00, a.V, false)
+			j.StrFlag(a.R00, V)
+
+			j.Cset(a.R00, a.C, false)
+			j.StrFlag(a.R00, C)
+
+			j.Cset(a.R00, a.N, false)
+			j.StrFlag(a.R00, N)
+
+			j.Cset(a.R00, a.Z, false)
+			j.StrFlag(a.R00, Z)
+		}
+
+	// test alu
+	case inst >= 0b1000 && inst < 0b1100:
+
+		switch inst {
+		case TST:
+			j.TstReg(a.R00, a.R01, 0, 0, false)
+		case TEQ:
+			j.EorReg(a.RZR, a.R00, a.R01, 0, 0, false)
+		case CMP:
+			j.CmpReg(a.R00, a.R01, 0, 0, false, false)
+		case CMN:
+			j.CmnReg(a.R00, a.R01, 0, 0, false, false)
+		}
+
+		if set := (op>>20)&1 != 0; set {
+
+			if inst == CMN || inst == CMP {
+				j.Cset(a.R00, a.V, false)
+				j.StrFlag(a.R00, V)
+
+				j.Cset(a.R00, a.C, false)
+				j.StrFlag(a.R00, C)
+			}
+
+			j.Cset(a.R00, a.N, false)
+			j.StrFlag(a.R00, N)
+
+			j.Cset(a.R00, a.Z, false)
+			j.StrFlag(a.R00, Z)
+		}
+
+		if rd == PC {
+			panic("alu jit rd == PC")
+		}
+
+	// logical
+	case inst&0b0110 == 0b0000 || inst&0b1100 == 0b1100:
+
+		switch inst {
+		case AND:
+			j.AndReg(a.R00, a.R00, a.R01, 0, 0, false, false)
+		case EOR:
+			j.EorReg(a.R00, a.R00, a.R01, 0, 0, false)
+		case ORR:
+			j.OrrReg(a.R00, a.R00, a.R01, 0, 0, false)
+		case BIC:
+			j.BicReg(a.R00, a.R00, a.R01, 0, 0, false, false)
+		case MVN:
+			j.OrnReg(a.R00, a.RZR, a.R01, 0, 0, false)
+		}
+
+		j.StrReg(a.R00, rd)
+
+		if set := (op>>20)&1 != 0; set {
+
+			j.TstReg(a.R00, a.R00, 0, 0, false)
+
+			j.Cset(a.R00, a.N, false)
+			j.StrFlag(a.R00, N)
+
+			j.Cset(a.R00, a.Z, false)
+			j.StrFlag(a.R00, Z)
+		}
+
+	default:
+
+		switch inst {
+		case RSB:
+			j.SUBReg(a.R00, a.R01, a.R00, 0, 0, true, false, false)
+		case ADD:
+			j.ADDReg(a.R00, a.R00, a.R01, 0, 0, true, false, false)
+
+		case ADC:
+			j.LslImm(a.R08, a.R08, 29, false)
+			j.Msr(a.R08)
+			j.AdcReg(a.R00, a.R00, a.R01, true, false)
+
+		case SBC:
+			j.LslImm(a.R08, a.R08, 29, false)
+			j.Msr(a.R08)
+			j.SbcReg(a.R00, a.R00, a.R01, true, false)
+
+		case RSC:
+			j.LslImm(a.R08, a.R08, 29, false)
+			j.Msr(a.R08)
+			j.SbcReg(a.R00, a.R01, a.R00, true, false)
+		}
+
+		j.StrReg(a.R00, rd)
+
+		if set := (op>>20)&1 != 0; set {
+
+			switch inst {
+			case ADD, ADC, SBC, RSB, RSC:
+				j.Cset(a.R00, a.V, false)
+				j.StrFlag(a.R00, V)
+
+				j.Cset(a.R00, a.C, false)
+				j.StrFlag(a.R00, C)
+			}
+
+			j.Cset(a.R00, a.N, false)
+			j.StrFlag(a.R00, N)
+
+			j.Cset(a.R00, a.Z, false)
+			j.StrFlag(a.R00, Z)
+		}
+	}
+}
+
+func (j *Jit) getShiftedAluOp2(op uint32) {
+	var (
+		shReg  = (op>>4)&1 != 0
+		shType = (op >> 5) & 0b11
+
+		inst     = (op >> 21) & 0xF
+		logical  = inst&0b0110 == 0b0000 || inst&0b1100 == 0b1100
+		setCarry = (op>>20)&1 != 0 && logical
+
+		rm = op & 0xF
+	)
+
+	// do not touch r0, r8
+	// op2 r1
+	// shift r2
+
+	j.LdrReg(a.R01, rm)
+
+	var zeroSkip func()
+
+	if shReg {
+
+		rs := (op >> 8) & 0xF
+
+		j.LdrReg(a.R02, rs)
+		j.AndImm(a.R02, a.R02, a.EncodeImm(0xFF, false), false, false)
+
+		if rm == PC {
+			j.ADDImm(a.R01, a.R01, 12, false, false, false)
+		}
+
+		j.TstReg(a.R02, a.R02, 0, 0, false)
+		zeroSkip = j.BCond(a.Z)
+
+	} else {
+		shift := (op >> 7) & 0x1F
+
+		if rm == PC {
+			j.ADDImm(a.R01, a.R01, 8, false, false, false)
+		}
+
+		j.Movz(a.R02, shift, 0, false)
+		j.TstReg(a.R02, a.R02, 0, 0, false)
+
+		// this is not working, shift == 0, but jumps to not zero sh reg
+
+		notZeroShReg := j.BCond(a.NZ)
+
+		switch shType {
+		case LSL:
+			// nothing
+		case LSR:
+			j.TstImm(a.R01, IMM_0x8000_0000, false)
+			j.Cset(a.R03, a.NZ, false)
+			j.StrFlag(a.R03, C)
+			j.Movz(a.R01, 0, 0, false)
+
+		case ASR:
+			j.TstImm(a.R01, IMM_0x8000_0000, false)
+			j.Cset(a.R03, a.NZ, false)
+			j.StrFlag(a.R03, C)
+			j.AsrImm(a.R01, a.R01, 31, false)
+
+		case ROR:
+
+			// r4 old carry, r3 scratch for new carry
+
+			j.LdrFlag(a.R04, C)
+
+			j.TstImm(a.R01, IMM_1, false)
+			j.Cset(a.R03, a.NZ, false)
+			j.StrFlag(a.R03, C)
+
+			j.LsrImm(a.R01, a.R01, 31, false)
+			j.OrrReg(a.R01, a.R01, a.R04, 31, 0, false)
+		}
+
+		zeroSkip = j.B()
+		notZeroShReg()
+	}
+
+	done := [...]func(){
+		func() {},
+		func() {},
+		func() {},
+	}
+
+	switch shType {
+	case LSL:
+
+		j.CmpImm(a.R02, 32, 0, false, false)
+		over32 := j.BCond(a.HI)
+
+		j.Movz(a.R04, 32, 0, false)
+		j.SUBReg(a.R04, a.R04, a.R02, 0, 0, false, false, false)
+		j.LsrReg(a.R03, a.R01, a.R04, false)
+		j.AndImm(a.R03, a.R03, IMM_1, false, false)
+
+		j.LslReg(a.R01, a.R01, a.R02, false)
+		done[0] = j.B()
+
+		over32()
+
+		j.Movz(a.R01, 0, 0, false)
+		j.Movz(a.R03, 0, 0, false)
+
+		done[1] = j.B()
+
+	case LSR:
+
+		j.CmpImm(a.R02, 32, 0, false, false)
+		over32 := j.BCond(a.HI)
+		is32 := j.BCond(a.EQ)
+
+		// shift - 1
+		// carry = op2 >> (shift - 1)
+		j.Movz(a.R04, 1, 0, false)
+		j.SUBReg(a.R04, a.R02, a.R04, 0, 0, false, false, false)
+		j.LsrReg(a.R03, a.R01, a.R04, false)
+		j.AndImm(a.R03, a.R03, IMM_1, false, false)
+
+		j.LsrReg(a.R01, a.R01, a.R02, false)
+		done[0] = j.B()
+
+		over32()
+
+		j.Movz(a.R01, 0, 0, false)
+		j.Movz(a.R03, 0, 0, false)
+
+		done[1] = j.B()
+
+		is32()
+
+		j.TstImm(a.R01, IMM_0x8000_0000, false)
+		j.Cset(a.R03, a.NZ, false)
+		j.Movz(a.R01, 0, 0, false)
+
+		done[2] = j.B()
+
+	case ASR:
+
+		j.CmpImm(a.R02, 32, 0, false, false)
+		ge32 := j.BCond(a.GE)
+
+		// shift - 1
+		// carry = op2 >> (shift - 1)
+		j.Movz(a.R04, 1, 0, false)
+		j.SUBReg(a.R04, a.R02, a.R04, 0, 0, false, false, false)
+		j.LsrReg(a.R03, a.R01, a.R04, false)
+		j.AndImm(a.R03, a.R03, IMM_1, false, false)
+		j.AsrReg(a.R01, a.R01, a.R02, false)
+		done[0] = j.B()
+
+		ge32()
+
+		j.AsrImm(a.R01, a.R01, 31, false)
+		j.LsrImm(a.R03, a.R01, 31, false)
+
+		done[1] = j.B()
+
+	case ROR:
+
+		j.CmpImm(a.R02, 32, 0, false, false)
+		ge32 := j.BCond(a.GE)
+
+		j.Movz(a.R04, 1, 0, false)
+		j.SUBReg(a.R04, a.R02, a.R04, 0, 0, false, false, false)
+		j.AndImm(a.R04, a.R04, a.EncodeImm(31, false), false, false)
+		j.LsrReg(a.R03, a.R01, a.R04, false)
+		j.AndImm(a.R03, a.R03, IMM_1, false, false)
+		j.RorReg(a.R01, a.R01, a.R02, false)
+		done[0] = j.B()
+		ge32()
+
+		j.Movz(a.R04, 1, 0, false)
+		j.LsrImm(a.R03, a.R01, 31, false)
+		j.AndImm(a.R03, a.R03, IMM_1, false, false)
+		done[1] = j.B()
+	}
+
+	for i := range done {
+		done[i]()
+	}
+
+	if setCarry {
+		j.StrFlag(a.R03, C)
+	}
+
+	// op2 unchanges, carry is set to original carry (no change)
+	zeroSkip()
+}
+
+func (j *Jit) emitCo(op uint32) {
+	var (
+		Op = uint32((op >> 21) & 0x7)
+		Cn = uint32((op >> 16) & 0xF)
+		Pn = uint32((op >> 8) & 0xF)
+		Cp = uint32((op >> 5) & 0x7)
+		Cm = uint32((op >> 0) & 0xF)
+
+		rd = (op >> 12) & 0xF
+	)
+
+	if (op >> 28) == 0xF {
+		panic("MRC2/MCR2")
+	}
+
+	if rd == 15 {
+		panic("SETUP PIPELINE OFFSET CO DATA REG")
+	}
+
+	if mrc := (op>>20)&1 == 1; mrc {
+
+		j.Movz(a.R00, Op, 0, false)
+		j.Movz(a.R01, Cn, 0, false)
+		j.Movz(a.R02, Pn, 0, false)
+		j.Movz(a.R03, Cp, 0, false)
+		j.Movz(a.R04, Cm, 0, false)
+
+		j.CallFunc(ReadCp15)
+
+		j.StrReg(a.R00, rd)
+		return
+	}
+
+	reg := cp15.CpRegister{
+		Op: uint8(Op),
+		Cn: uint8(Cn),
+		Pn: uint8(Pn),
+		Cp: uint8(Cp),
+		Cm: uint8(Cm),
+	}
+
+	if rd == 0 && (reg == cp15.HALT || reg == cp15.HALT2) {
+		j.Movz(a.R00, 1, 0, false)
+		j.StrFlag(a.R00, HALTED_FLAG)
+		return
+	}
+
+	j.Movz(a.R00, Op, 0, false)
+	j.Movz(a.R01, Cn, 0, false)
+	j.Movz(a.R02, Pn, 0, false)
+	j.Movz(a.R03, Cp, 0, false)
+	j.Movz(a.R04, Cm, 0, false)
+	j.LdrReg(a.R05, rd)
+
+	j.CallFunc(WriteCp15)
+}
+
+func (j *Jit) emitPsr(op uint32) {
+	if msr := (op>>21)&1 != 0; msr {
+		panic("msr jit arm")
+	}
+
+	rd := (op >> 12) & 0xF
+
+	if spsr := (op>>22)&1 != 0; spsr {
+		j.LdrReg(a.R00, MODE)
+		j.CallFunc(GetSpsr)
+		j.StrReg(a.R00, rd)
+		return
+	}
+
+	j.LdrReg(a.R00, MODE)
+	j.Mov32(a.R08, PRIV_MASK)
+	j.Mov32(a.R09, USR_MASK)
+	j.CmpImm(a.R00, MODE_USR, 0, false, false)
+	j.Csel(a.R08, a.R09, a.R08, a.EQ, true)
+
+	j.Mov64(a.R00, uint64(CPSR))
+	j.ADDReg(a.R00, a.R00, CPU, 0, 0, false, false, true)
+	j.CallFunc((*Cond).Get)
+	j.AndReg(a.R00, a.R00, a.R08, 0, 0, false, false)
+	j.StrReg(a.R00, rd)
+}
+
+func (j *Jit) emitBlock(op uint32) {
+	var (
+		rlist = op & 0xFFFF
+		rn    = (op >> 16) & 0xF
+		up    = (op>>23)&1 != 0
+	)
+
+	if rlist == 0 {
+
+		if up {
+			j.LdrReg(a.R00, rn)
+			j.ADDImm(a.R00, a.R00, 0x40, false, false, false)
+			j.StrReg(a.R00, rn)
+			return
+		}
+
+		j.LdrReg(a.R00, rn)
+		j.SUBImm(a.R00, a.R00, 0x40, false, false, false)
+		j.StrReg(a.R00, rn)
+		return
+	}
+	var (
+		regCount   = uint32(bits.OnesCount32(rlist))
+		rnIncluded = (rlist>>rn)&1 != 0
+		pre        = (op>>24)&1 != 0
+		psr        = (op>>22)&1 != 0
+		wb         = (op>>21)&1 != 0
+		load       = (op>>20)&1 != 0
+	)
+
+	j.LdrReg(a.R00, rn)
+	j.MovReg(a.R01, a.R00, false)
+	j.AndImm(a.R00, a.R00, IMM_0xFFFF_FFFC, false, false)
+
+	if up {
+		j.ADDImm(a.R01, a.R01, regCount<<2, false, false, false)
+	} else {
+		j.SUBImm(a.R01, a.R01, regCount<<2, false, false, false)
+	}
+
+	j.MovReg(a.R09, a.R01, false)
+	j.LdrReg(a.R01, rn)
+
+	if psr {
+		j.LdrReg(a.R03, MODE)
+		j.CmpImm(a.R03, MODE_FIQ, 0, false, false)
+		notFiq := j.BCond(a.NZ)
+
+		if rn >= 8 && rn < PC {
+			j.LdrUserReg(a.R01, rn)
+		}
+
+		notFiq()
+		j.CmpImm(a.R03, MODE_USR, 0, false, false)
+		user := j.BCond(a.Z)
+
+		if rn >= 13 && rn < PC {
+			j.LdrUserReg(a.R01, rn)
+		}
+
+		user()
+	}
+
+	j.MovReg(a.R10, a.R01, false)
+
+	reg := uint32(0)
+
+	if !up {
+		reg = 15
+	}
+
+	for range 16 {
+		if disabled := (rlist>>reg)&1 == 0; disabled {
+			if up {
+				reg++
+			} else {
+				reg--
+			}
+			continue
+		}
+
+		if pre {
+			if up {
+				j.ADDImm(a.R00, a.R00, 4, false, false, false)
+			} else {
+				j.SUBImm(a.R00, a.R00, 4, false, false, false)
+			}
+		}
+
+		j.MovReg(a.R08, a.R00, false)
+
+		if load {
+
+			j.CallFunc(Read32)
+
+			if psr {
+				j.LdrReg(a.R03, MODE)
+				j.CmpImm(a.R03, MODE_FIQ, 0, false, false)
+				notFiq := j.BCond(a.NZ)
+
+				if reg >= 8 && reg < PC {
+					j.StrUserReg(a.R00, reg)
+				} else {
+					j.StrReg(a.R00, reg)
+				}
+
+				fiqskip := j.B()
+
+				notFiq()
+
+				j.CmpImm(a.R03, MODE_USR, 0, false, false)
+				user := j.BCond(a.Z)
+
+				if reg >= 13 && reg < PC {
+					j.StrUserReg(a.R00, reg)
+				} else {
+					j.StrReg(a.R00, reg)
+				}
+
+				notuserskip := j.B()
+
+				user()
+
+				j.StrReg(a.R00, reg)
+
+				fiqskip()
+				notuserskip()
+			} else {
+				j.StrReg(a.R00, reg)
+			}
+
+		} else {
+			switch reg {
+			case rn:
+				j.MovReg(a.R01, a.R10, false)
+				j.CallFunc(Write32)
+			default:
+
+				if psr {
+					j.LdrReg(a.R03, MODE)
+					j.CmpImm(a.R03, MODE_FIQ, 0, false, false)
+					notFiq := j.BCond(a.NZ)
+
+					if reg >= 8 && reg < PC {
+						j.LdrUserReg(a.R01, reg)
+					} else {
+						j.LdrReg(a.R01, reg)
+					}
+
+					fiqskip := j.B()
+
+					notFiq()
+
+					j.CmpImm(a.R03, MODE_USR, 0, false, false)
+					user := j.BCond(a.Z)
+
+					if reg >= 13 && reg < PC {
+						j.LdrUserReg(a.R01, reg)
+					} else {
+						j.LdrReg(a.R01, reg)
+					}
+
+					notuserskip := j.B()
+
+					user()
+
+					j.StrReg(a.R01, reg)
+
+					fiqskip()
+					notuserskip()
+				} else {
+					j.LdrReg(a.R01, reg)
+				}
+
+				j.CallFunc(Write32)
+			}
+		}
+
+		j.MovReg(a.R00, a.R08, false)
+
+		if !pre {
+			if up {
+				j.ADDImm(a.R00, a.R00, 4, false, false, false)
+			} else {
+				j.SUBImm(a.R00, a.R00, 4, false, false, false)
+			}
+		}
+
+		if up {
+			reg++
+		} else {
+			reg--
+		}
+	}
+
+	if !load {
+		if wb {
+			j.StrReg(a.R09, rn)
+		}
+
+		return
+	}
+
+	if wb {
+		if rnIncluded {
+			isLast := (rlist < (1 << (rn + 1)))
+			isOnly := regCount == 1
+			if !isLast || isOnly {
+				j.StrReg(a.R09, rn)
+			}
+		} else {
+			j.StrReg(a.R09, rn)
+		}
+	}
+}
+
+func (c *Cpu) Block2(op uint32) {
+	var (
+		r          = &c.Reg.R
+		rlist      = op & 0xFFFF
+		regCount   = uint32(bits.OnesCount32(rlist))
+		rn         = (op >> 16) & 0xF
+		addr       = r[rn] &^ 0b11
+		up         = (op>>23)&1 != 0
+		pcIncluded = rlist&0x8000 != 0
+		rnIncluded = (rlist>>rn)&1 != 0
+		pre        = (op>>24)&1 != 0
+		psr        = (op>>22)&1 != 0
+		wb         = (op>>21)&1 != 0
+		load       = (op>>20)&1 != 0
+		forceUser  = psr && (c.Reg.CPSR.Mode != MODE_USR) && (!load || !pcIncluded)
+		wbValue    = r[rn]
+		// fiq switch has additional r8 - r12 use mode switch registers
+		forceFIQSwitch = forceUser && c.Reg.CPSR.Mode == MODE_FIQ
+	)
+
+	if up {
+		wbValue += regCount * 4
+	} else {
+		wbValue -= regCount * 4
+	}
+
+	rnRef := &c.Reg.R[rn]
+	switch {
+	case forceFIQSwitch:
+
+		switch {
+		case rn == 13:
+			rnRef = &c.Reg.SP[BANK_ID[MODE_USR]]
+		case rn == 14:
+			rnRef = &c.Reg.LR[BANK_ID[MODE_USR]]
+		case rn >= 8:
+			rnRef = &c.Reg.USR[rn-8]
+
+		}
+
+	case forceUser:
+		switch {
+		case rn == 13:
+			rnRef = &c.Reg.SP[BANK_ID[MODE_USR]]
+		case rn == 14:
+			rnRef = &c.Reg.LR[BANK_ID[MODE_USR]]
+		}
+	}
+
+	var (
+		rnv = *rnRef
+		reg = uint32(0)
+	)
+
+	if !up {
+		reg = 15
+	}
+
+	for range 16 {
+
+		if disabled := (rlist>>reg)&1 == 0; disabled {
+			if up {
+				reg++
+			} else {
+				reg--
+			}
+			continue
+		}
+
+		ref := &c.Reg.R[reg]
+		switch {
+		case forceFIQSwitch:
+			switch {
+			case reg == 13:
+				ref = &c.Reg.SP[BANK_ID[MODE_USR]]
+			case reg == 14:
+				ref = &c.Reg.LR[BANK_ID[MODE_USR]]
+			case reg >= 8:
+				ref = &c.Reg.USR[reg-8]
+			}
+
+		case forceUser:
+			switch {
+			case reg == 13:
+				ref = &c.Reg.SP[BANK_ID[MODE_USR]]
+			case reg == 14:
+				ref = &c.Reg.LR[BANK_ID[MODE_USR]]
+			}
+		}
+
+		if pre {
+			if up {
+				addr += 4
+			} else {
+				addr -= 4
+			}
+		}
+
+		if load {
+			*ref = c.mem.Read32(addr, true)
+		} else {
+			switch reg {
+			case rn:
+				c.mem.Write32(addr, rnv, true)
+			case PC:
+				c.mem.Write32(addr, *ref+12, true)
+			default:
+				c.mem.Write32(addr, *ref, true)
+			}
+		}
+
+		if !pre {
+			if up {
+				addr += 4
+			} else {
+				addr -= 4
+			}
+		}
+
+		if up {
+			reg++
+		} else {
+			reg--
+		}
+	}
+
+	if !load {
+		if wb {
+			r[rn] = wbValue
+		}
+
+		return
+	}
+
+	if wb {
+		if rnIncluded {
+			isLast := (rlist < (1 << (rn + 1)))
+			isOnly := regCount == 1
+			if !isLast || isOnly {
+				r[rn] = wbValue
+			}
+		} else {
+			r[rn] = wbValue
+		}
+	}
+
+	if pcIncluded {
+		panic("pcIncluded and load")
+	}
+}

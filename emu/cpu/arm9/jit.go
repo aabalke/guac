@@ -1,0 +1,269 @@
+package arm9
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/aabalke/gojit"
+	"github.com/aabalke/guac/config"
+
+	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
+)
+
+const (
+	ADDRESS_SPACE = 0x1_0000_0000
+	PAGE_SHIFT    = 16
+)
+
+var CpuPtr *Cpu
+
+type Jit struct {
+	*gojit.Assembler
+	Cpu *Cpu
+
+	BlockCache   *BlockCache
+	Pages        []*Page
+	Metrics      [ADDRESS_SPACE >> PAGE_SHIFT][]uint32
+	invalidPages []*Page
+
+	// used for testing individual instructions
+	testFunc func()
+
+	LoopThreshold uint32
+	PageShift     uint32
+	PageMask      uint32
+}
+
+type Page struct {
+	id     uint32
+	Blocks []*JitBlock
+	dead   bool
+}
+
+func NewJit(cpu *Cpu) *Jit {
+	const (
+		PAGE_SIZE  = 0x10000
+		PAGE_SHIFT = 16
+		PAGE_MASK  = (1 << PAGE_SHIFT) - 1
+	)
+
+	CpuPtr = cpu
+
+	if !cpu.jitEnabled {
+		j := &Jit{Cpu: cpu}
+		return j
+	}
+
+	return &Jit{
+		Cpu:   cpu,
+		Pages: make([]*Page, ADDRESS_SPACE>>PAGE_SHIFT),
+		BlockCache: InitBlockCache(
+			config.Conf.Nds.Jit.BlockCnt,
+			PAGE_SIZE,
+		),
+		LoopThreshold: config.Conf.Nds.Jit.LoopCnt,
+		PageShift:     PAGE_SHIFT,
+		PageMask:      PAGE_MASK,
+	}
+}
+
+func (j *Jit) Close() {
+	if j.BlockCache != nil {
+		j.BlockCache.Close()
+	}
+}
+
+func (j *Jit) InvalidatePage(addr uint32) {
+	if j.Pages == nil {
+		return
+	}
+
+	page := j.Pages[addr>>j.PageShift]
+	if page == nil || page.dead {
+		return
+	}
+
+	page.dead = true
+
+	j.Pages[addr>>j.PageShift] = nil
+	j.Metrics[addr>>j.PageShift] = make([]uint32, (1<<j.PageShift)>>1)
+	j.invalidPages = append(j.invalidPages, page)
+}
+
+func (j *Jit) DeletePages() {
+	if len(j.invalidPages) == 0 {
+		return
+	}
+
+	for _, page := range j.invalidPages {
+		for i := range page.Blocks {
+
+			block := page.Blocks[i]
+			if block == nil {
+				continue
+			}
+
+			page.Blocks[i] = nil
+
+			if block.Skip {
+				continue
+			}
+
+			j.BlockCache.InvalidateBlock(block)
+		}
+	}
+
+	j.invalidPages = j.invalidPages[:0]
+}
+
+//go:nosplit
+func Read(addr uint32) uint32 {
+	return CpuPtr.mem.Read8(addr, true)
+}
+
+//go:nosplit
+func Read16(addr uint32) uint32 {
+	return CpuPtr.mem.Read16(addr, true)
+}
+
+//go:nosplit
+func Read32(addr uint32) uint32 {
+	return CpuPtr.mem.Read32(addr, true)
+}
+
+//go:nosplit
+func Write(addr uint32, v uint8) {
+	CpuPtr.mem.Write8(addr, v, true)
+}
+
+//go:nosplit
+func Write16(addr uint32, v uint16) {
+	CpuPtr.mem.Write16(addr, v, true)
+}
+
+//go:nosplit
+func Write32(addr, v uint32) {
+	CpuPtr.mem.Write32(addr, v, true)
+}
+
+//go:nosplit
+func ReadCp15(op, cn, pn, cp, cm uint8) uint32 {
+	reg := cp15.CpRegister{
+		Op: op,
+		Cn: cn,
+		Pn: pn,
+		Cp: cp,
+		Cm: cm,
+	}
+	return CpuPtr.Cp15.Read(&reg)
+}
+
+//go:nosplit
+func WriteCp15(op, cn, pn, cp, cm uint8, v uint32) {
+	reg := cp15.CpRegister{
+		Op: op,
+		Cn: cn,
+		Pn: pn,
+		Cp: cp,
+		Cm: cm,
+	}
+	CpuPtr.Cp15.Write(&reg, &CpuPtr.LowVector, v)
+}
+
+//go:nosplit
+func GetSpsr(mode uint32) uint32 {
+	return CpuPtr.Reg.SPSR[BANK_ID[mode]].Get()
+}
+
+func (j *Jit) UpdateMetrics(pc uint32, thumb bool) {
+	pageIdx := pc >> j.PageShift
+	blockIdx := (pc & j.PageMask) >> 1 // aligned to word for thumb
+
+	if metrics := j.Metrics[pageIdx]; metrics == nil {
+		j.Metrics[pageIdx] = make([]uint32, (1<<j.PageShift)>>1)
+	}
+
+	j.Metrics[pageIdx][blockIdx]++
+	if j.Metrics[pageIdx][blockIdx] <= j.LoopThreshold {
+		return
+	}
+
+	j.CreateBlock(pc, thumb)
+}
+
+var (
+	cnt      uint32
+	sav, sta Reg
+)
+
+func (j *Jit) StartTest(op uint32, compare bool, f func(op uint32)) {
+	if config.Conf.Nds.Jit.Enabled {
+		panic("Jit Instruction Test is running with Jit Running")
+	}
+
+	if !compare {
+		return
+	}
+
+	cnt++
+
+	fmt.Printf("starting test cnt %08d, op %08X\n", cnt, op)
+
+	cpu := j.Cpu
+	sta = cpu.Reg
+
+	cpu.Jit.TestInst(op, f)
+
+	sav = cpu.Reg
+
+	cpu.Reg = sta
+}
+
+func (j *Jit) EndTest(op uint32, compare bool) {
+	if !compare {
+		return
+	}
+
+	cpu := j.Cpu
+
+	//sav.R[15] += 4
+
+	// do not (Reg) == (Reg), sta = cpu.Reg does not promise padding
+	if match := (cpu.Reg.R == sav.R &&
+		cpu.Reg.CPSR == sav.CPSR &&
+		cpu.Reg.SPSR == sav.SPSR &&
+		cpu.Reg.FIQ == sav.FIQ &&
+		cpu.Reg.LR == sav.LR &&
+		cpu.Reg.SP == sav.SP &&
+		cpu.Reg.USR == sav.USR); match {
+		return // match
+	}
+
+	fmt.Printf("STA REG %08X CPSR %08X\n", sta.R, sta.CPSR.Get())
+	fmt.Printf("JIT REG %08X CPSR %08X\n", sav.R, sav.CPSR.Get())
+	fmt.Printf("COR REG %08X CPSR %08X\n", cpu.Reg.R, cpu.Reg.CPSR.Get())
+
+	fmt.Printf("STA USRREG %08X\n", sta.USR)
+	fmt.Printf("JIT USRREG %08X\n", sav.USR)
+	fmt.Printf("COR USRREG %08X\n", cpu.Reg.USR)
+
+	fmt.Printf("STA LR %08X\n", sta.LR)
+	fmt.Printf("JIT LR %08X\n", sav.LR)
+	fmt.Printf("COR LR %08X\n", cpu.Reg.LR)
+
+	fmt.Printf("STA SP %08X\n", sta.SP)
+	fmt.Printf("JIT SP %08X\n", sav.SP)
+	fmt.Printf("COR SP %08X\n", cpu.Reg.SP)
+
+	fmt.Printf("STA FIQ %08X\n", sta.FIQ)
+	fmt.Printf("JIT FIQ %08X\n", sav.FIQ)
+	fmt.Printf("COR FIQ %08X\n", cpu.Reg.FIQ)
+	//fmt.Printf("JIT %+v\n", sav)
+	//fmt.Printf("COR %+v\n", cpu.Reg)
+
+	os.Exit(0)
+}
+
+//compare := true
+//cpu.Jit.StartTest(op, compare, cpu.Jit.emitClz)
+//defer cpu.Jit.EndTest(op, compare)

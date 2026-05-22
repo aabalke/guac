@@ -2,10 +2,9 @@
 package arm9
 
 import (
+	"math"
 	"math/bits"
 	"unsafe"
-
-	"math"
 
 	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
 )
@@ -37,7 +36,6 @@ const (
 )
 
 func (cpu *Cpu) Alu(op uint32) {
-
 	var (
 		r     = &cpu.Reg.R
 		cpsr  = &cpu.Reg.CPSR
@@ -57,7 +55,7 @@ func (cpu *Cpu) Alu(op uint32) {
 
 		if setCarry := ro != 0 && (op>>20)&1 != 0; setCarry {
 			// I believe this matches
-			//carry := (nn >> (ro-1)) & 1 != 0 // this line must be before op
+			// carry := (nn >> (ro-1)) & 1 != 0 // this line must be before op
 			cpsr.C = (op2>>31)&1 != 0
 		}
 
@@ -258,7 +256,6 @@ func (cpu *Cpu) Alu(op uint32) {
 }
 
 func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
-
 	var (
 		r = &cpu.Reg.R
 
@@ -398,7 +395,6 @@ func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
 }
 
 func (cpu *Cpu) psrSwitch() {
-
 	var (
 		reg  = &cpu.Reg
 		r    = &cpu.Reg.R
@@ -463,7 +459,6 @@ const (
 )
 
 func (cpu *Cpu) Mul(op uint32) {
-
 	var (
 		inst = (op >> 21) & 0xF
 		set  = (op>>20)&1 != 0
@@ -490,7 +485,7 @@ func (cpu *Cpu) Mul(op uint32) {
 			cpsr.N = (res>>31)&1 != 0
 			cpsr.Z = res == 0
 			// FLAG_C "destroyed" ARM <5, ignored ARM >=5
-			//cpsr.C = false
+			// cpsr.C = false
 		}
 
 		r[PC] += 4
@@ -564,8 +559,6 @@ func (cpu *Cpu) Mul(op uint32) {
 			cpsr.Q = true
 		}
 
-		println("correct output", uint32(res))
-
 	case SMLAWySMLALWy:
 
 		rsV := int64(int16((r[rs] >> (16 * y) & 0xFFFF)))
@@ -613,7 +606,6 @@ const (
 )
 
 func (c *Cpu) Sdt(op uint32) {
-
 	if pld := op&
 		0b1111_1101_0111_0000_1111_0000_0000_0000 ==
 		0b1111_0101_0101_0000_1111_0000_0000_0000; pld {
@@ -775,7 +767,6 @@ const (
 )
 
 func (cpu *Cpu) BX(op uint32) {
-
 	var (
 		r    = &cpu.Reg.R
 		inst = (op >> 4) & 0xF
@@ -823,7 +814,6 @@ const (
 )
 
 func (c *Cpu) Half(op uint32) {
-
 	var (
 		r       = &c.Reg.R
 		rn      = (op >> 16) & 0xF
@@ -922,10 +912,10 @@ func (c *Cpu) Half(op uint32) {
 }
 
 func (cpu *Cpu) Psr(op uint32) {
-
 	r := &cpu.Reg.R
 
 	if msr := (op>>21)&1 != 0; msr {
+
 		cpu.msr(op)
 		r[PC] += 4
 		return
@@ -956,7 +946,6 @@ const (
 )
 
 func (cpu *Cpu) msr(op uint32) {
-
 	r := &cpu.Reg.R
 
 	spsrFlag := (op>>22)&1 != 0
@@ -1061,7 +1050,6 @@ func (cpu *Cpu) msr(op uint32) {
 }
 
 func (cpu *Cpu) Swp(op uint32) {
-
 	var (
 		r      = &cpu.Reg.R
 		isByte = (op>>22)&1 != 0
@@ -1093,7 +1081,6 @@ const (
 )
 
 func (cpu *Cpu) Qalu(op uint32) {
-
 	var (
 		r    = &cpu.Reg.R
 		inst = (op >> 20) & 0xF
@@ -1139,7 +1126,6 @@ func (cpu *Cpu) Qalu(op uint32) {
 }
 
 func (cpu *Cpu) Clz(op uint32) {
-
 	r := &cpu.Reg.R
 	rm := op & 0xF
 
@@ -1150,7 +1136,6 @@ func (cpu *Cpu) Clz(op uint32) {
 }
 
 func (cpu *Cpu) CoDataReg(op uint32) {
-
 	var (
 		reg = cp15.CpRegister{
 			Op: uint8((op >> 21) & 0x7),
@@ -1194,7 +1179,6 @@ func (cpu *Cpu) CoDataReg(op uint32) {
 }
 
 func (c *Cpu) Block(op uint32) {
-
 	var (
 		r        = &c.Reg.R
 		rlist    = op & 0xFFFF
@@ -1327,15 +1311,12 @@ func (c *Cpu) Block(op uint32) {
 		}
 
 		if load {
-
 			if p == nil {
 				*ref = c.mem.Read32(addr, true)
 			} else {
 				*ref = *(*uint32)(p)
 			}
-
 		} else {
-
 			if p == nil {
 				switch reg {
 				case rn:

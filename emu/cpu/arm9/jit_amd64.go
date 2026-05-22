@@ -2,23 +2,15 @@
 package arm9
 
 import (
-	"fmt"
 	"unsafe"
 
 	"github.com/aabalke/gojit"
 	"github.com/aabalke/guac/config"
 
-	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
 	sys_cpu "golang.org/x/sys/cpu"
 )
 
-const (
-	ADDRESS_SPACE = 0x1_0000_0000
-	PAGE_SHIFT    = 16
-)
-
 var (
-	CpuPointer  *Cpu
 	CPU         = gojit.R9
 	REG         = int32(unsafe.Offsetof(Cpu{}.Reg))
 	R           = REG + int32(unsafe.Offsetof(Reg{}.R))
@@ -36,62 +28,6 @@ var (
 	F    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.F)), Bits: 8}
 	T    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.T)), Bits: 8}
 )
-
-type Jit struct {
-	*gojit.Assembler
-	Cpu *Cpu
-
-	BlockCache   *BlockCache
-	Pages        []*Page
-	Metrics      [ADDRESS_SPACE >> PAGE_SHIFT][]uint32
-	invalidPages []*Page
-
-	// used for testing individual instructions
-	testFunc func()
-
-	LoopThreshold uint32
-	PageShift     uint32
-	PageMask      uint32
-}
-
-type Page struct {
-	id     uint32
-	Blocks []*JitBlock
-	dead   bool
-}
-
-func NewJit(cpu *Cpu) *Jit {
-
-	const (
-		PAGE_SIZE  = 0x10000
-		PAGE_SHIFT = 16
-		PAGE_MASK  = (1 << PAGE_SHIFT) - 1
-	)
-
-	CpuPointer = cpu
-
-	if !cpu.jitEnabled {
-		j := &Jit{Cpu: cpu}
-		return j
-	}
-
-	return &Jit{
-		Cpu:   cpu,
-		Pages: make([]*Page, ADDRESS_SPACE>>PAGE_SHIFT),
-		BlockCache: InitBlockCache(
-			config.Conf.Nds.Jit.BlockCnt,
-			PAGE_SIZE),
-		LoopThreshold: config.Conf.Nds.Jit.LoopCnt,
-		PageShift:     PAGE_SHIFT,
-		PageMask:      PAGE_MASK,
-	}
-}
-
-func (j *Jit) Close() {
-	if j.BlockCache != nil {
-		j.BlockCache.Close()
-	}
-}
 
 func (j *Jit) UserBankReg(reg uint32) gojit.Indirect {
 
@@ -148,58 +84,6 @@ func (j *Jit) SCRATCH(i uint32) gojit.Indirect {
 	}
 }
 
-// gets spsr value, using mode and CPU
-//go:nosplit
-func GetSpsr(mode uint32) uint32 {
-	return CpuPointer.Reg.SPSR[BANK_ID[mode]].Get()
-}
-
-func (j *Jit) InvalidatePage(addr uint32) {
-
-	if j.Pages == nil {
-		return
-	}
-
-	page := j.Pages[addr>>j.PageShift]
-	if page == nil || page.dead {
-		return
-	}
-
-	page.dead = true
-
-	j.Pages[addr>>j.PageShift] = nil
-	j.Metrics[addr>>j.PageShift] = make([]uint32, (1<<j.PageShift)>>1)
-	j.invalidPages = append(j.invalidPages, page)
-}
-
-func (j *Jit) DeletePages() {
-
-	if len(j.invalidPages) == 0 {
-		return
-	}
-
-	for _, page := range j.invalidPages {
-
-		for i := range page.Blocks {
-
-			block := page.Blocks[i]
-			if block == nil {
-				continue
-			}
-
-			page.Blocks[i] = nil
-
-			if block.Skip {
-				continue
-			}
-
-			j.BlockCache.InvalidateBlock(block)
-		}
-	}
-
-	j.invalidPages = j.invalidPages[:0]
-}
-
 func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 
 	pageIdx := pc >> j.PageShift
@@ -231,7 +115,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 
 	j.Assembler = newBlock.assembler
 
-	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
+	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPtr))), CPU)
 
 	tempPc := pc
 	var length, op, i uint32
@@ -469,7 +353,6 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 
 	switch {
 	case isBkpt(op):
-
 	case isB(op):
 	case isBX(op):
 	case isSDT(op):
@@ -651,7 +534,7 @@ func (j *Jit) TestInst(op uint32, f func(op uint32)) {
 
 	j.Assembler = asm
 
-	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
+	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPtr))), CPU)
 
 	f(op)
 
@@ -667,119 +550,8 @@ func (j *Jit) TestInst(op uint32, f func(op uint32)) {
 	asm.Release()
 }
 
-//go:nosplit
-func Read(addr uint32) uint32 {
-	return CpuPointer.mem.Read8(addr, true)
-}
-
-//go:nosplit
-func Read16(addr uint32) uint32 {
-	return CpuPointer.mem.Read16(addr, true)
-}
-
-//go:nosplit
-func Read32(addr uint32) uint32 {
-	return CpuPointer.mem.Read32(addr, true)
-}
-
-//go:nosplit
-func Write(addr uint32, v uint8) {
-	CpuPointer.mem.Write8(addr, v, true)
-}
-
-//go:nosplit
-func Write16(addr uint32, v uint16) {
-	CpuPointer.mem.Write16(addr, v, true)
-}
-
-//go:nosplit
-func Write32(addr, v uint32) {
-	CpuPointer.mem.Write32(addr, v, true)
-}
-
-//go:nosplit
-func ReadCp15(op, cn, pn, cp, cm uint8) uint32 {
-	reg := cp15.CpRegister{
-		Op: op,
-		Cn: cn,
-		Pn: pn,
-		Cp: cp,
-		Cm: cm,
-	}
-	return CpuPointer.Cp15.Read(&reg)
-}
-
-//go:nosplit
-func WriteCp15(op, cn, pn, cp, cm uint8, v uint32) {
-	reg := cp15.CpRegister{
-		Op: op,
-		Cn: cn,
-		Pn: pn,
-		Cp: cp,
-		Cm: cm,
-	}
-	CpuPointer.Cp15.Write(&reg, &CpuPointer.LowVector, v)
-}
-
 func (j *Jit) CallFunc(f any) {
-	//j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
+	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPtr))), CPU)
 	j.InternalCallFunc(f)
-	//j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
-}
-
-func (j *Jit) UpdateMetrics(pc uint32, thumb bool) {
-
-	pageIdx := pc >> j.PageShift
-	blockIdx := (pc & j.PageMask) >> 1 // aligned to word for thumb
-
-	if metrics := j.Metrics[pageIdx]; metrics == nil {
-		j.Metrics[pageIdx] = make([]uint32, (1<<j.PageShift)>>1)
-	}
-
-	j.Metrics[pageIdx][blockIdx]++
-	if j.Metrics[pageIdx][blockIdx] <= j.LoopThreshold {
-		return
-	}
-
-	j.CreateBlock(pc, thumb)
-}
-
-var (
-	rpc uint32
-	sav Reg
-	sta Reg
-)
-
-func (j *Jit) StartTest(op uint32, compare bool, f func(op uint32)) {
-
-	if config.Conf.Nds.Jit.Enabled {
-		panic("Jit Instruction Test is running with Jit Running")
-	}
-
-	if !compare {
-		return
-	}
-
-	cpu := j.Cpu
-	rpc = cpu.Reg.R[15]
-	sta = cpu.Reg
-
-	cpu.Jit.TestInst(op, f)
-
-	sav = cpu.Reg
-
-	cpu.Reg = sta
-}
-
-func (j *Jit) EndTest(op uint32, compare bool) {
-
-	cpu := j.Cpu
-	if !(compare && cpu.Reg != sav) {
-		return
-	}
-
-	fmt.Printf("STA REG %08X CPSR %08X\n", sta.R, sta.CPSR.Get())
-	fmt.Printf("JIT REG %08X CPSR %08X\n", sav.R, sav.CPSR.Get())
-	fmt.Printf("COR REG %08X CPSR %08X\n", cpu.Reg.R, cpu.Reg.CPSR.Get())
-	panic(fmt.Sprintf("Bad Compare %08X %08X", rpc, op))
+	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPtr))), CPU)
 }
