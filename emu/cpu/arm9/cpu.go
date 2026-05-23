@@ -52,6 +52,7 @@ const (
 )
 
 func (cpu *Cpu) CheckCond(cond uint32) bool {
+
 	cpsr := &cpu.Reg.CPSR
 
 	switch cond {
@@ -101,6 +102,7 @@ var BANK_ID = map[uint32]uint32{
 }
 
 func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq, cp15 *cp15.Cp15) *Cpu {
+
 	c := &Cpu{
 		mem:        m,
 		Irq:        irq,
@@ -141,6 +143,7 @@ type Cond struct {
 
 //go:nosplit
 func (c *Cond) Get() uint32 {
+
 	v := c.Mode
 
 	if c.N {
@@ -184,6 +187,7 @@ func (c *Cond) Set(v uint32) {
 }
 
 func (cpu *Cpu) toggleThumb() {
+
 	r := &cpu.Reg.R
 	cpsr := &cpu.Reg.CPSR
 
@@ -198,6 +202,7 @@ func (cpu *Cpu) toggleThumb() {
 }
 
 func (cpu *Cpu) CheckIrq() {
+
 	if interrupts := cpu.Irq.IE&cpu.Irq.IF != 0; !interrupts {
 		return
 	}
@@ -238,6 +243,7 @@ func (cpu *Cpu) jitFunction(pc uint32, thumb bool) (uint32, int, bool) {
 }
 
 func (cpu *Cpu) GetOpArm() (uint32, int) {
+
 	r := &cpu.Reg.R
 
 	if cpu.isBranching {
@@ -276,18 +282,19 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 }
 
 func (cpu *Cpu) GetOpThumb() (uint16, int) {
+
 	r := &cpu.Reg.R
 
 	if cpu.isBranching {
 		cpu.isBranching = false
 		cpu.PcOff = 0
-		// if cpu.jitEnabled {
-		//	pc := r[PC]
-		//	if finalOp, length, ok := cpu.jitFunction(pc, true); ok {
-		//		return uint16(finalOp), length
-		//	}
+		//if cpu.jitEnabled {
+		//    pc := r[PC]
+		//    if finalOp, length, ok := cpu.jitFunction(pc, true); ok {
+		//        return uint16(finalOp), length
+		//    }
 
-		//	cpu.Jit.UpdateMetrics(pc, true)
+		//    cpu.Jit.UpdateMetrics(pc, true)
 		//}
 		if r[PC] != cpu.BranchPc {
 			cpu.PcPtr = nil
@@ -318,6 +325,7 @@ var (
 )
 
 func (c *Cpu) TestStart(op uint32, f func(op uint32), compare bool) {
+
 	if !compare {
 		return
 	}
@@ -333,6 +341,7 @@ func (c *Cpu) TestStart(op uint32, f func(op uint32), compare bool) {
 }
 
 func (c *Cpu) EndTest(op uint32, compare bool) {
+
 	if !(compare && c.Reg != t_sav) {
 		return
 	}
@@ -344,6 +353,7 @@ func (c *Cpu) EndTest(op uint32, compare bool) {
 }
 
 func DecodeTHUMBBranch(op uint16) bool {
+
 	switch {
 	case isthumbSWI(op):
 		return false
