@@ -71,9 +71,11 @@ func (j *Jit) StrUserReg(reg gojit.Reg, emuReg uint32) {
 
 func (j *Jit) LdrReg(reg gojit.Reg, emuReg uint32) {
 	j.LdrImm(reg, CPU, j.RegOffset(emuReg, IMM_WORD), gojit.SIZE_WORD, false, true)
+	j.LdrImm(reg, CPU, j.RegOffset(emuReg, IMM_WORD), gojit.SIZE_WORD, false, true)
 }
 
 func (j *Jit) StrReg(reg gojit.Reg, emuReg uint32) {
+	j.StrImm(reg, CPU, j.RegOffset(emuReg, IMM_WORD), gojit.SIZE_WORD, false, true)
 	j.StrImm(reg, CPU, j.RegOffset(emuReg, IMM_WORD), gojit.SIZE_WORD, false, true)
 }
 
@@ -83,6 +85,30 @@ func (j *Jit) LdrFlag(reg gojit.Reg, emuFlag uint32) {
 
 func (j *Jit) StrFlag(reg gojit.Reg, emuFlag uint32) {
 	j.StrImm(reg, CPU, emuFlag, gojit.SIZE_BYTE, false, true)
+}
+
+func (j *Jit) TestInstThumb(op uint16, f func(op uint16)) {
+	asm, err := gojit.New(gojit.PageSize)
+	if err != nil {
+		panic(err)
+	}
+
+	j.Assembler = asm
+
+	j.Mov64(CPU, uint64(uintptr(unsafe.Pointer(CpuPtr))))
+
+	f(op)
+
+	// pc += 4
+	j.LdrReg(gojit.R00, PC)
+	j.ADDImm(gojit.R00, gojit.R00, 2, false, false, false)
+	j.StrReg(gojit.R00, PC)
+
+	asm.Exit()
+
+	gojit.CallJit(uintptr(unsafe.Pointer(&asm.Buf[0])))
+
+	asm.Release()
 }
 
 func (j *Jit) TestInst(op uint32, f func(op uint32)) {
@@ -158,49 +184,47 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 	}
 
 	if thumb {
-		//for {
-		//    op = uint32(*(*uint16)(unsafe.Add(p, i*2)))
-		//    //    if length >= config.Conf.Nds.Jit.BatchInstA7 {
-		//
-		//        break
-		//    }
+		for {
+			op = uint32(*(*uint16)(unsafe.Add(p, i*2)))
+			if length >= config.Conf.Nds.Jit.BatchInstA7 {
 
-		//    if isThumbB(uint16(op)) {
+				break
+			}
 
-		//        if immLoop := op == 0xE7FE; immLoop {
-		//            j.Cpu.Halted = true
-		//            j.BlockCache.PushTail(newBlock)
-		//            page.Blocks[blockIdx] = j.BlockCache.SkipBlock
-		//            return
-		//        }
+			if isThumbB(uint16(op)) {
 
-		//        const shift = 32 - 11 // int32 - offset size
-		//        nn := (int32(op<<shift) >> shift) << 1
-		//        tempPc = uint32(int32(tempPc) + 4 + nn)
-		//        //j.Movl(gojit.Imm(tempPc), j.REG(PC))
-		//        panic("unsetup branch arm jit thumb")
+				if immLoop := op == 0xE7FE; immLoop {
+					j.Cpu.Halted = true
+					j.BlockCache.PushTail(newBlock)
+					page.Blocks[blockIdx] = j.BlockCache.SkipBlock
+					return
+				}
 
-		//        i = 0
+				const shift = 32 - 11 // int32 - offset size
+				nn := (int32(op<<shift) >> shift) << 1
+				tempPc = uint32(int32(tempPc) + 4 + nn)
+				j.Mov32(gojit.R00, tempPc)
+				j.StrReg(gojit.R00, PC)
 
-		//        p, ok = j.Cpu.mem.ReadPtr(tempPc, false)
-		//        if !ok {
-		//            j.BlockCache.PushTail(newBlock)
-		//            page.Blocks[blockIdx] = j.BlockCache.SkipBlock
-		//            return
-		//        }
-		//        continue
-		//    }
+				i = 0
 
-		//    if ok := j.emitOpThumb(uint16(op)); !ok {
-		//        break
-		//    }
+				p, ok = j.Cpu.mem.ReadPtr(tempPc, true)
+				if !ok {
+					j.BlockCache.PushTail(newBlock)
+					page.Blocks[blockIdx] = j.BlockCache.SkipBlock
+					return
+				}
+				continue
+			}
 
-		//    i++
-		//    length++
-		//    tempPc += 2
-		//}
+			if ok := j.emitOpThumb(uint16(op)); !ok {
+				break
+			}
 
-		panic("arm jit thumb")
+			i++
+			length++
+			tempPc += 2
+		}
 	} else {
 		for {
 			op = *(*uint32)(unsafe.Add(p, i*4))
@@ -291,16 +315,17 @@ func (j *Jit) emitOp(op uint32) bool {
 	return ok
 }
 
-//func (j *Jit) emitOpThumb(op uint16) bool {
-//
-//	ok := j.DecodeTHUMB(op)
-//
-//	if ok {
-//		j.Add(gojit.Imm(2), j.REG(PC))
-//	}
-//
-//	return ok
-//}
+func (j *Jit) emitOpThumb(op uint16) bool {
+	ok := j.DecodeTHUMB(op)
+
+	if ok {
+		j.LdrReg(gojit.R00, PC)
+		j.ADDImm(gojit.R00, gojit.R00, 2, false, false, false)
+		j.StrReg(gojit.R00, PC)
+	}
+
+	return ok
+}
 
 //go:inline
 func (j *Jit) emitCond(op uint32) []func() {
@@ -476,6 +501,94 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 
 		return true
 
+	}
+
+	return false
+}
+func (j *Jit) DecodeTHUMB(op uint16) bool {
+
+	switch {
+	case isthumbSWI(op):
+		return false
+	case isThumbAddSub(op):
+		j.emitThumbAddSub(op)
+		return true
+	case isThumbShift(op):
+		j.emitThumbShifted(op)
+		return true
+	case isThumbImm(op):
+		j.emitThumbImm(op)
+		return true
+	case isThumbAlu(op):
+		j.emitThumbAlu(op)
+		return true
+	case isThumbHiReg(op):
+
+		var (
+			inst = (op >> 8) & 0b11
+			mSBd = (op>>7)&1 != 0
+			rd   = op & 0x7
+		)
+
+		if inst != 3 && mSBd {
+			rd |= 0b1000
+		}
+
+		if inst == 3 || rd == PC {
+			return false
+		}
+
+		j.emitThumbHiRegBX(op)
+		return true
+	case isLSHalf(op):
+		j.emitThumbLSHalf(op)
+		return true
+	case isThumbSdt(op):
+		j.emitThumbSdt(op)
+		return true
+	case isLPC(op):
+		j.emitThumbLPC(op)
+		return true
+	case isLSImm(op):
+		j.emitThumbLSImm(op)
+		return true
+	case isPushPop(op):
+		pclr := (op>>8)&1 != 0
+		pop := (op>>11)&1 != 0
+		if pop && pclr {
+			return false
+		}
+
+		j.emitThumbPushPop(op)
+		return true
+	case isRelative(op):
+		j.emitThumbRelative(op)
+		return true
+	case isThumbB(op):
+		return false
+	case isJumpCall(op):
+		return false
+	case isStack(op):
+		j.emitThumbStack(op)
+		return true
+	case isLongBranch(op):
+		return false
+	case isShortLongBranch(op):
+		return false
+	case isLSSP(op):
+		j.emitThumbLSSP(op)
+		return true
+	case isMulti(op):
+
+		ldmia := (op>>11)&1 != 0
+		rlist := op & 0xFF
+
+		if ldmia && rlist == 0 {
+			return false
+		}
+
+		j.emitThumbBlock(op)
+		return true
 	}
 
 	return false

@@ -61,6 +61,7 @@ func generate(exportPath string, cfg CpuConfig) {
 		"thumb",
 		"thumb_decoder",
 		"thumb_amd64",
+		"thumb_arm64",
 	} {
 		generateFile(
 			buildImportPath(v),

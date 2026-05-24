@@ -171,7 +171,29 @@ var (
 	sav, sta Reg
 )
 
-func (j *Jit) StartTest(op uint32, compare bool, f func(op uint32)) {
+func (j *Jit) StartTestThumb(op uint16, compare bool, f func(op uint16)) {
+	if config.Conf.Nds.Jit.Enabled {
+		panic("Jit Instruction Test is running with Jit Running")
+	}
+
+	if !compare {
+		return
+	}
+
+	cnt++
+
+	fmt.Printf("starting test cnt %08d, op %08X\n", cnt, op)
+
+	cpu := j.Cpu
+	sta = cpu.Reg
+	cpu.Jit.TestInstThumb(op, f)
+
+	sav = cpu.Reg
+
+	cpu.Reg = sta
+}
+
+func (j *Jit) StartTest(op uint32, compare bool, f func(op uint32), thumb bool) {
 	if config.Conf.Nds.Jit.Enabled {
 		panic("Jit Instruction Test is running with Jit Running")
 	}

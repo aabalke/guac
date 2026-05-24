@@ -283,14 +283,14 @@ func (cpu *Cpu) GetOpThumb() (uint16, int) {
 	if cpu.isBranching {
 		cpu.isBranching = false
 		cpu.PcOff = 0
-		//if cpu.jitEnabled {
-		//    pc := r[PC]
-		//    if finalOp, length, ok := cpu.jitFunction(pc, true); ok {
-		//        return uint16(finalOp), length
-		//    }
+		if cpu.jitEnabled {
+			pc := r[PC]
+			if finalOp, length, ok := cpu.jitFunction(pc, true); ok {
+				return uint16(finalOp), length
+			}
 
-		//    cpu.Jit.UpdateMetrics(pc, true)
-		//}
+			cpu.Jit.UpdateMetrics(pc, true)
+		}
 		if r[PC] != cpu.BranchPc {
 			cpu.PcPtr = nil
 		}
