@@ -71,11 +71,9 @@ func (j *Jit) StrUserReg(reg gojit.Reg, emuReg uint32) {
 
 func (j *Jit) LdrReg(reg gojit.Reg, emuReg uint32) {
 	j.LdrImm(reg, CPU, j.RegOffset(emuReg, IMM_WORD), gojit.SIZE_WORD, false, true)
-	j.LdrImm(reg, CPU, j.RegOffset(emuReg, IMM_WORD), gojit.SIZE_WORD, false, true)
 }
 
 func (j *Jit) StrReg(reg gojit.Reg, emuReg uint32) {
-	j.StrImm(reg, CPU, j.RegOffset(emuReg, IMM_WORD), gojit.SIZE_WORD, false, true)
 	j.StrImm(reg, CPU, j.RegOffset(emuReg, IMM_WORD), gojit.SIZE_WORD, false, true)
 }
 
