@@ -27,8 +27,8 @@ type Memory struct {
 	writeRegions [0x100]func(m *Memory, addr uint32, v uint8, byteWrite bool)
 }
 
-func NewMemory(gba *GBA) Memory {
-	m := Memory{GBA: gba}
+func NewMemory(gba *GBA) *Memory {
+	m := &Memory{GBA: gba}
 
 	m.initReadRegions()
 	m.initWriteRegions()
@@ -44,7 +44,6 @@ func NewMemory(gba *GBA) Memory {
 }
 
 func (m *Memory) InitSaveLoop() {
-
 	saveTicker := time.Tick(time.Second)
 
 	go func() {
@@ -63,7 +62,6 @@ func (m *Memory) InitSaveLoop() {
 }
 
 func (m *Memory) initWriteRegions() {
-
 	for i := range len(m.writeRegions) {
 		m.writeRegions[i] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
 		}
@@ -84,8 +82,7 @@ func (m *Memory) initWriteRegions() {
 	}
 
 	m.writeRegions[0x5] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
-
-		relative := addr & (0x3FF)
+		relative := addr & 0x3FF
 
 		if relative&1 == 1 {
 			m.PRAM[relative>>1] &= 0xFF
@@ -136,37 +133,33 @@ func (m *Memory) initWriteRegions() {
 		if byteWrite {
 			return
 		}
-		rel := addr & (0x3FF)
+		rel := addr & 0x3FF
 		m.OAM[rel] = v
 		m.GBA.PPU.UpdateOAM(rel)
 	}
 
 	m.writeRegions[0xE] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
-
 		m.GBA.Save = true
 
-		cartridge := &m.GBA.Cartridge
-		relative := addr & (0xFFFF)
+		cartridge := m.GBA.Cartridge
+		relative := addr & 0xFFFF
 
 		cartridge.Write(relative, v)
 	}
 
 	m.writeRegions[0xF] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
-
 		m.GBA.Save = true
 
-		cartridge := &m.GBA.Cartridge
-		relative := addr & (0xFFFF)
+		cartridge := m.GBA.Cartridge
+		relative := addr & 0xFFFF
 
 		cartridge.Write(relative, v)
 	}
 }
 
 func (m *Memory) initReadRegions() {
-
 	for i := range len(m.readRegions) {
 		m.readRegions[i] = func(m *Memory, addr uint32) uint8 {
-
 			if m.GBA.Cpu.Reg.R[PC] < 0x4000 {
 				return 0
 			}
@@ -175,7 +168,6 @@ func (m *Memory) initReadRegions() {
 	}
 
 	m.readRegions[0x0] = func(m *Memory, addr uint32) uint8 {
-
 		if addr < 0x4000 {
 			if m.GBA.Cpu.Reg.R[PC] >= 0x4000 {
 				return m.ReadBios(addr)
@@ -202,7 +194,6 @@ func (m *Memory) initReadRegions() {
 	}
 
 	m.readRegions[0x5] = func(m *Memory, addr uint32) uint8 {
-
 		if addr&1 == 1 {
 			return uint8(m.PRAM[addr&0x3FF>>1] >> 8)
 		}
@@ -238,29 +229,33 @@ func (m *Memory) initReadRegions() {
 }
 
 func (m *Memory) ReadPtr(addr uint32, _ bool) (unsafe.Pointer, bool) {
-
 	switch regions := addr >> 24; regions {
 	case 0x2:
 		return unsafe.Add(
-			unsafe.Pointer(&m.WRAM1), addr&0x3FFFF), true
+			unsafe.Pointer(&m.WRAM1), addr&0x3FFFF,
+		), true
 	case 0x3:
 		return unsafe.Add(
-			unsafe.Pointer(&m.WRAM2), addr&0x7FFF), true
+			unsafe.Pointer(&m.WRAM2), addr&0x7FFF,
+		), true
 	case 0x6:
 		addr &= 0x1FFFF
 		if addr >= 0x18000 {
 			addr -= 0x8000
 		}
 		return unsafe.Add(
-			unsafe.Pointer(&m.VRAM), addr), true
+			unsafe.Pointer(&m.VRAM), addr,
+		), true
 
 	case 0x7:
 		return unsafe.Add(
-			unsafe.Pointer(&m.OAM), addr&0x3FF), true
+			unsafe.Pointer(&m.OAM), addr&0x3FF,
+		), true
 
 	case 0x8, 0x9, 0xA, 0xB, 0xC, 0xD:
 		return unsafe.Add(
-			unsafe.Pointer(&m.GBA.Cartridge.Rom), addr&0x1FF_FFFF), true
+			unsafe.Pointer(&m.GBA.Cartridge.Rom), addr&0x1FF_FFFF,
+		), true
 	default:
 		return nil, false
 	}
@@ -271,9 +266,8 @@ func (m *Memory) Read(addr uint32) uint8 {
 }
 
 func (m *Memory) ReadBios(addr uint32) uint8 {
-
 	// temp handler
-	//nAddr, ok := BIOS_ADDR[m.BIOS_MODE]
+	// nAddr, ok := BIOS_ADDR[m.BIOS_MODE]
 	var nAddr uint32
 	ok := false
 	if !ok {
@@ -295,33 +289,31 @@ func (m *Memory) ReadBios(addr uint32) uint8 {
 }
 
 func (m *Memory) ReadOpenBus(addr uint32) uint8 {
-
 	pc := m.GBA.Cpu.Reg.R[PC]
 
 	if m.GBA.Cpu.Reg.CPSR.T {
-
-		//if m.GBA.Cpu.Reg.isThumb {
+		// if m.GBA.Cpu.Reg.isThumb {
 
 		// region based thumb openbus behavior has not been implimented
 
-		//For THUMB code in Main RAM, Palette Memory, VRAM, and Cartridge ROM this is:
-		//LSW = [$+4], MSW = [$+4]
+		// For THUMB code in Main RAM, Palette Memory, VRAM, and Cartridge ROM this is:
+		// LSW = [$+4], MSW = [$+4]
 
-		//For THUMB code in BIOS or OAM
-		//LSW = [$+4], MSW = [$+6]   ;for opcodes at 4-byte aligned locations
-		//LSW = [$+2], MSW = [$+4]   ;for opcodes at non-4-byte aligned locations
+		// For THUMB code in BIOS or OAM
+		// LSW = [$+4], MSW = [$+6]   ;for opcodes at 4-byte aligned locations
+		// LSW = [$+2], MSW = [$+4]   ;for opcodes at non-4-byte aligned locations
 
-		//For THUMB code in 32K-WRAM
-		//LSW = [$+4], MSW = OldHI   ;for opcodes at 4-byte aligned locations
-		//LSW = OldLO, MSW = [$+4]   ;for opcodes at non-4-byte aligned locations
-		//Whereas OldLO/OldHI are usually:
-		//OldLO=[$+2], OldHI=[$+2]
-		//Unless the previous opcode's prefetch was overwritten;
-		//that can happen if the previous opcode was itself an LDR opcode, ie.
-		//if it was itself reading data:
+		// For THUMB code in 32K-WRAM
+		// LSW = [$+4], MSW = OldHI   ;for opcodes at 4-byte aligned locations
+		// LSW = OldLO, MSW = [$+4]   ;for opcodes at non-4-byte aligned locations
+		// Whereas OldLO/OldHI are usually:
+		// OldLO=[$+2], OldHI=[$+2]
+		// Unless the previous opcode's prefetch was overwritten;
+		// that can happen if the previous opcode was itself an LDR opcode, ie.
+		// if it was itself reading data:
 
-		//OldLO=LSW(data), OldHI=MSW(data)
-		//Theoretically, this might also change if a DMA transfer occurs.
+		// OldLO=LSW(data), OldHI=MSW(data)
+		// Theoretically, this might also change if a DMA transfer occurs.
 
 		return uint8(m.Read32((pc&^1)+4, false) >> ((addr & 1) << 3))
 	}
@@ -330,7 +322,6 @@ func (m *Memory) ReadOpenBus(addr uint32) uint8 {
 }
 
 func (m *Memory) ReadIO(addr uint32) uint8 {
-
 	// this addr is relative. - 0x400000
 
 	switch {
@@ -497,7 +488,6 @@ func (m *Memory) Read8(addr uint32, _ bool) uint32 {
 // Accessing SRAM Area by 16bit/32bit
 // Reading retrieves 8bit value from specified address, multiplied by 0101h (LDRH) or by 01010101h (LDR). Writing changes the 8bit value at the specified address only, being set to LSB of (source_data ROR (address*8)).
 func (m *Memory) Read16(addr uint32, _ bool) uint32 {
-
 	switch {
 	case addr >= 0xE00_0000:
 
@@ -531,11 +521,10 @@ func (m *Memory) Read16(addr uint32, _ bool) uint32 {
 }
 
 func (m *Memory) Read32(addr uint32, _ bool) uint32 {
-
 	switch {
 	case addr >= 0xE00_0000:
 
-		//if m.GBA.Cpu.Reg.R[PC] < 0x4000 {
+		// if m.GBA.Cpu.Reg.R[PC] < 0x4000 {
 
 		//    return uint32(m.Read(addr &^ 3)) * 0x01010101
 		//}
@@ -557,7 +546,6 @@ func (m *Memory) Read32(addr uint32, _ bool) uint32 {
 }
 
 func (m *Memory) ReadBadRom(addr uint32, bytesRead uint8) uint32 {
-
 	switch bytesRead {
 	case 1:
 		v := ((addr >> 1) >> ((addr & 1) * 8)) & 0xFF
@@ -581,7 +569,6 @@ func (m *Memory) ReadBadRom(addr uint32, bytesRead uint8) uint32 {
 }
 
 func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
-
 	//if addr < 0x1000 {
 	//    fmt.Printf("WRITE TO BIOS AT PC %08X and CURR %d ADDR %08X V %02X\n", m.GBA.Cpu.Reg.R[PC], CURR_INST, addr, v)
 	//}
@@ -590,7 +577,6 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
 }
 
 func (m *Memory) WriteIO(addr uint32, v uint8) {
-
 	// this addr should be relative. - 0x400000
 	// do not make bg control addrs special, unless you know what the f you are doing
 	// VCOUNT is not writable, no touchy
@@ -631,13 +617,13 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 		m.IO[addr] = v &^ 0b1111_1110 // BG3VOFS mask
 
 	case 0x0048:
-		m.IO[addr] = v & 0x3F //winin
+		m.IO[addr] = v & 0x3F // winin
 	case 0x0049:
-		m.IO[addr] = v & 0x3F //winin
+		m.IO[addr] = v & 0x3F // winin
 	case 0x004A:
-		m.IO[addr] = v & 0x3F //winout
+		m.IO[addr] = v & 0x3F // winout
 	case 0x004B:
-		m.IO[addr] = v & 0x3F //winout
+		m.IO[addr] = v & 0x3F // winout
 
 	case 0x0050:
 		m.IO[addr] = v // bldcnt
@@ -838,7 +824,6 @@ func (m *Memory) Write8(addr uint32, v uint8, _ bool) {
 }
 
 func (m *Memory) Write16(addr uint32, v uint16, _ bool) {
-
 	switch {
 	case addr >= 0xE00_0000:
 		if addr&1 == 1 {
@@ -860,7 +845,6 @@ func (m *Memory) Write16(addr uint32, v uint16, _ bool) {
 }
 
 func (m *Memory) Write32(addr uint32, v uint32, _ bool) {
-
 	if sram := addr >= 0xE00_0000; sram {
 		is := (addr << 3) & 0x1F
 		v = bits.RotateLeft32(v, -int(is))
@@ -875,7 +859,6 @@ func (m *Memory) Write32(addr uint32, v uint32, _ bool) {
 }
 
 func CheckEeprom(gba *GBA, addr uint32) bool {
-
 	if gba.Cartridge.Id != 1 {
 		return false
 	}
@@ -892,7 +875,6 @@ func CheckEeprom(gba *GBA, addr uint32) bool {
 }
 
 func (m *Memory) ReadSoundIO(addr uint32) uint8 {
-
 	switch addr &^ 0b1 {
 	case 0x8C:
 		return m.ReadOpenBus(addr)
@@ -918,8 +900,8 @@ func (m *Memory) ReadSoundIO(addr uint32) uint8 {
 		return ReadSound(addr, m.GBA.Apu)
 	}
 }
-func (m *Memory) ReadIODirect(addr uint32, size uint32) uint32 {
 
+func (m *Memory) ReadIODirect(addr uint32, size uint32) uint32 {
 	switch size {
 	case 1:
 		return m.ReadIODirectByte(addr)
@@ -949,21 +931,23 @@ func (m *Memory) ReadIODirectByte(addr uint32) uint32 {
 }
 
 func (m *Memory) WritePtr(addr uint32, _ bool) (unsafe.Pointer, bool) {
-
 	switch regions := addr >> 24; regions {
 	case 0x2:
 		return unsafe.Add(
-			unsafe.Pointer(&m.WRAM1), addr&0x3FFFF), true
+			unsafe.Pointer(&m.WRAM1), addr&0x3FFFF,
+		), true
 	case 0x3:
 		return unsafe.Add(
-			unsafe.Pointer(&m.WRAM2), addr&0x7FFF), true
+			unsafe.Pointer(&m.WRAM2), addr&0x7FFF,
+		), true
 	case 0x6:
 		addr &= 0x1FFFF
 		if addr >= 0x18000 {
 			addr -= 0x8000
 		}
 		return unsafe.Add(
-			unsafe.Pointer(&m.VRAM), addr), true
+			unsafe.Pointer(&m.VRAM), addr,
+		), true
 
 	default:
 		return nil, false

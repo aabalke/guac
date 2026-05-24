@@ -29,10 +29,10 @@ var CURR_INST = uint64(0)
 
 type GBA struct {
 	Debugger  Debugger
-	Cartridge cart.Cartridge
+	Cartridge *cart.Cartridge
 	Cpu       *arm7.Cpu
-	Mem       Memory
-	PPU       PPU
+	Mem       *Memory
+	PPU       *PPU
 	Timers    [4]Timer
 	Dma       [4]DMA
 	Irq       cpu.Irq
@@ -135,16 +135,17 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 		Keypad:          Keypad{KEYINPUT: 0x3FF},
 		Apu:             apu.NewApu(ctx, CPU_FREQ_HZ, SND_FREQUENCY, SND_SAMPLES),
 		SoundCyclesMask: max(0x80, uint32(config.Conf.Gba.SoundClockUpdateCycles)),
+		PPU:             &PPU{},
 	}
+
+	gba.PPU.gba = &gba
 
 	gba.Debugger = Debugger{Gba: &gba, Version: 1}
 
 	gba.Irq = cpu.Irq{}
 	gba.Mem = NewMemory(&gba)
 	//gba.Cpu = arm7.NewCpu(config.Conf.Jit.Enabled, &gba.Mem, &gba.Irq)
-	gba.Cpu = arm7.NewCpu(false, &gba.Mem, &gba.Irq)
-
-	gba.PPU.gba = &gba
+	gba.Cpu = arm7.NewCpu(false, gba.Mem, &gba.Irq)
 
 	gba.Timers[0].Gba = &gba
 	gba.Timers[1].Gba = &gba
