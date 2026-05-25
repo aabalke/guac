@@ -365,7 +365,6 @@ func (j *Jit) emitThumbHiRegBX(op uint16) {
 		}
 
 		j.SUBReg(a.R00, a.R01, a.R00, 0, 0, true, false, false)
-		j.StrReg(a.R00, rd)
 
 		j.Cset(a.R00, a.V, false)
 		j.StrFlag(a.R00, V)
@@ -432,8 +431,12 @@ func (j *Jit) emitThumbShifted(op uint16) {
 	case LSR:
 
 		if is == 0 {
-			j.Movz(a.R00, 0, 0, false)
+			j.LsrImm(a.R00, a.R00, 31, false)
+			j.TstImm(a.R00, IMM_1, false)
+			j.Cset(a.R00, a.NZ, false)
 			j.StrFlag(a.R00, C)
+
+			j.Movz(a.R00, 0, 0, false)
 		} else {
 
 			j.MovReg(a.R01, a.R00, false)
@@ -537,11 +540,13 @@ func (j *Jit) emitThumbAlu(op uint16) {
 			j.LslImm(a.R08, a.R08, 29, false)
 			j.Msr(a.R08)
 			j.AdcReg(a.R00, a.R00, a.R01, true, false)
+			j.StrReg(a.R00, rd)
 		case THUMB_SBC:
 			j.LdrFlag(a.R08, C)
 			j.LslImm(a.R08, a.R08, 29, false)
 			j.Msr(a.R08)
 			j.SbcReg(a.R00, a.R00, a.R01, true, false)
+			j.StrReg(a.R00, rd)
 		}
 
 		j.Cset(a.R00, a.C, false)
@@ -573,6 +578,7 @@ func (j *Jit) emitThumbAlu(op uint16) {
 			j.BicReg(a.R00, a.R00, a.R01, 0, 0, true, false)
 		case THUMB_MVN:
 			j.OrnReg(a.R00, a.RZR, a.R01, 0, 0, false)
+			j.TstReg(a.R00, a.R00, 0, 0, false)
 		}
 		j.StrReg(a.R00, rd)
 
@@ -643,34 +649,41 @@ func (j *Jit) emitThumbAlu(op uint16) {
 		j.StrFlag(a.R00, Z)
 
 	case THUMB_LSR, THUMB_ASR:
-		panic("unsetup reg shift arm jit")
 		j.LdrReg(a.R00, rd)
 		j.LdrReg(a.R01, rs)
 
-		j.AndImm(a.R01, a.R01, a.EncodeImm(0xFF, false), false, false)
+		j.AndImm(a.R01, a.R01, a.EncodeImm(0xFF, false), true, false)
 
-		j.SUBImm(a.R02, a.R00, 1, false, false, false)
-		j.LsrReg(a.R02, a.R00, a.R02, false)
+		j.TstReg(a.R01, a.R01, 0, 0, false)
+
+		zero := j.BCond(a.Z)
+
+		j.SUBImm(a.R02, a.R01, 1, false, false, false)
+		if inst == THUMB_LSR {
+			j.LsrReg(a.R02, a.R00, a.R02, true)
+		} else {
+			j.AsrReg(a.R02, a.R00, a.R02, false)
+		}
 		j.TstImm(a.R02, IMM_1, false)
 		j.Cset(a.R02, a.NZ, false)
 		j.StrFlag(a.R02, C)
 
-		j.LsrReg(a.R00, a.R00, a.R01, false)
+		zero()
+
+		if inst == THUMB_LSR {
+			j.LsrReg(a.R00, a.R00, a.R01, true)
+		} else {
+			j.AsrReg(a.R00, a.R00, a.R01, false)
+		}
 		j.StrReg(a.R00, rd)
 
-		// case THUMB_ASR:
-		//	rsv &= 0xFF
+		j.TstReg(a.R00, a.R00, 0, 0, false)
 
-		//	if rsv > 32 {
-		//		rsv = 32
-		//	}
+		j.Cset(a.R00, a.N, false)
+		j.StrFlag(a.R00, N)
 
-		//	if rsv != 0 {
-		//		cpsr.C = rdv&(1<<(rsv-1)) != 0
-		//	}
-
-		//	res = uint64(int32(rdv) >> rsv)
-		//	r[rd] = uint32(res)
+		j.Cset(a.R00, a.Z, false)
+		j.StrFlag(a.R00, Z)
 
 	case THUMB_ROR:
 		j.LdrReg(a.R00, rd)
@@ -786,7 +799,7 @@ func (j *Jit) emitThumbBlock(op uint16) {
 			j.CallFunc(Write32)
 
 			j.LdrReg(a.R00, rb)
-			j.ADDImm(a.R01, a.R01, 0x40, false, false, false)
+			j.ADDImm(a.R00, a.R00, 0x40, false, false, false)
 			j.StrReg(a.R00, rb)
 
 			return
