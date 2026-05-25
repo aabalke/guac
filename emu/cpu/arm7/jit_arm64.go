@@ -206,7 +206,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 
 				i = 0
 
-				p, ok = j.Cpu.mem.ReadPtr(tempPc, true)
+				p, ok = j.Cpu.mem.ReadPtr(tempPc, false)
 				if !ok {
 					j.BlockCache.PushTail(newBlock)
 					page.Blocks[blockIdx] = j.BlockCache.SkipBlock

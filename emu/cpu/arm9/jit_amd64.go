@@ -526,6 +526,33 @@ func (j *Jit) DecodeTHUMB(op uint16) bool {
 	return false
 }
 
+func (j *Jit) TestInstThumb(op uint16, f func(op uint16)) {
+
+	asm, err := gojit.New(gojit.PageSize)
+	if err != nil {
+		panic(err)
+	}
+
+	j.Assembler = asm
+
+	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPtr))), CPU)
+
+	f(op)
+
+	j.Add(gojit.Imm(2), j.REG(PC))
+
+	gojit.ExitAssembler(asm)
+
+	if err := asm.Error(); err != nil {
+		panic(err)
+	}
+
+	//gojit.CallJit(&asm.Buf[0])
+	gojit.CallJit(uintptr(unsafe.Pointer(&asm.Buf[0])))
+
+	asm.Release()
+}
+
 func (j *Jit) TestInst(op uint32, f func(op uint32)) {
 
 	asm, err := gojit.New(gojit.PageSize)
@@ -538,6 +565,8 @@ func (j *Jit) TestInst(op uint32, f func(op uint32)) {
 	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPtr))), CPU)
 
 	f(op)
+
+	j.Add(gojit.Imm(4), j.REG(PC))
 
 	gojit.ExitAssembler(asm)
 
