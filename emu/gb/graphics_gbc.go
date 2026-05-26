@@ -3,7 +3,6 @@
 package gb
 
 func (gb *GameBoy) renderTilesGBC(scanline uint8) {
-
 	var (
 		scrollY   = gb.MemoryBus.IO[0x42]
 		scrollX   = gb.MemoryBus.IO[0x43]
@@ -97,14 +96,13 @@ func (gb *GameBoy) renderTilesGBC(scanline uint8) {
 }
 
 func (gb *GameBoy) renderSpritesGBC(scanline int32) {
-
 	var ySize int32 = 8
 	if gb.Lcdc.DoubleHeight {
 		ySize = 16
 	}
 
 	gb.spMinx = [width]int32{}
-	var lineSprites = 0
+	lineSprites := 0
 	for sprite := range uint16(40) {
 		index := sprite * 4
 
@@ -169,7 +167,7 @@ func (gb *GameBoy) renderSpritesGBC(scanline int32) {
 			if drawPixel {
 
 				cgbPalette := attributes & 0x7
-				color := gb.spPalette.Unpacked[(cgbPalette<<2)+(colorNum)]
+				color := gb.spPalette.Unpacked[(cgbPalette<<2)+colorNum]
 				gb.Screen[pixel][scanline] = color
 
 			}

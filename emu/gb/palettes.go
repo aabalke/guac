@@ -14,14 +14,13 @@ func (p *ColorPalette) Init() {
 }
 
 func (p *ColorPalette) update(idx uint8) {
-
 	idx &^= 1
 
 	color := uint16(p.Palette[idx]) | uint16(p.Palette[idx+1])<<8
 
 	p.Unpacked[idx/2] = (uint32(colArr[color&0x1F]) |
 		uint32(colArr[(color>>5)&0x1F])<<8 |
-		uint32(colArr[(color>>10)&0x1F]<<16))
+		uint32(colArr[(color>>10)&0x1F]<<16)) | (0xFF << 24)
 }
 
 // Mapping of the 5 bit colour value to a 8 bit value.

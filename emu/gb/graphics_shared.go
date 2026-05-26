@@ -15,7 +15,7 @@ const (
 	WY          = 0x4A
 	WX          = 0x4B
 
-	//GBC
+	// GBC
 	BCPS = 0x68
 	BCPD = 0x69
 	OCPS = 0x6A
@@ -42,7 +42,6 @@ type Lcdc struct {
 }
 
 func (l *Lcdc) Read() uint8 {
-
 	v := uint8(0)
 
 	if l.BgMaster {
@@ -74,7 +73,6 @@ func (l *Lcdc) Read() uint8 {
 }
 
 func (l *Lcdc) Write(v uint8) {
-
 	wasEnabled := l.Enabled
 	l.BgMaster = (v>>0)&1 != 0
 	l.ObjEnabled = (v>>1)&1 != 0
@@ -90,7 +88,7 @@ func (l *Lcdc) Write(v uint8) {
 		// fingers crossed skyemu figured this out lol
 		// skyemu has similar problem, could not find similar offset on sameboy
 		// required to pass 1-lcd_sync.gb
-		//l.gb.Timer.DotCounter = 4
+		// l.gb.Timer.DotCounter = 4
 		l.gb.Timer.DotCounter = 4
 		l.gb.MemoryBus.IO[LY] = 0
 		l.gb.Stat.Mode = PPU_HBLANK
@@ -151,7 +149,6 @@ func (gb *GameBoy) UpdateDisplay() {
 }
 
 func (gb *GameBoy) UpdateGraphics(tcycles int) {
-
 	var (
 		dot      = &gb.Timer.DotCounter
 		stat     = &gb.Stat
@@ -214,7 +211,6 @@ func (gb *GameBoy) UpdateGraphics(tcycles int) {
 }
 
 func (gb *GameBoy) drawScanline(scanline int32) {
-
 	if gb.Color {
 		gb.renderTilesGBC(uint8(scanline))
 	} else if gb.Lcdc.BgMaster {

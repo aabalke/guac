@@ -96,7 +96,7 @@ type Hdma struct {
 	gb      *GameBoy
 	Halted  bool
 	Enabled bool
-	Length  int
+	Length  uint16
 	Src     uint16
 	Dst     uint16
 	v       uint8
@@ -105,22 +105,27 @@ type Hdma struct {
 func (h *Hdma) Write(v uint8) {
 	if terminate := h.Enabled && v&0x80 == 0; terminate {
 		h.Enabled = false
-		h.v = uint8(h.Length/0x10) - 1
+		if h.Length == 0 {
+			h.v = 0x80
+			return
+		}
+
+		h.v = 0x80 | uint8(h.Length-1)
 		return
 	}
 
-	length := ((uint16(v) & 0x7F) + 1) * 0x10
+	length := uint16(v & 0x7F)
 
 	if hblank := v&0x80 != 0; hblank {
-		h.Length = int(length)
+		h.Length = length
 		h.Enabled = true
+		h.v = uint8(length)
 		return
 	}
 
 	//~ 8 normal m cycles per 0x10 transfers
-	tcycles := ((8 << h.gb.DoubleSpeedFlag) << 2)
-
-	h.gb.Tick(int(length) * tcycles / 0x10)
+	tcycles := (8 << h.gb.DoubleSpeedFlag) << 2
+	h.gb.Tick(int(length) * tcycles)
 
 	h.Transfer(length)
 	h.Length = 0
@@ -134,10 +139,10 @@ func (h *Hdma) HblankTransfer() {
 	tcycles := (8 << h.gb.DoubleSpeedFlag) << 2
 	h.gb.Tick(tcycles)
 
-	h.Transfer(0x10)
+	h.Transfer(1)
 	if h.Length > 0 {
-		h.Length -= 0x10
-		h.v = uint8(h.Length/0x10) - 1
+		h.Length--
+		h.v--
 		return
 	}
 
@@ -147,18 +152,27 @@ func (h *Hdma) HblankTransfer() {
 }
 
 func (h *Hdma) Transfer(length uint16) {
+	length <<= 4
+
 	src := h.Src & 0xFFF0
 	dst := (h.Dst & 0x1FF0) | 0x8000
 
 	for range length {
+		if dst == 0x9ef7 {
+			dst++
+			src++
+			println("writing len", h.Length)
+			continue
+		}
 		b := h.gb.Read(src)
 		h.gb.Write(dst, b)
+
 		dst++
 		src++
 	}
 
-	h.Src = src
-	h.Dst = dst
+	h.Src += length
+	h.Dst += length
 }
 
 func initMemory(gb *GameBoy) {
@@ -201,6 +215,8 @@ func initMemory(gb *GameBoy) {
 	gb.Write(0xFFFF, 0x00)
 
 	gb.MemoryBus.WRAMBank = 1
+
+	gb.MemoryBus.Hdma.v = 0xFF
 
 	gb.InitSaveLoop()
 }
