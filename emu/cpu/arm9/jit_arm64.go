@@ -185,7 +185,6 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 		for {
 			op = uint32(*(*uint16)(unsafe.Add(p, i*2)))
 			if length >= config.Conf.Nds.Jit.BatchInstA9 {
-
 				break
 			}
 
@@ -228,7 +227,6 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 			op = *(*uint32)(unsafe.Add(p, i*4))
 
 			if length >= config.Conf.Nds.Jit.BatchInstA9 {
-
 				break
 			}
 
@@ -431,7 +429,6 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 
 	switch {
 	case isBkpt(op):
-
 	case isB(op):
 	case isBX(op):
 	case isSDT(op):
@@ -450,7 +447,6 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 		pcIncluded := op&0x8000 != 0
 
 		if pcIncluded && load {
-
 			return false
 		}
 
@@ -513,8 +509,8 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 
 	return false
 }
-func (j *Jit) DecodeTHUMB(op uint16) bool {
 
+func (j *Jit) DecodeTHUMB(op uint16) bool {
 	switch {
 	case isthumbSWI(op):
 		return false
