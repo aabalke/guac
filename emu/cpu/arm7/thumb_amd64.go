@@ -925,11 +925,11 @@ func (j *Jit) emitThumbBlock(op uint32) {
 				j.CallFunc(Write32)
 				j.Movl(amd64.R8d, amd64.Eax)
 
-				j.Movl(amd64.Eax, j.SCRATCH(2))
+				j.Movl(amd64.Eax, amd64.R10d)
 
 				j.Movl(j.REG(reg), amd64.Edx)
 				j.Add(amd64.Imm(4), amd64.Edx)
-				j.Movl(amd64.Edx, j.SCRATCH(3))
+				j.Movl(amd64.Edx, amd64.R11d)
 
 				rbIdx = regCount - count
 				j.Add(amd64.Imm(4), j.REG(rb))
@@ -956,8 +956,8 @@ func (j *Jit) emitThumbBlock(op uint32) {
 		}
 
 		if matchingRb {
-			j.Movl(j.SCRATCH(2), amd64.Eax)
-			j.Movl(j.SCRATCH(3), amd64.Ebx)
+			j.Movl(amd64.R10d, amd64.Eax)
+			j.Movl(amd64.R11d, amd64.Ebx)
 			j.Add(amd64.Imm(rbIdx*2), amd64.Ebx)
 			j.CallFunc(Write32)
 			return

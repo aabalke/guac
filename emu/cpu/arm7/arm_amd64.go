@@ -998,7 +998,7 @@ func (j *Jit) emitBlock(op uint32) {
 		user()
 	}
 
-	j.Movl(amd64.Ebx, j.SCRATCH(2))
+	j.Movl(amd64.Ebx, amd64.R10d)
 
 	reg := uint32(0)
 
@@ -1076,7 +1076,7 @@ func (j *Jit) emitBlock(op uint32) {
 				//Store OLD base if Rb is FIRST entry in Rlist
 				// otherwise store NEW base (STM/ARMv4),
 				if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
-					j.Movl(j.SCRATCH(2), amd64.Ebx)
+					j.Movl(amd64.R10d, amd64.Ebx)
 				} else {
 					j.Movl(amd64.Esi, amd64.Ebx)
 				}

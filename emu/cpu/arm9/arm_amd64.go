@@ -1207,7 +1207,7 @@ func (j *Jit) emitBlock(op uint32) {
 		user()
 	}
 
-	j.Movl(amd64.Ebx, j.SCRATCH(2))
+	j.Movl(amd64.Ebx, amd64.R10d)
 
 	reg := uint32(0)
 
@@ -1282,7 +1282,7 @@ func (j *Jit) emitBlock(op uint32) {
 			switch reg {
 			case rn:
 
-				j.Movl(j.SCRATCH(2), amd64.Ebx)
+				j.Movl(amd64.R10d, amd64.Ebx)
 
 				j.CallFunc(Write32)
 			default:

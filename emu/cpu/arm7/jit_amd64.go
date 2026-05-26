@@ -13,7 +13,6 @@ var (
 	REG         = int32(unsafe.Offsetof(Cpu{}.Reg))
 	R           = REG + int32(unsafe.Offsetof(Reg{}.R))
 	CPSR        = REG + int32(unsafe.Offsetof(Reg{}.CPSR))
-	SCRATCH     = int32(unsafe.Offsetof(Cpu{}.Scratch))
 	HALTED_FLAG = gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Halted)), Bits: 8}
 
 	MODE = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.Mode)), Bits: 32}
@@ -61,23 +60,6 @@ func (j *Jit) REG(i uint32) gojit.Indirect {
 	return gojit.Indirect{
 		Base:   CPU,
 		Offset: R + int32(i*4),
-		Bits:   32,
-	}
-}
-
-func (j *Jit) SCRATCH(i uint32) gojit.Indirect {
-
-	// i do not understand how clobbering of stack and registers works with
-	// function calls at this time. Simple solution is writing them to memory
-	// this is slower and should be replaced with a stac kor register based method
-
-	if i >= uint32(len(j.Cpu.Scratch)) {
-		panic("Called scratch register in jit > len of scratch registers")
-	}
-
-	return gojit.Indirect{
-		Base:   CPU,
-		Offset: SCRATCH + int32(i*4),
 		Bits:   32,
 	}
 }
@@ -229,7 +211,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 		return
 	}
 
-	gojit.ExitAssembler(j.Assembler)
+	j.Exit()
 
 	if err := j.Assembler.Error(); err != nil {
 		panic(err)
@@ -525,7 +507,7 @@ func (j *Jit) TestInstThumb(op uint16, f func(op uint16)) {
 
 	j.Add(gojit.Imm(2), j.REG(PC))
 
-	gojit.ExitAssembler(asm)
+	asm.Exit()
 
 	if err := asm.Error(); err != nil {
 		panic(err)
@@ -552,7 +534,7 @@ func (j *Jit) TestInst(op uint32, f func(op uint32)) {
 
 	j.Add(gojit.Imm(4), j.REG(PC))
 
-	gojit.ExitAssembler(asm)
+	asm.Exit()
 
 	if err := asm.Error(); err != nil {
 		panic(err)
@@ -565,7 +547,7 @@ func (j *Jit) TestInst(op uint32, f func(op uint32)) {
 }
 
 func (j *Jit) CallFunc(f any) {
-	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPtr))), CPU)
+	//j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPtr))), CPU)
 	j.InternalCallFunc(f)
-	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPtr))), CPU)
+	//j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPtr))), CPU)
 }
