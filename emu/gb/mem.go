@@ -58,7 +58,6 @@ func (o *OamDma) Write(gb *GameBoy, v uint8) {
 }
 
 func (o *OamDma) Tick(gb *GameBoy, tcycles int) {
-
 	for range tcycles / 4 {
 
 		if o.Pending {
@@ -104,7 +103,6 @@ type Hdma struct {
 }
 
 func (h *Hdma) Write(v uint8) {
-
 	if terminate := h.Enabled && v&0x80 == 0; terminate {
 		h.Enabled = false
 		h.v = uint8(h.Length/0x10) - 1
@@ -149,7 +147,6 @@ func (h *Hdma) HblankTransfer() {
 }
 
 func (h *Hdma) Transfer(length uint16) {
-
 	src := h.Src & 0xFFF0
 	dst := (h.Dst & 0x1FF0) | 0x8000
 
@@ -165,7 +162,6 @@ func (h *Hdma) Transfer(length uint16) {
 }
 
 func initMemory(gb *GameBoy) {
-
 	gb.Write(0xFF04, 0x1E) // not sur eon this one
 	gb.Write(0xFF05, 0x00)
 	gb.Write(0xFF06, 0x00)
@@ -210,7 +206,6 @@ func initMemory(gb *GameBoy) {
 }
 
 func (gb *GameBoy) SaveRam() {
-
 	if config.Conf.General.DisableSaves {
 		return
 	}
@@ -223,7 +218,6 @@ func (gb *GameBoy) SaveRam() {
 }
 
 func (gb *GameBoy) InitSaveLoop() {
-
 	saveTicker := time.Tick(time.Second)
 
 	go func() {
@@ -234,7 +228,6 @@ func (gb *GameBoy) InitSaveLoop() {
 }
 
 func (gb *GameBoy) ReadPtr(addr uint16) unsafe.Pointer {
-
 	switch {
 	case addr < 0x8000:
 		return gb.Cartridge.Mbc.ReadPtr(addr)
@@ -277,7 +270,6 @@ func (gb *GameBoy) ReadPtr(addr uint16) unsafe.Pointer {
 }
 
 func (gb *GameBoy) Read(addr uint16) uint8 {
-
 	switch {
 	case addr < 0x4000:
 		return gb.Cartridge.Mbc.Read(addr)
@@ -325,7 +317,6 @@ func (gb *GameBoy) Read(addr uint16) uint8 {
 }
 
 func (gb *GameBoy) Write(addr uint16, v uint8) {
-
 	//if addr == 0xD880 { // test addr for blargg
 	//    fmt.Printf("\nTest %02d started...\n", v)
 	//    debug.B[4] = true
@@ -374,12 +365,11 @@ func (gb *GameBoy) Write(addr uint16, v uint8) {
 }
 
 func (gb *GameBoy) ReadIO(addr uint16) uint8 {
-
 	if addr >= 0xFF10 && addr < 0xFF40 {
 		return gb.ReadSound(uint8(addr), gb.Apu)
 	}
 
-	if addr >= 0xFF4C && addr < 0xFF80 {
+	if !gb.Color && (addr >= 0xFF4C && addr < 0xFF80) {
 		return 0xFF
 	}
 
@@ -487,7 +477,6 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 }
 
 func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
-
 	io := &gb.MemoryBus.IO
 
 	if addr >= 0xFF10 && addr < 0xFF40 {
