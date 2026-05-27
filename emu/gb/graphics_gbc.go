@@ -3,6 +3,7 @@
 package gb
 
 func (gb *GameBoy) renderTilesGBC(scanline uint8) {
+
 	var (
 		scrollY   = gb.MemoryBus.IO[0x42]
 		scrollX   = gb.MemoryBus.IO[0x43]
@@ -26,13 +27,16 @@ func (gb *GameBoy) renderTilesGBC(scanline uint8) {
 		bgMemory = 0x9C00
 	}
 
+	windowRendered := false
+
 	for pixel := range width {
 
 		var yPos uint8
 		var xPos uint8
 		if winSpace := useWindow && pixel >= windowX; winSpace {
 			xPos = uint8((int(pixel) - windowX))
-			yPos = uint8(scanline - windowY)
+			yPos = gb.WindowLY
+			windowRendered = true
 		} else {
 			xPos = (uint8(pixel) + scrollX)
 			yPos = uint8(scrollY + scanline)
@@ -93,16 +97,20 @@ func (gb *GameBoy) renderTilesGBC(scanline uint8) {
 		gb.bgPriority[pixel][scanline] = priority
 
 	}
+	if windowRendered {
+		gb.WindowLY++
+	}
 }
 
 func (gb *GameBoy) renderSpritesGBC(scanline int32) {
+
 	var ySize int32 = 8
 	if gb.Lcdc.DoubleHeight {
 		ySize = 16
 	}
 
 	gb.spMinx = [width]int32{}
-	lineSprites := 0
+	var lineSprites = 0
 	for sprite := range uint16(40) {
 		index := sprite * 4
 
@@ -127,6 +135,10 @@ func (gb *GameBoy) renderSpritesGBC(scanline int32) {
 			xFlip        = (attributes>>5)&1 != 0
 			priority     = !((attributes>>7)&1 != 0)
 		)
+
+		if gb.Lcdc.DoubleHeight {
+			tileLocation &^= 1
+		}
 
 		// Set the line to draw based on if the sprite is flipped on the y
 		line := scanline - yPos
@@ -164,10 +176,11 @@ func (gb *GameBoy) renderSpritesGBC(scanline int32) {
 			}
 
 			drawPixel := (priority && !gb.bgPriority[pixel][scanline]) || !gb.pixelDrawn[pixel]
-			if drawPixel {
+
+			if drawPixel || !gb.Lcdc.BgMaster {
 
 				cgbPalette := attributes & 0x7
-				color := gb.spPalette.Unpacked[(cgbPalette<<2)+colorNum]
+				color := gb.spPalette.Unpacked[(cgbPalette<<2)+(colorNum)]
 				gb.Screen[pixel][scanline] = color
 
 			}

@@ -47,7 +47,6 @@ type Apu struct {
 }
 
 func (a *Apu) ClockFrameSequencer() {
-
 	if a.pendingPowerOff {
 		a.fsStep = 0
 		a.pendingPowerOff = false
@@ -87,7 +86,6 @@ func (a *Apu) ClockFrameSequencer() {
 }
 
 func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu {
-
 	a := &Apu{
 		WritePointer: 0x200,
 		cpuFreqHz:    cpuFreq,
@@ -97,7 +95,7 @@ func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu 
 		buffSamples:  sampleCnt * 16 * 2,
 		sampleTime:   1.0 / float64(sampleRate),
 		streamLen:    (2 * 2 * sampleRate / 60) - (2*2*sampleRate/60)%4,
-		buffSize:     uint32((sampleCnt) * 16 * 2),
+		buffSize:     uint32(sampleCnt * 16 * 2),
 	}
 
 	a.Stream = make([]byte, a.streamLen)
@@ -122,7 +120,6 @@ func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu 
 }
 
 func (a *Apu) Play(muted bool, stdFps bool) {
-
 	a.SoundBufferWrap()
 
 	if a.Stream == nil {
@@ -155,7 +152,6 @@ func (a *Apu) Close() {
 }
 
 func (a *Apu) soundMix() {
-
 	for i := 0; i < a.streamLen; i += 4 {
 		for j := range 2 {
 			snd := a.SoundBuffer[a.ReadPointer&uint32(a.buffSize-1)] << 6
@@ -185,7 +181,6 @@ func (a *Apu) SoundBufferWrap() {
 }
 
 func (a *Apu) SoundClock(cycles, doubleSpeedFlag uint32) {
-
 	a.sndCycles += cycles
 
 	var (

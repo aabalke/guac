@@ -198,6 +198,7 @@ func (gb *GameBoy) UpdateGraphics(tcycles int) {
 	}
 
 	*ly++
+
 	*dot -= dotScanline
 
 	switch *ly {
@@ -207,6 +208,7 @@ func (gb *GameBoy) UpdateGraphics(tcycles int) {
 	case 154: // new frame
 		gb.bgPriority = [width][height]bool{}
 		*ly = 0
+		gb.WindowLY = 0
 	}
 }
 

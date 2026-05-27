@@ -188,6 +188,11 @@ Oam Bug 2
 
 👍 EricKirschenmann/MBC3-Tester-gb
 
+# mattcurrie
+👍 dmg-acid2
+👍 gbc-acid2
+❌ gbc-acid-hell
+
 # aaaaaa123456789/rtc3test
 👍 basic
 ❌ range

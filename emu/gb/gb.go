@@ -44,6 +44,8 @@ type GameBoy struct {
 	Stat Stat
 	Lcdc Lcdc
 
+	WindowLY uint8 // windows internal line counter
+
 	// cycles are tcycles, 1/4 mcycles
 	frameCycles        int
 	Cycles             int
