@@ -206,3 +206,16 @@ Oam Bug 2
 👍 scxly
 ❌ statcount // need lcd enabled timing accurate
 ❌ winpos
+
+# LIJI32/SameSuite
+
+## apu
+## dma
+👍 gbc_dma_cont
+👍 gdma_addr_mask
+👍 hdma_lcd_off
+👍 hdma_mode0
+
+## interrupt
+## ppu
+## sgb

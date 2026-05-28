@@ -94,89 +94,82 @@ func (o *OamDma) Tick(gb *GameBoy, tcycles int) {
 
 type Hdma struct {
 	gb      *GameBoy
-	Halted  bool
 	Enabled bool
 	Length  uint16
 	Src     uint16
 	Dst     uint16
-	v       uint8
 }
 
 func (h *Hdma) Write(v uint8) {
-	if terminate := h.Enabled && v&0x80 == 0; terminate {
-		h.Enabled = false
-		if h.Length == 0 {
-			h.v = 0x80
-			return
+	length := uint16(v&0x7F) + 1
+
+	if h.Enabled {
+
+		if terminate := h.Enabled && v&0x80 == 0; terminate {
+			h.Enabled = false
 		}
 
-		h.v = 0x80 | uint8(h.Length-1)
+		h.Length = length
 		return
 	}
 
-	length := uint16(v & 0x7F)
+	h.Length = length
+	h.Enabled = true
 
 	if hblank := v&0x80 != 0; hblank {
-		h.Length = length
-		h.Enabled = true
-		h.v = uint8(length)
+		if h.gb.Stat.Mode == PPU_HBLANK || !h.gb.Lcdc.Enabled {
+			h.Transfer(1)
+		}
 		return
 	}
-
-	//~ 8 normal m cycles per 0x10 transfers
-	tcycles := (8 << h.gb.DoubleSpeedFlag) << 2
-	h.gb.Tick(int(length) * tcycles)
 
 	h.Transfer(length)
-	h.Length = 0
-	h.v = 0xFF
-	h.Enabled = false
 }
 
-func (h *Hdma) HblankTransfer() {
-	// should only be called from enabled check
+func (h *Hdma) Read() uint8 {
+	length := (uint8(h.Length) - 1) & 0x7F
 
-	tcycles := (8 << h.gb.DoubleSpeedFlag) << 2
-	h.gb.Tick(tcycles)
-
-	h.Transfer(1)
-	if h.Length > 0 {
-		h.Length--
-		h.v--
-		return
+	if !h.Enabled {
+		length |= 0x80
 	}
 
-	h.Length = 0
-	h.v = 0xFF
-	h.Enabled = false
+	return uint8(length)
 }
 
 func (h *Hdma) Transfer(length uint16) {
-	length <<= 4
-
-	src := h.Src & 0xFFF0
-	dst := (h.Dst & 0x1FF0) | 0x8000
+	//~ 8 normal m cycles per 0x10 transfers
+	tcycles := (8 << h.gb.DoubleSpeedFlag) << 2
 
 	for range length {
-		if dst == 0x9ef7 {
-			dst++
-			src++
-			println("writing len", h.Length)
-			continue
+
+		h.gb.Tick(tcycles)
+		for range 0x10 {
+			b := uint8(0xFF)
+			if h.Src < 0x8000 || (h.Src >= 0xA000 && h.Src < 0xE000) {
+				b = h.gb.Read(h.Src)
+			}
+
+			h.gb.Write((h.Dst&0x1FFF)|0x8000, b)
+
+			h.Src++
+			h.Dst++
+
+			if h.Dst == 0x0000 {
+				h.Enabled = false
+				return
+			}
 		}
-		b := h.gb.Read(src)
-		h.gb.Write(dst, b)
 
-		dst++
-		src++
+		h.Length--
+		if h.Length == 0 {
+			h.Enabled = false
+			return
+		}
 	}
-
-	h.Src += length
-	h.Dst += length
 }
 
 func initMemory(gb *GameBoy) {
-	gb.Write(0xFF04, 0x1E) // not sur eon this one
+	gb.Write(0xFF04, 0x1E) // not sure on this one
 	gb.Write(0xFF05, 0x00)
 	gb.Write(0xFF06, 0x00)
 	gb.Write(0xFF07, 0x00)
@@ -216,7 +209,8 @@ func initMemory(gb *GameBoy) {
 
 	gb.MemoryBus.WRAMBank = 1
 
-	gb.MemoryBus.Hdma.v = 0xFF
+	gb.MemoryBus.Hdma.Dst = 0xFFFF
+	gb.MemoryBus.Hdma.Src = 0xFFFF
 
 	gb.InitSaveLoop()
 }
@@ -441,7 +435,11 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 		return gb.MemoryBus.VRAMBank | 0xFE
 
 	case 0xFF55:
-		return gb.MemoryBus.Hdma.v
+		if !gb.Color {
+			return 0xFF
+		}
+
+		return gb.MemoryBus.Hdma.Read()
 
 	case 0xFF68:
 
@@ -645,7 +643,7 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 	case 0xFF52:
 		if gb.Color {
 			gb.MemoryBus.Hdma.Src &^= 0xFF
-			gb.MemoryBus.Hdma.Src |= uint16(v)
+			gb.MemoryBus.Hdma.Src |= uint16(v & 0xF0)
 		}
 
 	case 0xFF53:
@@ -657,14 +655,13 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 	case 0xFF54:
 		if gb.Color {
 			gb.MemoryBus.Hdma.Dst &^= 0xFF
-			gb.MemoryBus.Hdma.Dst |= uint16(v)
+			gb.MemoryBus.Hdma.Dst |= uint16(v & 0xF0)
 		}
 
 	case 0xFF55:
 		if gb.Color {
 			gb.MemoryBus.Hdma.Write(v)
 		}
-		io[uint8(addr)] = v
 
 	case 0xFF68:
 		if gb.Color {
