@@ -1,6 +1,7 @@
 package gb
 
 import (
+	"fmt"
 	"time"
 	"unsafe"
 
@@ -383,6 +384,12 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 		return 0xFF
 	}
 
+	//if addr >= 0xFF4C && addr < 0xFF80 &&
+	//	!(addr == 0xFF4F || addr == 0xFF70) {
+	//	fmt.Printf("READ %04X\n", addr)
+	//	return 0xFF
+	//}
+
 	switch addr {
 	case 0xFF00:
 		return gb.getJoypad()
@@ -431,59 +438,40 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 	case 0xFF46:
 		return gb.MemoryBus.Oam.Read()
 
-	case 0xFF4F:
-		return gb.MemoryBus.VRAMBank | 0xFE
-
-	case 0xFF55:
-		if !gb.Color {
-			return 0xFF
-		}
-
-		return gb.MemoryBus.Hdma.Read()
-
-	case 0xFF68:
-
-		if gb.Color {
-			return gb.bgPalette.Idx
-		}
-
-		return 0
-
-	case 0xFF69:
-
-		if gb.Color {
-			return gb.bgPalette.Palette[gb.bgPalette.Idx]
-		}
-
-		return 0
-	case 0xFF6A:
-
-		if gb.Color {
-			return gb.spPalette.Idx
-		}
-
-		return 0
-
-	case 0xFF6B:
-
-		if gb.Color {
-			return gb.spPalette.Palette[gb.spPalette.Idx]
-		}
-
-		return 0
+	case 0xFF50, 0xFF51, 0xFF52, 0xFF53, 0xFF54:
+		return 0xFF
 
 	case 0xFF4D:
 
-		b := uint8(gb.DoubleSpeedFlag << 7)
-
+		b := uint8(gb.DoubleSpeedFlag<<7) | 0x7E
 		if gb.PrepareSpeedToggle {
 			b |= 1
 		}
 
+		fmt.Printf("Reading PC %04X SPD %02X\n", gb.Cpu.PC, b)
+
 		return b
 
+	case 0xFF4F:
+		return gb.MemoryBus.VRAMBank | 0xFE
+
+	case 0xFF55:
+		return gb.MemoryBus.Hdma.Read()
+
+	case 0xFF68:
+		return gb.bgPalette.Idx
+
+	case 0xFF69:
+		return gb.bgPalette.Palette[gb.bgPalette.Idx]
+
+	case 0xFF6A:
+		return gb.spPalette.Idx
+
+	case 0xFF6B:
+		return gb.spPalette.Palette[gb.spPalette.Idx]
+
 	case 0xFF70:
-		return gb.MemoryBus.WRAMBank
+		return gb.MemoryBus.WRAMBank | 0xF8
 	default:
 
 		return gb.MemoryBus.IO[uint8(addr)]
@@ -622,17 +610,21 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 	case 0xFF4D:
 		if gb.Color {
 			gb.PrepareSpeedToggle = v&1 != 0
-			io[0x4D] &= 0x80
-			io[0x4D] |= v & 1
+			b := uint8(gb.DoubleSpeedFlag<<7) | 0x7E
+			if gb.PrepareSpeedToggle {
+				b |= 1
+			}
+			fmt.Printf("Writing PC %04X SPD %02X\n", gb.Cpu.PC, b)
+			return
 		}
-		io[uint8(addr)] = v
 
 	case 0xFF4F:
-		if gb.Color && !gb.MemoryBus.Hdma.Enabled {
+		// if gb.Color && !gb.MemoryBus.Hdma.Enabled {
+		// not sure when memory hdma enabled?
+		if gb.Color {
 			gb.MemoryBus.VRAMBank = v & 0x1
 			return
 		}
-		io[uint8(addr)] = v
 
 	case 0xFF51:
 		if gb.Color {
@@ -668,7 +660,6 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 			gb.bgPalette.Idx = v & 0b111111
 			gb.bgPalette.Inc = (v>>7)&1 != 0
 		}
-		io[uint8(addr)] = v
 
 	case 0xFF69:
 		if gb.Color {
@@ -679,14 +670,12 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 				gb.bgPalette.Idx = (gb.bgPalette.Idx + 1) & 0b111111
 			}
 		}
-		io[uint8(addr)] = v
 
 	case 0xFF6A:
 		if gb.Color {
 			gb.spPalette.Idx = v & 0b111111
 			gb.spPalette.Inc = (v>>7)&1 != 0
 		}
-		io[uint8(addr)] = v
 
 	case 0xFF6B:
 		if gb.Color {
@@ -698,8 +687,6 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 			}
 		}
 
-		io[uint8(addr)] = v
-
 	case 0xFF70:
 		if gb.Color {
 			gb.MemoryBus.WRAMBank = v & 7
@@ -710,7 +697,6 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 			gb.MemoryBus.WRAMBankV = v & 7
 		}
 
-		io[uint8(addr)] = v
 	default:
 
 		io[uint8(addr)] = v

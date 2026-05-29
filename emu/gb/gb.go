@@ -185,7 +185,6 @@ func (gb *GameBoy) Tick(tCycles int) {
 	}
 
 	tCycles >>= gb.DoubleSpeedFlag
-
 	gb.frameCycles += tCycles
 	gb.Cycles = tCycles
 
