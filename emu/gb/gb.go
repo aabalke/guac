@@ -36,6 +36,8 @@ type GameBoy struct {
 
 	UnpackedMonoPals [3][4]uint32
 
+	Scheduler *Scheduler
+
 	Cartridge *cartridge.Cartridge
 	Cpu       *Cpu
 	MemoryBus MemoryBus
@@ -94,6 +96,7 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 		Joypad:    0xFF,
 		Cartridge: cartridge.NewCartridge(path, path+".save"),
 		Palette:   &config.Conf.Gb.Palette,
+		Scheduler: NewScheduler(),
 	}
 
 	gb.Lcdc.gb = gb
@@ -155,49 +158,154 @@ func (gb *GameBoy) GetPixels() []byte {
 	return gb.Pixels
 }
 
+const (
+	CYCLES_PER_FRAME        = 70224
+	CYCLES_PER_END_SCANLINE = CYCLES_PER_FRAME / 154
+	CYCLES_PER_VBLANK       = CYCLES_PER_FRAME / 154 * 144
+	CYCLES_PER_DRAW         = 80
+	CYCLES_PER_HBLANK       = 80 + 172
+)
+
 func (gb *GameBoy) Update(stdFps bool) {
 	if gb.Paused {
 		return
 	}
 
-	targetCycles := gb.Clock / gb.FPS << gb.DoubleSpeedFlag
-	for gb.frameCycles < targetCycles {
-		if gb.Cpu.Halted {
-			gb.Tick(4)
-		} else {
-			gb.Execute()
+	gb.Scheduler.schedule(EVENT_END_FRAME, CYCLES_PER_FRAME)
+	gb.Scheduler.schedule(EVENT_END_SCANLINE, CYCLES_PER_END_SCANLINE)
+	gb.Scheduler.schedule(EVENT_VBK, CYCLES_PER_VBLANK)
+	gb.Scheduler.schedule(EVENT_DRW, CYCLES_PER_DRAW)
+	gb.Scheduler.schedule(EVENT_HBK, CYCLES_PER_HBLANK)
+
+	for {
+		nextEvent := gb.Scheduler.popNext()
+
+		for gb.Scheduler.CurrentCycle < nextEvent.InitCycle {
+			if gb.Cpu.Halted {
+				gb.Tick(4)
+			} else {
+				gb.Execute()
+			}
 		}
 
-		gb.Tick(gb.UpdateInterrupt())
+		overshoot := gb.Scheduler.CurrentCycle - nextEvent.InitCycle
+		gb.Scheduler.CurrentCycle = nextEvent.InitCycle
 
-		targetCycles = gb.Clock / gb.FPS << gb.DoubleSpeedFlag
+		switch nextEvent.Event {
+		case EVENT_VBK:
+			if gb.Lcdc.Enabled {
+				gb.Stat.Mode = PPU_VBLANK
+				if gb.Stat.IrqVBlank {
+					gb.SetIrq(IRQ_LCD)
+				}
+
+				gb.SetIrq(IRQ_VBL)
+				gb.UpdateDisplay()
+			}
+
+		case EVENT_DRW:
+			if gb.Lcdc.Enabled {
+				gb.Stat.Mode = PPU_DRAW
+			}
+
+		case EVENT_HBK:
+
+			if gb.Lcdc.Enabled {
+				gb.Stat.Mode = PPU_HBLANK
+				gb.drawScanline(int32(gb.MemoryBus.IO[LY]))
+				if gb.Stat.IrqHBlank {
+					gb.SetIrq(IRQ_LCD)
+				}
+			}
+
+			if gb.Color && gb.MemoryBus.Hdma.Enabled && !gb.Cpu.Halted {
+				gb.MemoryBus.Hdma.Transfer(1)
+			}
+
+		case EVENT_END_SCANLINE:
+
+			if gb.Lcdc.Enabled {
+				gb.MemoryBus.IO[LY]++
+				gb.Stat.Match = gb.MemoryBus.IO[LY] == gb.MemoryBus.IO[LYC]
+				if gb.Stat.Match && gb.Stat.IrqLyc {
+					gb.SetIrq(IRQ_LCD)
+				}
+
+				if nextEvent.InitCycle+CYCLES_PER_END_SCANLINE < CYCLES_PER_FRAME {
+					gb.Scheduler.scheduleAt(EVENT_END_SCANLINE, nextEvent.InitCycle+CYCLES_PER_END_SCANLINE)
+				}
+
+				if gb.MemoryBus.IO[LY] < height {
+					gb.Scheduler.scheduleAt(EVENT_DRW, nextEvent.InitCycle+CYCLES_PER_DRAW)
+					gb.Scheduler.scheduleAt(EVENT_HBK, nextEvent.InitCycle+CYCLES_PER_HBLANK)
+
+					gb.Stat.Mode = PPU_OAM
+					if gb.Stat.IrqOam {
+						gb.SetIrq(IRQ_LCD)
+					}
+				}
+			}
+
+		case EVENT_END_FRAME:
+			if gb.Lcdc.Enabled {
+				gb.bgPriority = [width][height]bool{}
+				gb.MemoryBus.IO[LY] = 0
+				gb.WindowLY = 0
+				gb.Image.WritePixels(gb.Pixels)
+			}
+			//gb.Apu.Play(gb.Muted, stdFps)
+
+			gb.Scheduler.endFrame()
+			return
+		}
+
+		gb.Scheduler.CurrentCycle += overshoot
 	}
-
-	gb.frameCycles -= targetCycles
-
-	gb.Apu.Play(gb.Muted, stdFps)
-	gb.Image.WritePixels(gb.Pixels)
 }
 
+//func (gb *GameBoy) Updateo(stdFps bool) {
+//	if gb.Paused {
+//		return
+//	}
+//
+//	targetCycles := gb.Clock / gb.FPS << gb.DoubleSpeedFlag
+//	for gb.frameCycles < targetCycles {
+//		//if gb.Cpu.Halted {
+//		//gb.Tick(4)
+//		//} else {
+//		gb.Execute()
+//		//}
+//
+//		//gb.Tick(gb.UpdateInterrupt())
+//
+//		targetCycles = gb.Clock / gb.FPS << gb.DoubleSpeedFlag
+//	}
+//
+//	gb.frameCycles -= targetCycles
+//
+//	//gb.Apu.Play(gb.Muted, stdFps)
+//	gb.Image.WritePixels(gb.Pixels)
+//}
+
 func (gb *GameBoy) Tick(tCycles int) {
-	if tCycles == 0 {
-		return
-	}
-
-	tCycles >>= gb.DoubleSpeedFlag
-	gb.frameCycles += tCycles
-	gb.Cycles = tCycles
-
-	if gb.Lcdc.Enabled {
-		gb.UpdateGraphics(tCycles)
-	}
-
+	gb.Scheduler.CurrentCycle += int64(tCycles)
 	gb.UpdateTimers(tCycles) // frame sequencer is here since div apu is controlled by div
+	return
+
+	//tCycles >>= gb.DoubleSpeedFlag
+	gb.frameCycles += tCycles
+	//gb.Cycles = tCycles
+
+	//if gb.Lcdc.Enabled {
+	//	gb.UpdateGraphics(tCycles)
+	//}
+
+	//gb.UpdateTimers(tCycles) // frame sequencer is here since div apu is controlled by div
 
 	//gb.MemoryBus.Oam.Tick(gb, tCycles)
 
-	gb.Apu.WaveChannel.ClockWave(uint32(tCycles), uint32(gb.frameCycles))
-	gb.Apu.SoundClock(uint32(tCycles), uint32(gb.DoubleSpeedFlag))
+	//gb.Apu.WaveChannel.ClockWave(uint32(tCycles), uint32(gb.frameCycles))
+	//gb.Apu.SoundClock(uint32(tCycles), uint32(gb.DoubleSpeedFlag))
 }
 
 func (gb *GameBoy) ToggleMute() bool {
