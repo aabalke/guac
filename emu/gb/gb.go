@@ -41,7 +41,6 @@ type GameBoy struct {
 	Cartridge *cartridge.Cartridge
 	Cpu       *Cpu
 	MemoryBus MemoryBus
-	FPS       int
 
 	Stat Stat
 	Lcdc Lcdc
@@ -49,7 +48,6 @@ type GameBoy struct {
 	WindowLY uint8 // windows internal line counter
 
 	// cycles are tcycles, 1/4 mcycles
-	Cycles             int
 	Clock              int
 	DoubleSpeedFlag    uint8
 	PrepareSpeedToggle bool
@@ -70,8 +68,6 @@ type GameBoy struct {
 }
 
 type Timer struct {
-	DotCounter int // should this be seperate?
-
 	Div      uint16
 	TIMA     uint8
 	TMA      uint8
@@ -90,7 +86,6 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 	gb := &GameBoy{
 		Image:     img,
 		Cpu:       NewCpu(),
-		FPS:       60,
 		Clock:     4194304, // t cycle count
 		Joypad:    0xFF,
 		Cartridge: cartridge.NewCartridge(path, path+".save"),
@@ -180,12 +175,12 @@ func (gb *GameBoy) Update(stdFps bool) {
 		nextEvent := gb.Scheduler.popNext()
 
 		for gb.Scheduler.CurrentCycle < nextEvent.InitCycle {
-			gb.Tick(gb.UpdateInterrupt())
 			if gb.Cpu.Halted {
 				gb.Tick(4)
 			} else {
 				gb.Execute()
 			}
+			gb.Tick(gb.UpdateInterrupt())
 		}
 
 		overshoot := gb.Scheduler.CurrentCycle - nextEvent.InitCycle
@@ -206,13 +201,13 @@ func (gb *GameBoy) Update(stdFps bool) {
 		case EVENT_DRW:
 			if gb.Lcdc.Enabled {
 				gb.Stat.Mode = PPU_DRAW
+				gb.drawScanline(int32(gb.MemoryBus.IO[LY]))
 			}
 
 		case EVENT_HBK:
 
 			if gb.Lcdc.Enabled {
 				gb.Stat.Mode = PPU_HBLANK
-				gb.drawScanline(int32(gb.MemoryBus.IO[LY]))
 				if gb.Stat.IrqHBlank {
 					gb.SetIrq(IRQ_LCD)
 				}
@@ -254,6 +249,14 @@ func (gb *GameBoy) Update(stdFps bool) {
 				gb.MemoryBus.IO[LY] = 0
 				gb.WindowLY = 0
 				gb.Image.WritePixels(gb.Pixels)
+				gb.Stat.Match = gb.MemoryBus.IO[LY] == gb.MemoryBus.IO[LYC]
+				if gb.Stat.Match && gb.Stat.IrqLyc {
+					gb.SetIrq(IRQ_LCD)
+				}
+				gb.Stat.Mode = PPU_OAM
+				if gb.Stat.IrqOam {
+					gb.SetIrq(IRQ_LCD)
+				}
 			}
 
 			gb.Apu.Play(gb.Muted, stdFps)
@@ -267,9 +270,8 @@ func (gb *GameBoy) Update(stdFps bool) {
 
 func (gb *GameBoy) Tick(tCycles int) {
 	//tCycles >>= gb.DoubleSpeedFlag
-	//gb.Cycles = tCycles
-	gb.Scheduler.CurrentCycle += int64(tCycles) //>> int64(gb.DoubleSpeedFlag)
-	gb.UpdateTimers(tCycles)                    // frame sequencer is here since div apu is controlled by div
+	gb.Scheduler.CurrentCycle += int64(tCycles) >> int64(gb.DoubleSpeedFlag)
+	gb.UpdateTimers(tCycles) // frame sequencer is here since div apu is controlled by div
 	//gb.MemoryBus.Oam.Tick(gb, tCycles)
 	gb.Apu.WaveChannel.ClockWave(uint32(tCycles>>int(gb.DoubleSpeedFlag)), uint32(gb.Scheduler.CurrentCycle))
 	gb.Apu.SoundClock(uint32(tCycles), uint32(gb.DoubleSpeedFlag))

@@ -137,8 +137,12 @@ func (h *Hdma) Read() uint8 {
 }
 
 func (h *Hdma) Transfer(length uint16) {
+	// since hdma transfers are included in lcd handler, I do not believe
+	// double speed is necessary here, is already running at correct time
+	// relative to cpu
 	//~ 8 normal m cycles per 0x10 transfers
-	tcycles := (8 << h.gb.DoubleSpeedFlag) << 2
+	//tcycles := (8 << h.gb.DoubleSpeedFlag) << 2
+	tcycles := 8 << 2
 
 	for range length {
 

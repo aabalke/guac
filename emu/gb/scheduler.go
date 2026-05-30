@@ -74,11 +74,11 @@ func (s *Scheduler) endFrame() {
 	}
 }
 
-func (s *Scheduler) cancel(e Event) {
-	for i, ev := range s.Events {
-		if ev.Event == e {
-			s.Events = append(s.Events[:i], s.Events[i+1:]...)
-			return
-		}
-	}
-}
+//func (s *Scheduler) cancel(e Event) {
+//	for i, ev := range s.Events {
+//		if ev.Event == e {
+//			s.Events = append(s.Events[:i], s.Events[i+1:]...)
+//			return
+//		}
+//	}
+//}

@@ -89,7 +89,6 @@ func (l *Lcdc) Write(v uint8) {
 		// skyemu has similar problem, could not find similar offset on sameboy
 		// required to pass 1-lcd_sync.gb
 		// l.gb.Timer.DotCounter = 4
-		l.gb.Timer.DotCounter = 4
 		l.gb.MemoryBus.IO[LY] = 0
 		l.gb.Stat.Mode = PPU_HBLANK
 	}
