@@ -24,17 +24,9 @@ type Apu struct {
 	NoiseChannel NoiseChannel
 
 	Stream []byte
-
-	sndCycles uint32
-
 	player *oto.Player
 
-	cpuFreqHz    int
 	sndFrequency int
-	sndSamples   int
-	sampCycles   int
-	buffSamples  int
-	sampleTime   float64
 	streamLen    int
 	buffSize     uint32
 
@@ -43,7 +35,10 @@ type Apu struct {
 
 	pendingPowerOff bool
 	pendingPowerOn  bool
-	suppress        bool
+}
+
+type Channel interface {
+	GetSample() int8
 }
 
 func (a *Apu) ClockFrameSequencer() {
@@ -55,7 +50,6 @@ func (a *Apu) ClockFrameSequencer() {
 	if a.pendingPowerOn {
 		a.fsStep = 0
 		a.pendingPowerOn = false
-		a.suppress = true
 	}
 
 	a.fsCounter++
@@ -88,12 +82,7 @@ func (a *Apu) ClockFrameSequencer() {
 func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu {
 	a := &Apu{
 		WritePointer: 0x200,
-		cpuFreqHz:    cpuFreq,
 		sndFrequency: sampleRate,
-		sndSamples:   sampleCnt,
-		sampCycles:   cpuFreq / sampleRate,
-		buffSamples:  sampleCnt * 16 * 2,
-		sampleTime:   1.0 / float64(sampleRate),
 		streamLen:    (2 * 2 * sampleRate / 60) - (2*2*sampleRate/60)%4,
 		buffSize:     uint32(sampleCnt * 16 * 2),
 	}
@@ -119,7 +108,7 @@ func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu 
 	return a
 }
 
-func (a *Apu) Play(muted bool, stdFps bool) {
+func (a *Apu) Play(muted, stdFps bool) {
 	a.SoundBufferWrap()
 
 	if a.Stream == nil {
@@ -180,84 +169,64 @@ func (a *Apu) SoundBufferWrap() {
 	}
 }
 
-func (a *Apu) SoundClock(cycles, doubleSpeedFlag uint32) {
-	a.sndCycles += cycles
-
+func (a *Apu) SoundClock() {
 	var (
-		pan  = a.PanReg
 		volL = int32((a.Master>>4)&7) + 1
 		volR = int32((a.Master>>0)&7) + 1
+		chs  = [4]struct {
+			Channel       Channel
+			Enabled, L, R bool
+		}{
+			{
+				Channel: &a.ToneChannel1,
+				Enabled: a.ToneChannel1.ChannelEnabled,
+				L:       (a.PanReg & 0x10) != 0,
+				R:       (a.PanReg & 0x01) != 0,
+			},
+			{
+				Channel: &a.ToneChannel2,
+				Enabled: a.ToneChannel2.ChannelEnabled,
+				L:       (a.PanReg & 0x20) != 0,
+				R:       (a.PanReg & 0x02) != 0,
+			},
+			{
+				Channel: &a.WaveChannel,
+				Enabled: a.WaveChannel.ChannelEnabled,
+				L:       (a.PanReg & 0x40) != 0,
+				R:       (a.PanReg & 0x04) != 0,
+			},
+			{
+				Channel: &a.NoiseChannel,
+				Enabled: a.NoiseChannel.ChannelEnabled,
+				L:       (a.PanReg & 0x80) != 0,
+				R:       (a.PanReg & 0x08) != 0,
+			},
+		}
 
-		ch1L = (pan & 0x10) != 0
-		ch1R = (pan & 0x01) != 0
-		ch2L = (pan & 0x20) != 0
-		ch2R = (pan & 0x02) != 0
-		ch3L = (pan & 0x40) != 0
-		ch3R = (pan & 0x04) != 0
-		ch4L = (pan & 0x80) != 0
-		ch4R = (pan & 0x08) != 0
-
-		ch1 = a.ToneChannel1.ChannelEnabled
-		ch2 = a.ToneChannel2.ChannelEnabled
-		ch3 = a.WaveChannel.ChannelEnabled
-		ch4 = a.NoiseChannel.ChannelEnabled
+		psgL int32
+		psgR int32
 	)
 
-	clockCycles := uint32(a.sampCycles) << doubleSpeedFlag
-
-	for a.sndCycles >= clockCycles {
-		psgL, psgR := int32(0), int32(0)
-
-		if ch1 {
-			ch := int32(a.ToneChannel1.GetSample())
-			if ch1L {
-				psgL += ch
-			}
-			if ch1R {
-				psgR += ch
-			}
+	for _, ch := range chs {
+		if !ch.Enabled {
+			continue
 		}
-
-		if ch2 {
-			ch := int32(a.ToneChannel2.GetSample())
-			if ch2L {
-				psgL += ch
-			}
-			if ch2R {
-				psgR += ch
-			}
+		data := int32(ch.Channel.GetSample())
+		if ch.L {
+			psgL += data
 		}
-
-		if ch3 {
-			ch := int32(a.WaveChannel.GetSample())
-			if ch3L {
-				psgL += ch
-			}
-			if ch3R {
-				psgR += ch
-			}
+		if ch.R {
+			psgR += data
 		}
-
-		if ch4 {
-			ch := int32(a.NoiseChannel.GetSample())
-			if ch4L {
-				psgL += ch
-			}
-			if ch4R {
-				psgR += ch
-			}
-		}
-
-		psgL = ((psgL * volL) >> 3) >> 2
-		psgR = ((psgR * volR) >> 3) >> 2
-
-		a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(psgL)
-		a.WritePointer++
-		a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(psgR)
-		a.WritePointer++
-
-		a.sndCycles -= clockCycles
 	}
+
+	psgL = ((psgL * volL) >> 3) >> 2
+	psgR = ((psgR * volR) >> 3) >> 2
+
+	a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(psgL)
+	a.WritePointer++
+	a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(psgR)
+	a.WritePointer++
 }
 
 func (a *Apu) PowerOff() {
@@ -268,23 +237,15 @@ func (a *Apu) PowerOff() {
 	a.Master = 0
 	a.PanReg = 0
 	a.pendingPowerOff = true
-	//fmt.Printf("Power Off\n")
 }
 
 func (a *Apu) PowerOn() {
 	a.pendingPowerOn = true
 	a.fsStep = 0
 	a.fsCounter = 0
-	//fmt.Printf("Power On\n")
 }
 
 //go:inline
 func clip(v int32) int16 {
-	if v > SAMP_MAX {
-		return SAMP_MAX
-	}
-	if v < SAMP_MIN {
-		return SAMP_MIN
-	}
-	return int16(v)
+	return min(SAMP_MAX, max(SAMP_MIN, int16(v)))
 }

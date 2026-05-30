@@ -7,13 +7,8 @@ const (
 	EVENT_HBK
 	EVENT_DRW
 	EVENT_END_FRAME
-	//EVENT_DMA
-	//
-	EVENT_DIV
-	EVENT_TIMA
-	EVENT_TAC
-
 	EVENT_END_SCANLINE
+	EVENT_SND_SAMPLE_GEN
 )
 
 type Scheduler struct {
@@ -28,7 +23,7 @@ type ScheduledEvent struct {
 
 func NewScheduler() *Scheduler {
 	return &Scheduler{
-		Events: []ScheduledEvent{},
+		Events: make([]ScheduledEvent, 0, 32),
 	}
 }
 
@@ -37,32 +32,23 @@ func (s *Scheduler) schedule(e Event, cyclesUntil int64) {
 }
 
 func (s *Scheduler) scheduleAt(e Event, initCycle int64) {
-	//fmt.Printf("Scheduling Event %d cycles till %d\n", e, cyclesUntilEvent)
+	es := ScheduledEvent{Event: e, InitCycle: initCycle}
 
-	es := ScheduledEvent{
-		Event:     e,
-		InitCycle: initCycle,
-	}
-
-	// Insert in sorted position (smallest cycles first)
-	inserted := false
 	for i, existing := range s.Events {
 		if es.InitCycle < existing.InitCycle {
-			// Insert at position i
-			s.Events = append(s.Events[:i], append([]ScheduledEvent{es}, s.Events[i:]...)...)
-			inserted = true
-			break
+			s.Events = append(s.Events, ScheduledEvent{})
+			copy(s.Events[i+1:], s.Events[i:])
+			s.Events[i] = es
+			return
 		}
 	}
-	if !inserted {
-		s.Events = append(s.Events, es)
-	}
+
+	s.Events = append(s.Events, es)
 }
 
 func (s *Scheduler) popNext() ScheduledEvent {
 	next := s.Events[0]
 	s.Events = s.Events[1:]
-	//fmt.Printf("Popped Event %d cycles till %d\n", next.Event, next.InitCycle)
 	return next
 }
 
@@ -73,12 +59,3 @@ func (s *Scheduler) endFrame() {
 		s.Events[i].InitCycle -= framecycles
 	}
 }
-
-//func (s *Scheduler) cancel(e Event) {
-//	for i, ev := range s.Events {
-//		if ev.Event == e {
-//			s.Events = append(s.Events[:i], s.Events[i+1:]...)
-//			return
-//		}
-//	}
-//}

@@ -27,7 +27,6 @@ type WaveChannel struct {
 }
 
 func (ch *WaveChannel) LengthTrigger() {
-
 	if ch.LengthCounter == 0 {
 		return
 	}
@@ -38,7 +37,6 @@ func (ch *WaveChannel) LengthTrigger() {
 }
 
 func (ch *WaveChannel) Trigger() {
-
 	if ch.LengthCounter == 0 {
 		ch.ResetLength(0)
 		ch.LengthTrigger()
@@ -59,7 +57,6 @@ func (ch *WaveChannel) Trigger() {
 }
 
 func (ch *WaveChannel) clockLength() {
-
 	if !ch.LenEnabled {
 		return
 	}
@@ -84,7 +81,6 @@ func (ch *WaveChannel) ResetLength(initLength uint8) {
 // wave channel period divider is 1/2 cpu speed (2097152hz)
 // relative to cpu cycles, clocked at CPU_CYCLE / (2 * (2048 - period))
 func (ch *WaveChannel) ClockWave(tCycles, frameCycles uint32) {
-
 	if !ch.ChannelEnabled {
 		return
 	}
@@ -103,10 +99,6 @@ func (ch *WaveChannel) ClockWave(tCycles, frameCycles uint32) {
 
 		ch.LastReadCycle = frameCycles - ch.accCycles
 
-		//if debug.B[3] {
-		//	fmt.Printf("Enabling Latch Acc Cycles %04d FrameCycle %08d lastRead %08d New Wave Position %02d BYTE VALUE %02X\n", ch.accCycles, frameCycles, ch.LastReadCycle, ch.WavePosition, ch.SampleByte)
-		//}
-
 		if ch.WavePosition&1 == 0 {
 			ch.Sample = ch.SampleByte >> 4
 		} else {
@@ -120,9 +112,8 @@ func (ch *WaveChannel) ClockWave(tCycles, frameCycles uint32) {
 }
 
 func (ch *WaveChannel) GetSample() int8 {
-
 	// -8 changes the wave to be signed 0...15 to -8...7
-	//vol := int8(ch.Buffer[ch.WavePosition & 0x1F]) - 8
+	// vol := int8(ch.Buffer[ch.WavePosition & 0x1F]) - 8
 	vol := int8(ch.Sample) - 8
 
 	switch ch.OutputLevel {

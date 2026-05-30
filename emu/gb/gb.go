@@ -80,13 +80,20 @@ type Timer struct {
 	BCycle          bool
 }
 
+const (
+	CPU_SPEED          = 4194304
+	SND_FREQ           = 48000 // native sample rate
+	CYCLES_PER_SND_GEN = CPU_SPEED / SND_FREQ
+	SND_SAMPLES        = 512
+)
+
 func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 	img := ebiten.NewImage(width, height)
 
 	gb := &GameBoy{
 		Image:     img,
 		Cpu:       NewCpu(),
-		Clock:     4194304, // t cycle count
+		Clock:     CPU_SPEED, // t cycle count
 		Joypad:    0xFF,
 		Cartridge: cartridge.NewCartridge(path, path+".save"),
 		Palette:   &config.Conf.Gb.Palette,
@@ -100,11 +107,7 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 	gb.spPalette.Init()
 	gb.Pixels = make([]byte, width*height*4)
 
-	const (
-		SND_FREQUENCY = 48000 // sample rate
-		SND_SAMPLES   = 512
-	)
-	gb.Apu = apu.NewApu(ctx, gb.Clock, SND_FREQUENCY, SND_SAMPLES)
+	gb.Apu = apu.NewApu(ctx, gb.Clock, SND_FREQ, SND_SAMPLES)
 
 	if gb.Cartridge.ColorMode {
 		gb.Color = true
@@ -122,6 +125,8 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 	if config.Conf.General.Logger {
 		L = NewLogger("./loggy", gb)
 	}
+
+	gb.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, CYCLES_PER_SND_GEN)
 
 	return gb
 }
@@ -187,6 +192,10 @@ func (gb *GameBoy) Update(stdFps bool) {
 		gb.Scheduler.CurrentCycle = nextEvent.InitCycle
 
 		switch nextEvent.Event {
+		case EVENT_SND_SAMPLE_GEN:
+			gb.Apu.SoundClock()
+			gb.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, CYCLES_PER_SND_GEN)
+
 		case EVENT_VBK:
 			if gb.Lcdc.Enabled {
 				gb.Stat.Mode = PPU_VBLANK
@@ -269,12 +278,10 @@ func (gb *GameBoy) Update(stdFps bool) {
 }
 
 func (gb *GameBoy) Tick(tCycles int) {
-	//tCycles >>= gb.DoubleSpeedFlag
 	gb.Scheduler.CurrentCycle += int64(tCycles) >> int64(gb.DoubleSpeedFlag)
 	gb.UpdateTimers(tCycles) // frame sequencer is here since div apu is controlled by div
 	//gb.MemoryBus.Oam.Tick(gb, tCycles)
 	gb.Apu.WaveChannel.ClockWave(uint32(tCycles>>int(gb.DoubleSpeedFlag)), uint32(gb.Scheduler.CurrentCycle))
-	gb.Apu.SoundClock(uint32(tCycles), uint32(gb.DoubleSpeedFlag))
 }
 
 func (gb *GameBoy) ToggleMute() bool {
@@ -402,14 +409,8 @@ func (gb *GameBoy) toggleDoubleSpeed() {
 	}
 
 	gb.PrepareSpeedToggle = false
-	if gb.DoubleSpeedFlag != 0 {
-		gb.DoubleSpeedFlag = 0
-	} else {
-		gb.DoubleSpeedFlag = 1
-	}
-
 	gb.Cpu.Halted = false
-
+	gb.DoubleSpeedFlag = ^gb.DoubleSpeedFlag
 	gb.MemoryBus.IO[0x4D] = gb.DoubleSpeedFlag << 7
 }
 
