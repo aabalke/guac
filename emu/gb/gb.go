@@ -127,7 +127,8 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 	}
 
 	gb.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 0)
-	gb.Scheduler.schedule(EVENT_WAVE_CLOCK, 0)
+	gb.Scheduler.schedule(EVENT_SND_WAVE_CLOCK, 0)
+	gb.Scheduler.schedule(EVENT_SND_FRAME_SEQ, 0)
 
 	return gb
 }
@@ -273,7 +274,7 @@ func (gb *GameBoy) Update(stdFps bool) {
 			gb.Scheduler.endFrame()
 			return
 
-		case EVENT_WAVE_CLOCK:
+		case EVENT_SND_WAVE_CLOCK:
 			ch := &gb.Apu.WaveChannel
 			if !ch.ChannelEnabled {
 				break
@@ -289,6 +290,12 @@ func (gb *GameBoy) Update(stdFps bool) {
 				ch.Sample = ch.SampleByte & 0xF
 			}
 			gb.scheduleWaveClock(nextEvent.InitCycle)
+
+		case EVENT_SND_FRAME_SEQ:
+			// I believe this is based on div, and will need to be reset based on div falling edge
+			// see polling version, but confirm
+			gb.Apu.ClockFrameSequencer()
+			gb.Scheduler.scheduleAt(EVENT_SND_FRAME_SEQ, nextEvent.InitCycle+8192)
 		}
 
 		gb.Scheduler.CurrentCycle += overshoot
@@ -299,7 +306,6 @@ func (gb *GameBoy) Tick(tCycles int) {
 	gb.Scheduler.CurrentCycle += int64(tCycles) >> int64(gb.DoubleSpeedFlag)
 	gb.UpdateTimers(tCycles) // frame sequencer is here since div apu is controlled by div
 	//gb.MemoryBus.Oam.Tick(gb, tCycles)
-	//gb.Apu.WaveChannel.ClockWave(uint32(tCycles>>int(gb.DoubleSpeedFlag)), uint32(gb.Scheduler.CurrentCycle))
 }
 
 func (gb *GameBoy) ToggleMute() bool {
@@ -311,6 +317,8 @@ func (gb *GameBoy) TogglePause() bool {
 	gb.Paused = !gb.Paused
 	return gb.Paused
 }
+
+var IRQ_SRC = [...]uint16{0x40, 0x48, 0x50, 0x58, 0x60}
 
 func (gb *GameBoy) SetIrq(bit uint8) {
 	gb.Cpu.IF |= bit
@@ -362,19 +370,17 @@ func (gb *GameBoy) UpdateInterrupt() int {
 	return 0
 }
 
-var IRQ_SRC = [...]uint16{0x40, 0x48, 0x50, 0x58, 0x60}
-
 func (gb *GameBoy) UpdateTimers(cycles int) {
 	t := &gb.Timer
 
 	prev := t.Div
 	t.Div += uint16(cycles)
 
-	mask := uint16(1 << 12)
-	mask <<= gb.DoubleSpeedFlag
-	if prev&mask != 0 && t.Div&mask == 0 {
-		gb.Apu.ClockFrameSequencer()
-	}
+	//mask := uint16(1 << 12)
+	//mask <<= gb.DoubleSpeedFlag
+	//if prev&mask != 0 && t.Div&mask == 0 {
+	//	gb.Apu.ClockFrameSequencer()
+	//}
 
 	if !t.Enabled {
 		return
@@ -465,5 +471,5 @@ func (gb *GameBoy) scheduleWaveClock(cycle int64) {
 		return
 	}
 	period := int64(2048-gb.Apu.WaveChannel.ActivePeriod) << 1
-	gb.Scheduler.scheduleAt(EVENT_WAVE_CLOCK, cycle+period)
+	gb.Scheduler.scheduleAt(EVENT_SND_WAVE_CLOCK, cycle+period)
 }
