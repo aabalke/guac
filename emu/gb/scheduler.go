@@ -9,6 +9,7 @@ const (
 	EVENT_END_FRAME
 	EVENT_END_SCANLINE
 	EVENT_SND_SAMPLE_GEN
+	EVENT_WAVE_CLOCK
 )
 
 type Scheduler struct {
@@ -57,5 +58,14 @@ func (s *Scheduler) endFrame() {
 	s.CurrentCycle -= framecycles
 	for i := range s.Events {
 		s.Events[i].InitCycle -= framecycles
+	}
+}
+
+func (s *Scheduler) cancel(e Event) {
+	for i, ev := range s.Events {
+		if ev.Event == e {
+			s.Events = append(s.Events[:i], s.Events[i+1:]...)
+			return
+		}
 	}
 }

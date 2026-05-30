@@ -126,7 +126,8 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 		L = NewLogger("./loggy", gb)
 	}
 
-	gb.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, CYCLES_PER_SND_GEN)
+	gb.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 0)
+	gb.Scheduler.schedule(EVENT_WAVE_CLOCK, 0)
 
 	return gb
 }
@@ -271,6 +272,23 @@ func (gb *GameBoy) Update(stdFps bool) {
 			gb.Apu.Play(gb.Muted, stdFps)
 			gb.Scheduler.endFrame()
 			return
+
+		case EVENT_WAVE_CLOCK:
+			ch := &gb.Apu.WaveChannel
+			if !ch.ChannelEnabled {
+				break
+			}
+			ch.WavePosition = (ch.WavePosition + 1) & 0x1F
+			ch.LastReadCycle = uint32(nextEvent.InitCycle) // exact cycle, no approximation
+			if ch.WavePosition&1 == 0 {
+				ch.Sample = ch.SampleByte >> 4
+			} else {
+				ch.ActivePeriod = ch.Period // period may change here
+				b := ch.Ram[ch.WavePosition>>1]
+				ch.SampleByte = b
+				ch.Sample = ch.SampleByte & 0xF
+			}
+			gb.scheduleWaveClock(nextEvent.InitCycle)
 		}
 
 		gb.Scheduler.CurrentCycle += overshoot
@@ -281,7 +299,7 @@ func (gb *GameBoy) Tick(tCycles int) {
 	gb.Scheduler.CurrentCycle += int64(tCycles) >> int64(gb.DoubleSpeedFlag)
 	gb.UpdateTimers(tCycles) // frame sequencer is here since div apu is controlled by div
 	//gb.MemoryBus.Oam.Tick(gb, tCycles)
-	gb.Apu.WaveChannel.ClockWave(uint32(tCycles>>int(gb.DoubleSpeedFlag)), uint32(gb.Scheduler.CurrentCycle))
+	//gb.Apu.WaveChannel.ClockWave(uint32(tCycles>>int(gb.DoubleSpeedFlag)), uint32(gb.Scheduler.CurrentCycle))
 }
 
 func (gb *GameBoy) ToggleMute() bool {
@@ -440,4 +458,12 @@ func (gb *GameBoy) Draw(screen *ebiten.Image) {
 	gb.DrawOptions.GeoM.Scale(scale, scale)
 	gb.DrawOptions.GeoM.Translate(offsetX, offsetY)
 	screen.DrawImage(gb.Image, &gb.DrawOptions)
+}
+
+func (gb *GameBoy) scheduleWaveClock(cycle int64) {
+	if !gb.Apu.WaveChannel.ChannelEnabled {
+		return
+	}
+	period := int64(2048-gb.Apu.WaveChannel.ActivePeriod) << 1
+	gb.Scheduler.scheduleAt(EVENT_WAVE_CLOCK, cycle+period)
 }

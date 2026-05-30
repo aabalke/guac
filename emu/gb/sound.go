@@ -133,6 +133,8 @@ func (gb *GameBoy) WriteSound(addr, v uint8, a *apu.Apu) {
 
 			if v&0x80 != 0 {
 				ch.Trigger()
+				gb.Scheduler.cancel(EVENT_WAVE_CLOCK)
+				gb.scheduleWaveClock(gb.Scheduler.CurrentCycle)
 			}
 		}
 
