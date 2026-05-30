@@ -428,7 +428,7 @@ func (gb *GameBoy) toggleDoubleSpeed() {
 
 	gb.PrepareSpeedToggle = false
 	gb.Cpu.Halted = false
-	gb.DoubleSpeedFlag = ^gb.DoubleSpeedFlag
+	gb.DoubleSpeedFlag = (^gb.DoubleSpeedFlag) & 1
 	gb.MemoryBus.IO[0x4D] = gb.DoubleSpeedFlag << 7
 }
 
