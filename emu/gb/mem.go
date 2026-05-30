@@ -1,7 +1,6 @@
 package gb
 
 import (
-	"fmt"
 	"time"
 	"unsafe"
 
@@ -448,8 +447,6 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 			b |= 1
 		}
 
-		fmt.Printf("Reading PC %04X SPD %02X\n", gb.Cpu.PC, b)
-
 		return b
 
 	case 0xFF4F:
@@ -614,7 +611,6 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 			if gb.PrepareSpeedToggle {
 				b |= 1
 			}
-			fmt.Printf("Writing PC %04X SPD %02X\n", gb.Cpu.PC, b)
 			return
 		}
 

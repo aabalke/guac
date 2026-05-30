@@ -299,54 +299,16 @@ func (gb *GameBoy) Block0(op uint8, pc uint16) uint16 {
 	case 0x00: // nop
 	case 0x10: // stop / toggle speed
 
-		if gb.PrepareSpeedToggle {
-			if gb.Cpu.IE&reg.IF != 0 {
-				if reg.IME {
-					gb.Tick(8200)
-					gb.toggleDoubleSpeed()
-					gb.Timer.Div = 0
-					pc++
-					reg.PcOff++
-					return pc
-				} else {
-					panic("gb: Stop instruction glitch")
-				}
-			} else {
-
-				gb.Tick(8200)
-				gb.toggleDoubleSpeed()
-				gb.Cpu.Halted = true
-				gb.Tick(0x20000) // halt will exit after 0x20000
-				gb.Cpu.Halted = false
-				gb.Timer.Div = 0
-				pc += 2
-				reg.PcOff += 2
-				return pc
-			}
+		if gb.Color && gb.PrepareSpeedToggle {
+			gb.Tick(8200)
+			gb.toggleDoubleSpeed()
 		} else {
-			if gb.Cpu.IE&reg.IF != 0 {
-				gb.Timer.Div = 0
-				gb.Cpu.Halted = true
-				pc++
-				reg.PcOff++
-				return pc
-			} else {
-				gb.Timer.Div = 0
-				gb.Cpu.Halted = true
-				pc += 2
-				reg.PcOff += 2
-				return pc
-			}
+			gb.Cpu.Halted = true
+			gb.Timer.Div = 0
 		}
 
-		//if gb.Color && gb.PrepareSpeedToggle {
-		//} else {
-		//	gb.Cpu.Halted = true
-		//	gb.Timer.Div = 0
-		//}
-
-		//pc++
-		//reg.PcOff++
+		pc++
+		reg.PcOff++
 
 	case 0x0A:
 		gb.Tick(4)

@@ -7,8 +7,11 @@ const (
 	EVENT_HBK
 	EVENT_DRW
 	EVENT_END_FRAME
-	EVENT_IRQ
-	EVENT_DMA
+	//EVENT_DMA
+	//
+	EVENT_DIV
+	EVENT_TIMA
+	EVENT_TAC
 
 	EVENT_END_SCANLINE
 )
@@ -68,5 +71,14 @@ func (s *Scheduler) endFrame() {
 	s.CurrentCycle -= framecycles
 	for i := range s.Events {
 		s.Events[i].InitCycle -= framecycles
+	}
+}
+
+func (s *Scheduler) cancel(e Event) {
+	for i, ev := range s.Events {
+		if ev.Event == e {
+			s.Events = append(s.Events[:i], s.Events[i+1:]...)
+			return
+		}
 	}
 }
