@@ -107,16 +107,16 @@ func (gb *GameBoy) renderTilesDMG(scanline uint8) {
 		gb.pixelDrawn[pixel] = colorNum != 0
 
         {{ if .GBC }}
-		if draw := !gb.bgPriority[pixel][scanline]; draw {
+		if draw := !gb.bgPriority[scanline][pixel]; draw {
 			color := gb.bgPalette.Unpacked[cgbPalBase+colorNum]
-			gb.Screen[pixel][scanline] = color
+			gb.Screen[scanline][pixel] = color
 		}
 
-		gb.bgPriority[pixel][scanline] = priority
+		gb.bgPriority[scanline][pixel] = priority
         {{ else }}
 
-		if draw := !gb.bgPriority[pixel][scanline]; draw {
-			gb.Screen[pixel][scanline] = gb.UnpackedMonoPals[0][colorNum]
+		if draw := !gb.bgPriority[scanline][pixel]; draw {
+			gb.Screen[scanline][pixel] = gb.UnpackedMonoPals[0][colorNum]
 		}
         {{ end }}
 	}
@@ -214,7 +214,7 @@ func (gb *GameBoy) renderSpritesDMG(scanline int32) {
 				continue
 			}
 
-			drawPixel := (priority && !gb.bgPriority[pixel][scanline]) || !gb.pixelDrawn[pixel]
+			drawPixel := (priority && !gb.bgPriority[scanline][pixel]) || !gb.pixelDrawn[pixel]
             {{if .GBC }}
 			if drawPixel || !gb.Lcdc.BgMaster {
             {{else -}}
@@ -223,7 +223,7 @@ func (gb *GameBoy) renderSpritesDMG(scanline int32) {
                 {{if .GBC }}
 				cgbPalette := attributes & 0x7
 				color := gb.spPalette.Unpacked[(cgbPalette<<2)+(colorNum)]
-				gb.Screen[pixel][scanline] = color
+				gb.Screen[scanline][pixel] = color
                 {{ else }}
 
 				pal := UNPACKED_OBJ0
@@ -231,7 +231,7 @@ func (gb *GameBoy) renderSpritesDMG(scanline int32) {
 					pal = UNPACKED_OBJ1
 				}
 
-				gb.Screen[pixel][scanline] = gb.UnpackedMonoPals[pal][colorNum]
+				gb.Screen[scanline][pixel] = gb.UnpackedMonoPals[pal][colorNum]
                 {{end}}
 			}
 

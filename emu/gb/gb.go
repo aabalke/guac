@@ -3,6 +3,7 @@ package gb
 import (
 	"image/color"
 	"log"
+	"unsafe"
 
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gb/apu"
@@ -26,7 +27,6 @@ const (
 type GameBoy struct {
 	// Palette [][]uint8
 	Palette *[4]color.Color
-	Pixels  []byte
 
 	DrawOptions ebiten.DrawImageOptions
 
@@ -56,9 +56,10 @@ type GameBoy struct {
 	Joypad uint8
 
 	Image      *ebiten.Image
-	Screen     [width][height]uint32
+	Pixels     []byte
+	Screen     [height][width]uint32
 	spMinx     [width]int32
-	bgPriority [width][height]bool
+	bgPriority [height][width]bool
 	pixelDrawn [width]bool
 
 	Paused bool
@@ -93,16 +94,17 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 		Cartridge: cartridge.NewCartridge(path, path+".save"),
 		Palette:   &config.Conf.Gb.Palette,
 		Scheduler: NewScheduler(),
+		Apu:       apu.NewApu(ctx, CPU_SPEED, SND_FREQ, SND_SAMPLES),
 	}
+
+	// ebiten engine requires a slice, Screen is easier to edit as an array of arrays
+	// instead of building an intermediate rep, pixels will just point to Screen
+	gb.Pixels = unsafe.Slice((*byte)(unsafe.Pointer(&gb.Screen[0])), height*width*4)
 
 	gb.Lcdc.gb = gb
 	gb.MemoryBus.Hdma.gb = gb
-
 	gb.bgPalette.Init()
 	gb.spPalette.Init()
-	gb.Pixels = make([]byte, width*height*4)
-
-	gb.Apu = apu.NewApu(ctx, gb.Clock, SND_FREQ, SND_SAMPLES)
 
 	if gb.Cartridge.ColorMode {
 		gb.Color = true
@@ -178,12 +180,12 @@ func (gb *GameBoy) Update(stdFps bool) {
 		nextEvent := gb.Scheduler.popNext()
 
 		for gb.Scheduler.CurrentCycle < nextEvent.InitCycle {
+			gb.Tick(gb.UpdateInterrupt())
 			if gb.Cpu.Halted {
 				gb.Tick(4)
 			} else {
 				gb.Execute()
 			}
-			gb.Tick(gb.UpdateInterrupt())
 		}
 
 		overshoot := gb.Scheduler.CurrentCycle - nextEvent.InitCycle
@@ -202,18 +204,18 @@ func (gb *GameBoy) Update(stdFps bool) {
 				}
 
 				gb.SetIrq(IRQ_VBL)
-				gb.UpdateDisplay()
+				gb.Image.WritePixels(gb.Pixels)
 			}
 
 		case EVENT_DRW:
 			if gb.Lcdc.Enabled {
 				gb.Stat.Mode = PPU_DRAW
-				gb.drawScanline(int32(gb.MemoryBus.IO[LY]))
 			}
 
 		case EVENT_HBK:
 
 			if gb.Lcdc.Enabled {
+				gb.drawScanline(int32(gb.MemoryBus.IO[LY]))
 				gb.Stat.Mode = PPU_HBLANK
 				if gb.Stat.IrqHBlank {
 					gb.SetIrq(IRQ_LCD)
@@ -252,10 +254,9 @@ func (gb *GameBoy) Update(stdFps bool) {
 
 		case EVENT_END_FRAME:
 			if gb.Lcdc.Enabled {
-				gb.bgPriority = [width][height]bool{}
+				gb.bgPriority = [height][width]bool{}
 				gb.MemoryBus.IO[LY] = 0
 				gb.WindowLY = 0
-				gb.Image.WritePixels(gb.Pixels)
 				gb.Stat.Match = gb.MemoryBus.IO[LY] == gb.MemoryBus.IO[LYC]
 				if gb.Stat.Match && gb.Stat.IrqLyc {
 					gb.SetIrq(IRQ_LCD)
@@ -276,11 +277,11 @@ func (gb *GameBoy) Update(stdFps bool) {
 				break
 			}
 			ch.WavePosition = (ch.WavePosition + 1) & 0x1F
-			ch.LastReadCycle = uint32(nextEvent.InitCycle) // exact cycle, no approximation
+			ch.LastReadCycle = uint32(nextEvent.InitCycle)
 			if ch.WavePosition&1 == 0 {
 				ch.Sample = ch.SampleByte >> 4
 			} else {
-				ch.ActivePeriod = ch.Period // period may change here
+				ch.ActivePeriod = ch.Period
 				b := ch.Ram[ch.WavePosition>>1]
 				ch.SampleByte = b
 				ch.Sample = ch.SampleByte & 0xF

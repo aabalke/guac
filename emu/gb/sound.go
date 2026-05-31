@@ -165,6 +165,14 @@ func (gb *GameBoy) WriteSound(addr, v uint8, a *apu.Apu) {
 			ch.S = v >> 4
 			ch.R = v & 7
 			ch.Width7 = v&0x8 != 0
+			r := float64(ch.R)
+			if r == 0 {
+				r = 0.5
+			}
+
+			div := 1 << (ch.S + 1)
+			frequency := (524288 / r) / float64(div)
+			ch.CycleSamples = SND_FREQ / frequency
 
 		case 0x23:
 

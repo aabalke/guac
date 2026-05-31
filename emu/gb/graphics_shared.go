@@ -1,9 +1,5 @@
 package gb
 
-import (
-	"unsafe"
-)
-
 const (
 	SCY         = 0x42
 	SCX         = 0x43
@@ -136,15 +132,6 @@ func (s *Stat) Write(v uint8) {
 	s.IrqVBlank = (v>>4)&1 != 0
 	s.IrqOam = (v>>5)&1 != 0
 	s.IrqLyc = (v>>6)&1 != 0
-}
-
-func (gb *GameBoy) UpdateDisplay() {
-	for y := range height {
-		p32 := (*[width]uint32)(unsafe.Pointer(&gb.Pixels[(y*width)*4]))
-		for x := range uint32(width) {
-			p32[x] = gb.Screen[x][y]
-		}
-	}
 }
 
 func (gb *GameBoy) drawScanline(scanline int32) {

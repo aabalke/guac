@@ -17,7 +17,8 @@ const (
 )
 
 type Scheduler struct {
-	Events       []ScheduledEvent
+	Events       [32]ScheduledEvent
+	Cnt          int
 	CurrentCycle int64
 }
 
@@ -27,9 +28,7 @@ type ScheduledEvent struct {
 }
 
 func NewScheduler() *Scheduler {
-	return &Scheduler{
-		Events: make([]ScheduledEvent, 0, 32),
-	}
+	return &Scheduler{}
 }
 
 func (s *Scheduler) schedule(e Event, cyclesUntil int64) {
@@ -37,38 +36,42 @@ func (s *Scheduler) schedule(e Event, cyclesUntil int64) {
 }
 
 func (s *Scheduler) scheduleAt(e Event, initCycle int64) {
-	es := ScheduledEvent{Event: e, InitCycle: initCycle}
+	if s.Cnt >= 32 {
+		panic("gb/gbc: scheduler reached hard limit")
+	}
 
-	for i, existing := range s.Events {
-		if es.InitCycle < existing.InitCycle {
-			s.Events = append(s.Events, ScheduledEvent{})
-			copy(s.Events[i+1:], s.Events[i:])
+	es := ScheduledEvent{Event: e, InitCycle: initCycle}
+	for i := range s.Cnt {
+		if es.InitCycle < s.Events[i].InitCycle {
+			copy(s.Events[i+1:s.Cnt+1], s.Events[i:s.Cnt])
 			s.Events[i] = es
+			s.Cnt++
 			return
 		}
 	}
-
-	s.Events = append(s.Events, es)
+	s.Events[s.Cnt] = es
+	s.Cnt++
 }
 
 func (s *Scheduler) popNext() ScheduledEvent {
 	next := s.Events[0]
-	s.Events = s.Events[1:]
+	copy(s.Events[0:s.Cnt-1], s.Events[1:s.Cnt])
+	s.Cnt--
 	return next
 }
 
 func (s *Scheduler) endFrame() {
-	framecycles := int64(CYCLES_PER_FRAME)
-	s.CurrentCycle -= framecycles
-	for i := range s.Events {
-		s.Events[i].InitCycle -= framecycles
+	s.CurrentCycle -= CYCLES_PER_FRAME
+	for i := range s.Cnt {
+		s.Events[i].InitCycle -= CYCLES_PER_FRAME
 	}
 }
 
 func (s *Scheduler) cancel(e Event) {
-	for i, ev := range s.Events {
-		if ev.Event == e {
-			s.Events = append(s.Events[:i], s.Events[i+1:]...)
+	for i := range s.Cnt {
+		if s.Events[i].Event == e {
+			copy(s.Events[i:s.Cnt-1], s.Events[i+1:s.Cnt])
+			s.Cnt--
 			return
 		}
 	}

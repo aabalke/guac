@@ -171,52 +171,64 @@ func (a *Apu) SoundBufferWrap() {
 
 func (a *Apu) SoundClock() {
 	var (
+		pan  = a.PanReg
 		volL = int32((a.Master>>4)&7) + 1
 		volR = int32((a.Master>>0)&7) + 1
-		chs  = [4]struct {
-			Channel       Channel
-			Enabled, L, R bool
-		}{
-			{
-				Channel: &a.ToneChannel1,
-				Enabled: a.ToneChannel1.ChannelEnabled,
-				L:       (a.PanReg & 0x10) != 0,
-				R:       (a.PanReg & 0x01) != 0,
-			},
-			{
-				Channel: &a.ToneChannel2,
-				Enabled: a.ToneChannel2.ChannelEnabled,
-				L:       (a.PanReg & 0x20) != 0,
-				R:       (a.PanReg & 0x02) != 0,
-			},
-			{
-				Channel: &a.WaveChannel,
-				Enabled: a.WaveChannel.ChannelEnabled,
-				L:       (a.PanReg & 0x40) != 0,
-				R:       (a.PanReg & 0x04) != 0,
-			},
-			{
-				Channel: &a.NoiseChannel,
-				Enabled: a.NoiseChannel.ChannelEnabled,
-				L:       (a.PanReg & 0x80) != 0,
-				R:       (a.PanReg & 0x08) != 0,
-			},
-		}
 
-		psgL int32
-		psgR int32
+		ch1L = (pan & 0x10) != 0
+		ch1R = (pan & 0x01) != 0
+		ch2L = (pan & 0x20) != 0
+		ch2R = (pan & 0x02) != 0
+		ch3L = (pan & 0x40) != 0
+		ch3R = (pan & 0x04) != 0
+		ch4L = (pan & 0x80) != 0
+		ch4R = (pan & 0x08) != 0
+
+		ch1 = a.ToneChannel1.ChannelEnabled
+		ch2 = a.ToneChannel2.ChannelEnabled
+		ch3 = a.WaveChannel.ChannelEnabled
+		ch4 = a.NoiseChannel.ChannelEnabled
 	)
 
-	for _, ch := range chs {
-		if !ch.Enabled {
-			continue
+	psgL, psgR := int32(0), int32(0)
+
+	if ch1 {
+		ch := int32(a.ToneChannel1.GetSample())
+		if ch1L {
+			psgL += ch
 		}
-		data := int32(ch.Channel.GetSample())
-		if ch.L {
-			psgL += data
+		if ch1R {
+			psgR += ch
 		}
-		if ch.R {
-			psgR += data
+	}
+
+	if ch2 {
+		ch := int32(a.ToneChannel2.GetSample())
+		if ch2L {
+			psgL += ch
+		}
+		if ch2R {
+			psgR += ch
+		}
+	}
+
+	if ch3 {
+		ch := int32(a.WaveChannel.GetSample())
+		if ch3L {
+			psgL += ch
+		}
+		if ch3R {
+			psgR += ch
+		}
+	}
+
+	if ch4 {
+		ch := int32(a.NoiseChannel.GetSample())
+		if ch4L {
+			psgL += ch
+		}
+		if ch4R {
+			psgR += ch
 		}
 	}
 

@@ -75,8 +75,8 @@ func (gb *GameBoy) renderTilesDMG(scanline uint8) {
 		colorNum := getColorVal(data2, data1, colorBit, colorBit)
 		gb.pixelDrawn[pixel] = colorNum != 0
 
-		if draw := !gb.bgPriority[pixel][scanline]; draw {
-			gb.Screen[pixel][scanline] = gb.UnpackedMonoPals[0][colorNum]
+		if draw := !gb.bgPriority[scanline][pixel]; draw {
+			gb.Screen[scanline][pixel] = gb.UnpackedMonoPals[0][colorNum]
 		}
 
 	}
@@ -158,7 +158,7 @@ func (gb *GameBoy) renderSpritesDMG(scanline int32) {
 				continue
 			}
 
-			drawPixel := (priority && !gb.bgPriority[pixel][scanline]) || !gb.pixelDrawn[pixel]
+			drawPixel := (priority && !gb.bgPriority[scanline][pixel]) || !gb.pixelDrawn[pixel]
 			if drawPixel {
 
 				pal := UNPACKED_OBJ0
@@ -166,7 +166,7 @@ func (gb *GameBoy) renderSpritesDMG(scanline int32) {
 					pal = UNPACKED_OBJ1
 				}
 
-				gb.Screen[pixel][scanline] = gb.UnpackedMonoPals[pal][colorNum]
+				gb.Screen[scanline][pixel] = gb.UnpackedMonoPals[pal][colorNum]
 
 			}
 
