@@ -255,7 +255,7 @@ var (
 	f *os.File
 )
 
-const UNLIMITED_FPS = 0x1000
+const UNLIMITED_FPS = 0x1800
 
 func (g *Game) Profile() {
 	p := &config.Conf.Profile

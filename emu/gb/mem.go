@@ -142,7 +142,7 @@ func (h *Hdma) Transfer(length uint16) {
 	// relative to cpu
 	//~ 8 normal m cycles per 0x10 transfers
 	//tcycles := (8 << h.gb.DoubleSpeedFlag) << 2
-	tcycles := 8 << 2
+	tcycles := int64(8 << 2)
 
 	for range length {
 
@@ -502,67 +502,71 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 	case 0xFF04: // DIV
 
 		t := &gb.Timer
-		prevDiv := t.Div
+		//prevDiv := t.Div
 		t.Div = 0
 
-		mask := uint16(1 << 12)
-		mask <<= gb.DoubleSpeedFlag
+		gb.Scheduler.cancel(EVENT_TIMA_INC)
+		gb.scheduleTima(gb.Scheduler.CurrentCycle)
 
-		if prevDiv&mask != 0 {
-			gb.Apu.ClockFrameSequencer()
-		}
+		//mask := uint16(1 << 12)
+		//mask <<= gb.DoubleSpeedFlag
 
-		if !t.Enabled {
-			return
-		}
+		//if prevDiv&mask != 0 {
+		//	gb.Apu.ClockFrameSequencer()
+		//}
 
-		if prevDiv&fallingEdgeBits[t.FreqBits] != 0 {
-			if overflow := t.TIMA == 0xFF; overflow {
-				t.TIMA = t.TMA
-				gb.SetIrq(IRQ_TMR)
-				return
-			}
+		//if !t.Enabled {
+		//	return
+		//}
 
-			t.TIMA++
-		}
+		// if prevDiv&fallingEdgeBits[t.FreqBits] != 0 {
+		//	if overflow := t.TIMA == 0xFF; overflow {
+		//		t.TIMA = t.TMA
+		//		gb.SetIrq(IRQ_TMR)
+		//		return
+		//	}
+
+		//	t.TIMA++
+		//}
 
 	case 0xFF05:
 
-		gb.Timer.PendingOverflow = false
-		if !gb.Timer.BCycle {
-			gb.Timer.TIMA = v
-		}
+		// gb.Timer.PendingOverflow = false
+		// if !gb.Timer.BCycle {
+		gb.Timer.TIMA = v
+		//}
 
 	case 0xFF06:
 		gb.Timer.TMA = v
 
-		if gb.Timer.BCycle {
-			gb.Timer.TIMA = v
-		}
+		//if gb.Timer.BCycle {
+		//gb.Timer.TIMA = v
+		//}
 
 	case 0xFF07:
-		t := &gb.Timer
+		//t := &gb.Timer
 
-		if gb.Timer.FreqBits != v&3 {
-			gb.Timer.FreqBits = v & 3
-		}
+		gb.Timer.FreqBits = v & 3
 
-		wasEnabled := gb.Timer.Enabled
+		//wasEnabled := gb.Timer.Enabled
 		gb.Timer.Enabled = v&4 != 0
 
-		if !wasEnabled || gb.Timer.Enabled {
-			return
-		}
+		gb.Scheduler.cancel(EVENT_TIMA_INC)
+		gb.scheduleTima(gb.Scheduler.CurrentCycle)
 
-		if gb.Timer.Div&fallingEdgeBits[t.FreqBits] != 0 {
-			if overflow := t.TIMA == 0xFF; overflow {
-				t.TIMA = t.TMA
-				gb.SetIrq(IRQ_TMR)
-				return
-			}
+		//if !wasEnabled || gb.Timer.Enabled {
+		//	return
+		//}
 
-			t.TIMA++
-		}
+		// if gb.Timer.Div&fallingEdgeBits[t.FreqBits] != 0 {
+		//	if overflow := t.TIMA == 0xFF; overflow {
+		//		t.TIMA = t.TMA
+		//		gb.SetIrq(IRQ_TMR)
+		//		return
+		//	}
+
+		//	t.TIMA++
+		//}
 
 	case 0xFF0F:
 		gb.Cpu.IF = v & 0x1F
