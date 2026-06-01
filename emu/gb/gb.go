@@ -131,7 +131,6 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 	gb.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 0)
 	gb.Scheduler.schedule(EVENT_SND_WAVE_CLOCK, 0)
 	gb.Scheduler.schedule(EVENT_SND_FRAME_SEQ, 0)
-	//gb.Scheduler.schedule(EVENT_TIMA_INC, 0)
 
 	return gb
 }
@@ -193,119 +192,127 @@ func (gb *GameBoy) Update(stdFps bool) {
 			}
 		}
 
-		overshoot := gb.Scheduler.CurrentCycle - nextEvent.InitCycle
-		gb.Scheduler.CurrentCycle = nextEvent.InitCycle
+		if done := gb.handleEvent(nextEvent, stdFps); done {
+			return
+		}
+	}
+}
 
-		switch nextEvent.Event {
-		case EVENT_SND_SAMPLE_GEN:
-			gb.Apu.SoundClock()
-			gb.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, CYCLES_PER_SND_GEN)
+func (gb *GameBoy) handleEvent(event ScheduledEvent, stdFps bool) bool {
+	overshoot := gb.Scheduler.CurrentCycle - event.InitCycle
+	gb.Scheduler.CurrentCycle = event.InitCycle
 
-		case EVENT_VBK:
-			if gb.Lcdc.Enabled {
-				gb.Stat.Mode = PPU_VBLANK
-				if gb.Stat.IrqVBlank {
-					gb.SetIrq(IRQ_LCD)
-				}
+	switch event.Event {
+	case EVENT_SND_SAMPLE_GEN:
+		gb.Apu.SoundClock()
+		gb.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, CYCLES_PER_SND_GEN)
 
-				gb.SetIrq(IRQ_VBL)
-				gb.Image.WritePixels(gb.Pixels)
+	case EVENT_VBK:
+		if gb.Lcdc.Enabled {
+			gb.Stat.Mode = PPU_VBLANK
+			if gb.Stat.IrqVBlank {
+				gb.SetIrq(IRQ_LCD)
 			}
 
-		case EVENT_DRW:
-			if gb.Lcdc.Enabled {
-				gb.Stat.Mode = PPU_DRAW
+			gb.SetIrq(IRQ_VBL)
+			gb.Image.WritePixels(gb.Pixels)
+		}
+
+	case EVENT_DRW:
+		if gb.Lcdc.Enabled {
+			gb.Stat.Mode = PPU_DRAW
+		}
+
+	case EVENT_HBK:
+
+		if gb.Lcdc.Enabled {
+			gb.drawScanline(int32(gb.MemoryBus.IO[LY]))
+			gb.Stat.Mode = PPU_HBLANK
+			if gb.Stat.IrqHBlank {
+				gb.SetIrq(IRQ_LCD)
 			}
 
-		case EVENT_HBK:
+			if gb.Color && gb.MemoryBus.Hdma.Enabled && !gb.Cpu.Halted {
+				gb.MemoryBus.Hdma.Transfer(1)
+			}
+		}
 
-			if gb.Lcdc.Enabled {
-				gb.drawScanline(int32(gb.MemoryBus.IO[LY]))
-				gb.Stat.Mode = PPU_HBLANK
-				if gb.Stat.IrqHBlank {
-					gb.SetIrq(IRQ_LCD)
-				}
+	case EVENT_END_SCANLINE:
 
-				if gb.Color && gb.MemoryBus.Hdma.Enabled && !gb.Cpu.Halted {
-					gb.MemoryBus.Hdma.Transfer(1)
-				}
+		if gb.Lcdc.Enabled {
+
+			gb.MemoryBus.IO[LY]++
+
+			gb.Stat.Match = gb.MemoryBus.IO[LY] == gb.MemoryBus.IO[LYC]
+			if gb.Stat.Match && gb.Stat.IrqLyc {
+				gb.SetIrq(IRQ_LCD)
 			}
 
-		case EVENT_END_SCANLINE:
-
-			if gb.Lcdc.Enabled {
-
-				gb.MemoryBus.IO[LY]++
-
-				gb.Stat.Match = gb.MemoryBus.IO[LY] == gb.MemoryBus.IO[LYC]
-				if gb.Stat.Match && gb.Stat.IrqLyc {
-					gb.SetIrq(IRQ_LCD)
-				}
-
-				if nextEvent.InitCycle+CYCLES_PER_END_SCANLINE != CYCLES_PER_FRAME {
-					gb.Scheduler.scheduleAt(EVENT_END_SCANLINE, nextEvent.InitCycle+CYCLES_PER_END_SCANLINE)
-				}
-
-				if gb.MemoryBus.IO[LY] < height {
-					gb.Scheduler.scheduleAt(EVENT_DRW, nextEvent.InitCycle+CYCLES_PER_DRAW)
-					gb.Scheduler.scheduleAt(EVENT_HBK, nextEvent.InitCycle+CYCLES_PER_HBLANK)
-
-					gb.Stat.Mode = PPU_OAM
-					if gb.Stat.IrqOam {
-						gb.SetIrq(IRQ_LCD)
-					}
-				}
+			if event.InitCycle+CYCLES_PER_END_SCANLINE != CYCLES_PER_FRAME {
+				gb.Scheduler.scheduleAt(EVENT_END_SCANLINE, event.InitCycle+CYCLES_PER_END_SCANLINE)
 			}
 
-		case EVENT_END_FRAME:
-			if gb.Lcdc.Enabled {
-				gb.bgPriority = [height][width]bool{}
-				gb.MemoryBus.IO[LY] = 0
-				gb.WindowLY = 0
-				gb.Stat.Match = gb.MemoryBus.IO[LY] == gb.MemoryBus.IO[LYC]
-				if gb.Stat.Match && gb.Stat.IrqLyc {
-					gb.SetIrq(IRQ_LCD)
-				}
+			if gb.MemoryBus.IO[LY] < height {
+				gb.Scheduler.scheduleAt(EVENT_DRW, event.InitCycle+CYCLES_PER_DRAW)
+				gb.Scheduler.scheduleAt(EVENT_HBK, event.InitCycle+CYCLES_PER_HBLANK)
+
 				gb.Stat.Mode = PPU_OAM
 				if gb.Stat.IrqOam {
 					gb.SetIrq(IRQ_LCD)
 				}
 			}
-
-			gb.Apu.Play(gb.Muted, stdFps)
-			gb.Scheduler.endFrame()
-			return
-
-		case EVENT_SND_WAVE_CLOCK:
-			ch := &gb.Apu.WaveChannel
-			if !ch.ChannelEnabled {
-				break
-			}
-			ch.WavePosition = (ch.WavePosition + 1) & 0x1F
-			ch.LastReadCycle = uint32(nextEvent.InitCycle)
-			if ch.WavePosition&1 == 0 {
-				ch.Sample = ch.SampleByte >> 4
-			} else {
-				ch.ActivePeriod = ch.Period
-				b := ch.Ram[ch.WavePosition>>1]
-				ch.SampleByte = b
-				ch.Sample = ch.SampleByte & 0xF
-			}
-			gb.scheduleWaveClock(nextEvent.InitCycle)
-
-		case EVENT_SND_FRAME_SEQ:
-			// I believe this is based on div, and will need to be reset based on div falling edge
-			// see polling version, but confirm
-			gb.Apu.ClockFrameSequencer()
-			gb.Scheduler.scheduleAt(EVENT_SND_FRAME_SEQ, nextEvent.InitCycle+8192)
-
-		default:
-			panic("unsetup event")
-
 		}
 
-		gb.Scheduler.CurrentCycle += overshoot
+	case EVENT_END_FRAME:
+		if gb.Lcdc.Enabled {
+			gb.bgPriority = [height][width]bool{}
+			gb.MemoryBus.IO[LY] = 0
+			gb.WindowLY = 0
+			gb.Stat.Match = gb.MemoryBus.IO[LY] == gb.MemoryBus.IO[LYC]
+			if gb.Stat.Match && gb.Stat.IrqLyc {
+				gb.SetIrq(IRQ_LCD)
+			}
+			gb.Stat.Mode = PPU_OAM
+			if gb.Stat.IrqOam {
+				gb.SetIrq(IRQ_LCD)
+			}
+		}
+
+		gb.Apu.Play(gb.Muted, stdFps)
+		gb.Scheduler.endFrame()
+		//gb.Scheduler.CurrentCycle += overshoot
+		return true
+
+	case EVENT_SND_WAVE_CLOCK:
+		ch := &gb.Apu.WaveChannel
+		if !ch.ChannelEnabled {
+			break
+		}
+		ch.WavePosition = (ch.WavePosition + 1) & 0x1F
+		ch.LastReadCycle = uint32(event.InitCycle)
+		if ch.WavePosition&1 == 0 {
+			ch.Sample = ch.SampleByte >> 4
+		} else {
+			ch.ActivePeriod = ch.Period
+			b := ch.Ram[ch.WavePosition>>1]
+			ch.SampleByte = b
+			ch.Sample = ch.SampleByte & 0xF
+		}
+		gb.scheduleWaveClock(event.InitCycle)
+
+	case EVENT_SND_FRAME_SEQ:
+		// I believe this is based on div, and will need to be reset based on div falling edge
+		// see polling version, but confirm
+		gb.Apu.ClockFrameSequencer()
+		gb.Scheduler.scheduleAt(EVENT_SND_FRAME_SEQ, event.InitCycle+8192)
+
+	default:
+		panic("unsetup event")
 	}
+
+	gb.Scheduler.CurrentCycle += overshoot
+
+	return false
 }
 
 //go:inline
@@ -318,7 +325,6 @@ func (gb *GameBoy) Tick(tCycles int64) {
 		gb.Timer.Div += uint16(tCycles)
 	}
 
-	//gb.Timer.Div += uint16(tCycles)
 	//gb.MemoryBus.Oam.Tick(gb, tCycles)
 }
 
@@ -367,11 +373,19 @@ func (gb *GameBoy) UpdateInterrupt() int64 {
 
 		gb.Cpu.IME = false
 		gb.Cpu.Halted = false
-		gb.Cpu.IF &^= (1 << i)
 
-		// stack push
+		// see mooneye/acceptance/interrupt/ie_push for stack handling
 		gb.Cpu.SP--
-		gb.Write(gb.Cpu.SP, uint8(gb.Cpu.PC>>8))
+
+		if gb.Cpu.SP != 0xFFFF {
+			gb.Cpu.IF &^= (1 << i)
+			gb.Write(gb.Cpu.SP, uint8(gb.Cpu.PC>>8))
+		} else {
+			gb.Cpu.PC = 0x0
+			gb.Cpu.isBranching = true
+			continue
+		}
+
 		gb.Cpu.SP--
 		gb.Write(gb.Cpu.SP, uint8(gb.Cpu.PC))
 
@@ -387,32 +401,21 @@ func (gb *GameBoy) UpdateInterrupt() int64 {
 var fallingEdgeBits = [...]uint16{1 << 9, 1 << 3, 1 << 5, 1 << 7}
 
 func (gb *GameBoy) UpdateTimers(cycles int64) {
-	t := &gb.Timer
-
-	if cycles >= 4 {
-
-		t.BCycle = false
-
-		if t.PendingOverflow {
-			t.TIMA = t.TMA
-			gb.SetIrq(IRQ_TMR)
-			t.PendingOverflow = false
-			t.BCycle = true
-		}
-	}
-
 	// have to handle edgecnt with div overflow (prev will be 0xFFC, div will be 0)
 	// see oracle of ages and polemon gold for behavior
-	period := uint32(fallingEdgeBits[t.FreqBits] << 1)
-	prev := uint32(t.Div)
-	edgeCnt := ((uint32(t.Div) + uint32(cycles)) / period) - (prev / period)
-	t.Div += uint16(cycles)
+	var (
+		t       = &gb.Timer
+		period  = uint32(fallingEdgeBits[t.FreqBits] << 1)
+		prev    = uint32(t.Div)
+		next    = prev + uint32(cycles)
+		edgeCnt = (next / period) - (prev / period)
+	)
+
+	t.Div = uint16(next)
 
 	for range edgeCnt {
 
-		if t.BCycle {
-			t.BCycle = false
-		}
+		t.BCycle = false
 
 		if t.PendingOverflow {
 			t.TIMA = t.TMA

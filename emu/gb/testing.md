@@ -119,7 +119,7 @@ Oam Bug 2
 
 👍 Manual Sprite Priority
 👍 Daa Instruction
-❌ Interrupt Handling ie Push
+👍 Interrupt Handling ie Push
 ❌ Serial boot sclk align dmgABCmgb
  
 ## OAM DMA

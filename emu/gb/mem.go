@@ -1,7 +1,6 @@
 package gb
 
 import (
-	"log"
 	"time"
 	"unsafe"
 
@@ -503,10 +502,10 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 	case 0xFF04: // DIV
 
 		t := &gb.Timer
-		//prevDiv := t.Div
+		prevDiv := t.Div
 		t.Div = 0
 
-		log.Printf("NEED TO SET UP EVENT HANDLING ON DIV SET 0")
+		//log.Printf("NEED TO SET UP EVENT HANDLING ON DIV SET 0")
 
 		//mask := uint16(1 << 12)
 		//mask <<= gb.DoubleSpeedFlag
@@ -515,19 +514,15 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		//	gb.Apu.ClockFrameSequencer()
 		//}
 
-		//if !t.Enabled {
-		//	return
-		//}
+		if t.Enabled && prevDiv&fallingEdgeBits[t.FreqBits] != 0 {
+			if overflow := t.TIMA == 0xFF; overflow {
+				t.TIMA = t.TMA
+				gb.SetIrq(IRQ_TMR)
+				return
+			}
 
-		// if prevDiv&fallingEdgeBits[t.FreqBits] != 0 {
-		//	if overflow := t.TIMA == 0xFF; overflow {
-		//		t.TIMA = t.TMA
-		//		gb.SetIrq(IRQ_TMR)
-		//		return
-		//	}
-
-		//	t.TIMA++
-		//}
+			t.TIMA++
+		}
 
 	case 0xFF05:
 
