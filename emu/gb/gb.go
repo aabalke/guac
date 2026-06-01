@@ -184,11 +184,17 @@ func (gb *GameBoy) Update(stdFps bool) {
 		nextEvent := gb.Scheduler.popNext()
 
 		for gb.Scheduler.CurrentCycle < nextEvent.InitCycle {
-			gb.Tick(gb.UpdateInterrupt())
+
 			if gb.Cpu.Halted {
 				gb.Tick(4)
 			} else {
 				gb.Execute()
+			}
+			// pending irq should be checked after handling irq, see mooneye/ei_sequence
+			gb.Tick(gb.UpdateInterrupt())
+			if gb.Cpu.PendingInterrupt {
+				gb.Cpu.IME = true
+				gb.Cpu.PendingInterrupt = false
 			}
 		}
 
@@ -345,12 +351,6 @@ func (gb *GameBoy) SetIrq(bit uint8) {
 }
 
 func (gb *GameBoy) UpdateInterrupt() int64 {
-	if gb.Cpu.PendingInterrupt {
-		gb.Cpu.IME = true
-		gb.Cpu.PendingInterrupt = false
-		return 0
-	}
-
 	if !gb.Cpu.IME && !gb.Cpu.Halted {
 		return 0
 	}
