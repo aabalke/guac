@@ -1,6 +1,7 @@
 package gb
 
 import (
+	"log"
 	"time"
 	"unsafe"
 
@@ -505,8 +506,7 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		//prevDiv := t.Div
 		t.Div = 0
 
-		gb.Scheduler.cancel(EVENT_TIMA_INC)
-		gb.scheduleTima(gb.Scheduler.CurrentCycle)
+		log.Printf("NEED TO SET UP EVENT HANDLING ON DIV SET 0")
 
 		//mask := uint16(1 << 12)
 		//mask <<= gb.DoubleSpeedFlag
@@ -531,42 +531,41 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 
 	case 0xFF05:
 
-		// gb.Timer.PendingOverflow = false
-		// if !gb.Timer.BCycle {
-		gb.Timer.TIMA = v
-		//}
+		gb.Timer.PendingOverflow = false
+		if !gb.Timer.BCycle {
+			gb.Timer.TIMA = v
+		}
 
 	case 0xFF06:
 		gb.Timer.TMA = v
 
-		//if gb.Timer.BCycle {
-		//gb.Timer.TIMA = v
-		//}
+		if gb.Timer.BCycle {
+			gb.Timer.TIMA = v
+		}
 
 	case 0xFF07:
-		//t := &gb.Timer
+		t := &gb.Timer
 
-		gb.Timer.FreqBits = v & 3
+		if gb.Timer.FreqBits != v&3 {
+			gb.Timer.FreqBits = v & 3
+		}
 
-		//wasEnabled := gb.Timer.Enabled
+		wasEnabled := gb.Timer.Enabled
 		gb.Timer.Enabled = v&4 != 0
 
-		gb.Scheduler.cancel(EVENT_TIMA_INC)
-		gb.scheduleTima(gb.Scheduler.CurrentCycle)
+		if !wasEnabled || gb.Timer.Enabled {
+			return
+		}
 
-		//if !wasEnabled || gb.Timer.Enabled {
-		//	return
-		//}
+		if gb.Timer.Div&fallingEdgeBits[t.FreqBits] != 0 {
+			if overflow := t.TIMA == 0xFF; overflow {
+				t.TIMA = t.TMA
+				gb.SetIrq(IRQ_TMR)
+				return
+			}
 
-		// if gb.Timer.Div&fallingEdgeBits[t.FreqBits] != 0 {
-		//	if overflow := t.TIMA == 0xFF; overflow {
-		//		t.TIMA = t.TMA
-		//		gb.SetIrq(IRQ_TMR)
-		//		return
-		//	}
-
-		//	t.TIMA++
-		//}
+			t.TIMA++
+		}
 
 	case 0xFF0F:
 		gb.Cpu.IF = v & 0x1F

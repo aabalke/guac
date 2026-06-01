@@ -74,6 +74,11 @@ type Timer struct {
 	TMA      uint8
 	Enabled  bool
 	FreqBits uint8
+
+	// for 8 cycles after overflow there is odd behavior
+	// Pending Overflow 0-4 cycles after, BCycle 4-8 after
+	PendingOverflow bool
+	BCycle          bool
 }
 
 const (
@@ -126,7 +131,7 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 	gb.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 0)
 	gb.Scheduler.schedule(EVENT_SND_WAVE_CLOCK, 0)
 	gb.Scheduler.schedule(EVENT_SND_FRAME_SEQ, 0)
-	gb.Scheduler.schedule(EVENT_TIMA_INC, 0)
+	//gb.Scheduler.schedule(EVENT_TIMA_INC, 0)
 
 	return gb
 }
@@ -294,20 +299,9 @@ func (gb *GameBoy) Update(stdFps bool) {
 			gb.Apu.ClockFrameSequencer()
 			gb.Scheduler.scheduleAt(EVENT_SND_FRAME_SEQ, nextEvent.InitCycle+8192)
 
-		case EVENT_TIMA_OVERFLOW:
-			gb.Timer.TIMA = gb.Timer.TMA
-			gb.SetIrq(IRQ_TMR)
+		default:
+			panic("unsetup event")
 
-		case EVENT_TIMA_INC:
-			if gb.Timer.TIMA == 0xFF {
-				gb.Timer.TIMA = 0
-				// tima overflow is 1 m cycle delayed
-				gb.Scheduler.scheduleAt(EVENT_TIMA_OVERFLOW, nextEvent.InitCycle+4)
-			} else {
-				gb.Timer.TIMA++
-			}
-
-			gb.scheduleTima(nextEvent.InitCycle)
 		}
 
 		gb.Scheduler.CurrentCycle += overshoot
@@ -317,7 +311,14 @@ func (gb *GameBoy) Update(stdFps bool) {
 //go:inline
 func (gb *GameBoy) Tick(tCycles int64) {
 	gb.Scheduler.CurrentCycle += tCycles >> gb.DoubleSpeedFlag
-	gb.Timer.Div += uint16(tCycles)
+
+	if gb.Timer.Enabled {
+		gb.UpdateTimers(tCycles)
+	} else {
+		gb.Timer.Div += uint16(tCycles)
+	}
+
+	//gb.Timer.Div += uint16(tCycles)
 	//gb.MemoryBus.Oam.Tick(gb, tCycles)
 }
 
@@ -383,6 +384,53 @@ func (gb *GameBoy) UpdateInterrupt() int64 {
 	return 0
 }
 
+var fallingEdgeBits = [...]uint16{1 << 9, 1 << 3, 1 << 5, 1 << 7}
+
+func (gb *GameBoy) UpdateTimers(cycles int64) {
+	t := &gb.Timer
+
+	if cycles >= 4 {
+
+		t.BCycle = false
+
+		if t.PendingOverflow {
+			t.TIMA = t.TMA
+			gb.SetIrq(IRQ_TMR)
+			t.PendingOverflow = false
+			t.BCycle = true
+		}
+	}
+
+	// have to handle edgecnt with div overflow (prev will be 0xFFC, div will be 0)
+	// see oracle of ages and polemon gold for behavior
+	period := uint32(fallingEdgeBits[t.FreqBits] << 1)
+	prev := uint32(t.Div)
+	edgeCnt := ((uint32(t.Div) + uint32(cycles)) / period) - (prev / period)
+	t.Div += uint16(cycles)
+
+	for range edgeCnt {
+
+		if t.BCycle {
+			t.BCycle = false
+		}
+
+		if t.PendingOverflow {
+			t.TIMA = t.TMA
+			gb.SetIrq(IRQ_TMR)
+			t.PendingOverflow = false
+			t.BCycle = true
+		}
+
+		if overflow := t.TIMA == 0xFF; overflow {
+			t.TIMA = 0
+			t.PendingOverflow = true
+			continue
+		}
+
+		t.TIMA++
+	}
+}
+
 func (gb *GameBoy) toggleDoubleSpeed() {
 	if !gb.PrepareSpeedToggle {
 		return
@@ -428,18 +476,4 @@ func (gb *GameBoy) scheduleWaveClock(cycle int64) {
 	}
 	period := int64(2048-gb.Apu.WaveChannel.ActivePeriod) << 1
 	gb.Scheduler.scheduleAt(EVENT_SND_WAVE_CLOCK, cycle+period)
-}
-
-var fallingEdgeBits = [...]uint16{1 << 9, 1 << 3, 1 << 5, 1 << 7}
-
-func (gb *GameBoy) scheduleTima(cycle int64) {
-	if !gb.Timer.Enabled {
-		return
-	}
-	period := int64(fallingEdgeBits[gb.Timer.FreqBits]) << 1
-	// align next event to the next falling edge
-	div := int64(gb.Timer.Div)
-	nextEdge := ((div / period) + 1) * period
-	cyclesUntil := nextEdge - div
-	gb.Scheduler.scheduleAt(EVENT_TIMA_INC, cycle+cyclesUntil)
 }
