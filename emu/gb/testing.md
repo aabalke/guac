@@ -1,5 +1,8 @@
 # Testing
 
+These tests require manual entry and testing.
+This means they may be out of date from the most recent commit.
+
 # Blargg Tests
 
 👍 Cpu Instructions

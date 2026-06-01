@@ -2,7 +2,6 @@ package gb
 
 import (
 	"image/color"
-	"log"
 	"unsafe"
 
 	"github.com/aabalke/guac/config"
@@ -119,9 +118,9 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 
 	if gb.Color {
 		gb.Cpu.a = 0x11
-		log.Printf("Color mode: GBC")
-	} else {
-		log.Printf("Color mode: DMG")
+		//	log.Printf("Color mode: GBC")
+		//} else {
+		//	log.Printf("Color mode: DMG")
 	}
 
 	initMemory(gb)
@@ -223,7 +222,10 @@ func (gb *GameBoy) handleEvent(event ScheduledEvent, stdFps bool) bool {
 			}
 
 			gb.SetIrq(IRQ_VBL)
-			gb.Image.WritePixels(gb.Pixels)
+
+			if !config.Conf.General.Headless {
+				gb.Image.WritePixels(gb.Pixels)
+			}
 		}
 
 	case EVENT_DRW:
