@@ -1,10 +1,10 @@
 # Mooneye Acceptance Tests
 
-Results generated 2026-06-01T13:02:40-06:00
+Results generated 2026-06-01T14:47:27-06:00
 
-Passing 63/115 54%
+Passing 69/115 60%
 
-❌ acceptance\add_sp_e_timing
+👍 acceptance\add_sp_e_timing
 👍 acceptance\bits\mem_oam
 👍 acceptance\bits\reg_f
 👍 acceptance\bits\unused_hwio-GS
@@ -36,15 +36,15 @@ Passing 63/115 54%
 👍 acceptance\instr\daa
 👍 acceptance\interrupts\ie_push
 👍 acceptance\intr_timing
-❌ acceptance\jp_cc_timing
-❌ acceptance\jp_timing
+👍 acceptance\jp_cc_timing
+👍 acceptance\jp_timing
 ❌ acceptance\ld_hl_sp_e_timing
 👍 acceptance\oam_dma\basic
 👍 acceptance\oam_dma\reg_read
 👍 acceptance\oam_dma\sources-GS
-❌ acceptance\oam_dma_restart
+👍 acceptance\oam_dma_restart
 ❌ acceptance\oam_dma_start
-❌ acceptance\oam_dma_timing
+👍 acceptance\oam_dma_timing
 👍 acceptance\pop_timing
 ❌ acceptance\ppu\hblank_ly_scx_timing-GS
 ❌ acceptance\ppu\intr_1_2_timing-GS
@@ -61,7 +61,7 @@ Passing 63/115 54%
 ❌ acceptance\push_timing
 👍 acceptance\rapid_di_ei
 ❌ acceptance\ret_cc_timing
-❌ acceptance\ret_timing
+👍 acceptance\ret_timing
 👍 acceptance\reti_intr_timing
 ❌ acceptance\reti_timing
 ❌ acceptance\rst_timing

@@ -333,7 +333,7 @@ func (gb *GameBoy) Tick(tCycles int64) {
 		gb.Timer.Div += uint16(tCycles)
 	}
 
-	//gb.MemoryBus.Oam.Tick(gb, tCycles)
+	gb.MemoryBus.Oam.Tick(gb, tCycles)
 }
 
 func (gb *GameBoy) ToggleMute() bool {

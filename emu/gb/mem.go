@@ -50,15 +50,10 @@ func (o *OamDma) Write(gb *GameBoy, v uint8) {
 	o.Base = uint16(v) << 8
 	o.Idx = 0
 	o.Pending = true
-
-	// currently skipping accurate timing (causes problems)
-	// I believe other things need to be emulated properly prior to getting this acc
-	// or it may be restart oams need to be proper
-	o.Tick(gb, 200<<2)
 }
 
-func (o *OamDma) Tick(gb *GameBoy, tcycles int) {
-	for range tcycles / 4 {
+func (o *OamDma) Tick(gb *GameBoy, tcycles int64) {
+	for range tcycles >> 2 {
 
 		if o.Pending {
 			o.Pending = false
@@ -70,25 +65,21 @@ func (o *OamDma) Tick(gb *GameBoy, tcycles int) {
 			continue
 		}
 
-		a := uint8(0)
-
-		// src of this behavior is sameboy - do not see any other ref
-		// req mooneye source dma test
-		if o.Base >= 0xE000 {
-			a = gb.Read((o.Base + o.Idx) &^ 0x2000)
-		} else {
-			a = gb.Read(o.Base + o.Idx)
-		}
-
-		gb.MemoryBus.OAM[o.Idx] = a
-
-		o.Idx++
-
 		if o.Idx >= 0xA0 {
 			o.IsActive = false
 			o.Pending = false
 			return
 		}
+
+		// src of this behavior is sameboy - do not see any other ref
+		// req mooneye source dma test
+		if o.Base >= 0xE000 {
+			gb.MemoryBus.OAM[o.Idx] = gb.Read((o.Base + o.Idx) &^ 0x2000)
+		} else {
+			gb.MemoryBus.OAM[o.Idx] = gb.Read(o.Base + o.Idx)
+		}
+
+		o.Idx++
 	}
 }
 
@@ -609,10 +600,6 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 	case 0xFF4D:
 		if gb.Color {
 			gb.PrepareSpeedToggle = v&1 != 0
-			b := uint8(gb.DoubleSpeedFlag<<7) | 0x7E
-			if gb.PrepareSpeedToggle {
-				b |= 1
-			}
 			return
 		}
 
