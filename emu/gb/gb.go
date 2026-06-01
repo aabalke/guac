@@ -413,6 +413,15 @@ func (gb *GameBoy) UpdateTimers(cycles int64) {
 
 	t.Div = uint16(next)
 
+	t.BCycle = false
+
+	if t.PendingOverflow {
+		t.TIMA = t.TMA
+		gb.SetIrq(IRQ_TMR)
+		t.PendingOverflow = false
+		t.BCycle = true
+	}
+
 	for range edgeCnt {
 
 		t.BCycle = false
