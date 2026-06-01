@@ -137,7 +137,9 @@ func (a *Apu) Play(muted, stdFps bool) {
 }
 
 func (a *Apu) Close() {
-	a.player.Close()
+	if a.player != nil {
+		a.player.Close()
+	}
 }
 
 func (a *Apu) soundMix() {

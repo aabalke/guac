@@ -66,6 +66,8 @@ type GameBoy struct {
 	Muted  bool
 
 	Apu *apu.Apu
+
+	InstInjectionFunc func(gb *GameBoy, op uint8)
 }
 
 type Timer struct {

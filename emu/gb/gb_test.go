@@ -1,0 +1,134 @@
+package gb
+
+import (
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/aabalke/guac/config/file"
+)
+
+type TestResult struct {
+	Name   string
+	Passed bool
+}
+
+func TestMooneye(t *testing.T) {
+	// https://github.com/Gekkio/mooneye-test-suite
+
+	directory := `C:\dev\repos\emulators\roms\gb_test_roms\game-boy-test-roms-v7.0\mooneye-test-suite`
+
+	file.Decode()
+	t.Logf("Mooneye Test Suite %s\n", time.Now().Format(time.RFC3339))
+
+	files, err := FindFiles(directory, ".gb")
+	if err != nil {
+		panic(err)
+	}
+
+	var results []TestResult
+
+	for _, file := range files {
+		finish := false
+		passed := false
+
+		gb := NewGameBoy(file, nil)
+
+		gb.InstInjectionFunc = func(gb *GameBoy, op uint8) {
+			if op == 0x40 {
+				passed =
+					gb.Cpu.b == 3 &&
+						gb.Cpu.c == 5 &&
+						gb.Cpu.d == 8 &&
+						gb.Cpu.e == 13 &&
+						gb.Cpu.h == 21 &&
+						gb.Cpu.l == 34
+
+				finish = true
+			}
+		}
+
+		for range 60 * 10 {
+			gb.Update(false)
+
+			if finish {
+				break
+			}
+		}
+
+		gb.Close()
+
+		p, _ := filepath.Rel(directory, file)
+
+		name := strings.TrimSuffix(p, ".gb")
+
+		results = append(results, TestResult{
+			Name:   name,
+			Passed: passed,
+		})
+
+		if !passed {
+			t.Errorf("Failed %s", file)
+		}
+	}
+
+	err = WriteMarkdown("Mooneye Acceptance Tests", results, "testing_mooneye.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func FindFiles(root, ext string) ([]string, error) {
+	var files []string
+
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		if filepath.Ext(path) == ext {
+			files = append(files, path)
+		}
+
+		return nil
+	})
+
+	return files, err
+}
+
+func WriteMarkdown(header string, results []TestResult, filename string) error {
+	passed, total := 0, len(results)
+	for _, r := range results {
+		if r.Passed {
+			passed++
+		}
+	}
+
+	var b strings.Builder
+	b.WriteString("# Mooneye Acceptance Tests\n\n")
+	fmt.Fprintf(&b, "Results generated %s\n\n", time.Now().Format(time.RFC3339))
+	fmt.Fprintf(&b, "Passing %d/%d %02d%%\n\n", passed, total, (passed*100)/total)
+
+	slices.SortFunc(results, func(a, b TestResult) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	for _, r := range results {
+		if r.Passed {
+			fmt.Fprintf(&b, "👍 %s\n", r.Name)
+		} else {
+			fmt.Fprintf(&b, "❌ %s\n", r.Name)
+		}
+	}
+
+	return os.WriteFile(filename, []byte(b.String()), 0o644)
+}
