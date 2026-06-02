@@ -34,11 +34,11 @@ type MemoryBus struct {
 }
 
 type OamDma struct {
-	IsActive          bool
-	Pending, Pending2 bool
-	OamValue          uint8
-	Idx               uint16
-	Base              uint16
+	IsActive bool
+	Pending  bool
+	OamValue uint8
+	Idx      uint16
+	Base     uint16
 }
 
 func (o *OamDma) Read() uint8 {
@@ -389,10 +389,10 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 		return gb.getJoypad()
 
 	case 0xFF01:
-		return gb.MemoryBus.Serial.sb
+		return gb.MemoryBus.Serial.ReadSb()
 
 	case 0xFF02:
-		return gb.MemoryBus.Serial.ReadSb()
+		return gb.MemoryBus.Serial.ReadSc()
 
 	case 0xFF03:
 		return 0xFF
@@ -485,10 +485,10 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		gb.MemoryBus.JoypadReg |= v & 0x30
 
 	case 0xFF01:
-		gb.MemoryBus.Serial.sb = v
+		gb.MemoryBus.Serial.WriteSb(v)
 
 	case 0xFF02:
-		gb.MemoryBus.Serial.WriteSb(v)
+		gb.MemoryBus.Serial.WriteSc(v)
 
 	case 0xFF04: // DIV
 

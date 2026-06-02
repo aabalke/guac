@@ -497,6 +497,8 @@ func (gb *GameBoy) Execute() {
 	gb.Tick(4)
 	op := gb.GetOp()
 
+	//L.WriteLog(0, op)
+
 	if gb.InstInjectionFunc != nil {
 		gb.InstInjectionFunc(gb, op)
 	}

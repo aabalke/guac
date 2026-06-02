@@ -73,3 +73,12 @@ func (s *Scheduler) cancel(e Event) {
 		}
 	}
 }
+
+func (s *Scheduler) penalize(e Event, cycles int64) {
+	for i := range s.Cnt {
+		if s.Events[i].Event == e {
+			s.Events[i].InitCycle += cycles
+			return
+		}
+	}
+}

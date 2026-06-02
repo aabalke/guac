@@ -231,6 +231,13 @@ func (gb *GameBoy) handleEvent(event ScheduledEvent, stdFps bool) bool {
 	case EVENT_DRW:
 		if gb.Lcdc.Enabled {
 			gb.Stat.Mode = PPU_DRAW
+
+			// if gb.Lcdc.WindowEnabled &&
+			//	gb.MemoryBus.IO[WY] <= gb.MemoryBus.IO[LY] &&
+			//	gb.MemoryBus.IO[WX] < 167 {
+
+			//	gb.Scheduler.penalize(EVENT_HBK, 6+(int64(gb.MemoryBus.IO[WX])-7)&7)
+			//}
 		}
 
 	case EVENT_HBK:
@@ -335,7 +342,9 @@ func (gb *GameBoy) Tick(tCycles int64) {
 		gb.Timer.Div += uint16(tCycles)
 	}
 
-	gb.MemoryBus.Oam.Tick(gb, tCycles)
+	if gb.MemoryBus.Oam.Pending || gb.MemoryBus.Oam.IsActive {
+		gb.MemoryBus.Oam.Tick(gb, tCycles)
+	}
 }
 
 func (gb *GameBoy) ToggleMute() bool {
