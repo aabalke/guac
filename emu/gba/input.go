@@ -8,60 +8,58 @@ import (
 )
 
 func (gba *GBA) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadButton) {
-	keyConfig := config.Conf.Gba.KeyboardConfig
-	buttonConfig := config.Conf.Gba.ControllerConfig
-
 	k := &gba.Keypad.KEYINPUT
+	*k = 0x3FF
 
-	*k = 0b11_1111_1111
-
+	keyConfig := config.Conf.Gba.KeyboardConfig
 	for _, key := range keys {
 		switch {
 		case slices.Contains(keyConfig.A, key):
-			*k &^= 0b1
+			*k &^= 1 << 0
 		case slices.Contains(keyConfig.B, key):
-			*k &^= 0b10
+			*k &^= 1 << 1
 		case slices.Contains(keyConfig.Select, key):
-			*k &^= 0b100
+			*k &^= 1 << 2
 		case slices.Contains(keyConfig.Start, key):
-			*k &^= 0b1000
+			*k &^= 1 << 3
 		case slices.Contains(keyConfig.Right, key):
-			*k &^= 0b10000
+			*k &^= 1 << 4
 		case slices.Contains(keyConfig.Left, key):
-			*k &^= 0b100000
+			*k &^= 1 << 5
 		case slices.Contains(keyConfig.Up, key):
-			*k &^= 0b1000000
+			*k &^= 1 << 6
 		case slices.Contains(keyConfig.Down, key):
-			*k &^= 0b10000000
+			*k &^= 1 << 7
 		case slices.Contains(keyConfig.R, key):
-			*k &^= 0b100000000
+			*k &^= 1 << 8
 		case slices.Contains(keyConfig.L, key):
-			*k &^= 0b1000000000
+			*k &^= 1 << 9
 		}
 	}
 
+	buttonConfig := config.Conf.Gba.ControllerConfig
 	for _, button := range buttons {
 		switch {
 		case slices.Contains(buttonConfig.A, button):
-			*k &^= 0b1
+			*k &^= 1 << 0
 		case slices.Contains(buttonConfig.B, button):
-			*k &^= 0b10
+			*k &^= 1 << 1
 		case slices.Contains(buttonConfig.Select, button):
-			*k &^= 0b100
+			*k &^= 1 << 2
 		case slices.Contains(buttonConfig.Start, button):
-			*k &^= 0b1000
+			*k &^= 1 << 3
 		case slices.Contains(buttonConfig.Right, button):
-			*k &^= 0b10000
+			*k &^= 1 << 4
 		case slices.Contains(buttonConfig.Left, button):
-			*k &^= 0b100000
+			*k &^= 1 << 5
 		case slices.Contains(buttonConfig.Up, button):
-			*k &^= 0b1000000
+			*k &^= 1 << 6
 		case slices.Contains(buttonConfig.Down, button):
-			*k &^= 0b10000000
+			*k &^= 1 << 7
 		case slices.Contains(buttonConfig.R, button):
-			*k &^= 0b100000000
+			*k &^= 1 << 8
 		case slices.Contains(buttonConfig.L, button):
-			*k &^= 0b1000000000
+			*k &^= 1 << 9
 		}
 	}
 

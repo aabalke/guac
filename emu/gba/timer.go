@@ -1,5 +1,10 @@
 package gba
 
+var (
+	freqs      = [...]uint32{1, 64, 256, 1024}
+	freqShifts = [...]uint32{0, 6, 8, 10}
+)
+
 type Timer struct {
 	Gba               *GBA
 	Idx               int
@@ -16,25 +21,15 @@ type Timer struct {
 }
 
 func (gba *GBA) UpdateTimers(cycles uint32) {
-
 	overflow := false
-
-	if gba.Timers[0].Enabled {
-		overflow = gba.Timers[0].Update(overflow, cycles)
-	}
-	if gba.Timers[1].Enabled {
-		overflow = gba.Timers[1].Update(overflow, cycles)
-	}
-	if gba.Timers[2].Enabled {
-		overflow = gba.Timers[2].Update(overflow, cycles)
-	}
-	if gba.Timers[3].Enabled {
-		overflow = gba.Timers[3].Update(overflow, cycles)
+	for i := range 4 {
+		if gba.Timers[i].Enabled {
+			overflow = gba.Timers[i].Update(overflow, cycles)
+		}
 	}
 }
 
 func (t *Timer) Update(overflow bool, cycles uint32) bool {
-
 	increment := uint32(0)
 	if t.Cascade {
 		if overflow {
@@ -53,7 +48,7 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
 
 	total := t.D + increment
 
-	if notOverflow := !(total > 0xFFFF); notOverflow {
+	if notOverflow := total <= 0xFFFF; notOverflow {
 		t.D = total
 		return false
 	}
@@ -90,7 +85,6 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
 }
 
 func (t *Timer) ReadCnt(hi bool) uint8 {
-
 	if hi {
 		return uint8(t.CNT >> 8)
 	}
@@ -99,7 +93,6 @@ func (t *Timer) ReadCnt(hi bool) uint8 {
 }
 
 func (t *Timer) WriteCnt(v uint8, hi bool) {
-
 	if hi {
 		return
 	}
@@ -109,8 +102,8 @@ func (t *Timer) WriteCnt(v uint8, hi bool) {
 	t.Cascade = (t.CNT>>2)&1 != 0
 	t.OverflowIRQ = (t.CNT>>6)&1 != 0
 	t.Enabled = (t.CNT>>7)&1 != 0
-	t.Freq = t.getFreq()
-	t.FreqShift = t.getFreqShift()
+	t.Freq = freqs[t.CNT&3]
+	t.FreqShift = freqShifts[t.CNT&3]
 
 	if setEnabled := (v>>7)&1 != 0 && (oldValue>>7) == 0; setEnabled {
 		t.D = t.SavedInitialValue
@@ -119,7 +112,6 @@ func (t *Timer) WriteCnt(v uint8, hi bool) {
 }
 
 func (t *Timer) ReadD(hi bool) uint8 {
-
 	if hi {
 		return uint8(t.D >> 8)
 	}
@@ -128,45 +120,10 @@ func (t *Timer) ReadD(hi bool) uint8 {
 }
 
 func (t *Timer) WriteD(v uint8, hi bool) {
-
 	if hi {
 		t.SavedInitialValue = (t.SavedInitialValue & 0xFF) | (uint32(v) << 8)
 		return
 	}
 
 	t.SavedInitialValue = (t.SavedInitialValue & 0xFF00) | uint32(v)
-}
-
-//go:inline
-func (t *Timer) getFreq() uint32 {
-
-	switch freq := t.CNT & 0b11; freq {
-	case 0:
-		return 1
-	case 1:
-		return 64
-	case 2:
-		return 256
-	case 3:
-		return 1024
-	}
-
-	return 1
-}
-
-//go:inline
-func (t *Timer) getFreqShift() uint32 {
-
-	switch freq := t.CNT & 0b11; freq {
-	case 0:
-		return 0
-	case 1:
-		return 6
-	case 2:
-		return 8
-	case 3:
-		return 10
-	}
-
-	return 0
 }

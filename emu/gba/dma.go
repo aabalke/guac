@@ -123,7 +123,7 @@ func (dma *DMA) WriteControl(v uint8, hi bool) {
 		}
 
 		wasDisabled := !dma.Enabled
-		dma.Control = (dma.Control & 0b1111_1111) | (a << 8)
+		dma.Control = (dma.Control & 0xFF) | (a << 8)
 		dma.SrcAdj = (dma.SrcAdj & 1) | (a&1)<<1
 
 		dma.Repeat = (a>>1)&1 != 0

@@ -40,7 +40,6 @@ type Apu struct {
 }
 
 func (a *Apu) Disable() {
-
 	a.ToneChannel1.CntL = 0
 	a.ToneChannel1.CntH = 0
 	a.ToneChannel1.CntX = 0
@@ -62,7 +61,6 @@ func (a *Apu) Disable() {
 }
 
 func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu {
-
 	a := &Apu{
 		WritePointer: 0x200,
 		FifoA:        Fifo{},
@@ -74,7 +72,7 @@ func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu 
 		buffSamples:  sampleCnt * 16 * 2,
 		sampleTime:   1.0 / float64(sampleRate),
 		streamLen:    (2 * 2 * sampleRate / 60) - (2*2*sampleRate/60)%4,
-		buffSize:     uint32((sampleCnt) * 16 * 2),
+		buffSize:     uint32(sampleCnt * 16 * 2),
 	}
 
 	a.Stream = make([]byte, a.streamLen)
@@ -92,7 +90,6 @@ func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu 
 }
 
 func (a *Apu) Play(muted, stdFps bool) {
-
 	a.SoundBufferWrap()
 
 	a.Enable = true
@@ -127,7 +124,6 @@ func (a *Apu) Close() {
 }
 
 func (a *Apu) soundMix() {
-
 	for i := 0; i < a.streamLen; i += 4 {
 		for j := range 2 {
 			snd := a.SoundBuffer[a.ReadPointer&uint32(a.buffSize-1)] << 6
@@ -152,7 +148,6 @@ func (a *Apu) IsSoundEnabled() bool {
 }
 
 func (a *Apu) GetSample() (int16, int16) {
-
 	if a.WritePointer == a.ReadPointer {
 		fmt.Printf("WRITE AND READ OVERLAP\n")
 	}
@@ -167,7 +162,6 @@ func (a *Apu) GetSample() (int16, int16) {
 }
 
 func (a *Apu) Sync() {
-
 	delta := (int32(a.WritePointer-a.ReadPointer) >> 8) - (int32(a.WritePointer-a.ReadPointer)>>8)%4
 	if delta > 0 {
 		a.ReadPointer += uint32(delta)
@@ -190,10 +184,7 @@ var (
 	rshLut = [4]int32{0xa, 0x9, 0x8, 0x7}
 )
 
-func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
-
-	a.sndCycles += cycles
-
+func (a *Apu) SoundClock() {
 	shift0 := int32(a.SoundCntH>>2) & 1
 	shift1 := int32(a.SoundCntH>>3) & 1
 	lpan0 := int32(a.SoundCntH>>9) & 1
@@ -210,44 +201,33 @@ func (a *Apu) SoundClock(cycles uint32, doubleSpeed bool) {
 	cntL := uint32(a.SoundCntL)
 	volL := volLut[(cntL>>4)&0b111]
 	volR := volLut[(cntL>>0)&0b111]
-	shift := rshLut[(a.SoundCntH)&0b11]
+	shift := rshLut[a.SoundCntH&0b11]
 
-	clockCycles := uint32(a.sampCycles)
-	if doubleSpeed {
-		clockCycles <<= 1
-	}
+	ch1 := int32(a.ToneChannel1.GetSample(false))
+	ch2 := int32(a.ToneChannel2.GetSample(false))
+	ch3 := int32(a.WaveChannel.GetSample(false))
+	ch4 := int32(a.NoiseChannel.GetSample(false))
 
-	for a.sndCycles >= clockCycles {
+	psgL := ch1*int32((cntL>>12)&1) +
+		ch2*int32((cntL>>13)&1) +
+		ch3*int32((cntL>>14)&1) +
+		ch4*int32((cntL>>15)&1)
 
-		ch1 := int32(a.ToneChannel1.GetSample(doubleSpeed))
-		ch2 := int32(a.ToneChannel2.GetSample(doubleSpeed))
-		ch3 := int32(a.WaveChannel.GetSample(doubleSpeed))
-		ch4 := int32(a.NoiseChannel.GetSample(doubleSpeed))
+	psgR := ch1*int32((cntL>>8)&1) +
+		ch2*int32((cntL>>9)&1) +
+		ch3*int32((cntL>>10)&1) +
+		ch4*int32((cntL>>11)&1)
 
-		psgL := ch1*int32((cntL>>12)&1) +
-			ch2*int32((cntL>>13)&1) +
-			ch3*int32((cntL>>14)&1) +
-			ch4*int32((cntL>>15)&1)
+	psgL = (psgL * volL) >> shift
+	psgR = (psgR * volR) >> shift
 
-		psgR := ch1*int32((cntL>>8)&1) +
-			ch2*int32((cntL>>9)&1) +
-			ch3*int32((cntL>>10)&1) +
-			ch4*int32((cntL>>11)&1)
-
-		psgL = (psgL * volL) >> shift
-		psgR = (psgR * volR) >> shift
-
-		a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(sampleLeft + psgL)
-		a.WritePointer++
-		a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(sampleRight + psgR)
-		a.WritePointer++
-
-		a.sndCycles -= clockCycles
-	}
+	a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(sampleLeft + psgL)
+	a.WritePointer++
+	a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(sampleRight + psgR)
+	a.WritePointer++
 }
 
 func IsResetSoundChan(addr uint32, isGB bool) bool {
-
 	if isGB {
 		_, ok := resetSoundChanMapGB[addr]
 		return ok
@@ -264,8 +244,10 @@ func (a *Apu) ResetSoundChan(addr uint32, b byte, isGB bool) {
 	a._resetSoundChan(resetSoundChanMapGBA[addr], (b>>7)&1 != 0)
 }
 
-var resetSoundChanMapGBA = map[uint32]int{0x65: 0, 0x6d: 1, 0x75: 2, 0x7d: 3}
-var resetSoundChanMapGB = map[uint32]int{0x14: 0, 0x19: 1, 0x1E: 2, 0x23: 3}
+var (
+	resetSoundChanMapGBA = map[uint32]int{0x65: 0, 0x6d: 1, 0x75: 2, 0x7d: 3}
+	resetSoundChanMapGB  = map[uint32]int{0x14: 0, 0x19: 1, 0x1E: 2, 0x23: 3}
+)
 
 func (a *Apu) _resetSoundChan(ch int, enable bool) {
 	if enable {

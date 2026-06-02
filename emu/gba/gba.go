@@ -1,7 +1,6 @@
 package gba
 
 import (
-	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/cpu/arm7"
 	"github.com/aabalke/guac/emu/gba/apu"
@@ -23,12 +22,16 @@ const (
 	CYCLES_VDRAW    = CYCLES_SCANLINE * SCREEN_HEIGHT
 	CYCLES_VBLANK   = CYCLES_SCANLINE * 68
 	CYCLES_FRAME    = CYCLES_VDRAW + CYCLES_VBLANK
+
+	CPU_SPEED          = 16777216
+	SND_FREQ           = 48000 // native sample rate
+	CYCLES_PER_SND_GEN = CPU_SPEED / SND_FREQ
+	SND_SAMPLES        = 512
 )
 
 var CURR_INST = uint64(0)
 
 type GBA struct {
-	Debugger  Debugger
 	Cartridge *cart.Cartridge
 	Cpu       *arm7.Cpu
 	Mem       *Memory
@@ -37,14 +40,12 @@ type GBA struct {
 	Dma       [4]DMA
 	Irq       cpu.Irq
 	Apu       *apu.Apu
+	Scheduler *Scheduler
 
 	Paused, Muted, Save, Drawn bool
 	OpenBusOpcode              uint32
 	AccCycles                  uint32
 	Keypad                     Keypad
-
-	SoundCycles     uint32
-	SoundCyclesMask uint32
 
 	vsyncAddr uint32
 
@@ -62,85 +63,167 @@ func (gba *GBA) Update(stdFps bool) {
 		return
 	}
 
-	gba.Drawn = false
+	gba.Scheduler.schedule(EVENT_END_FRAME, CYCLES_FRAME)
+	gba.Scheduler.schedule(EVENT_END_SCANLINE, CYCLES_SCANLINE)
+	//gba.Scheduler.schedule(EVENT_VBK, CYCLES_PER_VBLANK)
+	gba.Scheduler.schedule(EVENT_HBK, CYCLES_HDRAW)
 
-	for !gba.Drawn {
+	for {
 
-		cycles := 4
+		nextEvent := gba.Scheduler.popNext()
 
-		if !gba.Cpu.Halted {
-
-			thumb := gba.Cpu.Reg.CPSR.T
-
-			insts, ok := gba.Cpu.Execute()
-			if !ok {
-				panic("BAD")
-			}
-
-			// do not care about cycle accuracy right now
-			if thumb {
-				cycles = insts << 1
+		for gba.Scheduler.CurrentCycle < nextEvent.InitCycle {
+			if gba.Cpu.Halted {
+				gba.Tick(4)
 			} else {
-				cycles = insts << 2
+				thumb := gba.Cpu.Reg.CPSR.T
+
+				insts, ok := gba.Cpu.Execute()
+				if !ok {
+					panic("BAD")
+				}
+
+				// do not care about cycle accuracy right now
+				if thumb {
+					gba.Tick(uint32(insts << 1))
+				} else {
+					gba.Tick(uint32(insts << 2))
+				}
 			}
-		}
 
-		gba.Tick(uint32(cycles))
+			if gba.vsyncAddr != 0 && gba.Cpu.Reg.R[15] == gba.vsyncAddr {
+				vblRaised := gba.Irq.IdleIrq&1 == 1
+				vblHandled := gba.Irq.IF&1 != 1
+				if !(vblRaised && vblHandled) {
+					gba.Cpu.Halted = true
+				}
 
-		if gba.vsyncAddr != 0 && gba.Cpu.Reg.R[15] == gba.vsyncAddr {
-			vblRaised := gba.Irq.IdleIrq&1 == 1
-			vblHandled := gba.Irq.IF&1 != 1
-			if !(vblRaised && vblHandled) {
-				gba.Cpu.Halted = true
+				gba.Irq.IdleIrq = gba.Irq.IF
 			}
 
-			gba.Irq.IdleIrq = gba.Irq.IF
+			gba.Cpu.CheckIrq()
 		}
-
-		// irq has to be at end (count up tests)
-		gba.Cpu.CheckIrq()
 
 		if !gba.Cpu.Halted {
 			CURR_INST++
 		}
+
+		if done := gba.handleEvent(nextEvent, stdFps); done {
+			return
+		}
+
+	}
+}
+
+func (gba *GBA) handleEvent(event ScheduledEvent, stdFps bool) bool {
+	overshoot := gba.Scheduler.CurrentCycle - event.InitCycle
+	gba.Scheduler.CurrentCycle = event.InitCycle
+
+	switch event.Event {
+	case EVENT_SND_SAMPLE_GEN:
+		gba.Apu.SoundClock()
+		gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, CYCLES_PER_SND_GEN)
+
+	case EVENT_HBK:
+		dispstat := &gba.Mem.Dispstat
+		dispstat.SetHBlank(true)
+		if (*dispstat>>4)&1 != 0 {
+			gba.Irq.SetIRQ(1)
+		}
+
+		if vcount := gba.Mem.IO[0x6]; vcount < SCREEN_HEIGHT {
+			updateBackgrounds(gba, &gba.PPU.Dispcnt)
+			gba.PPU.bgPriorities = gba.getBgPriority(uint32(vcount), gba.PPU.Dispcnt.Mode, &gba.PPU.Backgrounds)
+			gba.PPU.objPriorities = gba.getObjPriority(uint32(vcount), &gba.PPU.Objects)
+			gba.scanlineGraphics(uint32(vcount))
+			gba.PPU.Backgrounds[2].BgAffineUpdate()
+			gba.PPU.Backgrounds[3].BgAffineUpdate()
+			gba.checkDmas(DMA_MODE_HBL)
+		}
+
+	case EVENT_END_SCANLINE:
+
+		dispstat := &gba.Mem.Dispstat
+		vcount := &gba.Mem.IO[0x6]
+
+		dispstat.SetHBlank(false)
+
+		*vcount++
+
+		switch *vcount {
+		case SCREEN_HEIGHT:
+			dispstat.SetVBlank(true)
+			gba.checkDmas(DMA_MODE_VBL)
+		// bios/bios.gba needs irq set on screen_height, iridion 3d needs screen_height + 1
+		// I believe this is cycle related
+		case SCREEN_HEIGHT + 1:
+			if (*dispstat>>3)&1 != 0 {
+				gba.Irq.SetIRQ(0)
+			}
+		}
+
+		match := dispstat.GetLYC() == *vcount
+		dispstat.SetVCFlag(match)
+
+		if vcounterIRQ := (*dispstat>>5)&1 != 0; vcounterIRQ && match {
+			gba.Irq.SetIRQ(2)
+		}
+
+		if event.InitCycle+CYCLES_SCANLINE != CYCLES_FRAME {
+			gba.Scheduler.scheduleAt(EVENT_END_SCANLINE, event.InitCycle+CYCLES_SCANLINE)
+			gba.Scheduler.scheduleAt(EVENT_HBK, event.InitCycle+CYCLES_HDRAW)
+		}
+
+	case EVENT_END_FRAME:
+
+		dispstat := &gba.Mem.Dispstat
+		vcount := &gba.Mem.IO[0x6]
+
+		gba.Apu.Play(gba.Muted, stdFps)
+		gba.Frame++
+		gba.Image.WritePixels(gba.Pixels)
+		gba.Scheduler.endFrame()
+		//gba.Scheduler.CurrentCycle += overshoot
+		//
+		*vcount = 0
+		dispstat.SetVBlank(false)
+
+		match := dispstat.GetLYC() == *vcount
+		dispstat.SetVCFlag(match)
+
+		if vcounterIRQ := (*dispstat>>5)&1 != 0; vcounterIRQ && match {
+			gba.Irq.SetIRQ(2)
+		}
+		gba.PPU.Backgrounds[2].BgAffineReset()
+		gba.PPU.Backgrounds[3].BgAffineReset()
+
+		return true
 	}
 
-	gba.Apu.Play(gba.Muted, stdFps)
-	gba.Frame++
-	gba.Image.WritePixels(gba.Pixels)
+	gba.Scheduler.CurrentCycle += overshoot
+	return false
 }
 
 func (gba *GBA) Tick(cycles uint32) {
-	gba.SoundCycles += cycles
-
-	if gba.SoundCycles >= gba.SoundCyclesMask {
-		gba.Apu.SoundClock(gba.SoundCycles, false)
-		gba.SoundCycles &= (gba.SoundCyclesMask - 1)
-	}
-
-	gba.VideoUpdate(uint32(cycles))
-	gba.UpdateTimers(uint32(cycles))
+	gba.Scheduler.CurrentCycle += int64(cycles)
+	gba.UpdateTimers(cycles)
 }
 
 func NewGBA(path string, ctx *oto.Context) *GBA {
 	const (
-		CPU_FREQ_HZ   = 16777216
-		SND_FREQUENCY = 48000 // sample rate
-		SND_SAMPLES   = 512
+		SND_SAMPLES = 512
 	)
 
 	gba := GBA{
-		Pixels:          make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
-		Image:           ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
-		Keypad:          Keypad{KEYINPUT: 0x3FF},
-		Apu:             apu.NewApu(ctx, CPU_FREQ_HZ, SND_FREQUENCY, SND_SAMPLES),
-		SoundCyclesMask: max(0x80, uint32(config.Conf.Gba.SoundClockUpdateCycles)),
-		PPU:             &PPU{},
+		Pixels:    make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
+		Image:     ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
+		Keypad:    Keypad{KEYINPUT: 0x3FF},
+		Apu:       apu.NewApu(ctx, CPU_SPEED, SND_FREQ, SND_SAMPLES),
+		PPU:       &PPU{},
+		Scheduler: NewScheduler(),
 	}
 
 	gba.PPU.gba = &gba
-
-	gba.Debugger = Debugger{Gba: &gba, Version: 1}
 
 	gba.Irq = cpu.Irq{}
 	gba.Mem = NewMemory(&gba)
@@ -182,33 +265,9 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 
 	gba.Cpu.Reg.CPSR.I = false
 
-	return &gba
-}
+	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 0)
 
-func (gba *GBA) startupNoBios() {
-	//
-	//    c := gba.Cpu
-	//
-	//    BANK_ID := arm7gba.BANK_ID
-	//
-	//	c.Irq.IME = true
-	//
-	//	c.Reg.R[PC] = 0x0800_0000
-	//	c.Reg.CPSR = 0x0000_001F
-	//	c.Reg.SPSR[BANK_ID[MODE_IRQ]] = 0x0000_0010
-	//	c.Reg.R[0] = 0x0000_0CA5
-	//
-	//	c.Reg.R[LR] = 0x0800_0000
-	//	c.Reg.LR[BANK_ID[MODE_SYS]] = 0x0800_0000
-	//	c.Reg.LR[BANK_ID[MODE_USR]] = 0x0800_0000
-	//	c.Reg.LR[BANK_ID[MODE_IRQ]] = 0x0800_0000
-	//	c.Reg.LR[BANK_ID[MODE_SWI]] = 0x0800_0000
-	//
-	//	c.Reg.R[SP] = 0x0300_7F00
-	//	c.Reg.SP[BANK_ID[MODE_SYS]] = 0x0300_7F00
-	//	c.Reg.SP[BANK_ID[MODE_USR]] = 0x0300_7F00
-	//	c.Reg.SP[BANK_ID[MODE_IRQ]] = 0x0300_7FA0
-	//	c.Reg.SP[BANK_ID[MODE_SWI]] = 0x0300_7FE0
+	return &gba
 }
 
 func (gba *GBA) ToggleMute() bool {
@@ -229,85 +288,6 @@ func (gba *GBA) Close() {
 
 func (gba *GBA) LoadGame(path string) {
 	gba.Cartridge = cart.NewCartridge(path, path+".save")
-}
-
-// RidgeX/ygba BSD3
-func (gba *GBA) VideoUpdate(cycles uint32) {
-	dispstat := &gba.Mem.Dispstat
-	vcount := gba.Mem.IO[0x6]
-
-	prevFrameCycles := gba.AccCycles
-	gba.AccCycles += cycles //% CYCLES_FRAME
-	if gba.AccCycles >= CYCLES_FRAME {
-		gba.AccCycles -= CYCLES_FRAME
-	}
-	currFrameCycles := gba.AccCycles
-
-	prevScanlineCycles := prevFrameCycles % CYCLES_SCANLINE
-	currScanlineCycles := currFrameCycles % CYCLES_SCANLINE
-
-	inHblank := currScanlineCycles >= CYCLES_HDRAW
-	prevInHdraw := prevScanlineCycles < CYCLES_HDRAW
-	if enteredHblank := inHblank && prevInHdraw; enteredHblank {
-
-		dispstat.SetHBlank(true)
-		if (*dispstat>>4)&1 != 0 {
-			gba.Irq.SetIRQ(1)
-		}
-
-		if vcount < SCREEN_HEIGHT {
-			updateBackgrounds(gba, &gba.PPU.Dispcnt)
-			gba.PPU.bgPriorities = gba.getBgPriority(uint32(vcount), gba.PPU.Dispcnt.Mode, &gba.PPU.Backgrounds)
-			gba.PPU.objPriorities = gba.getObjPriority(uint32(vcount), &gba.PPU.Objects)
-			gba.scanlineGraphics(uint32(vcount))
-			gba.PPU.Backgrounds[2].BgAffineUpdate()
-			gba.PPU.Backgrounds[3].BgAffineUpdate()
-			gba.checkDmas(DMA_MODE_HBL)
-		}
-	}
-
-	if newScanline := currScanlineCycles < prevScanlineCycles; newScanline {
-
-		// this 1232 cycle count is estimate, should replace with actual
-		// gba.Apu.SoundClock(1232, false)
-
-		dispstat.SetHBlank(false)
-
-		vcount++
-		if vcount == NUM_SCANLINES {
-			vcount = 0
-		}
-
-		gba.Mem.IO[0x6] = vcount
-
-		switch vcount {
-		case 0:
-			gba.PPU.Backgrounds[2].BgAffineReset()
-			gba.PPU.Backgrounds[3].BgAffineReset()
-		case SCREEN_HEIGHT:
-			dispstat.SetVBlank(true)
-			gba.checkDmas(DMA_MODE_VBL)
-			// bios/bios.gba needs irq set on screen_height, iridion 3d needs screen_height + 1
-			// I believe this is cycle related
-		case SCREEN_HEIGHT + 1:
-			if (*dispstat>>3)&1 != 0 {
-				gba.Irq.SetIRQ(0)
-			}
-		case NUM_SCANLINES - 1:
-			dispstat.SetVBlank(false)
-		}
-
-		match := dispstat.GetLYC() == vcount
-		dispstat.SetVCFlag(match)
-
-		if vcounterIRQ := (*dispstat>>5)&1 != 0; vcounterIRQ && match {
-			gba.Irq.SetIRQ(2)
-		}
-	}
-
-	if currFrameCycles < prevFrameCycles {
-		gba.Drawn = true
-	}
 }
 
 func (gb *GBA) Draw(screen *ebiten.Image) {

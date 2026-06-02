@@ -912,14 +912,13 @@ func (gba *GBA) setBackgroundPixel(bg *Background, x, y uint32) (uint32, bool) {
 }
 
 func getPositionsBg(screenData, xIdx, yIdx uint32) (uint32, uint32) {
-	inTileY := yIdx & 0b111 //% 8
-	inTileX := xIdx & 0b111 //% 8
-
-	if hFlip := screenData>>10&1 == 1; hFlip {
+	inTileX := xIdx & 7
+	if hFlip := screenData>>10&1 != 0; hFlip {
 		inTileX = 7 - inTileX
 	}
 
-	if vFlip := screenData>>11&1 == 1; vFlip {
+	inTileY := yIdx & 7
+	if vFlip := screenData>>11&1 != 0; vFlip {
 		inTileY = 7 - inTileY
 	}
 
