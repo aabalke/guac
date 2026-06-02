@@ -89,12 +89,12 @@ func (gb *GameBoy) renderTilesGBC(scanline uint8) {
 		colorNum := getColorVal(data2, data1, colorBit, colorBit)
 		gb.pixelDrawn[pixel] = colorNum != 0
 
-		if draw := !gb.bgPriority[pixel][scanline]; draw {
+		if draw := !gb.bgPriority[scanline][pixel]; draw {
 			color := gb.bgPalette.Unpacked[cgbPalBase+colorNum]
-			gb.Screen[pixel][scanline] = color
+			gb.Screen[scanline][pixel] = color
 		}
 
-		gb.bgPriority[pixel][scanline] = priority
+		gb.bgPriority[scanline][pixel] = priority
 
 	}
 	if windowRendered {
@@ -175,13 +175,13 @@ func (gb *GameBoy) renderSpritesGBC(scanline int32) {
 				continue
 			}
 
-			drawPixel := (priority && !gb.bgPriority[pixel][scanline]) || !gb.pixelDrawn[pixel]
+			drawPixel := (priority && !gb.bgPriority[scanline][pixel]) || !gb.pixelDrawn[pixel]
 
 			if drawPixel || !gb.Lcdc.BgMaster {
 
 				cgbPalette := attributes & 0x7
 				color := gb.spPalette.Unpacked[(cgbPalette<<2)+(colorNum)]
-				gb.Screen[pixel][scanline] = color
+				gb.Screen[scanline][pixel] = color
 
 			}
 

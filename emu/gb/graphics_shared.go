@@ -1,9 +1,5 @@
 package gb
 
-import (
-	"unsafe"
-)
-
 const (
 	SCY         = 0x42
 	SCX         = 0x43
@@ -89,7 +85,6 @@ func (l *Lcdc) Write(v uint8) {
 		// skyemu has similar problem, could not find similar offset on sameboy
 		// required to pass 1-lcd_sync.gb
 		// l.gb.Timer.DotCounter = 4
-		l.gb.Timer.DotCounter = 4
 		l.gb.MemoryBus.IO[LY] = 0
 		l.gb.Stat.Mode = PPU_HBLANK
 	}
@@ -137,79 +132,6 @@ func (s *Stat) Write(v uint8) {
 	s.IrqVBlank = (v>>4)&1 != 0
 	s.IrqOam = (v>>5)&1 != 0
 	s.IrqLyc = (v>>6)&1 != 0
-}
-
-func (gb *GameBoy) UpdateDisplay() {
-	for y := range height {
-		p32 := (*[width]uint32)(unsafe.Pointer(&gb.Pixels[(y*width)*4]))
-		for x := range uint32(width) {
-			p32[x] = gb.Screen[x][y]
-		}
-	}
-}
-
-func (gb *GameBoy) UpdateGraphics(tcycles int) {
-	var (
-		dot      = &gb.Timer.DotCounter
-		stat     = &gb.Stat
-		ly       = &gb.MemoryBus.IO[LY]
-		prevMode = gb.Stat.Mode
-	)
-
-	if vblank := *ly >= height; vblank {
-		stat.Mode = PPU_VBLANK
-		if stat.IrqVBlank && prevMode != PPU_VBLANK {
-			gb.SetIrq(IRQ_LCD)
-		}
-	} else if oam := *dot < 80; oam {
-		stat.Mode = PPU_OAM
-		if stat.IrqOam && prevMode != PPU_OAM {
-			gb.SetIrq(IRQ_LCD)
-		}
-	} else if drawing := *dot < 80+172; drawing {
-		stat.Mode = PPU_DRAW
-		if prevMode != PPU_DRAW {
-			gb.drawScanline(int32(*ly))
-		}
-	} else {
-		stat.Mode = PPU_HBLANK
-		if prevMode != PPU_HBLANK {
-
-			if gb.Color && gb.MemoryBus.Hdma.Enabled && !gb.Cpu.Halted {
-				gb.MemoryBus.Hdma.Transfer(1)
-			}
-
-			if stat.IrqHBlank {
-				gb.SetIrq(IRQ_LCD)
-			}
-		}
-	}
-
-	prevMatch := stat.Match
-	stat.Match = *ly == gb.MemoryBus.IO[LYC]
-	if !prevMatch && stat.Match && stat.IrqLyc {
-		gb.SetIrq(IRQ_LCD)
-	}
-
-	*dot += tcycles
-	dotScanline := 456 << gb.DoubleSpeedFlag
-	if *dot < dotScanline {
-		return
-	}
-
-	*ly++
-
-	*dot -= dotScanline
-
-	switch *ly {
-	case height: // vblank
-		gb.SetIrq(IRQ_VBL)
-		gb.UpdateDisplay()
-	case 154: // new frame
-		gb.bgPriority = [width][height]bool{}
-		*ly = 0
-		gb.WindowLY = 0
-	}
 }
 
 func (gb *GameBoy) drawScanline(scanline int32) {

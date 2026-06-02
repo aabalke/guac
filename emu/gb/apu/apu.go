@@ -24,17 +24,9 @@ type Apu struct {
 	NoiseChannel NoiseChannel
 
 	Stream []byte
-
-	sndCycles uint32
-
 	player *oto.Player
 
-	cpuFreqHz    int
 	sndFrequency int
-	sndSamples   int
-	sampCycles   int
-	buffSamples  int
-	sampleTime   float64
 	streamLen    int
 	buffSize     uint32
 
@@ -43,7 +35,10 @@ type Apu struct {
 
 	pendingPowerOff bool
 	pendingPowerOn  bool
-	suppress        bool
+}
+
+type Channel interface {
+	GetSample() int8
 }
 
 func (a *Apu) ClockFrameSequencer() {
@@ -55,7 +50,6 @@ func (a *Apu) ClockFrameSequencer() {
 	if a.pendingPowerOn {
 		a.fsStep = 0
 		a.pendingPowerOn = false
-		a.suppress = true
 	}
 
 	a.fsCounter++
@@ -88,12 +82,7 @@ func (a *Apu) ClockFrameSequencer() {
 func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu {
 	a := &Apu{
 		WritePointer: 0x200,
-		cpuFreqHz:    cpuFreq,
 		sndFrequency: sampleRate,
-		sndSamples:   sampleCnt,
-		sampCycles:   cpuFreq / sampleRate,
-		buffSamples:  sampleCnt * 16 * 2,
-		sampleTime:   1.0 / float64(sampleRate),
 		streamLen:    (2 * 2 * sampleRate / 60) - (2*2*sampleRate/60)%4,
 		buffSize:     uint32(sampleCnt * 16 * 2),
 	}
@@ -119,7 +108,7 @@ func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu 
 	return a
 }
 
-func (a *Apu) Play(muted bool, stdFps bool) {
+func (a *Apu) Play(muted, stdFps bool) {
 	a.SoundBufferWrap()
 
 	if a.Stream == nil {
@@ -148,7 +137,9 @@ func (a *Apu) Play(muted bool, stdFps bool) {
 }
 
 func (a *Apu) Close() {
-	a.player.Close()
+	if a.player != nil {
+		a.player.Close()
+	}
 }
 
 func (a *Apu) soundMix() {
@@ -180,9 +171,7 @@ func (a *Apu) SoundBufferWrap() {
 	}
 }
 
-func (a *Apu) SoundClock(cycles, doubleSpeedFlag uint32) {
-	a.sndCycles += cycles
-
+func (a *Apu) SoundClock() {
 	var (
 		pan  = a.PanReg
 		volL = int32((a.Master>>4)&7) + 1
@@ -203,61 +192,55 @@ func (a *Apu) SoundClock(cycles, doubleSpeedFlag uint32) {
 		ch4 = a.NoiseChannel.ChannelEnabled
 	)
 
-	clockCycles := uint32(a.sampCycles) << doubleSpeedFlag
+	psgL, psgR := int32(0), int32(0)
 
-	for a.sndCycles >= clockCycles {
-		psgL, psgR := int32(0), int32(0)
-
-		if ch1 {
-			ch := int32(a.ToneChannel1.GetSample())
-			if ch1L {
-				psgL += ch
-			}
-			if ch1R {
-				psgR += ch
-			}
+	if ch1 {
+		ch := int32(a.ToneChannel1.GetSample())
+		if ch1L {
+			psgL += ch
 		}
-
-		if ch2 {
-			ch := int32(a.ToneChannel2.GetSample())
-			if ch2L {
-				psgL += ch
-			}
-			if ch2R {
-				psgR += ch
-			}
+		if ch1R {
+			psgR += ch
 		}
-
-		if ch3 {
-			ch := int32(a.WaveChannel.GetSample())
-			if ch3L {
-				psgL += ch
-			}
-			if ch3R {
-				psgR += ch
-			}
-		}
-
-		if ch4 {
-			ch := int32(a.NoiseChannel.GetSample())
-			if ch4L {
-				psgL += ch
-			}
-			if ch4R {
-				psgR += ch
-			}
-		}
-
-		psgL = ((psgL * volL) >> 3) >> 2
-		psgR = ((psgR * volR) >> 3) >> 2
-
-		a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(psgL)
-		a.WritePointer++
-		a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(psgR)
-		a.WritePointer++
-
-		a.sndCycles -= clockCycles
 	}
+
+	if ch2 {
+		ch := int32(a.ToneChannel2.GetSample())
+		if ch2L {
+			psgL += ch
+		}
+		if ch2R {
+			psgR += ch
+		}
+	}
+
+	if ch3 {
+		ch := int32(a.WaveChannel.GetSample())
+		if ch3L {
+			psgL += ch
+		}
+		if ch3R {
+			psgR += ch
+		}
+	}
+
+	if ch4 {
+		ch := int32(a.NoiseChannel.GetSample())
+		if ch4L {
+			psgL += ch
+		}
+		if ch4R {
+			psgR += ch
+		}
+	}
+
+	psgL = ((psgL * volL) >> 3) >> 2
+	psgR = ((psgR * volR) >> 3) >> 2
+
+	a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(psgL)
+	a.WritePointer++
+	a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(psgR)
+	a.WritePointer++
 }
 
 func (a *Apu) PowerOff() {
@@ -268,23 +251,15 @@ func (a *Apu) PowerOff() {
 	a.Master = 0
 	a.PanReg = 0
 	a.pendingPowerOff = true
-	//fmt.Printf("Power Off\n")
 }
 
 func (a *Apu) PowerOn() {
 	a.pendingPowerOn = true
 	a.fsStep = 0
 	a.fsCounter = 0
-	//fmt.Printf("Power On\n")
 }
 
 //go:inline
 func clip(v int32) int16 {
-	if v > SAMP_MAX {
-		return SAMP_MAX
-	}
-	if v < SAMP_MIN {
-		return SAMP_MIN
-	}
-	return int16(v)
+	return min(SAMP_MAX, max(SAMP_MIN, int16(v)))
 }

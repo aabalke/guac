@@ -1,9 +1,5 @@
 package apu
 
-import (
-	"math"
-)
-
 type NoiseChannel struct {
 	Apu *Apu
 	Idx uint32
@@ -11,8 +7,9 @@ type NoiseChannel struct {
 	lfsr    uint16
 	samples float64
 
-	S, R   uint8
-	Width7 bool
+	S, R         uint8
+	Width7       bool
+	CycleSamples float64
 
 	LengthCounter uint8
 	EnvTimer      uint8
@@ -29,7 +26,6 @@ type NoiseChannel struct {
 }
 
 func (ch *NoiseChannel) LengthTrigger() {
-
 	if ch.LengthCounter == 0 {
 		return
 	}
@@ -40,7 +36,6 @@ func (ch *NoiseChannel) LengthTrigger() {
 }
 
 func (ch *NoiseChannel) Trigger() {
-
 	if ch.LengthCounter == 0 {
 		ch.ResetLength(0)
 		ch.LengthTrigger()
@@ -62,7 +57,6 @@ func (ch *NoiseChannel) Trigger() {
 }
 
 func (ch *NoiseChannel) clockLength() {
-
 	if !ch.LenEnabled {
 		return
 	}
@@ -85,7 +79,6 @@ func (ch *NoiseChannel) ResetLength(initLength uint8) {
 }
 
 func (ch *NoiseChannel) clockEnvelope() {
-
 	if !ch.ChannelEnabled {
 		return
 	}
@@ -109,19 +102,10 @@ func (ch *NoiseChannel) clockEnvelope() {
 }
 
 func (ch *NoiseChannel) GetSample() int8 {
-
-	r := float64(ch.R)
-	if r == 0 {
-		r = 0.5
-	}
-
-	frequency := (524288 / r) / math.Pow(2, float64(ch.S)+1)
-	cycleSamples := float64(ch.Apu.sndFrequency) / frequency
-
 	carry := ch.lfsr&1 != 0
 	ch.samples++
-	if ch.samples >= cycleSamples {
-		ch.samples -= cycleSamples
+	if ch.samples >= ch.CycleSamples {
+		ch.samples -= ch.CycleSamples
 		ch.lfsr >>= 1
 
 		if carry {

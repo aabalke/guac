@@ -497,6 +497,12 @@ func (gb *GameBoy) Execute() {
 	gb.Tick(4)
 	op := gb.GetOp()
 
+	//L.WriteLog(0, op)
+
+	if gb.InstInjectionFunc != nil {
+		gb.InstInjectionFunc(gb, op)
+	}
+
 	if block0 := op&0xC0 == 0x00; block0 {
 		pc := gb.Block0(op, pc)
 		reg.PC = pc

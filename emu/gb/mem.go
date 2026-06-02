@@ -1,7 +1,6 @@
 package gb
 
 import (
-	"fmt"
 	"time"
 	"unsafe"
 
@@ -35,11 +34,11 @@ type MemoryBus struct {
 }
 
 type OamDma struct {
-	IsActive          bool
-	Pending, Pending2 bool
-	OamValue          uint8
-	Idx               uint16
-	Base              uint16
+	IsActive bool
+	Pending  bool
+	OamValue uint8
+	Idx      uint16
+	Base     uint16
 }
 
 func (o *OamDma) Read() uint8 {
@@ -51,15 +50,10 @@ func (o *OamDma) Write(gb *GameBoy, v uint8) {
 	o.Base = uint16(v) << 8
 	o.Idx = 0
 	o.Pending = true
-
-	// currently skipping accurate timing (causes problems)
-	// I believe other things need to be emulated properly prior to getting this acc
-	// or it may be restart oams need to be proper
-	o.Tick(gb, 200<<2)
 }
 
-func (o *OamDma) Tick(gb *GameBoy, tcycles int) {
-	for range tcycles / 4 {
+func (o *OamDma) Tick(gb *GameBoy, tcycles int64) {
+	for range tcycles >> 2 {
 
 		if o.Pending {
 			o.Pending = false
@@ -71,25 +65,21 @@ func (o *OamDma) Tick(gb *GameBoy, tcycles int) {
 			continue
 		}
 
-		a := uint8(0)
-
-		// src of this behavior is sameboy - do not see any other ref
-		// req mooneye source dma test
-		if o.Base >= 0xE000 {
-			a = gb.Read((o.Base + o.Idx) &^ 0x2000)
-		} else {
-			a = gb.Read(o.Base + o.Idx)
-		}
-
-		gb.MemoryBus.OAM[o.Idx] = a
-
-		o.Idx++
-
 		if o.Idx >= 0xA0 {
 			o.IsActive = false
 			o.Pending = false
 			return
 		}
+
+		// src of this behavior is sameboy - do not see any other ref
+		// req mooneye source dma test
+		if o.Base >= 0xE000 {
+			gb.MemoryBus.OAM[o.Idx] = gb.Read((o.Base + o.Idx) &^ 0x2000)
+		} else {
+			gb.MemoryBus.OAM[o.Idx] = gb.Read(o.Base + o.Idx)
+		}
+
+		o.Idx++
 	}
 }
 
@@ -138,8 +128,12 @@ func (h *Hdma) Read() uint8 {
 }
 
 func (h *Hdma) Transfer(length uint16) {
+	// since hdma transfers are included in lcd handler, I do not believe
+	// double speed is necessary here, is already running at correct time
+	// relative to cpu
 	//~ 8 normal m cycles per 0x10 transfers
-	tcycles := (8 << h.gb.DoubleSpeedFlag) << 2
+	//tcycles := (8 << h.gb.DoubleSpeedFlag) << 2
+	tcycles := int64(8 << 2)
 
 	for range length {
 
@@ -395,10 +389,10 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 		return gb.getJoypad()
 
 	case 0xFF01:
-		return gb.MemoryBus.Serial.sb
+		return gb.MemoryBus.Serial.ReadSb()
 
 	case 0xFF02:
-		return gb.MemoryBus.Serial.ReadSb()
+		return gb.MemoryBus.Serial.ReadSc()
 
 	case 0xFF03:
 		return 0xFF
@@ -448,8 +442,6 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 			b |= 1
 		}
 
-		fmt.Printf("Reading PC %04X SPD %02X\n", gb.Cpu.PC, b)
-
 		return b
 
 	case 0xFF4F:
@@ -493,10 +485,10 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		gb.MemoryBus.JoypadReg |= v & 0x30
 
 	case 0xFF01:
-		gb.MemoryBus.Serial.sb = v
+		gb.MemoryBus.Serial.WriteSb(v)
 
 	case 0xFF02:
-		gb.MemoryBus.Serial.WriteSb(v)
+		gb.MemoryBus.Serial.WriteSc(v)
 
 	case 0xFF04: // DIV
 
@@ -504,18 +496,16 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		prevDiv := t.Div
 		t.Div = 0
 
-		mask := uint16(1 << 12)
-		mask <<= gb.DoubleSpeedFlag
+		//log.Printf("NEED TO SET UP EVENT HANDLING ON DIV SET 0")
 
-		if prevDiv&mask != 0 {
-			gb.Apu.ClockFrameSequencer()
-		}
+		//mask := uint16(1 << 12)
+		//mask <<= gb.DoubleSpeedFlag
 
-		if !t.Enabled {
-			return
-		}
+		//if prevDiv&mask != 0 {
+		//	gb.Apu.ClockFrameSequencer()
+		//}
 
-		if prevDiv&fallingEdgeBits[t.FreqBits] != 0 {
+		if t.Enabled && prevDiv&fallingEdgeBits[t.FreqBits] != 0 {
 			if overflow := t.TIMA == 0xFF; overflow {
 				t.TIMA = t.TMA
 				gb.SetIrq(IRQ_TMR)
@@ -610,11 +600,6 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 	case 0xFF4D:
 		if gb.Color {
 			gb.PrepareSpeedToggle = v&1 != 0
-			b := uint8(gb.DoubleSpeedFlag<<7) | 0x7E
-			if gb.PrepareSpeedToggle {
-				b |= 1
-			}
-			fmt.Printf("Writing PC %04X SPD %02X\n", gb.Cpu.PC, b)
 			return
 		}
 
