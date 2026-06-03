@@ -47,7 +47,6 @@ const (
 )
 
 func (cpu *Cpu) CheckCond(cond uint32) bool {
-
 	cpsr := &cpu.Reg.CPSR
 
 	switch cond {
@@ -97,7 +96,6 @@ var BANK_ID = map[uint32]uint32{
 }
 
 func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq) *Cpu {
-
 	c := &Cpu{
 		mem:        m,
 		Irq:        irq,
@@ -137,7 +135,6 @@ type Cond struct {
 
 //go:nosplit
 func (c *Cond) Get() uint32 {
-
 	v := c.Mode
 
 	if c.N {
@@ -181,7 +178,6 @@ func (c *Cond) Set(v uint32) {
 }
 
 func (cpu *Cpu) toggleThumb() {
-
 	r := &cpu.Reg.R
 	cpsr := &cpu.Reg.CPSR
 
@@ -196,7 +192,6 @@ func (cpu *Cpu) toggleThumb() {
 }
 
 func (cpu *Cpu) CheckIrq() {
-
 	if interrupts := cpu.Irq.IE&cpu.Irq.IF != 0; !interrupts {
 		return
 	}
@@ -237,7 +232,6 @@ func (cpu *Cpu) jitFunction(pc uint32, thumb bool) (uint32, int, bool) {
 }
 
 func (cpu *Cpu) GetOpArm() (uint32, int) {
-
 	r := &cpu.Reg.R
 
 	if cpu.isBranching {
@@ -261,10 +255,10 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 
 	if sequential := cpu.PcPtr == nil; sequential {
 		cpu.BranchPc = r[PC]
-		if p, ok := cpu.mem.ReadPtr(r[PC], false); ok {
+		if p, ok := cpu.mem.ReadPtr(r[PC]); ok {
 			cpu.PcPtr = p
 		} else {
-			return cpu.mem.Read32(r[PC], false), 0
+			return cpu.mem.Read32(r[PC]), 0
 		}
 	}
 
@@ -276,7 +270,6 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 }
 
 func (cpu *Cpu) GetOpThumb() (uint16, int) {
-
 	r := &cpu.Reg.R
 
 	if cpu.isBranching {
@@ -296,11 +289,11 @@ func (cpu *Cpu) GetOpThumb() (uint16, int) {
 	}
 
 	if sequential := cpu.PcPtr == nil; sequential {
-		if p, ok := cpu.mem.ReadPtr(r[PC], false); ok {
+		if p, ok := cpu.mem.ReadPtr(r[PC]); ok {
 			cpu.BranchPc = r[PC]
 			cpu.PcPtr = p
 		} else {
-			return uint16(cpu.mem.Read16(r[PC], false)), 0
+			return uint16(cpu.mem.Read16(r[PC])), 0
 		}
 	}
 
@@ -319,7 +312,6 @@ var (
 )
 
 func (c *Cpu) TestStart(op uint32, f func(op uint32), compare bool) {
-
 	if !compare {
 		return
 	}
@@ -335,7 +327,6 @@ func (c *Cpu) TestStart(op uint32, f func(op uint32), compare bool) {
 }
 
 func (c *Cpu) EndTest(op uint32, compare bool) {
-
 	if !(compare && c.Reg != t_sav) {
 		return
 	}
@@ -347,7 +338,6 @@ func (c *Cpu) EndTest(op uint32, compare bool) {
 }
 
 func DecodeTHUMBBranch(op uint16) bool {
-
 	switch {
 	case isthumbSWI(op):
 		return false

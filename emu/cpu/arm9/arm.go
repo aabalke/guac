@@ -2,11 +2,11 @@
 package arm9
 
 import (
+	"math"
 	"math/bits"
 	"unsafe"
 
 	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
-	"math"
 )
 
 const (
@@ -36,7 +36,6 @@ const (
 )
 
 func (cpu *Cpu) Alu(op uint32) {
-
 	var (
 		r     = &cpu.Reg.R
 		cpsr  = &cpu.Reg.CPSR
@@ -56,7 +55,7 @@ func (cpu *Cpu) Alu(op uint32) {
 
 		if setCarry := ro != 0 && (op>>20)&1 != 0; setCarry {
 			// I believe this matches
-			//carry := (nn >> (ro-1)) & 1 != 0 // this line must be before op
+			// carry := (nn >> (ro-1)) & 1 != 0 // this line must be before op
 			cpsr.C = (op2>>31)&1 != 0
 		}
 
@@ -257,7 +256,6 @@ func (cpu *Cpu) Alu(op uint32) {
 }
 
 func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
-
 	var (
 		r = &cpu.Reg.R
 
@@ -397,7 +395,6 @@ func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
 }
 
 func (cpu *Cpu) psrSwitch() {
-
 	var (
 		reg  = &cpu.Reg
 		r    = &cpu.Reg.R
@@ -462,7 +459,6 @@ const (
 )
 
 func (cpu *Cpu) Mul(op uint32) {
-
 	var (
 		inst = (op >> 21) & 0xF
 		set  = (op>>20)&1 != 0
@@ -489,7 +485,7 @@ func (cpu *Cpu) Mul(op uint32) {
 			cpsr.N = (uint32(res)>>31)&1 != 0
 			cpsr.Z = uint32(res) == 0
 			// FLAG_C "destroyed" ARM <5, ignored ARM >=5
-			//cpsr.C = false
+			// cpsr.C = false
 		}
 
 		r[PC] += 4
@@ -604,7 +600,6 @@ func (cpu *Cpu) Mul(op uint32) {
 	}
 
 	r[PC] += 4
-
 }
 
 const (
@@ -613,7 +608,6 @@ const (
 )
 
 func (c *Cpu) Sdt(op uint32) {
-
 	if pld := op&
 		0b1111_1101_0111_0000_1111_0000_0000_0000 ==
 		0b1111_0101_0101_0000_1111_0000_0000_0000; pld {
@@ -706,10 +700,10 @@ func (c *Cpu) Sdt(op uint32) {
 	if load {
 		if byte {
 			// DO NOT WORD ALIGN
-			r[rd] = c.mem.Read8(prev, true)
+			r[rd] = c.mem.Read8(prev)
 		} else {
 
-			v := c.mem.Read32(prev&^0b11, true)
+			v := c.mem.Read32(prev &^ 0b11)
 			is := ((prev & 0b11) << 3) & 0x1F
 			r[rd] = bits.RotateLeft32(v, -int(is))
 
@@ -725,9 +719,9 @@ func (c *Cpu) Sdt(op uint32) {
 		}
 
 		if byte {
-			c.mem.Write8(prev, uint8(v), true)
+			c.mem.Write8(prev, uint8(v))
 		} else {
-			c.mem.Write32(prev&^0b11, v, true)
+			c.mem.Write32(prev&^0b11, v)
 		}
 	}
 
@@ -775,7 +769,6 @@ const (
 )
 
 func (cpu *Cpu) BX(op uint32) {
-
 	var (
 		r    = &cpu.Reg.R
 		inst = (op >> 4) & 0xF
@@ -823,7 +816,6 @@ const (
 )
 
 func (c *Cpu) Half(op uint32) {
-
 	var (
 		r       = &c.Reg.R
 		rn      = (op >> 16) & 0xF
@@ -881,18 +873,18 @@ func (c *Cpu) Half(op uint32) {
 
 		switch inst {
 		case STRH:
-			c.mem.Write16(pre&^1, uint16(rdv), true)
+			c.mem.Write16(pre&^1, uint16(rdv))
 
 		case LDRD:
 			addr := pre &^ 0b111
-			r[rd] = c.mem.Read32(addr, true)
-			r[rd+1] = c.mem.Read32(addr+4, true)
+			r[rd] = c.mem.Read32(addr)
+			r[rd+1] = c.mem.Read32(addr + 4)
 
 		case STRD:
 
 			addr := pre &^ 0b111
-			c.mem.Write32(addr, rdv, true)
-			c.mem.Write32(addr+4, rd2v, true)
+			c.mem.Write32(addr, rdv)
+			c.mem.Write32(addr+4, rd2v)
 
 		}
 
@@ -907,14 +899,14 @@ func (c *Cpu) Half(op uint32) {
 	switch inst {
 	case LDRH:
 		//  LDRH Rd,[odd]   -->  LDRH Rd,[odd-1]        ;forced align
-		r[rd] = uint32(c.mem.Read16(pre&^1, true))
+		r[rd] = uint32(c.mem.Read16(pre &^ 1))
 	case LDRSB:
 		// sign-expand byte value
-		r[rd] = uint32(int32(int8(c.mem.Read8(pre, true))))
+		r[rd] = uint32(int32(int8(c.mem.Read8(pre))))
 
 	case LDRSH:
 		// sign-expand half value
-		r[rd] = uint32(int32(int16(c.mem.Read16(pre&^1, true))))
+		r[rd] = uint32(int32(int16(c.mem.Read16(pre &^ 1))))
 
 	}
 
@@ -922,7 +914,6 @@ func (c *Cpu) Half(op uint32) {
 }
 
 func (cpu *Cpu) Psr(op uint32) {
-
 	r := &cpu.Reg.R
 
 	if msr := (op>>21)&1 != 0; msr {
@@ -956,7 +947,6 @@ const (
 )
 
 func (cpu *Cpu) msr(op uint32) {
-
 	r := &cpu.Reg.R
 
 	spsrFlag := (op>>22)&1 != 0
@@ -1061,7 +1051,6 @@ func (cpu *Cpu) msr(op uint32) {
 }
 
 func (cpu *Cpu) Swp(op uint32) {
-
 	var (
 		r      = &cpu.Reg.R
 		isByte = (op>>22)&1 != 0
@@ -1073,13 +1062,13 @@ func (cpu *Cpu) Swp(op uint32) {
 	)
 
 	if isByte {
-		r[rd] = cpu.mem.Read8(rnv, true)
-		cpu.mem.Write8(rnv, uint8(rmv), true)
+		r[rd] = cpu.mem.Read8(rnv)
+		cpu.mem.Write8(rnv, uint8(rmv))
 	} else {
-		v := cpu.mem.Read32(rnv&^0b11, true)
+		v := cpu.mem.Read32(rnv &^ 0b11)
 		is := (rnv & 0b11) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
-		cpu.mem.Write32(rnv&^0b11, rmv, true)
+		cpu.mem.Write32(rnv&^0b11, rmv)
 	}
 
 	r[PC] += 4
@@ -1093,7 +1082,6 @@ const (
 )
 
 func (cpu *Cpu) Qalu(op uint32) {
-
 	var (
 		r    = &cpu.Reg.R
 		inst = (op >> 20) & 0xF
@@ -1139,7 +1127,6 @@ func (cpu *Cpu) Qalu(op uint32) {
 }
 
 func (cpu *Cpu) Clz(op uint32) {
-
 	r := &cpu.Reg.R
 	rm := op & 0xF
 	rd := (op >> 12) & 0xF
@@ -1148,7 +1135,6 @@ func (cpu *Cpu) Clz(op uint32) {
 }
 
 func (cpu *Cpu) CoDataReg(op uint32) {
-
 	var (
 		reg = cp15.CpRegister{
 			Op: uint8((op >> 21) & 0x7),
@@ -1192,7 +1178,6 @@ func (cpu *Cpu) CoDataReg(op uint32) {
 }
 
 func (c *Cpu) Block(op uint32) {
-
 	var (
 		r        = &c.Reg.R
 		rlist    = op & 0xFFFF
@@ -1270,9 +1255,9 @@ func (c *Cpu) Block(op uint32) {
 
 	// disabled for now. Need method to handle games that use edge of bank to subtract from. ex. metroid uses 0x200_0000 as addr, then subtracts to place values in different bank at 0x1FF_FFFC
 	//if load {
-	//	p, _ = c.mem.ReadPtr(addr, true)
+	//	p, _ = c.mem.ReadPtr(addr)
 	//} else {
-	//	p, _ = c.mem.WritePtr(addr, true)
+	//	p, _ = c.mem.WritePtr(addr)
 	//}
 
 	for range 16 {
@@ -1325,25 +1310,22 @@ func (c *Cpu) Block(op uint32) {
 		}
 
 		if load {
-
 			if p == nil {
-				*ref = c.mem.Read32(addr, true)
+				*ref = c.mem.Read32(addr)
 			} else {
 				*ref = *(*uint32)(p)
 			}
-
 		} else {
-
 			if p == nil {
 				switch reg {
 				case rn:
 
-					c.mem.Write32(addr, rnv, true)
+					c.mem.Write32(addr, rnv)
 
 				case PC:
-					c.mem.Write32(addr, *ref+12, true)
+					c.mem.Write32(addr, *ref+12)
 				default:
-					c.mem.Write32(addr, *ref, true)
+					c.mem.Write32(addr, *ref)
 				}
 			} else {
 				switch reg {

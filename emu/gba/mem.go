@@ -33,8 +33,8 @@ func NewMemory(gba *GBA) *Memory {
 	m.initReadRegions()
 	m.initWriteRegions()
 
-	m.Write32(0x4000000, 0x80, false)
-	m.Write32(0x4000134, 0x800F, false) // IR requires bit 3 on. I believe this is auth check (sonic adv)
+	m.Write32(0x4000000, 0x80)
+	m.Write32(0x4000134, 0x800F) // IR requires bit 3 on. I believe this is auth check (sonic adv)
 
 	//m.BIOS_MODE = BIOS_STARTUP
 
@@ -228,7 +228,7 @@ func (m *Memory) initReadRegions() {
 	}
 }
 
-func (m *Memory) ReadPtr(addr uint32, _ bool) (unsafe.Pointer, bool) {
+func (m *Memory) ReadPtr(addr uint32) (unsafe.Pointer, bool) {
 	switch regions := addr >> 24; regions {
 	case 0x2:
 		return unsafe.Add(
@@ -315,10 +315,10 @@ func (m *Memory) ReadOpenBus(addr uint32) uint8 {
 		// OldLO=LSW(data), OldHI=MSW(data)
 		// Theoretically, this might also change if a DMA transfer occurs.
 
-		return uint8(m.Read32((pc&^1)+4, false) >> ((addr & 1) << 3))
+		return uint8(m.Read32((pc&^1)+4) >> ((addr & 1) << 3))
 	}
 
-	return uint8(m.Read32((pc&^3)+8, false) >> ((addr & 3) << 3))
+	return uint8(m.Read32((pc&^3)+8) >> ((addr & 3) << 3))
 }
 
 func (m *Memory) ReadIO(addr uint32) uint8 {
@@ -475,7 +475,7 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 	return m.IO[addr]
 }
 
-func (m *Memory) Read8(addr uint32, _ bool) uint32 {
+func (m *Memory) Read8(addr uint32) uint32 {
 	if badRom := addr >= 0x800_0000 && addr < 0xE00_0000; badRom {
 		if addr&0x1FF_FFFF >= m.GBA.Cartridge.RomLength {
 			return m.ReadBadRom(addr, 1)
@@ -487,7 +487,7 @@ func (m *Memory) Read8(addr uint32, _ bool) uint32 {
 
 // Accessing SRAM Area by 16bit/32bit
 // Reading retrieves 8bit value from specified address, multiplied by 0101h (LDRH) or by 01010101h (LDR). Writing changes the 8bit value at the specified address only, being set to LSB of (source_data ROR (address*8)).
-func (m *Memory) Read16(addr uint32, _ bool) uint32 {
+func (m *Memory) Read16(addr uint32) uint32 {
 	switch {
 	case addr >= 0xE00_0000:
 
@@ -513,14 +513,14 @@ func (m *Memory) Read16(addr uint32, _ bool) uint32 {
 		}
 	}
 
-	if ptr, ok := m.ReadPtr(addr, false); ok {
+	if ptr, ok := m.ReadPtr(addr); ok {
 		return uint32(binary.LittleEndian.Uint16((*[4]uint8)(ptr)[:]))
 	}
 
 	return uint32(m.Read(addr+1))<<8 | uint32(m.Read(addr))
 }
 
-func (m *Memory) Read32(addr uint32, _ bool) uint32 {
+func (m *Memory) Read32(addr uint32) uint32 {
 	switch {
 	case addr >= 0xE00_0000:
 
@@ -536,7 +536,7 @@ func (m *Memory) Read32(addr uint32, _ bool) uint32 {
 		}
 	}
 
-	if ptr, ok := m.ReadPtr(addr, false); ok {
+	if ptr, ok := m.ReadPtr(addr); ok {
 		return binary.LittleEndian.Uint32((*[4]uint8)(ptr)[:])
 	}
 
@@ -819,11 +819,11 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 	}
 }
 
-func (m *Memory) Write8(addr uint32, v uint8, _ bool) {
+func (m *Memory) Write8(addr uint32, v uint8) {
 	m.Write(addr, v, true)
 }
 
-func (m *Memory) Write16(addr uint32, v uint16, _ bool) {
+func (m *Memory) Write16(addr uint32, v uint16) {
 	switch {
 	case addr >= 0xE00_0000:
 		if addr&1 == 1 {
@@ -844,7 +844,7 @@ func (m *Memory) Write16(addr uint32, v uint16, _ bool) {
 	m.Write(addr+1, uint8(v>>8), false)
 }
 
-func (m *Memory) Write32(addr uint32, v uint32, _ bool) {
+func (m *Memory) Write32(addr uint32, v uint32) {
 	if sram := addr >= 0xE00_0000; sram {
 		is := (addr << 3) & 0x1F
 		v = bits.RotateLeft32(v, -int(is))
@@ -930,7 +930,7 @@ func (m *Memory) ReadIODirectByte(addr uint32) uint32 {
 	}
 }
 
-func (m *Memory) WritePtr(addr uint32, _ bool) (unsafe.Pointer, bool) {
+func (m *Memory) WritePtr(addr uint32) (unsafe.Pointer, bool) {
 	switch regions := addr >> 24; regions {
 	case 0x2:
 		return unsafe.Add(

@@ -231,18 +231,18 @@ func (dma *DMA) transfer() {
 		return
 	}
 
-	srcPtr, _ := mem.ReadPtr(tmpSrc, false)
+	srcPtr, _ := mem.ReadPtr(tmpSrc)
 	if srcPtr != nil {
 		top := uint32(int(tmpSrc) + srcOffset*int(count))
-		if _, ok := mem.ReadPtr(top, false); !ok {
+		if _, ok := mem.ReadPtr(top); !ok {
 			srcPtr = nil
 		}
 	}
 
-	dstPtr, _ := mem.WritePtr(tmpDst, false)
+	dstPtr, _ := mem.WritePtr(tmpDst)
 	if dstPtr != nil {
 		top := uint32(int(tmpDst) + dstOffset*int(count))
-		if _, ok := mem.WritePtr(top, false); !ok {
+		if _, ok := mem.WritePtr(top); !ok {
 			dstPtr = nil
 		}
 	}
@@ -274,17 +274,17 @@ func (dma *DMA) transfer() {
 			if dstPtr == nil {
 				switch {
 				case badAddr:
-					mem.Write32(tmpDst&^3, dma.Value, false)
+					mem.Write32(tmpDst&^3, dma.Value)
 				case sram && dma.Idx == 0:
 					dma.Value = 0
-					mem.Write32(tmpDst&^3, dma.Value, false)
+					mem.Write32(tmpDst&^3, dma.Value)
 				default:
 					if srcPtr == nil {
-						dma.Value = mem.Read32(tmpSrc&^3, false)
+						dma.Value = mem.Read32(tmpSrc &^ 3)
 					} else {
 						dma.Value = *(*uint32)(srcPtr)
 					}
-					mem.Write32(tmpDst&^3, dma.Value, false)
+					mem.Write32(tmpDst&^3, dma.Value)
 				}
 			} else {
 				switch {
@@ -292,11 +292,11 @@ func (dma *DMA) transfer() {
 					dma.Value = 0
 				default:
 					if srcPtr == nil {
-						dma.Value = mem.Read32(tmpSrc&^3, false)
+						dma.Value = mem.Read32(tmpSrc &^ 3)
 					} else {
 						dma.Value = *(*uint32)(srcPtr)
 					}
-					dma.Value = mem.Read32(tmpSrc&^3, false)
+					dma.Value = mem.Read32(tmpSrc &^ 3)
 				}
 
 				*(*uint32)(dstPtr) = dma.Value
@@ -305,17 +305,17 @@ func (dma *DMA) transfer() {
 			if dstPtr == nil {
 				switch {
 				case badAddr:
-					mem.Write16(tmpDst&^1, uint16(dma.Value), false)
+					mem.Write16(tmpDst&^1, uint16(dma.Value))
 				case sram && dma.Idx == 0:
 					dma.Value = 0
-					mem.Write16(tmpDst&^1, uint16(dma.Value), false)
+					mem.Write16(tmpDst&^1, uint16(dma.Value))
 				default:
 					if srcPtr == nil {
-						dma.Value = mem.Read16(tmpSrc&^1, false)
+						dma.Value = mem.Read16(tmpSrc &^ 1)
 					} else {
 						dma.Value = uint32(*(*uint16)(srcPtr))
 					}
-					mem.Write16(tmpDst&^1, uint16(dma.Value), false)
+					mem.Write16(tmpDst&^1, uint16(dma.Value))
 				}
 			} else {
 				switch {
@@ -323,11 +323,11 @@ func (dma *DMA) transfer() {
 					dma.Value = 0
 				default:
 					if srcPtr == nil {
-						dma.Value = mem.Read16(tmpSrc&^1, false)
+						dma.Value = mem.Read16(tmpSrc &^ 1)
 					} else {
 						dma.Value = uint32(*(*uint16)(srcPtr))
 					}
-					dma.Value = mem.Read16(tmpSrc&^1, false)
+					dma.Value = mem.Read16(tmpSrc &^ 1)
 				}
 
 				*(*uint32)(dstPtr) = dma.Value
@@ -417,7 +417,7 @@ func (dma *DMA) transferFifo() {
 	}
 
 	for range 4 {
-		v := dma.Gba.Mem.Read32(dma.Src, false)
+		v := dma.Gba.Mem.Read32(dma.Src)
 		//dma.Gba.Mem.Write32(dma.Dst, v) //make sure this and fifoA / fifoB are not same
 		switch dma.Idx {
 		case 1:

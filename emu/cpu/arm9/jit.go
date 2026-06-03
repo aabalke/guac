@@ -119,32 +119,32 @@ func (j *Jit) DeletePages() {
 
 //go:nosplit
 func Read(addr uint32) uint32 {
-	return CpuPtr.mem.Read8(addr, true)
+	return CpuPtr.mem.Read8(addr)
 }
 
 //go:nosplit
 func Read16(addr uint32) uint32 {
-	return CpuPtr.mem.Read16(addr, true)
+	return CpuPtr.mem.Read16(addr)
 }
 
 //go:nosplit
 func Read32(addr uint32) uint32 {
-	return CpuPtr.mem.Read32(addr, true)
+	return CpuPtr.mem.Read32(addr)
 }
 
 //go:nosplit
 func Write(addr uint32, v uint8) {
-	CpuPtr.mem.Write8(addr, v, true)
+	CpuPtr.mem.Write8(addr, v)
 }
 
 //go:nosplit
 func Write16(addr uint32, v uint16) {
-	CpuPtr.mem.Write16(addr, v, true)
+	CpuPtr.mem.Write16(addr, v)
 }
 
 //go:nosplit
 func Write32(addr, v uint32) {
-	CpuPtr.mem.Write32(addr, v, true)
+	CpuPtr.mem.Write32(addr, v)
 }
 
 //go:nosplit

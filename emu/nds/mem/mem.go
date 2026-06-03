@@ -55,12 +55,43 @@ type Mem struct {
 	Timers      [8]Timer
 
 	Jit7, Jit9 Jit
+
+	Bus7 Bus7
+	Bus9 Bus9
 }
 
-type BiosProt uint16
-type WifiWaitCnt uint8
+type Bus7 struct {
+	M *Mem
+}
 
-func NewMemory(
+func (b *Bus7) Read8(addr uint32) uint32                    { return b.M.Read8(addr, false) }
+func (b *Bus7) Read16(addr uint32) uint32                   { return b.M.Read16(addr, false) }
+func (b *Bus7) Read32(addr uint32) uint32                   { return b.M.Read32(addr, false) }
+func (b *Bus7) ReadPtr(addr uint32) (unsafe.Pointer, bool)  { return b.M.ReadPtr(addr, false) }
+func (b *Bus7) Write8(addr uint32, v uint8)                 { b.M.Write8(addr, v, false) }
+func (b *Bus7) Write16(addr uint32, v uint16)               { b.M.Write16(addr, v, false) }
+func (b *Bus7) Write32(addr, v uint32)                      { b.M.Write32(addr, v, false) }
+func (b *Bus7) WritePtr(addr uint32) (unsafe.Pointer, bool) { return b.M.WritePtr(addr, false) }
+
+type Bus9 struct {
+	M *Mem
+}
+
+func (b *Bus9) Read8(addr uint32) uint32                    { return b.M.Read8(addr, true) }
+func (b *Bus9) Read16(addr uint32) uint32                   { return b.M.Read16(addr, true) }
+func (b *Bus9) Read32(addr uint32) uint32                   { return b.M.Read32(addr, true) }
+func (b *Bus9) ReadPtr(addr uint32) (unsafe.Pointer, bool)  { return b.M.ReadPtr(addr, true) }
+func (b *Bus9) Write8(addr uint32, v uint8)                 { b.M.Write8(addr, v, true) }
+func (b *Bus9) Write16(addr uint32, v uint16)               { b.M.Write16(addr, v, true) }
+func (b *Bus9) Write32(addr, v uint32)                      { b.M.Write32(addr, v, true) }
+func (b *Bus9) WritePtr(addr uint32) (unsafe.Pointer, bool) { return b.M.WritePtr(addr, true) }
+
+type (
+	BiosProt    uint16
+	WifiWaitCnt uint8
+)
+
+func (m *Mem) InitMemory(
 	arm7Pc *uint32,
 	halted7, halted9 *bool,
 	dma7, dma9 *[4]dma.DMA,
@@ -68,22 +99,20 @@ func NewMemory(
 	jit7, jit9 Jit,
 	c *cart.Cartridge,
 	Ppu *ppu.PPU,
-	snd *snd.Snd) Mem {
-
-	m := Mem{
-		halted7:   halted7,
-		halted9:   halted9,
-		dma7:      dma7,
-		dma9:      dma9,
-		irq9:      irq9,
-		irq7:      irq7,
-		Cartridge: c,
-		Ppu:       Ppu,
-		arm7Pc:    arm7Pc,
-		Snd:       snd,
-		Jit7:      jit7,
-		Jit9:      jit9,
-	}
+	snd *snd.Snd,
+) {
+	m.halted7 = halted7
+	m.halted9 = halted9
+	m.dma7 = dma7
+	m.dma9 = dma9
+	m.irq9 = irq9
+	m.irq7 = irq7
+	m.Cartridge = c
+	m.Ppu = Ppu
+	m.arm7Pc = arm7Pc
+	m.Snd = snd
+	m.Jit7 = jit7
+	m.Jit9 = jit9
 
 	// i believe this is default
 	m.WRAM.WriteCNT(3)
@@ -110,7 +139,8 @@ func NewMemory(
 
 	m.Wifi = wifi.NewWifi()
 
-	return m
+	m.Bus7 = Bus7{M: m}
+	m.Bus9 = Bus9{M: m}
 }
 
 var lockWrites bool
@@ -137,7 +167,6 @@ func (mem *Mem) LoadBios() {
 }
 
 func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
-
 	if arm9 {
 
 		if v, ok := mem.Tcm.ReadTcmWindow(addr); ok {
@@ -172,7 +201,6 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 	case 0x0, 0x1:
 
 		if addr < 0x4000 && (*mem.arm7Pc) < 0x4000 {
-
 			return (*mem.Arm7Bios)[addr]
 		}
 
@@ -196,8 +224,8 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 func (mem *Mem) Read8(addr uint32, arm9 bool) uint32 {
 	return uint32(mem.Read(addr, arm9))
 }
-func (mem *Mem) Read16(addr uint32, arm9 bool) uint32 {
 
+func (mem *Mem) Read16(addr uint32, arm9 bool) uint32 {
 	if !arm9 && addr >= 0x480_0000 && addr < 0x490_0000 {
 		return uint32(mem.Wifi.Read16(addr))
 	}
@@ -206,8 +234,8 @@ func (mem *Mem) Read16(addr uint32, arm9 bool) uint32 {
 	}
 	return uint32(mem.Read(addr, arm9)) | (uint32(mem.Read(addr+1, arm9)) << 8)
 }
-func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
 
+func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
 	switch addr {
 	case 0x410_0000:
 		return mem.Ipc.ReadFifo(arm9)
@@ -222,7 +250,7 @@ func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
 		return ((uint32(mem.Read(addr+3, arm9)) << 24) |
 			(uint32(mem.Read(addr+2, arm9)) << 16) |
 			(uint32(mem.Read(addr+1, arm9)) << 8) |
-			(uint32(mem.Read(addr+0, arm9))))
+			uint32(mem.Read(addr+0, arm9)))
 	}
 }
 
@@ -263,7 +291,6 @@ func (mem *Mem) WritePtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
 }
 
 func (mem *Mem) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
-
 	if arm9 {
 
 		if v, ok := mem.Tcm.ReadTcmWindowPtr(addr); ok {
@@ -311,7 +338,6 @@ func (mem *Mem) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
 }
 
 func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
-
 	mem.Jit7.InvalidatePage(addr)
 	mem.Jit9.InvalidatePage(addr)
 
@@ -359,8 +385,8 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 func (mem *Mem) Write8(addr uint32, v uint8, arm9 bool) {
 	mem.Write(addr, v, arm9)
 }
-func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
 
+func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
 	if !arm9 && addr >= 0x480_0000 && addr < 0x490_0000 {
 		mem.Wifi.Write16(addr, v)
 		return
@@ -374,8 +400,8 @@ func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
 	mem.Write(addr, uint8(v), arm9)
 	mem.Write(addr+1, uint8(v>>8), arm9)
 }
-func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
 
+func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
 	if arm9 {
 
 		if geo := addr >= 0x4000440 && addr < 0x4000600; geo {
@@ -409,7 +435,6 @@ func (mem *Mem) WriteGXFIFO(v uint32) {
 }
 
 func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
-
 	//if addr != 0x180 && addr != 0x181 && addr < 0x3000 {
 	//	fmt.Printf("READ ADDR %08X\n", addr)
 	//}
@@ -602,7 +627,6 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 }
 
 func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
-
 	if addr >= 0x188 && addr < 0x190 {
 		panic("WRITE IPC FIFO FROM BYTE OR HALF")
 	}
@@ -849,7 +873,6 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 }
 
 func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
-
 	//if addr != 0x180 && addr != 0x181 && addr < 0x3000 {
 	//	fmt.Printf("READ ADDR %08X\n", addr)
 	//}
@@ -1043,7 +1066,6 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 }
 
 func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
-
 	if addr >= 0x188 && addr < 0x190 {
 		panic("WRITE IPC FIFO FROM BYTE OR HALF")
 	}
@@ -1271,7 +1293,6 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 }
 
 func (m *Mem) ReadDma(dmas *[4]dma.DMA, addr uint32) uint8 {
-
 	switch addr {
 	case 0x00B8:
 		return 0

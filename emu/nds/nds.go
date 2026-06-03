@@ -49,7 +49,7 @@ const (
 var RASTERIZE_WG = sync.WaitGroup{}
 
 type Nds struct {
-	mem       mem.Mem
+	mem       *mem.Mem
 	arm7      *arm7.Cpu
 	arm9      *arm9.Cpu
 	ppu       *ppu.PPU
@@ -69,8 +69,9 @@ type Nds struct {
 }
 
 func NewNds(path string, audioCtx *oto.Context) *Nds {
-
 	nds := Nds{}
+
+	nds.mem = &mem.Mem{}
 
 	nds.Screen = NewScreen()
 
@@ -86,10 +87,10 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 	}
 
 	cp15 := &cp15.Cp15{}
-	cp15.Init(&nds.mem)
+	cp15.Init(nds.mem)
 
-	nds.arm7 = arm7.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem, &irq7)
-	nds.arm9 = arm9.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem, &irq9, cp15)
+	nds.arm7 = arm7.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem.Bus7, &irq7)
+	nds.arm9 = arm9.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem.Bus9, &irq9, cp15)
 
 	s := snd.NewSnd(
 		audioCtx,
@@ -98,7 +99,7 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 		SND_SAMPLES,
 	)
 
-	nds.mem = mem.NewMemory(
+	nds.mem.InitMemory(
 		&nds.arm7.Reg.R[15],
 		&nds.arm7.Halted, &nds.arm9.Halted,
 		&nds.dma7, &nds.dma9,
@@ -107,11 +108,11 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 		nds.Cartridge, nds.ppu, s,
 	)
 
-	s.Mem = &nds.mem
+	s.Mem = nds.mem
 
 	for i := range 4 {
-		nds.dma9[i].Init(i, &nds.mem, &irq9, true)
-		nds.dma7[i].Init(i, &nds.mem, &irq7, false)
+		nds.dma9[i].Init(i, nds.mem, &irq9, true)
+		nds.dma7[i].Init(i, nds.mem, &irq7, false)
 	}
 
 	nds.Cartridge = cart.NewCartridge(

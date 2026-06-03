@@ -29,7 +29,6 @@ var (
 )
 
 func (j *Jit) UserBankReg(reg uint32) gojit.Indirect {
-
 	// sp and lr banks have user bank first, no need to add offsets
 
 	if reg < 8 {
@@ -67,7 +66,6 @@ func (j *Jit) REG(i uint32) gojit.Indirect {
 }
 
 func (j *Jit) CreateBlock(pc uint32, thumb bool) {
-
 	pageIdx := pc >> j.PageShift
 	blockIdx := (pc & j.PageMask) >> 1
 
@@ -102,7 +100,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 	tempPc := pc
 	var length, op, i uint32
 
-	p, ok := j.Cpu.mem.ReadPtr(tempPc, true)
+	p, ok := j.Cpu.mem.ReadPtr(tempPc)
 	if !ok {
 
 		if tempPc&0xF00_0000 == 0x600_0000 {
@@ -119,7 +117,6 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 		for {
 			op = uint32(*(*uint16)(unsafe.Add(p, i*2)))
 			if length >= config.Conf.Nds.Jit.BatchInstA9 {
-
 				break
 			}
 
@@ -139,7 +136,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 
 				i = 0
 
-				p, ok = j.Cpu.mem.ReadPtr(tempPc, true)
+				p, ok = j.Cpu.mem.ReadPtr(tempPc)
 				if !ok {
 					j.BlockCache.PushTail(newBlock)
 					page.Blocks[blockIdx] = j.BlockCache.SkipBlock
@@ -156,13 +153,11 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 			length++
 			tempPc += 2
 		}
-
 	} else {
 		for {
 			op = *(*uint32)(unsafe.Add(p, i*4))
 
 			if length >= config.Conf.Nds.Jit.BatchInstA9 {
-
 				break
 			}
 
@@ -188,7 +183,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 
 				i = 0
 
-				p, ok = j.Cpu.mem.ReadPtr(tempPc, true)
+				p, ok = j.Cpu.mem.ReadPtr(tempPc)
 				if !ok {
 					j.BlockCache.PushTail(newBlock)
 					page.Blocks[blockIdx] = j.BlockCache.SkipBlock
@@ -230,7 +225,6 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 }
 
 func (j *Jit) emitOp(op uint32) bool {
-
 	jcctargets := j.emitCond(op)
 
 	ok := j.DecodeARM(op)
@@ -247,7 +241,6 @@ func (j *Jit) emitOp(op uint32) bool {
 }
 
 func (j *Jit) emitOpThumb(op uint16) bool {
-
 	ok := j.DecodeTHUMB(op)
 
 	if ok {
@@ -259,7 +252,6 @@ func (j *Jit) emitOpThumb(op uint16) bool {
 
 //go:inline
 func (j *Jit) emitCond(op uint32) []func() {
-
 	// thank you rasky
 
 	cond := op >> 28
@@ -328,7 +320,6 @@ func (j *Jit) emitCond(op uint32) []func() {
 
 //go:inline
 func (jit *Jit) DecodeARM(op uint32) bool {
-
 	if swi := op&0xF00_0000 == 0xF00_0000; swi {
 		return false
 	}
@@ -354,7 +345,6 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 		pcIncluded := op&0x8000 != 0
 
 		if pcIncluded && load {
-
 			return false
 		}
 
@@ -419,8 +409,8 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 
 	return false
 }
-func (j *Jit) DecodeTHUMB(op uint16) bool {
 
+func (j *Jit) DecodeTHUMB(op uint16) bool {
 	switch {
 	case isthumbSWI(op):
 		return false
@@ -509,7 +499,6 @@ func (j *Jit) DecodeTHUMB(op uint16) bool {
 }
 
 func (j *Jit) TestInstThumb(op uint16, f func(op uint16)) {
-
 	asm, err := gojit.New(gojit.PageSize)
 	if err != nil {
 		panic(err)
@@ -536,7 +525,6 @@ func (j *Jit) TestInstThumb(op uint16, f func(op uint16)) {
 }
 
 func (j *Jit) TestInst(op uint32, f func(op uint32)) {
-
 	asm, err := gojit.New(gojit.PageSize)
 	if err != nil {
 		panic(err)
