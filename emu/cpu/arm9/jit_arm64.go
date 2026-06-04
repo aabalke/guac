@@ -214,7 +214,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 				continue
 			}
 
-			if ok := j.emitOpThumb(uint16(op)); !ok {
+			if ok := j.EmitOpThumb(uint16(op)); !ok {
 				break
 			}
 
@@ -261,7 +261,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 				continue
 			}
 
-			if ok := j.emitOp(op); !ok {
+			if ok := j.EmitOp(op); !ok {
 				break
 			}
 
@@ -293,8 +293,8 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 	page.Blocks[blockIdx] = newBlock
 }
 
-func (j *Jit) emitOp(op uint32) bool {
-	jcctargets := j.emitCond(op)
+func (j *Jit) EmitOp(op uint32) bool {
+	jcctargets := j.EmitCond(op)
 
 	ok := j.DecodeARM(op)
 
@@ -311,7 +311,7 @@ func (j *Jit) emitOp(op uint32) bool {
 	return ok
 }
 
-func (j *Jit) emitOpThumb(op uint16) bool {
+func (j *Jit) EmitOpThumb(op uint16) bool {
 	ok := j.DecodeTHUMB(op)
 
 	if ok {
@@ -324,7 +324,7 @@ func (j *Jit) emitOpThumb(op uint16) bool {
 }
 
 //go:inline
-func (j *Jit) emitCond(op uint32) []func() {
+func (j *Jit) EmitCond(op uint32) []func() {
 	// jump if cond is NOT TRUE (Z has branch if ldr flag z is empty
 
 	cond := op >> 28
@@ -439,7 +439,7 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 			return false
 		}
 
-		jit.emitSdt(op)
+		jit.EmitSdt(op)
 		return true
 	case isBlock(op):
 
@@ -450,7 +450,7 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 			return false
 		}
 
-		jit.emitBlock(op)
+		jit.EmitBlock(op)
 		return true
 
 	case isHalf(op):
@@ -460,7 +460,7 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 			return false
 		}
 
-		jit.emitHalf(op)
+		jit.EmitHalf(op)
 		return true
 	case isUD(op):
 		return false
@@ -470,21 +470,21 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 			return false
 		}
 
-		jit.emitPsr(op)
+		jit.EmitPsr(op)
 
 		return true
 
 	case isSWP(op):
-		jit.emitSWP(op)
+		jit.EmitSWP(op)
 		return true
 	case isM(op):
-		jit.emitMul(op)
+		jit.EmitMul(op)
 		return true
 	case isCLZ(op):
-		jit.emitClz(op)
+		jit.EmitClz(op)
 		return true
 	case isQAlu(op):
-		jit.emitQalu(op)
+		jit.EmitQalu(op)
 		return true
 
 	case isALU(op):
@@ -497,12 +497,12 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 			return false
 		}
 
-		jit.emitAlu(op)
+		jit.EmitAlu(op)
 
 		return true
 
 	case isCoDataReg(op):
-		jit.emitCo(op)
+		jit.EmitCo(op)
 		return true
 
 	}
@@ -515,16 +515,16 @@ func (j *Jit) DecodeTHUMB(op uint16) bool {
 	case isthumbSWI(op):
 		return false
 	case isThumbAddSub(op):
-		j.emitThumbAddSub(op)
+		j.EmitThumbAddSub(op)
 		return true
 	case isThumbShift(op):
-		j.emitThumbShifted(op)
+		j.EmitThumbShifted(op)
 		return true
 	case isThumbImm(op):
-		j.emitThumbImm(op)
+		j.EmitThumbImm(op)
 		return true
 	case isThumbAlu(op):
-		j.emitThumbAlu(op)
+		j.EmitThumbAlu(op)
 		return true
 	case isThumbHiReg(op):
 
@@ -542,19 +542,19 @@ func (j *Jit) DecodeTHUMB(op uint16) bool {
 			return false
 		}
 
-		j.emitThumbHiRegBX(op)
+		j.EmitThumbHiRegBX(op)
 		return true
 	case isLSHalf(op):
-		j.emitThumbLSHalf(op)
+		j.EmitThumbLSHalf(op)
 		return true
 	case isThumbSdt(op):
-		j.emitThumbSdt(op)
+		j.EmitThumbSdt(op)
 		return true
 	case isLPC(op):
-		j.emitThumbLPC(op)
+		j.EmitThumbLPC(op)
 		return true
 	case isLSImm(op):
-		j.emitThumbLSImm(op)
+		j.EmitThumbLSImm(op)
 		return true
 	case isPushPop(op):
 		pclr := (op>>8)&1 != 0
@@ -563,24 +563,24 @@ func (j *Jit) DecodeTHUMB(op uint16) bool {
 			return false
 		}
 
-		j.emitThumbPushPop(op)
+		j.EmitThumbPushPop(op)
 		return true
 	case isRelative(op):
-		j.emitThumbRelative(op)
+		j.EmitThumbRelative(op)
 		return true
 	case isThumbB(op):
 		return false
 	case isJumpCall(op):
 		return false
 	case isStack(op):
-		j.emitThumbStack(op)
+		j.EmitThumbStack(op)
 		return true
 	case isLongBranch(op):
 		return false
 	case isShortLongBranch(op):
 		return false
 	case isLSSP(op):
-		j.emitThumbLSSP(op)
+		j.EmitThumbLSSP(op)
 		return true
 	case isMulti(op):
 
@@ -591,7 +591,7 @@ func (j *Jit) DecodeTHUMB(op uint16) bool {
 			return false
 		}
 
-		j.emitThumbBlock(op)
+		j.EmitThumbBlock(op)
 		return true
 	}
 

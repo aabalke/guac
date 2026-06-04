@@ -3,10 +3,11 @@ package arm9
 
 import (
 	"fmt"
+
+	"github.com/aabalke/guac/emu/cpu/arm7"
 )
 
 func (cpu *Cpu) DecodeARM() (int, bool) {
-
 	r := &cpu.Reg.R
 
 	op, cycles := cpu.GetOpArm()
@@ -27,21 +28,21 @@ func (cpu *Cpu) DecodeARM() (int, bool) {
 		return cycles + 1, true
 
 	default:
-		if !cpu.CheckCond(cond) {
+		if !cpu.Reg.CPSR.CheckCond(cond) {
 			r[PC] += 4
 			return cycles + 1, true
 		}
 	}
 
 	if swi := (op>>24)&0xF == 0xF; swi {
-		cpu.Exception(VEC_SWI, MODE_SWI)
+		cpu.Exception(arm7.VEC_SWI, arm7.MODE_SWI)
 		return cycles + 1, true
 	}
 
 	switch {
 
 	case isBkpt(op):
-		cpu.Exception(VEC_PREFETCHABORT, MODE_ABT)
+		cpu.Exception(arm7.VEC_PREFETCHABORT, arm7.MODE_ABT)
 
 	case isB(op):
 		cpu.B(op)
@@ -88,7 +89,8 @@ func isOpFormat(op, mask, format uint32) bool {
 
 //go:inline
 func isBkpt(op uint32) bool {
-	return isOpFormat(op,
+	return isOpFormat(
+		op,
 		0b1111_1111_1111_0000_0000_0000_1111_0000,
 		0b1110_0001_0010_0000_0000_0000_0111_0000,
 	)
@@ -96,7 +98,8 @@ func isBkpt(op uint32) bool {
 
 //go:inline
 func isCLZ(op uint32) bool {
-	return isOpFormat(op,
+	return isOpFormat(
+		op,
 		0b0000_1111_1111_1111_0000_1111_1111_0000,
 		0b0000_0001_0110_1111_0000_1111_0001_0000,
 	)
@@ -104,7 +107,8 @@ func isCLZ(op uint32) bool {
 
 //go:inline
 func isQAlu(op uint32) bool {
-	return isOpFormat(op,
+	return isOpFormat(
+		op,
 		0b0000_1111_1001_0000_0000_1111_1111_0000,
 		0b0000_0001_0000_0000_0000_0000_0101_0000,
 	)
@@ -112,7 +116,8 @@ func isQAlu(op uint32) bool {
 
 //go:inline
 func isCoDataReg(op uint32) bool {
-	return isOpFormat(op,
+	return isOpFormat(
+		op,
 		0b0000_1111_0000_0000_0000_0000_0000_0000,
 		0b0000_1110_0000_0000_0000_0000_0000_0000,
 	)
@@ -120,8 +125,8 @@ func isCoDataReg(op uint32) bool {
 
 //go:inline
 func isSWP(op uint32) bool {
-
-	return isOpFormat(op,
+	return isOpFormat(
+		op,
 		0b0000_1111_1011_0000_0000_1111_1111_0000,
 		0b0000_0001_0000_0000_0000_0000_1001_0000,
 	)
@@ -129,15 +134,16 @@ func isSWP(op uint32) bool {
 
 //go:inline
 func isBlock(op uint32) bool {
-
 	is := false
 
-	is = is || isOpFormat(op,
+	is = is || isOpFormat(
+		op,
 		0b0000_1110_0001_0000_0000_0000_0000_0000,
 		0b0000_1000_0001_0000_0000_0000_0000_0000,
 	)
 
-	is = is || isOpFormat(op,
+	is = is || isOpFormat(
+		op,
 		0b0000_1110_0001_0000_0000_0000_0000_0000,
 		0b0000_1000_0000_0000_0000_0000_0000_0000,
 	)
@@ -147,15 +153,16 @@ func isBlock(op uint32) bool {
 
 //go:inline
 func isHalf(op uint32) bool {
-
 	is := false
 
-	is = is || isOpFormat(op,
+	is = is || isOpFormat(
+		op,
 		0b0000_1110_0000_0000_0000_0000_1101_0000,
 		0b0000_0000_0000_0000_0000_0000_1101_0000,
 	)
 
-	is = is || isOpFormat(op,
+	is = is || isOpFormat(
+		op,
 		0b0000_1110_0000_0000_0000_0000_1011_0000,
 		0b0000_0000_0000_0000_0000_0000_1011_0000,
 	)
@@ -165,7 +172,8 @@ func isHalf(op uint32) bool {
 
 //go:inline
 func isALU(op uint32) bool {
-	return isOpFormat(op,
+	return isOpFormat(
+		op,
 		0b0000_1100_0000_0000_0000_0000_0000_0000,
 		0b0000_0000_0000_0000_0000_0000_0000_0000,
 	)
@@ -173,7 +181,8 @@ func isALU(op uint32) bool {
 
 //go:inline
 func isBX(op uint32) bool {
-	return isOpFormat(op,
+	return isOpFormat(
+		op,
 		0b0000_1111_1111_1111_1111_1111_1101_0000,
 		0b0000_0001_0010_1111_1111_1111_0001_0000,
 	)
@@ -181,7 +190,8 @@ func isBX(op uint32) bool {
 
 //go:inline
 func isB(op uint32) bool {
-	return isOpFormat(op,
+	return isOpFormat(
+		op,
 		0b0000_1110_0000_0000_0000_0000_0000_0000,
 		0b0000_1010_0000_0000_0000_0000_0000_0000,
 	)
@@ -189,19 +199,21 @@ func isB(op uint32) bool {
 
 //go:inline
 func isM(op uint32) bool {
-
 	is := false
 
-	is = is || isOpFormat(op,
+	is = is || isOpFormat(
+		op,
 		0b0000_1110_1000_0000_0000_0000_1111_0000,
 		0b0000_0000_0000_0000_0000_0000_1001_0000,
 	)
-	is = is || isOpFormat(op,
+	is = is || isOpFormat(
+		op,
 		0b0000_1110_1000_0000_0000_0000_1111_0000,
 		0b0000_0000_1000_0000_0000_0000_1001_0000,
 	)
 
-	is = is || isOpFormat(op,
+	is = is || isOpFormat(
+		op,
 		0b0000_1111_1001_0000_0000_0000_1001_0000,
 		0b0000_0001_0000_0000_0000_0000_1000_0000,
 	)
@@ -237,7 +249,6 @@ func isSDT(op uint32) bool {
 
 //go:inline
 func isPSR(op uint32) bool {
-
 	is := false
 
 	is = is || isOpFormat(

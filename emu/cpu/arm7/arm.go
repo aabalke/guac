@@ -92,7 +92,7 @@ func (cpu *Cpu) Alu(op uint32) {
 			if swiExit := !imm && rd == PC && rm == LR; swiExit {
 				cpu.ExitException(MODE_SWI)
 				if r[PC]&1 != 0 {
-					cpu.toggleThumb()
+					cpu.ToggleThumb()
 				}
 			} else {
 				cpsr.N = (uint32(res)>>31)&1 != 0
@@ -636,15 +636,15 @@ func (c *Cpu) Sdt(op uint32) {
 	if load {
 		if byte {
 			// DO NOT WORD ALIGN
-			r[rd] = c.mem.Read8(prev)
+			r[rd] = c.Mem.Read8(prev)
 		} else {
 
-			v := c.mem.Read32(prev &^ 0b11)
+			v := c.Mem.Read32(prev &^ 0b11)
 			is := ((prev & 0b11) << 3) & 0x1F
 			r[rd] = bits.RotateLeft32(v, -int(is))
 
 			if rd == PC {
-				c.toggleThumb() // this is arm9 - not sure if arm7
+				c.ToggleThumb() // this is arm9 - not sure if arm7
 				r[rd] -= 4
 			}
 		}
@@ -655,9 +655,9 @@ func (c *Cpu) Sdt(op uint32) {
 		}
 
 		if byte {
-			c.mem.Write8(prev, uint8(v))
+			c.Mem.Write8(prev, uint8(v))
 		} else {
-			c.mem.Write32(prev&^0b11, v)
+			c.Mem.Write32(prev&^0b11, v)
 		}
 	}
 
@@ -704,7 +704,7 @@ func (cpu *Cpu) BX(op uint32) {
 			r[PC] += 8
 		}
 
-		cpu.toggleThumb()
+		cpu.ToggleThumb()
 	case INST_BXJ:
 		panic("Unsupported BXJ Instruction")
 	case INST_BLX:
@@ -778,7 +778,7 @@ func (c *Cpu) Half(op uint32) {
 
 		switch inst {
 		case STRH:
-			c.mem.Write16(pre&^1, uint16(rdv))
+			c.Mem.Write16(pre&^1, uint16(rdv))
 
 		case LDRD:
 			panic("unsupported arm7 ldrd instruction")
@@ -798,22 +798,22 @@ func (c *Cpu) Half(op uint32) {
 	switch inst {
 	case LDRH:
 		//  LDRH Rd,[odd]   -->  LDRH Rd,[odd-1] ROR 8  ;read to bit0-7 and bit24-31
-		v := uint32(c.mem.Read16(pre &^ 1))
+		v := uint32(c.Mem.Read16(pre &^ 1))
 		is := (pre & 1) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
 	case LDRSB:
 		// sign-expand byte value
-		r[rd] = uint32(int32(int8(c.mem.Read8(pre))))
+		r[rd] = uint32(int32(int8(c.Mem.Read8(pre))))
 
 	case LDRSH:
 		// On ARM7 aka ARMv4 aka NDS7/GBA:
 		// LDRSH Rd,[odd]  -->  LDRSB Rd,[odd];sign-expand BYTE value
 		if misaligned := pre&1 != 0; misaligned {
 			// sign-expand byte value
-			r[rd] = uint32(int32(int8(c.mem.Read8(pre))))
+			r[rd] = uint32(int32(int8(c.Mem.Read8(pre))))
 		} else {
 			// sign-expand half value
-			r[rd] = uint32(int32(int16(c.mem.Read16(pre &^ 1))))
+			r[rd] = uint32(int32(int16(c.Mem.Read16(pre &^ 1))))
 		}
 
 	}
@@ -970,13 +970,13 @@ func (cpu *Cpu) Swp(op uint32) {
 	)
 
 	if isByte {
-		r[rd] = cpu.mem.Read8(rnv)
-		cpu.mem.Write8(rnv, uint8(rmv))
+		r[rd] = cpu.Mem.Read8(rnv)
+		cpu.Mem.Write8(rnv, uint8(rmv))
 	} else {
-		v := cpu.mem.Read32(rnv &^ 0b11)
+		v := cpu.Mem.Read32(rnv &^ 0b11)
 		is := (rnv & 0b11) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
-		cpu.mem.Write32(rnv&^0b11, rmv)
+		cpu.Mem.Write32(rnv&^0b11, rmv)
 	}
 
 	r[PC] += 4
@@ -1057,9 +1057,9 @@ func (c *Cpu) Block(op uint32) {
 
 	// disabled for now. Need method to handle games that use edge of bank to subtract from. ex. metroid uses 0x200_0000 as addr, then subtracts to place values in different bank at 0x1FF_FFFC
 	//if load {
-	//	p, _ = c.mem.ReadPtr(addr)
+	//	p, _ = c.Mem.ReadPtr(addr)
 	//} else {
-	//	p, _ = c.mem.WritePtr(addr)
+	//	p, _ = c.Mem.WritePtr(addr)
 	//}
 
 	for range 16 {
@@ -1113,7 +1113,7 @@ func (c *Cpu) Block(op uint32) {
 
 		if load {
 			if p == nil {
-				*ref = c.mem.Read32(addr)
+				*ref = c.Mem.Read32(addr)
 			} else {
 				*ref = *(*uint32)(p)
 			}
@@ -1123,15 +1123,15 @@ func (c *Cpu) Block(op uint32) {
 				case rn:
 
 					if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
-						c.mem.Write32(addr, rnv)
+						c.Mem.Write32(addr, rnv)
 					} else {
-						c.mem.Write32(addr, wbValue)
+						c.Mem.Write32(addr, wbValue)
 					}
 
 				case PC:
-					c.mem.Write32(addr, *ref+12)
+					c.Mem.Write32(addr, *ref+12)
 				default:
-					c.mem.Write32(addr, *ref)
+					c.Mem.Write32(addr, *ref)
 				}
 			} else {
 				switch reg {

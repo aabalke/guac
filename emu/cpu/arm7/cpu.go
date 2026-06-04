@@ -10,17 +10,19 @@ import (
 
 type Cpu struct {
 	Reg    Reg
-	mem    cpu.MemoryInterface
+	Mem    cpu.MemoryInterface
 	Irq    *cpu.Irq
 	Halted bool
 
 	PcPtr       unsafe.Pointer
 	PcOff       int
-	isBranching bool
+	IsBranching bool
 	BranchPc    uint32
 
+	LowVector bool
+
 	Jit        *Jit
-	jitEnabled bool
+	JitEnabled bool
 }
 
 const (
@@ -46,40 +48,38 @@ const (
 	MODE_SYS = 0x1F
 )
 
-func (cpu *Cpu) CheckCond(cond uint32) bool {
-	cpsr := &cpu.Reg.CPSR
-
+func (c *Cond) CheckCond(cond uint32) bool {
 	switch cond {
 	case 0xE: // AL (always)
 		return true
 	case 0x0: // EQ
-		return cpsr.Z
+		return c.Z
 	case 0x1: // NE
-		return !cpsr.Z
+		return !c.Z
 	case 0x2: // CS/HS
-		return cpsr.C
+		return c.C
 	case 0x3: // CC/LO
-		return !cpsr.C
+		return !c.C
 	case 0x4: // MI
-		return cpsr.N
+		return c.N
 	case 0x5: // PL
-		return !cpsr.N
+		return !c.N
 	case 0x6: // VS
-		return cpsr.V
+		return c.V
 	case 0x7: // VC
-		return !cpsr.V
+		return !c.V
 	case 0x8: // HI
-		return cpsr.C && !cpsr.Z
+		return c.C && !c.Z
 	case 0x9: // LS
-		return !cpsr.C || cpsr.Z
+		return !c.C || c.Z
 	case 0xA: // GE
-		return cpsr.N == cpsr.V
+		return c.N == c.V
 	case 0xB: // LT
-		return cpsr.N != cpsr.V
+		return c.N != c.V
 	case 0xC: // GT
-		return !cpsr.Z && (cpsr.N == cpsr.V)
+		return !c.Z && (c.N == c.V)
 	case 0xD: // LE
-		return cpsr.Z || (cpsr.N != cpsr.V)
+		return c.Z || (c.N != c.V)
 	default: // NV
 		return false
 	}
@@ -97,9 +97,10 @@ var BANK_ID = map[uint32]uint32{
 
 func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq) *Cpu {
 	c := &Cpu{
-		mem:        m,
+		Mem:        m,
 		Irq:        irq,
-		jitEnabled: jitEnabled,
+		JitEnabled: jitEnabled,
+		LowVector:  true,
 	}
 
 	// skip bios
@@ -177,7 +178,7 @@ func (c *Cond) Set(v uint32) {
 	c.Mode = v & 0x1F
 }
 
-func (cpu *Cpu) toggleThumb() {
+func (cpu *Cpu) ToggleThumb() {
 	r := &cpu.Reg.R
 	cpsr := &cpu.Reg.CPSR
 
@@ -200,7 +201,7 @@ func (cpu *Cpu) CheckIrq() {
 
 	if !cpu.Reg.CPSR.I && cpu.Irq.IME {
 		cpu.Exception(VEC_IRQ, MODE_IRQ)
-		cpu.isBranching = true
+		cpu.IsBranching = true
 	}
 }
 
@@ -226,7 +227,7 @@ func (cpu *Cpu) jitFunction(pc uint32, thumb bool) (uint32, int, bool) {
 	//}
 
 	block.f()
-	cpu.isBranching = true
+	cpu.IsBranching = true
 	cpu.Jit.BlockCache.TouchBlock(block)
 	return block.finalOp, int(block.Length), true
 }
@@ -234,11 +235,11 @@ func (cpu *Cpu) jitFunction(pc uint32, thumb bool) (uint32, int, bool) {
 func (cpu *Cpu) GetOpArm() (uint32, int) {
 	r := &cpu.Reg.R
 
-	if cpu.isBranching {
-		cpu.isBranching = false
+	if cpu.IsBranching {
+		cpu.IsBranching = false
 		cpu.PcOff = 0
 
-		if cpu.jitEnabled {
+		if cpu.JitEnabled {
 			pc := r[PC]
 			if finalOp, length, ok := cpu.jitFunction(pc, false); ok {
 				return finalOp, length
@@ -255,16 +256,16 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 
 	if sequential := cpu.PcPtr == nil; sequential {
 		cpu.BranchPc = r[PC]
-		if p, ok := cpu.mem.ReadPtr(r[PC]); ok {
+		if p, ok := cpu.Mem.ReadPtr(r[PC]); ok {
 			cpu.PcPtr = p
 		} else {
-			return cpu.mem.Read32(r[PC]), 0
+			return cpu.Mem.Read32(r[PC]), 0
 		}
 	}
 
 	op := *(*uint32)(unsafe.Add(cpu.PcPtr, cpu.PcOff))
 	cpu.PcOff += 4
-	cpu.isBranching = ((op>>27)&1 != 0) || (op>>12)&0xF == 0xF
+	cpu.IsBranching = ((op>>27)&1 != 0) || (op>>12)&0xF == 0xF
 
 	return op, 0
 }
@@ -272,10 +273,10 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 func (cpu *Cpu) GetOpThumb() (uint16, int) {
 	r := &cpu.Reg.R
 
-	if cpu.isBranching {
-		cpu.isBranching = false
+	if cpu.IsBranching {
+		cpu.IsBranching = false
 		cpu.PcOff = 0
-		if cpu.jitEnabled {
+		if cpu.JitEnabled {
 			pc := r[PC]
 			if finalOp, length, ok := cpu.jitFunction(pc, true); ok {
 				return uint16(finalOp), length
@@ -289,18 +290,18 @@ func (cpu *Cpu) GetOpThumb() (uint16, int) {
 	}
 
 	if sequential := cpu.PcPtr == nil; sequential {
-		if p, ok := cpu.mem.ReadPtr(r[PC]); ok {
+		if p, ok := cpu.Mem.ReadPtr(r[PC]); ok {
 			cpu.BranchPc = r[PC]
 			cpu.PcPtr = p
 		} else {
-			return uint16(cpu.mem.Read16(r[PC])), 0
+			return uint16(cpu.Mem.Read16(r[PC])), 0
 		}
 	}
 
 	op := *(*uint16)(unsafe.Add(cpu.PcPtr, cpu.PcOff))
 	cpu.PcOff += 2
 	//cpu.isBranching = (op >> 14) != 0
-	cpu.isBranching = !DecodeTHUMBBranch(op)
+	cpu.IsBranching = !DecodeTHUMBBranch(op)
 
 	return op, 0
 }
@@ -339,17 +340,17 @@ func (c *Cpu) EndTest(op uint32, compare bool) {
 
 func DecodeTHUMBBranch(op uint16) bool {
 	switch {
-	case isthumbSWI(op):
+	case IsthumbSWI(op):
 		return false
-	case isThumbAddSub(op):
+	case IsThumbAddSub(op):
 		return true
-	case isThumbShift(op):
+	case IsThumbShift(op):
 		return true
-	case isThumbImm(op):
+	case IsThumbImm(op):
 		return true
-	case isThumbAlu(op):
+	case IsThumbAlu(op):
 		return true
-	case isThumbHiReg(op):
+	case IsThumbHiReg(op):
 
 		var (
 			inst = (op >> 8) & 0b11
@@ -366,15 +367,15 @@ func DecodeTHUMBBranch(op uint16) bool {
 		}
 
 		return true
-	case isLSHalf(op):
+	case IsLSHalf(op):
 		return true
-	case isThumbSdt(op):
+	case IsThumbSdt(op):
 		return true
-	case isLPC(op):
+	case IsLPC(op):
 		return true
-	case isLSImm(op):
+	case IsLSImm(op):
 		return true
-	case isPushPop(op):
+	case IsPushPop(op):
 		pclr := (op>>8)&1 != 0
 		pop := (op>>11)&1 != 0
 		if pop && pclr {
@@ -382,26 +383,26 @@ func DecodeTHUMBBranch(op uint16) bool {
 		}
 
 		return true
-	case isRelative(op):
+	case IsRelative(op):
 		return true
-	case isThumbB(op):
+	case IsThumbB(op):
 		return false
-	case isJumpCall(op):
+	case IsJumpCall(op):
 		return false
-	case isStack(op):
+	case IsStack(op):
 		return true
-	case isLongBranch(op):
+	case IsLongBranch(op):
 		return false
-	case isShortLongBranch(op):
+	case IsShortLongBranch(op):
 		return false
-	case isLSSP(op):
+	case IsLSSP(op):
 		return true
-	case isMulti(op):
+	case IsMulti(op):
 
 		ldmia := (op>>11)&1 != 0
-		rlist := op & 0xFF
+		rlIst := op & 0xFF
 
-		if ldmia && rlist == 0 {
+		if ldmia && rlIst == 0 {
 			return false
 		}
 

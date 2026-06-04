@@ -2,18 +2,17 @@
 package arm7
 
 const (
-	VEC_RESET         = 0x0000_0000
-	VEC_UND           = 0x0000_0004
-	VEC_SWI           = 0x0000_0008
-	VEC_PREFETCHABORT = 0x0000_000C
-	VEC_DATAABORT     = 0x0000_0010
-	VEC_ADDR26BIT     = 0x0000_0014
-	VEC_IRQ           = 0x0000_0018
-	VEC_FIQ           = 0x0000_001C
+	VEC_RESET         = 0xFFFF_0000
+	VEC_UND           = 0xFFFF_0004
+	VEC_SWI           = 0xFFFF_0008
+	VEC_PREFETCHABORT = 0xFFFF_000C
+	VEC_DATAABORT     = 0xFFFF_0010
+	VEC_ADDR26BIT     = 0xFFFF_0014
+	VEC_IRQ           = 0xFFFF_0018
+	VEC_FIQ           = 0xFFFF_001C
 )
 
 func (cpu *Cpu) Exception(addr uint32, mode uint32) {
-
 	var (
 		cpsr = &cpu.Reg.CPSR
 		reg  = &cpu.Reg
@@ -45,11 +44,15 @@ func (cpu *Cpu) Exception(addr uint32, mode uint32) {
 	cpsr.T = false
 	cpsr.I = true
 
-	r[PC] = addr
+	if !cpu.LowVector {
+		r[PC] = addr
+		return
+	}
+
+	r[PC] = addr & 0xFFFF
 }
 
 func (cpu *Cpu) ExitException(mode uint32) {
-
 	var (
 		cpsr = &cpu.Reg.CPSR
 		reg  = &cpu.Reg

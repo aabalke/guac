@@ -3,10 +3,11 @@ package arm9
 
 import (
 	"fmt"
+
+	"github.com/aabalke/guac/emu/cpu/arm7"
 )
 
 func (c *Cpu) DecodeTHUMB() (int, bool) {
-
 	op, cycles := c.GetOpThumb()
 
 	switch {
@@ -14,43 +15,43 @@ func (c *Cpu) DecodeTHUMB() (int, bool) {
 		panic("unsetup arm9 thumb bkpt")
 
 	case isthumbSWI(op):
-		c.Exception(VEC_SWI, MODE_SWI)
+		c.Exception(arm7.VEC_SWI, arm7.MODE_SWI)
 	case isThumbAddSub(op):
 		c.ThumbAddSub(op)
 	case isThumbShift(op):
-		c.thumbShifted(op)
+		c.ThumbShifted(op)
 	case isThumbImm(op):
-		c.thumbImm(op)
+		c.ThumbImm(op)
 	case isThumbAlu(op):
 		c.ThumbAlu(op)
 	case isThumbHiReg(op):
 		c.HiRegBX(op)
 	case isLSHalf(op):
-		c.thumbLSHalf(op)
+		c.ThumbLSHalf(op)
 	case isThumbSdt(op):
-		c.thumbSdt(op)
+		c.ThumbSdt(op)
 	case isLPC(op):
-		c.thumbLPC(op)
+		c.ThumbLPC(op)
 	case isLSImm(op):
-		c.thumbLSImm(op)
+		c.ThumbLSImm(op)
 	case isPushPop(op):
-		c.thumbPushPop(op)
+		c.ThumbPushPop(op)
 	case isRelative(op):
-		c.thumbRelative(op)
+		c.ThumbRelative(op)
 	case isThumbB(op):
-		c.thumbB(op)
+		c.ThumbB(op)
 	case isJumpCall(op):
-		c.thumbJumpCalls(op)
+		c.ThumbJumpCalls(op)
 	case isStack(op):
-		c.thumbStack(op)
+		c.ThumbStack(op)
 	case isLongBranch(op):
-		c.thumbLongBranch(op)
+		c.ThumbLongBranch(op)
 	case isShortLongBranch(op):
-		c.thumbShortLongBranch(op)
+		c.ThumbShortLongBranch(op)
 	case isLSSP(op):
-		c.thumbLSSP(op)
+		c.ThumbLSSP(op)
 	case isMulti(op):
-		c.thumbBlock(op)
+		c.ThumbBlock(op)
 	default:
 		r := &c.Reg.R
 		fmt.Printf("Unable to Decode ARM true %04X, at PC %08X\n", op, r[PC])
@@ -67,7 +68,8 @@ func isThumbOpFormat(op, mask, fmt uint16) bool {
 
 //go:inline
 func isThumbBkpt(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1011_1110_0000_0000,
 		0b1111_1111_0000_0000,
 	)
@@ -75,7 +77,8 @@ func isThumbBkpt(op uint16) bool {
 
 //go:inline
 func isThumbShift(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1110_0000_0000_0000,
 		0b0000_0000_0000_0000,
 	)
@@ -83,7 +86,8 @@ func isThumbShift(op uint16) bool {
 
 //go:inline
 func isThumbAddSub(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1111_1000_0000_0000,
 		0b0001_1000_0000_0000,
 	)
@@ -91,7 +95,8 @@ func isThumbAddSub(op uint16) bool {
 
 //go:inline
 func isThumbImm(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1110_0000_0000_0000,
 		0b0010_0000_0000_0000,
 	)
@@ -99,7 +104,8 @@ func isThumbImm(op uint16) bool {
 
 //go:inline
 func isThumbAlu(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1111_1100_0000_0000,
 		0b0100_0000_0000_0000,
 	)
@@ -107,7 +113,8 @@ func isThumbAlu(op uint16) bool {
 
 //go:inline
 func isThumbHiReg(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1111_1100_0000_0000,
 		0b0100_0100_0000_0000,
 	)
@@ -115,7 +122,8 @@ func isThumbHiReg(op uint16) bool {
 
 //go:inline
 func isLSHalf(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1111_0000_0000_0000,
 		0b1000_0000_0000_0000,
 	)
@@ -123,7 +131,8 @@ func isLSHalf(op uint16) bool {
 
 //go:inline
 func isThumbSdt(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1111_0000_0000_0000,
 		0b0101_0000_0000_0000,
 	)
@@ -131,7 +140,8 @@ func isThumbSdt(op uint16) bool {
 
 //go:inline
 func isLPC(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1111_1000_0000_0000,
 		0b0100_1000_0000_0000,
 	)
@@ -139,7 +149,8 @@ func isLPC(op uint16) bool {
 
 //go:inline
 func isLSImm(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1110_0000_0000_0000,
 		0b0110_0000_0000_0000,
 	)
@@ -147,7 +158,8 @@ func isLSImm(op uint16) bool {
 
 //go:inline
 func isPushPop(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1111_0110_0000_0000,
 		0b1011_0100_0000_0000,
 	)
@@ -155,7 +167,8 @@ func isPushPop(op uint16) bool {
 
 //go:inline
 func isRelative(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1111_0000_0000_0000,
 		0b1010_0000_0000_0000,
 	)
@@ -163,7 +176,8 @@ func isRelative(op uint16) bool {
 
 //go:inline
 func isJumpCall(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1111_0000_0000_0000,
 		0b1101_0000_0000_0000,
 	)
@@ -171,7 +185,8 @@ func isJumpCall(op uint16) bool {
 
 //go:inline
 func isThumbB(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1111_1000_0000_0000,
 		0b1110_0000_0000_0000,
 	)
@@ -179,7 +194,8 @@ func isThumbB(op uint16) bool {
 
 //go:inline
 func isStack(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1111_1111_0000_0000,
 		0b1011_0000_0000_0000,
 	)
@@ -187,7 +203,8 @@ func isStack(op uint16) bool {
 
 //go:inline
 func isLongBranch(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1111_1000_0000_0000,
 		0b1111_0000_0000_0000,
 	)
@@ -195,7 +212,8 @@ func isLongBranch(op uint16) bool {
 
 //go:inline
 func isShortLongBranch(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1111_1000_0000_0000,
 		0b1111_1000_0000_0000,
 	)
@@ -203,7 +221,8 @@ func isShortLongBranch(op uint16) bool {
 
 //go:inline
 func isLSSP(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1111_0000_0000_0000,
 		0b1001_0000_0000_0000,
 	)
@@ -211,7 +230,8 @@ func isLSSP(op uint16) bool {
 
 //go:inline
 func isMulti(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1111_0000_0000_0000,
 		0b1100_0000_0000_0000,
 	)
@@ -219,7 +239,8 @@ func isMulti(op uint16) bool {
 
 //go:inline
 func isthumbSWI(op uint16) bool {
-	return isThumbOpFormat(op,
+	return isThumbOpFormat(
+		op,
 		0b1111_1111_0000_0000,
 		0b1101_1111_0000_0000,
 	)

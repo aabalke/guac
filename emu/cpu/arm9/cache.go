@@ -29,7 +29,6 @@ type JitBlock struct {
 }
 
 func InitBlockCache(capacity uint32, page_size int) *BlockCache {
-
 	bc := &BlockCache{
 		Blocks:    []*JitBlock{},
 		Head:      &JitBlock{},
@@ -76,7 +75,6 @@ func (bc *BlockCache) Close() {
 }
 
 func (bc *BlockCache) String() string {
-
 	// string, tail -> head pointers
 	s := "B "
 	for b := bc.Tail; ; {
@@ -93,7 +91,6 @@ func (bc *BlockCache) String() string {
 }
 
 func (bc *BlockCache) BlockString() string {
-
 	// string, need tail and head included to match String()
 
 	s := fmt.Sprintf("B %p ", bc.Tail)
@@ -150,7 +147,6 @@ func (bc *BlockCache) PushTail(block *JitBlock) {
 }
 
 func (bc *BlockCache) AssignBlock(jit *Jit) *JitBlock {
-
 	block := bc.PopTail()
 
 	if inUse := block.Length != 0; inUse {

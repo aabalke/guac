@@ -7,7 +7,7 @@ import (
 	a "github.com/aabalke/gojit"
 )
 
-func (j *Jit) emitThumbAddSub(op uint16) {
+func (j *Jit) EmitThumbAddSub(op uint16) {
 	var (
 		inst = (op >> 9) & 0b11
 		rs   = uint32((op >> 3) & 7)
@@ -47,7 +47,7 @@ func (j *Jit) emitThumbAddSub(op uint16) {
 	j.StrFlag(a.R00, Z)
 }
 
-func (j *Jit) emitThumbImm(op uint16) {
+func (j *Jit) EmitThumbImm(op uint16) {
 	var (
 		inst = (op >> 11) & 0b11
 		rd   = uint32(op>>8) & 0x7
@@ -95,7 +95,7 @@ func (j *Jit) emitThumbImm(op uint16) {
 	j.StrFlag(a.R00, Z)
 }
 
-func (j *Jit) emitThumbLSHalf(op uint16) {
+func (j *Jit) EmitThumbLSHalf(op uint16) {
 	var (
 		offset = uint32((op >> 6) & 0x1F << 1)
 		rd     = uint32(op & 0x7)
@@ -124,7 +124,7 @@ func (j *Jit) emitThumbLSHalf(op uint16) {
 	}
 }
 
-func (j *Jit) emitThumbSdt(op uint16) {
+func (j *Jit) EmitThumbSdt(op uint16) {
 	var (
 		inst = (op >> 10) & 0b11
 		rd   = uint32(op & 0x7)
@@ -217,7 +217,7 @@ func (j *Jit) emitThumbSdt(op uint16) {
 	}
 }
 
-func (j *Jit) emitThumbLPC(op uint16) {
+func (j *Jit) EmitThumbLPC(op uint16) {
 	var (
 		rd = uint32(op>>8) & 0x7
 		nn = uint32(op&0xFF) << 2
@@ -233,7 +233,7 @@ func (j *Jit) emitThumbLPC(op uint16) {
 	j.StrReg(a.R00, rd)
 }
 
-func (j *Jit) emitThumbLSImm(op uint16) {
+func (j *Jit) EmitThumbLSImm(op uint16) {
 	var (
 		inst = (op >> 11) & 0b11
 		rd   = uint32(op & 0x7)
@@ -274,7 +274,7 @@ func (j *Jit) emitThumbLSImm(op uint16) {
 	}
 }
 
-func (j *Jit) emitThumbRelative(op uint16) {
+func (j *Jit) EmitThumbRelative(op uint16) {
 	var (
 		rd = uint32(op>>8) & 0x7
 		nn = uint32(op&0xFF) << 2
@@ -296,7 +296,7 @@ func (j *Jit) emitThumbRelative(op uint16) {
 	j.StrReg(a.R00, rd)
 }
 
-func (j *Jit) emitThumbStack(op uint16) {
+func (j *Jit) EmitThumbStack(op uint16) {
 	nn := uint32(op&0x7F) << 2
 
 	j.LdrReg(a.R00, SP)
@@ -310,7 +310,7 @@ func (j *Jit) emitThumbStack(op uint16) {
 	j.StrReg(a.R00, SP)
 }
 
-func (j *Jit) emitThumbLSSP(op uint16) {
+func (j *Jit) EmitThumbLSSP(op uint16) {
 	rd := uint32(op>>8) & 0x7
 
 	j.LdrReg(a.R00, SP)
@@ -333,7 +333,7 @@ func (j *Jit) emitThumbLSSP(op uint16) {
 	}
 }
 
-func (j *Jit) emitThumbHiRegBX(op uint16) {
+func (j *Jit) EmitThumbHiRegBX(op uint16) {
 	var (
 		inst = (op >> 8) & 0b11
 		mSBd = (op>>7)&1 != 0
@@ -415,7 +415,7 @@ func (j *Jit) emitThumbHiRegBX(op uint16) {
 	}
 }
 
-func (j *Jit) emitThumbShifted(op uint16) {
+func (j *Jit) EmitThumbShifted(op uint16) {
 	var (
 		shType = (op >> 11) & 0b11
 		is     = uint32(op>>6) & 0x1F
@@ -497,7 +497,7 @@ func (j *Jit) emitThumbShifted(op uint16) {
 	j.StrFlag(a.R00, Z)
 }
 
-func (j *Jit) emitThumbAlu(op uint16) {
+func (j *Jit) EmitThumbAlu(op uint16) {
 	var (
 		rs = uint32(op>>3) & 7
 		rd = uint32(op) & 7
@@ -731,7 +731,7 @@ func (j *Jit) emitThumbAlu(op uint16) {
 	}
 }
 
-func (j *Jit) emitThumbPushPop(op uint16) {
+func (j *Jit) EmitThumbPushPop(op uint16) {
 	var (
 		pclr  = (op>>8)&1 != 0
 		rlist = op & 0xFF
@@ -795,7 +795,7 @@ func (j *Jit) emitThumbPushPop(op uint16) {
 	}
 }
 
-func (j *Jit) emitThumbBlock(op uint16) {
+func (j *Jit) EmitThumbBlock(op uint16) {
 	var (
 		ldmia = (op>>11)&1 != 0
 		rb    = uint32(op>>8) & 7

@@ -2,12 +2,12 @@
 package arm7
 
 import (
-	amd64 "github.com/aabalke/gojit"
 	"math/bits"
+
+	amd64 "github.com/aabalke/gojit"
 )
 
-func (j *Jit) emitThumbLSSP(op uint32) {
-
+func (j *Jit) EmitThumbLSSP(op uint32) {
 	rd := (op >> 8) & 0x7
 
 	j.Movl(j.REG(SP), amd64.Eax)
@@ -32,8 +32,7 @@ func (j *Jit) emitThumbLSSP(op uint32) {
 	}
 }
 
-func (j *Jit) emitThumbStack(op uint32) {
-
+func (j *Jit) EmitThumbStack(op uint32) {
 	nn := int(op&0x7F) << 2
 
 	if sub := (op>>7)&1 != 0; sub {
@@ -47,8 +46,7 @@ func (j *Jit) emitThumbStack(op uint32) {
 	//r[SP] = uint32(int(r[SP]) + nn)
 }
 
-func (j *Jit) emitThumbRelative(op uint32) {
-
+func (j *Jit) EmitThumbRelative(op uint32) {
 	var (
 		rd = (op >> 8) & 0x7
 		nn = uint32(op&0xFF) << 2
@@ -69,8 +67,7 @@ func (j *Jit) emitThumbRelative(op uint32) {
 	j.Movl(amd64.Eax, j.REG(rd))
 }
 
-func (j *Jit) emitThumbLPC(op uint32) {
-
+func (j *Jit) EmitThumbLPC(op uint32) {
 	var (
 		rd = (op >> 8) & 0x7
 		nn = uint32(op&0xFF) << 2
@@ -86,11 +83,10 @@ func (j *Jit) emitThumbLPC(op uint32) {
 	j.Movl(amd64.Eax, j.REG(rd))
 
 	//addr = (r[PC] + 4 + nn) &^ 0b11
-	//r[rd] = cpu.mem.Read32(addr, false)
+	//r[rd] = cpu.Mem.Read32(addr, false)
 }
 
-func (j *Jit) emitThumbLSImm(op uint32) {
-
+func (j *Jit) EmitThumbLSImm(op uint32) {
 	var (
 		inst = (op >> 11) & 0b11
 		rd   = op & 0x7
@@ -140,7 +136,7 @@ func (j *Jit) emitThumbLSImm(op uint32) {
 	}
 }
 
-func (j *Jit) emitThumbSdt(op uint32) {
+func (j *Jit) EmitThumbSdt(op uint32) {
 	var (
 		inst = (op >> 10) & 0b11
 		rd   = op & 0x7
@@ -161,7 +157,7 @@ func (j *Jit) emitThumbSdt(op uint32) {
 		case THUMB_LDSB:
 
 			// sign-expand byte value
-			//r[rd] = uint32(int32(int8(cpu.mem.Read8(addr, false))))
+			// r[rd] = uint32(int32(int8(cpu.Mem.Read8(addr, false))))
 
 			j.CallFunc(Read)
 			j.Movsx(amd64.Al, amd64.Eax)
@@ -230,11 +226,10 @@ func (j *Jit) emitThumbSdt(op uint32) {
 	}
 }
 
-func (j *Jit) emitThumbLSHalf(op uint32) {
-
+func (j *Jit) EmitThumbLSHalf(op uint32) {
 	var (
 		offset = uint32((op >> 6) & 0x1F << 1)
-		rd     = (op) & 0x7
+		rd     = op & 0x7
 	)
 
 	j.Movl(j.REG((op>>3)&0x7), amd64.Eax)
@@ -262,8 +257,7 @@ func (j *Jit) emitThumbLSHalf(op uint32) {
 	}
 }
 
-func (j *Jit) emitThumbImm(op uint32) {
-
+func (j *Jit) EmitThumbImm(op uint32) {
 	var (
 		inst = (op >> 11) & 0b11
 		rd   = (op >> 8) & 0x7
@@ -314,11 +308,10 @@ func (j *Jit) emitThumbImm(op uint32) {
 	}
 }
 
-func (j *Jit) emitThumbAddSub(op uint32) {
-
+func (j *Jit) EmitThumbAddSub(op uint32) {
 	var (
 		inst = (op >> 9) & 0b11
-		rd   = (op) & 0x7
+		rd   = op & 0x7
 	)
 
 	j.Movl(j.REG((op>>3)&0x7), amd64.Eax)
@@ -345,14 +338,13 @@ func (j *Jit) emitThumbAddSub(op uint32) {
 	j.SETcc(amd64.CC_Z, Z)
 }
 
-func (j *Jit) emitThumbAlu(op uint32) {
-
+func (j *Jit) EmitThumbAlu(op uint32) {
 	var (
 		inst = (op >> 6) & 0xF
 		rd   = op & 0x7
 	)
 
-	//rdv = eax, rsv = ebx
+	// rdv = eax, rsv = ebx
 
 	j.Movl(j.REG(rd), amd64.Eax)
 	j.Movl(j.REG((op>>3)&0x7), amd64.Ebx)
@@ -363,7 +355,7 @@ func (j *Jit) emitThumbAlu(op uint32) {
 		j.Movl(amd64.Eax, j.REG(rd))
 		j.Test(amd64.Eax, amd64.Eax)
 		// ARM < 4, carry flag destroyed, ARM >= 5, carry flag unchanged
-		//cpsr.C = false
+		// cpsr.C = false
 
 	case THUMB_TST:
 
@@ -495,7 +487,7 @@ func (j *Jit) emitThumbAlu(op uint32) {
 
 	case THUMB_LSR:
 
-		//rdv = eax, rsv = ebx
+		// rdv = eax, rsv = ebx
 
 		j.And(amd64.Imm(0xFF), amd64.Ebx)
 		j.Movl(amd64.Ebx, amd64.Ecx)
@@ -630,8 +622,7 @@ func (j *Jit) emitThumbAlu(op uint32) {
 	j.SETcc(amd64.CC_Z, Z)
 }
 
-func (j *Jit) emitThumbPushPop(op uint32) {
-
+func (j *Jit) EmitThumbPushPop(op uint32) {
 	var (
 		pclr  = (op>>8)&1 != 0
 		rlist = op & 0xFF
@@ -687,14 +678,13 @@ func (j *Jit) emitThumbPushPop(op uint32) {
 	}
 }
 
-func (j *Jit) emitThumbHiRegBX(op uint32) {
-
+func (j *Jit) EmitThumbHiRegBX(op uint32) {
 	var (
 		inst = (op >> 8) & 0b11
 		mSBd = (op>>7)&1 != 0
 		mSBs = (op>>6)&1 != 0
 		rs   = (op >> 3) & 0xF
-		rd   = (op) & 0x7
+		rd   = op & 0x7
 	)
 
 	if inst != 3 && mSBd {
@@ -761,8 +751,7 @@ func (j *Jit) emitThumbHiRegBX(op uint32) {
 	}
 }
 
-func (j *Jit) emitThumbShifted(op uint32) {
-
+func (j *Jit) EmitThumbShifted(op uint32) {
 	var (
 		shType = (op >> 11) & 0b11
 		is     = (op >> 6) & 0x1F
@@ -883,8 +872,7 @@ func (j *Jit) emitThumbShifted(op uint32) {
 	j.SETcc(amd64.CC_Z, Z)
 }
 
-func (j *Jit) emitThumbBlock(op uint32) {
-
+func (j *Jit) EmitThumbBlock(op uint32) {
 	ldmia := (op>>11)&1 != 0
 	rb := (op >> 8) & 7
 	rlist := uint32(op & 0xFF)

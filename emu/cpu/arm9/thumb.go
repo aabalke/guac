@@ -7,393 +7,6 @@ import (
 )
 
 const (
-	THUMB_AND = iota
-	THUMB_EOR
-	THUMB_LSL
-	THUMB_LSR
-	THUMB_ASR
-	THUMB_ADC
-	THUMB_SBC
-	THUMB_ROR
-	THUMB_TST
-	THUMB_NEG // arm eq is RSBS
-	THUMB_CMP
-	THUMB_CMN
-	THUMB_ORR
-	THUMB_MUL
-	THUMB_BIC
-	THUMB_MVN
-)
-
-func (cpu *Cpu) ThumbAlu(op uint16) {
-	var (
-		r    = &cpu.Reg.R
-		cpsr = &cpu.Reg.CPSR
-
-		inst = (op >> 6) & 0xF
-		rsv  = r[(op>>3)&0x7]
-		rd   = op & 0x7
-		rdv  = r[rd]
-
-		res uint64
-	)
-
-	switch inst {
-	case THUMB_MUL:
-		res = uint64(rdv) * uint64(rsv)
-		r[rd] = uint32(res)
-		// ARM < 4, carry flag destroyed, ARM >= 5, carry flag unchanged
-		// cpsr.C = false
-
-	case THUMB_TST:
-		res = uint64(rdv) & uint64(rsv)
-
-	case THUMB_CMN:
-		res = uint64(rdv) + uint64(rsv)
-		cpsr.V = ((^(rdv ^ rsv))&(rdv^uint32(res)))>>31 != 0
-		cpsr.C = res >= 0x1_0000_0000
-
-	case THUMB_CMP:
-		res = uint64(rdv) - uint64(rsv)
-		cpsr.C = res < 0x1_0000_0000
-		cpsr.V = ((rdv^rsv)&(rdv^uint32(res)))>>31 != 0
-
-	case THUMB_AND:
-		res = uint64(rdv) & uint64(rsv)
-		r[rd] = uint32(res)
-
-	case THUMB_EOR:
-		res = uint64(rdv) ^ uint64(rsv)
-		r[rd] = uint32(res)
-
-	case THUMB_ORR:
-		res = uint64(rdv) | uint64(rsv)
-		r[rd] = uint32(res)
-
-	case THUMB_BIC:
-		res = uint64(rdv) &^ uint64(rsv)
-		r[rd] = uint32(res)
-
-	case THUMB_MVN:
-		res = ^uint64(rsv)
-		r[rd] = uint32(res)
-
-	case THUMB_NEG:
-		res = 0 - uint64(rsv)
-		r[rd] = uint32(res)
-
-		cpsr.C = res < 0x1_0000_0000
-		cpsr.V = ((rdv^rsv)&(rdv^uint32(res)))>>31 != 0
-
-	case THUMB_SBC:
-		res = uint64(rdv) - uint64(rsv)
-		if !cpsr.C {
-			res--
-		}
-
-		cpsr.V = ((rdv^rsv)&(rdv^uint32(res)))>>31 != 0
-		cpsr.C = res < 0x1_0000_0000
-
-		r[rd] = uint32(res)
-
-	case THUMB_ADC:
-		res = uint64(rdv) + uint64(rsv)
-		if cpsr.C {
-			res++
-		}
-
-		cpsr.V = ((^(rdv ^ rsv))&(rdv^uint32(res)))>>31 != 0
-		cpsr.C = res >= 0x1_0000_0000
-
-		r[rd] = uint32(res)
-
-	case THUMB_LSL:
-		rsv &= 0xFF
-
-		if rsv > 32 {
-			res = 0
-			if rsv != 0 {
-				cpsr.C = false
-			}
-		} else {
-			res = uint64(rdv) << rsv
-			if rsv != 0 {
-				cpsr.C = rdv&(1<<(32-rsv)) != 0
-			}
-		}
-		r[rd] = uint32(res)
-
-	case THUMB_LSR:
-		rsv &= 0xFF
-
-		res = uint64(rdv) >> rsv
-		r[rd] = uint32(res)
-
-		if rsv != 0 {
-			cpsr.C = rdv&(1<<(rsv-1)) != 0
-		}
-
-	case THUMB_ASR:
-		rsv &= 0xFF
-
-		if rsv > 32 {
-			rsv = 32
-		}
-
-		if rsv != 0 {
-			cpsr.C = rdv&(1<<(rsv-1)) != 0
-		}
-
-		res = uint64(int32(rdv) >> rsv)
-		r[rd] = uint32(res)
-
-	case THUMB_ROR:
-		rsv &= 0xFF
-
-		if rsv != 0 {
-			cpsr.C = (rdv>>((rsv-1)%32))&1 != 0
-		}
-
-		res = uint64(bits.RotateLeft32(rdv, -int(rsv)))
-		r[rd] = uint32(res)
-	}
-
-	cpsr.N = (res>>31)&1 != 0
-	cpsr.Z = uint32(res) == 0
-
-	r[PC] += 2
-}
-
-const (
-	HI_ADD = 0
-	HI_CMP = 1
-	HI_MOV = 2
-	HI_BX  = 3
-)
-
-func (cpu *Cpu) HiRegBX(op uint16) {
-	var (
-		r    = &cpu.Reg.R
-		cpsr = &cpu.Reg.CPSR
-
-		inst = (op >> 8) & 0b11
-		mSBd = (op>>7)&1 != 0
-		mSBs = (op>>6)&1 != 0
-		rs   = (op >> 3) & 0xF
-		rd   = op & 0x7
-	)
-
-	if inst != 3 && mSBd {
-		rd |= 0b1000
-	}
-
-	if mSBs {
-		rs |= 0b1000
-	}
-
-	switch inst {
-	case HI_ADD:
-
-		rsv := r[rs]
-		rdv := r[rd]
-
-		if rs == PC {
-			rsv += 4
-		}
-
-		res := uint64(rsv) + uint64(rdv)
-
-		if rd == PC {
-			r[rd] = uint32(res&^1) + 4
-		} else {
-			r[rd] = uint32(res)
-			r[PC] += 2
-		}
-		return
-
-	case HI_CMP:
-
-		rsv := r[rs]
-		rdv := r[rd]
-
-		if rs == PC {
-			rsv += 4
-		}
-
-		res := uint64(rdv) - uint64(rsv)
-
-		if rd != PC {
-			r[PC] += 2
-		}
-
-		cpsr.N = (uint32(res)>>31)&1 != 0
-		cpsr.Z = uint32(res) == 0
-		cpsr.C = res < 0x1_0000_0000
-		cpsr.V = ((rdv^rsv)&(rdv^uint32(res)))>>31 != 0
-		return
-
-	case HI_MOV:
-
-		if nop := rs == 8 && rd == 8; nop {
-			r[PC] += 2
-			return
-		}
-
-		rsv := r[rs]
-		if rs == PC {
-			rsv += 4
-		}
-
-		if rd == PC {
-			r[rd] = rsv &^ 0b1
-			return
-		}
-
-		r[rd] = rsv
-		r[PC] += 2
-		return
-
-	case HI_BX:
-
-		if blx := mSBd; blx {
-			if rs == LR {
-				panic("Setup Thumb Blx LR, LR")
-			}
-
-			r[LR] = r[PC] + 3
-		}
-
-		if rs == PC {
-			cpsr.T = false
-			r[PC] = (r[PC] + 4) &^ 2
-			return
-		}
-
-		if thumb := r[rs]&1 != 0; thumb {
-			r[PC] = r[rs] &^ 0b1
-			return
-		}
-
-		cpsr.T = false
-		r[PC] = r[rs] &^ 0b11
-
-		return
-	}
-}
-
-const (
-	THUMB_ADD = iota
-	THUMB_SUB
-	THUMB_ADDImm
-	THUMB_SUBImm
-)
-
-func (cpu *Cpu) ThumbAddSub(op uint16) {
-	var (
-		r    = &cpu.Reg.R
-		cpsr = &cpu.Reg.CPSR
-
-		inst = (op >> 9) & 0b11
-		rsv  = uint32(r[(op>>3)&0x7])
-		rd   = op & 0x7
-
-		res uint64
-	)
-
-	var op2 uint32
-	if reg := inst < 2; reg {
-		op2 = uint32(r[(op>>6)&0x7])
-	} else {
-		op2 = uint32((op >> 6) & 0x7)
-	}
-
-	switch inst {
-	case THUMB_ADD, THUMB_ADDImm:
-		res = uint64(rsv) + uint64(op2)
-
-		cpsr.V = ((^(rsv ^ op2))&(rsv^uint32(res)))>>31 != 0
-		cpsr.C = res >= 0x1_0000_0000
-	case THUMB_SUB, THUMB_SUBImm:
-		res = uint64(rsv) - uint64(op2)
-
-		cpsr.V = ((rsv^op2)&(rsv^uint32(res)))>>31 != 0
-		cpsr.C = res < 0x1_0000_0000
-	}
-
-	r[rd] = uint32(res)
-
-	cpsr.N = (uint32(res)>>31)&1 != 0
-	cpsr.Z = uint32(res) == 0
-
-	r[PC] += 2
-}
-
-const (
-	THUMB_IMM_MOV = iota
-	THUMB_IMM_CMP
-	THUMB_IMM_ADD
-	THUMB_IMM_SUB
-)
-
-func (cpu *Cpu) thumbImm(op uint16) {
-	var (
-		r    = &cpu.Reg.R
-		cpsr = &cpu.Reg.CPSR
-		inst = (op >> 11) & 0b11
-		rd   = (op >> 8) & 0x7
-		nn   = uint32(op & 0xFF)
-		rdv  = r[rd]
-
-		res uint64
-	)
-
-	switch inst {
-	case THUMB_IMM_MOV:
-		res = uint64(nn)
-		r[rd] = uint32(res)
-	case THUMB_IMM_CMP:
-		res = uint64(rdv) - uint64(nn)
-		cpsr.V = ((rdv^nn)&(rdv^uint32(res)))>>31 != 0
-		cpsr.C = res < 0x1_0000_0000
-	case THUMB_IMM_ADD:
-		res = uint64(rdv) + uint64(nn)
-		r[rd] = uint32(res)
-		cpsr.V = ((^(rdv ^ nn))&(rdv^uint32(res)))>>31 != 0
-		cpsr.C = res >= 0x1_0000_0000
-	case THUMB_IMM_SUB:
-		res = uint64(rdv) - uint64(nn)
-		r[rd] = uint32(res)
-		cpsr.V = ((rdv^nn)&(rdv^uint32(res)))>>31 != 0
-		cpsr.C = res < 0x1_0000_0000
-	}
-
-	cpsr.N = (res>>31)&1 != 0
-	cpsr.Z = uint32(res) == 0
-
-	r[PC] += 2
-}
-
-func (cpu *Cpu) thumbLSHalf(op uint16) {
-	var (
-		r = &cpu.Reg.R
-
-		offset = uint32((op >> 6) & 0x1F << 1)
-		addr   = r[(op>>3)&0x7] + offset
-		rd     = op & 0x7
-	)
-
-	if ldr := (op>>11)&1 != 0; ldr {
-		v := uint32(cpu.mem.Read16(addr &^ 1))
-		is := (addr & 1) << 3
-		r[rd] = bits.RotateLeft32(v, -int(is))
-	} else {
-		cpu.mem.Write16(addr&^1, uint16(r[rd]))
-	}
-
-	r[PC] += 2
-}
-
-const (
 	THUMB_STRH = iota
 	THUMB_LDSB
 	THUMB_LDRH
@@ -407,7 +20,7 @@ const (
 	THUMB_LDRB_REG
 )
 
-func (cpu *Cpu) thumbSdt(op uint16) {
+func (cpu *Cpu) ThumbSdt(op uint16) {
 	var (
 		r    = &cpu.Reg.R
 		inst = (op >> 10) & 0b11
@@ -420,23 +33,23 @@ func (cpu *Cpu) thumbSdt(op uint16) {
 		switch inst {
 		case THUMB_STRH:
 
-			cpu.mem.Write16(addr&^1, uint16(r[rd]))
+			cpu.Mem.Write16(addr&^1, uint16(r[rd]))
 
 		case THUMB_LDSB:
 
 			// sign-expand byte value
-			r[rd] = uint32(int32(int8(cpu.mem.Read8(addr))))
+			r[rd] = uint32(int32(int8(cpu.Mem.Read8(addr))))
 
 		case THUMB_LDRH:
 
-			v := cpu.mem.Read16(addr &^ 1)
+			v := cpu.Mem.Read16(addr &^ 1)
 			is := (addr & 1) << 3
 			r[rd] = bits.RotateLeft32(v, -int(is))
 
 		case THUMB_LDSH:
 
 			// sign-expand half value
-			r[rd] = uint32(int32(int16(cpu.mem.Read16(addr &^ 1))))
+			r[rd] = uint32(int32(int16(cpu.Mem.Read16(addr &^ 1))))
 
 		}
 
@@ -447,71 +60,21 @@ func (cpu *Cpu) thumbSdt(op uint16) {
 
 	switch inst {
 	case THUMB_STR_REG:
-		cpu.mem.Write32(addr&^0b11, r[rd])
+		cpu.Mem.Write32(addr&^0b11, r[rd])
 	case THUMB_STRB_REG:
-		cpu.mem.Write8(addr, uint8(r[rd]))
+		cpu.Mem.Write8(addr, uint8(r[rd]))
 	case THUMB_LDR_REG:
-		v := cpu.mem.Read32(addr &^ 0b11)
+		v := cpu.Mem.Read32(addr &^ 0b11)
 		is := (addr & 0b11) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
 	case THUMB_LDRB_REG:
-		r[rd] = cpu.mem.Read8(addr)
+		r[rd] = cpu.Mem.Read8(addr)
 	}
 
 	r[PC] += 2
 }
 
-func (cpu *Cpu) thumbLPC(op uint16) {
-	var (
-		r    = &cpu.Reg.R
-		rd   = (op >> 8) & 0x7
-		nn   = uint32(op&0xFF) << 2
-		addr = ((r[PC] + 4) &^ 0b11) + nn
-	)
-
-	r[rd] = cpu.mem.Read32(addr)
-	r[PC] += 2
-}
-
-const (
-	THUMB_STR_IMM = iota
-	THUMB_LDR_IMM
-	THUMB_STRB_IMM
-	THUMB_LDRB_IMM
-)
-
-func (cpu *Cpu) thumbLSImm(op uint16) {
-	var (
-		r = &cpu.Reg.R
-
-		inst = (op >> 11) & 0b11
-		rd   = op & 0x7
-		rb   = (op >> 3) & 0x7
-		nn   = uint32(op>>6) & 0x1F
-	)
-
-	switch inst {
-	case THUMB_STR_IMM:
-		addr := r[rb] + (nn << 2)
-		cpu.mem.Write32(addr&^0b11, r[rd])
-	case THUMB_LDR_IMM:
-		addr := r[rb] + (nn << 2)
-		v := cpu.mem.Read32(addr &^ 0b11)
-		is := (addr & 0b11) << 3
-		r[rd] = bits.RotateLeft32(v, -int(is))
-
-	case THUMB_STRB_IMM:
-		addr := r[rb] + nn
-		cpu.mem.Write8(addr, uint8(r[rd]))
-	case THUMB_LDRB_IMM:
-		addr := r[rb] + nn
-		r[rd] = uint32(cpu.mem.Read8(addr))
-	}
-
-	r[PC] += 2
-}
-
-func (cpu *Cpu) thumbPushPop(op uint16) {
+func (cpu *Cpu) ThumbPushPop(op uint16) {
 	var (
 		r     = &cpu.Reg.R
 		pclr  = (op>>8)&1 != 0
@@ -527,9 +90,9 @@ func (cpu *Cpu) thumbPushPop(op uint16) {
 
 	// disabled for now. Need method to handle games that use edge of bank to subtract from. ex. metroid uses 0x200_0000 as addr, then subtracts to place values in different bank at 0x1FF_FFFC
 	//if pop {
-	//	p, _ = cpu.mem.ReadPtr(r[SP])
+	//	p, _ = cpu.Mem.ReadPtr(r[SP])
 	//} else {
-	//	p, _ = cpu.mem.WritePtr(r[SP])
+	//	p, _ = cpu.Mem.WritePtr(r[SP])
 	//}
 
 	if !pop && pclr {
@@ -538,7 +101,7 @@ func (cpu *Cpu) thumbPushPop(op uint16) {
 			p = unsafe.Add(p, -4)
 			*(*uint32)(p) = r[14]
 		} else {
-			cpu.mem.Write32(r[SP], r[14])
+			cpu.Mem.Write32(r[SP], r[14])
 		}
 	}
 
@@ -557,7 +120,7 @@ func (cpu *Cpu) thumbPushPop(op uint16) {
 				r[reg] = *(*uint32)(p)
 				p = unsafe.Add(p, 4)
 			} else {
-				r[reg] = cpu.mem.Read32(r[SP])
+				r[reg] = cpu.Mem.Read32(r[SP])
 			}
 			r[SP] += 4
 		} else {
@@ -566,7 +129,7 @@ func (cpu *Cpu) thumbPushPop(op uint16) {
 				p = unsafe.Add(p, -4)
 				*(*uint32)(p) = r[reg]
 			} else {
-				cpu.mem.Write32(r[SP], r[reg])
+				cpu.Mem.Write32(r[SP], r[reg])
 			}
 		}
 
@@ -582,265 +145,13 @@ func (cpu *Cpu) thumbPushPop(op uint16) {
 		if p != nil {
 			r[PC] = *(*uint32)(p)
 		} else {
-			r[PC] = cpu.mem.Read32(r[SP])
+			r[PC] = cpu.Mem.Read32(r[SP])
 		}
 
-		cpu.toggleThumb()
+		cpu.ToggleThumb()
 
 		r[SP] += 4
 		return
-	}
-
-	r[PC] += 2
-}
-
-func (cpu *Cpu) thumbRelative(op uint16) {
-	var (
-		r  = &cpu.Reg.R
-		rd = (op >> 8) & 0x7
-		nn = uint32(op&0xFF) << 2
-	)
-
-	if isSP := (op>>11)&1 != 0; isSP {
-		r[rd] = r[SP] + nn
-		r[PC] += 2
-		return
-	}
-
-	r[rd] = ((r[PC] + 4) &^ 0b11) + nn
-	r[PC] += 2
-}
-
-func (cpu *Cpu) thumbJumpCalls(op uint16) {
-	r := &cpu.Reg.R
-
-	if !cpu.CheckCond(uint32(op>>8) & 0xF) {
-		r[PC] += 2
-		return
-	}
-
-	nn := int(int8(op&0xFF)) << 1
-	r[PC] = uint32(int(r[PC]) + 4 + nn)
-}
-
-func (cpu *Cpu) thumbB(op uint16) {
-	if immLoop := op == 0xE7FE; immLoop {
-		cpu.Halted = true
-		return
-	}
-
-	r := &cpu.Reg.R
-
-	const shift = 32 - 11 // int32 - offset size
-
-	nn := (int32(uint32(op)<<shift) >> shift) << 1
-	r[PC] = uint32(int32(r[PC]) + 4 + nn)
-}
-
-func (cpu *Cpu) thumbShifted(op uint16) {
-	var (
-		cpsr = &cpu.Reg.CPSR
-		r    = &cpu.Reg.R
-
-		shType = (op >> 11) & 0b11
-		is     = (op >> 6) & 0x1F
-		rsv    = r[(op>>3)&0x7]
-		rd     = op & 0x7
-
-		res uint32
-	)
-
-	switch shType {
-	case LSL:
-
-		switch {
-		case is == 0:
-			res = rsv
-		case is > 32:
-			res = 0
-			cpsr.C = false
-		default:
-			res = rsv << is
-			cpsr.C = rsv&(1<<(32-is)) != 0
-		}
-
-	case LSR:
-
-		if is == 0 {
-			is = 32
-		}
-
-		cpsr.C = rsv&(1<<(is-1)) != 0
-		res = rsv >> is
-
-	case ASR:
-
-		if (is == 0) || is > 32 {
-			is = 32
-		}
-
-		cpsr.C = rsv&(1<<(is-1)) != 0
-		res = uint32(int32(rsv) >> is)
-	}
-
-	cpsr.N = (res>>31)&1 != 0
-	cpsr.Z = uint32(res) == 0
-
-	r[rd] = res
-	r[PC] += 2
-}
-
-func (cpu *Cpu) thumbStack(op uint16) {
-	r := &cpu.Reg.R
-	nn := int(op&0x7F) << 2
-
-	if sub := (op>>7)&1 != 0; sub {
-		nn = -nn
-	}
-
-	r[SP] = uint32(int(r[SP]) + nn)
-	r[PC] += 2
-}
-
-func (cpu *Cpu) thumbLongBranch(op uint16) {
-	const shift = 32 - 23 // 22 is bits, + 1 for * 2
-	var (
-		r   = &cpu.Reg.R
-		op2 = cpu.mem.Read16(r[PC] + 2)
-		hi  = uint32(op & 0x7FF)
-		lo  = uint32(op2 & 0x7FF)
-		nn  = int32(((hi<<12)|(lo<<1))<<shift) >> shift
-	)
-
-	r[LR] = ((r[PC] + 4) &^ 1) + 1
-	r[PC] = uint32(int32(r[PC]) + 4 + nn)
-
-	if exc := (op2>>12)&1 == 0; exc {
-		cpu.toggleThumb()
-	}
-}
-
-func (cpu *Cpu) thumbShortLongBranch(op uint16) {
-	// Using only the 2nd half of BL as "BL LR+imm" is possible
-	// (for example, Mario Golf Advance Tour for GBA uses op F800h as "BL LR+0").
-	// BL LR + nn
-	// bottom half never signed?
-
-	r := &cpu.Reg.R
-	nn := uint32(op&0x7FF) << 1
-	tmpLR := r[LR]
-	r[LR] = ((r[PC] + 2) &^ 0b1) + 1
-	r[PC] = (tmpLR + nn) &^ 0b1
-}
-
-func (cpu *Cpu) thumbLSSP(op uint16) {
-	r := &cpu.Reg.R
-	rd := (op >> 8) & 0x7
-	addr := r[SP] + (uint32(op&0xFF) << 2)
-
-	if ldr := (op>>11)&1 != 0; ldr {
-		v := cpu.mem.Read32(addr &^ 0b11)
-		is := (addr & 0b11) << 3
-		r[rd] = bits.RotateLeft32(v, -int(is))
-	} else {
-		cpu.mem.Write32(addr, r[rd])
-	}
-
-	r[PC] += 2
-}
-
-func (cpu *Cpu) thumbBlock(opcode uint16) {
-	r := &cpu.Reg.R
-	ldmia := (opcode>>11)&1 != 0
-	rb := (opcode >> 8) & 7
-	rlist := uint32(opcode & 0xFF)
-	addr := r[rb] &^ 0b11
-
-	if !ldmia {
-
-		regCount := uint32(bits.OnesCount32(rlist))
-		matchingValue := uint32(0)
-		matchingAddr := uint32(0) // rn during regs
-		smallest := (rlist & -rlist) == 1<<rb
-		matchingRb := (rlist>>rb)&1 == 1
-
-		rbIdx := uint32(0)
-		count := uint32(0)
-
-		if rlist == 0 {
-			cpu.mem.Write32(r[rb], r[PC]+6)
-			r[rb] += 0x40
-			r[PC] += 2
-			return
-		}
-
-		for reg := range 8 {
-			if disabled := (rlist>>reg)&1 == 0; disabled {
-				continue
-			}
-
-			if reg == int(rb) {
-				cpu.mem.Write32(addr, r[reg])
-				matchingValue = r[reg] + 4
-				matchingAddr = addr
-				rbIdx = regCount - count
-				r[rb] += 4
-				addr += 4
-				continue
-			}
-
-			cpu.mem.Write32(addr, r[reg])
-
-			r[rb] += 4
-			addr += 4
-		}
-
-		if smallest {
-			//v := cpu.mem.Read32(addr)
-			v := cpu.mem.Read32(addr & 0b11) // maybe??
-			cpu.mem.Write32(r[rb], v-(regCount*2))
-			r[PC] += 2
-			return
-		}
-
-		if matchingRb {
-			cpu.mem.Write32(matchingAddr, matchingValue+(rbIdx*2))
-			r[PC] += 2
-			return
-		}
-
-		r[PC] += 2
-		return
-	}
-
-	rbValue := r[rb]
-	matchingRb := false
-
-	if rlist == 0 {
-		r[rb] += 0x40
-		r[PC] += 8
-		return
-	}
-
-	for reg := range 8 {
-		if disabled := (rlist>>reg)&1 == 0; disabled {
-			continue
-		}
-
-		r[reg] = cpu.mem.Read32(addr &^ 0b11)
-
-		if reg == int(rb) {
-			matchingRb = true
-			// do not remove this, needed for golden sun and others
-			rbValue = r[rb]
-		}
-
-		r[rb] += 4
-		addr += 4
-	}
-
-	if matchingRb {
-		r[rb] = rbValue
 	}
 
 	r[PC] += 2

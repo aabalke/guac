@@ -2,29 +2,14 @@
 package arm9
 
 import (
-	"fmt"
-	"unsafe"
-
 	"github.com/aabalke/guac/emu/cpu"
+	"github.com/aabalke/guac/emu/cpu/arm7"
 	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
 )
 
 type Cpu struct {
-	Reg    Reg
-	mem    cpu.MemoryInterface
-	Irq    *cpu.Irq
-	Halted bool
-
-	LowVector bool
-	Cp15      *cp15.Cp15
-
-	PcPtr       unsafe.Pointer
-	PcOff       int
-	isBranching bool
-	BranchPc    uint32
-
-	Jit        *Jit
-	jitEnabled bool
+	arm7.Cpu
+	Cp15 *cp15.Cp15
 }
 
 const (
@@ -40,77 +25,19 @@ const (
 	FLAG_I = 7
 	FLAG_F = 6
 	FLAG_T = 5
-
-	MODE_USR = 0x10
-	MODE_FIQ = 0x11
-	MODE_IRQ = 0x12
-	MODE_SWI = 0x13
-	MODE_ABT = 0x17
-	MODE_UND = 0x1B
-	MODE_SYS = 0x1F
 )
-
-func (cpu *Cpu) CheckCond(cond uint32) bool {
-	cpsr := &cpu.Reg.CPSR
-
-	switch cond {
-	case 0xE: // AL (always)
-		return true
-	case 0x0: // EQ
-		return cpsr.Z
-	case 0x1: // NE
-		return !cpsr.Z
-	case 0x2: // CS/HS
-		return cpsr.C
-	case 0x3: // CC/LO
-		return !cpsr.C
-	case 0x4: // MI
-		return cpsr.N
-	case 0x5: // PL
-		return !cpsr.N
-	case 0x6: // VS
-		return cpsr.V
-	case 0x7: // VC
-		return !cpsr.V
-	case 0x8: // HI
-		return cpsr.C && !cpsr.Z
-	case 0x9: // LS
-		return !cpsr.C || cpsr.Z
-	case 0xA: // GE
-		return cpsr.N == cpsr.V
-	case 0xB: // LT
-		return cpsr.N != cpsr.V
-	case 0xC: // GT
-		return !cpsr.Z && (cpsr.N == cpsr.V)
-	case 0xD: // LE
-		return cpsr.Z || (cpsr.N != cpsr.V)
-	default: // NV
-		return false
-	}
-}
-
-var BANK_ID = map[uint32]uint32{
-	MODE_USR: 0,
-	MODE_SYS: 0,
-	MODE_FIQ: 1,
-	MODE_IRQ: 2,
-	MODE_SWI: 3,
-	MODE_ABT: 4,
-	MODE_UND: 5,
-}
 
 func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq, cp15 *cp15.Cp15) *Cpu {
 	c := &Cpu{
-		mem:        m,
-		Irq:        irq,
-		jitEnabled: jitEnabled,
-		Cp15:       cp15,
+		Cp15: cp15,
 	}
+
+	c.Irq = irq
+	c.JitEnabled = jitEnabled
+	c.Mem = m
 
 	// skip bios
 	c.Irq.IME = true
-
-	c.Jit = NewJit(c)
 
 	return c
 }
@@ -121,225 +48,6 @@ func (c *Cpu) Execute() (int, bool) {
 	}
 
 	return c.DecodeARM()
-}
-
-type Reg struct {
-	R    [16]uint32
-	SP   [6]uint32
-	LR   [6]uint32
-	FIQ  [5]uint32 // r8 - r12
-	USR  [5]uint32 // r8 - r12 // tmp to restore after FIQ
-	CPSR Cond
-	SPSR [6]Cond
-}
-
-type Cond struct {
-	N, Z, C, V, Q, I, F, T bool
-	Mode                   uint32
-}
-
-//go:nosplit
-func (c *Cond) Get() uint32 {
-	v := c.Mode
-
-	if c.N {
-		v |= 1 << FLAG_N
-	}
-	if c.Z {
-		v |= 1 << FLAG_Z
-	}
-	if c.C {
-		v |= 1 << FLAG_C
-	}
-	if c.V {
-		v |= 1 << FLAG_V
-	}
-	if c.Q {
-		v |= 1 << FLAG_Q
-	}
-	if c.I {
-		v |= 1 << FLAG_I
-	}
-	if c.F {
-		v |= 1 << FLAG_F
-	}
-	if c.T {
-		v |= 1 << FLAG_T
-	}
-
-	return v
-}
-
-func (c *Cond) Set(v uint32) {
-	c.N = (v>>FLAG_N)&1 != 0
-	c.Z = (v>>FLAG_Z)&1 != 0
-	c.C = (v>>FLAG_C)&1 != 0
-	c.V = (v>>FLAG_V)&1 != 0
-	c.Q = (v>>FLAG_Q)&1 != 0
-	c.I = (v>>FLAG_I)&1 != 0
-	c.F = (v>>FLAG_F)&1 != 0
-	c.T = (v>>FLAG_T)&1 != 0
-	c.Mode = v & 0x1F
-}
-
-func (cpu *Cpu) toggleThumb() {
-	r := &cpu.Reg.R
-	cpsr := &cpu.Reg.CPSR
-
-	cpsr.T = r[PC]&1 != 0
-
-	if cpsr.T {
-		r[PC] &^= 1
-		return
-	}
-
-	r[PC] &^= 3
-}
-
-func (cpu *Cpu) CheckIrq() {
-	if interrupts := cpu.Irq.IE&cpu.Irq.IF != 0; !interrupts {
-		return
-	}
-
-	cpu.Halted = false
-
-	if !cpu.Reg.CPSR.I && cpu.Irq.IME {
-		cpu.Exception(VEC_IRQ, MODE_IRQ)
-		cpu.isBranching = true
-	}
-}
-
-//go:inline
-func (cpu *Cpu) jitFunction(pc uint32, thumb bool) (uint32, int, bool) {
-	pageIdx := pc >> cpu.Jit.PageShift
-	blockIdx := (pc & cpu.Jit.PageMask) >> 1
-
-	page := cpu.Jit.Pages[pageIdx]
-
-	if page == nil || page.dead {
-		return 0, 0, false
-	}
-
-	block := page.Blocks[blockIdx]
-
-	if block == nil || block.Skip || block.f == nil {
-		return 0, 0, false
-	}
-
-	//if block.Thumb != thumb {
-	//    panic(fmt.Sprintf("called thumb block %t from %t\n", block.Thumb, thumb))
-	//}
-
-	block.f()
-	cpu.isBranching = true
-	cpu.Jit.BlockCache.TouchBlock(block)
-	return block.finalOp, int(block.Length), true
-}
-
-func (cpu *Cpu) GetOpArm() (uint32, int) {
-	r := &cpu.Reg.R
-
-	if cpu.isBranching {
-		cpu.isBranching = false
-		cpu.PcOff = 0
-
-		if cpu.jitEnabled {
-			pc := r[PC]
-			if finalOp, length, ok := cpu.jitFunction(pc, false); ok {
-				return finalOp, length
-			}
-
-			cpu.Jit.UpdateMetrics(pc, false)
-		}
-
-		if r[PC] != cpu.BranchPc {
-			cpu.PcPtr = nil
-			// imm loop ended
-		}
-	}
-
-	if sequential := cpu.PcPtr == nil; sequential {
-		cpu.BranchPc = r[PC]
-		if p, ok := cpu.mem.ReadPtr(r[PC]); ok {
-			cpu.PcPtr = p
-		} else {
-			return cpu.mem.Read32(r[PC]), 0
-		}
-	}
-
-	op := *(*uint32)(unsafe.Add(cpu.PcPtr, cpu.PcOff))
-	cpu.PcOff += 4
-	cpu.isBranching = ((op>>27)&1 != 0) || (op>>12)&0xF == 0xF
-
-	return op, 0
-}
-
-func (cpu *Cpu) GetOpThumb() (uint16, int) {
-	r := &cpu.Reg.R
-
-	if cpu.isBranching {
-		cpu.isBranching = false
-		cpu.PcOff = 0
-		if cpu.jitEnabled {
-			pc := r[PC]
-			if finalOp, length, ok := cpu.jitFunction(pc, true); ok {
-				return uint16(finalOp), length
-			}
-
-			cpu.Jit.UpdateMetrics(pc, true)
-		}
-		if r[PC] != cpu.BranchPc {
-			cpu.PcPtr = nil
-		}
-	}
-
-	if sequential := cpu.PcPtr == nil; sequential {
-		if p, ok := cpu.mem.ReadPtr(r[PC]); ok {
-			cpu.BranchPc = r[PC]
-			cpu.PcPtr = p
-		} else {
-			return uint16(cpu.mem.Read16(r[PC])), 0
-		}
-	}
-
-	op := *(*uint16)(unsafe.Add(cpu.PcPtr, cpu.PcOff))
-	cpu.PcOff += 2
-	//cpu.isBranching = (op >> 14) != 0
-	cpu.isBranching = !DecodeTHUMBBranch(op)
-
-	return op, 0
-}
-
-var (
-	t_rpc uint32
-	t_sav Reg
-	t_sta Reg
-)
-
-func (c *Cpu) TestStart(op uint32, f func(op uint32), compare bool) {
-	if !compare {
-		return
-	}
-
-	t_rpc = c.Reg.R[15]
-	t_sta = c.Reg
-
-	f(op)
-
-	t_sav = c.Reg
-
-	c.Reg = t_sta
-}
-
-func (c *Cpu) EndTest(op uint32, compare bool) {
-	if !(compare && c.Reg != t_sav) {
-		return
-	}
-
-	fmt.Printf("STA REG %08X CPSR %08X\n", t_sta.R, t_sta.CPSR.Get())
-	fmt.Printf("NEW REG %08X CPSR %08X\n", t_sav.R, t_sav.CPSR.Get())
-	fmt.Printf("ORI REG %08X CPSR %08X\n", c.Reg.R, c.Reg.CPSR.Get())
-	panic(fmt.Sprintf("Bad Compare %08X %08X", t_rpc, op))
 }
 
 func DecodeTHUMBBranch(op uint16) bool {

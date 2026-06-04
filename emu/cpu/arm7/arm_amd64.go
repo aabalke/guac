@@ -8,8 +8,7 @@ import (
 	amd64 "github.com/aabalke/gojit"
 )
 
-func (j *Jit) emitMul(op uint32) {
-
+func (j *Jit) EmitMul(op uint32) {
 	inst := (op >> 21) & 0xF
 	set := (op>>20)&1 != 0
 	rd := (op >> 16) & 0xF
@@ -123,11 +122,9 @@ func (j *Jit) emitMul(op uint32) {
 
 		return
 	}
-
 }
 
-func (j *Jit) emitSwp(op uint32) {
-
+func (j *Jit) EmitSwp(op uint32) {
 	isByte := (op>>22)&1 != 0
 	rn := (op >> 16) & 0xF
 	rd := (op >> 12) & 0xF
@@ -167,8 +164,7 @@ func (j *Jit) emitSwp(op uint32) {
 	j.CallFunc(Write32)
 }
 
-func (j *Jit) emitHalf(op uint32) {
-
+func (j *Jit) EmitHalf(op uint32) {
 	rn := (op >> 16) & 0xF
 	rd := (op >> 12) & 0xF
 	preFlag := (op>>24)&1 != 0
@@ -286,8 +282,7 @@ func (j *Jit) emitHalf(op uint32) {
 	}
 }
 
-func (j *Jit) emitSdt(op uint32) {
-
+func (j *Jit) EmitSdt(op uint32) {
 	rd := (op >> 12) & 0xF
 	rn := (op >> 16) & 0xF
 	reg := (op>>25)&1 != 0
@@ -299,7 +294,7 @@ func (j *Jit) emitSdt(op uint32) {
 
 	// offset
 	if reg {
-		j.emitSdtRegShift(op)
+		j.EmitSdtRegShift(op)
 		//CpuPointer = j.Cpu
 		//j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
 
@@ -369,8 +364,7 @@ func (j *Jit) emitSdt(op uint32) {
 	}
 }
 
-func (j *Jit) emitSdtRegShift(op uint32) {
-
+func (j *Jit) EmitSdtRegShift(op uint32) {
 	rm := op & 0xF
 	shType := (op >> 5) & 0b11
 	shift := (op >> 7) & 0x1F
@@ -384,7 +378,7 @@ func (j *Jit) emitSdtRegShift(op uint32) {
 	}
 
 	// why is this commented out
-	//if special := shift == 0; special {
+	// if special := shift == 0; special {
 
 	//    if rm == PC {
 	//        j.Add(amd64.Imm(8), amd64.Ebx)
@@ -443,8 +437,7 @@ func (j *Jit) emitSdtRegShift(op uint32) {
 	}
 }
 
-func (j *Jit) emitAluOp2Reg(op uint32) {
-
+func (j *Jit) EmitAluOp2Reg(op uint32) {
 	shReg := (op>>4)&1 != 0
 	shType := (op >> 5) & 0b11
 	setCarry := (op>>20)&1 != 0
@@ -647,8 +640,7 @@ func (j *Jit) emitAluOp2Reg(op uint32) {
 	skip()
 }
 
-func (j *Jit) emitAlu(op uint32) {
-
+func (j *Jit) EmitAlu(op uint32) {
 	inst := (op >> 21) & 0xF
 	rd := (op >> 12) & 0xF
 	rn := (op >> 16) & 0xF
@@ -683,7 +675,7 @@ func (j *Jit) emitAlu(op uint32) {
 
 		// get op2, op2 will be in bx
 		// shift
-		j.emitAluOp2Reg(op)
+		j.EmitAluOp2Reg(op)
 
 		j.Movl(j.REG(rn), amd64.Eax)
 
@@ -709,7 +701,6 @@ func (j *Jit) emitAlu(op uint32) {
 }
 
 var aluInstJit = [...]func(j *Jit, op, rd uint32){
-
 	// AND
 	func(j *Jit, op, rd uint32) {
 		j.And(amd64.Ebx, amd64.Eax)
@@ -906,7 +897,6 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32){
 
 	// BIC
 	func(j *Jit, op, rd uint32) {
-
 		j.Not(amd64.Ebx)
 		j.And(amd64.Ebx, amd64.Eax)
 
@@ -920,7 +910,6 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32){
 
 	// MVN
 	func(j *Jit, op, rd uint32) {
-
 		j.Not(amd64.Ebx)
 
 		if set := (op>>20)&1 != 0; set {
@@ -933,8 +922,7 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32){
 	},
 }
 
-func (j *Jit) emitBlock(op uint32) {
-
+func (j *Jit) EmitBlock(op uint32) {
 	var (
 		rlist    = op & 0xFFFF
 		regCount = uint32(bits.OnesCount32(rlist))
@@ -1073,7 +1061,7 @@ func (j *Jit) emitBlock(op uint32) {
 			switch reg {
 			case rn:
 
-				//Store OLD base if Rb is FIRST entry in Rlist
+				// Store OLD base if Rb is FIRST entry in Rlist
 				// otherwise store NEW base (STM/ARMv4),
 				if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
 					j.Movl(amd64.R10d, amd64.Ebx)
@@ -1155,11 +1143,9 @@ func (j *Jit) emitBlock(op uint32) {
 		j.Movl(amd64.Esi, amd64.Eax)
 		j.Movl(amd64.Eax, j.REG(rn))
 	}
-
 }
 
-func (j *Jit) emitPsr(op uint32) {
-
+func (j *Jit) EmitPsr(op uint32) {
 	//j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
 
 	if msr := (op>>21)&1 != 0; msr {

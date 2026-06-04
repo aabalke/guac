@@ -2,21 +2,21 @@
 package arm9
 
 import (
+	"math"
 	"math/bits"
 
 	a "github.com/aabalke/gojit"
 
 	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
-	"math"
 )
 
-func (j *Jit) emitClz(op uint32) {
+func (j *Jit) EmitClz(op uint32) {
 	j.LdrReg(a.R00, op&0xF)
 	j.Clz(a.R00, a.R00, false)
 	j.StrReg(a.R00, (op>>12)&0xF)
 }
 
-func (j *Jit) emitMul(op uint32) {
+func (j *Jit) EmitMul(op uint32) {
 	var (
 		inst = (op >> 21) & 0xF
 		set  = (op>>20)&1 != 0
@@ -202,10 +202,9 @@ func (j *Jit) emitMul(op uint32) {
 
 		j.StrReg(a.R00, rd)
 	}
-
 }
 
-func (j *Jit) emitQalu(op uint32) {
+func (j *Jit) EmitQalu(op uint32) {
 	var (
 		inst = (op >> 20) & 0xF
 		rn   = (op >> 16) & 0xF
@@ -249,48 +248,7 @@ func (j *Jit) emitQalu(op uint32) {
 	j.StrFlag(a.R04, Q)
 }
 
-func (j *Jit) emitSWP(op uint32) {
-	var (
-		isByte = (op>>22)&1 != 0
-		rn     = (op >> 16) & 0xF
-		rd     = (op >> 12) & 0xF
-		rm     = op & 0xF
-	)
-
-	j.LdrReg(a.R00, rn)
-	j.LdrReg(a.R09, rm)
-	j.MovReg(a.R08, a.R00, true)
-
-	if isByte {
-
-		j.CallFunc(Read)
-		j.StrReg(a.R00, rd)
-
-		j.MovReg(a.R00, a.R08, true)
-		j.MovReg(a.R01, a.R09, true)
-		j.CallFunc(Write)
-
-		return
-	}
-
-	j.AndImm(a.R00, a.R00, IMM_0xFFFF_FFFC, false, false)
-	j.CallFunc(Read32)
-	j.MovReg(a.R01, a.R08, true)
-	j.AndImm(a.R01, a.R01, IMM_3, false, false)
-	j.LslImm(a.R01, a.R01, 3, false)
-	j.RorReg(a.R00, a.R00, a.R01, false)
-	j.StrReg(a.R00, rd)
-
-	j.MovReg(a.R00, a.R08, true)
-
-	j.AndImm(a.R00, a.R00, IMM_0xFFFF_FFFC, false, false)
-
-	j.MovReg(a.R01, a.R09, true)
-
-	j.CallFunc(Write32)
-}
-
-func (j *Jit) emitSdt(op uint32) {
+func (j *Jit) EmitSdt(op uint32) {
 	if pld := op&
 		0b1111_1101_0111_0000_1111_0000_0000_0000 ==
 		0b1111_0101_0101_0000_1111_0000_0000_0000; pld {
@@ -425,7 +383,7 @@ func (j *Jit) emitSdt(op uint32) {
 	}
 }
 
-func (j *Jit) emitHalf(op uint32) {
+func (j *Jit) EmitHalf(op uint32) {
 	var (
 		rn      = (op >> 16) & 0xF
 		rd      = (op >> 12) & 0xF
@@ -539,7 +497,7 @@ func (j *Jit) emitHalf(op uint32) {
 	j.StrReg(a.R00, rd)
 }
 
-func (j *Jit) emitAlu(op uint32) {
+func (j *Jit) EmitAlu(op uint32) {
 	var (
 		rd   = (op >> 12) & 0xF
 		rn   = (op >> 16) & 0xF
@@ -933,7 +891,7 @@ func (j *Jit) getShiftedAluOp2(op uint32) {
 	zeroSkip()
 }
 
-func (j *Jit) emitCo(op uint32) {
+func (j *Jit) EmitCo(op uint32) {
 	var (
 		Op = uint32((op >> 21) & 0x7)
 		Cn = uint32((op >> 16) & 0xF)
@@ -990,35 +948,7 @@ func (j *Jit) emitCo(op uint32) {
 	j.CallFunc(WriteCp15)
 }
 
-func (j *Jit) emitPsr(op uint32) {
-	if msr := (op>>21)&1 != 0; msr {
-		panic("msr jit arm")
-	}
-
-	rd := (op >> 12) & 0xF
-
-	if spsr := (op>>22)&1 != 0; spsr {
-		j.LdrImm(a.R00, CPU, MODE/4, a.SIZE_WORD, false, true)
-		j.CallFunc(GetSpsr)
-		j.StrReg(a.R00, rd)
-		return
-	}
-
-	j.LdrImm(a.R00, CPU, MODE/4, a.SIZE_WORD, false, true)
-	j.Mov32(a.R08, PRIV_MASK)
-	j.Mov32(a.R09, USR_MASK)
-	j.CmpImm(a.R00, MODE_USR, 0, false, false)
-	j.Csel(a.R08, a.R09, a.R08, a.EQ, true)
-
-	j.Mov64(a.R00, uint64(CPSR))
-	j.ADDReg(a.R00, a.R00, CPU, 0, 0, false, false, true)
-	j.CallFunc((*Cond).Get)
-	j.AndReg(a.R00, a.R00, a.R08, 0, 0, false, false)
-	j.StrReg(a.R00, rd)
-}
-
-func (j *Jit) emitBlock(op uint32) {
-
+func (j *Jit) EmitBlock(op uint32) {
 	var (
 		rlist = op & 0xFFFF
 		rn    = (op >> 16) & 0xF
@@ -1234,5 +1164,4 @@ func (j *Jit) emitBlock(op uint32) {
 			j.StrReg(a.R09, rn)
 		}
 	}
-
 }

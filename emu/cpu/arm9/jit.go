@@ -2,12 +2,9 @@
 package arm9
 
 import (
-	"fmt"
-	"os"
-
-	"github.com/aabalke/gojit"
 	"github.com/aabalke/guac/config"
 
+	"github.com/aabalke/guac/emu/cpu/arm7"
 	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
 )
 
@@ -19,7 +16,7 @@ const (
 var CpuPtr *Cpu
 
 type Jit struct {
-	*gojit.Assembler
+	arm7.Jit
 	Cpu *Cpu
 
 	BlockCache   *BlockCache
@@ -50,7 +47,7 @@ func NewJit(cpu *Cpu) *Jit {
 
 	CpuPtr = cpu
 
-	if !cpu.jitEnabled {
+	if !cpu.JitEnabled {
 		j := &Jit{Cpu: cpu}
 		return j
 	}
@@ -119,32 +116,32 @@ func (j *Jit) DeletePages() {
 
 //go:nosplit
 func Read(addr uint32) uint32 {
-	return CpuPtr.mem.Read8(addr)
+	return CpuPtr.Mem.Read8(addr)
 }
 
 //go:nosplit
 func Read16(addr uint32) uint32 {
-	return CpuPtr.mem.Read16(addr)
+	return CpuPtr.Mem.Read16(addr)
 }
 
 //go:nosplit
 func Read32(addr uint32) uint32 {
-	return CpuPtr.mem.Read32(addr)
+	return CpuPtr.Mem.Read32(addr)
 }
 
 //go:nosplit
 func Write(addr uint32, v uint8) {
-	CpuPtr.mem.Write8(addr, v)
+	CpuPtr.Mem.Write8(addr, v)
 }
 
 //go:nosplit
 func Write16(addr uint32, v uint16) {
-	CpuPtr.mem.Write16(addr, v)
+	CpuPtr.Mem.Write16(addr, v)
 }
 
 //go:nosplit
 func Write32(addr, v uint32) {
-	CpuPtr.mem.Write32(addr, v)
+	CpuPtr.Mem.Write32(addr, v)
 }
 
 //go:nosplit
@@ -173,7 +170,7 @@ func WriteCp15(op, cn, pn, cp, cm uint8, v uint32) {
 
 //go:nosplit
 func GetSpsr(mode uint32) uint32 {
-	return CpuPtr.Reg.SPSR[BANK_ID[mode]].Get()
+	return CpuPtr.Reg.SPSR[arm7.BANK_ID[mode]].Get()
 }
 
 func (j *Jit) UpdateMetrics(pc uint32, thumb bool) {
@@ -191,102 +188,3 @@ func (j *Jit) UpdateMetrics(pc uint32, thumb bool) {
 
 	j.CreateBlock(pc, thumb)
 }
-
-var (
-	cnt      uint32
-	sav, sta Reg
-)
-
-func (j *Jit) StartTestThumb(op uint16, compare bool, f func(op uint16)) {
-	if config.Conf.Nds.Jit.Enabled {
-		panic("Jit Instruction Test is running with Jit Running")
-	}
-
-	if !compare {
-		return
-	}
-
-	cnt++
-
-	fmt.Printf("starting test cnt %08d, op %08X\n", cnt, op)
-
-	cpu := j.Cpu
-	sta = cpu.Reg
-	cpu.Jit.TestInstThumb(op, f)
-
-	sav = cpu.Reg
-
-	cpu.Reg = sta
-}
-
-func (j *Jit) StartTest(op uint32, compare bool, f func(op uint32), thumb bool) {
-	if config.Conf.Nds.Jit.Enabled {
-		panic("Jit Instruction Test is running with Jit Running")
-	}
-
-	if !compare {
-		return
-	}
-
-	cnt++
-
-	fmt.Printf("starting test cnt %08d, op %08X\n", cnt, op)
-
-	cpu := j.Cpu
-	sta = cpu.Reg
-
-	cpu.Jit.TestInst(op, f)
-
-	sav = cpu.Reg
-
-	cpu.Reg = sta
-}
-
-func (j *Jit) EndTest(op uint32, compare bool) {
-	if !compare {
-		return
-	}
-
-	cpu := j.Cpu
-
-	//sav.R[15] += 4
-
-	// do not (Reg) == (Reg), sta = cpu.Reg does not promise padding
-	if match := (cpu.Reg.R == sav.R &&
-		cpu.Reg.CPSR == sav.CPSR &&
-		cpu.Reg.SPSR == sav.SPSR &&
-		cpu.Reg.FIQ == sav.FIQ &&
-		cpu.Reg.LR == sav.LR &&
-		cpu.Reg.SP == sav.SP &&
-		cpu.Reg.USR == sav.USR); match {
-		return // match
-	}
-
-	fmt.Printf("STA REG %08X CPSR %08X\n", sta.R, sta.CPSR.Get())
-	fmt.Printf("JIT REG %08X CPSR %08X\n", sav.R, sav.CPSR.Get())
-	fmt.Printf("COR REG %08X CPSR %08X\n", cpu.Reg.R, cpu.Reg.CPSR.Get())
-
-	fmt.Printf("STA USRREG %08X\n", sta.USR)
-	fmt.Printf("JIT USRREG %08X\n", sav.USR)
-	fmt.Printf("COR USRREG %08X\n", cpu.Reg.USR)
-
-	fmt.Printf("STA LR %08X\n", sta.LR)
-	fmt.Printf("JIT LR %08X\n", sav.LR)
-	fmt.Printf("COR LR %08X\n", cpu.Reg.LR)
-
-	fmt.Printf("STA SP %08X\n", sta.SP)
-	fmt.Printf("JIT SP %08X\n", sav.SP)
-	fmt.Printf("COR SP %08X\n", cpu.Reg.SP)
-
-	fmt.Printf("STA FIQ %08X\n", sta.FIQ)
-	fmt.Printf("JIT FIQ %08X\n", sav.FIQ)
-	fmt.Printf("COR FIQ %08X\n", cpu.Reg.FIQ)
-	//fmt.Printf("JIT %+v\n", sav)
-	//fmt.Printf("COR %+v\n", cpu.Reg)
-
-	os.Exit(0)
-}
-
-//compare := true
-//cpu.Jit.StartTest(op, compare, cpu.Jit.emitClz)
-//defer cpu.Jit.EndTest(op, compare)
