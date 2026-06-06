@@ -289,6 +289,7 @@ func (m *Memory) ReadBios(addr uint32) uint8 {
 }
 
 func (m *Memory) ReadOpenBus(addr uint32) uint8 {
+	//panic(fmt.Sprintf("OPEN BUS READ %08X %08X REGS %08X", m.GBA.Cpu.P.Execute.Addr, m.GBA.Cpu.P.Execute.Op, m.GBA.Cpu.Reg.R))
 	pc := m.GBA.Cpu.Reg.R[PC]
 
 	if m.GBA.Cpu.Reg.CPSR.T {
