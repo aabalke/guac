@@ -116,7 +116,6 @@ func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq) *Cpu {
 
 	// skip bios
 	c.Irq.IME = true
-
 	c.P.Reload = true
 
 	return c
@@ -129,7 +128,19 @@ func (c *Cpu) Step() {
 
 	c.Fetch()
 
-	c.CheckIrq()
+	if c.Irq.IE&c.Irq.IF != 0 {
+		c.Halted = false
+
+		if !c.Reg.CPSR.I && c.Irq.IME {
+			c.Exception(VEC_IRQ, MODE_IRQ)
+
+			if c.P.Execute.Thumb {
+				c.Reg.R[14] += 2
+			}
+
+			return
+		}
+	}
 
 	if c.P.Execute.Thumb {
 		c.DecodeTHUMB(uint16(c.P.Execute.Op))
@@ -156,15 +167,17 @@ func (c *Cpu) Fetch() {
 func (c *Cpu) Reload() {
 	c.P.Reload = false
 
-	c.P.Fetch.Addr = c.Reg.R[15]
-	c.P.Fetch.Thumb = c.Reg.CPSR.T
-	if c.P.Fetch.Thumb {
+	thumb := c.Reg.CPSR.T
+	if thumb {
 		c.Reg.R[15] &^= 1
 		c.P.Fetch.Op = c.Mem.Read16(c.Reg.R[15])
 	} else {
 		c.Reg.R[15] &^= 3
 		c.P.Fetch.Op = c.Mem.Read32(c.Reg.R[15])
 	}
+	c.P.Fetch.Addr = c.Reg.R[15]
+	c.P.Fetch.Thumb = thumb
+
 	c.Fetch()
 }
 
@@ -177,14 +190,6 @@ func (p *Pipeline) String() string {
 
 	return b.String()
 }
-
-//func (c *Cpu) Execute() (int, bool) {
-//	if c.Reg.CPSR.T {
-//		return c.DecodeTHUMB(uint16(c.Mem.Read16(c.Reg.R[15])))
-//	}
-//
-//	return c.DecodeARM(c.Mem.Read32(c.Reg.R[15]))
-//}
 
 type Reg struct {
 	R    [16]uint32
@@ -257,23 +262,4 @@ func (cpu *Cpu) ToggleThumb() {
 	}
 
 	r[PC] &^= 3
-}
-
-func (cpu *Cpu) CheckIrq() {
-	if interrupts := cpu.Irq.IE&cpu.Irq.IF != 0; !interrupts {
-		return
-	}
-
-	cpu.Halted = false
-
-	if !cpu.Reg.CPSR.I && cpu.Irq.IME {
-		cpu.Exception(VEC_IRQ, MODE_IRQ)
-
-		if cpu.P.Execute.Thumb {
-			cpu.Reg.R[14] += 2
-		}
-
-		//cpu.IsBranching = true
-		//cpu.P.Reload = true
-	}
 }

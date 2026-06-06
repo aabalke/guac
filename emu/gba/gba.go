@@ -73,19 +73,25 @@ func (gba *GBA) Update(stdFps bool) {
 		nextEvent := gba.Scheduler.popNext()
 
 		for gba.Scheduler.CurrentCycle < nextEvent.InitCycle {
-			if gba.Cpu.Halted {
-				gba.Cpu.CheckIrq()
-				gba.Tick(4)
-			} else {
-				thumb := gba.Cpu.Reg.CPSR.T
 
-				gba.Cpu.Step()
-				// do not care about cycle accuracy right now
-				if thumb {
-					gba.Tick(2)
-				} else {
+			if gba.Cpu.Halted {
+
+				if gba.Irq.IE&gba.Irq.IF == 0 {
 					gba.Tick(4)
+					continue
 				}
+
+				gba.Cpu.Halted = false
+			}
+
+			thumb := gba.Cpu.Reg.CPSR.T
+
+			gba.Cpu.Step()
+
+			if thumb {
+				gba.Tick(2)
+			} else {
+				gba.Tick(4)
 			}
 
 			// if gba.vsyncAddr != 0 && gba.Cpu.Reg.R[15] == gba.vsyncAddr {
@@ -100,10 +106,6 @@ func (gba *GBA) Update(stdFps bool) {
 
 			//gba.Cpu.CheckIrq()
 		}
-
-		//if !gba.Cpu.Halted {
-		//	CURR_INST++
-		//}
 
 		if done := gba.handleEvent(nextEvent, stdFps); done {
 			return

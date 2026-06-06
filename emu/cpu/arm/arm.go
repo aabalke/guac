@@ -2,9 +2,7 @@
 package arm
 
 import (
-	"fmt"
 	"math/bits"
-	"unsafe"
 )
 
 const (
@@ -57,24 +55,12 @@ func (cpu *Cpu) Alu(op uint32) {
 			cpsr.C = (op2>>31)&1 != 0
 		}
 
-		//if rn == PC {
-		//	rnv += 8
-		//}
-
 	} else {
 		op2 = cpu.getShiftedAluReg(op)
 
 		if regShift := (op>>4)&1 != 0; regShift && rn == PC {
 			rnv += 4
 		}
-
-		//if rn == PC {
-		//	if regShift := (op>>4)&1 != 0; regShift {
-		//		rnv += 12
-		//	} else {
-		//		rnv += 8
-		//	}
-		//}
 	}
 
 	inst := (op >> 21) & 0xF
@@ -84,58 +70,19 @@ func (cpu *Cpu) Alu(op uint32) {
 		res := op2
 		r[rd] = res
 
-		if rd == PC {
-			// not sure on this
-			r[rd] &^= 0b1
-		}
-
 		if set := (op>>20)&1 != 0; set {
-
-			//rm := op & 0xF
-
-			// if swiExit := !imm && rd == PC && rm == LR; swiExit {
-			//	cpu.ExitException(MODE_SWI)
-			//	if r[PC]&1 != 0 {
-			//		cpu.ToggleThumb()
-			//	}
-
-			//	cpu.Reg.R[15] -= 4
-
-			//	fmt.Printf("Swi Exit\n")
-
-			//} else {
 			cpsr.N = (uint32(res)>>31)&1 != 0
 			cpsr.Z = uint32(res) == 0
-			//}
 		}
 
 	case inst == SUB:
 		res := uint64(rnv) - uint64(op2)
 		r[rd] = uint32(res)
 		if set := (op>>20)&1 != 0; set {
-			// if rd == PC {
-			//	if rn == LR {
-			//		switch cpsr.Mode {
-			//		case MODE_ABT:
-			//			cpu.ExitException(MODE_ABT)
-			//		case MODE_SWI:
-			//			cpu.ExitException(MODE_SWI)
-			//		default:
-			//			cpu.ExitException(MODE_IRQ)
-			//		}
-
-			//		fmt.Printf("SUBS PC, LR", a ...any)
-
-			//	} else {
-			//		// force exit
-			//		cpu.psrSwitch() // not sure if needed
-			//	}
-			//} else {
 			cpsr.V = ((rnv^op2)&(rnv^uint32(res)))>>31 != 0
 			cpsr.C = res < 0x1_0000_0000
 			cpsr.N = (uint32(res)>>31)&1 != 0
 			cpsr.Z = uint32(res) == 0
-			//}
 		}
 
 	// test alu
@@ -242,8 +189,6 @@ func (cpu *Cpu) Alu(op uint32) {
 		}
 	}
 
-	//cpu.Jit.EndTest(op, compare)
-
 	if rd == PC {
 
 		if inst < 0b1000 || inst > 0b1011 {
@@ -293,10 +238,6 @@ func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
 	} else {
 
 		shift = (op >> 7) & 0x1F
-
-		//if rm == PC {
-		//	op2 += 8
-		//}
 
 		if special := shift == 0; special {
 			switch shType {
@@ -400,55 +341,6 @@ func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
 	}
 
 	return op2
-}
-
-func (cpu *Cpu) psrSwitch() {
-	var (
-		reg  = &cpu.Reg
-		r    = &cpu.Reg.R
-		cpsr = &cpu.Reg.CPSR
-		curr = cpsr.Mode
-		i    = BANK_ID[curr]
-	)
-
-	*cpsr = reg.SPSR[i]
-	next := cpsr.Mode
-	c := BANK_ID[next]
-
-	reg.LR[i] = r[LR]
-	reg.SP[i] = r[SP]
-	r[SP] = reg.SP[c]
-	r[LR] = reg.LR[c]
-
-	if curr != MODE_FIQ {
-		for i := range 5 {
-			reg.USR[i] = r[8+i]
-		}
-	}
-
-	reg.SP[BANK_ID[curr]] = r[SP]
-	reg.LR[BANK_ID[curr]] = r[LR]
-
-	if curr == MODE_FIQ {
-		for i := range 5 {
-			reg.FIQ[i] = r[8+i]
-		}
-	}
-
-	if next != MODE_FIQ {
-		for i := range 5 {
-			r[8+i] = reg.USR[i]
-		}
-	}
-
-	r[SP] = reg.SP[BANK_ID[next]]
-	r[LR] = reg.LR[BANK_ID[next]]
-
-	if next == MODE_FIQ {
-		for i := range 5 {
-			r[8+i] = reg.FIQ[i]
-		}
-	}
 }
 
 const (
@@ -619,9 +511,6 @@ func (c *Cpu) Sdt(op uint32) {
 	}
 
 	post := r[rn]
-	//if rn == PC {
-	//	post += 8
-	//}
 
 	if up {
 		post += offset
@@ -635,23 +524,18 @@ func (c *Cpu) Sdt(op uint32) {
 		prev = r[rn]
 	}
 
-	//if sram := addr >= 0xE00_0000 && addr < 0x1000_0000; sram {
-	// no alignment?
-	//}
-
 	if load {
 		if byte {
 			// DO NOT WORD ALIGN
 			r[rd] = c.Mem.Read8(prev)
 		} else {
 
-			v := c.Mem.Read32(prev &^ 0b11)
-			is := ((prev & 0b11) << 3) & 0x1F
+			v := c.Mem.Read32(prev &^ 3)
+			is := ((prev & 3) << 3) & 0x1F
 			r[rd] = bits.RotateLeft32(v, -int(is))
 
 			if rd == PC {
 				c.ToggleThumb() // this is arm9 - not sure if arm7
-				//r[rd] -= 4
 				c.P.Reload = true
 			}
 		}
@@ -664,7 +548,7 @@ func (c *Cpu) Sdt(op uint32) {
 		if byte {
 			c.Mem.Write8(prev, uint8(v))
 		} else {
-			c.Mem.Write32(prev&^0b11, v)
+			c.Mem.Write32(prev&^3, v)
 		}
 	}
 
@@ -743,10 +627,6 @@ func (c *Cpu) Half(op uint32) {
 		pre, offset uint32
 	)
 
-	//if rn == PC {
-	//	rnv += 8
-	//}
-
 	if imm := (op>>22)&1 != 0; imm {
 		offset = (op & 0xF) | ((op >> 4) & 0xF0)
 	} else {
@@ -771,9 +651,6 @@ func (c *Cpu) Half(op uint32) {
 
 	if !load {
 		rdv := r[rd]
-		//if rd == PC {
-		//	rdv += 12
-		//}
 
 		if wb {
 			r[rn] = post
@@ -787,7 +664,6 @@ func (c *Cpu) Half(op uint32) {
 			panic("unsupported arm7 ldrd instruction")
 		case STRD:
 			panic("unsupported arm7 strd instruction")
-
 		}
 
 		return
@@ -972,10 +848,10 @@ func (cpu *Cpu) Swp(op uint32) {
 		r[rd] = cpu.Mem.Read8(rnv)
 		cpu.Mem.Write8(rnv, uint8(rmv))
 	} else {
-		v := cpu.Mem.Read32(rnv &^ 0b11)
-		is := (rnv & 0b11) << 3
+		v := cpu.Mem.Read32(rnv &^ 3)
+		is := (rnv & 3) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
-		cpu.Mem.Write32(rnv&^0b11, rmv)
+		cpu.Mem.Write32(rnv&^3, rmv)
 	}
 }
 
@@ -1044,20 +920,11 @@ func (c *Cpu) Block(op uint32) {
 	var (
 		rnv = *rnRef
 		reg = uint32(0)
-
-		p unsafe.Pointer
 	)
 
 	if !up {
 		reg = 15
 	}
-
-	// disabled for now. Need method to handle games that use edge of bank to subtract from. ex. metroid uses 0x200_0000 as addr, then subtracts to place values in different bank at 0x1FF_FFFC
-	//if load {
-	//	p, _ = c.Mem.ReadPtr(addr)
-	//} else {
-	//	p, _ = c.Mem.WritePtr(addr)
-	//}
 
 	for range 16 {
 
@@ -1094,74 +961,36 @@ func (c *Cpu) Block(op uint32) {
 
 		if pre {
 			if up {
-				if p != nil {
-					p = unsafe.Add(p, 4)
-				} else {
-					addr += 4
-				}
+				addr += 4
 			} else {
-				if p != nil {
-					p = unsafe.Add(p, -4)
-				} else {
-					addr -= 4
-				}
+				addr -= 4
 			}
 		}
 
 		if load {
-			if p == nil {
-				*ref = c.Mem.Read32(addr)
-			} else {
-				*ref = *(*uint32)(p)
-			}
+			*ref = c.Mem.Read32(addr)
 		} else {
-			if p == nil {
-				switch reg {
-				case rn:
+			switch reg {
+			case rn:
 
-					if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
-						c.Mem.Write32(addr, rnv)
-					} else {
-						c.Mem.Write32(addr, wbValue)
-					}
-
-				case PC:
-					panic("block pc")
-					c.Mem.Write32(addr, *ref+12)
-				default:
-					c.Mem.Write32(addr, *ref)
+				if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
+					c.Mem.Write32(addr, rnv)
+				} else {
+					c.Mem.Write32(addr, wbValue)
 				}
-			} else {
-				switch reg {
-				case rn:
 
-					if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
-						*(*uint32)(p) = rnv
-					} else {
-						*(*uint32)(p) = wbValue
-					}
-
-				case PC:
-					*(*uint32)(p) = *ref + 12
-				default:
-					*(*uint32)(p) = *ref
-				}
+			case PC:
+				c.Mem.Write32(addr, *ref+4)
+			default:
+				c.Mem.Write32(addr, *ref)
 			}
 		}
 
 		if !pre {
 			if up {
-				if p != nil {
-					p = unsafe.Add(p, 4)
-				} else {
-					addr += 4
-				}
+				addr += 4
 			} else {
-				if p != nil {
-					p = unsafe.Add(p, -4)
-				} else {
-					addr -= 4
-				}
+				addr -= 4
 			}
 		}
 
@@ -1177,19 +1006,12 @@ func (c *Cpu) Block(op uint32) {
 			r[rn] = wbValue
 		}
 
-		if pcIncluded {
-			fmt.Printf("PC STM INCLUDED %08X\n", op)
-			panic("block with pc included")
-		}
-
 		return
 	}
 
 	if wb && !rnIncluded {
 		r[rn] = wbValue
 	}
-
-	// A9
 
 	if !pcIncluded {
 		return

@@ -17,15 +17,13 @@ func (cpu *Cpu) Exception(addr uint32, mode uint32) {
 		cpsr = &cpu.Reg.CPSR
 		reg  = &cpu.Reg
 		r    = &cpu.Reg.R
-
-		pc = cpu.P.Execute.Addr
 	)
 
-	if mode == cpsr.Mode {
-		return
-	}
+	//if mode == cpsr.Mode {
+	//	return
+	//}
+	//fmt.Printf("START EXCEPTION Executing %08X PC %08X GOING TO %08X\n", cpu.P.Execute.Addr, r[15], addr)
 
-	thumb := cpsr.T
 	c := BANK_ID[cpsr.Mode]
 	i := BANK_ID[mode]
 	reg.SP[c] = r[SP]
@@ -34,43 +32,20 @@ func (cpu *Cpu) Exception(addr uint32, mode uint32) {
 	r[LR] = reg.LR[i]
 	reg.SPSR[i] = *cpsr
 
-	//r[LR] = cpu.P.Decode.Addr
-	//reg.LR[i] = cpu.P.Decode.Addr
-
-	// if cpu.P.Execute.Thumb && (mode == MODE_SWI || mode == MODE_ABT) {
-	//	r[LR] = r[PC] + 2
-	//	reg.LR[i] = r[PC] + 2
-	//fmt.Printf("EXEC PC %08X LR %08X SMALL\n", cpu.P.Execute.Addr, r[LR])
-	//if cpu.P.Execute.Thumb {
-	//	panic("THUMB")
-	//}
-
-	//} else {
-	//	r[LR] = r[PC] + 4
-	//	reg.LR[i] = r[PC] + 4
-	//	fmt.Printf("EXEC PC %08X LR %08X BIG\n", cpu.P.Execute.Addr, r[LR])
-	//}
-
-	if thumb && (mode == MODE_SWI || mode == MODE_ABT) {
-		r[LR] = pc + 2
-		reg.LR[i] = pc + 2
-	} else {
-		r[LR] = pc + 4
-		reg.LR[i] = pc + 4
-	}
+	r[LR] = cpu.P.Decode.Addr
+	reg.LR[i] = cpu.P.Decode.Addr
 
 	cpsr.Mode = mode
 	cpsr.T = false
 	cpsr.I = true
 
+	cpu.P.Reload = true
 	if !cpu.LowVector {
 		r[PC] = addr
 		return
 	}
 
 	r[PC] = addr & 0xFFFF
-
-	cpu.P.Reload = true
 }
 
 func (cpu *Cpu) ExitException(mode uint32) {
@@ -84,9 +59,9 @@ func (cpu *Cpu) ExitException(mode uint32) {
 	*cpsr = reg.SPSR[i]
 	c := BANK_ID[cpsr.Mode]
 
-	//fmt.Printf("EXIT PC %08X LR %08X\n", cpu.P.Execute.Addr, r[LR])
 	reg.LR[i] = r[LR]
 	reg.SP[i] = r[SP]
 	r[SP] = reg.SP[c]
 	r[LR] = reg.LR[c]
+	cpu.P.Reload = true
 }

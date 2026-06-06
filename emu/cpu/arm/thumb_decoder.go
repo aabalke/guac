@@ -9,10 +9,15 @@ func (c *Cpu) DecodeTHUMB(op uint16) (int, bool) {
 	//fmt.Printf("PC %08X OP %08X %s THUMB %08X CNT %08d\n", c.P.Execute.Addr, op, c.P.String(), c.Reg.R, cnt)
 	//cnt++
 
-	//if cnt2 >= 296270 && cnt2 < 300000 {
-	//	fmt.Printf("PC %08X OP %08X CNT %08d\n", c.P.Execute.Addr, op, cnt2)
+	// if cnt2 >= bot && cnt2 < top {
+
+	//if U {
+	//	// if cnt2 >= bot && cnt2 < top {
+	//	// fmt.Printf("PC %08X OP %08X CNT %08d\n", cpu.P.Execute.Addr, op, cnt2)
+	//	fmt.Printf("PC %08X OP %08X\n", c.P.Execute.Addr, op)
 	//}
-	//cnt2++
+	////cnt2++
+
 	switch {
 	case IsthumbSWI(op):
 		c.Exception(VEC_SWI, MODE_SWI)

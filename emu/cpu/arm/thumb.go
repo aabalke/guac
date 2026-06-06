@@ -260,13 +260,6 @@ func (cpu *Cpu) HiRegBX(op uint16) {
 			r[LR] = r[PC] // + 3
 		}
 
-		if rs == PC {
-			cpsr.T = false
-			r[PC] = (r[PC] + 4) &^ 2
-			cpu.P.Reload = true
-			return
-		}
-
 		if thumb := r[rs]&1 != 0; thumb {
 			r[PC] = r[rs] &^ 0b1
 			cpu.P.Reload = true

@@ -7,6 +7,15 @@ import (
 
 var cnt2 int
 
+var U bool
+
+// const bot = 0
+// const top = 296320
+const (
+	bot = 296320
+	top = 500000
+)
+
 func (cpu *Cpu) DecodeARM(op uint32) (int, bool) {
 	r := &cpu.Reg.R
 
@@ -14,10 +23,13 @@ func (cpu *Cpu) DecodeARM(op uint32) (int, bool) {
 	//cnt++
 
 	//op := cpu.Mem.Read32(r[PC])
-	if cnt2 >= 296270 && cnt2 < 300000 {
-		fmt.Printf("PC %08X OP %08X CNT %08d\n", cpu.P.Execute.Addr, op, cnt2)
-	}
-	cnt2++
+
+	//if U {
+	//	// if cnt2 >= bot && cnt2 < top {
+	//	// fmt.Printf("PC %08X OP %08X CNT %08d\n", cpu.P.Execute.Addr, op, cnt2)
+	//	fmt.Printf("PC %08X OP %08X\n", cpu.P.Execute.Addr, op)
+	//}
+	//cnt2++
 
 	switch cond := op >> 28; cond {
 	case 0xE: // skip
