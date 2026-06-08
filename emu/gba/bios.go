@@ -14,6 +14,6 @@ func (gba *GBA) LoadBios() {
 			break
 		}
 
-		gba.Mem.BIOS[i] = uint8(biosFile[i])
+		gba.Mem.BIOS[i] = biosFile[i]
 	}
 }

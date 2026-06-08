@@ -8,7 +8,8 @@ var (
 type Timer struct {
 	Gba               *GBA
 	Idx               int
-	CNT, D            uint32
+	Cnt               uint8
+	D                 uint32
 	SavedInitialValue uint32
 	SavedCycles       uint32
 	Elapsed           uint32
@@ -18,6 +19,13 @@ type Timer struct {
 	Cascade     bool
 	Freq        uint32
 	FreqShift   uint32
+}
+
+func NewTimer(gba *GBA, idx int) *Timer {
+	return &Timer{
+		Gba: gba,
+		Idx: idx,
+	}
 }
 
 func (gba *GBA) UpdateTimers(cycles uint32) {
@@ -53,57 +61,50 @@ func (t *Timer) Update(overflow bool, cycles uint32) bool {
 		return false
 	}
 
-	t.D = t.SavedInitialValue + (total & 0xFFFF)
+	//t.D = t.SavedInitialValue + (total & 0xFFFF)
 
-	if aTick := (t.Gba.Mem.IO[0x83]>>2)&1 == uint8(t.Idx); aTick {
+	// if aTick := (t.Gba.Mem.IO[0x83]>>2)&1 == uint8(t.Idx); aTick {
 
-		fifo := &t.Gba.Apu.FifoA
+	//	fifo := &t.Gba.Apu.FifoA
 
-		fifo.Load()
+	//	fifo.Load()
 
-		if refill := fifo.Length <= 0x10; refill {
-			t.Gba.Dma[1].transferFifo()
-		}
-	}
+	//	if refill := fifo.Length <= 0x10; refill {
+	//		t.Gba.Dma[1].transferFifo()
+	//	}
+	//}
 
-	if bTick := (t.Gba.Mem.IO[0x83]>>6)&1 == uint8(t.Idx); bTick {
+	// if bTick := (t.Gba.Mem.IO[0x83]>>6)&1 == uint8(t.Idx); bTick {
 
-		fifo := &t.Gba.Apu.FifoB
+	//	fifo := &t.Gba.Apu.FifoB
 
-		fifo.Load()
+	//	fifo.Load()
 
-		if refill := fifo.Length <= 0x10; refill {
-			t.Gba.Dma[2].transferFifo()
-		}
-	}
+	//	if refill := fifo.Length <= 0x10; refill {
+	//		t.Gba.Dma[2].transferFifo()
+	//	}
+	//}
 
-	if t.OverflowIRQ {
-		t.Gba.Irq.SetIRQ(3 + uint32(t.Idx))
-	}
+	//if t.OverflowIRQ {
+	//	println("irq")
+	//	t.Gba.Irq.SetIRQ(3 + uint32(t.Idx))
+	//}
 
 	return true
 }
 
-func (t *Timer) ReadCnt(hi bool) uint8 {
-	if hi {
-		return uint8(t.CNT >> 8)
-	}
-
-	return uint8(t.CNT)
+func (t *Timer) ReadCnt() uint8 {
+	return t.Cnt
 }
 
-func (t *Timer) WriteCnt(v uint8, hi bool) {
-	if hi {
-		return
-	}
-
-	oldValue := t.CNT & 0xC7
-	t.CNT = uint32(v) & 0xC7
-	t.Cascade = (t.CNT>>2)&1 != 0
-	t.OverflowIRQ = (t.CNT>>6)&1 != 0
-	t.Enabled = (t.CNT>>7)&1 != 0
-	t.Freq = freqs[t.CNT&3]
-	t.FreqShift = freqShifts[t.CNT&3]
+func (t *Timer) WriteCnt(v uint8) {
+	oldValue := t.Cnt & 0xC7
+	t.Cnt = v & 0xC7
+	t.Cascade = (t.Cnt>>2)&1 != 0
+	t.OverflowIRQ = (t.Cnt>>6)&1 != 0
+	t.Enabled = (t.Cnt>>7)&1 != 0
+	t.Freq = freqs[t.Cnt&3]
+	t.FreqShift = freqShifts[t.Cnt&3]
 
 	if setEnabled := (v>>7)&1 != 0 && (oldValue>>7) == 0; setEnabled {
 		t.D = t.SavedInitialValue

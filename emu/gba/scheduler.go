@@ -22,22 +22,23 @@ type Scheduler struct {
 type ScheduledEvent struct {
 	Event     Event
 	InitCycle int64
+	Func      func(int64, any) bool
 }
 
 func NewScheduler() *Scheduler {
 	return &Scheduler{}
 }
 
-func (s *Scheduler) schedule(e Event, cyclesUntil int64) {
-	s.scheduleAt(e, s.CurrentCycle+cyclesUntil)
+func (s *Scheduler) schedule(e Event, cyclesUntil int64, f func(int64, any) bool) {
+	s.scheduleAt(e, s.CurrentCycle+cyclesUntil, f)
 }
 
-func (s *Scheduler) scheduleAt(e Event, initCycle int64) {
+func (s *Scheduler) scheduleAt(e Event, initCycle int64, f func(int64, any) bool) {
 	if s.Cnt >= 32 {
 		panic("gb/gbc: scheduler reached hard limit")
 	}
 
-	es := ScheduledEvent{Event: e, InitCycle: initCycle}
+	es := ScheduledEvent{Event: e, InitCycle: initCycle, Func: f}
 	for i := range s.Cnt {
 		if es.InitCycle < s.Events[i].InitCycle {
 			copy(s.Events[i+1:s.Cnt+1], s.Events[i:s.Cnt])
@@ -64,21 +65,21 @@ func (s *Scheduler) endFrame() {
 	}
 }
 
-func (s *Scheduler) cancel(e Event) {
-	for i := range s.Cnt {
-		if s.Events[i].Event == e {
-			copy(s.Events[i:s.Cnt-1], s.Events[i+1:s.Cnt])
-			s.Cnt--
-			return
-		}
-	}
-}
-
-func (s *Scheduler) penalize(e Event, cycles int64) {
-	for i := range s.Cnt {
-		if s.Events[i].Event == e {
-			s.Events[i].InitCycle += cycles
-			return
-		}
-	}
-}
+//func (s *Scheduler) cancel(e Event) {
+//	for i := range s.Cnt {
+//		if s.Events[i].Event == e {
+//			copy(s.Events[i:s.Cnt-1], s.Events[i+1:s.Cnt])
+//			s.Cnt--
+//			return
+//		}
+//	}
+//}
+//
+//func (s *Scheduler) penalize(e Event, cycles int64) {
+//	for i := range s.Cnt {
+//		if s.Events[i].Event == e {
+//			s.Events[i].InitCycle += cycles
+//			return
+//		}
+//	}
+//}

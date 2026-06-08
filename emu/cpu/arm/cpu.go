@@ -296,45 +296,43 @@ func (c *Cpu) Read8(addr uint32) uint32 {
 func (c *Cpu) Read16(addr uint32) uint32 {
 	//c.AccCycles++
 	//c.AccCycles += c.CycleCounter(addr, 2)
-	c.AccCycles++
 	return c.Mem.Read16(addr)
 }
 
 func (c *Cpu) Read32(addr uint32) uint32 {
-	//c.AccCycles++
 	//c.AccCycles += c.CycleCounter(addr, 4)
-	c.AccCycles++
+	//c.AccCycles++
 	return c.Mem.Read32(addr)
 }
 
 func (c *Cpu) InstRead16(addr uint32) uint32 {
-	//c.AccCycles += c.CycleCounter(addr, 2)
+	c.AccCycles += c.CycleCounter(addr, 2)
 	return c.Read16(addr)
 }
 
 func (c *Cpu) InstRead32(addr uint32) uint32 {
-	//c.AccCycles += c.CycleCounter(addr, 4)
+	c.AccCycles += c.CycleCounter(addr, 4)
 	return c.Read32(addr)
 }
 
-//func (c *Cpu) CycleCounter(addr uint32, width int) int {
-//	return 1
-//	switch addr >> 24 {
-//	case 0, 1, 3, 4, 7: // no waitstates
-//		return 1
-//	case 2:
-//		return 3 << (width >> 2)
-//	case 5, 6:
-//		return 1 << (width >> 2)
-//	case 8, 9, 10, 11, 12, 13:
-//		return width
-//	case 14, 15:
-//		return width
-//	default:
-//		return 1
-//	}
-//}
-//
+func (c *Cpu) CycleCounter(addr uint32, width int) int {
+	return 1
+	switch addr >> 24 {
+	case 0, 1, 3, 4, 7: // no waitstates
+		return 1
+	case 2:
+		return 3 << (width >> 2)
+	case 5, 6:
+		return 1 << (width >> 2)
+	case 8, 9, 10, 11, 12, 13:
+		return width
+	case 14, 15:
+		return width
+	default:
+		return 1
+	}
+}
+
 //func idleMul(rs uint32, sign bool) int {
 //	cycles := 1
 //	mask := uint32(0xFFFFFF00)
