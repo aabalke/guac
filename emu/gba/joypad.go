@@ -6,7 +6,6 @@ type Keypad struct {
 }
 
 func (k *Keypad) readINPUT(hi bool) uint8 {
-
 	if hi {
 		return uint8(k.KEYINPUT >> 8)
 	}
@@ -15,7 +14,6 @@ func (k *Keypad) readINPUT(hi bool) uint8 {
 }
 
 func (k *Keypad) readCNT(hi bool) uint8 {
-
 	if hi {
 		return uint8(k.KEYCNT >> 8)
 	}
@@ -24,7 +22,6 @@ func (k *Keypad) readCNT(hi bool) uint8 {
 }
 
 func (k *Keypad) writeCNT(v uint8, hi bool) {
-
 	if hi {
 		k.KEYCNT = k.KEYCNT&0xFF | (uint16(v) << 8)
 		return
@@ -34,18 +31,17 @@ func (k *Keypad) writeCNT(v uint8, hi bool) {
 }
 
 func (k *Keypad) keyIRQ() bool {
-
-	if disabled := (k.KEYCNT>>14)&1 != 0; disabled {
+	if disabled := (k.KEYCNT>>14)&1 == 0; disabled {
 		return false
 	}
 
 	andFlag := (k.KEYCNT>>15)&1 != 0
 
-	if or := !andFlag && ^(k.KEYCNT)&k.KEYINPUT != 0; or {
+	if or := !andFlag && ^k.KEYCNT&k.KEYINPUT != 0; or {
 		return true
 	}
 
-	if and := andFlag && ^(k.KEYCNT)&^k.KEYINPUT == 0; and {
+	if and := andFlag && ^k.KEYCNT&^k.KEYINPUT == 0; and {
 		return true
 	}
 

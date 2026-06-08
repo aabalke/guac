@@ -527,10 +527,10 @@ func (c *Cpu) Sdt(op uint32) {
 	if load {
 		if byte {
 			// DO NOT WORD ALIGN
-			r[rd] = c.Mem.Read8(prev)
+			r[rd] = c.Read8(prev)
 		} else {
 
-			v := c.Mem.Read32(prev &^ 3)
+			v := c.Read32(prev &^ 3)
 			is := ((prev & 3) << 3) & 0x1F
 			r[rd] = bits.RotateLeft32(v, -int(is))
 
@@ -546,9 +546,9 @@ func (c *Cpu) Sdt(op uint32) {
 		}
 
 		if byte {
-			c.Mem.Write8(prev, uint8(v))
+			c.Write8(prev, uint8(v))
 		} else {
-			c.Mem.Write32(prev&^3, v)
+			c.Write32(prev&^3, v)
 		}
 	}
 
@@ -658,7 +658,7 @@ func (c *Cpu) Half(op uint32) {
 
 		switch inst {
 		case STRH:
-			c.Mem.Write16(pre&^1, uint16(rdv))
+			c.Write16(pre&^1, uint16(rdv))
 
 		case LDRD:
 			panic("unsupported arm7 ldrd instruction")
@@ -676,22 +676,22 @@ func (c *Cpu) Half(op uint32) {
 	switch inst {
 	case LDRH:
 		//  LDRH Rd,[odd]   -->  LDRH Rd,[odd-1] ROR 8  ;read to bit0-7 and bit24-31
-		v := uint32(c.Mem.Read16(pre &^ 1))
+		v := uint32(c.Read16(pre &^ 1))
 		is := (pre & 1) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
 	case LDRSB:
 		// sign-expand byte value
-		r[rd] = uint32(int32(int8(c.Mem.Read8(pre))))
+		r[rd] = uint32(int32(int8(c.Read8(pre))))
 
 	case LDRSH:
 		// On ARM7 aka ARMv4 aka NDS7/GBA:
 		// LDRSH Rd,[odd]  -->  LDRSB Rd,[odd];sign-expand BYTE value
 		if misaligned := pre&1 != 0; misaligned {
 			// sign-expand byte value
-			r[rd] = uint32(int32(int8(c.Mem.Read8(pre))))
+			r[rd] = uint32(int32(int8(c.Read8(pre))))
 		} else {
 			// sign-expand half value
-			r[rd] = uint32(int32(int16(c.Mem.Read16(pre &^ 1))))
+			r[rd] = uint32(int32(int16(c.Read16(pre &^ 1))))
 		}
 
 	}
@@ -845,13 +845,13 @@ func (cpu *Cpu) Swp(op uint32) {
 	)
 
 	if isByte {
-		r[rd] = cpu.Mem.Read8(rnv)
-		cpu.Mem.Write8(rnv, uint8(rmv))
+		r[rd] = cpu.Read8(rnv)
+		cpu.Write8(rnv, uint8(rmv))
 	} else {
-		v := cpu.Mem.Read32(rnv &^ 3)
+		v := cpu.Read32(rnv &^ 3)
 		is := (rnv & 3) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
-		cpu.Mem.Write32(rnv&^3, rmv)
+		cpu.Write32(rnv&^3, rmv)
 	}
 }
 
@@ -968,21 +968,21 @@ func (c *Cpu) Block(op uint32) {
 		}
 
 		if load {
-			*ref = c.Mem.Read32(addr)
+			*ref = c.Read32(addr)
 		} else {
 			switch reg {
 			case rn:
 
 				if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
-					c.Mem.Write32(addr, rnv)
+					c.Write32(addr, rnv)
 				} else {
-					c.Mem.Write32(addr, wbValue)
+					c.Write32(addr, wbValue)
 				}
 
 			case PC:
-				c.Mem.Write32(addr, *ref+4)
+				c.Write32(addr, *ref+4)
 			default:
-				c.Mem.Write32(addr, *ref)
+				c.Write32(addr, *ref)
 			}
 		}
 

@@ -5,44 +5,21 @@ import (
 	"fmt"
 )
 
-var cnt2 int
-
-var U bool
-
-// const bot = 0
-// const top = 296320
-const (
-	bot = 296320
-	top = 500000
-)
-
-func (cpu *Cpu) DecodeARM(op uint32) (int, bool) {
+func (cpu *Cpu) DecodeARM(op uint32) {
 	r := &cpu.Reg.R
-
-	//fmt.Printf("PC %08X OP %08X %s ARM   %08X CNT %08d\n", cpu.P.Execute.Addr, op, cpu.P.String(), cpu.Reg.R, cnt)
-	//cnt++
-
-	//op := cpu.Mem.Read32(r[PC])
-
-	//if U {
-	//	// if cnt2 >= bot && cnt2 < top {
-	//	// fmt.Printf("PC %08X OP %08X CNT %08d\n", cpu.P.Execute.Addr, op, cnt2)
-	//	fmt.Printf("PC %08X OP %08X\n", cpu.P.Execute.Addr, op)
-	//}
-	//cnt2++
 
 	switch cond := op >> 28; cond {
 	case 0xE: // skip
 
 	default:
 		if !cpu.Reg.CPSR.CheckCond(cond) {
-			return 4, true
+			return
 		}
 	}
 
 	if swi := (op>>24)&0xF == 0xF; swi {
 		cpu.Exception(VEC_SWI, MODE_SWI)
-		return 4, true
+		return
 	}
 
 	switch {
@@ -70,12 +47,8 @@ func (cpu *Cpu) DecodeARM(op uint32) (int, bool) {
 		cpu.Alu(op)
 
 	default:
-		fmt.Printf("Unable to Decode ARM false %08X, at PC %08X\n", op, r[PC])
-		panic("")
-		return 0, false
+		panic(fmt.Sprintf("Unable to Decode ARM false %08X, at PC %08X\n", op, r[PC]))
 	}
-
-	return 4, true
 }
 
 //go:inline

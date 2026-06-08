@@ -5,19 +5,7 @@ import (
 	"fmt"
 )
 
-func (c *Cpu) DecodeTHUMB(op uint16) (int, bool) {
-	//fmt.Printf("PC %08X OP %08X %s THUMB %08X CNT %08d\n", c.P.Execute.Addr, op, c.P.String(), c.Reg.R, cnt)
-	//cnt++
-
-	// if cnt2 >= bot && cnt2 < top {
-
-	//if U {
-	//	// if cnt2 >= bot && cnt2 < top {
-	//	// fmt.Printf("PC %08X OP %08X CNT %08d\n", cpu.P.Execute.Addr, op, cnt2)
-	//	fmt.Printf("PC %08X OP %08X\n", c.P.Execute.Addr, op)
-	//}
-	////cnt2++
-
+func (c *Cpu) DecodeTHUMB(op uint16) {
 	switch {
 	case IsthumbSWI(op):
 		c.Exception(VEC_SWI, MODE_SWI)
@@ -59,12 +47,8 @@ func (c *Cpu) DecodeTHUMB(op uint16) (int, bool) {
 		c.ThumbBlock(op)
 	default:
 		r := &c.Reg.R
-		fmt.Printf("Unable to Decode ARM false %04X, at PC %08X\n", op, r[PC])
-		panic("")
-		return 0, false
+		panic(fmt.Sprintf("Unable to Decode ARM false %04X, at PC %08X\n", op, r[PC]))
 	}
-
-	return 2, true
 }
 
 //go:inline

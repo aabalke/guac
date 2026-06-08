@@ -22,6 +22,9 @@ type Cpu struct {
 	BranchPc    uint32
 
 	LowVector bool
+
+	AccCycles int
+	NonSeq    bool
 }
 
 type Pipeline struct {
@@ -117,11 +120,14 @@ func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq) *Cpu {
 	// skip bios
 	c.Irq.IME = true
 	c.P.Reload = true
+	c.NonSeq = true
 
 	return c
 }
 
-func (c *Cpu) Step() {
+func (c *Cpu) Step() int {
+	c.AccCycles = 0
+
 	if c.P.Reload {
 		c.Reload()
 	}
@@ -138,7 +144,7 @@ func (c *Cpu) Step() {
 				c.Reg.R[14] += 2
 			}
 
-			return
+			return c.AccCycles
 		}
 	}
 
@@ -147,6 +153,8 @@ func (c *Cpu) Step() {
 	} else {
 		c.DecodeARM(c.P.Execute.Op)
 	}
+
+	return c.AccCycles
 }
 
 func (c *Cpu) Fetch() {
@@ -155,10 +163,10 @@ func (c *Cpu) Fetch() {
 
 	if c.Reg.CPSR.T {
 		c.Reg.R[15] = (c.Reg.R[15] + 2) &^ 1
-		c.P.Fetch.Op = c.Mem.Read16(c.Reg.R[15])
+		c.P.Fetch.Op = c.InstRead16(c.Reg.R[15])
 	} else {
 		c.Reg.R[15] = (c.Reg.R[15] + 4) &^ 3
-		c.P.Fetch.Op = c.Mem.Read32(c.Reg.R[15])
+		c.P.Fetch.Op = c.InstRead32(c.Reg.R[15])
 	}
 	c.P.Fetch.Addr = c.Reg.R[15]
 	c.P.Fetch.Thumb = c.Reg.CPSR.T
@@ -170,10 +178,10 @@ func (c *Cpu) Reload() {
 	thumb := c.Reg.CPSR.T
 	if thumb {
 		c.Reg.R[15] &^= 1
-		c.P.Fetch.Op = c.Mem.Read16(c.Reg.R[15])
+		c.P.Fetch.Op = c.InstRead16(c.Reg.R[15])
 	} else {
 		c.Reg.R[15] &^= 3
-		c.P.Fetch.Op = c.Mem.Read32(c.Reg.R[15])
+		c.P.Fetch.Op = c.InstRead32(c.Reg.R[15])
 	}
 	c.P.Fetch.Addr = c.Reg.R[15]
 	c.P.Fetch.Thumb = thumb
@@ -263,3 +271,83 @@ func (cpu *Cpu) ToggleThumb() {
 
 	r[PC] &^= 3
 }
+
+func (c *Cpu) Write8(addr uint32, v uint8) {
+	//c.AccCycles += c.CycleCounter(addr, 1)
+	c.Mem.Write8(addr, v)
+}
+
+func (c *Cpu) Write16(addr uint32, v uint16) {
+	//c.AccCycles += c.CycleCounter(addr, 2)
+	c.Mem.Write16(addr, v)
+}
+
+func (c *Cpu) Write32(addr uint32, v uint32) {
+	//c.AccCycles += c.CycleCounter(addr, 4)
+	c.Mem.Write32(addr, v)
+}
+
+func (c *Cpu) Read8(addr uint32) uint32 {
+	//c.AccCycles++
+	//c.AccCycles += c.CycleCounter(addr, 1)
+	return c.Mem.Read8(addr)
+}
+
+func (c *Cpu) Read16(addr uint32) uint32 {
+	//c.AccCycles++
+	//c.AccCycles += c.CycleCounter(addr, 2)
+	c.AccCycles++
+	return c.Mem.Read16(addr)
+}
+
+func (c *Cpu) Read32(addr uint32) uint32 {
+	//c.AccCycles++
+	//c.AccCycles += c.CycleCounter(addr, 4)
+	c.AccCycles++
+	return c.Mem.Read32(addr)
+}
+
+func (c *Cpu) InstRead16(addr uint32) uint32 {
+	//c.AccCycles += c.CycleCounter(addr, 2)
+	return c.Read16(addr)
+}
+
+func (c *Cpu) InstRead32(addr uint32) uint32 {
+	//c.AccCycles += c.CycleCounter(addr, 4)
+	return c.Read32(addr)
+}
+
+//func (c *Cpu) CycleCounter(addr uint32, width int) int {
+//	return 1
+//	switch addr >> 24 {
+//	case 0, 1, 3, 4, 7: // no waitstates
+//		return 1
+//	case 2:
+//		return 3 << (width >> 2)
+//	case 5, 6:
+//		return 1 << (width >> 2)
+//	case 8, 9, 10, 11, 12, 13:
+//		return width
+//	case 14, 15:
+//		return width
+//	default:
+//		return 1
+//	}
+//}
+//
+//func idleMul(rs uint32, sign bool) int {
+//	cycles := 1
+//	mask := uint32(0xFFFFFF00)
+//	for {
+//		rs &= mask
+//		if rs == 0 {
+//			break
+//		}
+//		if sign && (rs == mask) {
+//			break
+//		}
+//		mask <<= 8
+//		cycles++
+//	}
+//	return cycles
+//}

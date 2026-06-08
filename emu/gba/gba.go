@@ -77,22 +77,14 @@ func (gba *GBA) Update(stdFps bool) {
 			if gba.Cpu.Halted {
 
 				if gba.Irq.IE&gba.Irq.IF == 0 {
-					gba.Tick(4)
+					gba.Tick(1)
 					continue
 				}
 
 				gba.Cpu.Halted = false
 			}
 
-			thumb := gba.Cpu.Reg.CPSR.T
-
-			gba.Cpu.Step()
-
-			if thumb {
-				gba.Tick(2)
-			} else {
-				gba.Tick(4)
-			}
+			gba.Tick(gba.Cpu.Step())
 
 			// if gba.vsyncAddr != 0 && gba.Cpu.Reg.R[15] == gba.vsyncAddr {
 			//	vblRaised := gba.Irq.IdleIrq&1 == 1
@@ -203,9 +195,9 @@ func (gba *GBA) handleEvent(event ScheduledEvent, stdFps bool) bool {
 	return false
 }
 
-func (gba *GBA) Tick(cycles uint32) {
+func (gba *GBA) Tick(cycles int) {
 	gba.Scheduler.CurrentCycle += int64(cycles)
-	gba.UpdateTimers(cycles)
+	gba.UpdateTimers(uint32(cycles))
 }
 
 func NewGBA(path string, ctx *oto.Context) *GBA {
