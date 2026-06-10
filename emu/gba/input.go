@@ -34,6 +34,9 @@ func (gba *GBA) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 			*k &^= 1 << 8
 		case slices.Contains(keyConfig.L, key):
 			*k &^= 1 << 9
+
+		case key == ebiten.KeyH:
+			B[0] = true
 		}
 	}
 

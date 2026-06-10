@@ -42,7 +42,6 @@ type GBA struct {
 
 	Paused, Muted, Save, Drawn bool
 	OpenBusOpcode              uint32
-	AccCycles                  uint32
 	Keypad                     Keypad
 
 	Pixels      []byte
@@ -53,15 +52,9 @@ type GBA struct {
 }
 
 func (gba *GBA) Update(stdFps bool) {
-	gba.AccCycles = 0
-
 	if gba.Paused {
 		return
 	}
-
-	gba.Scheduler.schedule(EVENT_END_FRAME, CYCLES_FRAME, gba.FrameEndEvent)
-	gba.Scheduler.schedule(EVENT_END_SCANLINE, CYCLES_SCANLINE, gba.ScanlineEndEvent)
-	gba.Scheduler.schedule(EVENT_HBK, CYCLES_HDRAW, gba.HblankEvent)
 
 	for {
 
@@ -83,12 +76,9 @@ func (gba *GBA) Update(stdFps bool) {
 		}
 
 		overshoot := gba.Scheduler.CurrentCycle - event.InitCycle
-		gba.Scheduler.CurrentCycle = event.InitCycle
-		if done := event.Func(overshoot, nil); done {
-			// when overshoot is included on frame end event causes stack overflow
+		if done := event.Func(overshoot, event.Args); done {
 			return
 		}
-		gba.Scheduler.CurrentCycle += overshoot
 	}
 }
 
@@ -98,10 +88,6 @@ func (gba *GBA) Tick(cycles int) {
 }
 
 func NewGBA(path string, ctx *oto.Context) *GBA {
-	const (
-		SND_SAMPLES = 512
-	)
-
 	gba := GBA{
 		Pixels:    make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
 		Image:     ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
@@ -137,15 +123,14 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	//gba.startupNoBios()
 	gba.LoadGame(path)
 
-	startScanline := uint32(0)
-
 	//gba.Mem.BIOS_MODE = arm7.BIOS_STARTUP
-	gba.Mem.IO[0x6] = uint8(startScanline)
-	gba.AccCycles = CYCLES_SCANLINE*startScanline + 859
+	gba.Mem.IO[6] = 0
 
 	gba.Cpu.Reg.CPSR.I = false
 
-	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 0, gba.AudioSampleEvent)
+	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 0, gba.AudioSampleEvent, nil)
+	gba.Scheduler.schedule(EVENT_END_FRAME, 0, gba.FrameEndEvent, nil)
+	gba.Scheduler.schedule(EVENT_END_SCANLINE, 0, gba.ScanlineEndEvent, nil)
 
 	return &gba
 }
