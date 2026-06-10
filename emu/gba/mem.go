@@ -380,35 +380,35 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 		return m.GBA.Dma[3].ReadControl(true)
 
 	case 0x100:
-		return m.GBA.Timers[0].ReadD(false)
+		return m.GBA.Timers[0].Read(0)
 	case 0x101:
-		return m.GBA.Timers[0].ReadD(true)
+		return m.GBA.Timers[0].Read(1)
 	case 0x102:
-		return m.GBA.Timers[0].Cnt
+		return m.GBA.Timers[0].Read(2)
 	case 0x103:
 		return 0
 	case 0x104:
-		return m.GBA.Timers[1].ReadD(false)
+		return m.GBA.Timers[1].Read(0)
 	case 0x105:
-		return m.GBA.Timers[1].ReadD(true)
+		return m.GBA.Timers[1].Read(1)
 	case 0x106:
-		return m.GBA.Timers[1].Cnt
+		return m.GBA.Timers[1].Read(2)
 	case 0x107:
 		return 0
 	case 0x108:
-		return m.GBA.Timers[2].ReadD(false)
+		return m.GBA.Timers[2].Read(0)
 	case 0x109:
-		return m.GBA.Timers[2].ReadD(true)
+		return m.GBA.Timers[2].Read(1)
 	case 0x10A:
-		return m.GBA.Timers[2].Cnt
+		return m.GBA.Timers[2].Read(2)
 	case 0x10B:
 		return 0
 	case 0x10C:
-		return m.GBA.Timers[3].ReadD(false)
+		return m.GBA.Timers[3].Read(0)
 	case 0x10D:
-		return m.GBA.Timers[3].ReadD(true)
+		return m.GBA.Timers[3].Read(1)
 	case 0x10E:
-		return m.GBA.Timers[3].Cnt
+		return m.GBA.Timers[3].Read(2)
 	case 0x10F:
 		return 0
 
@@ -737,35 +737,35 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 		m.GBA.Dma[3].WriteControl(v, true)
 
 	case 0x100:
-		m.GBA.Timers[0].WriteD(v, false)
+		m.GBA.Timers[0].Write(0, v)
 	case 0x101:
-		m.GBA.Timers[0].WriteD(v, true)
+		m.GBA.Timers[0].Write(1, v)
 	case 0x102:
-		m.GBA.Timers[0].WriteCnt(v)
+		m.GBA.Timers[0].Write(2, v)
 	case 0x103:
 		return
 	case 0x104:
-		m.GBA.Timers[1].WriteD(v, false)
+		m.GBA.Timers[1].Write(0, v)
 	case 0x105:
-		m.GBA.Timers[1].WriteD(v, true)
+		m.GBA.Timers[1].Write(1, v)
 	case 0x106:
-		m.GBA.Timers[1].WriteCnt(v)
+		m.GBA.Timers[1].Write(2, v)
 	case 0x107:
 		return
 	case 0x108:
-		m.GBA.Timers[2].WriteD(v, false)
+		m.GBA.Timers[2].Write(0, v)
 	case 0x109:
-		m.GBA.Timers[2].WriteD(v, true)
+		m.GBA.Timers[2].Write(1, v)
 	case 0x10A:
-		m.GBA.Timers[2].WriteCnt(v)
+		m.GBA.Timers[2].Write(2, v)
 	case 0x10B:
 		return
 	case 0x10C:
-		m.GBA.Timers[3].WriteD(v, false)
+		m.GBA.Timers[3].Write(0, v)
 	case 0x10D:
-		m.GBA.Timers[3].WriteD(v, true)
+		m.GBA.Timers[3].Write(1, v)
 	case 0x10E:
-		m.GBA.Timers[3].WriteCnt(v)
+		m.GBA.Timers[3].Write(2, v)
 	case 0x10F:
 		return
 

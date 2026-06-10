@@ -58,7 +58,7 @@ func (gba *GBA) Update(stdFps bool) {
 
 	for {
 
-		event := gba.Scheduler.popNext()
+		event := gba.Scheduler.peekNext()
 
 		for gba.Scheduler.CurrentCycle < event.InitCycle {
 
@@ -75,16 +75,22 @@ func (gba *GBA) Update(stdFps bool) {
 			gba.Tick(gba.Cpu.Step())
 		}
 
-		overshoot := gba.Scheduler.CurrentCycle - event.InitCycle
-		if done := event.Func(overshoot, event.Args); done {
-			return
+		for {
+			next := gba.Scheduler.peekNext()
+			if next == nil || next.InitCycle > gba.Scheduler.CurrentCycle {
+				break
+			}
+			e := gba.Scheduler.popNext()
+			overshoot := gba.Scheduler.CurrentCycle - e.InitCycle
+			if done := e.Func(overshoot, e.Args); done {
+				return
+			}
 		}
 	}
 }
 
 func (gba *GBA) Tick(cycles int) {
 	gba.Scheduler.CurrentCycle += int64(cycles)
-	gba.UpdateTimers(uint32(cycles))
 }
 
 func NewGBA(path string, ctx *oto.Context) *GBA {

@@ -57,6 +57,13 @@ func (s *Scheduler) scheduleAt(e Event, initCycle int64, f func(int64, any) bool
 	s.Cnt++
 }
 
+func (s *Scheduler) peekNext() *ScheduledEvent {
+	if len(s.Events) == 0 {
+		return nil
+	}
+	return &s.Events[0]
+}
+
 func (s *Scheduler) popNext() ScheduledEvent {
 	next := s.Events[0]
 	copy(s.Events[0:s.Cnt-1], s.Events[1:s.Cnt])

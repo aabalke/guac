@@ -108,6 +108,9 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 		r[rd] = uint32(res)
 
 	case THUMB_LSL:
+
+		cpu.AccCycles++
+
 		rsv &= 0xFF
 
 		if rsv > 32 {
@@ -124,6 +127,7 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 		r[rd] = uint32(res)
 
 	case THUMB_LSR:
+		cpu.AccCycles++
 		rsv &= 0xFF
 
 		res = uint64(rdv) >> rsv
@@ -134,6 +138,7 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 		}
 
 	case THUMB_ASR:
+		cpu.AccCycles++
 		rsv &= 0xFF
 
 		if rsv > 32 {
@@ -148,6 +153,7 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 		r[rd] = uint32(res)
 
 	case THUMB_ROR:
+		cpu.AccCycles++
 		rsv &= 0xFF
 
 		if rsv != 0 {

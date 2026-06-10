@@ -231,6 +231,8 @@ func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
 		rs := (op >> 8) & 0xF
 		shift = r[rs] & 0xFF
 
+		cpu.AccCycles++
+
 		if rm == PC {
 			op2 += 4
 		}
@@ -370,8 +372,11 @@ func (cpu *Cpu) Mul(op uint32) {
 
 		res := r[rm] * r[rs]
 
+		cpu.AccCycles += idleMul(r[rs], true)
+
 		if inst == MLA {
 			res += r[rn]
+			cpu.AccCycles++
 		}
 
 		r[rd] = res
@@ -390,10 +395,13 @@ func (cpu *Cpu) Mul(op uint32) {
 
 	case UMULL, UMLAL:
 
+		cpu.AccCycles += idleMul(r[rs], false) + 1
+
 		res := uint64(r[rm]) * uint64(r[rs])
 
 		if inst == UMLAL {
 			res += uint64(r[rd])<<32 | uint64(r[rn])
+			cpu.AccCycles++
 		}
 
 		r[rd] = uint32(res >> 32)
@@ -411,10 +419,12 @@ func (cpu *Cpu) Mul(op uint32) {
 		return
 
 	case SMULL, SMLAL:
+		cpu.AccCycles += idleMul(r[rs], true) + 1
 
 		res := int64(int32(r[rm])) * int64(int32(r[rs]))
 		if inst == SMLAL {
 			res += int64(r[rd])<<32 | int64(r[rn])
+			cpu.AccCycles++
 		}
 
 		r[rd] = uint32(res >> 32)

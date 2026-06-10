@@ -273,53 +273,50 @@ func (cpu *Cpu) ToggleThumb() {
 }
 
 func (c *Cpu) Write8(addr uint32, v uint8) {
-	//c.AccCycles += c.CycleCounter(addr, 1)
+	c.AccCycles += c.CycleCounter(addr, 1)
 	c.Mem.Write8(addr, v)
 }
 
 func (c *Cpu) Write16(addr uint32, v uint16) {
-	//c.AccCycles += c.CycleCounter(addr, 2)
+	c.AccCycles += c.CycleCounter(addr, 2)
 	c.Mem.Write16(addr, v)
 }
 
 func (c *Cpu) Write32(addr uint32, v uint32) {
-	//c.AccCycles += c.CycleCounter(addr, 4)
+	c.AccCycles += c.CycleCounter(addr, 4)
 	c.Mem.Write32(addr, v)
 }
 
 func (c *Cpu) Read8(addr uint32) uint32 {
-	//c.AccCycles++
-	//c.AccCycles += c.CycleCounter(addr, 1)
+	c.AccCycles += c.CycleCounter(addr, 1)
+	c.AccCycles++
 	return c.Mem.Read8(addr)
 }
 
 func (c *Cpu) Read16(addr uint32) uint32 {
-	//c.AccCycles++
-	//c.AccCycles += c.CycleCounter(addr, 2)
+	c.AccCycles += c.CycleCounter(addr, 2)
+	c.AccCycles++
 	return c.Mem.Read16(addr)
 }
 
 func (c *Cpu) Read32(addr uint32) uint32 {
-	//c.AccCycles += c.CycleCounter(addr, 4)
-	//c.AccCycles++
+	c.AccCycles += c.CycleCounter(addr, 4)
+	c.AccCycles++
 	return c.Mem.Read32(addr)
 }
 
 func (c *Cpu) InstRead16(addr uint32) uint32 {
 	c.AccCycles += c.CycleCounter(addr, 2)
-	return c.Read16(addr)
+	return c.Mem.Read16(addr)
 }
 
 func (c *Cpu) InstRead32(addr uint32) uint32 {
 	c.AccCycles += c.CycleCounter(addr, 4)
-	return c.Read32(addr)
+	return c.Mem.Read32(addr)
 }
 
 func (c *Cpu) CycleCounter(addr uint32, width int) int {
-	return 1
 	switch addr >> 24 {
-	case 0, 1, 3, 4, 7: // no waitstates
-		return 1
 	case 2:
 		return 3 << (width >> 2)
 	case 5, 6:
@@ -329,23 +326,24 @@ func (c *Cpu) CycleCounter(addr uint32, width int) int {
 	case 14, 15:
 		return width
 	default:
+		// no waitstates
 		return 1
 	}
 }
 
-//func idleMul(rs uint32, sign bool) int {
-//	cycles := 1
-//	mask := uint32(0xFFFFFF00)
-//	for {
-//		rs &= mask
-//		if rs == 0 {
-//			break
-//		}
-//		if sign && (rs == mask) {
-//			break
-//		}
-//		mask <<= 8
-//		cycles++
-//	}
-//	return cycles
-//}
+func idleMul(rs uint32, sign bool) int {
+	cycles := 1
+	mask := uint32(0xFFFFFF00)
+	for {
+		rs &= mask
+		if rs == 0 {
+			break
+		}
+		if sign && (rs == mask) {
+			break
+		}
+		mask <<= 8
+		cycles++
+	}
+	return cycles
+}
