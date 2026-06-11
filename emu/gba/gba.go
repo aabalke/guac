@@ -107,7 +107,7 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 
 	gba.Irq = cpu.Irq{}
 	gba.Mem = NewMemory(&gba)
-	gba.Cpu = arm.NewCpu(false, gba.Mem, &gba.Irq)
+	gba.Cpu = arm.NewCpu(false, gba.Mem, &gba.Irq, &gba.Mem.Waitstate)
 
 	gba.Timers[0] = NewTimer(&gba, 0)
 	gba.Timers[1] = NewTimer(&gba, 1)

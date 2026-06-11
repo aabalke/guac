@@ -9,6 +9,10 @@ import (
 	"github.com/aabalke/guac/emu/cpu"
 )
 
+type Waitstate interface {
+	Get(width, addr uint32, seq bool) int64
+}
+
 type Cpu struct {
 	P      Pipeline
 	Reg    Reg
@@ -23,8 +27,11 @@ type Cpu struct {
 
 	LowVector bool
 
-	AccCycles int
-	NonSeq    bool
+	AccCycles     int
+	NonSeq        bool
+	BlockTransfer bool
+
+	Waitstate Waitstate
 }
 
 type Pipeline struct {
@@ -110,11 +117,12 @@ var BANK_ID = map[uint32]uint32{
 	MODE_UND: 5,
 }
 
-func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq) *Cpu {
+func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq, ws Waitstate) *Cpu {
 	c := &Cpu{
 		Mem:       m,
 		Irq:       irq,
 		LowVector: true,
+		Waitstate: ws,
 	}
 
 	// skip bios
@@ -161,12 +169,15 @@ func (c *Cpu) Fetch() {
 	c.P.Execute = c.P.Decode
 	c.P.Decode = c.P.Fetch
 
+	seq := !c.NonSeq
+	c.NonSeq = false
+
 	if c.Reg.CPSR.T {
 		c.Reg.R[15] = (c.Reg.R[15] + 2) &^ 1
-		c.P.Fetch.Op = c.InstRead16(c.Reg.R[15])
+		c.P.Fetch.Op = c.InstRead16(c.Reg.R[15], seq)
 	} else {
 		c.Reg.R[15] = (c.Reg.R[15] + 4) &^ 3
-		c.P.Fetch.Op = c.InstRead32(c.Reg.R[15])
+		c.P.Fetch.Op = c.InstRead32(c.Reg.R[15], seq)
 	}
 	c.P.Fetch.Addr = c.Reg.R[15]
 	c.P.Fetch.Thumb = c.Reg.CPSR.T
@@ -178,13 +189,15 @@ func (c *Cpu) Reload() {
 	thumb := c.Reg.CPSR.T
 	if thumb {
 		c.Reg.R[15] &^= 1
-		c.P.Fetch.Op = c.InstRead16(c.Reg.R[15])
+		c.P.Fetch.Op = c.InstRead16(c.Reg.R[15], false)
 	} else {
 		c.Reg.R[15] &^= 3
-		c.P.Fetch.Op = c.InstRead32(c.Reg.R[15])
+		c.P.Fetch.Op = c.InstRead32(c.Reg.R[15], false)
 	}
 	c.P.Fetch.Addr = c.Reg.R[15]
 	c.P.Fetch.Thumb = thumb
+
+	c.NonSeq = false
 
 	c.Fetch()
 }
@@ -273,58 +286,74 @@ func (cpu *Cpu) ToggleThumb() {
 }
 
 func (c *Cpu) Write8(addr uint32, v uint8) {
-	c.AccCycles += c.CycleCounter(addr, 1)
 	c.Mem.Write8(addr, v)
+	c.AccCycles += c.CycleCounter(addr, 1, false)
+	c.NonSeq = true
 }
 
 func (c *Cpu) Write16(addr uint32, v uint16) {
-	c.AccCycles += c.CycleCounter(addr, 2)
 	c.Mem.Write16(addr, v)
+	c.AccCycles += c.CycleCounter(addr, 2, false)
+	c.NonSeq = true
 }
 
 func (c *Cpu) Write32(addr uint32, v uint32) {
-	c.AccCycles += c.CycleCounter(addr, 4)
 	c.Mem.Write32(addr, v)
+	c.AccCycles += c.CycleCounter(addr, 4, c.BlockTransfer)
+	c.NonSeq = true
 }
 
 func (c *Cpu) Read8(addr uint32) uint32 {
-	c.AccCycles += c.CycleCounter(addr, 1)
+	c.AccCycles += c.CycleCounter(addr, 1, false)
 	c.AccCycles++
+	c.NonSeq = true
 	return c.Mem.Read8(addr)
 }
 
 func (c *Cpu) Read16(addr uint32) uint32 {
-	c.AccCycles += c.CycleCounter(addr, 2)
+	c.AccCycles += c.CycleCounter(addr, 2, false)
 	c.AccCycles++
+	c.NonSeq = true
 	return c.Mem.Read16(addr)
 }
 
 func (c *Cpu) Read32(addr uint32) uint32 {
-	c.AccCycles += c.CycleCounter(addr, 4)
-	c.AccCycles++
+	c.AccCycles += c.CycleCounter(addr, 4, c.BlockTransfer)
+
+	if !c.BlockTransfer {
+		c.AccCycles++
+		c.NonSeq = true
+	}
 	return c.Mem.Read32(addr)
 }
 
-func (c *Cpu) InstRead16(addr uint32) uint32 {
-	c.AccCycles += c.CycleCounter(addr, 2)
+func (c *Cpu) InstRead16(addr uint32, seq bool) uint32 {
+	c.AccCycles += c.CycleCounter(addr, 2, seq)
 	return c.Mem.Read16(addr)
 }
 
-func (c *Cpu) InstRead32(addr uint32) uint32 {
-	c.AccCycles += c.CycleCounter(addr, 4)
+func (c *Cpu) InstRead32(addr uint32, seq bool) uint32 {
+	c.AccCycles += c.CycleCounter(addr, 4, seq)
 	return c.Mem.Read32(addr)
 }
 
-func (c *Cpu) CycleCounter(addr uint32, width int) int {
+func (c *Cpu) CycleCounter(addr, width uint32, seq bool) int {
 	switch addr >> 24 {
 	case 2:
 		return 3 << (width >> 2)
 	case 5, 6:
 		return 1 << (width >> 2)
 	case 8, 9, 10, 11, 12, 13:
-		return width
+
+		if addr&0x1FFFF == 0 {
+			seq = false
+		}
+
+		fallthrough
+
 	case 14, 15:
-		return width
+
+		return int(c.Waitstate.Get(width, addr, seq))
 	default:
 		// no waitstates
 		return 1

@@ -23,6 +23,8 @@ type Memory struct {
 	BIOS_MODE uint32
 	Dispstat  Dispstat
 
+	Waitstate Waitstate
+
 	readRegions  [0x100]func(m *Memory, addr uint32) uint8
 	writeRegions [0x100]func(m *Memory, addr uint32, v uint8, byteWrite bool)
 }
@@ -35,6 +37,8 @@ func NewMemory(gba *GBA) *Memory {
 
 	m.Write32(0x4000000, 0x80)
 	m.Write32(0x4000134, 0x800F) // IR requires bit 3 on. I believe this is auth check (sonic adv)
+
+	m.Write32(0x4000204, 0x0000)
 
 	//m.BIOS_MODE = BIOS_STARTUP
 
@@ -449,10 +453,15 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 	case 0x203:
 		return uint8(m.GBA.Irq.IF >> 8)
 
+	case 0x204:
+		return m.Waitstate.Read(0)
+	case 0x205:
+		return m.Waitstate.Read(1)
 	case 0x206:
 		return 0
 	case 0x207:
 		return 0
+
 	case 0x208:
 		return m.GBA.Irq.ReadIME()
 	case 0x209:
@@ -786,15 +795,14 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 		m.GBA.Irq.WriteIF(v, 0)
 	case 0x203:
 		m.GBA.Irq.WriteIF(v, 1)
-
 	case 0x204:
-		m.IO[addr] = v
+		m.Waitstate.Write(0, v)
 	case 0x205:
-		m.IO[addr] = (m.IO[addr] & 0x80) | (v & 0x5F)
+		m.Waitstate.Write(1, v)
 	case 0x206:
-		return
+		m.Waitstate.Write(2, v)
 	case 0x207:
-		return
+		m.Waitstate.Write(3, v)
 
 	// IME
 	case 0x208:

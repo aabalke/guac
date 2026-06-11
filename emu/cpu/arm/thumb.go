@@ -40,6 +40,8 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 
 	switch inst {
 	case THUMB_MUL:
+		cpu.AccCycles += idleMul(rsv, true)
+
 		res = uint64(rdv) * uint64(rsv)
 		r[rd] = uint32(res)
 		// ARM < 4, carry flag destroyed, ARM >= 5, carry flag unchanged
@@ -110,6 +112,7 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 	case THUMB_LSL:
 
 		cpu.AccCycles++
+		cpu.NonSeq = true
 
 		rsv &= 0xFF
 
@@ -128,6 +131,7 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 
 	case THUMB_LSR:
 		cpu.AccCycles++
+		cpu.NonSeq = true
 		rsv &= 0xFF
 
 		res = uint64(rdv) >> rsv
@@ -139,6 +143,7 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 
 	case THUMB_ASR:
 		cpu.AccCycles++
+		cpu.NonSeq = true
 		rsv &= 0xFF
 
 		if rsv > 32 {
@@ -154,6 +159,7 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 
 	case THUMB_ROR:
 		cpu.AccCycles++
+		cpu.NonSeq = true
 		rsv &= 0xFF
 
 		if rsv != 0 {
@@ -564,6 +570,8 @@ func (cpu *Cpu) ThumbPushPop(op uint16) {
 			}
 		}
 
+		cpu.BlockTransfer = true
+
 		if pop {
 			reg++
 		} else {
@@ -583,9 +591,9 @@ func (cpu *Cpu) ThumbPushPop(op uint16) {
 		r[SP] += 4
 
 		cpu.P.Reload = true
-
-		return
 	}
+
+	cpu.BlockTransfer = false
 }
 
 func (cpu *Cpu) ThumbRelative(op uint16) {
@@ -778,6 +786,7 @@ func (cpu *Cpu) ThumbBlock(opcode uint16) {
 				rbIdx = regCount - count
 				r[rb] += 4
 				addr += 4
+				cpu.BlockTransfer = true
 				continue
 			}
 
@@ -785,7 +794,10 @@ func (cpu *Cpu) ThumbBlock(opcode uint16) {
 
 			r[rb] += 4
 			addr += 4
+			cpu.BlockTransfer = true
 		}
+
+		cpu.BlockTransfer = false
 
 		if smallest {
 			//v := cpu.Read32(addr)
@@ -830,9 +842,12 @@ func (cpu *Cpu) ThumbBlock(opcode uint16) {
 
 		r[rb] += 4
 		addr += 4
+		cpu.BlockTransfer = true
 	}
 
 	if matchingRb {
 		r[rb] = rbValue
 	}
+
+	cpu.BlockTransfer = false
 }
