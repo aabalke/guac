@@ -293,37 +293,15 @@ func (m *Memory) ReadBios(addr uint32) uint8 {
 }
 
 func (m *Memory) ReadOpenBus(addr uint32) uint8 {
-	//panic(fmt.Sprintf("OPEN BUS READ %08X %08X REGS %08X", m.GBA.Cpu.P.Execute.Addr, m.GBA.Cpu.P.Execute.Op, m.GBA.Cpu.Reg.R))
-	pc := m.GBA.Cpu.Reg.R[PC]
+	pc := m.GBA.Cpu.Reg.R[15]
 
 	if m.GBA.Cpu.Reg.CPSR.T {
-		// if m.GBA.Cpu.Reg.isThumb {
+		// does pipeline impliment region based thumb mode?
 
-		// region based thumb openbus behavior has not been implimented
-
-		// For THUMB code in Main RAM, Palette Memory, VRAM, and Cartridge ROM this is:
-		// LSW = [$+4], MSW = [$+4]
-
-		// For THUMB code in BIOS or OAM
-		// LSW = [$+4], MSW = [$+6]   ;for opcodes at 4-byte aligned locations
-		// LSW = [$+2], MSW = [$+4]   ;for opcodes at non-4-byte aligned locations
-
-		// For THUMB code in 32K-WRAM
-		// LSW = [$+4], MSW = OldHI   ;for opcodes at 4-byte aligned locations
-		// LSW = OldLO, MSW = [$+4]   ;for opcodes at non-4-byte aligned locations
-		// Whereas OldLO/OldHI are usually:
-		// OldLO=[$+2], OldHI=[$+2]
-		// Unless the previous opcode's prefetch was overwritten;
-		// that can happen if the previous opcode was itself an LDR opcode, ie.
-		// if it was itself reading data:
-
-		// OldLO=LSW(data), OldHI=MSW(data)
-		// Theoretically, this might also change if a DMA transfer occurs.
-
-		return uint8(m.Read32((pc&^1)+4) >> ((addr & 1) << 3))
+		return uint8(m.Read32((pc &^ 1)) >> ((addr & 1) << 3))
 	}
 
-	return uint8(m.Read32((pc&^3)+8) >> ((addr & 3) << 3))
+	return uint8(m.Read32((pc &^ 3)) >> ((addr & 3) << 3))
 }
 
 func (m *Memory) ReadIO(addr uint32) uint8 {

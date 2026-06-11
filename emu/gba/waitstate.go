@@ -45,6 +45,7 @@ func (w *Waitstate) Write(b, v uint8) {
 		w.S[1] = SeqWait[1][(v>>7)&1] + 1
 
 	case 1:
+		v &= 0x5F
 		w.V = (w.V & 0xFF) | (uint16(v) << 8)
 
 		w.N[2] = NonSeqWait[v&3] + 1
@@ -56,6 +57,10 @@ func (w *Waitstate) Write(b, v uint8) {
 
 func (w *Waitstate) Get(width, addr uint32, seq bool) int64 {
 	region := (addr >> 25) & 3
+
+	if region == 3 {
+		return int64(w.N[region])
+	}
 
 	if width == 4 {
 
