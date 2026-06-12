@@ -40,7 +40,7 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 
 	switch inst {
 	case THUMB_MUL:
-		cpu.AccCycles += idleMul(rsv, true)
+		cpu.idle(idleMul(rsv, true))
 
 		res = uint64(rdv) * uint64(rsv)
 		r[rd] = uint32(res)
@@ -111,8 +111,7 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 
 	case THUMB_LSL:
 
-		cpu.AccCycles++
-		cpu.NonSeq = true
+		cpu.idle(1)
 
 		rsv &= 0xFF
 
@@ -130,8 +129,7 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 		r[rd] = uint32(res)
 
 	case THUMB_LSR:
-		cpu.AccCycles++
-		cpu.NonSeq = true
+		cpu.idle(1)
 		rsv &= 0xFF
 
 		res = uint64(rdv) >> rsv
@@ -142,8 +140,7 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 		}
 
 	case THUMB_ASR:
-		cpu.AccCycles++
-		cpu.NonSeq = true
+		cpu.idle(1)
 		rsv &= 0xFF
 
 		if rsv > 32 {
@@ -158,8 +155,7 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 		r[rd] = uint32(res)
 
 	case THUMB_ROR:
-		cpu.AccCycles++
-		cpu.NonSeq = true
+		cpu.idle(1)
 		rsv &= 0xFF
 
 		if rsv != 0 {

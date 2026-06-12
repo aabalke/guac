@@ -13,6 +13,13 @@ type Waitstate interface {
 	Get(width, addr uint32, seq bool) int64
 }
 
+type Prefetch interface {
+	Cancel()
+	Step(cycles int64)
+	Wait(addr uint32, cycles int64, thumb bool) int64
+	Restart(addr uint32, thumb bool)
+}
+
 type Cpu struct {
 	P      Pipeline
 	Reg    Reg
@@ -32,6 +39,7 @@ type Cpu struct {
 	BlockTransfer bool
 
 	Waitstate Waitstate
+	Prefetch  Prefetch
 }
 
 type Pipeline struct {
@@ -117,12 +125,13 @@ var BANK_ID = map[uint32]uint32{
 	MODE_UND: 5,
 }
 
-func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq, ws Waitstate) *Cpu {
+func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq, ws Waitstate, prefetch Prefetch) *Cpu {
 	c := &Cpu{
 		Mem:       m,
 		Irq:       irq,
 		LowVector: true,
 		Waitstate: ws,
+		Prefetch:  prefetch,
 	}
 
 	// skip bios
@@ -287,77 +296,89 @@ func (cpu *Cpu) ToggleThumb() {
 
 func (c *Cpu) Write8(addr uint32, v uint8) {
 	c.Mem.Write8(addr, v)
-	c.AccCycles += c.CycleCounter(addr, 1, false)
+	c.AccCycles += c.CycleCounter(addr, 1, false, false)
 	c.NonSeq = true
 }
 
 func (c *Cpu) Write16(addr uint32, v uint16) {
 	c.Mem.Write16(addr, v)
-	c.AccCycles += c.CycleCounter(addr, 2, false)
+	c.AccCycles += c.CycleCounter(addr, 2, false, false)
 	c.NonSeq = true
 }
 
 func (c *Cpu) Write32(addr uint32, v uint32) {
 	c.Mem.Write32(addr, v)
-	c.AccCycles += c.CycleCounter(addr, 4, c.BlockTransfer)
+	c.AccCycles += c.CycleCounter(addr, 4, c.BlockTransfer, false)
 	c.NonSeq = true
 }
 
 func (c *Cpu) Read8(addr uint32) uint32 {
-	c.AccCycles += c.CycleCounter(addr, 1, false)
-	c.AccCycles++
-	c.NonSeq = true
+	c.AccCycles += c.CycleCounter(addr, 1, false, false)
+	c.idle(1)
 	return c.Mem.Read8(addr)
 }
 
 func (c *Cpu) Read16(addr uint32) uint32 {
-	c.AccCycles += c.CycleCounter(addr, 2, false)
-	c.AccCycles++
-	c.NonSeq = true
+	c.AccCycles += c.CycleCounter(addr, 2, false, false)
+	c.idle(1)
 	return c.Mem.Read16(addr)
 }
 
 func (c *Cpu) Read32(addr uint32) uint32 {
-	c.AccCycles += c.CycleCounter(addr, 4, c.BlockTransfer)
+	c.AccCycles += c.CycleCounter(addr, 4, c.BlockTransfer, false)
 
 	if !c.BlockTransfer {
-		c.AccCycles++
-		c.NonSeq = true
+		c.idle(1)
 	}
 	return c.Mem.Read32(addr)
 }
 
 func (c *Cpu) InstRead16(addr uint32, seq bool) uint32 {
-	c.AccCycles += c.CycleCounter(addr, 2, seq)
+	c.AccCycles += c.CycleCounter(addr, 2, seq, true)
 	return c.Mem.Read16(addr)
 }
 
 func (c *Cpu) InstRead32(addr uint32, seq bool) uint32 {
-	c.AccCycles += c.CycleCounter(addr, 4, seq)
+	c.AccCycles += c.CycleCounter(addr, 4, seq, true)
 	return c.Mem.Read32(addr)
 }
 
-func (c *Cpu) CycleCounter(addr, width uint32, seq bool) int {
+func (c *Cpu) CycleCounter(addr, width uint32, seq, inst bool) int {
+	prefetch := true
+
+	cycles := 1
+
 	switch addr >> 24 {
 	case 2:
-		return 3 << (width >> 2)
+		cycles = 3 << (width >> 2)
 	case 5, 6:
-		return 1 << (width >> 2)
+		cycles = 1 << (width >> 2)
 	case 8, 9, 10, 11, 12, 13:
 
 		if addr&0x1FFFF == 0 {
 			seq = false
 		}
 
-		fallthrough
+		cycles = int(c.Waitstate.Get(width, addr, seq))
+		prefetch = false
+		if inst {
+			cycles = int(c.Prefetch.Wait(addr, int64(cycles), c.Reg.CPSR.T))
+		} else {
+			c.Prefetch.Cancel()
+		}
 
 	case 14, 15:
 
-		return int(c.Waitstate.Get(width, addr, seq))
-	default:
-		// no waitstates
-		return 1
+		c.Prefetch.Cancel()
+		cycles = int(c.Waitstate.Get(width, addr, seq))
+		prefetch = false
 	}
+
+	if prefetch {
+		c.Prefetch.Step(int64(cycles))
+	}
+
+	return cycles
 }
 
 func idleMul(rs uint32, sign bool) int {
@@ -375,4 +396,10 @@ func idleMul(rs uint32, sign bool) int {
 		cycles++
 	}
 	return cycles
+}
+
+func (c *Cpu) idle(cycles int) {
+	c.AccCycles += cycles
+	c.NonSeq = true
+	c.Prefetch.Step(int64(cycles))
 }

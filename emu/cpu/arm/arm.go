@@ -231,8 +231,7 @@ func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
 		rs := (op >> 8) & 0xF
 		shift = r[rs] & 0xFF
 
-		cpu.AccCycles++
-		cpu.NonSeq = true
+		cpu.idle(1)
 
 		if rm == PC {
 			op2 += 4
@@ -373,13 +372,11 @@ func (cpu *Cpu) Mul(op uint32) {
 
 		res := r[rm] * r[rs]
 
-		cpu.AccCycles += idleMul(r[rs], true)
-		cpu.NonSeq = true
+		cpu.idle(idleMul(r[rs], true))
 
 		if inst == MLA {
 			res += r[rn]
-			cpu.AccCycles++
-			cpu.NonSeq = true
+			cpu.idle(1)
 		}
 
 		r[rd] = res
@@ -398,15 +395,12 @@ func (cpu *Cpu) Mul(op uint32) {
 
 	case UMULL, UMLAL:
 
-		cpu.AccCycles += idleMul(r[rs], false) + 1
-		cpu.NonSeq = true
-
+		cpu.idle(idleMul(r[rs], false) + 1)
 		res := uint64(r[rm]) * uint64(r[rs])
 
 		if inst == UMLAL {
 			res += uint64(r[rd])<<32 | uint64(r[rn])
-			cpu.AccCycles++
-			cpu.NonSeq = true
+			cpu.idle(1)
 		}
 
 		r[rd] = uint32(res >> 32)
@@ -421,17 +415,14 @@ func (cpu *Cpu) Mul(op uint32) {
 			// FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
 		}
 
-		return
-
 	case SMULL, SMLAL:
-		cpu.AccCycles += idleMul(r[rs], true) + 1
-		cpu.NonSeq = true
+
+		cpu.idle(idleMul(r[rs], true) + 1)
 
 		res := int64(int32(r[rm])) * int64(int32(r[rs]))
 		if inst == SMLAL {
 			res += int64(r[rd])<<32 | int64(r[rn])
-			cpu.AccCycles++
-			cpu.NonSeq = true
+			cpu.idle(1)
 		}
 
 		r[rd] = uint32(res >> 32)
@@ -445,7 +436,6 @@ func (cpu *Cpu) Mul(op uint32) {
 			// FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
 		}
 
-		return
 	}
 }
 

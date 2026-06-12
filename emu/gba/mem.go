@@ -24,6 +24,7 @@ type Memory struct {
 	Dispstat  Dispstat
 
 	Waitstate Waitstate
+	Prefetch  *Prefetch
 
 	readRegions  [0x100]func(m *Memory, addr uint32) uint8
 	writeRegions [0x100]func(m *Memory, addr uint32, v uint8, byteWrite bool)
@@ -32,6 +33,9 @@ type Memory struct {
 func NewMemory(gba *GBA) *Memory {
 	m := &Memory{GBA: gba}
 
+	m.Prefetch = NewPrefetch(&m.Waitstate)
+	m.Waitstate.Prefetch = m.Prefetch
+
 	m.initReadRegions()
 	m.initWriteRegions()
 
@@ -39,7 +43,6 @@ func NewMemory(gba *GBA) *Memory {
 	m.Write32(0x4000134, 0x800F) // IR requires bit 3 on. I believe this is auth check (sonic adv)
 
 	m.Write32(0x4000204, 0x0000)
-
 	//m.BIOS_MODE = BIOS_STARTUP
 
 	m.InitSaveLoop()

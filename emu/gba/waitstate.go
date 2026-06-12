@@ -12,10 +12,11 @@ var (
 type Waitstate struct {
 	V uint16
 
-	N [4]uint8
-	S [4]uint8
+	N    [3]uint8
+	S    [3]uint8
+	Sram uint8
 
-	Prefetch bool
+	Prefetch *Prefetch
 }
 
 func (w *Waitstate) Read(b uint8) uint8 {
@@ -36,22 +37,24 @@ func (w *Waitstate) Write(b, v uint8) {
 
 		// 0: gp0, 1: gp1, 2: gp2, 3: sram
 
-		w.N[3] = NonSeqWait[v&3] + 1
-		w.S[3] = NonSeqWait[v&3] + 1
-
-		w.N[0] = NonSeqWait[(v>>2)&3] + 1
-		w.S[0] = SeqWait[0][(v>>4)&1] + 1
-		w.N[1] = NonSeqWait[(v>>5)&3] + 1
-		w.S[1] = SeqWait[1][(v>>7)&1] + 1
+		w.Sram = NonSeqWait[w.V&3] + 1
+		w.N[0] = NonSeqWait[(w.V>>2)&3] + 1
+		w.S[0] = SeqWait[0][(w.V>>4)&1] + 1
+		w.N[1] = NonSeqWait[(w.V>>5)&3] + 1
+		w.S[1] = SeqWait[1][(w.V>>7)&1] + 1
 
 	case 1:
-		v &= 0x5F
-		w.V = (w.V & 0xFF) | (uint16(v) << 8)
+		w.V = (w.V & 0xFF) | (uint16(v&0x5F) << 8)
 
-		w.N[2] = NonSeqWait[v&3] + 1
-		w.S[2] = SeqWait[2][(v>>2)&1] + 1
+		w.N[2] = NonSeqWait[(w.V>>8)&3] + 1
+		w.S[2] = SeqWait[2][(w.V>>10)&1] + 1
 
-		w.Prefetch = v&0x40 != 0
+		old := w.Prefetch.Enabled
+		w.Prefetch.Enabled = (w.V>>14)&1 != 0
+
+		if old && !w.Prefetch.Enabled {
+			w.Prefetch.Disabled = true
+		}
 	}
 }
 
@@ -59,7 +62,7 @@ func (w *Waitstate) Get(width, addr uint32, seq bool) int64 {
 	region := (addr >> 25) & 3
 
 	if region == 3 {
-		return int64(w.N[region])
+		return int64(w.Sram)
 	}
 
 	if width == 4 {
