@@ -95,12 +95,11 @@ func (gba *GBA) Tick(cycles int) {
 
 func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba := GBA{
-		Pixels:    make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
-		Image:     ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
-		Keypad:    Keypad{KEYINPUT: 0x3FF},
-		Apu:       apu.NewApu(ctx, CPU_SPEED, SND_FREQ, SND_SAMPLES),
-		PPU:       &PPU{},
-		Scheduler: NewScheduler(),
+		Pixels: make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
+		Image:  ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
+		Keypad: Keypad{KEYINPUT: 0x3FF},
+		Apu:    apu.NewApu(ctx, CPU_SPEED, SND_FREQ, SND_SAMPLES),
+		PPU:    &PPU{},
 	}
 
 	gba.PPU.gba = &gba
@@ -108,6 +107,7 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba.Irq = cpu.Irq{}
 	gba.Mem = NewMemory(&gba)
 	gba.Cpu = arm.NewCpu(false, gba.Mem, &gba.Irq, &gba.Mem.Waitstate, gba.Mem.Prefetch)
+	gba.Scheduler = NewScheduler(&gba.Cpu.AccCycles)
 
 	gba.Timers[0] = NewTimer(&gba, 0)
 	gba.Timers[1] = NewTimer(&gba, 1)
@@ -134,9 +134,9 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 
 	gba.Cpu.Reg.CPSR.I = false
 
-	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 0, gba.AudioSampleEvent, nil)
-	gba.Scheduler.schedule(EVENT_END_FRAME, 0, gba.FrameEndEvent, nil)
-	gba.Scheduler.schedule(EVENT_END_SCANLINE, 0, gba.ScanlineEndEvent, nil)
+	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, 0, gba.AudioSampleEvent, nil)
+	gba.Scheduler.schedule(EVENT_END_FRAME, 1, 0, gba.FrameEndEvent, nil)
+	gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, 0, gba.ScanlineEndEvent, nil)
 
 	return &gba
 }

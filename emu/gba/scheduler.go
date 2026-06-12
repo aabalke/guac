@@ -3,48 +3,55 @@ package gba
 type Event string
 
 const (
-	EVENT_VBK            = "event vblank"
-	EVENT_HBK            = "event hblank"
-	EVENT_DRW            = "event draw"
-	EVENT_END_FRAME      = "event end frame"
-	EVENT_END_SCANLINE   = "event end scanline"
-	EVENT_SND_SAMPLE_GEN = "event gen sample"
-	EVENT_TIMER_RELOAD   = "event timer reload"
-	EVENT_TIMER_OVERFLOW = "event timer overflow"
-	EVENT_TIMER_CONTROL  = "event timer control"
+	EVENT_VBK             = "event vblank"
+	EVENT_HBK             = "event hblank"
+	EVENT_DRW             = "event draw"
+	EVENT_END_FRAME       = "event end frame"
+	EVENT_END_SCANLINE    = "event end scanline"
+	EVENT_SND_SAMPLE_GEN  = "event gen sample"
+	EVENT_TIMER_RELOAD    = "event timer reload"
+	EVENT_TIMER_OVERFLOW0 = "event timer overflow 0"
+	EVENT_TIMER_OVERFLOW1 = "event timer overflow 1"
+	EVENT_TIMER_OVERFLOW2 = "event timer overflow 2"
+	EVENT_TIMER_OVERFLOW3 = "event timer overflow 3"
+
+	EVENT_TIMER_CONTROL = "event timer control"
 )
 
 type Scheduler struct {
 	Events       [64]ScheduledEvent
 	Cnt          int
 	CurrentCycle int64
+	AccCycles    *int
 }
 
 type ScheduledEvent struct {
 	Event     Event
+	Priority  int
 	InitCycle int64
 	Func      func(int64, any) bool
 	Args      any
 }
 
-func NewScheduler() *Scheduler {
-	return &Scheduler{}
+func NewScheduler(acc *int) *Scheduler {
+	return &Scheduler{AccCycles: acc}
 }
 
-func (s *Scheduler) schedule(e Event, cyclesUntil int64, f func(int64, any) bool, args any) {
-	s.scheduleAt(e, s.CurrentCycle+cyclesUntil, f, args)
+func (s *Scheduler) Now() int64 {
+	return s.CurrentCycle + int64(*s.AccCycles)
 }
 
-func (s *Scheduler) scheduleAt(e Event, initCycle int64, f func(int64, any) bool, args any) {
+func (s *Scheduler) schedule(e Event, priority int, cyclesUntil int64, f func(int64, any) bool, args any) {
+	s.scheduleAt(e, priority, s.Now()+cyclesUntil, f, args)
+}
+
+func (s *Scheduler) scheduleAt(e Event, priority int, initCycle int64, f func(int64, any) bool, args any) {
 	if s.Cnt >= len(s.Events) {
 		panic("gba: scheduler reached hard limit")
 	}
 
-	es := ScheduledEvent{Event: e, InitCycle: initCycle, Func: f, Args: args}
+	es := ScheduledEvent{Event: e, Priority: priority, InitCycle: initCycle, Func: f, Args: args}
 	for i := range s.Cnt {
-		//if es.InitCycle == s.Events[i].InitCycle && es.Event != EVENT_SND_SAMPLE_GEN {
-		//	fmt.Printf("Clash: %32s\t%32s\n", es.Event, s.Events[i].Event)
-		//}
 
 		if es.InitCycle < s.Events[i].InitCycle {
 			copy(s.Events[i+1:s.Cnt+1], s.Events[i:s.Cnt])
@@ -52,7 +59,15 @@ func (s *Scheduler) scheduleAt(e Event, initCycle int64, f func(int64, any) bool
 			s.Cnt++
 			return
 		}
+
+		if es.InitCycle == s.Events[i].InitCycle && priority <= s.Events[i].Priority {
+			copy(s.Events[i+1:s.Cnt+1], s.Events[i:s.Cnt])
+			s.Events[i] = es
+			s.Cnt++
+			return
+		}
 	}
+
 	s.Events[s.Cnt] = es
 	s.Cnt++
 }

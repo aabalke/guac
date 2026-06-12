@@ -161,7 +161,9 @@ func (c *Cpu) Step() int {
 				c.Reg.R[14] += 2
 			}
 
-			return c.AccCycles
+			v := c.AccCycles
+			c.AccCycles = 0
+			return v
 		}
 	}
 
@@ -171,7 +173,9 @@ func (c *Cpu) Step() int {
 		c.DecodeARM(c.P.Execute.Op)
 	}
 
-	return c.AccCycles
+	v := c.AccCycles
+	c.AccCycles = 0
+	return v
 }
 
 func (c *Cpu) Fetch() {
@@ -345,7 +349,6 @@ func (c *Cpu) InstRead32(addr uint32, seq bool) uint32 {
 
 func (c *Cpu) CycleCounter(addr, width uint32, seq, inst bool) int {
 	prefetch := true
-
 	cycles := 1
 
 	switch addr >> 24 {

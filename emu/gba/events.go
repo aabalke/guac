@@ -2,7 +2,7 @@ package gba
 
 func (gba *GBA) AudioSampleEvent(overshoot int64, arg any) bool {
 	gba.Apu.SoundClock()
-	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, CYCLES_PER_SND_GEN-overshoot, gba.AudioSampleEvent, nil)
+	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, CYCLES_PER_SND_GEN-overshoot, gba.AudioSampleEvent, nil)
 	return false
 }
 
@@ -53,8 +53,8 @@ func (gba *GBA) ScanlineEndEvent(overshoot int64, arg any) bool {
 		gba.Irq.SetIRQ(2)
 	}
 
-	gba.Scheduler.schedule(EVENT_END_SCANLINE, CYCLES_SCANLINE-overshoot, gba.ScanlineEndEvent, nil)
-	gba.Scheduler.schedule(EVENT_HBK, CYCLES_HDRAW-overshoot, gba.HblankEvent, nil)
+	gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, CYCLES_SCANLINE-overshoot, gba.ScanlineEndEvent, nil)
+	gba.Scheduler.schedule(EVENT_HBK, 1, CYCLES_HDRAW-overshoot, gba.HblankEvent, nil)
 	return false
 }
 
@@ -77,7 +77,7 @@ func (gba *GBA) FrameEndEvent(overshoot int64, arg any) bool {
 	gba.PPU.Backgrounds[2].BgAffineReset()
 	gba.PPU.Backgrounds[3].BgAffineReset()
 
-	gba.Scheduler.schedule(EVENT_END_FRAME, CYCLES_FRAME-overshoot, gba.FrameEndEvent, nil)
+	gba.Scheduler.schedule(EVENT_END_FRAME, 1, CYCLES_FRAME-overshoot, gba.FrameEndEvent, nil)
 
 	return true
 }

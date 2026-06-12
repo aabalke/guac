@@ -21,15 +21,15 @@ func NewTimer(gba *GBA, idx int) *Timer {
 }
 
 func (t *Timer) Delta(late int64) uint32 {
-	return uint32((t.Gba.Scheduler.CurrentCycle-late)-t.From) >> t.FreqShift
+	return uint32((t.Gba.Scheduler.Now()-late)-t.From) >> t.FreqShift
 }
 
 func (t *Timer) GetCounter() uint32 {
 	if t.Enabled {
-		return uint32(t.Counter) + t.Delta(0)
+		return t.Counter + t.Delta(0)
 	}
 
-	return uint32(t.Counter)
+	return t.Counter
 }
 
 func (t *Timer) Read(idx int) uint8 {
@@ -48,11 +48,11 @@ func (t *Timer) Read(idx int) uint8 {
 func (t *Timer) Write(idx int, v uint8) {
 	switch idx {
 	case 0:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_RELOAD, 1, t.ReloadEventLo, v)
+		t.Gba.Scheduler.schedule(EVENT_TIMER_RELOAD, 2, 1, t.ReloadEventLo, v)
 	case 1:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_RELOAD, 1, t.ReloadEventHi, v)
+		t.Gba.Scheduler.schedule(EVENT_TIMER_RELOAD, 3, 1, t.ReloadEventHi, v)
 	case 2:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_CONTROL, 1, t.ControlEvent, v)
+		t.Gba.Scheduler.schedule(EVENT_TIMER_CONTROL, 4, 1, t.ControlEvent, v)
 	}
 }
 
@@ -79,14 +79,13 @@ func (t *Timer) ControlEvent(late int64, argz any) bool {
 
 	prevEnabled := t.Cnt&0x80 != 0
 	t.Cnt = v
-	t.Enabled = t.Cnt&0x80 != 0
 	t.FreqShift = freqShifts[t.Cnt&3]
 
 	if t.Cnt&0x80 == 0 {
 		return false
 	}
 
-	offset := (t.Gba.Scheduler.CurrentCycle - late) & ((int64(1) << t.FreqShift) - 1)
+	offset := (t.Gba.Scheduler.Now() - late) & ((int64(1) << t.FreqShift) - 1)
 
 	if prevEnabled {
 		if t.Cnt&0x4 == 0 {
@@ -95,7 +94,8 @@ func (t *Timer) ControlEvent(late int64, argz any) bool {
 	} else {
 		t.Counter = uint32(t.Reload)
 		if t.Cnt&0x4 == 0 {
-			t.Start(offset + late - 1)
+			//t.Start(offset + late - 1)
+			t.Start(offset + late - 3)
 		}
 	}
 	return false
@@ -103,9 +103,20 @@ func (t *Timer) ControlEvent(late int64, argz any) bool {
 
 func (t *Timer) Start(cycles int64) {
 	t.Enabled = true
-	t.From = t.Gba.Scheduler.CurrentCycle - cycles
+	t.From = t.Gba.Scheduler.Now() - cycles
 	until := int64((0x10000-t.Counter)<<t.FreqShift) - cycles
-	t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW, until, t.Overflow, nil)
+
+	switch t.Idx {
+	case 0:
+		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW0, 5, until, t.Overflow, nil)
+	case 1:
+		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW1, 5, until, t.Overflow, nil)
+	case 2:
+		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW2, 5, until, t.Overflow, nil)
+	case 3:
+		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW3, 5, until, t.Overflow, nil)
+
+	}
 }
 
 func (t *Timer) Stop(late int64) {
@@ -114,7 +125,17 @@ func (t *Timer) Stop(late int64) {
 		t._Overflow(late)
 	}
 	t.Enabled = false
-	t.Gba.Scheduler.cancel(EVENT_TIMER_OVERFLOW)
+
+	switch t.Idx {
+	case 0:
+		t.Gba.Scheduler.cancel(EVENT_TIMER_OVERFLOW0)
+	case 1:
+		t.Gba.Scheduler.cancel(EVENT_TIMER_OVERFLOW1)
+	case 2:
+		t.Gba.Scheduler.cancel(EVENT_TIMER_OVERFLOW2)
+	case 3:
+		t.Gba.Scheduler.cancel(EVENT_TIMER_OVERFLOW3)
+	}
 }
 
 func (t *Timer) Overflow(late int64, _ any) bool {

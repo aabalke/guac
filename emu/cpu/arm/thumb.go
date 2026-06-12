@@ -40,7 +40,7 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 
 	switch inst {
 	case THUMB_MUL:
-		cpu.idle(idleMul(rsv, true))
+		cpu.idle(idleMul(rdv, true))
 
 		res = uint64(rdv) * uint64(rsv)
 		r[rd] = uint32(res)
