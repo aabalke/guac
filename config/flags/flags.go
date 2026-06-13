@@ -2,6 +2,7 @@ package flags
 
 import (
 	"flag"
+	"os"
 
 	"github.com/aabalke/guac/config"
 )
@@ -16,6 +17,10 @@ func Decode() {
 		showfps  = flag.Bool("show-fps", false, "show fps")
 		headless = flag.Bool("headless", false, "headless")
 	)
+
+	if len(os.Args) >= 2 {
+		config.Conf.General.RomPath = os.Args[1]
+	}
 
 	flag.Parse()
 
