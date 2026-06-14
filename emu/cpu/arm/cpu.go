@@ -347,7 +347,9 @@ func (c *Cpu) InstRead32(addr uint32, seq bool) uint32 {
 	return c.Mem.Read32(addr)
 }
 
-func (c *Cpu) CycleCounterDma(addr, width uint32, seq, inst bool) int {
+var lastWasDma = false
+
+func (c *Cpu) CycleCounterDma(addr, width uint32, seq bool) int {
 	prefetch := true
 	cycles := 1
 
@@ -362,24 +364,20 @@ func (c *Cpu) CycleCounterDma(addr, width uint32, seq, inst bool) int {
 			seq = false
 		}
 
-		cycles = int(c.Waitstate.Get(width, addr, seq))
-		//prefetch = false
-		//if inst {
-		//	cycles = int(c.Prefetch.Wait(addr, int64(cycles), c.Reg.CPSR.T))
-		//} else {
-		//	c.Prefetch.Cancel()
-		//}
+		fallthrough
 
 	case 14, 15:
 
-		//c.Prefetch.Cancel()
+		c.Prefetch.Cancel()
 		cycles = int(c.Waitstate.Get(width, addr, seq))
-		//prefetch = false
+		prefetch = false
 	}
 
 	if prefetch {
 		c.Prefetch.Step(int64(cycles))
 	}
+
+	lastWasDma = true
 
 	return cycles
 }
@@ -397,6 +395,12 @@ func (c *Cpu) CycleCounter(addr, width uint32, seq, inst bool) int {
 
 		if addr&0x1FFFF == 0 {
 			seq = false
+		}
+
+		if lastWasDma {
+			lastWasDma = false
+			seq = false
+
 		}
 
 		cycles = int(c.Waitstate.Get(width, addr, seq))

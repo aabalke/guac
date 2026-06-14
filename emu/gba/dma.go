@@ -38,7 +38,7 @@ type DMA struct {
 	Repeat  bool
 	isWord  bool
 	DRQ     bool
-	Mode    uint32
+	Mode    uint8
 	IRQ     bool
 	Enabled bool
 	Active  bool
@@ -115,20 +115,16 @@ func (dma *DMA) Write(addr uint32, v uint8) {
 		dma.Repeat = (v>>1)&1 != 0
 		dma.isWord = (v>>2)&1 != 0
 		dma.DRQ = (v>>3)&1 != 0
-		dma.Mode = uint32(v>>4) & 3
-
+		dma.Mode = (v >> 4) & 3
 		dma.IRQ = (v>>6)&1 != 0
 		dma.Enabled = (v>>7)&1 != 0
 
 		dma.Control = (dma.Control & 0xFF) | (uint32(v) << 8)
 		dma.SrcAdj = (dma.SrcAdj & 1) | (uint32(v)&1)<<1
 
-		// immediate should be 2 cycles after enabling
-
 		if !prev && dma.Enabled {
 			dma.Src = dma.InitSrc
 			dma.Dst = dma.InitDst
-			// start
 
 			if dma.Mode == 0 {
 				dma.Gba.Scheduler.schedule(EVENT_DMA, 2, 1, dma.Start, nil)
@@ -138,10 +134,6 @@ func (dma *DMA) Write(addr uint32, v uint8) {
 		if prev && !dma.Enabled {
 			dma.Active = false
 		}
-
-		//if isImmediate := !prev && dma.checkMode(DMA_MODE_IMM); isImmediate {
-		//	dma.transfer()
-		//}
 	}
 }
 
@@ -198,7 +190,7 @@ func (dma *DMA) transfer() int {
 	case DMA_ADJ_DEC:
 		srcOffset = -offset
 	case DMA_ADJ_RES:
-		panic("DMA SRC SET TO PROHIBITTED")
+		panic("invalid dma src method")
 	}
 
 	count := dma.WordCount
@@ -212,23 +204,19 @@ func (dma *DMA) transfer() int {
 
 	cycles := 2
 
-	if tmpSrc >= 0x800_0000 && tmpDst >= 0x800_0000 {
-		cycles += 2 // not used in tests?
-	}
-
 	if dma.isWord {
 		for i := range count {
 
 			switch {
 			case bios:
-				dma.Value |= (dma.Value << 16)
 				cycles++
+
 			default:
-				cycles += dma.Gba.Cpu.CycleCounterDma(tmpSrc, uint32(offset), i != 0, false)
+				cycles += dma.Gba.Cpu.CycleCounterDma(tmpSrc, 4, i != 0)
 				dma.Value = mem.Read32(tmpSrc)
 			}
 
-			cycles += dma.Gba.Cpu.CycleCounterDma(tmpDst, uint32(offset), i != 0, false)
+			cycles += dma.Gba.Cpu.CycleCounterDma(tmpDst, 4, i != 0)
 			mem.Write32(tmpDst, dma.Value)
 
 			tmpDst = uint32(int(tmpDst) + dstOffset)
@@ -242,11 +230,12 @@ func (dma *DMA) transfer() int {
 				cycles++
 
 			default:
-				cycles += dma.Gba.Cpu.CycleCounterDma(tmpSrc, uint32(offset), i != 0, false)
-				dma.Value = mem.Read16(tmpSrc)
+				cycles += dma.Gba.Cpu.CycleCounterDma(tmpSrc, 2, i != 0)
+				v := mem.Read16(tmpSrc)
+				dma.Value = v | (v << 16)
 			}
 
-			cycles += dma.Gba.Cpu.CycleCounterDma(tmpDst, uint32(offset), i != 0, false)
+			cycles += dma.Gba.Cpu.CycleCounterDma(tmpDst, 2, i != 0)
 			mem.Write16(tmpDst, uint16(dma.Value))
 
 			tmpDst = uint32(int(tmpDst) + dstOffset)
@@ -266,32 +255,18 @@ func (dma *DMA) transfer() int {
 	dma.Src = tmpSrc
 
 	if dma.DstAdj != DMA_ADJ_RES {
-		if dma.Idx == 3 {
-			dma.Dst = tmpDst
-		} else {
-			dma.Dst = tmpDst & 0x7FF_FFFF
-		}
+		dma.Dst = tmpDst
 	}
 
 	return cycles
 }
 
-func (dma *DMA) checkMode(mode uint32) bool {
-	return mode == dma.Mode && dma.Enabled
-}
-
-func (gba *GBA) checkDmas(mode uint32) {
-	if ok := gba.Dma[0].checkMode(mode); ok {
-		gba.Dma[0].transfer()
-	}
-	if ok := gba.Dma[1].checkMode(mode); ok {
-		gba.Dma[1].transfer()
-	}
-	if ok := gba.Dma[2].checkMode(mode); ok {
-		gba.Dma[2].transfer()
-	}
-	if ok := gba.Dma[3].checkMode(mode); ok {
-		gba.Dma[3].transfer()
+func (gba *GBA) checkDmas(mode uint8) {
+	for i := range 4 {
+		dma := &gba.Dma[i]
+		if ok := dma.Enabled && dma.Mode == mode; ok {
+			gba.Scheduler.schedule(EVENT_DMA, 2, 1, gba.Dma[i].Start, nil)
+		}
 	}
 }
 

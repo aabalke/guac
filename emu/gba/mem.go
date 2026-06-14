@@ -282,18 +282,7 @@ func (m *Memory) Read(addr uint32) uint8 {
 }
 
 func (m *Memory) ReadBios(addr uint32) uint8 {
-	switch addr & 3 {
-	case 0:
-		return uint8(m.ProtectedValue)
-	case 1:
-		return uint8(m.ProtectedValue >> 8)
-	case 2:
-		return uint8(m.ProtectedValue >> 16)
-	case 3:
-		return uint8(m.ProtectedValue >> 24)
-	default:
-		panic("THIS IS IMPOSSIBLE")
-	}
+	return uint8(m.ProtectedValue >> ((addr & 3) << 3))
 }
 
 func (m *Memory) ReadOpenBus(addr uint32) uint8 {
@@ -301,7 +290,6 @@ func (m *Memory) ReadOpenBus(addr uint32) uint8 {
 
 	if m.GBA.Cpu.Reg.CPSR.T {
 		// does pipeline impliment region based thumb mode?
-
 		return uint8(m.Read32((pc &^ 1)) >> ((addr & 1) << 3))
 	}
 
@@ -309,8 +297,6 @@ func (m *Memory) ReadOpenBus(addr uint32) uint8 {
 }
 
 func (m *Memory) ReadIO(addr uint32) uint8 {
-	// this addr is relative. - 0x4000000
-
 	switch {
 	case addr >= 0x10 && addr < 0x48,
 		addr >= 0x4C && addr < 0x50,
@@ -426,16 +412,9 @@ func (m *Memory) Read8(addr uint32) uint32 {
 	return uint32(m.Read(addr))
 }
 
-// Accessing SRAM Area by 16bit/32bit
-// Reading retrieves 8bit value from specified address, multiplied by 0101h (LDRH) or by 01010101h (LDR). Writing changes the 8bit value at the specified address only, being set to LSB of (source_data ROR (address*8)).
 func (m *Memory) Read16(addr uint32) uint32 {
 	switch {
 	case addr >= 0xE00_0000:
-
-		//if m.GBA.Cpu.Reg.R[PC] < 0x4000 {
-		//    return uint32(m.Read(addr &^ 1)) * 0x0101
-		//}
-
 		return uint32(m.Read(addr)) * 0x0101
 
 	case addr >= 0xD00_0000:
@@ -464,12 +443,6 @@ func (m *Memory) Read16(addr uint32) uint32 {
 func (m *Memory) Read32(addr uint32) uint32 {
 	switch {
 	case addr >= 0xE00_0000:
-
-		// if m.GBA.Cpu.Reg.R[PC] < 0x4000 {
-
-		//    return uint32(m.Read(addr &^ 3)) * 0x01010101
-		//}
-
 		return uint32(m.Read(addr)) * 0x01010101
 	case addr >= 0x800_0000:
 		if addr&0x1FF_FFFF >= m.GBA.Cartridge.RomLength {
@@ -486,24 +459,21 @@ func (m *Memory) Read32(addr uint32) uint32 {
 	return (a << 16) + b
 }
 
-func (m *Memory) ReadBadRom(addr uint32, bytesRead uint8) uint32 {
-	switch bytesRead {
+func (m *Memory) ReadBadRom(addr, size uint32) uint32 {
+	switch size {
 	case 1:
-		v := ((addr >> 1) >> ((addr & 1) * 8)) & 0xFF
-		return uint32(uint8(v))
+		return ((addr >> 1) >> ((addr & 1) << 3)) & 0xFF
+
 	case 2:
 
-		v := (addr >> 1) & 0xFFFF
-		if addr&1 == 1 {
-			v = ((addr >> 1) >> ((addr & 1) * 8)) & 0xFF
+		if addr&1 != 0 {
+			return ((addr >> 1) >> ((addr & 1) << 3)) & 0xFF
 		}
 
-		return uint32(uint16(v))
+		return (addr >> 1) & 0xFFFF
 
 	case 4:
-		v := ((addr &^ 3) >> 1) & 0xFFFF
-		v |= (((addr &^ 3) + 2) >> 1) << 16
-		return uint32(v)
+		return (((addr &^ 3) >> 1) & 0xFFFF) | ((((addr &^ 3) + 2) >> 1) << 16)
 	default:
 		panic("BAD ROM READ USING BYTES READ NOT VALID (1, 2, 4)")
 	}
@@ -660,7 +630,7 @@ func (m *Memory) Write16(addr uint32, v uint16) {
 		}
 	}
 
-	m.Write(addr, uint8(v), false)
+	m.Write(addr+0, uint8(v), false)
 	m.Write(addr+1, uint8(v>>8), false)
 }
 
@@ -672,7 +642,7 @@ func (m *Memory) Write32(addr uint32, v uint32) {
 		return
 	}
 
-	m.Write(addr, uint8(v), false)
+	m.Write(addr+0, uint8(v), false)
 	m.Write(addr+1, uint8(v>>8), false)
 	m.Write(addr+2, uint8(v>>16), false)
 	m.Write(addr+3, uint8(v>>24), false)
