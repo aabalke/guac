@@ -1,11 +1,5 @@
 package gba
 
-import (
-	"unsafe"
-
-	"github.com/aabalke/guac/emu/gba/cart"
-)
-
 //var DMA_ACTIVE = -1
 //var DMA_FINISHED = -1
 //var DMA_PC = uint32(0)
@@ -47,391 +41,239 @@ type DMA struct {
 	Mode    uint32
 	IRQ     bool
 	Enabled bool
+	Active  bool
 
 	Value uint32
 }
 
-//go:inline
-func ReplaceByte(value uint32, newByte uint32, byteOffset uint32) uint32 {
-	bitOffset := 8 * byteOffset
-	mask := uint32(0b1111_1111)
-	return (value &^ (mask << bitOffset)) | (newByte << bitOffset)
-}
-
-func (dma *DMA) ReadControl(hi bool) uint8 {
-	if hi {
-		return uint8(dma.Control>>8) & 0xFF
+func (dma *DMA) Read(addr uint32) uint8 {
+	switch addr {
+	case 10:
+		return uint8(dma.Control)
+	case 11:
+		return uint8(dma.Control >> 8)
+	default:
+		return 0
 	}
-	return uint8(dma.Control) & 0xFF
 }
 
-func (dma *DMA) MaskAddr(v uint32, src bool) uint32 {
-	if !src && (dma.Idx == 0 || dma.Idx == 1 || dma.Idx == 2) {
-		return v & 0x7FF_FFFF
-	}
+func (dma *DMA) Write(addr uint32, v uint8) {
+	switch addr {
+	case 0, 1, 2, 3:
 
-	return v & 0xFFF_FFFF
-}
-
-func (dma *DMA) WriteSrc(v uint8, byte uint32) {
-	if byte == 3 {
-		v &= 0x0F
-		// switch dma.Idx {
-
-		//case 0: v &= 0x0F
-		////case 0: v &= 0x07
-		//case 1, 2, 3: v &= 0x0F
-		//}
-	}
-
-	dma.Src = ReplaceByte(dma.Src, uint32(v), byte)
-	dma.InitSrc = dma.Src
-}
-
-func (dma *DMA) WriteDst(v uint8, byte uint32) {
-	if byte == 3 {
-		switch dma.Idx {
-		case 0, 1, 2:
-			v &= 0x07
-		case 3:
-			v &= 0x0F
+		if addr == 3 {
+			if dma.Idx == 0 {
+				v &= 0x7
+			} else {
+				v &= 0xF
+			}
 		}
-	}
+		dma.Src = (dma.Src &^ (0xFF << (addr << 3))) | (uint32(v) << (addr << 3))
+		dma.InitSrc = dma.Src
 
-	dma.Dst = ReplaceByte(dma.Dst, uint32(v), byte)
-	dma.InitDst = dma.Dst
-}
+	case 4, 5, 6, 7:
 
-func (dma *DMA) WriteCount(v uint8, hi bool) {
-	if hi {
-		mask := uint32(0x3F)
-		if dma.Idx == 3 {
-			mask = 0xFF
-		}
-		dma.WordCount = (dma.WordCount & 0xFF) | ((uint32(v) & mask) << 8)
-		return
-	}
+		byte := addr - 4
 
-	dma.WordCount = (dma.WordCount &^ 0xFF) | uint32(v)
-}
-
-func (dma *DMA) WriteControl(v uint8, hi bool) {
-	if hi {
-		a := uint32(v) & 0xF7
-		if dma.Idx == 3 {
-			a = uint32(v) & 0xFF
+		if addr == 3 {
+			if dma.Idx != 0 {
+				v &= 0xF
+			} else {
+				v &= 0x7
+			}
 		}
 
-		wasDisabled := !dma.Enabled
-		dma.Control = (dma.Control & 0xFF) | (a << 8)
-		dma.SrcAdj = (dma.SrcAdj & 1) | (a&1)<<1
+		dma.Dst = (dma.Dst &^ (0xFF << (byte << 3))) | (uint32(v) << (byte << 3))
+		dma.InitDst = dma.Dst
 
-		dma.Repeat = (a>>1)&1 != 0
-		dma.isWord = (a>>2)&1 != 0
-		dma.DRQ = (a>>3)&1 != 0
-		dma.Mode = (a >> 4) & 0b11
+	case 8:
+		dma.WordCount = (dma.WordCount &^ 0xFF) | uint32(v)
 
-		dma.IRQ = (a>>6)&1 != 0
-		dma.Enabled = (a>>7)&1 != 0
+	case 9:
+
+		if dma.Idx != 3 {
+			v &= 0x3F
+		}
+
+		dma.WordCount = (dma.WordCount & 0xFF) | (uint32(v) << 8)
+
+	case 10:
+
+		v &= 0xE0
+		dma.Control = (dma.Control &^ 0xFF) | uint32(v)
+		dma.DstAdj = uint32(v>>5) & 3
+		dma.SrcAdj = (dma.SrcAdj &^ 1) | (uint32(v) >> 7)
+
+	case 11:
+
+		if dma.Idx != 3 {
+			v &= 0xF7
+		}
+
+		prev := dma.Enabled
+
+		dma.Repeat = (v>>1)&1 != 0
+		dma.isWord = (v>>2)&1 != 0
+		dma.DRQ = (v>>3)&1 != 0
+		dma.Mode = uint32(v>>4) & 3
+
+		dma.IRQ = (v>>6)&1 != 0
+		dma.Enabled = (v>>7)&1 != 0
+
+		dma.Control = (dma.Control & 0xFF) | (uint32(v) << 8)
+		dma.SrcAdj = (dma.SrcAdj & 1) | (uint32(v)&1)<<1
 
 		// immediate should be 2 cycles after enabling
 
-		if wasDisabled && dma.Enabled {
+		if !prev && dma.Enabled {
 			dma.Src = dma.InitSrc
 			dma.Dst = dma.InitDst
+			// start
+
+			if dma.Mode == 0 {
+				dma.Gba.Scheduler.schedule(EVENT_DMA, 2, 1, dma.Start, nil)
+			}
 		}
 
-		if isImmediate := wasDisabled && dma.checkMode(DMA_MODE_IMM); isImmediate {
-			dma.transfer()
+		if prev && !dma.Enabled {
+			dma.Active = false
 		}
 
-		return
+		//if isImmediate := !prev && dma.checkMode(DMA_MODE_IMM); isImmediate {
+		//	dma.transfer()
+		//}
 	}
+}
 
-	a := uint32(v) & 0xE0
-	dma.Control = (dma.Control &^ 0b1111_1111) | a
-	dma.DstAdj = (uint32(a) >> 5) & 0b11
-	dma.SrcAdj = (dma.SrcAdj &^ 1) | ((uint32(a) >> 7) & 1)
+func (dma *DMA) Start(_ int64, _ any) bool {
+	dma.Active = true
+	return false
 }
 
 func (dma *DMA) disable() {
+	dma.Active = false
 	dma.Enabled = false
-	dma.Control &^= 0b1000_0000_0000_0000
+	dma.Control &^= 0x8000
 }
 
-func (dma *DMA) transfer() {
-	mem := dma.Gba.Mem
-	count := dma.WordCount
-
-	switch {
-	case count == 0 && dma.Idx == 3:
-		count = 0x10000
-	case count == 0:
-		count = 0x4000
+func (dma *DMA) transfer() int {
+	if dma.Mode == DMA_MODE_REF {
+		return 0
 	}
 
-	if dma.Idx == 0 && dma.Mode == 3 {
-		return
-	}
-
-	if dma.Mode == DMA_MODE_HBL {
-		srcInLimited := dma.Src >= 0x600_0000 && dma.Src < 0x800_0000
-		dstInLimited := dma.Dst >= 0x600_0000 && dma.Dst < 0x800_0000
-		allowed := (dma.Gba.Mem.IO[0]>>5)&1 != 0
-
-		if (srcInLimited || dstInLimited) && !allowed {
-			return
-		}
-	}
-
-	dstOffset := int(0)
-	srcOffset := int(0)
-	tmpDst := dma.Dst
-	tmpSrc := dma.Src
+	var (
+		mem       = dma.Gba.Mem
+		dstOffset = 0
+		srcOffset = 0
+		offset    = 2
+		tmpDst    = dma.Dst
+		tmpSrc    = dma.Src
+	)
 
 	if dma.isWord {
-		tmpDst &^= 0b11
-		tmpSrc &^= 0b11
+		tmpDst &^= 3
+		tmpSrc &^= 3
+		offset = 4
 	} else {
-		tmpDst &^= 0b1
-		tmpSrc &^= 0b1
+		tmpDst &^= 1
+		tmpSrc &^= 1
 	}
 
-	rom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
-	if rom && dma.Idx == 0 {
-		tmpSrc &= 0x7FF_FFFF
-	}
+	bios := tmpSrc < 0x200_0000
 
-	if rom {
+	if rom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000; rom {
 		dma.SrcAdj = DMA_ADJ_INC
-	}
-
-	ofs := int(2)
-	if dma.isWord {
-		ofs = 4
 	}
 
 	switch dma.DstAdj {
 	case DMA_ADJ_INC, DMA_ADJ_RES:
-		dstOffset = ofs
+		dstOffset = offset
 	case DMA_ADJ_DEC:
-		dstOffset = -ofs
+		dstOffset = -offset
 	}
 
 	switch dma.SrcAdj {
 	case DMA_ADJ_INC:
-		srcOffset = ofs
+		srcOffset = offset
 	case DMA_ADJ_DEC:
-		srcOffset = -ofs
+		srcOffset = -offset
 	case DMA_ADJ_RES:
 		panic("DMA SRC SET TO PROHIBITTED")
 	}
 
-	if fifo := (dma.Idx == 1 || dma.Idx == 2) && dma.Mode == DMA_MODE_REF; fifo {
-		return
-	}
-
-	srcPtr, _ := mem.ReadPtr(tmpSrc)
-	if srcPtr != nil {
-		top := uint32(int(tmpSrc) + srcOffset*int(count))
-		if _, ok := mem.ReadPtr(top); !ok {
-			srcPtr = nil
-		}
-	}
-
-	dstPtr, _ := mem.WritePtr(tmpDst)
-	if dstPtr != nil {
-		top := uint32(int(tmpDst) + dstOffset*int(count))
-		if _, ok := mem.WritePtr(top); !ok {
-			dstPtr = nil
-		}
-	}
-
-	for range uint32(count) {
-
-		if eeprom := CheckEeprom(dma.Gba, tmpDst); eeprom {
-			dstRom := tmpDst >= 0x800_0000 && tmpDst < 0xE00_0000
-			srcRom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
-
-			switch count {
-			case 9, 73:
-				cart.EepromWidth = 6
-			case 17, 81:
-				cart.EepromWidth = 14
-			}
-
-			if srcRom && dstRom {
-				panic("EEPROM HAS BOTH SRC AND DST ROM ADDR")
-			}
-
-			// do not continue this., do not put this outside loop
-		}
-
-		badAddr := tmpSrc < 0x200_0000
-		sram := tmpSrc >= 0xE00_0000 && tmpSrc < 0x1000_0000
-
-		if dma.isWord {
-			if dstPtr == nil {
-				switch {
-				case badAddr:
-					mem.Write32(tmpDst&^3, dma.Value)
-				case sram && dma.Idx == 0:
-					dma.Value = 0
-					mem.Write32(tmpDst&^3, dma.Value)
-				default:
-					if srcPtr == nil {
-						dma.Value = mem.Read32(tmpSrc &^ 3)
-					} else {
-						dma.Value = *(*uint32)(srcPtr)
-					}
-					mem.Write32(tmpDst&^3, dma.Value)
-				}
-			} else {
-				switch {
-				case sram && dma.Idx == 0:
-					dma.Value = 0
-				default:
-					if srcPtr == nil {
-						dma.Value = mem.Read32(tmpSrc &^ 3)
-					} else {
-						dma.Value = *(*uint32)(srcPtr)
-					}
-					dma.Value = mem.Read32(tmpSrc &^ 3)
-				}
-
-				*(*uint32)(dstPtr) = dma.Value
-			}
+	count := dma.WordCount
+	if count == 0 {
+		if dma.Idx == 3 {
+			count = 0x10000
 		} else {
-			if dstPtr == nil {
-				switch {
-				case badAddr:
-					mem.Write16(tmpDst&^1, uint16(dma.Value))
-				case sram && dma.Idx == 0:
-					dma.Value = 0
-					mem.Write16(tmpDst&^1, uint16(dma.Value))
-				default:
-					if srcPtr == nil {
-						dma.Value = mem.Read16(tmpSrc &^ 1)
-					} else {
-						dma.Value = uint32(*(*uint16)(srcPtr))
-					}
-					mem.Write16(tmpDst&^1, uint16(dma.Value))
-				}
-			} else {
-				switch {
-				case sram && dma.Idx == 0:
-					dma.Value = 0
-				default:
-					if srcPtr == nil {
-						dma.Value = mem.Read16(tmpSrc &^ 1)
-					} else {
-						dma.Value = uint32(*(*uint16)(srcPtr))
-					}
-					dma.Value = mem.Read16(tmpSrc &^ 1)
-				}
-
-				*(*uint32)(dstPtr) = dma.Value
-			}
-		}
-
-		tmpDst = uint32(int(tmpDst) + dstOffset)
-		tmpSrc = uint32(int(tmpSrc) + srcOffset)
-
-		if srcPtr != nil {
-			srcPtr = unsafe.Add(srcPtr, srcOffset)
-		}
-		if dstPtr != nil {
-			dstPtr = unsafe.Add(dstPtr, dstOffset)
+			count = 0x4000
 		}
 	}
 
-	//DMA_FINISHED = DMA_ACTIVE
-	//DMA_ACTIVE = prevActive
+	cycles := 2
+
+	if tmpSrc >= 0x800_0000 && tmpDst >= 0x800_0000 {
+		cycles += 2 // not used in tests?
+	}
+
+	if dma.isWord {
+		for i := range count {
+
+			switch {
+			case bios:
+				dma.Value |= (dma.Value << 16)
+				cycles++
+			default:
+				cycles += dma.Gba.Cpu.CycleCounterDma(tmpSrc, uint32(offset), i != 0, false)
+				dma.Value = mem.Read32(tmpSrc)
+			}
+
+			cycles += dma.Gba.Cpu.CycleCounterDma(tmpDst, uint32(offset), i != 0, false)
+			mem.Write32(tmpDst, dma.Value)
+
+			tmpDst = uint32(int(tmpDst) + dstOffset)
+			tmpSrc = uint32(int(tmpSrc) + srcOffset)
+		}
+	} else {
+		for i := range count {
+
+			switch {
+			case bios:
+				cycles++
+
+			default:
+				cycles += dma.Gba.Cpu.CycleCounterDma(tmpSrc, uint32(offset), i != 0, false)
+				dma.Value = mem.Read16(tmpSrc)
+			}
+
+			cycles += dma.Gba.Cpu.CycleCounterDma(tmpDst, uint32(offset), i != 0, false)
+			mem.Write16(tmpDst, uint16(dma.Value))
+
+			tmpDst = uint32(int(tmpDst) + dstOffset)
+			tmpSrc = uint32(int(tmpSrc) + srcOffset)
+		}
+	}
 
 	if dma.IRQ {
 		dma.Gba.Irq.SetIRQ(8 + uint32(dma.Idx))
 	}
 
 	if !dma.Repeat {
-		// DO NOT WRITEBACK DST AND SRC UNLESS REPEAT
 		dma.disable()
-		return
+		return cycles
 	}
 
-	if dma.DstAdj == DMA_ADJ_RES {
-		// dma.Dst stays the same
-		dma.Dst = dma.InitDst
-		dma.Src = dma.MaskAddr(tmpSrc, true)
-		return
-	}
+	dma.Src = tmpSrc
 
-	dma.Src = dma.MaskAddr(tmpSrc, true)
-	dma.Dst = dma.MaskAddr(tmpDst, false)
-}
-
-//func (dma *DMA) transferVideo(vcount uint32) {
-//
-//    if dma.Idx != 3 || dma.Mode != 3 || !dma.Enabled || (dma.Dst >= 0x600_0000 || dma.Dst <= 0x700_0000) {
-//        return
-//    }
-//
-//    if vcount >= 2 && vcount <= 162 {
-//        dma.transfer(false)
-//    }
-//}
-
-func (dma *DMA) transferFifo() {
-	a := dma.Gba.Apu
-
-	switch {
-	case !a.IsSoundEnabled():
-		return
-	case !dma.Enabled:
-		return
-	case !dma.Repeat:
-		return
-	case dma.Mode != DMA_MODE_REF:
-		return
-	case dma.Idx != 1 && dma.Idx != 2:
-		return
-	case dma.Idx == 1 && dma.Dst != 0x400_00A0:
-		return
-	case dma.Idx == 2 && dma.Dst != 0x400_00A4:
-		return
-		// case dma.Idx == 1 && dma.Dst == 0x400_00A0 && !(a.FifoA.Length <= 0x10):
-		//	return
-		// case dma.Idx == 2 && dma.Dst == 0x400_00AA && !(a.FifoB.Length <= 0x10):
-		//	return
-	}
-
-	if rom := dma.Src >= 0x800_0000 && dma.Src < 0xE00_0000; rom {
-		dma.SrcAdj = DMA_ADJ_INC
-	}
-
-	srcOffset := 4
-	switch dma.SrcAdj {
-	case DMA_ADJ_DEC:
-		srcOffset = -4
-	case DMA_ADJ_NON:
-		srcOffset = 0
-	}
-
-	for range 4 {
-		v := dma.Gba.Mem.Read32(dma.Src)
-		//dma.Gba.Mem.Write32(dma.Dst, v) //make sure this and fifoA / fifoB are not same
-		switch dma.Idx {
-		case 1:
-			a.FifoA.Copy(v)
-		case 2:
-			a.FifoB.Copy(v)
+	if dma.DstAdj != DMA_ADJ_RES {
+		if dma.Idx == 3 {
+			dma.Dst = tmpDst
+		} else {
+			dma.Dst = tmpDst & 0x7FF_FFFF
 		}
-
-		dma.Src = uint32(int(dma.Src) + srcOffset)
 	}
 
-	if dma.IRQ {
-		dma.Gba.Irq.SetIRQ(8 + uint32(dma.Idx))
-	}
+	return cycles
 }
 
 func (dma *DMA) checkMode(mode uint32) bool {
@@ -451,4 +293,15 @@ func (gba *GBA) checkDmas(mode uint32) {
 	if ok := gba.Dma[3].checkMode(mode); ok {
 		gba.Dma[3].transfer()
 	}
+}
+
+func (gba *GBA) CheckDmas() bool {
+	for i := range 4 {
+		if gba.Dma[i].Active {
+			gba.Tick(gba.Dma[i].transfer())
+			return true
+		}
+	}
+
+	return false
 }

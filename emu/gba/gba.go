@@ -72,6 +72,10 @@ func (gba *GBA) Update(stdFps bool) {
 				gba.Cpu.Halted = false
 			}
 
+			if ok := gba.CheckDmas(); ok {
+				continue
+			}
+
 			gba.Tick(gba.Cpu.Step())
 		}
 
@@ -129,7 +133,6 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	//gba.startupNoBios()
 	gba.LoadGame(path)
 
-	//gba.Mem.BIOS_MODE = arm7.BIOS_STARTUP
 	gba.Mem.IO[6] = 0
 
 	gba.Cpu.Reg.CPSR.I = false

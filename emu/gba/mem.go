@@ -20,8 +20,8 @@ type Memory struct {
 	OAM  [0x400]uint8
 	IO   [0x400]uint8
 
-	BIOS_MODE uint32
-	Dispstat  Dispstat
+	ProtectedValue uint32
+	Dispstat       Dispstat
 
 	Waitstate Waitstate
 	Prefetch  *Prefetch
@@ -32,6 +32,7 @@ type Memory struct {
 
 func NewMemory(gba *GBA) *Memory {
 	m := &Memory{GBA: gba}
+	m.ProtectedValue = 0xE129F000
 
 	m.Prefetch = NewPrefetch(&m.Waitstate)
 	m.Waitstate.Prefetch = m.Prefetch
@@ -176,9 +177,17 @@ func (m *Memory) initReadRegions() {
 
 	m.readRegions[0x0] = func(m *Memory, addr uint32) uint8 {
 		if addr < 0x4000 {
-			if m.GBA.Cpu.Reg.R[PC] >= 0x4000 {
+
+			pc := m.GBA.Cpu.Reg.R[15]
+
+			if pc >= 0x4000 {
 				return m.ReadBios(addr)
 			}
+
+			if pc == 0xDC || pc == 0x134 || pc == 0x13C || pc == 0x188 {
+				m.ProtectedValue = binary.LittleEndian.Uint32(m.BIOS[pc+8:])
+			}
+
 			return m.BIOS[addr]
 		}
 
@@ -273,23 +282,15 @@ func (m *Memory) Read(addr uint32) uint8 {
 }
 
 func (m *Memory) ReadBios(addr uint32) uint8 {
-	// temp handler
-	// nAddr, ok := BIOS_ADDR[m.BIOS_MODE]
-	var nAddr uint32
-	ok := false
-	if !ok {
-		nAddr = 0xE129F000
-	}
-
-	switch addr & 0b11 {
+	switch addr & 3 {
 	case 0:
-		return uint8(nAddr)
+		return uint8(m.ProtectedValue)
 	case 1:
-		return uint8(nAddr >> 8)
+		return uint8(m.ProtectedValue >> 8)
 	case 2:
-		return uint8(nAddr >> 16)
+		return uint8(m.ProtectedValue >> 16)
 	case 3:
-		return uint8(nAddr >> 24)
+		return uint8(m.ProtectedValue >> 24)
 	default:
 		panic("THIS IS IMPOSSIBLE")
 	}
@@ -308,7 +309,7 @@ func (m *Memory) ReadOpenBus(addr uint32) uint8 {
 }
 
 func (m *Memory) ReadIO(addr uint32) uint8 {
-	// this addr is relative. - 0x400000
+	// this addr is relative. - 0x4000000
 
 	switch {
 	case addr >= 0x10 && addr < 0x48,
@@ -322,6 +323,20 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 		return m.ReadOpenBus(addr)
 	case addr >= 0x60 && addr < 0xB0:
 		return m.ReadSoundIO(addr)
+	case addr >= 0xB0 && addr < 0xE0:
+
+		addr -= 0xB0
+		i := addr / 12
+		addr %= 12
+		return m.GBA.Dma[i].Read(addr)
+
+	case addr >= 0x100 && addr < 0x110:
+
+		addr -= 0x100
+		i := addr / 4
+		idx := addr & 3
+		return m.GBA.Timers[i].Read(int(idx))
+
 	}
 
 	switch addr {
@@ -330,71 +345,6 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 	case 0x0005:
 		return uint8(m.Dispstat >> 8)
 	case 0x0007:
-		return 0
-	case 0x00B8:
-		return 0
-	case 0x00B9:
-		return 0
-	case 0x00BA:
-		return m.GBA.Dma[0].ReadControl(false)
-	case 0x00BB:
-		return m.GBA.Dma[0].ReadControl(true)
-	case 0x00C4:
-		return 0
-	case 0x00C5:
-		return 0
-	case 0x00C6:
-		return m.GBA.Dma[1].ReadControl(false)
-	case 0x00C7:
-		return m.GBA.Dma[1].ReadControl(true)
-	case 0x00D0:
-		return 0
-	case 0x00D1:
-		return 0
-	case 0x00D2:
-		return m.GBA.Dma[2].ReadControl(false)
-	case 0x00D3:
-		return m.GBA.Dma[2].ReadControl(true)
-	case 0x00DC:
-		return 0
-	case 0x00DD:
-		return 0
-	case 0x00DE:
-		return m.GBA.Dma[3].ReadControl(false)
-	case 0x00DF:
-		return m.GBA.Dma[3].ReadControl(true)
-
-	case 0x100:
-		return m.GBA.Timers[0].Read(0)
-	case 0x101:
-		return m.GBA.Timers[0].Read(1)
-	case 0x102:
-		return m.GBA.Timers[0].Read(2)
-	case 0x103:
-		return 0
-	case 0x104:
-		return m.GBA.Timers[1].Read(0)
-	case 0x105:
-		return m.GBA.Timers[1].Read(1)
-	case 0x106:
-		return m.GBA.Timers[1].Read(2)
-	case 0x107:
-		return 0
-	case 0x108:
-		return m.GBA.Timers[2].Read(0)
-	case 0x109:
-		return m.GBA.Timers[2].Read(1)
-	case 0x10A:
-		return m.GBA.Timers[2].Read(2)
-	case 0x10B:
-		return 0
-	case 0x10C:
-		return m.GBA.Timers[3].Read(0)
-	case 0x10D:
-		return m.GBA.Timers[3].Read(1)
-	case 0x10E:
-		return m.GBA.Timers[3].Read(2)
-	case 0x10F:
 		return 0
 
 	case 0x130:
@@ -560,20 +510,34 @@ func (m *Memory) ReadBadRom(addr uint32, bytesRead uint8) uint32 {
 }
 
 func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
-	//if addr < 0x1000 {
-	//    fmt.Printf("WRITE TO BIOS AT PC %08X and CURR %d ADDR %08X V %02X\n", m.GBA.Cpu.Reg.R[PC], CURR_INST, addr, v)
-	//}
-
 	m.writeRegions[addr>>24](m, addr, v, byteWrite)
 }
 
 func (m *Memory) WriteIO(addr uint32, v uint8) {
-	// this addr should be relative. - 0x400000
+	// this addr should be relative. - 0x4000000
 	// do not make bg control addrs special, unless you know what the f you are doing
 	// VCOUNT is not writable, no touchy
-	if sound := addr >= 0x60 && addr < 0xB0; sound {
+
+	switch {
+	case addr >= 0x60 && addr < 0xB0:
 		WriteSound(addr, v, m.GBA.Apu)
 		return
+	case addr >= 0xB0 && addr < 0xE0:
+
+		addr -= 0xB0
+		i := addr / 12
+		addr %= 12
+		m.GBA.Dma[i].Write(addr, v)
+		return
+
+	case addr >= 0x100 && addr < 0x110:
+
+		addr -= 0x100
+		i := addr / 4
+		idx := addr & 3
+		m.GBA.Timers[i].Write(int(idx), v)
+		return
+
 	}
 
 	switch addr {
@@ -624,140 +588,6 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 		m.IO[addr] = v &^ 0b1110_0000 // bldalpha
 	case 0x0053:
 		m.IO[addr] = v &^ 0b1110_0000 // bldalpha
-
-	case 0x00B0:
-		m.GBA.Dma[0].WriteSrc(v, 0)
-		m.IO[addr] = v
-	case 0x00B1:
-		m.GBA.Dma[0].WriteSrc(v, 1)
-		m.IO[addr] = v
-	case 0x00B2:
-		m.GBA.Dma[0].WriteSrc(v, 2)
-		m.IO[addr] = v
-	case 0x00B3:
-		m.GBA.Dma[0].WriteSrc(v, 3)
-		m.IO[addr] = v
-	case 0x00B4:
-		m.GBA.Dma[0].WriteDst(v, 0)
-	case 0x00B5:
-		m.GBA.Dma[0].WriteDst(v, 1)
-	case 0x00B6:
-		m.GBA.Dma[0].WriteDst(v, 2)
-	case 0x00B7:
-		m.GBA.Dma[0].WriteDst(v, 3)
-	case 0x00B8:
-		m.GBA.Dma[0].WriteCount(v, false)
-	case 0x00B9:
-		m.GBA.Dma[0].WriteCount(v, true)
-	case 0x00BA:
-		m.GBA.Dma[0].WriteControl(v, false)
-	case 0x00BB:
-		m.GBA.Dma[0].WriteControl(v, true)
-	case 0x00BC:
-		m.GBA.Dma[1].WriteSrc(v, 0)
-	case 0x00BD:
-		m.GBA.Dma[1].WriteSrc(v, 1)
-	case 0x00BE:
-		m.GBA.Dma[1].WriteSrc(v, 2)
-	case 0x00BF:
-		m.GBA.Dma[1].WriteSrc(v, 3)
-	case 0x00C0:
-		m.GBA.Dma[1].WriteDst(v, 0)
-	case 0x00C1:
-		m.GBA.Dma[1].WriteDst(v, 1)
-	case 0x00C2:
-		m.GBA.Dma[1].WriteDst(v, 2)
-	case 0x00C3:
-		m.GBA.Dma[1].WriteDst(v, 3)
-	case 0x00C4:
-		m.GBA.Dma[1].WriteCount(v, false)
-	case 0x00C5:
-		m.GBA.Dma[1].WriteCount(v, true)
-	case 0x00C6:
-		m.GBA.Dma[1].WriteControl(v, false)
-	case 0x00C7:
-		m.GBA.Dma[1].WriteControl(v, true)
-	case 0x00C8:
-		m.GBA.Dma[2].WriteSrc(v, 0)
-	case 0x00C9:
-		m.GBA.Dma[2].WriteSrc(v, 1)
-	case 0x00CA:
-		m.GBA.Dma[2].WriteSrc(v, 2)
-	case 0x00CB:
-		m.GBA.Dma[2].WriteSrc(v, 3)
-	case 0x00CC:
-		m.GBA.Dma[2].WriteDst(v, 0)
-	case 0x00CD:
-		m.GBA.Dma[2].WriteDst(v, 1)
-	case 0x00CE:
-		m.GBA.Dma[2].WriteDst(v, 2)
-	case 0x00CF:
-		m.GBA.Dma[2].WriteDst(v, 3)
-	case 0x00D0:
-		m.GBA.Dma[2].WriteCount(v, false)
-	case 0x00D1:
-		m.GBA.Dma[2].WriteCount(v, true)
-	case 0x00D2:
-		m.GBA.Dma[2].WriteControl(v, false)
-	case 0x00D3:
-		m.GBA.Dma[2].WriteControl(v, true)
-	case 0x00D4:
-		m.GBA.Dma[3].WriteSrc(v, 0)
-	case 0x00D5:
-		m.GBA.Dma[3].WriteSrc(v, 1)
-	case 0x00D6:
-		m.GBA.Dma[3].WriteSrc(v, 2)
-	case 0x00D7:
-		m.GBA.Dma[3].WriteSrc(v, 3)
-	case 0x00D8:
-		m.GBA.Dma[3].WriteDst(v, 0)
-	case 0x00D9:
-		m.GBA.Dma[3].WriteDst(v, 1)
-	case 0x00DA:
-		m.GBA.Dma[3].WriteDst(v, 2)
-	case 0x00DB:
-		m.GBA.Dma[3].WriteDst(v, 3)
-	case 0x00DC:
-		m.GBA.Dma[3].WriteCount(v, false)
-	case 0x00DD:
-		m.GBA.Dma[3].WriteCount(v, true)
-	case 0x00DE:
-		m.GBA.Dma[3].WriteControl(v, false)
-	case 0x00DF:
-		m.GBA.Dma[3].WriteControl(v, true)
-
-	case 0x100:
-		m.GBA.Timers[0].Write(0, v)
-	case 0x101:
-		m.GBA.Timers[0].Write(1, v)
-	case 0x102:
-		m.GBA.Timers[0].Write(2, v)
-	case 0x103:
-		return
-	case 0x104:
-		m.GBA.Timers[1].Write(0, v)
-	case 0x105:
-		m.GBA.Timers[1].Write(1, v)
-	case 0x106:
-		m.GBA.Timers[1].Write(2, v)
-	case 0x107:
-		return
-	case 0x108:
-		m.GBA.Timers[2].Write(0, v)
-	case 0x109:
-		m.GBA.Timers[2].Write(1, v)
-	case 0x10A:
-		m.GBA.Timers[2].Write(2, v)
-	case 0x10B:
-		return
-	case 0x10C:
-		m.GBA.Timers[3].Write(0, v)
-	case 0x10D:
-		m.GBA.Timers[3].Write(1, v)
-	case 0x10E:
-		m.GBA.Timers[3].Write(2, v)
-	case 0x10F:
-		return
 
 	case 0x130:
 		return

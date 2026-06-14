@@ -347,6 +347,43 @@ func (c *Cpu) InstRead32(addr uint32, seq bool) uint32 {
 	return c.Mem.Read32(addr)
 }
 
+func (c *Cpu) CycleCounterDma(addr, width uint32, seq, inst bool) int {
+	prefetch := true
+	cycles := 1
+
+	switch addr >> 24 {
+	case 2:
+		cycles = 3 << (width >> 2)
+	case 5, 6:
+		cycles = 1 << (width >> 2)
+	case 8, 9, 10, 11, 12, 13:
+
+		if addr&0x1FFFF == 0 {
+			seq = false
+		}
+
+		cycles = int(c.Waitstate.Get(width, addr, seq))
+		//prefetch = false
+		//if inst {
+		//	cycles = int(c.Prefetch.Wait(addr, int64(cycles), c.Reg.CPSR.T))
+		//} else {
+		//	c.Prefetch.Cancel()
+		//}
+
+	case 14, 15:
+
+		//c.Prefetch.Cancel()
+		cycles = int(c.Waitstate.Get(width, addr, seq))
+		//prefetch = false
+	}
+
+	if prefetch {
+		c.Prefetch.Step(int64(cycles))
+	}
+
+	return cycles
+}
+
 func (c *Cpu) CycleCounter(addr, width uint32, seq, inst bool) int {
 	prefetch := true
 	cycles := 1
