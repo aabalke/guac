@@ -35,20 +35,56 @@ type GBA struct {
 	Mem       *Memory
 	PPU       *PPU
 	Timers    [4]*Timer
-	Dma       [4]DMA
+	Dma       [4]*Dma
 	Irq       cpu.Irq
 	Apu       *apu.Apu
 	Scheduler *Scheduler
+	Keypad    Keypad
 
 	Paused, Muted, Save, Drawn bool
-	OpenBusOpcode              uint32
-	Keypad                     Keypad
 
 	Pixels      []byte
 	Image       *ebiten.Image
 	DrawOptions ebiten.DrawImageOptions
 
 	Frame uint64
+}
+
+var DirectBoot = false
+
+func NewGBA(path string, ctx *oto.Context) *GBA {
+	gba := &GBA{
+		Pixels: make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
+		Image:  ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
+		Keypad: Keypad{KEYINPUT: 0x3FF},
+		Apu:    apu.NewApu(ctx, CPU_SPEED, SND_FREQ, SND_SAMPLES),
+	}
+
+	gba.PPU = &PPU{gba: gba}
+	gba.Irq = cpu.Irq{}
+	gba.Mem = NewMemory(gba)
+	gba.Cpu = arm.NewCpu(false, gba.Mem, &gba.Irq, &gba.Mem.Waitstate, gba.Mem.Prefetch)
+	gba.Scheduler = NewScheduler(&gba.Cpu.AccCycles)
+
+	for i := range 4 {
+		gba.Timers[i] = NewTimer(gba, i)
+		gba.Dma[i] = NewDma(gba, i)
+	}
+
+	gba.LoadBios()
+	gba.LoadGame(path)
+
+	if DirectBoot {
+		gba.DirectBoot()
+	} else {
+		gba.Cpu.Exception(arm.VEC_SWI, arm.MODE_SWI)
+	}
+
+	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, 0, gba.AudioSampleEvent, nil)
+	gba.Scheduler.schedule(EVENT_END_FRAME, 1, 0, gba.FrameEndEvent, nil)
+	gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, 0, gba.ScanlineEndEvent, nil)
+
+	return gba
 }
 
 func (gba *GBA) Update(stdFps bool) {
@@ -76,6 +112,10 @@ func (gba *GBA) Update(stdFps bool) {
 				continue
 			}
 
+			//if B[5] {
+			//	fmt.Printf("PC %08X\n", gba.Cpu.Reg.R[15])
+			//}
+
 			gba.Tick(gba.Cpu.Step())
 		}
 
@@ -95,53 +135,6 @@ func (gba *GBA) Update(stdFps bool) {
 
 func (gba *GBA) Tick(cycles int) {
 	gba.Scheduler.CurrentCycle += int64(cycles)
-}
-
-func NewGBA(path string, ctx *oto.Context) *GBA {
-	gba := GBA{
-		Pixels: make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
-		Image:  ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
-		Keypad: Keypad{KEYINPUT: 0x3FF},
-		Apu:    apu.NewApu(ctx, CPU_SPEED, SND_FREQ, SND_SAMPLES),
-		PPU:    &PPU{},
-	}
-
-	gba.PPU.gba = &gba
-
-	gba.Irq = cpu.Irq{}
-	gba.Mem = NewMemory(&gba)
-	gba.Cpu = arm.NewCpu(false, gba.Mem, &gba.Irq, &gba.Mem.Waitstate, gba.Mem.Prefetch)
-	gba.Scheduler = NewScheduler(&gba.Cpu.AccCycles)
-
-	gba.Timers[0] = NewTimer(&gba, 0)
-	gba.Timers[1] = NewTimer(&gba, 1)
-	gba.Timers[2] = NewTimer(&gba, 2)
-	gba.Timers[3] = NewTimer(&gba, 3)
-
-	gba.Dma[0].Gba = &gba
-	gba.Dma[1].Gba = &gba
-	gba.Dma[2].Gba = &gba
-	gba.Dma[3].Gba = &gba
-
-	gba.Dma[0].Idx = 0
-	gba.Dma[1].Idx = 1
-	gba.Dma[2].Idx = 2
-	gba.Dma[3].Idx = 3
-
-	gba.LoadBios()
-	gba.Cpu.Exception(arm.VEC_SWI, arm.MODE_SWI)
-	//gba.startupNoBios()
-	gba.LoadGame(path)
-
-	gba.Mem.IO[6] = 0
-
-	gba.Cpu.Reg.CPSR.I = false
-
-	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, 0, gba.AudioSampleEvent, nil)
-	gba.Scheduler.schedule(EVENT_END_FRAME, 1, 0, gba.FrameEndEvent, nil)
-	gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, 0, gba.ScanlineEndEvent, nil)
-
-	return &gba
 }
 
 func (gba *GBA) ToggleMute() bool {
@@ -179,27 +172,26 @@ func (gba *GBA) Draw(screen *ebiten.Image) {
 	screen.DrawImage(gba.Image, &gba.DrawOptions)
 }
 
-func (gba *GBA) startupNoBios() {
-	c := gba.Cpu
-
+func (gba *GBA) DirectBoot() {
+	reg := &gba.Cpu.Reg
 	BANK_ID := arm.BANK_ID
 
-	c.Irq.IME = true
+	gba.Cpu.Irq.IME = true
 
-	c.Reg.R[PC] = 0x0800_0000
-	c.Reg.CPSR.Set(0x0000_001F)
-	c.Reg.SPSR[BANK_ID[arm.MODE_IRQ]].Set(0x0000_0010)
-	c.Reg.R[0] = 0x0000_0CA5
+	reg.CPSR.Set(0x1F)
+	reg.SPSR[BANK_ID[arm.MODE_IRQ]].Set(0x10)
+	reg.R[0] = 0x0000_0CA5
 
-	c.Reg.R[arm.LR] = 0x0800_0000
-	c.Reg.LR[BANK_ID[arm.MODE_SYS]] = 0x0800_0000
-	c.Reg.LR[BANK_ID[arm.MODE_USR]] = 0x0800_0000
-	c.Reg.LR[BANK_ID[arm.MODE_IRQ]] = 0x0800_0000
-	c.Reg.LR[BANK_ID[arm.MODE_SWI]] = 0x0800_0000
+	reg.R[PC] = 0x0800_0000
+	reg.R[arm.LR] = 0x0800_0000
+	reg.LR[BANK_ID[arm.MODE_SYS]] = 0x0800_0000
+	reg.LR[BANK_ID[arm.MODE_USR]] = 0x0800_0000
+	reg.LR[BANK_ID[arm.MODE_IRQ]] = 0x0800_0000
+	reg.LR[BANK_ID[arm.MODE_SWI]] = 0x0800_0000
 
-	c.Reg.R[arm.SP] = 0x0300_7F00
-	c.Reg.SP[BANK_ID[arm.MODE_SYS]] = 0x0300_7F00
-	c.Reg.SP[BANK_ID[arm.MODE_USR]] = 0x0300_7F00
-	c.Reg.SP[BANK_ID[arm.MODE_IRQ]] = 0x0300_7FA0
-	c.Reg.SP[BANK_ID[arm.MODE_SWI]] = 0x0300_7FE0
+	reg.R[arm.SP] = 0x0300_7F00
+	reg.SP[BANK_ID[arm.MODE_SYS]] = 0x0300_7F00
+	reg.SP[BANK_ID[arm.MODE_USR]] = 0x0300_7F00
+	reg.SP[BANK_ID[arm.MODE_IRQ]] = 0x0300_7FA0
+	reg.SP[BANK_ID[arm.MODE_SWI]] = 0x0300_7FE0
 }

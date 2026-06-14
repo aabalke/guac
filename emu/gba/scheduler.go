@@ -15,7 +15,10 @@ const (
 	EVENT_TIMER_OVERFLOW2 = "event timer overflow 2"
 	EVENT_TIMER_OVERFLOW3 = "event timer overflow 3"
 	EVENT_TIMER_CONTROL   = "event timer control"
-	EVENT_DMA             = "event dma"
+	EVENT_DMA0            = "event dma 0"
+	EVENT_DMA1            = "event dma 1"
+	EVENT_DMA2            = "event dma 2"
+	EVENT_DMA3            = "event dma 3"
 )
 
 type Scheduler struct {

@@ -1,5 +1,11 @@
 package gba
 
+import (
+	"fmt"
+
+	"github.com/aabalke/guac/emu/gba/cart"
+)
+
 //var DMA_ACTIVE = -1
 //var DMA_FINISHED = -1
 //var DMA_PC = uint32(0)
@@ -21,7 +27,7 @@ const (
 	IRQ_DMA_3 = 11
 )
 
-type DMA struct {
+type Dma struct {
 	Gba *GBA
 	Idx int
 
@@ -46,7 +52,14 @@ type DMA struct {
 	Value uint32
 }
 
-func (dma *DMA) Read(addr uint32) uint8 {
+func NewDma(gba *GBA, idx int) *Dma {
+	return &Dma{
+		Gba: gba,
+		Idx: idx,
+	}
+}
+
+func (dma *Dma) Read(addr uint32) uint8 {
 	switch addr {
 	case 10:
 		return uint8(dma.Control)
@@ -57,7 +70,7 @@ func (dma *DMA) Read(addr uint32) uint8 {
 	}
 }
 
-func (dma *DMA) Write(addr uint32, v uint8) {
+func (dma *Dma) Write(addr uint32, v uint8) {
 	switch addr {
 	case 0, 1, 2, 3:
 
@@ -68,6 +81,7 @@ func (dma *DMA) Write(addr uint32, v uint8) {
 				v &= 0xF
 			}
 		}
+
 		dma.Src = (dma.Src &^ (0xFF << (addr << 3))) | (uint32(v) << (addr << 3))
 		dma.InitSrc = dma.Src
 
@@ -75,7 +89,7 @@ func (dma *DMA) Write(addr uint32, v uint8) {
 
 		byte := addr - 4
 
-		if addr == 3 {
+		if byte == 3 {
 			if dma.Idx != 0 {
 				v &= 0xF
 			} else {
@@ -119,36 +133,71 @@ func (dma *DMA) Write(addr uint32, v uint8) {
 		dma.IRQ = (v>>6)&1 != 0
 		dma.Enabled = (v>>7)&1 != 0
 
+		if B[5] {
+			fmt.Printf("Write Idx %d Mode %d V %02X\n", dma.Idx, dma.Mode, v)
+			//os.Exit(0)
+		}
+
+		if dma.Repeat {
+			B[5] = true
+			fmt.Printf("Write Idx %d Mode %d V %02X\n", dma.Idx, dma.Mode, v)
+		}
+
 		dma.Control = (dma.Control & 0xFF) | (uint32(v) << 8)
 		dma.SrcAdj = (dma.SrcAdj & 1) | (uint32(v)&1)<<1
+
+		//fmt.Printf("new Dma Idx %d Mode %d Repeat %t V %02X\n", dma.Idx, dma.Mode, dma.Repeat, v)
 
 		if !prev && dma.Enabled {
 			dma.Src = dma.InitSrc
 			dma.Dst = dma.InitDst
 
 			if dma.Mode == 0 {
-				dma.Gba.Scheduler.schedule(EVENT_DMA, 2, 1, dma.Start, nil)
+				switch dma.Idx {
+				case 0:
+					dma.Gba.Scheduler.schedule(EVENT_DMA0, 2, 1, dma.Start, nil)
+				case 1:
+					dma.Gba.Scheduler.schedule(EVENT_DMA1, 2, 1, dma.Start, nil)
+				case 2:
+					dma.Gba.Scheduler.schedule(EVENT_DMA2, 2, 1, dma.Start, nil)
+				case 3:
+					dma.Gba.Scheduler.schedule(EVENT_DMA3, 2, 1, dma.Start, nil)
+				}
 			}
 		}
 
 		if prev && !dma.Enabled {
-			dma.Active = false
+
+			dma.disable()
+			//fmt.Printf("disabling Dma Idx %d Mode %d Repeat %t\n", dma.Idx, dma.Mode, dma.Repeat)
+
+			switch dma.Idx {
+			case 0:
+				dma.Gba.Scheduler.cancel(EVENT_DMA0)
+			case 1:
+				dma.Gba.Scheduler.cancel(EVENT_DMA1)
+			case 2:
+				dma.Gba.Scheduler.cancel(EVENT_DMA2)
+			case 3:
+				dma.Gba.Scheduler.cancel(EVENT_DMA3)
+			}
+
 		}
 	}
 }
 
-func (dma *DMA) Start(_ int64, _ any) bool {
+func (dma *Dma) Start(_ int64, _ any) bool {
 	dma.Active = true
 	return false
 }
 
-func (dma *DMA) disable() {
+func (dma *Dma) disable() {
 	dma.Active = false
 	dma.Enabled = false
 	dma.Control &^= 0x8000
 }
 
-func (dma *DMA) transfer() int {
+func (dma *Dma) transfer() int {
 	if dma.Mode == DMA_MODE_REF {
 		return 0
 	}
@@ -207,6 +256,8 @@ func (dma *DMA) transfer() int {
 	if dma.isWord {
 		for i := range count {
 
+			dma.EepromDma(count, tmpDst, tmpSrc)
+
 			switch {
 			case bios:
 				cycles++
@@ -224,6 +275,8 @@ func (dma *DMA) transfer() int {
 		}
 	} else {
 		for i := range count {
+
+			dma.EepromDma(count, tmpDst, tmpSrc)
 
 			switch {
 			case bios:
@@ -258,14 +311,25 @@ func (dma *DMA) transfer() int {
 		dma.Dst = tmpDst
 	}
 
+	//fmt.Printf("SRC %08X DST %08X\n", dma.Src, dma.Dst)
+
 	return cycles
 }
 
 func (gba *GBA) checkDmas(mode uint8) {
 	for i := range 4 {
-		dma := &gba.Dma[i]
+		dma := gba.Dma[i]
 		if ok := dma.Enabled && dma.Mode == mode; ok {
-			gba.Scheduler.schedule(EVENT_DMA, 2, 1, gba.Dma[i].Start, nil)
+			switch i {
+			case 0:
+				gba.Scheduler.schedule(EVENT_DMA0, 2, 1, gba.Dma[i].Start, nil)
+			case 1:
+				gba.Scheduler.schedule(EVENT_DMA1, 2, 1, gba.Dma[i].Start, nil)
+			case 2:
+				gba.Scheduler.schedule(EVENT_DMA2, 2, 1, gba.Dma[i].Start, nil)
+			case 3:
+				gba.Scheduler.schedule(EVENT_DMA3, 2, 1, gba.Dma[i].Start, nil)
+			}
 		}
 	}
 }
@@ -279,4 +343,24 @@ func (gba *GBA) CheckDmas() bool {
 	}
 
 	return false
+}
+
+func (dma *Dma) EepromDma(count, tmpDst, tmpSrc uint32) {
+	if eeprom := CheckEeprom(dma.Gba, tmpDst); eeprom {
+		dstRom := tmpDst >= 0x800_0000 && tmpDst < 0xE00_0000
+		srcRom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
+
+		switch count {
+		case 9, 73:
+			cart.EepromWidth = 6
+		case 17, 81:
+			cart.EepromWidth = 14
+		}
+
+		if srcRom && dstRom {
+			panic("EEPROM HAS BOTH SRC AND DST ROM ADDR")
+		}
+
+		// do not continue this., do not put this outside loop
+	}
 }
