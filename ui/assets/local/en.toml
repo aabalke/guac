@@ -17,7 +17,7 @@ saved = "saved"
 muted = "muted"
 unmuted = "unmuted"
 controller_connected = "controller connected"
-controller_unconnected = "controller unconnected"
+controller_disconnected = "controller disconnected"
 
 [settings]
 

@@ -1,15 +1,10 @@
 module github.com/aabalke/guac
 
-replace github.com/ebitenui/ebitenui => ../ebitenui
-
-replace github.com/aabalke/gojit => ../gojit
-
 go 1.26.2
 
 require (
 	github.com/BurntSushi/toml v1.5.0
-	github.com/aabalke/gojit v0.0.0-20260508030348-14e750bc9cc5
-	github.com/aabalke/gojit/arm64 v0.0.0-20260513001811-c3a1d6d0b875
+	github.com/aabalke/gojit v0.0.0-20260616021404-5808a49d96fc
 	github.com/ebitenui/ebitenui v0.7.3
 	github.com/hajimehoshi/ebiten/v2 v2.9.7
 	github.com/hajimehoshi/oto v1.0.1
@@ -34,3 +29,5 @@ require (
 	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
 )
+
+replace github.com/ebitenui/ebitenui => github.com/aabalke/ebitenui v0.0.0-20260507040224-7e5cd031ea7d

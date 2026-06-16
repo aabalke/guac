@@ -50,7 +50,10 @@ var radioInset = widget.Insets{
 	Bottom: 4,
 }
 
-var keybindsLink = "see [link=https://guacemulator.com]guacemulator.com[/link] for valid keybinds"
+var (
+	controllerLink = "see [link=https://guacemulator.com/docs/configuration/controller]guacemulator.com[/link] for valid keybinds"
+	keybindsLink   = "see [link=https://guacemulator.com/docs/configuration/keys]guacemulator.com[/link] for valid keybinds"
+)
 
 var transparentNine = image.NewNineSliceColor(color.Transparent)
 

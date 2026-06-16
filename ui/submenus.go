@@ -129,7 +129,7 @@ func NewGeneralMenu(g *Game, parent *widget.Container) {
 		{WIDGET_KEY, l.Quit, l.KeyboardQuit, &k.Quit, KeyValidation()},
 
 		{WIDGET_HDR, l.Controller, "", nil, nil},
-		{WIDGET_LNK, "", "", nil, keybindsLink},
+		{WIDGET_LNK, "", "", nil, controllerLink},
 		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, ControllerValidation()},
 		{WIDGET_KEY, l.Return, l.ControllerReturn, &c.Return, ControllerValidation()},
 		{WIDGET_KEY, l.Mute, l.ControllerMute, &c.Mute, ControllerValidation()},
@@ -243,7 +243,7 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 		{WIDGET_KEY, l.Down, l.KeyboardDown, &k.Down, KeyValidation()},
 
 		{WIDGET_HDR, l.Controller, "", nil, nil},
-		{WIDGET_LNK, "", "", nil, keybindsLink},
+		{WIDGET_LNK, "", "", nil, controllerLink},
 		{WIDGET_KEY, l.A, l.ControllerA, &c.A, ControllerValidation()},
 		{WIDGET_KEY, l.B, l.ControllerB, &c.B, ControllerValidation()},
 		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, ControllerValidation()},
@@ -312,7 +312,7 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 		{WIDGET_KEY, l.R, l.KeyboardR, &k.R, KeyValidation()},
 
 		{WIDGET_HDR, l.Controller, "", nil, nil},
-		{WIDGET_LNK, "", "", nil, keybindsLink},
+		{WIDGET_LNK, "", "", nil, controllerLink},
 		{WIDGET_KEY, l.A, l.ControllerA, &c.A, ControllerValidation()},
 		{WIDGET_KEY, l.B, l.ControllerB, &c.B, ControllerValidation()},
 		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, ControllerValidation()},
@@ -400,7 +400,7 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 		{WIDGET_KEY, l.ExportToggle, l.KeyboardExportToggle, &k.ExportScene, KeyValidation()},
 
 		{WIDGET_HDR, l.Controller, "", nil, nil},
-		{WIDGET_LNK, "", "", nil, keybindsLink},
+		{WIDGET_LNK, "", "", nil, controllerLink},
 		{WIDGET_KEY, l.A, l.ControllerA, &c.A, ControllerValidation()},
 		{WIDGET_KEY, l.B, l.ControllerB, &c.B, ControllerValidation()},
 		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, ControllerValidation()},
