@@ -6,7 +6,9 @@ Guac is an Emulator written in golang for Gameboy, Gameboy Color, Gameboy Advanc
 
 # Update Videos
 [UI Update (v0.0.3)](https://www.youtube.com/watch?v=dVdIM_bPQrY)
+
 [NDS Update (v0.0.2)](https://youtu.be/AsWBItlGmZg)
+
 [Original (v0.0.1)](https://youtu.be/BP_sMHJ99n0)
 
 # Features
@@ -23,9 +25,18 @@ guac comes with a TON of customizable options. The ui has customizable colors, h
 ## 3D Export
 guac comes with a 3D Scene Export, allowing the current 3d scene to be exported as a .obj file. This allow the 3D scene to be imported into 3D software such as Blender, Maya etc for debugging, artistic expression and more.
 
-# Installation / Building
+# Getting Started
 
 See Releases for Windows and Linux precompiled binaries.
+Run the executable without any flags or configuration.
+
+```
+.\guac
+```
+
+If you are interested in specific flags and configuration options please see [guacemulator.com](https://guacemulator.com/).
+
+# Building
 
 Building from source is possible with golang > 1.26.2, using:
 
@@ -34,14 +45,3 @@ go build .
 ```
 
 For specific system build quirks please see [guacemulator.com](https://guacemulator.com/).
-
-
-# Getting Started
-
-Run the executable without any flags or configuration.
-
-```
-.\guac
-```
-
-If you are interested in specific flags and configuration options please see [guacemulator.com](https://guacemulator.com/).
