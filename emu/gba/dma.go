@@ -66,7 +66,6 @@ func (dma *DMA) ReadControl(hi bool) uint8 {
 }
 
 func (dma *DMA) MaskAddr(v uint32, src bool) uint32 {
-
 	if !src && (dma.Idx == 0 || dma.Idx == 1 || dma.Idx == 2) {
 		return v & 0x7FF_FFFF
 	}
@@ -75,10 +74,9 @@ func (dma *DMA) MaskAddr(v uint32, src bool) uint32 {
 }
 
 func (dma *DMA) WriteSrc(v uint8, byte uint32) {
-
 	if byte == 3 {
 		v &= 0x0F
-		//switch dma.Idx {
+		// switch dma.Idx {
 
 		//case 0: v &= 0x0F
 		////case 0: v &= 0x07
@@ -91,7 +89,6 @@ func (dma *DMA) WriteSrc(v uint8, byte uint32) {
 }
 
 func (dma *DMA) WriteDst(v uint8, byte uint32) {
-
 	if byte == 3 {
 		switch dma.Idx {
 		case 0, 1, 2:
@@ -106,7 +103,6 @@ func (dma *DMA) WriteDst(v uint8, byte uint32) {
 }
 
 func (dma *DMA) WriteCount(v uint8, hi bool) {
-
 	if hi {
 		mask := uint32(0x3F)
 		if dma.Idx == 3 {
@@ -120,7 +116,6 @@ func (dma *DMA) WriteCount(v uint8, hi bool) {
 }
 
 func (dma *DMA) WriteControl(v uint8, hi bool) {
-
 	if hi {
 		a := uint32(v) & 0xF7
 		if dma.Idx == 3 {
@@ -165,8 +160,7 @@ func (dma *DMA) disable() {
 }
 
 func (dma *DMA) transfer() {
-
-	mem := &dma.Gba.Mem
+	mem := dma.Gba.Mem
 	count := dma.WordCount
 
 	switch {
@@ -277,7 +271,6 @@ func (dma *DMA) transfer() {
 		sram := tmpSrc >= 0xE00_0000 && tmpSrc < 0x1000_0000
 
 		if dma.isWord {
-
 			if dstPtr == nil {
 				switch {
 				case badAddr:
@@ -308,9 +301,7 @@ func (dma *DMA) transfer() {
 
 				*(*uint32)(dstPtr) = dma.Value
 			}
-
 		} else {
-
 			if dstPtr == nil {
 				switch {
 				case badAddr:
@@ -390,7 +381,6 @@ func (dma *DMA) transfer() {
 //}
 
 func (dma *DMA) transferFifo() {
-
 	a := dma.Gba.Apu
 
 	switch {
@@ -408,9 +398,9 @@ func (dma *DMA) transferFifo() {
 		return
 	case dma.Idx == 2 && dma.Dst != 0x400_00A4:
 		return
-		//case dma.Idx == 1 && dma.Dst == 0x400_00A0 && !(a.FifoA.Length <= 0x10):
+		// case dma.Idx == 1 && dma.Dst == 0x400_00A0 && !(a.FifoA.Length <= 0x10):
 		//	return
-		//case dma.Idx == 2 && dma.Dst == 0x400_00AA && !(a.FifoB.Length <= 0x10):
+		// case dma.Idx == 2 && dma.Dst == 0x400_00AA && !(a.FifoB.Length <= 0x10):
 		//	return
 	}
 
@@ -449,7 +439,6 @@ func (dma *DMA) checkMode(mode uint32) bool {
 }
 
 func (gba *GBA) checkDmas(mode uint32) {
-
 	if ok := gba.Dma[0].checkMode(mode); ok {
 		gba.Dma[0].transfer()
 	}

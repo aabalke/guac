@@ -1,20 +1,15 @@
 package gba
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/cpu"
-	arm7 "github.com/aabalke/guac/emu/cpu/arm7"
+	"github.com/aabalke/guac/emu/cpu/arm7"
 	"github.com/aabalke/guac/emu/gba/apu"
 	"github.com/aabalke/guac/emu/gba/cart"
+	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/oto"
 )
-
-var _ = fmt.Sprintf
-var _ = os.Exit
 
 const (
 	PC            = 15
@@ -34,10 +29,10 @@ var CURR_INST = uint64(0)
 
 type GBA struct {
 	Debugger  Debugger
-	Cartridge cart.Cartridge
+	Cartridge *cart.Cartridge
 	Cpu       *arm7.Cpu
-	Mem       Memory
-	PPU       PPU
+	Mem       *Memory
+	PPU       *PPU
 	Timers    [4]Timer
 	Dma       [4]DMA
 	Irq       cpu.Irq
@@ -53,14 +48,14 @@ type GBA struct {
 
 	vsyncAddr uint32
 
-	Pixels []byte
-	Image  *ebiten.Image
+	Pixels      []byte
+	Image       *ebiten.Image
+	DrawOptions ebiten.DrawImageOptions
 
 	Frame uint64
 }
 
 func (gba *GBA) Update(stdFps bool) {
-
 	gba.AccCycles = 0
 
 	if gba.Paused {
@@ -112,10 +107,10 @@ func (gba *GBA) Update(stdFps bool) {
 
 	gba.Apu.Play(gba.Muted, stdFps)
 	gba.Frame++
+	gba.Image.WritePixels(gba.Pixels)
 }
 
 func (gba *GBA) Tick(cycles uint32) {
-
 	gba.SoundCycles += cycles
 
 	if gba.SoundCycles >= gba.SoundCyclesMask {
@@ -128,7 +123,6 @@ func (gba *GBA) Tick(cycles uint32) {
 }
 
 func NewGBA(path string, ctx *oto.Context) *GBA {
-
 	const (
 		CPU_FREQ_HZ   = 16777216
 		SND_FREQUENCY = 48000 // sample rate
@@ -141,16 +135,17 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 		Keypad:          Keypad{KEYINPUT: 0x3FF},
 		Apu:             apu.NewApu(ctx, CPU_FREQ_HZ, SND_FREQUENCY, SND_SAMPLES),
 		SoundCyclesMask: max(0x80, uint32(config.Conf.Gba.SoundClockUpdateCycles)),
+		PPU:             &PPU{},
 	}
+
+	gba.PPU.gba = &gba
 
 	gba.Debugger = Debugger{Gba: &gba, Version: 1}
 
 	gba.Irq = cpu.Irq{}
 	gba.Mem = NewMemory(&gba)
 	//gba.Cpu = arm7.NewCpu(config.Conf.Jit.Enabled, &gba.Mem, &gba.Irq)
-	gba.Cpu = arm7.NewCpu(false, &gba.Mem, &gba.Irq)
-
-	gba.PPU.gba = &gba
+	gba.Cpu = arm7.NewCpu(false, gba.Mem, &gba.Irq)
 
 	gba.Timers[0].Gba = &gba
 	gba.Timers[1].Gba = &gba
@@ -238,7 +233,6 @@ func (gba *GBA) LoadGame(path string) {
 
 // RidgeX/ygba BSD3
 func (gba *GBA) VideoUpdate(cycles uint32) {
-
 	dispstat := &gba.Mem.Dispstat
 	vcount := gba.Mem.IO[0x6]
 
@@ -275,7 +269,7 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 	if newScanline := currScanlineCycles < prevScanlineCycles; newScanline {
 
 		// this 1232 cycle count is estimate, should replace with actual
-		//gba.Apu.SoundClock(1232, false)
+		// gba.Apu.SoundClock(1232, false)
 
 		dispstat.SetHBlank(false)
 
@@ -314,4 +308,22 @@ func (gba *GBA) VideoUpdate(cycles uint32) {
 	if currFrameCycles < prevFrameCycles {
 		gba.Drawn = true
 	}
+}
+
+func (gb *GBA) Draw(screen *ebiten.Image) {
+	var (
+		sw = float64(screen.Bounds().Dx())
+		sh = float64(screen.Bounds().Dy())
+	)
+
+	gb.DrawOptions.GeoM.Reset()
+
+	scale := utils.ScaleImage(sw, sh, SCREEN_WIDTH, SCREEN_HEIGHT)
+
+	offsetX := (sw - (SCREEN_WIDTH * scale)) / 2
+	offsetY := (sh - (SCREEN_HEIGHT * scale)) / 2
+
+	gb.DrawOptions.GeoM.Scale(scale, scale)
+	gb.DrawOptions.GeoM.Translate(offsetX, offsetY)
+	screen.DrawImage(gb.Image, &gb.DrawOptions)
 }

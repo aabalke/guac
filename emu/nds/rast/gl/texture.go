@@ -27,7 +27,6 @@ func (t *Texture) Sample(u, v float32) Color {
 }
 
 func (t *Texture) getColor(idx uint32) Color {
-
 	if idx >= uint32(len(*t.CachedTexture)) {
 		return Transparent
 	}
@@ -36,14 +35,16 @@ func (t *Texture) getColor(idx uint32) Color {
 }
 
 func (t *Texture) getTextureIdx(u, v float32) uint32 {
-
 	x := int(u * float32(t.Width))
 	y := int(v * float32(t.Height))
 
 	if t.RepeatT {
 
-		flip := t.FlipT && uint(math.Floor(float64(v)))&1 == 1
+		flip := t.FlipT && int64(math.Floor(float64(v)))&1 == 1
 		v -= float32(math.Floor(float64(v)))
+		if v < 0 {
+			v += 1.0 // clamp negative residual from float imprecision - necessary arm64
+		}
 		tmp := int(v * float32(t.Height))
 
 		// does tmp need - 1 not just flip??
@@ -60,8 +61,11 @@ func (t *Texture) getTextureIdx(u, v float32) uint32 {
 	}
 
 	if t.RepeatS {
-		flip := t.FlipS && uint(math.Floor(float64(u)))&1 == 1
+		flip := t.FlipS && int64(math.Floor(float64(u)))&1 == 1
 		u -= float32(math.Floor(float64(u)))
+		if u < 0 {
+			u += 1.0 // clamp negative residual from float imprecision - necessary arm64
+		}
 		tmp := int(u * float32(t.Width))
 
 		// does tmp need - 1 not just flip??
@@ -77,7 +81,7 @@ func (t *Texture) getTextureIdx(u, v float32) uint32 {
 		x = max(x, 0)
 	}
 
-	return uint32((x + y*(t.Width)))
+	return uint32((x + y*t.Width))
 }
 
 //type BilinearCoords struct {

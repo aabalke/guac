@@ -46,9 +46,7 @@ const (
 	SINGLE_THREAD = !true // debugging
 )
 
-var (
-	RASTERIZE_WG = sync.WaitGroup{}
-)
+var RASTERIZE_WG = sync.WaitGroup{}
 
 type Nds struct {
 	mem       mem.Mem
@@ -90,8 +88,8 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 	cp15 := &cp15.Cp15{}
 	cp15.Init(&nds.mem)
 
-	nds.arm7 = arm7.NewCpu(config.Conf.Jit.Enabled, &nds.mem, &irq7)
-	nds.arm9 = arm9.NewCpu(config.Conf.Jit.Enabled, &nds.mem, &irq9, cp15)
+	nds.arm7 = arm7.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem, &irq7)
+	nds.arm9 = arm9.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem, &irq9, cp15)
 
 	s := snd.NewSnd(
 		audioCtx,
@@ -106,7 +104,8 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 		&nds.dma7, &nds.dma9,
 		&irq7, &irq9,
 		nds.arm7.Jit, nds.arm9.Jit,
-		nds.Cartridge, nds.ppu, s)
+		nds.Cartridge, nds.ppu, s,
+	)
 
 	s.Mem = &nds.mem
 
@@ -126,25 +125,32 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 
 	nds.DirectBoot()
 
-	debug.Init("./log.csv")
+	if config.Conf.General.Logger {
+		debug.Init("./log.csv")
+	}
 
 	return &nds
 }
 
 func (nds *Nds) Update(stdFps bool) {
-
 	if nds.Paused {
 		return
 	}
 
 	if !nds.ppu.EngineA.Dispcnt.Is3D {
 		nds.UpdateFrame(stdFps)
+		t, b := nds.GetScreens()
+		nds.Screen.Top.WritePixels(*t)
+		nds.Screen.Bottom.WritePixels(*b)
 		return
 	}
 
 	if SINGLE_THREAD {
 		nds.UpdateFrame(stdFps)
 		nds.ppu.Rasterizer.Render.UpdateRender()
+		t, b := nds.GetScreens()
+		nds.Screen.Top.WritePixels(*t)
+		nds.Screen.Bottom.WritePixels(*b)
 		return
 	}
 
@@ -161,25 +167,27 @@ func (nds *Nds) Update(stdFps bool) {
 	}()
 
 	RASTERIZE_WG.Wait()
+
+	t, b := nds.GetScreens()
+	nds.Screen.Top.WritePixels(*t)
+	nds.Screen.Bottom.WritePixels(*b)
 }
 
 func (nds *Nds) UpdateFrame(stdFps bool) {
-
 	for nds.Drawn = false; !nds.Drawn; {
+		if config.Conf.Nds.Jit.Enabled {
 
-		if config.Conf.Jit.Enabled {
-
-			for c := uint32(0); c < config.Conf.Jit.BatchInstA9; {
+			for c := uint32(0); c < config.Conf.Nds.Jit.BatchInstA9; {
 				c += nds.StepArm9()
 			}
 
-			for c := uint32(0); c < config.Conf.Jit.BatchInstA7; {
+			for c := uint32(0); c < config.Conf.Nds.Jit.BatchInstA7; {
 				c += nds.StepArm7()
 			}
 
-			nds.VideoUpdate(config.Conf.Jit.BatchInstA7)
+			nds.VideoUpdate(config.Conf.Nds.Jit.BatchInstA7)
 
-			for c := uint32(0); c < config.Conf.Jit.BatchInstA7; {
+			for c := uint32(0); c < config.Conf.Nds.Jit.BatchInstA7; {
 				nds.StepOther()
 				c++
 			}
@@ -202,7 +210,7 @@ func (nds *Nds) UpdateFrame(stdFps bool) {
 		}
 	}
 
-	if config.Conf.Jit.Enabled {
+	if config.Conf.Nds.Jit.Enabled {
 		nds.arm7.Jit.DeletePages()
 		nds.arm9.Jit.DeletePages()
 	}
@@ -212,7 +220,6 @@ func (nds *Nds) UpdateFrame(stdFps bool) {
 }
 
 func (nds *Nds) StepOther() {
-
 	if nds.TimerCycles&TIMER_CYCLE_MASK == 0 {
 		nds.UpdateTimers(TIMER_CYCLE_MASK + 1)
 	}
@@ -221,7 +228,6 @@ func (nds *Nds) StepOther() {
 }
 
 func (nds *Nds) StepArm9() uint32 {
-
 	nds.arm9.CheckIrq()
 
 	if nds.arm9.Halted {
@@ -250,7 +256,6 @@ func (nds *Nds) StepArm9() uint32 {
 }
 
 func (nds *Nds) StepArm7() uint32 {
-
 	nds.arm7.CheckIrq()
 
 	if nds.arm7.Halted {
@@ -279,7 +284,6 @@ func (nds *Nds) TogglePause() bool {
 }
 
 func (nds *Nds) GetScreens() (t, b *[]byte) {
-
 	pa := &nds.ppu.EngineA.Pixels
 	pb := &nds.ppu.EngineB.Pixels
 
@@ -291,16 +295,20 @@ func (nds *Nds) GetScreens() (t, b *[]byte) {
 }
 
 func (nds *Nds) Close() {
+	RASTERIZE_WG.Wait()
+
 	nds.Muted = true
 	nds.Paused = true
 
-	debug.L.Close()
+	nds.mem.Snd.Close()
+	if debug.L != nil {
+		debug.L.Close()
+	}
 	nds.arm7.Jit.Close()
 	nds.arm9.Jit.Close()
 }
 
 func (nds *Nds) DirectBoot() {
-
 	nds.mem.DirectBootMemory()
 
 	nds.arm9.Reg.R[12] = nds.Cartridge.Header.Arm9EntryAddr
@@ -321,7 +329,6 @@ func (nds *Nds) DirectBoot() {
 
 // RidgeX/ygba BSD3
 func (nds *Nds) VideoUpdate(cycles uint32) {
-
 	dispstat := &nds.mem.Dispstat
 	vcount := nds.mem.Vcount
 
@@ -445,7 +452,6 @@ func (nds *Nds) CheckDmas(mode uint32, arm9 bool) {
 }
 
 func (nds *Nds) CheckGeoDmas() {
-
 	for i := range 4 {
 
 		if !nds.dma9[i].Enabled {
@@ -461,7 +467,6 @@ func (nds *Nds) CheckGeoDmas() {
 }
 
 func (nds *Nds) UpdateTimers(cycles uint32) {
-
 	overflow, setIrq := false, false
 
 	for i := range uint32(8) {

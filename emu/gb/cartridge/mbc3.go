@@ -122,7 +122,7 @@ func (m *Mbc3) ReadPtr(addr uint16) unsafe.Pointer {
 	case addr < 0x8000:
 		return unsafe.Pointer(&m.Cartridge.Data[(m.RomBase2|uint32(addr-0x4000))&m.Cartridge.RomMask])
 	default:
-        return nil
+		return nil
 	}
 }
 

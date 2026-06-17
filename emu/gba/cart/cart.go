@@ -40,8 +40,7 @@ const (
 	TYPE_MACRONIX128 = 5
 )
 
-func NewCartridge(rom, sav string) Cartridge {
-
+func NewCartridge(rom, sav string) *Cartridge {
 	c := Cartridge{
 		RomPath: rom,
 		SavPath: sav,
@@ -64,11 +63,10 @@ func NewCartridge(rom, sav string) Cartridge {
 		log.Printf("Cartridge Type FLASH128\n")
 	}
 
-	return c
+	return &c
 }
 
 func (c *Cartridge) getCartBackupId() int {
-
 	// have to be word aligned // maybe not???
 
 	for i := range len(c.Rom) {
@@ -100,7 +98,6 @@ func (c *Cartridge) getCartBackupId() int {
 }
 
 func (c *Cartridge) setDeviceManufacturer(size128 bool) {
-
 	// set small to SST, and large to Sanyo - this avoids Macronix and Atmel specific cmds
 	// do some games require the special cmds???
 
@@ -115,7 +112,6 @@ func (c *Cartridge) setDeviceManufacturer(size128 bool) {
 }
 
 func (c *Cartridge) getDeviceManufacturer() int {
-
 	code := (uint16(c.Flash[0]) << 8) | uint16(c.Flash[1])
 
 	c.Device = uint32(c.Flash[0])
@@ -140,7 +136,6 @@ func (c *Cartridge) getDeviceManufacturer() int {
 }
 
 func (c *Cartridge) load() {
-
 	buf, err := os.ReadFile(c.RomPath)
 	if err != nil {
 		panic(err)
@@ -157,7 +152,6 @@ func (c *Cartridge) load() {
 	// sav
 
 	sBuf, err := os.ReadFile(c.SavPath)
-
 	if err != nil {
 		switch c.Id {
 		case SRAM:
@@ -190,7 +184,6 @@ func (c *Cartridge) load() {
 }
 
 func (c *Cartridge) Save() {
-
 	log.Printf("Saving Game Path: %s\n", c.SavPath)
 
 	f, err := os.Create(c.SavPath)
@@ -218,7 +211,6 @@ func (c *Cartridge) Save() {
 }
 
 func (c *Cartridge) Read(addr uint32) uint8 {
-
 	switch c.Id {
 	case SRAM:
 		return c.SRAM[addr]
@@ -233,7 +225,6 @@ func (c *Cartridge) Read(addr uint32) uint8 {
 }
 
 func (c *Cartridge) Write(addr uint32, v uint8) {
-
 	switch c.Id {
 	case SRAM:
 		c.SRAM[addr] = v

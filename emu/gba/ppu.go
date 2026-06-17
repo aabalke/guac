@@ -27,7 +27,7 @@ type Dispcnt struct {
 	HBlankIntervalFree bool
 	OneDimensional     bool
 	ForcedBlank        bool
-	//DisplayBg [4]bool
+	// DisplayBg [4]bool
 	DisplayObj    bool
 	DisplayWin0   bool
 	DisplayWin1   bool
@@ -76,7 +76,7 @@ type Background struct {
 	aXOffset, aYOffset uint32
 	Affine             bool
 
-	//PbCalc, PdCalc float64
+	// PbCalc, PdCalc float64
 	OutX, OutY float64
 }
 
@@ -100,7 +100,6 @@ type Object struct {
 }
 
 func (p *PPU) UpdatePPU(addr uint32, v uint32) {
-
 	if win := addr >= 0x40 && addr < 0x4C; win {
 		p.UpdateWin(addr, v)
 		return
@@ -177,7 +176,6 @@ func (p *PPU) UpdatePPU(addr uint32, v uint32) {
 }
 
 func (p *PPU) UpdateWin(addr uint32, v uint32) {
-
 	wins := &p.Windows
 	win0 := &p.Windows.Win0
 	win1 := &p.Windows.Win1
@@ -295,7 +293,6 @@ func (p *PPU) UpdateWin(addr uint32, v uint32) {
 }
 
 func (p *PPU) UpdateAffine(relAddr uint32) {
-
 	paramIdx := (relAddr &^ 0b1) / 0x20
 
 	for i := range 128 {
@@ -310,15 +307,14 @@ func (p *PPU) UpdateAffine(relAddr uint32) {
 			continue
 		}
 
-		UpdateAffineParams(obj, &p.gba.Mem)
+		UpdateAffineParams(obj, p.gba.Mem)
 	}
 }
 
 func (p *PPU) UpdateOAM(relAddr uint32) {
-
 	attrIdx := relAddr % 8
 
-	m := &p.gba.Mem
+	m := p.gba.Mem
 
 	if affineParam := attrIdx == 6 || attrIdx == 7; affineParam {
 		p.UpdateAffine(relAddr)
@@ -385,7 +381,6 @@ func UpdateAffineParams(obj *Object, m *Memory) {
 }
 
 func (p *PPU) UpdateBackgrounds(addr, v uint32) {
-
 	switch addr {
 	case 0x08:
 		p.Backgrounds[0].Priority = v & 0b11
@@ -601,7 +596,6 @@ func (p *PPU) UpdateBackgrounds(addr, v uint32) {
 }
 
 func (bg *Background) setSize() {
-
 	if bg.Affine {
 		switch bg.Size {
 		case 0:
@@ -642,7 +636,6 @@ func (bg *Background) setSize() {
 }
 
 func (obj *Object) setSize(shape, size uint32) {
-
 	const (
 		SQUARE     = 0
 		HORIZONTAL = 1

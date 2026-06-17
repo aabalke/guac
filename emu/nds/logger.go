@@ -21,7 +21,6 @@ func Log(nds *Nds, start, end uint64, arm9 bool) {
 }
 
 func (nds *Nds) LogCpu(arm9 bool) {
-
 	var (
 		r      [16]uint32
 		opcode uint32

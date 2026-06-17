@@ -1,59 +1,59 @@
-package gameboy
+package gb
 
 import (
+	"slices"
+
 	"github.com/aabalke/guac/config"
 	"github.com/hajimehoshi/ebiten/v2"
-	"slices"
 )
 
 func (gb *GameBoy) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadButton) {
-
 	var (
 		keyConfig    = config.Conf.Gb.KeyboardConfig
-		buttonConfig = config.Conf.Gba.ControllerConfig
+		buttonConfig = config.Conf.Gb.ControllerConfig
 		k            = &gb.Joypad
 	)
 
 	*k = 0xFF
 
 	for _, key := range keys {
-		switch keyStr := key.String(); {
-		case slices.Contains(keyConfig.A, keyStr):
+		switch {
+		case slices.Contains(keyConfig.A, key):
 			*k &^= 1 << 4
-		case slices.Contains(keyConfig.B, keyStr):
+		case slices.Contains(keyConfig.B, key):
 			*k &^= 1 << 5
-		case slices.Contains(keyConfig.Select, keyStr):
+		case slices.Contains(keyConfig.Select, key):
 			*k &^= 1 << 6
-		case slices.Contains(keyConfig.Start, keyStr):
+		case slices.Contains(keyConfig.Start, key):
 			*k &^= 1 << 7
-		case slices.Contains(keyConfig.Right, keyStr):
+		case slices.Contains(keyConfig.Right, key):
 			*k &^= 1 << 0
-		case slices.Contains(keyConfig.Left, keyStr):
+		case slices.Contains(keyConfig.Left, key):
 			*k &^= 1 << 1
-		case slices.Contains(keyConfig.Up, keyStr):
+		case slices.Contains(keyConfig.Up, key):
 			*k &^= 1 << 2
-		case slices.Contains(keyConfig.Down, keyStr):
+		case slices.Contains(keyConfig.Down, key):
 			*k &^= 1 << 3
 		}
 	}
 
 	for _, button := range buttons {
-		switch buttonStr := int(button); {
-		case slices.Contains(buttonConfig.A, buttonStr):
+		switch {
+		case slices.Contains(buttonConfig.A, button):
 			*k &^= 1 << 4
-		case slices.Contains(buttonConfig.B, buttonStr):
+		case slices.Contains(buttonConfig.B, button):
 			*k &^= 1 << 5
-		case slices.Contains(buttonConfig.Select, buttonStr):
+		case slices.Contains(buttonConfig.Select, button):
 			*k &^= 1 << 6
-		case slices.Contains(buttonConfig.Start, buttonStr):
+		case slices.Contains(buttonConfig.Start, button):
 			*k &^= 1 << 7
-		case slices.Contains(buttonConfig.Right, buttonStr):
+		case slices.Contains(buttonConfig.Right, button):
 			*k &^= 1 << 0
-		case slices.Contains(buttonConfig.Left, buttonStr):
+		case slices.Contains(buttonConfig.Left, button):
 			*k &^= 1 << 1
-		case slices.Contains(buttonConfig.Up, buttonStr):
+		case slices.Contains(buttonConfig.Up, button):
 			*k &^= 1 << 2
-		case slices.Contains(buttonConfig.Down, buttonStr):
+		case slices.Contains(buttonConfig.Down, button):
 			*k &^= 1 << 3
 		}
 	}

@@ -9,66 +9,66 @@ import (
 )
 
 var (
-    flagArm7 = flag.Bool("arm9", true, "run arm9 generator")
-    flagArm9 = flag.Bool("arm7", true, "run arm7 generator")
-    flagPath = flag.String("path", "../", "export generated code to `path`")
+	flagArm7 = flag.Bool("arm9", true, "run arm9 generator")
+	flagArm9 = flag.Bool("arm7", true, "run arm7 generator")
+	flagPath = flag.String("path", "../", "export generated code to `path`")
 )
 
 type CpuConfig struct {
-    A9 bool
+	A9 bool
 }
 
 func main() {
-
 	flag.Parse()
 
-    if flag.NArg() > 0 {
-        flag.Usage()
-        os.Exit(1)
-        return
-    }
+	if flag.NArg() > 0 {
+		flag.Usage()
+		os.Exit(1)
+		return
+	}
 
-    if *flagArm7 {
-        generate(*flagPath + "arm7/", CpuConfig{})
-    }
+	if *flagArm7 {
+		generate(*flagPath+"arm7/", CpuConfig{})
+	}
 
-    if *flagArm9 {
-        generate(*flagPath + "arm9/", CpuConfig{A9: true})
-    }
+	if *flagArm9 {
+		generate(*flagPath+"arm9/", CpuConfig{A9: true})
+	}
 }
 
 func generate(exportPath string, cfg CpuConfig) {
+	buildImportPath := func(file string) string {
+		return "./templates/" + file + ".gotmpl"
+	}
 
-    buildImportPath := func(file string) string {
-        return "./templates/" + file + ".gotmpl"
-    }
+	buildExportPath := func(file string) string {
+		return exportPath + file + ".go"
+	}
 
-    buildExportPath := func(file string) string {
-        return exportPath + file + ".go"
-    }
+	for _, v := range [...]string{
+		"cpu",
+		"cache",
+		"exceptions",
+		"jit",
+		"jit_amd64",
+		"jit_arm64",
 
-    for _, v := range [...]string{
+		"arm",
+		"arm_amd64",
+		"arm_arm64",
+		"arm_decoder",
 
-        "cpu",
-        "cache",
-        "exceptions",
-        "jit",
-
-        "arm",
-        "arm_decoder",
-        "arm_jit",
-
-        "thumb",
-        "thumb_decoder",
-        "thumb_jit",
-
-    } {
-        generateFile(
-            buildImportPath(v),
-            buildExportPath(v),
-            cfg,
-        )
-    }
+		"thumb",
+		"thumb_decoder",
+		"thumb_amd64",
+		"thumb_arm64",
+	} {
+		generateFile(
+			buildImportPath(v),
+			buildExportPath(v),
+			cfg,
+		)
+	}
 }
 
 func generateFile(templatePath, exportPath string, cfg CpuConfig) {
@@ -87,7 +87,7 @@ func generateFile(templatePath, exportPath string, cfg CpuConfig) {
 		panic(err)
 	}
 
-	if err := os.WriteFile(exportPath, formatted, 0644); err != nil {
+	if err := os.WriteFile(exportPath, formatted, 0o644); err != nil {
 		panic(err)
 	}
 }

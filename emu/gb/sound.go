@@ -1,4 +1,4 @@
-package gameboy
+package gb
 
 import (
 	"fmt"
@@ -7,7 +7,6 @@ import (
 )
 
 func (gb *GameBoy) WriteSound(addr, v uint8, a *apu.Apu) {
-
 	if addr == 0x26 {
 		wasEnabled := a.Enabled
 		a.Enabled = v&0x80 != 0
@@ -134,6 +133,8 @@ func (gb *GameBoy) WriteSound(addr, v uint8, a *apu.Apu) {
 
 			if v&0x80 != 0 {
 				ch.Trigger()
+				gb.Scheduler.cancel(EVENT_SND_WAVE_CLOCK)
+				gb.scheduleWaveClock(gb.Scheduler.CurrentCycle)
 			}
 		}
 
@@ -164,6 +165,14 @@ func (gb *GameBoy) WriteSound(addr, v uint8, a *apu.Apu) {
 			ch.S = v >> 4
 			ch.R = v & 7
 			ch.Width7 = v&0x8 != 0
+			r := float64(ch.R)
+			if r == 0 {
+				r = 0.5
+			}
+
+			div := 1 << (ch.S + 1)
+			frequency := (524288 / r) / float64(div)
+			ch.CycleSamples = SND_FREQ / frequency
 
 		case 0x23:
 
@@ -214,7 +223,6 @@ func (gb *GameBoy) WriteSound(addr, v uint8, a *apu.Apu) {
 }
 
 func (gb *GameBoy) ReadSound(addr uint8, a *apu.Apu) uint8 {
-
 	//fmt.Printf("R ADDR %02X\n", addr)
 
 	if wave := addr >= 0x30 && addr < 0x40; wave {
@@ -225,7 +233,7 @@ func (gb *GameBoy) ReadSound(addr uint8, a *apu.Apu) uint8 {
 			return ch.Ram[(addr-0x30)&0xF]
 		}
 
-		delta := int(gb.frameCycles) - int(ch.LastReadCycle)
+		delta := int(gb.Scheduler.CurrentCycle) - int(ch.LastReadCycle)
 
 		//fmt.Printf("Read Wave Ram 0x30. Enabled %t Latch %08d Frame %08d Delta %02d Latched %t CNT %03d V %02X\n\n", ch.ChannelEnabled, ch.LastReadCycle, gb.frameCycles, delta, delta != 0, cnt, ch.SampleByte)
 
@@ -292,7 +300,6 @@ func (gb *GameBoy) ReadSound(addr uint8, a *apu.Apu) uint8 {
 	}
 
 	if wave := addr >= 0x1A && addr < 0x20; wave {
-
 		switch ch := &a.WaveChannel; addr {
 		case 0x1A:
 
@@ -318,7 +325,6 @@ func (gb *GameBoy) ReadSound(addr uint8, a *apu.Apu) uint8 {
 	}
 
 	if noise := addr >= 0x20 && addr < 0x24; noise {
-
 		switch ch := &a.NoiseChannel; addr {
 
 		case 0x21:
@@ -335,7 +341,7 @@ func (gb *GameBoy) ReadSound(addr uint8, a *apu.Apu) uint8 {
 
 		case 0x22:
 			v := ch.R
-			v |= (ch.S) << 4
+			v |= ch.S << 4
 			if ch.Width7 {
 				v |= 1 << 3
 			}

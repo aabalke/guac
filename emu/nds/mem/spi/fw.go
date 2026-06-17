@@ -177,7 +177,7 @@ func firwareSetUseSetting(d *[]byte, base, idx uint32) {
 
 	c := &config.Conf.Nds.Firmware
 
-	(*d)[base+0x02] = c.Color
+	(*d)[base+0x02] = uint8(c.Color)
 	(*d)[base+0x03] = c.BirthdayMonth
 	(*d)[base+0x04] = c.BirthdayDay
 

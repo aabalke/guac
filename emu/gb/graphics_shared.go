@@ -1,8 +1,4 @@
-package gameboy
-
-import (
-	"unsafe"
-)
+package gb
 
 const (
 	SCY         = 0x42
@@ -15,7 +11,7 @@ const (
 	WY          = 0x4A
 	WX          = 0x4B
 
-	//GBC
+	// GBC
 	BCPS = 0x68
 	BCPD = 0x69
 	OCPS = 0x6A
@@ -42,7 +38,6 @@ type Lcdc struct {
 }
 
 func (l *Lcdc) Read() uint8 {
-
 	v := uint8(0)
 
 	if l.BgMaster {
@@ -74,7 +69,6 @@ func (l *Lcdc) Read() uint8 {
 }
 
 func (l *Lcdc) Write(v uint8) {
-
 	wasEnabled := l.Enabled
 	l.BgMaster = (v>>0)&1 != 0
 	l.ObjEnabled = (v>>1)&1 != 0
@@ -90,8 +84,7 @@ func (l *Lcdc) Write(v uint8) {
 		// fingers crossed skyemu figured this out lol
 		// skyemu has similar problem, could not find similar offset on sameboy
 		// required to pass 1-lcd_sync.gb
-		//l.gb.Timer.DotCounter = 4
-		l.gb.Timer.DotCounter = 4
+		// l.gb.Timer.DotCounter = 4
 		l.gb.MemoryBus.IO[LY] = 0
 		l.gb.Stat.Mode = PPU_HBLANK
 	}
@@ -111,8 +104,6 @@ type Stat struct {
 	IrqVBlank bool
 	IrqOam    bool
 	IrqLyc    bool
-
-
 }
 
 func (s *Stat) Read() uint8 {
@@ -143,80 +134,7 @@ func (s *Stat) Write(v uint8) {
 	s.IrqLyc = (v>>6)&1 != 0
 }
 
-func (gb *GameBoy) UpdateDisplay() {
-	for y := range height {
-		p32 := (*[width]uint32)(unsafe.Pointer(&gb.Pixels[(y*width)*4]))
-		for x := range uint32(width) {
-			p32[x] = gb.Screen[x][y]
-		}
-	}
-}
-
-func (gb *GameBoy) UpdateGraphics(tcycles int) {
-
-	var (
-		dot      = &gb.Timer.DotCounter
-		stat     = &gb.Stat
-		ly       = &gb.MemoryBus.IO[LY]
-		prevMode = gb.Stat.Mode
-	)
-
-	if vblank := *ly >= height; vblank {
-		stat.Mode = PPU_VBLANK
-		if stat.IrqVBlank && prevMode != PPU_VBLANK {
-			gb.SetIrq(IRQ_LCD)
-		}
-	} else if oam := *dot < 80; oam {
-		stat.Mode = PPU_OAM
-		if stat.IrqOam && prevMode != PPU_OAM {
-			gb.SetIrq(IRQ_LCD)
-		}
-	} else if drawing := *dot < 80+172; drawing {
-		stat.Mode = PPU_DRAW
-		if prevMode != PPU_DRAW {
-			gb.drawScanline(int32(*ly))
-		}
-	} else {
-		stat.Mode = PPU_HBLANK
-		if prevMode != PPU_HBLANK {
-
-			if gb.Color && gb.MemoryBus.Hdma.Enabled && !gb.Cpu.Halted {
-				gb.MemoryBus.Hdma.HblankTransfer()
-			}
-
-			if stat.IrqHBlank {
-				gb.SetIrq(IRQ_LCD)
-			}
-		}
-	}
-
-	prevMatch := stat.Match
-	stat.Match = *ly == gb.MemoryBus.IO[LYC]
-	if !prevMatch && stat.Match && stat.IrqLyc {
-		gb.SetIrq(IRQ_LCD)
-	}
-
-	*dot += tcycles
-	dotScanline := 456 << gb.DoubleSpeedFlag
-	if *dot < dotScanline {
-		return
-	}
-
-	*ly++
-	*dot -= dotScanline
-
-	switch *ly {
-	case height: // vblank
-		gb.SetIrq(IRQ_VBL)
-		gb.UpdateDisplay()
-	case 154: // new frame
-		gb.bgPriority = [width][height]bool{}
-		*ly = 0
-	}
-}
-
 func (gb *GameBoy) drawScanline(scanline int32) {
-
 	if gb.Color {
 		gb.renderTilesGBC(uint8(scanline))
 	} else if gb.Lcdc.BgMaster {

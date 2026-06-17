@@ -4,9 +4,6 @@ import (
 	_ "embed"
 )
 
-//go:embed bios.bin
-var biosFile []byte
-
 const (
 	INTRWAIT_NONE   = 0
 	INTRWAIT_VBLANK = 1
@@ -58,14 +55,17 @@ const (
 	SYS_SoundGetJumpList               = 0x2A
 )
 
+//go:embed bios.bin
+var bios []byte
+
 func (gba *GBA) LoadBios() {
-	for i := range len(biosFile) {
+	for i := range len(bios) {
 
 		if i >= len(gba.Mem.BIOS) {
 			break
 		}
 
-		gba.Mem.BIOS[i] = uint8(biosFile[i])
+		gba.Mem.BIOS[i] = bios[i]
 	}
 }
 

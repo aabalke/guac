@@ -1,4 +1,4 @@
-package gameboy
+package gb
 
 import (
 	"fmt"
@@ -43,7 +43,7 @@ type Cpu struct {
 	l uint8
 	h uint8
 
-	//AF
+	// AF
 	BC *uint16
 	DE *uint16
 	HL *uint16
@@ -63,7 +63,6 @@ type Flags struct {
 }
 
 func (f *Flags) Get() uint8 {
-
 	var v uint8
 
 	if f.Z {
@@ -122,7 +121,6 @@ func NewCpu() *Cpu {
 }
 
 func (gb *GameBoy) GetOp() uint8 {
-
 	cpu := gb.Cpu
 
 	if cpu.isBranching {
@@ -153,7 +151,6 @@ func (gb *GameBoy) GetOp() uint8 {
 }
 
 func (gb *GameBoy) getImm8() uint8 {
-
 	if gb.Cpu.PcPtr != nil {
 		gb.Tick(4)
 		v := *(*uint8)(unsafe.Add(gb.Cpu.PcPtr, gb.Cpu.PcOff))
@@ -166,7 +163,6 @@ func (gb *GameBoy) getImm8() uint8 {
 }
 
 func (gb *GameBoy) getImm16() uint16 {
-
 	if gb.Cpu.PcPtr != nil {
 		gb.Tick(4)
 		gb.Tick(4)
@@ -235,7 +231,6 @@ func (gb *GameBoy) getR16(i uint8) *uint16 {
 }
 
 func (gb *GameBoy) Block0(op uint8, pc uint16) uint16 {
-
 	reg := gb.Cpu
 
 	switch inst := op & 0x7; inst {
@@ -345,7 +340,7 @@ func (gb *GameBoy) Block0(op uint8, pc uint16) uint16 {
 		gb.Write(*reg.HL, reg.a)
 		*reg.HL--
 
-	//other misc arth
+	// other misc arth
 	case 0x27:
 		gb.execDAA()
 	case 0x37:
@@ -429,7 +424,6 @@ func (gb *GameBoy) Block0(op uint8, pc uint16) uint16 {
 }
 
 func (gb *GameBoy) Block1(op uint8) {
-
 	if op == 0x76 {
 		gb.Cpu.Halted = true
 		return
@@ -467,7 +461,6 @@ const (
 )
 
 func (gb *GameBoy) Block2(op uint8) {
-
 	reg := gb.Cpu
 	v := uint8(0)
 	if src := gb.getR8(op & 7); src == nil {
@@ -498,22 +491,17 @@ func (gb *GameBoy) Block2(op uint8) {
 }
 
 func (gb *GameBoy) Execute() {
-
 	pc := gb.Cpu.PC + 1
 	reg := gb.Cpu
 
 	gb.Tick(4)
 	op := gb.GetOp()
 
-	//if debug.B[0] {
-	//    L.WriteLog(cnt, op)
-	//    cnt++
-	//}
+	//L.WriteLog(0, op)
 
-	//if cnt >= 10000 {
-	//    L.Close()
-	//    os.Exit(0)
-	//}
+	if gb.InstInjectionFunc != nil {
+		gb.InstInjectionFunc(gb, op)
+	}
 
 	if block0 := op&0xC0 == 0x00; block0 {
 		pc := gb.Block0(op, pc)
@@ -756,7 +744,6 @@ const (
 )
 
 func (gb *GameBoy) execCB(op uint8) {
-
 	reg := gb.Cpu
 	src := gb.getR8(op & 7)
 	bit := (op >> 3) & 7
@@ -851,7 +838,6 @@ func (gb *GameBoy) execRlc(v uint8) uint8 {
 }
 
 func (gb *GameBoy) execRl(v uint8) uint8 {
-
 	carry := uint8(0)
 	if gb.Cpu.f.C {
 		carry = 1
@@ -867,7 +853,6 @@ func (gb *GameBoy) execRl(v uint8) uint8 {
 }
 
 func (gb *GameBoy) execRr(v uint8) uint8 {
-
 	carry := uint8(0)
 	if gb.Cpu.f.C {
 		carry = 0x80
@@ -933,7 +918,6 @@ func (gb *GameBoy) execSET(v, bit uint8) uint8 {
 }
 
 func (gb *GameBoy) execDAA() {
-
 	reg := gb.Cpu
 
 	if !reg.f.S {
@@ -1097,7 +1081,6 @@ func (gb *GameBoy) execDec(v uint8) uint8 {
 }
 
 func (gb *GameBoy) execJP(cond bool) uint16 {
-
 	if cond {
 		gb.Tick(4)
 		return gb.getImm16()
@@ -1108,7 +1091,6 @@ func (gb *GameBoy) execJP(cond bool) uint16 {
 }
 
 func (gb *GameBoy) execJR(cond bool) uint16 {
-
 	gb.Tick(4)
 
 	if cond {
@@ -1138,7 +1120,6 @@ func (gb *GameBoy) StackPush(v uint16) {
 }
 
 func (gb *GameBoy) execCall(cond bool) uint16 {
-
 	addr := gb.getImm16()
 
 	if cond {
@@ -1150,7 +1131,6 @@ func (gb *GameBoy) execCall(cond bool) uint16 {
 }
 
 func (gb *GameBoy) execRet(cond bool) uint16 {
-
 	if cond {
 		gb.Tick(8)
 		return gb.StackPop()

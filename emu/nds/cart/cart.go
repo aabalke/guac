@@ -274,14 +274,15 @@ func (c *Cartridge) RomTransfer(initial bool, arm9 bool) {
 
 func (c *Cartridge) InitSaveLoop() {
 
-	if config.Conf.Nds.DisableSaves {
-		return
-	}
-
 	saveTicker := time.Tick(time.Second)
 
 	go func() {
 		for range saveTicker {
+
+			if config.Conf.General.DisableSaves {
+				continue
+			}
+
 			if c.SaveFlag {
 				log.Printf("Saving Game Path: %s\n", c.SavPath)
 				utils.WriteFile(c.SavPath, c.Sav[:])
