@@ -2,8 +2,6 @@ package gba
 
 import (
 	_ "embed"
-
-	"github.com/aabalke/guac/emu/bios"
 )
 
 const (
@@ -57,14 +55,17 @@ const (
 	SYS_SoundGetJumpList               = 0x2A
 )
 
+//go:embed bios.bin
+var bios []byte
+
 func (gba *GBA) LoadBios() {
-	for i := range len(bios.BiosGba) {
+	for i := range len(bios) {
 
 		if i >= len(gba.Mem.BIOS) {
 			break
 		}
 
-		gba.Mem.BIOS[i] = uint8(bios.BiosGba[i])
+		gba.Mem.BIOS[i] = bios[i]
 	}
 }
 
