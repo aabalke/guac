@@ -53,13 +53,11 @@ func NewMemory(gba *GBA) *Memory {
 }
 
 func (m *Memory) LoadBios() {
-	m.BIOS = &bios.BiosGba
-
-	p := config.Conf.Gba.BiosPath
-
-	if p != "" {
+	if p := config.Conf.Gba.Bios.Path; p != "" {
 		buf, _, _ := utils.ReadFile(p)
 		m.BIOS = &buf
+	} else {
+		m.BIOS = &bios.BiosGba
 	}
 }
 

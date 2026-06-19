@@ -193,8 +193,14 @@ func (c *Config) decodeGba() {
 	c.config.Gba.IdleOptimize = c.Gba.IdleOptimize
 	c.config.Gba.SoundClockUpdateCycles = c.Gba.SoundClockUpdateCycles
 
-	if utils.IsFile(c.Gba.BiosPath) {
-		c.config.Gba.BiosPath = c.Gba.BiosPath
+	if utils.IsFile(c.Gba.GbaBios.Path) {
+		c.config.Gba.Bios.Path = c.Gba.GbaBios.Path
+	}
+
+	c.config.Gba.Bios.Direct = c.Gba.GbaBios.Direct
+
+	if c.config.Gba.Bios.Path == "" {
+		c.config.Gba.Bios.Direct = true
 	}
 }
 

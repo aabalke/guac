@@ -155,6 +155,10 @@ general = "general"
 optimize_idle_loops = "optimizar bucles inactivos"
 sound_clock_cycles  = "ciclos de reloj de sonido"
 
+bios = "bios"
+bios_path = "ruta de bios"
+direct_boot = "arranque directo"
+
 keyboard   = "teclado"
 controller = "controlador"
 

@@ -202,6 +202,9 @@ type GbaLocalization struct {
 	General          string `toml:"general"`
 	OptmizeIdleLoops string `toml:"optimize_idle_loops"`
 	SoundClockCycles string `toml:"sound_clock_cycles"`
+	Bios             string `toml:"bios"`
+	BiosPath         string `toml:"bios_path"`
+	DirectBoot       string `toml:"direct_boot"`
 	Keyboard         string `toml:"keyboard"`
 	Controller       string `toml:"controller"`
 	A                string `toml:"a"`

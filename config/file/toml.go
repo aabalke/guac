@@ -72,9 +72,14 @@ type Gb struct {
 type Gba struct {
 	IdleOptimize           bool          `toml:"idle_optimize"`
 	SoundClockUpdateCycles int           `toml:"sound_clock_update_cycles"`
-	BiosPath               string        `toml:"bios_path"`
+	GbaBios                GbaBios       `toml:"bios"`
 	Keyboard               EmulatorInput `toml:"keyboard"`
 	Controller             EmulatorInput `toml:"controller"`
+}
+
+type GbaBios struct {
+	Path   string `toml:"bios_path"`
+	Direct bool   `toml:"direct_boot"`
 }
 
 type Nds struct {

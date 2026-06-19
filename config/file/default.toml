@@ -93,7 +93,10 @@ idle_optimize = true
 # higher is better for lower end systems that cannot render sound fast enough
 sound_clock_update_cycles = 0x100
 
+[gba.bios]
+
 #bios_path = "./rom/bios/BIOSGBA.bin"
+direct_boot = true
 
 [gba.keyboard]
 a = ["J"]

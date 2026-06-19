@@ -144,9 +144,14 @@ type Gb struct {
 type Gba struct {
 	IdleOptimize           bool
 	SoundClockUpdateCycles int
-	BiosPath               string
+	Bios                   GbaBios
 	KeyboardConfig         EmulatorKeyboard
 	ControllerConfig       EmulatorController
+}
+
+type GbaBios struct {
+	Path   string
+	Direct bool
 }
 
 type NdsConfig struct {

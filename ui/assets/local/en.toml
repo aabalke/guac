@@ -154,6 +154,10 @@ general = "general"
 optimize_idle_loops = "optimize idle loops"
 sound_clock_cycles = "sound clock cycles"
 
+bios = "bios"
+bios_path = "bios path"
+direct_boot = "direct boot"
+
 keyboard = "keyboard"
 controller = "controller"
 

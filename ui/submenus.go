@@ -298,6 +298,10 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 		{WIDGET_CBX, l.OptmizeIdleLoops, "", &tmp.IdleOptimize, nil},
 		{WIDGET_HEX, l.SoundClockCycles, l.SoundClockCycles, &tmp.SoundClockUpdateCycles, 1000},
 
+		{WIDGET_HDR, l.Bios, "", nil, nil},
+		{WIDGET_FLE, l.BiosPath, "", &tmp.Bios.Path, nil},
+		{WIDGET_CBX, l.DirectBoot, "", &tmp.Bios.Direct, nil},
+
 		{WIDGET_HDR, l.Keyboard, "", nil, nil},
 		{WIDGET_LNK, "", "", nil, keybindsLink},
 		{WIDGET_KEY, l.A, l.KeyboardA, &k.A, KeyValidation()},
@@ -329,6 +333,10 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 	buildSubMenu(g, parent, fields)
 
 	parent.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
+		if tmp.Bios.Path == "" {
+			tmp.Bios.Direct = true
+		}
+
 		config.Conf.Gba = tmp
 
 		parent.RemoveChildren()

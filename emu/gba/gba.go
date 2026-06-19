@@ -1,6 +1,7 @@
 package gba
 
 import (
+	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/cpu/arm"
 	"github.com/aabalke/guac/emu/gba/apu"
@@ -50,8 +51,6 @@ type GBA struct {
 	Frame uint64
 }
 
-var DirectBoot = false
-
 func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba := &GBA{
 		Pixels: make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
@@ -74,7 +73,7 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba.Mem.LoadBios()
 	gba.LoadGame(path)
 
-	if DirectBoot {
+	if config.Conf.Gba.Bios.Direct {
 		gba.DirectBoot()
 	} else {
 		gba.BiosBoot()
