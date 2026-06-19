@@ -14,7 +14,7 @@ https://emulation.gametechwiki.com/index.php/GBA_Tests
 
 👍 arm
 👍 thumb
-❌ bios (cycle problem)
+❌ bios
 👍 memory
 ❌ nes
 
@@ -53,16 +53,18 @@ Additionally, other ARMv5 instructions will fail.
 
 ### MGBA Test Suite
 
-❌ Memory tests [1542/1552] (with hle bios)
-❌ I/O read tests [129/130]
-❌ Timing tests [228/2020]
-❌ Timer count-up tests [186/936]
-❌ Timer IRQ tests [0/90]
+Requires Official bios for passing tests
+
+👍 Memory tests [1552/1552]
+👍 I/O read tests [130/130]
+❌ Timing tests [1806/2020]
+❌ Timer count-up tests [633/936]
+❌ Timer IRQ tests [52/90]
 👍 Shifter tests [140/140]
 👍 Carry tests [93/93]
-👍 Multiply long tests [52/72] (matches mgba)
-👍 BIOS math tests [615/615] (with hle bios)
-❌ DMA tests [1240/1256]
+❌ Multiply long tests [52/72] (matches mgba)
+👍 BIOS math tests [615/615]
+👍 DMA tests [1256/1256]
 ❌ SIO register R/W tests [25/90]
 ❌ SIO timing tests [0/4]
 ❌ Misc. edge case tests [3/10]
@@ -178,83 +180,3 @@ Requires "GGPIO" eeprom panic to be removed
 👍 txt_se1
 👍 txt_se2 (text has different amounts)
 👍 win_demo
-
-### Games
-
-Many games have problems with the Channel 3 sound volume
-
-Advance Wars
-    - intro bg does not move
-Advance Wars 2
-    - No known errors
-Fire Emblem
-    - No known errors
-Fire Emblem Sacred Stones
-    - No known errors
-Golden Sun
-    - crashes in game
-Drill Dozer
-    - No known errors
-Harvest Moon Friends of Mineral Town
-    - No known errors
-Hello Kitty Happy Party Pals
-    - No known errors
-Kirby Nightmare in Dream Land
-    - No known errors
-Lord of The Rings Fellowship
-    - No known errors
-Lord of The Rings Two Towers
-    - No known errors
-Mario Kart Super Circuit
-    - No known errors
-Mega Man Zero
-    - No known errors
-Metroid Fusion
-    - No known errors
-Mother 12
-    - No known errors
-Mother 3
-    - No known errors
-Pokémon Mystery Dungeon Red Rescue Team
-    - No known errors
-Pokémon Firered / LeafGreen
-    - No known errors
-Pokémon Emerald
-    - No known errors
-Pokémon Ruby / Sapphire
-    - No known errors
-Sonic Advance
-    - No known errors
-Spyro Season of Ice
-    - No known errors
-Superstar Saga
-    - No known errors
-Super Dodge Ball Advance
-    - No known errors
-Super Mario Advance
-    - No known errors
-Tetris Worlds
-    - No known errors
-The Minish Cap
-    - No known errors
-Ultimate Puzzle Games
-    - No known errors
-Warioware Twisted
-    - No known errors
-Wolfenstein 3D
-    - No known errors
-Doom
-    - No known errors
-Doom II
-    - Need to fix Mode 4 flashing and object handling
-Zelda Link to the Past
-    - No known errors
-Iridion II
-    - No audio
-Iridion 3D
-    - No audio
-    - crashes after menus
-Mario Party
-    - Start Menu has graphical error - it is related to incorrect writes
-    to vram for some reason - an extra FastCpuSet
-

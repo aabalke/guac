@@ -88,7 +88,7 @@ func (dma *Dma) Write(addr uint32, v uint8) {
 		byte := addr - 4
 
 		if byte == 3 {
-			if dma.Idx != 0 {
+			if dma.Idx == 3 {
 				v &= 0xF
 			} else {
 				v &= 0x7
@@ -135,6 +135,9 @@ func (dma *Dma) Write(addr uint32, v uint8) {
 		dma.SrcAdj = (dma.SrcAdj & 1) | (uint32(v)&1)<<1
 
 		//fmt.Printf("new Dma Idx %d Mode %d Repeat %t V %02X\n", dma.Idx, dma.Mode, dma.Repeat, v)
+
+		if dma.Idx == 1 || dma.Idx == 2 {
+		}
 
 		if !prev && dma.Enabled {
 			dma.Src = dma.InitSrc
@@ -198,11 +201,6 @@ func (dma *Dma) transfer() int {
 		tmpDst    = dma.Dst
 		tmpSrc    = dma.Src
 	)
-
-	//if dma.Dst >= 0xE00_0000 || dma.Src >= 0xE00_0000 {
-	//	dma.disable()
-	//	return 0
-	//}
 
 	if dma.isWord {
 		tmpDst &^= 3

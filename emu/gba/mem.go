@@ -353,23 +353,7 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 	case 0x133:
 		return m.GBA.Keypad.readCNT(true)
 
-	case 0x136:
-		return 0
-	case 0x137:
-		return 0
-	case 0x138:
-		return 0
-	case 0x139:
-		return 0
-
-	case 0x142:
-		return 0
-	case 0x143:
-		return 0
-
-	case 0x15A:
-		return 0
-	case 0x15B:
+	case 0x136, 0x137, 0x138, 0x139, 0x142, 0x143, 0x15A, 0x15B:
 		return 0
 
 	case 0x200:
@@ -385,28 +369,12 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 		return m.Waitstate.Read(0)
 	case 0x205:
 		return m.Waitstate.Read(1)
-	case 0x206:
-		return 0
-	case 0x207:
+	case 0x206, 0x207:
 		return 0
 
 	case 0x208:
 		return m.GBA.Irq.ReadIME()
-	case 0x209:
-		return 0
-
-	case 0x20A:
-		return 0
-	case 0x20B:
-		return 0
-
-	case 0x301:
-		return 0
-	case 0x302:
-		return 0
-	case 0x303:
-		return 0
-	case 0x304:
+	case 0x209, 0x20A, 0x20B, 0x301, 0x302, 0x303, 0x304:
 		return 0
 	}
 
