@@ -453,7 +453,7 @@ func (cpu *Cpu) ThumbSdt(op uint16) {
 		cpu.Write8(addr, uint8(r[rd]))
 	case THUMB_LDR_REG:
 		v := cpu.Read32(addr)
-		is := (addr & 0b11) << 3
+		is := (addr & 3) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
 	case THUMB_LDRB_REG:
 		r[rd] = cpu.Read8(addr)
@@ -495,7 +495,7 @@ func (cpu *Cpu) ThumbLSImm(op uint16) {
 	case THUMB_LDR_IMM:
 		addr := r[rb] + (nn << 2)
 		v := cpu.Read32(addr)
-		is := (addr & 0b11) << 3
+		is := (addr & 3) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
 
 	case THUMB_STRB_IMM:
@@ -738,19 +738,21 @@ func (cpu *Cpu) ThumbLSSP(op uint16) {
 
 	if ldr := (op>>11)&1 != 0; ldr {
 		v := cpu.Read32(addr)
-		is := (addr & 0b11) << 3
+		is := (addr & 3) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
 	} else {
 		cpu.Write32(addr, r[rd])
 	}
 }
 
-func (cpu *Cpu) ThumbBlock(opcode uint16) {
-	r := &cpu.Reg.R
-	ldmia := (opcode>>11)&1 != 0
-	rb := (opcode >> 8) & 7
-	rlist := uint32(opcode & 0xFF)
-	addr := r[rb] &^ 0b11
+func (cpu *Cpu) ThumbBlock(op uint16) {
+	var (
+		r     = &cpu.Reg.R
+		ldmia = (op>>11)&1 != 0
+		rb    = (op >> 8) & 7
+		rlist = uint32(op & 0xFF)
+		addr  = r[rb]
+	)
 
 	if !ldmia {
 

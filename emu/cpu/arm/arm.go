@@ -868,7 +868,7 @@ func (c *Cpu) Block(op uint32) {
 		rlist    = op & 0xFFFF
 		regCount = uint32(bits.OnesCount32(rlist))
 		rn       = (op >> 16) & 0xF
-		addr     = r[rn] &^ 0b11
+		addr     = r[rn]
 		up       = (op>>23)&1 != 0
 	)
 
