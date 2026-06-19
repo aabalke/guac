@@ -164,6 +164,10 @@ func (c *Config) encodeGba() {
 	c.encodeController(&c.Gba.Controller, &c.config.Gba.ControllerConfig)
 	c.Gba.IdleOptimize = c.config.Gba.IdleOptimize
 	c.Gba.SoundClockUpdateCycles = c.config.Gba.SoundClockUpdateCycles
+
+	if utils.IsFile(c.Gba.BiosPath) {
+		c.Gba.BiosPath = c.config.Gba.BiosPath
+	}
 }
 
 func (c *Config) encodeNds() {

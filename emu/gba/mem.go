@@ -2,16 +2,17 @@ package gba
 
 import (
 	"encoding/binary"
-	"math/bits"
 	"time"
 	"unsafe"
 
 	"github.com/aabalke/guac/config"
+	"github.com/aabalke/guac/emu/bios"
+	"github.com/aabalke/guac/utils"
 )
 
 type Memory struct {
 	GBA   *GBA
-	BIOS  [0x4000]uint8
+	BIOS  *[]uint8
 	WRAM1 [0x40000]uint8
 	WRAM2 [0x8000]uint8
 
@@ -44,11 +45,22 @@ func NewMemory(gba *GBA) *Memory {
 	m.Write32(0x4000134, 0x800F) // IR requires bit 3 on. I believe this is auth check (sonic adv)
 
 	m.Write32(0x4000204, 0x0000)
-	//m.BIOS_MODE = BIOS_STARTUP
+	m.Write32(0x4000088, 0x0200)
 
 	m.InitSaveLoop()
 
 	return m
+}
+
+func (m *Memory) LoadBios() {
+	m.BIOS = &bios.BiosGba
+
+	p := config.Conf.Gba.BiosPath
+
+	if p != "" {
+		buf, _, _ := utils.ReadFile(p)
+		m.BIOS = &buf
+	}
 }
 
 func (m *Memory) InitSaveLoop() {
@@ -185,10 +197,10 @@ func (m *Memory) initReadRegions() {
 			}
 
 			if pc == 0xDC || pc == 0x134 || pc == 0x13C || pc == 0x188 {
-				m.ProtectedValue = binary.LittleEndian.Uint32(m.BIOS[pc+8:])
+				m.ProtectedValue = binary.LittleEndian.Uint32((*m.BIOS)[pc+8:])
 			}
 
-			return m.BIOS[addr]
+			return (*m.BIOS)[addr]
 		}
 
 		return m.ReadOpenBus(addr)
@@ -245,6 +257,7 @@ func (m *Memory) initReadRegions() {
 }
 
 func (m *Memory) ReadPtr(addr uint32) (unsafe.Pointer, bool) {
+	return nil, false
 	switch regions := addr >> 24; regions {
 	case 0x2:
 		return unsafe.Add(
@@ -413,10 +426,14 @@ func (m *Memory) Read8(addr uint32) uint32 {
 }
 
 func (m *Memory) Read16(addr uint32) uint32 {
-	switch {
-	case addr >= 0xE00_0000:
-		return uint32(m.Read(addr)) * 0x0101
+	if addr >= 0xE00_0000 {
+		v := uint32(m.Read(addr))
+		return v | (v << 8)
+	}
 
+	addr &^= 1
+
+	switch {
 	case addr >= 0xD00_0000:
 		if ok := CheckEeprom(m.GBA, addr); ok {
 			return uint32(m.GBA.Cartridge.EepromRead())
@@ -433,30 +450,37 @@ func (m *Memory) Read16(addr uint32) uint32 {
 		}
 	}
 
-	if ptr, ok := m.ReadPtr(addr); ok {
-		return uint32(binary.LittleEndian.Uint16((*[4]uint8)(ptr)[:]))
-	}
+	//if ptr, ok := m.ReadPtr(addr); ok {
+	//	return uint32(binary.LittleEndian.Uint16((*[4]uint8)(ptr)[:]))
+	//}
 
-	return uint32(m.Read(addr+1))<<8 | uint32(m.Read(addr))
+	v := uint32(m.Read(addr + 0))
+	v |= uint32(m.Read(addr+1)) << 8
+
+	return v
 }
 
 func (m *Memory) Read32(addr uint32) uint32 {
-	switch {
-	case addr >= 0xE00_0000:
-		return uint32(m.Read(addr)) * 0x01010101
-	case addr >= 0x800_0000:
-		if addr&0x1FF_FFFF >= m.GBA.Cartridge.RomLength {
-			return m.ReadBadRom(addr, 4)
-		}
+	if addr >= 0xE00_0000 {
+		v := uint32(m.Read(addr))
+		return v | (v << 8) | (v << 16) | (v << 24)
 	}
 
-	if ptr, ok := m.ReadPtr(addr); ok {
-		return binary.LittleEndian.Uint32((*[4]uint8)(ptr)[:])
+	addr &^= 3
+
+	if addr >= 0x800_0000 && addr&0x1FF_FFFF >= m.GBA.Cartridge.RomLength {
+		return m.ReadBadRom(addr, 4)
 	}
 
-	a := uint32(m.Read(addr+3))<<8 | uint32(m.Read(addr+2))
-	b := uint32(m.Read(addr+1))<<8 | uint32(m.Read(addr))
-	return (a << 16) + b
+	//if ptr, ok := m.ReadPtr(addr); ok {
+	//	return binary.LittleEndian.Uint32((*[4]uint8)(ptr)[:])
+	//}
+
+	v := uint32(m.Read(addr + 0))
+	v |= uint32(m.Read(addr+1)) << 8
+	v |= uint32(m.Read(addr+2)) << 16
+	v |= uint32(m.Read(addr+3)) << 24
+	return v
 }
 
 func (m *Memory) ReadBadRom(addr, size uint32) uint32 {
@@ -614,15 +638,15 @@ func (m *Memory) Write8(addr uint32, v uint8) {
 }
 
 func (m *Memory) Write16(addr uint32, v uint16) {
-	switch {
-	case addr >= 0xE00_0000:
-		if addr&1 == 1 {
-			v >>= 8
-		}
-
-		m.Write(addr, uint8(v), true)
+	if addr >= 0xE00_0000 {
+		v = v >> ((addr & 1) << 3)
+		m.Write(addr, uint8(v), false)
 		return
-	case addr >= 0xD00_0000:
+	}
+
+	addr &^= 1
+
+	if addr >= 0xD00_0000 {
 		if ok := CheckEeprom(m.GBA, addr); ok {
 			m.GBA.Save = true
 			m.GBA.Cartridge.EepromWrite(v)
@@ -635,12 +659,13 @@ func (m *Memory) Write16(addr uint32, v uint16) {
 }
 
 func (m *Memory) Write32(addr uint32, v uint32) {
-	if sram := addr >= 0xE00_0000; sram {
-		is := (addr << 3) & 0x1F
-		v = bits.RotateLeft32(v, -int(is))
+	if addr >= 0xE00_0000 {
+		v = v >> ((addr & 3) << 3)
 		m.Write(addr, uint8(v), false)
 		return
 	}
+
+	addr &^= 3
 
 	m.Write(addr+0, uint8(v), false)
 	m.Write(addr+1, uint8(v>>8), false)

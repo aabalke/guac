@@ -192,6 +192,10 @@ func (c *Config) decodeGba() {
 
 	c.config.Gba.IdleOptimize = c.Gba.IdleOptimize
 	c.config.Gba.SoundClockUpdateCycles = c.Gba.SoundClockUpdateCycles
+
+	if utils.IsFile(c.Gba.BiosPath) {
+		c.config.Gba.BiosPath = c.Gba.BiosPath
+	}
 }
 
 func (c *Config) decodeNds() {

@@ -218,8 +218,8 @@ func (c *Cpu) Reload() {
 func (p *Pipeline) String() string {
 	var b strings.Builder
 
-	//fmt.Fprintf(&b, "Fetch %08X %08X ", p.Fetch.Addr, p.Fetch.Op)
-	//fmt.Fprintf(&b, "Decode %08X %08X ", p.Decode.Addr, p.Decode.Op)
+	fmt.Fprintf(&b, "Fetch %08X %08X ", p.Fetch.Addr, p.Fetch.Op)
+	fmt.Fprintf(&b, "Decode %08X %08X ", p.Decode.Addr, p.Decode.Op)
 	fmt.Fprintf(&b, "Execute %08X %08X ", p.Execute.Addr, p.Execute.Op)
 
 	return b.String()

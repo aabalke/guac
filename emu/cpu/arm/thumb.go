@@ -381,11 +381,11 @@ func (cpu *Cpu) ThumbLSHalf(op uint16) {
 	)
 
 	if ldr := (op>>11)&1 != 0; ldr {
-		v := uint32(cpu.Read16(addr &^ 1))
+		v := uint32(cpu.Read16(addr))
 		is := (addr & 1) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
 	} else {
-		cpu.Write16(addr&^1, uint16(r[rd]))
+		cpu.Write16(addr, uint16(r[rd]))
 	}
 }
 
@@ -416,7 +416,7 @@ func (cpu *Cpu) ThumbSdt(op uint16) {
 		switch inst {
 		case THUMB_STRH:
 
-			cpu.Write16(addr&^1, uint16(r[rd]))
+			cpu.Write16(addr, uint16(r[rd]))
 
 		case THUMB_LDSB:
 
@@ -425,7 +425,7 @@ func (cpu *Cpu) ThumbSdt(op uint16) {
 
 		case THUMB_LDRH:
 
-			v := cpu.Read16(addr &^ 1)
+			v := cpu.Read16(addr)
 			is := (addr & 1) << 3
 			r[rd] = bits.RotateLeft32(v, -int(is))
 
@@ -438,7 +438,7 @@ func (cpu *Cpu) ThumbSdt(op uint16) {
 				r[rd] = uint32(int32(int8(cpu.Read8(addr))))
 			} else {
 				// sign-expand half value
-				r[rd] = uint32(int32(int16(cpu.Read16(addr &^ 1))))
+				r[rd] = uint32(int32(int16(cpu.Read16(addr))))
 			}
 
 		}
@@ -448,11 +448,11 @@ func (cpu *Cpu) ThumbSdt(op uint16) {
 
 	switch inst {
 	case THUMB_STR_REG:
-		cpu.Write32(addr&^0b11, r[rd])
+		cpu.Write32(addr, r[rd])
 	case THUMB_STRB_REG:
 		cpu.Write8(addr, uint8(r[rd]))
 	case THUMB_LDR_REG:
-		v := cpu.Read32(addr &^ 0b11)
+		v := cpu.Read32(addr)
 		is := (addr & 0b11) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
 	case THUMB_LDRB_REG:
@@ -491,10 +491,10 @@ func (cpu *Cpu) ThumbLSImm(op uint16) {
 	switch inst {
 	case THUMB_STR_IMM:
 		addr := r[rb] + (nn << 2)
-		cpu.Write32(addr&^0b11, r[rd])
+		cpu.Write32(addr, r[rd])
 	case THUMB_LDR_IMM:
 		addr := r[rb] + (nn << 2)
-		v := cpu.Read32(addr &^ 0b11)
+		v := cpu.Read32(addr)
 		is := (addr & 0b11) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
 
@@ -737,7 +737,7 @@ func (cpu *Cpu) ThumbLSSP(op uint16) {
 	addr := r[SP] + (uint32(op&0xFF) << 2)
 
 	if ldr := (op>>11)&1 != 0; ldr {
-		v := cpu.Read32(addr &^ 0b11)
+		v := cpu.Read32(addr)
 		is := (addr & 0b11) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
 	} else {
@@ -796,8 +796,7 @@ func (cpu *Cpu) ThumbBlock(opcode uint16) {
 		cpu.BlockTransfer = false
 
 		if smallest {
-			//v := cpu.Read32(addr)
-			v := cpu.Read32(addr &^ 0b11) // maybe??
+			v := cpu.Read32(addr)
 			cpu.Write32(r[rb], v-(regCount*2))
 
 			return
@@ -828,7 +827,7 @@ func (cpu *Cpu) ThumbBlock(opcode uint16) {
 			continue
 		}
 
-		r[reg] = cpu.Read32(addr &^ 0b11)
+		r[reg] = cpu.Read32(addr)
 
 		if reg == int(rb) {
 			matchingRb = true

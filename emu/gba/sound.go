@@ -5,17 +5,49 @@ import (
 )
 
 func WriteSound(addr uint32, v uint8, a *apu.Apu) {
+	switch addr {
 
-	if addr == 0x84 {
+	case 0x82:
+
+		a.SoundCntH &^= 0x00FF
+		a.SoundCntH |= uint16(v)
+
+		return
+	case 0x83:
+
+		a.SoundCntH &= 0x00FF
+		a.SoundCntH |= uint16(v) << 8
+
+		if resetFifoA := (a.SoundCntH>>11)&1 != 0; resetFifoA {
+			a.FifoA.Length = 0
+		}
+
+		if resetFifoB := (a.SoundCntH>>15)&1 != 0; resetFifoB {
+			a.FifoB.Length = 0
+		}
+
+		return
+
+	case 0x84:
 
 		//v &= 0x8F // should be 0x80 but setting channel bit does not work rn
 
 		a.SoundCntX = uint16((uint8(a.SoundCntX) & 0x0F) | (v & 0x80))
 
-		if disabled := (v>>7)&1 == 0; disabled {
+		if disabled := 0x80 == 0; disabled {
 			a.Disable()
 		}
 
+		return
+
+	case 0x85, 0x86, 0x87:
+		return
+
+	case 0x88:
+		a.SoundBias = (a.SoundBias &^ 0xFF) | uint16(v)
+		return
+	case 0x89:
+		a.SoundBias = (a.SoundBias & 0xFF) | (uint16(v) << 8)
 		return
 	}
 
@@ -148,35 +180,8 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 		a.SoundCntL &= 0x00FF
 		a.SoundCntL |= uint16(v) << 8
 
-	case 0x82:
-
-		a.SoundCntH &^= 0x00FF
-		a.SoundCntH |= uint16(v)
-
-	case 0x83:
-
-		a.SoundCntH &= 0x00FF
-		a.SoundCntH |= uint16(v) << 8
-
-		if resetFifoA := (a.SoundCntH>>11)&1 != 0; resetFifoA {
-			a.FifoA.Length = 0
-		}
-
-		if resetFifoB := (a.SoundCntH>>15)&1 != 0; resetFifoB {
-			a.FifoB.Length = 0
-		}
-
 	case 0x85, 0x86, 0x87:
 		return
-
-	case 0x88:
-		a.SoundBias &^= 0x00FF
-		a.SoundBias |= uint16(v)
-
-	case 0x89:
-
-		a.SoundBias &= 0x00FF
-		a.SoundBias |= uint16(v) << 8
 
 	default:
 
@@ -186,7 +191,6 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 }
 
 func ReadSound(addr uint32, a *apu.Apu) uint8 {
-
 	if wave := addr >= 0x90 && addr < 0xA0; wave {
 		bank := (a.WaveChannel.CntL >> 2) & 0x10
 		idx := (bank ^ 0x10) | uint16(addr)&0xF
@@ -284,9 +288,9 @@ func ReadSound(addr uint32, a *apu.Apu) uint8 {
 		return 0
 
 	case 0x88:
-		return uint8(a.SoundBias) &^ 0x1
+		return uint8(a.SoundBias) //&^ 0x1
 	case 0x89:
-		return uint8(a.SoundBias>>8) &^ 0xC3
+		return uint8(a.SoundBias >> 8) // &^ 0xC3
 	case 0x8A:
 		return 0
 	case 0x8B:

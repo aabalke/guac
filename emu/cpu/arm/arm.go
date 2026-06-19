@@ -537,7 +537,7 @@ func (c *Cpu) Sdt(op uint32) {
 			r[rd] = c.Read8(prev)
 		} else {
 
-			v := c.Read32(prev &^ 3)
+			v := c.Read32(prev)
 			is := ((prev & 3) << 3) & 0x1F
 			r[rd] = bits.RotateLeft32(v, -int(is))
 
@@ -555,7 +555,7 @@ func (c *Cpu) Sdt(op uint32) {
 		if byte {
 			c.Write8(prev, uint8(v))
 		} else {
-			c.Write32(prev&^3, v)
+			c.Write32(prev, v)
 		}
 	}
 
@@ -665,7 +665,7 @@ func (c *Cpu) Half(op uint32) {
 
 		switch inst {
 		case STRH:
-			c.Write16(pre&^1, uint16(rdv))
+			c.Write16(pre, uint16(rdv))
 
 		case LDRD:
 			panic("unsupported arm7 ldrd instruction")
@@ -683,7 +683,7 @@ func (c *Cpu) Half(op uint32) {
 	switch inst {
 	case LDRH:
 		//  LDRH Rd,[odd]   -->  LDRH Rd,[odd-1] ROR 8  ;read to bit0-7 and bit24-31
-		v := uint32(c.Read16(pre &^ 1))
+		v := uint32(c.Read16(pre))
 		is := (pre & 1) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
 	case LDRSB:
@@ -698,7 +698,7 @@ func (c *Cpu) Half(op uint32) {
 			r[rd] = uint32(int32(int8(c.Read8(pre))))
 		} else {
 			// sign-expand half value
-			r[rd] = uint32(int32(int16(c.Read16(pre &^ 1))))
+			r[rd] = uint32(int32(int16(c.Read16(pre))))
 		}
 
 	}
@@ -855,10 +855,10 @@ func (cpu *Cpu) Swp(op uint32) {
 		r[rd] = cpu.Read8(rnv)
 		cpu.Write8(rnv, uint8(rmv))
 	} else {
-		v := cpu.Read32(rnv &^ 3)
+		v := cpu.Read32(rnv)
 		is := (rnv & 3) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
-		cpu.Write32(rnv&^3, rmv)
+		cpu.Write32(rnv, rmv)
 	}
 }
 

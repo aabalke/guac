@@ -1,8 +1,6 @@
 package gba
 
 import (
-	"fmt"
-
 	"github.com/aabalke/guac/emu/gba/cart"
 )
 
@@ -133,16 +131,6 @@ func (dma *Dma) Write(addr uint32, v uint8) {
 		dma.IRQ = (v>>6)&1 != 0
 		dma.Enabled = (v>>7)&1 != 0
 
-		if B[5] {
-			fmt.Printf("Write Idx %d Mode %d V %02X\n", dma.Idx, dma.Mode, v)
-			//os.Exit(0)
-		}
-
-		if dma.Repeat {
-			B[5] = true
-			fmt.Printf("Write Idx %d Mode %d V %02X\n", dma.Idx, dma.Mode, v)
-		}
-
 		dma.Control = (dma.Control & 0xFF) | (uint32(v) << 8)
 		dma.SrcAdj = (dma.SrcAdj & 1) | (uint32(v)&1)<<1
 
@@ -210,6 +198,11 @@ func (dma *Dma) transfer() int {
 		tmpDst    = dma.Dst
 		tmpSrc    = dma.Src
 	)
+
+	//if dma.Dst >= 0xE00_0000 || dma.Src >= 0xE00_0000 {
+	//	dma.disable()
+	//	return 0
+	//}
 
 	if dma.isWord {
 		tmpDst &^= 3
