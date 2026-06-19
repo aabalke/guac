@@ -301,10 +301,10 @@ func (m *Memory) ReadOpenBus(addr uint32) uint8 {
 
 	if m.GBA.Cpu.Reg.CPSR.T {
 		// does pipeline impliment region based thumb mode?
-		return uint8(m.Read32((pc &^ 1)) >> ((addr & 1) << 3))
+		return uint8(m.Read16(pc) >> ((addr & 1) << 3))
 	}
 
-	return uint8(m.Read32((pc &^ 3)) >> ((addr & 3) << 3))
+	return uint8(m.Read32(pc) >> ((addr & 3) << 3))
 }
 
 func (m *Memory) ReadIO(addr uint32) uint8 {
