@@ -38,9 +38,8 @@ func (gba *GBA) ScanlineEndEvent(overshoot int64, arg any) bool {
 	case SCREEN_HEIGHT:
 		dispstat.SetVBlank(true)
 		gba.checkDmas(DMA_MODE_VBL)
-	// bios/bios.gba needs irq set on screen_height, iridion 3d needs screen_height + 1
-	// I believe this is cycle related
-	case SCREEN_HEIGHT + 1:
+		// bios/bios.gba needs irq set on screen_height, iridion 3d needs screen_height + 1
+		// I believe this is cycle related
 		if (*dispstat>>3)&1 != 0 {
 			gba.Irq.SetIRQ(0)
 		}

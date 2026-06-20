@@ -200,9 +200,9 @@ func (cpu *Cpu) Alu(op uint32) {
 		}
 
 		if cpsr.T {
-			r[PC] &^= 0b1
+			r[PC] &^= 1
 		} else {
-			r[PC] &^= 0b11
+			r[PC] &^= 3
 		}
 
 	}
@@ -567,11 +567,6 @@ func (c *Cpu) Sdt(op uint32) {
 func (cpu *Cpu) B(op uint32) {
 	r := &cpu.Reg.R
 
-	if immLoop := op == 0xEAFFFFFE; immLoop {
-		cpu.Halted = true
-		return
-	}
-
 	if link := (op>>24)&1 != 0; link {
 		r[14] = r[15] - 4
 	}
@@ -709,7 +704,6 @@ func (cpu *Cpu) Psr(op uint32) {
 
 	if msr := (op>>21)&1 != 0; msr {
 		cpu.msr(op)
-
 		return
 	}
 
@@ -718,7 +712,6 @@ func (cpu *Cpu) Psr(op uint32) {
 	if spsr := (op>>22)&1 != 0; spsr {
 		mode := cpu.Reg.CPSR.Mode
 		r[rd] = cpu.Reg.SPSR[BANK_ID[mode]].Get()
-
 		return
 	}
 
@@ -739,12 +732,10 @@ const (
 func (cpu *Cpu) msr(op uint32) {
 	r := &cpu.Reg.R
 
-	spsrFlag := (op>>22)&1 != 0
-
 	var v uint32
 	if imm := (op>>25)&1 != 0; imm {
-		shift := ((op >> 8) & 0xF) * 2
-		v = bits.RotateLeft32(op&0xFF, -int(shift&31))
+		shift := ((op >> 8) & 0xF) << 1
+		v = bits.RotateLeft32(op&0xFF, -int(shift))
 
 	} else {
 		v = r[op&0xF]
@@ -766,9 +757,12 @@ func (cpu *Cpu) msr(op uint32) {
 
 	secMask := PRIV_MASK
 	curr := cpu.Reg.CPSR.Mode
+
 	if curr == MODE_USR {
 		secMask = USR_MASK
 	}
+
+	spsrFlag := (op>>22)&1 != 0
 
 	if spsrFlag {
 		secMask |= STATE_MASK
@@ -809,35 +803,7 @@ func (cpu *Cpu) msr(op uint32) {
 		panic("USER MODE MSR")
 	}
 
-	if curr != MODE_FIQ {
-		for i := range 5 {
-			reg.USR[i] = r[8+i]
-		}
-	}
-
-	reg.SP[BANK_ID[curr]] = r[SP]
-	reg.LR[BANK_ID[curr]] = r[LR]
-
-	if curr == MODE_FIQ {
-		for i := range 5 {
-			reg.FIQ[i] = r[8+i]
-		}
-	}
-
-	if next != MODE_FIQ {
-		for i := range 5 {
-			r[8+i] = reg.USR[i]
-		}
-	}
-
-	r[SP] = reg.SP[BANK_ID[next]]
-	r[LR] = reg.LR[BANK_ID[next]]
-
-	if next == MODE_FIQ {
-		for i := range 5 {
-			r[8+i] = reg.FIQ[i]
-		}
-	}
+	cpu.ModeSwitch(curr, next)
 }
 
 func (cpu *Cpu) Swp(op uint32) {
@@ -1046,33 +1012,5 @@ func (c *Cpu) Block(op uint32) {
 		panic("USER MODE LDM PC CHANGE")
 	}
 
-	if curr != MODE_FIQ {
-		for i := range 5 {
-			c.Reg.USR[i] = r[8+i]
-		}
-	}
-
-	c.Reg.SP[BANK_ID[curr]] = r[SP]
-	c.Reg.LR[BANK_ID[curr]] = r[LR]
-
-	if curr == MODE_FIQ {
-		for i := range 5 {
-			c.Reg.FIQ[i] = r[8+i]
-		}
-	}
-
-	if next != MODE_FIQ {
-		for i := range 5 {
-			r[8+i] = c.Reg.USR[i]
-		}
-	}
-
-	r[SP] = c.Reg.SP[BANK_ID[next]]
-	r[LR] = c.Reg.LR[BANK_ID[next]]
-
-	if next == MODE_FIQ {
-		for i := range 5 {
-			r[8+i] = c.Reg.FIQ[i]
-		}
-	}
+	c.ModeSwitch(curr, next)
 }

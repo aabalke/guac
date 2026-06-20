@@ -194,6 +194,8 @@ func (m *Memory) initReadRegions() {
 				return m.ReadBios(addr)
 			}
 
+			pc = m.GBA.Cpu.P.Execute.Addr
+
 			if pc == 0xDC || pc == 0x134 || pc == 0x13C || pc == 0x188 {
 				m.ProtectedValue = binary.LittleEndian.Uint32((*m.BIOS)[pc+8:])
 			}

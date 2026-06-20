@@ -12,16 +12,15 @@ type Header struct {
 }
 
 func NewHeader(c *Cartridge) *Header {
-
 	h := &Header{
 		Title:    strings.ToUpper(strings.ReplaceAll(string(c.Rom[0xA0:0xA0+12]), "\x00", " ")),
 		GameCode: strings.ToUpper(string(c.Rom[0xAC : 0xAC+4])),
 		Version:  uint8(c.Rom[0xBC]),
 	}
 
-	if strings.HasPrefix(h.GameCode, "F") {
-		panic("NES CLASSIC GAME. NOT SUPPORTED")
-	}
+	//if strings.HasPrefix(h.GameCode, "F") {
+	//	panic("NES CLASSIC GAME. NOT SUPPORTED")
+	//}
 
 	h.valid(c)
 	h.print()
@@ -29,7 +28,6 @@ func NewHeader(c *Cartridge) *Header {
 }
 
 func (h *Header) valid(c *Cartridge) bool {
-
 	tests := []bool{
 		c.Rom[0xB2] == 0x96,
 		c.Rom[0xB5] == 0x00,

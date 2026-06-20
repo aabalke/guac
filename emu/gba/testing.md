@@ -1,7 +1,6 @@
 # Testing
 
-https://emulation.gametechwiki.com/index.php/GBA_Tests
-
+[GBA Tests](https://emulation.gametechwiki.com/index.php/GBA_Tests)
 ### DenSinH / FuzzARM
 
 👍 ARM_DataProcessing
@@ -14,9 +13,9 @@ https://emulation.gametechwiki.com/index.php/GBA_Tests
 
 👍 arm
 👍 thumb
-❌ bios
+👍 bios
 👍 memory
-❌ nes
+👍 nes
 
    ppu
 👍 hello
@@ -25,7 +24,7 @@ https://emulation.gametechwiki.com/index.php/GBA_Tests
 
    save
 👍 flash64
-👍 flash128
+❌ flash128
 👍 none
 👍 sram
 
@@ -94,7 +93,7 @@ Requires Official bios for passing tests
 ❌ ppu: sprite-hmosaic
 ❌ ppu: status-irq-dma
 ❌ ppu: vram-mirror [7/10]
-❌ timer: start stop [0/2]
+❌ timer: start stop [1/2]
 ❌ timer: reload [0/7]
 
 ### AGS

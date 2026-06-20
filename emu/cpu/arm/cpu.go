@@ -218,8 +218,8 @@ func (c *Cpu) Reload() {
 func (p *Pipeline) String() string {
 	var b strings.Builder
 
-	fmt.Fprintf(&b, "Fetch %08X %08X ", p.Fetch.Addr, p.Fetch.Op)
-	fmt.Fprintf(&b, "Decode %08X %08X ", p.Decode.Addr, p.Decode.Op)
+	//fmt.Fprintf(&b, "Fetch %08X %08X ", p.Fetch.Addr, p.Fetch.Op)
+	//fmt.Fprintf(&b, "Decode %08X %08X ", p.Decode.Addr, p.Decode.Op)
 	fmt.Fprintf(&b, "Execute %08X %08X ", p.Execute.Addr, p.Execute.Op)
 
 	return b.String()
@@ -446,4 +446,76 @@ func (c *Cpu) idle(cycles int) {
 	c.AccCycles += cycles
 	c.NonSeq = true
 	c.Prefetch.Step(int64(cycles))
+}
+
+func (c *Cpu) String() string {
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "R ")
+	for i := range 16 {
+		fmt.Fprintf(&b, "%08X ", c.Reg.R[i])
+	}
+
+	//fmt.Fprintf(&b, "IME %t ", c.Irq.IME)
+	//fmt.Fprintf(&b, "IE %08X ", c.Irq.IE)
+	//fmt.Fprintf(&b, "IF %08X ", c.Irq.IF)
+
+	//fmt.Fprintf(&b, "V %08X ", c.Read16(0x4000006))
+
+	//fmt.Fprintf(&b, "FIQ ")
+
+	//for i := range 5 {
+	//	fmt.Fprintf(&b, "%08X ", c.Reg.FIQ[i])
+	//}
+
+	//fmt.Fprintf(&b, "USR ")
+
+	//for i := range 5 {
+	//	fmt.Fprintf(&b, "%08X ", c.Reg.USR[i])
+	//}
+
+	//fmt.Fprintf(&b, "PIPE ")
+
+	fmt.Fprintf(&b, "%s", c.P.String())
+
+	//fmt.Fprintf(&b, "\n")
+
+	return b.String()
+}
+
+func (c *Cpu) ModeSwitch(curr, next uint32) {
+	// DO NOT RELOAD PIPE AFTER CALLING ModeSwitch
+
+	reg := &c.Reg
+	r := &c.Reg.R
+
+	if curr != MODE_FIQ {
+		for i := range 5 {
+			reg.USR[i] = r[8+i]
+		}
+	}
+
+	reg.SP[BANK_ID[curr]] = r[SP]
+	reg.LR[BANK_ID[curr]] = r[LR]
+
+	if curr == MODE_FIQ {
+		for i := range 5 {
+			reg.FIQ[i] = r[8+i]
+		}
+	}
+
+	if next != MODE_FIQ {
+		for i := range 5 {
+			r[8+i] = reg.USR[i]
+		}
+	}
+
+	r[SP] = reg.SP[BANK_ID[next]]
+	r[LR] = reg.LR[BANK_ID[next]]
+
+	if next == MODE_FIQ {
+		for i := range 5 {
+			r[8+i] = reg.FIQ[i]
+		}
+	}
 }

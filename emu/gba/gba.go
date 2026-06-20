@@ -31,24 +31,24 @@ const (
 )
 
 type GBA struct {
-	Cartridge *cart.Cartridge
 	Cpu       *arm.Cpu
+	Scheduler *Scheduler
 	Mem       *Memory
+	Cartridge *cart.Cartridge
 	PPU       *PPU
 	Timers    [4]*Timer
 	Dma       [4]*Dma
-	Irq       cpu.Irq
 	Apu       *apu.Apu
-	Scheduler *Scheduler
 	Keypad    Keypad
+	Irq       cpu.Irq
 
-	Paused, Muted, Save, Drawn bool
+	Frame uint64
 
 	Pixels      []byte
 	Image       *ebiten.Image
 	DrawOptions ebiten.DrawImageOptions
 
-	Frame uint64
+	Paused, Muted, Save, Drawn bool
 }
 
 func NewGBA(path string, ctx *oto.Context) *GBA {

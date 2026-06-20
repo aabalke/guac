@@ -19,17 +19,9 @@ func (cpu *Cpu) Exception(addr uint32, mode uint32) {
 		r    = &cpu.Reg.R
 	)
 
-	//if mode == cpsr.Mode {
-	//	return
-	//}
-	//fmt.Printf("START EXCEPTION Executing %08X PC %08X GOING TO %08X\n", cpu.P.Execute.Addr, r[15], addr)
+	cpu.ModeSwitch(cpsr.Mode, mode)
 
-	c := BANK_ID[cpsr.Mode]
 	i := BANK_ID[mode]
-	reg.SP[c] = r[SP]
-	reg.LR[c] = r[LR]
-	r[SP] = reg.SP[i]
-	r[LR] = reg.LR[i]
 	reg.SPSR[i] = *cpsr
 
 	r[LR] = cpu.P.Decode.Addr
@@ -38,30 +30,26 @@ func (cpu *Cpu) Exception(addr uint32, mode uint32) {
 	cpsr.Mode = mode
 	cpsr.T = false
 	cpsr.I = true
-
-	cpu.P.Reload = true
-	if !cpu.LowVector {
-		r[PC] = addr
-		return
+	if mode == MODE_FIQ {
+		cpsr.F = true
 	}
 
-	r[PC] = addr & 0xFFFF
+	cpu.P.Reload = true
+
+	if cpu.LowVector {
+		r[PC] = addr & 0xFFFF
+	} else {
+		r[PC] = addr
+	}
 }
 
 func (cpu *Cpu) ExitException(mode uint32) {
 	var (
 		cpsr = &cpu.Reg.CPSR
 		reg  = &cpu.Reg
-		r    = &cpu.Reg.R
 	)
 
-	i := BANK_ID[mode]
-	*cpsr = reg.SPSR[i]
-	c := BANK_ID[cpsr.Mode]
+	*cpsr = reg.SPSR[BANK_ID[mode]]
 
-	reg.LR[i] = r[LR]
-	reg.SP[i] = r[SP]
-	r[SP] = reg.SP[c]
-	r[LR] = reg.LR[c]
-	cpu.P.Reload = true
+	cpu.ModeSwitch(mode, cpsr.Mode)
 }

@@ -621,11 +621,6 @@ func (cpu *Cpu) ThumbJumpCalls(op uint16) {
 }
 
 func (cpu *Cpu) ThumbB(op uint16) {
-	if immLoop := op == 0xE7FE; immLoop {
-		cpu.Halted = true
-		return
-	}
-
 	r := &cpu.Reg.R
 
 	const shift = 32 - 11 // int32 - offset size
