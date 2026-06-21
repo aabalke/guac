@@ -24,6 +24,7 @@ func (k *Keypad) readCNT(hi bool) uint8 {
 func (k *Keypad) writeCNT(v uint8, hi bool) {
 	if hi {
 		k.KEYCNT = k.KEYCNT&0xFF | (uint16(v) << 8)
+
 		return
 	}
 

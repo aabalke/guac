@@ -29,25 +29,24 @@ type Dma struct {
 	Gba *GBA
 	Idx int
 
-	Src     uint32
-	Dst     uint32
-	InitSrc uint32
-	InitDst uint32
-
+	Src       uint32
+	Dst       uint32
+	InitSrc   uint32
+	InitDst   uint32
+	Value     uint32
 	Control   uint32
 	WordCount uint32
+	DstAdj    uint32
+	SrcAdj    uint32
+	Mode      uint8
 
-	DstAdj  uint32
-	SrcAdj  uint32
-	Repeat  bool
-	isWord  bool
-	DRQ     bool
-	Mode    uint8
-	IRQ     bool
-	Enabled bool
-	Active  bool
-
-	Value uint32
+	Repeat      bool
+	isWord      bool
+	DRQ         bool
+	IRQ         bool
+	Enabled     bool
+	Active      bool
+	InVideoMode bool
 }
 
 func NewDma(gba *GBA, idx int) *Dma {
@@ -134,11 +133,6 @@ func (dma *Dma) Write(addr uint32, v uint8) {
 		dma.Control = (dma.Control & 0xFF) | (uint32(v) << 8)
 		dma.SrcAdj = (dma.SrcAdj & 1) | (uint32(v)&1)<<1
 
-		//fmt.Printf("new Dma Idx %d Mode %d Repeat %t V %02X\n", dma.Idx, dma.Mode, dma.Repeat, v)
-
-		if dma.Idx == 1 || dma.Idx == 2 {
-		}
-
 		if !prev && dma.Enabled {
 			dma.Src = dma.InitSrc
 			dma.Dst = dma.InitDst
@@ -183,16 +177,11 @@ func (dma *Dma) Start(_ int64, _ any) bool {
 }
 
 func (dma *Dma) disable() {
-	dma.Active = false
 	dma.Enabled = false
 	dma.Control &^= 0x8000
 }
 
 func (dma *Dma) transfer() int {
-	if dma.Mode == DMA_MODE_REF {
-		return 0
-	}
-
 	var (
 		mem       = dma.Gba.Mem
 		dstOffset = 0
@@ -291,6 +280,8 @@ func (dma *Dma) transfer() int {
 		dma.Gba.Irq.SetIRQ(8 + uint32(dma.Idx))
 	}
 
+	dma.Active = false
+
 	if !dma.Repeat {
 		dma.disable()
 		return cycles
@@ -302,24 +293,41 @@ func (dma *Dma) transfer() int {
 		dma.Dst = tmpDst
 	}
 
-	//fmt.Printf("SRC %08X DST %08X\n", dma.Src, dma.Dst)
-
 	return cycles
+}
+
+func (dma *Dma) videoDma(vcount uint8) {
+	if ok := dma.Enabled && dma.Mode == DMA_MODE_REF; ok {
+
+		if vcount == 2 {
+			dma.InVideoMode = true
+		}
+
+		if vcount == 162 {
+			dma.disable()
+			dma.InVideoMode = false
+		}
+
+		if dma.InVideoMode {
+			dma.Gba.Scheduler.schedule(EVENT_DMA3, 2, 1, dma.Start, nil)
+		}
+	}
 }
 
 func (gba *GBA) checkDmas(mode uint8) {
 	for i := range 4 {
 		dma := gba.Dma[i]
 		if ok := dma.Enabled && dma.Mode == mode; ok {
+			//dma.transfer()
 			switch i {
 			case 0:
-				gba.Scheduler.schedule(EVENT_DMA0, 2, 1, gba.Dma[i].Start, nil)
+				gba.Scheduler.schedule(EVENT_DMA0, 2, 1, dma.Start, nil)
 			case 1:
-				gba.Scheduler.schedule(EVENT_DMA1, 2, 1, gba.Dma[i].Start, nil)
+				gba.Scheduler.schedule(EVENT_DMA1, 2, 1, dma.Start, nil)
 			case 2:
-				gba.Scheduler.schedule(EVENT_DMA2, 2, 1, gba.Dma[i].Start, nil)
+				gba.Scheduler.schedule(EVENT_DMA2, 2, 1, dma.Start, nil)
 			case 3:
-				gba.Scheduler.schedule(EVENT_DMA3, 2, 1, gba.Dma[i].Start, nil)
+				gba.Scheduler.schedule(EVENT_DMA3, 2, 1, dma.Start, nil)
 			}
 		}
 	}

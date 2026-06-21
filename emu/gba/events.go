@@ -13,7 +13,11 @@ func (gba *GBA) HblankEvent(overshoot int64, arg any) bool {
 		gba.Irq.SetIRQ(1)
 	}
 
-	if vcount := gba.Mem.IO[0x6]; vcount < SCREEN_HEIGHT {
+	vcount := gba.Mem.IO[6]
+
+	gba.Dma[3].videoDma(vcount)
+
+	if vcount < SCREEN_HEIGHT {
 		updateBackgrounds(gba, &gba.PPU.Dispcnt)
 		gba.PPU.bgPriorities = gba.getBgPriority(uint32(vcount), gba.PPU.Dispcnt.Mode, &gba.PPU.Backgrounds)
 		gba.PPU.objPriorities = gba.getObjPriority(uint32(vcount), &gba.PPU.Objects)
@@ -28,13 +32,14 @@ func (gba *GBA) HblankEvent(overshoot int64, arg any) bool {
 
 func (gba *GBA) ScanlineEndEvent(overshoot int64, arg any) bool {
 	dispstat := &gba.Mem.Dispstat
-	vcount := &gba.Mem.IO[0x6]
+	vcount := &gba.Mem.IO[6]
 
 	dispstat.SetHBlank(false)
 
 	*vcount++
 
 	switch *vcount {
+
 	case SCREEN_HEIGHT:
 		dispstat.SetVBlank(true)
 		gba.checkDmas(DMA_MODE_VBL)
@@ -43,6 +48,9 @@ func (gba *GBA) ScanlineEndEvent(overshoot int64, arg any) bool {
 		if (*dispstat>>3)&1 != 0 {
 			gba.Irq.SetIRQ(0)
 		}
+
+	case 227:
+		dispstat.SetVBlank(false)
 	}
 
 	match := dispstat.GetLYC() == *vcount
@@ -59,15 +67,13 @@ func (gba *GBA) ScanlineEndEvent(overshoot int64, arg any) bool {
 
 func (gba *GBA) FrameEndEvent(overshoot int64, arg any) bool {
 	dispstat := &gba.Mem.Dispstat
-	vcount := &gba.Mem.IO[0x6]
 
 	gba.Apu.Play(gba.Muted, true)
 	gba.Frame++
 	gba.Image.WritePixels(gba.Pixels)
-	*vcount = 0
-	dispstat.SetVBlank(false)
 
-	match := dispstat.GetLYC() == *vcount
+	gba.Mem.IO[6] = 0
+	match := dispstat.GetLYC() == 0
 	dispstat.SetVCFlag(match)
 
 	if vcounterIRQ := (*dispstat>>5)&1 != 0; vcounterIRQ && match {

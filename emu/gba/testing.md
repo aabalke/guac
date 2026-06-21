@@ -25,6 +25,16 @@
    save
 👍 flash64
 ❌ flash128
+
+note:
+Flash128 fails if save exists. Test 009 requires cleared memory to pass.
+This is because according to gbatek the target memory location must have been previously erased.
+
+Nanoboy treats if as a free write, [addr] = v
+Skyemu forces has to be erased addr &= v
+
+not sure which is correct and if test has accounted for it.
+
 👍 none
 👍 sram
 
@@ -179,3 +189,8 @@ Requires "GGPIO" eeprom panic to be removed
 👍 txt_se1
 👍 txt_se2 (text has different amounts)
 👍 win_demo
+
+# Questions
+
+1. Do all 72 long multiply tests pass on actual hardware?
+2. Does Flash memory actually need to be zeroed (0xFF) before write? See Flash 128 problems

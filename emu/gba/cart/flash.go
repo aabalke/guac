@@ -1,34 +1,42 @@
 package cart
 
+import "fmt"
+
 const (
-	FL_READ         = 0
-	FL_ID           = 1
-	FL_ERASE_ALL    = 2
-	FL_ERASE        = 3
-	FL_WRITE        = 4
-	FL_BANKSWITCH   = 5
-	FL_ERASE_SECTOR = 6
+	FL_READ = iota
+	FL_ID
+	FL_ERASE_ALL
+	FL_ERASE
+	FL_WRITE
+	FL_BANKSWITCH
+	FL_ERASE_SECTOR
 )
 
 func (c *Cartridge) ReadFlash(addr uint32) uint8 {
+	var v uint8
 
 	if c.FlashMode == FL_ID {
 		switch addr {
 		case 0:
-			return uint8(c.Manufacturer)
+			v = uint8(c.Manufacturer)
 		case 1:
-			return uint8(c.Device)
+			v = uint8(c.Device)
 		default:
-			return 0xFF
+			v = 0xFF
 		}
+	} else {
+		bankAddr := (c.FlashBank * 0x1_0000) + addr
+
+		v = c.Flash[bankAddr]
+
 	}
 
-	bankAddr := (c.FlashBank * 0x1_0000) + addr
-
-	return c.Flash[bankAddr]
+	fmt.Printf("R ADDR %08X V %02X\n", addr, v)
+	return v
 }
 
 func (c *Cartridge) WriteFlash(addr uint32, v uint8) {
+	fmt.Printf("W ADDR %08X V %02X\n", addr, v)
 
 	if c.SetMode(addr, v) {
 		return
@@ -40,9 +48,9 @@ func (c *Cartridge) WriteFlash(addr uint32, v uint8) {
 
 	case FL_WRITE:
 		bankAddr := (c.FlashBank * 0x1_0000) + addr
-		if c.Flash[bankAddr] == 0xFF {
-			c.Flash[bankAddr] = v
-		}
+
+		// The target memory location must have been previously erased.
+		c.Flash[bankAddr] &= v
 
 	case FL_ERASE_ALL:
 
@@ -60,17 +68,17 @@ func (c *Cartridge) WriteFlash(addr uint32, v uint8) {
 			return
 		}
 
-		i := uint32(0)
-		for i = range 0x1000 {
-			c.Flash[(c.FlashBank*0x1_0000)+addr+i] = 0xFF
+		bankAddr := (c.FlashBank * 0x1_0000) + addr
+		for i := range uint32(0x1000) {
+			c.Flash[bankAddr+i] = 0xFF
 		}
 
 		c.FlashMode = FL_READ
 		c.FlashStage = 0
 
 	case FL_BANKSWITCH:
-		if addr == 0x0000 && c.FlashType == FLASH128 && (v == 0 || v == 1) {
-			c.FlashBank = uint32(v)
+		if addr == 0 && c.FlashType == FLASH128 {
+			c.FlashBank = uint32(v & 1)
 		}
 	}
 
@@ -78,7 +86,6 @@ func (c *Cartridge) WriteFlash(addr uint32, v uint8) {
 }
 
 func (c *Cartridge) SetMode(addr uint32, v uint8) bool {
-
 	switch c.FlashStage {
 	case 0:
 		if addr == 0x5555 && v == 0xAA {
