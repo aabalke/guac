@@ -154,7 +154,6 @@ func (dma *Dma) Write(addr uint32, v uint8) {
 		if prev && !dma.Enabled {
 
 			dma.disable()
-			//fmt.Printf("disabling Dma Idx %d Mode %d Repeat %t\n", dma.Idx, dma.Mode, dma.Repeat)
 
 			switch dma.Idx {
 			case 0:

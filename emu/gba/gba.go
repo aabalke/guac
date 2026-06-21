@@ -31,16 +31,17 @@ const (
 )
 
 type GBA struct {
-	Cpu       *arm.Cpu
-	Scheduler *Scheduler
-	Mem       *Memory
-	Cartridge *cart.Cartridge
-	PPU       *PPU
-	Timers    [4]*Timer
-	Dma       [4]*Dma
-	Apu       *apu.Apu
-	Keypad    Keypad
-	Irq       cpu.Irq
+	Cpu               *arm.Cpu
+	Scheduler         *Scheduler
+	Mem               *Memory
+	Cartridge         *cart.Cartridge
+	PPU               *PPU
+	Timers            [4]*Timer
+	Dma               [4]*Dma
+	Apu               *apu.Apu
+	Keypad            Keypad
+	Irq               cpu.Irq
+	InstInjectionFunc func(op uint32)
 
 	Frame uint64
 
@@ -109,6 +110,10 @@ func (gba *GBA) Update(stdFps bool) {
 
 			if ok := gba.CheckDmas(); ok {
 				continue
+			}
+
+			if gba.InstInjectionFunc != nil {
+				gba.InstInjectionFunc(gba.Cpu.P.Execute.Op)
 			}
 
 			gba.Tick(gba.Cpu.Step())

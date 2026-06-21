@@ -1,7 +1,5 @@
 package cart
 
-import "fmt"
-
 const (
 	FL_READ = iota
 	FL_ID
@@ -31,13 +29,10 @@ func (c *Cartridge) ReadFlash(addr uint32) uint8 {
 
 	}
 
-	fmt.Printf("R ADDR %08X V %02X\n", addr, v)
 	return v
 }
 
 func (c *Cartridge) WriteFlash(addr uint32, v uint8) {
-	fmt.Printf("W ADDR %08X V %02X\n", addr, v)
-
 	if c.SetMode(addr, v) {
 		return
 	}

@@ -9,7 +9,7 @@ import (
 // akatsuki105/magia MIT License
 
 type Apu struct {
-	Enable bool
+	player *oto.Player
 
 	FifoA, FifoB                    Fifo
 	SoundCntL, SoundCntH, SoundCntX uint16
@@ -23,11 +23,7 @@ type Apu struct {
 	WaveChannel  WaveChannel
 	NoiseChannel NoiseChannel
 
-	Stream []byte
-
 	sndCycles uint32
-
-	player *oto.Player
 
 	cpuFreqHz    int
 	sndFrequency int
@@ -37,6 +33,9 @@ type Apu struct {
 	sampleTime   float64
 	streamLen    int
 	buffSize     uint32
+
+	Stream []byte
+	Enable bool
 }
 
 func (a *Apu) Disable() {
@@ -120,7 +119,9 @@ func (a *Apu) Play(muted, stdFps bool) {
 }
 
 func (a *Apu) Close() {
-	a.player.Close()
+	if a.player != nil {
+		a.player.Close()
+	}
 }
 
 func (a *Apu) soundMix() {

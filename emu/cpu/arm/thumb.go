@@ -3,7 +3,6 @@ package arm
 
 import (
 	"math/bits"
-	"unsafe"
 )
 
 const (
@@ -513,29 +512,32 @@ func (cpu *Cpu) ThumbPushPop(op uint16) {
 		pclr  = (op>>8)&1 != 0
 		rlist = op & 0xFF
 		pop   = (op>>11)&1 != 0
-		p     unsafe.Pointer
 	)
+
+	// thank you nano
+	if rlist == 0 && !pclr {
+		if pop {
+			r[PC] = cpu.Read32(r[SP])
+			cpu.P.Reload = true
+			r[SP] += 0x40
+		} else {
+			// alyosha test fails this.
+			// i think it is timing related
+			r[SP] -= 0x40
+			cpu.Write32(r[SP], r[PC])
+		}
+
+		return
+	}
 
 	reg := 0
 	if !pop {
 		reg = 7
 	}
 
-	// disabled for now. Need method to handle games that use edge of bank to subtract from. ex. metroid uses 0x200_0000 as addr, then subtracts to place values in different bank at 0x1FF_FFFC
-	//if pop {
-	//	p, _ = cpu.ReadPtr(r[SP])
-	//} else {
-	//	p, _ = cpu.WritePtr(r[SP])
-	//}
-
 	if !pop && pclr {
 		r[SP] -= 4
-		if p != nil {
-			p = unsafe.Add(p, -4)
-			*(*uint32)(p) = r[14]
-		} else {
-			cpu.Write32(r[SP], r[14])
-		}
+		cpu.Write32(r[SP], r[14])
 	}
 
 	for range 8 {
@@ -549,21 +551,11 @@ func (cpu *Cpu) ThumbPushPop(op uint16) {
 		}
 
 		if pop {
-			if p != nil {
-				r[reg] = *(*uint32)(p)
-				p = unsafe.Add(p, 4)
-			} else {
-				r[reg] = cpu.Read32(r[SP])
-			}
+			r[reg] = cpu.Read32(r[SP])
 			r[SP] += 4
 		} else {
 			r[SP] -= 4
-			if p != nil {
-				p = unsafe.Add(p, -4)
-				*(*uint32)(p) = r[reg]
-			} else {
-				cpu.Write32(r[SP], r[reg])
-			}
+			cpu.Write32(r[SP], r[reg])
 		}
 
 		cpu.BlockTransfer = true
@@ -577,14 +569,12 @@ func (cpu *Cpu) ThumbPushPop(op uint16) {
 
 	if pop && pclr {
 
-		if p != nil {
-			r[PC] = *(*uint32)(p)
-		} else {
-			r[PC] = cpu.Read32(r[SP])
-		}
+		r[PC] = cpu.Read32(r[SP])
 
 		r[PC] &^= 1
 		r[SP] += 4
+
+		cpu.idle(1)
 
 		cpu.P.Reload = true
 	}

@@ -298,7 +298,19 @@ func (m *Memory) ReadBios(addr uint32) uint8 {
 	return uint8(m.ProtectedValue >> ((addr & 3) << 3))
 }
 
+var openBusDepth int
+
 func (m *Memory) ReadOpenBus(addr uint32) uint8 {
+	openBusDepth++
+
+	defer func() {
+		openBusDepth--
+	}()
+
+	if openBusDepth > 100 {
+		panic("open bus depth >= 100")
+	}
+
 	pc := m.GBA.Cpu.Reg.R[15]
 
 	if m.GBA.Cpu.Reg.CPSR.T {

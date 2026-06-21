@@ -788,7 +788,7 @@ func (cpu *Cpu) msr(op uint32) {
 		return
 	}
 
-	next := v & 0x1F
+	next := v&0x1F | 0x10
 	cpsr := uint32(reg.CPSR.Get()) &^ mask
 
 	cpsr |= v & mask
