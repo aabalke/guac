@@ -8,7 +8,7 @@ import (
 )
 
 func (gba *GBA) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadButton) {
-	k := &gba.Keypad.KEYINPUT
+	k := &gba.Keypad.Input
 	*k = 0x3FF
 
 	keyConfig := config.Conf.Gba.KeyboardConfig

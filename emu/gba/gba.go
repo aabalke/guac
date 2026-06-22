@@ -39,7 +39,7 @@ type GBA struct {
 	Timers            [4]*Timer
 	Dma               [4]*Dma
 	Apu               *apu.Apu
-	Keypad            Keypad
+	Keypad            Key
 	Irq               cpu.Irq
 	InstInjectionFunc func(op uint32)
 
@@ -56,7 +56,7 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba := &GBA{
 		Pixels: make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
 		Image:  ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
-		Keypad: Keypad{KEYINPUT: 0x3FF},
+		Keypad: Key{Input: 0x3FF},
 		Apu:    apu.NewApu(ctx, CPU_SPEED, SND_FREQ, SND_SAMPLES),
 	}
 

@@ -4,41 +4,30 @@ import (
 	"github.com/aabalke/guac/emu/gba/cart"
 )
 
-//var DMA_ACTIVE = -1
-//var DMA_FINISHED = -1
-//var DMA_PC = uint32(0)
-
 const (
 	DMA_MODE_IMM = 0
 	DMA_MODE_VBL = 1
 	DMA_MODE_HBL = 2
-	DMA_MODE_REF = 3
+	DMA_MODE_SPE = 3
 
 	DMA_ADJ_INC = 0
 	DMA_ADJ_DEC = 1
 	DMA_ADJ_NON = 2
-	DMA_ADJ_RES = 3
-
-	IRQ_DMA_0 = 8
-	IRQ_DMA_1 = 9
-	IRQ_DMA_2 = 10
-	IRQ_DMA_3 = 11
+	DMA_ADJ_REL = 3
 )
 
 type Dma struct {
 	Gba *GBA
 	Idx int
 
-	Src       uint32
-	Dst       uint32
-	InitSrc   uint32
-	InitDst   uint32
-	Value     uint32
-	Control   uint32
-	WordCount uint32
-	DstAdj    uint32
-	SrcAdj    uint32
-	Mode      uint8
+	Src     uint32
+	Dst     uint32
+	Value   uint32
+	Control uint32
+	Cnt     uint32
+	DstAdj  uint32
+	SrcAdj  uint32
+	Mode    uint8
 
 	Repeat      bool
 	isWord      bool
@@ -47,6 +36,14 @@ type Dma struct {
 	Enabled     bool
 	Active      bool
 	InVideoMode bool
+
+	latched struct {
+		src       uint32
+		dst       uint32
+		cnt       uint32
+		dstOffset int
+		srcOffset int
+	}
 }
 
 func NewDma(gba *GBA, idx int) *Dma {
@@ -80,13 +77,12 @@ func (dma *Dma) Write(addr uint32, v uint8) {
 		}
 
 		dma.Src = (dma.Src &^ (0xFF << (addr << 3))) | (uint32(v) << (addr << 3))
-		dma.InitSrc = dma.Src
 
 	case 4, 5, 6, 7:
 
-		byte := addr - 4
+		addr -= 4
 
-		if byte == 3 {
+		if addr == 3 {
 			if dma.Idx == 3 {
 				v &= 0xF
 			} else {
@@ -94,11 +90,10 @@ func (dma *Dma) Write(addr uint32, v uint8) {
 			}
 		}
 
-		dma.Dst = (dma.Dst &^ (0xFF << (byte << 3))) | (uint32(v) << (byte << 3))
-		dma.InitDst = dma.Dst
+		dma.Dst = (dma.Dst &^ (0xFF << (addr << 3))) | (uint32(v) << (addr << 3))
 
 	case 8:
-		dma.WordCount = (dma.WordCount &^ 0xFF) | uint32(v)
+		dma.Cnt = (dma.Cnt &^ 0xFF) | uint32(v)
 
 	case 9:
 
@@ -106,7 +101,7 @@ func (dma *Dma) Write(addr uint32, v uint8) {
 			v &= 0x3F
 		}
 
-		dma.WordCount = (dma.WordCount & 0xFF) | (uint32(v) << 8)
+		dma.Cnt = (dma.Cnt & 0xFF) | (uint32(v) << 8)
 
 	case 10:
 
@@ -134,9 +129,6 @@ func (dma *Dma) Write(addr uint32, v uint8) {
 		dma.SrcAdj = (dma.SrcAdj & 1) | (uint32(v)&1)<<1
 
 		if !prev && dma.Enabled {
-			dma.Src = dma.InitSrc
-			dma.Dst = dma.InitDst
-
 			if dma.Mode == 0 {
 				switch dma.Idx {
 				case 0:
@@ -171,7 +163,59 @@ func (dma *Dma) Write(addr uint32, v uint8) {
 }
 
 func (dma *Dma) Start(_ int64, _ any) bool {
+	var (
+		src       = dma.Src
+		dst       = dma.Dst
+		count     = dma.Cnt
+		dstOffset = 2
+		srcOffset = 2
+	)
+
 	dma.Active = true
+	if dma.isWord {
+		dst &^= 3
+		src &^= 3
+		dstOffset = 4
+		srcOffset = 4
+	} else {
+		dst &^= 1
+		src &^= 1
+	}
+
+	if count == 0 {
+		if dma.Idx == 3 {
+			count = 0x10000
+		} else {
+			count = 0x4000
+		}
+	}
+
+	if rom := src >= 0x800_0000 && src < 0xE00_0000; !rom {
+		switch dma.SrcAdj {
+		case DMA_ADJ_NON:
+			srcOffset = 0
+		case DMA_ADJ_DEC:
+			srcOffset = -srcOffset
+		case DMA_ADJ_REL:
+			panic("invalid dma src method")
+		}
+	}
+
+	if rom := dst >= 0x800_0000 && dst < 0xE00_0000; !rom {
+		switch dma.DstAdj {
+		case DMA_ADJ_NON:
+			dstOffset = 0
+		case DMA_ADJ_DEC:
+			dstOffset = -dstOffset
+		}
+	}
+
+	dma.latched.src = src
+	dma.latched.dst = dst
+	dma.latched.cnt = count
+	dma.latched.srcOffset = srcOffset
+	dma.latched.dstOffset = dstOffset
+
 	return false
 }
 
@@ -182,96 +226,55 @@ func (dma *Dma) disable() {
 
 func (dma *Dma) transfer() int {
 	var (
-		mem       = dma.Gba.Mem
-		dstOffset = 0
-		srcOffset = 0
-		offset    = 2
-		tmpDst    = dma.Dst
-		tmpSrc    = dma.Src
+		mem = dma.Gba.Mem
+		src = dma.latched.src
+		dst = dma.latched.dst
 	)
 
-	if dma.isWord {
-		tmpDst &^= 3
-		tmpSrc &^= 3
-		offset = 4
-	} else {
-		tmpDst &^= 1
-		tmpSrc &^= 1
-	}
-
-	bios := tmpSrc < 0x200_0000
-
-	if rom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000; rom {
-		dma.SrcAdj = DMA_ADJ_INC
-	}
-
-	switch dma.DstAdj {
-	case DMA_ADJ_INC, DMA_ADJ_RES:
-		dstOffset = offset
-	case DMA_ADJ_DEC:
-		dstOffset = -offset
-	}
-
-	switch dma.SrcAdj {
-	case DMA_ADJ_INC:
-		srcOffset = offset
-	case DMA_ADJ_DEC:
-		srcOffset = -offset
-	case DMA_ADJ_RES:
-		panic("invalid dma src method")
-	}
-
-	count := dma.WordCount
-	if count == 0 {
-		if dma.Idx == 3 {
-			count = 0x10000
-		} else {
-			count = 0x4000
-		}
-	}
+	bios := src < 0x200_0000
 
 	cycles := 2
 
 	if dma.isWord {
-		for i := range count {
+		for i := range dma.latched.cnt {
 
-			dma.EepromDma(count, tmpDst, tmpSrc)
+			dma.EepromDma(dma.latched.cnt, dst, src)
 
 			switch {
 			case bios:
 				cycles++
 
 			default:
-				cycles += dma.Gba.Cpu.CycleCounterDma(tmpSrc, 4, i != 0)
-				dma.Value = mem.Read32(tmpSrc)
+				cycles += dma.Gba.Cpu.CycleCounterDma(src, 4, i != 0)
+				dma.Value = mem.Read32(src)
 			}
 
-			cycles += dma.Gba.Cpu.CycleCounterDma(tmpDst, 4, i != 0)
-			mem.Write32(tmpDst, dma.Value)
+			cycles += dma.Gba.Cpu.CycleCounterDma(dst, 4, i != 0)
+			mem.Write32(dst, dma.Value)
 
-			tmpDst = uint32(int(tmpDst) + dstOffset)
-			tmpSrc = uint32(int(tmpSrc) + srcOffset)
+			dst = uint32(int(dst) + dma.latched.dstOffset)
+			src = uint32(int(src) + dma.latched.srcOffset)
 		}
 	} else {
-		for i := range count {
+		for i := range dma.latched.cnt {
 
-			dma.EepromDma(count, tmpDst, tmpSrc)
+			dma.EepromDma(dma.latched.cnt, dst, src)
 
 			switch {
 			case bios:
 				cycles++
 
 			default:
-				cycles += dma.Gba.Cpu.CycleCounterDma(tmpSrc, 2, i != 0)
-				v := mem.Read16(tmpSrc)
+				cycles += dma.Gba.Cpu.CycleCounterDma(src, 2, i != 0)
+				v := mem.Read16(src)
 				dma.Value = v | (v << 16)
 			}
 
-			cycles += dma.Gba.Cpu.CycleCounterDma(tmpDst, 2, i != 0)
-			mem.Write16(tmpDst, uint16(dma.Value))
+			cycles += dma.Gba.Cpu.CycleCounterDma(dst, 2, i != 0)
+			mem.Write16(dst, uint16(dma.Value))
 
-			tmpDst = uint32(int(tmpDst) + dstOffset)
-			tmpSrc = uint32(int(tmpSrc) + srcOffset)
+			dst = uint32(int(dst) + dma.latched.dstOffset)
+			src = uint32(int(src) + dma.latched.srcOffset)
 		}
 	}
 
@@ -281,22 +284,25 @@ func (dma *Dma) transfer() int {
 
 	dma.Active = false
 
+	dma.latched.src = src
+	dma.latched.dst = dst
+
 	if !dma.Repeat {
 		dma.disable()
 		return cycles
 	}
 
-	dma.Src = tmpSrc
+	dma.Src = src
 
-	if dma.DstAdj != DMA_ADJ_RES {
-		dma.Dst = tmpDst
+	if dma.DstAdj != DMA_ADJ_REL {
+		dma.Dst = dst
 	}
 
 	return cycles
 }
 
 func (dma *Dma) videoDma(vcount uint8) {
-	if ok := dma.Enabled && dma.Mode == DMA_MODE_REF; ok {
+	if ok := dma.Enabled && dma.Mode == DMA_MODE_SPE; ok {
 
 		if vcount == 2 {
 			dma.InVideoMode = true
@@ -317,7 +323,6 @@ func (gba *GBA) checkDmas(mode uint8) {
 	for i := range 4 {
 		dma := gba.Dma[i]
 		if ok := dma.Enabled && dma.Mode == mode; ok {
-			//dma.transfer()
 			switch i {
 			case 0:
 				gba.Scheduler.schedule(EVENT_DMA0, 2, 1, dma.Start, nil)
@@ -345,8 +350,6 @@ func (gba *GBA) CheckDmas() bool {
 
 func (dma *Dma) EepromDma(count, tmpDst, tmpSrc uint32) {
 	if eeprom := CheckEeprom(dma.Gba, tmpDst); eeprom {
-		dstRom := tmpDst >= 0x800_0000 && tmpDst < 0xE00_0000
-		srcRom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
 
 		switch count {
 		case 9, 73:
@@ -355,6 +358,8 @@ func (dma *Dma) EepromDma(count, tmpDst, tmpSrc uint32) {
 			cart.EepromWidth = 14
 		}
 
+		dstRom := tmpDst >= 0x800_0000 && tmpDst < 0xE00_0000
+		srcRom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
 		if srcRom && dstRom {
 			panic("EEPROM HAS BOTH SRC AND DST ROM ADDR")
 		}

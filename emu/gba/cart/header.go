@@ -18,10 +18,6 @@ func NewHeader(c *Cartridge) *Header {
 		Version:  uint8(c.Rom[0xBC]),
 	}
 
-	//if strings.HasPrefix(h.GameCode, "F") {
-	//	panic("NES CLASSIC GAME. NOT SUPPORTED")
-	//}
-
 	h.valid(c)
 	h.print()
 	return h

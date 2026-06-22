@@ -1,48 +1,46 @@
 package gba
 
-type Keypad struct {
-	KEYINPUT uint16
-	KEYCNT   uint16
+type Key struct {
+	Input uint16
+	Cnt   uint16
 }
 
-func (k *Keypad) readINPUT(hi bool) uint8 {
-	if hi {
-		return uint8(k.KEYINPUT >> 8)
+func (k *Key) Read(addr uint32) uint8 {
+	switch addr & 3 {
+	case 0:
+		return uint8(k.Input)
+	case 1:
+		return uint8(k.Input >> 8)
+	case 2:
+		return uint8(k.Cnt)
+	case 3:
+		return uint8(k.Cnt >> 8)
+	default:
+		return 0
 	}
-
-	return uint8(k.KEYINPUT)
 }
 
-func (k *Keypad) readCNT(hi bool) uint8 {
-	if hi {
-		return uint8(k.KEYCNT >> 8)
+func (k *Key) Write(addr uint32, v uint8) {
+	switch addr & 3 {
+	case 2:
+		k.Cnt = (k.Cnt &^ 0xFF) | uint16(v)
+	case 3:
+		k.Cnt = (k.Cnt & 0xFF) | (uint16(v) << 8)
 	}
-
-	return uint8(k.KEYCNT)
 }
 
-func (k *Keypad) writeCNT(v uint8, hi bool) {
-	if hi {
-		k.KEYCNT = k.KEYCNT&0xFF | (uint16(v) << 8)
-
-		return
-	}
-
-	k.KEYCNT = k.KEYCNT&^0xFF | uint16(v)
-}
-
-func (k *Keypad) keyIRQ() bool {
-	if disabled := (k.KEYCNT>>14)&1 == 0; disabled {
+func (k *Key) keyIRQ() bool {
+	if disabled := (k.Cnt>>14)&1 == 0; disabled {
 		return false
 	}
 
-	andFlag := (k.KEYCNT>>15)&1 != 0
+	andFlag := k.Cnt&0x80 != 0
 
-	if or := !andFlag && ^k.KEYCNT&k.KEYINPUT != 0; or {
+	if or := !andFlag && ^k.Cnt&k.Input != 0; or {
 		return true
 	}
 
-	if and := andFlag && ^k.KEYCNT&^k.KEYINPUT == 0; and {
+	if and := andFlag && ^k.Cnt&^k.Input == 0; and {
 		return true
 	}
 

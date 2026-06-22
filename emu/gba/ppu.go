@@ -329,14 +329,14 @@ func (p *PPU) UpdateOAM(relAddr uint32) {
 
 	switch attrIdx {
 	case 0:
-		obj.Y = attr & 0b1111_1111
+		obj.Y = attr & 0xFF
 	case 1:
 
 		obj.RotScale = (attr>>0)&1 != 0
-		obj.Mode = (attr >> 2) & 0b11
+		obj.Mode = (attr >> 2) & 3
 		obj.Mosaic = (attr>>4)&1 != 0
 		obj.Palette256 = (attr>>5)&1 != 0
-		obj.Shape = (attr >> 6) & 0b11
+		obj.Shape = (attr >> 6) & 3
 		obj.setSize(obj.Shape, obj.Size)
 
 		if obj.RotScale {

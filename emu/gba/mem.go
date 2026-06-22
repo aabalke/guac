@@ -358,14 +358,8 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 	case 0x0007:
 		return 0
 
-	case 0x130:
-		return m.GBA.Keypad.readINPUT(false)
-	case 0x131:
-		return m.GBA.Keypad.readINPUT(true)
-	case 0x132:
-		return m.GBA.Keypad.readCNT(false)
-	case 0x133:
-		return m.GBA.Keypad.readCNT(true)
+	case 0x130, 0x131, 0x132, 0x133:
+		return m.GBA.Keypad.Read(addr & 3)
 
 	case 0x136, 0x137, 0x138, 0x139, 0x142, 0x143, 0x15A, 0x15B:
 		return 0
@@ -563,14 +557,9 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 	case 0x0053:
 		m.IO[addr] = v &^ 0b1110_0000 // bldalpha
 
-	case 0x130:
+	case 0x130, 0x131, 0x132, 0x133:
+		m.GBA.Keypad.Write(addr&3, v)
 		return
-	case 0x131:
-		return
-	case 0x132:
-		m.GBA.Keypad.writeCNT(v, false)
-	case 0x133:
-		m.GBA.Keypad.writeCNT(v, true)
 
 	case 0x200:
 		m.GBA.Irq.WriteIE(v, 0)
@@ -580,24 +569,14 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 		m.GBA.Irq.WriteIF(v, 0)
 	case 0x203:
 		m.GBA.Irq.WriteIF(v, 1)
-	case 0x204:
-		m.Waitstate.Write(0, v)
-	case 0x205:
-		m.Waitstate.Write(1, v)
-	case 0x206:
-		m.Waitstate.Write(2, v)
-	case 0x207:
-		m.Waitstate.Write(3, v)
+	case 0x204, 0x205, 0x206, 0x207:
+		m.Waitstate.Write(uint8(addr&3), v)
 
 	// IME
 	case 0x208:
 		m.GBA.Irq.WriteIME(v)
 		m.IO[addr] = v
-	case 0x209:
-		return
-	case 0x20A:
-		return
-	case 0x20B:
+	case 0x209, 0x20A, 0x20B:
 		return
 
 	case 0x301:
@@ -670,7 +649,7 @@ func CheckEeprom(gba *GBA, addr uint32) bool {
 }
 
 func (m *Memory) ReadSoundIO(addr uint32) uint8 {
-	switch addr &^ 0b1 {
+	switch addr &^ 1 {
 	case 0x8C:
 		return m.ReadOpenBus(addr)
 	case 0x8E:
