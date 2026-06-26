@@ -50,6 +50,8 @@ type GBA struct {
 	DrawOptions ebiten.DrawImageOptions
 
 	Paused, Muted, Save, Drawn bool
+
+	Booted bool
 }
 
 func NewGBA(path string, ctx *oto.Context) *GBA {
@@ -63,7 +65,7 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba.PPU = &PPU{gba: gba}
 	gba.Irq = cpu.Irq{}
 	gba.Mem = NewMemory(gba)
-	gba.Cpu = arm.NewCpu(false, gba.Mem, &gba.Irq, &gba.Mem.Waitstate, gba.Mem.Prefetch)
+	gba.Cpu = arm.NewCpu(false, gba.Mem, &gba.Irq, &gba.Mem.Waitstate, gba.Mem.Prefetch, gba.Tick)
 	gba.Scheduler = NewScheduler(&gba.Cpu.AccCycles)
 
 	for i := range 4 {
@@ -84,6 +86,8 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba.Scheduler.schedule(EVENT_END_FRAME, 1, 0, gba.FrameEndEvent, nil)
 	gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, 0, gba.ScanlineEndEvent, nil)
 
+	gba.Booted = true
+
 	return gba
 }
 
@@ -91,6 +95,18 @@ func (gba *GBA) Update(stdFps bool) {
 	if gba.Paused {
 		return
 	}
+
+	//start := gba.Scheduler.Now()
+
+	//fmt.Printf("Start of Frame %08X\n", start)
+
+	//if start > 0x160000 {
+	//	os.Exit(0)
+	//}
+
+	//if start >= 0x0011250 {
+	//	B[1] = true
+	//}
 
 	for {
 
@@ -100,8 +116,8 @@ func (gba *GBA) Update(stdFps bool) {
 
 			if gba.Cpu.Halted {
 
+				gba.Tick(1)
 				if gba.Irq.IE&gba.Irq.IF == 0 {
-					gba.Tick(1)
 					continue
 				}
 
@@ -117,6 +133,15 @@ func (gba *GBA) Update(stdFps bool) {
 			}
 
 			gba.Tick(gba.Cpu.Step())
+			//fmt.Printf("SCH TIMERSTAMP SET %08X\n", gba.Scheduler.CurrentCycle)
+
+			//// if B[1] {
+			//if gba.Cpu.P.Execute.Thumb {
+			//	fmt.Printf("AFTER %08X PC %08X\n", gba.Scheduler.Now(), gba.Cpu.P.Execute.Addr|1)
+			//} else {
+			//	fmt.Printf("AFTER %08X PC %08X\n", gba.Scheduler.Now(), gba.Cpu.P.Execute.Addr)
+			//}
+			////}
 		}
 
 		for {

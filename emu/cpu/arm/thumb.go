@@ -613,10 +613,8 @@ func (cpu *Cpu) ThumbJumpCalls(op uint16) {
 func (cpu *Cpu) ThumbB(op uint16) {
 	r := &cpu.Reg.R
 
-	const shift = 32 - 11 // int32 - offset size
-
-	nn := (int32(uint32(op)<<shift) >> shift) << 1
-	r[PC] = uint32(int32(r[PC]) + nn)
+	offset := int16((op&0x7FF)<<5) >> 4
+	r[15] += uint32(offset)
 	cpu.P.Reload = true
 }
 
@@ -684,36 +682,46 @@ func (cpu *Cpu) ThumbStack(op uint16) {
 }
 
 func (cpu *Cpu) ThumbLongBranch(op uint16) {
-	const shift = 32 - 23 // 22 is bits, + 1 for * 2
-	var (
-		r   = &cpu.Reg.R
-		op2 = cpu.Read16(cpu.P.Execute.Addr + 2)
-		hi  = uint32(op & 0x7FF)
-		lo  = uint32(op2 & 0x7FF)
-		nn  = int32(((hi<<12)|(lo<<1))<<shift) >> shift
-	)
+	r := &cpu.Reg.R
+	offset := int32(uint32(op&0x7FF)<<21) >> 9
+	r[14] = r[15] + uint32(offset)
 
-	r[LR] = (r[PC] &^ 1) + 1
-	r[PC] = uint32(int32(r[PC]) + nn)
+	//const shift = 32 - 23 // 22 is bits, + 1 for * 2
+	//var (
+	//	r = &cpu.Reg.R
+	//	//op2 = cpu.Read16(cpu.P.Execute.Addr + 2)
+	//	op2 = cpu.P.Decode.Op
+	//	hi  = uint32(op & 0x7FF)
+	//	lo  = uint32(op2 & 0x7FF)
+	//	nn  = int32(((hi<<12)|(lo<<1))<<shift) >> shift
+	//)
 
-	if exc := (op2>>12)&1 == 0; exc {
-		cpu.ToggleThumb()
-	}
-	cpu.P.Reload = true
+	//r[LR] = (r[PC] &^ 1) + 1
+	//r[PC] = uint32(int32(r[PC]) + nn)
+
+	//if exc := (op2>>12)&1 == 0; exc {
+	//	cpu.ToggleThumb()
+	//}
+	//cpu.P.Reload = true
 }
 
 func (cpu *Cpu) ThumbShortLongBranch(op uint16) {
+	r := &cpu.Reg.R
+
+	nn := uint32(op&0x7FF) << 1
+	r[15], cpu.P.Reload = r[14]+nn, true
+	r[14] = cpu.P.Decode.Addr | 1
+
 	// Using only the 2nd half of BL as "BL LR+imm" is possible
 	// (for example, Mario Golf Advance Tour for GBA uses op F800h as "BL LR+0").
 	// BL LR + nn
 	// bottom half never signed?
 
-	r := &cpu.Reg.R
-	nn := uint32(op&0x7FF) << 1
-	tmpLR := r[LR]
-	r[LR] = ((r[PC] + 2) &^ 0b1) + 1
-	r[PC] = (tmpLR + nn) &^ 0b1
-	cpu.P.Reload = true
+	//nn := uint32(op&0x7FF) << 1
+	//tmpLR := r[LR]
+	//r[LR] = ((r[PC] + 2) &^ 0b1) + 1
+	//r[PC] = (tmpLR + nn) &^ 0b1
+	//cpu.P.Reload = true
 }
 
 func (cpu *Cpu) ThumbLSSP(op uint16) {

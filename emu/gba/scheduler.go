@@ -41,7 +41,17 @@ func NewScheduler(acc *int) *Scheduler {
 }
 
 func (s *Scheduler) Now() int64 {
+	//fmt.Printf("NOW CPU %08X\n", s.CurrentCycle+int64(*s.AccCycles))
 	return s.CurrentCycle + int64(*s.AccCycles)
+}
+
+func (s *Scheduler) NowNoCpu() int64 {
+	//fmt.Printf("NOW SCH %08X\n", s.CurrentCycle)
+	return s.CurrentCycle
+}
+
+func (s *Scheduler) scheduleNoCpu(e Event, priority int, cyclesUntil int64, f func(int64, any) bool, args any) {
+	s.scheduleAt(e, priority, s.NowNoCpu()+cyclesUntil, f, args)
 }
 
 func (s *Scheduler) schedule(e Event, priority int, cyclesUntil int64, f func(int64, any) bool, args any) {
@@ -54,24 +64,22 @@ func (s *Scheduler) scheduleAt(e Event, priority int, initCycle int64, f func(in
 	}
 
 	es := ScheduledEvent{Event: e, Priority: priority, InitCycle: initCycle, Func: f, Args: args}
-	for i := range s.Cnt {
+
+	var i int
+	for ; i < s.Cnt; i++ {
 
 		if es.InitCycle < s.Events[i].InitCycle {
 			copy(s.Events[i+1:s.Cnt+1], s.Events[i:s.Cnt])
-			s.Events[i] = es
-			s.Cnt++
-			return
+			break
 		}
 
 		if es.InitCycle == s.Events[i].InitCycle && priority <= s.Events[i].Priority {
 			copy(s.Events[i+1:s.Cnt+1], s.Events[i:s.Cnt])
-			s.Events[i] = es
-			s.Cnt++
-			return
+			break
 		}
 	}
 
-	s.Events[s.Cnt] = es
+	s.Events[i] = es
 	s.Cnt++
 }
 

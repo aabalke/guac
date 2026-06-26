@@ -322,6 +322,10 @@ func (m *Memory) ReadOpenBus(addr uint32) uint8 {
 }
 
 func (m *Memory) ReadIO(addr uint32) uint8 {
+	//if m.GBA.Booted && addr&3 == 0 {
+	//	// if addr == 0x208 {
+	//	fmt.Printf("ADDR %08X STAR %08X\n", addr, m.GBA.Scheduler.Now())
+	//}
 	switch {
 	case addr >= 0x10 && addr < 0x48,
 		addr >= 0x4C && addr < 0x50,
@@ -345,8 +349,9 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 
 		addr -= 0x100
 		i := addr / 4
-		idx := addr & 3
-		return m.GBA.Timers[i].Read(int(idx))
+		addr &= 3
+
+		return m.GBA.Timers[i].Read(int(addr))
 
 	}
 
@@ -482,6 +487,10 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
 }
 
 func (m *Memory) WriteIO(addr uint32, v uint8) {
+	// if m.GBA.Booted && addr&3 == 0 {
+	//if addr == 0x208 {
+	//	fmt.Printf("ADDR %08X STAR %08X\n", addr, m.GBA.Scheduler.NowNoCpu())
+	//}
 	// this addr should be relative. - 0x4000000
 	// do not make bg control addrs special, unless you know what the f you are doing
 	// VCOUNT is not writable, no touchy

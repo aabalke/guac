@@ -40,6 +40,8 @@ type Cpu struct {
 
 	Waitstate Waitstate
 	Prefetch  Prefetch
+
+	Tick func(int)
 }
 
 type Pipeline struct {
@@ -125,13 +127,14 @@ var BANK_ID = map[uint32]uint32{
 	MODE_UND: 5,
 }
 
-func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq, ws Waitstate, prefetch Prefetch) *Cpu {
+func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq, ws Waitstate, prefetch Prefetch, Tick func(int)) *Cpu {
 	c := &Cpu{
 		Mem:       m,
 		Irq:       irq,
 		LowVector: true,
 		Waitstate: ws,
 		Prefetch:  prefetch,
+		Tick:      Tick,
 	}
 
 	// skip bios
@@ -317,34 +320,39 @@ func (c *Cpu) Write32(addr uint32, v uint32) {
 }
 
 func (c *Cpu) Read8(addr uint32) uint32 {
+	v := c.Mem.Read8(addr)
 	c.AccCycles += c.CycleCounter(addr, 1, false, false)
 	c.idle(1)
-	return c.Mem.Read8(addr)
+	return v
 }
 
 func (c *Cpu) Read16(addr uint32) uint32 {
+	v := c.Mem.Read16(addr)
 	c.AccCycles += c.CycleCounter(addr, 2, false, false)
 	c.idle(1)
-	return c.Mem.Read16(addr)
+	return v
 }
 
 func (c *Cpu) Read32(addr uint32) uint32 {
+	v := c.Mem.Read32(addr)
 	c.AccCycles += c.CycleCounter(addr, 4, c.BlockTransfer, false)
 
 	if !c.BlockTransfer {
 		c.idle(1)
 	}
-	return c.Mem.Read32(addr)
+	return v
 }
 
 func (c *Cpu) InstRead16(addr uint32, seq bool) uint32 {
+	v := c.Mem.Read16(addr)
 	c.AccCycles += c.CycleCounter(addr, 2, seq, true)
-	return c.Mem.Read16(addr)
+	return v
 }
 
 func (c *Cpu) InstRead32(addr uint32, seq bool) uint32 {
+	v := c.Mem.Read32(addr)
 	c.AccCycles += c.CycleCounter(addr, 4, seq, true)
-	return c.Mem.Read32(addr)
+	return v
 }
 
 var lastWasDma = false
@@ -443,6 +451,7 @@ func idleMul(rs uint32, sign bool) int {
 }
 
 func (c *Cpu) idle(cycles int) {
+	//c.Tick(cycles)
 	c.AccCycles += cycles
 	c.NonSeq = true
 	c.Prefetch.Step(int64(cycles))

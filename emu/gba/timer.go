@@ -94,8 +94,8 @@ func (t *Timer) ControlEvent(late int64, argz any) bool {
 	} else {
 		t.Counter = uint32(t.Reload)
 		if t.Cnt&0x4 == 0 {
-			//t.Start(offset + late - 1)
-			t.Start(offset + late - 3)
+			//t.Start(offset + late - 3)
+			t.Start(offset + late - 1)
 		}
 	}
 	return false
@@ -108,13 +108,13 @@ func (t *Timer) Start(cycles int64) {
 
 	switch t.Idx {
 	case 0:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW0, 5, until, t.Overflow, nil)
+		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW0, 4, until, t.Overflow, nil)
 	case 1:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW1, 5, until, t.Overflow, nil)
+		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW1, 4, until, t.Overflow, nil)
 	case 2:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW2, 5, until, t.Overflow, nil)
+		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW2, 4, until, t.Overflow, nil)
 	case 3:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW3, 5, until, t.Overflow, nil)
+		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW3, 4, until, t.Overflow, nil)
 
 	}
 }
@@ -150,8 +150,7 @@ func (t *Timer) _Overflow(late int64) {
 }
 
 func (t *Timer) OnTimerOverflow(late int64) {
-	if t.Cnt&(1<<6) != 0 { // オーバーフロー時にIRQ
-		//c.IRQ(3+int(t.Idx), late)
+	if t.Cnt&(1<<6) != 0 {
 		t.Gba.Irq.SetIRQ(3 + uint32(t.Idx))
 	}
 

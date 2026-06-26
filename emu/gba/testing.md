@@ -56,6 +56,15 @@ Additionally, other ARMv5 instructions will fail.
 👍 THUMB LDR/STR
 👍 THUMB LDM/STM
 
+### hades-emu/Hades-Tests
+
+[Link](https://github.com/hades-emu/Hades-Tests)
+
+👍 Bios Open Bus [12/12]
+❌ Dma Latch [2/4]
+❌ Dma Start Delay [0/8]
+👍 Timer Basic [10/10]
+
 ### Other
  
 👍 deadbody Cpu Test
@@ -103,20 +112,17 @@ Requires Official bios for passing tests
 ❌ ppu: sprite-hmosaic
 ❌ ppu: status-irq-dma
 ❌ ppu: vram-mirror [7/10]
-❌ timer: start stop [1/2]
-❌ timer: reload [0/7]
+👍 timer: start stop [2/2]
+❌ timer: reload [4/7]
 
 ### AGS
 
-Requires "GGPIO" eeprom panic to be removed
-
-❌ Memory XXXXX0XXX FAIL
-❌ LCD X0000X0 FAIL
-❌ TIMER XX0 FAIL
-❌ DMA 000000X0X FAIL
-❌ COM -
-👍 KEY INPUT 0 PASS
-❌ INTERRUPT 0000___
+❌ Memory XXXXX0000
+👍 LCD
+❌ TIMER 0X0
+❌ DMA 00000000X
+👍 KEY INPUT
+❌ INTERRUPT 0000___ (SIO)
 
 ### Tonc
 
