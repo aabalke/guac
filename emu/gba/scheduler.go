@@ -45,15 +45,6 @@ func (s *Scheduler) Now() int64 {
 	return s.CurrentCycle + int64(*s.AccCycles)
 }
 
-func (s *Scheduler) NowNoCpu() int64 {
-	//fmt.Printf("NOW SCH %08X\n", s.CurrentCycle)
-	return s.CurrentCycle
-}
-
-func (s *Scheduler) scheduleNoCpu(e Event, priority int, cyclesUntil int64, f func(int64, any) bool, args any) {
-	s.scheduleAt(e, priority, s.NowNoCpu()+cyclesUntil, f, args)
-}
-
 func (s *Scheduler) schedule(e Event, priority int, cyclesUntil int64, f func(int64, any) bool, args any) {
 	s.scheduleAt(e, priority, s.Now()+cyclesUntil, f, args)
 }

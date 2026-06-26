@@ -622,6 +622,21 @@ func (m *Memory) Write16(addr uint32, v uint16) {
 		}
 	}
 
+	switch addr {
+	case 0x400_0100:
+		m.GBA.Timers[0].Write16(v)
+		return
+	case 0x400_0104:
+		m.GBA.Timers[1].Write16(v)
+		return
+	case 0x400_0108:
+		m.GBA.Timers[2].Write16(v)
+		return
+	case 0x400_010c:
+		m.GBA.Timers[3].Write16(v)
+		return
+	}
+
 	m.Write(addr+0, uint8(v), false)
 	m.Write(addr+1, uint8(v>>8), false)
 }
@@ -634,6 +649,21 @@ func (m *Memory) Write32(addr uint32, v uint32) {
 	}
 
 	addr &^= 3
+
+	switch addr {
+	case 0x400_0100:
+		m.GBA.Timers[0].Write32(v)
+		return
+	case 0x400_0104:
+		m.GBA.Timers[1].Write32(v)
+		return
+	case 0x400_0108:
+		m.GBA.Timers[2].Write32(v)
+		return
+	case 0x400_010c:
+		m.GBA.Timers[3].Write32(v)
+		return
+	}
 
 	m.Write(addr+0, uint8(v), false)
 	m.Write(addr+1, uint8(v>>8), false)

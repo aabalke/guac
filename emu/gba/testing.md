@@ -113,7 +113,7 @@ Requires Official bios for passing tests
 ❌ ppu: status-irq-dma
 ❌ ppu: vram-mirror [7/10]
 👍 timer: start stop [2/2]
-❌ timer: reload [4/7]
+👍 timer: reload [7/7]
 
 ### AGS
 

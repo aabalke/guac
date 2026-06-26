@@ -45,23 +45,52 @@ func (t *Timer) Read(idx int) uint8 {
 	return 0
 }
 
+// separate writes required for ngba-suite timer/reload.gba
+
 func (t *Timer) Write(idx int, v uint8) {
 	switch idx {
 	case 0:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_RELOAD, 2, 1, t.ReloadEventLo, v)
+		t.Gba.Scheduler.schedule(EVENT_TIMER_RELOAD, 1, 1, t.ReloadEventLo, v)
 	case 1:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_RELOAD, 3, 1, t.ReloadEventHi, v)
+		t.Gba.Scheduler.schedule(EVENT_TIMER_RELOAD, 1, 1, t.ReloadEventHi, v)
 	case 2:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_CONTROL, 4, 1, t.ControlEvent, v)
+		t.Gba.Scheduler.schedule(EVENT_TIMER_CONTROL, 2, 1, t.ControlEvent, v)
 	}
 }
 
-func (t *Timer) ReloadEventLo(late int64, argz any) bool {
+func (t *Timer) Write16(v uint16) {
+	// write16 Control is identical to Write8
+
+	t.Gba.Scheduler.schedule(EVENT_TIMER_RELOAD, 1, 1, t.WriteEvent16, v)
+}
+
+func (t *Timer) WriteEvent16(late int64, argz any) bool {
+	v := argz.(uint16)
+
+	t.ReloadEventLo(late, uint8(v))
+	t.ReloadEventHi(late, uint8(v>>8))
+	return false
+}
+
+func (t *Timer) Write32(v uint32) {
+	t.Gba.Scheduler.schedule(EVENT_TIMER_CONTROL, 1, 1, t.WriteEvent32, v)
+}
+
+func (t *Timer) WriteEvent32(late int64, argz any) bool {
+	v := argz.(uint32)
+
+	t.ReloadEventLo(late, uint8(v))
+	t.ReloadEventHi(late, uint8(v>>8))
+	t.ControlEvent(late, uint8(v>>16))
+	return false
+}
+
+func (t *Timer) ReloadEventLo(_ int64, argz any) bool {
 	t.Reload = (t.Reload &^ 0xFF) | uint16(argz.(uint8))
 	return false
 }
 
-func (t *Timer) ReloadEventHi(late int64, argz any) bool {
+func (t *Timer) ReloadEventHi(_ int64, argz any) bool {
 	t.Reload = (t.Reload & 0xFF) | (uint16(argz.(uint8)) << 8)
 	return false
 }
@@ -92,9 +121,14 @@ func (t *Timer) ControlEvent(late int64, argz any) bool {
 			t.Start(offset + late)
 		}
 	} else {
-		t.Counter = uint32(t.Reload)
-		if t.Cnt&0x4 == 0 {
-			//t.Start(offset + late - 3)
+		switch {
+		case t.Cnt&0x4 != 0:
+			t.Counter = uint32(t.Reload)
+		// case t.Counter == 0xFFFF && offset == 0:
+		//	println("here")
+		//	t.Start(0)
+		default:
+			t.Counter = uint32(t.Reload)
 			t.Start(offset + late - 1)
 		}
 	}
@@ -108,13 +142,13 @@ func (t *Timer) Start(cycles int64) {
 
 	switch t.Idx {
 	case 0:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW0, 4, until, t.Overflow, nil)
+		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW0, 0, until, t.Overflow, nil)
 	case 1:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW1, 4, until, t.Overflow, nil)
+		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW1, 0, until, t.Overflow, nil)
 	case 2:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW2, 4, until, t.Overflow, nil)
+		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW2, 0, until, t.Overflow, nil)
 	case 3:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW3, 4, until, t.Overflow, nil)
+		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW3, 0, until, t.Overflow, nil)
 
 	}
 }
@@ -149,7 +183,7 @@ func (t *Timer) _Overflow(late int64) {
 	t.OnTimerOverflow(late)
 }
 
-func (t *Timer) OnTimerOverflow(late int64) {
+func (t *Timer) OnTimerOverflow(_ int64) {
 	if t.Cnt&(1<<6) != 0 {
 		t.Gba.Irq.SetIRQ(3 + uint32(t.Idx))
 	}

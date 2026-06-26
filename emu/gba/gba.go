@@ -96,18 +96,6 @@ func (gba *GBA) Update(stdFps bool) {
 		return
 	}
 
-	//start := gba.Scheduler.Now()
-
-	//fmt.Printf("Start of Frame %08X\n", start)
-
-	//if start > 0x160000 {
-	//	os.Exit(0)
-	//}
-
-	//if start >= 0x0011250 {
-	//	B[1] = true
-	//}
-
 	for {
 
 		event := gba.Scheduler.peekNext()
@@ -133,15 +121,6 @@ func (gba *GBA) Update(stdFps bool) {
 			}
 
 			gba.Tick(gba.Cpu.Step())
-			//fmt.Printf("SCH TIMERSTAMP SET %08X\n", gba.Scheduler.CurrentCycle)
-
-			//// if B[1] {
-			//if gba.Cpu.P.Execute.Thumb {
-			//	fmt.Printf("AFTER %08X PC %08X\n", gba.Scheduler.Now(), gba.Cpu.P.Execute.Addr|1)
-			//} else {
-			//	fmt.Printf("AFTER %08X PC %08X\n", gba.Scheduler.Now(), gba.Cpu.P.Execute.Addr)
-			//}
-			////}
 		}
 
 		for {
