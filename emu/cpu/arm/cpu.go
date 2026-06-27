@@ -176,6 +176,10 @@ func (c *Cpu) Step() int {
 		}
 	}
 
+	//if c.P.Execute.Addr == 0x80021B8 {
+	//	fmt.Printf("FLAGS %08X\n", c.Reg.R[1])
+	//}
+
 	if c.P.Execute.Thumb {
 		c.DecodeTHUMB(uint16(c.P.Execute.Op))
 	} else {

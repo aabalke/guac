@@ -25,6 +25,8 @@
    save
 👍 flash64
 ❌ flash128
+👍 none
+👍 sram
 
 note:
 Flash128 fails if save exists. Test 009 requires cleared memory to pass.
@@ -34,9 +36,6 @@ Nanoboy treats if as a free write, [addr] = v
 Skyemu forces has to be erased addr &= v
 
 not sure which is correct and if test has accounted for it.
-
-👍 none
-👍 sram
 
 ### Arm Wrestler
 
@@ -90,18 +89,18 @@ Requires Official bios for passing tests
     👍 Basic Mode 3
     👍 Basic Mode 4
     👍 Degenerate OBJ transforms
-    ❌ Layer toggle
+    👍 Layer toggle
     ❌ Layer toggle 2
     ❌ OAM Update Delay
-    👍 Window offscreen reset (matches mgba)
+    ❌ Window offscreen reset (matches mgba)
 
 ### NBA-EMU Test Suite
 
 ❌ bus: 128kb Boundary
 ❌ dma: burst into tears [0/3]
 ❌ dma: force nseq access [0/2]
-❌ dma: latch [2/3]
-❌ dma: start delay [0/1]
+👍 dma: latch [3/3]
+👍 dma: start delay [1/1]
 ❌ halt: halt cnt [0/6]
 ❌ irq: irq delay [0/3]
 ❌ ppu: bgpd
@@ -118,13 +117,15 @@ Requires Official bios for passing tests
 ### AGS
 
 ❌ Memory XXXXX0000
-👍 LCD
-❌ TIMER 0X0
-❌ DMA 00000000X
-👍 KEY INPUT
-❌ INTERRUPT 0000___ (SIO)
+👍 Lcd
+❌ Timer
+❌ Dma
+👍 Key
+👍 Irq
 
-timer fails cascade test by off by 1 cycle error. 0x1ff should be 0x200. Not sure on cause.
+1. Timer: fails cascade test by off by 1 cycle error. 0x1ff should be 0x200. Not sure on cause.
+2. Dma: Fails Priority test
+3. Memory: Fails EWRAM, IWRQM, PRAM, VRAM and OAM. EWRAM Fails dma test 0x8, and 0x10. Assume others are dma related also.
 
 ### Tonc
 

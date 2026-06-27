@@ -4,6 +4,8 @@ import (
 	"github.com/aabalke/guac/emu/gba/cart"
 )
 
+var EVENTS = []Event{EVENT_DMA0, EVENT_DMA1, EVENT_DMA2, EVENT_DMA3}
+
 const (
 	DMA_MODE_IMM = 0
 	DMA_MODE_VBL = 1
@@ -130,16 +132,7 @@ func (dma *Dma) Write(addr uint32, v uint8) {
 
 		if !prev && dma.Enabled {
 			if dma.Mode == 0 {
-				switch dma.Idx {
-				case 0:
-					dma.Gba.Scheduler.schedule(EVENT_DMA0, 0, 2, dma.Start, nil)
-				case 1:
-					dma.Gba.Scheduler.schedule(EVENT_DMA1, 0, 2, dma.Start, nil)
-				case 2:
-					dma.Gba.Scheduler.schedule(EVENT_DMA2, 0, 2, dma.Start, nil)
-				case 3:
-					dma.Gba.Scheduler.schedule(EVENT_DMA3, 0, 2, dma.Start, nil)
-				}
+				dma.Gba.Scheduler.schedule(EVENTS[dma.Idx], 0, 2, dma.Start, nil)
 			}
 
 			return
@@ -148,18 +141,7 @@ func (dma *Dma) Write(addr uint32, v uint8) {
 		if prev && !dma.Enabled {
 
 			dma.disable()
-
-			switch dma.Idx {
-			case 0:
-				dma.Gba.Scheduler.cancel(EVENT_DMA0)
-			case 1:
-				dma.Gba.Scheduler.cancel(EVENT_DMA1)
-			case 2:
-				dma.Gba.Scheduler.cancel(EVENT_DMA2)
-			case 3:
-				dma.Gba.Scheduler.cancel(EVENT_DMA3)
-			}
-
+			dma.Gba.Scheduler.cancel(EVENTS[dma.Idx])
 		}
 	}
 }
@@ -235,7 +217,7 @@ func (dma *Dma) transfer() int {
 
 	bios := src < 0x200_0000
 
-	cycles := 1
+	cycles := 0
 
 	if dma.isWord {
 		for i := range dma.latched.cnt {
@@ -262,18 +244,28 @@ func (dma *Dma) transfer() int {
 
 			dma.EepromDma(dma.latched.cnt, dst, src)
 
+			var v uint32
+
 			switch {
 			case bios:
+
+				// required for ngba-suite/latch.gba
+				if dst&2 != 0 {
+					v = dma.Value >> 16
+				} else {
+					v = dma.Value & 0xFFFF
+				}
+
 				cycles++
 
 			default:
 				cycles += dma.Gba.Cpu.CycleCounterDma(src, 2, i != 0)
-				v := mem.Read16(src)
+				v = mem.Read16(src)
 				dma.Value = v | (v << 16)
 			}
 
 			cycles += dma.Gba.Cpu.CycleCounterDma(dst, 2, i != 0)
-			mem.Write16(dst, uint16(dma.Value))
+			mem.Write16(dst, uint16(v))
 
 			dst = uint32(int(dst) + dma.latched.dstOffset)
 			src = uint32(int(src) + dma.latched.srcOffset)
@@ -325,16 +317,7 @@ func (gba *GBA) checkDmas(mode uint8) {
 	for i := range 4 {
 		dma := gba.Dma[i]
 		if ok := dma.Enabled && dma.Mode == mode; ok {
-			switch i {
-			case 0:
-				gba.Scheduler.schedule(EVENT_DMA0, 0, 2, dma.Start, nil)
-			case 1:
-				gba.Scheduler.schedule(EVENT_DMA1, 0, 2, dma.Start, nil)
-			case 2:
-				gba.Scheduler.schedule(EVENT_DMA2, 0, 2, dma.Start, nil)
-			case 3:
-				gba.Scheduler.schedule(EVENT_DMA3, 0, 2, dma.Start, nil)
-			}
+			dma.Gba.Scheduler.schedule(EVENTS[dma.Idx], 0, 2, dma.Start, nil)
 		}
 	}
 }

@@ -1,7 +1,5 @@
 package gba
 
-import "fmt"
-
 var freqShifts = [...]uint8{0, 6, 8, 10}
 
 type Timer struct {
@@ -40,9 +38,9 @@ func (t *Timer) GetCounter() uint32 {
 }
 
 func (t *Timer) Read(idx int) uint8 {
-	if idx == 0 && t.Idx == 3 {
-		fmt.Printf("Timer 3 %08X Counter %08X, Delta %08X, From %08X, Shift %08X  \n", t.GetCounter(), t.Counter, t.Delta(0), t.From, t.FreqShift)
-	}
+	//if idx == 0 && t.Idx == 3 {
+	//	fmt.Printf("Timer 3 %08X Counter %08X, Delta %08X, From %08X, Shift %08X  \n", t.GetCounter(), t.Counter, t.Delta(0), t.From, t.FreqShift)
+	//}
 
 	switch idx {
 	case 0:
