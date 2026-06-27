@@ -1,16 +1,22 @@
 package gba
 
-var freqShifts = [...]uint32{0, 6, 8, 10}
+import "fmt"
+
+var freqShifts = [...]uint8{0, 6, 8, 10}
 
 type Timer struct {
-	Gba       *GBA
-	Idx       int
+	Gba     *GBA
+	Idx     int
+	From    int64
+	Counter uint32
+	Reload  uint16
+
+	FreqShift uint8
 	Cnt       uint8
-	Counter   uint32
-	Reload    uint16
+	Irq       bool
+	Cascade   bool
 	Enabled   bool
-	FreqShift uint32
-	From      int64
+	Running   bool
 }
 
 func NewTimer(gba *GBA, idx int) *Timer {
@@ -25,14 +31,19 @@ func (t *Timer) Delta(late int64) uint32 {
 }
 
 func (t *Timer) GetCounter() uint32 {
-	if t.Enabled {
-		return t.Counter + t.Delta(0)
+	counter := t.Counter
+	if t.Running {
+		counter += t.Delta(0)
 	}
 
-	return t.Counter
+	return counter
 }
 
 func (t *Timer) Read(idx int) uint8 {
+	if idx == 0 && t.Idx == 3 {
+		fmt.Printf("Timer 3 %08X Counter %08X, Delta %08X, From %08X, Shift %08X  \n", t.GetCounter(), t.Counter, t.Delta(0), t.From, t.FreqShift)
+	}
+
 	switch idx {
 	case 0:
 		return uint8(t.GetCounter())
@@ -98,7 +109,7 @@ func (t *Timer) ReloadEventHi(_ int64, argz any) bool {
 func (t *Timer) ControlEvent(late int64, argz any) bool {
 	v := argz.(uint8)
 
-	if t.Enabled {
+	if t.Running {
 		t.Stop(late)
 	}
 
@@ -108,9 +119,13 @@ func (t *Timer) ControlEvent(late int64, argz any) bool {
 
 	prevEnabled := t.Cnt&0x80 != 0
 	t.Cnt = v
-	t.FreqShift = freqShifts[t.Cnt&3]
 
-	if t.Cnt&0x80 == 0 {
+	t.FreqShift = freqShifts[t.Cnt&3]
+	t.Cascade = t.Cnt&0x4 != 0
+	t.Irq = t.Cnt&0x40 != 0
+	t.Enabled = t.Cnt&0x80 != 0
+
+	if !t.Enabled {
 		return false
 	}
 
@@ -124,9 +139,8 @@ func (t *Timer) ControlEvent(late int64, argz any) bool {
 		switch {
 		case t.Cnt&0x4 != 0:
 			t.Counter = uint32(t.Reload)
-		// case t.Counter == 0xFFFF && offset == 0:
-		//	println("here")
-		//	t.Start(0)
+		case t.Counter == 0xFFFF && offset == 0:
+			t.Start(late)
 		default:
 			t.Counter = uint32(t.Reload)
 			t.Start(offset + late - 1)
@@ -136,7 +150,7 @@ func (t *Timer) ControlEvent(late int64, argz any) bool {
 }
 
 func (t *Timer) Start(cycles int64) {
-	t.Enabled = true
+	t.Running = true
 	t.From = t.Gba.Scheduler.Now() - cycles
 	until := int64((0x10000-t.Counter)<<t.FreqShift) - cycles
 
@@ -158,7 +172,6 @@ func (t *Timer) Stop(late int64) {
 	if t.Counter >= 0x10000 {
 		t._Overflow(late)
 	}
-	t.Enabled = false
 
 	switch t.Idx {
 	case 0:
@@ -170,6 +183,8 @@ func (t *Timer) Stop(late int64) {
 	case 3:
 		t.Gba.Scheduler.cancel(EVENT_TIMER_OVERFLOW3)
 	}
+
+	t.Running = false
 }
 
 func (t *Timer) Overflow(late int64, _ any) bool {
@@ -183,8 +198,8 @@ func (t *Timer) _Overflow(late int64) {
 	t.OnTimerOverflow(late)
 }
 
-func (t *Timer) OnTimerOverflow(_ int64) {
-	if t.Cnt&(1<<6) != 0 {
+func (t *Timer) OnTimerOverflow(late int64) {
+	if t.Irq {
 		t.Gba.Irq.SetIRQ(3 + uint32(t.Idx))
 	}
 
@@ -196,16 +211,12 @@ func (t *Timer) OnTimerOverflow(_ int64) {
 	//	}
 	//}
 
-	if t.Idx < 3 {
-		t.Gba.Timers[t.Idx+1].Cascade()
-	}
-}
-
-func (t *Timer) Cascade() {
-	if t.Cnt&0x84 == 0x84 {
-		t.Counter++
-		if t.Counter >= 0x10000 {
-			t._Overflow(0)
+	if t.Idx != 3 {
+		if next := t.Gba.Timers[t.Idx+1]; next.Enabled && next.Cascade {
+			next.Counter++
+			if next.Counter >= 0x10000 {
+				next._Overflow(late)
+			}
 		}
 	}
 }

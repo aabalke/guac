@@ -42,6 +42,7 @@ type Cpu struct {
 	Prefetch  Prefetch
 
 	Tick func(int)
+	Dmas Dmas
 }
 
 type Pipeline struct {
@@ -127,7 +128,11 @@ var BANK_ID = map[uint32]uint32{
 	MODE_UND: 5,
 }
 
-func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq, ws Waitstate, prefetch Prefetch, Tick func(int)) *Cpu {
+type Dmas interface {
+	CheckDmas() bool
+}
+
+func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq, ws Waitstate, prefetch Prefetch, Tick func(int), dmas Dmas) *Cpu {
 	c := &Cpu{
 		Mem:       m,
 		Irq:       irq,
@@ -135,6 +140,7 @@ func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq, ws Waitstate, 
 		Waitstate: ws,
 		Prefetch:  prefetch,
 		Tick:      Tick,
+		Dmas:      dmas,
 	}
 
 	// skip bios

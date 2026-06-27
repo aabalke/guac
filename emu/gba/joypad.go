@@ -1,8 +1,15 @@
 package gba
 
+import (
+	"github.com/aabalke/guac/emu/cpu"
+)
+
 type Key struct {
-	Input uint16
-	Cnt   uint16
+	Irq     *cpu.Irq
+	Input   uint16
+	Cnt     uint16
+	Enabled bool
+	AndMode bool
 }
 
 func (k *Key) Read(addr uint32) uint8 {
@@ -25,24 +32,29 @@ func (k *Key) Write(addr uint32, v uint8) {
 	case 2:
 		k.Cnt = (k.Cnt &^ 0xFF) | uint16(v)
 	case 3:
-		k.Cnt = (k.Cnt & 0xFF) | (uint16(v) << 8)
+		k.Cnt = (k.Cnt & 0xFF) | (uint16(v&3) << 8)
+
+		k.Enabled = v&0x40 != 0
+		k.AndMode = v&0x80 != 0
 	}
+
+	k.keyIRQ()
 }
 
-func (k *Key) keyIRQ() bool {
-	if disabled := (k.Cnt>>14)&1 == 0; disabled {
-		return false
+func (k *Key) keyIRQ() {
+	if !k.Enabled {
+		return
 	}
 
-	andFlag := k.Cnt&0x80 != 0
+	if k.AndMode {
+		if (^k.Cnt & 0x3FF) == k.Input {
+			k.Irq.SetIRQ(12)
+		}
 
-	if or := !andFlag && ^k.Cnt&k.Input != 0; or {
-		return true
+		return
 	}
 
-	if and := andFlag && ^k.Cnt&^k.Input == 0; and {
-		return true
+	if (^k.Cnt&k.Input)&0x3FF != 0 {
+		k.Irq.SetIRQ(12)
 	}
-
-	return false
 }

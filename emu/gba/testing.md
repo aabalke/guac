@@ -124,6 +124,8 @@ Requires Official bios for passing tests
 👍 KEY INPUT
 ❌ INTERRUPT 0000___ (SIO)
 
+timer fails cascade test by off by 1 cycle error. 0x1ff should be 0x200. Not sure on cause.
+
 ### Tonc
 
 👍 bigmap

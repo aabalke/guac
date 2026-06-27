@@ -58,14 +58,14 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba := &GBA{
 		Pixels: make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
 		Image:  ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
-		Keypad: Key{Input: 0x3FF},
 		Apu:    apu.NewApu(ctx, CPU_SPEED, SND_FREQ, SND_SAMPLES),
 	}
 
 	gba.PPU = &PPU{gba: gba}
 	gba.Irq = cpu.Irq{}
 	gba.Mem = NewMemory(gba)
-	gba.Cpu = arm.NewCpu(false, gba.Mem, &gba.Irq, &gba.Mem.Waitstate, gba.Mem.Prefetch, gba.Tick)
+	gba.Keypad = Key{Irq: &gba.Irq, Input: 0x3FF}
+	gba.Cpu = arm.NewCpu(false, gba.Mem, &gba.Irq, &gba.Mem.Waitstate, gba.Mem.Prefetch, gba.Tick, gba)
 	gba.Scheduler = NewScheduler(&gba.Cpu.AccCycles)
 
 	for i := range 4 {

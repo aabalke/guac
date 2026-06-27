@@ -22,6 +22,7 @@ type Memory struct {
 	IO   [0x400]uint8
 
 	ProtectedValue uint32
+	SioCnt         uint8
 	Dispstat       Dispstat
 
 	Waitstate Waitstate
@@ -565,6 +566,15 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 		m.IO[addr] = v &^ 0b1110_0000 // bldalpha
 	case 0x0053:
 		m.IO[addr] = v &^ 0b1110_0000 // bldalpha
+
+	case 0x0128:
+		// temp to pass ags sio irq, will need timing
+		m.SioCnt = (m.SioCnt & 0x80) | (v &^ 0x80)
+
+		if m.SioCnt&0x80 == 0 && v&0x80 != 0 {
+			m.SioCnt |= 0x80
+			m.GBA.Irq.SetIRQ(7)
+		}
 
 	case 0x130, 0x131, 0x132, 0x133:
 		m.GBA.Keypad.Write(addr&3, v)

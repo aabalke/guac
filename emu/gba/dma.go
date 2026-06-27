@@ -132,15 +132,17 @@ func (dma *Dma) Write(addr uint32, v uint8) {
 			if dma.Mode == 0 {
 				switch dma.Idx {
 				case 0:
-					dma.Gba.Scheduler.schedule(EVENT_DMA0, 2, 1, dma.Start, nil)
+					dma.Gba.Scheduler.schedule(EVENT_DMA0, 0, 2, dma.Start, nil)
 				case 1:
-					dma.Gba.Scheduler.schedule(EVENT_DMA1, 2, 1, dma.Start, nil)
+					dma.Gba.Scheduler.schedule(EVENT_DMA1, 0, 2, dma.Start, nil)
 				case 2:
-					dma.Gba.Scheduler.schedule(EVENT_DMA2, 2, 1, dma.Start, nil)
+					dma.Gba.Scheduler.schedule(EVENT_DMA2, 0, 2, dma.Start, nil)
 				case 3:
-					dma.Gba.Scheduler.schedule(EVENT_DMA3, 2, 1, dma.Start, nil)
+					dma.Gba.Scheduler.schedule(EVENT_DMA3, 0, 2, dma.Start, nil)
 				}
 			}
+
+			return
 		}
 
 		if prev && !dma.Enabled {
@@ -233,7 +235,7 @@ func (dma *Dma) transfer() int {
 
 	bios := src < 0x200_0000
 
-	cycles := 2
+	cycles := 1
 
 	if dma.isWord {
 		for i := range dma.latched.cnt {
@@ -314,7 +316,7 @@ func (dma *Dma) videoDma(vcount uint8) {
 		}
 
 		if dma.InVideoMode {
-			dma.Gba.Scheduler.schedule(EVENT_DMA3, 2, 1, dma.Start, nil)
+			dma.Gba.Scheduler.schedule(EVENT_DMA3, 0, 2, dma.Start, nil)
 		}
 	}
 }
@@ -325,13 +327,13 @@ func (gba *GBA) checkDmas(mode uint8) {
 		if ok := dma.Enabled && dma.Mode == mode; ok {
 			switch i {
 			case 0:
-				gba.Scheduler.schedule(EVENT_DMA0, 2, 1, dma.Start, nil)
+				gba.Scheduler.schedule(EVENT_DMA0, 0, 2, dma.Start, nil)
 			case 1:
-				gba.Scheduler.schedule(EVENT_DMA1, 2, 1, dma.Start, nil)
+				gba.Scheduler.schedule(EVENT_DMA1, 0, 2, dma.Start, nil)
 			case 2:
-				gba.Scheduler.schedule(EVENT_DMA2, 2, 1, dma.Start, nil)
+				gba.Scheduler.schedule(EVENT_DMA2, 0, 2, dma.Start, nil)
 			case 3:
-				gba.Scheduler.schedule(EVENT_DMA3, 2, 1, dma.Start, nil)
+				gba.Scheduler.schedule(EVENT_DMA3, 0, 2, dma.Start, nil)
 			}
 		}
 	}

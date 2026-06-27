@@ -1,8 +1,8 @@
 # Alyosha Tas Gba Tests
 
-Results generated 2026-06-25T21:43:08-06:00
+Results generated 2026-06-26T22:05:15-06:00
 
-Passing 42/119 35%
+Passing 45/119 37%
 
 👍 DMA\DMA_Mode_Change
 ❌ DMA\DMA_ROM_Fixed
@@ -19,7 +19,7 @@ Passing 42/119 35%
 ❌ Interactions\Internal_Cycle_DMA_IRQ
 ❌ Interactions\Internal_Cycle_DMA_IRQ_7
 ❌ Interactions\Internal_Cycle_DMA_IRQ_Br_pre
-❌ Interactions\Internal_Cycle_DMA_IRQ_Br_pre_tim
+👍 Interactions\Internal_Cycle_DMA_IRQ_Br_pre_tim
 ❌ Interactions\Internal_Cycle_DMA_IRQ_ST
 ❌ Interactions\Internal_Cycle_DMA_IRQ_ST_p3
 👍 Interactions\Internal_Cycle_DMA_IRQ_br
@@ -28,7 +28,7 @@ Passing 42/119 35%
 ❌ Interactions\Internal_Cycle_DMA_IRQ_nop_IWRAM
 ❌ Interactions\Internal_Cycle_DMA_MUL_IRQ
 ❌ Interactions\Internal_Cycle_DMA_Mul
-❌ Interactions\Internal_Cycle_DMA_TIM_Br_pre
+👍 Interactions\Internal_Cycle_DMA_TIM_Br_pre
 👍 LDM\LDM_ALU
 👍 LDM\LDM_ALU_IMM
 👍 LDM\LDM_ALU_Store
@@ -45,8 +45,8 @@ Passing 42/119 35%
 ❌ Serial\serial_time_2M_2
 ❌ Serial\serial_time_2M_3
 ❌ Serial\serial_time_3
-👍 Serial\serial_time_start_bit
-❌ Serial\serial_time_start_bit_2
+❌ Serial\serial_time_start_bit
+👍 Serial\serial_time_start_bit_2
 👍 arm\arm
 ❌ bios\bios
 ❌ fifo_dma\fifo
@@ -114,7 +114,7 @@ Passing 42/119 35%
 👍 thumb\cpy
 👍 thumb\thumb
 ❌ timer\timer
-❌ timer\timer_disable
+👍 timer\timer_disable
 ❌ timer\timer_reset
 ❌ timing\cpy_data_bios
 ❌ timing\dma_from_bios

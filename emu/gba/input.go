@@ -66,7 +66,5 @@ func (gba *GBA) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 		}
 	}
 
-	if gba.Keypad.keyIRQ() {
-		gba.Irq.SetIRQ(12)
-	}
+	gba.Keypad.keyIRQ()
 }
