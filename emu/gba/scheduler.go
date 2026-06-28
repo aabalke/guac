@@ -25,7 +25,6 @@ type Scheduler struct {
 	Events       [64]ScheduledEvent
 	Cnt          int
 	CurrentCycle int64
-	AccCycles    *int
 }
 
 type ScheduledEvent struct {
@@ -36,13 +35,12 @@ type ScheduledEvent struct {
 	Args      any
 }
 
-func NewScheduler(acc *int) *Scheduler {
-	return &Scheduler{AccCycles: acc}
+func NewScheduler() *Scheduler {
+	return &Scheduler{}
 }
 
 func (s *Scheduler) Now() int64 {
-	//fmt.Printf("NOW CPU %08X\n", s.CurrentCycle+int64(*s.AccCycles))
-	return s.CurrentCycle + int64(*s.AccCycles)
+	return s.CurrentCycle
 }
 
 func (s *Scheduler) schedule(e Event, priority int, cyclesUntil int64, f func(int64, any) bool, args any) {
@@ -98,11 +96,17 @@ func (s *Scheduler) cancel(e Event) {
 	}
 }
 
-func (s *Scheduler) penalize(e Event, cycles int64) {
-	for i := range s.Cnt {
-		if s.Events[i].Event == e {
-			s.Events[i].InitCycle += cycles
-			return
+func (s *Scheduler) Add(cycles int64) {
+	s.CurrentCycle += cycles
+
+	for {
+		next := s.peekNext()
+		if next == nil || next.InitCycle > s.CurrentCycle {
+			break
 		}
+
+		event := s.popNext()
+		late := s.CurrentCycle - event.InitCycle
+		event.Func(late, event.Args)
 	}
 }

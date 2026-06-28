@@ -39,6 +39,8 @@ type Dma struct {
 	Active      bool
 	InVideoMode bool
 
+	Started bool
+
 	latched struct {
 		src       uint32
 		dst       uint32
@@ -130,10 +132,10 @@ func (dma *Dma) Write(addr uint32, v uint8) {
 		dma.Control = (dma.Control & 0xFF) | (uint32(v) << 8)
 		dma.SrcAdj = (dma.SrcAdj & 1) | (uint32(v)&1)<<1
 
-		if !prev && dma.Enabled {
-			if dma.Mode == 0 {
-				dma.Gba.Scheduler.schedule(EVENTS[dma.Idx], 0, 2, dma.Start, nil)
-			}
+		dma.Started = true
+
+		if !prev && dma.Enabled && dma.Mode == 0 {
+			dma.Gba.Scheduler.schedule(EVENTS[dma.Idx], 0, 2, dma.Start, nil)
 
 			return
 		}
@@ -146,7 +148,7 @@ func (dma *Dma) Write(addr uint32, v uint8) {
 	}
 }
 
-func (dma *Dma) Start(_ int64, _ any) bool {
+func (dma *Dma) Start(late int64, _ any) bool {
 	var (
 		src       = dma.Src
 		dst       = dma.Dst
@@ -155,6 +157,7 @@ func (dma *Dma) Start(_ int64, _ any) bool {
 		srcOffset = 2
 	)
 
+	dma.Started = false
 	dma.Active = true
 	if dma.isWord {
 		dst &^= 3
@@ -210,14 +213,13 @@ func (dma *Dma) disable() {
 
 func (dma *Dma) transfer() int {
 	var (
-		mem = dma.Gba.Mem
-		src = dma.latched.src
-		dst = dma.latched.dst
+		mem  = dma.Gba.Mem
+		src  = dma.latched.src
+		dst  = dma.latched.dst
+		bios = src < 0x200_0000
+		tick = dma.Gba.Tick
+		//cycles = 0
 	)
-
-	bios := src < 0x200_0000
-
-	cycles := 0
 
 	if dma.isWord {
 		for i := range dma.latched.cnt {
@@ -226,25 +228,25 @@ func (dma *Dma) transfer() int {
 
 			switch {
 			case bios:
-				cycles++
+				tick(1)
 
 			default:
-				cycles += dma.Gba.Cpu.CycleCounterDma(src, 4, i != 0)
 				dma.Value = mem.Read32(src)
+				tick(dma.Gba.Cpu.CycleCounterDma(src, 4, i != 0))
 			}
 
-			cycles += dma.Gba.Cpu.CycleCounterDma(dst, 4, i != 0)
 			mem.Write32(dst, dma.Value)
+			tick(dma.Gba.Cpu.CycleCounterDma(dst, 4, i != 0))
 
 			dst = uint32(int(dst) + dma.latched.dstOffset)
 			src = uint32(int(src) + dma.latched.srcOffset)
 		}
 	} else {
+		var v uint32
+
 		for i := range dma.latched.cnt {
 
 			dma.EepromDma(dma.latched.cnt, dst, src)
-
-			var v uint32
 
 			switch {
 			case bios:
@@ -256,16 +258,16 @@ func (dma *Dma) transfer() int {
 					v = dma.Value & 0xFFFF
 				}
 
-				cycles++
+				tick(1)
 
 			default:
-				cycles += dma.Gba.Cpu.CycleCounterDma(src, 2, i != 0)
 				v = mem.Read16(src)
 				dma.Value = v | (v << 16)
+				tick(dma.Gba.Cpu.CycleCounterDma(src, 2, i != 0))
 			}
 
-			cycles += dma.Gba.Cpu.CycleCounterDma(dst, 2, i != 0)
 			mem.Write16(dst, uint16(v))
+			tick(dma.Gba.Cpu.CycleCounterDma(dst, 2, i != 0))
 
 			dst = uint32(int(dst) + dma.latched.dstOffset)
 			src = uint32(int(src) + dma.latched.srcOffset)
@@ -277,13 +279,12 @@ func (dma *Dma) transfer() int {
 	}
 
 	dma.Active = false
-
 	dma.latched.src = src
 	dma.latched.dst = dst
 
 	if !dma.Repeat {
 		dma.disable()
-		return cycles
+		return 0
 	}
 
 	dma.Src = src
@@ -292,7 +293,7 @@ func (dma *Dma) transfer() int {
 		dma.Dst = dst
 	}
 
-	return cycles
+	return 0
 }
 
 func (dma *Dma) videoDma(vcount uint8) {
@@ -323,14 +324,30 @@ func (gba *GBA) checkDmas(mode uint8) {
 }
 
 func (gba *GBA) CheckDmas() bool {
+	none := true
 	for i := range 4 {
-		if gba.Dma[i].Active {
-			gba.Tick(gba.Dma[i].transfer())
-			return true
+		dma := gba.Dma[i]
+		if dma.Active {
+			none = false
+			break
 		}
 	}
 
-	return false
+	if none {
+		return false
+	}
+
+	gba.Tick(1)
+
+	for i := range 4 {
+		dma := gba.Dma[i]
+		if dma.Active {
+			dma.transfer()
+		}
+	}
+
+	gba.Tick(1)
+	return true
 }
 
 func (dma *Dma) EepromDma(count, tmpDst, tmpSrc uint32) {

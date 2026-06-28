@@ -66,7 +66,7 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba.Mem = NewMemory(gba)
 	gba.Keypad = Key{Irq: &gba.Irq, Input: 0x3FF}
 	gba.Cpu = arm.NewCpu(false, gba.Mem, &gba.Irq, &gba.Mem.Waitstate, gba.Mem.Prefetch, gba.Tick, gba)
-	gba.Scheduler = NewScheduler(&gba.Cpu.AccCycles)
+	gba.Scheduler = NewScheduler()
 
 	for i := range 4 {
 		gba.Timers[i] = NewTimer(gba, i)
@@ -96,49 +96,31 @@ func (gba *GBA) Update(stdFps bool) {
 		return
 	}
 
-	for {
+	nextFrame := gba.Scheduler.CurrentCycle + CYCLES_FRAME
+	for gba.Scheduler.CurrentCycle < nextFrame {
 
-		event := gba.Scheduler.peekNext()
+		if gba.Cpu.Halted {
+			gba.CheckDmas()
 
-		for gba.Scheduler.CurrentCycle < event.InitCycle {
+			gba.Tick(1)
 
-			if gba.Cpu.Halted {
-
-				gba.Tick(1)
-				if gba.Irq.IE&gba.Irq.IF == 0 {
-					continue
-				}
-
-				gba.Cpu.Halted = false
-			}
-
-			if ok := gba.CheckDmas(); ok {
+			if gba.Irq.IE&gba.Irq.IF == 0 {
 				continue
 			}
 
-			if gba.InstInjectionFunc != nil {
-				gba.InstInjectionFunc(gba.Cpu.P.Execute.Op)
-			}
-
-			gba.Tick(gba.Cpu.Step())
+			gba.Cpu.Halted = false
 		}
 
-		for {
-			next := gba.Scheduler.peekNext()
-			if next == nil || next.InitCycle > gba.Scheduler.CurrentCycle {
-				break
-			}
-			e := gba.Scheduler.popNext()
-			overshoot := gba.Scheduler.CurrentCycle - e.InitCycle
-			if done := e.Func(overshoot, e.Args); done {
-				return
-			}
+		if gba.InstInjectionFunc != nil {
+			gba.InstInjectionFunc(gba.Cpu.P.Execute.Op)
 		}
+
+		gba.Cpu.Step()
 	}
 }
 
 func (gba *GBA) Tick(cycles int) {
-	gba.Scheduler.CurrentCycle += int64(cycles)
+	gba.Scheduler.Add(int64(cycles))
 }
 
 func (gba *GBA) ToggleMute() bool {

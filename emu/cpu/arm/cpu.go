@@ -34,7 +34,6 @@ type Cpu struct {
 
 	LowVector bool
 
-	AccCycles     int
 	NonSeq        bool
 	BlockTransfer bool
 
@@ -151,9 +150,7 @@ func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq, ws Waitstate, 
 	return c
 }
 
-func (c *Cpu) Step() int {
-	c.AccCycles = 0
-
+func (c *Cpu) Step() {
 	if c.P.Reload {
 		c.Reload()
 	}
@@ -170,25 +167,15 @@ func (c *Cpu) Step() int {
 				c.Reg.R[14] += 2
 			}
 
-			v := c.AccCycles
-			c.AccCycles = 0
-			return v
+			return
 		}
 	}
-
-	//if c.P.Execute.Addr == 0x80021B8 {
-	//	fmt.Printf("FLAGS %08X\n", c.Reg.R[1])
-	//}
 
 	if c.P.Execute.Thumb {
 		c.DecodeTHUMB(uint16(c.P.Execute.Op))
 	} else {
 		c.DecodeARM(c.P.Execute.Op)
 	}
-
-	v := c.AccCycles
-	c.AccCycles = 0
-	return v
 }
 
 func (c *Cpu) Fetch() {
@@ -312,40 +299,40 @@ func (cpu *Cpu) ToggleThumb() {
 }
 
 func (c *Cpu) Write8(addr uint32, v uint8) {
+	c.Tick(c.CycleCounter(addr, 1, false, false))
 	c.Mem.Write8(addr, v)
-	c.AccCycles += c.CycleCounter(addr, 1, false, false)
 	c.NonSeq = true
 }
 
 func (c *Cpu) Write16(addr uint32, v uint16) {
+	c.Tick(c.CycleCounter(addr, 2, false, false))
 	c.Mem.Write16(addr, v)
-	c.AccCycles += c.CycleCounter(addr, 2, false, false)
 	c.NonSeq = true
 }
 
 func (c *Cpu) Write32(addr uint32, v uint32) {
+	c.Tick(c.CycleCounter(addr, 4, c.BlockTransfer, false))
 	c.Mem.Write32(addr, v)
-	c.AccCycles += c.CycleCounter(addr, 4, c.BlockTransfer, false)
 	c.NonSeq = true
 }
 
 func (c *Cpu) Read8(addr uint32) uint32 {
+	c.Tick(c.CycleCounter(addr, 1, false, false))
 	v := c.Mem.Read8(addr)
-	c.AccCycles += c.CycleCounter(addr, 1, false, false)
 	c.idle(1)
 	return v
 }
 
 func (c *Cpu) Read16(addr uint32) uint32 {
+	c.Tick(c.CycleCounter(addr, 2, false, false))
 	v := c.Mem.Read16(addr)
-	c.AccCycles += c.CycleCounter(addr, 2, false, false)
 	c.idle(1)
 	return v
 }
 
 func (c *Cpu) Read32(addr uint32) uint32 {
+	c.Tick(c.CycleCounter(addr, 4, c.BlockTransfer, false))
 	v := c.Mem.Read32(addr)
-	c.AccCycles += c.CycleCounter(addr, 4, c.BlockTransfer, false)
 
 	if !c.BlockTransfer {
 		c.idle(1)
@@ -354,14 +341,14 @@ func (c *Cpu) Read32(addr uint32) uint32 {
 }
 
 func (c *Cpu) InstRead16(addr uint32, seq bool) uint32 {
+	c.Tick(c.CycleCounter(addr, 2, seq, true))
 	v := c.Mem.Read16(addr)
-	c.AccCycles += c.CycleCounter(addr, 2, seq, true)
 	return v
 }
 
 func (c *Cpu) InstRead32(addr uint32, seq bool) uint32 {
+	c.Tick(c.CycleCounter(addr, 4, seq, true))
 	v := c.Mem.Read32(addr)
-	c.AccCycles += c.CycleCounter(addr, 4, seq, true)
 	return v
 }
 
@@ -404,6 +391,8 @@ func (c *Cpu) CycleCounter(addr, width uint32, seq, inst bool) int {
 	prefetch := true
 	cycles := 1
 
+	c.Dmas.CheckDmas()
+
 	switch addr >> 24 {
 	case 2:
 		cycles = 3 << (width >> 2)
@@ -418,7 +407,6 @@ func (c *Cpu) CycleCounter(addr, width uint32, seq, inst bool) int {
 		if lastWasDma {
 			lastWasDma = false
 			seq = false
-
 		}
 
 		cycles = int(c.Waitstate.Get(width, addr, seq))
@@ -461,8 +449,7 @@ func idleMul(rs uint32, sign bool) int {
 }
 
 func (c *Cpu) idle(cycles int) {
-	//c.Tick(cycles)
-	c.AccCycles += cycles
+	c.Tick(cycles)
 	c.NonSeq = true
 	c.Prefetch.Step(int64(cycles))
 }
