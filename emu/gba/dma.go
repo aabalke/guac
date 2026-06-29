@@ -6,6 +6,8 @@ import (
 
 var EVENTS = []Event{EVENT_DMA0, EVENT_DMA1, EVENT_DMA2, EVENT_DMA3}
 
+var isDmas uint8
+
 const (
 	DMA_MODE_IMM = 0
 	DMA_MODE_VBL = 1
@@ -19,8 +21,9 @@ const (
 )
 
 type Dma struct {
-	Gba *GBA
-	Idx int
+	Gba  *GBA
+	Tick func(cycles int)
+	Idx  int
 
 	Src     uint32
 	Dst     uint32
@@ -39,8 +42,6 @@ type Dma struct {
 	Active      bool
 	InVideoMode bool
 
-	Started bool
-
 	latched struct {
 		src       uint32
 		dst       uint32
@@ -52,8 +53,9 @@ type Dma struct {
 
 func NewDma(gba *GBA, idx int) *Dma {
 	return &Dma{
-		Gba: gba,
-		Idx: idx,
+		Gba:  gba,
+		Idx:  idx,
+		Tick: gba.Tick,
 	}
 }
 
@@ -132,16 +134,12 @@ func (dma *Dma) Write(addr uint32, v uint8) {
 		dma.Control = (dma.Control & 0xFF) | (uint32(v) << 8)
 		dma.SrcAdj = (dma.SrcAdj & 1) | (uint32(v)&1)<<1
 
-		dma.Started = true
-
 		if !prev && dma.Enabled && dma.Mode == 0 {
 			dma.Gba.Scheduler.schedule(EVENTS[dma.Idx], 0, 2, dma.Start, nil)
-
 			return
 		}
 
 		if prev && !dma.Enabled {
-
 			dma.disable()
 			dma.Gba.Scheduler.cancel(EVENTS[dma.Idx])
 		}
@@ -152,13 +150,14 @@ func (dma *Dma) Start(late int64, _ any) bool {
 	var (
 		src       = dma.Src
 		dst       = dma.Dst
-		count     = dma.Cnt
+		cnt       = dma.Cnt
 		dstOffset = 2
 		srcOffset = 2
 	)
 
-	dma.Started = false
 	dma.Active = true
+	isDmas |= 1 << dma.Idx
+
 	if dma.isWord {
 		dst &^= 3
 		src &^= 3
@@ -169,11 +168,11 @@ func (dma *Dma) Start(late int64, _ any) bool {
 		src &^= 1
 	}
 
-	if count == 0 {
+	if cnt == 0 {
 		if dma.Idx == 3 {
-			count = 0x10000
+			cnt = 0x10000
 		} else {
-			count = 0x4000
+			cnt = 0x4000
 		}
 	}
 
@@ -199,9 +198,11 @@ func (dma *Dma) Start(late int64, _ any) bool {
 
 	dma.latched.src = src
 	dma.latched.dst = dst
-	dma.latched.cnt = count
+	dma.latched.cnt = cnt
 	dma.latched.srcOffset = srcOffset
 	dma.latched.dstOffset = dstOffset
+
+	dma.EepromDma(dma.latched.cnt, dst, src)
 
 	return false
 }
@@ -211,75 +212,46 @@ func (dma *Dma) disable() {
 	dma.Control &^= 0x8000
 }
 
-func (dma *Dma) transfer() int {
+func (dma *Dma) transfer() {
 	var (
-		mem  = dma.Gba.Mem
-		src  = dma.latched.src
-		dst  = dma.latched.dst
-		bios = src < 0x200_0000
-		tick = dma.Gba.Tick
-		//cycles = 0
+		mem       = dma.Gba.Mem
+		src       = dma.latched.src
+		dst       = dma.latched.dst
+		accessRom = false
 	)
 
-	accessRom := false
+	for range dma.latched.cnt {
 
-	if dma.isWord {
-		for range dma.latched.cnt {
+		srcSeq := true
+		dstSeq := true
 
-			srcSeq := true
-			dstSeq := true
-
-			if !accessRom {
-				if src >= 0x800_0000 {
-					srcSeq = false
-					accessRom = true
-				} else if dst >= 0x800_0000 {
-					dstSeq = false
-					accessRom = true
-
-				}
+		if !accessRom {
+			if src >= 0x800_0000 {
+				srcSeq = false
+				accessRom = true
+			} else if dst >= 0x800_0000 {
+				dstSeq = false
+				accessRom = true
 			}
+		}
 
-			dma.EepromDma(dma.latched.cnt, dst, src)
+		if dma.isWord {
 
-			switch {
-			case bios:
-				tick(1)
-
-			default:
-				dma.Gba.Cpu.ReadCycles(src, 4, true, srcSeq, false)
+			if src < 0x200_0000 {
+				dma.Tick(1)
+			} else {
+				dma.Gba.Cpu.Cycles(src, 4, true, srcSeq, false)
 				dma.Value = mem.Read32(src)
 			}
 
-			dma.Gba.Cpu.WriteCycles(dst, 4, true, dstSeq)
+			dma.Gba.Cpu.Cycles(dst, 4, true, dstSeq, false)
 			mem.Write32(dst, dma.Value)
 
-			dst = uint32(int(dst) + dma.latched.dstOffset)
-			src = uint32(int(src) + dma.latched.srcOffset)
-		}
-	} else {
-		var v uint32
+		} else {
 
-		for range dma.latched.cnt {
+			v := uint32(0)
 
-			srcSeq := true
-			dstSeq := true
-
-			if !accessRom {
-				if src >= 0x800_0000 {
-					srcSeq = false
-					accessRom = true
-				} else if dst >= 0x800_0000 {
-					dstSeq = false
-					accessRom = true
-
-				}
-			}
-
-			dma.EepromDma(dma.latched.cnt, dst, src)
-
-			switch {
-			case bios:
+			if src < 0x200_0000 {
 
 				// required for ngba-suite/latch.gba
 				if dst&2 != 0 {
@@ -288,20 +260,20 @@ func (dma *Dma) transfer() int {
 					v = dma.Value & 0xFFFF
 				}
 
-				tick(1)
+				dma.Tick(1)
+			} else {
 
-			default:
-				dma.Gba.Cpu.ReadCycles(src, 2, true, srcSeq, false)
+				dma.Gba.Cpu.Cycles(src, 2, true, srcSeq, false)
 				v = mem.Read16(src)
 				dma.Value = v | (v << 16)
 			}
 
-			dma.Gba.Cpu.WriteCycles(dst, 2, true, dstSeq)
+			dma.Gba.Cpu.Cycles(dst, 2, true, dstSeq, false)
 			mem.Write16(dst, uint16(v))
-
-			dst = uint32(int(dst) + dma.latched.dstOffset)
-			src = uint32(int(src) + dma.latched.srcOffset)
 		}
+
+		dst = uint32(int(dst) + dma.latched.dstOffset)
+		src = uint32(int(src) + dma.latched.srcOffset)
 	}
 
 	if dma.IRQ {
@@ -309,12 +281,13 @@ func (dma *Dma) transfer() int {
 	}
 
 	dma.Active = false
+	isDmas &^= 1 << dma.Idx
 	dma.latched.src = src
 	dma.latched.dst = dst
 
 	if !dma.Repeat {
 		dma.disable()
-		return 0
+		return
 	}
 
 	dma.Src = src
@@ -322,8 +295,6 @@ func (dma *Dma) transfer() int {
 	if dma.DstAdj != DMA_ADJ_REL {
 		dma.Dst = dst
 	}
-
-	return 0
 }
 
 func (dma *Dma) videoDma(vcount uint8) {
@@ -353,49 +324,37 @@ func (gba *GBA) checkDmas(mode uint8) {
 	}
 }
 
-func (gba *GBA) CheckDmas() bool {
-	none := true
-	for i := range 4 {
-		dma := gba.Dma[i]
-		if dma.Active {
-			none = false
-			break
-		}
-	}
-
-	if none {
-		return false
+func (gba *GBA) CheckDmas() {
+	if isDmas == 0 {
+		return
 	}
 
 	gba.Tick(1)
 
 	for i := range 4 {
-		dma := gba.Dma[i]
-		if dma.Active {
+		if dma := gba.Dma[i]; dma.Active {
 			dma.transfer()
 		}
 	}
 
 	gba.Tick(1)
-	return true
 }
 
-func (dma *Dma) EepromDma(count, tmpDst, tmpSrc uint32) {
-	if eeprom := CheckEeprom(dma.Gba, tmpDst); eeprom {
+func (dma *Dma) EepromDma(count, dst, src uint32) {
+	if !CheckEeprom(dma.Gba, dst) {
+		return
+	}
 
-		switch count {
-		case 9, 73:
-			cart.EepromWidth = 6
-		case 17, 81:
-			cart.EepromWidth = 14
-		}
+	switch count {
+	case 9, 73:
+		cart.EepromWidth = 6
+	case 17, 81:
+		cart.EepromWidth = 14
+	}
 
-		dstRom := tmpDst >= 0x800_0000 && tmpDst < 0xE00_0000
-		srcRom := tmpSrc >= 0x800_0000 && tmpSrc < 0xE00_0000
-		if srcRom && dstRom {
-			panic("EEPROM HAS BOTH SRC AND DST ROM ADDR")
-		}
-
-		// do not continue this., do not put this outside loop
+	dstRom := dst >= 0x800_0000 && dst < 0xE00_0000
+	srcRom := src >= 0x800_0000 && src < 0xE00_0000
+	if srcRom && dstRom {
+		panic("EEPROM HAS BOTH SRC AND DST ROM ADDR")
 	}
 }

@@ -1,24 +1,27 @@
 package gba
 
 type Prefetch struct {
+	Tick                  func(cycles int)
+	Ws                    *Waitstate
+	AccessTime, Countdown int64
+	Head, Addr            uint32
+	Width                 uint32
+	Capacity              uint32
+	Opcodes               uint32
 	Enabled               bool
 	Disabled              bool
 	Active                bool
-	Head, Addr            uint32
-	Opcodes               uint8
-	Thumb                 bool
-	AccessTime, Countdown int64
-	Ws                    *Waitstate
 }
 
-func NewPrefetch(ws *Waitstate) *Prefetch {
+func NewPrefetch(ws *Waitstate, Tick func(int)) *Prefetch {
 	return &Prefetch{
 		Ws:         ws,
 		AccessTime: 5,
+		Tick:       Tick,
 	}
 }
 
-func (p *Prefetch) Cancel(r15 uint32, tick func(int)) {
+func (p *Prefetch) Cancel(r15 uint32) {
 	if !p.Active {
 		return
 	}
@@ -30,63 +33,58 @@ func (p *Prefetch) Cancel(r15 uint32, tick func(int)) {
 	}
 
 	halfPlusOne := (p.AccessTime >> 1) + 1
-	if p.Countdown == 1 || (!p.Thumb && p.Countdown == halfPlusOne) {
-		tick(1)
+	if p.Countdown == 1 || (p.Width == 4 && p.Countdown == halfPlusOne) {
+		p.Tick(1)
 	}
 }
 
 func (p *Prefetch) Step(cycles int64) {
-	if !p.Active {
+	p.Countdown -= cycles
+
+	if !p.Enabled {
+		p.Opcodes++
 		return
 	}
 
-	p.Countdown -= cycles
-
-	size, capacity := uint32(4), uint8(4)
-	if p.Thumb {
-		size, capacity = 2, 8
-	}
-
 	for p.Countdown <= 0 {
-		p.Opcodes++
-		if !p.Enabled || (p.Opcodes >= capacity) {
+		if p.Opcodes >= p.Capacity {
+			p.Opcodes++
 			break
 		}
 
-		p.Addr += size
+		p.Opcodes++
+		p.Addr += p.Width
 		p.Countdown += p.AccessTime
 	}
 }
 
-func (p *Prefetch) Wait(r15, addr uint32, cycles int64, thumb, code bool, tick func(int)) {
+func (p *Prefetch) Wait(r15, addr, width uint32, cycles int64, code bool) {
 	if !code {
-		p.Cancel(r15, tick)
-		tick(int(cycles))
+		p.Cancel(r15)
+		p.Tick(int(cycles))
 		return
 	}
 
-	size := uint32(4)
-	if p.Thumb {
-		size = 2
-	}
+	// width 2 = cap 8, width 4 = cap 4
+	p.Capacity = (1 << ((width & 3) >> 1)) << 2
 
 	if p.Active {
 		if p.Opcodes != 0 && addr == p.Head {
 			p.Opcodes--
-			p.Head += size
-			tick(1)
+			p.Head += width
+			p.Tick(1)
 			return
 		}
 
 		if p.Countdown > 0 && addr == p.Addr {
-			tick(int(p.Countdown))
+			p.Tick(int(p.Countdown))
 			p.Head = p.Addr
 			p.Opcodes = 0
 			return
 		}
 	}
 
-	p.Cancel(r15, tick)
+	p.Cancel(r15)
 
 	if p.Disabled {
 		p.Disabled = false
@@ -106,23 +104,17 @@ func (p *Prefetch) Wait(r15, addr uint32, cycles int64, thumb, code bool, tick f
 
 	}
 
-	tick(int(cycles))
+	p.Tick(int(cycles))
 
-	if p.Enabled {
-		p.Restart(addr, thumb)
+	if !p.Enabled {
+		return
 	}
-}
 
-func (p *Prefetch) Restart(addr uint32, thumb bool) {
 	p.Active = true
-	p.Opcodes, p.Thumb = 0, thumb
-	if thumb {
-		p.AccessTime = int64(p.Ws.S[(addr>>25)&3])
-		p.Addr = addr + 2
-	} else {
-		p.AccessTime = int64(p.Ws.S[(addr>>25)&3]) << 1
-		p.Addr = addr + 4
-	}
+	p.Opcodes = 0
+	p.Width = width
+	p.AccessTime = int64(p.Ws.S[(addr>>25)&3]) << (width >> 2) // * 2 if 32bit addr
 	p.Countdown = p.AccessTime
+	p.Addr = addr + width
 	p.Head = p.Addr
 }

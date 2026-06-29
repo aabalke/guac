@@ -97,16 +97,21 @@ func (s *Scheduler) cancel(e Event) {
 }
 
 func (s *Scheduler) Add(cycles int64) {
+	//nextCycle := s.CurrentCycle + cycles
 	s.CurrentCycle += cycles
 
 	for {
-		next := s.peekNext()
-		if next == nil || next.InitCycle > s.CurrentCycle {
+		// if next := s.peekNext(); next == nil || next.InitCycle > nextCycle {
+		if next := s.peekNext(); next == nil || next.InitCycle > s.CurrentCycle {
 			break
 		}
 
 		event := s.popNext()
 		late := s.CurrentCycle - event.InitCycle
+		//late := int64(0)
+		//s.CurrentCycle = event.InitCycle
 		event.Func(late, event.Args)
 	}
+
+	//s.CurrentCycle = nextCycle
 }

@@ -2,7 +2,6 @@ package gba
 
 import (
 	"encoding/binary"
-	"fmt"
 	"sync"
 )
 
@@ -773,7 +772,7 @@ func convert8_8Float(v int16) float64 {
 
 func (gba *GBA) setAffineBackgroundPixel(bg *Background, x uint32) (uint32, bool) {
 	if !bg.Palette256 {
-		panic(fmt.Sprintf("AFFINE WITHOUT PAL 256"))
+		panic("AFFINE WITHOUT PAL 256")
 	}
 
 	pa := convert8_8Float(int16(bg.Pa))

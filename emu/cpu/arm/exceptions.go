@@ -12,20 +12,20 @@ const (
 	VEC_FIQ           = 0xFFFF_001C
 )
 
-func (cpu *Cpu) Exception(addr uint32, mode uint32) {
+func (c *Cpu) Exception(addr uint32, mode uint32) {
 	var (
-		cpsr = &cpu.Reg.CPSR
-		reg  = &cpu.Reg
-		r    = &cpu.Reg.R
+		cpsr = &c.Reg.CPSR
+		reg  = &c.Reg
+		r    = &c.Reg.R
 	)
 
-	cpu.ModeSwitch(cpsr.Mode, mode)
+	c.ModeSwitch(cpsr.Mode, mode)
 
 	i := BANK_ID[mode]
 	reg.SPSR[i] = *cpsr
 
-	r[LR] = cpu.P.Decode.Addr
-	reg.LR[i] = cpu.P.Decode.Addr
+	r[LR] = c.P.Decode.Addr
+	reg.LR[i] = c.P.Decode.Addr
 
 	cpsr.Mode = mode
 	cpsr.T = false
@@ -34,22 +34,22 @@ func (cpu *Cpu) Exception(addr uint32, mode uint32) {
 		cpsr.F = true
 	}
 
-	cpu.P.Reload = true
+	c.P.Reload = true
 
-	if cpu.LowVector {
+	if c.LowVector {
 		r[PC] = addr & 0xFFFF
 	} else {
 		r[PC] = addr
 	}
 }
 
-func (cpu *Cpu) ExitException(mode uint32) {
+func (c *Cpu) ExitException(mode uint32) {
 	var (
-		cpsr = &cpu.Reg.CPSR
-		reg  = &cpu.Reg
+		cpsr = &c.Reg.CPSR
+		reg  = &c.Reg
 	)
 
 	*cpsr = reg.SPSR[BANK_ID[mode]]
 
-	cpu.ModeSwitch(mode, cpsr.Mode)
+	c.ModeSwitch(mode, cpsr.Mode)
 }

@@ -806,9 +806,9 @@ func (cpu *Cpu) msr(op uint32) {
 	cpu.ModeSwitch(curr, next)
 }
 
-func (cpu *Cpu) Swp(op uint32) {
+func (c *Cpu) Swp(op uint32) {
 	var (
-		r      = &cpu.Reg.R
+		r      = &c.Reg.R
 		isByte = (op>>22)&1 != 0
 		rn     = (op >> 16) & 0xF
 		rd     = (op >> 12) & 0xF
@@ -818,13 +818,13 @@ func (cpu *Cpu) Swp(op uint32) {
 	)
 
 	if isByte {
-		r[rd] = cpu.Read8(rnv)
-		cpu.Write8(rnv, uint8(rmv))
+		r[rd] = c.Read8(rnv)
+		c.Write8(rnv, uint8(rmv))
 	} else {
-		v := cpu.Read32(rnv)
+		v := c.Read32(rnv)
 		is := (rnv & 3) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
-		cpu.Write32(rnv, rmv)
+		c.Write32(rnv, rmv)
 	}
 }
 
@@ -850,10 +850,9 @@ func (c *Cpu) Block(op uint32) {
 		psr        = (op>>22)&1 != 0
 		wb         = (op>>21)&1 != 0
 		load       = (op>>20)&1 != 0
-		forceUser  = psr && (c.Reg.CPSR.Mode != MODE_USR) && (!load || !pcIncluded)
+		mode       = c.Reg.CPSR.Mode
+		forceUser  = psr && (mode != MODE_USR && mode != MODE_SYS) && (!load || !pcIncluded)
 		wbValue    = r[rn]
-		// fiq switch has additional r8 - r12 use mode switch registers
-		forceFIQSwitch = forceUser && c.Reg.CPSR.Mode == MODE_FIQ
 	)
 
 	if up {
@@ -862,33 +861,11 @@ func (c *Cpu) Block(op uint32) {
 		wbValue -= regCount * 4
 	}
 
-	rnRef := &c.Reg.R[rn]
-	switch {
-	case forceFIQSwitch:
-
-		switch {
-		case rn == 13:
-			rnRef = &c.Reg.SP[BANK_ID[MODE_USR]]
-		case rn == 14:
-			rnRef = &c.Reg.LR[BANK_ID[MODE_USR]]
-		case rn >= 8:
-			rnRef = &c.Reg.USR[rn-8]
-
-		}
-
-	case forceUser:
-		switch {
-		case rn == 13:
-			rnRef = &c.Reg.SP[BANK_ID[MODE_USR]]
-		case rn == 14:
-			rnRef = &c.Reg.LR[BANK_ID[MODE_USR]]
-		}
+	if forceUser {
+		c.ModeSwitch(mode, MODE_USR)
 	}
 
-	var (
-		rnv = *rnRef
-		reg = uint32(0)
-	)
+	rnv := c.Reg.R[rn]
 
 	if !up {
 		pre = !pre
@@ -897,33 +874,10 @@ func (c *Cpu) Block(op uint32) {
 
 	seq := false
 
-	for range 16 {
+	for reg := range uint32(16) {
 
 		if disabled := (rlist>>reg)&1 == 0; disabled {
-			reg++
 			continue
-		}
-
-		ref := &c.Reg.R[reg]
-		switch {
-		case forceFIQSwitch:
-
-			switch {
-			case reg == 13:
-				ref = &c.Reg.SP[BANK_ID[MODE_USR]]
-			case reg == 14:
-				ref = &c.Reg.LR[BANK_ID[MODE_USR]]
-			case reg >= 8:
-				ref = &c.Reg.USR[reg-8]
-			}
-
-		case forceUser:
-			switch {
-			case reg == 13:
-				ref = &c.Reg.SP[BANK_ID[MODE_USR]]
-			case reg == 14:
-				ref = &c.Reg.LR[BANK_ID[MODE_USR]]
-			}
 		}
 
 		if pre {
@@ -931,11 +885,10 @@ func (c *Cpu) Block(op uint32) {
 		}
 
 		if load {
-			*ref = c.Read32Block(addr, seq)
+			c.Reg.R[reg] = c.Read32Block(addr, seq)
 		} else {
 			switch reg {
 			case rn:
-
 				if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
 					c.Write32Block(addr, rnv, seq)
 				} else {
@@ -943,9 +896,9 @@ func (c *Cpu) Block(op uint32) {
 				}
 
 			case PC:
-				c.Write32Block(addr, *ref+4, seq)
+				c.Write32Block(addr, c.Reg.R[reg]+4, seq)
 			default:
-				c.Write32Block(addr, *ref, seq)
+				c.Write32Block(addr, c.Reg.R[reg], seq)
 			}
 		}
 
@@ -954,22 +907,25 @@ func (c *Cpu) Block(op uint32) {
 		if !pre {
 			addr += 4
 		}
-
-		reg++
 	}
 
 	if !load {
 		if wb {
 			r[rn] = wbValue
 		}
+		if forceUser {
+			c.ModeSwitch(MODE_USR, mode)
+		}
 
 		return
 	}
-
 	c.idle(1)
 
 	if wb && !rnIncluded {
 		r[rn] = wbValue
+	}
+	if forceUser {
+		c.ModeSwitch(MODE_USR, mode)
 	}
 
 	if !pcIncluded {

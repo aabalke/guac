@@ -36,7 +36,7 @@ func NewMemory(gba *GBA) *Memory {
 	m := &Memory{GBA: gba}
 	m.ProtectedValue = 0xE129F000
 
-	m.Prefetch = NewPrefetch(&m.Waitstate)
+	m.Prefetch = NewPrefetch(&m.Waitstate, gba.Tick)
 	m.Waitstate.Prefetch = m.Prefetch
 
 	m.initReadRegions()
@@ -257,38 +257,8 @@ func (m *Memory) initReadRegions() {
 	}
 }
 
-func (m *Memory) ReadPtr(addr uint32) (unsafe.Pointer, bool) {
+func (m *Memory) ReadPtr(_ uint32) (unsafe.Pointer, bool) {
 	return nil, false
-	switch regions := addr >> 24; regions {
-	case 0x2:
-		return unsafe.Add(
-			unsafe.Pointer(&m.WRAM1), addr&0x3FFFF,
-		), true
-	case 0x3:
-		return unsafe.Add(
-			unsafe.Pointer(&m.WRAM2), addr&0x7FFF,
-		), true
-	case 0x6:
-		addr &= 0x1FFFF
-		if addr >= 0x18000 {
-			addr -= 0x8000
-		}
-		return unsafe.Add(
-			unsafe.Pointer(&m.VRAM), addr,
-		), true
-
-	case 0x7:
-		return unsafe.Add(
-			unsafe.Pointer(&m.OAM), addr&0x3FF,
-		), true
-
-	case 0x8, 0x9, 0xA, 0xB, 0xC, 0xD:
-		return unsafe.Add(
-			unsafe.Pointer(&m.GBA.Cartridge.Rom), addr&0x1FF_FFFF,
-		), true
-	default:
-		return nil, false
-	}
 }
 
 func (m *Memory) Read(addr uint32) uint8 {
@@ -323,10 +293,6 @@ func (m *Memory) ReadOpenBus(addr uint32) uint8 {
 }
 
 func (m *Memory) ReadIO(addr uint32) uint8 {
-	//if m.GBA.Booted && addr&3 == 0 {
-	//	// if addr == 0x208 {
-	//	fmt.Printf("ADDR %08X STAR %08X\n", addr, m.GBA.Scheduler.Now())
-	//}
 	switch {
 	case addr >= 0x10 && addr < 0x48,
 		addr >= 0x4C && addr < 0x50,
@@ -353,7 +319,6 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 		addr &= 3
 
 		return m.GBA.Timers[i].Read(int(addr))
-
 	}
 
 	switch addr {
@@ -379,12 +344,8 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 	case 0x203:
 		return uint8(m.GBA.Irq.IF >> 8)
 
-	case 0x204:
-		return m.Waitstate.Read(0)
-	case 0x205:
-		return m.Waitstate.Read(1)
-	case 0x206, 0x207:
-		return 0
+	case 0x204, 0x205, 0x206, 0x207:
+		return m.Waitstate.Read(addr)
 
 	case 0x208:
 		return m.GBA.Irq.ReadIME()
@@ -488,14 +449,6 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
 }
 
 func (m *Memory) WriteIO(addr uint32, v uint8) {
-	// if m.GBA.Booted && addr&3 == 0 {
-	//if addr == 0x208 {
-	//	fmt.Printf("ADDR %08X STAR %08X\n", addr, m.GBA.Scheduler.NowNoCpu())
-	//}
-	// this addr should be relative. - 0x4000000
-	// do not make bg control addrs special, unless you know what the f you are doing
-	// VCOUNT is not writable, no touchy
-
 	switch {
 	case addr >= 0x60 && addr < 0xB0:
 		WriteSound(addr, v, m.GBA.Apu)
@@ -515,7 +468,6 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 		idx := addr & 3
 		m.GBA.Timers[i].Write(int(idx), v)
 		return
-
 	}
 
 	switch addr {
@@ -589,7 +541,7 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 	case 0x203:
 		m.GBA.Irq.WriteIF(v, 1)
 	case 0x204, 0x205, 0x206, 0x207:
-		m.Waitstate.Write(uint8(addr&3), v)
+		m.Waitstate.Write(addr, v)
 
 	// IME
 	case 0x208:
