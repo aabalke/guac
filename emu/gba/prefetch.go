@@ -18,8 +18,21 @@ func NewPrefetch(ws *Waitstate) *Prefetch {
 	}
 }
 
-func (p *Prefetch) Cancel() {
+func (p *Prefetch) Cancel(r15 uint32, tick func(int)) {
+	if !p.Active {
+		return
+	}
+
 	p.Active = false
+
+	if r15 < 0x800_0000 || r15 >= 0xE00_0000 {
+		return
+	}
+
+	halfPlusOne := (p.AccessTime >> 1) + 1
+	if p.Countdown == 1 || (!p.Thumb && p.Countdown == halfPlusOne) {
+		tick(1)
+	}
 }
 
 func (p *Prefetch) Step(cycles int64) {
@@ -45,30 +58,35 @@ func (p *Prefetch) Step(cycles int64) {
 	}
 }
 
-func (p *Prefetch) Wait(addr uint32, cycles int64, thumb bool) int64 {
+func (p *Prefetch) Wait(r15, addr uint32, cycles int64, thumb, code bool, tick func(int)) {
+	if !code {
+		p.Cancel(r15, tick)
+		tick(int(cycles))
+		return
+	}
+
 	size := uint32(4)
 	if p.Thumb {
 		size = 2
 	}
 
 	if p.Active {
-		if p.Opcodes > 0 && addr == p.Head {
+		if p.Opcodes != 0 && addr == p.Head {
 			p.Opcodes--
 			p.Head += size
-			p.Step(1)
-			return 1
+			tick(1)
+			return
 		}
 
 		if p.Countdown > 0 && addr == p.Addr {
-			cycles = p.Countdown
-			p.Step(p.Countdown)
+			tick(int(p.Countdown))
 			p.Head = p.Addr
 			p.Opcodes = 0
-			return cycles
+			return
 		}
 	}
 
-	p.Cancel()
+	p.Cancel(r15, tick)
 
 	if p.Disabled {
 		p.Disabled = false
@@ -85,26 +103,26 @@ func (p *Prefetch) Wait(addr uint32, cycles int64, thumb bool) int64 {
 		case int64(p.Ws.S[region] << 1):
 			cycles = int64(p.Ws.N[0]) + int64(p.Ws.S[0])
 		}
+
 	}
+
+	tick(int(cycles))
 
 	if p.Enabled {
 		p.Restart(addr, thumb)
 	}
-
-	return cycles
 }
 
 func (p *Prefetch) Restart(addr uint32, thumb bool) {
 	p.Active = true
 	p.Opcodes, p.Thumb = 0, thumb
 	if thumb {
-		addr &^= 1
 		p.AccessTime = int64(p.Ws.S[(addr>>25)&3])
-		p.Head, p.Addr = addr+2, addr+2
+		p.Addr = addr + 2
 	} else {
-		addr &^= 3
 		p.AccessTime = int64(p.Ws.S[(addr>>25)&3]) << 1
-		p.Head, p.Addr = addr+4, addr+4
+		p.Addr = addr + 4
 	}
 	p.Countdown = p.AccessTime
+	p.Head = p.Addr
 }

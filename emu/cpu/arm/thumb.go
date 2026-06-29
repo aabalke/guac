@@ -530,6 +530,8 @@ func (cpu *Cpu) ThumbPushPop(op uint16) {
 		return
 	}
 
+	seq := false
+
 	reg := 0
 	if !pop {
 		reg = 7
@@ -551,14 +553,14 @@ func (cpu *Cpu) ThumbPushPop(op uint16) {
 		}
 
 		if pop {
-			r[reg] = cpu.Read32(r[SP])
+			r[reg] = cpu.Read32Block(r[SP], seq)
 			r[SP] += 4
 		} else {
 			r[SP] -= 4
-			cpu.Write32(r[SP], r[reg])
+			cpu.Write32Block(r[SP], r[reg], seq)
 		}
 
-		cpu.BlockTransfer = true
+		seq = true
 
 		if pop {
 			reg++
@@ -578,8 +580,6 @@ func (cpu *Cpu) ThumbPushPop(op uint16) {
 
 		cpu.P.Reload = true
 	}
-
-	cpu.BlockTransfer = false
 }
 
 func (cpu *Cpu) ThumbRelative(op uint16) {
@@ -745,6 +745,7 @@ func (cpu *Cpu) ThumbBlock(op uint16) {
 		rb    = (op >> 8) & 7
 		rlist = uint32(op & 0xFF)
 		addr  = r[rb]
+		seq   = false
 	)
 
 	if !ldmia {
@@ -771,24 +772,22 @@ func (cpu *Cpu) ThumbBlock(op uint16) {
 			}
 
 			if reg == int(rb) {
-				cpu.Write32(addr, r[reg])
+				cpu.Write32Block(addr, r[reg], seq)
 				matchingValue = r[reg] + 4
 				matchingAddr = addr
 				rbIdx = regCount - count
 				r[rb] += 4
 				addr += 4
-				cpu.BlockTransfer = true
+				seq = true
 				continue
 			}
 
-			cpu.Write32(addr, r[reg])
+			cpu.Write32Block(addr, r[reg], seq)
 
 			r[rb] += 4
 			addr += 4
-			cpu.BlockTransfer = true
+			seq = true
 		}
-
-		cpu.BlockTransfer = false
 
 		if smallest {
 			v := cpu.Read32(addr)
@@ -822,7 +821,7 @@ func (cpu *Cpu) ThumbBlock(op uint16) {
 			continue
 		}
 
-		r[reg] = cpu.Read32(addr)
+		r[reg] = cpu.Read32Block(addr, seq)
 
 		if reg == int(rb) {
 			matchingRb = true
@@ -832,12 +831,12 @@ func (cpu *Cpu) ThumbBlock(op uint16) {
 
 		r[rb] += 4
 		addr += 4
-		cpu.BlockTransfer = true
+		seq = true
 	}
+
+	cpu.idle(1)
 
 	if matchingRb {
 		r[rb] = rbValue
 	}
-
-	cpu.BlockTransfer = false
 }

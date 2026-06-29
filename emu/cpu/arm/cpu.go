@@ -14,9 +14,8 @@ type Waitstate interface {
 }
 
 type Prefetch interface {
-	Cancel()
-	Step(cycles int64)
-	Wait(addr uint32, cycles int64, thumb bool) int64
+	Cancel(r15 uint32, tick func(int))
+	Wait(r15, addr uint32, cycles int64, thumb, code bool, tick func(int))
 	Restart(addr uint32, thumb bool)
 }
 
@@ -34,8 +33,7 @@ type Cpu struct {
 
 	LowVector bool
 
-	NonSeq        bool
-	BlockTransfer bool
+	NonSeq bool
 
 	Waitstate Waitstate
 	Prefetch  Prefetch
@@ -299,136 +297,141 @@ func (cpu *Cpu) ToggleThumb() {
 }
 
 func (c *Cpu) Write8(addr uint32, v uint8) {
-	c.Tick(c.CycleCounter(addr, 1, false, false))
+	c.WriteCycles(addr, 1, false, false)
 	c.Mem.Write8(addr, v)
 	c.NonSeq = true
 }
 
 func (c *Cpu) Write16(addr uint32, v uint16) {
-	c.Tick(c.CycleCounter(addr, 2, false, false))
+	c.WriteCycles(addr, 2, false, false)
 	c.Mem.Write16(addr, v)
 	c.NonSeq = true
 }
 
 func (c *Cpu) Write32(addr uint32, v uint32) {
-	c.Tick(c.CycleCounter(addr, 4, c.BlockTransfer, false))
+	c.WriteCycles(addr, 4, false, false)
 	c.Mem.Write32(addr, v)
 	c.NonSeq = true
 }
 
 func (c *Cpu) Read8(addr uint32) uint32 {
-	c.Tick(c.CycleCounter(addr, 1, false, false))
+	c.ReadCycles(addr, 1, false, false, false)
 	v := c.Mem.Read8(addr)
 	c.idle(1)
 	return v
 }
 
 func (c *Cpu) Read16(addr uint32) uint32 {
-	c.Tick(c.CycleCounter(addr, 2, false, false))
+	c.ReadCycles(addr, 2, false, false, false)
 	v := c.Mem.Read16(addr)
 	c.idle(1)
 	return v
 }
 
 func (c *Cpu) Read32(addr uint32) uint32 {
-	c.Tick(c.CycleCounter(addr, 4, c.BlockTransfer, false))
+	c.ReadCycles(addr, 4, false, false, false)
 	v := c.Mem.Read32(addr)
+	c.idle(1)
+	return v
+}
 
-	if !c.BlockTransfer {
-		c.idle(1)
-	}
+func (c *Cpu) Write32Block(addr, v uint32, seq bool) {
+	c.WriteCycles(addr, 4, false, seq)
+	c.Mem.Write32(addr, v)
+	c.NonSeq = true
+}
+
+func (c *Cpu) Read32Block(addr uint32, seq bool) uint32 {
+	c.ReadCycles(addr, 4, false, seq, false)
+	v := c.Mem.Read32(addr)
 	return v
 }
 
 func (c *Cpu) InstRead16(addr uint32, seq bool) uint32 {
-	c.Tick(c.CycleCounter(addr, 2, seq, true))
+	c.ReadCycles(addr, 2, false, seq, true)
 	v := c.Mem.Read16(addr)
 	return v
 }
 
 func (c *Cpu) InstRead32(addr uint32, seq bool) uint32 {
-	c.Tick(c.CycleCounter(addr, 4, seq, true))
+	c.ReadCycles(addr, 4, false, seq, true)
 	v := c.Mem.Read32(addr)
 	return v
 }
 
 var lastWasDma = false
 
-func (c *Cpu) CycleCounterDma(addr, width uint32, seq bool) int {
-	prefetch := true
-	cycles := 1
+func (c *Cpu) WriteCycles(addr, width uint32, dma, seq bool) {
+	if dma {
+		lastWasDma = true
+	} else {
+		c.Dmas.CheckDmas()
+	}
 
 	switch addr >> 24 {
 	case 2:
-		cycles = 3 << (width >> 2)
+		cycles := 3 << (width >> 2)
+		c.Tick(cycles)
 	case 5, 6:
-		cycles = 1 << (width >> 2)
+		cycles := 1 << (width >> 2)
+		c.Tick(cycles)
 	case 8, 9, 10, 11, 12, 13:
 
 		if addr&0x1FFFF == 0 {
 			seq = false
 		}
 
-		fallthrough
-
-	case 14, 15:
-
-		c.Prefetch.Cancel()
-		cycles = int(c.Waitstate.Get(width, addr, seq))
-		prefetch = false
-	}
-
-	if prefetch {
-		c.Prefetch.Step(int64(cycles))
-	}
-
-	lastWasDma = true
-
-	return cycles
-}
-
-func (c *Cpu) CycleCounter(addr, width uint32, seq, inst bool) int {
-	prefetch := true
-	cycles := 1
-
-	c.Dmas.CheckDmas()
-
-	switch addr >> 24 {
-	case 2:
-		cycles = 3 << (width >> 2)
-	case 5, 6:
-		cycles = 1 << (width >> 2)
-	case 8, 9, 10, 11, 12, 13:
-
-		if addr&0x1FFFF == 0 {
-			seq = false
-		}
-
-		if lastWasDma {
+		if lastWasDma && !dma {
 			lastWasDma = false
 			seq = false
 		}
 
-		cycles = int(c.Waitstate.Get(width, addr, seq))
-		prefetch = false
-		if inst {
-			cycles = int(c.Prefetch.Wait(addr, int64(cycles), c.Reg.CPSR.T))
-		} else {
-			c.Prefetch.Cancel()
+		c.Prefetch.Cancel(c.Reg.R[15], c.Tick)
+		c.Tick(int(c.Waitstate.Get(width, addr, seq)))
+
+	case 14, 15:
+		c.Prefetch.Cancel(c.Reg.R[15], c.Tick)
+		c.Tick(int(c.Waitstate.Get(width, addr, seq)))
+	default:
+		c.Tick(1)
+	}
+}
+
+func (c *Cpu) ReadCycles(addr, width uint32, dma, seq, inst bool) {
+	if dma {
+		lastWasDma = true
+	} else {
+		c.Dmas.CheckDmas()
+	}
+
+	switch addr >> 24 {
+	case 2:
+		cycles := 3 << (width >> 2)
+		c.Tick(cycles)
+	case 5, 6:
+		cycles := 1 << (width >> 2)
+		c.Tick(cycles)
+	case 8, 9, 10, 11, 12, 13:
+
+		if addr&0x1FFFF == 0 {
+			seq = false
 		}
+
+		if lastWasDma && !dma {
+			lastWasDma = false
+			seq = false
+		}
+
+		cycles := c.Waitstate.Get(width, addr, seq)
+		c.Prefetch.Wait(c.Reg.R[15], addr, int64(cycles), c.Reg.CPSR.T, inst, c.Tick)
 
 	case 14, 15:
 
-		c.Prefetch.Cancel()
-		cycles = int(c.Waitstate.Get(width, addr, seq))
-		prefetch = false
+		c.Tick(int(c.Waitstate.Get(width, addr, seq)))
+		c.Prefetch.Cancel(c.Reg.R[15], c.Tick)
+	default:
+		c.Tick(1)
 	}
-
-	if prefetch {
-		c.Prefetch.Step(int64(cycles))
-	}
-
-	return cycles
 }
 
 func idleMul(rs uint32, sign bool) int {
@@ -451,7 +454,6 @@ func idleMul(rs uint32, sign bool) int {
 func (c *Cpu) idle(cycles int) {
 	c.Tick(cycles)
 	c.NonSeq = true
-	c.Prefetch.Step(int64(cycles))
 }
 
 func (c *Cpu) String() string {

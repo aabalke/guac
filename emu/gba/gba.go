@@ -121,6 +121,7 @@ func (gba *GBA) Update(stdFps bool) {
 
 func (gba *GBA) Tick(cycles int) {
 	gba.Scheduler.Add(int64(cycles))
+	gba.Mem.Prefetch.Step(int64(cycles))
 }
 
 func (gba *GBA) ToggleMute() bool {

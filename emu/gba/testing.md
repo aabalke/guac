@@ -60,8 +60,8 @@ Additionally, other ARMv5 instructions will fail.
 [Link](https://github.com/hades-emu/Hades-Tests)
 
 👍 Bios Open Bus [12/12]
-❌ Dma Latch [2/4]
-❌ Dma Start Delay [0/8]
+❌ Dma Latch [3/4]
+❌ Dma Start Delay [6/8]
 👍 Timer Basic [10/10]
 
 ### Other
@@ -74,9 +74,9 @@ Requires Official bios for passing tests
 
 👍 Memory tests [1552/1552]
 👍 I/O read tests [130/130]
-❌ Timing tests [1806/2020]
-❌ Timer count-up tests [633/936]
-❌ Timer IRQ tests [52/90]
+👍 Timing tests [2020/2020]
+❌ Timer count-up tests [555/936]
+❌ Timer IRQ tests [36/90]
 👍 Shifter tests [140/140]
 👍 Carry tests [93/93]
 ❌ Multiply long tests [52/72] (matches mgba)
@@ -98,9 +98,9 @@ Requires Official bios for passing tests
 
 ❌ bus: 128kb Boundary
 ❌ dma: burst into tears [0/3]
-❌ dma: force nseq access [0/2]
+👍 dma: force nseq access [2/2]
 👍 dma: latch [3/3]
-👍 dma: start delay [1/1]
+❌ dma: start delay [0/1]
 ❌ halt: halt cnt [0/6]
 ❌ irq: irq delay [0/3]
 ❌ ppu: bgpd
@@ -116,16 +116,12 @@ Requires Official bios for passing tests
 
 ### AGS
 
-❌ Memory XXXXX0000
+👍 Memory
 👍 Lcd
-❌ Timer
-❌ Dma
+👍 Timer
+❌ Dma (priority test)
 👍 Key
 👍 Irq
-
-1. Timer: fails cascade test by off by 1 cycle error. 0x1ff should be 0x200. Not sure on cause.
-2. Dma: Fails Priority test
-3. Memory: Fails EWRAM, IWRQM, PRAM, VRAM and OAM. EWRAM Fails dma test 0x8, and 0x10. Assume others are dma related also.
 
 ### Tonc
 

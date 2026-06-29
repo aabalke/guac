@@ -221,8 +221,24 @@ func (dma *Dma) transfer() int {
 		//cycles = 0
 	)
 
+	accessRom := false
+
 	if dma.isWord {
-		for i := range dma.latched.cnt {
+		for range dma.latched.cnt {
+
+			srcSeq := true
+			dstSeq := true
+
+			if !accessRom {
+				if src >= 0x800_0000 {
+					srcSeq = false
+					accessRom = true
+				} else if dst >= 0x800_0000 {
+					dstSeq = false
+					accessRom = true
+
+				}
+			}
 
 			dma.EepromDma(dma.latched.cnt, dst, src)
 
@@ -231,12 +247,12 @@ func (dma *Dma) transfer() int {
 				tick(1)
 
 			default:
+				dma.Gba.Cpu.ReadCycles(src, 4, true, srcSeq, false)
 				dma.Value = mem.Read32(src)
-				tick(dma.Gba.Cpu.CycleCounterDma(src, 4, i != 0))
 			}
 
+			dma.Gba.Cpu.WriteCycles(dst, 4, true, dstSeq)
 			mem.Write32(dst, dma.Value)
-			tick(dma.Gba.Cpu.CycleCounterDma(dst, 4, i != 0))
 
 			dst = uint32(int(dst) + dma.latched.dstOffset)
 			src = uint32(int(src) + dma.latched.srcOffset)
@@ -244,7 +260,21 @@ func (dma *Dma) transfer() int {
 	} else {
 		var v uint32
 
-		for i := range dma.latched.cnt {
+		for range dma.latched.cnt {
+
+			srcSeq := true
+			dstSeq := true
+
+			if !accessRom {
+				if src >= 0x800_0000 {
+					srcSeq = false
+					accessRom = true
+				} else if dst >= 0x800_0000 {
+					dstSeq = false
+					accessRom = true
+
+				}
+			}
 
 			dma.EepromDma(dma.latched.cnt, dst, src)
 
@@ -261,13 +291,13 @@ func (dma *Dma) transfer() int {
 				tick(1)
 
 			default:
+				dma.Gba.Cpu.ReadCycles(src, 2, true, srcSeq, false)
 				v = mem.Read16(src)
 				dma.Value = v | (v << 16)
-				tick(dma.Gba.Cpu.CycleCounterDma(src, 2, i != 0))
 			}
 
+			dma.Gba.Cpu.WriteCycles(dst, 2, true, dstSeq)
 			mem.Write16(dst, uint16(v))
-			tick(dma.Gba.Cpu.CycleCounterDma(dst, 2, i != 0))
 
 			dst = uint32(int(dst) + dma.latched.dstOffset)
 			src = uint32(int(src) + dma.latched.srcOffset)

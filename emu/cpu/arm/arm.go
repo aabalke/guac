@@ -841,11 +841,6 @@ func (c *Cpu) Block(op uint32) {
 	if rlist == 0 {
 		rlist = 0x8000
 		regCount = 0x10
-
-		// starts at bottom instead
-		if !up {
-			addr -= (regCount << 2) - 4
-		}
 	}
 
 	var (
@@ -896,17 +891,16 @@ func (c *Cpu) Block(op uint32) {
 	)
 
 	if !up {
-		reg = 15
+		pre = !pre
+		addr -= regCount * 4
 	}
+
+	seq := false
 
 	for range 16 {
 
 		if disabled := (rlist>>reg)&1 == 0; disabled {
-			if up {
-				reg++
-			} else {
-				reg--
-			}
+			reg++
 			continue
 		}
 
@@ -933,50 +927,36 @@ func (c *Cpu) Block(op uint32) {
 		}
 
 		if pre {
-			if up {
-				addr += 4
-			} else {
-				addr -= 4
-			}
+			addr += 4
 		}
 
 		if load {
-			*ref = c.Read32(addr)
+			*ref = c.Read32Block(addr, seq)
 		} else {
 			switch reg {
 			case rn:
 
 				if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
-					c.Write32(addr, rnv)
+					c.Write32Block(addr, rnv, seq)
 				} else {
-					c.Write32(addr, wbValue)
+					c.Write32Block(addr, wbValue, seq)
 				}
 
 			case PC:
-				c.Write32(addr, *ref+4)
+				c.Write32Block(addr, *ref+4, seq)
 			default:
-				c.Write32(addr, *ref)
+				c.Write32Block(addr, *ref, seq)
 			}
 		}
 
-		c.BlockTransfer = true
+		seq = true
 
 		if !pre {
-			if up {
-				addr += 4
-			} else {
-				addr -= 4
-			}
+			addr += 4
 		}
 
-		if up {
-			reg++
-		} else {
-			reg--
-		}
+		reg++
 	}
-
-	c.BlockTransfer = false
 
 	if !load {
 		if wb {
@@ -985,6 +965,8 @@ func (c *Cpu) Block(op uint32) {
 
 		return
 	}
+
+	c.idle(1)
 
 	if wb && !rnIncluded {
 		r[rn] = wbValue

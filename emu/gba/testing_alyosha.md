@@ -1,8 +1,8 @@
 # Alyosha Tas Gba Tests
 
-Results generated 2026-06-26T23:15:41-06:00
+Results generated 2026-06-28T22:52:41-06:00
 
-Passing 42/119 35%
+Passing 45/119 37%
 
 👍 DMA\DMA_Mode_Change
 ❌ DMA\DMA_ROM_Fixed
@@ -19,16 +19,16 @@ Passing 42/119 35%
 ❌ Interactions\Internal_Cycle_DMA_IRQ
 ❌ Interactions\Internal_Cycle_DMA_IRQ_7
 ❌ Interactions\Internal_Cycle_DMA_IRQ_Br_pre
-❌ Interactions\Internal_Cycle_DMA_IRQ_Br_pre_tim
+👍 Interactions\Internal_Cycle_DMA_IRQ_Br_pre_tim
 ❌ Interactions\Internal_Cycle_DMA_IRQ_ST
 ❌ Interactions\Internal_Cycle_DMA_IRQ_ST_p3
-👍 Interactions\Internal_Cycle_DMA_IRQ_br
+❌ Interactions\Internal_Cycle_DMA_IRQ_br
 ❌ Interactions\Internal_Cycle_DMA_IRQ_br1_IWRAM
 ❌ Interactions\Internal_Cycle_DMA_IRQ_ldr_IWRAM
 ❌ Interactions\Internal_Cycle_DMA_IRQ_nop_IWRAM
 ❌ Interactions\Internal_Cycle_DMA_MUL_IRQ
 ❌ Interactions\Internal_Cycle_DMA_Mul
-❌ Interactions\Internal_Cycle_DMA_TIM_Br_pre
+👍 Interactions\Internal_Cycle_DMA_TIM_Br_pre
 👍 LDM\LDM_ALU
 👍 LDM\LDM_ALU_IMM
 👍 LDM\LDM_ALU_Store
@@ -86,11 +86,11 @@ Passing 42/119 35%
 👍 ppu\stripes
 ❌ ppu\stripes_x_offset
 ❌ prefetcher\bounday_test_1
-❌ prefetcher\prefetcher_boundary_1
+👍 prefetcher\prefetcher_boundary_1
 👍 prefetcher\prefetcher_boundary_2
 👍 prefetcher\prefetcher_boundary_3
 👍 prefetcher\prefetcher_boundary_4
-❌ prefetcher\prefetcher_branch_thumb
+👍 prefetcher\prefetcher_branch_thumb
 ❌ prefetcher\prefetcher_branch_thumb_2
 ❌ prefetcher\prefetcher_branch_thumb_3
 ❌ prefetcher\prefetcher_branch_thumb_4
