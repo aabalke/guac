@@ -1,0 +1,221 @@
+# keyboard ids come from ebitengine string values.
+# gamepad / controller ids: https://www.w3.org/TR/gamepad/#remapping
+
+[general]
+
+muted           = false
+target_fps      = 60
+show_fps        = false
+init_fullscreen = false
+vsync_enabled   = true
+disable_saves   = false
+integer_scaling = false
+integer_scaling_ratio = 0
+
+# only use this if you load the same game constantly
+# otherwise it would be better to use the cli flags or gui
+# rom_path = "./rom/gb/path.gb"
+
+[general.keyboard]
+select     = ["J", "Enter"]
+return     = ["Backspace"]
+mute       = ["M"]
+pause      = ["P"]
+quit       = ["Q"]
+fullscreen = ["F11"]
+left       = ["A", "ArrowLeft"]
+right      = ["D", "ArrowRight"]
+up         = ["W", "ArrowUp"]
+down       = ["S", "ArrowDown"]
+
+[general.controller]
+select = ["RightRight"]
+return = ["RightBottom"]
+mute   = ["CenterLeft"]
+pause  = ["CenterRight"]
+left   = ["LeftLeft"]
+right  = ["LeftRight"]
+up     = ["LeftTop"]
+down   = ["LeftBottom"]
+
+[ui]
+language = "en"
+
+backdrop_color = "0x0A0A0A"
+menu_background_color = "0xFFFFFF"
+menu_foreground_color = "0x000000"
+menu_secondary_color  = "0xCCCCCC"
+
+[profile]
+# used for performance profiling. Uses go pprof
+# cmd: go tool pprof profile.prof
+# usually 60 ticks per second
+# profiler ignores target fps and runs "unlimited" 
+enabled = false
+file_path = "./profile.prof"
+start_tick = 0
+end_tick = 1000
+
+[gb]
+# Define a 4 color palette to replace greyscale using hex values [lightest...darkest]
+# if invalid input, will fall back to greyscale
+dmg_palette = [ "0xE0F8D0", "0x88C070", "0x346856", "0x081820" ]
+
+[gb.keyboard]
+
+a = ["J"]
+b = ["K"]
+select = ["L"]
+start = ["Semicolon"]
+left = ["A"]
+right = ["D"]
+up = ["W"]
+down = ["S"]
+
+[gb.controller]
+a      = ["RightRight"]
+b      = ["RightBottom"]
+select = ["RightLeft"]
+start  = ["RightTop"]
+left   = ["LeftLeft"]
+right  = ["LeftRight"]
+up     = ["LeftTop"]
+down   = ["LeftBottom"]
+
+[gba]
+
+# many gba games will idle loop until the end of a frame, this optimization
+# replaces these cpu instructions with a halt, leading to a performance increase
+idle_optimize = true
+
+# set between 0x100 - 0x400 to set how often the sound clock is updated
+# lower is more often, which is great for quality
+# higher is better for lower end systems that cannot render sound fast enough
+sound_clock_update_cycles = 0x100
+
+[gba.bios]
+
+#bios_path = "./rom/bios/BIOSGBA.bin"
+direct_boot = true
+
+[gba.keyboard]
+a = ["J"]
+b = ["K"]
+select = ["L"]
+start = ["Semicolon"]
+left = ["A"]
+right = ["D"]
+up = ["W"]
+down = ["S"]
+r = ["Y"]
+l = ["T"]
+
+[gba.controller]
+a      = ["RightRight"]
+b      = ["RightBottom"]
+select = ["RightLeft"]
+start  = ["RightTop"]
+left   = ["LeftLeft"]
+right  = ["LeftRight"]
+up     = ["LeftTop"]
+down   = ["LeftBottom"]
+r = ["FrontTopRight", "FrontBottomRight"]
+l = ["FrontTopLeft", "FrontBottomLeft"]
+
+[nds]
+
+[nds.bios]
+
+# Nds bios is not necessary. The Drastic ARM7/ARM9 BIOS Replacements are provided. If you have your own bios files you can include them here.
+
+#arm7_path = "./rom/bios/bios7.bin"
+#arm9_path = "./rom/bios/bios9.bin"
+
+[nds.screen]
+
+# Hybrid is special mode showing a large screen and both screens to the side.
+# Hybrid cannot be rotated. If Hybrid and sizing is "only bottom", large screen
+# will be bottom and touch input will be on main screen instead of secondary.
+
+layout = "vertical" # "vertical", "horizontal", "Hybrid"
+sizing = "even"     # "even", "only top", "only bottom"
+rotation = 0        # 0, 90, 180, 270
+
+[nds.keyboard]
+a = ["J"]
+b = ["K"]
+select = ["L"]
+start = ["Semicolon"]
+left = ["A"]
+right = ["D"]
+up = ["W"]
+down = ["S"]
+r = ["Y"]
+l = ["T"]
+x = ["U"]
+y = ["I"]
+hinge = ["O"]
+debug = ["M"]
+
+# these will increment through selected screen options.
+layout_toggle = ["F1"]
+sizing_toggle = ["F2"]
+rotation_toggle = ["F3"]
+
+export_scene = ["F4"]
+
+[nds.controller]
+a      = ["RightRight"]
+b      = ["RightBottom"]
+select = ["LeftStick"]
+start  = ["RightStick"]
+left   = ["LeftLeft"]
+right  = ["LeftRight"]
+up     = ["LeftTop"]
+down   = ["LeftBottom"]
+r      = ["FrontTopRight", "FrontBottomRight"]
+l      = ["FrontTopLeft", "FrontBottomLeft"]
+x      = ["RightTop"]
+y      = ["RightLeft"]
+
+[nds.firmware]
+
+#file_path = "./rom/bios/firmware.bin"
+
+# nickname = "guac"
+# message = "This is a message."
+# Gray, Brown, Red, Pink, Orange, Yellow, LimeGreen, Green, DarkGreen, SeaGreen,
+# Turquoise, Blue, DarkBlue, DarkPurple, Violet, Magenta
+# favorite_color = "Pink"
+
+[nds.rtc]
+# real time clock uses your current time, you can add hours to skip to different times of day. ex if real time is 9pm. add 11 hours sets rtc to 8am.
+# additional_hours = 6 
+
+[nds.export]
+# allows 3d scene to exported to obj/mtl file formats.
+# also exports all textures in active scene as pngs
+# useful for debugging, and preservation.
+
+# Obj export is basic and does not support texture blending, texture clamping,
+# repeat, or flipping. It's mostly for meshes.
+directory = "./export/"
+shadow_polygons = false
+
+[nds.jit]
+
+# jit (just in time compilation) converts emulated machine code into native machine code when loops are detected. This increases the speed significantly but can ruin accuracy.
+# jit only supports amd64 (64 bit x86 instruction set)
+# jit only works for nds, gba is too time sensitive at this time
+
+enabled = true
+
+# how many times a loop occurs before jitting
+loop_cnt = 255
+
+# cnt of jit blocks in cache (per cpu)
+block_cnt = 0x1000
+
+# how many instructions to batch at a time (use 16, or 32 for best results)
+# to many will cause crashes and artificants by desyncing cpus from sound and graphics
+batch_inst = 32

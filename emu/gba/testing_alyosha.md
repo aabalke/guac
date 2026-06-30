@@ -1,8 +1,8 @@
 # Alyosha Tas Gba Tests
 
-Results generated 2026-06-28T22:52:41-06:00
+Results generated 2026-06-29T23:05:13-06:00
 
-Passing 45/119 37%
+Passing 51/119 42%
 
 👍 DMA\DMA_Mode_Change
 ❌ DMA\DMA_ROM_Fixed
@@ -21,10 +21,10 @@ Passing 45/119 37%
 ❌ Interactions\Internal_Cycle_DMA_IRQ_Br_pre
 👍 Interactions\Internal_Cycle_DMA_IRQ_Br_pre_tim
 ❌ Interactions\Internal_Cycle_DMA_IRQ_ST
-❌ Interactions\Internal_Cycle_DMA_IRQ_ST_p3
-❌ Interactions\Internal_Cycle_DMA_IRQ_br
+👍 Interactions\Internal_Cycle_DMA_IRQ_ST_p3
+👍 Interactions\Internal_Cycle_DMA_IRQ_br
 ❌ Interactions\Internal_Cycle_DMA_IRQ_br1_IWRAM
-❌ Interactions\Internal_Cycle_DMA_IRQ_ldr_IWRAM
+👍 Interactions\Internal_Cycle_DMA_IRQ_ldr_IWRAM
 ❌ Interactions\Internal_Cycle_DMA_IRQ_nop_IWRAM
 ❌ Interactions\Internal_Cycle_DMA_MUL_IRQ
 ❌ Interactions\Internal_Cycle_DMA_Mul
@@ -58,10 +58,10 @@ Passing 45/119 37%
 👍 irq\BL_1
 ❌ irq\BL_IRQ
 ❌ irq\BL_IRQ_2
-❌ irq\BL_IRQ_3
-❌ irq\BL_IRQ_R14
+👍 irq\BL_IRQ_3
+👍 irq\BL_IRQ_R14
 👍 irq\IE
-❌ irq\IF
+👍 irq\IF
 👍 irq\IF_Timer
 ❌ irq\IRQ_sub
 ❌ irq\IRQ_sub_2

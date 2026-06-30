@@ -1,11 +1,7 @@
 package gba
 
-import (
-	"github.com/aabalke/guac/emu/cpu"
-)
-
 type Key struct {
-	Irq     *cpu.Irq
+	Irq     *Irq
 	Input   uint16
 	Cnt     uint16
 	Enabled bool

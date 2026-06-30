@@ -335,20 +335,12 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 	case 0x136, 0x137, 0x138, 0x139, 0x142, 0x143, 0x15A, 0x15B:
 		return 0
 
-	case 0x200:
-		return uint8(m.GBA.Irq.IE)
-	case 0x201:
-		return uint8(m.GBA.Irq.IE >> 8)
-	case 0x202:
-		return uint8(m.GBA.Irq.IF)
-	case 0x203:
-		return uint8(m.GBA.Irq.IF >> 8)
+	case 0x200, 0x201, 0x202, 0x203, 0x208:
+		return m.GBA.Irq.Read(addr)
 
 	case 0x204, 0x205, 0x206, 0x207:
 		return m.Waitstate.Read(addr)
 
-	case 0x208:
-		return m.GBA.Irq.ReadIME()
 	case 0x209, 0x20A, 0x20B, 0x301, 0x302, 0x303, 0x304:
 		return 0
 	}
@@ -417,10 +409,8 @@ func (m *Memory) Read32(addr uint32) uint32 {
 	//	return binary.LittleEndian.Uint32((*[4]uint8)(ptr)[:])
 	//}
 
-	v := uint32(m.Read(addr + 0))
-	v |= uint32(m.Read(addr+1)) << 8
-	v |= uint32(m.Read(addr+2)) << 16
-	v |= uint32(m.Read(addr+3)) << 24
+	v := uint32(m.Read16(addr + 0))
+	v |= uint32(m.Read16(addr+2)) << 16
 	return v
 }
 
@@ -532,21 +522,12 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 		m.GBA.Keypad.Write(addr&3, v)
 		return
 
-	case 0x200:
-		m.GBA.Irq.WriteIE(v, 0)
-	case 0x201:
-		m.GBA.Irq.WriteIE(v, 1)
-	case 0x202:
-		m.GBA.Irq.WriteIF(v, 0)
-	case 0x203:
-		m.GBA.Irq.WriteIF(v, 1)
+	case 0x200, 0x201, 0x202, 0x203, 0x208:
+		m.GBA.Irq.Write8(addr, v)
+
 	case 0x204, 0x205, 0x206, 0x207:
 		m.Waitstate.Write(addr, v)
 
-	// IME
-	case 0x208:
-		m.GBA.Irq.WriteIME(v)
-		m.IO[addr] = v
 	case 0x209, 0x20A, 0x20B:
 		return
 
@@ -594,8 +575,12 @@ func (m *Memory) Write16(addr uint32, v uint16) {
 	case 0x400_0108:
 		m.GBA.Timers[2].Write16(v)
 		return
-	case 0x400_010c:
+	case 0x400_010C:
 		m.GBA.Timers[3].Write16(v)
+		return
+
+	case 0x400_0200, 0x400_0202, 0x400_0208:
+		m.GBA.Irq.Write16(addr&0xFFFF, v)
 		return
 	}
 
@@ -627,10 +612,8 @@ func (m *Memory) Write32(addr uint32, v uint32) {
 		return
 	}
 
-	m.Write(addr+0, uint8(v), false)
-	m.Write(addr+1, uint8(v>>8), false)
-	m.Write(addr+2, uint8(v>>16), false)
-	m.Write(addr+3, uint8(v>>24), false)
+	m.Write16(addr+0, uint16(v))
+	m.Write16(addr+2, uint16(v>>16))
 }
 
 func CheckEeprom(gba *GBA, addr uint32) bool {

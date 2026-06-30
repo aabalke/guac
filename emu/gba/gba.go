@@ -2,8 +2,6 @@ package gba
 
 import (
 	"github.com/aabalke/guac/config"
-	"github.com/aabalke/guac/emu/cpu"
-	"github.com/aabalke/guac/emu/cpu/arm"
 	"github.com/aabalke/guac/emu/gba/apu"
 	"github.com/aabalke/guac/emu/gba/cart"
 	"github.com/aabalke/guac/utils"
@@ -12,7 +10,6 @@ import (
 )
 
 const (
-	PC            = 15
 	SCREEN_WIDTH  = 240
 	SCREEN_HEIGHT = 160
 
@@ -31,7 +28,7 @@ const (
 )
 
 type GBA struct {
-	Cpu               *arm.Cpu
+	Cpu               *Cpu
 	Scheduler         *Scheduler
 	Mem               *Memory
 	Cartridge         *cart.Cartridge
@@ -40,7 +37,7 @@ type GBA struct {
 	Dma               [4]*Dma
 	Apu               *apu.Apu
 	Keypad            Key
-	Irq               cpu.Irq
+	Irq               *Irq
 	InstInjectionFunc func(op uint32)
 
 	Frame uint64
@@ -56,17 +53,17 @@ type GBA struct {
 
 func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba := &GBA{
-		Pixels: make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
-		Image:  ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
-		Apu:    apu.NewApu(ctx, CPU_SPEED, SND_FREQ, SND_SAMPLES),
+		Pixels:    make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
+		Image:     ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
+		Apu:       apu.NewApu(ctx, CPU_SPEED, SND_FREQ, SND_SAMPLES),
+		Scheduler: NewScheduler(),
 	}
 
 	gba.PPU = &PPU{gba: gba}
-	gba.Irq = cpu.Irq{}
+	gba.Irq = NewIrq(gba.Scheduler)
 	gba.Mem = NewMemory(gba)
-	gba.Keypad = Key{Irq: &gba.Irq, Input: 0x3FF}
-	gba.Cpu = arm.NewCpu(false, gba.Mem, &gba.Irq, &gba.Mem.Waitstate, gba.Mem.Prefetch, gba.Tick, gba)
-	gba.Scheduler = NewScheduler()
+	gba.Cpu = NewCpu(false, gba.Mem, gba.Irq)
+	gba.Keypad = Key{Irq: gba.Irq, Input: 0x3FF}
 
 	for i := range 4 {
 		gba.Timers[i] = NewTimer(gba, i)
@@ -163,28 +160,28 @@ func (gba *GBA) Draw(screen *ebiten.Image) {
 
 func (gba *GBA) DirectBoot() {
 	reg := &gba.Cpu.Reg
-	BANK_ID := arm.BANK_ID
+	BANK_ID := BANK_ID
 
 	gba.Cpu.Irq.IME = true
 
 	reg.CPSR.Set(0x1F)
-	reg.SPSR[BANK_ID[arm.MODE_IRQ]].Set(0x10)
+	reg.SPSR[BANK_ID[MODE_IRQ]].Set(0x10)
 	reg.R[0] = 0x0CA5
 
 	reg.R[PC] = 0x800_0000
-	reg.R[arm.LR] = 0x800_0000
-	reg.LR[BANK_ID[arm.MODE_SYS]] = 0x800_0000
-	reg.LR[BANK_ID[arm.MODE_USR]] = 0x800_0000
-	reg.LR[BANK_ID[arm.MODE_IRQ]] = 0x800_0000
-	reg.LR[BANK_ID[arm.MODE_SWI]] = 0x800_0000
+	reg.R[LR] = 0x800_0000
+	reg.LR[BANK_ID[MODE_SYS]] = 0x800_0000
+	reg.LR[BANK_ID[MODE_USR]] = 0x800_0000
+	reg.LR[BANK_ID[MODE_IRQ]] = 0x800_0000
+	reg.LR[BANK_ID[MODE_SWI]] = 0x800_0000
 
-	reg.R[arm.SP] = 0x300_7F00
-	reg.SP[BANK_ID[arm.MODE_SYS]] = 0x300_7F00
-	reg.SP[BANK_ID[arm.MODE_USR]] = 0x300_7F00
-	reg.SP[BANK_ID[arm.MODE_IRQ]] = 0x300_7FA0
-	reg.SP[BANK_ID[arm.MODE_SWI]] = 0x300_7FE0
+	reg.R[SP] = 0x300_7F00
+	reg.SP[BANK_ID[MODE_SYS]] = 0x300_7F00
+	reg.SP[BANK_ID[MODE_USR]] = 0x300_7F00
+	reg.SP[BANK_ID[MODE_IRQ]] = 0x300_7FA0
+	reg.SP[BANK_ID[MODE_SWI]] = 0x300_7FE0
 }
 
 func (gba *GBA) BiosBoot() {
-	gba.Cpu.Exception(arm.VEC_RESET, arm.MODE_SYS)
+	gba.Cpu.Exception(VEC_RESET, MODE_SYS)
 }
