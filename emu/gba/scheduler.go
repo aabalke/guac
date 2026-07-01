@@ -32,7 +32,7 @@ type ScheduledEvent struct {
 	Event     Event
 	Priority  int
 	InitCycle int64
-	Func      func(int64, any) bool
+	Func      func(int64, any)
 	Args      any
 }
 
@@ -44,11 +44,11 @@ func (s *Scheduler) Now() int64 {
 	return s.CurrentCycle
 }
 
-func (s *Scheduler) schedule(e Event, priority int, cyclesUntil int64, f func(int64, any) bool, args any) {
+func (s *Scheduler) schedule(e Event, priority int, cyclesUntil int64, f func(int64, any), args any) {
 	s.scheduleAt(e, priority, s.Now()+cyclesUntil, f, args)
 }
 
-func (s *Scheduler) scheduleAt(e Event, priority int, initCycle int64, f func(int64, any) bool, args any) {
+func (s *Scheduler) scheduleAt(e Event, priority int, initCycle int64, f func(int64, any), args any) {
 	if s.Cnt >= len(s.Events) {
 		panic("gba: scheduler reached hard limit")
 	}

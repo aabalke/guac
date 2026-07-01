@@ -1,12 +1,11 @@
 package gba
 
-func (gba *GBA) AudioSampleEvent(overshoot int64, arg any) bool {
+func (gba *GBA) AudioSampleEvent(late int64, arg any) {
 	gba.Apu.SoundClock()
-	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, CYCLES_PER_SND_GEN-overshoot, gba.AudioSampleEvent, nil)
-	return false
+	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, CYCLES_PER_SND_GEN-late, gba.AudioSampleEvent, nil)
 }
 
-func (gba *GBA) HblankEvent(overshoot int64, arg any) bool {
+func (gba *GBA) HblankEvent(late int64, arg any) {
 	dispstat := &gba.Mem.Dispstat
 	dispstat.SetHBlank(true)
 	if (*dispstat>>4)&1 != 0 {
@@ -26,11 +25,9 @@ func (gba *GBA) HblankEvent(overshoot int64, arg any) bool {
 		gba.PPU.Backgrounds[3].BgAffineUpdate()
 		gba.checkDmas(DMA_MODE_HBL)
 	}
-
-	return false
 }
 
-func (gba *GBA) ScanlineEndEvent(overshoot int64, arg any) bool {
+func (gba *GBA) ScanlineEndEvent(late int64, arg any) {
 	dispstat := &gba.Mem.Dispstat
 	vcount := &gba.Mem.IO[6]
 
@@ -60,12 +57,11 @@ func (gba *GBA) ScanlineEndEvent(overshoot int64, arg any) bool {
 		gba.Irq.SetIRQ(2)
 	}
 
-	gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, CYCLES_SCANLINE-overshoot, gba.ScanlineEndEvent, nil)
-	gba.Scheduler.schedule(EVENT_HBK, 1, CYCLES_HDRAW-overshoot, gba.HblankEvent, nil)
-	return false
+	gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, CYCLES_SCANLINE-late, gba.ScanlineEndEvent, nil)
+	gba.Scheduler.schedule(EVENT_HBK, 1, CYCLES_HDRAW-late, gba.HblankEvent, nil)
 }
 
-func (gba *GBA) FrameEndEvent(overshoot int64, arg any) bool {
+func (gba *GBA) FrameEndEvent(late int64, arg any) {
 	dispstat := &gba.Mem.Dispstat
 
 	gba.Apu.Play(gba.Muted, true)
@@ -82,7 +78,5 @@ func (gba *GBA) FrameEndEvent(overshoot int64, arg any) bool {
 	gba.PPU.Backgrounds[2].BgAffineReset()
 	gba.PPU.Backgrounds[3].BgAffineReset()
 
-	gba.Scheduler.schedule(EVENT_END_FRAME, 1, CYCLES_FRAME-overshoot, gba.FrameEndEvent, nil)
-
-	return true
+	gba.Scheduler.schedule(EVENT_END_FRAME, 1, CYCLES_FRAME-late, gba.FrameEndEvent, nil)
 }

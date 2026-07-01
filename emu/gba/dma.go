@@ -146,7 +146,7 @@ func (dma *Dma) Write(addr uint32, v uint8) {
 	}
 }
 
-func (dma *Dma) Start(late int64, _ any) bool {
+func (dma *Dma) Start(late int64, _ any) {
 	var (
 		src       = dma.Src
 		dst       = dma.Dst
@@ -203,8 +203,6 @@ func (dma *Dma) Start(late int64, _ any) bool {
 	dma.latched.dstOffset = dstOffset
 
 	dma.EepromDma(dma.latched.cnt, dst, src)
-
-	return false
 }
 
 func (dma *Dma) disable() {

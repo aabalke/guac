@@ -180,10 +180,6 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 
 	wins := &gba.PPU.Windows
 
-	if dispcnt.Mode < 3 {
-		return
-	}
-
 	renderPixel := func(x uint32) {
 		bldPal := NewBlendPalette(x, &gba.PPU.Blend, gba)
 		index := (x + (y * SCREEN_WIDTH)) * 4

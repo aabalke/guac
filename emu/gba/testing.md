@@ -68,7 +68,7 @@ Additionally, other ARMv5 instructions will fail.
  
 👍 deadbody Cpu Test
 
-### MGBA Test Suite
+### MGBA Test Suite r93 2a8eca1
 
 Requires Official bios for passing tests
 
@@ -79,12 +79,12 @@ Requires Official bios for passing tests
 👍 Timer IRQ tests [90/90]
 👍 Shifter tests [140/140]
 👍 Carry tests [93/93]
-❌ Multiply long tests [52/72] (matches mgba)
+❌ Multiply long tests [52/72]
 👍 BIOS math tests [615/615]
-👍 DMA tests [1256/1256]
+👍 DMA tests [1244/1244]
 ❌ SIO register R/W tests [25/90]
 ❌ SIO timing tests [0/4]
-❌ Misc. edge case tests [3/10]
+❌ Misc. edge case tests [4/12]
 ❌ Video tests
     👍 Basic Mode 3
     👍 Basic Mode 4
@@ -92,7 +92,7 @@ Requires Official bios for passing tests
     👍 Layer toggle
     ❌ Layer toggle 2
     ❌ OAM Update Delay
-    ❌ Window offscreen reset (matches mgba)
+    ❌ Window offscreen reset
 
 ### NBA-EMU Test Suite
 

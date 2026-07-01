@@ -140,6 +140,7 @@ func (c *Cpu) Step() {
 		if !c.Reg.CPSR.I {
 
 			c.Fetch()
+
 			c.Exception(VEC_IRQ, MODE_IRQ)
 
 			if c.P.Execute.Thumb {
@@ -328,20 +329,17 @@ func (c *Cpu) Read32(addr uint32) uint32 {
 
 func (c *Cpu) Read32Block(addr uint32, seq bool) uint32 {
 	c.Cycles(addr, 4, false, seq, false)
-	v := c.Mem.Read32(addr)
-	return v
+	return c.Mem.Read32(addr)
 }
 
 func (c *Cpu) InstRead16(addr uint32, seq bool) uint32 {
 	c.Cycles(addr, 2, false, seq, true)
-	v := c.Mem.Read16(addr)
-	return v
+	return c.Mem.Read16(addr)
 }
 
 func (c *Cpu) InstRead32(addr uint32, seq bool) uint32 {
 	c.Cycles(addr, 4, false, seq, true)
-	v := c.Mem.Read32(addr)
-	return v
+	return c.Mem.Read32(addr)
 }
 
 func (c *Cpu) Cycles(addr, width uint32, dma, seq, inst bool) {
@@ -353,11 +351,9 @@ func (c *Cpu) Cycles(addr, width uint32, dma, seq, inst bool) {
 
 	switch addr >> 24 {
 	case 2:
-		cycles := 3 << (width >> 2)
-		c.Tick(cycles)
+		c.Tick(3 << (width >> 2))
 	case 5, 6:
-		cycles := 1 << (width >> 2)
-		c.Tick(cycles)
+		c.Tick(1 << (width >> 2))
 	case 8, 9, 10, 11, 12, 13:
 
 		if addr&0x1FFFF == 0 {
@@ -492,19 +488,15 @@ const (
 )
 
 func (c *Cpu) Exception(addr uint32, mode uint32) {
-	var (
-		cpsr = &c.Reg.CPSR
-		reg  = &c.Reg
-		r    = &c.Reg.R
-	)
+	cpsr := &c.Reg.CPSR
 
 	c.ModeSwitch(cpsr.Mode, mode)
 
 	i := BANK_ID[mode]
-	reg.SPSR[i] = *cpsr
+	c.Reg.SPSR[i] = *cpsr
 
-	r[LR] = c.P.Decode.Addr
-	reg.LR[i] = c.P.Decode.Addr
+	c.Reg.R[LR] = c.P.Decode.Addr
+	c.Reg.LR[i] = c.P.Decode.Addr
 
 	cpsr.Mode = mode
 	cpsr.T = false
@@ -513,17 +505,11 @@ func (c *Cpu) Exception(addr uint32, mode uint32) {
 		cpsr.F = true
 	}
 
-	r[PC] = addr
+	c.Reg.R[PC] = addr
 	c.P.Reload = true
 }
 
 func (c *Cpu) ExitException(mode uint32) {
-	var (
-		cpsr = &c.Reg.CPSR
-		reg  = &c.Reg
-	)
-
-	*cpsr = reg.SPSR[BANK_ID[mode]]
-
-	c.ModeSwitch(mode, cpsr.Mode)
+	c.Reg.CPSR = c.Reg.SPSR[BANK_ID[mode]]
+	c.ModeSwitch(mode, c.Reg.CPSR.Mode)
 }

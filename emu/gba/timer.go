@@ -66,41 +66,31 @@ func (t *Timer) Write(idx int, v uint8) {
 func (t *Timer) Write16(v uint16) {
 	// write16 Control is identical to Write8
 
-	t.Gba.Scheduler.schedule(EVENT_TIMER_RELOAD, 1, 1, t.WriteEvent16, v)
-}
-
-func (t *Timer) WriteEvent16(late int64, argz any) bool {
-	v := argz.(uint16)
-
-	t.ReloadEventLo(late, uint8(v))
-	t.ReloadEventHi(late, uint8(v>>8))
-	return false
+	t.Gba.Scheduler.schedule(EVENT_TIMER_RELOAD, 1, 1, func(late int64, a any) {
+		v := a.(uint16)
+		t.ReloadEventLo(late, uint8(v))
+		t.ReloadEventHi(late, uint8(v>>8))
+	}, v)
 }
 
 func (t *Timer) Write32(v uint32) {
-	t.Gba.Scheduler.schedule(EVENT_TIMER_CONTROL, 1, 1, t.WriteEvent32, v)
+	t.Gba.Scheduler.schedule(EVENT_TIMER_CONTROL, 1, 1, func(late int64, a any) {
+		v := a.(uint32)
+		t.ReloadEventLo(late, uint8(v))
+		t.ReloadEventHi(late, uint8(v>>8))
+		t.ControlEvent(late, uint8(v>>16))
+	}, v)
 }
 
-func (t *Timer) WriteEvent32(late int64, argz any) bool {
-	v := argz.(uint32)
-
-	t.ReloadEventLo(late, uint8(v))
-	t.ReloadEventHi(late, uint8(v>>8))
-	t.ControlEvent(late, uint8(v>>16))
-	return false
-}
-
-func (t *Timer) ReloadEventLo(_ int64, argz any) bool {
+func (t *Timer) ReloadEventLo(_ int64, argz any) {
 	t.Reload = (t.Reload &^ 0xFF) | uint16(argz.(uint8))
-	return false
 }
 
-func (t *Timer) ReloadEventHi(_ int64, argz any) bool {
+func (t *Timer) ReloadEventHi(_ int64, argz any) {
 	t.Reload = (t.Reload & 0xFF) | (uint16(argz.(uint8)) << 8)
-	return false
 }
 
-func (t *Timer) ControlEvent(late int64, argz any) bool {
+func (t *Timer) ControlEvent(late int64, argz any) {
 	v := argz.(uint8)
 
 	if t.Running {
@@ -120,7 +110,7 @@ func (t *Timer) ControlEvent(late int64, argz any) bool {
 	t.Enabled = t.Cnt&0x80 != 0
 
 	if !t.Enabled {
-		return false
+		return
 	}
 
 	offset := (t.Gba.Scheduler.Now() - late) & ((int64(1) << t.FreqShift) - 1)
@@ -140,7 +130,6 @@ func (t *Timer) ControlEvent(late int64, argz any) bool {
 			t.Start(offset + late - 1)
 		}
 	}
-	return false
 }
 
 func (t *Timer) Start(cycles int64) {
@@ -181,10 +170,9 @@ func (t *Timer) Stop(late int64) {
 	t.Running = false
 }
 
-func (t *Timer) Overflow(late int64, _ any) bool {
+func (t *Timer) Overflow(late int64, _ any) {
 	t._Overflow(late)
 	t.Start(late)
-	return false
 }
 
 func (t *Timer) _Overflow(late int64) {

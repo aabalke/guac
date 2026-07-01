@@ -88,7 +88,7 @@ func (i *Irq) SetIRQ(irq uint32) {
 	i.sch.schedule(EVENT_IRQ_SET, 0, 1, i.OnWrite, nil)
 }
 
-func (i *Irq) OnWrite(late int64, argz any) bool {
+func (i *Irq) OnWrite(late int64, argz any) {
 	i.IF = i.pendingIF
 	i.IE = i.pendingIE
 	i.IME = i.pendingIME
@@ -104,16 +104,12 @@ func (i *Irq) OnWrite(late int64, argz any) bool {
 	if i.IrqLine != irqLineNew {
 		i.sch.schedule(EVENT_IRQ_SET, 0, 2, i.UpdateIRQLine, irqLineNew)
 	}
-
-	return false
 }
 
-func (i *Irq) UpdateIEAndIF(late int64, argz any) bool {
+func (i *Irq) UpdateIEAndIF(late int64, argz any) {
 	i.IrqAvailable = argz.(bool)
-	return false
 }
 
-func (i *Irq) UpdateIRQLine(late int64, argz any) bool {
+func (i *Irq) UpdateIRQLine(late int64, argz any) {
 	i.IrqLine = argz.(bool)
-	return false
 }
