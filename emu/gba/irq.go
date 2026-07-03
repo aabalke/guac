@@ -26,6 +26,8 @@ type Irq struct {
 	IrqAvailable         bool
 	IrqLine              bool
 
+	CpuIrqLine *bool
+
 	// IdleIrq uint32
 }
 
@@ -103,6 +105,7 @@ func (i *Irq) OnWrite(late int64, argz any) {
 
 	if i.IrqLine != irqLineNew {
 		i.sch.schedule(EVENT_IRQ_SET, 0, 2, i.UpdateIRQLine, irqLineNew)
+		i.IrqLine = irqLineNew
 	}
 }
 
@@ -111,5 +114,5 @@ func (i *Irq) UpdateIEAndIF(late int64, argz any) {
 }
 
 func (i *Irq) UpdateIRQLine(late int64, argz any) {
-	i.IrqLine = argz.(bool)
+	*i.CpuIrqLine = argz.(bool)
 }

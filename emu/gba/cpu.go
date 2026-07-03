@@ -3,28 +3,23 @@ package gba
 import (
 	"fmt"
 	"strings"
-	"unsafe"
 )
 
 type Cpu struct {
-	P         Pipeline
-	Reg       Reg
-	Mem       *Memory
-	Irq       *Irq
-	Tick      func(int)
-	CheckDmas func()
-	Waitstate *Waitstate
-	Prefetch  *Prefetch
+	P          Pipeline
+	Reg        Reg
+	Mem        *Memory
+	Irq        *Irq
+	Tick       func(int)
+	CheckDmas  func() int64
+	Waitstate  *Waitstate
+	Prefetch   *Prefetch
+	Halted     bool
+	NonSeq     bool
+	LastWasDma bool
+	IrqLine    bool
 
-	PcPtr    unsafe.Pointer
-	PcOff    int
-	BranchPc uint32
-
-	LowVector   bool
-	Halted      bool
-	IsBranching bool
-	NonSeq      bool
-	LastWasDma  bool
+	Parr int64
 }
 
 type Pipeline struct {
@@ -114,17 +109,15 @@ func NewCpu(jitEnabled bool, m *Memory, irq *Irq) *Cpu {
 	c := &Cpu{
 		Mem:       m,
 		Irq:       irq,
-		LowVector: true,
 		Waitstate: &m.Waitstate,
 		Prefetch:  m.Prefetch,
 		Tick:      m.GBA.Tick,
 		CheckDmas: m.GBA.CheckDmas,
+		NonSeq:    true,
 	}
 
-	// skip bios
 	c.Irq.IME = true
 	c.P.Reload = true
-	c.NonSeq = true
 
 	return c
 }
@@ -134,7 +127,7 @@ func (c *Cpu) Step() {
 		c.Reload()
 	}
 
-	if c.Irq.IrqLine {
+	if c.IrqLine {
 		c.Halted = false
 
 		if !c.Reg.CPSR.I {
@@ -269,17 +262,13 @@ func (c *Cond) Set(v uint32) {
 }
 
 func (cpu *Cpu) ToggleThumb() {
-	r := &cpu.Reg.R
-	cpsr := &cpu.Reg.CPSR
+	cpu.Reg.CPSR.T = cpu.Reg.R[15]&1 != 0
 
-	cpsr.T = r[PC]&1 != 0
-
-	if cpsr.T {
-		r[PC] &^= 1
+	if cpu.Reg.CPSR.T {
+		cpu.Reg.R[15] &^= 1
 		return
 	}
-
-	r[PC] &^= 3
+	cpu.Reg.R[15] &^= 3
 }
 
 func (c *Cpu) Write8(addr uint32, v uint8) {
@@ -346,8 +335,12 @@ func (c *Cpu) Cycles(addr, width uint32, dma, seq, inst bool) {
 	if dma {
 		c.LastWasDma = true
 	} else {
-		c.CheckDmas()
+		if c.Mem.GBA.IsRunning() {
+			c.CheckDmas()
+		}
 	}
+
+	c.Parr = 0
 
 	switch addr >> 24 {
 	case 2:
@@ -400,8 +393,16 @@ func idleMul(rs uint32, sign bool) int {
 }
 
 func (c *Cpu) idle(cycles int) {
-	c.Tick(cycles)
-	c.NonSeq = true
+	if c.Mem.GBA.IsRunning() {
+		c.Parr = c.CheckDmas()
+	}
+
+	if c.Parr == 0 {
+		c.Tick(cycles)
+		c.NonSeq = true
+	} else {
+		c.Parr--
+	}
 }
 
 func (c *Cpu) String() string {

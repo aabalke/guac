@@ -13,6 +13,7 @@ func (cpu *Cpu) DecodeARM(op uint32) {
 
 	default:
 		if !cpu.Reg.CPSR.CheckCond(cond) {
+			cpu.NonSeq = false
 			return
 		}
 	}

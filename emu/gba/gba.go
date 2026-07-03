@@ -64,6 +64,7 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba.Mem = NewMemory(gba)
 	gba.Cpu = NewCpu(false, gba.Mem, gba.Irq)
 	gba.Keypad = Key{Irq: gba.Irq, Input: 0x3FF}
+	gba.Irq.CpuIrqLine = &gba.Cpu.IrqLine
 
 	for i := range 4 {
 		gba.Timers[i] = NewTimer(gba, i)

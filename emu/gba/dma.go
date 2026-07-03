@@ -142,6 +142,7 @@ func (dma *Dma) Write(addr uint32, v uint8) {
 		if prev && !dma.Enabled {
 			dma.disable()
 			dma.Gba.Scheduler.cancel(EVENTS[dma.Idx])
+			return
 		}
 	}
 }
@@ -208,6 +209,8 @@ func (dma *Dma) Start(late int64, _ any) {
 func (dma *Dma) disable() {
 	dma.Enabled = false
 	dma.Control &^= 0x8000
+	dma.Active = false
+	isDmas &^= 1 << dma.Idx
 }
 
 func (dma *Dma) transfer() {
@@ -322,10 +325,12 @@ func (gba *GBA) checkDmas(mode uint8) {
 	}
 }
 
-func (gba *GBA) CheckDmas() {
-	if isDmas == 0 {
-		return
-	}
+func (gba *GBA) IsRunning() bool {
+	return isDmas != 0
+}
+
+func (gba *GBA) CheckDmas() int64 {
+	start := gba.Scheduler.CurrentCycle
 
 	gba.Tick(1)
 
@@ -336,6 +341,8 @@ func (gba *GBA) CheckDmas() {
 	}
 
 	gba.Tick(1)
+
+	return gba.Scheduler.CurrentCycle - start
 }
 
 func (dma *Dma) EepromDma(count, dst, src uint32) {

@@ -824,6 +824,7 @@ func (cpu *Cpu) ThumbJumpCalls(op uint16) {
 	r := &cpu.Reg.R
 
 	if !cpu.Reg.CPSR.CheckCond(uint32(op>>8) & 0xF) {
+		cpu.NonSeq = false
 		return
 	}
 
