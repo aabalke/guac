@@ -109,9 +109,9 @@ func (gba *GBA) Update(stdFps bool) {
 			gba.Cpu.Halted = false
 		}
 
-		if gba.InstInjectionFunc != nil {
-			gba.InstInjectionFunc(gba.Cpu.P.Execute.Op)
-		}
+		//if gba.InstInjectionFunc != nil {
+		//	gba.InstInjectionFunc(gba.Cpu.Op[0])
+		//}
 
 		gba.Cpu.Step()
 	}
@@ -167,7 +167,7 @@ func (gba *GBA) DirectBoot() {
 
 	reg.CPSR.Set(0x1F)
 	reg.SPSR[BANK_ID[MODE_IRQ]].Set(0x10)
-	reg.R[0] = 0x0CA5
+	//reg.R[0] = 0x0CA5
 
 	reg.R[PC] = 0x800_0000
 	reg.R[LR] = 0x800_0000
@@ -181,6 +181,10 @@ func (gba *GBA) DirectBoot() {
 	reg.SP[BANK_ID[MODE_USR]] = 0x300_7F00
 	reg.SP[BANK_ID[MODE_IRQ]] = 0x300_7FA0
 	reg.SP[BANK_ID[MODE_SWI]] = 0x300_7FE0
+
+	gba.Cpu.Op[0] = 0xF000_0000
+	gba.Cpu.Op[1] = 0xF000_0000
+	gba.Cpu.NonSeq = true
 }
 
 func (gba *GBA) BiosBoot() {

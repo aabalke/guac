@@ -1,10 +1,5 @@
 package gba
 
-import (
-	"fmt"
-	"strings"
-)
-
 type Cpu struct {
 	P          Pipeline
 	Reg        Reg
@@ -14,26 +9,23 @@ type Cpu struct {
 	CheckDmas  func() int64
 	Waitstate  *Waitstate
 	Prefetch   *Prefetch
+	Op         [2]uint32
 	Halted     bool
 	NonSeq     bool
 	LastWasDma bool
 	IrqLine    bool
+	Reloaded   bool
 
 	Parr int64
 }
 
-type Pipeline struct {
-	Execute Inst
-	Decode  Inst
-	Fetch   Inst
-	Reload  bool
-}
+const (
+	EXECUTE = iota
+	DECODE
+	FETCH
+)
 
-type Inst struct {
-	Addr  uint32
-	Op    uint32
-	Thumb bool
-}
+type Pipeline struct{}
 
 const (
 	SP = 13
@@ -117,89 +109,108 @@ func NewCpu(jitEnabled bool, m *Memory, irq *Irq) *Cpu {
 	}
 
 	c.Irq.IME = true
-	c.P.Reload = true
 
 	return c
 }
 
 func (c *Cpu) Step() {
-	if c.P.Reload {
-		c.Reload()
-	}
-
 	if c.IrqLine {
 		c.Halted = false
 
 		if !c.Reg.CPSR.I {
 
-			c.Fetch()
+			var (
+				cpsr  = &c.Reg.CPSR
+				thumb = cpsr.T
+				addr  = uint32(VEC_IRQ)
+				mode  = uint32(MODE_IRQ)
+				seq   = !c.NonSeq
+			)
 
-			c.Exception(VEC_IRQ, MODE_IRQ)
+			c.NonSeq = false
 
-			if c.P.Execute.Thumb {
-				c.Reg.R[14] += 2
+			if thumb {
+				c.InstRead16(c.Reg.R[15], seq)
+			} else {
+				c.InstRead32(c.Reg.R[15], seq)
 			}
 
-			if c.P.Reload {
-				c.Reload()
+			c.ModeSwitch(cpsr.Mode, mode)
+
+			i := BANK_ID[mode]
+			c.Reg.SPSR[i] = *cpsr
+
+			if thumb {
+				c.Reg.R[LR] = c.Reg.R[15]
+				c.Reg.LR[i] = c.Reg.R[15]
+
+			} else {
+				c.Reg.R[LR] = c.Reg.R[15] - 4
+				c.Reg.LR[i] = c.Reg.R[15] - 4
+
 			}
+
+			cpsr.Mode = mode
+			cpsr.T = false
+			cpsr.I = true
+
+			c.Reg.R[PC] = addr
+
+			c.Reload32()
 		}
 	}
 
-	c.Fetch()
+	inst := c.Op[0]
+	//fmt.Printf("OP %08X %08X PC %08X SCH %08X\n", c.P.Op[0], c.P.Op[1], c.Reg.R[15], c.Mem.GBA.Scheduler.Now())
+	////fmt.Printf("SP %08X %08X\n", c.Reg.R[PC], c.P.Op[FETCH])
 
-	if c.P.Execute.Thumb {
-		c.DecodeTHUMB(uint16(c.P.Execute.Op))
-	} else {
-		c.DecodeARM(c.P.Execute.Op)
-	}
-}
+	//if V[15] > 300000 {
+	//	os.Exit(0)
+	//}
 
-func (c *Cpu) Fetch() {
-	c.P.Execute = c.P.Decode
-	c.P.Decode = c.P.Fetch
+	//V[15]++
 
 	seq := !c.NonSeq
 	c.NonSeq = false
 
 	if c.Reg.CPSR.T {
-		c.Reg.R[15] = (c.Reg.R[15] + 2) &^ 1
-		c.P.Fetch.Op = c.InstRead16(c.Reg.R[15], seq)
+
+		c.Op[0] = c.Op[1]
+		c.Op[1] = c.InstRead16(c.Reg.R[15], seq)
+
+		c.DecodeTHUMB(uint16(inst))
+		if !c.Reloaded {
+			c.Reg.R[15] += 2
+		}
+
 	} else {
-		c.Reg.R[15] = (c.Reg.R[15] + 4) &^ 3
-		c.P.Fetch.Op = c.InstRead32(c.Reg.R[15], seq)
+
+		c.Op[0] = c.Op[1]
+		c.Op[1] = c.InstRead32(c.Reg.R[15], seq)
+		c.DecodeARM(inst)
+
+		if !c.Reloaded {
+			c.Reg.R[15] += 4
+		}
 	}
-	c.P.Fetch.Addr = c.Reg.R[15]
-	c.P.Fetch.Thumb = c.Reg.CPSR.T
+
+	c.Reloaded = false
 }
 
-func (c *Cpu) Reload() {
-	c.P.Reload = false
-
-	thumb := c.Reg.CPSR.T
-	if thumb {
-		c.Reg.R[15] &^= 1
-		c.P.Fetch.Op = c.InstRead16(c.Reg.R[15], false)
-	} else {
-		c.Reg.R[15] &^= 3
-		c.P.Fetch.Op = c.InstRead32(c.Reg.R[15], false)
-	}
-	c.P.Fetch.Addr = c.Reg.R[15]
-	c.P.Fetch.Thumb = thumb
-
+func (c *Cpu) Reload16() {
+	c.Op[0] = c.InstRead16(c.Reg.R[15]+0, false)
+	c.Op[1] = c.InstRead16(c.Reg.R[15]+2, true)
+	c.Reg.R[15] += 4
+	c.Reloaded = true
 	c.NonSeq = false
-
-	c.Fetch()
 }
 
-func (p *Pipeline) String() string {
-	var b strings.Builder
-
-	//fmt.Fprintf(&b, "Fetch %08X %08X ", p.Fetch.Addr, p.Fetch.Op)
-	//fmt.Fprintf(&b, "Decode %08X %08X ", p.Decode.Addr, p.Decode.Op)
-	fmt.Fprintf(&b, "Execute %08X %08X ", p.Execute.Addr, p.Execute.Op)
-
-	return b.String()
+func (c *Cpu) Reload32() {
+	c.Op[0] = c.InstRead32(c.Reg.R[15]+0, false)
+	c.Op[1] = c.InstRead32(c.Reg.R[15]+4, true)
+	c.Reg.R[15] += 8
+	c.Reloaded = true
+	c.NonSeq = false
 }
 
 type Reg struct {
@@ -405,41 +416,6 @@ func (c *Cpu) idle(cycles int) {
 	}
 }
 
-func (c *Cpu) String() string {
-	var b strings.Builder
-
-	fmt.Fprintf(&b, "R ")
-	for i := range 16 {
-		fmt.Fprintf(&b, "%08X ", c.Reg.R[i])
-	}
-
-	//fmt.Fprintf(&b, "IME %t ", c.Irq.IME)
-	//fmt.Fprintf(&b, "IE %08X ", c.Irq.IE)
-	//fmt.Fprintf(&b, "IF %08X ", c.Irq.IF)
-
-	//fmt.Fprintf(&b, "V %08X ", c.Read16(0x4000006))
-
-	//fmt.Fprintf(&b, "FIQ ")
-
-	//for i := range 5 {
-	//	fmt.Fprintf(&b, "%08X ", c.Reg.FIQ[i])
-	//}
-
-	//fmt.Fprintf(&b, "USR ")
-
-	//for i := range 5 {
-	//	fmt.Fprintf(&b, "%08X ", c.Reg.USR[i])
-	//}
-
-	//fmt.Fprintf(&b, "PIPE ")
-
-	fmt.Fprintf(&b, "%s", c.P.String())
-
-	//fmt.Fprintf(&b, "\n")
-
-	return b.String()
-}
-
 func (c *Cpu) ModeSwitch(curr, next uint32) {
 	// DO NOT RELOAD PIPE AFTER CALLING ModeSwitch
 
@@ -490,14 +466,22 @@ const (
 
 func (c *Cpu) Exception(addr uint32, mode uint32) {
 	cpsr := &c.Reg.CPSR
+	thumb := cpsr.T
 
 	c.ModeSwitch(cpsr.Mode, mode)
 
 	i := BANK_ID[mode]
 	c.Reg.SPSR[i] = *cpsr
 
-	c.Reg.R[LR] = c.P.Decode.Addr
-	c.Reg.LR[i] = c.P.Decode.Addr
+	if thumb {
+		c.Reg.R[LR] = c.Reg.R[15] - 2
+		c.Reg.LR[i] = c.Reg.R[15] - 2
+
+	} else {
+		c.Reg.R[LR] = c.Reg.R[15] - 4
+		c.Reg.LR[i] = c.Reg.R[15] - 4
+
+	}
 
 	cpsr.Mode = mode
 	cpsr.T = false
@@ -507,7 +491,7 @@ func (c *Cpu) Exception(addr uint32, mode uint32) {
 	}
 
 	c.Reg.R[PC] = addr
-	c.P.Reload = true
+	c.Reload32()
 }
 
 func (c *Cpu) ExitException(mode uint32) {

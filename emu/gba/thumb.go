@@ -432,7 +432,8 @@ func (cpu *Cpu) HiRegBX(op uint16) {
 
 		if rd == PC {
 			r[rd] = uint32(res &^ 1)
-			cpu.P.Reload = true
+			//cpu.P.Reload = true
+			cpu.Reload16()
 		} else {
 			r[rd] = uint32(res)
 		}
@@ -464,18 +465,19 @@ func (cpu *Cpu) HiRegBX(op uint16) {
 			return
 		}
 
-		rsv := r[rs]
+		r[rd] = r[rs]
 		//if rs == PC {
 		//	rsv += 4
 		//}
 
 		if rd == PC {
-			r[rd] = rsv &^ 0b1
-			cpu.P.Reload = true
+			r[rd] &^= 1
+			//cpu.P.Reload = true
+			fmt.Printf("A PC %08X SCH %08X LR %04X\n", r[rd], cpu.Mem.GBA.Scheduler.Now(), r[14])
+			//fmt.Printf("B PC %08X SCH %08X\n", r[rd], cpu.Mem.GBA.Scheduler.Now())
+			cpu.Reload16()
 			return
 		}
-
-		r[rd] = rsv
 
 		return
 
@@ -490,15 +492,17 @@ func (cpu *Cpu) HiRegBX(op uint16) {
 		}
 
 		if thumb := r[rs]&1 != 0; thumb {
-			r[PC] = r[rs] &^ 0b1
-			cpu.P.Reload = true
+			r[PC] = r[rs] &^ 1
+			//cpu.P.Reload = true
+			cpu.Reload16()
 			return
 		}
 
 		cpsr.T = false
-		r[PC] = r[rs] &^ 0b11
+		r[PC] = r[rs] &^ 3
 
-		cpu.P.Reload = true
+		//cpu.P.Reload = true
+		cpu.Reload32()
 
 		return
 	}
@@ -740,7 +744,8 @@ func (cpu *Cpu) ThumbPushPop(op uint16) {
 	if rlist == 0 && !pclr {
 		if pop {
 			r[PC] = cpu.Read32(r[SP])
-			cpu.P.Reload = true
+			//cpu.P.Reload = true
+			cpu.Reload16()
 			r[SP] += 0x40
 		} else {
 			// alyosha test fails this.
@@ -800,7 +805,8 @@ func (cpu *Cpu) ThumbPushPop(op uint16) {
 
 		cpu.idle(1)
 
-		cpu.P.Reload = true
+		//cpu.P.Reload = true
+		cpu.Reload16()
 	}
 }
 
@@ -830,7 +836,8 @@ func (cpu *Cpu) ThumbJumpCalls(op uint16) {
 
 	nn := int(int8(op&0xFF)) << 1
 	r[PC] = uint32(int(r[PC]) + nn)
-	cpu.P.Reload = true
+	//cpu.P.Reload = true
+	cpu.Reload16()
 }
 
 func (cpu *Cpu) ThumbB(op uint16) {
@@ -838,7 +845,8 @@ func (cpu *Cpu) ThumbB(op uint16) {
 
 	offset := int16((op&0x7FF)<<5) >> 4
 	r[15] += uint32(offset)
-	cpu.P.Reload = true
+	//cpu.P.Reload = true
+	cpu.Reload16()
 }
 
 func (cpu *Cpu) ThumbShifted(op uint16) {
@@ -908,43 +916,17 @@ func (cpu *Cpu) ThumbLongBranch(op uint16) {
 	r := &cpu.Reg.R
 	offset := int32(uint32(op&0x7FF)<<21) >> 9
 	r[14] = r[15] + uint32(offset)
-
-	//const shift = 32 - 23 // 22 is bits, + 1 for * 2
-	//var (
-	//	r = &cpu.Reg.R
-	//	//op2 = cpu.Read16(cpu.P.Execute.Addr + 2)
-	//	op2 = cpu.P.Decode.Op
-	//	hi  = uint32(op & 0x7FF)
-	//	lo  = uint32(op2 & 0x7FF)
-	//	nn  = int32(((hi<<12)|(lo<<1))<<shift) >> shift
-	//)
-
-	//r[LR] = (r[PC] &^ 1) + 1
-	//r[PC] = uint32(int32(r[PC]) + nn)
-
-	//if exc := (op2>>12)&1 == 0; exc {
-	//	cpu.ToggleThumb()
-	//}
-	//cpu.P.Reload = true
 }
 
 func (cpu *Cpu) ThumbShortLongBranch(op uint16) {
 	r := &cpu.Reg.R
 
 	nn := uint32(op&0x7FF) << 1
-	r[15], cpu.P.Reload = r[14]+nn, true
-	r[14] = cpu.P.Decode.Addr | 1
+	tmp := (r[15] - 2) | 1
+	r[15] = r[14] + nn
+	r[14] = tmp
 
-	// Using only the 2nd half of BL as "BL LR+imm" is possible
-	// (for example, Mario Golf Advance Tour for GBA uses op F800h as "BL LR+0").
-	// BL LR + nn
-	// bottom half never signed?
-
-	//nn := uint32(op&0x7FF) << 1
-	//tmpLR := r[LR]
-	//r[LR] = ((r[PC] + 2) &^ 0b1) + 1
-	//r[PC] = (tmpLR + nn) &^ 0b1
-	//cpu.P.Reload = true
+	cpu.Reload16()
 }
 
 func (cpu *Cpu) ThumbLSSP(op uint16) {
@@ -1034,7 +1016,7 @@ func (cpu *Cpu) ThumbBlock(op uint16) {
 	if rlist == 0 {
 		r[rb] += 0x40
 		r[PC] += 4
-		cpu.P.Reload = true
+		cpu.Reload16()
 
 		return
 	}

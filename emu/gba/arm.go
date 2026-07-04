@@ -386,10 +386,6 @@ func (cpu *Cpu) Alu(op uint32) {
 
 	if rd == PC {
 
-		if inst < 0b1000 || inst > 0b1011 {
-			cpu.P.Reload = true
-		}
-
 		if op&(1<<20) != 0 {
 			cpu.ExitException(cpsr.Mode)
 		}
@@ -398,6 +394,14 @@ func (cpu *Cpu) Alu(op uint32) {
 			r[PC] &^= 1
 		} else {
 			r[PC] &^= 3
+		}
+		if inst < 0b1000 || inst > 0b1011 {
+			//cpu.P.Reload = true
+			if cpsr.T {
+				cpu.Reload16()
+			} else {
+				cpu.Reload32()
+			}
 		}
 
 	}
@@ -738,7 +742,8 @@ func (c *Cpu) Sdt(op uint32) {
 
 			if rd == PC {
 				c.ToggleThumb() // this is arm9 - not sure if arm7
-				c.P.Reload = true
+				//c.P.Reload = true
+				c.Reload32()
 			}
 		}
 	} else {
@@ -767,7 +772,8 @@ func (cpu *Cpu) B(op uint32) {
 	}
 
 	r[PC] += uint32((int32(op) << 8) >> 6)
-	cpu.P.Reload = true
+	//cpu.P.Reload = true
+	cpu.Reload32()
 }
 
 const (
@@ -787,7 +793,12 @@ func (cpu *Cpu) BX(op uint32) {
 	case INST_BX:
 		r[PC] = r[rn]
 		cpu.ToggleThumb()
-		cpu.P.Reload = true
+		//cpu.P.Reload = true
+		if cpu.Reg.CPSR.T {
+			cpu.Reload16()
+			return
+		}
+		cpu.Reload32()
 
 	case INST_BXJ:
 		panic("Unsupported BXJ Instruction")
@@ -1127,7 +1138,8 @@ func (c *Cpu) Block(op uint32) {
 		return
 	}
 
-	c.P.Reload = true
+	//c.P.Reload = true
+	c.Reload32()
 
 	if !psr {
 		return
