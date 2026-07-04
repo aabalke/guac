@@ -329,7 +329,7 @@ func (gba *GBA) IsRunning() bool {
 	return isDmas != 0
 }
 
-func (gba *GBA) CheckDmas() int64 {
+func (gba *GBA) CheckDmas() uint32 {
 	start := gba.Scheduler.CurrentCycle
 
 	gba.Tick(1)
@@ -342,7 +342,7 @@ func (gba *GBA) CheckDmas() int64 {
 
 	gba.Tick(1)
 
-	return gba.Scheduler.CurrentCycle - start
+	return uint32(gba.Scheduler.CurrentCycle - start)
 }
 
 func (dma *Dma) EepromDma(count, dst, src uint32) {

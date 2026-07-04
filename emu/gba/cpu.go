@@ -1,22 +1,15 @@
 package gba
 
 type Cpu struct {
-	P          Pipeline
-	Reg        Reg
-	Mem        *Memory
-	Irq        *Irq
-	Tick       func(int)
-	CheckDmas  func() int64
-	Waitstate  *Waitstate
-	Prefetch   *Prefetch
-	Op         [2]uint32
-	Halted     bool
-	NonSeq     bool
-	LastWasDma bool
-	IrqLine    bool
-	Reloaded   bool
-
-	Parr int64
+	gba               *GBA
+	ParallelDmaCycles uint32
+	Op                [2]uint32
+	Reg               Reg
+	Halted            bool
+	NonSeq            bool
+	LastWasDma        bool
+	IrqLine           bool
+	Reloaded          bool
 }
 
 const (
@@ -24,8 +17,6 @@ const (
 	DECODE
 	FETCH
 )
-
-type Pipeline struct{}
 
 const (
 	SP = 13
@@ -97,20 +88,11 @@ var BANK_ID = map[uint32]uint32{
 	MODE_UND: 5,
 }
 
-func NewCpu(jitEnabled bool, m *Memory, irq *Irq) *Cpu {
-	c := &Cpu{
-		Mem:       m,
-		Irq:       irq,
-		Waitstate: &m.Waitstate,
-		Prefetch:  m.Prefetch,
-		Tick:      m.GBA.Tick,
-		CheckDmas: m.GBA.CheckDmas,
-		NonSeq:    true,
+func NewCpu(g *GBA) *Cpu {
+	return &Cpu{
+		NonSeq: true,
+		gba:    g,
 	}
-
-	c.Irq.IME = true
-
-	return c
 }
 
 func (c *Cpu) Step() {
@@ -161,31 +143,22 @@ func (c *Cpu) Step() {
 	}
 
 	inst := c.Op[0]
-	//fmt.Printf("OP %08X %08X PC %08X SCH %08X\n", c.P.Op[0], c.P.Op[1], c.Reg.R[15], c.Mem.GBA.Scheduler.Now())
-	////fmt.Printf("SP %08X %08X\n", c.Reg.R[PC], c.P.Op[FETCH])
-
-	//if V[15] > 300000 {
-	//	os.Exit(0)
-	//}
-
-	//V[15]++
 
 	seq := !c.NonSeq
 	c.NonSeq = false
+	c.Op[0] = c.Op[1]
 
 	if c.Reg.CPSR.T {
 
-		c.Op[0] = c.Op[1]
 		c.Op[1] = c.InstRead16(c.Reg.R[15], seq)
-
 		c.DecodeTHUMB(uint16(inst))
+
 		if !c.Reloaded {
 			c.Reg.R[15] += 2
 		}
 
 	} else {
 
-		c.Op[0] = c.Op[1]
 		c.Op[1] = c.InstRead32(c.Reg.R[15], seq)
 		c.DecodeARM(inst)
 
@@ -215,11 +188,12 @@ func (c *Cpu) Reload32() {
 
 type Reg struct {
 	R    [16]uint32
+	CPSR Cond
+
 	SP   [6]uint32
 	LR   [6]uint32
 	FIQ  [5]uint32 // r8 - r12
 	USR  [5]uint32 // r8 - r12 // tmp to restore after FIQ
-	CPSR Cond
 	SPSR [6]Cond
 }
 
@@ -284,80 +258,80 @@ func (cpu *Cpu) ToggleThumb() {
 
 func (c *Cpu) Write8(addr uint32, v uint8) {
 	c.Cycles(addr, 1, false, false, false)
-	c.Mem.Write8(addr, v)
+	c.gba.Mem.Write8(addr, v)
 	c.NonSeq = true
 }
 
 func (c *Cpu) Write16(addr uint32, v uint16) {
 	c.Cycles(addr, 2, false, false, false)
-	c.Mem.Write16(addr, v)
+	c.gba.Mem.Write16(addr, v)
 	c.NonSeq = true
 }
 
 func (c *Cpu) Write32(addr uint32, v uint32) {
 	c.Cycles(addr, 4, false, false, false)
-	c.Mem.Write32(addr, v)
+	c.gba.Mem.Write32(addr, v)
 	c.NonSeq = true
 }
 
 func (c *Cpu) Write32Block(addr, v uint32, seq bool) {
 	c.Cycles(addr, 4, false, seq, false)
-	c.Mem.Write32(addr, v)
+	c.gba.Mem.Write32(addr, v)
 	c.NonSeq = true
 }
 
 func (c *Cpu) Read8(addr uint32) uint32 {
 	c.Cycles(addr, 1, false, false, false)
-	v := c.Mem.Read8(addr)
+	v := c.gba.Mem.Read8(addr)
 	c.idle(1)
 	return v
 }
 
 func (c *Cpu) Read16(addr uint32) uint32 {
 	c.Cycles(addr, 2, false, false, false)
-	v := c.Mem.Read16(addr)
+	v := c.gba.Mem.Read16(addr)
 	c.idle(1)
 	return v
 }
 
 func (c *Cpu) Read32(addr uint32) uint32 {
 	c.Cycles(addr, 4, false, false, false)
-	v := c.Mem.Read32(addr)
+	v := c.gba.Mem.Read32(addr)
 	c.idle(1)
 	return v
 }
 
 func (c *Cpu) Read32Block(addr uint32, seq bool) uint32 {
 	c.Cycles(addr, 4, false, seq, false)
-	return c.Mem.Read32(addr)
+	return c.gba.Mem.Read32(addr)
 }
 
 func (c *Cpu) InstRead16(addr uint32, seq bool) uint32 {
 	c.Cycles(addr, 2, false, seq, true)
-	return c.Mem.Read16(addr)
+	return c.gba.Mem.Read16(addr)
 }
 
 func (c *Cpu) InstRead32(addr uint32, seq bool) uint32 {
 	c.Cycles(addr, 4, false, seq, true)
-	return c.Mem.Read32(addr)
+	return c.gba.Mem.Read32(addr)
 }
 
 func (c *Cpu) Cycles(addr, width uint32, dma, seq, inst bool) {
 	if dma {
 		c.LastWasDma = true
 	} else {
-		if c.Mem.GBA.IsRunning() {
-			c.CheckDmas()
+		if c.gba.IsRunning() {
+			c.gba.CheckDmas()
 		}
 	}
 
-	c.Parr = 0
+	c.ParallelDmaCycles = 0
 
 	switch addr >> 24 {
 	case 2:
-		c.Tick(3 << (width >> 2))
+		c.gba.Tick(3 << (width >> 2))
 	case 5, 6:
-		c.Tick(1 << (width >> 2))
+		c.gba.Tick(1 << (width >> 2))
 	case 8, 9, 10, 11, 12, 13:
 
 		if addr&0x1FFFF == 0 {
@@ -369,20 +343,20 @@ func (c *Cpu) Cycles(addr, width uint32, dma, seq, inst bool) {
 			seq = false
 		}
 
-		cycles := c.Waitstate.Get(width, addr, seq)
+		cycles := c.gba.Mem.Waitstate.Get(width, addr, seq)
 
 		w := uint32(4)
 		if c.Reg.CPSR.T {
 			w = 2
 		}
 
-		c.Prefetch.Wait(c.Reg.R[15], addr, w, int64(cycles), inst)
+		c.gba.Mem.Prefetch.Wait(c.Reg.R[15], addr, w, int64(cycles), inst)
 
 	case 14, 15:
-		c.Prefetch.Cancel(c.Reg.R[15])
-		c.Tick(int(c.Waitstate.Get(width, addr, seq)))
+		c.gba.Mem.Prefetch.Cancel(c.Reg.R[15])
+		c.gba.Tick(int(c.gba.Mem.Waitstate.Get(width, addr, seq)))
 	default:
-		c.Tick(1)
+		c.gba.Tick(1)
 	}
 }
 
@@ -404,15 +378,15 @@ func idleMul(rs uint32, sign bool) int {
 }
 
 func (c *Cpu) idle(cycles int) {
-	if c.Mem.GBA.IsRunning() {
-		c.Parr = c.CheckDmas()
+	if c.gba.IsRunning() {
+		c.ParallelDmaCycles = c.gba.CheckDmas()
 	}
 
-	if c.Parr == 0 {
-		c.Tick(cycles)
+	if c.ParallelDmaCycles == 0 {
+		c.gba.Tick(cycles)
 		c.NonSeq = true
 	} else {
-		c.Parr--
+		c.ParallelDmaCycles--
 	}
 }
 

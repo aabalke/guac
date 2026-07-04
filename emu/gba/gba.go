@@ -62,9 +62,10 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba.PPU = &PPU{gba: gba}
 	gba.Irq = NewIrq(gba.Scheduler)
 	gba.Mem = NewMemory(gba)
-	gba.Cpu = NewCpu(false, gba.Mem, gba.Irq)
+	gba.Cpu = NewCpu(gba)
 	gba.Keypad = Key{Irq: gba.Irq, Input: 0x3FF}
 	gba.Irq.CpuIrqLine = &gba.Cpu.IrqLine
+	gba.Irq.IME = true
 
 	for i := range 4 {
 		gba.Timers[i] = NewTimer(gba, i)
@@ -109,9 +110,9 @@ func (gba *GBA) Update(stdFps bool) {
 			gba.Cpu.Halted = false
 		}
 
-		//if gba.InstInjectionFunc != nil {
-		//	gba.InstInjectionFunc(gba.Cpu.Op[0])
-		//}
+		if gba.InstInjectionFunc != nil {
+			gba.InstInjectionFunc(gba.Cpu.Op[0])
+		}
 
 		gba.Cpu.Step()
 	}
@@ -163,7 +164,7 @@ func (gba *GBA) DirectBoot() {
 	reg := &gba.Cpu.Reg
 	BANK_ID := BANK_ID
 
-	gba.Cpu.Irq.IME = true
+	gba.Irq.IME = true
 
 	reg.CPSR.Set(0x1F)
 	reg.SPSR[BANK_ID[MODE_IRQ]].Set(0x10)

@@ -473,8 +473,6 @@ func (cpu *Cpu) HiRegBX(op uint16) {
 		if rd == PC {
 			r[rd] &^= 1
 			//cpu.P.Reload = true
-			fmt.Printf("A PC %08X SCH %08X LR %04X\n", r[rd], cpu.Mem.GBA.Scheduler.Now(), r[14])
-			//fmt.Printf("B PC %08X SCH %08X\n", r[rd], cpu.Mem.GBA.Scheduler.Now())
 			cpu.Reload16()
 			return
 		}
@@ -707,14 +705,15 @@ func (cpu *Cpu) ThumbLSImm(op uint16) {
 	var (
 		r = &cpu.Reg.R
 
-		inst = (op >> 11) & 0b11
-		rd   = op & 0x7
-		rb   = (op >> 3) & 0x7
+		inst = (op >> 11) & 3
+		rd   = op & 7
+		rb   = (op >> 3) & 7
 		nn   = uint32(op>>6) & 0x1F
 	)
 
 	switch inst {
 	case THUMB_STR_IMM:
+
 		addr := r[rb] + (nn << 2)
 		cpu.Write32(addr, r[rd])
 	case THUMB_LDR_IMM:
@@ -738,75 +737,64 @@ func (cpu *Cpu) ThumbPushPop(op uint16) {
 		pclr  = (op>>8)&1 != 0
 		rlist = op & 0xFF
 		pop   = (op>>11)&1 != 0
+		seq   = false
 	)
 
 	// thank you nano
 	if rlist == 0 && !pclr {
 		if pop {
-			r[PC] = cpu.Read32(r[SP])
-			//cpu.P.Reload = true
+			r[PC] = cpu.Read32Block(r[SP], seq)
 			cpu.Reload16()
 			r[SP] += 0x40
 		} else {
 			// alyosha test fails this.
 			// i think it is timing related
 			r[SP] -= 0x40
-			cpu.Write32(r[SP], r[PC])
+			cpu.Write32Block(r[SP], r[PC], seq)
 		}
 
 		return
 	}
 
-	seq := false
-
-	reg := 0
-	if !pop {
-		reg = 7
-	}
-
-	if !pop && pclr {
-		r[SP] -= 4
-		cpu.Write32(r[SP], r[14])
-	}
-
-	for range 8 {
-		if disabled := (rlist>>reg)&1 == 0; disabled {
-			if pop {
-				reg++
-			} else {
-				reg--
+	if pop {
+		for reg := range 8 {
+			if disabled := (rlist>>reg)&1 == 0; disabled {
+				continue
 			}
-			continue
-		}
 
-		if pop {
 			r[reg] = cpu.Read32Block(r[SP], seq)
 			r[SP] += 4
-		} else {
-			r[SP] -= 4
-			cpu.Write32Block(r[SP], r[reg], seq)
+
+			seq = true
 		}
 
-		seq = true
-
-		if pop {
-			reg++
-		} else {
-			reg--
+		if pclr {
+			r[PC] = cpu.Read32Block(r[SP], seq) &^ 1
+			r[SP] += 4
+			cpu.idle(1)
+			cpu.Reload16()
+			return
 		}
-	}
-
-	if pop && pclr {
-
-		r[PC] = cpu.Read32(r[SP])
-
-		r[PC] &^= 1
-		r[SP] += 4
 
 		cpu.idle(1)
 
-		//cpu.P.Reload = true
-		cpu.Reload16()
+	} else {
+
+		if pclr {
+			r[SP] -= 4
+			cpu.Write32Block(r[SP], r[14], seq)
+		}
+
+		for reg := 7; reg >= 0; reg-- {
+			if disabled := (rlist>>reg)&1 == 0; disabled {
+				continue
+			}
+
+			r[SP] -= 4
+			cpu.Write32Block(r[SP], r[reg], seq)
+
+			seq = true
+		}
 	}
 }
 

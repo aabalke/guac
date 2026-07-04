@@ -8,14 +8,9 @@ import (
 func (cpu *Cpu) DecodeARM(op uint32) {
 	r := &cpu.Reg.R
 
-	switch cond := op >> 28; cond {
-	case 0xE: // skip
-
-	default:
-		if !cpu.Reg.CPSR.CheckCond(cond) {
-			cpu.NonSeq = false
-			return
-		}
+	if cond := op >> 28; cond != 0xE && !cpu.Reg.CPSR.CheckCond(cond) {
+		cpu.NonSeq = false
+		return
 	}
 
 	if swi := (op>>24)&0xF == 0xF; swi {
@@ -24,7 +19,6 @@ func (cpu *Cpu) DecodeARM(op uint32) {
 	}
 
 	switch {
-
 	case isB(op):
 		cpu.B(op)
 	case isBX(op):
@@ -43,7 +37,6 @@ func (cpu *Cpu) DecodeARM(op uint32) {
 		cpu.Swp(op)
 	case isM(op):
 		cpu.Mul(op)
-
 	case isALU(op):
 		cpu.Alu(op)
 

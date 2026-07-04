@@ -62,6 +62,10 @@ func (w *Waitstate) Write(addr uint32, v uint8) {
 func (w *Waitstate) Get(width, addr uint32, seq bool) int64 {
 	region := (addr >> 25) & 3
 
+	if sram := region == 3; sram {
+		return int64(w.S[region])
+	}
+
 	if width == 4 {
 
 		if seq {
