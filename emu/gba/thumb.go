@@ -936,100 +936,64 @@ func (cpu *Cpu) ThumbBlock(op uint16) {
 		r     = &cpu.Reg.R
 		ldmia = (op>>11)&1 != 0
 		rb    = (op >> 8) & 7
-		rlist = uint32(op & 0xFF)
-		addr  = r[rb]
-		seq   = false
+		rlist = op & 0xFF
 	)
+
+	if rlist == 0 {
+		if !ldmia {
+			cpu.Write32(r[rb], r[PC]+2)
+		} else {
+			r[PC] = cpu.Read32Block(r[rb], false)
+			cpu.Reload16()
+		}
+		r[rb] += 0x40
+		return
+	}
 
 	if !ldmia {
 
-		regCount := uint32(bits.OnesCount32(rlist))
-		matchingValue := uint32(0)
-		matchingAddr := uint32(0) // rn during regs
-		smallest := (rlist & -rlist) == 1<<rb
-		matchingRb := (rlist>>rb)&1 == 1
+		var (
+			count   = uint32(bits.OnesCount16(rlist))
+			first   = 0
+			addr    = r[rb]
+			baseNew = addr + count*4
+		)
 
-		rbIdx := uint32(0)
-		count := uint32(0)
-
-		if rlist == 0 {
-			cpu.Write32(r[rb], r[PC]+2)
-			r[rb] += 0x40
-
-			return
+		// can this be sped up? Its just log2(rlist & -rlist)
+		// first = int(math.Log2(float64(rlist & -rlist)))
+		for reg := 7; reg >= 0; reg-- {
+			if rlist&(1<<reg) != 0 {
+				first = reg
+			}
 		}
+
+		cpu.Write32Block(addr, r[first], false)
+		r[rb] = baseNew
+		addr += 4
+
+		for reg := first + 1; reg < 8; reg++ {
+			if enabled := (rlist>>reg)&1 != 0; enabled {
+				cpu.Write32Block(addr, r[reg], true)
+				addr += 4
+			}
+		}
+
+	} else {
+		addr := r[rb]
+		seq := false
 
 		for reg := range 8 {
-			if disabled := (rlist>>reg)&1 == 0; disabled {
-				continue
-			}
-
-			if reg == int(rb) {
-				cpu.Write32Block(addr, r[reg], seq)
-				matchingValue = r[reg] + 4
-				matchingAddr = addr
-				rbIdx = regCount - count
-				r[rb] += 4
+			if enabled := (rlist>>reg)&1 != 0; enabled {
+				r[reg] = cpu.Read32Block(addr, seq)
 				addr += 4
 				seq = true
-				continue
 			}
-
-			cpu.Write32Block(addr, r[reg], seq)
-
-			r[rb] += 4
-			addr += 4
-			seq = true
 		}
 
-		if smallest {
-			v := cpu.Read32(addr)
-			cpu.Write32(r[rb], v-(regCount*2))
+		cpu.idle(1)
 
-			return
+		if ^rlist&(1<<rb) != 0 {
+			r[rb] = addr
 		}
-
-		if matchingRb {
-			cpu.Write32(matchingAddr, matchingValue+(rbIdx*2))
-
-			return
-		}
-
-		return
-	}
-
-	rbValue := r[rb]
-	matchingRb := false
-
-	if rlist == 0 {
-		r[rb] += 0x40
-		r[PC] += 4
-		cpu.Reload16()
-
-		return
-	}
-
-	for reg := range 8 {
-		if disabled := (rlist>>reg)&1 == 0; disabled {
-			continue
-		}
-
-		r[reg] = cpu.Read32Block(addr, seq)
-
-		if reg == int(rb) {
-			matchingRb = true
-			// do not remove this, needed for golden sun and others
-			rbValue = r[rb]
-		}
-
-		r[rb] += 4
-		addr += 4
-		seq = true
-	}
-
-	cpu.idle(1)
-
-	if matchingRb {
-		r[rb] = rbValue
 	}
 }

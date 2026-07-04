@@ -75,7 +75,7 @@ Requires Official bios for passing tests
 👍 Memory tests [1552/1552]
 👍 I/O read tests [130/130]
 👍 Timing tests [2020/2020]
-❌ Timer count-up tests [903/936]
+❌ Timer count-up tests [922/936]
 👍 Timer IRQ tests [90/90]
 👍 Shifter tests [140/140]
 👍 Carry tests [93/93]

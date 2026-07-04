@@ -85,6 +85,13 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba.Scheduler.schedule(EVENT_END_FRAME, 1, 0, gba.FrameEndEvent, nil)
 	gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, 0, gba.ScanlineEndEvent, nil)
 
+	// matches nanoboy
+	// gba.Mem.IO[6] = 225
+	// gba.Mem.Dispstat.SetVBlank(true)
+	// gba.Mem.Dispstat.SetHBlank(true)
+	// gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, CYCLES_HBLANK, gba.ScanlineEndEvent, nil)
+	// gba.Scheduler.schedule(EVENT_END_FRAME, 1, CYCLES_FRAME-(CYCLES_SCANLINE*225), gba.FrameEndEvent, nil)
+
 	gba.Booted = true
 
 	return gba
