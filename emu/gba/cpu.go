@@ -1,7 +1,10 @@
 package gba
 
+import "unsafe"
+
 type Cpu struct {
 	gba               *GBA
+	PcPtr             unsafe.Pointer
 	ParallelDmaCycles uint32
 	Op                [2]uint32
 	Reg               Reg
@@ -11,12 +14,6 @@ type Cpu struct {
 	IrqLine           bool
 	Reloaded          bool
 }
-
-const (
-	EXECUTE = iota
-	DECODE
-	FETCH
-)
 
 const (
 	SP = 13
@@ -112,9 +109,11 @@ func (c *Cpu) Step() {
 			c.NonSeq = false
 
 			if thumb {
-				c.InstRead16(c.Reg.R[15], seq)
+				c.Cycles(c.Reg.R[15], 2, false, seq, true)
+				c.gba.Mem.Read16(c.Reg.R[15])
 			} else {
-				c.InstRead32(c.Reg.R[15], seq)
+				c.Cycles(c.Reg.R[15], 4, false, seq, true)
+				c.gba.Mem.Read32(c.Reg.R[15])
 			}
 
 			c.ModeSwitch(cpsr.Mode, mode)
@@ -129,7 +128,6 @@ func (c *Cpu) Step() {
 			} else {
 				c.Reg.R[LR] = c.Reg.R[15] - 4
 				c.Reg.LR[i] = c.Reg.R[15] - 4
-
 			}
 
 			cpsr.Mode = mode
@@ -150,20 +148,39 @@ func (c *Cpu) Step() {
 
 	if c.Reg.CPSR.T {
 
-		c.Op[1] = c.InstRead16(c.Reg.R[15], seq)
+		c.Cycles(c.Reg.R[15], 2, false, seq, true)
+
+		if c.PcPtr == nil {
+			c.Op[1] = c.gba.Mem.Read16(c.Reg.R[15])
+		} else {
+			c.Op[1] = *(*uint32)(c.PcPtr) & 0xFFFF
+		}
+
 		c.DecodeTHUMB(uint16(inst))
 
 		if !c.Reloaded {
 			c.Reg.R[15] += 2
+			if c.PcPtr != nil {
+				c.PcPtr = unsafe.Add(c.PcPtr, 2)
+			}
 		}
 
 	} else {
 
-		c.Op[1] = c.InstRead32(c.Reg.R[15], seq)
+		c.Cycles(c.Reg.R[15], 4, false, seq, true)
+		if c.PcPtr == nil {
+			c.Op[1] = c.gba.Mem.Read32(c.Reg.R[15])
+		} else {
+			c.Op[1] = *(*uint32)(c.PcPtr)
+		}
+
 		c.DecodeARM(inst)
 
 		if !c.Reloaded {
 			c.Reg.R[15] += 4
+			if c.PcPtr != nil {
+				c.PcPtr = unsafe.Add(c.PcPtr, 4)
+			}
 		}
 	}
 
@@ -171,17 +188,47 @@ func (c *Cpu) Step() {
 }
 
 func (c *Cpu) Reload16() {
-	c.Op[0] = c.InstRead16(c.Reg.R[15]+0, false)
-	c.Op[1] = c.InstRead16(c.Reg.R[15]+2, true)
-	c.Reg.R[15] += 4
+	pc := &c.Reg.R[15]
+
+	c.PcPtr = c.gba.Mem.ReadPtr(c.Reg.R[15])
+
+	c.Cycles(*pc, 2, false, false, true)
+	c.Cycles(*pc+2, 2, false, true, true)
+
+	if c.PcPtr == nil {
+		c.Op[0] = c.gba.Mem.Read16(*pc + 0)
+		c.Op[1] = c.gba.Mem.Read16(*pc + 2)
+	} else {
+		c.Op[0] = *(*uint32)(c.PcPtr) & 0xFFFF
+		c.PcPtr = unsafe.Add(c.PcPtr, 2)
+		c.Op[1] = *(*uint32)(c.PcPtr) & 0xFFFF
+		c.PcPtr = unsafe.Add(c.PcPtr, 2)
+	}
+
+	*pc += 4
 	c.Reloaded = true
 	c.NonSeq = false
 }
 
 func (c *Cpu) Reload32() {
-	c.Op[0] = c.InstRead32(c.Reg.R[15]+0, false)
-	c.Op[1] = c.InstRead32(c.Reg.R[15]+4, true)
-	c.Reg.R[15] += 8
+	pc := &c.Reg.R[15]
+
+	c.PcPtr = c.gba.Mem.ReadPtr(c.Reg.R[15])
+
+	c.Cycles(*pc, 4, false, false, true)
+	c.Cycles(*pc+4, 4, false, true, true)
+
+	if c.PcPtr == nil {
+		c.Op[0] = c.gba.Mem.Read32(*pc + 0)
+		c.Op[1] = c.gba.Mem.Read32(*pc + 4)
+	} else {
+		c.Op[0] = *(*uint32)(c.PcPtr)
+		c.PcPtr = unsafe.Add(c.PcPtr, 4)
+		c.Op[1] = *(*uint32)(c.PcPtr)
+		c.PcPtr = unsafe.Add(c.PcPtr, 4)
+	}
+
+	*pc += 8
 	c.Reloaded = true
 	c.NonSeq = false
 }
@@ -306,23 +353,11 @@ func (c *Cpu) Read32Block(addr uint32, seq bool) uint32 {
 	return c.gba.Mem.Read32(addr)
 }
 
-func (c *Cpu) InstRead16(addr uint32, seq bool) uint32 {
-	c.Cycles(addr, 2, false, seq, true)
-	return c.gba.Mem.Read16(addr)
-}
-
-func (c *Cpu) InstRead32(addr uint32, seq bool) uint32 {
-	c.Cycles(addr, 4, false, seq, true)
-	return c.gba.Mem.Read32(addr)
-}
-
 func (c *Cpu) Cycles(addr, width uint32, dma, seq, inst bool) {
 	if dma {
 		c.LastWasDma = true
-	} else {
-		if c.gba.IsRunning() {
-			c.gba.CheckDmas()
-		}
+	} else if c.gba.IsRunning() {
+		c.gba.CheckDmas()
 	}
 
 	c.ParallelDmaCycles = 0
@@ -343,25 +378,30 @@ func (c *Cpu) Cycles(addr, width uint32, dma, seq, inst bool) {
 			seq = false
 		}
 
-		cycles := c.gba.Mem.Waitstate.Get(width, addr, seq)
+		if !inst {
+			c.gba.Mem.Prefetch.Cancel(c.Reg.R[15])
+			c.gba.Tick(c.gba.Mem.Waitstate.Get(width, addr, seq))
+			return
+		}
 
 		w := uint32(4)
 		if c.Reg.CPSR.T {
 			w = 2
 		}
 
-		c.gba.Mem.Prefetch.Wait(c.Reg.R[15], addr, w, int64(cycles), inst)
+		cycles := c.gba.Mem.Waitstate.Get(width, addr, seq)
+		c.gba.Mem.Prefetch.Wait(c.Reg.R[15], addr, w, cycles)
 
 	case 14, 15:
 		c.gba.Mem.Prefetch.Cancel(c.Reg.R[15])
-		c.gba.Tick(int(c.gba.Mem.Waitstate.Get(width, addr, seq)))
+		c.gba.Tick(c.gba.Mem.Waitstate.Get(width, addr, seq))
 	default:
 		c.gba.Tick(1)
 	}
 }
 
-func idleMul(rs uint32, sign bool) int {
-	cycles := 1
+func idleMul(rs uint32, sign bool) int64 {
+	cycles := int64(1)
 	mask := uint32(0xFFFFFF00)
 	for {
 		rs &= mask
@@ -377,7 +417,7 @@ func idleMul(rs uint32, sign bool) int {
 	return cycles
 }
 
-func (c *Cpu) idle(cycles int) {
+func (c *Cpu) idle(cycles int64) {
 	if c.gba.IsRunning() {
 		c.ParallelDmaCycles = c.gba.CheckDmas()
 	}

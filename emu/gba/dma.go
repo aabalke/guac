@@ -1,6 +1,8 @@
 package gba
 
 import (
+	"unsafe"
+
 	"github.com/aabalke/guac/emu/gba/cart"
 )
 
@@ -22,7 +24,7 @@ const (
 
 type Dma struct {
 	Gba  *GBA
-	Tick func(cycles int)
+	Tick func(cycles int64)
 	Idx  int
 
 	Src     uint32
@@ -203,7 +205,7 @@ func (dma *Dma) Start(late int64, _ any) {
 	dma.latched.srcOffset = srcOffset
 	dma.latched.dstOffset = dstOffset
 
-	dma.EepromDma(dma.latched.cnt, dst, src)
+	dma.EepromDma(dma.latched.cnt, dst)
 }
 
 func (dma *Dma) disable() {
@@ -219,6 +221,9 @@ func (dma *Dma) transfer() {
 		src       = dma.latched.src
 		dst       = dma.latched.dst
 		accessRom = false
+
+		srcPtr = dma.Gba.Mem.ReadPtr(src)
+		dstPtr = dma.Gba.Mem.WritePtr(dst)
 	)
 
 	for range dma.latched.cnt {
@@ -242,11 +247,19 @@ func (dma *Dma) transfer() {
 				dma.Tick(1)
 			} else {
 				dma.Gba.Cpu.Cycles(src, 4, true, srcSeq, false)
-				dma.Value = mem.Read32(src)
+				if srcPtr == nil {
+					dma.Value = mem.Read32(src)
+				} else {
+					dma.Value = *(*uint32)(srcPtr)
+				}
 			}
 
 			dma.Gba.Cpu.Cycles(dst, 4, true, dstSeq, false)
-			mem.Write32(dst, dma.Value)
+			if dstPtr == nil {
+				mem.Write32(dst, dma.Value)
+			} else {
+				*(*uint32)(dstPtr) = dma.Value
+			}
 
 		} else {
 
@@ -265,16 +278,31 @@ func (dma *Dma) transfer() {
 			} else {
 
 				dma.Gba.Cpu.Cycles(src, 2, true, srcSeq, false)
-				v = mem.Read16(src)
+
+				if srcPtr == nil {
+					v = mem.Read16(src)
+				} else {
+					v = *(*uint32)(srcPtr) & 0xFFFF
+				}
 				dma.Value = v | (v << 16)
 			}
 
 			dma.Gba.Cpu.Cycles(dst, 2, true, dstSeq, false)
-			mem.Write16(dst, uint16(v))
+			if dstPtr == nil {
+				mem.Write16(dst, uint16(v))
+			} else {
+				*(*uint16)(dstPtr) = uint16(v)
+			}
 		}
 
-		dst = uint32(int(dst) + dma.latched.dstOffset)
 		src = uint32(int(src) + dma.latched.srcOffset)
+		dst = uint32(int(dst) + dma.latched.dstOffset)
+		if srcPtr != nil {
+			srcPtr = unsafe.Add(srcPtr, dma.latched.srcOffset)
+		}
+		if dstPtr != nil {
+			dstPtr = unsafe.Add(dstPtr, dma.latched.dstOffset)
+		}
 	}
 
 	if dma.IRQ {
@@ -345,7 +373,7 @@ func (gba *GBA) CheckDmas() uint32 {
 	return uint32(gba.Scheduler.CurrentCycle - start)
 }
 
-func (dma *Dma) EepromDma(count, dst, src uint32) {
+func (dma *Dma) EepromDma(count, dst uint32) {
 	if !CheckEeprom(dma.Gba, dst) {
 		return
 	}
@@ -355,11 +383,5 @@ func (dma *Dma) EepromDma(count, dst, src uint32) {
 		cart.EepromWidth = 6
 	case 17, 81:
 		cart.EepromWidth = 14
-	}
-
-	dstRom := dst >= 0x800_0000 && dst < 0xE00_0000
-	srcRom := src >= 0x800_0000 && src < 0xE00_0000
-	if srcRom && dstRom {
-		panic("EEPROM HAS BOTH SRC AND DST ROM ADDR")
 	}
 }

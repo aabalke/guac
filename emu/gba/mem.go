@@ -83,19 +83,19 @@ func (m *Memory) InitSaveLoop() {
 
 func (m *Memory) initWriteRegions() {
 	for i := range len(m.writeRegions) {
-		m.writeRegions[i] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
+		m.writeRegions[i] = func(_ *Memory, _ uint32, _ uint8, _ bool) {
 		}
 	}
 
-	m.writeRegions[0x2] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
+	m.writeRegions[0x2] = func(m *Memory, addr uint32, v uint8, _ bool) {
 		m.WRAM1[addr&0x3_FFFF] = v
 	}
 
-	m.writeRegions[0x3] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
+	m.writeRegions[0x3] = func(m *Memory, addr uint32, v uint8, _ bool) {
 		m.WRAM2[addr&0x7FFF] = v
 	}
 
-	m.writeRegions[0x4] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
+	m.writeRegions[0x4] = func(m *Memory, addr uint32, v uint8, _ bool) {
 		if addr < 0x0400_0400 {
 			m.WriteIO(addr&0x3FF, v)
 		}
@@ -139,11 +139,9 @@ func (m *Memory) initWriteRegions() {
 
 			m.VRAM[addr] = v
 
-			if addr+1 >= uint32(len(m.VRAM)) {
-				return
+			if addr+1 < uint32(len(m.VRAM)) {
+				m.VRAM[addr+1] = v
 			}
-
-			m.VRAM[addr+1] = v
 
 			return
 		}
@@ -158,22 +156,11 @@ func (m *Memory) initWriteRegions() {
 		m.GBA.PPU.UpdateOAM(rel)
 	}
 
-	m.writeRegions[0xE] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
-		m.GBA.Save = true
-
-		cartridge := m.GBA.Cartridge
-		relative := addr & 0xFFFF
-
-		cartridge.Write(relative, v)
-	}
-
-	m.writeRegions[0xF] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
-		m.GBA.Save = true
-
-		cartridge := m.GBA.Cartridge
-		relative := addr & 0xFFFF
-
-		cartridge.Write(relative, v)
+	for i := 0xE; i < 0x10; i++ {
+		m.writeRegions[i] = func(m *Memory, addr uint32, v uint8, _ bool) {
+			m.GBA.Save = true
+			m.GBA.Cartridge.Write(addr&0xFFFF, v)
+		}
 	}
 }
 
@@ -222,11 +209,7 @@ func (m *Memory) initReadRegions() {
 	}
 
 	m.readRegions[0x5] = func(m *Memory, addr uint32) uint8 {
-		if addr&1 == 1 {
-			return uint8(m.PRAM[addr&0x3FF>>1] >> 8)
-		}
-
-		return uint8(m.PRAM[addr&0x3FF>>1])
+		return uint8(m.PRAM[addr&0x3FF>>1] >> ((addr & 1) << 3))
 	}
 
 	m.readRegions[0x6] = func(m *Memory, addr uint32) uint8 {
@@ -247,17 +230,76 @@ func (m *Memory) initReadRegions() {
 		}
 	}
 
-	m.readRegions[0xE] = func(m *Memory, addr uint32) uint8 {
-		return m.GBA.Cartridge.Read(addr & 0xFFFF)
-	}
-
-	m.readRegions[0xF] = func(m *Memory, addr uint32) uint8 {
-		return m.GBA.Cartridge.Read(addr & 0xFFFF)
+	for i := 0xE; i < 0x10; i++ {
+		m.readRegions[i] = func(m *Memory, addr uint32) uint8 {
+			return m.GBA.Cartridge.Read(addr & 0xFFFF)
+		}
 	}
 }
 
-func (m *Memory) ReadPtr(_ uint32) (unsafe.Pointer, bool) {
-	return nil, false
+func (m *Memory) ReadPtr(addr uint32) unsafe.Pointer {
+	switch addr >> 24 {
+	case 0:
+
+		if addr >= 0x4000 {
+			return nil
+		}
+
+		if m.GBA.Cpu.Reg.R[15] >= 0x4000 {
+			return nil
+		}
+
+		// need to avoid protected latch value, skip anything near latches
+		if addr < 0x200 {
+			return nil
+		}
+
+		return unsafe.Add(unsafe.Pointer(&(*m.BIOS)[0]), addr&0x3FFF)
+	case 2:
+		return unsafe.Add(unsafe.Pointer(&m.WRAM1), addr&0x3FFFF)
+	case 3:
+		return unsafe.Add(unsafe.Pointer(&m.WRAM2), addr&0x7FFF)
+	case 5:
+		return unsafe.Add(unsafe.Pointer(&m.PRAM), addr&0x3FF)
+	case 6:
+		addr &= 0x1FFFF
+		if addr >= 0x18000 {
+			addr -= 0x8000
+		}
+		return unsafe.Add(unsafe.Pointer(&m.VRAM), addr)
+
+	case 7:
+		return unsafe.Add(unsafe.Pointer(&m.OAM), addr&0x3FF)
+
+	case 8, 9, 0xA, 0xB, 0xC, 0xD:
+		if addr&0x1FF_FFFF >= m.GBA.Cartridge.RomLength {
+			return nil
+		}
+		return unsafe.Add(unsafe.Pointer(&m.GBA.Cartridge.Rom), addr&0x1FF_FFFF)
+	}
+
+	return nil
+}
+
+func (m *Memory) WritePtr(addr uint32) unsafe.Pointer {
+	switch addr >> 24 {
+	case 2:
+		return unsafe.Add(unsafe.Pointer(&m.WRAM1), addr&0x3FFFF)
+	case 3:
+		return unsafe.Add(unsafe.Pointer(&m.WRAM2), addr&0x7FFF)
+	case 5:
+		return unsafe.Add(unsafe.Pointer(&m.PRAM), addr&0x3FF)
+	case 6:
+		addr &= 0x1FFFF
+		if addr >= 0x18000 {
+			addr -= 0x8000
+		}
+		return unsafe.Add(unsafe.Pointer(&m.VRAM), addr)
+
+		// cannot case 7 rn since need to update oam on every write
+	}
+
+	return nil
 }
 
 func (m *Memory) Read(addr uint32) uint8 {
@@ -385,9 +427,9 @@ func (m *Memory) Read16(addr uint32) uint32 {
 		}
 	}
 
-	//if ptr, ok := m.ReadPtr(addr); ok {
-	//	return uint32(binary.LittleEndian.Uint16((*[4]uint8)(ptr)[:]))
-	//}
+	if ptr := m.ReadPtr(addr); ptr != nil {
+		return uint32(*(*uint16)(ptr))
+	}
 
 	v := uint32(m.Read(addr + 0))
 	v |= uint32(m.Read(addr+1)) << 8
@@ -407,12 +449,13 @@ func (m *Memory) Read32(addr uint32) uint32 {
 		return m.ReadBadRom(addr, 4)
 	}
 
-	//if ptr, ok := m.ReadPtr(addr); ok {
-	//	return binary.LittleEndian.Uint32((*[4]uint8)(ptr)[:])
-	//}
+	if ptr := m.ReadPtr(addr); ptr != nil {
+		return *(*uint32)(ptr)
+	}
 
 	v := uint32(m.Read16(addr + 0))
 	v |= uint32(m.Read16(addr+2)) << 16
+
 	return v
 }
 
@@ -595,6 +638,11 @@ func (m *Memory) Write16(addr uint32, v uint16) {
 		return
 	}
 
+	if ptr := m.WritePtr(addr); ptr != nil {
+		*(*uint16)(ptr) = v
+		return
+	}
+
 	m.Write(addr+0, uint8(v), false)
 	m.Write(addr+1, uint8(v>>8), false)
 }
@@ -620,6 +668,11 @@ func (m *Memory) Write32(addr uint32, v uint32) {
 		return
 	case 0x400_010c:
 		m.GBA.Timers[3].Write32(v)
+		return
+	}
+
+	if ptr := m.WritePtr(addr); ptr != nil {
+		*(*uint32)(ptr) = v
 		return
 	}
 
@@ -696,29 +749,5 @@ func (m *Memory) ReadIODirectByte(addr uint32) uint32 {
 		return uint32(m.Dispstat >> 8)
 	default:
 		return uint32(m.IO[addr])
-	}
-}
-
-func (m *Memory) WritePtr(addr uint32) (unsafe.Pointer, bool) {
-	switch regions := addr >> 24; regions {
-	case 0x2:
-		return unsafe.Add(
-			unsafe.Pointer(&m.WRAM1), addr&0x3FFFF,
-		), true
-	case 0x3:
-		return unsafe.Add(
-			unsafe.Pointer(&m.WRAM2), addr&0x7FFF,
-		), true
-	case 0x6:
-		addr &= 0x1FFFF
-		if addr >= 0x18000 {
-			addr -= 0x8000
-		}
-		return unsafe.Add(
-			unsafe.Pointer(&m.VRAM), addr,
-		), true
-
-	default:
-		return nil, false
 	}
 }

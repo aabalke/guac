@@ -1,7 +1,7 @@
 package gba
 
 type Prefetch struct {
-	Tick                  func(cycles int)
+	Tick                  func(cycles int64)
 	Ws                    *Waitstate
 	AccessTime, Countdown int64
 	Head, Addr            uint32
@@ -13,7 +13,7 @@ type Prefetch struct {
 	Active                bool
 }
 
-func NewPrefetch(ws *Waitstate, Tick func(int)) *Prefetch {
+func NewPrefetch(ws *Waitstate, Tick func(int64)) *Prefetch {
 	return &Prefetch{
 		Ws:         ws,
 		AccessTime: 5,
@@ -58,13 +58,7 @@ func (p *Prefetch) Step(cycles int64) {
 	}
 }
 
-func (p *Prefetch) Wait(r15, addr, width uint32, cycles int64, code bool) {
-	if !code {
-		p.Cancel(r15)
-		p.Tick(int(cycles))
-		return
-	}
-
+func (p *Prefetch) Wait(r15, addr, width uint32, cycles int64) {
 	// width 2 = cap 8, width 4 = cap 4
 	p.Capacity = (1 << ((width & 3) >> 1)) << 2
 
@@ -77,7 +71,7 @@ func (p *Prefetch) Wait(r15, addr, width uint32, cycles int64, code bool) {
 		}
 
 		if p.Countdown > 0 && addr == p.Addr {
-			p.Tick(int(p.Countdown))
+			p.Tick(p.Countdown)
 			p.Head = p.Addr
 			p.Opcodes = 0
 			return
@@ -104,7 +98,7 @@ func (p *Prefetch) Wait(r15, addr, width uint32, cycles int64, code bool) {
 
 	}
 
-	p.Tick(int(cycles))
+	p.Tick(cycles)
 
 	if !p.Enabled {
 		return

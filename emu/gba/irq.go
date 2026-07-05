@@ -21,14 +21,12 @@ type Irq struct {
 	sch                  *Scheduler
 	pendingIF, pendingIE uint32
 	IF, IE               uint32
-	pendingIME           bool
 	IME                  bool
+	pendingIME           bool
 	IrqAvailable         bool
 	IrqLine              bool
 
 	CpuIrqLine *bool
-
-	// IdleIrq uint32
 }
 
 func NewIrq(s *Scheduler) *Irq {

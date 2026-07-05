@@ -111,7 +111,7 @@ func (gba *GBA) Update(stdFps bool) {
 					continue
 				}
 
-				gba.Tick(int(gba.Scheduler.GetRemaining()))
+				gba.Tick(gba.Scheduler.GetRemaining())
 			}
 
 			if gba.Irq.IrqAvailable {
@@ -130,10 +130,10 @@ func (gba *GBA) Update(stdFps bool) {
 	}
 }
 
-func (gba *GBA) Tick(cycles int) {
-	gba.Scheduler.Add(int64(cycles))
+func (gba *GBA) Tick(cycles int64) {
+	gba.Scheduler.Add(cycles)
 	if gba.Mem.Prefetch.Active {
-		gba.Mem.Prefetch.Step(int64(cycles))
+		gba.Mem.Prefetch.Step(cycles)
 	}
 }
 
