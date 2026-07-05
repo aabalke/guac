@@ -24,6 +24,7 @@ type Memory struct {
 	ProtectedValue uint32
 	SioCnt         uint8
 	Dispstat       Dispstat
+	postflg        uint8
 
 	Waitstate Waitstate
 	Prefetch  *Prefetch
@@ -339,6 +340,9 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 	case 0x204, 0x205, 0x206, 0x207:
 		return m.Waitstate.Read(addr)
 
+	case 0x300:
+		return m.postflg
+
 	case 0x209, 0x20A, 0x20B, 0x301, 0x302, 0x303, 0x304:
 		return 0
 	}
@@ -529,9 +533,18 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 	case 0x209, 0x20A, 0x20B:
 		return
 
+	case 0x300:
+		m.postflg |= v & 1
+
 	case 0x301:
-		m.IO[addr] = v & 0x80
-		m.GBA.Cpu.Halted = true
+
+		if m.GBA.Cpu.Reg.R[15] < 0x4000 {
+			if halt := v&0x80 == 0; halt {
+				m.GBA.Cpu.Halted = true
+				m.GBA.Tick(1)
+
+			}
+		}
 
 	default:
 		m.IO[addr] = v
@@ -564,17 +577,17 @@ func (m *Memory) Write16(addr uint32, v uint16) {
 	}
 
 	switch addr {
-	case 0x400_0100:
-		m.GBA.Timers[0].Write16(v)
+	case 0x400_0100, 0x400_0102:
+		m.GBA.Timers[0].Write16(addr&3, v)
 		return
-	case 0x400_0104:
-		m.GBA.Timers[1].Write16(v)
+	case 0x400_0104, 0x400_0106:
+		m.GBA.Timers[1].Write16(addr&3, v)
 		return
-	case 0x400_0108:
-		m.GBA.Timers[2].Write16(v)
+	case 0x400_0108, 0x400_010A:
+		m.GBA.Timers[2].Write16(addr&3, v)
 		return
-	case 0x400_010C:
-		m.GBA.Timers[3].Write16(v)
+	case 0x400_010C, 0x400_010E:
+		m.GBA.Timers[3].Write16(addr&3, v)
 		return
 
 	case 0x400_0200, 0x400_0202, 0x400_0208:

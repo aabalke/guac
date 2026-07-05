@@ -75,7 +75,7 @@ Requires Official bios for passing tests
 👍 Memory tests [1552/1552]
 👍 I/O read tests [130/130]
 👍 Timing tests [2020/2020]
-❌ Timer count-up tests [922/936]
+👍 Timer count-up tests [936/936]
 👍 Timer IRQ tests [90/90]
 👍 Shifter tests [140/140]
 👍 Carry tests [93/93]
@@ -100,8 +100,8 @@ Requires Official bios for passing tests
 ❌ dma: burst into tears [0/3]
 👍 dma: force nseq access [2/2]
 👍 dma: latch [3/3]
-❌ dma: start delay [0/1]
-❌ halt: halt cnt [0/6]
+👍 dma: start delay [1/1]
+❌ halt: halt cnt [4/6]
 👍 irq: irq delay [3/3]
 ❌ ppu: bgpd
 ❌ ppu: bgx

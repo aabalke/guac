@@ -75,12 +75,6 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba.Mem.LoadBios()
 	gba.LoadGame(path)
 
-	if config.Conf.Gba.Bios.Direct {
-		gba.DirectBoot()
-	} else {
-		gba.BiosBoot()
-	}
-
 	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, 0, gba.AudioSampleEvent, nil)
 	gba.Scheduler.schedule(EVENT_END_FRAME, 1, 0, gba.FrameEndEvent, nil)
 	gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, 0, gba.ScanlineEndEvent, nil)
@@ -91,6 +85,12 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	// gba.Mem.Dispstat.SetHBlank(true)
 	// gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, CYCLES_HBLANK, gba.ScanlineEndEvent, nil)
 	// gba.Scheduler.schedule(EVENT_END_FRAME, 1, CYCLES_FRAME-(CYCLES_SCANLINE*225), gba.FrameEndEvent, nil)
+
+	if config.Conf.Gba.Bios.Direct {
+		gba.DirectBoot()
+	} else {
+		gba.BiosBoot()
+	}
 
 	gba.Booted = true
 
@@ -104,24 +104,29 @@ func (gba *GBA) Update(stdFps bool) {
 
 	nextFrame := gba.Scheduler.CurrentCycle + CYCLES_FRAME
 	for gba.Scheduler.CurrentCycle < nextFrame {
-
 		if gba.Cpu.Halted {
-			gba.CheckDmas()
+			for gba.Scheduler.CurrentCycle < nextFrame && !gba.Irq.IrqAvailable {
+				gba.CheckDmas()
+				if gba.Irq.IrqAvailable {
+					continue
+				}
 
-			gba.Tick(1)
-
-			if gba.Irq.IE&gba.Irq.IF == 0 {
-				continue
+				gba.Tick(int(gba.Scheduler.GetRemaining()))
 			}
 
-			gba.Cpu.Halted = false
-		}
+			if gba.Irq.IrqAvailable {
+				gba.Tick(1)
+				gba.Cpu.Halted = false
+			}
 
-		if gba.InstInjectionFunc != nil {
-			gba.InstInjectionFunc(gba.Cpu.Op[0])
-		}
+		} else {
 
-		gba.Cpu.Step()
+			if gba.InstInjectionFunc != nil {
+				gba.InstInjectionFunc(gba.Cpu.Op[0])
+			}
+
+			gba.Cpu.Step()
+		}
 	}
 }
 
@@ -193,6 +198,8 @@ func (gba *GBA) DirectBoot() {
 	gba.Cpu.Op[0] = 0xF000_0000
 	gba.Cpu.Op[1] = 0xF000_0000
 	gba.Cpu.NonSeq = true
+
+	gba.Mem.postflg = 1
 }
 
 func (gba *GBA) BiosBoot() {

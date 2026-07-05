@@ -82,6 +82,7 @@ func (s *Scheduler) peekNext() *ScheduledEvent {
 
 func (s *Scheduler) popNext() ScheduledEvent {
 	next := s.Events[0]
+
 	copy(s.Events[0:s.Cnt-1], s.Events[1:s.Cnt])
 	s.Cnt--
 	return next
@@ -115,4 +116,8 @@ func (s *Scheduler) Add(cycles int64) {
 	}
 
 	//s.CurrentCycle = nextCycle
+}
+
+func (s *Scheduler) GetRemaining() int64 {
+	return s.Events[0].InitCycle - s.Now()
 }

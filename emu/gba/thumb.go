@@ -638,7 +638,6 @@ func (cpu *Cpu) ThumbSdt(op uint16) {
 
 		switch inst {
 		case THUMB_STRH:
-
 			cpu.Write16(addr, uint16(r[rd]))
 
 		case THUMB_LDSB:
@@ -649,8 +648,7 @@ func (cpu *Cpu) ThumbSdt(op uint16) {
 		case THUMB_LDRH:
 
 			v := cpu.Read16(addr)
-			is := (addr & 1) << 3
-			r[rd] = bits.RotateLeft32(v, -int(is))
+			r[rd] = bits.RotateLeft32(v, -int((addr&1)<<3))
 
 		case THUMB_LDSH:
 
