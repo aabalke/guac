@@ -180,7 +180,7 @@ func (m *Memory) initReadRegions() {
 			pc := m.GBA.Cpu.Reg.R[15]
 
 			if pc >= 0x4000 {
-				return m.ReadBios(addr)
+				return uint8(m.ProtectedValue >> ((addr & 3) << 3))
 			}
 
 			if pc8 := pc - 8; pc8 == 0xDC || pc8 == 0x134 || pc8 == 0x13C || pc8 == 0x188 {
@@ -302,8 +302,64 @@ func (m *Memory) Read(addr uint32) uint8 {
 	return m.readRegions[addr>>24](m, addr)
 }
 
-func (m *Memory) ReadBios(addr uint32) uint8 {
-	return uint8(m.ProtectedValue >> ((addr & 3) << 3))
+func (m *Memory) Read8(addr uint32) uint32 {
+	if addr < 0x800_0000 || addr >= 0xE00_0000 {
+		return uint32(m.Read(addr))
+	}
+
+	if addr&0x1FF_FFFF >= uint32(len(*m.GBA.Cartridge.Rom)) {
+		return m.ReadBadRom(addr, 1)
+	}
+
+	return uint32(m.Read(addr))
+}
+
+func (m *Memory) Read16(addr uint32) uint32 {
+	if addr >= 0xE00_0000 {
+		v := uint32(m.Read(addr))
+		return v | (v << 8)
+	}
+
+	addr &^= 1
+
+	if addr >= 0xD00_0000 && CheckEeprom(m.GBA, addr) {
+		return uint32(m.GBA.Cartridge.EepromRead())
+	}
+
+	if addr >= 0x800_0000 && addr&0x1FF_FFFF >= uint32(len(*m.GBA.Cartridge.Rom)) {
+		return m.ReadBadRom(addr, 2)
+	}
+
+	if ptr := m.ReadPtr(addr); ptr != nil {
+		return uint32(*(*uint16)(ptr))
+	}
+
+	v := uint32(m.Read(addr + 0))
+	v |= uint32(m.Read(addr+1)) << 8
+
+	return v
+}
+
+func (m *Memory) Read32(addr uint32) uint32 {
+	if addr >= 0xE00_0000 {
+		v := uint32(m.Read(addr))
+		return v | (v << 8) | (v << 16) | (v << 24)
+	}
+
+	addr &^= 3
+
+	if addr >= 0x800_0000 && addr&0x1FF_FFFF >= uint32(len(*m.GBA.Cartridge.Rom)) {
+		return m.ReadBadRom(addr, 4)
+	}
+
+	if ptr := m.ReadPtr(addr); ptr != nil {
+		return *(*uint32)(ptr)
+	}
+
+	v := uint32(m.Read16(addr + 0))
+	v |= uint32(m.Read16(addr+2)) << 16
+
+	return v
 }
 
 var openBusDepth int
@@ -327,6 +383,26 @@ func (m *Memory) ReadOpenBus(addr uint32) uint8 {
 	return uint8(m.Read32(m.GBA.Cpu.Reg.R[15]) >> ((addr & 3) << 3))
 }
 
+func (m *Memory) ReadBadRom(addr, size uint32) uint32 {
+	switch size {
+	case 1:
+		return ((addr >> 1) >> ((addr & 1) << 3)) & 0xFF
+
+	case 2:
+
+		if addr&1 != 0 {
+			return ((addr >> 1) >> ((addr & 1) << 3)) & 0xFF
+		}
+
+		return (addr >> 1) & 0xFFFF
+
+	case 4:
+		return (((addr &^ 3) >> 1) & 0xFFFF) | ((((addr &^ 3) + 2) >> 1) << 16)
+	default:
+		panic("BAD ROM READ USING BYTES READ NOT VALID (1, 2, 4)")
+	}
+}
+
 func (m *Memory) ReadIO(addr uint32) uint8 {
 	switch {
 	case
@@ -340,7 +416,12 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 		addr >= 0xE0 && addr < 0x100:
 		return m.ReadOpenBus(addr)
 	case addr >= 0x60 && addr < 0xB0:
-		return m.ReadSoundIO(addr)
+		switch addr &^ 1 {
+		case 0x8C, 0x8E, 0xA0, 0xA2, 0xA4, 0xA6, 0xA8, 0xAA, 0xAC, 0xAE:
+			return m.ReadOpenBus(addr)
+		default:
+			return ReadSound(addr, m.GBA.Apu)
+		}
 	case addr >= 0xB0 && addr < 0xE0:
 
 		addr -= 0xB0
@@ -387,95 +468,102 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 	return m.IO[addr]
 }
 
-func (m *Memory) Read8(addr uint32) uint32 {
-	if badRom := addr >= 0x800_0000 && addr < 0xE00_0000; badRom {
-		if addr&0x1FF_FFFF >= uint32(len(*m.GBA.Cartridge.Rom)) {
-			return m.ReadBadRom(addr, 1)
-		}
-	}
-
-	return uint32(m.Read(addr))
+func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
+	m.writeRegions[addr>>24](m, addr, v, byteWrite)
 }
 
-func (m *Memory) Read16(addr uint32) uint32 {
+func (m *Memory) Write8(addr uint32, v uint8) {
+	m.Write(addr, v, true)
+}
+
+func (m *Memory) Write16(addr uint32, v uint16) {
 	if addr >= 0xE00_0000 {
-		v := uint32(m.Read(addr))
-		return v | (v << 8)
+		v = v >> ((addr & 1) << 3)
+		m.Write(addr, uint8(v), false)
+		return
 	}
 
 	addr &^= 1
 
-	switch {
-	case addr >= 0xD00_0000:
+	if addr >= 0xD00_0000 {
 		if ok := CheckEeprom(m.GBA, addr); ok {
-			return uint32(m.GBA.Cartridge.EepromRead())
-		}
-
-		offset := (addr - 0x800_0000) & (0x200_0000 - 1)
-		if offset >= uint32(len(*m.GBA.Cartridge.Rom)) {
-			return m.ReadBadRom(addr, 2)
-		}
-
-	case addr >= 0x800_0000:
-		if addr&0x1FF_FFFF >= uint32(len(*m.GBA.Cartridge.Rom)) {
-			return m.ReadBadRom(addr, 2)
+			m.GBA.Save = true
+			m.GBA.Cartridge.EepromWrite(v)
+			return
 		}
 	}
 
-	if ptr := m.ReadPtr(addr); ptr != nil {
-		return uint32(*(*uint16)(ptr))
+	switch addr {
+	case 0x400_0100, 0x400_0102:
+		m.GBA.Timers[0].Write16(addr&3, v)
+		return
+	case 0x400_0104, 0x400_0106:
+		m.GBA.Timers[1].Write16(addr&3, v)
+		return
+	case 0x400_0108, 0x400_010A:
+		m.GBA.Timers[2].Write16(addr&3, v)
+		return
+	case 0x400_010C, 0x400_010E:
+		m.GBA.Timers[3].Write16(addr&3, v)
+		return
+
+	case 0x400_0200, 0x400_0202, 0x400_0208:
+		m.GBA.Irq.Write16(addr&0xFFFF, v)
+		return
 	}
 
-	v := uint32(m.Read(addr + 0))
-	v |= uint32(m.Read(addr+1)) << 8
+	if ptr := m.WritePtr(addr); ptr != nil {
+		*(*uint16)(ptr) = v
+		return
+	}
 
-	return v
+	m.Write(addr+0, uint8(v), false)
+	m.Write(addr+1, uint8(v>>8), false)
 }
 
-func (m *Memory) Read32(addr uint32) uint32 {
+func (m *Memory) Write32(addr uint32, v uint32) {
 	if addr >= 0xE00_0000 {
-		v := uint32(m.Read(addr))
-		return v | (v << 8) | (v << 16) | (v << 24)
+		v = v >> ((addr & 3) << 3)
+		m.Write(addr, uint8(v), false)
+		return
 	}
 
 	addr &^= 3
 
-	if addr >= 0x800_0000 && addr&0x1FF_FFFF >= uint32(len(*m.GBA.Cartridge.Rom)) {
-		return m.ReadBadRom(addr, 4)
+	switch addr {
+	case 0x400_0100:
+		m.GBA.Timers[0].Write32(v)
+		return
+	case 0x400_0104:
+		m.GBA.Timers[1].Write32(v)
+		return
+	case 0x400_0108:
+		m.GBA.Timers[2].Write32(v)
+		return
+	case 0x400_010c:
+		m.GBA.Timers[3].Write32(v)
+		return
 	}
 
-	if ptr := m.ReadPtr(addr); ptr != nil {
-		return *(*uint32)(ptr)
+	if ptr := m.WritePtr(addr); ptr != nil {
+		*(*uint32)(ptr) = v
+		return
 	}
 
-	v := uint32(m.Read16(addr + 0))
-	v |= uint32(m.Read16(addr+2)) << 16
-
-	return v
+	m.Write16(addr+0, uint16(v))
+	m.Write16(addr+2, uint16(v>>16))
 }
 
-func (m *Memory) ReadBadRom(addr, size uint32) uint32 {
-	switch size {
-	case 1:
-		return ((addr >> 1) >> ((addr & 1) << 3)) & 0xFF
-
-	case 2:
-
-		if addr&1 != 0 {
-			return ((addr >> 1) >> ((addr & 1) << 3)) & 0xFF
-		}
-
-		return (addr >> 1) & 0xFFFF
-
-	case 4:
-		return (((addr &^ 3) >> 1) & 0xFFFF) | ((((addr &^ 3) + 2) >> 1) << 16)
-	default:
-		panic("BAD ROM READ USING BYTES READ NOT VALID (1, 2, 4)")
+func CheckEeprom(gba *GBA, addr uint32) bool {
+	if notEeprom := gba.Cartridge.Id != 1; notEeprom {
+		return false
 	}
-}
 
-func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
-	m.writeRegions[addr>>24](m, addr, v, byteWrite)
+	if len(*gba.Cartridge.Rom) <= 0x100_0000 {
+		return addr >= 0xD00_0000
+	}
+
+	return addr >= 0xDFFFF00
 }
 
 func (m *Memory) WriteIO(addr uint32, v uint8) {
@@ -590,159 +678,5 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 
 	if addr == 0x0 || addr == 0x1 || (addr >= 0x8 && addr < 0x55) {
 		m.GBA.PPU.UpdatePPU(addr, uint32(v))
-	}
-}
-
-func (m *Memory) Write8(addr uint32, v uint8) {
-	m.Write(addr, v, true)
-}
-
-func (m *Memory) Write16(addr uint32, v uint16) {
-	if addr >= 0xE00_0000 {
-		v = v >> ((addr & 1) << 3)
-		m.Write(addr, uint8(v), false)
-		return
-	}
-
-	addr &^= 1
-
-	if addr >= 0xD00_0000 {
-		if ok := CheckEeprom(m.GBA, addr); ok {
-			m.GBA.Save = true
-			m.GBA.Cartridge.EepromWrite(v)
-			return
-		}
-	}
-
-	switch addr {
-	case 0x400_0100, 0x400_0102:
-		m.GBA.Timers[0].Write16(addr&3, v)
-		return
-	case 0x400_0104, 0x400_0106:
-		m.GBA.Timers[1].Write16(addr&3, v)
-		return
-	case 0x400_0108, 0x400_010A:
-		m.GBA.Timers[2].Write16(addr&3, v)
-		return
-	case 0x400_010C, 0x400_010E:
-		m.GBA.Timers[3].Write16(addr&3, v)
-		return
-
-	case 0x400_0200, 0x400_0202, 0x400_0208:
-		m.GBA.Irq.Write16(addr&0xFFFF, v)
-		return
-	}
-
-	if ptr := m.WritePtr(addr); ptr != nil {
-		*(*uint16)(ptr) = v
-		return
-	}
-
-	m.Write(addr+0, uint8(v), false)
-	m.Write(addr+1, uint8(v>>8), false)
-}
-
-func (m *Memory) Write32(addr uint32, v uint32) {
-	if addr >= 0xE00_0000 {
-		v = v >> ((addr & 3) << 3)
-		m.Write(addr, uint8(v), false)
-		return
-	}
-
-	addr &^= 3
-
-	switch addr {
-	case 0x400_0100:
-		m.GBA.Timers[0].Write32(v)
-		return
-	case 0x400_0104:
-		m.GBA.Timers[1].Write32(v)
-		return
-	case 0x400_0108:
-		m.GBA.Timers[2].Write32(v)
-		return
-	case 0x400_010c:
-		m.GBA.Timers[3].Write32(v)
-		return
-	}
-
-	if ptr := m.WritePtr(addr); ptr != nil {
-		*(*uint32)(ptr) = v
-		return
-	}
-
-	m.Write16(addr+0, uint16(v))
-	m.Write16(addr+2, uint16(v>>16))
-}
-
-func CheckEeprom(gba *GBA, addr uint32) bool {
-	if gba.Cartridge.Id != 1 {
-		return false
-	}
-
-	if addr < 0xD00_0000 || addr >= 0xE00_0000 {
-		return false
-	}
-
-	if len(*gba.Cartridge.Rom) > 0x1000_0000 && addr < 0xDFF_FF00 {
-		return false
-	}
-
-	return true
-}
-
-func (m *Memory) ReadSoundIO(addr uint32) uint8 {
-	switch addr &^ 1 {
-	case 0x8C:
-		return m.ReadOpenBus(addr)
-	case 0x8E:
-		return m.ReadOpenBus(addr)
-	case 0xA0:
-		return m.ReadOpenBus(addr)
-	case 0xA2:
-		return m.ReadOpenBus(addr)
-	case 0xA4:
-		return m.ReadOpenBus(addr)
-	case 0xA6:
-		return m.ReadOpenBus(addr)
-	case 0xA8:
-		return m.ReadOpenBus(addr)
-	case 0xAA:
-		return m.ReadOpenBus(addr)
-	case 0xAC:
-		return m.ReadOpenBus(addr)
-	case 0xAE:
-		return m.ReadOpenBus(addr)
-	default:
-		return ReadSound(addr, m.GBA.Apu)
-	}
-}
-
-func (m *Memory) ReadIODirect(addr uint32, size uint32) uint32 {
-	switch size {
-	case 1:
-		return m.ReadIODirectByte(addr)
-
-	case 2:
-		return m.ReadIODirectByte(addr+1)<<8 | m.ReadIODirectByte(addr)
-	case 4:
-		a := m.ReadIODirectByte(addr+3)<<8 | m.ReadIODirectByte(addr+2)
-		b := m.ReadIODirectByte(addr+1)<<8 | m.ReadIODirectByte(addr)
-
-		return (a << 16) | b
-
-	default:
-		panic("UNKOWN READ IO DIRECT SIZE")
-	}
-}
-
-func (m *Memory) ReadIODirectByte(addr uint32) uint32 {
-	switch addr {
-	case 0x4:
-		return uint32(m.Dispstat)
-	case 0x5:
-		return uint32(m.Dispstat >> 8)
-	default:
-		return uint32(m.IO[addr])
 	}
 }

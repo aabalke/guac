@@ -64,8 +64,6 @@ func (t *Timer) Write(idx int, v uint8) {
 }
 
 func (t *Timer) Write16(idx uint32, v uint16) {
-	B[14] = true
-
 	if idx == 2 {
 		t.Gba.Scheduler.schedule(EVENT_TIMER_RELOAD, 1, 1, func(late int64, a any) {
 			v := a.(uint16)

@@ -6,7 +6,6 @@ import (
 )
 
 func (ppu *PPU) Graphics(y, frame uint32) {
-
 	a := &ppu.EngineA
 	b := &ppu.EngineB
 
@@ -20,7 +19,7 @@ func (ppu *PPU) Graphics(y, frame uint32) {
 	a.getObjPriority(y)
 	b.getObjPriority(y)
 
-	//if frame & ppu.FrameSkipMask == 0 {
+	// if frame & ppu.FrameSkipMask == 0 {
 	ppu.buildFrame(y)
 	//}
 
@@ -31,7 +30,6 @@ func (ppu *PPU) Graphics(y, frame uint32) {
 }
 
 func (ppu *PPU) buildFrame(y uint32) {
-
 	switch a := &ppu.EngineA; a.Dispcnt.DisplayMode {
 	case 0:
 		ppu.screenoff(y, a)
@@ -64,7 +62,6 @@ func (ppu *PPU) screenoff(y uint32, e *Engine) {
 }
 
 func (ppu *PPU) vramDisplay(y uint32, e *Engine) {
-
 	bank := (*[0x20000]uint8)(ppu.Vram.Cnt[e.Dispcnt.VramBlock].bank)
 
 	addr := (y * SCREEN_WIDTH) * 2
@@ -80,7 +77,6 @@ func (ppu *PPU) vramDisplay(y uint32, e *Engine) {
 }
 
 func (ppu *PPU) standard(y uint32, e *Engine) {
-
 	ResetBlendPalettes(e)
 	for x := range uint32(SCREEN_WIDTH) {
 		e.Windows.inObjWindow[x] = false
@@ -144,7 +140,6 @@ func (ppu *PPU) standard(y uint32, e *Engine) {
 					ppu.bitmapObject(e, i, uint32(priority), y)
 				}
 			} else {
-
 				if obj.RotScale {
 					ppu.tiledObjectAffine(e, i, uint32(priority), y)
 				} else {

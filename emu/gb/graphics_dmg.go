@@ -3,7 +3,6 @@
 package gb
 
 func (gb *GameBoy) renderTilesDMG(scanline uint8) {
-
 	var (
 		scrollY   = gb.MemoryBus.IO[0x42]
 		scrollX   = gb.MemoryBus.IO[0x43]
@@ -86,14 +85,13 @@ func (gb *GameBoy) renderTilesDMG(scanline uint8) {
 }
 
 func (gb *GameBoy) renderSpritesDMG(scanline int32) {
-
 	var ySize int32 = 8
 	if gb.Lcdc.DoubleHeight {
 		ySize = 16
 	}
 
 	gb.spMinx = [width]int32{}
-	var lineSprites = 0
+	lineSprites := 0
 	for sprite := range uint16(40) {
 		index := sprite * 4
 

@@ -2,10 +2,7 @@ package gba
 
 import (
 	"encoding/binary"
-	"sync"
 )
-
-var wg = sync.WaitGroup{}
 
 const (
 	MAX_HEIGHT = 256
@@ -47,8 +44,7 @@ func updateBackgrounds(gba *GBA, dispcnt *Dispcnt) *[4]Background {
 func (gba *GBA) scanlineGraphics(y uint32) {
 	switch {
 	case gba.PPU.Dispcnt.ForcedBlank:
-		x := uint32(0)
-		for x = range SCREEN_WIDTH {
+		for x := range uint32(SCREEN_WIDTH) {
 			index := (x + (y * SCREEN_WIDTH)) * 4
 			gba.Pixels[index] = 0xFF
 			gba.Pixels[index+1] = 0xFF
@@ -62,36 +58,10 @@ func (gba *GBA) scanlineGraphics(y uint32) {
 	}
 }
 
-const THREADS = 0
-
 func (gba *GBA) scanlineTileMode(y uint32) {
-	if THREADS == 0 {
-
-		x := uint32(0)
-		for x = range SCREEN_WIDTH {
-			gba.renderTilePixel(x, y)
-		}
-
-		return
+	for x := range uint32(SCREEN_WIDTH) {
+		gba.renderTilePixel(x, y)
 	}
-
-	WAIT_GROUPS := THREADS
-	dx := SCREEN_WIDTH / WAIT_GROUPS
-
-	wg.Add(WAIT_GROUPS)
-
-	for i := range WAIT_GROUPS {
-		go func(i int) {
-			defer wg.Done()
-
-			for j := range dx {
-				x := uint32((i * dx) + j)
-				gba.renderTilePixel(x, y)
-			}
-		}(i)
-	}
-
-	wg.Wait()
 }
 
 func (gba *GBA) renderTilePixel(x, y uint32) {
@@ -316,32 +286,9 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 		gba.applyColor(finalPalData, uint32(index))
 	}
 
-	if THREADS == 0 {
-
-		x := uint32(0)
-		for x = range SCREEN_WIDTH {
-			renderPixel(x)
-		}
-
-		return
+	for x := range uint32(SCREEN_WIDTH) {
+		renderPixel(x)
 	}
-
-	WAIT_GROUPS := THREADS
-	dx := SCREEN_WIDTH / WAIT_GROUPS
-
-	wg.Add(WAIT_GROUPS)
-
-	for i := range WAIT_GROUPS {
-		go func(i int) {
-			defer wg.Done()
-
-			for j := range dx {
-				renderPixel(uint32((i * dx) + j))
-			}
-		}(i)
-	}
-
-	wg.Wait()
 }
 
 func outObjectBound(obj *Object, xIdx, yIdx int) bool {
