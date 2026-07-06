@@ -11,25 +11,16 @@ const (
 )
 
 func (c *Cartridge) ReadFlash(addr uint32) uint8 {
-	var v uint8
-
 	if c.FlashMode == FL_ID {
 		switch addr {
-		case 0:
-			v = uint8(c.Manufacturer)
-		case 1:
-			v = uint8(c.Device)
+		case 0, 1:
+			return c.Device[addr]
 		default:
-			v = 0xFF
+			return 0xFF
 		}
 	} else {
-		bankAddr := (c.FlashBank * 0x1_0000) + addr
-
-		v = c.Flash[bankAddr]
-
+		return c.Sav[(c.FlashBank*0x1_0000)+addr]
 	}
-
-	return v
 }
 
 func (c *Cartridge) WriteFlash(addr uint32, v uint8) {
@@ -45,12 +36,12 @@ func (c *Cartridge) WriteFlash(addr uint32, v uint8) {
 		bankAddr := (c.FlashBank * 0x1_0000) + addr
 
 		// The target memory location must have been previously erased.
-		c.Flash[bankAddr] &= v
+		c.Sav[bankAddr] &= v
 
 	case FL_ERASE_ALL:
 
-		for i := range len(c.Flash) {
-			c.Flash[i] = 0xFF
+		for i := range len(c.Sav) {
+			c.Sav[i] = 0xFF
 		}
 
 		c.FlashMode = FL_READ
@@ -65,7 +56,7 @@ func (c *Cartridge) WriteFlash(addr uint32, v uint8) {
 
 		bankAddr := (c.FlashBank * 0x1_0000) + addr
 		for i := range uint32(0x1000) {
-			c.Flash[bankAddr+i] = 0xFF
+			c.Sav[bankAddr+i] = 0xFF
 		}
 
 		c.FlashMode = FL_READ

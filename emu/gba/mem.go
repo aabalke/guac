@@ -226,7 +226,7 @@ func (m *Memory) initReadRegions() {
 
 	for i := 0x8; i < 0xE; i++ {
 		m.readRegions[i] = func(m *Memory, addr uint32) uint8 {
-			return m.GBA.Cartridge.Rom[addr&0x1FFFFFF]
+			return (*m.GBA.Cartridge.Rom)[addr&0x1FFFFFF]
 		}
 	}
 
@@ -241,16 +241,12 @@ func (m *Memory) ReadPtr(addr uint32) unsafe.Pointer {
 	switch addr >> 24 {
 	case 0:
 
-		if addr >= 0x4000 {
+		// need to avoid protected latch value, skip anything near latches
+		if addr >= 0x4000 || addr < 0x200 {
 			return nil
 		}
 
 		if m.GBA.Cpu.Reg.R[15] >= 0x4000 {
-			return nil
-		}
-
-		// need to avoid protected latch value, skip anything near latches
-		if addr < 0x200 {
 			return nil
 		}
 
@@ -272,10 +268,10 @@ func (m *Memory) ReadPtr(addr uint32) unsafe.Pointer {
 		return unsafe.Add(unsafe.Pointer(&m.OAM), addr&0x3FF)
 
 	case 8, 9, 0xA, 0xB, 0xC, 0xD:
-		if addr&0x1FF_FFFF >= m.GBA.Cartridge.RomLength {
+		if addr&0x1FF_FFFF >= uint32(len(*m.GBA.Cartridge.Rom)) {
 			return nil
 		}
-		return unsafe.Add(unsafe.Pointer(&m.GBA.Cartridge.Rom), addr&0x1FF_FFFF)
+		return unsafe.Add(unsafe.Pointer(&(*m.GBA.Cartridge.Rom)[0]), addr&0x1FF_FFFF)
 	}
 
 	return nil
@@ -296,7 +292,7 @@ func (m *Memory) WritePtr(addr uint32) unsafe.Pointer {
 		}
 		return unsafe.Add(unsafe.Pointer(&m.VRAM), addr)
 
-		// cannot case 7 rn since need to update oam on every write
+		// cannot case 7 (oam) rn since need to update oam on every write
 	}
 
 	return nil
@@ -323,19 +319,18 @@ func (m *Memory) ReadOpenBus(addr uint32) uint8 {
 		panic("open bus depth >= 100")
 	}
 
-	pc := m.GBA.Cpu.Reg.R[15]
-
 	if m.GBA.Cpu.Reg.CPSR.T {
 		// does pipeline impliment region based thumb mode?
-		return uint8(m.Read16(pc) >> ((addr & 1) << 3))
+		return uint8(m.Read16(m.GBA.Cpu.Reg.R[15]) >> ((addr & 1) << 3))
 	}
 
-	return uint8(m.Read32(pc) >> ((addr & 3) << 3))
+	return uint8(m.Read32(m.GBA.Cpu.Reg.R[15]) >> ((addr & 3) << 3))
 }
 
 func (m *Memory) ReadIO(addr uint32) uint8 {
 	switch {
-	case addr >= 0x10 && addr < 0x48,
+	case
+		addr >= 0x10 && addr < 0x48,
 		addr >= 0x4C && addr < 0x50,
 		addr >= 0x54 && addr < 0x60,
 		addr >= 0xB0 && addr < 0xB8,
@@ -363,11 +358,11 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 	}
 
 	switch addr {
-	case 0x0004:
+	case 0x04:
 		return uint8(m.Dispstat)
-	case 0x0005:
+	case 0x05:
 		return uint8(m.Dispstat >> 8)
-	case 0x0007:
+	case 0x07:
 		return 0
 
 	case 0x130, 0x131, 0x132, 0x133:
@@ -394,7 +389,7 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 
 func (m *Memory) Read8(addr uint32) uint32 {
 	if badRom := addr >= 0x800_0000 && addr < 0xE00_0000; badRom {
-		if addr&0x1FF_FFFF >= m.GBA.Cartridge.RomLength {
+		if addr&0x1FF_FFFF >= uint32(len(*m.GBA.Cartridge.Rom)) {
 			return m.ReadBadRom(addr, 1)
 		}
 	}
@@ -417,12 +412,12 @@ func (m *Memory) Read16(addr uint32) uint32 {
 		}
 
 		offset := (addr - 0x800_0000) & (0x200_0000 - 1)
-		if offset >= m.GBA.Cartridge.RomLength {
+		if offset >= uint32(len(*m.GBA.Cartridge.Rom)) {
 			return m.ReadBadRom(addr, 2)
 		}
 
 	case addr >= 0x800_0000:
-		if addr&0x1FF_FFFF >= m.GBA.Cartridge.RomLength {
+		if addr&0x1FF_FFFF >= uint32(len(*m.GBA.Cartridge.Rom)) {
 			return m.ReadBadRom(addr, 2)
 		}
 	}
@@ -445,7 +440,7 @@ func (m *Memory) Read32(addr uint32) uint32 {
 
 	addr &^= 3
 
-	if addr >= 0x800_0000 && addr&0x1FF_FFFF >= m.GBA.Cartridge.RomLength {
+	if addr >= 0x800_0000 && addr&0x1FF_FFFF >= uint32(len(*m.GBA.Cartridge.Rom)) {
 		return m.ReadBadRom(addr, 4)
 	}
 
@@ -689,7 +684,7 @@ func CheckEeprom(gba *GBA, addr uint32) bool {
 		return false
 	}
 
-	if gba.Cartridge.RomLength > 0x1000_0000 && addr < 0xDFF_FF00 {
+	if len(*gba.Cartridge.Rom) > 0x1000_0000 && addr < 0xDFF_FF00 {
 		return false
 	}
 

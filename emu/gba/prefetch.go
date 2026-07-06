@@ -85,10 +85,6 @@ func (p *Prefetch) Wait(r15, addr, width uint32, cycles int64) {
 
 		region := (addr >> 25) & 3
 
-		if region == 3 {
-			panic("sram")
-		}
-
 		switch cycles {
 		case int64(p.Ws.S[region]):
 			cycles = int64(p.Ws.N[0])

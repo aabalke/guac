@@ -5,106 +5,92 @@ package cart
 import "fmt"
 
 const (
-	EE_MODE_IDLE       = 0
-	EE_MODE_WRITE_INIT = 1
-	EE_MODE_WRITE      = 2
-	EE_MODE_READ       = 3
-	EE_MODE_READ_INIT  = 4
-)
-
-var (
-	eepromReadBitsCount uint32
-	eepromReadBits      uint64
-
-	eepromWriteBitsCount uint32
-	eepromWriteBits      uint64
-
-	EepromWidth uint32
-	EepromAddr  uint32
-	EepromState uint32
+	EE_MODE_IDLE = iota
+	EE_MODE_WRITE_INIT
+	EE_MODE_WRITE
+	EE_MODE_READ
+	EE_MODE_READ_INIT
 )
 
 func (c *Cartridge) EepromRead() uint16 {
-
 	switch {
-	case eepromReadBitsCount > 64:
-		eepromReadBitsCount--
+	case c.EepromReadBitsCount > 64:
+		c.EepromReadBitsCount--
 		return 1
-	case eepromReadBitsCount > 0:
-		eepromReadBitsCount--
-		return uint16(eepromReadBits>>uint64(eepromReadBitsCount)) & 1
+	case c.EepromReadBitsCount > 0:
+		c.EepromReadBitsCount--
+		return uint16(c.EepromReadBits>>uint64(c.EepromReadBitsCount)) & 1
 	default:
 		return 1
 	}
 }
 
 func (c *Cartridge) EepromWrite(v uint16) {
-
-	if EepromWidth == 0 {
+	if c.EepromWidth == 0 {
 		panic("EEPROM WIDTH 0")
 	}
 
-	eepromWriteBits <<= 1
-	eepromWriteBits |= uint64(v & 1)
-	eepromWriteBitsCount++
+	c.EepromWriteBits <<= 1
+	c.EepromWriteBits |= uint64(v & 1)
+	c.EepromWriteBitsCount++
 
-	switch EepromState {
+	switch c.EepromState {
 	case 0: // Start of stream
-		if eepromWriteBitsCount < 2 {
+		if c.EepromWriteBitsCount < 2 {
 			return
 		}
-		EepromState = uint32(eepromWriteBits)
+		c.EepromState = uint32(c.EepromWriteBits)
 
-		if EepromState != 2 && EepromState != 3 {
+		if c.EepromState != 2 && c.EepromState != 3 {
 			panic("EEPROM INCORRECT START STREAM STATE")
 		}
 
-		eepromWriteBits = 0
-		eepromWriteBitsCount = 0
+		c.EepromWriteBits = 0
+		c.EepromWriteBitsCount = 0
 
 	case 1: // End of stream
 
-		EepromState = 0
-		eepromWriteBits = 0
-		eepromWriteBitsCount = 0
+		c.EepromState = 0
+		c.EepromWriteBits = 0
+		c.EepromWriteBitsCount = 0
 
 	case 2: // Write request
-		if eepromWriteBitsCount < EepromWidth {
+		if c.EepromWriteBitsCount < c.EepromWidth {
 			return
 		}
-		EepromAddr = uint32(eepromWriteBits * 8)
-		eepromReadBits = 0
-		eepromReadBitsCount = 0
-		EepromState = 4
-		eepromWriteBits = 0
-		eepromWriteBitsCount = 0
+		c.EepromAddr = uint32(c.EepromWriteBits * 8)
+		c.EepromReadBits = 0
+		c.EepromReadBitsCount = 0
+		c.EepromState = 4
+		c.EepromWriteBits = 0
+		c.EepromWriteBitsCount = 0
 
 	case 3: // Read request
-		if eepromWriteBitsCount < EepromWidth {
+		if c.EepromWriteBitsCount < c.EepromWidth {
 			return
 		}
-		EepromAddr = uint32(eepromWriteBits * 8)
+		c.EepromAddr = uint32(c.EepromWriteBits * 8)
 
-		//if EepromAddr > uint32(len(c.Eeprom)) {
-		//    fmt.Printf("3 ADDR %08X", EepromAddr)
+		//if c.EepromAddr > uint32(len(c.c.Eeprom)) {
+		//    fmt.Printf("3 ADDR %08X", c.EepromAddr)
 		//    panic("TOO BIG")
 		//}
 
-		eepromReadBits = 0
-		eepromReadBitsCount = 68
+		c.EepromReadBits = 0
+		c.EepromReadBitsCount = 68
 		for i := range 8 {
-			b := c.Eeprom[int(EepromAddr)+i]
+			b := c.Sav[int(c.EepromAddr)+i]
 			for j := 7; j >= 0; j-- {
-				eepromReadBits <<= 1
-				eepromReadBits |= uint64(b>>j) & 1
+				c.EepromReadBits <<= 1
+				c.EepromReadBits |= uint64(b>>j) & 1
 			}
 		}
-		EepromState = 1
-		eepromWriteBits = 0
-		eepromWriteBitsCount = 0
+		c.EepromState = 1
+		c.EepromWriteBits = 0
+		c.EepromWriteBitsCount = 0
 
 	case 4: // Data
-		if eepromWriteBitsCount < 64 {
+		if c.EepromWriteBitsCount < 64 {
 			return
 		}
 
@@ -112,20 +98,20 @@ func (c *Cartridge) EepromWrite(v uint16) {
 			b := uint8(0)
 			for j := 7; j >= 0; j-- {
 				b <<= 1
-				b |= uint8(eepromWriteBits>>((7-i)*8+j)) & 1
+				b |= uint8(c.EepromWriteBits>>((7-i)*8+j)) & 1
 			}
 
-			if EepromAddr+uint32(i) > 8192 {
-				fmt.Printf("EEPROM ADDR WRITING V %02X, ADDR %08X, I %08X\n", b, EepromAddr, i)
+			if c.EepromAddr+uint32(i) > 8192 {
+				fmt.Printf("EEPROM ADDR WRITING V %02X, ADDR %08X, I %08X\n", b, c.EepromAddr, i)
 				panic("TOO BIG")
 			}
 
-			c.Eeprom[EepromAddr+uint32(i)] = uint8(b)
+			c.Sav[c.EepromAddr+uint32(i)] = uint8(b)
 		}
 
-		EepromState = 1
-		eepromWriteBits = 0
-		eepromWriteBitsCount = 0
+		c.EepromState = 1
+		c.EepromWriteBits = 0
+		c.EepromWriteBitsCount = 0
 
 	default:
 		panic("UNKNOWN EEPROM STATE")

@@ -2,8 +2,6 @@ package gba
 
 import (
 	"unsafe"
-
-	"github.com/aabalke/guac/emu/gba/cart"
 )
 
 var EVENTS = []Event{EVENT_DMA0, EVENT_DMA1, EVENT_DMA2, EVENT_DMA3}
@@ -380,8 +378,8 @@ func (dma *Dma) EepromDma(count, dst uint32) {
 
 	switch count {
 	case 9, 73:
-		cart.EepromWidth = 6
+		dma.Gba.Cartridge.EepromWidth = 6
 	case 17, 81:
-		cart.EepromWidth = 14
+		dma.Gba.Cartridge.EepromWidth = 14
 	}
 }
