@@ -9,10 +9,10 @@ type Cpu struct {
 	Op                [2]uint32
 	Reg               Reg
 	Halted            bool
-	NonSeq            bool
 	LastWasDma        bool
 	IrqLine           bool
 	Reloaded          bool
+	Seq               uint32
 }
 
 const (
@@ -36,6 +36,9 @@ const (
 	MODE_ABT = 0x17
 	MODE_UND = 0x1B
 	MODE_SYS = 0x1F
+
+	NONSEQ = 0
+	SEQ    = 1
 )
 
 func (c *Cond) CheckCond(cond uint32) bool {
@@ -87,8 +90,7 @@ var BANK_ID = map[uint32]uint32{
 
 func NewCpu(g *GBA) *Cpu {
 	return &Cpu{
-		NonSeq: true,
-		gba:    g,
+		gba: g,
 	}
 }
 
@@ -103,16 +105,16 @@ func (c *Cpu) Step() {
 				thumb = cpsr.T
 				addr  = uint32(VEC_IRQ)
 				mode  = uint32(MODE_IRQ)
-				seq   = !c.NonSeq
+				seq   = c.Seq
 			)
 
-			c.NonSeq = false
+			c.Seq = SEQ
 
 			if thumb {
-				c.Cycles(c.Reg.R[15], 2, false, seq, true)
+				c.Cycles(c.Reg.R[15], 2, seq, true)
 				c.gba.Mem.Read16(c.Reg.R[15])
 			} else {
-				c.Cycles(c.Reg.R[15], 4, false, seq, true)
+				c.Cycles(c.Reg.R[15], 4, seq, true)
 				c.gba.Mem.Read32(c.Reg.R[15])
 			}
 
@@ -142,13 +144,13 @@ func (c *Cpu) Step() {
 
 	inst := c.Op[0]
 
-	seq := !c.NonSeq
-	c.NonSeq = false
+	seq := c.Seq
+	c.Seq = SEQ
 	c.Op[0] = c.Op[1]
 
 	if c.Reg.CPSR.T {
 
-		c.Cycles(c.Reg.R[15], 2, false, seq, true)
+		c.Cycles(c.Reg.R[15], 2, seq, true)
 
 		if c.PcPtr == nil {
 			c.Op[1] = c.gba.Mem.Read16(c.Reg.R[15])
@@ -167,7 +169,7 @@ func (c *Cpu) Step() {
 
 	} else {
 
-		c.Cycles(c.Reg.R[15], 4, false, seq, true)
+		c.Cycles(c.Reg.R[15], 4, seq, true)
 		if c.PcPtr == nil {
 			c.Op[1] = c.gba.Mem.Read32(c.Reg.R[15])
 		} else {
@@ -192,8 +194,8 @@ func (c *Cpu) Reload16() {
 
 	c.PcPtr = c.gba.Mem.ReadPtr(c.Reg.R[15])
 
-	c.Cycles(*pc, 2, false, false, true)
-	c.Cycles(*pc+2, 2, false, true, true)
+	c.Cycles(*pc, 2, NONSEQ, true)
+	c.Cycles(*pc+2, 2, SEQ, true)
 
 	if c.PcPtr == nil {
 		c.Op[0] = c.gba.Mem.Read16(*pc + 0)
@@ -207,7 +209,7 @@ func (c *Cpu) Reload16() {
 
 	*pc += 4
 	c.Reloaded = true
-	c.NonSeq = false
+	c.Seq = SEQ
 }
 
 func (c *Cpu) Reload32() {
@@ -215,8 +217,8 @@ func (c *Cpu) Reload32() {
 
 	c.PcPtr = c.gba.Mem.ReadPtr(c.Reg.R[15])
 
-	c.Cycles(*pc, 4, false, false, true)
-	c.Cycles(*pc+4, 4, false, true, true)
+	c.Cycles(*pc, 4, NONSEQ, true)
+	c.Cycles(*pc+4, 4, SEQ, true)
 
 	if c.PcPtr == nil {
 		c.Op[0] = c.gba.Mem.Read32(*pc + 0)
@@ -230,7 +232,7 @@ func (c *Cpu) Reload32() {
 
 	*pc += 8
 	c.Reloaded = true
-	c.NonSeq = false
+	c.Seq = SEQ
 }
 
 type Reg struct {
@@ -304,99 +306,113 @@ func (cpu *Cpu) ToggleThumb() {
 }
 
 func (c *Cpu) Write8(addr uint32, v uint8) {
-	c.Cycles(addr, 1, false, false, false)
+	c.Cycles(addr, 1, NONSEQ, false)
 	c.gba.Mem.Write8(addr, v)
-	c.NonSeq = true
+	c.Seq = NONSEQ
 }
 
 func (c *Cpu) Write16(addr uint32, v uint16) {
-	c.Cycles(addr, 2, false, false, false)
+	c.Cycles(addr, 2, NONSEQ, false)
 	c.gba.Mem.Write16(addr, v)
-	c.NonSeq = true
+	c.Seq = NONSEQ
 }
 
 func (c *Cpu) Write32(addr uint32, v uint32) {
-	c.Cycles(addr, 4, false, false, false)
+	c.Cycles(addr, 4, NONSEQ, false)
 	c.gba.Mem.Write32(addr, v)
-	c.NonSeq = true
+	c.Seq = NONSEQ
 }
 
-func (c *Cpu) Write32Block(addr, v uint32, seq bool) {
-	c.Cycles(addr, 4, false, seq, false)
+func (c *Cpu) Write32Block(addr, v, seq uint32) {
+	c.Cycles(addr, 4, seq, false)
 	c.gba.Mem.Write32(addr, v)
-	c.NonSeq = true
+	c.Seq = NONSEQ
 }
 
 func (c *Cpu) Read8(addr uint32) uint32 {
-	c.Cycles(addr, 1, false, false, false)
+	c.Cycles(addr, 1, NONSEQ, false)
 	v := c.gba.Mem.Read8(addr)
 	c.idle(1)
 	return v
 }
 
 func (c *Cpu) Read16(addr uint32) uint32 {
-	c.Cycles(addr, 2, false, false, false)
+	c.Cycles(addr, 2, NONSEQ, false)
 	v := c.gba.Mem.Read16(addr)
 	c.idle(1)
 	return v
 }
 
 func (c *Cpu) Read32(addr uint32) uint32 {
-	c.Cycles(addr, 4, false, false, false)
+	c.Cycles(addr, 4, NONSEQ, false)
 	v := c.gba.Mem.Read32(addr)
 	c.idle(1)
 	return v
 }
 
-func (c *Cpu) Read32Block(addr uint32, seq bool) uint32 {
-	c.Cycles(addr, 4, false, seq, false)
+func (c *Cpu) Read32Block(addr, seq uint32) uint32 {
+	c.Cycles(addr, 4, seq, false)
 	return c.gba.Mem.Read32(addr)
 }
 
-func (c *Cpu) Cycles(addr, width uint32, dma, seq, inst bool) {
-	if dma {
-		c.LastWasDma = true
-	} else if c.gba.IsRunning() {
+func (c *Cpu) CyclesDma(addr, width, seq uint32) {
+	c.LastWasDma = true
+	c.ParallelDmaCycles = 0
+
+	switch region := addr >> 24; {
+	case region < 8:
+		c.gba.Tick(int64(c.gba.Mem.Timings.Timings[width>>2][0][region]))
+	case region < 14:
+
+		if addr&0x1FFFF == 0 {
+			seq = NONSEQ
+		}
+
+		c.gba.Mem.Timings.Cancel(c.Reg.R[15])
+		c.gba.Tick(int64(c.gba.Mem.Timings.Timings[width>>2][seq][region]))
+	default:
+		c.gba.Mem.Timings.Cancel(c.Reg.R[15])
+		c.gba.Tick(int64(c.gba.Mem.Timings.Timings[width>>2][0][region]))
+	}
+}
+
+func (c *Cpu) Cycles(addr, width, seq uint32, inst bool) {
+	if c.gba.IsRunning() {
 		c.gba.CheckDmas()
 	}
 
 	c.ParallelDmaCycles = 0
 
-	switch addr >> 24 {
-	case 2:
-		c.gba.Tick(3 << (width >> 2))
-	case 5, 6:
-		c.gba.Tick(1 << (width >> 2))
-	case 8, 9, 10, 11, 12, 13:
+	switch region := addr >> 24; {
+	case region < 8:
+		c.gba.Tick(int64(c.gba.Mem.Timings.Timings[width>>2][0][region]))
+	case region < 14:
 
 		if addr&0x1FFFF == 0 {
-			seq = false
+			seq = NONSEQ
 		}
 
-		if c.LastWasDma && !dma {
-			c.LastWasDma = false
-			seq = false
+		if c.LastWasDma {
+			seq = NONSEQ
 		}
 
-		if !inst {
-			c.gba.Mem.Prefetch.Cancel(c.Reg.R[15])
-			c.gba.Tick(c.gba.Mem.Waitstate.Get(width, addr, seq))
+		c.LastWasDma = false
+
+		if inst {
+			w := uint32(4)
+			if c.Reg.CPSR.T {
+				w = 2
+			}
+
+			cycles := int64(c.gba.Mem.Timings.Timings[width>>2][seq][region])
+			c.gba.Mem.Timings.Wait(c.Reg.R[15], addr, w, cycles)
 			return
 		}
-
-		w := uint32(4)
-		if c.Reg.CPSR.T {
-			w = 2
-		}
-
-		cycles := c.gba.Mem.Waitstate.Get(width, addr, seq)
-		c.gba.Mem.Prefetch.Wait(c.Reg.R[15], addr, w, cycles)
-
-	case 14, 15:
-		c.gba.Mem.Prefetch.Cancel(c.Reg.R[15])
-		c.gba.Tick(c.gba.Mem.Waitstate.Get(width, addr, seq))
+		c.gba.Mem.Timings.Cancel(c.Reg.R[15])
+		c.gba.Tick(int64(c.gba.Mem.Timings.Timings[width>>2][seq][region]))
 	default:
-		c.gba.Tick(1)
+		c.gba.Mem.Timings.Cancel(c.Reg.R[15])
+		c.gba.Tick(int64(c.gba.Mem.Timings.Timings[width>>2][0][region]))
 	}
 }
 
@@ -424,7 +440,7 @@ func (c *Cpu) idle(cycles int64) {
 
 	if c.ParallelDmaCycles == 0 {
 		c.gba.Tick(cycles)
-		c.NonSeq = true
+		c.Seq = NONSEQ
 	} else {
 		c.ParallelDmaCycles--
 	}

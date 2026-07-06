@@ -34,7 +34,7 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 
 		a.SoundCntX = uint16((uint8(a.SoundCntX) & 0x0F) | (v & 0x80))
 
-		if disabled := 0x80 == 0; disabled {
+		if disabled := v&0x80 == 0; disabled {
 			a.Disable()
 		}
 
@@ -43,11 +43,8 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 	case 0x85, 0x86, 0x87:
 		return
 
-	case 0x88:
-		a.SoundBias = (a.SoundBias &^ 0xFF) | uint16(v)
-		return
-	case 0x89:
-		a.SoundBias = (a.SoundBias & 0xFF) | (uint16(v) << 8)
+	case 0x88, 0x89:
+		a.SoundBias = (a.SoundBias & 0xFF) | (uint16(v) << ((addr & 1) << 3))
 		return
 	}
 

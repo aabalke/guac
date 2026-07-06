@@ -31,3 +31,22 @@ WAVE and pitch of NOISE.
 - nes game support
 - gb / gbc on gba
 
+
+	// if c.Reg.R[15] == 0x8022B08 {
+	// if V[15] >= 235312 {
+	//	B[15] = c.Reg.R[15] == 0x8022B08
+	fmt.Printf("OP %08X %08X PC %08X SCH %08X\n",
+		c.Op[0], c.Op[1], c.Reg.R[15], c.gba.Scheduler.Now())
+	//}
+
+	if V[15] > 300_000 {
+		// if V[15] > 235315 {
+		os.Exit(0)
+	}
+
+	V[15]++
+
+
+
+gba pokemon emerald fps 
+nano 310fps

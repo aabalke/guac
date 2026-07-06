@@ -26,8 +26,7 @@ type Memory struct {
 	Dispstat       Dispstat
 	postflg        uint8
 
-	Waitstate Waitstate
-	Prefetch  *Prefetch
+	Timings *Timings
 
 	readRegions  [0x100]func(m *Memory, addr uint32) uint8
 	writeRegions [0x100]func(m *Memory, addr uint32, v uint8, byteWrite bool)
@@ -37,8 +36,7 @@ func NewMemory(gba *GBA) *Memory {
 	m := &Memory{GBA: gba}
 	m.ProtectedValue = 0xE129F000
 
-	m.Prefetch = NewPrefetch(&m.Waitstate, gba.Tick)
-	m.Waitstate.Prefetch = m.Prefetch
+	m.Timings = NewTimings(gba.Tick)
 
 	m.initReadRegions()
 	m.initWriteRegions()
@@ -456,7 +454,7 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 		return m.GBA.Irq.Read(addr)
 
 	case 0x204, 0x205, 0x206, 0x207:
-		return m.Waitstate.Read(addr)
+		return m.Timings.ReadWaitstate(addr)
 
 	case 0x300:
 		return m.postflg
@@ -654,7 +652,7 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 		m.GBA.Irq.Write8(addr, v)
 
 	case 0x204, 0x205, 0x206, 0x207:
-		m.Waitstate.Write(addr, v)
+		m.Timings.WriteWaitstate(addr, v)
 
 	case 0x209, 0x20A, 0x20B:
 		return

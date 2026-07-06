@@ -2,7 +2,6 @@ package gba
 
 import (
 	"encoding/binary"
-	//"github.com/aabalke/guac/emu/gba/utils"
 )
 
 type PPU struct {
@@ -27,33 +26,32 @@ type Dispcnt struct {
 	HBlankIntervalFree bool
 	OneDimensional     bool
 	ForcedBlank        bool
-	// DisplayBg [4]bool
-	DisplayObj    bool
-	DisplayWin0   bool
-	DisplayWin1   bool
-	DisplayObjWin bool
+	DisplayObj         bool
+	DisplayWin0        bool
+	DisplayWin1        bool
+	DisplayObjWin      bool
 }
 
 // blends are [6]... because Bg0, Bg1, Bg2, Bg3, Obj, Bd
 type Blend struct {
+	aEv, bEv, yEv float32
 	Mode          uint32
 	a, b          [6]bool
-	aEv, bEv, yEv float32
 }
 
 type Windows struct {
-	Enabled            bool
 	Win0, Win1, WinObj Window
 	OutBg              [4]bool
 	OutObj, OutBld     bool
+	Enabled            bool
 }
 
 type Window struct {
-	Enabled        bool
 	L, R, T, B     uint32
 	oL, oR, oT, oB uint32
 	InBg           [4]bool
 	InObj, InBld   bool
+	Enabled        bool
 }
 
 type Mosaic struct {
@@ -61,41 +59,39 @@ type Mosaic struct {
 }
 
 type Background struct {
-	Enabled            bool
-	Invalid            bool
+	OutX, OutY         float64
 	W, H               uint32
 	Pa, Pb, Pc, Pd     uint32
 	Priority           uint32
 	CharBaseBlock      uint32
-	Mosaic             bool
-	Palette256         bool
 	ScreenBaseBlock    uint32
-	AffineWrap         bool
 	Size               uint32
 	XOffset, YOffset   uint32
 	aXOffset, aYOffset uint32
+	AffineWrap         bool
+	Enabled            bool
+	Invalid            bool
+	Mosaic             bool
+	Palette256         bool
 	Affine             bool
-
-	// PbCalc, PdCalc float64
-	OutX, OutY float64
 }
 
 type Object struct {
-	X, Y, W, H     uint32
 	Pa, Pb, Pc, Pd float32
-	RotScale       bool
-	DoubleSize     bool
-	Disable        bool
+	X, Y, W, H     uint32
 	Mode           uint32
-	Mosaic         bool
-	Palette256     bool
 	Shape          uint32
-	HFlip, VFlip   bool
 	Size           uint32
 	RotParams      uint32
 	CharName       uint32
 	Priority       uint32
 	Palette        uint32
+	RotScale       bool
+	DoubleSize     bool
+	Disable        bool
+	Mosaic         bool
+	Palette256     bool
+	HFlip, VFlip   bool
 	OneDimensional bool
 }
 
@@ -293,388 +289,140 @@ func (p *PPU) UpdateWin(addr uint32, v uint32) {
 }
 
 func (p *PPU) UpdateAffine(relAddr uint32) {
-	paramIdx := (relAddr &^ 0b1) / 0x20
+	paramIdx := (relAddr &^ 1) / 0x20
 
 	for i := range 128 {
 
 		obj := &p.Objects[i]
 
-		if !obj.RotScale {
+		if !obj.RotScale || obj.RotParams != paramIdx {
 			continue
 		}
 
-		if obj.RotParams != paramIdx {
-			continue
-		}
-
-		UpdateAffineParams(obj, p.gba.Mem)
+		UpdateAffineParams(obj, &p.gba.Mem.OAM)
 	}
 }
 
 func (p *PPU) UpdateOAM(relAddr uint32) {
-	attrIdx := relAddr % 8
+	attrIdx := relAddr & 7
 
-	m := p.gba.Mem
-
-	if affineParam := attrIdx == 6 || attrIdx == 7; affineParam {
+	if affineParam := attrIdx >= 6; affineParam {
 		p.UpdateAffine(relAddr)
 		return
 	}
 
-	objIdx := relAddr / 8
-
-	obj := &p.Objects[objIdx]
-
-	attr := uint32(m.OAM[relAddr])
+	obj := &p.Objects[relAddr>>3]
+	attr := uint32(p.gba.Mem.OAM[relAddr])
 
 	switch attrIdx {
 	case 0:
-		obj.Y = attr & 0xFF
+		obj.Y = attr
 	case 1:
-
 		obj.RotScale = (attr>>0)&1 != 0
 		obj.Mode = (attr >> 2) & 3
 		obj.Mosaic = (attr>>4)&1 != 0
 		obj.Palette256 = (attr>>5)&1 != 0
 		obj.Shape = (attr >> 6) & 3
-		obj.setSize(obj.Shape, obj.Size)
+		obj.W = objSize[obj.Shape][obj.Size][0]
+		obj.H = objSize[obj.Shape][obj.Size][1]
 
 		if obj.RotScale {
 			obj.DoubleSize = (attr>>1)&1 != 0
-			UpdateAffineParams(obj, m)
+			UpdateAffineParams(obj, &p.gba.Mem.OAM)
 		} else {
 			obj.Disable = (attr>>1)&1 != 0
 		}
 
 	case 2:
-		obj.X &^= 0xFF
-		obj.X |= attr
+		obj.X = (obj.X &^ 0xFF) | attr
 	case 3:
-		obj.X &= 0xFF
-		obj.X |= (attr & 0b1) << 8
-		obj.Size = (attr >> 6) & 0b11
-		obj.setSize(obj.Shape, obj.Size)
+		obj.X = (obj.X & 0xFF) | ((attr & 1) << 8)
+		obj.Size = attr >> 6
+		obj.W = objSize[obj.Shape][obj.Size][0]
+		obj.H = objSize[obj.Shape][obj.Size][1]
 
 		if obj.RotScale {
 			obj.RotParams = (attr >> 1) & 0x1F
-			UpdateAffineParams(obj, m)
+			UpdateAffineParams(obj, &p.gba.Mem.OAM)
+		} else {
+			obj.HFlip = (attr>>4)&1 != 0
+			obj.VFlip = (attr>>5)&1 != 0
 		}
-		obj.HFlip = (attr>>4)&1 != 0
-		obj.VFlip = (attr>>5)&1 != 0
 	case 4:
-		obj.CharName &^= 0xFF
-		obj.CharName |= attr
+		obj.CharName = (obj.CharName &^ 0xFF) | attr
 	case 5:
-		obj.CharName &= 0xFF
-		obj.CharName |= (attr & 0b11) << 8
-		obj.Priority = (attr >> 2) & 0b11
-		obj.Palette = (attr >> 4) & 0xF
+		obj.CharName = (obj.CharName & 0xFF) | ((attr & 3) << 8)
+		obj.Priority = (attr >> 2) & 3
+		obj.Palette = attr >> 4
 	}
 }
 
-func UpdateAffineParams(obj *Object, m *Memory) {
+func UpdateAffineParams(obj *Object, oam *[0x400]uint8) {
 	paramsAddr := obj.RotParams * 0x20
-	obj.Pa = float32(int16(binary.LittleEndian.Uint16(m.OAM[paramsAddr+0x06:]))) / 256
-	obj.Pb = float32(int16(binary.LittleEndian.Uint16(m.OAM[paramsAddr+0x0E:]))) / 256
-	obj.Pc = float32(int16(binary.LittleEndian.Uint16(m.OAM[paramsAddr+0x16:]))) / 256
-	obj.Pd = float32(int16(binary.LittleEndian.Uint16(m.OAM[paramsAddr+0x1E:]))) / 256
+	obj.Pa = float32(int16(binary.LittleEndian.Uint16(oam[paramsAddr+0x06:]))) / 256
+	obj.Pb = float32(int16(binary.LittleEndian.Uint16(oam[paramsAddr+0x0E:]))) / 256
+	obj.Pc = float32(int16(binary.LittleEndian.Uint16(oam[paramsAddr+0x16:]))) / 256
+	obj.Pd = float32(int16(binary.LittleEndian.Uint16(oam[paramsAddr+0x1E:]))) / 256
 }
 
 func (p *PPU) UpdateBackgrounds(addr, v uint32) {
 	switch addr {
-	case 0x08:
-		p.Backgrounds[0].Priority = v & 0b11
-		p.Backgrounds[0].CharBaseBlock = ((v >> 2) & 0xF) * 0x4000
-		p.Backgrounds[0].Mosaic = (v>>6)&1 != 0
-		p.Backgrounds[0].Palette256 = (v>>7)&1 != 0
-	case 0x09:
-		p.Backgrounds[0].ScreenBaseBlock = (v & 0x1F) * 0x800
-		p.Backgrounds[0].AffineWrap = (v>>5)&1 != 0
-		p.Backgrounds[0].Size = (v >> 6) & 0b11
+	case 0x08, 0xA, 0xC, 0xE:
+		p.Backgrounds[(addr>>1)&3].Priority = v & 3
+		p.Backgrounds[(addr>>1)&3].CharBaseBlock = ((v >> 2) & 0xF) * 0x4000
+		p.Backgrounds[(addr>>1)&3].Mosaic = (v>>6)&1 != 0
+		p.Backgrounds[(addr>>1)&3].Palette256 = (v>>7)&1 != 0
+	case 0x09, 0xB, 0xD, 0xF:
+		p.Backgrounds[(addr>>1)&3].ScreenBaseBlock = (v & 0x1F) * 0x800
+		p.Backgrounds[(addr>>1)&3].AffineWrap = (v>>5)&1 != 0
+		p.Backgrounds[(addr>>1)&3].Size = (v >> 6) & 3
 
-	case 0x0A:
-		p.Backgrounds[1].Priority = v & 0b11
-		p.Backgrounds[1].CharBaseBlock = ((v >> 2) & 0xF) * 0x4000
-		p.Backgrounds[1].Mosaic = (v>>6)&1 != 0
-		p.Backgrounds[1].Palette256 = (v>>7)&1 != 0
-	case 0x0B:
-		p.Backgrounds[1].ScreenBaseBlock = (v & 0x1F) * 0x800
-		p.Backgrounds[1].AffineWrap = (v>>5)&1 != 0
-		p.Backgrounds[1].Size = (v >> 6) & 0b11
+	case 0x10, 0x14, 0x18, 0x1C, 0x11, 0x15, 0x19, 0x1D:
+		p.Backgrounds[(addr>>2)&3].XOffset &^= 0xFF << ((addr & 1) << 3)
+		p.Backgrounds[(addr>>2)&3].XOffset |= v << ((addr & 1) << 3)
+	case 0x12, 0x16, 0x1A, 0x1E, 0x13, 0x17, 0x1B, 0x1F:
+		p.Backgrounds[(addr>>2)&3].YOffset &^= 0xFF << ((addr & 1) << 3)
+		p.Backgrounds[(addr>>2)&3].YOffset |= v << ((addr & 1) << 3)
 
-	case 0x0C:
-		p.Backgrounds[2].Priority = v & 0b11
-		p.Backgrounds[2].CharBaseBlock = ((v >> 2) & 0xF) * 0x4000
-		p.Backgrounds[2].Mosaic = (v>>6)&1 != 0
-		p.Backgrounds[2].Palette256 = (v>>7)&1 != 0
-	case 0x0D:
-		p.Backgrounds[2].ScreenBaseBlock = (v & 0x1F) * 0x800
-		p.Backgrounds[2].AffineWrap = (v>>5)&1 != 0
-		p.Backgrounds[2].Size = (v >> 6) & 0b11
+	case 0x20, 0x21, 0x30, 0x31:
+		p.Backgrounds[(addr>>4)&3].Pa &^= 0xFF << ((addr & 1) << 3)
+		p.Backgrounds[(addr>>4)&3].Pa |= v << ((addr & 1) << 3)
+	case 0x22, 0x23, 0x32, 0x33:
+		p.Backgrounds[(addr>>4)&3].Pb &^= 0xFF << ((addr & 1) << 3)
+		p.Backgrounds[(addr>>4)&3].Pb |= v << ((addr & 1) << 3)
+	case 0x24, 0x25, 0x34, 0x35:
+		p.Backgrounds[(addr>>4)&3].Pc &^= 0xFF << ((addr & 1) << 3)
+		p.Backgrounds[(addr>>4)&3].Pc |= v << ((addr & 1) << 3)
+	case 0x26, 0x27, 0x36, 0x37:
+		p.Backgrounds[(addr>>4)&3].Pd &^= 0xFF << ((addr & 1) << 3)
+		p.Backgrounds[(addr>>4)&3].Pd |= v << ((addr & 1) << 3)
 
-	case 0x0E:
-		p.Backgrounds[3].Priority = v & 0b11
-		p.Backgrounds[3].CharBaseBlock = ((v >> 2) & 0xF) * 0x4000
-		p.Backgrounds[3].Mosaic = (v>>6)&1 != 0
-		p.Backgrounds[3].Palette256 = (v>>7)&1 != 0
+	case 0x28, 0x29, 0x2A, 0x2B, 0x38, 0x39, 0x3A, 0x3B:
+		p.Backgrounds[(addr>>4)&3].aXOffset &^= 0xFF << ((addr & 3) << 3)
+		p.Backgrounds[(addr>>4)&3].aXOffset |= v << ((addr & 3) << 3)
+		p.Backgrounds[(addr>>4)&3].BgAffineReset()
 
-	case 0x0F:
-		p.Backgrounds[3].ScreenBaseBlock = (v & 0x1F) * 0x800
-		p.Backgrounds[3].AffineWrap = (v>>5)&1 != 0
-		p.Backgrounds[3].Size = (v >> 6) & 0b11
-
-	case 0x10:
-		p.Backgrounds[0].XOffset &^= 0xFF
-		p.Backgrounds[0].XOffset |= v
-	case 0x11:
-		p.Backgrounds[0].XOffset &= 0xFF
-		p.Backgrounds[0].XOffset |= v << 8
-	case 0x12:
-		p.Backgrounds[0].YOffset &^= 0xFF
-		p.Backgrounds[0].YOffset |= v
-	case 0x13:
-		p.Backgrounds[0].YOffset &= 0xFF
-		p.Backgrounds[0].YOffset |= v << 8
-
-	case 0x14:
-		p.Backgrounds[1].XOffset &^= 0xFF
-		p.Backgrounds[1].XOffset |= v
-	case 0x15:
-		p.Backgrounds[1].XOffset &= 0xFF
-		p.Backgrounds[1].XOffset |= v << 8
-	case 0x16:
-		p.Backgrounds[1].YOffset &^= 0xFF
-		p.Backgrounds[1].YOffset |= v
-	case 0x17:
-		p.Backgrounds[1].YOffset &= 0xFF
-		p.Backgrounds[1].YOffset |= v << 8
-
-	case 0x18:
-		p.Backgrounds[2].XOffset &^= 0xFF
-		p.Backgrounds[2].XOffset |= v
-	case 0x19:
-		p.Backgrounds[2].XOffset &= 0xFF
-		p.Backgrounds[2].XOffset |= v << 8
-	case 0x1A:
-		p.Backgrounds[2].YOffset &^= 0xFF
-		p.Backgrounds[2].YOffset |= v
-	case 0x1B:
-		p.Backgrounds[2].YOffset &= 0xFF
-		p.Backgrounds[2].YOffset |= v << 8
-
-	case 0x1C:
-		p.Backgrounds[3].XOffset &^= 0xFF
-		p.Backgrounds[3].XOffset |= v
-	case 0x1D:
-		p.Backgrounds[3].XOffset &= 0xFF
-		p.Backgrounds[3].XOffset |= v << 8
-	case 0x1E:
-		p.Backgrounds[3].YOffset &^= 0xFF
-		p.Backgrounds[3].YOffset |= v
-	case 0x1F:
-		p.Backgrounds[3].YOffset &= 0xFF
-		p.Backgrounds[3].YOffset |= v << 8
-
-	case 0x20:
-		p.Backgrounds[2].Pa &^= 0xFF
-		p.Backgrounds[2].Pa |= v
-	case 0x21:
-		p.Backgrounds[2].Pa &= 0xFF
-		p.Backgrounds[2].Pa |= v << 8
-	case 0x22:
-		p.Backgrounds[2].Pb &^= 0xFF
-		p.Backgrounds[2].Pb |= v
-	case 0x23:
-		p.Backgrounds[2].Pb &= 0xFF
-		p.Backgrounds[2].Pb |= v << 8
-	case 0x24:
-		p.Backgrounds[2].Pc &^= 0xFF
-		p.Backgrounds[2].Pc |= v
-	case 0x25:
-		p.Backgrounds[2].Pc &= 0xFF
-		p.Backgrounds[2].Pc |= v << 8
-	case 0x26:
-		p.Backgrounds[2].Pd &^= 0xFF
-		p.Backgrounds[2].Pd |= v
-	case 0x27:
-		p.Backgrounds[2].Pd &= 0xFF
-		p.Backgrounds[2].Pd |= v << 8
-
-	case 0x28:
-		p.Backgrounds[2].aXOffset &^= 0xFF
-		p.Backgrounds[2].aXOffset |= v
-		p.Backgrounds[2].BgAffineReset()
-	case 0x29:
-		p.Backgrounds[2].aXOffset &^= 0xFF00
-		p.Backgrounds[2].aXOffset |= v << 8
-		p.Backgrounds[2].BgAffineReset()
-	case 0x2A:
-		p.Backgrounds[2].aXOffset &^= 0xFF0000
-		p.Backgrounds[2].aXOffset |= v << 16
-		p.Backgrounds[2].BgAffineReset()
-	case 0x2B:
-		p.Backgrounds[2].aXOffset &^= 0xFF000000
-		p.Backgrounds[2].aXOffset |= v << 24
-		p.Backgrounds[2].BgAffineReset()
-
-	case 0x2C:
-		p.Backgrounds[2].aYOffset &^= 0xFF
-		p.Backgrounds[2].aYOffset |= v
-		p.Backgrounds[2].BgAffineReset()
-	case 0x2D:
-		p.Backgrounds[2].aYOffset &^= 0xFF00
-		p.Backgrounds[2].aYOffset |= v << 8
-		p.Backgrounds[2].BgAffineReset()
-	case 0x2E:
-		p.Backgrounds[2].aYOffset &^= 0xFF0000
-		p.Backgrounds[2].aYOffset |= v << 16
-		p.Backgrounds[2].BgAffineReset()
-	case 0x2F:
-		p.Backgrounds[2].aYOffset &^= 0xFF000000
-		p.Backgrounds[2].aYOffset |= v << 24
-		p.Backgrounds[2].BgAffineReset()
-
-	case 0x30:
-		p.Backgrounds[3].Pa &^= 0xFF
-		p.Backgrounds[3].Pa |= v
-	case 0x31:
-		p.Backgrounds[3].Pa &= 0xFF
-		p.Backgrounds[3].Pa |= v << 8
-	case 0x32:
-		p.Backgrounds[3].Pb &^= 0xFF
-		p.Backgrounds[3].Pb |= v
-	case 0x33:
-		p.Backgrounds[3].Pb &= 0xFF
-		p.Backgrounds[3].Pb |= v << 8
-	case 0x34:
-		p.Backgrounds[3].Pc &^= 0xFF
-		p.Backgrounds[3].Pc |= v
-	case 0x35:
-		p.Backgrounds[3].Pc &= 0xFF
-		p.Backgrounds[3].Pc |= v << 8
-	case 0x36:
-		p.Backgrounds[3].Pd &^= 0xFF
-		p.Backgrounds[3].Pd |= v
-	case 0x37:
-		p.Backgrounds[3].Pd &= 0xFF
-		p.Backgrounds[3].Pd |= v << 8
-
-	case 0x38:
-		p.Backgrounds[3].aXOffset &^= 0xFF
-		p.Backgrounds[3].aXOffset |= v
-		p.Backgrounds[3].BgAffineReset()
-	case 0x39:
-		p.Backgrounds[3].aXOffset &^= 0xFF00
-		p.Backgrounds[3].aXOffset |= v << 8
-		p.Backgrounds[3].BgAffineReset()
-	case 0x3A:
-		p.Backgrounds[3].aXOffset &^= 0xFF0000
-		p.Backgrounds[3].aXOffset |= v << 16
-		p.Backgrounds[3].BgAffineReset()
-	case 0x3B:
-		p.Backgrounds[3].aXOffset &^= 0xFF000000
-		p.Backgrounds[3].aXOffset |= v << 24
-		p.Backgrounds[3].BgAffineReset()
-
-	case 0x3C:
-		p.Backgrounds[3].aYOffset &^= 0xFF
-		p.Backgrounds[3].aYOffset |= v
-		p.Backgrounds[3].BgAffineReset()
-	case 0x3D:
-		p.Backgrounds[3].aYOffset &^= 0xFF00
-		p.Backgrounds[3].aYOffset |= v << 8
-		p.Backgrounds[3].BgAffineReset()
-	case 0x3E:
-		p.Backgrounds[3].aYOffset &^= 0xFF0000
-		p.Backgrounds[3].aYOffset |= v << 16
-		p.Backgrounds[3].BgAffineReset()
-	case 0x3F:
-		p.Backgrounds[3].aYOffset &^= 0xFF000000
-		p.Backgrounds[3].aYOffset |= v << 24
-		p.Backgrounds[3].BgAffineReset()
+	case 0x2C, 0x2D, 0x2E, 0x2F, 0x3C, 0x3D, 0x3E, 0x3F:
+		p.Backgrounds[(addr>>4)&3].aYOffset &^= 0xFF << ((addr & 3) << 3)
+		p.Backgrounds[(addr>>4)&3].aYOffset |= v << ((addr & 3) << 3)
+		p.Backgrounds[(addr>>4)&3].BgAffineReset()
 	}
 }
 
-func (bg *Background) setSize() {
-	if bg.Affine {
-		switch bg.Size {
-		case 0:
-			//bg.W, bg.H = 16, 16
-			bg.W, bg.H = 128, 128
-		case 1:
-			//bg.W, bg.H = 32, 32
-			bg.W, bg.H = 256, 256
-		case 2:
-			//bg.W, bg.H = 64, 64
-			bg.W, bg.H = 512, 512
-		case 3:
-			//bg.W, bg.H = 128, 128
-			bg.W, bg.H = 1024, 1024
-		default:
-			panic("PROHIBITTED AFFINE BG SIZE")
-		}
+// w, h
 
-		return
-	}
-
-	switch bg.Size {
-	case 0:
-		//bg.W, bg.H = 32, 32
-		bg.W, bg.H = 256, 256
-	case 1:
-		//bg.W, bg.H = 64, 32
-		bg.W, bg.H = 512, 256
-	case 2:
-		//bg.W, bg.H = 32, 64
-		bg.W, bg.H = 256, 512
-	case 3:
-		//bg.W, bg.H = 64, 64
-		bg.W, bg.H = 512, 512
-	default:
-		panic("PROHIBITTED BG SIZE")
-	}
+var bgSize = [2][4][2]uint32{
+	// std
+	{{256, 256}, {512, 256}, {256, 512}, {512, 512}},
+	// affine
+	{{128, 128}, {256, 256}, {512, 512}, {1024, 1024}},
 }
 
-func (obj *Object) setSize(shape, size uint32) {
-	const (
-		SQUARE     = 0
-		HORIZONTAL = 1
-		VERTICAL   = 2
-	)
-
-	switch shape {
-	case SQUARE:
-		switch size {
-		case 0:
-			obj.H, obj.W = 8, 8
-		case 1:
-			obj.H, obj.W = 16, 16
-		case 2:
-			obj.H, obj.W = 32, 32
-		case 3:
-			obj.H, obj.W = 64, 64
-		}
-	case HORIZONTAL:
-		switch size {
-		case 0:
-			obj.H, obj.W = 8, 16
-		case 1:
-			obj.H, obj.W = 8, 32
-		case 2:
-			obj.H, obj.W = 16, 32
-		case 3:
-			obj.H, obj.W = 32, 64
-		}
-	case VERTICAL:
-		switch size {
-		case 0:
-			obj.H, obj.W = 16, 8
-		case 1:
-			obj.H, obj.W = 32, 8
-		case 2:
-			obj.H, obj.W = 32, 16
-		case 3:
-			obj.H, obj.W = 64, 32
-		}
-	}
+var objSize = [3][4][2]uint32{
+	// SQUARE
+	{{8, 8}, {16, 16}, {32, 32}, {64, 64}},
+	// HORIZONTAL
+	{{16, 8}, {32, 8}, {32, 16}, {64, 32}},
+	// VERTICAL
+	{{8, 16}, {8, 32}, {16, 32}, {32, 64}},
 }

@@ -9,7 +9,7 @@ func (cpu *Cpu) DecodeARM(op uint32) {
 	r := &cpu.Reg.R
 
 	if cond := op >> 28; cond != 0xE && !cpu.Reg.CPSR.CheckCond(cond) {
-		cpu.NonSeq = false
+		cpu.Seq = SEQ
 		return
 	}
 
@@ -1071,7 +1071,7 @@ func (c *Cpu) Block(op uint32) {
 		addr -= regCount * 4
 	}
 
-	seq := false
+	seq := uint32(NONSEQ)
 
 	for reg := range uint32(16) {
 
@@ -1101,7 +1101,7 @@ func (c *Cpu) Block(op uint32) {
 			}
 		}
 
-		seq = true
+		seq = SEQ
 
 		if !pre {
 			addr += 4

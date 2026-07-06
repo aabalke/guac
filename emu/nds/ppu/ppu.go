@@ -126,7 +126,6 @@ type Mosaic struct {
 }
 
 type Background struct {
-
 	// used for getPriority -> standard func
 	MasterEnabled bool
 
@@ -144,7 +143,7 @@ type Background struct {
 	aXOffset, aYOffset uint32
 	Affine             bool
 
-	//PbCalc, PdCalc float64
+	// PbCalc, PdCalc float64
 	OutX, OutY float64
 
 	Type uint8
@@ -190,7 +189,6 @@ type Object struct {
 }
 
 func NewPPU(irq *cpu.Irq) *PPU {
-
 	p := &PPU{}
 
 	p.EngineA.Pixels = make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)
@@ -244,7 +242,6 @@ func NextPow2(n uint32) uint32 {
 }
 
 func (p *PPU) Update(addr, v uint32) {
-
 	if engineA := addr < 0x60 || addr >= 0x6C && addr < 0x6E; engineA && p.EngineA2D {
 
 		p.EngineA.UpdateEngine(addr, v)
@@ -271,7 +268,6 @@ func (p *PPU) Update(addr, v uint32) {
 }
 
 func (e *Engine) UpdateEngine(addr, v uint32) {
-
 	if win := addr >= 0x40 && addr < 0x4C; win {
 		e.UpdateWin(addr, v)
 		return
@@ -376,11 +372,9 @@ func (e *Engine) UpdateEngine(addr, v uint32) {
 	case 0x6D:
 		e.MasterBright.Write(uint8(v), 1)
 	}
-
 }
 
 func (engine *Engine) UpdateWin(addr uint32, v uint32) {
-
 	wins := &engine.Windows
 	win0 := &engine.Windows.Win0
 	win1 := &engine.Windows.Win1
@@ -498,7 +492,6 @@ func (engine *Engine) UpdateWin(addr uint32, v uint32) {
 }
 
 func (p *Engine) UpdateBackgrounds(addr, v uint32) {
-
 	switch addr {
 	case 0x08:
 		p.Backgrounds[0].Priority = v & 0b11
@@ -716,7 +709,6 @@ func (p *Engine) UpdateBackgrounds(addr, v uint32) {
 }
 
 func (bg *Background) SetSize() {
-
 	switch bg.Type {
 	case BG_TYPE_TEX:
 		switch bg.Size {
@@ -770,7 +762,6 @@ func (bg *Background) SetSize() {
 }
 
 func (obj *Object) SetSize(shape, size uint32) {
-
 	const (
 		SQUARE     = 0
 		HORIZONTAL = 1
@@ -824,7 +815,6 @@ func (obj *Object) SetSize(shape, size uint32) {
 			return
 		}
 	}
-
 }
 
 func (bg *Background) BgAffineReset() {
@@ -838,7 +828,6 @@ func (bg *Background) BgAffineUpdate() {
 }
 
 func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
-
 	relAddr &= 0x7FF
 
 	engine := &p.EngineA
@@ -920,7 +909,6 @@ func UpdateAffineParams(obj *Object, oam *[0x800]uint8, isB bool) {
 }
 
 func (p *PPU) UpdateAffine(relAddr uint32, engine *Engine, oam *[0x800]uint8) {
-
 	paramIdx := (relAddr &^ 0b1) / 0x20
 
 	for i := range 128 {
@@ -953,7 +941,6 @@ const (
 )
 
 func (e *Engine) UpdateObjMapping(d *Dispcnt) {
-
 	for i := range e.Objects {
 
 		obj := &e.Objects[i]
@@ -1002,7 +989,6 @@ func (e *Engine) UpdateObjMapping(d *Dispcnt) {
 }
 
 func (e *Engine) setBgType(bgIdx uint32) {
-
 	bg := &e.Backgrounds[bgIdx]
 
 	switch bgIdx {

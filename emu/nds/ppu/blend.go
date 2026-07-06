@@ -37,7 +37,6 @@ type Blend struct {
 }
 
 func NewBlend() *Blend {
-
 	b := &Blend{}
 
 	// set luts
@@ -58,7 +57,6 @@ func NewBlend() *Blend {
 
 // occurs per priority
 func (e *Engine) SetBgPals() {
-
 	bld := e.Blend
 
 	for x := range uint32(SCREEN_WIDTH) {
@@ -92,7 +90,6 @@ func (e *Engine) SetBgPals() {
 
 // occurs per priority
 func (e *Engine) SetObjPals(priority uint32) {
-
 	bld := e.Blend
 
 	for x := range uint32(SCREEN_WIDTH) {
@@ -123,7 +120,6 @@ func (e *Engine) SetObjPals(priority uint32) {
 
 // occurs per scanline
 func ResetBlendPalettes(e *Engine) {
-
 	bld := e.Blend
 
 	backdrop := *e.Backdrop &^ 0x8000
@@ -154,7 +150,6 @@ func ResetBlendPalettes(e *Engine) {
 
 // occurs per scanline
 func BlendAll(bld *Blend, wins *Windows, y uint32) {
-
 	if wins.Enabled {
 		for x := range uint32(SCREEN_WIDTH) {
 			bld.outWindow[x] = !wins.inWinBld(x, y)

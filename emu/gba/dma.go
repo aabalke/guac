@@ -226,15 +226,15 @@ func (dma *Dma) transfer() {
 
 	for range dma.latched.cnt {
 
-		srcSeq := true
-		dstSeq := true
+		srcSeq := uint32(SEQ)
+		dstSeq := uint32(SEQ)
 
 		if !accessRom {
 			if src >= 0x800_0000 {
-				srcSeq = false
+				srcSeq = NONSEQ
 				accessRom = true
 			} else if dst >= 0x800_0000 {
-				dstSeq = false
+				dstSeq = NONSEQ
 				accessRom = true
 			}
 		}
@@ -244,7 +244,7 @@ func (dma *Dma) transfer() {
 			if src < 0x200_0000 {
 				dma.Tick(1)
 			} else {
-				dma.Gba.Cpu.Cycles(src, 4, true, srcSeq, false)
+				dma.Gba.Cpu.CyclesDma(src, 4, srcSeq)
 				if srcPtr == nil {
 					dma.Value = mem.Read32(src)
 				} else {
@@ -252,7 +252,7 @@ func (dma *Dma) transfer() {
 				}
 			}
 
-			dma.Gba.Cpu.Cycles(dst, 4, true, dstSeq, false)
+			dma.Gba.Cpu.CyclesDma(dst, 4, dstSeq)
 			if dstPtr == nil {
 				mem.Write32(dst, dma.Value)
 			} else {
@@ -275,7 +275,7 @@ func (dma *Dma) transfer() {
 				dma.Tick(1)
 			} else {
 
-				dma.Gba.Cpu.Cycles(src, 2, true, srcSeq, false)
+				dma.Gba.Cpu.CyclesDma(src, 2, srcSeq)
 
 				if srcPtr == nil {
 					v = mem.Read16(src)
@@ -285,7 +285,7 @@ func (dma *Dma) transfer() {
 				dma.Value = v | (v << 16)
 			}
 
-			dma.Gba.Cpu.Cycles(dst, 2, true, dstSeq, false)
+			dma.Gba.Cpu.CyclesDma(dst, 2, dstSeq)
 			if dstPtr == nil {
 				mem.Write16(dst, uint16(v))
 			} else {

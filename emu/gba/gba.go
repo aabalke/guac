@@ -46,9 +46,7 @@ type GBA struct {
 	Image       *ebiten.Image
 	DrawOptions ebiten.DrawImageOptions
 
-	Paused, Muted, Save, Drawn bool
-
-	Booted bool
+	Paused, Muted, Save, Booted bool
 }
 
 func NewGBA(path string, ctx *oto.Context) *GBA {
@@ -132,8 +130,8 @@ func (gba *GBA) Update(stdFps bool) {
 
 func (gba *GBA) Tick(cycles int64) {
 	gba.Scheduler.Add(cycles)
-	if gba.Mem.Prefetch.Active {
-		gba.Mem.Prefetch.Step(cycles)
+	if gba.Mem.Timings.Active {
+		gba.Mem.Timings.Step(cycles)
 	}
 }
 
@@ -195,7 +193,6 @@ func (gba *GBA) DirectBoot() {
 
 	gba.Cpu.Op[0] = 0xF000_0000
 	gba.Cpu.Op[1] = 0xF000_0000
-	gba.Cpu.NonSeq = true
 
 	gba.Mem.postflg = 1
 }

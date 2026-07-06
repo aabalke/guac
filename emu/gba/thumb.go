@@ -735,7 +735,7 @@ func (cpu *Cpu) ThumbPushPop(op uint16) {
 		pclr  = (op>>8)&1 != 0
 		rlist = op & 0xFF
 		pop   = (op>>11)&1 != 0
-		seq   = false
+		seq   = uint32(NONSEQ)
 	)
 
 	// thank you nano
@@ -763,7 +763,7 @@ func (cpu *Cpu) ThumbPushPop(op uint16) {
 			r[reg] = cpu.Read32Block(r[SP], seq)
 			r[SP] += 4
 
-			seq = true
+			seq = SEQ
 		}
 
 		if pclr {
@@ -791,7 +791,7 @@ func (cpu *Cpu) ThumbPushPop(op uint16) {
 			r[SP] -= 4
 			cpu.Write32Block(r[SP], r[reg], seq)
 
-			seq = true
+			seq = SEQ
 		}
 	}
 }
@@ -816,7 +816,7 @@ func (cpu *Cpu) ThumbJumpCalls(op uint16) {
 	r := &cpu.Reg.R
 
 	if !cpu.Reg.CPSR.CheckCond(uint32(op>>8) & 0xF) {
-		cpu.NonSeq = false
+		cpu.Seq = SEQ
 		return
 	}
 
@@ -941,7 +941,7 @@ func (cpu *Cpu) ThumbBlock(op uint16) {
 		if !ldmia {
 			cpu.Write32(r[rb], r[PC]+2)
 		} else {
-			r[PC] = cpu.Read32Block(r[rb], false)
+			r[PC] = cpu.Read32Block(r[rb], NONSEQ)
 			cpu.Reload16()
 		}
 		r[rb] += 0x40
@@ -965,26 +965,26 @@ func (cpu *Cpu) ThumbBlock(op uint16) {
 			}
 		}
 
-		cpu.Write32Block(addr, r[first], false)
+		cpu.Write32Block(addr, r[first], NONSEQ)
 		r[rb] = baseNew
 		addr += 4
 
 		for reg := first + 1; reg < 8; reg++ {
 			if enabled := (rlist>>reg)&1 != 0; enabled {
-				cpu.Write32Block(addr, r[reg], true)
+				cpu.Write32Block(addr, r[reg], SEQ)
 				addr += 4
 			}
 		}
 
 	} else {
 		addr := r[rb]
-		seq := false
+		seq := uint32(NONSEQ)
 
 		for reg := range 8 {
 			if enabled := (rlist>>reg)&1 != 0; enabled {
 				r[reg] = cpu.Read32Block(addr, seq)
 				addr += 4
-				seq = true
+				seq = SEQ
 			}
 		}
 
