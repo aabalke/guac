@@ -1,25 +1,25 @@
 # Alyosha Tas Gba Tests
 
-Results generated 2026-07-05T18:32:29-06:00
+Results generated 2026-07-07T20:36:50-06:00
 
 Passing 51/119 42%
 
 👍 DMA\DMA_Mode_Change
 ❌ DMA\DMA_ROM_Fixed
 ❌ DMA\DMA_pause_timing_ROM_to_IWRAM
-❌ DMA\DMA_pause_timing_end_1
+👍 DMA\DMA_pause_timing_end_1
 ❌ DMA\DMA_pause_timing_end_2
-❌ DMA\DMA_pause_timing_end_3
+👍 DMA\DMA_pause_timing_end_3
 ❌ DMA\DMA_pause_timing_end_4
-❌ DMA\DMA_pause_timing_mid_1
+👍 DMA\DMA_pause_timing_mid_1
 ❌ DMA\DMA_pause_timing_mid_2
 ❌ Interactions\Halt_DMA_IRQ
 ❌ Interactions\Halt_DMA_IRQ_Read_OAM
 ❌ Interactions\Halt_IRQ
 ❌ Interactions\Internal_Cycle_DMA_IRQ
-❌ Interactions\Internal_Cycle_DMA_IRQ_7
-❌ Interactions\Internal_Cycle_DMA_IRQ_Br_pre
-👍 Interactions\Internal_Cycle_DMA_IRQ_Br_pre_tim
+👍 Interactions\Internal_Cycle_DMA_IRQ_7
+👍 Interactions\Internal_Cycle_DMA_IRQ_Br_pre
+❌ Interactions\Internal_Cycle_DMA_IRQ_Br_pre_tim
 ❌ Interactions\Internal_Cycle_DMA_IRQ_ST
 👍 Interactions\Internal_Cycle_DMA_IRQ_ST_p3
 👍 Interactions\Internal_Cycle_DMA_IRQ_br
@@ -28,11 +28,11 @@ Passing 51/119 42%
 ❌ Interactions\Internal_Cycle_DMA_IRQ_nop_IWRAM
 ❌ Interactions\Internal_Cycle_DMA_MUL_IRQ
 ❌ Interactions\Internal_Cycle_DMA_Mul
-👍 Interactions\Internal_Cycle_DMA_TIM_Br_pre
+❌ Interactions\Internal_Cycle_DMA_TIM_Br_pre
 👍 LDM\LDM_ALU
 👍 LDM\LDM_ALU_IMM
 👍 LDM\LDM_ALU_Store
-👍 LDM\LDM_Bx
+❌ LDM\LDM_Bx
 👍 LDM\LDM_LD
 👍 LDM\LDM_MUL_UL_32
 👍 LDM\LDM_MUL_UL_SL
@@ -47,7 +47,7 @@ Passing 51/119 42%
 ❌ Serial\serial_time_3
 ❌ Serial\serial_time_start_bit
 👍 Serial\serial_time_start_bit_2
-👍 arm\arm
+❌ arm\arm
 ❌ bios\bios
 ❌ fifo_dma\fifo
 ❌ fifo_dma\fifo_2
@@ -79,7 +79,7 @@ Passing 51/119 42%
 ❌ ppu\Sprite_Last_VRAM_Access_Free
 👍 ppu\hello
 👍 ppu\shades
-👍 ppu\start_up
+❌ ppu\start_up
 ❌ ppu\start_up_vbl
 👍 ppu\start_up_vbl_irq
 👍 ppu\start_up_vbl_irq_halt

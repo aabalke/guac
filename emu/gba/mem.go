@@ -328,6 +328,17 @@ func (m *Memory) Read16(addr uint32) uint32 {
 		return m.ReadBadRom(addr, 2)
 	}
 
+	switch addr {
+	case 0x400_0100, 0x400_0102:
+		return uint32(m.GBA.Timers[0].Read16(int(addr & 3)))
+	case 0x400_0104, 0x400_0106:
+		return uint32(m.GBA.Timers[1].Read16(int(addr & 3)))
+	case 0x400_0108, 0x400_010A:
+		return uint32(m.GBA.Timers[2].Read16(int(addr & 3)))
+	case 0x400_010c, 0x400_010E:
+		return uint32(m.GBA.Timers[3].Read16(int(addr & 3)))
+	}
+
 	if ptr := m.ReadPtr(addr); ptr != nil {
 		return uint32(*(*uint16)(ptr))
 	}
@@ -425,7 +436,7 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 		addr -= 0xB0
 		i := addr / 12
 		addr %= 12
-		return m.GBA.Dma[i].Read(addr)
+		return m.GBA.Dma.Read(i, addr)
 
 	case addr >= 0x100 && addr < 0x110:
 
@@ -574,7 +585,7 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 		addr -= 0xB0
 		i := addr / 12
 		addr %= 12
-		m.GBA.Dma[i].Write(addr, v)
+		m.GBA.Dma.Write(i, addr, v)
 		return
 
 	case addr >= 0x100 && addr < 0x110:

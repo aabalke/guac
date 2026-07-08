@@ -152,35 +152,36 @@ func (gba *GBA) renderTilePixel(x, y uint32) {
 }
 
 func (gba *GBA) scanlineBitmapMode(y uint32) {
-	mem := gba.Mem
-	dispcnt := &gba.PPU.Dispcnt
-
-	objPriorities := gba.getObjPriority(y, &gba.PPU.Objects)
-
-	wins := &gba.PPU.Windows
+	var (
+		mem           = gba.Mem
+		wins          = &gba.PPU.Windows
+		dispcnt       = &gba.PPU.Dispcnt
+		objPriorities = gba.getObjPriority(y, &gba.PPU.Objects)
+	)
 
 	renderPixel := func(x uint32) {
-		bldPal := NewBlendPalette(x, &gba.PPU.Blend, gba)
-		index := (x + (y * SCREEN_WIDTH)) * 4
+		var (
+			bldPal = NewBlendPalette(x, &gba.PPU.Blend, gba)
+			index  = (x + (y * SCREEN_WIDTH)) * 4
 
-		var objMode uint32
-		var inObjWindow bool
+			objMode     uint32
+			inObjWindow bool
+			DEC_IDX     uint32 // this will have to be updated
 
-		BG_IDX := uint32(2)
-		DEC_IDX := uint32(0) // this will have to be updated
+			BG_IDX = uint32(2)
+		)
 
 		switch dispcnt.Mode {
 		case 3:
 
 			const (
-				BYTE_PER_PIXEL = 2
-				WIDTH          = SCREEN_WIDTH
+				WIDTH = SCREEN_WIDTH
 			)
 
 			xIdx := x
 			yIdx := y
 
-			bg := gba.PPU.Backgrounds[2]
+			bg := &gba.PPU.Backgrounds[2]
 
 			if bg.Mosaic && gba.PPU.Mosaic.BgH != 0 {
 				xIdx -= (xIdx % (gba.PPU.Mosaic.BgH + 1))
@@ -190,24 +191,17 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 				yIdx -= (yIdx % (gba.PPU.Mosaic.BgV + 1))
 			}
 
-			idx := (xIdx + (yIdx * WIDTH)) * BYTE_PER_PIXEL
-
-			data := uint32(mem.VRAM[idx])
-			data |= uint32(mem.VRAM[idx+1]) << 8
+			idx := (xIdx + (yIdx * WIDTH)) * 2
+			data := uint32(binary.LittleEndian.Uint16(mem.VRAM[idx:]))
 
 			bldPal.setBlendPalettes(data, BG_IDX, false, false)
 
 		case 4:
 
-			const (
-				BYTE_PER_PIXEL = 1
-				WIDTH          = SCREEN_WIDTH
-			)
-
 			xIdx := x
 			yIdx := y
 
-			bg := gba.PPU.Backgrounds[2]
+			bg := &gba.PPU.Backgrounds[2]
 
 			if bg.Mosaic && gba.PPU.Mosaic.BgH != 0 {
 				xIdx -= (xIdx % (gba.PPU.Mosaic.BgH + 1))
@@ -217,7 +211,7 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 				yIdx -= (yIdx % (gba.PPU.Mosaic.BgV + 1))
 			}
 
-			idx := (xIdx + (yIdx * WIDTH)) * BYTE_PER_PIXEL
+			idx := (xIdx + (yIdx * SCREEN_WIDTH))
 
 			if dispcnt.DisplayFrame1 {
 				idx += 0xA000
@@ -226,32 +220,28 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 			palIdx := uint32(mem.VRAM[idx])
 
 			if palIdx != 0 {
-				addr := palIdx << 1
-				data := uint32(gba.Mem.PRAM[addr>>1])
+				data := uint32(gba.Mem.PRAM[palIdx])
 				bldPal.setBlendPalettes(data, BG_IDX, false, false)
 			}
 
 		case 5:
 
 			const (
-				BYTE_PER_PIXEL = 2
-				WIDTH          = 160
-				HEIGHT         = 128
+				WIDTH  = 160
+				HEIGHT = 128
 			)
 
 			if x >= WIDTH || y >= HEIGHT {
-				palData := uint32(gba.Mem.PRAM[0])
-				gba.applyColor(palData, uint32(index))
+				gba.applyColor(uint32(gba.Mem.PRAM[0]), uint32(index))
 				return
 			}
 
-			idx := (x + (y * WIDTH)) * BYTE_PER_PIXEL
+			idx := (x + (y * WIDTH)) * 2
 			if dispcnt.DisplayFrame1 {
 				idx += 0xA000
 			}
 
-			data := uint32(mem.VRAM[idx])
-			data |= uint32(mem.VRAM[idx+1]) << 8
+			data := uint32(binary.LittleEndian.Uint16(mem.VRAM[idx:]))
 			bldPal.setBlendPalettes(data, BG_IDX, false, false)
 		}
 
@@ -343,7 +333,6 @@ func (gba *GBA) setObjectAffinePixel(obj *Object, x, y uint32) (uint32, bool) {
 
 	xOrigin := float32(xIdx - (int(obj.W) / 2))
 	yOrigin := float32(yIdx - (int(obj.H) / 2))
-
 	xIdx = int(obj.Pa*xOrigin+obj.Pb*yOrigin) + (int(obj.W) / 2)
 	yIdx = int(obj.Pc*xOrigin+obj.Pd*yOrigin) + (int(obj.H) / 2)
 
@@ -355,12 +344,6 @@ func (gba *GBA) setObjectAffinePixel(obj *Object, x, y uint32) (uint32, bool) {
 
 	addr := getTileAddr(obj, enTileX, enTileY, inTileX, inTileY)
 
-	//addr &= 0x1FFFF
-
-	//if addr >= 0x18000 {
-	//    addr -= 0x8000
-	//}
-
 	tileData := uint32(binary.LittleEndian.Uint16(mem.VRAM[addr:]))
 
 	return getPaletteData(gba, obj.Palette256, obj.Palette, tileData, uint32(inTileX))
@@ -368,8 +351,8 @@ func (gba *GBA) setObjectAffinePixel(obj *Object, x, y uint32) (uint32, bool) {
 
 func (gba *GBA) outBoundsAffine(obj *Object, x, y uint32) bool {
 	const (
-		MAX_X_MASK = 511
-		MAX_Y_MASK = 255
+		MAX_X_MASK = 0x1FF
+		MAX_Y_MASK = 0xFF
 	)
 
 	if !obj.DoubleSize {

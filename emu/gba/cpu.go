@@ -1,6 +1,8 @@
 package gba
 
-import "unsafe"
+import (
+	"unsafe"
+)
 
 type Cpu struct {
 	gba               *GBA
@@ -143,7 +145,6 @@ func (c *Cpu) Step() {
 	}
 
 	inst := c.Op[0]
-
 	seq := c.Seq
 	c.Seq = SEQ
 	c.Op[0] = c.Op[1]
@@ -377,7 +378,7 @@ func (c *Cpu) CyclesDma(addr, width, seq uint32) {
 }
 
 func (c *Cpu) Cycles(addr, width, seq uint32, inst bool) {
-	if c.gba.IsRunning() {
+	if c.gba.Dma.IsRunning() {
 		c.gba.CheckDmas()
 	}
 
@@ -410,9 +411,11 @@ func (c *Cpu) Cycles(addr, width, seq uint32, inst bool) {
 		}
 		c.gba.Mem.Timings.Cancel(c.Reg.R[15])
 		c.gba.Tick(int64(c.gba.Mem.Timings.Timings[width>>2][seq][region]))
-	default:
+	case region < 0x10:
 		c.gba.Mem.Timings.Cancel(c.Reg.R[15])
 		c.gba.Tick(int64(c.gba.Mem.Timings.Timings[width>>2][0][region]))
+	default:
+		c.gba.Tick(int64(c.gba.Mem.Timings.Timings[width>>2][0][0]))
 	}
 }
 
@@ -434,7 +437,7 @@ func idleMul(rs uint32, sign bool) int64 {
 }
 
 func (c *Cpu) idle(cycles int64) {
-	if c.gba.IsRunning() {
+	if c.gba.Dma.IsRunning() {
 		c.ParallelDmaCycles = c.gba.CheckDmas()
 	}
 

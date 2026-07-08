@@ -8,12 +8,13 @@ func (gba *GBA) AudioSampleEvent(late int64, arg any) {
 func (gba *GBA) HblankEvent(late int64, arg any) {
 	dispstat := &gba.Mem.Dispstat
 	dispstat.SetHBlank(true)
+
 	if (*dispstat>>4)&1 != 0 {
 		gba.Irq.SetIRQ(1)
 	}
 
 	vcount := gba.Mem.IO[6]
-	gba.Dma[3].videoDma(vcount)
+	gba.Dma.videoDma(vcount)
 
 	if vcount < SCREEN_HEIGHT {
 		updateBackgrounds(gba, &gba.PPU.Dispcnt)
@@ -44,6 +45,14 @@ func (gba *GBA) ScanlineEndEvent(late int64, arg any) {
 
 	case 227:
 		dispstat.SetVBlank(false)
+	case 228:
+		*vcount = 0
+
+		gba.Apu.Play(gba.Muted, true)
+		gba.Frame++
+		gba.Image.WritePixels(gba.Pixels)
+		gba.PPU.Backgrounds[2].BgAffineReset()
+		gba.PPU.Backgrounds[3].BgAffineReset()
 	}
 
 	match := dispstat.GetLYC() == *vcount
@@ -55,24 +64,4 @@ func (gba *GBA) ScanlineEndEvent(late int64, arg any) {
 
 	gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, CYCLES_SCANLINE-late, gba.ScanlineEndEvent, nil)
 	gba.Scheduler.schedule(EVENT_HBK, 1, CYCLES_HDRAW-late, gba.HblankEvent, nil)
-}
-
-func (gba *GBA) FrameEndEvent(late int64, arg any) {
-	dispstat := &gba.Mem.Dispstat
-
-	gba.Apu.Play(gba.Muted, true)
-	gba.Frame++
-	gba.Image.WritePixels(gba.Pixels)
-
-	gba.Mem.IO[6] = 0
-	match := dispstat.GetLYC() == 0
-	dispstat.SetVCFlag(match)
-
-	if vcounterIRQ := (*dispstat>>5)&1 != 0; vcounterIRQ && match {
-		gba.Irq.SetIRQ(2)
-	}
-	gba.PPU.Backgrounds[2].BgAffineReset()
-	gba.PPU.Backgrounds[3].BgAffineReset()
-
-	gba.Scheduler.schedule(EVENT_END_FRAME, 1, CYCLES_FRAME-late, gba.FrameEndEvent, nil)
 }

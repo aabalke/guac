@@ -14,7 +14,7 @@ const (
 	SCREEN_HEIGHT = 160
 
 	NUM_SCANLINES   = SCREEN_HEIGHT + 68
-	CYCLES_HDRAW    = 1006
+	CYCLES_HDRAW    = 1007
 	CYCLES_HBLANK   = 226
 	CYCLES_SCANLINE = CYCLES_HDRAW + CYCLES_HBLANK
 	CYCLES_VDRAW    = CYCLES_SCANLINE * SCREEN_HEIGHT
@@ -34,7 +34,7 @@ type GBA struct {
 	Cartridge         *cart.Cartridge
 	PPU               *PPU
 	Timers            [4]*Timer
-	Dma               [4]*Dma
+	Dma               *Dma
 	Apu               *apu.Apu
 	Keypad            Key
 	Irq               *Irq
@@ -67,22 +67,20 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 
 	for i := range 4 {
 		gba.Timers[i] = NewTimer(gba, i)
-		gba.Dma[i] = NewDma(gba, i)
 	}
 
+	gba.Dma = NewDma(gba)
 	gba.Mem.LoadBios()
 	gba.LoadGame(path)
 
-	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, 0, gba.AudioSampleEvent, nil)
-	gba.Scheduler.schedule(EVENT_END_FRAME, 1, 0, gba.FrameEndEvent, nil)
-	gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, 0, gba.ScanlineEndEvent, nil)
+	//gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, 0, gba.AudioSampleEvent, nil)
+	//gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, 0, gba.ScanlineEndEvent, nil)
 
 	// matches nanoboy
-	// gba.Mem.IO[6] = 225
-	// gba.Mem.Dispstat.SetVBlank(true)
-	// gba.Mem.Dispstat.SetHBlank(true)
-	// gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, CYCLES_HBLANK, gba.ScanlineEndEvent, nil)
-	// gba.Scheduler.schedule(EVENT_END_FRAME, 1, CYCLES_FRAME-(CYCLES_SCANLINE*225), gba.FrameEndEvent, nil)
+	gba.Mem.IO[6] = 225
+	gba.Mem.Dispstat.SetVBlank(true)
+	gba.Mem.Dispstat.SetHBlank(true)
+	gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, CYCLES_HBLANK, gba.ScanlineEndEvent, nil)
 
 	if config.Conf.Gba.Bios.Direct {
 		gba.DirectBoot()

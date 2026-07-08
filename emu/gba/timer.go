@@ -28,7 +28,7 @@ func (t *Timer) Delta(late int64) uint32 {
 	return uint32((t.Gba.Scheduler.Now()-late)-t.From) >> t.FreqShift
 }
 
-func (t *Timer) GetCounter(idx int) uint32 {
+func (t *Timer) GetCounter() uint32 {
 	counter := t.Counter
 	if t.Running {
 		counter += t.Delta(0)
@@ -40,11 +40,22 @@ func (t *Timer) GetCounter(idx int) uint32 {
 func (t *Timer) Read(idx int) uint8 {
 	switch idx {
 	case 0:
-		return uint8(t.GetCounter(idx))
+		return uint8(t.GetCounter())
 	case 1:
-		return uint8(t.GetCounter(idx) >> 8)
+		return uint8(t.GetCounter() >> 8)
 	case 2:
 		return t.Cnt
+	default:
+		return 0
+	}
+}
+
+func (t *Timer) Read16(idx int) uint16 {
+	switch idx {
+	case 0:
+		return uint16(t.GetCounter())
+	case 2:
+		return uint16(t.Cnt)
 	default:
 		return 0
 	}

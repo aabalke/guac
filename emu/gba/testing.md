@@ -61,7 +61,7 @@ Additionally, other ARMv5 instructions will fail.
 
 👍 Bios Open Bus [12/12]
 ❌ Dma Latch [3/4]
-❌ Dma Start Delay [6/8]
+👍 Dma Start Delay [8/8]
 👍 Timer Basic [10/10]
 
 ### Other
@@ -119,9 +119,11 @@ Requires Official bios for passing tests
 👍 Memory
 👍 Lcd
 👍 Timer
-❌ Dma (priority test)
+👍 Dma
 👍 Key
 👍 Irq
+
+- siocnt irq fails around :41 seconds
 
 ### Tonc
 
