@@ -22,7 +22,7 @@ type Memory struct {
 	IO   [0x400]uint8
 
 	ProtectedValue uint32
-	SioCnt         uint8
+	Sio            *Sio
 	Dispstat       Dispstat
 	postflg        uint8
 
@@ -35,8 +35,8 @@ type Memory struct {
 func NewMemory(gba *GBA) *Memory {
 	m := &Memory{GBA: gba}
 	m.ProtectedValue = 0xE129F000
-
 	m.Timings = NewTimings(gba.Tick)
+	m.Sio = NewSio(gba.Irq, gba.Scheduler)
 
 	m.initReadRegions()
 	m.initWriteRegions()
@@ -455,6 +455,9 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 	case 0x07:
 		return 0
 
+	case 0x128, 0x129:
+		return m.Sio.Read(addr & 1)
+
 	case 0x130, 0x131, 0x132, 0x133:
 		return m.GBA.Keypad.Read(addr & 3)
 
@@ -646,14 +649,8 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 	case 0x0053:
 		m.IO[addr] = v &^ 0b1110_0000 // bldalpha
 
-	case 0x0128:
-		// temp to pass ags sio irq, will need timing
-		m.SioCnt = (m.SioCnt & 0x80) | (v &^ 0x80)
-
-		if m.SioCnt&0x80 == 0 && v&0x80 != 0 {
-			m.SioCnt |= 0x80
-			m.GBA.Irq.SetIRQ(7)
-		}
+	case 0x128, 0x129:
+		m.Sio.Write(addr&1, v)
 
 	case 0x130, 0x131, 0x132, 0x133:
 		m.GBA.Keypad.Write(addr&3, v)

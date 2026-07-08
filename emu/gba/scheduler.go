@@ -20,6 +20,7 @@ const (
 	EVENT_DMA2            = "event dma 2"
 	EVENT_DMA3            = "event dma 3"
 	EVENT_IRQ_SET         = "irq set"
+	EVENT_SIO             = "event sio"
 )
 
 type Scheduler struct {

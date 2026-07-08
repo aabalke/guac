@@ -123,8 +123,6 @@ Requires Official bios for passing tests
 👍 Key
 👍 Irq
 
-- siocnt irq fails around :41 seconds
-
 ### Tonc
 
 👍 bigmap
