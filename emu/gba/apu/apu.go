@@ -115,8 +115,6 @@ func (a *Apu) Play(muted, stdFps bool) {
 		return
 	}
 
-	return
-
 	a.player.Write(a.Stream)
 }
 

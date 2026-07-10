@@ -14,7 +14,7 @@ func (gba *GBA) HblankEvent(late int64, arg any) {
 	}
 
 	vcount := gba.Mem.IO[6]
-	gba.Dma.videoDma(vcount)
+	gba.Dma.videoDma(vcount, late)
 
 	if vcount < SCREEN_HEIGHT {
 		updateBackgrounds(gba, &gba.PPU.Dispcnt)
@@ -23,7 +23,7 @@ func (gba *GBA) HblankEvent(late int64, arg any) {
 		gba.scanlineGraphics(uint32(vcount))
 		gba.PPU.Backgrounds[2].BgAffineUpdate()
 		gba.PPU.Backgrounds[3].BgAffineUpdate()
-		gba.checkDmas(DMA_MODE_HBL)
+		gba.Dma.raise(DMA_MODE_HBL, late)
 	}
 }
 
@@ -38,7 +38,7 @@ func (gba *GBA) ScanlineEndEvent(late int64, arg any) {
 	switch *vcount {
 	case SCREEN_HEIGHT:
 		dispstat.SetVBlank(true)
-		gba.checkDmas(DMA_MODE_VBL)
+		gba.Dma.raise(DMA_MODE_VBL, late)
 		if (*dispstat>>3)&1 != 0 {
 			gba.Irq.SetIRQ(0)
 		}

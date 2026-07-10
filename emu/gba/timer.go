@@ -203,19 +203,48 @@ func (t *Timer) OnTimerOverflow(late int64) {
 		t.Gba.Irq.SetIRQ(3 + uint32(t.Idx))
 	}
 
-	//if t.Idx < 2 {
-	//	for ch := uint8(0); ch < 2; ch++ { // 0: PCM-A, 1: PCM-B
-	//		if c.apu.StepPCM(ch, t.Idx) {
-	//			c.RequestSoundDMA(ch + 1) // PCM-A: DMA1, PCM-B: DMA2
-	//		}
-	//	}
-	//}
-
 	if t.Idx != 3 {
 		if next := t.Gba.Timers[t.Idx+1]; next.Enabled && next.Cascade {
 			next.Counter++
 			if next.Counter >= 0x10000 {
 				next._Overflow(late)
+			}
+		}
+	}
+
+	if t.Idx < 2 {
+
+		if !t.Gba.Apu.Enable {
+			return
+		}
+
+		if aTick := (t.Gba.Mem.IO[0x83]>>2)&1 == uint8(t.Idx); aTick {
+
+			fifo := &t.Gba.Apu.FifoA
+
+			fifo.Load()
+
+			// nanoboy uses length 3
+			// gbatek mentions 16 bytes, why difference?
+			if refill := fifo.Length <= 3; refill {
+
+				ch := t.Gba.Dma.Chs[1]
+				if ch.Enabled && ch.Mode == DMA_MODE_SPE {
+					t.Gba.Scheduler.schedule(EVENTS[1], 0, 2-late, ch.Start, nil)
+				}
+			}
+		}
+
+		if bTick := (t.Gba.Mem.IO[0x83]>>6)&1 == uint8(t.Idx); bTick {
+			fifo := &t.Gba.Apu.FifoB
+
+			fifo.Load()
+
+			if refill := fifo.Length <= 3; refill {
+				ch := t.Gba.Dma.Chs[2]
+				if ch.Enabled && ch.Mode == DMA_MODE_SPE {
+					t.Gba.Scheduler.schedule(EVENTS[2], 0, 2-late, ch.Start, nil)
+				}
 			}
 		}
 	}

@@ -73,7 +73,7 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba.Mem.LoadBios()
 	gba.LoadGame(path)
 
-	//gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, 0, gba.AudioSampleEvent, nil)
+	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, 0, gba.AudioSampleEvent, nil)
 	//gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, 0, gba.ScanlineEndEvent, nil)
 
 	// matches nanoboy

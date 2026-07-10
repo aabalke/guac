@@ -1,8 +1,8 @@
 # Alyosha Tas Gba Tests
 
-Results generated 2026-07-07T20:36:50-06:00
+Results generated 2026-07-10T15:19:14-06:00
 
-Passing 51/119 42%
+Passing 54/119 45%
 
 👍 DMA\DMA_Mode_Change
 ❌ DMA\DMA_ROM_Fixed
@@ -32,7 +32,7 @@ Passing 51/119 42%
 👍 LDM\LDM_ALU
 👍 LDM\LDM_ALU_IMM
 👍 LDM\LDM_ALU_Store
-❌ LDM\LDM_Bx
+👍 LDM\LDM_Bx
 👍 LDM\LDM_LD
 👍 LDM\LDM_MUL_UL_32
 👍 LDM\LDM_MUL_UL_SL
@@ -47,7 +47,7 @@ Passing 51/119 42%
 ❌ Serial\serial_time_3
 ❌ Serial\serial_time_start_bit
 👍 Serial\serial_time_start_bit_2
-❌ arm\arm
+👍 arm\arm
 ❌ bios\bios
 ❌ fifo_dma\fifo
 ❌ fifo_dma\fifo_2
@@ -99,7 +99,7 @@ Passing 51/119 42%
 ❌ prefetcher\prefetcher_branch_thumb_arm
 ❌ prefetcher\prefetcher_branch_thumb_arm_3
 👍 prefetcher\prefetcher_branch_thumb_arm_4
-❌ prefetcher\prefetcher_dma
+👍 prefetcher\prefetcher_dma
 ❌ prefetcher\prefetcher_full_arm
 ❌ prefetcher\prefetcher_full_arm_2
 👍 prefetcher\prefetcher_full_thumb

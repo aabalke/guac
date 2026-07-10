@@ -84,7 +84,7 @@ Requires Official bios for passing tests
 👍 DMA tests [1244/1244]
 ❌ SIO register R/W tests [25/90]
 ❌ SIO timing tests [0/4]
-❌ Misc. edge case tests [4/12]
+❌ Misc. edge case tests [6/12]
 ❌ Video tests
     👍 Basic Mode 3
     👍 Basic Mode 4

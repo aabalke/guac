@@ -115,9 +115,11 @@ func (c *Cpu) Step() {
 			if thumb {
 				c.Cycles(c.Reg.R[15], 2, seq, true)
 				c.gba.Mem.Read16(c.Reg.R[15])
+				c.LastWasDma = false
 			} else {
 				c.Cycles(c.Reg.R[15], 4, seq, true)
 				c.gba.Mem.Read32(c.Reg.R[15])
+				c.LastWasDma = false
 			}
 
 			c.ModeSwitch(cpsr.Mode, mode)
@@ -158,6 +160,7 @@ func (c *Cpu) Step() {
 		} else {
 			c.Op[1] = *(*uint32)(c.PcPtr) & 0xFFFF
 		}
+		c.LastWasDma = false
 
 		c.DecodeTHUMB(uint16(inst))
 
@@ -176,6 +179,7 @@ func (c *Cpu) Step() {
 		} else {
 			c.Op[1] = *(*uint32)(c.PcPtr)
 		}
+		c.LastWasDma = false
 
 		c.DecodeARM(inst)
 
@@ -207,6 +211,7 @@ func (c *Cpu) Reload16() {
 		c.Op[1] = *(*uint32)(c.PcPtr) & 0xFFFF
 		c.PcPtr = unsafe.Add(c.PcPtr, 2)
 	}
+	c.LastWasDma = false
 
 	*pc += 4
 	c.Reloaded = true
@@ -230,6 +235,7 @@ func (c *Cpu) Reload32() {
 		c.Op[1] = *(*uint32)(c.PcPtr)
 		c.PcPtr = unsafe.Add(c.PcPtr, 4)
 	}
+	c.LastWasDma = false
 
 	*pc += 8
 	c.Reloaded = true
@@ -309,30 +315,35 @@ func (cpu *Cpu) ToggleThumb() {
 func (c *Cpu) Write8(addr uint32, v uint8) {
 	c.Cycles(addr, 1, NONSEQ, false)
 	c.gba.Mem.Write8(addr, v)
+	c.LastWasDma = false
 	c.Seq = NONSEQ
 }
 
 func (c *Cpu) Write16(addr uint32, v uint16) {
 	c.Cycles(addr, 2, NONSEQ, false)
 	c.gba.Mem.Write16(addr, v)
+	c.LastWasDma = false
 	c.Seq = NONSEQ
 }
 
 func (c *Cpu) Write32(addr uint32, v uint32) {
 	c.Cycles(addr, 4, NONSEQ, false)
 	c.gba.Mem.Write32(addr, v)
+	c.LastWasDma = false
 	c.Seq = NONSEQ
 }
 
 func (c *Cpu) Write32Block(addr, v, seq uint32) {
 	c.Cycles(addr, 4, seq, false)
 	c.gba.Mem.Write32(addr, v)
+	c.LastWasDma = false
 	c.Seq = NONSEQ
 }
 
 func (c *Cpu) Read8(addr uint32) uint32 {
 	c.Cycles(addr, 1, NONSEQ, false)
 	v := c.gba.Mem.Read8(addr)
+	c.LastWasDma = false
 	c.idle(1)
 	return v
 }
@@ -340,6 +351,7 @@ func (c *Cpu) Read8(addr uint32) uint32 {
 func (c *Cpu) Read16(addr uint32) uint32 {
 	c.Cycles(addr, 2, NONSEQ, false)
 	v := c.gba.Mem.Read16(addr)
+	c.LastWasDma = false
 	c.idle(1)
 	return v
 }
@@ -347,17 +359,19 @@ func (c *Cpu) Read16(addr uint32) uint32 {
 func (c *Cpu) Read32(addr uint32) uint32 {
 	c.Cycles(addr, 4, NONSEQ, false)
 	v := c.gba.Mem.Read32(addr)
+	c.LastWasDma = false
 	c.idle(1)
 	return v
 }
 
 func (c *Cpu) Read32Block(addr, seq uint32) uint32 {
 	c.Cycles(addr, 4, seq, false)
-	return c.gba.Mem.Read32(addr)
+	v := c.gba.Mem.Read32(addr)
+	c.LastWasDma = false
+	return v
 }
 
 func (c *Cpu) CyclesDma(addr, width, seq uint32) {
-	c.LastWasDma = true
 	c.ParallelDmaCycles = 0
 
 	switch region := addr >> 24; {
@@ -396,8 +410,6 @@ func (c *Cpu) Cycles(addr, width, seq uint32, inst bool) {
 		if c.LastWasDma {
 			seq = NONSEQ
 		}
-
-		c.LastWasDma = false
 
 		if inst {
 			w := uint32(4)

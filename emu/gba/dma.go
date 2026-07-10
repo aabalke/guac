@@ -1,6 +1,7 @@
 package gba
 
 import (
+	"fmt"
 	"unsafe"
 )
 
@@ -25,6 +26,9 @@ type Dma struct {
 	Runnable      uint8
 	ActiveDma     int
 	ShouldReEnter bool
+
+	// hades/dma-latch.gba / https://mgba.io/2020/01/25/infinite-loop-holy-grail/
+	LatchValue uint32
 }
 
 type Channel struct {
@@ -44,17 +48,16 @@ type Channel struct {
 	DRQ         bool
 	IRQ         bool
 	Enabled     bool
-	Active      bool
 	InVideoMode bool
 
+	Fifo bool
+
 	latched struct {
-		srcPtr    unsafe.Pointer
-		dstPtr    unsafe.Pointer
-		src       uint32
-		dst       uint32
-		cnt       uint32
-		dstOffset int
-		srcOffset int
+		srcPtr unsafe.Pointer
+		dstPtr unsafe.Pointer
+		src    uint32
+		dst    uint32
+		cnt    uint32
 	}
 }
 
@@ -77,46 +80,45 @@ func NewDma(gba *GBA) *Dma {
 	return d
 }
 
-func (d *Dma) Read(idx, addr uint32) uint8 {
+func (ch *Channel) Read(addr uint32) uint8 {
 	switch addr {
 	case 10:
-		return uint8(d.Chs[idx].Control)
+		return uint8(ch.Control)
 	case 11:
-		return uint8(d.Chs[idx].Control >> 8)
+		return uint8(ch.Control >> 8)
 	default:
 		return 0
 	}
 }
 
-func (d *Dma) Write(idx, addr uint32, v uint8) {
-	ch := &d.Chs[idx]
-
+func (ch *Channel) Write(addr uint32, v uint8) {
 	switch addr {
-	case 0, 1, 2, 3:
-
-		if addr == 3 {
-			if ch.Idx == 0 {
-				v &= 0x7
-			} else {
-				v &= 0xF
-			}
-		}
-
+	case 0, 1, 2:
 		ch.Src = (ch.Src &^ (0xFF << (addr << 3))) | (uint32(v) << (addr << 3))
 
-	case 4, 5, 6, 7:
+	case 3:
+
+		v &= 0xF
+		if ch.Idx == 0 {
+			v &= 0x7
+		}
+
+		ch.Src = (ch.Src &^ (0xFF << 24)) | (uint32(v) << 24)
+
+	case 4, 5, 6:
 
 		addr -= 4
 
-		if addr == 3 {
-			if ch.Idx == 3 {
-				v &= 0xF
-			} else {
-				v &= 0x7
-			}
+		ch.Dst = (ch.Dst &^ (0xFF << (addr << 3))) | (uint32(v) << (addr << 3))
+
+	case 7:
+
+		v &= 0xF
+		if ch.Idx != 3 {
+			v &= 0x7
 		}
 
-		ch.Dst = (ch.Dst &^ (0xFF << (addr << 3))) | (uint32(v) << (addr << 3))
+		ch.Dst = (ch.Dst &^ (0xFF << 24)) | (uint32(v) << 24)
 
 	case 8:
 		ch.Cnt = (ch.Cnt &^ 0xFF) | uint32(v)
@@ -150,89 +152,78 @@ func (d *Dma) Write(idx, addr uint32, v uint8) {
 		ch.Mode = (v >> 4) & 3
 		ch.IRQ = (v>>6)&1 != 0
 		ch.Enabled = (v>>7)&1 != 0
-
 		ch.Control = (ch.Control & 0xFF) | (uint32(v) << 8)
 		ch.SrcAdj = (ch.SrcAdj & 1) | (uint32(v)&1)<<1
 
-		//if B[15] && !prev && ch.Enabled && ch.Mode == 2 {
-		//	fmt.Printf("Enabling Hblank Dma\n")
-		//}
+		if !prev && ch.Enabled {
 
-		if !prev && ch.Enabled && ch.Mode == 0 {
-			d.Gba.Scheduler.schedule(EVENTS[ch.Idx], 0, 2, ch.Start, nil)
+			ch.latched.src = ch.Src
+			ch.latched.dst = ch.Dst
+
+			if ch.Mode == DMA_MODE_SPE && (ch.Idx == 1 || ch.Idx == 2) {
+				ch.Fifo = true
+				ch.latched.src &^= 3
+				ch.latched.dst &^= 3
+				ch.isWord = true
+				ch.latched.cnt = 4
+				ch.latched.srcPtr = ch.dma.Gba.Mem.ReadPtr(ch.latched.src)
+				ch.latched.dstPtr = nil
+
+			} else {
+
+				ch.Fifo = false
+
+				var (
+					src = ch.Src
+					dst = ch.Dst
+					cnt = ch.Cnt
+				)
+
+				if ch.isWord {
+					dst &^= 3
+					src &^= 3
+				} else {
+					dst &^= 1
+					src &^= 1
+				}
+
+				if cnt == 0 {
+					if ch.Idx == 3 {
+						cnt = 0x10000
+					} else {
+						cnt = 0x4000
+					}
+				}
+
+				ch.latched.src = src
+				ch.latched.dst = dst
+				ch.latched.cnt = cnt
+				ch.latched.srcPtr = ch.dma.Gba.Mem.ReadPtr(src)
+				ch.latched.dstPtr = ch.dma.Gba.Mem.WritePtr(dst)
+
+				ch.dma.EepromDma(ch.latched.cnt, dst)
+
+				if ch.Mode == DMA_MODE_IMM {
+					ch.dma.Gba.Scheduler.schedule(EVENTS[ch.Idx], 0, 2, ch.Start, nil)
+				}
+			}
+
 			return
 		}
 
 		if prev && !ch.Enabled {
 			ch.disable()
-			d.Gba.Scheduler.cancel(EVENTS[ch.Idx])
+			ch.dma.Gba.Scheduler.cancel(EVENTS[ch.Idx])
 			return
 		}
 	}
 }
 
 func (ch *Channel) Start(late int64, _ any) {
-	var (
-		src       = ch.Src
-		dst       = ch.Dst
-		cnt       = ch.Cnt
-		dstOffset = 2
-		srcOffset = 2
-	)
-
-	ch.Active = true
-
-	if ch.isWord {
-		dst &^= 3
-		src &^= 3
-		dstOffset = 4
-		srcOffset = 4
-	} else {
-		dst &^= 1
-		src &^= 1
-	}
-
-	if cnt == 0 {
-		if ch.Idx == 3 {
-			cnt = 0x10000
-		} else {
-			cnt = 0x4000
-		}
-	}
-
-	if rom := src >= 0x800_0000 && src < 0xE00_0000; !rom {
-		switch ch.SrcAdj {
-		case DMA_ADJ_NON:
-			srcOffset = 0
-		case DMA_ADJ_DEC:
-			srcOffset = -srcOffset
-		case DMA_ADJ_REL:
-			panic("invalid ch.src method")
-		}
-	}
-
-	if rom := dst >= 0x800_0000 && dst < 0xE00_0000; !rom {
-		switch ch.DstAdj {
-		case DMA_ADJ_NON:
-			dstOffset = 0
-		case DMA_ADJ_DEC:
-			dstOffset = -dstOffset
-		}
-	}
-
-	ch.latched.src = src
-	ch.latched.dst = dst
-	ch.latched.cnt = cnt
-	ch.latched.srcOffset = srcOffset
-	ch.latched.dstOffset = dstOffset
-
-	ch.dma.EepromDma(ch.latched.cnt, dst)
-
 	switch {
 	case ch.dma.Runnable == 0:
 		ch.dma.ActiveDma = ch.Idx
 	case ch.Idx < ch.dma.ActiveDma:
-		//fmt.Printf("New Ch %d is < ActiveDma %b\n", ch.Idx, ch.dma.ActiveDma)
 		ch.dma.ActiveDma = ch.Idx
 		ch.dma.ShouldReEnter = true
 	}
@@ -243,33 +234,57 @@ func (ch *Channel) Start(late int64, _ any) {
 func (ch *Channel) disable() {
 	ch.Enabled = false
 	ch.Control &^= 0x8000
-	ch.Active = false
 	ch.dma.Runnable &^= 1 << ch.Idx
 }
 
 func (ch *Channel) transfer() {
 	var (
 		mem       = ch.dma.Gba.Mem
-		src       = ch.latched.src
-		dst       = ch.latched.dst
 		accessRom = false
+		srcOffset = 2
+		dstOffset = 2
 	)
 
-	ch.latched.srcPtr = ch.dma.Gba.Mem.ReadPtr(src)
-	ch.latched.dstPtr = ch.dma.Gba.Mem.WritePtr(dst)
+	if ch.isWord {
+		dstOffset = 4
+		srcOffset = 4
+	}
+
+	if rom := ch.latched.src >= 0x800_0000 && ch.latched.src < 0xE00_0000; !rom {
+		switch ch.SrcAdj {
+		case DMA_ADJ_NON:
+			srcOffset = 0
+		case DMA_ADJ_DEC:
+			srcOffset = -srcOffset
+		case DMA_ADJ_REL:
+			panic(fmt.Sprintf("invalid dma src method. idx=%d src=%08X dst=%08X", ch.Idx, ch.Src, ch.Dst))
+		}
+	}
+
+	if rom := ch.latched.dst >= 0x800_0000 && ch.latched.dst < 0xE00_0000; !rom {
+		switch ch.DstAdj {
+		case DMA_ADJ_NON:
+			dstOffset = 0
+		case DMA_ADJ_DEC:
+			dstOffset = -dstOffset
+		}
+	}
+
+	if ch.Fifo {
+		dstOffset = 0
+	}
 
 	for ch.latched.cnt > 0 {
-
 		if ch.dma.ShouldReEnter {
 			ch.dma.ShouldReEnter = false
 			return
 		}
-
-		src = ch.latched.src
-		dst = ch.latched.dst
-
-		srcSeq := uint32(SEQ)
-		dstSeq := uint32(SEQ)
+		var (
+			src    = ch.latched.src
+			dst    = ch.latched.dst
+			srcSeq = uint32(SEQ)
+			dstSeq = uint32(SEQ)
+		)
 
 		if !accessRom {
 			if src >= 0x800_0000 {
@@ -285,13 +300,17 @@ func (ch *Channel) transfer() {
 
 			if src < 0x200_0000 {
 				ch.dma.Tick(1)
+				ch.dma.Gba.Cpu.LastWasDma = true
 			} else {
+
 				ch.dma.Gba.Cpu.CyclesDma(src, 4, srcSeq)
 				if ch.latched.srcPtr == nil {
 					ch.Value = mem.Read32(src)
 				} else {
 					ch.Value = *(*uint32)(ch.latched.srcPtr)
 				}
+				ch.dma.Gba.Cpu.LastWasDma = true
+				ch.dma.LatchValue = ch.Value
 			}
 
 			ch.dma.Gba.Cpu.CyclesDma(dst, 4, dstSeq)
@@ -315,6 +334,8 @@ func (ch *Channel) transfer() {
 				}
 
 				ch.dma.Tick(1)
+				ch.dma.Gba.Cpu.LastWasDma = true
+
 			} else {
 
 				ch.dma.Gba.Cpu.CyclesDma(src, 2, srcSeq)
@@ -324,7 +345,10 @@ func (ch *Channel) transfer() {
 				} else {
 					v = *(*uint32)(ch.latched.srcPtr) & 0xFFFF
 				}
+				ch.dma.Gba.Cpu.LastWasDma = true
+
 				ch.Value = v | (v << 16)
+				ch.dma.LatchValue = ch.Value
 			}
 
 			ch.dma.Gba.Cpu.CyclesDma(dst, 2, dstSeq)
@@ -335,51 +359,65 @@ func (ch *Channel) transfer() {
 			}
 		}
 
-		ch.latched.src = uint32(int(ch.latched.src) + ch.latched.srcOffset)
-		ch.latched.dst = uint32(int(ch.latched.dst) + ch.latched.dstOffset)
+		ch.latched.src = uint32(int(ch.latched.src) + srcOffset)
+		ch.latched.dst = uint32(int(ch.latched.dst) + dstOffset)
 		if ch.latched.srcPtr != nil {
-			ch.latched.srcPtr = unsafe.Add(ch.latched.srcPtr, ch.latched.srcOffset)
+			ch.latched.srcPtr = unsafe.Add(ch.latched.srcPtr, srcOffset)
 		}
 		if ch.latched.dstPtr != nil {
-			ch.latched.dstPtr = unsafe.Add(ch.latched.dstPtr, ch.latched.dstOffset)
+			ch.latched.dstPtr = unsafe.Add(ch.latched.dstPtr, dstOffset)
 		}
 
 		ch.latched.cnt--
 	}
 
+	ch.dma.Runnable &^= 1 << ch.Idx
+
 	if ch.IRQ {
 		ch.dma.Gba.Irq.SetIRQ(8 + uint32(ch.Idx))
 	}
 
-	ch.Active = false
-	ch.dma.Runnable &^= 1 << ch.Idx
-	ch.dma.SelectNextChannel(ch.Idx)
+	if ch.Repeat && ch.Mode != DMA_MODE_IMM {
+		if ch.Fifo {
+			ch.latched.cnt = 4
+		} else {
+			cnt := ch.Cnt
+			if cnt == 0 {
+				if ch.Idx == 3 {
+					cnt = 0x10000
+				} else {
+					cnt = 0x4000
+				}
+			}
 
-	if !ch.Repeat {
+			ch.latched.cnt = cnt
+		}
+
+		if ch.DstAdj == DMA_ADJ_REL && !ch.Fifo {
+			ch.latched.dst = ch.Dst
+		}
+	} else {
 		ch.disable()
-		return
 	}
 
-	ch.Src = ch.latched.src
-
-	if ch.DstAdj != DMA_ADJ_REL {
-		ch.Dst = ch.latched.dst
-	}
+	ch.dma.SelectNextChannel(ch.Idx)
 }
 
 func (d *Dma) SelectNextChannel(curr int) {
 	if curr == 3 || d.Runnable == 0 {
+		d.ActiveDma = 0
 		return
 	}
 
 	for i := curr; i < 4; i++ {
 		if d.Runnable&(1<<i) != 0 {
 			d.ActiveDma = i
+			return
 		}
 	}
 }
 
-func (d *Dma) videoDma(vcount uint8) {
+func (d *Dma) videoDma(vcount uint8, late int64) {
 	ch := &d.Chs[3]
 
 	if ok := ch.Enabled && ch.Mode == DMA_MODE_SPE; ok {
@@ -394,7 +432,7 @@ func (d *Dma) videoDma(vcount uint8) {
 		}
 
 		if ch.InVideoMode {
-			d.Gba.Scheduler.schedule(EVENT_DMA3, 0, 2, ch.Start, nil)
+			d.Gba.Scheduler.schedule(EVENT_DMA3, 0, 2-late, ch.Start, nil)
 		}
 	}
 }
@@ -403,11 +441,10 @@ func (d *Dma) IsRunning() bool {
 	return d.Runnable != 0
 }
 
-func (gba *GBA) checkDmas(mode uint8) {
+func (d *Dma) raise(mode uint8, late int64) {
 	for i := range 4 {
-		ch := &gba.Dma.Chs[i]
-		if ok := ch.Enabled && ch.Mode == mode; ok {
-			gba.Scheduler.schedule(EVENTS[ch.Idx], 0, 2, ch.Start, nil)
+		if ch := &d.Chs[i]; ch.Enabled && ch.Mode == mode {
+			d.Gba.Scheduler.schedule(EVENTS[ch.Idx], 0, 2-late, ch.Start, nil)
 		}
 	}
 }
@@ -418,7 +455,6 @@ func (gba *GBA) CheckDmas() uint32 {
 	gba.Tick(1)
 
 	for gba.Dma.IsRunning() {
-
 		ch := &gba.Dma.Chs[gba.Dma.ActiveDma]
 		ch.transfer()
 	}

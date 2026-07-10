@@ -374,6 +374,10 @@ func (m *Memory) Read32(addr uint32) uint32 {
 var openBusDepth int
 
 func (m *Memory) ReadOpenBus(addr uint32) uint8 {
+	if m.GBA.Cpu.LastWasDma {
+		return uint8(m.GBA.Dma.LatchValue >> ((addr & 3) << 3))
+	}
+
 	openBusDepth++
 
 	defer func() {
@@ -436,7 +440,7 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 		addr -= 0xB0
 		i := addr / 12
 		addr %= 12
-		return m.GBA.Dma.Read(i, addr)
+		return m.GBA.Dma.Chs[i].Read(addr)
 
 	case addr >= 0x100 && addr < 0x110:
 
@@ -555,6 +559,12 @@ func (m *Memory) Write32(addr uint32, v uint32) {
 	case 0x400_010c:
 		m.GBA.Timers[3].Write32(v)
 		return
+	case 0x400_00A0:
+		m.GBA.Apu.FifoA.Copy(v)
+		return
+	case 0x400_00A4:
+		m.GBA.Apu.FifoB.Copy(v)
+		return
 	}
 
 	if ptr := m.WritePtr(addr); ptr != nil {
@@ -588,7 +598,8 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 		addr -= 0xB0
 		i := addr / 12
 		addr %= 12
-		m.GBA.Dma.Write(i, addr, v)
+
+		m.GBA.Dma.Chs[i].Write(addr, v)
 		return
 
 	case addr >= 0x100 && addr < 0x110:
