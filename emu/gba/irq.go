@@ -21,6 +21,7 @@ type Irq struct {
 	sch                  *Scheduler
 	pendingIF, pendingIE uint32
 	IF, IE               uint32
+	IdleIrq              uint32
 	IME                  bool
 	pendingIME           bool
 	IrqAvailable         bool

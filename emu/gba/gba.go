@@ -40,6 +40,8 @@ type GBA struct {
 	Irq               *Irq
 	InstInjectionFunc func(op uint32)
 
+	vsyncAddr uint32
+
 	Frame uint64
 
 	Pixels      []byte
@@ -90,6 +92,8 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 
 	gba.Booted = true
 
+	gba.SetIdleAddr()
+
 	return gba
 }
 
@@ -122,6 +126,16 @@ func (gba *GBA) Update(stdFps bool) {
 			}
 
 			gba.Cpu.Step()
+		}
+
+		if gba.vsyncAddr != 0 && gba.Cpu.Reg.R[15] == gba.vsyncAddr {
+			vblRaised := gba.Irq.IdleIrq&1 != 0
+			vblHandled := gba.Irq.IF&1 != 0
+			if vblRaised && !vblHandled {
+				gba.Cpu.Halted = true
+			}
+
+			gba.Irq.IdleIrq = gba.Irq.IF
 		}
 	}
 }
