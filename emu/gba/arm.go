@@ -14,7 +14,7 @@ func (cpu *Cpu) DecodeARM(op uint32) {
 	}
 
 	if swi := (op>>24)&0xF == 0xF; swi {
-		cpu.Exception(VEC_SWI, MODE_SWI)
+		cpu.swi(op)
 		return
 	}
 

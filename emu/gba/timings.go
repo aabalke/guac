@@ -61,23 +61,52 @@ func (t *Timings) Cancel(r15 uint32) {
 
 func (t *Timings) Step(cycles int64) {
 	t.Countdown -= cycles
-
 	if !t.Enabled {
 		t.Opcodes++
 		return
 	}
+	if t.Countdown > 0 {
+		return
+	}
 
-	for t.Countdown <= 0 {
-		if t.Opcodes >= t.Capacity {
-			t.Opcodes++
-			break
-		}
-
+	if t.Opcodes >= t.Capacity {
 		t.Opcodes++
-		t.Addr += t.Width
-		t.Countdown += t.AccessTime
+		return
+	}
+
+	need := uint32((-t.Countdown)/t.AccessTime + 1)
+	avail := t.Capacity - t.Opcodes
+
+	if need <= avail {
+		t.Opcodes += need
+		t.Addr += t.Width * need
+		t.Countdown += t.AccessTime * int64(need)
+	} else {
+		t.Opcodes += avail + 1
+		t.Addr += t.Width * avail
+		t.Countdown += t.AccessTime * int64(avail)
 	}
 }
+
+//func (t *Timings) Step(cycles int64) {
+//	t.Countdown -= cycles
+//
+//	if !t.Enabled {
+//		t.Opcodes++
+//		return
+//	}
+//
+//	for t.Countdown <= 0 {
+//		if t.Opcodes >= t.Capacity {
+//			t.Opcodes++
+//			break
+//		}
+//
+//		t.Opcodes++
+//		t.Addr += t.Width
+//		t.Countdown += t.AccessTime
+//	}
+//}
 
 func (t *Timings) ReadWaitstate(addr uint32) uint8 {
 	switch addr & 3 {

@@ -8,7 +8,8 @@ import (
 func (c *Cpu) DecodeTHUMB(op uint16) {
 	switch {
 	case IsthumbSWI(op):
-		c.Exception(VEC_SWI, MODE_SWI)
+		c.swi(uint32(op) & 0xFF)
+		return
 	case IsThumbAddSub(op):
 		c.ThumbAddSub(op)
 	case IsThumbShift(op):

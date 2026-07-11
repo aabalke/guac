@@ -48,7 +48,7 @@ type GBA struct {
 	Image       *ebiten.Image
 	DrawOptions ebiten.DrawImageOptions
 
-	Paused, Muted, Save, Booted bool
+	Paused, Muted, Save, Booted, StdFps bool
 }
 
 func NewGBA(path string, ctx *oto.Context) *GBA {
@@ -80,8 +80,8 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 
 	// matches nanoboy
 	gba.Mem.IO[6] = 225
-	gba.Mem.Dispstat.SetVBlank(true)
-	gba.Mem.Dispstat.SetHBlank(true)
+	gba.Mem.Dispstat |= DISP_HBL
+	gba.Mem.Dispstat |= DISP_VBL
 	gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, CYCLES_HBLANK, gba.ScanlineEndEvent, nil)
 
 	if config.Conf.Gba.Bios.Direct {
@@ -101,6 +101,8 @@ func (gba *GBA) Update(stdFps bool) {
 	if gba.Paused {
 		return
 	}
+
+	gba.StdFps = stdFps
 
 	nextFrame := gba.Scheduler.CurrentCycle + CYCLES_FRAME
 	for gba.Scheduler.CurrentCycle < nextFrame {
