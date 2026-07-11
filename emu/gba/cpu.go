@@ -113,11 +113,11 @@ func (c *Cpu) Step() {
 			c.Seq = SEQ
 
 			if thumb {
-				c.Cycles(c.Reg.R[15], 2, seq, true)
+				c.CyclesInst(c.Reg.R[15], 2, seq)
 				c.gba.Mem.Read16(c.Reg.R[15])
 				c.LastWasDma = false
 			} else {
-				c.Cycles(c.Reg.R[15], 4, seq, true)
+				c.CyclesInst(c.Reg.R[15], 4, seq)
 				c.gba.Mem.Read32(c.Reg.R[15])
 				c.LastWasDma = false
 			}
@@ -153,7 +153,7 @@ func (c *Cpu) Step() {
 
 	if c.Reg.CPSR.T {
 
-		c.Cycles(c.Reg.R[15], 2, seq, true)
+		c.CyclesInst(c.Reg.R[15], 2, seq)
 
 		if c.PcPtr == nil {
 			c.Op[1] = c.gba.Mem.Read16(c.Reg.R[15])
@@ -173,7 +173,7 @@ func (c *Cpu) Step() {
 
 	} else {
 
-		c.Cycles(c.Reg.R[15], 4, seq, true)
+		c.CyclesInst(c.Reg.R[15], 4, seq)
 		if c.PcPtr == nil {
 			c.Op[1] = c.gba.Mem.Read32(c.Reg.R[15])
 		} else {
@@ -199,8 +199,8 @@ func (c *Cpu) Reload16() {
 
 	c.PcPtr = c.gba.Mem.ReadPtr(c.Reg.R[15])
 
-	c.Cycles(*pc, 2, NONSEQ, true)
-	c.Cycles(*pc+2, 2, SEQ, true)
+	c.CyclesInst(*pc+0, 2, NONSEQ)
+	c.CyclesInst(*pc+2, 2, SEQ)
 
 	if c.PcPtr == nil {
 		c.Op[0] = c.gba.Mem.Read16(*pc + 0)
@@ -223,8 +223,8 @@ func (c *Cpu) Reload32() {
 
 	c.PcPtr = c.gba.Mem.ReadPtr(c.Reg.R[15])
 
-	c.Cycles(*pc, 4, NONSEQ, true)
-	c.Cycles(*pc+4, 4, SEQ, true)
+	c.CyclesInst(*pc+0, 4, NONSEQ)
+	c.CyclesInst(*pc+4, 4, SEQ)
 
 	if c.PcPtr == nil {
 		c.Op[0] = c.gba.Mem.Read32(*pc + 0)
@@ -313,35 +313,35 @@ func (cpu *Cpu) ToggleThumb() {
 }
 
 func (c *Cpu) Write8(addr uint32, v uint8) {
-	c.Cycles(addr, 1, NONSEQ, false)
+	c.Cycles(addr, 1, NONSEQ)
 	c.gba.Mem.Write8(addr, v)
 	c.LastWasDma = false
 	c.Seq = NONSEQ
 }
 
 func (c *Cpu) Write16(addr uint32, v uint16) {
-	c.Cycles(addr, 2, NONSEQ, false)
+	c.Cycles(addr, 2, NONSEQ)
 	c.gba.Mem.Write16(addr, v)
 	c.LastWasDma = false
 	c.Seq = NONSEQ
 }
 
 func (c *Cpu) Write32(addr uint32, v uint32) {
-	c.Cycles(addr, 4, NONSEQ, false)
+	c.Cycles(addr, 4, NONSEQ)
 	c.gba.Mem.Write32(addr, v)
 	c.LastWasDma = false
 	c.Seq = NONSEQ
 }
 
 func (c *Cpu) Write32Block(addr, v, seq uint32) {
-	c.Cycles(addr, 4, seq, false)
+	c.Cycles(addr, 4, seq)
 	c.gba.Mem.Write32(addr, v)
 	c.LastWasDma = false
 	c.Seq = NONSEQ
 }
 
 func (c *Cpu) Read8(addr uint32) uint32 {
-	c.Cycles(addr, 1, NONSEQ, false)
+	c.Cycles(addr, 1, NONSEQ)
 	v := c.gba.Mem.Read8(addr)
 	c.LastWasDma = false
 	c.idle(1)
@@ -349,7 +349,7 @@ func (c *Cpu) Read8(addr uint32) uint32 {
 }
 
 func (c *Cpu) Read16(addr uint32) uint32 {
-	c.Cycles(addr, 2, NONSEQ, false)
+	c.Cycles(addr, 2, NONSEQ)
 	v := c.gba.Mem.Read16(addr)
 	c.LastWasDma = false
 	c.idle(1)
@@ -357,7 +357,7 @@ func (c *Cpu) Read16(addr uint32) uint32 {
 }
 
 func (c *Cpu) Read32(addr uint32) uint32 {
-	c.Cycles(addr, 4, NONSEQ, false)
+	c.Cycles(addr, 4, NONSEQ)
 	v := c.gba.Mem.Read32(addr)
 	c.LastWasDma = false
 	c.idle(1)
@@ -365,7 +365,7 @@ func (c *Cpu) Read32(addr uint32) uint32 {
 }
 
 func (c *Cpu) Read32Block(addr, seq uint32) uint32 {
-	c.Cycles(addr, 4, seq, false)
+	c.Cycles(addr, 4, seq)
 	v := c.gba.Mem.Read32(addr)
 	c.LastWasDma = false
 	return v
@@ -383,15 +383,88 @@ func (c *Cpu) CyclesDma(addr, width, seq uint32) {
 			seq = NONSEQ
 		}
 
-		c.gba.Mem.Timings.Cancel(c.Reg.R[15])
+		if c.gba.Mem.Timings.Active {
+			c.gba.Mem.Timings.Cancel(c.Reg.R[15])
+		}
 		c.gba.Tick(int64(c.gba.Mem.Timings.Timings[width>>2][seq][region]))
 	default:
-		c.gba.Mem.Timings.Cancel(c.Reg.R[15])
+		if c.gba.Mem.Timings.Active {
+			c.gba.Mem.Timings.Cancel(c.Reg.R[15])
+		}
 		c.gba.Tick(int64(c.gba.Mem.Timings.Timings[width>>2][0][region]))
 	}
 }
 
-func (c *Cpu) Cycles(addr, width, seq uint32, inst bool) {
+func (c *Cpu) CyclesInst(addr, width, seq uint32) {
+	if c.gba.Dma.IsRunning() {
+		c.gba.CheckDmas()
+	}
+
+	c.ParallelDmaCycles = 0
+
+	if region := addr >> 24; region < 8 {
+		c.gba.Tick(int64(c.gba.Mem.Timings.Timings[width>>2][0][region]))
+		return
+	}
+
+	if addr&0x1FFFF == 0 || c.LastWasDma {
+		seq = NONSEQ
+	}
+
+	instWidth := uint32(4)
+	if c.Reg.CPSR.T {
+		instWidth = 2
+	}
+
+	t := c.gba.Mem.Timings
+
+	t.Capacity = (1 << ((instWidth & 3) >> 1)) << 2
+
+	if t.Active {
+		if t.Opcodes != 0 && addr == t.Head {
+			t.Opcodes--
+			t.Head += instWidth
+			t.Tick(1)
+			return
+		}
+
+		if t.Countdown > 0 && addr == t.Addr {
+			t.Tick(t.Countdown)
+			t.Head = t.Addr
+			t.Opcodes = 0
+			return
+		}
+
+		t.Cancel(c.Reg.R[15])
+	}
+
+	cycles := int64(t.Timings[width>>2][seq][addr>>24])
+
+	if t.Disabled {
+		switch cycles {
+		case int64(t.Timings[0][1][addr>>24]):
+			cycles = int64(t.Timings[0][0][8])
+		case int64(t.Timings[1][1][addr>>24]):
+			cycles = int64(t.Timings[1][0][8])
+		}
+	}
+
+	t.Disabled = false
+
+	t.Tick(cycles)
+
+	if t.Enabled {
+		t.Active = true
+		t.Opcodes = 0
+		t.Width = instWidth
+		t.AccessTime = int64(t.Timings[instWidth>>2][1][addr>>24])
+		t.Countdown = int64(t.Timings[instWidth>>2][1][addr>>24])
+		t.Addr = addr + instWidth
+		t.Head = addr + instWidth
+	}
+}
+
+func (c *Cpu) Cycles(addr, width, seq uint32) {
 	if c.gba.Dma.IsRunning() {
 		c.gba.CheckDmas()
 	}
@@ -403,29 +476,21 @@ func (c *Cpu) Cycles(addr, width, seq uint32, inst bool) {
 		c.gba.Tick(int64(c.gba.Mem.Timings.Timings[width>>2][0][region]))
 	case region < 14:
 
-		if addr&0x1FFFF == 0 {
+		if addr&0x1FFFF == 0 || c.LastWasDma {
 			seq = NONSEQ
 		}
 
-		if c.LastWasDma {
-			seq = NONSEQ
+		if c.gba.Mem.Timings.Active {
+			c.gba.Mem.Timings.Cancel(c.Reg.R[15])
 		}
-
-		if inst {
-			w := uint32(4)
-			if c.Reg.CPSR.T {
-				w = 2
-			}
-
-			cycles := int64(c.gba.Mem.Timings.Timings[width>>2][seq][region])
-			c.gba.Mem.Timings.Wait(c.Reg.R[15], addr, w, cycles)
-			return
-		}
-		c.gba.Mem.Timings.Cancel(c.Reg.R[15])
 		c.gba.Tick(int64(c.gba.Mem.Timings.Timings[width>>2][seq][region]))
+
 	case region < 0x10:
-		c.gba.Mem.Timings.Cancel(c.Reg.R[15])
+		if c.gba.Mem.Timings.Active {
+			c.gba.Mem.Timings.Cancel(c.Reg.R[15])
+		}
 		c.gba.Tick(int64(c.gba.Mem.Timings.Timings[width>>2][0][region]))
+
 	default:
 		c.gba.Tick(int64(c.gba.Mem.Timings.Timings[width>>2][0][0]))
 	}

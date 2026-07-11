@@ -10,7 +10,9 @@ var (
 )
 
 type Timings struct {
-	Tick                  func(cycles int64)
+	Tick func(cycles int64)
+
+	// prefetch
 	AccessTime, Countdown int64
 	Head, Addr            uint32
 	Width                 uint32
@@ -45,10 +47,6 @@ func NewTimings(Tick func(int64)) *Timings {
 }
 
 func (t *Timings) Cancel(r15 uint32) {
-	if !t.Active {
-		return
-	}
-
 	t.Active = false
 
 	if r15 < 0x800_0000 || r15 >= 0xE00_0000 {
@@ -79,57 +77,6 @@ func (t *Timings) Step(cycles int64) {
 		t.Addr += t.Width
 		t.Countdown += t.AccessTime
 	}
-}
-
-func (t *Timings) Wait(r15, addr, width uint32, cycles int64) {
-	// width 2 = cap 8, width 4 = cap 4
-	t.Capacity = (1 << ((width & 3) >> 1)) << 2
-
-	if t.Active {
-		if t.Opcodes != 0 && addr == t.Head {
-			t.Opcodes--
-			t.Head += width
-			t.Tick(1)
-			return
-		}
-
-		if t.Countdown > 0 && addr == t.Addr {
-			t.Tick(t.Countdown)
-			t.Head = t.Addr
-			t.Opcodes = 0
-			return
-		}
-	}
-
-	t.Cancel(r15)
-
-	if t.Disabled {
-		t.Disabled = false
-
-		region := (addr >> 24)
-
-		switch cycles {
-		case int64(t.Timings[0][1][region]):
-			cycles = int64(t.Timings[0][0][8])
-		case int64(t.Timings[1][1][region]):
-			cycles = int64(t.Timings[1][0][8])
-		}
-
-	}
-
-	t.Tick(cycles)
-
-	if !t.Enabled {
-		return
-	}
-
-	t.Active = true
-	t.Opcodes = 0
-	t.Width = width
-	t.AccessTime = int64(t.Timings[width>>2][1][addr>>24])
-	t.Countdown = t.AccessTime
-	t.Addr = addr + width
-	t.Head = t.Addr
 }
 
 func (t *Timings) ReadWaitstate(addr uint32) uint8 {
@@ -205,5 +152,6 @@ func (t *Timings) WriteWaitstate(addr uint32, v uint8) {
 		if old && !t.Enabled {
 			t.Disabled = true
 		}
+
 	}
 }
