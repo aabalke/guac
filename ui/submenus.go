@@ -365,12 +365,13 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 		if g.gba != nil {
 			g.gba.IdleOptimize = tmp.IdleOptimize
 
-			for _, device := range g.gba.Mem.Gpio.Devices {
-				if d, ok := device.(*gpio.Solar); ok {
-					d.SetLevel(uint8(tmp.SpecialHardware.SolarSensorLevel))
+			if g.gba.Mem.Gpio != nil {
+				for _, device := range g.gba.Mem.Gpio.Devices {
+					if d, ok := device.(*gpio.Solar); ok {
+						d.SetLevel(uint8(tmp.SpecialHardware.SolarSensorLevel))
+					}
 				}
 			}
-
 		}
 
 		parent.RemoveChildren()
