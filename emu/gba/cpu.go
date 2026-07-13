@@ -195,40 +195,41 @@ func (c *Cpu) Step() {
 }
 
 func (c *Cpu) Reload16() {
-	pc := &c.Reg.R[15]
+	pc := c.Reg.R[15] &^ 1
 
-	c.PcPtr = c.gba.Mem.ReadPtr(c.Reg.R[15])
+	c.PcPtr = c.gba.Mem.ReadPtr(pc)
 
-	c.CyclesInst(*pc+0, 2, NONSEQ)
-	c.CyclesInst(*pc+2, 2, SEQ)
+	c.CyclesInst(pc+0, 2, NONSEQ)
+	c.CyclesInst(pc+2, 2, SEQ)
 
 	if c.PcPtr == nil {
-		c.Op[0] = c.gba.Mem.Read16(*pc + 0)
-		c.Op[1] = c.gba.Mem.Read16(*pc + 2)
+		c.Op[0] = c.gba.Mem.Read16(pc + 0)
+		c.Op[1] = c.gba.Mem.Read16(pc + 2)
 	} else {
 		c.Op[0] = *(*uint32)(c.PcPtr) & 0xFFFF
 		c.PcPtr = unsafe.Add(c.PcPtr, 2)
 		c.Op[1] = *(*uint32)(c.PcPtr) & 0xFFFF
 		c.PcPtr = unsafe.Add(c.PcPtr, 2)
 	}
+
 	c.LastWasDma = false
 
-	*pc += 4
+	c.Reg.R[15] += 4
 	c.Reloaded = true
 	c.Seq = SEQ
 }
 
 func (c *Cpu) Reload32() {
-	pc := &c.Reg.R[15]
+	pc := c.Reg.R[15] &^ 3
 
 	c.PcPtr = c.gba.Mem.ReadPtr(c.Reg.R[15])
 
-	c.CyclesInst(*pc+0, 4, NONSEQ)
-	c.CyclesInst(*pc+4, 4, SEQ)
+	c.CyclesInst(pc+0, 4, NONSEQ)
+	c.CyclesInst(pc+4, 4, SEQ)
 
 	if c.PcPtr == nil {
-		c.Op[0] = c.gba.Mem.Read32(*pc + 0)
-		c.Op[1] = c.gba.Mem.Read32(*pc + 4)
+		c.Op[0] = c.gba.Mem.Read32(pc + 0)
+		c.Op[1] = c.gba.Mem.Read32(pc + 4)
 	} else {
 		c.Op[0] = *(*uint32)(c.PcPtr)
 		c.PcPtr = unsafe.Add(c.PcPtr, 4)
@@ -237,7 +238,7 @@ func (c *Cpu) Reload32() {
 	}
 	c.LastWasDma = false
 
-	*pc += 8
+	c.Reg.R[15] += 8
 	c.Reloaded = true
 	c.Seq = SEQ
 }

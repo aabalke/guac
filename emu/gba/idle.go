@@ -65,7 +65,9 @@ var vsyncAddrMap = map[struct {
 	{Title: "FFTA_USVER. ", Code: "AFXE"}: 0x0800041E,
 	{Title: "GRADIUSGALAX", Code: "AGAE"}: 0x08013844,
 	{Title: "REBELSTAR   ", Code: "BRLE"}: 0x0800041A,
-	{Title: "GOLDEN_SUN_B", Code: "AGFE"}: 0x08013542,
+
+	// golden sun idle loop fails, need to look into
+	//{Title: "GOLDEN_SUN_B", Code: "AGFE"}: 0x08013542,
 	{Title: "MARIOGOLFGBA", Code: "BMGE"}: 0x08014E0A,
 	{Title: "MARIOGOLFGBA", Code: "BMGP"}: 0x08014E0A,
 	{Title: "MARIOGOLFGBA", Code: "BMGS"}: 0x08014E0A,
