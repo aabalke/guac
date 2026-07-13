@@ -164,6 +164,16 @@ func (c *Config) decodeGb() {
 	c.decodeKeyboard(&c.Gb.Keyboard, &c.config.Gb.KeyboardConfig)
 	c.decodeController(&c.Gb.Controller, &c.config.Gb.ControllerConfig)
 
+	if utils.IsFile(c.Gb.Bios.DmgPath) {
+		c.config.Gb.Bios.DmgPath = c.Gb.Bios.DmgPath
+	}
+
+	if utils.IsFile(c.Gb.Bios.GbcPath) {
+		c.config.Gb.Bios.GbcPath = c.Gb.Bios.GbcPath
+	}
+
+	c.config.Gb.Bios.Direct = c.Gb.Bios.Direct
+
 	var pals []color.Color
 
 	for i := range c.Gb.Palette {

@@ -61,6 +61,12 @@ end_tick = 1000
 # if invalid input, will fall back to greyscale
 dmg_palette = [ "0xE0F8D0", "0x88C070", "0x346856", "0x081820" ]
 
+[gb.bios]
+
+direct_boot = true
+#dmg_bios_path = ""
+#gbc_bios_path = ""
+
 [gb.keyboard]
 
 a = ["J"]

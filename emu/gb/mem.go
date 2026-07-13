@@ -10,6 +10,7 @@ import (
 )
 
 type MemoryBus struct {
+	Boot *[]uint8
 	WRAM [9][0x1000]uint8
 	VRAM [2][0x2000]uint8
 	OAM  [0x100]uint8
@@ -31,6 +32,8 @@ type MemoryBus struct {
 	Serial Serial
 
 	JoypadReg uint8
+
+	bootflg uint8
 }
 
 type OamDma struct {
@@ -163,53 +166,6 @@ func (h *Hdma) Transfer(length uint16) {
 	}
 }
 
-func initMemory(gb *GameBoy) {
-	gb.Write(0xFF04, 0x1E) // not sure on this one
-	gb.Write(0xFF05, 0x00)
-	gb.Write(0xFF06, 0x00)
-	gb.Write(0xFF07, 0x00)
-	gb.Cpu.IF = 0xE1
-	gb.Write(0xFF10, 0x80)
-	gb.Write(0xFF11, 0xBF)
-	gb.Write(0xFF12, 0xF3)
-	gb.Write(0xFF14, 0xBF)
-	gb.Write(0xFF16, 0x3F)
-	gb.Write(0xFF17, 0x00)
-	gb.Write(0xFF19, 0xBF)
-	gb.Write(0xFF1A, 0x7F)
-	gb.Write(0xFF1B, 0xFF)
-	gb.Write(0xFF1C, 0x9F)
-	gb.Write(0xFF1E, 0xBF)
-	gb.Write(0xFF20, 0xFF)
-	gb.Write(0xFF21, 0x00)
-	gb.Write(0xFF22, 0x00)
-	gb.Write(0xFF23, 0xBF)
-	gb.Write(0xFF24, 0x77)
-	gb.Write(0xFF25, 0xF3)
-
-	gb.Write(0xFF26, 0xF1)
-
-	gb.Write(0xFF40, 0x91)
-	gb.Write(0xFF41, 0x81)
-	gb.Write(0xFF42, 0x00)
-	gb.Write(0xFF43, 0x00)
-	//gb.Write(0xFF44, 0x90)
-	gb.Write(0xFF45, 0x00)
-	gb.Write(0xFF47, 0xFC)
-	gb.Write(0xFF48, 0xFF)
-	gb.Write(0xFF49, 0xFF)
-	gb.Write(0xFF4A, 0x00)
-	gb.Write(0xFF4B, 0x00)
-	gb.Write(0xFFFF, 0x00)
-
-	gb.MemoryBus.WRAMBank = 1
-
-	gb.MemoryBus.Hdma.Dst = 0xFFFF
-	gb.MemoryBus.Hdma.Src = 0xFFFF
-
-	gb.InitSaveLoop()
-}
-
 func (gb *GameBoy) SaveRam() {
 	if config.Conf.General.DisableSaves {
 		return
@@ -234,6 +190,9 @@ func (gb *GameBoy) InitSaveLoop() {
 
 func (gb *GameBoy) ReadPtr(addr uint16) unsafe.Pointer {
 	switch {
+	case addr < 0x100 || gb.Color && addr < 0x900:
+		return nil
+
 	case addr < 0x8000:
 		return gb.Cartridge.Mbc.ReadPtr(addr)
 
@@ -276,11 +235,16 @@ func (gb *GameBoy) ReadPtr(addr uint16) unsafe.Pointer {
 
 func (gb *GameBoy) Read(addr uint16) uint8 {
 	switch {
-	case addr < 0x4000:
-		return gb.Cartridge.Mbc.Read(addr)
-	case addr < 0x8000:
+	case addr < 0x100, gb.Color && addr >= 0x200 && addr < 0x900:
+		if gb.MemoryBus.bootflg == 0 {
+			return (*gb.MemoryBus.Boot)[addr]
+		}
 
 		return gb.Cartridge.Mbc.Read(addr)
+
+	case addr < 0x8000:
+		return gb.Cartridge.Mbc.Read(addr)
+
 	case addr < 0xA000:
 
 		if drawing := gb.Stat.Mode == 3; drawing {
@@ -432,7 +396,10 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 	case 0xFF46:
 		return gb.MemoryBus.Oam.Read()
 
-	case 0xFF50, 0xFF51, 0xFF52, 0xFF53, 0xFF54:
+	case 0xFF50:
+		return gb.MemoryBus.bootflg | 0xFE
+
+	case 0xFF51, 0xFF52, 0xFF53, 0xFF54:
 		return 0xFF
 
 	case 0xFF4D:
@@ -610,6 +577,10 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 			gb.MemoryBus.VRAMBank = v & 0x1
 			return
 		}
+
+	case 0xFF50:
+		gb.MemoryBus.bootflg |= v & 1
+		return
 
 	case 0xFF51:
 		if gb.Color {

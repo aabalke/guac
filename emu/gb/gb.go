@@ -116,14 +116,16 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 		gb.Color = true
 	}
 
-	if gb.Color {
-		gb.Cpu.a = 0x11
-		//	log.Printf("Color mode: GBC")
-		//} else {
-		//	log.Printf("Color mode: DMG")
-	}
+	gb.MemoryBus.WRAMBank = 1
+	gb.MemoryBus.Hdma.Dst = 0xFFFF
+	gb.MemoryBus.Hdma.Src = 0xFFFF
+	gb.InitSaveLoop()
 
-	initMemory(gb)
+	if config.Conf.Gb.Bios.Direct {
+		gb.DirectBoot()
+	} else {
+		gb.BiosBoot()
+	}
 
 	if config.Conf.General.Logger {
 		L = NewLogger("./loggy", gb)
@@ -134,6 +136,86 @@ func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
 	gb.Scheduler.schedule(EVENT_SND_FRAME_SEQ, 0)
 
 	return gb
+}
+
+func (gb *GameBoy) BiosBoot() {
+	if gb.Color {
+		if p := config.Conf.Gb.Bios.GbcPath; p != "" {
+			buf, _, _ := utils.ReadFile(p)
+			gb.MemoryBus.Boot = &buf
+			return
+		}
+	} else {
+		if p := config.Conf.Gb.Bios.DmgPath; p != "" {
+			buf, _, _ := utils.ReadFile(p)
+			gb.MemoryBus.Boot = &buf
+			return
+		}
+	}
+
+	gb.DirectBoot()
+}
+
+func (gb *GameBoy) DirectBoot() {
+	gb.MemoryBus.bootflg = 1
+	gb.Cpu.PC = 0x100
+	gb.Cpu.SP = 0xFFFE
+	gb.Cpu.a = 0x01
+	gb.Cpu.b = 0x00
+	gb.Cpu.c = 0x13
+	gb.Cpu.d = 0x00
+	gb.Cpu.e = 0xD8
+	gb.Cpu.h = 0x01
+	gb.Cpu.l = 0x4D
+	gb.Cpu.f = Flags{
+		Z: true,
+		S: false,
+		H: true,
+		C: true,
+	}
+
+	if gb.Color {
+		gb.Cpu.a = 0x11
+	}
+
+	// memory
+	gb.Write(0xFF04, 0x1E) // not sure on this one
+	gb.Write(0xFF05, 0x00)
+	gb.Write(0xFF06, 0x00)
+	gb.Write(0xFF07, 0x00)
+	gb.Cpu.IF = 0xE1
+	gb.Write(0xFF10, 0x80)
+	gb.Write(0xFF11, 0xBF)
+	gb.Write(0xFF12, 0xF3)
+	gb.Write(0xFF14, 0xBF)
+	gb.Write(0xFF16, 0x3F)
+	gb.Write(0xFF17, 0x00)
+	gb.Write(0xFF19, 0xBF)
+	gb.Write(0xFF1A, 0x7F)
+	gb.Write(0xFF1B, 0xFF)
+	gb.Write(0xFF1C, 0x9F)
+	gb.Write(0xFF1E, 0xBF)
+	gb.Write(0xFF20, 0xFF)
+	gb.Write(0xFF21, 0x00)
+	gb.Write(0xFF22, 0x00)
+	gb.Write(0xFF23, 0xBF)
+	gb.Write(0xFF24, 0x77)
+	gb.Write(0xFF25, 0xF3)
+
+	gb.Write(0xFF26, 0xF1)
+
+	gb.Write(0xFF40, 0x91)
+	gb.Write(0xFF41, 0x81)
+	gb.Write(0xFF42, 0x00)
+	gb.Write(0xFF43, 0x00)
+	//gb.Write(0xFF44, 0x90)
+	gb.Write(0xFF45, 0x00)
+	gb.Write(0xFF47, 0xFC)
+	gb.Write(0xFF48, 0xFF)
+	gb.Write(0xFF49, 0xFF)
+	gb.Write(0xFF4A, 0x00)
+	gb.Write(0xFF4B, 0x00)
+	gb.Write(0xFFFF, 0x00)
 }
 
 func (gb *GameBoy) UpdateFromConfig() {

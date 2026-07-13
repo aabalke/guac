@@ -232,6 +232,11 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 	)
 
 	fields := []Field{
+		{WIDGET_HDR, l.Bios, "", nil, nil},
+		{WIDGET_FLE, l.DmgPath, "", &tmp.Bios.DmgPath, nil},
+		{WIDGET_FLE, l.GbcPath, "", &tmp.Bios.GbcPath, nil},
+		{WIDGET_CBX, l.DirectBoot, "", &tmp.Bios.Direct, nil},
+
 		{WIDGET_HDR, l.Keyboard, "", nil, nil},
 		{WIDGET_LNK, "", "", nil, keybindsLink},
 		{WIDGET_KEY, l.A, l.KeyboardA, &k.A, KeyValidation()},

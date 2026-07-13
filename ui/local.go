@@ -169,6 +169,10 @@ type GbLocalization struct {
 	DmgDark          string `toml:"dmg_dark"`
 	DmgDarkest       string `toml:"dmg_darkest"`
 	ApplyPalette     string `toml:"apply_palette"`
+	Bios             string `toml:"bios"`
+	DmgPath          string `toml:"dmg_bios_path"`
+	GbcPath          string `toml:"gbc_bios_path"`
+	DirectBoot       string `toml:"direct_boot"`
 	Keyboard         string `toml:"keyboard"`
 	Controller       string `toml:"controller"`
 	A                string `toml:"a"`

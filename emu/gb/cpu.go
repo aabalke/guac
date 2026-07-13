@@ -92,31 +92,10 @@ func (f *Flags) Set(v uint8) {
 }
 
 func NewCpu() *Cpu {
-	c := &Cpu{
-		a: 0x01,
-		b: 0x00,
-		c: 0x13,
-		d: 0x00,
-		e: 0xD8,
-		h: 0x01,
-		l: 0x4D,
-		f: Flags{
-			Z: true,
-			S: false,
-			H: true,
-			C: true,
-		},
-
-		IME:              false,
-		PendingInterrupt: false,
-		PC:               0x0100,
-		SP:               0xFFFE,
-	}
-
+	c := &Cpu{}
 	c.BC = (*uint16)(unsafe.Pointer(&c.c))
 	c.DE = (*uint16)(unsafe.Pointer(&c.e))
 	c.HL = (*uint16)(unsafe.Pointer(&c.l))
-
 	return c
 }
 

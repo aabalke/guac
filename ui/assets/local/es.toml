@@ -117,6 +117,11 @@ dmg_dark      = "dmg oscuro"
 dmg_darkest   = "dmg más oscuro"
 apply_palette = "aplicar paleta"
 
+bios = "bios"
+dmg_bios_path = "ruta de bios (dmg)"
+gbc_bios_path = "ruta de bios (gbc)"
+direct_boot = "direct boot"
+
 keyboard   = "teclado"
 controller = "controlador"
 

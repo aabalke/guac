@@ -151,6 +151,16 @@ func (c *Config) encodeGb() {
 	c.encodeKeyboard(&c.Gb.Keyboard, &c.config.Gb.KeyboardConfig)
 	c.encodeController(&c.Gb.Controller, &c.config.Gb.ControllerConfig)
 
+	if utils.IsFile(c.config.Gb.Bios.DmgPath) {
+		c.Gb.Bios.DmgPath = c.config.Gb.Bios.DmgPath
+	}
+
+	if utils.IsFile(c.config.Gb.Bios.GbcPath) {
+		c.Gb.Bios.GbcPath = c.config.Gb.Bios.GbcPath
+	}
+
+	c.Gb.Bios.Direct = c.config.Gb.Bios.Direct
+
 	c.Gb.Palette = []string{
 		"0x" + utils.ColorToHex(c.config.Gb.Palette[0]),
 		"0x" + utils.ColorToHex(c.config.Gb.Palette[1]),

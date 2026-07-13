@@ -137,8 +137,15 @@ type Profile struct {
 
 type Gb struct {
 	Palette          [4]color.Color
+	Bios             GbBios
 	KeyboardConfig   EmulatorKeyboard
 	ControllerConfig EmulatorController
+}
+
+type GbBios struct {
+	DmgPath string
+	GbcPath string
+	Direct  bool
 }
 
 type Gba struct {

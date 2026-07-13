@@ -64,9 +64,16 @@ type Profile struct {
 }
 
 type Gb struct {
+	Bios       GbBios        `toml:"bios"`
 	Palette    []string      `toml:"dmg_palette"`
 	Keyboard   EmulatorInput `toml:"keyboard"`
 	Controller EmulatorInput `toml:"controller"`
+}
+
+type GbBios struct {
+	DmgPath string `toml:"dmg_bios_path"`
+	GbcPath string `toml:"gbc_bios_path"`
+	Direct  bool   `toml:"direct_boot"`
 }
 
 type Gba struct {
