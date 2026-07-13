@@ -191,7 +191,10 @@ func (c *Config) decodeGba() {
 	c.decodeController(&c.Gba.Controller, &c.config.Gba.ControllerConfig)
 
 	c.config.Gba.IdleOptimize = c.Gba.IdleOptimize
-	c.config.Gba.SoundClockUpdateCycles = c.Gba.SoundClockUpdateCycles
+
+	c.config.Gba.SpecialHardware.ForceRtc = c.Gba.SpecialHardware.ForceRtc
+	c.config.Gba.SpecialHardware.ForceSolarSensor = c.Gba.SpecialHardware.ForceSolarSensor
+	c.config.Gba.SpecialHardware.SolarSensorLevel = c.Gba.SpecialHardware.SolarSensorLevel
 
 	if utils.IsFile(c.Gba.Bios.Path) {
 		c.config.Gba.Bios.Path = c.Gba.Bios.Path
@@ -353,6 +356,11 @@ func (c *Config) decodeKeyboard(in *EmulatorInput, conf *config.EmulatorKeyboard
 		&in.SizingToggle,
 		&in.RotationToggle,
 		&in.ExportScene,
+		&in.SolarLevel0,
+		&in.SolarLevel1,
+		&in.SolarLevel2,
+		&in.SolarLevel3,
+		&in.SolarLevel4,
 	}
 
 	outputs := []*[]ebiten.Key{
@@ -374,6 +382,11 @@ func (c *Config) decodeKeyboard(in *EmulatorInput, conf *config.EmulatorKeyboard
 		&conf.SizingToggle,
 		&conf.RotationToggle,
 		&conf.ExportScene,
+		&conf.SolarLevel0,
+		&conf.SolarLevel1,
+		&conf.SolarLevel2,
+		&conf.SolarLevel3,
+		&conf.SolarLevel4,
 	}
 
 	for i := range len(tomls) {
@@ -400,6 +413,11 @@ func (c *Config) decodeController(in *EmulatorInput, conf *config.EmulatorContro
 		&in.X,
 		&in.Y,
 		&in.Hinge,
+		&in.SolarLevel0,
+		&in.SolarLevel1,
+		&in.SolarLevel2,
+		&in.SolarLevel3,
+		&in.SolarLevel4,
 	}
 
 	outputs := []*[]ebiten.StandardGamepadButton{
@@ -416,6 +434,11 @@ func (c *Config) decodeController(in *EmulatorInput, conf *config.EmulatorContro
 		&conf.X,
 		&conf.Y,
 		&conf.Hinge,
+		&conf.SolarLevel0,
+		&conf.SolarLevel1,
+		&conf.SolarLevel2,
+		&conf.SolarLevel3,
+		&conf.SolarLevel4,
 	}
 
 	for i := range len(tomls) {

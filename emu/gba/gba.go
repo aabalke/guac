@@ -49,14 +49,16 @@ type GBA struct {
 	DrawOptions ebiten.DrawImageOptions
 
 	Paused, Muted, Save, Booted, StdFps bool
+	IdleOptimize                        bool
 }
 
 func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba := &GBA{
-		Pixels:    make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
-		Image:     ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
-		Apu:       apu.NewApu(ctx, CPU_SPEED, SND_FREQ, SND_SAMPLES),
-		Scheduler: NewScheduler(),
+		Pixels:       make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
+		Image:        ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
+		Apu:          apu.NewApu(ctx, CPU_SPEED, SND_FREQ, SND_SAMPLES),
+		Scheduler:    NewScheduler(),
+		IdleOptimize: config.Conf.Gba.IdleOptimize,
 	}
 
 	gba.PPU = &PPU{gba: gba}
@@ -74,9 +76,9 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	gba.Dma = NewDma(gba)
 	gba.Mem.LoadBios()
 	gba.LoadGame(path)
+	gba.AddGpios()
 
 	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, 0, gba.AudioSampleEvent, nil)
-	//gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, 0, gba.ScanlineEndEvent, nil)
 
 	// matches nanoboy
 	gba.Mem.IO[6] = 225
@@ -130,7 +132,7 @@ func (gba *GBA) Update(stdFps bool) {
 			gba.Cpu.Step()
 		}
 
-		if gba.vsyncAddr != 0 && gba.Cpu.Reg.R[15] == gba.vsyncAddr {
+		if gba.IdleOptimize && gba.vsyncAddr != 0 && gba.Cpu.Reg.R[15] == gba.vsyncAddr {
 			vblRaised := gba.Irq.IdleIrq&1 != 0
 			vblHandled := gba.Irq.IF&1 != 0
 			if vblRaised && !vblHandled {

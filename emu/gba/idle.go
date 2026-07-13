@@ -2,8 +2,6 @@ package gba
 
 import (
 	"log"
-
-	"github.com/aabalke/guac/config"
 )
 
 // ygba
@@ -175,10 +173,6 @@ var vsyncAddrMap = map[struct {
 }
 
 func (gba *GBA) SetIdleAddr() {
-	if !config.Conf.Gba.IdleOptimize {
-		return
-	}
-
 	v, ok := vsyncAddrMap[struct {
 		Title string
 		Code  string

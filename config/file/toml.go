@@ -70,11 +70,17 @@ type Gb struct {
 }
 
 type Gba struct {
-	IdleOptimize           bool          `toml:"idle_optimize"`
-	SoundClockUpdateCycles int           `toml:"sound_clock_update_cycles"`
-	Bios                   GbaBios       `toml:"bios"`
-	Keyboard               EmulatorInput `toml:"keyboard"`
-	Controller             EmulatorInput `toml:"controller"`
+	IdleOptimize    bool               `toml:"idle_optimize"`
+	SpecialHardware GbaSpecialHardware `toml:"hardware"`
+	Bios            GbaBios            `toml:"bios"`
+	Keyboard        EmulatorInput      `toml:"keyboard"`
+	Controller      EmulatorInput      `toml:"controller"`
+}
+
+type GbaSpecialHardware struct {
+	ForceRtc         bool `toml:"force_rtc"`
+	ForceSolarSensor bool `toml:"force_solar_sensor"`
+	SolarSensorLevel int  `toml:"solar_sensor_level"`
 }
 
 type GbaBios struct {
@@ -148,4 +154,10 @@ type EmulatorInput struct {
 	SizingToggle   []string `toml:"sizing_toggle"`
 	RotationToggle []string `toml:"rotation_toggle"`
 	ExportScene    []string `toml:"export_scene"`
+
+	SolarLevel0 []string `toml:"solar_min"`
+	SolarLevel1 []string `toml:"solar_25"`
+	SolarLevel2 []string `toml:"solar_50"`
+	SolarLevel3 []string `toml:"solar_75"`
+	SolarLevel4 []string `toml:"solar_max"`
 }

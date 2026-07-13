@@ -7,6 +7,7 @@ import (
 
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/bios"
+	"github.com/aabalke/guac/emu/gba/gpio"
 	"github.com/aabalke/guac/utils"
 )
 
@@ -23,6 +24,7 @@ type Memory struct {
 
 	ProtectedValue uint32
 	Sio            *Sio
+	Gpio           *gpio.Gpio
 	Dispstat       Dispstat
 	postflg        uint8
 
@@ -152,6 +154,11 @@ func (m *Memory) initWriteRegions() {
 		rel := addr & 0x3FF
 		m.OAM[rel] = v
 		m.GBA.PPU.UpdateOAM(rel)
+	}
+	m.writeRegions[0x8] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
+		if m.Gpio != nil && addr >= 0x800_00C4 && addr <= 0x800_00C8 {
+			m.Gpio.Write(addr, v)
+		}
 	}
 
 	for i := 0xE; i < 0x10; i++ {
@@ -304,7 +311,6 @@ func (m *Memory) Read8(addr uint32) uint32 {
 	if addr < 0x800_0000 || addr >= 0xE00_0000 {
 		return uint32(m.Read(addr))
 	}
-
 	if addr&0x1FF_FFFF >= uint32(len(*m.GBA.Cartridge.Rom)) {
 		return m.ReadBadRom(addr, 1)
 	}
@@ -337,6 +343,10 @@ func (m *Memory) Read16(addr uint32) uint32 {
 		return uint32(m.GBA.Timers[2].Read16(int(addr & 3)))
 	case 0x400_010c, 0x400_010E:
 		return uint32(m.GBA.Timers[3].Read16(int(addr & 3)))
+	case 0x800_00C4, 0x800_00C6, 0x800_00C8:
+		if m.Gpio != nil {
+			return uint32(m.Gpio.Read(addr))
+		}
 	}
 
 	if ptr := m.ReadPtr(addr); ptr != nil {

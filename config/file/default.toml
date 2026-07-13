@@ -88,10 +88,16 @@ down   = ["LeftBottom"]
 # replaces these cpu instructions with a halt, leading to a performance increase
 idle_optimize = true
 
-# set between 0x100 - 0x400 to set how often the sound clock is updated
-# lower is more often, which is great for quality
-# higher is better for lower end systems that cannot render sound fast enough
-sound_clock_update_cycles = 0x100
+[gba.hardware]
+
+force_rtc = false
+
+# force cartridge to use solar sensor - may break emulation if game does not use 
+# solar sensor
+force_solar_sensor = false
+
+# for cartridges with solar sensor, percentage solar power range 0 - 100
+solar_sensor_level = 50
 
 [gba.bios]
 
@@ -109,6 +115,12 @@ up = ["W"]
 down = ["S"]
 r = ["Y"]
 l = ["T"]
+
+solar_min = ["Numpad0"]
+solar_25  = ["Numpad1"]
+solar_50  = ["Numpad2"]
+solar_75  = ["Numpad3"]
+solar_max = ["Numpad4"]
 
 [gba.controller]
 a      = ["RightRight"]

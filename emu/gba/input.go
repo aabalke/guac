@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/aabalke/guac/config"
+	"github.com/aabalke/guac/emu/gba/gpio"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -63,6 +64,45 @@ func (gba *GBA) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 			*k &^= 1 << 8
 		case slices.Contains(buttonConfig.L, button):
 			*k &^= 1 << 9
+		}
+	}
+
+	if gba.Mem.Gpio != nil {
+		for _, device := range gba.Mem.Gpio.Devices {
+			d, ok := device.(*gpio.Solar)
+			if !ok {
+				continue
+			}
+			keyConfig := config.Conf.Gba.KeyboardConfig
+			for _, key := range keys {
+				switch {
+				case slices.Contains(keyConfig.SolarLevel0, key):
+					d.SetLevel(0)
+				case slices.Contains(keyConfig.SolarLevel1, key):
+					d.SetLevel(25)
+				case slices.Contains(keyConfig.SolarLevel2, key):
+					d.SetLevel(50)
+				case slices.Contains(keyConfig.SolarLevel3, key):
+					d.SetLevel(75)
+				case slices.Contains(keyConfig.SolarLevel4, key):
+					d.SetLevel(100)
+				}
+			}
+			buttonConfig := config.Conf.Gba.ControllerConfig
+			for _, button := range buttons {
+				switch {
+				case slices.Contains(buttonConfig.SolarLevel0, button):
+					d.SetLevel(0)
+				case slices.Contains(buttonConfig.SolarLevel1, button):
+					d.SetLevel(25)
+				case slices.Contains(buttonConfig.SolarLevel2, button):
+					d.SetLevel(50)
+				case slices.Contains(buttonConfig.SolarLevel3, button):
+					d.SetLevel(75)
+				case slices.Contains(buttonConfig.SolarLevel4, button):
+					d.SetLevel(100)
+				}
+			}
 		}
 	}
 

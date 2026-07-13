@@ -3,6 +3,7 @@ package ui
 import (
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/config/file"
+	"github.com/aabalke/guac/emu/gba/gpio"
 	"github.com/ebitenui/ebitenui/widget"
 )
 
@@ -296,7 +297,12 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 	fields := []Field{
 		{WIDGET_HDR, l.General, "", nil, nil},
 		{WIDGET_CBX, l.OptmizeIdleLoops, "", &tmp.IdleOptimize, nil},
-		{WIDGET_HEX, l.SoundClockCycles, l.SoundClockCycles, &tmp.SoundClockUpdateCycles, 1000},
+		//{WIDGET_HEX, l.SoundClockCycles, l.SoundClockCycles, &tmp.SoundClockUpdateCycles, 1000},
+
+		{WIDGET_HDR, l.SpecialHardware, "", nil, nil},
+		//{WIDGET_CBX, l.ForceRtc, "", &tmp.SpecialHardware.ForceRtc, nil},
+		//{WIDGET_CBX, l.ForceSolarSensor, "", &tmp.SpecialHardware.ForceSolarSensor, nil},
+		{WIDGET_DEC, l.SolarSensorLevel, l.SolarSensorLevel, &tmp.SpecialHardware.SolarSensorLevel, 100},
 
 		{WIDGET_HDR, l.Bios, "", nil, nil},
 		{WIDGET_FLE, l.BiosPath, "", &tmp.Bios.Path, nil},
@@ -315,6 +321,12 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 		{WIDGET_KEY, l.L, l.KeyboardL, &k.L, KeyValidation()},
 		{WIDGET_KEY, l.R, l.KeyboardR, &k.R, KeyValidation()},
 
+		{WIDGET_KEY, l.SolarMin, l.KeyboardSolarMin, &k.SolarLevel0, KeyValidation()},
+		{WIDGET_KEY, l.Solar1, l.KeyboardSolar1, &k.SolarLevel1, KeyValidation()},
+		{WIDGET_KEY, l.Solar2, l.KeyboardSolar2, &k.SolarLevel2, KeyValidation()},
+		{WIDGET_KEY, l.Solar3, l.KeyboardSolar3, &k.SolarLevel3, KeyValidation()},
+		{WIDGET_KEY, l.SolarMax, l.KeyboardSolarMax, &k.SolarLevel4, KeyValidation()},
+
 		{WIDGET_HDR, l.Controller, "", nil, nil},
 		{WIDGET_LNK, "", "", nil, keybindsLink},
 		{WIDGET_KEY, l.A, l.ControllerA, &c.A, ControllerValidation()},
@@ -325,8 +337,14 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 		{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, ControllerValidation()},
 		{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, ControllerValidation()},
 		{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, ControllerValidation()},
-		{WIDGET_KEY, l.L, l.ControllerL, &k.L, ControllerValidation()},
-		{WIDGET_KEY, l.R, l.ControllerR, &k.R, ControllerValidation()},
+		{WIDGET_KEY, l.L, l.ControllerL, &c.L, ControllerValidation()},
+		{WIDGET_KEY, l.R, l.ControllerR, &c.R, ControllerValidation()},
+
+		{WIDGET_KEY, l.SolarMin, l.ControllerSolarMin, &c.SolarLevel0, ControllerValidation()},
+		{WIDGET_KEY, l.Solar1, l.ControllerSolar1, &c.SolarLevel1, ControllerValidation()},
+		{WIDGET_KEY, l.Solar2, l.ControllerSolar2, &c.SolarLevel2, ControllerValidation()},
+		{WIDGET_KEY, l.Solar3, l.ControllerSolar3, &c.SolarLevel3, ControllerValidation()},
+		{WIDGET_KEY, l.SolarMax, l.ControllerSolarMax, &c.SolarLevel4, ControllerValidation()},
 	}
 
 	parent.RemoveChildren()
@@ -338,6 +356,17 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 		}
 
 		config.Conf.Gba = tmp
+
+		if g.gba != nil {
+			g.gba.IdleOptimize = tmp.IdleOptimize
+
+			for _, device := range g.gba.Mem.Gpio.Devices {
+				if d, ok := device.(*gpio.Solar); ok {
+					d.SetLevel(uint8(tmp.SpecialHardware.SolarSensorLevel))
+				}
+			}
+
+		}
 
 		parent.RemoveChildren()
 		NewGbaMenu(g, parent)

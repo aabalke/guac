@@ -142,11 +142,17 @@ type Gb struct {
 }
 
 type Gba struct {
-	IdleOptimize           bool
-	SoundClockUpdateCycles int
-	Bios                   GbaBios
-	KeyboardConfig         EmulatorKeyboard
-	ControllerConfig       EmulatorController
+	IdleOptimize     bool
+	SpecialHardware  GbaSpecialHardware
+	Bios             GbaBios
+	KeyboardConfig   EmulatorKeyboard
+	ControllerConfig EmulatorController
+}
+
+type GbaSpecialHardware struct {
+	ForceRtc         bool
+	ForceSolarSensor bool
+	SolarSensorLevel int
 }
 
 type GbaBios struct {
@@ -221,6 +227,12 @@ type EmulatorKeyboard struct {
 	SizingToggle   []ebiten.Key
 	RotationToggle []ebiten.Key
 	ExportScene    []ebiten.Key
+
+	SolarLevel0 []ebiten.Key
+	SolarLevel1 []ebiten.Key
+	SolarLevel2 []ebiten.Key
+	SolarLevel3 []ebiten.Key
+	SolarLevel4 []ebiten.Key
 }
 
 type EmulatorController struct {
@@ -242,4 +254,10 @@ type EmulatorController struct {
 	SizingToggle   []ebiten.StandardGamepadButton
 	RotationToggle []ebiten.StandardGamepadButton
 	ExportScene    []ebiten.StandardGamepadButton
+
+	SolarLevel0 []ebiten.StandardGamepadButton
+	SolarLevel1 []ebiten.StandardGamepadButton
+	SolarLevel2 []ebiten.StandardGamepadButton
+	SolarLevel3 []ebiten.StandardGamepadButton
+	SolarLevel4 []ebiten.StandardGamepadButton
 }
