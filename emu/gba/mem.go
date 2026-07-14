@@ -126,7 +126,7 @@ func (m *Memory) initWriteRegions() {
 
 	m.writeRegions[0x6] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
 		addr &= 0x1FFFF
-		if addr >= 0x1_8000 {
+		if addr >= 0x18000 {
 			addr -= 0x8000 // 32k internal mirror
 		}
 
@@ -135,15 +135,17 @@ func (m *Memory) initWriteRegions() {
 			return
 		}
 
-		if bgVRAM := addr < 0x1_0000; bgVRAM {
-
-			m.VRAM[addr] = v
-
-			if addr+1 < uint32(len(m.VRAM)) {
-				m.VRAM[addr+1] = v
+		if bitmap := m.GBA.PPU.Dispcnt.Mode >= 3; bitmap {
+			if addr < 0x14000 {
+				m.VRAM[(addr&^1)+0] = v
+				m.VRAM[(addr&^1)+1] = v
 			}
-
 			return
+		}
+
+		if addr < 0x10000 {
+			m.VRAM[(addr&^1)+0] = v
+			m.VRAM[(addr&^1)+1] = v
 		}
 	}
 

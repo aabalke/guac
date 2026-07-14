@@ -55,7 +55,7 @@ Additionally, other ARMv5 instructions will fail.
 👍 THUMB LDR/STR
 👍 THUMB LDM/STM
 
-### hades-emu/Hades-Tests
+### hades-emu/Hades-Tests commit 29
 
 [Link](https://github.com/hades-emu/Hades-Tests)
 
