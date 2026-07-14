@@ -247,10 +247,10 @@ const (
 	THUMB_MVN
 )
 
-func (cpu *Cpu) ThumbAlu(op uint16) {
+func (c *Cpu) ThumbAlu(op uint16) {
 	var (
-		r    = &cpu.Reg.R
-		cpsr = &cpu.Reg.CPSR
+		r    = &c.Reg.R
+		cpsr = &c.Reg.CPSR
 
 		inst = (op >> 6) & 0xF
 		rsv  = r[(op>>3)&0x7]
@@ -262,7 +262,7 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 
 	switch inst {
 	case THUMB_MUL:
-		cpu.idle(idleMul(rdv, true))
+		c.idle(idleMul(rdv, true))
 
 		res = uint64(rdv) * uint64(rsv)
 		r[rd] = uint32(res)
@@ -333,7 +333,7 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 
 	case THUMB_LSL:
 
-		cpu.idle(1)
+		c.idle(1)
 
 		rsv &= 0xFF
 
@@ -351,7 +351,7 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 		r[rd] = uint32(res)
 
 	case THUMB_LSR:
-		cpu.idle(1)
+		c.idle(1)
 		rsv &= 0xFF
 
 		res = uint64(rdv) >> rsv
@@ -362,7 +362,7 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 		}
 
 	case THUMB_ASR:
-		cpu.idle(1)
+		c.idle(1)
 		rsv &= 0xFF
 
 		if rsv > 32 {
@@ -377,7 +377,7 @@ func (cpu *Cpu) ThumbAlu(op uint16) {
 		r[rd] = uint32(res)
 
 	case THUMB_ROR:
-		cpu.idle(1)
+		c.idle(1)
 		rsv &= 0xFF
 
 		if rsv != 0 {
@@ -399,10 +399,10 @@ const (
 	HI_BX  = 3
 )
 
-func (cpu *Cpu) HiRegBX(op uint16) {
+func (c *Cpu) HiRegBX(op uint16) {
 	var (
-		r    = &cpu.Reg.R
-		cpsr = &cpu.Reg.CPSR
+		r    = &c.Reg.R
+		cpsr = &c.Reg.CPSR
 
 		inst = (op >> 8) & 0b11
 		mSBd = (op>>7)&1 != 0
@@ -433,8 +433,8 @@ func (cpu *Cpu) HiRegBX(op uint16) {
 
 		if rd == PC {
 			r[rd] = uint32(res &^ 1)
-			//cpu.P.Reload = true
-			cpu.Reload16()
+			//c.P.Reload = true
+			c.Reload16()
 		} else {
 			r[rd] = uint32(res)
 		}
@@ -473,8 +473,8 @@ func (cpu *Cpu) HiRegBX(op uint16) {
 
 		if rd == PC {
 			r[rd] &^= 1
-			//cpu.P.Reload = true
-			cpu.Reload16()
+			//c.P.Reload = true
+			c.Reload16()
 			return
 		}
 
@@ -492,16 +492,16 @@ func (cpu *Cpu) HiRegBX(op uint16) {
 
 		if thumb := r[rs]&1 != 0; thumb {
 			r[PC] = r[rs] &^ 1
-			//cpu.P.Reload = true
-			cpu.Reload16()
+			//c.P.Reload = true
+			c.Reload16()
 			return
 		}
 
 		cpsr.T = false
 		r[PC] = r[rs] &^ 3
 
-		//cpu.P.Reload = true
-		cpu.Reload32()
+		//c.P.Reload = true
+		c.Reload32()
 
 		return
 	}
@@ -514,10 +514,10 @@ const (
 	THUMB_SUBImm
 )
 
-func (cpu *Cpu) ThumbAddSub(op uint16) {
+func (c *Cpu) ThumbAddSub(op uint16) {
 	var (
-		r    = &cpu.Reg.R
-		cpsr = &cpu.Reg.CPSR
+		r    = &c.Reg.R
+		cpsr = &c.Reg.CPSR
 
 		inst = (op >> 9) & 0b11
 		rsv  = uint32(r[(op>>3)&0x7])
@@ -559,10 +559,10 @@ const (
 	THUMB_IMM_SUB
 )
 
-func (cpu *Cpu) ThumbImm(op uint16) {
+func (c *Cpu) ThumbImm(op uint16) {
 	var (
-		r    = &cpu.Reg.R
-		cpsr = &cpu.Reg.CPSR
+		r    = &c.Reg.R
+		cpsr = &c.Reg.CPSR
 		inst = (op >> 11) & 0b11
 		rd   = (op >> 8) & 0x7
 		nn   = uint32(op & 0xFF)
@@ -595,9 +595,9 @@ func (cpu *Cpu) ThumbImm(op uint16) {
 	cpsr.Z = uint32(res) == 0
 }
 
-func (cpu *Cpu) ThumbLSHalf(op uint16) {
+func (c *Cpu) ThumbLSHalf(op uint16) {
 	var (
-		r = &cpu.Reg.R
+		r = &c.Reg.R
 
 		offset = uint32((op >> 6) & 0x1F << 1)
 		addr   = r[(op>>3)&0x7] + offset
@@ -605,11 +605,11 @@ func (cpu *Cpu) ThumbLSHalf(op uint16) {
 	)
 
 	if ldr := (op>>11)&1 != 0; ldr {
-		v := uint32(cpu.Read16(addr))
+		v := uint32(c.Read16(addr))
 		is := (addr & 1) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
 	} else {
-		cpu.Write16(addr, uint16(r[rd]))
+		c.Write16(addr, uint16(r[rd]))
 	}
 }
 
@@ -627,9 +627,9 @@ const (
 	THUMB_LDRB_REG
 )
 
-func (cpu *Cpu) ThumbSdt(op uint16) {
+func (c *Cpu) ThumbSdt(op uint16) {
 	var (
-		r    = &cpu.Reg.R
+		r    = &c.Reg.R
 		inst = (op >> 10) & 0b11
 		rd   = op & 0x7
 		addr = r[(op>>3)&0x7] + r[(op>>6)&0x7]
@@ -639,16 +639,16 @@ func (cpu *Cpu) ThumbSdt(op uint16) {
 
 		switch inst {
 		case THUMB_STRH:
-			cpu.Write16(addr, uint16(r[rd]))
+			c.Write16(addr, uint16(r[rd]))
 
 		case THUMB_LDSB:
 
 			// sign-expand byte value
-			r[rd] = uint32(int32(int8(cpu.Read8(addr))))
+			r[rd] = uint32(int32(int8(c.Read8(addr))))
 
 		case THUMB_LDRH:
 
-			v := cpu.Read16(addr)
+			v := c.Read16(addr)
 			r[rd] = bits.RotateLeft32(v, -int((addr&1)<<3))
 
 		case THUMB_LDSH:
@@ -657,10 +657,10 @@ func (cpu *Cpu) ThumbSdt(op uint16) {
 			// LDRSH Rd,[odd]  -->  LDRSB Rd,[odd];sign-expand BYTE value
 			if misaligned := addr&1 != 0; misaligned {
 				// sign-expand byte value
-				r[rd] = uint32(int32(int8(cpu.Read8(addr))))
+				r[rd] = uint32(int32(int8(c.Read8(addr))))
 			} else {
 				// sign-expand half value
-				r[rd] = uint32(int32(int16(cpu.Read16(addr))))
+				r[rd] = uint32(int32(int16(c.Read16(addr))))
 			}
 
 		}
@@ -670,27 +670,27 @@ func (cpu *Cpu) ThumbSdt(op uint16) {
 
 	switch inst {
 	case THUMB_STR_REG:
-		cpu.Write32(addr, r[rd])
+		c.Write32(addr, r[rd])
 	case THUMB_STRB_REG:
-		cpu.Write8(addr, uint8(r[rd]))
+		c.Write8(addr, uint8(r[rd]))
 	case THUMB_LDR_REG:
-		v := cpu.Read32(addr)
+		v := c.Read32(addr)
 		is := (addr & 3) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
 	case THUMB_LDRB_REG:
-		r[rd] = cpu.Read8(addr)
+		r[rd] = c.Read8(addr)
 	}
 }
 
-func (cpu *Cpu) ThumbLPC(op uint16) {
+func (c *Cpu) ThumbLPC(op uint16) {
 	var (
-		r    = &cpu.Reg.R
+		r    = &c.Reg.R
 		rd   = (op >> 8) & 0x7
 		nn   = uint32(op&0xFF) << 2
 		addr = (r[PC] &^ 0b11) + nn
 	)
 
-	r[rd] = cpu.Read32(addr)
+	r[rd] = c.Read32(addr)
 }
 
 const (
@@ -700,9 +700,9 @@ const (
 	THUMB_LDRB_IMM
 )
 
-func (cpu *Cpu) ThumbLSImm(op uint16) {
+func (c *Cpu) ThumbLSImm(op uint16) {
 	var (
-		r = &cpu.Reg.R
+		r = &c.Reg.R
 
 		inst = (op >> 11) & 3
 		rd   = op & 7
@@ -714,25 +714,25 @@ func (cpu *Cpu) ThumbLSImm(op uint16) {
 	case THUMB_STR_IMM:
 
 		addr := r[rb] + (nn << 2)
-		cpu.Write32(addr, r[rd])
+		c.Write32(addr, r[rd])
 	case THUMB_LDR_IMM:
 		addr := r[rb] + (nn << 2)
-		v := cpu.Read32(addr)
+		v := c.Read32(addr)
 		is := (addr & 3) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
 
 	case THUMB_STRB_IMM:
 		addr := r[rb] + nn
-		cpu.Write8(addr, uint8(r[rd]))
+		c.Write8(addr, uint8(r[rd]))
 	case THUMB_LDRB_IMM:
 		addr := r[rb] + nn
-		r[rd] = uint32(cpu.Read8(addr))
+		r[rd] = uint32(c.Read8(addr))
 	}
 }
 
-func (cpu *Cpu) ThumbPushPop(op uint16) {
+func (c *Cpu) ThumbPushPop(op uint16) {
 	var (
-		r     = &cpu.Reg.R
+		r     = &c.Reg.R
 		pclr  = (op>>8)&1 != 0
 		rlist = op & 0xFF
 		pop   = (op>>11)&1 != 0
@@ -742,14 +742,14 @@ func (cpu *Cpu) ThumbPushPop(op uint16) {
 	// thank you nano
 	if rlist == 0 && !pclr {
 		if pop {
-			r[PC] = cpu.Read32Block(r[SP], seq)
-			cpu.Reload16()
+			r[PC] = c.Read32Block(r[SP], seq)
+			c.Reload16()
 			r[SP] += 0x40
 		} else {
 			// alyosha test fails this.
 			// i think it is timing related
 			r[SP] -= 0x40
-			cpu.Write32Block(r[SP], r[PC], seq)
+			c.Write32Block(r[SP], r[PC], seq)
 		}
 
 		return
@@ -761,27 +761,27 @@ func (cpu *Cpu) ThumbPushPop(op uint16) {
 				continue
 			}
 
-			r[reg] = cpu.Read32Block(r[SP], seq)
+			r[reg] = c.Read32Block(r[SP], seq)
 			r[SP] += 4
 
 			seq = SEQ
 		}
 
 		if pclr {
-			r[PC] = cpu.Read32Block(r[SP], seq) &^ 1
+			r[PC] = c.Read32Block(r[SP], seq) &^ 1
 			r[SP] += 4
-			cpu.idle(1)
-			cpu.Reload16()
+			c.idle(1)
+			c.Reload16()
 			return
 		}
 
-		cpu.idle(1)
+		c.idle(1)
 
 	} else {
 
 		if pclr {
 			r[SP] -= 4
-			cpu.Write32Block(r[SP], r[14], seq)
+			c.Write32Block(r[SP], r[14], seq)
 		}
 
 		for reg := 7; reg >= 0; reg-- {
@@ -790,16 +790,16 @@ func (cpu *Cpu) ThumbPushPop(op uint16) {
 			}
 
 			r[SP] -= 4
-			cpu.Write32Block(r[SP], r[reg], seq)
+			c.Write32Block(r[SP], r[reg], seq)
 
 			seq = SEQ
 		}
 	}
 }
 
-func (cpu *Cpu) ThumbRelative(op uint16) {
+func (c *Cpu) ThumbRelative(op uint16) {
 	var (
-		r  = &cpu.Reg.R
+		r  = &c.Reg.R
 		rd = (op >> 8) & 0x7
 		nn = uint32(op&0xFF) << 2
 	)
@@ -813,33 +813,33 @@ func (cpu *Cpu) ThumbRelative(op uint16) {
 	r[rd] = (r[PC] &^ 0b11) + nn
 }
 
-func (cpu *Cpu) ThumbJumpCalls(op uint16) {
-	r := &cpu.Reg.R
+func (c *Cpu) ThumbJumpCalls(op uint16) {
+	r := &c.Reg.R
 
-	if !cpu.Reg.CPSR.CheckCond(uint32(op>>8) & 0xF) {
-		cpu.Seq = SEQ
+	if !c.Reg.CPSR.CheckCond(uint32(op>>8) & 0xF) {
+		c.Seq = SEQ
 		return
 	}
 
 	nn := int(int8(op&0xFF)) << 1
 	r[PC] = uint32(int(r[PC]) + nn)
-	//cpu.P.Reload = true
-	cpu.Reload16()
+	//c.P.Reload = true
+	c.Reload16()
 }
 
-func (cpu *Cpu) ThumbB(op uint16) {
-	r := &cpu.Reg.R
+func (c *Cpu) ThumbB(op uint16) {
+	r := &c.Reg.R
 
 	offset := int16((op&0x7FF)<<5) >> 4
 	r[15] += uint32(offset)
-	//cpu.P.Reload = true
-	cpu.Reload16()
+	//c.P.Reload = true
+	c.Reload16()
 }
 
-func (cpu *Cpu) ThumbShifted(op uint16) {
+func (c *Cpu) ThumbShifted(op uint16) {
 	var (
-		cpsr = &cpu.Reg.CPSR
-		r    = &cpu.Reg.R
+		cpsr = &c.Reg.CPSR
+		r    = &c.Reg.R
 
 		shType = (op >> 11) & 0b11
 		is     = (op >> 6) & 0x1F
@@ -888,8 +888,8 @@ func (cpu *Cpu) ThumbShifted(op uint16) {
 	r[rd] = res
 }
 
-func (cpu *Cpu) ThumbStack(op uint16) {
-	r := &cpu.Reg.R
+func (c *Cpu) ThumbStack(op uint16) {
+	r := &c.Reg.R
 	nn := int(op&0x7F) << 2
 
 	if sub := (op>>7)&1 != 0; sub {
@@ -899,40 +899,40 @@ func (cpu *Cpu) ThumbStack(op uint16) {
 	r[SP] = uint32(int(r[SP]) + nn)
 }
 
-func (cpu *Cpu) ThumbLongBranch(op uint16) {
-	r := &cpu.Reg.R
+func (c *Cpu) ThumbLongBranch(op uint16) {
+	r := &c.Reg.R
 	offset := int32(uint32(op&0x7FF)<<21) >> 9
 	r[14] = r[15] + uint32(offset)
 }
 
-func (cpu *Cpu) ThumbShortLongBranch(op uint16) {
-	r := &cpu.Reg.R
+func (c *Cpu) ThumbShortLongBranch(op uint16) {
+	r := &c.Reg.R
 
 	nn := uint32(op&0x7FF) << 1
 	tmp := (r[15] - 2) | 1
 	r[15] = r[14] + nn
 	r[14] = tmp
 
-	cpu.Reload16()
+	c.Reload16()
 }
 
-func (cpu *Cpu) ThumbLSSP(op uint16) {
-	r := &cpu.Reg.R
+func (c *Cpu) ThumbLSSP(op uint16) {
+	r := &c.Reg.R
 	rd := (op >> 8) & 0x7
 	addr := r[SP] + (uint32(op&0xFF) << 2)
 
 	if ldr := (op>>11)&1 != 0; ldr {
-		v := cpu.Read32(addr)
+		v := c.Read32(addr)
 		is := (addr & 3) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
 	} else {
-		cpu.Write32(addr, r[rd])
+		c.Write32(addr, r[rd])
 	}
 }
 
-func (cpu *Cpu) ThumbBlock(op uint16) {
+func (c *Cpu) ThumbBlock(op uint16) {
 	var (
-		r     = &cpu.Reg.R
+		r     = &c.Reg.R
 		ldmia = (op>>11)&1 != 0
 		rb    = (op >> 8) & 7
 		rlist = op & 0xFF
@@ -940,10 +940,10 @@ func (cpu *Cpu) ThumbBlock(op uint16) {
 
 	if rlist == 0 {
 		if !ldmia {
-			cpu.Write32(r[rb], r[PC]+2)
+			c.Write32(r[rb], r[PC]+2)
 		} else {
-			r[PC] = cpu.Read32Block(r[rb], NONSEQ)
-			cpu.Reload16()
+			r[PC] = c.Read32Block(r[rb], NONSEQ)
+			c.Reload16()
 		}
 		r[rb] += 0x40
 		return
@@ -966,13 +966,13 @@ func (cpu *Cpu) ThumbBlock(op uint16) {
 			}
 		}
 
-		cpu.Write32Block(addr, r[first], NONSEQ)
+		c.Write32Block(addr, r[first], NONSEQ)
 		r[rb] = baseNew
 		addr += 4
 
 		for reg := first + 1; reg < 8; reg++ {
 			if enabled := (rlist>>reg)&1 != 0; enabled {
-				cpu.Write32Block(addr, r[reg], SEQ)
+				c.Write32Block(addr, r[reg], SEQ)
 				addr += 4
 			}
 		}
@@ -983,13 +983,13 @@ func (cpu *Cpu) ThumbBlock(op uint16) {
 
 		for reg := range 8 {
 			if enabled := (rlist>>reg)&1 != 0; enabled {
-				r[reg] = cpu.Read32Block(addr, seq)
+				r[reg] = c.Read32Block(addr, seq)
 				addr += 4
 				seq = SEQ
 			}
 		}
 
-		cpu.idle(1)
+		c.idle(1)
 
 		if ^rlist&(1<<rb) != 0 {
 			r[rb] = addr

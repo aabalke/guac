@@ -5,40 +5,37 @@ import (
 	"math/bits"
 )
 
-func (cpu *Cpu) DecodeARM(op uint32) {
-	r := &cpu.Reg.R
+func (c *Cpu) DecodeARM(op uint32) {
+	r := &c.Reg.R
 
-	if cond := op >> 28; cond != 0xE && !cpu.Reg.CPSR.CheckCond(cond) {
-		cpu.Seq = SEQ
-		return
-	}
-
-	if swi := (op>>24)&0xF == 0xF; swi {
-		cpu.swi(op)
+	if cond := op >> 28; cond != 0xE && !c.Reg.CPSR.CheckCond(cond) {
+		c.Seq = SEQ
 		return
 	}
 
 	switch {
+	case (op>>24)&0xF == 0xF:
+		c.swi(op)
 	case isB(op):
-		cpu.B(op)
+		c.B(op)
 	case isBX(op):
-		cpu.BX(op)
+		c.BX(op)
 	case isSDT(op):
-		cpu.Sdt(op)
+		c.Sdt(op)
 	case isBlock(op):
-		cpu.Block(op)
+		c.Block(op)
 	case isHalf(op):
-		cpu.Half(op)
+		c.Half(op)
 	case isUD(op):
 		panic("unsetup undefined instruction")
 	case isPSR(op):
-		cpu.Psr(op)
+		c.Psr(op)
 	case isSWP(op):
-		cpu.Swp(op)
+		c.Swp(op)
 	case isM(op):
-		cpu.Mul(op)
+		c.Mul(op)
 	case isALU(op):
-		cpu.Alu(op)
+		c.Alu(op)
 
 	default:
 		panic(fmt.Sprintf("Unable to Decode ARM false %08X, at PC %08X\n", op, r[PC]))
@@ -219,10 +216,10 @@ const (
 	MVN
 )
 
-func (cpu *Cpu) Alu(op uint32) {
+func (c *Cpu) Alu(op uint32) {
 	var (
-		r     = &cpu.Reg.R
-		cpsr  = &cpu.Reg.CPSR
+		r     = &c.Reg.R
+		cpsr  = &c.Reg.CPSR
 		rd    = (op >> 12) & 0xF
 		rn    = (op >> 16) & 0xF
 		carry = cpsr.C
@@ -244,7 +241,7 @@ func (cpu *Cpu) Alu(op uint32) {
 		}
 
 	} else {
-		op2 = cpu.getShiftedAluReg(op)
+		op2 = c.getShiftedAluReg(op)
 
 		if regShift := (op>>4)&1 != 0; regShift && rn == PC {
 			rnv += 4
@@ -380,7 +377,7 @@ func (cpu *Cpu) Alu(op uint32) {
 	if rd == PC {
 
 		if op&(1<<20) != 0 {
-			cpu.ExitException(cpsr.Mode)
+			c.ExitException(cpsr.Mode)
 		}
 
 		if cpsr.T {
@@ -389,22 +386,21 @@ func (cpu *Cpu) Alu(op uint32) {
 			r[PC] &^= 3
 		}
 		if inst < 0b1000 || inst > 0b1011 {
-			//cpu.P.Reload = true
 			if cpsr.T {
-				cpu.Reload16()
+				c.Reload16()
 			} else {
-				cpu.Reload32()
+				c.Reload32()
 			}
 		}
 
 	}
 }
 
-func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
+func (c *Cpu) getShiftedAluReg(op uint32) uint32 {
 	var (
-		r = &cpu.Reg.R
+		r = &c.Reg.R
 
-		carry = cpu.Reg.CPSR.C
+		carry = c.Reg.CPSR.C
 
 		shReg  = (op>>4)&1 != 0
 		shType = (op >> 5) & 0b11
@@ -423,7 +419,7 @@ func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
 		rs := (op >> 8) & 0xF
 		shift = r[rs] & 0xFF
 
-		cpu.idle(1)
+		c.idle(1)
 
 		if rm == PC {
 			op2 += 4
@@ -438,14 +434,14 @@ func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
 			case LSL:
 				return op2
 			case LSR:
-				cpu.Reg.CPSR.C = op2&0x8000_0000 != 0
+				c.Reg.CPSR.C = op2&0x8000_0000 != 0
 				return 0
 			case ASR:
 
 				signed := op2&0x8000_0000 != 0
 
 				if setCarry {
-					cpu.Reg.CPSR.C = signed
+					c.Reg.CPSR.C = signed
 				}
 
 				if signed {
@@ -456,7 +452,7 @@ func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
 
 			case ROR:
 
-				cpu.Reg.CPSR.C = op2&1 != 0
+				c.Reg.CPSR.C = op2&1 != 0
 
 				op2 >>= 1
 				if carry {
@@ -531,7 +527,7 @@ func (cpu *Cpu) getShiftedAluReg(op uint32) uint32 {
 	}
 
 	if setCarry {
-		cpu.Reg.CPSR.C = carry
+		c.Reg.CPSR.C = carry
 	}
 
 	return op2
@@ -547,7 +543,7 @@ const (
 	SMLAL = 0b111
 )
 
-func (cpu *Cpu) Mul(op uint32) {
+func (c *Cpu) Mul(op uint32) {
 	var (
 		inst = (op >> 21) & 0xF
 		set  = (op>>20)&1 != 0
@@ -555,8 +551,8 @@ func (cpu *Cpu) Mul(op uint32) {
 		rn   = (op >> 12) & 0xF
 		rs   = (op >> 8) & 0xF
 		rm   = (op >> 0) & 0xF
-		r    = &cpu.Reg.R
-		cpsr = &cpu.Reg.CPSR
+		r    = &c.Reg.R
+		cpsr = &c.Reg.CPSR
 	)
 
 	switch inst {
@@ -564,11 +560,11 @@ func (cpu *Cpu) Mul(op uint32) {
 
 		res := r[rm] * r[rs]
 
-		cpu.idle(idleMul(r[rs], true))
+		c.idle(idleMul(r[rs], true))
 
 		if inst == MLA {
 			res += r[rn]
-			cpu.idle(1)
+			c.idle(1)
 		}
 
 		r[rd] = res
@@ -587,12 +583,12 @@ func (cpu *Cpu) Mul(op uint32) {
 
 	case UMULL, UMLAL:
 
-		cpu.idle(idleMul(r[rs], false) + 1)
+		c.idle(idleMul(r[rs], false) + 1)
 		res := uint64(r[rm]) * uint64(r[rs])
 
 		if inst == UMLAL {
 			res += uint64(r[rd])<<32 | uint64(r[rn])
-			cpu.idle(1)
+			c.idle(1)
 		}
 
 		r[rd] = uint32(res >> 32)
@@ -609,12 +605,12 @@ func (cpu *Cpu) Mul(op uint32) {
 
 	case SMULL, SMLAL:
 
-		cpu.idle(idleMul(r[rs], true) + 1)
+		c.idle(idleMul(r[rs], true) + 1)
 
 		res := int64(int32(r[rm])) * int64(int32(r[rs]))
 		if inst == SMLAL {
 			res += int64(r[rd])<<32 | int64(r[rn])
-			cpu.idle(1)
+			c.idle(1)
 		}
 
 		r[rd] = uint32(res >> 32)
@@ -631,18 +627,8 @@ func (cpu *Cpu) Mul(op uint32) {
 	}
 }
 
-const (
-	STR = iota
-	LDR_PLD
-)
-
 func (c *Cpu) Sdt(op uint32) {
-	if pld := op&
-		0b1111_1101_0111_0000_1111_0000_0000_0000 ==
-		0b1111_0101_0101_0000_1111_0000_0000_0000; pld {
-	}
-
-	if valid := (op>>26)&0b11 == 0b01; !valid {
+	if valid := (op>>26)&3 == 1; !valid {
 		panic("Malformed Sdt Instruction")
 	}
 
@@ -667,7 +653,7 @@ func (c *Cpu) Sdt(op uint32) {
 		}
 
 		shift := (op >> 7) & 0x1F
-		sType := (op >> 5) & 0b11
+		sType := (op >> 5) & 3
 		rm := op & 0xF
 
 		switch sType {
@@ -735,7 +721,6 @@ func (c *Cpu) Sdt(op uint32) {
 
 			if rd == PC {
 				c.ToggleThumb() // this is arm9 - not sure if arm7
-				//c.P.Reload = true
 				c.Reload32()
 			}
 		}
@@ -757,16 +742,15 @@ func (c *Cpu) Sdt(op uint32) {
 	}
 }
 
-func (cpu *Cpu) B(op uint32) {
-	r := &cpu.Reg.R
+func (c *Cpu) B(op uint32) {
+	r := &c.Reg.R
 
 	if link := (op>>24)&1 != 0; link {
 		r[14] = r[15] - 4
 	}
 
 	r[PC] += uint32((int32(op) << 8) >> 6)
-	//cpu.P.Reload = true
-	cpu.Reload32()
+	c.Reload32()
 }
 
 const (
@@ -775,9 +759,9 @@ const (
 	INST_BLX = 3
 )
 
-func (cpu *Cpu) BX(op uint32) {
+func (c *Cpu) BX(op uint32) {
 	var (
-		r    = &cpu.Reg.R
+		r    = &c.Reg.R
 		inst = (op >> 4) & 0xF
 		rn   = op & 0xF
 	)
@@ -785,13 +769,12 @@ func (cpu *Cpu) BX(op uint32) {
 	switch inst {
 	case INST_BX:
 		r[PC] = r[rn]
-		cpu.ToggleThumb()
-		//cpu.P.Reload = true
-		if cpu.Reg.CPSR.T {
-			cpu.Reload16()
+		c.ToggleThumb()
+		if c.Reg.CPSR.T {
+			c.Reload16()
 			return
 		}
-		cpu.Reload32()
+		c.Reload32()
 
 	case INST_BXJ:
 		panic("Unsupported BXJ Instruction")
@@ -898,28 +881,28 @@ func (c *Cpu) Half(op uint32) {
 	}
 }
 
-func (cpu *Cpu) Psr(op uint32) {
-	r := &cpu.Reg.R
+func (c *Cpu) Psr(op uint32) {
+	r := &c.Reg.R
 
 	if msr := (op>>21)&1 != 0; msr {
-		cpu.msr(op)
+		c.msr(op)
 		return
 	}
 
 	rd := (op >> 12) & 0xF
 
 	if spsr := (op>>22)&1 != 0; spsr {
-		mode := cpu.Reg.CPSR.Mode
-		r[rd] = cpu.Reg.SPSR[BANK_ID[mode]].Get()
+		mode := c.Reg.CPSR.Mode
+		r[rd] = c.Reg.SPSR[BANK_ID[mode]].Get()
 		return
 	}
 
 	mask := PRIV_MASK
-	if cpu.Reg.CPSR.Mode == MODE_USR {
+	if c.Reg.CPSR.Mode == MODE_USR {
 		mask = USR_MASK
 	}
 
-	r[rd] = uint32(cpu.Reg.CPSR.Get()) & mask
+	r[rd] = uint32(c.Reg.CPSR.Get()) & mask
 }
 
 const (
@@ -928,8 +911,8 @@ const (
 	STATE_MASK uint32 = 0x0100_0020
 )
 
-func (cpu *Cpu) msr(op uint32) {
-	r := &cpu.Reg.R
+func (c *Cpu) msr(op uint32) {
+	r := &c.Reg.R
 
 	var v uint32
 	if imm := (op>>25)&1 != 0; imm {
@@ -955,7 +938,7 @@ func (cpu *Cpu) msr(op uint32) {
 	}
 
 	secMask := PRIV_MASK
-	curr := cpu.Reg.CPSR.Mode
+	curr := c.Reg.CPSR.Mode
 
 	if curr == MODE_USR {
 		secMask = USR_MASK
@@ -969,7 +952,7 @@ func (cpu *Cpu) msr(op uint32) {
 
 	mask &= secMask
 
-	reg := &cpu.Reg
+	reg := &c.Reg
 
 	if spsrFlag {
 
@@ -1002,7 +985,7 @@ func (cpu *Cpu) msr(op uint32) {
 		panic("USER MODE MSR")
 	}
 
-	cpu.ModeSwitch(curr, next)
+	c.ModeSwitch(curr, next)
 }
 
 func (c *Cpu) Swp(op uint32) {
@@ -1131,7 +1114,6 @@ func (c *Cpu) Block(op uint32) {
 		return
 	}
 
-	//c.P.Reload = true
 	c.Reload32()
 
 	if !psr {

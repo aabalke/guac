@@ -7,14 +7,14 @@ import (
 type Cpu struct {
 	gba               *GBA
 	PcPtr             unsafe.Pointer
-	ParallelDmaCycles uint32
-	Op                [2]uint32
 	Reg               Reg
+	Op                [2]uint32
+	ParallelDmaCycles uint32
+	Seq               uint32
 	Halted            bool
 	LastWasDma        bool
 	IrqLine           bool
 	Reloaded          bool
-	Seq               uint32
 }
 
 const (
@@ -305,14 +305,14 @@ func (c *Cond) Set(v uint32) {
 	c.Mode = v & 0x1F
 }
 
-func (cpu *Cpu) ToggleThumb() {
-	cpu.Reg.CPSR.T = cpu.Reg.R[15]&1 != 0
+func (c *Cpu) ToggleThumb() {
+	c.Reg.CPSR.T = c.Reg.R[15]&1 != 0
 
-	if cpu.Reg.CPSR.T {
-		cpu.Reg.R[15] &^= 1
+	if c.Reg.CPSR.T {
+		c.Reg.R[15] &^= 1
 		return
 	}
-	cpu.Reg.R[15] &^= 3
+	c.Reg.R[15] &^= 3
 }
 
 func (c *Cpu) Write8(addr uint32, v uint8) {
@@ -329,7 +329,7 @@ func (c *Cpu) Write16(addr uint32, v uint16) {
 	c.Seq = NONSEQ
 }
 
-func (c *Cpu) Write32(addr uint32, v uint32) {
+func (c *Cpu) Write32(addr, v uint32) {
 	c.Cycles(addr, 4, NONSEQ)
 	c.gba.Mem.Write32(addr, v)
 	c.LastWasDma = false

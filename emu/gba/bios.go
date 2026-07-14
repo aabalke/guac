@@ -5,8 +5,6 @@ import (
 	"unsafe"
 )
 
-//var swis [0x30]uint32
-
 func (c *Cpu) swi(op uint32) {
 	//op &= 0xFFFFFF
 
@@ -15,16 +13,6 @@ func (c *Cpu) swi(op uint32) {
 	//	c.CpuSet()
 	//	return
 	//}
-
-	//swis[op]++
-
-	//for i := range 0x30 {
-	//	if swis[i] != 0 {
-	//		fmt.Printf("%2X: %08X ", i, swis[i])
-	//	}
-	//}
-
-	//fmt.Printf("\n")
 
 	c.Exception(VEC_SWI, MODE_SWI)
 }
