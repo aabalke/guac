@@ -437,6 +437,7 @@ func (d *Dma) videoDma(vcount uint8, late int64) {
 	}
 }
 
+//go:inline
 func (d *Dma) IsRunning() bool {
 	return d.Runnable != 0
 }

@@ -16,11 +16,10 @@ type Memory struct {
 	BIOS  *[]uint8
 	WRAM1 [0x40000]uint8
 	WRAM2 [0x8000]uint8
-
-	PRAM [0x200]uint16
-	VRAM [0x18001]uint8
-	OAM  [0x400]uint8
-	IO   [0x400]uint8
+	PRAM  [0x200]uint16
+	VRAM  [0x18000]uint8
+	OAM   [0x400]uint8
+	IO    [0x400]uint8
 
 	ProtectedValue uint32
 	Sio            *Sio
@@ -37,7 +36,7 @@ type Memory struct {
 func NewMemory(gba *GBA) *Memory {
 	m := &Memory{GBA: gba}
 	m.ProtectedValue = 0xE129F000
-	m.Timings = NewTimings(gba.Tick)
+	m.Timings = NewTimings()
 	m.Sio = NewSio(gba.Irq, gba.Scheduler)
 
 	m.initReadRegions()
@@ -602,7 +601,67 @@ func CheckEeprom(gba *GBA, addr uint32) bool {
 
 func (m *Memory) WriteIO(addr uint32, v uint8) {
 	switch {
-	case addr >= 0x60 && addr < 0xB0:
+	case addr < 0x60:
+
+		switch addr {
+		case 0x004:
+			m.Dispstat.Write(v, false)
+		case 0x005:
+			m.Dispstat.Write(v, true)
+		case 0x006:
+			return
+		case 0x007:
+			return
+		case 0x0009:
+			m.IO[addr] = v &^ 0b0010_0000 // BG0CNT mask
+		case 0x000B:
+			m.IO[addr] = v &^ 0b0010_0000 // BG1CNT mask
+
+		case 0x0011:
+			m.IO[addr] = v &^ 0b1111_1110 // BG0HOFS mask
+		case 0x0013:
+			m.IO[addr] = v &^ 0b1111_1110 // BG0VOFS mask
+		case 0x0015:
+			m.IO[addr] = v &^ 0b1111_1110 // BG1HOFS mask
+		case 0x0017:
+			m.IO[addr] = v &^ 0b1111_1110 // BG1VOFS mask
+		case 0x0019:
+			m.IO[addr] = v &^ 0b1111_1110 // BG2HOFS mask
+		case 0x001B:
+			m.IO[addr] = v &^ 0b1111_1110 // BG2VOFS mask
+		case 0x001D:
+			m.IO[addr] = v &^ 0b1111_1110 // BG3HOFS mask
+		case 0x001F:
+			m.IO[addr] = v &^ 0b1111_1110 // BG3VOFS mask
+
+		case 0x0048:
+			m.IO[addr] = v & 0x3F // winin
+		case 0x0049:
+			m.IO[addr] = v & 0x3F // winin
+		case 0x004A:
+			m.IO[addr] = v & 0x3F // winout
+		case 0x004B:
+			m.IO[addr] = v & 0x3F // winout
+
+		case 0x0050:
+			m.IO[addr] = v // bldcnt
+		case 0x0051:
+			m.IO[addr] = v &^ 0b1100_0000 // bldcnt
+		case 0x0052:
+			m.IO[addr] = v &^ 0b1110_0000 // bldalpha
+		case 0x0053:
+			m.IO[addr] = v &^ 0b1110_0000 // bldalpha
+		default:
+			m.IO[addr] = v
+		}
+
+		if addr < 2 || addr >= 8 {
+			m.GBA.PPU.UpdatePPU(addr, uint32(v))
+		}
+
+		return
+
+	case addr < 0xB0:
 		WriteSound(addr, v, m.GBA.Apu)
 		return
 	case addr >= 0xB0 && addr < 0xE0:
@@ -624,54 +683,6 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 	}
 
 	switch addr {
-	case 0x004:
-		m.Dispstat.Write(v, false)
-	case 0x005:
-		m.Dispstat.Write(v, true)
-	case 0x006:
-		return
-	case 0x007:
-		return
-	case 0x0009:
-		m.IO[addr] = v &^ 0b0010_0000 // BG0CNT mask
-	case 0x000B:
-		m.IO[addr] = v &^ 0b0010_0000 // BG1CNT mask
-
-	case 0x0011:
-		m.IO[addr] = v &^ 0b1111_1110 // BG0HOFS mask
-	case 0x0013:
-		m.IO[addr] = v &^ 0b1111_1110 // BG0VOFS mask
-	case 0x0015:
-		m.IO[addr] = v &^ 0b1111_1110 // BG1HOFS mask
-	case 0x0017:
-		m.IO[addr] = v &^ 0b1111_1110 // BG1VOFS mask
-	case 0x0019:
-		m.IO[addr] = v &^ 0b1111_1110 // BG2HOFS mask
-	case 0x001B:
-		m.IO[addr] = v &^ 0b1111_1110 // BG2VOFS mask
-	case 0x001D:
-		m.IO[addr] = v &^ 0b1111_1110 // BG3HOFS mask
-	case 0x001F:
-		m.IO[addr] = v &^ 0b1111_1110 // BG3VOFS mask
-
-	case 0x0048:
-		m.IO[addr] = v & 0x3F // winin
-	case 0x0049:
-		m.IO[addr] = v & 0x3F // winin
-	case 0x004A:
-		m.IO[addr] = v & 0x3F // winout
-	case 0x004B:
-		m.IO[addr] = v & 0x3F // winout
-
-	case 0x0050:
-		m.IO[addr] = v // bldcnt
-	case 0x0051:
-		m.IO[addr] = v &^ 0b1100_0000 // bldcnt
-	case 0x0052:
-		m.IO[addr] = v &^ 0b1110_0000 // bldalpha
-	case 0x0053:
-		m.IO[addr] = v &^ 0b1110_0000 // bldalpha
-
 	case 0x128, 0x129:
 		m.Sio.Write(addr&1, v)
 
@@ -697,15 +708,10 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 			if halt := v&0x80 == 0; halt {
 				m.GBA.Cpu.Halted = true
 				m.GBA.Tick(1)
-
 			}
 		}
 
 	default:
 		m.IO[addr] = v
-	}
-
-	if addr == 0x0 || addr == 0x1 || (addr >= 0x8 && addr < 0x55) {
-		m.GBA.PPU.UpdatePPU(addr, uint32(v))
 	}
 }

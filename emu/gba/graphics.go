@@ -74,16 +74,18 @@ func (gba *GBA) scanlineTileMode(y uint32) {
 }
 
 func (gba *GBA) renderTilePixel(x, y uint32) {
-	dispcnt := &gba.PPU.Dispcnt
-	wins := &gba.PPU.Windows
-	bgs := &gba.PPU.Backgrounds
-	objPriorities := &gba.PPU.objPriorities
-	bgPriorities := &gba.PPU.bgPriorities
+	var (
+		dispcnt       = &gba.PPU.Dispcnt
+		wins          = &gba.PPU.Windows
+		bgs           = &gba.PPU.Backgrounds
+		objPriorities = &gba.PPU.objPriorities
+		bgPriorities  = &gba.PPU.bgPriorities
 
-	bldPal := NewBlendPalette(x, &gba.PPU.Blend, gba)
+		bldPal = NewBlendPalette(x, &gba.PPU.Blend, gba)
 
-	var objMode uint32
-	var inObjWindow bool
+		objMode     uint32
+		inObjWindow bool
+	)
 
 	// work backwards for proper priorities
 	for i := 3; i >= 0; i-- {
