@@ -460,6 +460,20 @@ func (c *Cpu) CyclesInst(addr, width, seq uint32) {
 		t.Width = instWidth
 		t.AccessTime = int64(t.Timings[instWidth>>2][1][addr>>24])
 		t.Countdown = int64(t.Timings[instWidth>>2][1][addr>>24])
+
+		switch t.AccessTime {
+		case 1:
+			t.AccessTimeShift = 0
+		case 2:
+			t.AccessTimeShift = 1
+		case 4:
+			t.AccessTimeShift = 2
+		case 8:
+			t.AccessTimeShift = 3
+		default:
+			t.AccessTimeShift = -1
+		}
+
 		t.Addr = addr + instWidth
 		t.Head = addr + instWidth
 	}

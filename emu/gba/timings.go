@@ -13,14 +13,16 @@ type Timings struct {
 	Tick func(cycles int64)
 
 	// prefetch
+	AccessTimeShift       int
 	AccessTime, Countdown int64
-	Head, Addr            uint32
-	Width                 uint32
-	Capacity              uint32
-	Opcodes               uint32
-	Enabled               bool
-	Disabled              bool
-	Active                bool
+
+	Head, Addr uint32
+	Width      uint32
+	Capacity   uint32
+	Opcodes    uint32
+	Enabled    bool
+	Disabled   bool
+	Active     bool
 
 	// waitstate
 	V       uint16
@@ -59,12 +61,14 @@ func (t *Timings) Cancel(r15 uint32) {
 	}
 }
 
+//go:inline
 func (t *Timings) Step(cycles int64) {
 	t.Countdown -= cycles
 	if !t.Enabled {
 		t.Opcodes++
 		return
 	}
+
 	if t.Countdown > 0 {
 		return
 	}
@@ -74,39 +78,22 @@ func (t *Timings) Step(cycles int64) {
 		return
 	}
 
-	need := uint32((-t.Countdown)/t.AccessTime + 1)
-	avail := t.Capacity - t.Opcodes
-
-	if need <= avail {
-		t.Opcodes += need
-		t.Addr += t.Width * need
-		t.Countdown += t.AccessTime * int64(need)
+	var need uint32
+	if notShiftable := t.AccessTimeShift < 0; notShiftable {
+		need = uint32((-t.Countdown)/t.AccessTime) + 1
 	} else {
-		t.Opcodes += avail + 1
-		t.Addr += t.Width * avail
-		t.Countdown += t.AccessTime * int64(avail)
+		need = uint32(-t.Countdown>>t.AccessTimeShift) + 1
 	}
-}
 
-//func (t *Timings) Step(cycles int64) {
-//	t.Countdown -= cycles
-//
-//	if !t.Enabled {
-//		t.Opcodes++
-//		return
-//	}
-//
-//	for t.Countdown <= 0 {
-//		if t.Opcodes >= t.Capacity {
-//			t.Opcodes++
-//			break
-//		}
-//
-//		t.Opcodes++
-//		t.Addr += t.Width
-//		t.Countdown += t.AccessTime
-//	}
-//}
+	if avail := t.Capacity - t.Opcodes; need > avail {
+		need = avail
+		t.Opcodes++
+	}
+
+	t.Opcodes += need
+	t.Addr += t.Width * need
+	t.Countdown += t.AccessTime * int64(need)
+}
 
 func (t *Timings) ReadWaitstate(addr uint32) uint8 {
 	switch addr & 3 {
@@ -181,6 +168,5 @@ func (t *Timings) WriteWaitstate(addr uint32, v uint8) {
 		if old && !t.Enabled {
 			t.Disabled = true
 		}
-
 	}
 }
