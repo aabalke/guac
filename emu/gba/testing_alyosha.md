@@ -1,8 +1,8 @@
 # Alyosha Tas Gba Tests
 
-Results generated 2026-07-13T16:42:37-06:00
+Results generated 2026-07-14T19:12:04-06:00
 
-Passing 54/119 45%
+Passing 53/119 44%
 
 👍 DMA\DMA_Mode_Change
 ❌ DMA\DMA_ROM_Fixed
@@ -58,7 +58,7 @@ Passing 54/119 45%
 👍 irq\BL_1
 ❌ irq\BL_IRQ
 ❌ irq\BL_IRQ_2
-👍 irq\BL_IRQ_3
+❌ irq\BL_IRQ_3
 👍 irq\BL_IRQ_R14
 👍 irq\IE
 👍 irq\IF

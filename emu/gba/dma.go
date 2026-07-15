@@ -300,7 +300,6 @@ func (ch *Channel) transfer() {
 
 			if src < 0x200_0000 {
 				ch.dma.Tick(1)
-				ch.dma.Gba.Cpu.LastWasDma = true
 			} else {
 
 				ch.dma.Gba.Cpu.CyclesDma(src, 4, srcSeq)
@@ -309,9 +308,10 @@ func (ch *Channel) transfer() {
 				} else {
 					ch.Value = *(*uint32)(ch.latched.srcPtr)
 				}
-				ch.dma.Gba.Cpu.LastWasDma = true
 				ch.dma.LatchValue = ch.Value
 			}
+
+			ch.dma.Gba.Cpu.LastWasDma = true
 
 			ch.dma.Gba.Cpu.CyclesDma(dst, 4, dstSeq)
 			if ch.latched.dstPtr == nil {
@@ -334,7 +334,6 @@ func (ch *Channel) transfer() {
 				}
 
 				ch.dma.Tick(1)
-				ch.dma.Gba.Cpu.LastWasDma = true
 
 			} else {
 
@@ -345,11 +344,12 @@ func (ch *Channel) transfer() {
 				} else {
 					v = *(*uint32)(ch.latched.srcPtr) & 0xFFFF
 				}
-				ch.dma.Gba.Cpu.LastWasDma = true
 
 				ch.Value = v | (v << 16)
 				ch.dma.LatchValue = ch.Value
 			}
+
+			ch.dma.Gba.Cpu.LastWasDma = true
 
 			ch.dma.Gba.Cpu.CyclesDma(dst, 2, dstSeq)
 			if ch.latched.dstPtr == nil {
@@ -394,7 +394,14 @@ func (ch *Channel) transfer() {
 		}
 
 		if ch.DstAdj == DMA_ADJ_REL && !ch.Fifo {
-			ch.latched.dst = ch.Dst
+			dst := ch.Dst
+			if ch.isWord {
+				dst &^= 3
+			} else {
+				dst &^= 1
+			}
+			ch.latched.dst = dst
+			ch.latched.dstPtr = ch.dma.Gba.Mem.WritePtr(dst)
 		}
 	} else {
 		ch.disable()
