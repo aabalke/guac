@@ -62,7 +62,7 @@ func NewGBA(path string, ctx *oto.Context) *GBA {
 	}
 
 	gba.PPU = &PPU{gba: gba}
-	gba.Irq = NewIrq(gba.Scheduler)
+	gba.Irq = NewIrq(gba, gba.Scheduler)
 	gba.Mem = NewMemory(gba)
 	gba.Cpu = NewCpu(gba)
 	gba.Keypad = Key{Irq: gba.Irq, Input: 0x3FF}
@@ -131,23 +131,29 @@ func (gba *GBA) Update(stdFps bool) {
 
 			gba.Cpu.Step()
 		}
-
-		if gba.IdleOptimize && gba.vsyncAddr != 0 && gba.Cpu.Reg.R[15] == gba.vsyncAddr {
-			vblRaised := gba.Irq.IdleIrq&1 != 0
-			vblHandled := gba.Irq.IF&1 != 0
-			if vblRaised && !vblHandled {
-				gba.Cpu.Halted = true
-			}
-
-			gba.Irq.IdleIrq = gba.Irq.IF
-		}
 	}
 }
 
 func (gba *GBA) Tick(cycles int64) {
 	gba.Scheduler.Add(cycles)
+
 	if gba.Mem.Timings.Active {
 		gba.Mem.Timings.Step(cycles)
+	}
+
+	if gba.IdleOptimize {
+		gba.CheckIdleLoopOptimization()
+	}
+}
+
+func (gba *GBA) CheckIdleLoopOptimization() {
+	if gba.Cpu.Reg.R[15] == gba.vsyncAddr {
+		prevFlag := gba.Irq.IdleIrq&1 != 0
+		ifFlag := gba.Irq.IF&1 != 0
+		if !prevFlag || ifFlag {
+			gba.Cpu.Halted = true
+		}
+		gba.Irq.IdleIrq = gba.Irq.IF
 	}
 }
 

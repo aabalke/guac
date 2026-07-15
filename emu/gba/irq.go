@@ -18,6 +18,7 @@ const (
 )
 
 type Irq struct {
+	gba                  *GBA
 	sch                  *Scheduler
 	pendingIF, pendingIE uint32
 	IF, IE               uint32
@@ -30,8 +31,9 @@ type Irq struct {
 	CpuIrqLine *bool
 }
 
-func NewIrq(s *Scheduler) *Irq {
+func NewIrq(gba *GBA, s *Scheduler) *Irq {
 	return &Irq{
+		gba: gba,
 		sch: s,
 	}
 }
@@ -106,6 +108,8 @@ func (i *Irq) OnWrite(late int64, argz any) {
 		i.sch.schedule(EVENT_IRQ_SET, 0, 2, i.UpdateIRQLine, irqLineNew)
 		i.IrqLine = irqLineNew
 	}
+
+	i.gba.CheckIdleLoopOptimization()
 }
 
 func (i *Irq) UpdateIEAndIF(late int64, argz any) {

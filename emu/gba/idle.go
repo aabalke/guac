@@ -175,6 +175,8 @@ var vsyncAddrMap = map[struct {
 }
 
 func (gba *GBA) SetIdleAddr() {
+	gba.vsyncAddr = 0xFFFF_FFFF
+
 	v, ok := vsyncAddrMap[struct {
 		Title string
 		Code  string

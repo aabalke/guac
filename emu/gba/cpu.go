@@ -145,6 +145,7 @@ func (c *Cpu) Step() {
 			c.Reg.R[PC] = addr
 
 			c.Reload32()
+
 		}
 	}
 

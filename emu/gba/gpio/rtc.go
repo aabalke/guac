@@ -189,6 +189,7 @@ func (r *Rtc) WriteData(sio uint8) {
 				now := time.Now()
 
 				hour := convertDecimalToBcd(uint8(now.Hour()))
+
 				if !r.ctrl.hour24 {
 					hour %= 12
 				}

@@ -99,17 +99,14 @@ func (gba *GBA) renderTilePixel(x, y uint32) {
 				continue
 			}
 
-			var palData uint32
-			var ok bool
-
 			if bg.Affine {
-				palData, ok = gba.setAffineBackgroundPixel(bg, x)
+				if palData, ok := gba.setAffineBackgroundPixel(bg, x); ok {
+					bldPal.setBlendPalettes(palData, uint32(bgIdx), false, false)
+				}
 			} else {
-				palData, ok = gba.setBackgroundPixel(bg, x, y)
-			}
-
-			if ok {
-				bldPal.setBlendPalettes(palData, uint32(bgIdx), false, false)
+				if palData, ok := gba.setBackgroundPixel(bg, x, y); ok {
+					bldPal.setBlendPalettes(palData, uint32(bgIdx), false, false)
+				}
 			}
 		}
 
@@ -753,12 +750,15 @@ func (gba *GBA) setBackgroundPixel(bg *Background, x, y uint32) (uint32, bool) {
 	xIdx := (x + bg.XOffset) & (bg.W - 1)
 	yIdx := (y + bg.YOffset) & (bg.H - 1)
 
-	if bg.Mosaic && gba.PPU.Mosaic.BgH != 0 {
-		xIdx -= xIdx % (gba.PPU.Mosaic.BgH + 1)
-	}
+	if bg.Mosaic {
 
-	if bg.Mosaic && gba.PPU.Mosaic.BgV != 0 {
-		yIdx -= yIdx % (gba.PPU.Mosaic.BgV + 1)
+		if gba.PPU.Mosaic.BgH != 0 {
+			xIdx -= xIdx % (gba.PPU.Mosaic.BgH + 1)
+		}
+
+		if gba.PPU.Mosaic.BgV != 0 {
+			yIdx -= yIdx % (gba.PPU.Mosaic.BgV + 1)
+		}
 	}
 
 	map_x := xIdx >> 3
@@ -777,35 +777,43 @@ func (gba *GBA) setBackgroundPixel(bg *Background, x, y uint32) (uint32, bool) {
 	mapAddr := bg.ScreenBaseBlock + mapIdx
 	screenData := uint32(binary.LittleEndian.Uint16(gba.Mem.VRAM[mapAddr:]))
 	tileIdx := (screenData & 0x3FF) << 5
-	tileAddr := bg.CharBaseBlock + tileIdx
-	if bg.Palette256 {
-		tileAddr += tileIdx
+
+	inTileX := xIdx & 7
+	if hFlip := screenData>>10&1 != 0; hFlip {
+		inTileX = 7 - inTileX
 	}
+
+	inTileY := yIdx & 7
+	if vFlip := screenData>>11&1 != 0; vFlip {
+		inTileY = 7 - inTileY
+	}
+
+	if bg.Palette256 {
+
+		tileAddr := bg.CharBaseBlock + (tileIdx << 1)
+
+		if inObjTiles := tileAddr >= 0x10000; inObjTiles {
+			return 0, false
+		}
+
+		inTileIdx := inTileX + (inTileY << 3)
+		pal := gba.Mem.VRAM[tileAddr+inTileIdx]
+
+		if pal == 0 {
+			return 0, false
+		}
+
+		return uint32(gba.Mem.PRAM[pal]), true
+	}
+
+	tileAddr := bg.CharBaseBlock + tileIdx
 
 	if inObjTiles := tileAddr >= 0x10000; inObjTiles {
 		return 0, false
 	}
 
-	inTileX, inTileY := getPositionsBg(screenData, xIdx, yIdx)
-
-	var inTileIdx uint32
-	if bg.Palette256 {
-		inTileIdx = inTileX + (inTileY << 3)
-	} else {
-		inTileIdx = (inTileX >> 1) + (inTileY << 2)
-	}
-
+	inTileIdx := (inTileX >> 1) + (inTileY << 2)
 	tileData := uint32(gba.Mem.VRAM[tileAddr+inTileIdx])
-
-	if bg.Palette256 {
-		palIdx := tileData
-		if palIdx == 0 {
-			return 0, false
-		}
-
-		return uint32(gba.Mem.PRAM[palIdx]), true
-	}
-
 	palIdx := (tileData >> ((inTileX & 1) << 2)) & 0xF
 
 	if palIdx == 0 {
