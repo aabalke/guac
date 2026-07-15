@@ -57,7 +57,6 @@ func (g *Gpio) Write(addr uint32, v uint8) {
 		return
 	}
 
-	//fmt.Printf("Write %08X %02X\n", addr, v)
 	switch addr {
 	case 0x800_00C4:
 

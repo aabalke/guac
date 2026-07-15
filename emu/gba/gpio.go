@@ -51,15 +51,17 @@ func (gba *GBA) AddGpios() {
 	if solarCards[gba.Cartridge.Code] {
 		if gba.Mem.Gpio == nil {
 			gba.Mem.Gpio = gpio.NewGpio()
-			level := uint8(config.Conf.Gba.SpecialHardware.SolarSensorLevel)
-			gba.Mem.Gpio.Devices = append(gba.Mem.Gpio.Devices, gpio.NewSolar(level))
 		}
+
+		level := uint8(config.Conf.Gba.SpecialHardware.SolarSensorLevel)
+		gba.Mem.Gpio.Devices = append(gba.Mem.Gpio.Devices, gpio.NewSolar(level))
 	}
 
-	//if rtcCards[gba.Cartridge.Code] {
-	//	if gba.Mem.Gpio == nil {
-	//		gba.Mem.Gpio = gpio.NewGpio()
-	//		//gba.Mem.Gpio.Devices = append(gba.Mem.Gpio.Devices, gpio.NewSolar())
-	//	}
-	//}
+	if rtcCards[gba.Cartridge.Code] {
+		if gba.Mem.Gpio == nil {
+			gba.Mem.Gpio = gpio.NewGpio()
+		}
+
+		gba.Mem.Gpio.Devices = append(gba.Mem.Gpio.Devices, gpio.NewRtc(gba.Irq))
+	}
 }

@@ -61,7 +61,6 @@ func (r *Rtc) InitRtc() {
 }
 
 func (r *Rtc) Write(v uint8) {
-
 	//r.Print(v, false)
 
 	clk := v&BIT_CLK_OUT != 0
@@ -98,7 +97,6 @@ func (r *Rtc) Write(v uint8) {
 }
 
 func (r *Rtc) Read() uint8 {
-
 	v := uint8(r.data & 1)
 	if r.wasClk {
 		v |= BIT_CLK_OUT
@@ -121,7 +119,6 @@ func (r *Rtc) Read() uint8 {
 }
 
 func (r *Rtc) ReadData() uint8 {
-
 	if r.isWriteData {
 		return 0
 	}
@@ -222,14 +219,16 @@ func (r *Rtc) WriteData(v uint8) {
 		}
 
 		if reg == 2 {
-			r.Buffer = append(r.Buffer,
+			r.Buffer = append(
+				r.Buffer,
 				bcd(uint(now.Year()-2000)),
 				bcd(uint(now.Month())),
 				bcd(uint(now.Day())),
 				bcd(uint(now.Weekday())),
 			)
 		}
-		r.Buffer = append(r.Buffer,
+		r.Buffer = append(
+			r.Buffer,
 			hour,
 			bcd(uint(now.Minute())),
 			bcd(uint(now.Second())),
@@ -237,21 +236,24 @@ func (r *Rtc) WriteData(v uint8) {
 
 	case CMD_ALM1:
 		if r.isFreqDuty() {
-			r.Buffer = append(r.Buffer,
+			r.Buffer = append(
+				r.Buffer,
 				r.Alarms[0].MinFreq,
 			)
 
 			return
 		}
 
-		r.Buffer = append(r.Buffer,
+		r.Buffer = append(
+			r.Buffer,
 			r.Alarms[0].Dow,
 			r.Alarms[0].Hr,
 			r.Alarms[0].MinFreq,
 		)
 
 	case CMD_ALM2:
-		r.Buffer = append(r.Buffer,
+		r.Buffer = append(
+			r.Buffer,
 			r.Alarms[1].Dow,
 			r.Alarms[1].Hr,
 			r.Alarms[1].MinFreq,
@@ -262,7 +264,6 @@ func (r *Rtc) WriteData(v uint8) {
 }
 
 func bcd(v uint) uint8 {
-
 	if v > 99 {
 		return 0xFF
 	}
@@ -271,7 +272,6 @@ func bcd(v uint) uint8 {
 }
 
 func (r *Rtc) Print(v uint8, read bool) {
-
 	s := "RTC "
 
 	if read {

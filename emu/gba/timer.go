@@ -227,7 +227,6 @@ func (t *Timer) OnTimerOverflow(late int64) {
 			// nanoboy uses length 3
 			// gbatek mentions 16 bytes, why difference?
 			if refill := fifo.Length <= 3; refill {
-
 				ch := t.Gba.Dma.Chs[1]
 				if ch.Enabled && ch.Mode == DMA_MODE_SPE {
 					t.Gba.Scheduler.schedule(EVENTS[1], 0, 2-late, ch.Start, nil)
