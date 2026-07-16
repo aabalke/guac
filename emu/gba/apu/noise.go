@@ -17,7 +17,6 @@ type NoiseChannel struct {
 }
 
 func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
-
 	if !ch.ChannelEnabled {
 		return 0
 	}

@@ -59,7 +59,7 @@ type Mosaic struct {
 }
 
 type Background struct {
-	OutX, OutY         float64
+	OutX, OutY         float32
 	W, H               uint32
 	Pa, Pb, Pc, Pd     uint32
 	Priority           uint32
@@ -79,13 +79,13 @@ type Background struct {
 type Object struct {
 	Pa, Pb, Pc, Pd float32
 	X, Y, W, H     uint32
-	Mode           uint32
-	Shape          uint32
-	Size           uint32
-	RotParams      uint32
 	CharName       uint32
-	Priority       uint32
 	Palette        uint32
+	Mode           uint16
+	RotParams      uint16
+	Priority       uint16
+	Shape          uint16
+	Size           uint16
 	RotScale       bool
 	DoubleSize     bool
 	Disable        bool
@@ -95,7 +95,7 @@ type Object struct {
 	OneDimensional bool
 }
 
-func (p *PPU) UpdatePPU(addr uint32, v uint32) {
+func (p *PPU) UpdatePPU(addr, v uint32) {
 	if win := addr >= 0x40 && addr < 0x4C; win {
 		p.UpdateWin(addr, v)
 		return
@@ -171,7 +171,7 @@ func (p *PPU) UpdatePPU(addr uint32, v uint32) {
 	}
 }
 
-func (p *PPU) UpdateWin(addr uint32, v uint32) {
+func (p *PPU) UpdateWin(addr, v uint32) {
 	wins := &p.Windows
 	win0 := &p.Windows.Win0
 	win1 := &p.Windows.Win1
@@ -288,72 +288,78 @@ func (p *PPU) UpdateWin(addr uint32, v uint32) {
 	}
 }
 
-func (p *PPU) UpdateAffine(relAddr uint32) {
-	paramIdx := (relAddr &^ 1) / 0x20
-
-	for i := range 128 {
-
-		obj := &p.Objects[i]
-
-		if !obj.RotScale || obj.RotParams != paramIdx {
-			continue
-		}
-
-		UpdateAffineParams(obj, &p.gba.Mem.OAM)
-	}
-}
-
-func (p *PPU) UpdateOAM(relAddr uint32) {
-	attrIdx := relAddr & 7
-
-	if affineParam := attrIdx >= 6; affineParam {
-		p.UpdateAffine(relAddr)
-		return
-	}
-
-	obj := &p.Objects[relAddr>>3]
-	attr := uint32(p.gba.Mem.OAM[relAddr])
-
-	switch attrIdx {
+func (p *PPU) UpdateOAM(relAddr uint32, v uint16) {
+	switch idx := relAddr & 7; idx {
 	case 0:
-		obj.Y = attr
-	case 1:
-		obj.RotScale = (attr>>0)&1 != 0
-		obj.Mode = (attr >> 2) & 3
-		obj.Mosaic = (attr>>4)&1 != 0
-		obj.Palette256 = (attr>>5)&1 != 0
-		obj.Shape = (attr >> 6) & 3
-		obj.W = objSize[obj.Shape][obj.Size][0]
-		obj.H = objSize[obj.Shape][obj.Size][1]
+		obj := &p.Objects[relAddr>>3]
+		attr := uint32(v)
+
+		obj.Y = attr & 0xFF
+		obj.RotScale = (attr>>8)&1 != 0
 
 		if obj.RotScale {
-			obj.DoubleSize = (attr>>1)&1 != 0
+			obj.DoubleSize = (attr>>9)&1 != 0
 			UpdateAffineParams(obj, &p.gba.Mem.OAM)
 		} else {
-			obj.Disable = (attr>>1)&1 != 0
+			obj.Disable = (attr>>9)&1 != 0
 		}
+
+		obj.Mode = (v >> 10) & 3
+		obj.Mosaic = (attr>>12)&1 != 0
+		obj.Palette256 = (attr>>13)&1 != 0
+
+		obj.Shape = v >> 14
+		obj.W = objSize[obj.Shape][obj.Size][0]
+		obj.H = objSize[obj.Shape][obj.Size][1]
 
 	case 2:
-		obj.X = (obj.X &^ 0xFF) | attr
-	case 3:
-		obj.X = (obj.X & 0xFF) | ((attr & 1) << 8)
-		obj.Size = attr >> 6
-		obj.W = objSize[obj.Shape][obj.Size][0]
-		obj.H = objSize[obj.Shape][obj.Size][1]
+		obj := &p.Objects[relAddr>>3]
+		attr := uint32(v)
+
+		obj.X = attr & 0x1FF
 
 		if obj.RotScale {
-			obj.RotParams = (attr >> 1) & 0x1F
+			obj.RotParams = (v >> 9) & 0x1F
 			UpdateAffineParams(obj, &p.gba.Mem.OAM)
 		} else {
-			obj.HFlip = (attr>>4)&1 != 0
-			obj.VFlip = (attr>>5)&1 != 0
+			obj.HFlip = (attr>>12)&1 != 0
+			obj.VFlip = (attr>>13)&1 != 0
 		}
+
+		obj.Size = v >> 14
+		obj.W = objSize[obj.Shape][obj.Size][0]
+		obj.H = objSize[obj.Shape][obj.Size][1]
 	case 4:
-		obj.CharName = (obj.CharName &^ 0xFF) | attr
-	case 5:
-		obj.CharName = (obj.CharName & 0xFF) | ((attr & 3) << 8)
-		obj.Priority = (attr >> 2) & 3
-		obj.Palette = attr >> 4
+		obj := &p.Objects[relAddr>>3]
+		attr := uint32(v)
+
+		obj.CharName = attr & 0x3FF
+		obj.Priority = (v >> 10) & 3
+		obj.Palette = attr >> 12
+
+	case 6:
+		paramIdx := uint16(relAddr / 0x20)
+
+		v := float32(int16(v)) / 256
+
+		for i := range 128 {
+
+			obj := &p.Objects[i]
+
+			if obj.RotScale && obj.RotParams == paramIdx {
+				switch relAddr & 0x1F {
+				case 0x06:
+					obj.Pa = v
+				case 0x0E:
+					obj.Pb = v
+				case 0x16:
+					obj.Pc = v
+				case 0x1E:
+					obj.Pd = v
+				}
+				continue
+			}
+		}
 	}
 }
 

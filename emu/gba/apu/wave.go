@@ -16,7 +16,6 @@ type WaveChannel struct {
 }
 
 func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
-
 	if !ch.ChannelEnabled {
 		return 0
 	}
@@ -63,7 +62,6 @@ func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
 	sample := (float64((wavedata>>((ch.WavePosition&1)<<2))&0xf) - 0x8) / 8
 
 	if forceVolume := (ch.CntH>>15)&1 != 0; forceVolume {
-
 		sample *= 0.75
 	} else {
 		switch vol := GetVarData(uint32(ch.CntH), 13, 14); vol {
@@ -89,7 +87,6 @@ func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
 }
 
 func (ch *WaveChannel) Reset() {
-
 	if twoBanks := (ch.CntL>>5)&1 != 0; twoBanks {
 		ch.WavePosition = 0
 		ch.WaveSamples = 64

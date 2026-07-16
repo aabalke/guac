@@ -12,13 +12,13 @@ const (
 )
 
 func (bg *Background) BgAffineReset() {
-	bg.OutX = float64(utils.Convert28ToFloat(bg.aXOffset, 8))
-	bg.OutY = float64(utils.Convert28ToFloat(bg.aYOffset, 8))
+	bg.OutX = float32(utils.Convert28ToFloat(bg.aXOffset, 8))
+	bg.OutY = float32(utils.Convert28ToFloat(bg.aYOffset, 8))
 }
 
 func (bg *Background) BgAffineUpdate() {
-	bg.OutX += float64(utils.Convert16ToFloat(uint16(bg.Pb), 8))
-	bg.OutY += float64(utils.Convert16ToFloat(uint16(bg.Pd), 8))
+	bg.OutX += float32(utils.Convert16ToFloat(uint16(bg.Pb), 8))
+	bg.OutY += float32(utils.Convert16ToFloat(uint16(bg.Pd), 8))
 }
 
 func updateBackgrounds(gba *GBA, dispcnt *Dispcnt) *[4]Background {
@@ -55,7 +55,7 @@ func (gba *GBA) scanlineGraphics(y uint32) {
 	case gba.PPU.Dispcnt.ForcedBlank:
 		for x := range uint32(SCREEN_WIDTH) {
 			index := (x + (y * SCREEN_WIDTH)) * 4
-			gba.Pixels[index] = 0xFF
+			gba.Pixels[index+0] = 0xFF
 			gba.Pixels[index+1] = 0xFF
 			gba.Pixels[index+2] = 0xFF
 			gba.Pixels[index+3] = 0xFF
@@ -77,13 +77,12 @@ func (gba *GBA) renderTilePixel(x, y uint32) {
 	var (
 		dispcnt       = &gba.PPU.Dispcnt
 		wins          = &gba.PPU.Windows
-		bgs           = &gba.PPU.Backgrounds
 		objPriorities = &gba.PPU.objPriorities
 		bgPriorities  = &gba.PPU.bgPriorities
 
-		bldPal = NewBlendPalette(x, &gba.PPU.Blend, gba)
+		bp = NewBlendPalette(x, &gba.PPU.Blend, gba)
 
-		objMode     uint32
+		objMode     uint16
 		inObjWindow bool
 	)
 
@@ -93,61 +92,77 @@ func (gba *GBA) renderTilePixel(x, y uint32) {
 		for j := len(bgPriorities[i]) - 1; j >= 0; j-- {
 
 			bgIdx := bgPriorities[i][j]
-			bg := &bgs[bgIdx]
 
 			if !windowPixelAllowed(bgIdx, x, y, wins) {
 				continue
 			}
 
-			if bg.Affine {
+			if bg := &gba.PPU.Backgrounds[bgIdx]; bg.Affine {
 				if palData, ok := gba.setAffineBackgroundPixel(bg, x); ok {
-					bldPal.setBlendPalettes(palData, uint32(bgIdx), false, false)
+					bp.setPaletteBg(palData, bgIdx)
 				}
 			} else {
 				if palData, ok := gba.setBackgroundPixel(bg, x, y); ok {
-					bldPal.setBlendPalettes(palData, uint32(bgIdx), false, false)
+					bp.setPaletteBg(palData, bgIdx)
 				}
 			}
 		}
 
-		if objDisabled := !dispcnt.DisplayObj; objDisabled {
-			continue
-		}
+		if dispcnt.DisplayObj {
+		ObjectLoop:
+			for j := len(objPriorities[i]) - 1; j >= 0; j-- {
 
-		// ObjectLoop:
-		for j := len(objPriorities[i]) - 1; j >= 0; j-- {
-			objIdx := objPriorities[i][j]
-			obj := &gba.PPU.Objects[objIdx]
-			obj.OneDimensional = dispcnt.OneDimensional
+				obj := &gba.PPU.Objects[objPriorities[i][j]]
+				obj.OneDimensional = dispcnt.OneDimensional
 
-			if !windowObjPixelAllowed(x, y, wins) {
-				continue
-			}
+				if !windowObjPixelAllowed(x, y, wins) {
+					continue
+				}
 
-			var palData uint32
-			var ok bool
+				if obj.Mode == 2 {
+					if obj.RotScale {
+						if _, ok := gba.setObjectAffinePixel(obj, x, y); ok {
+							inObjWindow = true
+							break ObjectLoop
+						}
+					} else {
+						if _, ok := gba.setObjectPixel(obj, x, y); ok {
+							inObjWindow = true
+							break ObjectLoop
+						}
+					}
+				}
 
-			if obj.RotScale {
-				palData, ok = gba.setObjectAffinePixel(obj, x, y)
-			} else {
-				palData, ok = gba.setObjectPixel(obj, x, y)
-			}
-
-			switch {
-			case ok && obj.Mode == 2:
-				inObjWindow = true
-				//break ObjectLoop
-			case ok:
-				objMode = obj.Mode
-				bldPal.setBlendPalettes(palData, 0, true, objMode == 1)
-				//break ObjectLoop
+				if obj.RotScale {
+					if data, ok := gba.setObjectAffinePixel(obj, x, y); ok {
+						objMode = obj.Mode
+						bp.setPaletteObj(data, objMode == 1)
+					}
+				} else {
+					if data, ok := gba.setObjectPixel(obj, x, y); ok {
+						objMode = obj.Mode
+						bp.setPaletteObj(data, objMode == 1)
+					}
+				}
 			}
 		}
 	}
 
-	finalPalData := bldPal.blend(objMode == 1, x, y, wins, inObjWindow)
-	index := (x + (y * SCREEN_WIDTH)) << 2
-	gba.applyColor(finalPalData, uint32(index))
+	data := bp.blend(wins, x, y, objMode == 1, inObjWindow)
+	i := (x + (y * SCREEN_WIDTH)) << 2
+
+	r := (data & 0x1F)
+	g := ((data >> 5) & 0x1F)
+	b := ((data >> 10) & 0x1F)
+
+	r = (r << 3) | (r >> 2)
+	g = (g << 3) | (g >> 2)
+	b = (b << 3) | (b >> 2)
+
+	gba.Pixels[i+0] = uint8(r)
+	gba.Pixels[i+1] = uint8(g)
+	gba.Pixels[i+2] = uint8(b)
+	gba.Pixels[i+3] = 0xFF
 }
 
 func (gba *GBA) scanlineBitmapMode(y uint32) {
@@ -160,10 +175,10 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 
 	renderPixel := func(x uint32) {
 		var (
-			bldPal = NewBlendPalette(x, &gba.PPU.Blend, gba)
-			index  = (x + (y * SCREEN_WIDTH)) * 4
+			bp    = NewBlendPalette(x, &gba.PPU.Blend, gba)
+			index = (x + (y * SCREEN_WIDTH)) * 4
 
-			objMode     uint32
+			objMode     uint16
 			inObjWindow bool
 			DEC_IDX     uint32 // this will have to be updated
 
@@ -193,7 +208,7 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 			idx := (xIdx + (yIdx * WIDTH)) * 2
 			data := uint32(binary.LittleEndian.Uint16(mem.VRAM[idx:]))
 
-			bldPal.setBlendPalettes(data, BG_IDX, false, false)
+			bp.setBlendPalettes(data, BG_IDX, false, false)
 
 		case 4:
 
@@ -220,7 +235,7 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 
 			if palIdx != 0 {
 				data := uint32(gba.Mem.PRAM[palIdx])
-				bldPal.setBlendPalettes(data, BG_IDX, false, false)
+				bp.setBlendPalettes(data, BG_IDX, false, false)
 			}
 
 		case 5:
@@ -241,7 +256,7 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 			}
 
 			data := uint32(binary.LittleEndian.Uint16(mem.VRAM[idx:]))
-			bldPal.setBlendPalettes(data, BG_IDX, false, false)
+			bp.setBlendPalettes(data, BG_IDX, false, false)
 		}
 
 		if objs := dispcnt.DisplayObj; objs {
@@ -275,14 +290,14 @@ func (gba *GBA) scanlineBitmapMode(y uint32) {
 					break ObjectLoop
 				case ok:
 					objMode = obj.Mode
-					bldPal.setBlendPalettes(palData, 0, true, objMode == 1)
+					bp.setBlendPalettes(palData, 0, true, objMode == 1)
 					break ObjectLoop
 				}
 			}
 		}
 
-		finalPalData := bldPal.blend(objMode == 1, x, y, wins, inObjWindow)
-		gba.applyColor(finalPalData, uint32(index))
+		data := bp.blend(wins, x, y, objMode == 1, inObjWindow)
+		gba.applyColor(data, uint32(index))
 	}
 
 	for x := range uint32(SCREEN_WIDTH) {
@@ -543,7 +558,7 @@ func (gba *GBA) getObjPriority(y uint32, objects *[128]Object) [4][]uint32 {
 	priorities := [4][]uint32{}
 
 	added := false
-	highestPriority := uint32(5)
+	highestPriority := uint16(5)
 
 	for i := range 128 {
 
@@ -690,10 +705,10 @@ func (gba *GBA) setAffineBackgroundPixel(bg *Background, x uint32) (uint32, bool
 	}
 
 	var (
-		pa   = float64(utils.Convert16ToFloat(uint16(bg.Pa), 8))
-		pc   = float64(utils.Convert16ToFloat(uint16(bg.Pc), 8))
-		xIdx = int(pa*float64(x) + bg.OutX)
-		yIdx = int(pc*float64(x) + bg.OutY)
+		pa   = float32(utils.Convert16ToFloat(uint16(bg.Pa), 8))
+		pc   = float32(utils.Convert16ToFloat(uint16(bg.Pc), 8))
+		xIdx = int(pa*float32(x) + bg.OutX)
+		yIdx = int(pc*float32(x) + bg.OutY)
 	)
 
 	if bg.Mosaic {
@@ -890,6 +905,41 @@ func NewBlendPalette(i uint32, bld *Blend, gba *GBA) *BlendPalettes {
 	return bp
 }
 
+func (bp *BlendPalettes) setPaletteBg(data, idx uint32) {
+	bp.NoBlendPalette = data
+
+	if bp.Bld.a[idx] {
+		bp.APalette = data
+		bp.hasA = true
+		bp.targetATop = true
+		return
+	}
+
+	bp.targetATop = false
+
+	if bp.Bld.b[idx] {
+		bp.BPalette = data
+		bp.hasB = true
+	}
+}
+
+func (bp *BlendPalettes) setPaletteObj(data uint32, semiTransparent bool) {
+	bp.NoBlendPalette = data
+
+	if bp.Bld.a[4] || semiTransparent {
+		bp.APalette = data
+		bp.hasA = true
+		bp.targetATop = true
+	} else {
+		bp.targetATop = false
+	}
+
+	if bp.Bld.b[4] {
+		bp.BPalette = data
+		bp.hasB = true
+	}
+}
+
 func (bp *BlendPalettes) setBlendPalettes(palData uint32, bgIdx uint32, obj bool, semiTransparent bool) {
 	bp.NoBlendPalette = palData
 
@@ -925,14 +975,15 @@ func (bp *BlendPalettes) setBlendPalettes(palData uint32, bgIdx uint32, obj bool
 	}
 }
 
-func (bp *BlendPalettes) blend(objTransparent bool, x, y uint32, wins *Windows, inObjWindow bool) uint32 {
+func (bp *BlendPalettes) blend(wins *Windows, x, y uint32, objTrans, inObjWindow bool) uint32 {
 	if !windowBldPixelAllowed(x, y, wins, inObjWindow) {
-		return bp.noBlend(objTransparent)
+		if objTrans {
+			return bp.alphaBlend()
+		}
+		return bp.NoBlendPalette
 	}
 
 	switch bp.Bld.Mode {
-	case BLD_MODE_OFF:
-		return bp.noBlend(objTransparent)
 	case BLD_MODE_STD:
 		return bp.alphaBlend()
 	case BLD_MODE_WHITE:
@@ -940,15 +991,11 @@ func (bp *BlendPalettes) blend(objTransparent bool, x, y uint32, wins *Windows, 
 	case BLD_MODE_BLACK:
 		return bp.grayscaleBlend(false)
 	default:
-		return bp.noBlend(objTransparent)
+		if objTrans {
+			return bp.alphaBlend()
+		}
+		return bp.NoBlendPalette
 	}
-}
-
-func (bp *BlendPalettes) noBlend(objTransparent bool) uint32 {
-	if objTransparent {
-		return bp.alphaBlend()
-	}
-	return bp.NoBlendPalette
 }
 
 func (bp *BlendPalettes) alphaBlend() uint32 {

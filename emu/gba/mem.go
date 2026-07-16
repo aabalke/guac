@@ -103,10 +103,9 @@ func (m *Memory) initWriteRegions() {
 	m.writeRegions[0x5] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
 		relative := addr & 0x3FF
 
-		if relative&1 == 1 {
+		if relative&1 != 0 {
 			m.PRAM[relative>>1] &= 0xFF
 			m.PRAM[relative>>1] |= uint16(v) << 8
-
 			return
 		}
 
@@ -149,12 +148,6 @@ func (m *Memory) initWriteRegions() {
 	}
 
 	m.writeRegions[0x7] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
-		if byteWrite {
-			return
-		}
-		rel := addr & 0x3FF
-		m.OAM[rel] = v
-		m.GBA.PPU.UpdateOAM(rel)
 	}
 	m.writeRegions[0x8] = func(m *Memory, addr uint32, v uint8, byteWrite bool) {
 		if m.Gpio != nil && addr >= 0x800_00C4 && addr <= 0x800_00C8 {
@@ -504,7 +497,9 @@ func (m *Memory) Write8(addr uint32, v uint8) {
 }
 
 func (m *Memory) Write16(addr uint32, v uint16) {
-	if addr >= 0xE00_0000 {
+	region := addr >> 24
+
+	if region >= 0xE {
 		v = v >> ((addr & 1) << 3)
 		m.Write(addr, uint8(v), false)
 		return
@@ -512,31 +507,41 @@ func (m *Memory) Write16(addr uint32, v uint16) {
 
 	addr &^= 1
 
-	if addr >= 0xD00_0000 {
+	switch region {
+	case 0x4:
+
+		switch addr {
+		case 0x400_0100, 0x400_0102:
+			m.GBA.Timers[0].Write16(addr&3, v)
+			return
+		case 0x400_0104, 0x400_0106:
+			m.GBA.Timers[1].Write16(addr&3, v)
+			return
+		case 0x400_0108, 0x400_010A:
+			m.GBA.Timers[2].Write16(addr&3, v)
+			return
+		case 0x400_010C, 0x400_010E:
+			m.GBA.Timers[3].Write16(addr&3, v)
+			return
+
+		case 0x400_0200, 0x400_0202, 0x400_0208:
+			m.GBA.Irq.Write16(addr&0xFFFF, v)
+			return
+		}
+
+	case 0x7:
+		rel := addr & 0x3FE
+		binary.LittleEndian.PutUint16(m.OAM[rel:], v)
+		m.GBA.PPU.UpdateOAM(rel, v)
+		return
+
+	case 0xD:
 		if ok := CheckEeprom(m.GBA, addr); ok {
 			m.GBA.Save = true
 			m.GBA.Cartridge.EepromWrite(v)
 			return
 		}
-	}
 
-	switch addr {
-	case 0x400_0100, 0x400_0102:
-		m.GBA.Timers[0].Write16(addr&3, v)
-		return
-	case 0x400_0104, 0x400_0106:
-		m.GBA.Timers[1].Write16(addr&3, v)
-		return
-	case 0x400_0108, 0x400_010A:
-		m.GBA.Timers[2].Write16(addr&3, v)
-		return
-	case 0x400_010C, 0x400_010E:
-		m.GBA.Timers[3].Write16(addr&3, v)
-		return
-
-	case 0x400_0200, 0x400_0202, 0x400_0208:
-		m.GBA.Irq.Write16(addr&0xFFFF, v)
-		return
 	}
 
 	if ptr := m.WritePtr(addr); ptr != nil {
