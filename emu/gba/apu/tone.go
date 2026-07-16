@@ -15,14 +15,11 @@ type ToneChannel struct {
 
 	phase                                   bool
 	samples, lengthTime, sweepTime, envTime float64
-
-	DACEnabled     bool
-	ChannelEnabled bool
 }
 
 func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 
-	if !ch.ChannelEnabled {
+	if !ch.Apu.isSoundChanEnable(uint8(ch.Idx)) {
 		return 0
 	}
 
@@ -51,10 +48,10 @@ func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 
 	// Length reached check (if so, just disable the channel and return silence)
 
-	if lenFlag := (ch.CntX>>14)&1 != 0; lenFlag {
+	if lenFlag := BitEnabled(uint32(ch.CntX), 14); lenFlag {
 		ch.lengthTime += ch.Apu.sampleTime
 		if ch.lengthTime >= length {
-			ch.ChannelEnabled = false
+			ch.Apu.enableSoundChan(int(ch.Idx), false)
 			return 0
 		}
 	}
@@ -74,7 +71,7 @@ func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 			if sweepShift != 0 {
 				// X(t) = X(t-1) ± X(t-1)/2^n
 				disp := freqHz >> sweepShift // X(t-1)/2^n
-				if decrease := (ch.CntL>>3)&1 != 0; decrease {
+				if decrease := BitEnabled(uint32(ch.CntL), 3); decrease {
 					freqHz -= disp
 				} else {
 					freqHz += disp
@@ -86,9 +83,7 @@ func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 					ch.CntX = cntx
 
 				} else {
-					if ch.Idx == 0 {
-						ch.ChannelEnabled = false
-					}
+					ch.Apu.enableSoundChan(int(ch.Idx), false)
 				}
 			}
 		}
@@ -102,7 +97,7 @@ func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
 		if ch.envTime >= envelopeInterval {
 			ch.envTime -= envelopeInterval
 
-			if increment := (ch.CntH>>11)&1 != 0; increment {
+			if increment := BitEnabled(uint32(ch.CntH), 11); increment {
 				if envelope < 0xf {
 					envelope++
 				}

@@ -9,7 +9,7 @@ import (
 // akatsuki105/magia MIT License
 
 type Apu struct {
-	player *oto.Player
+	Enable bool
 
 	FifoA, FifoB                    Fifo
 	SoundCntL, SoundCntH, SoundCntX uint16
@@ -23,7 +23,11 @@ type Apu struct {
 	WaveChannel  WaveChannel
 	NoiseChannel NoiseChannel
 
+	Stream []byte
+
 	sndCycles uint32
+
+	player *oto.Player
 
 	cpuFreqHz    int
 	sndFrequency int
@@ -33,9 +37,6 @@ type Apu struct {
 	sampleTime   float64
 	streamLen    int
 	buffSize     uint32
-
-	Stream []byte
-	Enable bool
 }
 
 func (a *Apu) Disable() {
@@ -57,6 +58,11 @@ func (a *Apu) Disable() {
 	a.SoundCntL = 0
 	//a.SoundCntH = 0
 	//a.SoundCntX = 0
+}
+
+func (a *Apu) isSoundChanEnable(ch uint8) bool {
+	cntx := uint32(a.SoundCntX)
+	return BitEnabled(cntx, ch)
 }
 
 func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu {
@@ -81,9 +87,7 @@ func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu 
 	a.WaveChannel = WaveChannel{Apu: a, Idx: 2}
 	a.NoiseChannel = NoiseChannel{Apu: a, Idx: 3}
 
-	if audioContext != nil {
-		a.player = audioContext.NewPlayer()
-	}
+	a.player = audioContext.NewPlayer()
 
 	return a
 }
@@ -103,7 +107,7 @@ func (a *Apu) Play(muted, stdFps bool) {
 
 	a.soundMix()
 
-	if muted {
+	if muted || !stdFps {
 		return
 	}
 
@@ -111,17 +115,11 @@ func (a *Apu) Play(muted, stdFps bool) {
 		return
 	}
 
-	if !stdFps {
-		return
-	}
-
 	a.player.Write(a.Stream)
 }
 
 func (a *Apu) Close() {
-	if a.player != nil {
-		a.player.Close()
-	}
+	a.player.Close()
 }
 
 func (a *Apu) soundMix() {
@@ -145,7 +143,7 @@ func (a *Apu) soundMix() {
 }
 
 func (a *Apu) IsSoundEnabled() bool {
-	return (a.SoundCntX>>7)&1 != 0
+	return BitEnabled(uint32(a.SoundCntX), 7)
 }
 
 func (a *Apu) GetSample() (int16, int16) {
@@ -185,7 +183,7 @@ var (
 	rshLut = [4]int32{0xa, 0x9, 0x8, 0x7}
 )
 
-func (a *Apu) SoundClock() {
+func (a *Apu) SoundClock(doubleSpeed bool) {
 	shift0 := int32(a.SoundCntH>>2) & 1
 	shift1 := int32(a.SoundCntH>>3) & 1
 	lpan0 := int32(a.SoundCntH>>9) & 1
@@ -204,10 +202,10 @@ func (a *Apu) SoundClock() {
 	volR := volLut[(cntL>>0)&0b111]
 	shift := rshLut[a.SoundCntH&0b11]
 
-	ch1 := int32(a.ToneChannel1.GetSample(false))
-	ch2 := int32(a.ToneChannel2.GetSample(false))
-	ch3 := int32(a.WaveChannel.GetSample(false))
-	ch4 := int32(a.NoiseChannel.GetSample(false))
+	ch1 := int32(a.ToneChannel1.GetSample(doubleSpeed))
+	ch2 := int32(a.ToneChannel2.GetSample(doubleSpeed))
+	ch3 := int32(a.WaveChannel.GetSample(doubleSpeed))
+	ch4 := int32(a.NoiseChannel.GetSample(doubleSpeed))
 
 	psgL := ch1*int32((cntL>>12)&1) +
 		ch2*int32((cntL>>13)&1) +
@@ -228,6 +226,15 @@ func (a *Apu) SoundClock() {
 	a.WritePointer++
 }
 
+func (a *Apu) enableSoundChan(ch int, enable bool) {
+	if enable {
+		a.SoundCntX |= (1 << ch)
+		return
+	}
+
+	a.SoundCntX &^= (1 << ch)
+}
+
 func IsResetSoundChan(addr uint32, isGB bool) bool {
 	if isGB {
 		_, ok := resetSoundChanMapGB[addr]
@@ -239,10 +246,10 @@ func IsResetSoundChan(addr uint32, isGB bool) bool {
 
 func (a *Apu) ResetSoundChan(addr uint32, b byte, isGB bool) {
 	if isGB {
-		a._resetSoundChan(resetSoundChanMapGB[addr], (b>>7)&1 != 0)
+		a._resetSoundChan(resetSoundChanMapGB[addr], BitEnabled(uint32(b), 7))
 		return
 	}
-	a._resetSoundChan(resetSoundChanMapGBA[addr], (b>>7)&1 != 0)
+	a._resetSoundChan(resetSoundChanMapGBA[addr], BitEnabled(uint32(b), 7))
 }
 
 var (
@@ -255,65 +262,37 @@ func (a *Apu) _resetSoundChan(ch int, enable bool) {
 		switch ch {
 		case 0:
 
-			if !a.ToneChannel1.DACEnabled {
-				return
-			}
-
 			a.ToneChannel1.phase = false
 			a.ToneChannel1.samples = 0
 			a.ToneChannel1.lengthTime = 0
 			a.ToneChannel1.sweepTime = 0
 			a.ToneChannel1.envTime = 0
 
-			a.ToneChannel1.ChannelEnabled = true
-
 		case 1:
-			if !a.ToneChannel2.DACEnabled {
-				return
-			}
 
 			a.ToneChannel2.phase = false
 			a.ToneChannel2.samples = 0
 			a.ToneChannel2.lengthTime = 0
 			a.ToneChannel2.sweepTime = 0
 			a.ToneChannel2.envTime = 0
-			a.ToneChannel2.ChannelEnabled = true
 
 		case 2:
-
-			if !a.WaveChannel.DACEnabled {
-				return
-			}
-
 			a.WaveChannel.samples = 0
 			a.WaveChannel.lengthTime = 0
 			a.WaveChannel.Reset()
-			a.WaveChannel.ChannelEnabled = true
 		case 3:
-			if !a.NoiseChannel.DACEnabled {
-				return
-			}
 
 			a.NoiseChannel.samples = 0
 			a.NoiseChannel.lengthTime = 0
 			a.NoiseChannel.envTime = 0
 
-			if (a.NoiseChannel.CntH>>3)&1 != 0 {
+			if BitEnabled(uint32(a.NoiseChannel.CntH), 3) {
 				a.NoiseChannel.lfsr = 0x0040 // 7bit
 			} else {
 				a.NoiseChannel.lfsr = 0x4000 // 15bit
 			}
-			a.NoiseChannel.ChannelEnabled = true
 		}
-	}
-}
 
-func (a *Apu) PowerOff() {
-	a.ToneChannel1 = ToneChannel{Idx: 0, Apu: a}
-	a.ToneChannel2 = ToneChannel{Idx: 1, Apu: a}
-	a.WaveChannel = WaveChannel{Idx: 2, Apu: a, WaveRam: a.WaveChannel.WaveRam}
-	a.NoiseChannel = NoiseChannel{Idx: 3, Apu: a}
-	a.SoundCntL = 0
-	a.SoundCntH = 0
-	a.SoundCntX = 0
+		a.enableSoundChan(ch, true)
+	}
 }

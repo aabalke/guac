@@ -11,13 +11,11 @@ type NoiseChannel struct {
 
 	lfsr                         uint16
 	samples, lengthTime, envTime float64
-
-	DACEnabled     bool
-	ChannelEnabled bool
 }
 
 func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
-	if !ch.ChannelEnabled {
+
+	if !ch.Apu.isSoundChanEnable(uint8(ch.Idx)) {
 		return 0
 	}
 
@@ -31,12 +29,12 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 	soundLength := GetVarData(uint32(ch.CntL), 0, 5)
 	length := (maxTimer - float64(soundLength)) * divApuRate
 
-	if stopAtLength := (ch.CntH>>14)&1 != 0; stopAtLength {
+	if stopAtLength := BitEnabled(uint32(ch.CntH), 14); stopAtLength {
 
 		ch.lengthTime += ch.Apu.sampleTime
 
 		if stop := ch.lengthTime >= length; stop {
-			ch.ChannelEnabled = false
+			ch.Apu.enableSoundChan(int(ch.Idx), false)
 			return 0
 		}
 	}
@@ -51,7 +49,7 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 		if ch.envTime >= envelopeInterval {
 			ch.envTime -= envelopeInterval
 
-			if (ch.CntL>>11)&1 != 0 {
+			if BitEnabled(uint32(ch.CntL), 11) {
 				if envelope < 0xf {
 					envelope++
 				}
@@ -82,7 +80,7 @@ func (ch *NoiseChannel) GetSample(doubleSpeed bool) int8 {
 		ch.lfsr >>= 1
 
 		if carry > 0 {
-			if (ch.CntH>>3)&1 != 0 { // R/W Counter Step/Width
+			if BitEnabled(uint32(ch.CntH), 3) { // R/W Counter Step/Width
 				ch.lfsr ^= 0x60 // 1: 7bits
 			} else {
 				ch.lfsr ^= 0x6000 // 0: 15bits

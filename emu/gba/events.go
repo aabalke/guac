@@ -1,7 +1,7 @@
 package gba
 
 func (gba *GBA) AudioSampleEvent(late int64, arg any) {
-	gba.Apu.SoundClock()
+	gba.Apu.SoundClock(false)
 	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, CYCLES_PER_SND_GEN-late, gba.AudioSampleEvent, nil)
 }
 
