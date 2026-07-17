@@ -1,10 +1,11 @@
 package snd
 
 import (
-	"fmt"
+	"encoding/binary"
+	"math"
+	"time"
 
-	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/oto"
+	"github.com/hajimehoshi/ebiten/v2/audio"
 )
 
 const (
@@ -28,6 +29,10 @@ type Mem interface {
 }
 
 type Snd struct {
+	stream Stream
+	Ctx    *audio.Context
+	player *audio.Player
+
 	Mem Mem
 
 	VolMaster float64
@@ -42,44 +47,43 @@ type Snd struct {
 	Channels [16]Channel
 	Capture  [2]Capture
 
-	player    *oto.Player
-	Stream    []uint8
 	sndCycles uint32
 
-	SoundBuffer               []int16
-	ReadPointer, WritePointer uint32
-
-	cpuFreqHz    int
-	sndFrequency int
-	sndSamples   int
-	sampCycles   int
-	buffSamples  int
-	sampleTime   float64
-	streamLen    int
-	buffSize     uint32
-
-	steamCh chan []uint8
-
-	muted bool
+	SampCycles int
 }
 
-func NewSnd(ctx *oto.Context, freq, rate, cnt int) *Snd {
+type Stream struct {
+	buf []int16
+}
 
-	s := &Snd{
-		WritePointer: 0x200,
-		cpuFreqHz:    freq,
-		sndFrequency: rate,
-		sndSamples:   cnt,
-		sampCycles:   freq / rate,
-		buffSamples:  cnt * 16 * 2,
-		sampleTime:   1.0 / float64(rate),
-		streamLen:    (2 * 2 * rate / 60) - (2*2*rate/60)%4,
-		buffSize:     uint32((cnt) * 16 * 2),
-		//steamCh: make(chan []uint8, 10000),
+func (s *Stream) Read(buf []byte) (int, error) {
+	for i := range len(buf) / 4 {
+		var l, r int16
+		if len(s.buf) >= 2 {
+			l, r = s.buf[0], s.buf[1]
+			s.buf = s.buf[2:]
+		}
+		binary.LittleEndian.PutUint16(buf[4*i+0:], uint16(l))
+		binary.LittleEndian.PutUint16(buf[4*i+2:], uint16(r))
 	}
+	return len(buf), nil
+}
 
-	s.Stream = make([]byte, s.streamLen)
-	s.SoundBuffer = make([]int16, s.buffSize)
+func NewSnd(ctx *audio.Context, bufferSize time.Duration) *Snd {
+	s := &Snd{}
+
+	if ctx != nil {
+
+		s.Ctx = ctx
+
+		var err error
+		s.player, err = s.Ctx.NewPlayer(&s.stream)
+		if err != nil {
+			panic(err)
+		}
+		s.player.SetBufferSize(bufferSize)
+		s.player.Play()
+	}
 
 	for i := range 16 {
 
@@ -97,115 +101,39 @@ func NewSnd(ctx *oto.Context, freq, rate, cnt int) *Snd {
 
 	s.Capture = NewCaptures(s)
 
-	if ctx != nil {
-		s.player = ctx.NewPlayer()
-		//go s.runCh()
-	}
-
 	return s
 }
 
-func (s *Snd) runCh() {
-	for stream := range s.steamCh {
-		if s.muted {
-			continue
+func (s *Snd) ToggleMute(muted bool) {
+	if s.player != nil {
+		if muted {
+			s.player.SetVolume(0)
+		} else {
+			s.player.SetVolume(1)
 		}
-
-		if ebiten.ActualTPS() > 130 {
-			continue
-		}
-
-		s.player.Write(stream)
 	}
 }
 
-func (s *Snd) Play(muted, stdFps bool) {
-
-	s.muted = muted
-
-	s.SoundBufferWrap()
-
-	if len(s.Stream) == 0 {
-		return
+func (s *Snd) TogglePause(paused bool) {
+	if s.player != nil {
+		if paused {
+			s.player.Pause()
+		} else {
+			s.player.Play()
+		}
 	}
-
-	s.Mix()
-
-	if muted || s.player == nil {
-		return
-	}
-
-	if !stdFps {
-		return
-	}
-
-	s.player.Write(s.Stream)
 }
 
 func (s *Snd) Close() {
-	s.player.Close()
-}
-
-func (s *Snd) Mix() {
-
-	for i := 0; i < s.streamLen; i += 4 {
-		for j := range 2 {
-			snd := s.SoundBuffer[s.ReadPointer&uint32(s.buffSize-1)] << 6
-			idx := i + (2 * j)
-			s.Stream[idx] = uint8(snd)
-			s.Stream[idx+1] = uint8(snd >> 8)
-			s.ReadPointer++
-		}
-	}
-
-	// Avoid desync between the Play cursor and the Write cursor
-	delta := (int32(s.WritePointer-s.ReadPointer) >> 8) - (int32(s.WritePointer-s.ReadPointer)>>8)%2
-	if delta > 0 {
-		s.ReadPointer += uint32(delta)
-	} else {
-		s.ReadPointer -= uint32(delta)
-	}
-}
-
-func (a *Snd) GetSample() (int16, int16) {
-
-	if a.WritePointer == a.ReadPointer {
-		fmt.Printf("WRITE AND READ OVERLAP\n")
-	}
-
-	l := a.SoundBuffer[a.ReadPointer&uint32(a.buffSize-1)] << 6
-	a.ReadPointer++
-
-	r := a.SoundBuffer[a.ReadPointer&uint32(a.buffSize-1)] << 6
-	a.ReadPointer++
-
-	return l, r
-}
-
-func (a *Snd) Sync() {
-
-	delta := (int32(a.WritePointer-a.ReadPointer) >> 8) - (int32(a.WritePointer-a.ReadPointer)>>8)%4
-	if delta > 0 {
-		a.ReadPointer += uint32(delta)
-	} else {
-		a.ReadPointer -= uint32(delta)
-	}
-}
-
-func (s *Snd) SoundBufferWrap() {
-	l := s.ReadPointer / uint32(s.buffSize)
-	r := s.WritePointer / uint32(s.buffSize)
-	if l == r {
-		s.ReadPointer &= (uint32(s.buffSize) - 1)
-		s.WritePointer &= (uint32(s.buffSize) - 1)
+	if s.player != nil {
+		s.player.Close()
 	}
 }
 
 func (s *Snd) SoundClock(cycles uint32) {
-
 	s.sndCycles += cycles
 
-	for s.sndCycles >= uint32(s.sampCycles) {
+	for s.sndCycles >= uint32(s.SampCycles) {
 
 		l := float64(0)
 		r := float64(0)
@@ -229,27 +157,16 @@ func (s *Snd) SoundClock(cycles uint32) {
 			r = (float64(r) * float64(s.VolMaster))
 		}
 
-		s.SoundBuffer[s.WritePointer&(s.buffSize-1)] = clip(int32(l))
-		s.WritePointer++
-		s.SoundBuffer[s.WritePointer&(s.buffSize-1)] = clip(int32(r))
-		s.WritePointer++
+		l *= 10
+		r *= 10
 
-		s.sndCycles -= uint32(s.sampCycles)
+		s.stream.buf = append(s.stream.buf, int16(clip(int32(l))), int16(clip(int32(r))))
+
+		s.sndCycles -= uint32(s.SampCycles)
 	}
 }
 
-const (
-	SAMP_MAX = 0x1ff
-	SAMP_MIN = -0x200
-)
-
 //go:inline
-func clip(v int32) int16 {
-	if v > SAMP_MAX {
-		return SAMP_MAX
-	}
-	if v < SAMP_MIN {
-		return SAMP_MIN
-	}
-	return int16(v)
+func clip(v int32) int32 {
+	return min(math.MaxInt16, max(math.MinInt16, v))
 }

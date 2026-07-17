@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/cpu"
@@ -16,7 +17,7 @@ import (
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/nds/ppu"
 	"github.com/aabalke/guac/emu/nds/snd"
-	"github.com/hajimehoshi/oto"
+	"github.com/hajimehoshi/ebiten/v2/audio"
 )
 
 const (
@@ -33,9 +34,8 @@ const (
 	CYCLES_FRAME    = CYCLES_VDRAW + CYCLES_VBLANK
 
 	// sound
-	CPU_FREQ_HZ   = 33513982
-	SND_FREQUENCY = 48000 // sample rate
-	SND_SAMPLES   = 1024  // 512 in gba?
+	CPU_FREQ_HZ = 33513982
+	BUFFER_SIZE = 20 * time.Millisecond
 
 	// timer and geo shouldn't be checked every inst
 	// these should probably be replaced with a less lazy method
@@ -68,7 +68,7 @@ type Nds struct {
 	Frame uint64
 }
 
-func NewNds(path string, audioCtx *oto.Context) *Nds {
+func NewNds(ctx *audio.Context, path string) *Nds {
 	nds := Nds{}
 
 	nds.mem = &mem.Mem{}
@@ -92,12 +92,8 @@ func NewNds(path string, audioCtx *oto.Context) *Nds {
 	nds.arm7 = arm7.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem.Bus7, &irq7)
 	nds.arm9 = arm9.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem.Bus9, &irq9, cp15)
 
-	s := snd.NewSnd(
-		audioCtx,
-		CPU_FREQ_HZ,
-		SND_FREQUENCY,
-		SND_SAMPLES,
-	)
+	s := snd.NewSnd(ctx, BUFFER_SIZE)
+	s.SampCycles = CPU_FREQ_HZ / ctx.SampleRate()
 
 	nds.mem.InitMemory(
 		&nds.arm7.Reg.R[15],
@@ -216,7 +212,6 @@ func (nds *Nds) UpdateFrame(stdFps bool) {
 		nds.arm9.Jit.DeletePages()
 	}
 
-	nds.mem.Snd.Play(nds.Muted, stdFps)
 	nds.Frame++
 }
 
@@ -276,11 +271,13 @@ func (nds *Nds) StepArm7() uint32 {
 
 func (nds *Nds) ToggleMute() bool {
 	nds.Muted = !nds.Muted
+	nds.mem.Snd.ToggleMute(nds.Muted)
 	return nds.Muted
 }
 
 func (nds *Nds) TogglePause() bool {
 	nds.Paused = !nds.Paused
+	nds.mem.Snd.TogglePause(nds.Paused)
 	return nds.Paused
 }
 

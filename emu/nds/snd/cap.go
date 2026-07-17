@@ -20,7 +20,6 @@ type Capture struct {
 }
 
 func NewCaptures(snd *Snd) [2]Capture {
-
 	c := [2]Capture{}
 
 	c[0].Snd = snd
@@ -33,7 +32,6 @@ func NewCaptures(snd *Snd) [2]Capture {
 }
 
 func (c *Capture) Capture(sample float64) {
-
 	if c.Start {
 		c.Playing = true
 		c.Start = false
@@ -44,7 +42,7 @@ func (c *Capture) Capture(sample float64) {
 		return
 	}
 
-	sndFreq := float64(c.Snd.sndFrequency)
+	sndFreq := float64(c.Snd.Ctx.SampleRate())
 	playbackRate := BASE_FREQ / float64(-int16(*c.TimerValue))
 	c.SamplePos += playbackRate / sndFreq
 

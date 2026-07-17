@@ -2,6 +2,7 @@ package gb
 
 import (
 	"image/color"
+	"time"
 	"unsafe"
 
 	"github.com/aabalke/guac/config"
@@ -9,7 +10,7 @@ import (
 	"github.com/aabalke/guac/emu/gb/cartridge"
 	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/oto"
+	"github.com/hajimehoshi/ebiten/v2/audio"
 )
 
 const (
@@ -67,6 +68,8 @@ type GameBoy struct {
 	Apu *apu.Apu
 
 	InstInjectionFunc func(gb *GameBoy, op uint8)
+
+	CyclesPerSndGen int64
 }
 
 type Timer struct {
@@ -83,24 +86,23 @@ type Timer struct {
 }
 
 const (
-	CPU_SPEED          = 4194304
-	SND_FREQ           = 48000 // native sample rate
-	CYCLES_PER_SND_GEN = CPU_SPEED / SND_FREQ
-	SND_SAMPLES        = 512
+	CPU_SPEED   = 4194304
+	BUFFER_SIZE = 20 * time.Millisecond
 )
 
-func NewGameBoy(path string, ctx *oto.Context) *GameBoy {
+func NewGameBoy(ctx *audio.Context, path string) *GameBoy {
 	img := ebiten.NewImage(width, height)
 
 	gb := &GameBoy{
-		Image:     img,
-		Cpu:       NewCpu(),
-		Clock:     CPU_SPEED, // t cycle count
-		Joypad:    0xFF,
-		Cartridge: cartridge.NewCartridge(path, path+".save"),
-		Palette:   &config.Conf.Gb.Palette,
-		Scheduler: NewScheduler(),
-		Apu:       apu.NewApu(ctx, CPU_SPEED, SND_FREQ, SND_SAMPLES),
+		Image:           img,
+		Cpu:             NewCpu(),
+		Clock:           CPU_SPEED, // t cycle count
+		Joypad:          0xFF,
+		Cartridge:       cartridge.NewCartridge(path, path+".save"),
+		Palette:         &config.Conf.Gb.Palette,
+		Scheduler:       NewScheduler(),
+		Apu:             apu.NewApu(ctx, BUFFER_SIZE),
+		CyclesPerSndGen: int64(CPU_SPEED / ctx.SampleRate()),
 	}
 
 	// ebiten engine requires a slice, Screen is easier to edit as an array of arrays
@@ -292,10 +294,6 @@ func (gb *GameBoy) handleEvent(event ScheduledEvent, stdFps bool) bool {
 	gb.Scheduler.CurrentCycle = event.InitCycle
 
 	switch event.Event {
-	case EVENT_SND_SAMPLE_GEN:
-		gb.Apu.SoundClock()
-		gb.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, CYCLES_PER_SND_GEN)
-
 	case EVENT_VBK:
 		if gb.Lcdc.Enabled {
 			gb.Stat.Mode = PPU_VBLANK
@@ -377,10 +375,13 @@ func (gb *GameBoy) handleEvent(event ScheduledEvent, stdFps bool) bool {
 			}
 		}
 
-		gb.Apu.Play(gb.Muted, stdFps)
 		gb.Scheduler.endFrame()
 		//gb.Scheduler.CurrentCycle += overshoot
 		return true
+
+	case EVENT_SND_SAMPLE_GEN:
+		gb.Apu.SoundClock()
+		gb.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, gb.CyclesPerSndGen)
 
 	case EVENT_SND_WAVE_CLOCK:
 		ch := &gb.Apu.WaveChannel
@@ -431,11 +432,13 @@ func (gb *GameBoy) Tick(tCycles int64) {
 
 func (gb *GameBoy) ToggleMute() bool {
 	gb.Muted = !gb.Muted
+	gb.Apu.ToggleMute(gb.Muted)
 	return gb.Muted
 }
 
 func (gb *GameBoy) TogglePause() bool {
 	gb.Paused = !gb.Paused
+	gb.Apu.TogglePause(gb.Paused)
 	return gb.Paused
 }
 

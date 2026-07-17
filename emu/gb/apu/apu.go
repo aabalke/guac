@@ -1,94 +1,69 @@
 package apu
 
 import (
-	"github.com/hajimehoshi/oto"
-)
+	"encoding/binary"
+	"math"
+	"time"
 
-const (
-	SAMP_MAX = 0x1ff
-	SAMP_MIN = -0x200
+	"github.com/hajimehoshi/ebiten/v2/audio"
 )
 
 type Apu struct {
-	Enabled bool
-
-	PanReg uint8
-	Master uint8
-
-	SoundBuffer               []int16
-	ReadPointer, WritePointer uint32
+	stream Stream
+	Ctx    *audio.Context
+	player *audio.Player
 
 	ToneChannel1 ToneChannel
 	ToneChannel2 ToneChannel
 	WaveChannel  WaveChannel
 	NoiseChannel NoiseChannel
 
-	Stream []byte
-	player *oto.Player
-
-	sndFrequency int
-	streamLen    int
-	buffSize     uint32
-
-	fsCounter uint32
-	fsStep    uint8
-
+	fsCounter       uint32
+	fsStep          uint8
+	Enabled         bool
 	pendingPowerOff bool
 	pendingPowerOn  bool
+	PanReg          uint8
+	Master          uint8
+}
+
+type Stream struct {
+	buf []int16
+}
+
+func (s *Stream) Read(buf []byte) (int, error) {
+	for i := range len(buf) / 4 {
+		var l, r int16
+		if len(s.buf) >= 2 {
+			l, r = s.buf[0], s.buf[1]
+			s.buf = s.buf[2:]
+		}
+		binary.LittleEndian.PutUint16(buf[4*i+0:], uint16(l))
+		binary.LittleEndian.PutUint16(buf[4*i+2:], uint16(r))
+	}
+	return len(buf), nil
 }
 
 type Channel interface {
 	GetSample() int8
 }
 
-func (a *Apu) ClockFrameSequencer() {
-	if a.pendingPowerOff {
-		a.fsStep = 0
-		a.pendingPowerOff = false
+func NewApu(ctx *audio.Context, bufferSize time.Duration) *Apu {
+	a := &Apu{}
+
+	if ctx != nil {
+
+		a.Ctx = ctx
+
+		var err error
+		a.player, err = a.Ctx.NewPlayer(&a.stream)
+		if err != nil {
+			panic(err)
+		}
+		a.player.SetBufferSize(bufferSize)
+		a.player.Play()
 	}
 
-	if a.pendingPowerOn {
-		a.fsStep = 0
-		a.pendingPowerOn = false
-	}
-
-	a.fsCounter++
-
-	// frame sequencer runs at 512hz
-	// length ctr at 256hz
-	// sweep at 128hz
-	// vol at 64hz
-
-	if a.fsStep&1 == 0 {
-		a.ToneChannel1.clockLength()
-		a.ToneChannel2.clockLength()
-		a.WaveChannel.clockLength()
-		a.NoiseChannel.clockLength()
-	}
-
-	if a.fsStep == 2 || a.fsStep == 6 {
-		a.ToneChannel1.clockSweep()
-	}
-
-	if a.fsStep == 7 {
-		a.ToneChannel1.clockEnvelope()
-		a.ToneChannel2.clockEnvelope()
-		a.NoiseChannel.clockEnvelope()
-	}
-
-	a.fsStep = (a.fsStep + 1) & 7
-}
-
-func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu {
-	a := &Apu{
-		WritePointer: 0x200,
-		sndFrequency: sampleRate,
-		streamLen:    (2 * 2 * sampleRate / 60) - (2*2*sampleRate/60)%4,
-		buffSize:     uint32(sampleCnt * 16 * 2),
-	}
-
-	a.Stream = make([]byte, a.streamLen)
-	a.SoundBuffer = make([]int16, a.buffSize)
 	a.ToneChannel1 = ToneChannel{Apu: a, Idx: 0}
 	a.ToneChannel2 = ToneChannel{Apu: a, Idx: 1}
 	a.WaveChannel = WaveChannel{
@@ -101,73 +76,32 @@ func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu 
 	}
 	a.NoiseChannel = NoiseChannel{Apu: a, Idx: 3}
 
-	if audioContext != nil {
-		a.player = audioContext.NewPlayer()
-	}
-
 	return a
 }
 
-func (a *Apu) Play(muted, stdFps bool) {
-	a.SoundBufferWrap()
-
-	if a.Stream == nil {
-		return
+func (a *Apu) ToggleMute(muted bool) {
+	if a.player != nil {
+		if muted {
+			a.player.SetVolume(0)
+		} else {
+			a.player.SetVolume(1)
+		}
 	}
+}
 
-	if len(a.Stream) == 0 {
-		return
+func (a *Apu) TogglePause(paused bool) {
+	if a.player != nil {
+		if paused {
+			a.player.Pause()
+		} else {
+			a.player.Play()
+		}
 	}
-
-	a.soundMix()
-
-	if muted {
-		return
-	}
-
-	if a.player == nil {
-		return
-	}
-
-	if !stdFps {
-		return
-	}
-
-	a.player.Write(a.Stream)
 }
 
 func (a *Apu) Close() {
 	if a.player != nil {
 		a.player.Close()
-	}
-}
-
-func (a *Apu) soundMix() {
-	for i := 0; i < a.streamLen; i += 4 {
-		for j := range 2 {
-			snd := a.SoundBuffer[a.ReadPointer&uint32(a.buffSize-1)] << 6
-			idx := i + (2 * j)
-			a.Stream[idx] = uint8(snd)
-			a.Stream[idx+1] = uint8(snd >> 8)
-			a.ReadPointer++
-		}
-	}
-
-	// Avoid desync between the Play cursor and the Write cursor
-	delta := (int32(a.WritePointer-a.ReadPointer) >> 8) - (int32(a.WritePointer-a.ReadPointer)>>8)%2
-	if delta > 0 {
-		a.ReadPointer += uint32(delta)
-	} else {
-		a.ReadPointer -= uint32(delta)
-	}
-}
-
-func (a *Apu) SoundBufferWrap() {
-	l := a.ReadPointer / uint32(a.buffSize)
-	r := a.WritePointer / uint32(a.buffSize)
-	if l == r {
-		a.ReadPointer &= (uint32(a.buffSize) - 1)
-		a.WritePointer &= (uint32(a.buffSize) - 1)
 	}
 }
 
@@ -234,13 +168,17 @@ func (a *Apu) SoundClock() {
 		}
 	}
 
-	psgL = ((psgL * volL) >> 3) >> 2
-	psgR = ((psgR * volR) >> 3) >> 2
+	//l := clip(((psgL * volL) >> 3) >> 2)
+	//r := clip(((psgR * volR) >> 3) >> 2)
 
-	a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(psgL)
-	a.WritePointer++
-	a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(psgR)
-	a.WritePointer++
+	l := int16(clip(psgL * volL))
+	r := int16(clip(psgR * volR))
+	a.stream.buf = append(a.stream.buf, l, r)
+}
+
+//go:inline
+func clip(v int32) int32 {
+	return min(math.MaxInt16, max(math.MinInt16, v))
 }
 
 func (a *Apu) PowerOff() {
@@ -259,7 +197,40 @@ func (a *Apu) PowerOn() {
 	a.fsCounter = 0
 }
 
-//go:inline
-func clip(v int32) int16 {
-	return min(SAMP_MAX, max(SAMP_MIN, int16(v)))
+func (a *Apu) ClockFrameSequencer() {
+	if a.pendingPowerOff {
+		a.fsStep = 0
+		a.pendingPowerOff = false
+	}
+
+	if a.pendingPowerOn {
+		a.fsStep = 0
+		a.pendingPowerOn = false
+	}
+
+	a.fsCounter++
+
+	// frame sequencer runs at 512hz
+	// length ctr at 256hz
+	// sweep at 128hz
+	// vol at 64hz
+
+	if a.fsStep&1 == 0 {
+		a.ToneChannel1.clockLength()
+		a.ToneChannel2.clockLength()
+		a.WaveChannel.clockLength()
+		a.NoiseChannel.clockLength()
+	}
+
+	if a.fsStep == 2 || a.fsStep == 6 {
+		a.ToneChannel1.clockSweep()
+	}
+
+	if a.fsStep == 7 {
+		a.ToneChannel1.clockEnvelope()
+		a.ToneChannel2.clockEnvelope()
+		a.NoiseChannel.clockEnvelope()
+	}
+
+	a.fsStep = (a.fsStep + 1) & 7
 }

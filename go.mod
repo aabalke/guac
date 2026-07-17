@@ -9,7 +9,6 @@ go 1.26.2
 require (
 	github.com/BurntSushi/toml v1.5.0
 	github.com/aabalke/gojit v0.0.0-20260508030348-14e750bc9cc5
-	github.com/aabalke/gojit/arm64 v0.0.0-20260513001811-c3a1d6d0b875
 	github.com/ebitenui/ebitenui v0.7.3
 	github.com/hajimehoshi/ebiten/v2 v2.9.7
 	github.com/hajimehoshi/oto v1.0.1
@@ -21,6 +20,7 @@ require (
 	github.com/TheTitanrain/w32 v0.0.0-20180517000239-4f5cfb03fabf // indirect
 	github.com/ebitengine/gomobile v0.0.0-20250923094054-ea854a63cce1 // indirect
 	github.com/ebitengine/hideconsole v1.0.0 // indirect
+	github.com/ebitengine/oto/v3 v3.4.0 // indirect
 	github.com/ebitengine/purego v0.9.1 // indirect
 	github.com/edsrzf/mmap-go v1.2.0 // indirect
 	github.com/frustra/bbcode v0.0.0-20201127003707-6ef347fbe1c8 // indirect

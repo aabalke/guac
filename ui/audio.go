@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/oto"
 )
 
@@ -10,11 +11,16 @@ const (
 )
 
 func NewAudioContext() *oto.Context {
-
 	c, err := oto.NewContext(SND_FREQUENCY, 2, 2, STREAM_LEN*3)
 	if err != nil {
 		panic(err)
 	}
 
 	return c
+}
+
+const SAMPLE_RATE = 48000
+
+func NewNewAudioContext() *audio.Context {
+	return audio.NewContext(SAMPLE_RATE)
 }

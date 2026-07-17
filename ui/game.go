@@ -18,6 +18,7 @@ import (
 	"github.com/aabalke/guac/emu/nds"
 	"github.com/aabalke/guac/input"
 	"github.com/aabalke/guac/utils"
+	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
@@ -33,12 +34,13 @@ const (
 type Game struct {
 	// flags
 
-	ui       *Ui
-	nds      *nds.Nds
-	gba      *gba.GBA
-	gb       *gb.GameBoy
-	mouse    *input.Mouse
-	audioCtx *oto.Context
+	ui          *Ui
+	nds         *nds.Nds
+	gba         *gba.GBA
+	gb          *gb.GameBoy
+	mouse       *input.Mouse
+	audioCtx    *oto.Context
+	newAudioCtx *audio.Context
 
 	gamepadIdBuf []ebiten.GamepadID
 	gamepadIds   map[ebiten.GamepadID]struct{}
@@ -101,6 +103,7 @@ func StartEngine() {
 func NewGame(res *Resources) *Game {
 	g := &Game{
 		audioCtx:     NewAudioContext(),
+		newAudioCtx:  NewNewAudioContext(),
 		mouse:        input.NewMouse(),
 		vsync:        config.Conf.General.Vsync,
 		gamepadIds:   make(map[ebiten.GamepadID]struct{}),
@@ -308,7 +311,8 @@ func (g *Game) Profile() {
 func (g *Game) InitConsole(file string) bool {
 	switch romType := utils.GetRomType(file); romType {
 	case utils.GB:
-		g.gb = gb.NewGameBoy(file, g.audioCtx)
+
+		g.gb = gb.NewGameBoy(g.newAudioCtx, file)
 		g.ui.ui = nil
 		if g.muted {
 			g.gb.ToggleMute()
@@ -324,7 +328,7 @@ func (g *Game) InitConsole(file string) bool {
 		return true
 
 	case utils.NDS:
-		g.nds = nds.NewNds(file, g.audioCtx)
+		g.nds = nds.NewNds(g.newAudioCtx, file)
 		g.ui.ui = nil
 		if g.muted {
 			g.nds.ToggleMute()

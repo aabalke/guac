@@ -28,7 +28,7 @@ func TestMooneye(t *testing.T) {
 		finish := false
 		passed := false
 
-		gb := NewGameBoy(file, nil)
+		gb := NewGameBoy(nil, file)
 
 		gb.InstInjectionFunc = func(gb *GameBoy, op uint8) {
 			if op == 0x40 {
@@ -77,7 +77,7 @@ func TestGbMicroTest(t *testing.T) {
 	t.Logf("GBMicrotest Test Suite %s\n", time.Now().Format(time.RFC3339))
 
 	perRomHandler := func(file string, results *[]TestResult) {
-		gb := NewGameBoy(file, nil)
+		gb := NewGameBoy(nil, file)
 
 		for range 60 * 2 {
 			gb.Update(false)

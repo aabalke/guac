@@ -66,7 +66,6 @@ type Channel struct {
 }
 
 func NewChannel(idx int, s *Snd) Channel {
-
 	c := Channel{
 		Idx:  idx,
 		Snd:  s,
@@ -77,7 +76,6 @@ func NewChannel(idx int, s *Snd) Channel {
 }
 
 func (c *Channel) GetSample() (int8, int8) {
-
 	if c.Start {
 		c.Playing = true
 		c.Start = false
@@ -101,10 +99,10 @@ func (c *Channel) GetSample() (int8, int8) {
 		return 0, 0
 	}
 
-	sndFreq := float64(c.Snd.sndFrequency)
+	sndFreq := float64(c.Snd.Ctx.SampleRate())
 	if c.Format == 3 && c.isDuty {
-		//Each duty cycle consists of eight HIGH or LOW samples,
-		//so the sound frequency is 1/8th of the selected sample rate (gbatek)
+		// Each duty cycle consists of eight HIGH or LOW samples,
+		// so the sound frequency is 1/8th of the selected sample rate (gbatek)
 		sndFreq *= 8
 	}
 
@@ -158,13 +156,10 @@ func (c *Channel) GetSample() (int8, int8) {
 }
 
 func (c *Channel) GetPCM8() float64 {
-
 	length := (c.SndLength + uint32(c.StartPosition)) * 4
 	if uint32(c.SamplePos) >= length {
-
 		if loop := c.RepeatMode == 1; loop {
 			c.SamplePos = float64(c.StartPosition) * 4
-
 		} else {
 			c.Playing = false
 			return 0
@@ -176,13 +171,10 @@ func (c *Channel) GetPCM8() float64 {
 }
 
 func (c *Channel) GetPCM16() float64 {
-
-	length := ((c.SndLength) + uint32(c.StartPosition)) * 2
+	length := (c.SndLength + uint32(c.StartPosition)) * 2
 	if uint32(c.SamplePos) >= length {
-
 		if loop := c.RepeatMode == 1; loop {
 			c.SamplePos = float64(c.StartPosition * 2)
-
 		} else {
 			c.Playing = false
 			return 0
@@ -191,15 +183,15 @@ func (c *Channel) GetPCM16() float64 {
 
 	v := int16(uint16(c.Snd.Mem.Read16(
 		c.SrcAddr+(uint32(c.SamplePos)*2),
-		false)))
+		false,
+	)))
 
 	return float64(v) / 32768
 }
 
 func (c *Channel) DecompressADPCM() {
-
 	addr := c.SrcAddr
-	length := ((c.SndLength * 4) + uint32(4*(c.StartPosition)) - 4)
+	length := ((c.SndLength * 4) + uint32(4*c.StartPosition) - 4)
 	c.Samples = make([]int16, 0, length)
 
 	head := c.Snd.Mem.Read32(addr, false)
@@ -251,9 +243,7 @@ func (c *Channel) DecompressADPCM() {
 }
 
 func (c *Channel) GetADPCM() float64 {
-
 	if int(c.SamplePos) >= len(c.Samples) {
-
 		if loop := c.RepeatMode == 1; loop {
 			c.SamplePos = (float64(c.StartPosition*4) - 4)
 		} else {
@@ -283,7 +273,6 @@ func (c *Channel) GetPSG() float64 {
 }
 
 func (c *Channel) GetNoise() float64 {
-
 	// untested
 
 	carry := c.lfsr&1 == 1
@@ -298,7 +287,6 @@ func (c *Channel) GetNoise() float64 {
 }
 
 func (c *Channel) GetWaveDuty() float64 {
-
 	if c.SamplePos >= 1.0 {
 		c.SamplePos -= 1.0
 	}

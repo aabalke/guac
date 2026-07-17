@@ -2,8 +2,10 @@ package apu
 
 // source https://nightshade256.github.io/2021/03/27/gb-sound-emulation.html
 
-var DutyLookUp = [4]float64{0.125, 0.25, 0.5, 0.75}
-var DutyLookUpi = [4]float64{0.875, 0.75, 0.5, 0.25}
+var (
+	DutyLookUp  = [4]float64{0.125, 0.25, 0.5, 0.75}
+	DutyLookUpi = [4]float64{0.875, 0.75, 0.5, 0.25}
+)
 
 type ToneChannel struct {
 	Apu *Apu
@@ -41,7 +43,6 @@ type ToneChannel struct {
 }
 
 func (ch *ToneChannel) LengthTrigger() {
-
 	if ch.LengthCounter == 0 {
 		return
 	}
@@ -52,7 +53,6 @@ func (ch *ToneChannel) LengthTrigger() {
 }
 
 func (ch *ToneChannel) Trigger() {
-
 	if ch.LengthCounter == 0 {
 		ch.ResetLength(0)
 		ch.LengthTrigger()
@@ -83,7 +83,6 @@ func (ch *ToneChannel) Trigger() {
 }
 
 func (ch *ToneChannel) clockSweep() {
-
 	if ch.SweepTimer > 0 {
 		ch.SweepTimer -= 1
 	}
@@ -115,7 +114,6 @@ func (ch *ToneChannel) clockSweep() {
 }
 
 func (ch *ToneChannel) calcFreq() uint16 {
-
 	newPeriod := ch.Shadow >> ch.SweepStep
 
 	if ch.SweepDecrease {
@@ -134,7 +132,6 @@ func (ch *ToneChannel) calcFreq() uint16 {
 }
 
 func (ch *ToneChannel) clockLength() {
-
 	if !ch.LenEnabled {
 		return
 	}
@@ -157,7 +154,6 @@ func (ch *ToneChannel) ResetLength(initLength uint8) {
 }
 
 func (ch *ToneChannel) clockEnvelope() {
-
 	if !ch.ChannelEnabled {
 		return
 	}
@@ -181,9 +177,8 @@ func (ch *ToneChannel) clockEnvelope() {
 }
 
 func (ch *ToneChannel) GetSample() int8 {
-
 	freq := 131072 / float64(2048-ch.Shadow)
-	cycleSamples := float64(ch.Apu.sndFrequency) / freq
+	cycleSamples := float64(ch.Apu.Ctx.SampleRate()) / freq
 
 	ch.samples++
 	if ch.phase {
