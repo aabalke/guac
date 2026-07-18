@@ -272,6 +272,11 @@ func (ch *Channel) transfer() {
 
 	if ch.Fifo {
 		dstOffset = 0
+
+		if !ch.isWord {
+			srcOffset *= 2
+			ch.isWord = true
+		}
 	}
 
 	for ch.latched.cnt > 0 {

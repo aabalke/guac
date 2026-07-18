@@ -203,6 +203,36 @@ func (t *Timer) OnTimerOverflow(late int64) {
 		t.Gba.Irq.SetIRQ(3 + uint32(t.Idx))
 	}
 
+	if t.Idx < 2 && t.Gba.Apu.SoundCntX&0x80 != 0 {
+		if aTick := (t.Gba.Apu.SoundCntH>>10)&1 == uint16(t.Idx); aTick {
+
+			fifo := &t.Gba.Apu.FifoA
+
+			if refill := fifo.Count <= 3; refill {
+				ch := t.Gba.Dma.Chs[1]
+				if ch.Enabled && ch.Mode == DMA_MODE_SPE {
+					t.Gba.Scheduler.schedule(EVENTS[1], 0, 2-late, ch.Start, nil)
+				}
+			}
+
+			fifo.Load()
+		}
+
+		if bTick := (t.Gba.Apu.SoundCntH>>14)&1 == uint16(t.Idx); bTick {
+
+			fifo := &t.Gba.Apu.FifoB
+
+			if refill := fifo.Count <= 3; refill {
+				ch := t.Gba.Dma.Chs[2]
+				if ch.Enabled && ch.Mode == DMA_MODE_SPE {
+					t.Gba.Scheduler.schedule(EVENTS[2], 0, 2-late, ch.Start, nil)
+				}
+			}
+
+			fifo.Load()
+		}
+	}
+
 	if t.Idx != 3 {
 		if next := t.Gba.Timers[t.Idx+1]; next.Enabled && next.Cascade {
 			next.Counter++
@@ -211,40 +241,4 @@ func (t *Timer) OnTimerOverflow(late int64) {
 			}
 		}
 	}
-
-	if t.Idx < 2 && t.Gba.Apu.SoundCntX&0x80 != 0 {
-
-		if aTick := (t.Gba.Apu.SoundCntH>>10)&1 == uint16(t.Idx); aTick {
-
-			fifo := &t.Gba.Apu.FifoA
-
-			fifo.Load()
-
-			// nanoboy uses length 3
-			// gbatek mentions 16 bytes, why difference?
-			if refill := fifo.Length <= refill_rate; refill {
-				ch := t.Gba.Dma.Chs[1]
-				if ch.Enabled && ch.Mode == DMA_MODE_SPE {
-					t.Gba.Scheduler.schedule(EVENTS[1], 0, 2-late, ch.Start, nil)
-				}
-			}
-		}
-
-		if bTick := (t.Gba.Apu.SoundCntH>>14)&1 == uint16(t.Idx); bTick {
-			fifo := &t.Gba.Apu.FifoB
-
-			fifo.Load()
-
-			if refill := fifo.Length <= refill_rate; refill {
-				ch := t.Gba.Dma.Chs[2]
-				if ch.Enabled && ch.Mode == DMA_MODE_SPE {
-					t.Gba.Scheduler.schedule(EVENTS[2], 0, 2-late, ch.Start, nil)
-				}
-			}
-		}
-	}
 }
-
-// refill rate should be 0x10, however breaks fifo b on pokemon emerald, need to find out why
-
-const refill_rate = 0x3

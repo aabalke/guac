@@ -576,10 +576,10 @@ func (m *Memory) Write32(addr uint32, v uint32) {
 		m.GBA.Timers[3].Write32(v)
 		return
 	case 0x400_00A0:
-		m.GBA.Apu.FifoA.Copy(v)
+		m.GBA.Apu.FifoA.Write32(v)
 		return
 	case 0x400_00A4:
-		m.GBA.Apu.FifoB.Copy(v)
+		m.GBA.Apu.FifoB.Write32(v)
 		return
 	}
 
