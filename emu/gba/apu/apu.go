@@ -1,42 +1,33 @@
 package apu
 
 import (
-	"fmt"
+	"math"
+	"time"
 
-	"github.com/hajimehoshi/oto"
+	"github.com/aabalke/guac/utils"
+	"github.com/hajimehoshi/ebiten/v2/audio"
 )
 
 // akatsuki105/magia MIT License
 
 type Apu struct {
-	Enable bool
+	stream utils.Stream
+	Ctx    *audio.Context
+	player *audio.Player
 
 	FifoA, FifoB                    Fifo
 	SoundCntL, SoundCntH, SoundCntX uint16
 	SoundBias                       uint16
-
-	SoundBuffer               []int16
-	ReadPointer, WritePointer uint32
 
 	ToneChannel1 ToneChannel
 	ToneChannel2 ToneChannel
 	WaveChannel  WaveChannel
 	NoiseChannel NoiseChannel
 
-	Stream []byte
-
-	sndCycles uint32
-
-	player *oto.Player
-
 	cpuFreqHz    int
 	sndFrequency int
-	sndSamples   int
 	sampCycles   int
-	buffSamples  int
 	sampleTime   float64
-	streamLen    int
-	buffSize     uint32
 }
 
 func (a *Apu) Disable() {
@@ -65,117 +56,43 @@ func (a *Apu) isSoundChanEnable(ch uint8) bool {
 	return BitEnabled(cntx, ch)
 }
 
-func NewApu(audioContext *oto.Context, cpuFreq, sampleRate, sampleCnt int) *Apu {
+func NewApu(ctx *audio.Context, bufferSize time.Duration, cpuFreq int) *Apu {
 	a := &Apu{
-		WritePointer: 0x200,
 		FifoA:        Fifo{},
 		FifoB:        Fifo{},
 		cpuFreqHz:    cpuFreq,
-		sndFrequency: sampleRate,
-		sndSamples:   sampleCnt,
-		sampCycles:   cpuFreq / sampleRate,
-		buffSamples:  sampleCnt * 16 * 2,
-		sampleTime:   1.0 / float64(sampleRate),
-		streamLen:    (2 * 2 * sampleRate / 60) - (2*2*sampleRate/60)%4,
-		buffSize:     uint32(sampleCnt * 16 * 2),
+		sndFrequency: ctx.SampleRate(),
+		sampCycles:   cpuFreq / ctx.SampleRate(),
+		sampleTime:   1.0 / float64(ctx.SampleRate()),
 	}
 
-	a.Stream = make([]byte, a.streamLen)
-	a.SoundBuffer = make([]int16, a.buffSize)
+	if ctx != nil {
+
+		a.Ctx = ctx
+
+		var err error
+		a.player, err = a.Ctx.NewPlayer(&a.stream)
+		if err != nil {
+			panic(err)
+		}
+		a.player.SetBufferSize(bufferSize)
+		a.player.Play()
+	}
+
 	a.ToneChannel1 = ToneChannel{Apu: a, Idx: 0}
 	a.ToneChannel2 = ToneChannel{Apu: a, Idx: 1}
 	a.WaveChannel = WaveChannel{Apu: a, Idx: 2}
 	a.NoiseChannel = NoiseChannel{Apu: a, Idx: 3}
 
-	a.player = audioContext.NewPlayer()
-
 	return a
-}
-
-func (a *Apu) Play(muted, stdFps bool) {
-	a.SoundBufferWrap()
-
-	a.Enable = true
-
-	if a.Stream == nil {
-		return
-	}
-
-	if len(a.Stream) == 0 {
-		return
-	}
-
-	a.soundMix()
-
-	if muted || !stdFps {
-		return
-	}
-
-	if a.player == nil {
-		return
-	}
-
-	a.player.Write(a.Stream)
 }
 
 func (a *Apu) Close() {
 	a.player.Close()
 }
 
-func (a *Apu) soundMix() {
-	for i := 0; i < a.streamLen; i += 4 {
-		for j := range 2 {
-			snd := a.SoundBuffer[a.ReadPointer&uint32(a.buffSize-1)] << 6
-			idx := i + (2 * j)
-			a.Stream[idx] = uint8(snd)
-			a.Stream[idx+1] = uint8(snd >> 8)
-			a.ReadPointer++
-		}
-	}
-
-	// Avoid desync between the Play cursor and the Write cursor
-	delta := (int32(a.WritePointer-a.ReadPointer) >> 8) - (int32(a.WritePointer-a.ReadPointer)>>8)%2
-	if delta > 0 {
-		a.ReadPointer += uint32(delta)
-	} else {
-		a.ReadPointer -= uint32(delta)
-	}
-}
-
 func (a *Apu) IsSoundEnabled() bool {
 	return BitEnabled(uint32(a.SoundCntX), 7)
-}
-
-func (a *Apu) GetSample() (int16, int16) {
-	if a.WritePointer == a.ReadPointer {
-		fmt.Printf("WRITE AND READ OVERLAP\n")
-	}
-
-	l := a.SoundBuffer[a.ReadPointer&uint32(a.buffSize-1)] << 6
-	a.ReadPointer++
-
-	r := a.SoundBuffer[a.ReadPointer&uint32(a.buffSize-1)] << 6
-	a.ReadPointer++
-
-	return l, r
-}
-
-func (a *Apu) Sync() {
-	delta := (int32(a.WritePointer-a.ReadPointer) >> 8) - (int32(a.WritePointer-a.ReadPointer)>>8)%4
-	if delta > 0 {
-		a.ReadPointer += uint32(delta)
-	} else {
-		a.ReadPointer -= uint32(delta)
-	}
-}
-
-func (a *Apu) SoundBufferWrap() {
-	l := a.ReadPointer / uint32(a.buffSize)
-	r := a.WritePointer / uint32(a.buffSize)
-	if l == r {
-		a.ReadPointer &= (uint32(a.buffSize) - 1)
-		a.WritePointer &= (uint32(a.buffSize) - 1)
-	}
 }
 
 var (
@@ -220,10 +137,14 @@ func (a *Apu) SoundClock(doubleSpeed bool) {
 	psgL = (psgL * volL) >> shift
 	psgR = (psgR * volR) >> shift
 
-	a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(sampleLeft + psgL)
-	a.WritePointer++
-	a.SoundBuffer[a.WritePointer&(a.buffSize-1)] = clip(sampleRight + psgR)
-	a.WritePointer++
+	l := int16(clip((psgL + sampleLeft) * 50))
+	r := int16(clip((psgR + sampleRight) * 50))
+	a.stream.Write(l, r)
+}
+
+//go:inline
+func clip(v int32) int32 {
+	return min(math.MaxInt16, max(math.MinInt16, v))
 }
 
 func (a *Apu) enableSoundChan(ch int, enable bool) {

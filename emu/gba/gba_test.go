@@ -27,7 +27,7 @@ func TestAlyosha(t *testing.T) {
 		finish := false
 		passed := false
 
-		gba := NewGBA(file, nil)
+		gba := NewGBA(nil, file)
 
 		gba.InstInjectionFunc = func(op uint32) {
 			if op == 0xEAFF_FFFE {

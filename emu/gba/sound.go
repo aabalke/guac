@@ -158,11 +158,11 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 		a.SoundCntH |= uint16(v) << 8
 
 		if resetFifoA := (a.SoundCntH>>11)&1 != 0; resetFifoA {
-			a.FifoA.Length = 0
+			a.FifoA.Reset()
 		}
 
 		if resetFifoB := (a.SoundCntH>>15)&1 != 0; resetFifoB {
-			a.FifoB.Length = 0
+			a.FifoB.Reset()
 		}
 
 	case 0x85, 0x86, 0x87:

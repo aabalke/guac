@@ -10,7 +10,6 @@ import (
 	"github.com/ebitenui/ebitenui"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/oto"
 
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gb"
@@ -31,27 +30,23 @@ const (
 	PAGE_KEYBOARD
 )
 
+const SAMPLE_RATE = 48000
+
 type Game struct {
-	// flags
-
-	ui          *Ui
-	nds         *nds.Nds
-	gba         *gba.GBA
-	gb          *gb.GameBoy
-	mouse       *input.Mouse
-	audioCtx    *oto.Context
-	newAudioCtx *audio.Context
-
+	ui           *Ui
+	nds          *nds.Nds
+	gba          *gba.GBA
+	gb           *gb.GameBoy
+	mouse        *input.Mouse
+	audioCtx     *audio.Context
 	gamepadIdBuf []ebiten.GamepadID
 	gamepadIds   map[ebiten.GamepadID]struct{}
-
 	pauseEndTick int64
 	TargetFps    int
 	vsync        bool
-
-	paused bool
-	muted  bool
-	quit   bool
+	paused       bool
+	muted        bool
+	quit         bool
 }
 
 type Ui struct {
@@ -102,8 +97,7 @@ func StartEngine() {
 
 func NewGame(res *Resources) *Game {
 	g := &Game{
-		audioCtx:     NewAudioContext(),
-		newAudioCtx:  NewNewAudioContext(),
+		audioCtx:     audio.NewContext(SAMPLE_RATE),
 		mouse:        input.NewMouse(),
 		vsync:        config.Conf.General.Vsync,
 		gamepadIds:   make(map[ebiten.GamepadID]struct{}),
@@ -312,7 +306,7 @@ func (g *Game) InitConsole(file string) bool {
 	switch romType := utils.GetRomType(file); romType {
 	case utils.GB:
 
-		g.gb = gb.NewGameBoy(g.newAudioCtx, file)
+		g.gb = gb.NewGameBoy(g.audioCtx, file)
 		g.ui.ui = nil
 		if g.muted {
 			g.gb.ToggleMute()
@@ -320,7 +314,7 @@ func (g *Game) InitConsole(file string) bool {
 		return true
 
 	case utils.GBA:
-		g.gba = gba.NewGBA(file, g.audioCtx)
+		g.gba = gba.NewGBA(g.audioCtx, file)
 		g.ui.ui = nil
 		if g.muted {
 			g.gba.ToggleMute()
@@ -328,7 +322,7 @@ func (g *Game) InitConsole(file string) bool {
 		return true
 
 	case utils.NDS:
-		g.nds = nds.NewNds(g.newAudioCtx, file)
+		g.nds = nds.NewNds(g.audioCtx, file)
 		g.ui.ui = nil
 		if g.muted {
 			g.nds.ToggleMute()

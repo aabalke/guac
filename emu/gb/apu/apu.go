@@ -1,15 +1,15 @@
 package apu
 
 import (
-	"encoding/binary"
 	"math"
 	"time"
 
+	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 )
 
 type Apu struct {
-	stream Stream
+	stream utils.Stream
 	Ctx    *audio.Context
 	player *audio.Player
 
@@ -25,23 +25,6 @@ type Apu struct {
 	pendingPowerOn  bool
 	PanReg          uint8
 	Master          uint8
-}
-
-type Stream struct {
-	buf []int16
-}
-
-func (s *Stream) Read(buf []byte) (int, error) {
-	for i := range len(buf) / 4 {
-		var l, r int16
-		if len(s.buf) >= 2 {
-			l, r = s.buf[0], s.buf[1]
-			s.buf = s.buf[2:]
-		}
-		binary.LittleEndian.PutUint16(buf[4*i+0:], uint16(l))
-		binary.LittleEndian.PutUint16(buf[4*i+2:], uint16(r))
-	}
-	return len(buf), nil
 }
 
 type Channel interface {
@@ -173,7 +156,7 @@ func (a *Apu) SoundClock() {
 
 	l := int16(clip(psgL * volL))
 	r := int16(clip(psgR * volR))
-	a.stream.buf = append(a.stream.buf, l, r)
+	a.stream.Write(l, r)
 }
 
 //go:inline

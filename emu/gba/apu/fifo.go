@@ -1,61 +1,40 @@
 package apu
 
-type Fifo struct {
-	Buffer [0x20]int8
-	Length uint8
-	Sample int8
+const (
+	BUF_LEN      = 0x20
+	BUF_MASK     = BUF_LEN - 1
+	BUF_OVERFLOW = 0x20 - 4
+)
 
-	Head, Tail uint8
+type Fifo struct {
+	Length, Head, Tail uint8
+	Buffer             [BUF_LEN]int8
+	Sample             int8
 }
 
-//func (f *Fifo) Copy(v uint32) {
-//
-//	if fifoFull := f.Length > 28; fifoFull {
-//		f.Length -= 28
-//	}
-//
-//	for i := range 4 {
-//		f.Buffer[f.Length] = int8(v >> (i << 3))
-//		f.Length++
-//	}
-//}
-//
-//func (f *Fifo) Load() {
-//
-//	if f.Length == 0 {
-//		return
-//	}
-//
-//	f.Sample = f.Buffer[0]
-//	f.Length--
-//
-//	for i := range f.Length {
-//		f.Buffer[i] = f.Buffer[i+1]
-//	}
-//}
+func (f *Fifo) Reset() {
+	f.Length = 0
+	f.Head = 0
+	f.Tail = 0
+	f.Buffer = [BUF_LEN]int8{}
+}
 
-// Adds 4 bytes from the uint32 `v` into the buffer
 func (f *Fifo) Copy(v uint32) {
-	// Prevent overflow: drop oldest data if needed
-	if f.Length > 28 {
-		f.Head = (f.Head + 28) & 0x1F // wrap at 0x20
-		f.Length -= 28
+	if f.Length > BUF_OVERFLOW {
+		f.Reset()
 	}
 
 	for i := range 4 {
 		f.Buffer[f.Tail] = int8(v >> (i << 3))
-		f.Tail = (f.Tail + 1) & 0x1F // wrap around
+		f.Tail = (f.Tail + 1) & BUF_MASK
 		f.Length++
 	}
 }
 
-// Loads the next sample from the buffer
 func (f *Fifo) Load() {
-	if f.Length == 0 {
-		return
+	if f.Length != 0 {
+		f.Sample = f.Buffer[f.Head]
+		f.Head = (f.Head + 1) & BUF_MASK
+		f.Length--
 	}
-
-	f.Sample = f.Buffer[f.Head]
-	f.Head = (f.Head + 1) & 0x1F // wrap around
-	f.Length--
 }

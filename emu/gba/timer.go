@@ -212,7 +212,7 @@ func (t *Timer) OnTimerOverflow(late int64) {
 		}
 	}
 
-	if t.Idx < 2 && t.Gba.Apu.Enable {
+	if t.Idx < 2 && t.Gba.Apu.SoundCntX&0x80 != 0 {
 
 		if aTick := (t.Gba.Apu.SoundCntH>>10)&1 == uint16(t.Idx); aTick {
 
@@ -244,5 +244,7 @@ func (t *Timer) OnTimerOverflow(late int64) {
 		}
 	}
 }
+
+// refill rate should be 0x10, however breaks fifo b on pokemon emerald, need to find out why
 
 const refill_rate = 0x3

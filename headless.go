@@ -19,7 +19,7 @@ func StartHeadless() {
 		}
 
 	case utils.GBA:
-		gba := gba.NewGBA(path, nil)
+		gba := gba.NewGBA(nil, path)
 		for i := 0; true; i++ {
 			gba.Update(false)
 		}

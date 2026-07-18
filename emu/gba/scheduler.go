@@ -46,6 +46,9 @@ func (s *Scheduler) Now() int64 {
 }
 
 func (s *Scheduler) schedule(e Event, priority int, cyclesUntil int64, f func(int64, any), args any) {
+	// is this needed?
+	cyclesUntil = max(cyclesUntil, 0)
+
 	s.scheduleAt(e, priority, s.Now()+cyclesUntil, f, args)
 }
 

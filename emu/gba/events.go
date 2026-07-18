@@ -2,7 +2,7 @@ package gba
 
 func (gba *GBA) AudioSampleEvent(late int64, arg any) {
 	gba.Apu.SoundClock(false)
-	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, CYCLES_PER_SND_GEN-late, gba.AudioSampleEvent, nil)
+	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, gba.CyclesPerSndGen-late, gba.AudioSampleEvent, nil)
 }
 
 func (gba *GBA) HblankVDrawEvent(late int64, arg any) {
@@ -53,7 +53,6 @@ func (gba *GBA) ScanlineEndEvent(late int64, arg any) {
 	case 228:
 		*vcount = 0
 
-		gba.Apu.Play(gba.Muted, gba.StdFps)
 		gba.Frame++
 		gba.Image.WritePixels(gba.Pixels)
 		gba.PPU.Backgrounds[2].BgAffineReset()

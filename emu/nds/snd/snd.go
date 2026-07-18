@@ -1,10 +1,10 @@
 package snd
 
 import (
-	"encoding/binary"
 	"math"
 	"time"
 
+	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 )
 
@@ -29,7 +29,7 @@ type Mem interface {
 }
 
 type Snd struct {
-	stream Stream
+	stream utils.Stream
 	Ctx    *audio.Context
 	player *audio.Player
 
@@ -50,23 +50,6 @@ type Snd struct {
 	sndCycles uint32
 
 	SampCycles int
-}
-
-type Stream struct {
-	buf []int16
-}
-
-func (s *Stream) Read(buf []byte) (int, error) {
-	for i := range len(buf) / 4 {
-		var l, r int16
-		if len(s.buf) >= 2 {
-			l, r = s.buf[0], s.buf[1]
-			s.buf = s.buf[2:]
-		}
-		binary.LittleEndian.PutUint16(buf[4*i+0:], uint16(l))
-		binary.LittleEndian.PutUint16(buf[4*i+2:], uint16(r))
-	}
-	return len(buf), nil
 }
 
 func NewSnd(ctx *audio.Context, bufferSize time.Duration) *Snd {
@@ -157,10 +140,10 @@ func (s *Snd) SoundClock(cycles uint32) {
 			r = (float64(r) * float64(s.VolMaster))
 		}
 
-		l *= 10
-		r *= 10
+		l *= 50
+		r *= 50
 
-		s.stream.buf = append(s.stream.buf, int16(clip(int32(l))), int16(clip(int32(r))))
+		s.stream.Write(int16(clip(int32(l))), int16(clip(int32(r))))
 
 		s.sndCycles -= uint32(s.SampCycles)
 	}

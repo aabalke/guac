@@ -1,12 +1,14 @@
 package gba
 
 import (
+	"time"
+
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gba/apu"
 	"github.com/aabalke/guac/emu/gba/cart"
 	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/oto"
+	"github.com/hajimehoshi/ebiten/v2/audio"
 )
 
 const (
@@ -21,10 +23,8 @@ const (
 	CYCLES_VBLANK   = CYCLES_SCANLINE * 68
 	CYCLES_FRAME    = CYCLES_VDRAW + CYCLES_VBLANK
 
-	CPU_SPEED          = 16777216
-	SND_FREQ           = 48000 // native sample rate
-	CYCLES_PER_SND_GEN = CPU_SPEED / SND_FREQ
-	SND_SAMPLES        = 512
+	CPU_SPEED   = 16777216
+	SND_SAMPLES = 512
 )
 
 type GBA struct {
@@ -50,15 +50,19 @@ type GBA struct {
 
 	Paused, Muted, Save, Booted, StdFps bool
 	IdleOptimize                        bool
+	CyclesPerSndGen                     int64
 }
 
-func NewGBA(path string, ctx *oto.Context) *GBA {
+const BUFFER_SIZE = 20 * time.Millisecond
+
+func NewGBA(ctx *audio.Context, path string) *GBA {
 	gba := &GBA{
-		Pixels:       make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
-		Image:        ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
-		Apu:          apu.NewApu(ctx, CPU_SPEED, SND_FREQ, SND_SAMPLES),
-		Scheduler:    NewScheduler(),
-		IdleOptimize: config.Conf.Gba.IdleOptimize,
+		Pixels:          make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
+		Image:           ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
+		Apu:             apu.NewApu(ctx, BUFFER_SIZE, CPU_SPEED),
+		Scheduler:       NewScheduler(),
+		IdleOptimize:    config.Conf.Gba.IdleOptimize,
+		CyclesPerSndGen: int64(CPU_SPEED / ctx.SampleRate()),
 	}
 
 	gba.PPU = &PPU{gba: gba}
@@ -159,11 +163,13 @@ func (gba *GBA) CheckIdleLoopOptimization() {
 
 func (gba *GBA) ToggleMute() bool {
 	gba.Muted = !gba.Muted
+	//gba.Apu.ToggleMute(gba.Muted)
 	return gba.Muted
 }
 
 func (gba *GBA) TogglePause() bool {
 	gba.Paused = !gba.Paused
+	//gba.Apu.TogglePause(gba.Paused)
 	return gba.Paused
 }
 
