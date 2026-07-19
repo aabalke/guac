@@ -90,6 +90,7 @@ type General struct {
 	Logger              bool
 	IntegerScaling      bool
 	IntegerScalingRatio int
+	SampleRate          int
 	Keyboard            GeneralKeyboard
 	Controller          GeneralController
 }

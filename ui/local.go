@@ -101,8 +101,11 @@ type GeneralLocalization struct {
 	TargetFps            string `toml:"target_fps"`
 	VsyncEnabled         string `toml:"vsync_enabled"`
 	DisableSaves         string `toml:"disable_saves"`
+	IntegerScalingDesc   string `toml:"integer_scaling_desc"`
 	IntegerScaling       string `toml:"integer_scaling"`
 	IntegerScalingRatio  string `toml:"integer_scaling_ratio"`
+	SampleRateDesc       string `toml:"sample_rate_desc"`
+	SampleRate           string `toml:"sample_rate"`
 	Keyboard             string `toml:"keyboard"`
 	Controller           string `toml:"controller"`
 	Select               string `toml:"select"`

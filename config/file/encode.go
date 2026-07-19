@@ -49,6 +49,7 @@ func (c *Config) encodeGeneral() {
 		Vsync:               c.config.General.Vsync,
 		IntegerScaling:      c.config.General.IntegerScaling,
 		IntegerScalingRatio: c.config.General.IntegerScalingRatio,
+		SampleRate:          c.config.General.SampleRate,
 		// rompath
 		DisableSaves: c.config.General.DisableSaves,
 	}

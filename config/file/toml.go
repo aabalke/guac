@@ -30,6 +30,7 @@ type General struct {
 	RomPath             string       `toml:"rom_path"`
 	IntegerScaling      bool         `toml:"integer_scaling"`
 	IntegerScalingRatio int          `toml:"integer_scaling_ratio"`
+	SampleRate          int          `toml:"sample_rate"`
 	DisableSaves        bool         `toml:"disable_saves"`
 	Keyboard            GeneralInput `toml:"keyboard"`
 	Controller          GeneralInput `toml:"controller"`

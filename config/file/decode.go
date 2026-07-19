@@ -59,6 +59,11 @@ func (c *Config) decodeGeneral() {
 	c.config.General.DisableSaves = c.General.DisableSaves
 	c.config.General.IntegerScaling = c.General.IntegerScaling
 	c.config.General.IntegerScalingRatio = c.General.IntegerScalingRatio
+	c.config.General.SampleRate = c.General.SampleRate
+
+	if c.config.General.SampleRate == 0 {
+		c.config.General.SampleRate = 48000
+	}
 
 	in := &c.General.Keyboard
 	confKey := &c.config.General.Keyboard

@@ -30,8 +30,6 @@ const (
 	PAGE_KEYBOARD
 )
 
-const SAMPLE_RATE = 48000
-
 type Game struct {
 	ui           *Ui
 	nds          *nds.Nds
@@ -97,7 +95,7 @@ func StartEngine() {
 
 func NewGame(res *Resources) *Game {
 	g := &Game{
-		audioCtx:     audio.NewContext(SAMPLE_RATE),
+		audioCtx:     audio.NewContext(config.Conf.General.SampleRate),
 		mouse:        input.NewMouse(),
 		vsync:        config.Conf.General.Vsync,
 		gamepadIds:   make(map[ebiten.GamepadID]struct{}),
