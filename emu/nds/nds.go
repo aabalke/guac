@@ -93,7 +93,9 @@ func NewNds(ctx *audio.Context, path string) *Nds {
 	nds.arm9 = arm9.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem.Bus9, &irq9, cp15)
 
 	s := snd.NewSnd(ctx, BUFFER_SIZE)
-	s.SampCycles = CPU_FREQ_HZ / ctx.SampleRate()
+	if ctx != nil {
+		s.SampCycles = CPU_FREQ_HZ / ctx.SampleRate()
+	}
 
 	nds.mem.InitMemory(
 		&nds.arm7.Reg.R[15],
@@ -361,7 +363,9 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 
 	if newScanline := currScanlineCycles < prevScanlineCycles; newScanline {
 
-		nds.mem.Snd.SoundClock(CYCLES_SCANLINE)
+		if nds.mem.Snd.Ctx != nil {
+			nds.mem.Snd.SoundClock(CYCLES_SCANLINE)
+		}
 
 		dispstat.H = false
 

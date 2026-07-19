@@ -57,12 +57,11 @@ const BUFFER_SIZE = 20 * time.Millisecond
 
 func NewGBA(ctx *audio.Context, path string) *GBA {
 	gba := &GBA{
-		Pixels:          make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
-		Image:           ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
-		Apu:             apu.NewApu(ctx, BUFFER_SIZE, CPU_SPEED),
-		Scheduler:       NewScheduler(),
-		IdleOptimize:    config.Conf.Gba.IdleOptimize,
-		CyclesPerSndGen: int64(CPU_SPEED / ctx.SampleRate()),
+		Pixels:       make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
+		Image:        ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
+		Apu:          apu.NewApu(ctx, BUFFER_SIZE, CPU_SPEED),
+		Scheduler:    NewScheduler(),
+		IdleOptimize: config.Conf.Gba.IdleOptimize,
 	}
 
 	gba.PPU = &PPU{gba: gba}
@@ -82,7 +81,10 @@ func NewGBA(ctx *audio.Context, path string) *GBA {
 	gba.LoadGame(path)
 	gba.AddGpios()
 
-	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, 0, gba.AudioSampleEvent, nil)
+	if ctx != nil {
+		gba.CyclesPerSndGen = int64(CPU_SPEED / ctx.SampleRate())
+		gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, 0, gba.AudioSampleEvent, nil)
+	}
 
 	// matches nanoboy
 	gba.Mem.IO[6] = 225
@@ -163,13 +165,13 @@ func (gba *GBA) CheckIdleLoopOptimization() {
 
 func (gba *GBA) ToggleMute() bool {
 	gba.Muted = !gba.Muted
-	//gba.Apu.ToggleMute(gba.Muted)
+	gba.Apu.ToggleMute(gba.Muted)
 	return gba.Muted
 }
 
 func (gba *GBA) TogglePause() bool {
 	gba.Paused = !gba.Paused
-	//gba.Apu.TogglePause(gba.Paused)
+	gba.Apu.TogglePause(gba.Paused)
 	return gba.Paused
 }
 

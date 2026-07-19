@@ -94,15 +94,14 @@ func NewGameBoy(ctx *audio.Context, path string) *GameBoy {
 	img := ebiten.NewImage(width, height)
 
 	gb := &GameBoy{
-		Image:           img,
-		Cpu:             NewCpu(),
-		Clock:           CPU_SPEED, // t cycle count
-		Joypad:          0xFF,
-		Cartridge:       cartridge.NewCartridge(path, path+".save"),
-		Palette:         &config.Conf.Gb.Palette,
-		Scheduler:       NewScheduler(),
-		Apu:             apu.NewApu(ctx, BUFFER_SIZE),
-		CyclesPerSndGen: int64(CPU_SPEED / ctx.SampleRate()),
+		Image:     img,
+		Cpu:       NewCpu(),
+		Clock:     CPU_SPEED, // t cycle count
+		Joypad:    0xFF,
+		Cartridge: cartridge.NewCartridge(path, path+".save"),
+		Palette:   &config.Conf.Gb.Palette,
+		Scheduler: NewScheduler(),
+		Apu:       apu.NewApu(ctx, BUFFER_SIZE),
 	}
 
 	// ebiten engine requires a slice, Screen is easier to edit as an array of arrays
@@ -133,7 +132,11 @@ func NewGameBoy(ctx *audio.Context, path string) *GameBoy {
 		L = NewLogger("./loggy", gb)
 	}
 
-	gb.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 0)
+	if ctx != nil {
+		gb.CyclesPerSndGen = int64(CPU_SPEED / ctx.SampleRate())
+		gb.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 0)
+	}
+
 	gb.Scheduler.schedule(EVENT_SND_WAVE_CLOCK, 0)
 	gb.Scheduler.schedule(EVENT_SND_FRAME_SEQ, 0)
 

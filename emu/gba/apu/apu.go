@@ -58,17 +58,18 @@ func (a *Apu) isSoundChanEnable(ch uint8) bool {
 
 func NewApu(ctx *audio.Context, bufferSize time.Duration, cpuFreq int) *Apu {
 	a := &Apu{
-		FifoA:        Fifo{},
-		FifoB:        Fifo{},
-		cpuFreqHz:    cpuFreq,
-		sndFrequency: ctx.SampleRate(),
-		sampCycles:   cpuFreq / ctx.SampleRate(),
-		sampleTime:   1.0 / float64(ctx.SampleRate()),
+		FifoA:     Fifo{},
+		FifoB:     Fifo{},
+		cpuFreqHz: cpuFreq,
 	}
 
 	if ctx != nil {
 
 		a.Ctx = ctx
+
+		a.sndFrequency = ctx.SampleRate()
+		a.sampCycles = cpuFreq / ctx.SampleRate()
+		a.sampleTime = 1.0 / float64(ctx.SampleRate())
 
 		var err error
 		a.player, err = a.Ctx.NewPlayer(&a.stream)
@@ -87,8 +88,30 @@ func NewApu(ctx *audio.Context, bufferSize time.Duration, cpuFreq int) *Apu {
 	return a
 }
 
+func (a *Apu) ToggleMute(muted bool) {
+	if a.player != nil {
+		if muted {
+			a.player.SetVolume(0)
+		} else {
+			a.player.SetVolume(1)
+		}
+	}
+}
+
+func (a *Apu) TogglePause(paused bool) {
+	if a.player != nil {
+		if paused {
+			a.player.Pause()
+		} else {
+			a.player.Play()
+		}
+	}
+}
+
 func (a *Apu) Close() {
-	a.player.Close()
+	if a.player != nil {
+		a.player.Close()
+	}
 }
 
 func (a *Apu) IsSoundEnabled() bool {

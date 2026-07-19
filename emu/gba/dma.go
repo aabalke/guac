@@ -23,8 +23,8 @@ type Dma struct {
 	Gba           *GBA
 	Tick          func(cycles int64)
 	Chs           [4]Channel
-	Runnable      uint8
 	ActiveDma     int
+	Runnable      uint8
 	ShouldReEnter bool
 
 	// hades/dma-latch.gba / https://mgba.io/2020/01/25/infinite-loop-holy-grail/
@@ -32,25 +32,22 @@ type Dma struct {
 }
 
 type Channel struct {
-	dma     *Dma
-	Idx     int
-	Src     uint32
-	Dst     uint32
-	Value   uint32
-	Control uint32
-	Cnt     uint32
-	DstAdj  uint32
-	SrcAdj  uint32
-	Mode    uint8
-
+	dma         *Dma
+	Idx         int
+	Src         uint32
+	Dst         uint32
+	Value       uint32
+	Control     uint32
+	Cnt         uint32
+	DstAdj      uint32
+	SrcAdj      uint32
+	Mode        uint8
 	Repeat      bool
 	isWord      bool
-	DRQ         bool
 	IRQ         bool
 	Enabled     bool
 	InVideoMode bool
-
-	Fifo bool
+	Fifo        bool
 
 	latched struct {
 		srcPtr unsafe.Pointer
@@ -148,7 +145,7 @@ func (ch *Channel) Write(addr uint32, v uint8) {
 
 		ch.Repeat = (v>>1)&1 != 0
 		ch.isWord = (v>>2)&1 != 0
-		ch.DRQ = (v>>3)&1 != 0
+		//ch.DRQ = (v>>3)&1 != 0
 		ch.Mode = (v >> 4) & 3
 		ch.IRQ = (v>>6)&1 != 0
 		ch.Enabled = (v>>7)&1 != 0
