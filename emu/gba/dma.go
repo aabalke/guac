@@ -409,17 +409,14 @@ func (ch *Channel) transfer() {
 }
 
 func (d *Dma) SelectNextChannel(curr int) {
-	if curr == 3 || d.Runnable == 0 {
-		d.ActiveDma = 0
-		return
-	}
-
-	for i := curr; i < 4; i++ {
+	for i := range 4 {
 		if d.Runnable&(1<<i) != 0 {
 			d.ActiveDma = i
 			return
 		}
 	}
+
+	d.ActiveDma = -1
 }
 
 func (d *Dma) videoDma(vcount uint8, late int64) {
