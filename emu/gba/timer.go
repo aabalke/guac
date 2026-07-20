@@ -207,29 +207,29 @@ func (t *Timer) OnTimerOverflow(late int64) {
 		if aTick := (t.Gba.Apu.SoundCntH>>10)&1 == uint16(t.Idx); aTick {
 
 			fifo := &t.Gba.Apu.FifoA
+			fifo.Load()
 
-			if refill := fifo.Count <= 3; refill {
+			if refill := fifo.Count < 12; refill {
 				ch := t.Gba.Dma.Chs[1]
 				if ch.Enabled && ch.Mode == DMA_MODE_SPE {
 					t.Gba.Scheduler.schedule(EVENTS[1], 0, 2-late, ch.Start, nil)
 				}
 			}
 
-			fifo.Load()
 		}
 
 		if bTick := (t.Gba.Apu.SoundCntH>>14)&1 == uint16(t.Idx); bTick {
 
 			fifo := &t.Gba.Apu.FifoB
+			fifo.Load()
 
-			if refill := fifo.Count <= 3; refill {
+			if refill := fifo.Count < 12; refill {
 				ch := t.Gba.Dma.Chs[2]
 				if ch.Enabled && ch.Mode == DMA_MODE_SPE {
 					t.Gba.Scheduler.schedule(EVENTS[2], 0, 2-late, ch.Start, nil)
 				}
 			}
 
-			fifo.Load()
 		}
 	}
 

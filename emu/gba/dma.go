@@ -313,8 +313,6 @@ func (ch *Channel) transfer() {
 				ch.dma.LatchValue = ch.Value
 			}
 
-			ch.dma.Gba.Cpu.LastWasDma = true
-
 			ch.dma.Gba.Cpu.CyclesDma(dst, 4, dstSeq)
 			if ch.latched.dstPtr == nil {
 				mem.Write32(dst, ch.Value)
@@ -350,8 +348,6 @@ func (ch *Channel) transfer() {
 				ch.Value = v | (v << 16)
 				ch.dma.LatchValue = ch.Value
 			}
-
-			ch.dma.Gba.Cpu.LastWasDma = true
 
 			ch.dma.Gba.Cpu.CyclesDma(dst, 2, dstSeq)
 			if ch.latched.dstPtr == nil {
@@ -460,18 +456,17 @@ func (d *Dma) raise(mode uint8, late int64) {
 }
 
 func (gba *GBA) CheckDmas() uint32 {
-	start := gba.Scheduler.CurrentCycle
+	start := gba.Scheduler.Now()
 
 	gba.Tick(1)
 
 	for gba.Dma.IsRunning() {
-		ch := &gba.Dma.Chs[gba.Dma.ActiveDma]
-		ch.transfer()
+		gba.Dma.Chs[gba.Dma.ActiveDma].transfer()
 	}
 
 	gba.Tick(1)
 
-	return uint32(gba.Scheduler.CurrentCycle - start)
+	return uint32(gba.Scheduler.Now() - start)
 }
 
 func (d *Dma) EepromDma(count, dst uint32) {

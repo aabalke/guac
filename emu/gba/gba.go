@@ -12,19 +12,16 @@ import (
 )
 
 const (
-	SCREEN_WIDTH  = 240
-	SCREEN_HEIGHT = 160
-
-	NUM_SCANLINES   = SCREEN_HEIGHT + 68
+	SCREEN_WIDTH    = 240
+	SCREEN_HEIGHT   = 160
+	BUFFER_SIZE     = 20 * time.Millisecond
+	CPU_SPEED       = 16777216
 	CYCLES_HDRAW    = 1007
 	CYCLES_HBLANK   = 226
 	CYCLES_SCANLINE = CYCLES_HDRAW + CYCLES_HBLANK
 	CYCLES_VDRAW    = CYCLES_SCANLINE * SCREEN_HEIGHT
 	CYCLES_VBLANK   = CYCLES_SCANLINE * 68
 	CYCLES_FRAME    = CYCLES_VDRAW + CYCLES_VBLANK
-
-	CPU_SPEED   = 16777216
-	SND_SAMPLES = 512
 )
 
 type GBA struct {
@@ -36,24 +33,20 @@ type GBA struct {
 	Timers            [4]*Timer
 	Dma               *Dma
 	Apu               *apu.Apu
-	Keypad            Key
 	Irq               *Irq
 	InstInjectionFunc func(op uint32)
-
-	vsyncAddr uint32
-
-	Frame uint64
+	Keypad            Key
 
 	Pixels      []byte
 	Image       *ebiten.Image
 	DrawOptions ebiten.DrawImageOptions
 
+	vsyncAddr                           uint32
+	Frame                               uint64
 	Paused, Muted, Save, Booted, StdFps bool
 	IdleOptimize                        bool
 	CyclesPerSndGen                     int64
 }
-
-const BUFFER_SIZE = 20 * time.Millisecond
 
 func NewGBA(ctx *audio.Context, path string) *GBA {
 	gba := &GBA{

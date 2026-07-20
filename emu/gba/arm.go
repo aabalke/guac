@@ -1012,53 +1012,63 @@ func (c *Cpu) Swp(op uint32) {
 
 func (c *Cpu) Block(op uint32) {
 	var (
-		r        = &c.Reg.R
-		rlist    = op & 0xFFFF
-		regCount = uint32(bits.OnesCount32(rlist))
-		rn       = (op >> 16) & 0xF
-		addr     = r[rn]
-		up       = (op>>23)&1 != 0
+		r          = &c.Reg.R
+		rlist      = op & 0xFFFF
+		rn         = (op >> 16) & 0xF
+		pcIncluded = rlist&0x8000 != 0
+		pre        = (op>>24)&1 != 0
+		up         = (op>>23)&1 != 0
+		psr        = (op>>22)&1 != 0
+		wb         = (op>>21)&1 != 0
+		load       = (op>>20)&1 != 0
+
+		addr = r[rn]
+
+		first int
+		bytes uint32
 	)
 
 	if rlist == 0 {
 		rlist = 0x8000
-		regCount = 0x10
-	}
-
-	var (
-		pcIncluded = rlist&0x8000 != 0
-		rnIncluded = (rlist>>rn)&1 != 0
-		pre        = (op>>24)&1 != 0
-		psr        = (op>>22)&1 != 0
-		wb         = (op>>21)&1 != 0
-		load       = (op>>20)&1 != 0
-		mode       = c.Reg.CPSR.Mode
-		forceUser  = psr && (mode != MODE_USR && mode != MODE_SYS) && (!load || !pcIncluded)
-		wbValue    = r[rn]
-	)
-
-	if up {
-		wbValue += regCount * 4
+		first = 0xF
+		bytes = 16 * 4
+		pcIncluded = true
 	} else {
-		wbValue -= regCount * 4
+		bytes = uint32(bits.OnesCount32(rlist)) * 4
+
+		// can this be sped up? Its just log2(rlist & -rlist)
+		// first = int(math.Log2(float64(rlist & -rlist)))
+		for i := 0xF; i >= 0; i-- {
+			if rlist&(1<<i) != 0 {
+				first = i
+			}
+		}
 	}
+
+	mode := c.Reg.CPSR.Mode
+	forceUser := psr && (mode != MODE_USR && mode != MODE_SYS) && (!load || !pcIncluded)
 
 	if forceUser {
 		c.ModeSwitch(mode, MODE_USR)
 	}
 
-	rnv := c.Reg.R[rn]
+	rnNew := addr
 
-	if !up {
+	// even when decrementing, cpu increments from "final" reg
+	// see mgba https://mgba.io/2014/12/28/classic-nes/
+
+	if up {
+		rnNew += bytes
+	} else {
 		pre = !pre
-		addr -= regCount * 4
+		rnNew -= bytes
+		addr -= bytes
 	}
 
 	seq := uint32(NONSEQ)
 
-	for reg := range uint32(16) {
-
-		if disabled := (rlist>>reg)&1 == 0; disabled {
+	for i := first; i < 0x10; i++ {
+		if disabled := rlist&(1<<i) == 0; disabled {
 			continue
 		}
 
@@ -1067,54 +1077,54 @@ func (c *Cpu) Block(op uint32) {
 		}
 
 		if load {
-			c.Reg.R[reg] = c.Read32Block(addr, seq)
-		} else {
-			switch reg {
-			case rn:
-				if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
-					c.Write32Block(addr, rnv, seq)
-				} else {
-					c.Write32Block(addr, wbValue, seq)
-				}
 
-			case PC:
-				c.Write32Block(addr, c.Reg.R[reg]+4, seq)
-			default:
-				c.Write32Block(addr, c.Reg.R[reg], seq)
+			v := c.Read32Block(addr, seq)
+			if wb && i == first {
+				r[rn] = rnNew
 			}
-		}
 
-		seq = SEQ
+			r[i] = v
+
+		} else {
+
+			v := r[i]
+			if i == 15 {
+				v += 4
+			}
+
+			c.Write32Block(addr, v, seq)
+			if wb && i == first {
+				r[rn] = rnNew
+			}
+
+		}
 
 		if !pre {
 			addr += 4
 		}
+
+		seq = SEQ
 	}
 
-	if !load {
-		if wb {
-			r[rn] = wbValue
-		}
-		if forceUser {
-			c.ModeSwitch(MODE_USR, mode)
-		}
-
-		return
-	}
-	c.idle(1)
-
-	if wb && !rnIncluded {
-		r[rn] = wbValue
-	}
 	if forceUser {
 		c.ModeSwitch(MODE_USR, mode)
 	}
+
+	if !load {
+		return
+	}
+
+	c.idle(1)
 
 	if !pcIncluded {
 		return
 	}
 
-	c.Reload32()
+	if c.Reg.CPSR.T {
+		c.Reload16()
+	} else {
+		c.Reload32()
+	}
 
 	if !psr {
 		return

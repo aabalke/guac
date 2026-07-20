@@ -131,8 +131,8 @@ func (a *Apu) SoundClock(doubleSpeed bool) {
 	lpan1 := int32(a.SoundCntH>>13) & 1
 	rpan1 := int32(a.SoundCntH>>12) & 1
 
-	sampleA := int32(a.FifoA.Latched) << (1 - shift0)
-	sampleB := int32(a.FifoB.Latched) << (1 - shift1)
+	sampleA := int32(a.FifoA.Get()) << (1 - shift0)
+	sampleB := int32(a.FifoB.Get()) << (1 - shift1)
 
 	sampleLeft := sampleA*lpan0 + sampleB*lpan1
 	sampleRight := sampleA*rpan0 + sampleB*rpan1
