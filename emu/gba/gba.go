@@ -201,7 +201,6 @@ func (gba *GBA) DirectBoot() {
 
 	reg.CPSR.Set(0x1F)
 	reg.SPSR[BANK_ID[MODE_IRQ]].Set(0x10)
-	//reg.R[0] = 0x0CA5
 
 	reg.R[PC] = 0x800_0000
 	reg.R[LR] = 0x800_0000

@@ -17,7 +17,7 @@ type Memory struct {
 	WRAM1 [0x40000]uint8
 	WRAM2 [0x8000]uint8
 	PRAM  [0x200]uint16
-	VRAM  [0x18000]uint8
+	VRAM  [0x18001]uint8 // required for some objects (see ags test with only 0x18000), not sure if better method or sign of problem
 	OAM   [0x400]uint8
 	IO    [0x400]uint8
 
