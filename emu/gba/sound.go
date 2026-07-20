@@ -5,7 +5,29 @@ import (
 )
 
 func WriteSound(addr uint32, v uint8, a *apu.Apu) {
-	if addr == 0x84 {
+	switch addr {
+	case 0x82:
+
+		a.SoundCntH &^= 0x00FF
+		a.SoundCntH |= uint16(v)
+		return
+
+	case 0x83:
+
+		a.SoundCntH &= 0x00FF
+		a.SoundCntH |= uint16(v) << 8
+
+		if resetFifoA := (a.SoundCntH>>11)&1 != 0; resetFifoA {
+			a.FifoA.Reset()
+		}
+
+		if resetFifoB := (a.SoundCntH>>15)&1 != 0; resetFifoB {
+			a.FifoB.Reset()
+		}
+
+		return
+
+	case 0x84:
 
 		//v &= 0x8F // should be 0x80 but setting channel bit does not work rn
 
@@ -15,6 +37,19 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 			a.Disable()
 		}
 
+		return
+	case 0x85, 0x86, 0x87:
+		return
+
+	case 0x88:
+		a.SoundBias &^= 0x00FF
+		a.SoundBias |= uint16(v)
+		return
+
+	case 0x89:
+
+		a.SoundBias &= 0x00FF
+		a.SoundBias |= uint16(v) << 8
 		return
 	}
 
@@ -111,9 +146,7 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 		a.WaveChannel.CntX &= 0x00FF
 		a.WaveChannel.CntX |= uint16(v) << 8
 
-	case 0x76:
-		return
-	case 0x77:
+	case 0x76, 0x77:
 		return
 
 	case 0x78:
@@ -123,9 +156,7 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 	case 0x79:
 		a.NoiseChannel.CntL &= 0x00FF
 		a.NoiseChannel.CntL |= uint16(v) << 8
-	case 0x7A:
-		return
-	case 0x7B:
+	case 0x7A, 0x7B:
 		return
 	case 0x7C:
 		a.NoiseChannel.CntH &^= 0x00FF
@@ -133,9 +164,7 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 	case 0x7D:
 		a.NoiseChannel.CntH &= 0x00FF
 		a.NoiseChannel.CntH |= uint16(v) << 8
-	case 0x7E:
-		return
-	case 0x7F:
+	case 0x7E, 0x7F:
 		return
 
 	case 0x80:
@@ -143,44 +172,9 @@ func WriteSound(addr uint32, v uint8, a *apu.Apu) {
 		a.SoundCntL |= uint16(v)
 
 	case 0x81:
-
 		a.SoundCntL &= 0x00FF
 		a.SoundCntL |= uint16(v) << 8
 
-	case 0x82:
-
-		a.SoundCntH &^= 0x00FF
-		a.SoundCntH |= uint16(v)
-
-	case 0x83:
-
-		a.SoundCntH &= 0x00FF
-		a.SoundCntH |= uint16(v) << 8
-
-		if resetFifoA := (a.SoundCntH>>11)&1 != 0; resetFifoA {
-			a.FifoA.Reset()
-		}
-
-		if resetFifoB := (a.SoundCntH>>15)&1 != 0; resetFifoB {
-			a.FifoB.Reset()
-		}
-
-	case 0x85, 0x86, 0x87:
-		return
-
-	case 0x88:
-		a.SoundBias &^= 0x00FF
-		a.SoundBias |= uint16(v)
-
-	case 0x89:
-
-		a.SoundBias &= 0x00FF
-		a.SoundBias |= uint16(v) << 8
-
-	default:
-
-		//fmt.Printf("SND WRITE AT ADDR %08X\n", addr)
-		//a.IO[addr] = v
 	}
 }
 
@@ -198,72 +192,30 @@ func ReadSound(addr uint32, a *apu.Apu) uint8 {
 	switch addr {
 	case 0x60:
 		return uint8(a.ToneChannel1.CntL) &^ 0x80
-	case 0x61:
-		return 0
 	case 0x62:
 		return uint8(a.ToneChannel1.CntH) & 0xC0
 	case 0x63:
 		return uint8(a.ToneChannel1.CntH >> 8)
-	case 0x64:
-		return 0
 	case 0x65:
 		return uint8(a.ToneChannel1.CntX>>8) & 0x40
-	case 0x66:
-		return 0
-	case 0x67:
-		return 0
-
 	case 0x68:
 		return uint8(a.ToneChannel2.CntH) & 0xC0
 	case 0x69:
 		return uint8(a.ToneChannel2.CntH >> 8)
-	case 0x6A:
-		return 0
-	case 0x6B:
-		return 0
-	case 0x6C:
-		return 0
 	case 0x6D:
 		return uint8(a.ToneChannel2.CntX>>8) & 0x40
-	case 0x6E:
-		return 0
-	case 0x6F:
-		return 0
-
 	case 0x70:
 		return uint8(a.WaveChannel.CntL) & 0xE0
-	case 0x71:
-		return 0
-	case 0x72:
-		return 0
 	case 0x73:
 		return uint8(a.WaveChannel.CntH) & 0xE0
-	case 0x74:
-		return 0
 	case 0x75:
 		return uint8(a.WaveChannel.CntX) & 0x40
-	case 0x76:
-		return 0
-	case 0x77:
-		return 0
-
-	case 0x78:
-		return 0
 	case 0x79:
 		return uint8(a.NoiseChannel.CntL >> 8)
-	case 0x7A:
-		return 0
-	case 0x7B:
-		return 0
 	case 0x7C:
 		return uint8(a.NoiseChannel.CntH)
 	case 0x7D:
 		return uint8(a.NoiseChannel.CntH>>8) & 0x40
-	case 0x7E:
-		return 0
-	case 0x7F:
-		return 0
-
 	case 0x80:
 		return uint8(a.SoundCntL) & 0x77
 	case 0x81:
@@ -274,25 +226,11 @@ func ReadSound(addr uint32, a *apu.Apu) uint8 {
 		return uint8(a.SoundCntH>>8) & 0x77
 	case 0x84:
 		return uint8(a.SoundCntX) & 0x8F
-	case 0x85:
-		return 0
-	case 0x86:
-		return 0
-	case 0x87:
-		return 0
-
 	case 0x88:
-		return uint8(a.SoundBias) &^ 0x1
+		return uint8(a.SoundBias) & 0xFE
 	case 0x89:
-		return uint8(a.SoundBias>>8) &^ 0xC3
-	case 0x8A:
-		return 0
-	case 0x8B:
-		return 0
-
+		return uint8(a.SoundBias>>8) & 0xC3
 	default:
 		return 0
-		//fmt.Printf("SND READ AT ADDR %08X\n", addr)
-		//return a.IO[addr]
 	}
 }

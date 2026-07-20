@@ -95,6 +95,8 @@ func NewGBA(ctx *audio.Context, path string) *GBA {
 
 	gba.SetIdleAddr()
 
+	gba.Apu.SoundBias = 0x0200
+
 	return gba
 }
 
