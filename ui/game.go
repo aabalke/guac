@@ -100,6 +100,7 @@ func NewGame(res *Resources) *Game {
 		vsync:        config.Conf.General.Vsync,
 		gamepadIds:   make(map[ebiten.GamepadID]struct{}),
 		gamepadIdBuf: make([]ebiten.GamepadID, 0),
+		muted:        config.Conf.General.Muted,
 		ui: &Ui{
 			res:      res,
 			focus:    &Focus{},

@@ -387,20 +387,7 @@ func (gb *GameBoy) handleEvent(event ScheduledEvent, stdFps bool) bool {
 		gb.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, gb.CyclesPerSndGen)
 
 	case EVENT_SND_WAVE_CLOCK:
-		ch := &gb.Apu.WaveChannel
-		if !ch.ChannelEnabled {
-			break
-		}
-		ch.WavePosition = (ch.WavePosition + 1) & 0x1F
-		ch.LastReadCycle = uint32(event.InitCycle)
-		if ch.WavePosition&1 == 0 {
-			ch.Sample = ch.SampleByte >> 4
-		} else {
-			ch.ActivePeriod = ch.Period
-			b := ch.Ram[ch.WavePosition>>1]
-			ch.SampleByte = b
-			ch.Sample = ch.SampleByte & 0xF
-		}
+		gb.Apu.WaveChannel.ClockRam()
 		gb.scheduleWaveClock(event.InitCycle)
 
 	case EVENT_SND_FRAME_SEQ:

@@ -32,6 +32,11 @@ func Decode() {
 			config.Conf.General.RomPath = *romPath
 		case "p":
 			config.Conf.Profile.Enabled = *profile
+
+			if config.Conf.Profile.Enabled {
+				config.Conf.General.Muted = true
+			}
+
 		case "fps":
 			config.Conf.General.TargetFps = *fps
 		case "m":
