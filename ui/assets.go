@@ -49,6 +49,7 @@ var radioInset = widget.Insets{
 	Top:    4,
 	Bottom: 4,
 }
+var mainLink = "[link=https://guacemulator.com]guacemulator.com[/link]"
 
 var keybindsLink = "see [link=https://guacemulator.com]guacemulator.com[/link] for valid keybinds"
 

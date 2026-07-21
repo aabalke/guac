@@ -25,6 +25,7 @@ ui      = "interfaz"
 gb      = "gb"
 gba     = "gba"
 nds     = "nds"
+about   = "sobre"
 return  = "volver"
 
 [settings.general]
@@ -307,3 +308,10 @@ controller_x      = "nds controlador x"
 controller_y      = "nds controlador y"
 
 save = "guardar"
+
+[settings.about]
+
+about = "sobre"
+version = "Versión de desarrollo posterior a la v0.0.3"
+copyright = "© 2024 - 2026 Aaron Balke,\ncon licencia BSD de 3 cláusulas.\nGame Boy Advance es una marca\ncomercial registrada de Nintendo Co., Ltd."
+thank_yous = "Gracias a Giovanni Bajo, Mireille Meyer,\nVicki Pfau, Martin Korth y muchos más."

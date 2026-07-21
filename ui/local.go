@@ -82,6 +82,7 @@ type SettingsLocalization struct {
 	Gb      GbLocalization      `toml:"gb"`
 	Gba     GbaLocalization     `toml:"gba"`
 	Nds     NdsLocalization     `toml:"nds"`
+	About   AboutLocalization   `toml:"about"`
 }
 
 type SidebarLocalization struct {
@@ -90,7 +91,16 @@ type SidebarLocalization struct {
 	Gb      string `toml:"gb"`
 	Gba     string `toml:"gba"`
 	Nds     string `toml:"nds"`
+	About   string `toml:"about"`
 	Return  string `toml:"return"`
+}
+
+type AboutLocalization struct {
+	About string `toml:"about"`
+
+	Version   string `toml:"version"`
+	Copyright string `toml:"copyright"`
+	ThankYous string `toml:"thank_yous"`
 }
 
 type GeneralLocalization struct {

@@ -13,6 +13,7 @@ const (
 	MENU_GB
 	MENU_GBA
 	MENU_NDS
+	MENU_ABOUT
 	MENU_RETURN
 )
 
@@ -38,6 +39,7 @@ func NewSidebarFields(res *Resources) []SidebarField {
 		{l.Gb, func(g *Game) { NewGbMenu(g, g.ui.content) }},
 		{l.Gba, func(g *Game) { NewGbaMenu(g, g.ui.content) }},
 		{l.Nds, func(g *Game) { NewNdsMenu(g, g.ui.content) }},
+		{l.About, func(g *Game) { NewAboutMenu(g, g.ui.content) }},
 		{
 			l.Return, func(g *Game) {
 				switch g.ui.PrevPageId {
@@ -93,6 +95,21 @@ func buildSubMenu(g *Game, parent *widget.Container, fields []Field) {
 			)
 		}
 	}
+}
+
+func NewAboutMenu(g *Game, parent *widget.Container) {
+	l := g.ui.res.localization.Settings.About
+
+	parent.RemoveChildren()
+
+	parent.AddChild(NewSeparator(), NewHeader(l.About, g.ui.res))
+	parent.AddChild(NewSeparator(), NewLinkText(mainLink))
+	parent.AddChild(NewSeparator(), NewLinkText(l.Version))
+	parent.AddChild(NewSeparator(), NewLinkText(l.Copyright))
+	parent.AddChild(NewSeparator(), NewLinkText(l.ThankYous))
+
+	g.ui.focus.submenu = parent.GetFocusers()
+	g.ui.focus.BuildFocus(g.ui.ui)
 }
 
 func NewGeneralMenu(g *Game, parent *widget.Container) {
