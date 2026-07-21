@@ -1,8 +1,8 @@
 package apu
 
 type NoiseChannel struct {
-	Apu *Apu
-	Idx uint32
+	FsStep *uint8
+	Idx    uint32
 
 	lfsr    uint16
 	samples float64
@@ -30,8 +30,8 @@ func (ch *NoiseChannel) LengthTrigger() {
 		return
 	}
 
-	if ch.Apu.fsStep&1 != 0 {
-		ch.clockLength()
+	if *ch.FsStep&1 != 0 {
+		ch.ClockLength()
 	}
 }
 
@@ -56,7 +56,7 @@ func (ch *NoiseChannel) Trigger() {
 	ch.EnvVolume = ch.InitVolume
 }
 
-func (ch *NoiseChannel) clockLength() {
+func (ch *NoiseChannel) ClockLength() {
 	if !ch.LenEnabled {
 		return
 	}
@@ -78,7 +78,7 @@ func (ch *NoiseChannel) ResetLength(initLength uint8) {
 	ch.LengthCounter = 64 - initLength
 }
 
-func (ch *NoiseChannel) clockEnvelope() {
+func (ch *NoiseChannel) ClockEnvelope() {
 	if !ch.ChannelEnabled {
 		return
 	}

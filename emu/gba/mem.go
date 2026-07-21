@@ -437,7 +437,7 @@ func (m *Memory) ReadIO(addr uint32) uint8 {
 		case 0x8C, 0x8E, 0xA0, 0xA2, 0xA4, 0xA6, 0xA8, 0xAA, 0xAC, 0xAE:
 			return m.ReadOpenBus(addr)
 		default:
-			return ReadSound(addr, m.GBA.Apu)
+			return m.GBA.ReadSound(addr)
 		}
 	case addr >= 0xB0 && addr < 0xE0:
 

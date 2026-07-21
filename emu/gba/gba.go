@@ -55,7 +55,7 @@ func NewGBA(ctx *audio.Context, path string) *GBA {
 	gba := &GBA{
 		Pixels:       make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
 		Image:        ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
-		Apu:          apu.NewApu(ctx, BUFFER_SIZE, CPU_SPEED),
+		Apu:          apu.NewApu(ctx, BUFFER_SIZE),
 		Scheduler:    NewScheduler(),
 		IdleOptimize: config.Conf.Gba.IdleOptimize,
 	}

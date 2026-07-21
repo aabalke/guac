@@ -18,7 +18,7 @@ func (gba *GBA) ClockFrameSequencerEvent(late int64, arg any) {
 }
 
 func (gba *GBA) AudioSampleEvent(late int64, arg any) {
-	gba.Apu.SoundClock(false)
+	gba.Apu.SoundClock()
 	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, gba.CyclesPerSndGen-late, gba.AudioSampleEvent, nil)
 }
 

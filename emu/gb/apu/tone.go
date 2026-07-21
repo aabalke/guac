@@ -8,8 +8,8 @@ var (
 )
 
 type ToneChannel struct {
-	Apu *Apu
-	Idx uint32
+	FsStep *uint8
+	Idx    uint32
 
 	phase       bool
 	InFirstHalf bool
@@ -47,8 +47,8 @@ func (ch *ToneChannel) LengthTrigger() {
 		return
 	}
 
-	if ch.Apu.fsStep&1 != 0 {
-		ch.clockLength()
+	if *ch.FsStep&1 != 0 {
+		ch.ClockLength()
 	}
 }
 
@@ -82,7 +82,7 @@ func (ch *ToneChannel) Trigger() {
 	}
 }
 
-func (ch *ToneChannel) clockSweep() {
+func (ch *ToneChannel) ClockSweep() {
 	if ch.SweepTimer > 0 {
 		ch.SweepTimer -= 1
 	}
@@ -131,7 +131,7 @@ func (ch *ToneChannel) calcFreq() uint16 {
 	return newPeriod
 }
 
-func (ch *ToneChannel) clockLength() {
+func (ch *ToneChannel) ClockLength() {
 	if !ch.LenEnabled {
 		return
 	}
@@ -153,7 +153,7 @@ func (ch *ToneChannel) ResetLength(initLength uint8) {
 	ch.LengthCounter = 64 - initLength
 }
 
-func (ch *ToneChannel) clockEnvelope() {
+func (ch *ToneChannel) ClockEnvelope() {
 	if !ch.ChannelEnabled {
 		return
 	}
@@ -176,9 +176,9 @@ func (ch *ToneChannel) clockEnvelope() {
 	}
 }
 
-func (ch *ToneChannel) GetSample() int8 {
+func (ch *ToneChannel) GetSample(sampleRate float64) int8 {
 	freq := 131072 / float64(2048-ch.Shadow)
-	cycleSamples := float64(ch.Apu.Ctx.SampleRate()) / freq
+	cycleSamples := sampleRate / freq
 
 	ch.samples++
 	if ch.phase {

@@ -9,19 +9,19 @@ import (
 )
 
 type Apu struct {
-	stream utils.Stream
+	Stream utils.Stream
 	Ctx    *audio.Context
-	player *audio.Player
+	Player *audio.Player
 
 	ToneChannel1 ToneChannel
 	ToneChannel2 ToneChannel
 	WaveChannel  WaveChannel
 	NoiseChannel NoiseChannel
 
-	fsCounter       uint32
-	fsStep          uint8
-	pendingPowerOff bool
-	pendingPowerOn  bool
+	FsCounter       uint32
+	FsStep          uint8
+	PendingPowerOff bool
+	PendingPowerOn  bool
 	Enabled         bool
 	PanReg          uint8
 	Master          uint8
@@ -35,52 +35,52 @@ func NewApu(ctx *audio.Context, bufferSize time.Duration) *Apu {
 		a.Ctx = ctx
 
 		var err error
-		a.player, err = a.Ctx.NewPlayer(&a.stream)
+		a.Player, err = a.Ctx.NewPlayer(&a.Stream)
 		if err != nil {
 			panic(err)
 		}
-		a.player.SetBufferSize(bufferSize)
-		a.player.Play()
+		a.Player.SetBufferSize(bufferSize)
+		a.Player.Play()
 	}
 
-	a.ToneChannel1 = ToneChannel{Apu: a, Idx: 0}
-	a.ToneChannel2 = ToneChannel{Apu: a, Idx: 1}
+	a.ToneChannel1 = ToneChannel{FsStep: &a.FsStep, Idx: 0}
+	a.ToneChannel2 = ToneChannel{FsStep: &a.FsStep, Idx: 1}
+	a.NoiseChannel = NoiseChannel{FsStep: &a.FsStep, Idx: 3}
 	a.WaveChannel = WaveChannel{
-		Apu: a,
-		Idx: 2,
+		FsStep: &a.FsStep,
+		Idx:    2,
 		//WaveRam: [32]uint8{
 		//	0x84, 0x40, 0x43, 0xAA, 0x2D, 0x78, 0x92, 0x3C,
 		//	0x60, 0x59, 0x59, 0xB0, 0x34, 0xB8, 0x2E, 0xDA,
 		//},
 	}
-	a.NoiseChannel = NoiseChannel{Apu: a, Idx: 3}
 
 	return a
 }
 
 func (a *Apu) ToggleMute(muted bool) {
-	if a.player != nil {
+	if a.Player != nil {
 		if muted {
-			a.player.SetVolume(0)
+			a.Player.SetVolume(0)
 		} else {
-			a.player.SetVolume(1)
+			a.Player.SetVolume(1)
 		}
 	}
 }
 
 func (a *Apu) TogglePause(paused bool) {
-	if a.player != nil {
+	if a.Player != nil {
 		if paused {
-			a.player.Pause()
+			a.Player.Pause()
 		} else {
-			a.player.Play()
+			a.Player.Play()
 		}
 	}
 }
 
 func (a *Apu) Close() {
-	if a.player != nil {
-		a.player.Close()
+	if a.Player != nil {
+		a.Player.Close()
 	}
 }
 
@@ -108,7 +108,7 @@ func (a *Apu) SoundClock() {
 	psgL, psgR := int32(0), int32(0)
 
 	if ch1 {
-		ch := int32(a.ToneChannel1.GetSample())
+		ch := int32(a.ToneChannel1.GetSample(float64(a.Ctx.SampleRate())))
 		if ch1L {
 			psgL += ch
 		}
@@ -118,7 +118,7 @@ func (a *Apu) SoundClock() {
 	}
 
 	if ch2 {
-		ch := int32(a.ToneChannel2.GetSample())
+		ch := int32(a.ToneChannel2.GetSample(float64(a.Ctx.SampleRate())))
 		if ch2L {
 			psgL += ch
 		}
@@ -150,66 +150,66 @@ func (a *Apu) SoundClock() {
 	//l := clip(((psgL * volL) >> 3) >> 2)
 	//r := clip(((psgR * volR) >> 3) >> 2)
 
-	l := int16(clip(psgL * volL))
-	r := int16(clip(psgR * volR))
-	a.stream.Write(l, r)
+	l := int16(Clip(psgL * volL))
+	r := int16(Clip(psgR * volR))
+	a.Stream.Write(l, r)
 }
 
 //go:inline
-func clip(v int32) int32 {
+func Clip(v int32) int32 {
 	return min(math.MaxInt16, max(math.MinInt16, v))
 }
 
 func (a *Apu) PowerOff() {
-	a.ToneChannel1 = ToneChannel{Idx: 0, Apu: a}
-	a.ToneChannel2 = ToneChannel{Idx: 1, Apu: a}
-	a.WaveChannel = WaveChannel{Idx: 2, Apu: a, Ram: a.WaveChannel.Ram}
-	a.NoiseChannel = NoiseChannel{Idx: 3, Apu: a}
+	a.ToneChannel1 = ToneChannel{FsStep: &a.FsStep, Idx: 0}
+	a.ToneChannel2 = ToneChannel{FsStep: &a.FsStep, Idx: 1}
+	a.WaveChannel = WaveChannel{FsStep: &a.FsStep, Idx: 2, Ram: a.WaveChannel.Ram}
+	a.NoiseChannel = NoiseChannel{FsStep: &a.FsStep, Idx: 3}
 	a.Master = 0
 	a.PanReg = 0
-	a.pendingPowerOff = true
+	a.PendingPowerOff = true
 }
 
 func (a *Apu) PowerOn() {
-	a.pendingPowerOn = true
-	a.fsStep = 0
-	a.fsCounter = 0
+	a.PendingPowerOn = true
+	a.FsStep = 0
+	a.FsCounter = 0
 }
 
 func (a *Apu) ClockFrameSequencer() {
-	if a.pendingPowerOff {
-		a.fsStep = 0
-		a.pendingPowerOff = false
+	if a.PendingPowerOff {
+		a.FsStep = 0
+		a.PendingPowerOff = false
 	}
 
-	if a.pendingPowerOn {
-		a.fsStep = 0
-		a.pendingPowerOn = false
+	if a.PendingPowerOn {
+		a.FsStep = 0
+		a.PendingPowerOn = false
 	}
 
-	a.fsCounter++
+	a.FsCounter++
 
 	// frame sequencer runs at 512hz
 	// length ctr at 256hz
 	// sweep at 128hz
 	// vol at 64hz
 
-	if a.fsStep&1 == 0 {
-		a.ToneChannel1.clockLength()
-		a.ToneChannel2.clockLength()
-		a.WaveChannel.clockLength()
-		a.NoiseChannel.clockLength()
+	if a.FsStep&1 == 0 {
+		a.ToneChannel1.ClockLength()
+		a.ToneChannel2.ClockLength()
+		a.WaveChannel.ClockLength()
+		a.NoiseChannel.ClockLength()
 	}
 
-	if a.fsStep == 2 || a.fsStep == 6 {
-		a.ToneChannel1.clockSweep()
+	if a.FsStep == 2 || a.FsStep == 6 {
+		a.ToneChannel1.ClockSweep()
 	}
 
-	if a.fsStep == 7 {
-		a.ToneChannel1.clockEnvelope()
-		a.ToneChannel2.clockEnvelope()
-		a.NoiseChannel.clockEnvelope()
+	if a.FsStep == 7 {
+		a.ToneChannel1.ClockEnvelope()
+		a.ToneChannel2.ClockEnvelope()
+		a.NoiseChannel.ClockEnvelope()
 	}
 
-	a.fsStep = (a.fsStep + 1) & 7
+	a.FsStep = (a.FsStep + 1) & 7
 }

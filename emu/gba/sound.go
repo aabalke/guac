@@ -1,9 +1,5 @@
 package gba
 
-import (
-	"github.com/aabalke/guac/emu/gba/apu"
-)
-
 func (gba *GBA) WriteSound(addr uint32, v uint8) {
 	a := gba.Apu
 
@@ -208,7 +204,7 @@ func (gba *GBA) WriteSound(addr uint32, v uint8) {
 
 			div := 1 << (ch.S + 1)
 			frequency := (524288 / r) / float64(div)
-			ch.CycleSamples = float64(ch.Apu.Ctx.SampleRate()) / frequency
+			ch.CycleSamples = float64(gba.Apu.Ctx.SampleRate()) / frequency
 
 		case 0x7D:
 
@@ -238,7 +234,9 @@ func (gba *GBA) WriteSound(addr uint32, v uint8) {
 	}
 }
 
-func ReadSound(addr uint32, a *apu.Apu) uint8 {
+func (gba *GBA) ReadSound(addr uint32) uint8 {
+	a := gba.Apu
+
 	if wave := addr >= 0x90 && addr < 0xA0; wave {
 		bank := uint16(a.WaveChannel.BankIdx) << 4
 		idx := (bank ^ 0x10) | uint16(addr)&0xF

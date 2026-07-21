@@ -1,28 +1,26 @@
 package apu
 
 type WaveChannel struct {
-	Apu *Apu
-	Idx uint32
+	FsStep *uint8
+	Idx    uint32
 
-	Ram [0x10]uint8
+	// gba uses banking and DoubleSize, gb only [0x10]uint8
+	Ram [0x20]uint8
 
-	OutputLevel uint8
-
-	WavePosition  uint8
-	LengthCounter uint16
-	Period        uint16
-	ActivePeriod  uint16
-
-	LastReadCycle uint32
-	Sample        uint8
-	SampleByte    uint8
-
-	accCycles uint32
-
+	LastReadCycle  uint32
+	OutputLevel    uint8
+	WavePosition   uint8
+	LengthCounter  uint16
+	Period         uint16
+	ActivePeriod   uint16
+	Sample         uint8
+	SampleByte     uint8
 	DACEnabled     bool
 	EnvEnabled     bool
 	LenEnabled     bool
 	ChannelEnabled bool
+	BankIdx        uint8
+	DoubleSize     bool
 }
 
 func (ch *WaveChannel) LengthTrigger() {
@@ -30,8 +28,8 @@ func (ch *WaveChannel) LengthTrigger() {
 		return
 	}
 
-	if ch.Apu.fsStep&1 != 0 {
-		ch.clockLength()
+	if *ch.FsStep&1 != 0 {
+		ch.ClockLength()
 	}
 }
 
@@ -46,16 +44,12 @@ func (ch *WaveChannel) Trigger() {
 	}
 
 	// bank
-	ch.WavePosition = 0
+	ch.WavePosition = 0 | (ch.BankIdx << 5)
 	ch.ChannelEnabled = true
 	ch.ActivePeriod = ch.Period
-	ch.accCycles = 0
-
-	//fmt.Printf("Trigger. Active Period is %04d tcycles\n", (2048-ch.ActivePeriod)<<1)
-	//debug.B[3] = true
 }
 
-func (ch *WaveChannel) clockLength() {
+func (ch *WaveChannel) ClockLength() {
 	if !ch.LenEnabled {
 		return
 	}
@@ -92,11 +86,37 @@ func (ch *WaveChannel) GetSample() int8 {
 		vol >>= 1
 	case 3:
 		vol >>= 2
+	default:
+		// 75 % on gba
+		vol = (vol >> 2) + (vol >> 1)
 	}
 
 	vol <<= 3
 
 	return vol
+}
+
+func (ch *WaveChannel) ClockRam() {
+	if !ch.ChannelEnabled {
+		return
+	}
+
+	// wave position has range 0...31 or 0...63 depending on double size
+
+	if ch.DoubleSize {
+		ch.WavePosition = ((ch.WavePosition + 1) & 0x3F)
+	} else {
+		ch.WavePosition = ((ch.WavePosition + 1) & 0x1F) | (ch.BankIdx << 5)
+	}
+
+	if ch.WavePosition&1 == 0 {
+		ch.Sample = ch.SampleByte >> 4
+	} else {
+		ch.ActivePeriod = ch.Period
+		b := ch.Ram[ch.WavePosition>>1]
+		ch.SampleByte = b
+		ch.Sample = ch.SampleByte & 0xF
+	}
 }
 
 //func (ch *WaveChannel) Reset() {
