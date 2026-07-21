@@ -17,8 +17,7 @@ type WaveChannel struct {
 	Sample        uint8
 	SampleByte    uint8
 
-	cyclesPerSample uint32
-	accCycles       uint32
+	accCycles uint32
 
 	DACEnabled     bool
 	EnvEnabled     bool
@@ -76,39 +75,6 @@ func (ch *WaveChannel) clockLength() {
 
 func (ch *WaveChannel) ResetLength(initLength uint8) {
 	ch.LengthCounter = 256 - uint16(initLength)
-}
-
-// wave channel period divider is 1/2 cpu speed (2097152hz)
-// relative to cpu cycles, clocked at CPU_CYCLE / (2 * (2048 - period))
-func (ch *WaveChannel) ClockWave(tCycles, frameCycles uint32) {
-	if !ch.ChannelEnabled {
-		return
-	}
-
-	ch.cyclesPerSample = uint32(2048-ch.ActivePeriod) << 1
-	ch.accCycles += tCycles
-
-	for i := 0; ch.accCycles >= ch.cyclesPerSample; i++ {
-		// need to set bank as well
-		ch.accCycles -= ch.cyclesPerSample
-
-		ch.WavePosition = (ch.WavePosition + 1) & 0x1F
-		//ch.ReadLatch = ch.accCycles == 0
-
-		// instead of read latch, have read latch cycle cnt
-
-		ch.LastReadCycle = frameCycles - ch.accCycles
-
-		if ch.WavePosition&1 == 0 {
-			ch.Sample = ch.SampleByte >> 4
-		} else {
-			ch.ActivePeriod = ch.Period
-			ch.cyclesPerSample = uint32(2048-ch.ActivePeriod) << 1
-			b := ch.Ram[ch.WavePosition>>1]
-			ch.SampleByte = b
-			ch.Sample = ch.SampleByte & 0xF
-		}
-	}
 }
 
 func (ch *WaveChannel) GetSample() int8 {

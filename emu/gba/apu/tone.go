@@ -1,138 +1,207 @@
 package apu
 
-var dutyLookUp = [4]float64{0.125, 0.25, 0.5, 0.75}
-var dutyLookUpi = [4]float64{0.875, 0.75, 0.5, 0.25}
+// source https://nightshade256.github.io/2021/03/27/gb-sound-emulation.html
 
-const (
-	PSG_MAX = 0x7f
-	PSG_MIN = -0x80
+var (
+	DutyLookUp  = [4]float64{0.125, 0.25, 0.5, 0.75}
+	DutyLookUpi = [4]float64{0.875, 0.75, 0.5, 0.25}
 )
 
 type ToneChannel struct {
-	Apu              *Apu
-	Idx              uint32
-	CntL, CntH, CntX uint16
+	Apu *Apu
+	Idx uint32
 
-	phase                                   bool
-	samples, lengthTime, sweepTime, envTime float64
+	phase       bool
+	InFirstHalf bool
+	Duty        uint8
+
+	samples float64
+
+	SweepPace     uint8
+	SweepDecrease bool
+	SweepStep     uint8
+	SweepEnabled  bool
+	SweepTimer    uint8
+	Shadow        uint16
+
+	NegateLatch bool
+
+	Period uint16
+
+	LengthCounter uint8
+	EnvTimer      uint8
+	EnvVolume     uint8
+
+	InitVolume   uint8
+	EnvPace      uint8
+	EnvIncrement bool
+
+	DACEnabled     bool
+	EnvEnabled     bool
+	LenEnabled     bool
+	ChannelEnabled bool
 }
 
-func (ch *ToneChannel) GetSample(doubleSpeed bool) int8 {
-
-	if !ch.Apu.isSoundChanEnable(uint8(ch.Idx)) {
-		return 0
+func (ch *ToneChannel) LengthTrigger() {
+	if ch.LengthCounter == 0 {
+		return
 	}
 
-	multipler := uint16(1)
-	if doubleSpeed {
-		multipler = 2
+	if ch.Apu.fsStep&1 != 0 {
+		ch.clockLength()
+	}
+}
+
+func (ch *ToneChannel) Trigger() {
+	if ch.LengthCounter == 0 {
+		ch.ResetLength(0)
+		ch.LengthTrigger()
 	}
 
-	//toneAddr := uint32(ch.CntH)
-	freqHz := ch.CntX & 0b0111_1111_1111
-	frequency := 131072 / float64(2048-freqHz)
-
-	// Full length of the generated wave (if enabled) in seconds
-	soundLen := ch.CntH & 0b0011_1111
-	//length := float64(64-soundLen) / 256
-	maxTimer := 64.0 * float64(multipler)
-	divApuRate := float64(multipler) / 256.0
-	length := (maxTimer - float64(soundLen)) * divApuRate
-	//length := float64((multipler * 64)-soundLen) / (256) * 2
-
-	// Envelope volume change interval in seconds
-	envStep := ch.CntH >> 8 & 0b111
-	envelopeInterval := float64(envStep) / float64(64)
-
-	cycleSamples := float64(ch.Apu.sndFrequency) / frequency // Numbers of samples that a single cycle (wave phase change 1 -> 0) takes at output sample rate
-
-	// Length reached check (if so, just disable the channel and return silence)
-
-	if lenFlag := BitEnabled(uint32(ch.CntX), 14); lenFlag {
-		ch.lengthTime += ch.Apu.sampleTime
-		if ch.lengthTime >= length {
-			ch.Apu.enableSoundChan(int(ch.Idx), false)
-			return 0
-		}
+	if !ch.DACEnabled {
+		return
 	}
 
-	// Frequency sweep (Square 1 channel only)
-	if ch.Idx == 0 {
-		sweepTime := (ch.CntL >> 4) & 0b111            // 0-7 (0=7.8ms, 7=54.7ms)
-		sweepInterval := 0.0078 * float64(sweepTime+1) // Frquency sweep change interval in seconds
+	ch.phase = false
+	ch.samples = 0
 
-		ch.sweepTime += ch.Apu.sampleTime
-		if ch.sweepTime >= sweepInterval {
-			ch.sweepTime -= sweepInterval
+	ch.Shadow = ch.Period
+	ch.SweepTimer = ch.SweepPace
+	if ch.SweepTimer == 0 {
+		ch.SweepTimer = 8
+	}
+	ch.SweepEnabled = ch.SweepStep != 0 || ch.SweepPace != 0
 
-			// A Sweep Shift of 0 means that Sweep is disabled
-			sweepShift := byte(ch.CntL & 0b111)
+	ch.EnvTimer = ch.EnvPace
+	ch.EnvVolume = ch.InitVolume
+	ch.ChannelEnabled = true
+	ch.NegateLatch = false
 
-			if sweepShift != 0 {
-				// X(t) = X(t-1) ± X(t-1)/2^n
-				disp := freqHz >> sweepShift // X(t-1)/2^n
-				if decrease := BitEnabled(uint32(ch.CntL), 3); decrease {
-					freqHz -= disp
-				} else {
-					freqHz += disp
-				}
+	if ch.SweepStep != 0 {
+		ch.calcFreq()
+	}
+}
 
-				if freqHz < 0x7ff {
-					// update frequency
-					cntx := (ch.CntX & ^uint16(0x7ff)) | uint16(freqHz)
-					ch.CntX = cntx
-
-				} else {
-					ch.Apu.enableSoundChan(int(ch.Idx), false)
-				}
-			}
-		}
+func (ch *ToneChannel) clockSweep() {
+	if ch.SweepTimer > 0 {
+		ch.SweepTimer -= 1
 	}
 
-	// Envelope volume
-	envelope := (ch.CntH >> 12) & 0xf
-	if envStep > 0 {
-		ch.envTime += ch.Apu.sampleTime
-
-		if ch.envTime >= envelopeInterval {
-			ch.envTime -= envelopeInterval
-
-			if increment := BitEnabled(uint32(ch.CntH), 11); increment {
-				if envelope < 0xf {
-					envelope++
-				}
-			} else {
-				if envelope > 0 {
-					envelope--
-				}
-			}
-
-			ch.CntH = (ch.CntH & ^uint16(0xf000)) | (envelope << 12)
-		}
+	if ch.SweepTimer != 0 {
+		return
 	}
 
-	// Phase change (when the wave goes from Low to High or High to Low, the Square Wave pattern)
-	duty := (ch.CntH >> 6) & 0b11
+	if ch.SweepPace != 0 {
+		ch.SweepTimer = ch.SweepPace
+	} else {
+		ch.SweepTimer = 8
+	}
+
+	if !ch.SweepEnabled {
+		return
+	}
+
+	if ch.SweepPace == 0 {
+		return
+	}
+
+	newPeriod := ch.calcFreq()
+	if newPeriod <= 2047 && ch.SweepStep > 0 {
+		ch.Period = newPeriod
+		ch.Shadow = newPeriod
+		ch.calcFreq()
+	}
+}
+
+func (ch *ToneChannel) calcFreq() uint16 {
+	newPeriod := ch.Shadow >> ch.SweepStep
+
+	if ch.SweepDecrease {
+		newPeriod = ch.Shadow - newPeriod
+		ch.NegateLatch = true
+
+	} else {
+		newPeriod = ch.Shadow + newPeriod
+	}
+
+	if newPeriod > 2047 {
+		ch.ChannelEnabled = false
+	}
+
+	return newPeriod
+}
+
+func (ch *ToneChannel) clockLength() {
+	if !ch.LenEnabled {
+		return
+	}
+
+	if ch.LengthCounter == 0 {
+		return
+	}
+
+	ch.LengthCounter--
+
+	if ch.LengthCounter != 0 {
+		return
+	}
+
+	ch.ChannelEnabled = false
+}
+
+func (ch *ToneChannel) ResetLength(initLength uint8) {
+	ch.LengthCounter = 64 - initLength
+}
+
+func (ch *ToneChannel) clockEnvelope() {
+	if !ch.ChannelEnabled {
+		return
+	}
+
+	if !ch.EnvEnabled {
+		return
+	}
+
+	ch.EnvTimer--
+
+	if ch.EnvTimer != 0 {
+		return
+	}
+
+	ch.EnvTimer = ch.EnvPace
+	if ch.EnvIncrement && ch.EnvVolume < 15 {
+		ch.EnvVolume++
+	} else if !ch.EnvIncrement && ch.EnvVolume > 0 {
+		ch.EnvVolume--
+	}
+}
+
+func (ch *ToneChannel) GetSample() int8 {
+	freq := 131072 / float64(2048-ch.Shadow)
+	cycleSamples := float64(ch.Apu.Ctx.SampleRate()) / freq
+
 	ch.samples++
 	if ch.phase {
-		// 1 -> 0 -_
-		phaseChange := cycleSamples * dutyLookUp[duty]
-		if ch.samples > phaseChange {
-			ch.samples -= phaseChange
+		if ch.samples > cycleSamples*DutyLookUp[ch.Duty] {
+			ch.samples -= cycleSamples * DutyLookUp[ch.Duty]
 			ch.phase = false
 		}
 	} else {
-		// 0 -> 1 _-
-		phaseChange := cycleSamples * dutyLookUpi[duty]
-		if ch.samples > phaseChange {
-			ch.samples -= phaseChange
+		if ch.samples > cycleSamples*DutyLookUpi[ch.Duty] {
+			ch.samples -= cycleSamples * DutyLookUpi[ch.Duty]
 			ch.phase = true
 		}
 	}
 
-	if ch.phase {
-		return int8(float64(envelope) * PSG_MAX / 15)
+	vol := uint8(ch.InitVolume)
+	if ch.EnvEnabled {
+		vol = ch.EnvVolume
 	}
-	return int8(float64(envelope) * PSG_MIN / 15)
 
+	vol <<= 3 // original range 0...15, need 0..127 for int8
+
+	if ch.phase {
+		return int8(vol)
+	}
+	return -int8(vol)
 }

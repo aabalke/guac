@@ -1,5 +1,22 @@
 package gba
 
+func (gba *GBA) WaveRamClock(late int64, arg any) {
+	ch := &gba.Apu.WaveChannel
+
+	ch.ClockRam()
+
+	if ch.ChannelEnabled {
+		// period * 4 since gba is 4x speed
+		period := (int64(2048-ch.ActivePeriod) << 1) << 2
+		gba.Scheduler.schedule(EVENT_SND_WAVE_CLK, 1, period-late, gba.WaveRamClock, nil)
+	}
+}
+
+func (gba *GBA) ClockFrameSequencerEvent(late int64, arg any) {
+	gba.Apu.ClockFrameSequencer()
+	gba.Scheduler.schedule(EVENT_SND_FRAME_SEQ, 1, CYCLES_PER_FRAME_SEQ-late, gba.ClockFrameSequencerEvent, nil)
+}
+
 func (gba *GBA) AudioSampleEvent(late int64, arg any) {
 	gba.Apu.SoundClock(false)
 	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, gba.CyclesPerSndGen-late, gba.AudioSampleEvent, nil)

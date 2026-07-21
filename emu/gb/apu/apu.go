@@ -20,15 +20,11 @@ type Apu struct {
 
 	fsCounter       uint32
 	fsStep          uint8
-	Enabled         bool
 	pendingPowerOff bool
 	pendingPowerOn  bool
+	Enabled         bool
 	PanReg          uint8
 	Master          uint8
-}
-
-type Channel interface {
-	GetSample() int8
 }
 
 func NewApu(ctx *audio.Context, bufferSize time.Duration) *Apu {

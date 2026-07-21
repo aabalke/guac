@@ -203,7 +203,7 @@ func (t *Timer) OnTimerOverflow(late int64) {
 		t.Gba.Irq.SetIRQ(3 + uint32(t.Idx))
 	}
 
-	if t.Idx < 2 && t.Gba.Apu.SoundCntX&0x80 != 0 {
+	if t.Idx < 2 && t.Gba.Apu.Enabled {
 		if aTick := (t.Gba.Apu.SoundCntH>>10)&1 == uint16(t.Idx); aTick {
 			fifo := &t.Gba.Apu.FifoA
 

@@ -22,6 +22,9 @@ const (
 	CYCLES_VDRAW    = CYCLES_SCANLINE * SCREEN_HEIGHT
 	CYCLES_VBLANK   = CYCLES_SCANLINE * 68
 	CYCLES_FRAME    = CYCLES_VDRAW + CYCLES_VBLANK
+
+	// dmg is 8192, needs to be 4x to match 512hz clocking
+	CYCLES_PER_FRAME_SEQ = 8192 * 4
 )
 
 type GBA struct {
@@ -76,6 +79,7 @@ func NewGBA(ctx *audio.Context, path string) *GBA {
 
 	if ctx != nil {
 		gba.CyclesPerSndGen = int64(CPU_SPEED / ctx.SampleRate())
+		gba.Scheduler.schedule(EVENT_SND_FRAME_SEQ, 1, 0, gba.ClockFrameSequencerEvent, nil)
 		gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, 0, gba.AudioSampleEvent, nil)
 	}
 

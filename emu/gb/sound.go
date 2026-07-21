@@ -116,10 +116,6 @@ func (gb *GameBoy) WriteSound(addr, v uint8, a *apu.Apu) {
 			ch.Period &^= 0x00FF
 			ch.Period |= uint16(v)
 
-			//if int8(v) == -2 {
-			//	fmt.Printf("Write Period -2\n")
-			//}
-
 		case 0x1E:
 
 			ch.Period &^= 0xFF00

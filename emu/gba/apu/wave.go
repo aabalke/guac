@@ -4,96 +4,129 @@ type WaveChannel struct {
 	Apu *Apu
 	Idx uint32
 
-	CntL, CntH, CntX uint16
-	WaveRam          [0x20]uint8
+	Ram [0x20]uint8
 
-	samples, lengthTime float64
-
-	WaveSamples, WavePosition uint8
+	OutputLevel    uint8
+	WavePosition   uint8
+	LengthCounter  uint16
+	Period         uint16
+	ActivePeriod   uint16
+	Sample         uint8
+	SampleByte     uint8
+	DACEnabled     bool
+	EnvEnabled     bool
+	LenEnabled     bool
+	ChannelEnabled bool
+	BankIdx        uint8
+	DoubleSize     bool
 }
 
-func (ch *WaveChannel) GetSample(doubleSpeed bool) int8 {
-
-	if !ch.Apu.isSoundChanEnable(uint8(ch.Idx)) {
-		return 0
-	}
-
-	if !BitEnabled(uint32(ch.CntL), 7) {
-		return 0
-	}
-
-	multipler := uint16(1)
-	if doubleSpeed {
-		multipler = 2
-	}
-	maxTimer := 256.0 * float64(multipler)
-	divApuRate := float64(multipler) / 256.0
-
-	soundLength := GetVarData(uint32(ch.CntH), 0, 7)
-	length := (maxTimer - float64(soundLength)) * divApuRate
-
-	if stopAtLength := BitEnabled(uint32(ch.CntX), 14); stopAtLength {
-		ch.lengthTime += ch.Apu.sampleTime
-		if stop := ch.lengthTime >= length; stop {
-			ch.Apu.enableSoundChan(int(ch.Idx), false)
-			return 0
-		}
-	}
-
-	rate := GetVarData(uint32(ch.CntX), 0, 10)
-	freq := 2097152 / (2048 - float64(rate))
-	cycleSamples := float64(ch.Apu.sndFrequency) / freq
-
-	ch.samples++
-	if ch.samples >= cycleSamples {
-		ch.samples -= cycleSamples
-
-		ch.WaveSamples--
-		if ch.WaveSamples != 0 {
-			ch.WavePosition = (ch.WavePosition + 1) & 0b0011_1111
-		} else {
-			ch.Reset()
-		}
-	}
-
-	wavedata := ch.WaveRam[(uint32(ch.WavePosition)>>1)&0x1f]
-	sample := (float64((wavedata>>((ch.WavePosition&1)<<2))&0xf) - 0x8) / 8
-
-	if forceVolume := BitEnabled(uint32(ch.CntH), 15); forceVolume {
-
-		sample *= 0.75
-	} else {
-		switch vol := GetVarData(uint32(ch.CntH), 13, 14); vol {
-		case 0:
-			sample = 0
-		case 1:
-		case 2:
-			sample *= 0.5
-		case 3:
-			sample *= 0.25
-		}
-	}
-
-	//if sample >= 0 {
-	//	return int8(sample / 5 * PSG_MAX)
-	//}
-	//return int8(sample / (-6) * PSG_MIN)
-
-	if sample >= 0 {
-		return int8(sample / 7 * PSG_MAX)
-	}
-	return int8(sample / (-8) * PSG_MIN)
-}
-
-func (ch *WaveChannel) Reset() {
-
-	if twoBanks := BitEnabled(uint32(ch.CntL), 5); twoBanks {
-		ch.WavePosition = 0
-		ch.WaveSamples = 64
+func (ch *WaveChannel) LengthTrigger() {
+	if ch.LengthCounter == 0 {
 		return
 	}
 
-	bankIdx := (ch.CntL >> 6) & 0b1
-	ch.WavePosition = uint8(32 * bankIdx)
-	ch.WaveSamples = 32
+	if ch.Apu.fsStep&1 != 0 {
+		ch.clockLength()
+	}
 }
+
+func (ch *WaveChannel) Trigger() {
+	if ch.LengthCounter == 0 {
+		ch.ResetLength(0)
+		ch.LengthTrigger()
+	}
+
+	if !ch.DACEnabled {
+		return
+	}
+
+	// bank
+	ch.WavePosition = 0 | (ch.BankIdx << 5)
+	ch.ChannelEnabled = true
+	ch.ActivePeriod = ch.Period
+}
+
+func (ch *WaveChannel) clockLength() {
+	if !ch.LenEnabled {
+		return
+	}
+
+	if ch.LengthCounter == 0 {
+		return
+	}
+
+	ch.LengthCounter--
+
+	if ch.LengthCounter != 0 {
+		return
+	}
+
+	ch.ChannelEnabled = false
+}
+
+func (ch *WaveChannel) ResetLength(initLength uint8) {
+	ch.LengthCounter = 256 - uint16(initLength)
+}
+
+func (ch *WaveChannel) GetSample() int8 {
+	// -8 changes the wave to be signed 0...15 to -8...7
+	// vol := int8(ch.Buffer[ch.WavePosition & 0x1F]) - 8
+	vol := int8(ch.Sample) - 8
+
+	switch ch.OutputLevel {
+	case 0:
+		//vol >>= 4
+		vol = 0
+	case 1:
+		//vol >>= 0
+	case 2:
+		vol >>= 1
+	case 3:
+		vol >>= 2
+	default:
+		// 75 % on gba
+		vol = (vol >> 2) + (vol >> 1)
+	}
+
+	vol <<= 3
+
+	return vol
+}
+
+func (ch *WaveChannel) ClockRam() {
+	if !ch.ChannelEnabled {
+		return
+	}
+
+	// wave position has range 0...31 or 0...63 depending on double size
+
+	if ch.DoubleSize {
+		ch.WavePosition = ((ch.WavePosition + 1) & 0x3F)
+	} else {
+		ch.WavePosition = ((ch.WavePosition + 1) & 0x1F) | (ch.BankIdx << 5)
+	}
+
+	if ch.WavePosition&1 == 0 {
+		ch.Sample = ch.SampleByte >> 4
+	} else {
+		ch.ActivePeriod = ch.Period
+		b := ch.Ram[ch.WavePosition>>1]
+		ch.SampleByte = b
+		ch.Sample = ch.SampleByte & 0xF
+	}
+}
+
+//func (ch *WaveChannel) Reset() {
+//
+//	//if twoBanks := (ch.CntL >> 5) & 1 != 0; twoBanks {
+//	//	ch.WavePosition = 0
+//	//	ch.WaveSamples = 64
+//	//	return
+//	//}
+//
+//	//bankIdx := (ch.CntL >> 6) & 0b1
+//	bankIdx := 0
+//	ch.WavePosition = uint8(32 * bankIdx)
+//	ch.WaveSamples = 32
+//}

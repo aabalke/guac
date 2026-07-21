@@ -667,7 +667,7 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 		return
 
 	case addr < 0xB0:
-		WriteSound(addr, v, m.GBA.Apu)
+		m.GBA.WriteSound(addr, v)
 		return
 	case addr >= 0xB0 && addr < 0xE0:
 

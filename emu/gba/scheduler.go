@@ -19,8 +19,10 @@ const (
 	EVENT_DMA1            = "event dma 1"
 	EVENT_DMA2            = "event dma 2"
 	EVENT_DMA3            = "event dma 3"
-	EVENT_IRQ_SET         = "irq set"
+	EVENT_IRQ_SET         = "event irq set"
 	EVENT_SIO             = "event sio"
+	EVENT_SND_FRAME_SEQ   = "event sound frame sequencer"
+	EVENT_SND_WAVE_CLK    = "event sound wave clock"
 )
 
 type Scheduler struct {
