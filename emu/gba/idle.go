@@ -181,11 +181,9 @@ func (gba *GBA) SetIdleAddr() {
 		Title string
 		Code  string
 	}{Title: gba.Cartridge.Title, Code: gba.Cartridge.Code}]
-	if !ok {
-		return
+	if ok {
+		// subtracting 8 since pipeline is not emulated
+		gba.vsyncAddr = v
+		log.Printf("Idle Loop Address Set %08X\n", v)
 	}
-
-	// subtracting 8 since pipeline is not emulated
-	gba.vsyncAddr = v
-	log.Printf("Idle Loop Address Set %08X\n", v)
 }

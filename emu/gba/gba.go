@@ -89,6 +89,9 @@ func NewGBA(ctx *audio.Context, path string) *GBA {
 	gba.Mem.Dispstat |= DISP_VBL
 	gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, CYCLES_HBLANK, gba.ScanlineEndEvent, nil)
 
+	gba.SetIdleAddr()
+	gba.Apu.SoundBias = 0x0200
+
 	if config.Conf.Gba.Bios.Direct {
 		gba.DirectBoot()
 	} else {
@@ -96,10 +99,6 @@ func NewGBA(ctx *audio.Context, path string) *GBA {
 	}
 
 	gba.Booted = true
-
-	gba.SetIdleAddr()
-
-	gba.Apu.SoundBias = 0x0200
 
 	return gba
 }
