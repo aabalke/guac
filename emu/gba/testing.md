@@ -60,7 +60,7 @@ Additionally, other ARMv5 instructions will fail.
 [Link](https://github.com/hades-emu/Hades-Tests)
 
 👍 Bios Open Bus [12/12]
-❌ Dma Latch [3/4]
+👍 Dma Latch [4/4]
 👍 Dma Start Delay [8/8]
 👍 Timer Basic [10/10]
 

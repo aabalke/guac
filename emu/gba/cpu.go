@@ -313,30 +313,35 @@ func (c *Cpu) Write8(addr uint32, v uint8) {
 	c.Cycles(addr, 1, NONSEQ)
 	c.gba.Mem.Write8(addr, v)
 	c.Seq = NONSEQ
+	c.LastWasDma = false
 }
 
 func (c *Cpu) Write16(addr uint32, v uint16) {
 	c.Cycles(addr, 2, NONSEQ)
 	c.gba.Mem.Write16(addr, v)
 	c.Seq = NONSEQ
+	c.LastWasDma = false
 }
 
 func (c *Cpu) Write32(addr, v uint32) {
 	c.Cycles(addr, 4, NONSEQ)
 	c.gba.Mem.Write32(addr, v)
 	c.Seq = NONSEQ
+	c.LastWasDma = false
 }
 
 func (c *Cpu) Write32Block(addr, v, seq uint32) {
 	c.Cycles(addr, 4, seq)
 	c.gba.Mem.Write32(addr, v)
 	c.Seq = NONSEQ
+	c.LastWasDma = false
 }
 
 func (c *Cpu) Read8(addr uint32) uint32 {
 	c.Cycles(addr, 1, NONSEQ)
 	v := c.gba.Mem.Read8(addr)
 	c.idle(1)
+	c.LastWasDma = false
 	return v
 }
 
@@ -344,6 +349,7 @@ func (c *Cpu) Read16(addr uint32) uint32 {
 	c.Cycles(addr, 2, NONSEQ)
 	v := c.gba.Mem.Read16(addr)
 	c.idle(1)
+	c.LastWasDma = false
 	return v
 }
 
@@ -351,17 +357,18 @@ func (c *Cpu) Read32(addr uint32) uint32 {
 	c.Cycles(addr, 4, NONSEQ)
 	v := c.gba.Mem.Read32(addr)
 	c.idle(1)
+	c.LastWasDma = false
 	return v
 }
 
 func (c *Cpu) Read32Block(addr, seq uint32) uint32 {
 	c.Cycles(addr, 4, seq)
 	v := c.gba.Mem.Read32(addr)
+	c.LastWasDma = false
 	return v
 }
 
 func (c *Cpu) CyclesDma(addr, width, seq uint32) {
-	c.LastWasDma = true
 	c.ParallelDmaCycles = 0
 
 	t := c.gba.Mem.Timings
@@ -461,8 +468,6 @@ func (c *Cpu) CyclesInst(addr, width, seq uint32) {
 		seq = NONSEQ
 	}
 
-	c.LastWasDma = false
-
 	cycles := t.Timings[flag32][seq][region]
 
 	if t.Disabled {
@@ -505,8 +510,6 @@ func (c *Cpu) Cycles(addr, width, seq uint32) {
 		if addr&0x1FFFF == 0 || c.LastWasDma {
 			seq = NONSEQ
 		}
-
-		c.LastWasDma = false
 
 		if t.Active {
 			t.Cancel(c.Reg.R[15], c.gba.Tick)

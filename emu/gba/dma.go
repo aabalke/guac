@@ -310,6 +310,7 @@ func (ch *Channel) transfer() {
 				} else {
 					ch.Value = *(*uint32)(ch.latched.srcPtr)
 				}
+				ch.dma.Gba.Cpu.LastWasDma = true
 				ch.dma.LatchValue = ch.Value
 			}
 
@@ -319,6 +320,7 @@ func (ch *Channel) transfer() {
 			} else {
 				*(*uint32)(ch.latched.dstPtr) = ch.Value
 			}
+			ch.dma.Gba.Cpu.LastWasDma = true
 
 		} else {
 
@@ -344,6 +346,7 @@ func (ch *Channel) transfer() {
 				} else {
 					v = *(*uint32)(ch.latched.srcPtr) & 0xFFFF
 				}
+				ch.dma.Gba.Cpu.LastWasDma = true
 
 				ch.Value = v | (v << 16)
 				ch.dma.LatchValue = ch.Value
@@ -355,6 +358,7 @@ func (ch *Channel) transfer() {
 			} else {
 				*(*uint16)(ch.latched.dstPtr) = uint16(v)
 			}
+			ch.dma.Gba.Cpu.LastWasDma = true
 		}
 
 		ch.latched.src = uint32(int(ch.latched.src) + srcOffset)
