@@ -7,9 +7,8 @@ type NoiseChannel struct {
 	lfsr    uint16
 	samples float64
 
-	S, R         uint8
-	Width7       bool
-	CycleSamples float64
+	Divider, Shift uint8
+	Width7         bool
 
 	LengthCounter uint8
 	EnvTimer      uint8
@@ -102,21 +101,6 @@ func (ch *NoiseChannel) ClockEnvelope() {
 }
 
 func (ch *NoiseChannel) GetSample() int8 {
-	carry := ch.lfsr&1 != 0
-	ch.samples++
-	if ch.samples >= ch.CycleSamples {
-		ch.samples -= ch.CycleSamples
-		ch.lfsr >>= 1
-
-		if carry {
-			if ch.Width7 {
-				ch.lfsr ^= 0x60
-			} else {
-				ch.lfsr ^= 0x6000
-			}
-		}
-	}
-
 	vol := ch.InitVolume
 	if ch.EnvEnabled {
 		vol = ch.EnvVolume
@@ -124,8 +108,23 @@ func (ch *NoiseChannel) GetSample() int8 {
 
 	vol <<= 3 // original range 0...15, need 0..127 for int8
 
-	if carry {
+	if ch.lfsr&1 != 0 {
 		return int8(vol)
 	}
 	return -int8(vol)
+}
+
+func (ch *NoiseChannel) Clock() {
+	carry := ch.lfsr&1 != 0
+	ch.lfsr >>= 1
+
+	if !carry {
+		return
+	}
+
+	if ch.Width7 {
+		ch.lfsr ^= 0x60
+	} else {
+		ch.lfsr ^= 0x6000
+	}
 }

@@ -154,18 +154,7 @@ func (t *Timer) Start(cycles int64) {
 	t.Running = true
 	t.From = t.Gba.Scheduler.Now() - cycles
 	until := int64((0x10000-t.Counter)<<t.FreqShift) - cycles
-
-	switch t.Idx {
-	case 0:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW0, 0, until, t.Overflow, nil)
-	case 1:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW1, 0, until, t.Overflow, nil)
-	case 2:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW2, 0, until, t.Overflow, nil)
-	case 3:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_OVERFLOW3, 0, until, t.Overflow, nil)
-
-	}
+	t.Gba.Scheduler.schedule(OVERFLOW_EVENTS[t.Idx], 0, until, t.Overflow, nil)
 }
 
 func (t *Timer) Stop(late int64) {
@@ -174,16 +163,7 @@ func (t *Timer) Stop(late int64) {
 		t._Overflow(late)
 	}
 
-	switch t.Idx {
-	case 0:
-		t.Gba.Scheduler.cancel(EVENT_TIMER_OVERFLOW0)
-	case 1:
-		t.Gba.Scheduler.cancel(EVENT_TIMER_OVERFLOW1)
-	case 2:
-		t.Gba.Scheduler.cancel(EVENT_TIMER_OVERFLOW2)
-	case 3:
-		t.Gba.Scheduler.cancel(EVENT_TIMER_OVERFLOW3)
-	}
+	t.Gba.Scheduler.cancel(OVERFLOW_EVENTS[t.Idx])
 
 	t.Running = false
 }
@@ -212,7 +192,7 @@ func (t *Timer) OnTimerOverflow(late int64) {
 			if refill := fifo.Count <= 3; refill {
 				ch := t.Gba.Dma.Chs[1]
 				if ch.Enabled && ch.Mode == DMA_MODE_SPE {
-					t.Gba.Scheduler.schedule(EVENTS[1], 0, 2-late, ch.Start, nil)
+					t.Gba.Scheduler.schedule(DMA_EVENTS[1], 0, 2-late, ch.Start, nil)
 				}
 			}
 		}
@@ -225,7 +205,7 @@ func (t *Timer) OnTimerOverflow(late int64) {
 			if refill := fifo.Count <= 3; refill {
 				ch := t.Gba.Dma.Chs[2]
 				if ch.Enabled && ch.Mode == DMA_MODE_SPE {
-					t.Gba.Scheduler.schedule(EVENTS[2], 0, 2-late, ch.Start, nil)
+					t.Gba.Scheduler.schedule(DMA_EVENTS[2], 0, 2-late, ch.Start, nil)
 				}
 			}
 

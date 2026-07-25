@@ -1,28 +1,37 @@
 package gba
 
-type Event string
+type Event int
 
 const (
-	EVENT_VBK             = "event vblank"
-	EVENT_HBK             = "event hblank"
-	EVENT_DRW             = "event draw"
-	EVENT_END_FRAME       = "event end frame"
-	EVENT_END_SCANLINE    = "event end scanline"
-	EVENT_SND_SAMPLE_GEN  = "event gen sample"
-	EVENT_TIMER_RELOAD    = "event timer reload"
-	EVENT_TIMER_OVERFLOW0 = "event timer overflow 0"
-	EVENT_TIMER_OVERFLOW1 = "event timer overflow 1"
-	EVENT_TIMER_OVERFLOW2 = "event timer overflow 2"
-	EVENT_TIMER_OVERFLOW3 = "event timer overflow 3"
-	EVENT_TIMER_CONTROL   = "event timer control"
-	EVENT_DMA0            = "event dma 0"
-	EVENT_DMA1            = "event dma 1"
-	EVENT_DMA2            = "event dma 2"
-	EVENT_DMA3            = "event dma 3"
-	EVENT_IRQ_SET         = "event irq set"
-	EVENT_SIO             = "event sio"
-	EVENT_SND_FRAME_SEQ   = "event sound frame sequencer"
-	EVENT_SND_WAVE_CLK    = "event sound wave clock"
+	EVENT_VBK Event = iota
+	EVENT_HBK
+	EVENT_DRW
+	EVENT_END_FRAME
+	EVENT_END_SCANLINE
+	EVENT_SND_SAMPLE_GEN
+	EVENT_TIMER_RELOAD
+	EVENT_TIMER_OVERFLOW0
+	EVENT_TIMER_OVERFLOW1
+	EVENT_TIMER_OVERFLOW2
+	EVENT_TIMER_OVERFLOW3
+	EVENT_TIMER_CONTROL
+	EVENT_DMA0
+	EVENT_DMA1
+	EVENT_DMA2
+	EVENT_DMA3
+	EVENT_IRQ_SET
+	EVENT_SIO
+	EVENT_SND_FRAME_SEQ
+	EVENT_APU_TONE1
+	EVENT_APU_TONE2
+	EVENT_APU_WAVE
+	EVENT_APU_NOISE
+)
+
+var (
+	APU_EVENTS      = [4]Event{EVENT_APU_TONE1, EVENT_APU_TONE2, EVENT_APU_WAVE, EVENT_APU_NOISE}
+	DMA_EVENTS      = [4]Event{EVENT_DMA0, EVENT_DMA1, EVENT_DMA2, EVENT_DMA3}
+	OVERFLOW_EVENTS = [4]Event{EVENT_TIMER_OVERFLOW0, EVENT_TIMER_OVERFLOW1, EVENT_TIMER_OVERFLOW2, EVENT_TIMER_OVERFLOW3}
 )
 
 type Scheduler struct {

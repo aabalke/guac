@@ -2,9 +2,11 @@ package apu
 
 // source https://nightshade256.github.io/2021/03/27/gb-sound-emulation.html
 
+const m = 4
+
 var (
-	DutyLookUp  = [4]float64{0.125, 0.25, 0.5, 0.75}
-	DutyLookUpi = [4]float64{0.875, 0.75, 0.5, 0.25}
+	DUTY_CLOCKS   = [4]uint8{1 * m, 2 * m, 4 * m, 6 * m}
+	DUTY_CLOCKS_I = [4]uint8{7 * m, 6 * m, 4 * m, 2 * m}
 )
 
 type ToneChannel struct {
@@ -15,7 +17,7 @@ type ToneChannel struct {
 	InFirstHalf bool
 	Duty        uint8
 
-	samples float64
+	samples uint8
 
 	SweepPace     uint8
 	SweepDecrease bool
@@ -83,7 +85,7 @@ func (ch *ToneChannel) Trigger() {
 }
 
 func (ch *ToneChannel) ClockSweep() {
-	if ch.SweepTimer > 0 {
+	if ch.SweepTimer != 0 {
 		ch.SweepTimer -= 1
 	}
 
@@ -176,23 +178,7 @@ func (ch *ToneChannel) ClockEnvelope() {
 	}
 }
 
-func (ch *ToneChannel) GetSample(sampleRate float64) int8 {
-	freq := 131072 / float64(2048-ch.Shadow)
-	cycleSamples := sampleRate / freq
-
-	ch.samples++
-	if ch.phase {
-		if ch.samples > cycleSamples*DutyLookUp[ch.Duty] {
-			ch.samples -= cycleSamples * DutyLookUp[ch.Duty]
-			ch.phase = false
-		}
-	} else {
-		if ch.samples > cycleSamples*DutyLookUpi[ch.Duty] {
-			ch.samples -= cycleSamples * DutyLookUpi[ch.Duty]
-			ch.phase = true
-		}
-	}
-
+func (ch *ToneChannel) GetSample() int8 {
 	vol := uint8(ch.InitVolume)
 	if ch.EnvEnabled {
 		vol = ch.EnvVolume
@@ -204,4 +190,19 @@ func (ch *ToneChannel) GetSample(sampleRate float64) int8 {
 		return int8(vol)
 	}
 	return -int8(vol)
+}
+
+func (ch *ToneChannel) Clock() {
+	ch.samples++
+	if ch.phase {
+		if ch.samples > DUTY_CLOCKS[ch.Duty] {
+			ch.samples -= DUTY_CLOCKS[ch.Duty]
+			ch.phase = false
+		}
+	} else {
+		if ch.samples > DUTY_CLOCKS_I[ch.Duty] {
+			ch.samples -= DUTY_CLOCKS_I[ch.Duty]
+			ch.phase = true
+		}
+	}
 }

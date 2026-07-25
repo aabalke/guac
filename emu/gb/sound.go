@@ -39,7 +39,9 @@ func (gb *GameBoy) WriteSound(addr, v uint8, a *apu.Apu) {
 
 	if tone := addr < 0x1A; tone {
 		ch := &a.ToneChannel1
-		if addr >= 0x16 {
+
+		tone2 := addr >= 0x16
+		if tone2 {
 			ch = &a.ToneChannel2
 		}
 
@@ -90,6 +92,14 @@ func (gb *GameBoy) WriteSound(addr, v uint8, a *apu.Apu) {
 
 			if (v & 0x80) != 0 {
 				ch.Trigger()
+
+				if tone2 {
+					gb.Scheduler.cancel(EVENT_APU_TONE2)
+					gb.ScheduleApuChannel(gb.Scheduler.CurrentCycle, 1)
+				} else {
+					gb.Scheduler.cancel(EVENT_APU_TONE1)
+					gb.ScheduleApuChannel(gb.Scheduler.CurrentCycle, 0)
+				}
 			}
 		}
 
@@ -129,8 +139,8 @@ func (gb *GameBoy) WriteSound(addr, v uint8, a *apu.Apu) {
 
 			if v&0x80 != 0 {
 				ch.Trigger()
-				gb.Scheduler.cancel(EVENT_SND_WAVE_CLOCK)
-				gb.scheduleWaveClock(gb.Scheduler.CurrentCycle)
+				gb.Scheduler.cancel(EVENT_APU_WAVE)
+				gb.ScheduleApuChannel(gb.Scheduler.CurrentCycle, 2)
 			}
 		}
 
@@ -158,17 +168,9 @@ func (gb *GameBoy) WriteSound(addr, v uint8, a *apu.Apu) {
 
 		case 0x22:
 
-			ch.S = v >> 4
-			ch.R = v & 7
+			ch.Shift = v >> 4
+			ch.Divider = v & 7
 			ch.Width7 = v&0x8 != 0
-			r := float64(ch.R)
-			if r == 0 {
-				r = 0.5
-			}
-
-			div := 1 << (ch.S + 1)
-			frequency := (524288 / r) / float64(div)
-			ch.CycleSamples = float64(gb.Apu.Ctx.SampleRate()) / frequency
 
 		case 0x23:
 
@@ -181,6 +183,8 @@ func (gb *GameBoy) WriteSound(addr, v uint8, a *apu.Apu) {
 
 			if v&0x80 != 0 {
 				ch.Trigger()
+				gb.Scheduler.cancel(EVENT_APU_NOISE)
+				gb.ScheduleApuChannel(gb.Scheduler.CurrentCycle, 3)
 			}
 		}
 
@@ -336,8 +340,8 @@ func (gb *GameBoy) ReadSound(addr uint8, a *apu.Apu) uint8 {
 			return v
 
 		case 0x22:
-			v := ch.R
-			v |= ch.S << 4
+			v := ch.Divider
+			v |= ch.Shift << 4
 			if ch.Width7 {
 				v |= 1 << 3
 			}

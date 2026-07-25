@@ -96,7 +96,7 @@ func (ch *WaveChannel) GetSample() int8 {
 	return vol
 }
 
-func (ch *WaveChannel) ClockRam() {
+func (ch *WaveChannel) Clock() {
 	if !ch.ChannelEnabled {
 		return
 	}

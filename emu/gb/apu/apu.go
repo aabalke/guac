@@ -107,8 +107,11 @@ func (a *Apu) SoundClock() {
 
 	psgL, psgR := int32(0), int32(0)
 
+	ch3 = false
+	ch4 = false
+
 	if ch1 {
-		ch := int32(a.ToneChannel1.GetSample(float64(a.Ctx.SampleRate())))
+		ch := int32(a.ToneChannel1.GetSample())
 		if ch1L {
 			psgL += ch
 		}
@@ -118,7 +121,7 @@ func (a *Apu) SoundClock() {
 	}
 
 	if ch2 {
-		ch := int32(a.ToneChannel2.GetSample(float64(a.Ctx.SampleRate())))
+		ch := int32(a.ToneChannel2.GetSample())
 		if ch2L {
 			psgL += ch
 		}
@@ -150,8 +153,8 @@ func (a *Apu) SoundClock() {
 	//l := clip(((psgL * volL) >> 3) >> 2)
 	//r := clip(((psgR * volR) >> 3) >> 2)
 
-	l := int16(Clip(psgL * volL))
-	r := int16(Clip(psgR * volR))
+	l := int16(Clip(psgL * volL * 2))
+	r := int16(Clip(psgR * volR * 2))
 	a.Stream.Write(l, r)
 }
 

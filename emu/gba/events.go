@@ -1,15 +1,68 @@
 package gba
 
-func (gba *GBA) WaveRamClock(late int64, arg any) {
-	ch := &gba.Apu.WaveChannel
+func (gba *GBA) ClockApuChannel(late int64, arg any) {
+	// clock apu channels based on internal div in gb
+	// fifo does not need to be clocked since clocked externally by timers
 
-	ch.ClockRam()
+	idx := arg.(uint8)
 
-	if ch.ChannelEnabled {
-		// period * 4 since gba is 4x speed
-		period := (int64(2048-ch.ActivePeriod) << 1) << 2
-		gba.Scheduler.schedule(EVENT_SND_WAVE_CLK, 1, period-late, gba.WaveRamClock, nil)
+	switch idx {
+	case 0:
+		gba.Apu.ToneChannel1.Clock()
+	case 1:
+		gba.Apu.ToneChannel2.Clock()
+	case 2:
+		gba.Apu.WaveChannel.Clock()
+	case 3:
+		gba.Apu.NoiseChannel.Clock()
 	}
+
+	gba.ScheduleApuChannel(late, idx)
+}
+
+func (gba *GBA) ScheduleApuChannel(late int64, idx uint8) {
+	period := int64(0)
+
+	switch idx {
+	case 0, 1:
+		ch := &gba.Apu.ToneChannel1
+		if idx == 1 {
+			ch = &gba.Apu.ToneChannel2
+		}
+
+		if !ch.ChannelEnabled {
+			return
+		}
+		period = int64(2048 - ch.Shadow)
+
+	case 2:
+		ch := &gba.Apu.WaveChannel
+		if !ch.ChannelEnabled {
+			return
+		}
+		period = int64(2048-ch.ActivePeriod) << 1
+
+	case 3:
+		ch := &gba.Apu.NoiseChannel
+		if !ch.ChannelEnabled {
+			return
+		}
+
+		period = 8
+
+		if ch.Divider > 0 {
+			period = int64(ch.Divider) << 4
+		}
+
+		period <<= int64(ch.Shift)
+	}
+
+	// period * 4 since gba is 4x speed
+	period <<= 2
+
+	// this will keep same pitch
+	// period = (period * gba.CurrFps) / FPS
+	gba.Scheduler.schedule(APU_EVENTS[idx], 1, period-late, gba.ClockApuChannel, idx)
 }
 
 func (gba *GBA) ClockFrameSequencerEvent(late int64, arg any) {

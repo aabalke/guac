@@ -5,8 +5,6 @@ import (
 	"unsafe"
 )
 
-var EVENTS = []Event{EVENT_DMA0, EVENT_DMA1, EVENT_DMA2, EVENT_DMA3}
-
 const (
 	DMA_MODE_IMM = 0
 	DMA_MODE_VBL = 1
@@ -201,7 +199,7 @@ func (ch *Channel) Write(addr uint32, v uint8) {
 				ch.dma.EepromDma(ch.latched.cnt, dst)
 
 				if ch.Mode == DMA_MODE_IMM {
-					ch.dma.Gba.Scheduler.schedule(EVENTS[ch.Idx], 0, 2, ch.Start, nil)
+					ch.dma.Gba.Scheduler.schedule(DMA_EVENTS[ch.Idx], 0, 2, ch.Start, nil)
 				}
 			}
 
@@ -210,7 +208,7 @@ func (ch *Channel) Write(addr uint32, v uint8) {
 
 		if prev && !ch.Enabled {
 			ch.disable()
-			ch.dma.Gba.Scheduler.cancel(EVENTS[ch.Idx])
+			ch.dma.Gba.Scheduler.cancel(DMA_EVENTS[ch.Idx])
 			return
 		}
 	}
@@ -451,7 +449,7 @@ func (d *Dma) IsRunning() bool {
 func (d *Dma) raise(mode uint8, late int64) {
 	for i := range 4 {
 		if ch := &d.Chs[i]; ch.Enabled && ch.Mode == mode {
-			d.Gba.Scheduler.schedule(EVENTS[ch.Idx], 0, 2-late, ch.Start, nil)
+			d.Gba.Scheduler.schedule(DMA_EVENTS[ch.Idx], 0, 2-late, ch.Start, nil)
 		}
 	}
 }

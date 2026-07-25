@@ -137,7 +137,6 @@ func NewGameBoy(ctx *audio.Context, path string) *GameBoy {
 		gb.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 0)
 	}
 
-	gb.Scheduler.schedule(EVENT_SND_WAVE_CLOCK, 0)
 	gb.Scheduler.schedule(EVENT_SND_FRAME_SEQ, 0)
 
 	return gb
@@ -257,9 +256,13 @@ const (
 	CYCLES_PER_HBLANK       = 80 + 172
 )
 
-func (gb *GameBoy) Update(stdFps bool) {
+func (gb *GameBoy) Update(fps int64) {
 	if gb.Paused {
 		return
+	}
+
+	if gb.Apu.Ctx != nil {
+		gb.CyclesPerSndGen = (int64(CPU_SPEED/gb.Apu.Ctx.SampleRate()) * fps) / 60
 	}
 
 	gb.Scheduler.schedule(EVENT_END_FRAME, CYCLES_PER_FRAME)
@@ -286,7 +289,7 @@ func (gb *GameBoy) Update(stdFps bool) {
 			}
 		}
 
-		if done := gb.handleEvent(nextEvent, stdFps); done {
+		if done := gb.handleEvent(nextEvent, fps == 60); done {
 			return
 		}
 	}
@@ -386,9 +389,14 @@ func (gb *GameBoy) handleEvent(event ScheduledEvent, stdFps bool) bool {
 		gb.Apu.SoundClock()
 		gb.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, gb.CyclesPerSndGen)
 
-	case EVENT_SND_WAVE_CLOCK:
-		gb.Apu.WaveChannel.ClockRam()
-		gb.scheduleWaveClock(event.InitCycle)
+	case EVENT_APU_TONE1:
+		gb.ClockApuChannel(event.InitCycle, 0)
+	case EVENT_APU_TONE2:
+		gb.ClockApuChannel(event.InitCycle, 1)
+	case EVENT_APU_WAVE:
+		gb.ClockApuChannel(event.InitCycle, 2)
+	case EVENT_APU_NOISE:
+		gb.ClockApuChannel(event.InitCycle, 3)
 
 	case EVENT_SND_FRAME_SEQ:
 		// I believe this is based on div, and will need to be reset based on div falling edge
@@ -570,10 +578,62 @@ func (gb *GameBoy) Draw(screen *ebiten.Image) {
 	screen.DrawImage(gb.Image, &gb.DrawOptions)
 }
 
-func (gb *GameBoy) scheduleWaveClock(cycle int64) {
-	if !gb.Apu.WaveChannel.ChannelEnabled {
-		return
+func (gb *GameBoy) ClockApuChannel(init int64, idx int) {
+	// clock apu channels based on internal div in gb
+	// fifo does not need to be clocked since clocked externally by timers
+
+	switch idx {
+	case 0:
+		gb.Apu.ToneChannel1.Clock()
+	case 1:
+		gb.Apu.ToneChannel2.Clock()
+	case 2:
+		gb.Apu.WaveChannel.Clock()
+	case 3:
+		gb.Apu.NoiseChannel.Clock()
 	}
-	period := int64(2048-gb.Apu.WaveChannel.ActivePeriod) << 1
-	gb.Scheduler.scheduleAt(EVENT_SND_WAVE_CLOCK, cycle+period)
+
+	gb.ScheduleApuChannel(init, idx)
+}
+
+func (gb *GameBoy) ScheduleApuChannel(init int64, idx int) {
+	period := int64(0)
+
+	switch idx {
+	case 0, 1:
+		ch := &gb.Apu.ToneChannel1
+		if idx == 1 {
+			ch = &gb.Apu.ToneChannel2
+		}
+
+		if !ch.ChannelEnabled {
+			return
+		}
+		period = int64(2048 - ch.Shadow)
+
+	case 2:
+		ch := &gb.Apu.WaveChannel
+		if !ch.ChannelEnabled {
+			return
+		}
+		period = int64(2048-ch.ActivePeriod) << 1
+
+	case 3:
+		ch := &gb.Apu.NoiseChannel
+		if !ch.ChannelEnabled {
+			return
+		}
+
+		period = 8
+
+		if ch.Divider > 0 {
+			period = int64(ch.Divider) << 4
+		}
+
+		period <<= int64(ch.Shift)
+	}
+
+	// this will keep same pitch
+	// period = (period * gba.CurrFps) / FPS
+	gb.Scheduler.scheduleAt(APU_EVENTS[idx], init+period)
 }

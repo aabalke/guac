@@ -70,11 +70,11 @@ func (a *Apu) SoundClock() {
 	pcmR := pcmA*rpanA + pcmB*rpanB
 
 	if a.ToneChannel1.ChannelEnabled {
-		ch1 = int32(a.ToneChannel1.GetSample(float64(a.Ctx.SampleRate())))
+		ch1 = int32(a.ToneChannel1.GetSample())
 	}
 
 	if a.ToneChannel2.ChannelEnabled {
-		ch2 = int32(a.ToneChannel2.GetSample(float64(a.Ctx.SampleRate())))
+		ch2 = int32(a.ToneChannel2.GetSample())
 	}
 
 	if a.WaveChannel.ChannelEnabled {
@@ -84,6 +84,9 @@ func (a *Apu) SoundClock() {
 	if a.NoiseChannel.ChannelEnabled {
 		ch4 = int32(a.NoiseChannel.GetSample())
 	}
+
+	ch3, ch4 = 0, 0
+	pcmL, pcmR = 0, 0
 
 	psgL := ch1*int32((cntL>>12)&1) +
 		ch2*int32((cntL>>13)&1) +

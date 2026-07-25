@@ -38,11 +38,13 @@ func TestAlyosha(t *testing.T) {
 
 		func() {
 			defer func() {
-				recover()
+				if r := recover(); r != nil {
+					fmt.Printf("Error: %v\n", r)
+				}
 			}()
 
 			for range 60 * 10 {
-				gba.Update(false)
+				gba.Update(0x10000)
 
 				if finish {
 					break

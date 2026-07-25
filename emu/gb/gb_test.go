@@ -45,7 +45,7 @@ func TestMooneye(t *testing.T) {
 		}
 
 		for range 60 * 10 {
-			gb.Update(false)
+			gb.Update(0x10000)
 
 			if finish {
 				break
@@ -80,7 +80,7 @@ func TestGbMicroTest(t *testing.T) {
 		gb := NewGameBoy(nil, file)
 
 		for range 60 * 2 {
-			gb.Update(false)
+			gb.Update(0x10000)
 		}
 
 		passed := gb.Read(0xFF82) == 0x1

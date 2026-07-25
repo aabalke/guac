@@ -69,7 +69,9 @@ func (gba *GBA) WriteSound(addr uint32, v uint8) {
 	if tone := addr < 0x70; tone {
 
 		ch := &a.ToneChannel1
-		if addr >= 0x68 {
+
+		tone2 := addr >= 0x68
+		if tone2 {
 			ch = &a.ToneChannel2
 		}
 
@@ -117,6 +119,13 @@ func (gba *GBA) WriteSound(addr uint32, v uint8) {
 
 			if (v & 0x80) != 0 {
 				ch.Trigger()
+				if tone2 {
+					gba.Scheduler.cancel(EVENT_APU_TONE2)
+					gba.ScheduleApuChannel(0, 1)
+				} else {
+					gba.Scheduler.cancel(EVENT_APU_TONE1)
+					gba.ScheduleApuChannel(0, 0)
+				}
 			}
 
 		}
@@ -161,12 +170,8 @@ func (gba *GBA) WriteSound(addr uint32, v uint8) {
 
 			if v&0x80 != 0 {
 				ch.Trigger()
-				gba.Scheduler.cancel(EVENT_SND_WAVE_CLK)
-				if ch.ChannelEnabled {
-					// period * 4 since gba is 4x speed
-					period := (int64(2048-ch.ActivePeriod) << 1) << 2
-					gba.Scheduler.schedule(EVENT_SND_WAVE_CLK, 1, period, gba.WaveRamClock, nil)
-				}
+				gba.Scheduler.cancel(EVENT_APU_WAVE)
+				gba.ScheduleApuChannel(0, 2)
 			}
 		}
 
@@ -194,17 +199,17 @@ func (gba *GBA) WriteSound(addr uint32, v uint8) {
 
 		case 0x7C:
 
-			ch.S = v >> 4
-			ch.R = v & 7
+			ch.Shift = v >> 4
+			ch.Divider = v & 7
 			ch.Width7 = v&0x8 != 0
-			r := float64(ch.R)
-			if r == 0 {
-				r = 0.5
-			}
+			//r := float64(ch.R)
+			//if r == 0 {
+			//	r = 0.5
+			//}
 
-			div := 1 << (ch.S + 1)
-			frequency := (524288 / r) / float64(div)
-			ch.CycleSamples = float64(gba.Apu.Ctx.SampleRate()) / frequency
+			//div := 1 << (ch.S + 1)
+			//frequency := (524288 / r) / float64(div)
+			//ch.CycleSamples = float64(gba.Apu.Ctx.SampleRate()) / frequency
 
 		case 0x7D:
 
@@ -217,6 +222,8 @@ func (gba *GBA) WriteSound(addr uint32, v uint8) {
 
 			if v&0x80 != 0 {
 				ch.Trigger()
+				gba.Scheduler.cancel(EVENT_APU_NOISE)
+				gba.ScheduleApuChannel(0, 3)
 			}
 		}
 
@@ -338,8 +345,8 @@ func (gba *GBA) ReadSound(addr uint32) uint8 {
 			return v
 
 		case 0x7C:
-			v := ch.R
-			v |= ch.S << 4
+			v := ch.Divider
+			v |= ch.Shift << 4
 			if ch.Width7 {
 				v |= 1 << 3
 			}

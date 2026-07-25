@@ -163,11 +163,11 @@ func (g *Game) Update() error {
 
 	case g.gba != nil:
 		g.gba.InputHandler(keys, buttons)
-		g.gba.Update(g.TargetFps == 60)
+		g.gba.Update(int64(ebiten.TPS()))
 
 	case g.gb != nil:
 		g.gb.InputHandler(keys, buttons)
-		g.gb.Update(g.TargetFps == 60)
+		g.gb.Update(int64(ebiten.TPS()))
 	}
 
 	return nil

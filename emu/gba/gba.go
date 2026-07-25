@@ -12,6 +12,7 @@ import (
 )
 
 const (
+	FPS             = 60
 	SCREEN_WIDTH    = 240
 	SCREEN_HEIGHT   = 160
 	BUFFER_SIZE     = 20 * time.Millisecond
@@ -44,11 +45,12 @@ type GBA struct {
 	Image       *ebiten.Image
 	DrawOptions ebiten.DrawImageOptions
 
-	vsyncAddr                           uint32
-	Frame                               uint64
-	Paused, Muted, Save, Booted, StdFps bool
-	IdleOptimize                        bool
-	CyclesPerSndGen                     int64
+	vsyncAddr                   uint32
+	Frame                       uint64
+	Paused, Muted, Save, Booted bool
+	IdleOptimize                bool
+	CyclesPerSndGen             int64
+	CurrFps                     int64
 }
 
 func NewGBA(ctx *audio.Context, path string) *GBA {
@@ -103,12 +105,16 @@ func NewGBA(ctx *audio.Context, path string) *GBA {
 	return gba
 }
 
-func (gba *GBA) Update(stdFps bool) {
+func (gba *GBA) Update(fps int64) {
 	if gba.Paused {
 		return
 	}
 
-	gba.StdFps = stdFps
+	gba.CurrFps = fps
+
+	if gba.Apu.Ctx != nil {
+		gba.CyclesPerSndGen = (int64(CPU_SPEED/gba.Apu.Ctx.SampleRate()) * fps) / 60
+	}
 
 	nextFrame := gba.Scheduler.CurrentCycle + CYCLES_FRAME
 	for gba.Scheduler.CurrentCycle < nextFrame {
