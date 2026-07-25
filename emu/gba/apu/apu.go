@@ -85,9 +85,6 @@ func (a *Apu) SoundClock() {
 		ch4 = int32(a.NoiseChannel.GetSample())
 	}
 
-	ch3, ch4 = 0, 0
-	pcmL, pcmR = 0, 0
-
 	psgL := ch1*int32((cntL>>12)&1) +
 		ch2*int32((cntL>>13)&1) +
 		ch3*int32((cntL>>14)&1) +
@@ -104,8 +101,8 @@ func (a *Apu) SoundClock() {
 	psgL >>= 4
 	psgR >>= 4
 
-	l := int16(apu.Clip((psgL + pcmL) * 100))
-	r := int16(apu.Clip((psgR + pcmR) * 100))
+	l := int16(apu.Clip((psgL + pcmL) * 75))
+	r := int16(apu.Clip((psgR + pcmR) * 75))
 	a.Stream.Write(l, r)
 }
 

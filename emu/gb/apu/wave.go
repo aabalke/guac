@@ -12,7 +12,7 @@ type WaveChannel struct {
 	WavePosition   uint8
 	LengthCounter  uint16
 	Period         uint16
-	ActivePeriod   uint16
+	Shadow         uint16
 	Sample         uint8
 	SampleByte     uint8
 	DACEnabled     bool
@@ -46,7 +46,7 @@ func (ch *WaveChannel) Trigger() {
 	// bank
 	ch.WavePosition = 0 | (ch.BankIdx << 5)
 	ch.ChannelEnabled = true
-	ch.ActivePeriod = ch.Period
+	ch.Shadow = ch.Period
 }
 
 func (ch *WaveChannel) ClockLength() {
@@ -112,7 +112,7 @@ func (ch *WaveChannel) Clock() {
 	if ch.WavePosition&1 == 0 {
 		ch.Sample = ch.SampleByte >> 4
 	} else {
-		ch.ActivePeriod = ch.Period
+		ch.Shadow = ch.Period
 		b := ch.Ram[ch.WavePosition>>1]
 		ch.SampleByte = b
 		ch.Sample = ch.SampleByte & 0xF

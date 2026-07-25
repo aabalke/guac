@@ -120,10 +120,10 @@ func (gba *GBA) WriteSound(addr uint32, v uint8) {
 			if (v & 0x80) != 0 {
 				ch.Trigger()
 				if tone2 {
-					gba.Scheduler.cancel(EVENT_APU_TONE2)
+					gba.Scheduler.Cancel(EVENT_APU_TONE2)
 					gba.ScheduleApuChannel(0, 1)
 				} else {
-					gba.Scheduler.cancel(EVENT_APU_TONE1)
+					gba.Scheduler.Cancel(EVENT_APU_TONE1)
 					gba.ScheduleApuChannel(0, 0)
 				}
 			}
@@ -170,7 +170,7 @@ func (gba *GBA) WriteSound(addr uint32, v uint8) {
 
 			if v&0x80 != 0 {
 				ch.Trigger()
-				gba.Scheduler.cancel(EVENT_APU_WAVE)
+				gba.Scheduler.Cancel(EVENT_APU_WAVE)
 				gba.ScheduleApuChannel(0, 2)
 			}
 		}
@@ -222,7 +222,7 @@ func (gba *GBA) WriteSound(addr uint32, v uint8) {
 
 			if v&0x80 != 0 {
 				ch.Trigger()
-				gba.Scheduler.cancel(EVENT_APU_NOISE)
+				gba.Scheduler.Cancel(EVENT_APU_NOISE)
 				gba.ScheduleApuChannel(0, 3)
 			}
 		}

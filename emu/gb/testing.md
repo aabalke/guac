@@ -16,13 +16,13 @@ This means they may be out of date from the most recent commit.
     👍 02
     👍 03
     👍 04
-    ❌ 05
+    👍 05
     👍 06
     👍 07
-    ❌ 08 - 21 not 22, otherwise good
+    👍 08
     ❌ 09
-    ❌ 10
-    👍 11 - regs after power
+    👍 10
+    ❌  11 - regs after power
         note: retrio/gb-test-roms version states NR41 shouldn't be affected, but
         aquach/gameboy says should. Bgb and sameboy both have N41 unaffected. So 
         we will use not affected version.

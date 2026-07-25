@@ -1,6 +1,6 @@
 # Mooneye Acceptance Tests
 
-Results generated 2026-07-18T19:09:45-06:00
+Results generated 2026-07-25T14:28:38-06:00
 
 Passing 69/115 60%
 
@@ -31,7 +31,7 @@ Passing 69/115 60%
 👍 acceptance\halt_ime0_ei
 ❌ acceptance\halt_ime0_nointr_timing
 👍 acceptance\halt_ime1_timing
-❌ acceptance\halt_ime1_timing2-GS
+👍 acceptance\halt_ime1_timing2-GS
 👍 acceptance\if_ie_registers
 👍 acceptance\instr\daa
 👍 acceptance\interrupts\ie_push
@@ -47,12 +47,12 @@ Passing 69/115 60%
 👍 acceptance\oam_dma_timing
 👍 acceptance\pop_timing
 ❌ acceptance\ppu\hblank_ly_scx_timing-GS
-❌ acceptance\ppu\intr_1_2_timing-GS
-❌ acceptance\ppu\intr_2_0_timing
-👍 acceptance\ppu\intr_2_mode0_timing
+👍 acceptance\ppu\intr_1_2_timing-GS
+👍 acceptance\ppu\intr_2_0_timing
+❌ acceptance\ppu\intr_2_mode0_timing
 ❌ acceptance\ppu\intr_2_mode0_timing_sprites
-👍 acceptance\ppu\intr_2_mode3_timing
-👍 acceptance\ppu\intr_2_oam_ok_timing
+❌ acceptance\ppu\intr_2_mode3_timing
+❌ acceptance\ppu\intr_2_oam_ok_timing
 ❌ acceptance\ppu\lcdon_timing-GS
 ❌ acceptance\ppu\lcdon_write_timing-GS
 ❌ acceptance\ppu\stat_irq_blocking

@@ -94,10 +94,10 @@ func (gb *GameBoy) WriteSound(addr, v uint8, a *apu.Apu) {
 				ch.Trigger()
 
 				if tone2 {
-					gb.Scheduler.cancel(EVENT_APU_TONE2)
+					gb.Scheduler.Cancel(EVENT_APU_TONE2)
 					gb.ScheduleApuChannel(gb.Scheduler.CurrentCycle, 1)
 				} else {
-					gb.Scheduler.cancel(EVENT_APU_TONE1)
+					gb.Scheduler.Cancel(EVENT_APU_TONE1)
 					gb.ScheduleApuChannel(gb.Scheduler.CurrentCycle, 0)
 				}
 			}
@@ -139,7 +139,7 @@ func (gb *GameBoy) WriteSound(addr, v uint8, a *apu.Apu) {
 
 			if v&0x80 != 0 {
 				ch.Trigger()
-				gb.Scheduler.cancel(EVENT_APU_WAVE)
+				gb.Scheduler.Cancel(EVENT_APU_WAVE)
 				gb.ScheduleApuChannel(gb.Scheduler.CurrentCycle, 2)
 			}
 		}
@@ -183,7 +183,7 @@ func (gb *GameBoy) WriteSound(addr, v uint8, a *apu.Apu) {
 
 			if v&0x80 != 0 {
 				ch.Trigger()
-				gb.Scheduler.cancel(EVENT_APU_NOISE)
+				gb.Scheduler.Cancel(EVENT_APU_NOISE)
 				gb.ScheduleApuChannel(gb.Scheduler.CurrentCycle, 3)
 			}
 		}

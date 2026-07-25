@@ -1,5 +1,39 @@
 package gba
 
+import "github.com/aabalke/guac/emu/scheduler"
+
+const (
+	EVENT_VBK scheduler.Event = iota
+	EVENT_HBK
+	EVENT_DRW
+	EVENT_END_FRAME
+	EVENT_END_SCANLINE
+	EVENT_SND_SAMPLE_GEN
+	EVENT_TIMER_RELOAD
+	EVENT_TIMER_OVERFLOW0
+	EVENT_TIMER_OVERFLOW1
+	EVENT_TIMER_OVERFLOW2
+	EVENT_TIMER_OVERFLOW3
+	EVENT_TIMER_CONTROL
+	EVENT_DMA0
+	EVENT_DMA1
+	EVENT_DMA2
+	EVENT_DMA3
+	EVENT_IRQ_SET
+	EVENT_SIO
+	EVENT_SND_FRAME_SEQ
+	EVENT_APU_TONE1
+	EVENT_APU_TONE2
+	EVENT_APU_WAVE
+	EVENT_APU_NOISE
+)
+
+var (
+	APU_EVENTS      = [4]scheduler.Event{EVENT_APU_TONE1, EVENT_APU_TONE2, EVENT_APU_WAVE, EVENT_APU_NOISE}
+	DMA_EVENTS      = [4]scheduler.Event{EVENT_DMA0, EVENT_DMA1, EVENT_DMA2, EVENT_DMA3}
+	OVERFLOW_EVENTS = [4]scheduler.Event{EVENT_TIMER_OVERFLOW0, EVENT_TIMER_OVERFLOW1, EVENT_TIMER_OVERFLOW2, EVENT_TIMER_OVERFLOW3}
+)
+
 func (gba *GBA) ClockApuChannel(late int64, arg any) {
 	// clock apu channels based on internal div in gb
 	// fifo does not need to be clocked since clocked externally by timers
@@ -40,7 +74,7 @@ func (gba *GBA) ScheduleApuChannel(late int64, idx uint8) {
 		if !ch.ChannelEnabled {
 			return
 		}
-		period = int64(2048-ch.ActivePeriod) << 1
+		period = int64(2048-ch.Shadow) << 1
 
 	case 3:
 		ch := &gba.Apu.NoiseChannel
@@ -62,17 +96,17 @@ func (gba *GBA) ScheduleApuChannel(late int64, idx uint8) {
 
 	// this will keep same pitch
 	// period = (period * gba.CurrFps) / FPS
-	gba.Scheduler.schedule(APU_EVENTS[idx], 1, period-late, gba.ClockApuChannel, idx)
+	gba.Scheduler.Schedule(APU_EVENTS[idx], 1, period-late, gba.ClockApuChannel, idx)
 }
 
 func (gba *GBA) ClockFrameSequencerEvent(late int64, arg any) {
 	gba.Apu.ClockFrameSequencer()
-	gba.Scheduler.schedule(EVENT_SND_FRAME_SEQ, 1, CYCLES_PER_FRAME_SEQ-late, gba.ClockFrameSequencerEvent, nil)
+	gba.Scheduler.Schedule(EVENT_SND_FRAME_SEQ, 1, CYCLES_PER_FRAME_SEQ-late, gba.ClockFrameSequencerEvent, nil)
 }
 
 func (gba *GBA) AudioSampleEvent(late int64, arg any) {
 	gba.Apu.SoundClock()
-	gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, gba.CyclesPerSndGen-late, gba.AudioSampleEvent, nil)
+	gba.Scheduler.Schedule(EVENT_SND_SAMPLE_GEN, 1, gba.CyclesPerSndGen-late, gba.AudioSampleEvent, nil)
 }
 
 func (gba *GBA) HblankVDrawEvent(late int64, arg any) {
@@ -139,11 +173,11 @@ func (gba *GBA) ScanlineEndEvent(late int64, arg any) {
 		}
 	}
 
-	gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, CYCLES_SCANLINE-late, gba.ScanlineEndEvent, nil)
+	gba.Scheduler.Schedule(EVENT_END_SCANLINE, 1, CYCLES_SCANLINE-late, gba.ScanlineEndEvent, nil)
 
 	if *vcount < SCREEN_HEIGHT {
-		gba.Scheduler.schedule(EVENT_HBK, 1, CYCLES_HDRAW-late, gba.HblankVDrawEvent, nil)
+		gba.Scheduler.Schedule(EVENT_HBK, 1, CYCLES_HDRAW-late, gba.HblankVDrawEvent, nil)
 	} else {
-		gba.Scheduler.schedule(EVENT_HBK, 1, CYCLES_HDRAW-late, gba.HblankVBlankEvent, nil)
+		gba.Scheduler.Schedule(EVENT_HBK, 1, CYCLES_HDRAW-late, gba.HblankVBlankEvent, nil)
 	}
 }

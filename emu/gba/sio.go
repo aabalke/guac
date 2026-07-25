@@ -1,14 +1,16 @@
 package gba
 
+import "github.com/aabalke/guac/emu/scheduler"
+
 var sioClock = [...]int64{512, 64}
 
 type Sio struct {
 	Cnt uint16
 	irq *Irq
-	sch *Scheduler
+	sch *scheduler.Scheduler
 }
 
-func NewSio(irq *Irq, sch *Scheduler) *Sio {
+func NewSio(irq *Irq, sch *scheduler.Scheduler) *Sio {
 	return &Sio{
 		irq: irq,
 		sch: sch,
@@ -27,7 +29,7 @@ func (s *Sio) Write(idx uint32, v uint8) {
 		bytes := ((s.Cnt >> 12) & 1) << 2
 		cycles <<= bytes
 
-		s.sch.schedule(EVENT_SIO, 3, cycles, s.CompleteSioTransfer, nil)
+		s.sch.Schedule(EVENT_SIO, 3, cycles, s.CompleteSioTransfer, nil)
 	}
 }
 

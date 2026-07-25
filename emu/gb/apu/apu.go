@@ -107,9 +107,6 @@ func (a *Apu) SoundClock() {
 
 	psgL, psgR := int32(0), int32(0)
 
-	ch3 = false
-	ch4 = false
-
 	if ch1 {
 		ch := int32(a.ToneChannel1.GetSample())
 		if ch1L {

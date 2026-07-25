@@ -8,6 +8,7 @@ import (
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gb/apu"
 	"github.com/aabalke/guac/emu/gb/cartridge"
+	"github.com/aabalke/guac/emu/scheduler"
 	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
@@ -22,6 +23,17 @@ const (
 	IRQ_TMR = 1 << 2
 	IRQ_SER = 1 << 3
 	IRQ_JPD = 1 << 4
+
+	CPU_SPEED           = 4194304
+	BUFFER_SIZE         = 20 * time.Millisecond
+	CYCLES_FRAME        = 70224
+	CYCLES_END_SCANLINE = CYCLES_FRAME / 154
+	CYCLES_VBLANK       = CYCLES_FRAME / 154 * 144
+	CYCLES_DRAW         = 80
+	CYCLES_HBLANK       = 80 + 172
+	CYCLES_FRAME_SEQ    = 8192
+
+	FPS = 60
 )
 
 type GameBoy struct {
@@ -36,7 +48,7 @@ type GameBoy struct {
 
 	UnpackedMonoPals [3][4]uint32
 
-	Scheduler *Scheduler
+	Scheduler *scheduler.Scheduler
 
 	Cartridge *cartridge.Cartridge
 	Cpu       *Cpu
@@ -70,6 +82,7 @@ type GameBoy struct {
 	InstInjectionFunc func(gb *GameBoy, op uint8)
 
 	CyclesPerSndGen int64
+	CurrFps         int64
 }
 
 type Timer struct {
@@ -85,11 +98,6 @@ type Timer struct {
 	BCycle          bool
 }
 
-const (
-	CPU_SPEED   = 4194304
-	BUFFER_SIZE = 20 * time.Millisecond
-)
-
 func NewGameBoy(ctx *audio.Context, path string) *GameBoy {
 	img := ebiten.NewImage(width, height)
 
@@ -100,7 +108,7 @@ func NewGameBoy(ctx *audio.Context, path string) *GameBoy {
 		Joypad:    0xFF,
 		Cartridge: cartridge.NewCartridge(path, path+".save"),
 		Palette:   &config.Conf.Gb.Palette,
-		Scheduler: NewScheduler(),
+		Scheduler: scheduler.NewScheduler(),
 		Apu:       apu.NewApu(ctx, BUFFER_SIZE),
 	}
 
@@ -134,10 +142,9 @@ func NewGameBoy(ctx *audio.Context, path string) *GameBoy {
 
 	if ctx != nil {
 		gb.CyclesPerSndGen = int64(CPU_SPEED / ctx.SampleRate())
-		gb.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 0)
+		gb.Scheduler.Schedule(EVENT_SND_FRAME_SEQ, 1, 0, gb.ClockFrameSequencerEvent, nil)
+		gb.Scheduler.Schedule(EVENT_SND_SAMPLE_GEN, 1, 0, gb.AudioSampleEvent, nil)
 	}
-
-	gb.Scheduler.schedule(EVENT_SND_FRAME_SEQ, 0)
 
 	return gb
 }
@@ -248,174 +255,36 @@ func (gb *GameBoy) GetPixels() []byte {
 	return gb.Pixels
 }
 
-const (
-	CYCLES_PER_FRAME        = 70224
-	CYCLES_PER_END_SCANLINE = CYCLES_PER_FRAME / 154
-	CYCLES_PER_VBLANK       = CYCLES_PER_FRAME / 154 * 144
-	CYCLES_PER_DRAW         = 80
-	CYCLES_PER_HBLANK       = 80 + 172
-)
-
 func (gb *GameBoy) Update(fps int64) {
 	if gb.Paused {
 		return
 	}
 
+	gb.CurrFps = fps
+
 	if gb.Apu.Ctx != nil {
 		gb.CyclesPerSndGen = (int64(CPU_SPEED/gb.Apu.Ctx.SampleRate()) * fps) / 60
 	}
 
-	gb.Scheduler.schedule(EVENT_END_FRAME, CYCLES_PER_FRAME)
-	gb.Scheduler.schedule(EVENT_END_SCANLINE, CYCLES_PER_END_SCANLINE)
-	gb.Scheduler.schedule(EVENT_VBK, CYCLES_PER_VBLANK)
-	gb.Scheduler.schedule(EVENT_DRW, CYCLES_PER_DRAW)
-	gb.Scheduler.schedule(EVENT_HBK, CYCLES_PER_HBLANK)
-
-	for {
-		nextEvent := gb.Scheduler.popNext()
-
-		for gb.Scheduler.CurrentCycle < nextEvent.InitCycle {
-
-			if gb.Cpu.Halted {
-				gb.Tick(4)
-			} else {
-				gb.Execute()
-			}
-			// pending irq should be checked after handling irq, see mooneye/ei_sequence
-			gb.Tick(gb.UpdateInterrupt())
-			if gb.Cpu.PendingInterrupt {
-				gb.Cpu.IME = true
-				gb.Cpu.PendingInterrupt = false
-			}
+	nextFrame := gb.Scheduler.CurrentCycle + CYCLES_FRAME
+	for gb.Scheduler.CurrentCycle < nextFrame {
+		if gb.Cpu.Halted {
+			gb.Tick(4)
+		} else {
+			gb.Execute()
 		}
-
-		if done := gb.handleEvent(nextEvent, fps == 60); done {
-			return
+		// pending irq should be checked after handling irq, see mooneye/ei_sequence
+		gb.Tick(gb.UpdateInterrupt())
+		if gb.Cpu.PendingInterrupt {
+			gb.Cpu.IME = true
+			gb.Cpu.PendingInterrupt = false
 		}
 	}
-}
-
-func (gb *GameBoy) handleEvent(event ScheduledEvent, stdFps bool) bool {
-	overshoot := gb.Scheduler.CurrentCycle - event.InitCycle
-	gb.Scheduler.CurrentCycle = event.InitCycle
-
-	switch event.Event {
-	case EVENT_VBK:
-		if gb.Lcdc.Enabled {
-			gb.Stat.Mode = PPU_VBLANK
-			if gb.Stat.IrqVBlank {
-				gb.SetIrq(IRQ_LCD)
-			}
-
-			gb.SetIrq(IRQ_VBL)
-
-			if !config.Conf.General.Headless {
-				gb.Image.WritePixels(gb.Pixels)
-			}
-		}
-
-	case EVENT_DRW:
-		if gb.Lcdc.Enabled {
-			gb.Stat.Mode = PPU_DRAW
-
-			// if gb.Lcdc.WindowEnabled &&
-			//	gb.MemoryBus.IO[WY] <= gb.MemoryBus.IO[LY] &&
-			//	gb.MemoryBus.IO[WX] < 167 {
-
-			//	gb.Scheduler.penalize(EVENT_HBK, 6+(int64(gb.MemoryBus.IO[WX])-7)&7)
-			//}
-		}
-
-	case EVENT_HBK:
-
-		if gb.Lcdc.Enabled {
-			gb.drawScanline(int32(gb.MemoryBus.IO[LY]))
-			gb.Stat.Mode = PPU_HBLANK
-			if gb.Stat.IrqHBlank {
-				gb.SetIrq(IRQ_LCD)
-			}
-
-			if gb.Color && gb.MemoryBus.Hdma.Enabled && !gb.Cpu.Halted {
-				gb.MemoryBus.Hdma.Transfer(1)
-			}
-		}
-
-	case EVENT_END_SCANLINE:
-
-		if gb.Lcdc.Enabled {
-
-			gb.MemoryBus.IO[LY]++
-
-			gb.Stat.Match = gb.MemoryBus.IO[LY] == gb.MemoryBus.IO[LYC]
-			if gb.Stat.Match && gb.Stat.IrqLyc {
-				gb.SetIrq(IRQ_LCD)
-			}
-
-			if event.InitCycle+CYCLES_PER_END_SCANLINE != CYCLES_PER_FRAME {
-				gb.Scheduler.scheduleAt(EVENT_END_SCANLINE, event.InitCycle+CYCLES_PER_END_SCANLINE)
-			}
-
-			if gb.MemoryBus.IO[LY] < height {
-				gb.Scheduler.scheduleAt(EVENT_DRW, event.InitCycle+CYCLES_PER_DRAW)
-				gb.Scheduler.scheduleAt(EVENT_HBK, event.InitCycle+CYCLES_PER_HBLANK)
-
-				gb.Stat.Mode = PPU_OAM
-				if gb.Stat.IrqOam {
-					gb.SetIrq(IRQ_LCD)
-				}
-			}
-		}
-
-	case EVENT_END_FRAME:
-		if gb.Lcdc.Enabled {
-			gb.bgPriority = [height][width]bool{}
-			gb.MemoryBus.IO[LY] = 0
-			gb.WindowLY = 0
-			gb.Stat.Match = gb.MemoryBus.IO[LY] == gb.MemoryBus.IO[LYC]
-			if gb.Stat.Match && gb.Stat.IrqLyc {
-				gb.SetIrq(IRQ_LCD)
-			}
-			gb.Stat.Mode = PPU_OAM
-			if gb.Stat.IrqOam {
-				gb.SetIrq(IRQ_LCD)
-			}
-		}
-
-		gb.Scheduler.endFrame()
-		//gb.Scheduler.CurrentCycle += overshoot
-		return true
-
-	case EVENT_SND_SAMPLE_GEN:
-		gb.Apu.SoundClock()
-		gb.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, gb.CyclesPerSndGen)
-
-	case EVENT_APU_TONE1:
-		gb.ClockApuChannel(event.InitCycle, 0)
-	case EVENT_APU_TONE2:
-		gb.ClockApuChannel(event.InitCycle, 1)
-	case EVENT_APU_WAVE:
-		gb.ClockApuChannel(event.InitCycle, 2)
-	case EVENT_APU_NOISE:
-		gb.ClockApuChannel(event.InitCycle, 3)
-
-	case EVENT_SND_FRAME_SEQ:
-		// I believe this is based on div, and will need to be reset based on div falling edge
-		// see polling version, but confirm
-		gb.Apu.ClockFrameSequencer()
-		gb.Scheduler.scheduleAt(EVENT_SND_FRAME_SEQ, event.InitCycle+8192)
-
-	default:
-		panic("unsetup event")
-	}
-
-	gb.Scheduler.CurrentCycle += overshoot
-
-	return false
 }
 
 //go:inline
 func (gb *GameBoy) Tick(tCycles int64) {
-	gb.Scheduler.CurrentCycle += tCycles >> gb.DoubleSpeedFlag
+	gb.Scheduler.Add(tCycles >> gb.DoubleSpeedFlag)
 
 	if gb.Timer.Enabled {
 		gb.UpdateTimers(tCycles)
@@ -540,14 +409,12 @@ func (gb *GameBoy) UpdateTimers(cycles int64) {
 }
 
 func (gb *GameBoy) toggleDoubleSpeed() {
-	if !gb.PrepareSpeedToggle {
-		return
+	if gb.PrepareSpeedToggle {
+		gb.PrepareSpeedToggle = false
+		gb.Cpu.Halted = false
+		gb.DoubleSpeedFlag = (^gb.DoubleSpeedFlag) & 1
+		gb.MemoryBus.IO[0x4D] = gb.DoubleSpeedFlag << 7
 	}
-
-	gb.PrepareSpeedToggle = false
-	gb.Cpu.Halted = false
-	gb.DoubleSpeedFlag = (^gb.DoubleSpeedFlag) & 1
-	gb.MemoryBus.IO[0x4D] = gb.DoubleSpeedFlag << 7
 }
 
 func (gb *GameBoy) Close() {
@@ -562,78 +429,15 @@ func (gb *GameBoy) Close() {
 
 func (gb *GameBoy) Draw(screen *ebiten.Image) {
 	var (
-		sw = float64(screen.Bounds().Dx())
-		sh = float64(screen.Bounds().Dy())
+		sw      = float64(screen.Bounds().Dx())
+		sh      = float64(screen.Bounds().Dy())
+		scale   = utils.ScaleImage(sw, sh, width, height)
+		offsetX = (sw - (width * scale)) / 2
+		offsetY = (sh - (height * scale)) / 2
 	)
 
 	gb.DrawOptions.GeoM.Reset()
-
-	scale := utils.ScaleImage(sw, sh, width, height)
-
-	offsetX := (sw - (width * scale)) / 2
-	offsetY := (sh - (height * scale)) / 2
-
 	gb.DrawOptions.GeoM.Scale(scale, scale)
 	gb.DrawOptions.GeoM.Translate(offsetX, offsetY)
 	screen.DrawImage(gb.Image, &gb.DrawOptions)
-}
-
-func (gb *GameBoy) ClockApuChannel(init int64, idx int) {
-	// clock apu channels based on internal div in gb
-	// fifo does not need to be clocked since clocked externally by timers
-
-	switch idx {
-	case 0:
-		gb.Apu.ToneChannel1.Clock()
-	case 1:
-		gb.Apu.ToneChannel2.Clock()
-	case 2:
-		gb.Apu.WaveChannel.Clock()
-	case 3:
-		gb.Apu.NoiseChannel.Clock()
-	}
-
-	gb.ScheduleApuChannel(init, idx)
-}
-
-func (gb *GameBoy) ScheduleApuChannel(init int64, idx int) {
-	period := int64(0)
-
-	switch idx {
-	case 0, 1:
-		ch := &gb.Apu.ToneChannel1
-		if idx == 1 {
-			ch = &gb.Apu.ToneChannel2
-		}
-
-		if !ch.ChannelEnabled {
-			return
-		}
-		period = int64(2048 - ch.Shadow)
-
-	case 2:
-		ch := &gb.Apu.WaveChannel
-		if !ch.ChannelEnabled {
-			return
-		}
-		period = int64(2048-ch.ActivePeriod) << 1
-
-	case 3:
-		ch := &gb.Apu.NoiseChannel
-		if !ch.ChannelEnabled {
-			return
-		}
-
-		period = 8
-
-		if ch.Divider > 0 {
-			period = int64(ch.Divider) << 4
-		}
-
-		period <<= int64(ch.Shift)
-	}
-
-	// this will keep same pitch
-	// period = (period * gba.CurrFps) / FPS
-	gb.Scheduler.scheduleAt(APU_EVENTS[idx], init+period)
 }

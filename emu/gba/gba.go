@@ -6,6 +6,7 @@ import (
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gba/apu"
 	"github.com/aabalke/guac/emu/gba/cart"
+	"github.com/aabalke/guac/emu/scheduler"
 	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
@@ -30,7 +31,7 @@ const (
 
 type GBA struct {
 	Cpu               *Cpu
-	Scheduler         *Scheduler
+	Scheduler         *scheduler.Scheduler
 	Mem               *Memory
 	Cartridge         *cart.Cartridge
 	PPU               *PPU
@@ -58,7 +59,7 @@ func NewGBA(ctx *audio.Context, path string) *GBA {
 		Pixels:       make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
 		Image:        ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 		Apu:          apu.NewApu(ctx, BUFFER_SIZE),
-		Scheduler:    NewScheduler(),
+		Scheduler:    scheduler.NewScheduler(),
 		IdleOptimize: config.Conf.Gba.IdleOptimize,
 	}
 
@@ -81,15 +82,15 @@ func NewGBA(ctx *audio.Context, path string) *GBA {
 
 	if ctx != nil {
 		gba.CyclesPerSndGen = int64(CPU_SPEED / ctx.SampleRate())
-		gba.Scheduler.schedule(EVENT_SND_FRAME_SEQ, 1, 0, gba.ClockFrameSequencerEvent, nil)
-		gba.Scheduler.schedule(EVENT_SND_SAMPLE_GEN, 1, 0, gba.AudioSampleEvent, nil)
+		gba.Scheduler.Schedule(EVENT_SND_FRAME_SEQ, 1, 0, gba.ClockFrameSequencerEvent, nil)
+		gba.Scheduler.Schedule(EVENT_SND_SAMPLE_GEN, 1, 0, gba.AudioSampleEvent, nil)
 	}
 
 	// matches nanoboy
 	gba.Mem.IO[6] = 225
 	gba.Mem.Dispstat |= DISP_HBL
 	gba.Mem.Dispstat |= DISP_VBL
-	gba.Scheduler.schedule(EVENT_END_SCANLINE, 1, CYCLES_HBLANK, gba.ScanlineEndEvent, nil)
+	gba.Scheduler.Schedule(EVENT_END_SCANLINE, 1, CYCLES_HBLANK, gba.ScanlineEndEvent, nil)
 
 	gba.SetIdleAddr()
 	gba.Apu.SoundBias = 0x0200

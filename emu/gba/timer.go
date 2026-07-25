@@ -66,17 +66,17 @@ func (t *Timer) Read16(idx int) uint16 {
 func (t *Timer) Write(idx int, v uint8) {
 	switch idx {
 	case 0:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_RELOAD, 1, 1, t.ReloadEventLo, v)
+		t.Gba.Scheduler.Schedule(EVENT_TIMER_RELOAD, 1, 1, t.ReloadEventLo, v)
 	case 1:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_RELOAD, 1, 1, t.ReloadEventHi, v)
+		t.Gba.Scheduler.Schedule(EVENT_TIMER_RELOAD, 1, 1, t.ReloadEventHi, v)
 	case 2:
-		t.Gba.Scheduler.schedule(EVENT_TIMER_CONTROL, 2, 1, t.ControlEvent, v)
+		t.Gba.Scheduler.Schedule(EVENT_TIMER_CONTROL, 2, 1, t.ControlEvent, v)
 	}
 }
 
 func (t *Timer) Write16(idx uint32, v uint16) {
 	if idx == 2 {
-		t.Gba.Scheduler.schedule(EVENT_TIMER_RELOAD, 1, 1, func(late int64, a any) {
+		t.Gba.Scheduler.Schedule(EVENT_TIMER_RELOAD, 1, 1, func(late int64, a any) {
 			v := a.(uint16)
 			t.ControlEvent(late, uint8(v))
 		}, v)
@@ -84,7 +84,7 @@ func (t *Timer) Write16(idx uint32, v uint16) {
 		return
 	}
 
-	t.Gba.Scheduler.schedule(EVENT_TIMER_RELOAD, 1, 1, func(late int64, a any) {
+	t.Gba.Scheduler.Schedule(EVENT_TIMER_RELOAD, 1, 1, func(late int64, a any) {
 		v := a.(uint16)
 		t.ReloadEventLo(late, uint8(v))
 		t.ReloadEventHi(late, uint8(v>>8))
@@ -92,7 +92,7 @@ func (t *Timer) Write16(idx uint32, v uint16) {
 }
 
 func (t *Timer) Write32(v uint32) {
-	t.Gba.Scheduler.schedule(EVENT_TIMER_CONTROL, 1, 1, func(late int64, a any) {
+	t.Gba.Scheduler.Schedule(EVENT_TIMER_CONTROL, 1, 1, func(late int64, a any) {
 		v := a.(uint32)
 		t.ReloadEventLo(late, uint8(v))
 		t.ReloadEventHi(late, uint8(v>>8))
@@ -154,7 +154,7 @@ func (t *Timer) Start(cycles int64) {
 	t.Running = true
 	t.From = t.Gba.Scheduler.Now() - cycles
 	until := int64((0x10000-t.Counter)<<t.FreqShift) - cycles
-	t.Gba.Scheduler.schedule(OVERFLOW_EVENTS[t.Idx], 0, until, t.Overflow, nil)
+	t.Gba.Scheduler.Schedule(OVERFLOW_EVENTS[t.Idx], 0, until, t.Overflow, nil)
 }
 
 func (t *Timer) Stop(late int64) {
@@ -163,7 +163,7 @@ func (t *Timer) Stop(late int64) {
 		t._Overflow(late)
 	}
 
-	t.Gba.Scheduler.cancel(OVERFLOW_EVENTS[t.Idx])
+	t.Gba.Scheduler.Cancel(OVERFLOW_EVENTS[t.Idx])
 
 	t.Running = false
 }
@@ -192,7 +192,7 @@ func (t *Timer) OnTimerOverflow(late int64) {
 			if refill := fifo.Count <= 3; refill {
 				ch := t.Gba.Dma.Chs[1]
 				if ch.Enabled && ch.Mode == DMA_MODE_SPE {
-					t.Gba.Scheduler.schedule(DMA_EVENTS[1], 0, 2-late, ch.Start, nil)
+					t.Gba.Scheduler.Schedule(DMA_EVENTS[1], 0, 2-late, ch.Start, nil)
 				}
 			}
 		}
@@ -205,7 +205,7 @@ func (t *Timer) OnTimerOverflow(late int64) {
 			if refill := fifo.Count <= 3; refill {
 				ch := t.Gba.Dma.Chs[2]
 				if ch.Enabled && ch.Mode == DMA_MODE_SPE {
-					t.Gba.Scheduler.schedule(DMA_EVENTS[2], 0, 2-late, ch.Start, nil)
+					t.Gba.Scheduler.Schedule(DMA_EVENTS[2], 0, 2-late, ch.Start, nil)
 				}
 			}
 

@@ -1,5 +1,7 @@
 package gba
 
+import "github.com/aabalke/guac/emu/scheduler"
+
 const (
 	IRQ_VBL  = 0
 	IRQ_HBL  = 1
@@ -19,7 +21,7 @@ const (
 
 type Irq struct {
 	gba                  *GBA
-	sch                  *Scheduler
+	sch                  *scheduler.Scheduler
 	pendingIF, pendingIE uint32
 	IF, IE               uint32
 	IdleIrq              uint32
@@ -31,7 +33,7 @@ type Irq struct {
 	CpuIrqLine *bool
 }
 
-func NewIrq(gba *GBA, s *Scheduler) *Irq {
+func NewIrq(gba *GBA, s *scheduler.Scheduler) *Irq {
 	return &Irq{
 		gba: gba,
 		sch: s,
@@ -70,7 +72,7 @@ func (i *Irq) Write8(addr uint32, v uint8) {
 		i.pendingIME = v&1 != 0
 	}
 
-	i.sch.schedule(EVENT_IRQ_SET, 1, 1, i.OnWrite, nil)
+	i.sch.Schedule(EVENT_IRQ_SET, 1, 1, i.OnWrite, nil)
 }
 
 func (i *Irq) Write16(addr uint32, v uint16) {
@@ -83,12 +85,12 @@ func (i *Irq) Write16(addr uint32, v uint16) {
 		i.pendingIME = v&1 != 0
 	}
 
-	i.sch.schedule(EVENT_IRQ_SET, 1, 1, i.OnWrite, nil)
+	i.sch.Schedule(EVENT_IRQ_SET, 1, 1, i.OnWrite, nil)
 }
 
 func (i *Irq) SetIRQ(irq uint32) {
 	i.pendingIF |= (1 << irq)
-	i.sch.schedule(EVENT_IRQ_SET, 0, 1, i.OnWrite, nil)
+	i.sch.Schedule(EVENT_IRQ_SET, 0, 1, i.OnWrite, nil)
 }
 
 func (i *Irq) OnWrite(late int64, argz any) {
@@ -99,13 +101,13 @@ func (i *Irq) OnWrite(late int64, argz any) {
 	irqAvailableNew := i.IF&i.IE != 0
 
 	if i.IrqAvailable != irqAvailableNew {
-		i.sch.schedule(EVENT_IRQ_SET, 0, 1, i.UpdateIEAndIF, irqAvailableNew)
+		i.sch.Schedule(EVENT_IRQ_SET, 0, 1, i.UpdateIEAndIF, irqAvailableNew)
 	}
 
 	irqLineNew := i.IME && irqAvailableNew
 
 	if i.IrqLine != irqLineNew {
-		i.sch.schedule(EVENT_IRQ_SET, 0, 2, i.UpdateIRQLine, irqLineNew)
+		i.sch.Schedule(EVENT_IRQ_SET, 0, 2, i.UpdateIRQLine, irqLineNew)
 		i.IrqLine = irqLineNew
 	}
 }
