@@ -7,6 +7,7 @@ import (
 
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/bios"
+	"github.com/aabalke/guac/emu/gba/cart"
 	"github.com/aabalke/guac/emu/gba/gpio"
 	"github.com/aabalke/guac/utils"
 )
@@ -225,7 +226,7 @@ func (m *Memory) initReadRegions() {
 
 	for i := 0x8; i < 0xE; i++ {
 		m.readRegions[i] = func(m *Memory, addr uint32) uint8 {
-			return (*m.GBA.Cartridge.Rom)[addr&0x1FFFFFF]
+			panic("not reachable")
 		}
 	}
 
@@ -266,11 +267,34 @@ func (m *Memory) ReadPtr(addr uint32) unsafe.Pointer {
 	case 7:
 		return unsafe.Add(unsafe.Pointer(&m.OAM), addr&0x3FF)
 
-	case 8, 9, 0xA, 0xB, 0xC, 0xD:
-		if addr&0x1FF_FFFF >= uint32(len(*m.GBA.Cartridge.Rom)) {
+	case 8, 9, 0xA, 0xB, 0xC:
+
+		addr &= 0x1FF_FFFF
+
+		c := m.GBA.Cartridge
+
+		switch {
+		case addr < uint32(len(*c.Rom)):
+			return unsafe.Add(unsafe.Pointer(&(*c.Rom)[0]), addr)
+		case c.Mirrored && (addr&c.RomMask) < uint32(len(*c.Rom)):
+			return unsafe.Add(unsafe.Pointer(&(*c.Rom)[0]), addr&c.RomMask)
+		}
+	case 0xD:
+
+		c := m.GBA.Cartridge
+
+		if c.Id == cart.EEPROM {
 			return nil
 		}
-		return unsafe.Add(unsafe.Pointer(&(*m.GBA.Cartridge.Rom)[0]), addr&0x1FF_FFFF)
+
+		addr &= 0x1FF_FFFF
+
+		switch {
+		case addr < uint32(len(*c.Rom)):
+			return unsafe.Add(unsafe.Pointer(&(*c.Rom)[0]), addr)
+		case c.Mirrored && (addr&c.RomMask) < uint32(len(*c.Rom)):
+			return unsafe.Add(unsafe.Pointer(&(*c.Rom)[0]), addr&c.RomMask)
+		}
 	}
 
 	return nil
@@ -305,11 +329,19 @@ func (m *Memory) Read8(addr uint32) uint32 {
 	if addr < 0x800_0000 || addr >= 0xE00_0000 {
 		return uint32(m.Read(addr))
 	}
-	if addr&0x1FF_FFFF >= uint32(len(*m.GBA.Cartridge.Rom)) {
+
+	addr &= 0x1FF_FFFF
+
+	cart := m.GBA.Cartridge
+
+	switch {
+	case addr < uint32(len(*cart.Rom)):
+		return binary.LittleEndian.Uint32((*cart.Rom)[addr:]) & 0xFF
+	case cart.Mirrored && addr&cart.RomMask < uint32(len(*cart.Rom)):
+		return binary.LittleEndian.Uint32((*cart.Rom)[addr&cart.RomMask:]) & 0xFF
+	default:
 		return m.ReadBadRom(addr, 1)
 	}
-
-	return uint32(m.Read(addr))
 }
 
 func (m *Memory) Read16(addr uint32) uint32 {
@@ -324,8 +356,20 @@ func (m *Memory) Read16(addr uint32) uint32 {
 		return uint32(m.GBA.Cartridge.EepromRead())
 	}
 
-	if addr >= 0x800_0000 && addr&0x1FF_FFFF >= uint32(len(*m.GBA.Cartridge.Rom)) {
-		return m.ReadBadRom(addr, 2)
+	if addr >= 0x800_0000 {
+
+		addr &= 0x1FF_FFFF
+
+		cart := m.GBA.Cartridge
+
+		switch {
+		case addr < uint32(len(*cart.Rom)):
+			return binary.LittleEndian.Uint32((*cart.Rom)[addr:]) & 0xFFFF
+		case cart.Mirrored && addr&cart.RomMask < uint32(len(*cart.Rom)):
+			return binary.LittleEndian.Uint32((*cart.Rom)[addr&cart.RomMask:]) & 0xFFFF
+		default:
+			return m.ReadBadRom(addr, 2)
+		}
 	}
 
 	switch addr {
@@ -361,8 +405,20 @@ func (m *Memory) Read32(addr uint32) uint32 {
 
 	addr &^= 3
 
-	if addr >= 0x800_0000 && addr&0x1FF_FFFF >= uint32(len(*m.GBA.Cartridge.Rom)) {
-		return m.ReadBadRom(addr, 4)
+	if addr >= 0x800_0000 {
+
+		addr &= 0x1FF_FFFF
+
+		cart := m.GBA.Cartridge
+
+		switch {
+		case addr < uint32(len(*cart.Rom)):
+			return binary.LittleEndian.Uint32((*cart.Rom)[addr:])
+		case cart.Mirrored && addr&cart.RomMask < uint32(len(*cart.Rom)):
+			return binary.LittleEndian.Uint32((*cart.Rom)[addr&cart.RomMask:])
+		default:
+			return m.ReadBadRom(addr, 4)
+		}
 	}
 
 	if ptr := m.ReadPtr(addr); ptr != nil {

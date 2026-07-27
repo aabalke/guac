@@ -28,6 +28,9 @@ type Cartridge struct {
 	EepromAddr           uint32
 	EepromState          uint32
 
+	RomMask  uint32
+	Mirrored bool
+
 	Rom *[]uint8
 	Sav []uint8
 }
@@ -59,6 +62,7 @@ func NewCartridge(rom, sav string) *Cartridge {
 	c := Cartridge{
 		RomPath: rom,
 		SavPath: sav,
+		RomMask: 0x1FF_FFFF,
 	}
 
 	buf, err := os.ReadFile(c.RomPath)
@@ -94,6 +98,13 @@ func NewCartridge(rom, sav string) *Cartridge {
 
 	c.Title = strings.ToUpper(strings.ReplaceAll(string((*c.Rom)[0xA0:0xA0+12]), "\x00", " "))
 	c.Code = strings.ToUpper(string((*c.Rom)[0xAC : 0xAC+4]))
+
+	// some dumps of classic nes games are only 1mb etc, since mirrored the rest
+	// to fix we lower rom mask to fit smaller carts
+	if classic := (*c.Rom)[0xAC] == 'F'; classic {
+		c.RomMask = RoundPowerOfTwo(uint32(len(*c.Rom))) - 1
+		c.Mirrored = true
+	}
 
 	return &c
 }
@@ -163,4 +174,14 @@ func (c *Cartridge) Write(addr uint32, v uint8) {
 	case FLASH, FLASH128:
 		c.WriteFlash(addr, v)
 	}
+}
+
+func RoundPowerOfTwo(v uint32) uint32 {
+	s := uint32(1)
+
+	for s < v {
+		s *= 2
+	}
+
+	return s
 }
