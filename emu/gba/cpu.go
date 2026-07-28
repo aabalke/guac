@@ -17,6 +17,17 @@ type Cpu struct {
 	Reloaded          bool
 }
 
+type Reg struct {
+	R    [16]uint32
+	CPSR Cond
+
+	SP   [6]uint32
+	LR   [6]uint32
+	FIQ  [5]uint32 // r8 - r12
+	USR  [5]uint32 // r8 - r12 // tmp to restore after FIQ
+	SPSR [6]Cond
+}
+
 const (
 	SP = 13
 	LR = 14
@@ -237,17 +248,6 @@ func (c *Cpu) Reload32() {
 	c.Reg.R[15] += 8
 	c.Reloaded = true
 	c.Seq = SEQ
-}
-
-type Reg struct {
-	R    [16]uint32
-	CPSR Cond
-
-	SP   [6]uint32
-	LR   [6]uint32
-	FIQ  [5]uint32 // r8 - r12
-	USR  [5]uint32 // r8 - r12 // tmp to restore after FIQ
-	SPSR [6]Cond
 }
 
 type Cond struct {

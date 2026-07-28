@@ -12,7 +12,7 @@ type ScheduledEvent struct {
 	Event     Event
 	Priority  int
 	InitCycle int64
-	Func      func(int64, any)
+	Func      func(late int64, args any)
 	Args      any
 }
 
@@ -81,24 +81,37 @@ func (s *Scheduler) Cancel(e Event) {
 	}
 }
 
+// nanoboy rewinds cuu cycle for event handling
+// would not require explicit "late" amount but otherwise I do not think it matters
+//func (s *Scheduler) Add(cycles int64) {
+//	nextCycle := s.CurrentCycle + cycles
+//
+//	for {
+//		if next := s.peekNext(); next == nil || next.InitCycle > nextCycle {
+//			break
+//		}
+//
+//		event := s.popNext()
+//		late := int64(0)
+//		s.CurrentCycle = event.InitCycle
+//		event.Func(late, event.Args)
+//	}
+//
+//	s.CurrentCycle = nextCycle
+//}
+
 func (s *Scheduler) Add(cycles int64) {
-	//nextCycle := s.CurrentCycle + cycles
 	s.CurrentCycle += cycles
 
 	for {
-		// if next := s.peekNext(); next == nil || next.InitCycle > nextCycle {
 		if next := s.peekNext(); next == nil || next.InitCycle > s.CurrentCycle {
 			break
 		}
 
 		event := s.popNext()
 		late := s.CurrentCycle - event.InitCycle
-		//late := int64(0)
-		//s.CurrentCycle = event.InitCycle
 		event.Func(late, event.Args)
 	}
-
-	//s.CurrentCycle = nextCycle
 }
 
 func (s *Scheduler) GetRemaining() int64 {

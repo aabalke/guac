@@ -9,7 +9,6 @@ func (c *Cpu) DecodeTHUMB(op uint16) {
 	switch {
 	case IsthumbSWI(op):
 		c.swi(uint32(op) & 0xFF)
-		return
 	case IsThumbAddSub(op):
 		c.ThumbAddSub(op)
 	case IsThumbShift(op):
@@ -47,8 +46,7 @@ func (c *Cpu) DecodeTHUMB(op uint16) {
 	case IsMulti(op):
 		c.ThumbBlock(op)
 	default:
-		r := &c.Reg.R
-		panic(fmt.Sprintf("Unable to Decode ARM false %04X, at PC %08X\n", op, r[PC]))
+		panic(fmt.Sprintf("Unable to Decode ARM false %04X, at PC %08X\n", op, c.Reg.R[PC]))
 	}
 }
 

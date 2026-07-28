@@ -154,7 +154,8 @@ func (gb *GameBoy) ScheduleApuChannel(late int64, idx uint8) {
 	}
 
 	// this will keep same pitch
-	period = (period * gb.CurrFps) / FPS
+	// period = (period * gb.CurrFps) / FPS
+
 	gb.Scheduler.Schedule(APU_EVENTS[idx], 1, period-late, gb.ClockApuChannel, idx)
 }
 

@@ -22,13 +22,12 @@ type Memory struct {
 	OAM   [0x400]uint8
 	IO    [0x400]uint8
 
-	ProtectedValue uint32
+	Timings        *Timings
 	Sio            *Sio
 	Gpio           *gpio.Gpio
 	Dispstat       Dispstat
+	ProtectedValue uint32
 	postflg        uint8
-
-	Timings *Timings
 
 	readRegions  [0x100]func(m *Memory, addr uint32) uint8
 	writeRegions [0x100]func(m *Memory, addr uint32, v uint8, byteWrite bool)
@@ -88,7 +87,7 @@ func (m *Memory) initWriteRegions() {
 	}
 
 	m.writeRegions[0x2] = func(m *Memory, addr uint32, v uint8, _ bool) {
-		m.WRAM1[addr&0x3_FFFF] = v
+		m.WRAM1[addr&0x3FFFF] = v
 	}
 
 	m.writeRegions[0x3] = func(m *Memory, addr uint32, v uint8, _ bool) {
@@ -269,15 +268,17 @@ func (m *Memory) ReadPtr(addr uint32) unsafe.Pointer {
 
 	case 8, 9, 0xA, 0xB, 0xC:
 
+		c := m.GBA.Cartridge
+
 		addr &= 0x1FF_FFFF
 
-		c := m.GBA.Cartridge
+		ptr := unsafe.Pointer(&(*c.Rom)[0])
 
 		switch {
 		case addr < uint32(len(*c.Rom)):
-			return unsafe.Add(unsafe.Pointer(&(*c.Rom)[0]), addr)
+			return unsafe.Add(ptr, addr)
 		case c.Mirrored && (addr&c.RomMask) < uint32(len(*c.Rom)):
-			return unsafe.Add(unsafe.Pointer(&(*c.Rom)[0]), addr&c.RomMask)
+			return unsafe.Add(ptr, addr&c.RomMask)
 		}
 	case 0xD:
 
@@ -289,11 +290,13 @@ func (m *Memory) ReadPtr(addr uint32) unsafe.Pointer {
 
 		addr &= 0x1FF_FFFF
 
+		ptr := unsafe.Pointer(&(*c.Rom)[0])
+
 		switch {
 		case addr < uint32(len(*c.Rom)):
-			return unsafe.Add(unsafe.Pointer(&(*c.Rom)[0]), addr)
+			return unsafe.Add(ptr, addr)
 		case c.Mirrored && (addr&c.RomMask) < uint32(len(*c.Rom)):
-			return unsafe.Add(unsafe.Pointer(&(*c.Rom)[0]), addr&c.RomMask)
+			return unsafe.Add(ptr, addr&c.RomMask)
 		}
 	}
 
