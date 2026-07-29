@@ -185,6 +185,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 		for {
 			op = uint32(*(*uint16)(unsafe.Add(p, i*2)))
 			if length >= config.Conf.Nds.Jit.BatchInstA7 {
+
 				break
 			}
 
@@ -214,7 +215,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 				continue
 			}
 
-			if ok := j.EmitOpThumb(uint16(op)); !ok {
+			if ok := j.emitOpThumb(uint16(op)); !ok {
 				break
 			}
 
@@ -227,6 +228,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 			op = *(*uint32)(unsafe.Add(p, i*4))
 
 			if length >= config.Conf.Nds.Jit.BatchInstA7 {
+
 				break
 			}
 
@@ -261,7 +263,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 				continue
 			}
 
-			if ok := j.EmitOp(op); !ok {
+			if ok := j.emitOp(op); !ok {
 				break
 			}
 
@@ -293,8 +295,8 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 	page.Blocks[blockIdx] = newBlock
 }
 
-func (j *Jit) EmitOp(op uint32) bool {
-	jcctargets := j.EmitCond(op)
+func (j *Jit) emitOp(op uint32) bool {
+	jcctargets := j.emitCond(op)
 
 	ok := j.DecodeARM(op)
 
@@ -311,7 +313,7 @@ func (j *Jit) EmitOp(op uint32) bool {
 	return ok
 }
 
-func (j *Jit) EmitOpThumb(op uint16) bool {
+func (j *Jit) emitOpThumb(op uint16) bool {
 	ok := j.DecodeTHUMB(op)
 
 	if ok {
@@ -324,7 +326,7 @@ func (j *Jit) EmitOpThumb(op uint16) bool {
 }
 
 //go:inline
-func (j *Jit) EmitCond(op uint32) []func() {
+func (j *Jit) emitCond(op uint32) []func() {
 	// jump if cond is NOT TRUE (Z has branch if ldr flag z is empty
 
 	cond := op >> 28
@@ -439,7 +441,7 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 			return false
 		}
 
-		jit.EmitSdt(op)
+		jit.emitSdt(op)
 		return true
 	case isBlock(op):
 
@@ -448,10 +450,11 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 
 		rlist := op & 0xFFFF
 		if pcIncluded && load || rlist == 0 {
+
 			return false
 		}
 
-		jit.EmitBlock(op)
+		jit.emitBlock(op)
 		return true
 
 	case isHalf(op):
@@ -461,7 +464,7 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 			return false
 		}
 
-		jit.EmitHalf(op)
+		jit.emitHalf(op)
 		return true
 	case isUD(op):
 		return false
@@ -471,15 +474,15 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 			return false
 		}
 
-		jit.EmitPsr(op)
+		jit.emitPsr(op)
 
 		return true
 
 	case isSWP(op):
-		jit.EmitSWP(op)
+		jit.emitSWP(op)
 		return true
 	case isM(op):
-		jit.EmitMul(op)
+		jit.emitMul(op)
 		return true
 
 	case isALU(op):
@@ -492,7 +495,7 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 			return false
 		}
 
-		jit.EmitAlu(op)
+		jit.emitAlu(op)
 
 		return true
 
@@ -500,24 +503,24 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 
 	return false
 }
-
 func (j *Jit) DecodeTHUMB(op uint16) bool {
+
 	switch {
-	case IsthumbSWI(op):
+	case isthumbSWI(op):
 		return false
-	case IsThumbAddSub(op):
-		j.EmitThumbAddSub(op)
+	case isThumbAddSub(op):
+		j.emitThumbAddSub(op)
 		return true
-	case IsThumbShift(op):
-		j.EmitThumbShifted(op)
+	case isThumbShift(op):
+		j.emitThumbShifted(op)
 		return true
-	case IsThumbImm(op):
-		j.EmitThumbImm(op)
+	case isThumbImm(op):
+		j.emitThumbImm(op)
 		return true
-	case IsThumbAlu(op):
-		j.EmitThumbAlu(op)
+	case isThumbAlu(op):
+		j.emitThumbAlu(op)
 		return true
-	case IsThumbHiReg(op):
+	case isThumbHiReg(op):
 
 		var (
 			inst = (op >> 8) & 0b11
@@ -533,56 +536,56 @@ func (j *Jit) DecodeTHUMB(op uint16) bool {
 			return false
 		}
 
-		j.EmitThumbHiRegBX(op)
+		j.emitThumbHiRegBX(op)
 		return true
-	case IsLSHalf(op):
-		j.EmitThumbLSHalf(op)
+	case isLSHalf(op):
+		j.emitThumbLSHalf(op)
 		return true
-	case IsThumbSdt(op):
-		j.EmitThumbSdt(op)
+	case isThumbSdt(op):
+		j.emitThumbSdt(op)
 		return true
-	case IsLPC(op):
-		j.EmitThumbLPC(op)
+	case isLPC(op):
+		j.emitThumbLPC(op)
 		return true
-	case IsLSImm(op):
-		j.EmitThumbLSImm(op)
+	case isLSImm(op):
+		j.emitThumbLSImm(op)
 		return true
-	case IsPushPop(op):
+	case isPushPop(op):
 		pclr := (op>>8)&1 != 0
 		pop := (op>>11)&1 != 0
 		if pop && pclr {
 			return false
 		}
 
-		j.EmitThumbPushPop(op)
+		j.emitThumbPushPop(op)
 		return true
-	case IsRelative(op):
-		j.EmitThumbRelative(op)
+	case isRelative(op):
+		j.emitThumbRelative(op)
 		return true
-	case IsThumbB(op):
+	case isThumbB(op):
 		return false
-	case IsJumpCall(op):
+	case isJumpCall(op):
 		return false
-	case IsStack(op):
-		j.EmitThumbStack(op)
+	case isStack(op):
+		j.emitThumbStack(op)
 		return true
-	case IsLongBranch(op):
+	case isLongBranch(op):
 		return false
-	case IsShortLongBranch(op):
+	case isShortLongBranch(op):
 		return false
-	case IsLSSP(op):
-		j.EmitThumbLSSP(op)
+	case isLSSP(op):
+		j.emitThumbLSSP(op)
 		return true
-	case IsMulti(op):
+	case isMulti(op):
 
 		ldmia := (op>>11)&1 != 0
-		rlIst := op & 0xFF
+		rlist := op & 0xFF
 
-		if ldmia && rlIst == 0 {
+		if ldmia && rlist == 0 {
 			return false
 		}
 
-		j.EmitThumbBlock(op)
+		j.emitThumbBlock(op)
 		return true
 	}
 

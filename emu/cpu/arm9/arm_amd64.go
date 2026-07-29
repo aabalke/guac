@@ -3,17 +3,17 @@ package arm9
 
 import (
 	"math"
-	"math/bits"
 
+	"math/bits"
 	//"unsafe"
 
 	amd64 "github.com/aabalke/gojit"
 
-	"github.com/aabalke/guac/emu/cpu/arm7"
 	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
 )
 
-func (j *Jit) EmitClz(op uint32) {
+func (j *Jit) emitClz(op uint32) {
+
 	rd := (op >> 12) & 0xF
 	rm := op & 0xF
 
@@ -21,13 +21,14 @@ func (j *Jit) EmitClz(op uint32) {
 	j.Lzcnt(amd64.Eax, amd64.Eax)
 
 	// lzcnt returns op size when input is zero
-	// j.Mov(amd64.Imm(0), amd64.Ebx)
-	// j.Cmovcc(amd64.CC_Z, amd64.Ebx, amd64.Eax)
+	//j.Mov(amd64.Imm(0), amd64.Ebx)
+	//j.Cmovcc(amd64.CC_Z, amd64.Ebx, amd64.Eax)
 
 	j.Movl(amd64.Eax, j.REG(rd))
 }
 
-func (j *Jit) EmitMul(op uint32) {
+func (j *Jit) emitMul(op uint32) {
+
 	inst := (op >> 21) & 0xF
 	set := (op>>20)&1 != 0
 	rd := (op >> 16) & 0xF
@@ -266,9 +267,52 @@ func (j *Jit) EmitMul(op uint32) {
 
 		j.Movl(amd64.Eax, j.REG(rd))
 	}
+
 }
 
-func (j *Jit) EmitQalu(op uint32) {
+func (j *Jit) emitSwp(op uint32) {
+
+	isByte := (op>>22)&1 != 0
+	rn := (op >> 16) & 0xF
+	rd := (op >> 12) & 0xF
+	rm := op & 0xF
+
+	j.Movl(j.REG(rn), amd64.Eax)
+	j.Movl(j.REG(rm), amd64.Ebx)
+
+	j.Movl(amd64.Eax, amd64.R8d)
+	j.Movl(amd64.Ebx, amd64.Esi)
+
+	if isByte {
+
+		j.CallFunc(Read)
+		j.Movl(amd64.Eax, j.REG(rd))
+
+		j.Movl(amd64.R8d, amd64.Eax)
+		j.Movl(amd64.Esi, amd64.Ebx)
+
+		j.And(amd64.Imm(0xFF), amd64.Rbx)
+		j.CallFunc(Write)
+		return
+	}
+
+	j.And(amd64.Imm(^0b11), amd64.Rax)
+	j.CallFunc(Read32)
+
+	j.Movl(amd64.R8d, amd64.Ecx)
+	j.And(amd64.Imm(0b11), amd64.Ecx)
+	j.Shl(amd64.Imm(0b11), amd64.Ecx)
+	j.And(amd64.Imm(31), amd64.Ecx)
+	j.RorCl(amd64.Eax)
+	j.Movl(amd64.Eax, j.REG(rd))
+
+	j.Movl(amd64.R8d, amd64.Eax)
+	j.Movl(amd64.Esi, amd64.Ebx)
+	j.CallFunc(Write32)
+}
+
+func (j *Jit) emitQalu(op uint32) {
+
 	maxInt32 := amd64.Imm(math.MaxInt32)
 	minInt32 := amd64.Imm(math.MinInt32)
 
@@ -321,7 +365,8 @@ func (j *Jit) EmitQalu(op uint32) {
 	j.Movl(amd64.Eax, j.REG(rd))
 }
 
-func (j *Jit) EmitHalf(op uint32) {
+func (j *Jit) emitHalf(op uint32) {
+
 	rn := (op >> 16) & 0xF
 	rd := (op >> 12) & 0xF
 	preFlag := (op>>24)&1 != 0
@@ -449,7 +494,8 @@ func (j *Jit) EmitHalf(op uint32) {
 	}
 }
 
-func (j *Jit) EmitSdt(op uint32) {
+func (j *Jit) emitSdt(op uint32) {
+
 	rd := (op >> 12) & 0xF
 	rn := (op >> 16) & 0xF
 	reg := (op>>25)&1 != 0
@@ -461,7 +507,7 @@ func (j *Jit) EmitSdt(op uint32) {
 
 	// offset
 	if reg {
-		j.EmitSdtRegShift(op)
+		j.emitSdtRegShift(op)
 		//CpuPointer = j.Cpu
 		//j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
 
@@ -531,7 +577,8 @@ func (j *Jit) EmitSdt(op uint32) {
 	}
 }
 
-func (j *Jit) EmitSdtRegShift(op uint32) {
+func (j *Jit) emitSdtRegShift(op uint32) {
+
 	rm := op & 0xF
 	shType := (op >> 5) & 0b11
 	shift := (op >> 7) & 0x1F
@@ -545,7 +592,7 @@ func (j *Jit) EmitSdtRegShift(op uint32) {
 	}
 
 	// why is this commented out
-	// if special := shift == 0; special {
+	//if special := shift == 0; special {
 
 	//    if rm == PC {
 	//        j.Add(amd64.Imm(8), amd64.Ebx)
@@ -604,7 +651,8 @@ func (j *Jit) EmitSdtRegShift(op uint32) {
 	}
 }
 
-func (j *Jit) EmitAluOp2Reg(op uint32) {
+func (j *Jit) emitAluOp2Reg(op uint32) {
+
 	shReg := (op>>4)&1 != 0
 	shType := (op >> 5) & 0b11
 	setCarry := (op>>20)&1 != 0
@@ -807,7 +855,8 @@ func (j *Jit) EmitAluOp2Reg(op uint32) {
 	skip()
 }
 
-func (j *Jit) EmitAlu(op uint32) {
+func (j *Jit) emitAlu(op uint32) {
+
 	inst := (op >> 21) & 0xF
 	rd := (op >> 12) & 0xF
 	rn := (op >> 16) & 0xF
@@ -842,7 +891,7 @@ func (j *Jit) EmitAlu(op uint32) {
 
 		// get op2, op2 will be in bx
 		// shift
-		j.EmitAluOp2Reg(op)
+		j.emitAluOp2Reg(op)
 
 		j.Movl(j.REG(rn), amd64.Eax)
 
@@ -868,6 +917,7 @@ func (j *Jit) EmitAlu(op uint32) {
 }
 
 var aluInstJit = [...]func(j *Jit, op, rd uint32){
+
 	// AND
 	func(j *Jit, op, rd uint32) {
 		j.And(amd64.Ebx, amd64.Eax)
@@ -1064,6 +1114,7 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32){
 
 	// BIC
 	func(j *Jit, op, rd uint32) {
+
 		j.Not(amd64.Ebx)
 		j.And(amd64.Ebx, amd64.Eax)
 
@@ -1077,6 +1128,7 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32){
 
 	// MVN
 	func(j *Jit, op, rd uint32) {
+
 		j.Not(amd64.Ebx)
 
 		if set := (op>>20)&1 != 0; set {
@@ -1089,7 +1141,8 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32){
 	},
 }
 
-func (j *Jit) EmitBlock(op uint32) {
+func (j *Jit) emitBlock(op uint32) {
+
 	var (
 		rlist    = op & 0xFFFF
 		regCount = uint32(bits.OnesCount32(rlist))
@@ -1136,7 +1189,7 @@ func (j *Jit) EmitBlock(op uint32) {
 
 	if psr {
 		j.Movl(MODE, amd64.Edi)
-		j.Cmp(amd64.Imm(arm7.MODE_FIQ), amd64.Edi)
+		j.Cmp(amd64.Imm(MODE_FIQ), amd64.Edi)
 		notFiq := j.JccForward(amd64.CC_NZ)
 
 		if rn >= 8 && rn < PC {
@@ -1144,7 +1197,7 @@ func (j *Jit) EmitBlock(op uint32) {
 		}
 
 		notFiq()
-		j.Cmp(amd64.Imm(arm7.MODE_USR), amd64.Edi)
+		j.Cmp(amd64.Imm(MODE_USR), amd64.Edi)
 		user := j.JccForward(amd64.CC_Z)
 
 		if rn >= 13 && rn < PC {
@@ -1190,7 +1243,7 @@ func (j *Jit) EmitBlock(op uint32) {
 			if psr {
 
 				j.Movl(MODE, amd64.Edi)
-				j.Cmp(amd64.Imm(arm7.MODE_FIQ), amd64.Edi)
+				j.Cmp(amd64.Imm(MODE_FIQ), amd64.Edi)
 				notFiq := j.JccForward(amd64.CC_NZ)
 
 				if reg >= 8 && reg < PC {
@@ -1203,7 +1256,7 @@ func (j *Jit) EmitBlock(op uint32) {
 
 				notFiq()
 
-				j.Cmp(amd64.Imm(arm7.MODE_USR), amd64.Edi)
+				j.Cmp(amd64.Imm(MODE_USR), amd64.Edi)
 				user := j.JccForward(amd64.CC_Z)
 
 				if reg >= 13 && reg < PC {
@@ -1237,7 +1290,7 @@ func (j *Jit) EmitBlock(op uint32) {
 				if psr {
 
 					j.Movl(MODE, amd64.Edi)
-					j.Cmp(amd64.Imm(arm7.MODE_FIQ), amd64.Edi)
+					j.Cmp(amd64.Imm(MODE_FIQ), amd64.Edi)
 					notFiq := j.JccForward(amd64.CC_NZ)
 
 					if reg >= 8 && reg < PC {
@@ -1250,7 +1303,7 @@ func (j *Jit) EmitBlock(op uint32) {
 
 					notFiq()
 
-					j.Cmp(amd64.Imm(arm7.MODE_USR), amd64.Edi)
+					j.Cmp(amd64.Imm(MODE_USR), amd64.Edi)
 					user := j.JccForward(amd64.CC_Z)
 
 					if reg >= 13 && reg < PC {
@@ -1302,6 +1355,7 @@ func (j *Jit) EmitBlock(op uint32) {
 	}
 
 	if wb {
+
 		if rnIncluded {
 			isLast := (rlist < (1 << (rn + 1)))
 			isOnly := regCount == 1
@@ -1314,9 +1368,56 @@ func (j *Jit) EmitBlock(op uint32) {
 			j.Movl(amd64.Eax, j.REG(rn))
 		}
 	}
+
 }
 
-func (j *Jit) EmitCoDataReg(op uint32) {
+func (j *Jit) emitPsr(op uint32) {
+
+	//j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPointer))), CPU)
+
+	if msr := (op>>21)&1 != 0; msr {
+		panic("unsetup jit msr")
+	}
+
+	rd := (op >> 12) & 0xF
+
+	if spsr := (op>>22)&1 != 0; spsr {
+		j.Movl(MODE, amd64.Eax)
+		j.CallFunc(GetSpsr)
+		j.Movl(amd64.Eax, j.REG(rd))
+
+		//mode := cpu.Reg.CPSR.Mode
+		//r[rd] = cpu.Reg.SPSR[BANK_ID[mode]].Get()
+		return
+	}
+
+	//mask := PRIV_MASK
+	//if cpu.Reg.CPSR.Mode == MODE_USR {
+	//	mask = USR_MASK
+	//}
+
+	//r[rd] = uint32(cpu.Reg.CPSR.Get()) & mask
+
+	j.Mov(amd64.Imm(CPSR), amd64.Rax)
+	j.Add(CPU, amd64.Rax)
+
+	j.CallFunc((*Cond).Get)
+
+	j.Cmp(amd64.Imm(MODE_USR), MODE)
+	user := j.JccForward(amd64.CC_Z)
+	j.MovAbs(uint64(PRIV_MASK), amd64.Rbx)
+	priv := j.JmpForward()
+	user()
+	j.MovAbs(uint64(USR_MASK), amd64.Rbx)
+	priv()
+
+	j.And(amd64.Rbx, amd64.Rax)
+
+	j.Movl(amd64.Eax, j.REG(rd))
+}
+
+func (j *Jit) emitCoDataReg(op uint32) {
+
 	var (
 		reg = cp15.CpRegister{
 			Op: uint8((op >> 21) & 0x7),

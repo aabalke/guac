@@ -48,7 +48,7 @@ func NewJit(cpu *Cpu) *Jit {
 
 	CpuPtr = cpu
 
-	if !cpu.JitEnabled {
+	if !cpu.jitEnabled {
 		j := &Jit{Cpu: cpu}
 		return j
 	}
@@ -117,32 +117,32 @@ func (j *Jit) DeletePages() {
 
 //go:nosplit
 func Read(addr uint32) uint32 {
-	return CpuPtr.Mem.Read8(addr)
+	return CpuPtr.mem.Read8(addr)
 }
 
 //go:nosplit
 func Read16(addr uint32) uint32 {
-	return CpuPtr.Mem.Read16(addr)
+	return CpuPtr.mem.Read16(addr)
 }
 
 //go:nosplit
 func Read32(addr uint32) uint32 {
-	return CpuPtr.Mem.Read32(addr)
+	return CpuPtr.mem.Read32(addr)
 }
 
 //go:nosplit
 func Write(addr uint32, v uint8) {
-	CpuPtr.Mem.Write8(addr, v)
+	CpuPtr.mem.Write8(addr, v)
 }
 
 //go:nosplit
 func Write16(addr uint32, v uint16) {
-	CpuPtr.Mem.Write16(addr, v)
+	CpuPtr.mem.Write16(addr, v)
 }
 
 //go:nosplit
 func Write32(addr, v uint32) {
-	CpuPtr.Mem.Write32(addr, v)
+	CpuPtr.mem.Write32(addr, v)
 }
 
 //go:nosplit

@@ -6,48 +6,49 @@ import (
 )
 
 func (c *Cpu) DecodeTHUMB() (int, bool) {
+
 	op, cycles := c.GetOpThumb()
 
 	switch {
 
-	case IsthumbSWI(op):
+	case isthumbSWI(op):
 		c.Exception(VEC_SWI, MODE_SWI)
-	case IsThumbAddSub(op):
+	case isThumbAddSub(op):
 		c.ThumbAddSub(op)
-	case IsThumbShift(op):
-		c.ThumbShifted(op)
-	case IsThumbImm(op):
-		c.ThumbImm(op)
-	case IsThumbAlu(op):
+	case isThumbShift(op):
+		c.thumbShifted(op)
+	case isThumbImm(op):
+		c.thumbImm(op)
+	case isThumbAlu(op):
 		c.ThumbAlu(op)
-	case IsThumbHiReg(op):
+	case isThumbHiReg(op):
 		c.HiRegBX(op)
-	case IsLSHalf(op):
-		c.ThumbLSHalf(op)
-	case IsThumbSdt(op):
-		c.ThumbSdt(op)
-	case IsLPC(op):
-		c.ThumbLPC(op)
-	case IsLSImm(op):
-		c.ThumbLSImm(op)
-	case IsPushPop(op):
-		c.ThumbPushPop(op)
-	case IsRelative(op):
-		c.ThumbRelative(op)
-	case IsThumbB(op):
-		c.ThumbB(op)
-	case IsJumpCall(op):
-		c.ThumbJumpCalls(op)
-	case IsStack(op):
-		c.ThumbStack(op)
-	case IsLongBranch(op):
-		c.ThumbLongBranch(op)
-	case IsShortLongBranch(op):
-		c.ThumbShortLongBranch(op)
-	case IsLSSP(op):
-		c.ThumbLSSP(op)
-	case IsMulti(op):
-		c.ThumbBlock(op)
+	case isLSHalf(op):
+		c.thumbLSHalf(op)
+	case isThumbSdt(op):
+		c.thumbSdt(op)
+	case isLPC(op):
+		c.thumbLPC(op)
+	case isLSImm(op):
+		c.thumbLSImm(op)
+	case isPushPop(op):
+		c.thumbPushPop(op)
+	case isRelative(op):
+		c.thumbRelative(op)
+	case isThumbB(op):
+		c.thumbB(op)
+	case isJumpCall(op):
+		c.thumbJumpCalls(op)
+	case isStack(op):
+		c.thumbStack(op)
+	case isLongBranch(op):
+		c.thumbLongBranch(op)
+	case isShortLongBranch(op):
+		c.thumbShortLongBranch(op)
+	case isLSSP(op):
+		c.thumbLSSP(op)
+	case isMulti(op):
+		c.thumbBlock(op)
 	default:
 		r := &c.Reg.R
 		fmt.Printf("Unable to Decode ARM false %04X, at PC %08X\n", op, r[PC])
@@ -58,176 +59,157 @@ func (c *Cpu) DecodeTHUMB() (int, bool) {
 }
 
 //go:inline
-func IsThumbOpFormat(op, mask, fmt uint16) bool {
+func isThumbOpFormat(op, mask, fmt uint16) bool {
 	return op&mask == fmt
 }
 
 //go:inline
-func IsThumbShift(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
+func isThumbShift(op uint16) bool {
+	return isThumbOpFormat(op,
 		0b1110_0000_0000_0000,
 		0b0000_0000_0000_0000,
 	)
 }
 
 //go:inline
-func IsThumbAddSub(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
+func isThumbAddSub(op uint16) bool {
+	return isThumbOpFormat(op,
 		0b1111_1000_0000_0000,
 		0b0001_1000_0000_0000,
 	)
 }
 
 //go:inline
-func IsThumbImm(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
+func isThumbImm(op uint16) bool {
+	return isThumbOpFormat(op,
 		0b1110_0000_0000_0000,
 		0b0010_0000_0000_0000,
 	)
 }
 
 //go:inline
-func IsThumbAlu(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
+func isThumbAlu(op uint16) bool {
+	return isThumbOpFormat(op,
 		0b1111_1100_0000_0000,
 		0b0100_0000_0000_0000,
 	)
 }
 
 //go:inline
-func IsThumbHiReg(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
+func isThumbHiReg(op uint16) bool {
+	return isThumbOpFormat(op,
 		0b1111_1100_0000_0000,
 		0b0100_0100_0000_0000,
 	)
 }
 
 //go:inline
-func IsLSHalf(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
+func isLSHalf(op uint16) bool {
+	return isThumbOpFormat(op,
 		0b1111_0000_0000_0000,
 		0b1000_0000_0000_0000,
 	)
 }
 
 //go:inline
-func IsThumbSdt(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
+func isThumbSdt(op uint16) bool {
+	return isThumbOpFormat(op,
 		0b1111_0000_0000_0000,
 		0b0101_0000_0000_0000,
 	)
 }
 
 //go:inline
-func IsLPC(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
+func isLPC(op uint16) bool {
+	return isThumbOpFormat(op,
 		0b1111_1000_0000_0000,
 		0b0100_1000_0000_0000,
 	)
 }
 
 //go:inline
-func IsLSImm(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
+func isLSImm(op uint16) bool {
+	return isThumbOpFormat(op,
 		0b1110_0000_0000_0000,
 		0b0110_0000_0000_0000,
 	)
 }
 
 //go:inline
-func IsPushPop(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
+func isPushPop(op uint16) bool {
+	return isThumbOpFormat(op,
 		0b1111_0110_0000_0000,
 		0b1011_0100_0000_0000,
 	)
 }
 
 //go:inline
-func IsRelative(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
+func isRelative(op uint16) bool {
+	return isThumbOpFormat(op,
 		0b1111_0000_0000_0000,
 		0b1010_0000_0000_0000,
 	)
 }
 
 //go:inline
-func IsJumpCall(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
+func isJumpCall(op uint16) bool {
+	return isThumbOpFormat(op,
 		0b1111_0000_0000_0000,
 		0b1101_0000_0000_0000,
 	)
 }
 
 //go:inline
-func IsThumbB(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
+func isThumbB(op uint16) bool {
+	return isThumbOpFormat(op,
 		0b1111_1000_0000_0000,
 		0b1110_0000_0000_0000,
 	)
 }
 
 //go:inline
-func IsStack(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
+func isStack(op uint16) bool {
+	return isThumbOpFormat(op,
 		0b1111_1111_0000_0000,
 		0b1011_0000_0000_0000,
 	)
 }
 
 //go:inline
-func IsLongBranch(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
+func isLongBranch(op uint16) bool {
+	return isThumbOpFormat(op,
 		0b1111_1000_0000_0000,
 		0b1111_0000_0000_0000,
 	)
 }
 
 //go:inline
-func IsShortLongBranch(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
+func isShortLongBranch(op uint16) bool {
+	return isThumbOpFormat(op,
 		0b1111_1000_0000_0000,
 		0b1111_1000_0000_0000,
 	)
 }
 
 //go:inline
-func IsLSSP(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
+func isLSSP(op uint16) bool {
+	return isThumbOpFormat(op,
 		0b1111_0000_0000_0000,
 		0b1001_0000_0000_0000,
 	)
 }
 
 //go:inline
-func IsMulti(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
+func isMulti(op uint16) bool {
+	return isThumbOpFormat(op,
 		0b1111_0000_0000_0000,
 		0b1100_0000_0000_0000,
 	)
 }
 
 //go:inline
-func IsthumbSWI(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
+func isthumbSWI(op uint16) bool {
+	return isThumbOpFormat(op,
 		0b1111_1111_0000_0000,
 		0b1101_1111_0000_0000,
 	)

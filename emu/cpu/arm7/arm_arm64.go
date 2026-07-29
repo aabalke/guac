@@ -7,7 +7,7 @@ import (
 	a "github.com/aabalke/gojit"
 )
 
-func (j *Jit) EmitMul(op uint32) {
+func (j *Jit) emitMul(op uint32) {
 	var (
 		inst = (op >> 21) & 0xF
 		set  = (op>>20)&1 != 0
@@ -86,9 +86,10 @@ func (j *Jit) EmitMul(op uint32) {
 
 		return
 	}
+
 }
 
-func (j *Jit) EmitSWP(op uint32) {
+func (j *Jit) emitSWP(op uint32) {
 	var (
 		isByte = (op>>22)&1 != 0
 		rn     = (op >> 16) & 0xF
@@ -129,7 +130,7 @@ func (j *Jit) EmitSWP(op uint32) {
 	j.CallFunc(Write32)
 }
 
-func (j *Jit) EmitSdt(op uint32) {
+func (j *Jit) emitSdt(op uint32) {
 	if pld := op&
 		0b1111_1101_0111_0000_1111_0000_0000_0000 ==
 		0b1111_0101_0101_0000_1111_0000_0000_0000; pld {
@@ -264,7 +265,7 @@ func (j *Jit) EmitSdt(op uint32) {
 	}
 }
 
-func (j *Jit) EmitHalf(op uint32) {
+func (j *Jit) emitHalf(op uint32) {
 	var (
 		rn      = (op >> 16) & 0xF
 		rd      = (op >> 12) & 0xF
@@ -385,7 +386,7 @@ func (j *Jit) EmitHalf(op uint32) {
 	j.StrReg(a.R00, rd)
 }
 
-func (j *Jit) EmitAlu(op uint32) {
+func (j *Jit) emitAlu(op uint32) {
 	var (
 		rd   = (op >> 12) & 0xF
 		rn   = (op >> 16) & 0xF
@@ -779,7 +780,7 @@ func (j *Jit) getShiftedAluOp2(op uint32) {
 	zeroSkip()
 }
 
-func (j *Jit) EmitPsr(op uint32) {
+func (j *Jit) emitPsr(op uint32) {
 	if msr := (op>>21)&1 != 0; msr {
 		panic("msr jit arm")
 	}
@@ -806,7 +807,8 @@ func (j *Jit) EmitPsr(op uint32) {
 	j.StrReg(a.R00, rd)
 }
 
-func (j *Jit) EmitBlock(op uint32) {
+func (j *Jit) emitBlock(op uint32) {
+
 	var (
 		rlist = op & 0xFFFF
 		rn    = (op >> 16) & 0xF
@@ -938,7 +940,7 @@ func (j *Jit) EmitBlock(op uint32) {
 		} else {
 			switch reg {
 			case rn:
-				// Store OLD base if Rb is FIRST entry in Rlist
+				//Store OLD base if Rb is FIRST entry in Rlist
 				// otherwise store NEW base (STM/ARMv4),
 				if isFirst := (rlist & ((1 << rn) - 1)) == 0; isFirst {
 					j.MovReg(a.R01, a.R10, false)
@@ -1017,4 +1019,5 @@ func (j *Jit) EmitBlock(op uint32) {
 	if wb && !rnIncluded {
 		j.StrReg(a.R09, rn)
 	}
+
 }

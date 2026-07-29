@@ -6,7 +6,6 @@ import (
 
 	"github.com/aabalke/gojit"
 	"github.com/aabalke/guac/config"
-	"github.com/aabalke/guac/emu/cpu/arm7"
 
 	sys_cpu "golang.org/x/sys/cpu"
 )
@@ -14,19 +13,19 @@ import (
 var (
 	CPU         = gojit.R9
 	REG         = int32(unsafe.Offsetof(Cpu{}.Reg))
-	R           = REG + int32(unsafe.Offsetof(arm7.Reg{}.R))
-	CPSR        = REG + int32(unsafe.Offsetof(arm7.Reg{}.CPSR))
+	R           = REG + int32(unsafe.Offsetof(Reg{}.R))
+	CPSR        = REG + int32(unsafe.Offsetof(Reg{}.CPSR))
 	HALTED_FLAG = gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Halted)), Bits: 8}
 
-	MODE = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(arm7.Cond{}.Mode)), Bits: 32}
-	N    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(arm7.Cond{}.N)), Bits: 8}
-	Z    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(arm7.Cond{}.Z)), Bits: 8}
-	C    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(arm7.Cond{}.C)), Bits: 8}
-	V    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(arm7.Cond{}.V)), Bits: 8}
-	Q    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(arm7.Cond{}.Q)), Bits: 8}
-	I    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(arm7.Cond{}.I)), Bits: 8}
-	F    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(arm7.Cond{}.F)), Bits: 8}
-	T    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(arm7.Cond{}.T)), Bits: 8}
+	MODE = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.Mode)), Bits: 32}
+	N    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.N)), Bits: 8}
+	Z    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.Z)), Bits: 8}
+	C    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.C)), Bits: 8}
+	V    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.V)), Bits: 8}
+	Q    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.Q)), Bits: 8}
+	I    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.I)), Bits: 8}
+	F    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.F)), Bits: 8}
+	T    = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.T)), Bits: 8}
 )
 
 func (j *Jit) UserBankReg(reg uint32) gojit.Indirect {
@@ -40,19 +39,19 @@ func (j *Jit) UserBankReg(reg uint32) gojit.Indirect {
 	case 13:
 		return gojit.Indirect{
 			Base:   CPU,
-			Offset: REG + int32(unsafe.Offsetof(arm7.Reg{}.SP)),
+			Offset: REG + int32(unsafe.Offsetof(Reg{}.SP)),
 			Bits:   32,
 		}
 	case 14:
 		return gojit.Indirect{
 			Base:   CPU,
-			Offset: REG + int32(unsafe.Offsetof(arm7.Reg{}.LR)),
+			Offset: REG + int32(unsafe.Offsetof(Reg{}.LR)),
 			Bits:   32,
 		}
 	default:
 		return gojit.Indirect{
 			Base:   CPU,
-			Offset: REG + int32(unsafe.Offsetof(arm7.Reg{}.USR)) + int32(reg-8)*4,
+			Offset: REG + int32(unsafe.Offsetof(Reg{}.USR)) + int32(reg-8)*4,
 			Bits:   32,
 		}
 	}
@@ -101,7 +100,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 	tempPc := pc
 	var length, op, i uint32
 
-	p, ok := j.Cpu.Mem.ReadPtr(tempPc)
+	p, ok := j.Cpu.mem.ReadPtr(tempPc)
 	if !ok {
 
 		if tempPc&0xF00_0000 == 0x600_0000 {
@@ -137,7 +136,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 
 				i = 0
 
-				p, ok = j.Cpu.Mem.ReadPtr(tempPc)
+				p, ok = j.Cpu.mem.ReadPtr(tempPc)
 				if !ok {
 					j.BlockCache.PushTail(newBlock)
 					page.Blocks[blockIdx] = j.BlockCache.SkipBlock
@@ -146,7 +145,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 				continue
 			}
 
-			if ok := j.EmitOpThumb(uint16(op)); !ok {
+			if ok := j.emitOpThumb(uint16(op)); !ok {
 				break
 			}
 
@@ -184,7 +183,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 
 				i = 0
 
-				p, ok = j.Cpu.Mem.ReadPtr(tempPc)
+				p, ok = j.Cpu.mem.ReadPtr(tempPc)
 				if !ok {
 					j.BlockCache.PushTail(newBlock)
 					page.Blocks[blockIdx] = j.BlockCache.SkipBlock
@@ -193,7 +192,7 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 				continue
 			}
 
-			if ok := j.EmitOp(op); !ok {
+			if ok := j.emitOp(op); !ok {
 				break
 			}
 
@@ -225,8 +224,8 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 	page.Blocks[blockIdx] = newBlock
 }
 
-func (j *Jit) EmitOp(op uint32) bool {
-	jcctargets := j.EmitCond(op)
+func (j *Jit) emitOp(op uint32) bool {
+	jcctargets := j.emitCond(op)
 
 	ok := j.DecodeARM(op)
 
@@ -241,7 +240,7 @@ func (j *Jit) EmitOp(op uint32) bool {
 	return ok
 }
 
-func (j *Jit) EmitOpThumb(op uint16) bool {
+func (j *Jit) emitOpThumb(op uint16) bool {
 	ok := j.DecodeTHUMB(op)
 
 	if ok {
@@ -252,7 +251,7 @@ func (j *Jit) EmitOpThumb(op uint16) bool {
 }
 
 //go:inline
-func (j *Jit) EmitCond(op uint32) []func() {
+func (j *Jit) emitCond(op uint32) []func() {
 	// thank you rasky
 
 	cond := op >> 28
@@ -338,7 +337,7 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 			return false
 		}
 
-		jit.EmitSdt(op)
+		jit.emitSdt(op)
 		return true
 	case isBlock(op):
 
@@ -349,7 +348,7 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 			return false
 		}
 
-		jit.EmitBlock(op)
+		jit.emitBlock(op)
 		return true
 
 	case isHalf(op):
@@ -359,7 +358,7 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 			return false
 		}
 
-		jit.EmitHalf(op)
+		jit.emitHalf(op)
 		return true
 	case isUD(op):
 	case isPSR(op):
@@ -368,25 +367,25 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 			return false
 		}
 
-		jit.EmitPsr(op)
+		jit.emitPsr(op)
 
 		return true
 
 	case isSWP(op):
-		jit.EmitSwp(op)
+		jit.emitSwp(op)
 		return true
 	case isM(op):
-		jit.EmitMul(op)
+		jit.emitMul(op)
 		return true
 	case isCLZ(op):
 		if !sys_cpu.X86.HasBMI1 {
 			return false
 		}
 
-		jit.EmitClz(op)
+		jit.emitClz(op)
 		return true
 	case isQAlu(op):
-		jit.EmitQalu(op)
+		jit.emitQalu(op)
 		return true
 
 	case isALU(op):
@@ -399,11 +398,11 @@ func (jit *Jit) DecodeARM(op uint32) bool {
 			return false
 		}
 
-		jit.EmitAlu(op)
+		jit.emitAlu(op)
 		return true
 
 	case isCoDataReg(op):
-		jit.EmitCoDataReg(op)
+		jit.emitCoDataReg(op)
 		return true
 
 	}
@@ -416,16 +415,16 @@ func (j *Jit) DecodeTHUMB(op uint16) bool {
 	case isthumbSWI(op):
 		return false
 	case isThumbAddSub(op):
-		j.EmitThumbAddSub(uint32(op))
+		j.emitThumbAddSub(uint32(op))
 		return true
 	case isThumbShift(op):
-		j.EmitThumbShifted(uint32(op))
+		j.emitThumbShifted(uint32(op))
 		return true
 	case isThumbImm(op):
-		j.EmitThumbImm(uint32(op))
+		j.emitThumbImm(uint32(op))
 		return true
 	case isThumbAlu(op):
-		j.EmitThumbAlu(uint32(op))
+		j.emitThumbAlu(uint32(op))
 		return true
 	case isThumbHiReg(op):
 
@@ -443,19 +442,19 @@ func (j *Jit) DecodeTHUMB(op uint16) bool {
 			return false
 		}
 
-		j.EmitThumbHiRegBX(uint32(op))
+		j.emitThumbHiRegBX(uint32(op))
 		return true
 	case isLSHalf(op):
-		j.EmitThumbLSHalf(uint32(op))
+		j.emitThumbLSHalf(uint32(op))
 		return true
 	case isThumbSdt(op):
-		j.EmitThumbSdt(uint32(op))
+		j.emitThumbSdt(uint32(op))
 		return true
 	case isLPC(op):
-		j.EmitThumbLPC(uint32(op))
+		j.emitThumbLPC(uint32(op))
 		return true
 	case isLSImm(op):
-		j.EmitThumbLSImm(uint32(op))
+		j.emitThumbLSImm(uint32(op))
 		return true
 	case isPushPop(op):
 		pclr := (op>>8)&1 != 0
@@ -464,24 +463,24 @@ func (j *Jit) DecodeTHUMB(op uint16) bool {
 			return false
 		}
 
-		j.EmitThumbPushPop(uint32(op))
+		j.emitThumbPushPop(uint32(op))
 		return true
 	case isRelative(op):
-		j.EmitThumbRelative(uint32(op))
+		j.emitThumbRelative(uint32(op))
 		return true
 	case isThumbB(op):
 		return false
 	case isJumpCall(op):
 		return false
 	case isStack(op):
-		j.EmitThumbStack(uint32(op))
+		j.emitThumbStack(uint32(op))
 		return true
 	case isLongBranch(op):
 		return false
 	case isShortLongBranch(op):
 		return false
 	case isLSSP(op):
-		j.EmitThumbLSSP(uint32(op))
+		j.emitThumbLSSP(uint32(op))
 		return true
 	case isMulti(op):
 
@@ -492,7 +491,7 @@ func (j *Jit) DecodeTHUMB(op uint16) bool {
 			return false
 		}
 
-		j.EmitThumbBlock(uint32(op))
+		j.emitThumbBlock(uint32(op))
 		return true
 	}
 

@@ -6,7 +6,6 @@ import (
 	"math/bits"
 	"unsafe"
 
-	"github.com/aabalke/guac/emu/cpu/arm7"
 	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
 )
 
@@ -94,9 +93,9 @@ func (cpu *Cpu) Alu(op uint32) {
 			rm := op & 0xF
 
 			if swiExit := !imm && rd == PC && rm == LR; swiExit {
-				cpu.ExitException(arm7.MODE_SWI)
+				cpu.ExitException(MODE_SWI)
 				if r[PC]&1 != 0 {
-					cpu.ToggleThumb()
+					cpu.toggleThumb()
 				}
 			} else {
 				cpsr.N = (uint32(res)>>31)&1 != 0
@@ -111,13 +110,13 @@ func (cpu *Cpu) Alu(op uint32) {
 			if rd == PC {
 				if rn == LR {
 					switch cpsr.Mode {
-					case arm7.MODE_ABT:
+					case MODE_ABT:
 						r[PC] += 4
-						cpu.ExitException(arm7.MODE_ABT)
-					case arm7.MODE_SWI:
-						cpu.ExitException(arm7.MODE_SWI)
+						cpu.ExitException(MODE_ABT)
+					case MODE_SWI:
+						cpu.ExitException(MODE_SWI)
 					default:
-						cpu.ExitException(arm7.MODE_IRQ)
+						cpu.ExitException(MODE_IRQ)
 					}
 				} else {
 					// force exit
@@ -125,7 +124,7 @@ func (cpu *Cpu) Alu(op uint32) {
 				}
 
 				if r[PC]&1 != 0 {
-					cpu.ToggleThumb()
+					cpu.toggleThumb()
 				}
 
 			} else {
@@ -401,43 +400,43 @@ func (cpu *Cpu) psrSwitch() {
 		r    = &cpu.Reg.R
 		cpsr = &cpu.Reg.CPSR
 		curr = cpsr.Mode
-		i    = arm7.BANK_ID[curr]
+		i    = BANK_ID[curr]
 	)
 
 	*cpsr = reg.SPSR[i]
 	next := cpsr.Mode
-	c := arm7.BANK_ID[next]
+	c := BANK_ID[next]
 
 	reg.LR[i] = r[LR]
 	reg.SP[i] = r[SP]
 	r[SP] = reg.SP[c]
 	r[LR] = reg.LR[c]
 
-	if curr != arm7.MODE_FIQ {
+	if curr != MODE_FIQ {
 		for i := range 5 {
 			reg.USR[i] = r[8+i]
 		}
 	}
 
-	reg.SP[arm7.BANK_ID[curr]] = r[SP]
-	reg.LR[arm7.BANK_ID[curr]] = r[LR]
+	reg.SP[BANK_ID[curr]] = r[SP]
+	reg.LR[BANK_ID[curr]] = r[LR]
 
-	if curr == arm7.MODE_FIQ {
+	if curr == MODE_FIQ {
 		for i := range 5 {
 			reg.FIQ[i] = r[8+i]
 		}
 	}
 
-	if next != arm7.MODE_FIQ {
+	if next != MODE_FIQ {
 		for i := range 5 {
 			r[8+i] = reg.USR[i]
 		}
 	}
 
-	r[SP] = reg.SP[arm7.BANK_ID[next]]
-	r[LR] = reg.LR[arm7.BANK_ID[next]]
+	r[SP] = reg.SP[BANK_ID[next]]
+	r[LR] = reg.LR[BANK_ID[next]]
 
-	if next == arm7.MODE_FIQ {
+	if next == MODE_FIQ {
 		for i := range 5 {
 			r[8+i] = reg.FIQ[i]
 		}
@@ -701,15 +700,15 @@ func (c *Cpu) Sdt(op uint32) {
 	if load {
 		if byte {
 			// DO NOT WORD ALIGN
-			r[rd] = c.Mem.Read8(prev)
+			r[rd] = c.mem.Read8(prev)
 		} else {
 
-			v := c.Mem.Read32(prev &^ 0b11)
+			v := c.mem.Read32(prev &^ 0b11)
 			is := ((prev & 0b11) << 3) & 0x1F
 			r[rd] = bits.RotateLeft32(v, -int(is))
 
 			if rd == PC {
-				c.ToggleThumb() // this is arm9 - not sure if arm
+				c.toggleThumb() // this is arm9 - not sure if arm7
 				r[rd] -= 4
 			}
 		}
@@ -720,9 +719,9 @@ func (c *Cpu) Sdt(op uint32) {
 		}
 
 		if byte {
-			c.Mem.Write8(prev, uint8(v))
+			c.mem.Write8(prev, uint8(v))
 		} else {
-			c.Mem.Write32(prev&^0b11, v)
+			c.mem.Write32(prev&^0b11, v)
 		}
 	}
 
@@ -784,7 +783,7 @@ func (cpu *Cpu) BX(op uint32) {
 			r[PC] += 8
 		}
 
-		cpu.ToggleThumb()
+		cpu.toggleThumb()
 	case INST_BXJ:
 		panic("Unsupported BXJ Instruction")
 	case INST_BLX:
@@ -794,13 +793,13 @@ func (cpu *Cpu) BX(op uint32) {
 			tmp := r[14]
 			r[14] = r[PC] + 4
 			r[PC] = tmp
-			cpu.ToggleThumb()
+			cpu.toggleThumb()
 			return
 		}
 
 		r[14] = r[PC] + 4
 		r[PC] = r[rn]
-		cpu.ToggleThumb()
+		cpu.toggleThumb()
 
 	}
 }
@@ -874,18 +873,18 @@ func (c *Cpu) Half(op uint32) {
 
 		switch inst {
 		case STRH:
-			c.Mem.Write16(pre&^1, uint16(rdv))
+			c.mem.Write16(pre&^1, uint16(rdv))
 
 		case LDRD:
 			addr := pre &^ 0b111
-			r[rd] = c.Mem.Read32(addr)
-			r[rd+1] = c.Mem.Read32(addr + 4)
+			r[rd] = c.mem.Read32(addr)
+			r[rd+1] = c.mem.Read32(addr + 4)
 
 		case STRD:
 
 			addr := pre &^ 0b111
-			c.Mem.Write32(addr, rdv)
-			c.Mem.Write32(addr+4, rd2v)
+			c.mem.Write32(addr, rdv)
+			c.mem.Write32(addr+4, rd2v)
 
 		}
 
@@ -900,14 +899,14 @@ func (c *Cpu) Half(op uint32) {
 	switch inst {
 	case LDRH:
 		//  LDRH Rd,[odd]   -->  LDRH Rd,[odd-1]        ;forced align
-		r[rd] = uint32(c.Mem.Read16(pre &^ 1))
+		r[rd] = uint32(c.mem.Read16(pre &^ 1))
 	case LDRSB:
 		// sign-expand byte value
-		r[rd] = uint32(int32(int8(c.Mem.Read8(pre))))
+		r[rd] = uint32(int32(int8(c.mem.Read8(pre))))
 
 	case LDRSH:
 		// sign-expand half value
-		r[rd] = uint32(int32(int16(c.Mem.Read16(pre &^ 1))))
+		r[rd] = uint32(int32(int16(c.mem.Read16(pre &^ 1))))
 
 	}
 
@@ -927,13 +926,13 @@ func (cpu *Cpu) Psr(op uint32) {
 
 	if spsr := (op>>22)&1 != 0; spsr {
 		mode := cpu.Reg.CPSR.Mode
-		r[rd] = cpu.Reg.SPSR[arm7.BANK_ID[mode]].Get()
+		r[rd] = cpu.Reg.SPSR[BANK_ID[mode]].Get()
 		r[PC] += 4
 		return
 	}
 
 	mask := PRIV_MASK
-	if cpu.Reg.CPSR.Mode == arm7.MODE_USR {
+	if cpu.Reg.CPSR.Mode == MODE_USR {
 		mask = USR_MASK
 	}
 
@@ -977,7 +976,7 @@ func (cpu *Cpu) msr(op uint32) {
 
 	secMask := PRIV_MASK
 	curr := cpu.Reg.CPSR.Mode
-	if curr == arm7.MODE_USR {
+	if curr == MODE_USR {
 		secMask = USR_MASK
 	}
 
@@ -993,14 +992,14 @@ func (cpu *Cpu) msr(op uint32) {
 
 		var spsr uint32
 
-		if curr == arm7.MODE_USR || curr == arm7.MODE_SYS {
+		if curr == MODE_USR || curr == MODE_SYS {
 			spsr = uint32(reg.CPSR.Get()) &^ mask
 		} else {
-			spsr = uint32(reg.SPSR[arm7.BANK_ID[curr]].Get()) &^ mask
+			spsr = uint32(reg.SPSR[BANK_ID[curr]].Get()) &^ mask
 		}
 
 		spsr |= v & mask
-		reg.SPSR[arm7.BANK_ID[curr]].Set(spsr)
+		reg.SPSR[BANK_ID[curr]].Set(spsr)
 
 		return
 	}
@@ -1012,39 +1011,39 @@ func (cpu *Cpu) msr(op uint32) {
 
 	reg.CPSR.Set(cpsr)
 
-	if skip := arm7.BANK_ID[curr] == arm7.BANK_ID[next]; skip {
+	if skip := BANK_ID[curr] == BANK_ID[next]; skip {
 		return
 	}
 
-	if curr == arm7.MODE_USR {
+	if curr == MODE_USR {
 		panic("USER MODE MSR")
 	}
 
-	if curr != arm7.MODE_FIQ {
+	if curr != MODE_FIQ {
 		for i := range 5 {
 			reg.USR[i] = r[8+i]
 		}
 	}
 
-	reg.SP[arm7.BANK_ID[curr]] = r[SP]
-	reg.LR[arm7.BANK_ID[curr]] = r[LR]
+	reg.SP[BANK_ID[curr]] = r[SP]
+	reg.LR[BANK_ID[curr]] = r[LR]
 
-	if curr == arm7.MODE_FIQ {
+	if curr == MODE_FIQ {
 		for i := range 5 {
 			reg.FIQ[i] = r[8+i]
 		}
 	}
 
-	if next != arm7.MODE_FIQ {
+	if next != MODE_FIQ {
 		for i := range 5 {
 			r[8+i] = reg.USR[i]
 		}
 	}
 
-	r[SP] = reg.SP[arm7.BANK_ID[next]]
-	r[LR] = reg.LR[arm7.BANK_ID[next]]
+	r[SP] = reg.SP[BANK_ID[next]]
+	r[LR] = reg.LR[BANK_ID[next]]
 
-	if next == arm7.MODE_FIQ {
+	if next == MODE_FIQ {
 		for i := range 5 {
 			r[8+i] = reg.FIQ[i]
 		}
@@ -1063,13 +1062,13 @@ func (cpu *Cpu) Swp(op uint32) {
 	)
 
 	if isByte {
-		r[rd] = cpu.Mem.Read8(rnv)
-		cpu.Mem.Write8(rnv, uint8(rmv))
+		r[rd] = cpu.mem.Read8(rnv)
+		cpu.mem.Write8(rnv, uint8(rmv))
 	} else {
-		v := cpu.Mem.Read32(rnv &^ 0b11)
+		v := cpu.mem.Read32(rnv &^ 0b11)
 		is := (rnv & 0b11) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
-		cpu.Mem.Write32(rnv&^0b11, rmv)
+		cpu.mem.Write32(rnv&^0b11, rmv)
 	}
 
 	r[PC] += 4
@@ -1208,10 +1207,10 @@ func (c *Cpu) Block(op uint32) {
 		psr        = (op>>22)&1 != 0
 		wb         = (op>>21)&1 != 0
 		load       = (op>>20)&1 != 0
-		forceUser  = psr && (c.Reg.CPSR.Mode != arm7.MODE_USR) && (!load || !pcIncluded)
+		forceUser  = psr && (c.Reg.CPSR.Mode != MODE_USR) && (!load || !pcIncluded)
 		wbValue    = r[rn]
 		// fiq switch has additional r8 - r12 use mode switch registers
-		forceFIQSwitch = forceUser && c.Reg.CPSR.Mode == arm7.MODE_FIQ
+		forceFIQSwitch = forceUser && c.Reg.CPSR.Mode == MODE_FIQ
 	)
 
 	if up {
@@ -1226,9 +1225,9 @@ func (c *Cpu) Block(op uint32) {
 
 		switch {
 		case rn == 13:
-			rnRef = &c.Reg.SP[arm7.BANK_ID[arm7.MODE_USR]]
+			rnRef = &c.Reg.SP[BANK_ID[MODE_USR]]
 		case rn == 14:
-			rnRef = &c.Reg.LR[arm7.BANK_ID[arm7.MODE_USR]]
+			rnRef = &c.Reg.LR[BANK_ID[MODE_USR]]
 		case rn >= 8:
 			rnRef = &c.Reg.USR[rn-8]
 
@@ -1237,9 +1236,9 @@ func (c *Cpu) Block(op uint32) {
 	case forceUser:
 		switch {
 		case rn == 13:
-			rnRef = &c.Reg.SP[arm7.BANK_ID[arm7.MODE_USR]]
+			rnRef = &c.Reg.SP[BANK_ID[MODE_USR]]
 		case rn == 14:
-			rnRef = &c.Reg.LR[arm7.BANK_ID[arm7.MODE_USR]]
+			rnRef = &c.Reg.LR[BANK_ID[MODE_USR]]
 		}
 	}
 
@@ -1256,9 +1255,9 @@ func (c *Cpu) Block(op uint32) {
 
 	// disabled for now. Need method to handle games that use edge of bank to subtract from. ex. metroid uses 0x200_0000 as addr, then subtracts to place values in different bank at 0x1FF_FFFC
 	//if load {
-	//	p, _ = c.Mem.ReadPtr(addr)
+	//	p, _ = c.mem.ReadPtr(addr, true)
 	//} else {
-	//	p, _ = c.Mem.WritePtr(addr)
+	//	p, _ = c.mem.WritePtr(addr, true)
 	//}
 
 	for range 16 {
@@ -1278,9 +1277,9 @@ func (c *Cpu) Block(op uint32) {
 
 			switch {
 			case reg == 13:
-				ref = &c.Reg.SP[arm7.BANK_ID[arm7.MODE_USR]]
+				ref = &c.Reg.SP[BANK_ID[MODE_USR]]
 			case reg == 14:
-				ref = &c.Reg.LR[arm7.BANK_ID[arm7.MODE_USR]]
+				ref = &c.Reg.LR[BANK_ID[MODE_USR]]
 			case reg >= 8:
 				ref = &c.Reg.USR[reg-8]
 			}
@@ -1288,9 +1287,9 @@ func (c *Cpu) Block(op uint32) {
 		case forceUser:
 			switch {
 			case reg == 13:
-				ref = &c.Reg.SP[arm7.BANK_ID[arm7.MODE_USR]]
+				ref = &c.Reg.SP[BANK_ID[MODE_USR]]
 			case reg == 14:
-				ref = &c.Reg.LR[arm7.BANK_ID[arm7.MODE_USR]]
+				ref = &c.Reg.LR[BANK_ID[MODE_USR]]
 			}
 		}
 
@@ -1312,7 +1311,7 @@ func (c *Cpu) Block(op uint32) {
 
 		if load {
 			if p == nil {
-				*ref = c.Mem.Read32(addr)
+				*ref = c.mem.Read32(addr)
 			} else {
 				*ref = *(*uint32)(p)
 			}
@@ -1321,12 +1320,12 @@ func (c *Cpu) Block(op uint32) {
 				switch reg {
 				case rn:
 
-					c.Mem.Write32(addr, rnv)
+					c.mem.Write32(addr, rnv)
 
 				case PC:
-					c.Mem.Write32(addr, *ref+12)
+					c.mem.Write32(addr, *ref+12)
 				default:
-					c.Mem.Write32(addr, *ref)
+					c.mem.Write32(addr, *ref)
 				}
 			} else {
 				switch reg {
@@ -1394,48 +1393,48 @@ func (c *Cpu) Block(op uint32) {
 	}
 
 	if !psr {
-		c.ToggleThumb()
+		c.toggleThumb()
 
 		return
 	}
 
 	var (
 		curr = c.Reg.CPSR.Mode
-		spsr = c.Reg.SPSR[arm7.BANK_ID[curr]]
+		spsr = c.Reg.SPSR[BANK_ID[curr]]
 		next = spsr.Mode
 	)
 
 	c.Reg.CPSR = spsr
 
-	if curr == arm7.MODE_USR {
+	if curr == MODE_USR {
 		panic("USER MODE LDM PC CHANGE")
 	}
 
-	if curr != arm7.MODE_FIQ {
+	if curr != MODE_FIQ {
 		for i := range 5 {
 			c.Reg.USR[i] = r[8+i]
 		}
 	}
 
-	c.Reg.SP[arm7.BANK_ID[curr]] = r[SP]
-	c.Reg.LR[arm7.BANK_ID[curr]] = r[LR]
+	c.Reg.SP[BANK_ID[curr]] = r[SP]
+	c.Reg.LR[BANK_ID[curr]] = r[LR]
 
-	if curr == arm7.MODE_FIQ {
+	if curr == MODE_FIQ {
 		for i := range 5 {
 			c.Reg.FIQ[i] = r[8+i]
 		}
 	}
 
-	if next != arm7.MODE_FIQ {
+	if next != MODE_FIQ {
 		for i := range 5 {
 			r[8+i] = c.Reg.USR[i]
 		}
 	}
 
-	r[SP] = c.Reg.SP[arm7.BANK_ID[next]]
-	r[LR] = c.Reg.LR[arm7.BANK_ID[next]]
+	r[SP] = c.Reg.SP[BANK_ID[next]]
+	r[LR] = c.Reg.LR[BANK_ID[next]]
 
-	if next == arm7.MODE_FIQ {
+	if next == MODE_FIQ {
 		for i := range 5 {
 			r[8+i] = c.Reg.FIQ[i]
 		}
