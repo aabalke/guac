@@ -15,7 +15,7 @@ func (c *Cpu) DecodeARM(op uint32) {
 
 	switch {
 	case (op>>24)&0xF == 0xF:
-		c.swi(op)
+		c.Exception(VEC_SWI, MODE_SWI)
 	case isB(op):
 		c.B(op)
 	case isBX(op):
