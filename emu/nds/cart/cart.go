@@ -21,7 +21,7 @@ type Cartridge struct {
 	SavPath string
 	SavLen  int
 
-	//io
+	// io
 	Header  Header
 	ExMem   ExMem
 	AuxSpi  AuxSpi
@@ -41,7 +41,6 @@ type Cartridge struct {
 }
 
 func NewCartridge(romPath, savPath string, bios *[]uint8, irq7, irq9 *cpu.Irq, dma7, dma9 *[4]dma.DMA) *Cartridge {
-
 	c := &Cartridge{
 		RomPath: romPath,
 		SavPath: savPath,
@@ -94,7 +93,6 @@ func (c *Cartridge) checkAccessRights(arm9 bool) bool {
 }
 
 func (c *Cartridge) readSave(savPath string, gamecode uint32) {
-
 	if romData, ok := roms[gamecode]; ok {
 		// in db
 		c.Backup.Size = romData.Size
@@ -112,7 +110,6 @@ func (c *Cartridge) readSave(savPath string, gamecode uint32) {
 
 	sav, length, ok := utils.ReadFile(savPath)
 	if ok {
-
 		for i := range length {
 			c.Sav[i] = sav[i]
 		}
@@ -127,7 +124,6 @@ const (
 )
 
 func createChipId(b *Backup) [4]uint8 {
-
 	var id [4]uint8
 
 	id[0] = 0xC2
@@ -154,7 +150,6 @@ func createChipId(b *Backup) [4]uint8 {
 }
 
 func (c *Cartridge) RunRom(arm9 bool) {
-
 	r := &c.RomCtrl
 
 	//log.Printf("RUNNING COMMAND %X %08X\n", r.Command, r.v)
@@ -172,9 +167,9 @@ func (c *Cartridge) RunRom(arm9 bool) {
 	buffer := make([]uint8, r.BlockSize)
 
 	switch c.Status {
-	//case GAMECARD_STAT_RAW:
-	//case GAMECARD_STAT_K1A:
-	//case GAMECARD_STAT_K1B:
+	// case GAMECARD_STAT_RAW:
+	// case GAMECARD_STAT_K1A:
+	// case GAMECARD_STAT_K1B:
 	case GAMECARD_STAT_KY2:
 
 		const (
@@ -211,7 +206,7 @@ func (c *Cartridge) RunRom(arm9 bool) {
 			buffer = c.ChipId[:]
 			//fmt.Printf("CHIP ID = % X\n", r.Gamecard.Buffer)
 
-		//case NAND_STAT, 0x94:
+		// case NAND_STAT, 0x94:
 
 		//    //fmt.Printf("READING NAND STATUS ON Gamecard Key2\n")
 
@@ -222,7 +217,7 @@ func (c *Cartridge) RunRom(arm9 bool) {
 		//    //r.Gamecard.Buffer = []uint8{0x0, 0x0, 0x0, 0x0}
 		//    buffer = r.Gamecard.ChipId[:]
 
-		//case 0xB5:
+		// case 0xB5:
 		//    fmt.Printf("READING NAND HIGHZ ON Gamecard Key2\n")
 		//    r.Gamecard.Buffer = nil //[]uint8{0,0,0,0}
 		//    r.Gamecard.Transfer(true)
@@ -239,7 +234,6 @@ func (c *Cartridge) RunRom(arm9 bool) {
 }
 
 func (c *Cartridge) RomTransfer(initial bool, arm9 bool) {
-
 	if len(c.Buffer) == 0 {
 
 		c.RomCtrl.v &^= (1 << 31)
@@ -273,7 +267,6 @@ func (c *Cartridge) RomTransfer(initial bool, arm9 bool) {
 }
 
 func (c *Cartridge) InitSaveLoop() {
-
 	saveTicker := time.Tick(time.Second)
 
 	go func() {
