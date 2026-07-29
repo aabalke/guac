@@ -6,6 +6,7 @@ import (
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gba/apu"
 	"github.com/aabalke/guac/emu/gba/cart"
+	"github.com/aabalke/guac/emu/gba/cpu"
 	"github.com/aabalke/guac/emu/scheduler"
 	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -30,7 +31,7 @@ const (
 )
 
 type GBA struct {
-	Cpu               *Cpu
+	Cpu               *cpu.Cpu
 	Scheduler         *scheduler.Scheduler
 	Mem               *Memory
 	Cartridge         *cart.Cartridge
@@ -66,7 +67,7 @@ func NewGBA(ctx *audio.Context, path string) *GBA {
 	gba.PPU = &PPU{gba: gba}
 	gba.Irq = NewIrq(gba, gba.Scheduler)
 	gba.Mem = NewMemory(gba)
-	gba.Cpu = NewCpu(gba)
+	gba.Cpu = cpu.NewCpu(gba.Mem, gba.Cycles, gba.Idle)
 	gba.Keypad = Key{Irq: gba.Irq, Input: 0x3FF}
 	gba.Irq.CpuIrqLine = &gba.Cpu.IrqLine
 	gba.Irq.IME = true
@@ -207,23 +208,22 @@ func (gba *GBA) Draw(screen *ebiten.Image) {
 
 func (gba *GBA) DirectBoot() {
 	reg := &gba.Cpu.Reg
-	BANK_ID := BANK_ID
 
 	gba.Irq.IME = true
 
 	reg.CPSR.Set(0x1F)
-	reg.SPSR[BANK_ID[MODE_IRQ]].Set(0x10)
+	reg.SPSR[cpu.ModeBank[cpu.MODE_IRQ]].Set(0x10)
 
-	reg.R[PC] = 0x800_0000
-	reg.R[LR] = 0x800_0000
-	reg.LR[BANK_ID[MODE_SYS]] = 0x800_0000
-	reg.LR[BANK_ID[MODE_IRQ]] = 0x800_0000
-	reg.LR[BANK_ID[MODE_SWI]] = 0x800_0000
+	reg.R[cpu.PC] = 0x800_0000
+	reg.R[cpu.LR] = 0x800_0000
+	reg.LR[cpu.ModeBank[cpu.MODE_SYS]] = 0x800_0000
+	reg.LR[cpu.ModeBank[cpu.MODE_IRQ]] = 0x800_0000
+	reg.LR[cpu.ModeBank[cpu.MODE_SWI]] = 0x800_0000
 
-	reg.R[SP] = 0x300_7F00
-	reg.SP[BANK_ID[MODE_SYS]] = 0x300_7F00
-	reg.SP[BANK_ID[MODE_IRQ]] = 0x300_7FA0
-	reg.SP[BANK_ID[MODE_SWI]] = 0x300_7FE0
+	reg.R[cpu.SP] = 0x300_7F00
+	reg.SP[cpu.ModeBank[cpu.MODE_SYS]] = 0x300_7F00
+	reg.SP[cpu.ModeBank[cpu.MODE_IRQ]] = 0x300_7FA0
+	reg.SP[cpu.ModeBank[cpu.MODE_SWI]] = 0x300_7FE0
 
 	gba.Cpu.Op[0] = 0xF000_0000
 	gba.Cpu.Op[1] = 0xF000_0000
@@ -232,5 +232,5 @@ func (gba *GBA) DirectBoot() {
 }
 
 func (gba *GBA) BiosBoot() {
-	gba.Cpu.Exception(VEC_RESET, MODE_SYS)
+	gba.Cpu.Exception(cpu.VEC_RESET, cpu.MODE_SYS)
 }

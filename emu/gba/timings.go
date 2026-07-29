@@ -1,5 +1,7 @@
 package gba
 
+import "github.com/aabalke/guac/emu/gba/cpu"
+
 var (
 	NonSeqWait = [4]uint8{4, 3, 2, 8}
 	SeqWait    = [3][2]uint8{
@@ -150,5 +152,173 @@ func (t *Timings) WriteWaitstate(addr uint32, v uint8) {
 		if old && !t.Enabled {
 			t.Disabled = true
 		}
+	}
+}
+
+func (g *GBA) CyclesDma(addr, width, seq uint32) {
+	g.Dma.ParallelDmaCycles = 0
+
+	t := g.Mem.Timings
+	region := addr >> 24
+	flag32 := width >> 2
+
+	switch {
+	case region < 8:
+		g.Tick(int64(t.Timings[flag32][0][region]))
+	case region < 14:
+
+		if addr&0x1FFFF == 0 {
+			seq = cpu.NONSEQ
+		}
+
+		if t.Active {
+			t.Cancel(g.Cpu.Reg.R[15], g.Tick)
+		}
+		g.Tick(int64(t.Timings[flag32][seq][region]))
+	default:
+		if t.Active {
+			t.Cancel(g.Cpu.Reg.R[15], g.Tick)
+		}
+
+		g.Tick(int64(t.Timings[flag32][0][region]))
+	}
+}
+
+func (g *GBA) Cycles(addr, width, seq uint32, inst bool) {
+	if g.Dma.IsRunning() {
+		g.CheckDmas()
+	}
+
+	g.Dma.ParallelDmaCycles = 0
+
+	t := g.Mem.Timings
+	region := addr >> 24
+	flag32 := width >> 2
+
+	if region < 8 {
+		g.Tick(int64(t.Timings[flag32][0][region]))
+		return
+	}
+
+	if inst {
+
+		if t.Active {
+			if t.Opcodes != 0 && addr == t.Head {
+				// requested addr is first entry in prefetch
+				t.Head += width
+				g.Scheduler.Add(1)
+				t.Countdown--
+
+				if !t.Enabled {
+					return
+				}
+
+				t.Opcodes--
+
+				for t.Countdown <= 0 {
+					if t.Opcodes >= t.Capacity {
+						t.Opcodes++
+						break
+					}
+
+					t.Opcodes++
+					t.Addr += width
+					t.Countdown += t.AccessTime
+				}
+
+				return
+			}
+
+			if t.Countdown > 0 && addr == t.Addr {
+
+				// requested addr is being prefetch
+
+				g.Scheduler.Add(t.Countdown)
+
+				if t.Enabled && t.Opcodes < t.Capacity {
+					t.Addr += width
+					t.Countdown = t.AccessTime
+				} else {
+					t.Countdown = 0
+				}
+
+				t.Head = t.Addr
+				t.Opcodes = 0
+				return
+			}
+
+			// cancel prefetch
+			t.Active = false
+
+			halfPlusOne := (t.AccessTime >> 1) + 1
+			if t.Countdown == 1 || (t.Width == 4 && t.Countdown == halfPlusOne) {
+				g.Scheduler.Add(1)
+			}
+		}
+
+		if addr&0x1FFFF == 0 || g.Cpu.LastWasDma {
+			seq = cpu.NONSEQ
+		}
+
+		cycles := t.Timings[flag32][seq][region]
+
+		if t.Disabled {
+
+			if cycles == t.Timings[flag32][cpu.SEQ][region] {
+				cycles = t.Timings[flag32][cpu.NONSEQ][8]
+			}
+			t.Disabled = false
+		}
+
+		g.Scheduler.Add(int64(cycles))
+
+		if t.Enabled {
+			t.Active = true
+			t.Opcodes = 0
+			t.Width = width
+			t.Addr = addr + width
+			t.Head = addr + width
+			timing := int64(t.Timings[flag32][1][region])
+			t.AccessTime = timing
+			t.Countdown = timing
+			t.Capacity = (1 << ((width & 3) >> 1)) << 2
+		}
+
+		return
+	}
+
+	switch {
+	case region < 14:
+
+		if addr&0x1FFFF == 0 || g.Cpu.LastWasDma {
+			seq = cpu.NONSEQ
+		}
+
+		if t.Active {
+			t.Cancel(g.Cpu.Reg.R[15], g.Tick)
+		}
+		g.Tick(int64(t.Timings[flag32][seq][region]))
+
+	case region < 0x10:
+		if t.Active {
+			t.Cancel(g.Cpu.Reg.R[15], g.Tick)
+		}
+		g.Tick(int64(t.Timings[flag32][0][region]))
+
+	default:
+		g.Tick(int64(t.Timings[flag32][0][0]))
+	}
+}
+
+func (gba *GBA) Idle(cycles int64) {
+	if gba.Dma.IsRunning() {
+		gba.Dma.ParallelDmaCycles = gba.CheckDmas()
+	}
+
+	if gba.Dma.ParallelDmaCycles == 0 {
+		gba.Tick(cycles)
+		gba.Cpu.Seq = cpu.NONSEQ
+	} else {
+		gba.Dma.ParallelDmaCycles--
 	}
 }

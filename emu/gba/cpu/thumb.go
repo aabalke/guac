@@ -1,4 +1,4 @@
-package gba
+package cpu
 
 import (
 	"fmt"
@@ -260,7 +260,7 @@ func (c *Cpu) ThumbAlu(op uint16) {
 
 	switch inst {
 	case THUMB_MUL:
-		c.idle(idleMul(rdv, true))
+		c.Idle(idleMul(rdv, true))
 
 		res = uint64(rdv) * uint64(rsv)
 		r[rd] = uint32(res)
@@ -331,7 +331,7 @@ func (c *Cpu) ThumbAlu(op uint16) {
 
 	case THUMB_LSL:
 
-		c.idle(1)
+		c.Idle(1)
 
 		rsv &= 0xFF
 
@@ -349,7 +349,7 @@ func (c *Cpu) ThumbAlu(op uint16) {
 		r[rd] = uint32(res)
 
 	case THUMB_LSR:
-		c.idle(1)
+		c.Idle(1)
 		rsv &= 0xFF
 
 		res = uint64(rdv) >> rsv
@@ -360,7 +360,7 @@ func (c *Cpu) ThumbAlu(op uint16) {
 		}
 
 	case THUMB_ASR:
-		c.idle(1)
+		c.Idle(1)
 		rsv &= 0xFF
 
 		if rsv > 32 {
@@ -375,7 +375,7 @@ func (c *Cpu) ThumbAlu(op uint16) {
 		r[rd] = uint32(res)
 
 	case THUMB_ROR:
-		c.idle(1)
+		c.Idle(1)
 		rsv &= 0xFF
 
 		if rsv != 0 {
@@ -768,12 +768,12 @@ func (c *Cpu) ThumbPushPop(op uint16) {
 		if pclr {
 			r[PC] = c.Read32Block(r[SP], seq) &^ 1
 			r[SP] += 4
-			c.idle(1)
+			c.Idle(1)
 			c.Reload16()
 			return
 		}
 
-		c.idle(1)
+		c.Idle(1)
 
 	} else {
 
@@ -987,7 +987,7 @@ func (c *Cpu) ThumbBlock(op uint16) {
 			}
 		}
 
-		c.idle(1)
+		c.Idle(1)
 
 		if ^rlist&(1<<rb) != 0 {
 			r[rb] = addr

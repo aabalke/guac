@@ -3,6 +3,8 @@ package gba
 import (
 	"fmt"
 	"unsafe"
+
+	"github.com/aabalke/guac/emu/gba/cpu"
 )
 
 const (
@@ -27,6 +29,8 @@ type Dma struct {
 
 	// hades/dma-latch.gba / https://mgba.io/2020/01/25/infinite-loop-holy-grail/
 	LatchValue uint32
+
+	ParallelDmaCycles uint32
 }
 
 type Channel struct {
@@ -282,16 +286,16 @@ func (ch *Channel) transfer() {
 		var (
 			src    = ch.latched.src
 			dst    = ch.latched.dst
-			srcSeq = uint32(SEQ)
-			dstSeq = uint32(SEQ)
+			srcSeq = uint32(cpu.SEQ)
+			dstSeq = uint32(cpu.SEQ)
 		)
 
 		if !accessRom {
 			if src >= 0x800_0000 {
-				srcSeq = NONSEQ
+				srcSeq = cpu.NONSEQ
 				accessRom = true
 			} else if dst >= 0x800_0000 {
-				dstSeq = NONSEQ
+				dstSeq = cpu.NONSEQ
 				accessRom = true
 			}
 		}
@@ -302,7 +306,7 @@ func (ch *Channel) transfer() {
 				ch.dma.Tick(1)
 			} else {
 
-				ch.dma.Gba.Cpu.CyclesDma(src, 4, srcSeq)
+				ch.dma.Gba.CyclesDma(src, 4, srcSeq)
 				if ch.latched.srcPtr == nil {
 					ch.Value = mem.Read32(src)
 				} else {
@@ -312,7 +316,7 @@ func (ch *Channel) transfer() {
 				ch.dma.LatchValue = ch.Value
 			}
 
-			ch.dma.Gba.Cpu.CyclesDma(dst, 4, dstSeq)
+			ch.dma.Gba.CyclesDma(dst, 4, dstSeq)
 			if ch.latched.dstPtr == nil {
 				mem.Write32(dst, ch.Value)
 			} else {
@@ -337,7 +341,7 @@ func (ch *Channel) transfer() {
 
 			} else {
 
-				ch.dma.Gba.Cpu.CyclesDma(src, 2, srcSeq)
+				ch.dma.Gba.CyclesDma(src, 2, srcSeq)
 
 				if ch.latched.srcPtr == nil {
 					v = mem.Read16(src)
@@ -350,7 +354,7 @@ func (ch *Channel) transfer() {
 				ch.dma.LatchValue = ch.Value
 			}
 
-			ch.dma.Gba.Cpu.CyclesDma(dst, 2, dstSeq)
+			ch.dma.Gba.CyclesDma(dst, 2, dstSeq)
 			if ch.latched.dstPtr == nil {
 				mem.Write16(dst, uint16(v))
 			} else {

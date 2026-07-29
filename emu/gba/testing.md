@@ -101,8 +101,8 @@ Requires Official bios for passing tests
 👍 dma: force nseq access [2/2]
 👍 dma: latch [3/3]
 👍 dma: start delay [1/1]
-❌ halt: halt cnt [4/6]
-👍 irq: irq delay [3/3]
+❌ halt: halt cnt [5/6]
+👍 irq: irq delay [1/3]
 ❌ ppu: bgpd
 ❌ ppu: bgx
 ❌ ppu: dispcnt-latch
@@ -124,6 +124,8 @@ Requires Official bios for passing tests
 👍 Irq
 
 ### Tonc
+
+(These have not been tested since v0.0.1 and results may be inaccurate now)
 
 👍 bigmap
 👍 bld_demo

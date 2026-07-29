@@ -1,4 +1,4 @@
-package gba
+package cpu
 
 import (
 	"fmt"
@@ -419,7 +419,7 @@ func (c *Cpu) getShiftedAluReg(op uint32) uint32 {
 		rs := (op >> 8) & 0xF
 		shift = r[rs] & 0xFF
 
-		c.idle(1)
+		c.Idle(1)
 
 		if rm == PC {
 			op2 += 4
@@ -560,11 +560,11 @@ func (c *Cpu) Mul(op uint32) {
 
 		res := r[rm] * r[rs]
 
-		c.idle(idleMul(r[rs], true))
+		c.Idle(idleMul(r[rs], true))
 
 		if inst == MLA {
 			res += r[rn]
-			c.idle(1)
+			c.Idle(1)
 		}
 
 		r[rd] = res
@@ -583,12 +583,12 @@ func (c *Cpu) Mul(op uint32) {
 
 	case UMULL, UMLAL:
 
-		c.idle(idleMul(r[rs], false) + 1)
+		c.Idle(idleMul(r[rs], false) + 1)
 		res := uint64(r[rm]) * uint64(r[rs])
 
 		if inst == UMLAL {
 			res += uint64(r[rd])<<32 | uint64(r[rn])
-			c.idle(1)
+			c.Idle(1)
 		}
 
 		r[rd] = uint32(res >> 32)
@@ -605,12 +605,12 @@ func (c *Cpu) Mul(op uint32) {
 
 	case SMULL, SMLAL:
 
-		c.idle(idleMul(r[rs], true) + 1)
+		c.Idle(idleMul(r[rs], true) + 1)
 
 		res := int64(int32(r[rm])) * int64(int32(r[rs]))
 		if inst == SMLAL {
 			res += int64(r[rd])<<32 | int64(r[rn])
-			c.idle(1)
+			c.Idle(1)
 		}
 
 		r[rd] = uint32(res >> 32)
@@ -893,7 +893,7 @@ func (c *Cpu) Psr(op uint32) {
 
 	if spsr := (op>>22)&1 != 0; spsr {
 		mode := c.Reg.CPSR.Mode
-		r[rd] = c.Reg.SPSR[BANK_ID[mode]].Get()
+		r[rd] = c.Reg.SPSR[ModeBank[mode]].Get()
 		return
 	}
 
@@ -961,23 +961,23 @@ func (c *Cpu) msr(op uint32) {
 		if curr == MODE_USR || curr == MODE_SYS {
 			spsr = uint32(reg.CPSR.Get()) &^ mask
 		} else {
-			spsr = uint32(reg.SPSR[BANK_ID[curr]].Get()) &^ mask
+			spsr = uint32(reg.SPSR[ModeBank[curr]].Get()) &^ mask
 		}
 
 		spsr |= v & mask
-		reg.SPSR[BANK_ID[curr]].Set(spsr)
+		reg.SPSR[ModeBank[curr]].Set(spsr)
 
 		return
 	}
 
-	next := v&0x1F | 0x10
+	next := CpuMode(v&0x1F | 0x10)
 	cpsr := uint32(reg.CPSR.Get()) &^ mask
 
 	cpsr |= v & mask
 
 	reg.CPSR.Set(cpsr)
 
-	if skip := BANK_ID[curr] == BANK_ID[next]; skip {
+	if skip := ModeBank[curr] == ModeBank[next]; skip {
 		return
 	}
 
@@ -1114,7 +1114,7 @@ func (c *Cpu) Block(op uint32) {
 		return
 	}
 
-	c.idle(1)
+	c.Idle(1)
 
 	if !pcIncluded {
 		return
@@ -1132,7 +1132,7 @@ func (c *Cpu) Block(op uint32) {
 
 	var (
 		curr = c.Reg.CPSR.Mode
-		spsr = c.Reg.SPSR[BANK_ID[curr]]
+		spsr = c.Reg.SPSR[ModeBank[curr]]
 		next = spsr.Mode
 	)
 

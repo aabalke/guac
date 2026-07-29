@@ -166,7 +166,7 @@ func (m *Memory) initWriteRegions() {
 func (m *Memory) initReadRegions() {
 	for i := range len(m.readRegions) {
 		m.readRegions[i] = func(m *Memory, addr uint32) uint8 {
-			if m.GBA.Cpu.Reg.R[PC] < 0x4000 {
+			if m.GBA.Cpu.Reg.R[15] < 0x4000 {
 				return 0
 			}
 			return m.ReadOpenBus(addr)
