@@ -48,7 +48,7 @@ var solarCards = map[string]bool{
 }
 
 func (gba *GBA) AddGpios() {
-	if solarCards[gba.Cartridge.Code] {
+	if solarCards[gba.Cartridge.Code] || config.Conf.Gba.SpecialHardware.ForceSolarSensor {
 		if gba.Mem.Gpio == nil {
 			gba.Mem.Gpio = gpio.NewGpio()
 		}
@@ -57,7 +57,7 @@ func (gba *GBA) AddGpios() {
 		gba.Mem.Gpio.Devices = append(gba.Mem.Gpio.Devices, gpio.NewSolar(level))
 	}
 
-	if rtcCards[gba.Cartridge.Code] {
+	if rtcCards[gba.Cartridge.Code] || config.Conf.Gba.SpecialHardware.ForceRtc {
 		if gba.Mem.Gpio == nil {
 			gba.Mem.Gpio = gpio.NewGpio()
 		}

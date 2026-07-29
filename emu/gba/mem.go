@@ -360,6 +360,12 @@ func (m *Memory) Read16(addr uint32) uint32 {
 	}
 
 	if addr >= 0x800_0000 {
+		switch addr {
+		case 0x800_00C4, 0x800_00C6, 0x800_00C8:
+			if m.Gpio != nil {
+				return uint32(m.Gpio.Read(addr))
+			}
+		}
 
 		addr &= 0x1FF_FFFF
 
@@ -384,10 +390,6 @@ func (m *Memory) Read16(addr uint32) uint32 {
 		return uint32(m.GBA.Timers[2].Read16(int(addr & 3)))
 	case 0x400_010c, 0x400_010E:
 		return uint32(m.GBA.Timers[3].Read16(int(addr & 3)))
-	case 0x800_00C4, 0x800_00C6, 0x800_00C8:
-		if m.Gpio != nil {
-			return uint32(m.Gpio.Read(addr))
-		}
 	}
 
 	if ptr := m.ReadPtr(addr); ptr != nil {
