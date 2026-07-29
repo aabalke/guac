@@ -189,8 +189,6 @@ func NewCpu(mem Mem, cycles func(addr, width, seq uint32, inst bool), idle func(
 }
 
 func (c *Cpu) Step() {
-	pc := c.Reg.R[PC]
-
 	if c.IrqLine {
 		c.Halted = false
 
@@ -207,11 +205,11 @@ func (c *Cpu) Step() {
 			c.Seq = SEQ
 
 			if thumb {
-				c.Cycles(pc, 2, seq, true)
-				c.mem.Read16(pc)
+				c.Cycles(c.Reg.R[PC], 2, seq, true)
+				c.mem.Read16(c.Reg.R[PC])
 			} else {
-				c.Cycles(pc, 4, seq, true)
-				c.mem.Read32(pc)
+				c.Cycles(c.Reg.R[PC], 4, seq, true)
+				c.mem.Read32(c.Reg.R[PC])
 			}
 
 			c.ModeSwitch(cpsr.Mode, mode)
@@ -220,12 +218,12 @@ func (c *Cpu) Step() {
 			c.Reg.SPSR[i] = *cpsr
 
 			if thumb {
-				c.Reg.R[LR] = pc
-				c.Reg.LR[i] = pc
+				c.Reg.R[LR] = c.Reg.R[PC]
+				c.Reg.LR[i] = c.Reg.R[PC]
 
 			} else {
-				c.Reg.R[LR] = pc - 4
-				c.Reg.LR[i] = pc - 4
+				c.Reg.R[LR] = c.Reg.R[PC] - 4
+				c.Reg.LR[i] = c.Reg.R[PC] - 4
 			}
 
 			cpsr.Mode = mode
@@ -245,10 +243,10 @@ func (c *Cpu) Step() {
 
 	if c.Reg.CPSR.T {
 
-		c.Cycles(pc, 2, seq, true)
+		c.Cycles(c.Reg.R[PC], 2, seq, true)
 
 		if c.PcPtr == nil {
-			c.Op[1] = c.mem.Read16(pc)
+			c.Op[1] = c.mem.Read16(c.Reg.R[PC])
 		} else {
 			c.Op[1] = *(*uint32)(c.PcPtr) & 0xFFFF
 		}
@@ -264,9 +262,9 @@ func (c *Cpu) Step() {
 
 	} else {
 
-		c.Cycles(pc, 4, seq, true)
+		c.Cycles(c.Reg.R[PC], 4, seq, true)
 		if c.PcPtr == nil {
-			c.Op[1] = c.mem.Read32(pc)
+			c.Op[1] = c.mem.Read32(c.Reg.R[PC])
 		} else {
 			c.Op[1] = *(*uint32)(c.PcPtr)
 		}

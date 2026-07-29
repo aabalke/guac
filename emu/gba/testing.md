@@ -102,7 +102,7 @@ Requires Official bios for passing tests
 👍 dma: latch [3/3]
 👍 dma: start delay [1/1]
 ❌ halt: halt cnt [5/6]
-👍 irq: irq delay [1/3]
+👍 irq: irq delay [3/3]
 ❌ ppu: bgpd
 ❌ ppu: bgx
 ❌ ppu: dispcnt-latch
