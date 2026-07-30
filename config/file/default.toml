@@ -95,9 +95,15 @@ down   = ["LeftBottom"]
 # replaces these cpu instructions with a halt, leading to a performance increase
 idle_optimize = true
 
-rotation = 0
+# screen rotation, valid values [0, 90, 180, 270]
+# rotation = 0
+
 
 [gba.hardware]
+
+# explicit backup type, usually auto is fine
+# valid: ["auto", "none", "sram", "eeprom", "flash", "flash128"]
+# backup_type = "auto"
 
 force_rtc = false
 

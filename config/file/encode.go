@@ -175,9 +175,9 @@ func (c *Config) encodeGba() {
 	c.encodeController(&c.Gba.Controller, &c.config.Gba.ControllerConfig)
 	c.Gba.IdleOptimize = c.config.Gba.IdleOptimize
 
-	c.Gba.SpecialHardware.ForceRtc = c.config.Gba.SpecialHardware.ForceRtc
-	c.Gba.SpecialHardware.ForceSolarSensor = c.config.Gba.SpecialHardware.ForceSolarSensor
-	c.Gba.SpecialHardware.SolarSensorLevel = c.config.Gba.SpecialHardware.SolarSensorLevel
+	c.Gba.Hardware.ForceRtc = c.config.Gba.Hardware.ForceRtc
+	c.Gba.Hardware.ForceSolarSensor = c.config.Gba.Hardware.ForceSolarSensor
+	c.Gba.Hardware.SolarSensorLevel = c.config.Gba.Hardware.SolarSensorLevel
 
 	if utils.IsFile(c.config.Gba.Bios.Path) {
 		c.Gba.Bios.Path = c.config.Gba.Bios.Path
@@ -199,6 +199,17 @@ func (c *Config) encodeGba() {
 	default:
 		c.Gba.Rotation = 0
 	}
+
+	backupType := [...]string{
+		"auto",
+		"none",
+		"eeprom",
+		"sram",
+		"flash",
+		"flash128",
+	}
+
+	c.Gba.Hardware.BackupType = backupType[c.config.Gba.Hardware.BackupType]
 }
 
 func (c *Config) encodeNds() {

@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"strings"
+
+	"github.com/aabalke/guac/config"
 )
 
 type Cartridge struct {
@@ -36,7 +38,8 @@ type Cartridge struct {
 }
 
 const (
-	NONE = iota
+	AUTO = iota
+	NONE
 	EEPROM
 	SRAM
 	FLASH
@@ -52,7 +55,7 @@ const (
 	TYPE_MACRONIX128
 )
 
-var idType = [...]string{"none", "eeprom", "sram", "flash", "flash128"}
+var idType = [...]string{"auto", "none", "eeprom", "sram", "flash", "flash128"}
 
 func (c *Cartridge) String() string {
 	return fmt.Sprintf("Gba Header: Title %12s, Code %4s, Id %8s", c.Title, c.Code, idType[c.Id])
@@ -72,7 +75,15 @@ func NewCartridge(rom, sav string) *Cartridge {
 
 	c.Rom = &buf
 
-	c.Id = c.getCartBackupId()
+	c.Id = config.Conf.Gba.Hardware.BackupType
+	if c.Id == AUTO {
+		c.Id = c.getCartBackupId()
+	}
+
+	if c.Id == FLASH || c.Id == FLASH128 {
+		c.setFlashDevice(c.Id == FLASH128)
+	}
+
 	switch c.Id {
 	case SRAM:
 		c.Sav = make([]uint8, 0x10000)
@@ -88,12 +99,10 @@ func NewCartridge(rom, sav string) *Cartridge {
 		}
 	} else {
 		if len(c.Sav) != len(sBuf) {
-			fmt.Printf("Sav Size != Save File Size %d != %d\n", len(c.Sav), len(sBuf))
-			panic("BAD")
+			panic(fmt.Sprintf("Sav Size != Save File Size %d != %d\n", len(c.Sav), len(sBuf)))
 		}
 
 		c.Sav = sBuf
-
 	}
 
 	c.Title = strings.ToUpper(strings.ReplaceAll(string((*c.Rom)[0xA0:0xA0+12]), "\x00", " "))
@@ -110,9 +119,9 @@ func NewCartridge(rom, sav string) *Cartridge {
 }
 
 func (c *Cartridge) getCartBackupId() int {
-	// have to be word aligned // maybe not???
+	// gbatek says has to be word aligned - need to confirm
 
-	for i := 0; i < len(*c.Rom)-4; i++ {
+	for i := range len(*c.Rom) - 4 {
 		switch string((*c.Rom)[i : i+4]) {
 		case "EEPR":
 			return EEPROM
@@ -125,21 +134,27 @@ func (c *Cartridge) getCartBackupId() int {
 			}
 
 			if string((*c.Rom)[i:i+8]) == "FLASH1M_" {
-				c.Device = [2]uint8{0x62, 0x13}
-				c.FlashType = TYPE_SANYO
 				return FLASH128
 			}
 
 			if string((*c.Rom)[i:i+6]) == "FLASH_" ||
 				string((*c.Rom)[i:i+8]) == "FLASH512" {
-				c.Device = [2]uint8{0xBF, 0xD4}
-				c.FlashType = TYPE_SST
 				return FLASH
 			}
 		}
 	}
 
 	return NONE
+}
+
+func (c *Cartridge) setFlashDevice(flash128 bool) {
+	if flash128 {
+		c.Device = [2]uint8{0x62, 0x13}
+		c.FlashType = TYPE_SANYO
+		return
+	}
+	c.Device = [2]uint8{0xBF, 0xD4}
+	c.FlashType = TYPE_SST
 }
 
 func (c *Cartridge) Save() {

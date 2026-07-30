@@ -207,9 +207,9 @@ func (c *Config) decodeGba() {
 
 	c.config.Gba.IdleOptimize = c.Gba.IdleOptimize
 
-	c.config.Gba.SpecialHardware.ForceRtc = c.Gba.SpecialHardware.ForceRtc
-	c.config.Gba.SpecialHardware.ForceSolarSensor = c.Gba.SpecialHardware.ForceSolarSensor
-	c.config.Gba.SpecialHardware.SolarSensorLevel = c.Gba.SpecialHardware.SolarSensorLevel
+	c.config.Gba.Hardware.ForceRtc = c.Gba.Hardware.ForceRtc
+	c.config.Gba.Hardware.ForceSolarSensor = c.Gba.Hardware.ForceSolarSensor
+	c.config.Gba.Hardware.SolarSensorLevel = c.Gba.Hardware.SolarSensorLevel
 
 	if utils.IsFile(c.Gba.Bios.Path) {
 		c.config.Gba.Bios.Path = c.Gba.Bios.Path
@@ -230,6 +230,21 @@ func (c *Config) decodeGba() {
 		c.config.Gba.Rotation = 3
 	default:
 		c.config.Gba.Rotation = 0
+	}
+
+	switch strings.ToLower(c.Gba.Hardware.BackupType) {
+	case "none":
+		c.config.Gba.Hardware.BackupType = 1
+	case "eeprom":
+		c.config.Gba.Hardware.BackupType = 2
+	case "sram":
+		c.config.Gba.Hardware.BackupType = 3
+	case "flash":
+		c.config.Gba.Hardware.BackupType = 4
+	case "flash128":
+		c.config.Gba.Hardware.BackupType = 5
+	default:
+		c.config.Gba.Hardware.BackupType = 0
 	}
 }
 

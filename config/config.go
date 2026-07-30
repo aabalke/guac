@@ -152,13 +152,14 @@ type GbBios struct {
 type Gba struct {
 	IdleOptimize     bool
 	Rotation         int
-	SpecialHardware  GbaSpecialHardware
+	Hardware         GbaHardware
 	Bios             GbaBios
 	KeyboardConfig   EmulatorKeyboard
 	ControllerConfig EmulatorController
 }
 
-type GbaSpecialHardware struct {
+type GbaHardware struct {
+	BackupType       int
 	ForceRtc         bool
 	ForceSolarSensor bool
 	SolarSensorLevel int

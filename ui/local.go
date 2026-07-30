@@ -220,15 +220,19 @@ type GbaLocalization struct {
 	OptmizeIdleLoops string   `toml:"optimize_idle_loops"`
 	Rotation         string   `toml:"rotation"`
 	Rotations        []string `toml:"rotations"`
-	SpecialHardware  string   `toml:"special_hardware"`
+
+	Hardware         string   `toml:"hardware"`
+	BackupType       string   `toml:"backup_type"`
+	BackupTypes      []string `toml:"backup_types"`
 	ForceRtc         string   `toml:"force_rtc"`
 	ForceSolarSensor string   `toml:"force_solar_sensor"`
 	SolarSensorLevel string   `toml:"solar_sensor_level"`
-	Bios             string   `toml:"bios"`
-	BiosPath         string   `toml:"bios_path"`
-	DirectBoot       string   `toml:"direct_boot"`
-	Keyboard         string   `toml:"keyboard"`
-	Controller       string   `toml:"controller"`
+
+	Bios       string `toml:"bios"`
+	BiosPath   string `toml:"bios_path"`
+	DirectBoot string `toml:"direct_boot"`
+	Keyboard   string `toml:"keyboard"`
+	Controller string `toml:"controller"`
 
 	A              string `toml:"a"`
 	B              string `toml:"b"`

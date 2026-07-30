@@ -78,18 +78,19 @@ type GbBios struct {
 }
 
 type Gba struct {
-	IdleOptimize    bool               `toml:"idle_optimize"`
-	Rotation        int                `toml:"rotation"`
-	SpecialHardware GbaSpecialHardware `toml:"hardware"`
-	Bios            GbaBios            `toml:"bios"`
-	Keyboard        EmulatorInput      `toml:"keyboard"`
-	Controller      EmulatorInput      `toml:"controller"`
+	IdleOptimize bool          `toml:"idle_optimize"`
+	Rotation     int           `toml:"rotation"`
+	Hardware     GbaHardware   `toml:"hardware"`
+	Bios         GbaBios       `toml:"bios"`
+	Keyboard     EmulatorInput `toml:"keyboard"`
+	Controller   EmulatorInput `toml:"controller"`
 }
 
-type GbaSpecialHardware struct {
-	ForceRtc         bool `toml:"force_rtc"`
-	ForceSolarSensor bool `toml:"force_solar_sensor"`
-	SolarSensorLevel int  `toml:"solar_sensor_level"`
+type GbaHardware struct {
+	BackupType       string `toml:"backup_type"`
+	ForceRtc         bool   `toml:"force_rtc"`
+	ForceSolarSensor bool   `toml:"force_solar_sensor"`
+	SolarSensorLevel int    `toml:"solar_sensor_level"`
 }
 
 type GbaBios struct {

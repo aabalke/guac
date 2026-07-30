@@ -323,10 +323,11 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 		{WIDGET_CBX, l.OptmizeIdleLoops, "", &tmp.IdleOptimize, nil},
 		{WIDGET_RAD, l.Rotation, "", &tmp.Rotation, l.Rotations},
 
-		{WIDGET_HDR, l.SpecialHardware, "", nil, nil},
-		{WIDGET_CBX, l.ForceRtc, "", &tmp.SpecialHardware.ForceRtc, nil},
-		{WIDGET_CBX, l.ForceSolarSensor, "", &tmp.SpecialHardware.ForceSolarSensor, nil},
-		{WIDGET_DEC, l.SolarSensorLevel, l.SolarSensorLevel, &tmp.SpecialHardware.SolarSensorLevel, 100},
+		{WIDGET_HDR, l.Hardware, "", nil, nil},
+		{WIDGET_RAD, l.BackupType, "", &tmp.Hardware.BackupType, l.BackupTypes},
+		{WIDGET_CBX, l.ForceRtc, "", &tmp.Hardware.ForceRtc, nil},
+		{WIDGET_CBX, l.ForceSolarSensor, "", &tmp.Hardware.ForceSolarSensor, nil},
+		{WIDGET_DEC, l.SolarSensorLevel, l.SolarSensorLevel, &tmp.Hardware.SolarSensorLevel, 100},
 
 		{WIDGET_HDR, l.Bios, "", nil, nil},
 		{WIDGET_FLE, l.BiosPath, "", &tmp.Bios.Path, nil},
@@ -389,7 +390,7 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 			if g.gba.Mem.Gpio != nil {
 				for _, device := range g.gba.Mem.Gpio.Devices {
 					if d, ok := device.(*gpio.Solar); ok {
-						d.SetLevel(uint8(tmp.SpecialHardware.SolarSensorLevel))
+						d.SetLevel(uint8(tmp.Hardware.SolarSensorLevel))
 					}
 				}
 			}

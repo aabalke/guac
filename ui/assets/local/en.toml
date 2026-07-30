@@ -164,7 +164,9 @@ optimize_idle_loops = "optimize idle loops"
 rotation = "rotation"
 rotations = ["0", "90", "180", "270"]
 
-special_hardware = "hardware"
+hardware = "hardware"
+backup_type = "backup type"
+backup_types = ["auto", "none", "eeprom", "sram", "flash", "flash128"]
 force_rtc = "force rtc"
 force_solar_sensor = "force solar sensor"
 solar_sensor_level = "solar level"
@@ -322,5 +324,5 @@ save = "save"
 
 about = "about"
 version = "Version dev post-v0.0.3"
-copyright = "© 2024 - 2026 Aaron Balke,\nlicensed under BSD 3-Clause License.\nGame Boy Advance is a registered\ntrademark of Nintendo Co., Ltd."
+copyright = "© 2024 - 2026 Aaron Balke,\nlicensed under BSD 3-Clause License.\nGame Boy, Game Boy Advance, and Nintendo DS\nare registered trademarks of Nintendo Co., Ltd."
 thank_yous = "Thank you Giovanni Bajo, Mireille Meyer,\nVicki Pfau, Martin Korth, and many more."
