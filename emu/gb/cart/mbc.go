@@ -1,4 +1,4 @@
-package cartridge
+package cart
 
 import (
 	"bufio"
@@ -15,7 +15,6 @@ type Mbc interface {
 }
 
 func ReadRam(path string) ([]uint8, error) {
-
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -52,7 +51,6 @@ func ReadRam(path string) ([]uint8, error) {
 }
 
 func WriteRam(path string, data []uint8) {
-
 	f, err := os.Create(path)
 	if err != nil {
 		panic(err)

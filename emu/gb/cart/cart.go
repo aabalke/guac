@@ -1,4 +1,4 @@
-package cartridge
+package cart
 
 import (
 	"fmt"
@@ -35,7 +35,6 @@ const (
 )
 
 func NewCartridge(rompath, savpath string) *Cartridge {
-
 	c := &Cartridge{
 		RomPath: rompath,
 		SavPath: savpath,
@@ -93,6 +92,7 @@ var romSize = [...]int{
 	1 << 22, // 4 * 1024 * 1024
 	1 << 23, // 8 * 1024 * 1024
 }
+
 var romMask = [...]uint32{
 	(1 << 15) - 1, // 32 * 1024
 	(1 << 16) - 1, // 64 * 1024
@@ -130,7 +130,6 @@ var validRamCodes = []uint8{
 }
 
 func (c *Cartridge) ParseHeader(buf []uint8) {
-
 	c.Type = buf[TYPE]
 	c.Title = strings.Trim(string(buf[0x134:0x143]), string(byte(0)))
 	c.RomSize = romSize[buf[ROM]]
@@ -151,9 +150,7 @@ func (c *Cartridge) ParseHeader(buf []uint8) {
 		c.RamMask = (1 << 18) - 1
 	}
 
-	if flag := buf[0x143]; flag == 0x80 || flag == 0xC0 {
-		c.ColorMode = true
-	}
+	c.ColorMode = buf[0x143]&0x80 != 0
 
 	check := uint8(0)
 	for addr := 0x134; addr <= 0x14C; addr++ {

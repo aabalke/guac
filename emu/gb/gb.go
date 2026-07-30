@@ -7,7 +7,7 @@ import (
 
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gb/apu"
-	"github.com/aabalke/guac/emu/gb/cartridge"
+	"github.com/aabalke/guac/emu/gb/cart"
 	"github.com/aabalke/guac/emu/scheduler"
 	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -50,7 +50,7 @@ type GameBoy struct {
 
 	Scheduler *scheduler.Scheduler
 
-	Cartridge *cartridge.Cartridge
+	Cartridge *cart.Cartridge
 	Cpu       *Cpu
 	MemoryBus MemoryBus
 
@@ -106,7 +106,7 @@ func NewGameBoy(ctx *audio.Context, path string) *GameBoy {
 		Cpu:       NewCpu(),
 		Clock:     CPU_SPEED, // t cycle count
 		Joypad:    0xFF,
-		Cartridge: cartridge.NewCartridge(path, path+".save"),
+		Cartridge: cart.NewCartridge(path, path+".save"),
 		Palette:   &config.Conf.Gb.Palette,
 		Scheduler: scheduler.NewScheduler(),
 		Apu:       apu.NewApu(ctx, BUFFER_SIZE),
@@ -121,9 +121,7 @@ func NewGameBoy(ctx *audio.Context, path string) *GameBoy {
 	gb.bgPalette.Init()
 	gb.spPalette.Init()
 
-	if gb.Cartridge.ColorMode {
-		gb.Color = true
-	}
+	gb.Color = gb.Cartridge.ColorMode
 
 	gb.MemoryBus.WRAMBank = 1
 	gb.MemoryBus.Hdma.Dst = 0xFFFF

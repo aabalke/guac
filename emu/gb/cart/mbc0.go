@@ -1,4 +1,4 @@
-package cartridge
+package cart
 
 import (
 	"fmt"
@@ -10,7 +10,6 @@ type Mbc0 struct {
 }
 
 func NewMbc0(c *Cartridge) *Mbc0 {
-
 	fmt.Printf("Cartridge ROM ONLY\n")
 
 	if c.Type != 0 {
@@ -23,7 +22,6 @@ func NewMbc0(c *Cartridge) *Mbc0 {
 }
 
 func (m *Mbc0) Read(addr uint16) uint8 {
-
 	if addr < 0x8000 {
 		return m.Cartridge.Data[addr]
 	}
@@ -32,7 +30,6 @@ func (m *Mbc0) Read(addr uint16) uint8 {
 }
 
 func (m *Mbc0) ReadPtr(addr uint16) unsafe.Pointer {
-
 	if addr < 0x8000 {
 		return unsafe.Pointer(&m.Cartridge.Data[addr])
 	}

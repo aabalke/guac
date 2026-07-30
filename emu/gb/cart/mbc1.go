@@ -1,4 +1,4 @@
-package cartridge
+package cart
 
 import (
 	"fmt"
@@ -16,7 +16,6 @@ type Mbc1 struct {
 }
 
 func NewMbc1(c *Cartridge) *Mbc1 {
-
 	fmt.Printf("Cartridge MBC1\n")
 
 	m := &Mbc1{
@@ -56,7 +55,6 @@ func (m *Mbc1) ReadPtr(addr uint16) unsafe.Pointer {
 }
 
 func (m *Mbc1) Write(addr uint16, v uint8) {
-
 	switch {
 	case addr < 0x2000:
 		m.RamEnabled = v&0xF == 0xA
@@ -79,7 +77,6 @@ func (m *Mbc1) Write(addr uint16, v uint8) {
 }
 
 func (m *Mbc1) UpdateAddrs() {
-
 	m.RomBase2 = (uint32(m.Bank2) << 19) | (uint32(m.Bank1) << 14)
 
 	if m.AdvMode {

@@ -1,4 +1,4 @@
-package cartridge
+package cart
 
 import (
 	"encoding/binary"
@@ -33,7 +33,6 @@ type Mbc3 struct {
 var bitMask = [...]uint8{0x3F, 0x3F, 0x1F, 0xFF, 0xFF}
 
 func NewMbc3(c *Cartridge) *Mbc3 {
-
 	fmt.Printf("Cartridge MBC3 %02X\n", c.Type)
 
 	m := &Mbc3{
@@ -54,7 +53,6 @@ func NewMbc3(c *Cartridge) *Mbc3 {
 }
 
 func (m *Mbc3) Parse(buf []byte) {
-
 	m.time[0] = uint32(buf[0])
 	m.time[1] = uint32(buf[4])
 	m.time[2] = uint32(buf[8])
@@ -71,7 +69,6 @@ func (m *Mbc3) Parse(buf []byte) {
 }
 
 func (m *Mbc3) Save() {
-
 	buf := make([]uint8, 48)
 
 	m.UpdateSince()
@@ -127,7 +124,6 @@ func (m *Mbc3) ReadPtr(addr uint16) unsafe.Pointer {
 }
 
 func (m *Mbc3) Write(addr uint16, v uint8) {
-
 	switch {
 	case addr < 0x2000:
 		m.RamTimerEnabled = v&0xF == 0xA
@@ -190,7 +186,6 @@ func (m *Mbc3) UpdateSince() {
 }
 
 func (m *Mbc3) UpdateTime(cnt uint32) {
-
 	if halted := (m.time[4]>>6)&1 != 0; halted {
 		return
 	}
@@ -215,7 +210,7 @@ func (m *Mbc3) UpdateTime(cnt uint32) {
 		return
 	}
 
-	day := uint32(m.time[3]) | (uint32(m.time[4]&1) << 8) + (uint32(m.time[2] / 24))
+	day := uint32(m.time[3]) | (uint32(m.time[4]&1) << 8) + uint32(m.time[2]/24)
 	m.time[2] %= 24
 
 	if day >= 512 {

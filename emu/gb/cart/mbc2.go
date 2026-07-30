@@ -1,4 +1,4 @@
-package cartridge
+package cart
 
 import (
 	"fmt"
@@ -14,7 +14,6 @@ type Mbc2 struct {
 }
 
 func NewMbc2(c *Cartridge) *Mbc2 {
-
 	fmt.Printf("Cartridge MBC2\n")
 
 	m := &Mbc2{
@@ -52,7 +51,6 @@ func (m *Mbc2) ReadPtr(addr uint16) unsafe.Pointer {
 }
 
 func (m *Mbc2) Write(addr uint16, v uint8) {
-
 	switch {
 	case addr < 0x4000:
 
