@@ -120,15 +120,22 @@ func (c *Cartridge) getCartBackupId() int {
 			return SRAM
 		case "FLAS":
 
-			if i < len(*c.Rom)-8 && string((*c.Rom)[i:i+8]) == "FLASH1M_" {
+			if i >= len(*c.Rom)-8 {
+				continue
+			}
+
+			if string((*c.Rom)[i:i+8]) == "FLASH1M_" {
 				c.Device = [2]uint8{0x62, 0x13}
 				c.FlashType = TYPE_SANYO
 				return FLASH128
 			}
 
-			c.Device = [2]uint8{0xBF, 0xD4}
-			c.FlashType = TYPE_SST
-			return FLASH
+			if string((*c.Rom)[i:i+6]) == "FLASH_" ||
+				string((*c.Rom)[i:i+8]) == "FLASH512" {
+				c.Device = [2]uint8{0xBF, 0xD4}
+				c.FlashType = TYPE_SST
+				return FLASH
+			}
 		}
 	}
 

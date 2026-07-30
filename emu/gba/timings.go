@@ -165,22 +165,21 @@ func (g *GBA) CyclesDma(addr, width, seq uint32) {
 	switch {
 	case region < 8:
 		g.Tick(int64(t.Timings[flag32][0][region]))
-	case region < 14:
 
-		if addr&0x1FFFF == 0 {
+	case region < 0x10:
+
+		if region < 14 && addr&0x1FFFF == 0 {
 			seq = cpu.NONSEQ
 		}
 
 		if t.Active {
 			t.Cancel(g.Cpu.Reg.R[15], g.Tick)
 		}
-		g.Tick(int64(t.Timings[flag32][seq][region]))
-	default:
-		if t.Active {
-			t.Cancel(g.Cpu.Reg.R[15], g.Tick)
-		}
 
-		g.Tick(int64(t.Timings[flag32][0][region]))
+		g.Tick(int64(t.Timings[flag32][seq][region]))
+
+	default:
+		g.Tick(int64(t.Timings[flag32][0][0]))
 	}
 }
 
@@ -284,6 +283,8 @@ func (g *GBA) Cycles(addr, width, seq uint32, inst bool) {
 			t.Capacity = (1 << ((width & 3) >> 1)) << 2
 		}
 
+		g.Cpu.LastWasDma = false
+
 	} else {
 		switch {
 		case region < 14:
@@ -307,8 +308,6 @@ func (g *GBA) Cycles(addr, width, seq uint32, inst bool) {
 			g.Tick(int64(t.Timings[flag32][0][0]))
 		}
 	}
-
-	g.Cpu.LastWasDma = false
 }
 
 func (gba *GBA) Idle(cycles int64) {
