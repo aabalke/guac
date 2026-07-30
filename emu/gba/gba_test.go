@@ -20,7 +20,7 @@ type TestResult struct {
 }
 
 func TestAlyosha(t *testing.T) {
-	directory := `C:\dev\repos\emulators\roms\gba_test_roms\alyosha-tas-gba-tests`
+	directory := `../../..\roms\gba_test_roms\alyosha-tas-gba-tests`
 	t.Logf("Alyosha Tas Gba Test Suite %s\n", time.Now().Format(time.RFC3339))
 
 	perRomHandler := func(file string, results *[]TestResult) {
@@ -127,6 +127,8 @@ func WriteMarkdown(header string, results []TestResult, filename string) error {
 	fmt.Fprintf(&b, "# %s\n\n", header)
 	fmt.Fprintf(&b, "Results generated %s\n\n", time.Now().Format(time.RFC3339))
 	fmt.Fprintf(&b, "Passing %d/%d %02d%%\n\n", passed, total, (passed*100)/total)
+
+	fmt.Fprintf(&b, "Disclaimer: These Test Results are automated and may not be completely accurate.\n")
 
 	slices.SortFunc(results, func(a, b TestResult) int {
 		return strings.Compare(a.Name, b.Name)
