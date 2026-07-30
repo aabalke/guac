@@ -151,6 +151,7 @@ type GbBios struct {
 
 type Gba struct {
 	IdleOptimize     bool
+	Rotation         int
 	SpecialHardware  GbaSpecialHardware
 	Bios             GbaBios
 	KeyboardConfig   EmulatorKeyboard

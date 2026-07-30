@@ -8,7 +8,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-func (gba *GBA) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadButton) {
+func (gba *GBA) InputHandler(justKeys, keys []ebiten.Key, justButtons, buttons []ebiten.StandardGamepadButton) {
 	k := &gba.Keypad.Input
 	*k = 0x3FF
 
@@ -38,6 +38,13 @@ func (gba *GBA) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 		}
 	}
 
+	for _, key := range justKeys {
+		if slices.Contains(keyConfig.RotationToggle, key) {
+			r := &config.Conf.Gba.Rotation
+			*r = (*r + 1) % 4
+		}
+	}
+
 	buttonConfig := config.Conf.Gba.ControllerConfig
 	for _, button := range buttons {
 		switch {
@@ -61,6 +68,13 @@ func (gba *GBA) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepad
 			*k &^= 1 << 8
 		case slices.Contains(buttonConfig.L, button):
 			*k &^= 1 << 9
+		}
+	}
+
+	for _, button := range justButtons {
+		if slices.Contains(buttonConfig.RotationToggle, button) {
+			r := &config.Conf.Gba.Rotation
+			*r = (*r + 1) % 4
 		}
 	}
 

@@ -220,6 +220,17 @@ func (c *Config) decodeGba() {
 	if c.config.Gba.Bios.Path == "" {
 		c.config.Gba.Bios.Direct = true
 	}
+
+	switch c.Gba.Rotation {
+	case 90:
+		c.config.Gba.Rotation = 1
+	case 180:
+		c.config.Gba.Rotation = 2
+	case 270:
+		c.config.Gba.Rotation = 3
+	default:
+		c.config.Gba.Rotation = 0
+	}
 }
 
 func (c *Config) decodeNds() {
@@ -433,6 +444,10 @@ func (c *Config) decodeController(in *EmulatorInput, conf *config.EmulatorContro
 		&in.SolarLevel2,
 		&in.SolarLevel3,
 		&in.SolarLevel4,
+		&in.LayoutToggle,
+		&in.SizingToggle,
+		&in.RotationToggle,
+		&in.ExportScene,
 	}
 
 	outputs := []*[]ebiten.StandardGamepadButton{
@@ -454,6 +469,10 @@ func (c *Config) decodeController(in *EmulatorInput, conf *config.EmulatorContro
 		&conf.SolarLevel2,
 		&conf.SolarLevel3,
 		&conf.SolarLevel4,
+		&conf.LayoutToggle,
+		&conf.SizingToggle,
+		&conf.RotationToggle,
+		&conf.ExportScene,
 	}
 
 	for i := range len(tomls) {

@@ -1,6 +1,7 @@
 package gba
 
 import (
+	"math"
 	"time"
 
 	"github.com/aabalke/guac/config"
@@ -191,20 +192,87 @@ func (gba *GBA) LoadGame(path string) {
 	gba.Cartridge = cart.NewCartridge(path, path+".save")
 }
 
+const (
+	ROT_0 = iota
+	ROT_90
+	ROT_180
+	ROT_270
+)
+
+const (
+	RAD_0   = float64(math.Pi/180) * 0
+	RAD_90  = float64(math.Pi/180) * 90
+	RAD_180 = float64(math.Pi/180) * 180
+	RAD_270 = float64(math.Pi/180) * 270
+)
+
 func (gba *GBA) Draw(screen *ebiten.Image) {
 	var (
-		sw      = float64(screen.Bounds().Dx())
-		sh      = float64(screen.Bounds().Dy())
-		scale   = utils.ScaleImage(sw, sh, SCREEN_WIDTH, SCREEN_HEIGHT)
-		offsetX = (sw - (SCREEN_WIDTH * scale)) / 2
-		offsetY = (sh - (SCREEN_HEIGHT * scale)) / 2
+		rot        bool
+		rotRadians float64
+		rotX, rotY float64
 	)
 
+	switch config.Conf.Gba.Rotation {
+	case ROT_0: // skip
+		rotRadians = RAD_0
+	case ROT_90:
+		rotX = SCREEN_HEIGHT
+		rot = true
+		rotRadians = RAD_90
+	case ROT_180:
+		rotX = SCREEN_WIDTH
+		rotY = SCREEN_HEIGHT
+		rotRadians = RAD_180
+	case ROT_270:
+		rotY = SCREEN_WIDTH
+		rot = true
+		rotRadians = RAD_270
+	default:
+		panic("unallowed nds rotation value")
+	}
+
+	var (
+		screenW = float64(screen.Bounds().Dx())
+		screenH = float64(screen.Bounds().Dy())
+		canvasW = float64(SCREEN_WIDTH)
+		canvasH = float64(SCREEN_HEIGHT)
+	)
+
+	if rot {
+		screenH, screenW = screenW, screenH
+	}
+
+	scale := utils.ScaleImage(screenW, screenH, canvasW, canvasH)
+	offsetX := (screenW - (canvasW * scale)) / 2
+	offsetY := (screenH - (canvasH * scale)) / 2
+
+	if rot {
+		offsetX, offsetY = offsetY, offsetX
+	}
+
 	gba.DrawOptions.GeoM.Reset()
+	gba.DrawOptions.GeoM.Rotate(rotRadians)
+	gba.DrawOptions.GeoM.Translate(rotX, rotY)
 	gba.DrawOptions.GeoM.Scale(scale, scale)
 	gba.DrawOptions.GeoM.Translate(offsetX, offsetY)
 	screen.DrawImage(gba.Image, &gba.DrawOptions)
 }
+
+//func (gba *GBA) Draw(screen *ebiten.Image) {
+//	var (
+//		sw      = float64(screen.Bounds().Dx())
+//		sh      = float64(screen.Bounds().Dy())
+//		scale   = utils.ScaleImage(sw, sh, SCREEN_WIDTH, SCREEN_HEIGHT)
+//		offsetX = (sw - (SCREEN_WIDTH * scale)) / 2
+//		offsetY = (sh - (SCREEN_HEIGHT * scale)) / 2
+//	)
+//
+//	gba.DrawOptions.GeoM.Reset()
+//	gba.DrawOptions.GeoM.Scale(scale, scale)
+//	gba.DrawOptions.GeoM.Translate(offsetX, offsetY)
+//	screen.DrawImage(gba.Image, &gba.DrawOptions)
+//}
 
 func (gba *GBA) DirectBoot() {
 	reg := &gba.Cpu.Reg

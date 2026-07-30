@@ -321,11 +321,11 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 	fields := []Field{
 		{WIDGET_HDR, l.General, "", nil, nil},
 		{WIDGET_CBX, l.OptmizeIdleLoops, "", &tmp.IdleOptimize, nil},
-		//{WIDGET_HEX, l.SoundClockCycles, l.SoundClockCycles, &tmp.SoundClockUpdateCycles, 1000},
+		{WIDGET_RAD, l.Rotation, "", &tmp.Rotation, l.Rotations},
 
 		{WIDGET_HDR, l.SpecialHardware, "", nil, nil},
-		//{WIDGET_CBX, l.ForceRtc, "", &tmp.SpecialHardware.ForceRtc, nil},
-		//{WIDGET_CBX, l.ForceSolarSensor, "", &tmp.SpecialHardware.ForceSolarSensor, nil},
+		{WIDGET_CBX, l.ForceRtc, "", &tmp.SpecialHardware.ForceRtc, nil},
+		{WIDGET_CBX, l.ForceSolarSensor, "", &tmp.SpecialHardware.ForceSolarSensor, nil},
 		{WIDGET_DEC, l.SolarSensorLevel, l.SolarSensorLevel, &tmp.SpecialHardware.SolarSensorLevel, 100},
 
 		{WIDGET_HDR, l.Bios, "", nil, nil},
@@ -350,6 +350,7 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 		{WIDGET_KEY, l.Solar2, l.KeyboardSolar2, &k.SolarLevel2, KeyValidation()},
 		{WIDGET_KEY, l.Solar3, l.KeyboardSolar3, &k.SolarLevel3, KeyValidation()},
 		{WIDGET_KEY, l.SolarMax, l.KeyboardSolarMax, &k.SolarLevel4, KeyValidation()},
+		{WIDGET_KEY, l.RotationToggle, l.KeyboardRotationToggle, &k.RotationToggle, KeyValidation()},
 
 		{WIDGET_HDR, l.Controller, "", nil, nil},
 		{WIDGET_LNK, "", "", nil, controllerLink},
@@ -369,6 +370,7 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 		{WIDGET_KEY, l.Solar2, l.ControllerSolar2, &c.SolarLevel2, ControllerValidation()},
 		{WIDGET_KEY, l.Solar3, l.ControllerSolar3, &c.SolarLevel3, ControllerValidation()},
 		{WIDGET_KEY, l.SolarMax, l.ControllerSolarMax, &c.SolarLevel4, ControllerValidation()},
+		{WIDGET_KEY, l.RotationToggle, l.ControllerRotationToggle, &c.RotationToggle, ControllerValidation()},
 	}
 
 	parent.RemoveChildren()
@@ -455,7 +457,6 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 		{WIDGET_KEY, l.X, l.KeyboardX, &k.X, KeyValidation()},
 		{WIDGET_KEY, l.Y, l.KeyboardY, &k.Y, KeyValidation()},
 		{WIDGET_KEY, l.Hinge, l.KeyboardHinge, &k.Hinge, KeyValidation()},
-		{WIDGET_KEY, l.Debug, l.KeyboardDebug, &k.Debug, KeyValidation()},
 		{WIDGET_KEY, l.LayoutToggle, l.KeyboardLayoutToggle, &k.LayoutToggle, KeyValidation()},
 		{WIDGET_KEY, l.SizingToggle, l.KeyboardSizingToggle, &k.SizingToggle, KeyValidation()},
 		{WIDGET_KEY, l.RotationToggle, l.KeyboardRotationToggle, &k.RotationToggle, KeyValidation()},
@@ -475,6 +476,11 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 		{WIDGET_KEY, l.R, l.ControllerR, &k.R, ControllerValidation()},
 		{WIDGET_KEY, l.X, l.ControllerX, &k.X, ControllerValidation()},
 		{WIDGET_KEY, l.Y, l.ControllerY, &k.Y, ControllerValidation()},
+		{WIDGET_KEY, l.Hinge, l.ControllerHinge, &k.Hinge, ControllerValidation()},
+		{WIDGET_KEY, l.LayoutToggle, l.ControllerLayoutToggle, &c.LayoutToggle, ControllerValidation()},
+		{WIDGET_KEY, l.SizingToggle, l.ControllerSizingToggle, &c.SizingToggle, ControllerValidation()},
+		{WIDGET_KEY, l.RotationToggle, l.ControllerRotationToggle, &c.RotationToggle, ControllerValidation()},
+		{WIDGET_KEY, l.ExportToggle, l.ControllerExportToggle, &c.ExportScene, ControllerValidation()},
 	}
 
 	parent.RemoveChildren()

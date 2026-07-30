@@ -131,7 +131,7 @@ func (g *Game) Update() error {
 
 	g.Profile()
 
-	justKeys, keys, _, buttons := g.GetInput()
+	justKeys, keys, justButtons, buttons := g.GetInput()
 
 	switch {
 	case g.quit:
@@ -158,11 +158,11 @@ func (g *Game) Update() error {
 		g.ui.ui.Update()
 
 	case g.nds != nil:
-		g.nds.InputHandler(justKeys, keys, buttons, g.mouse, uint64(ebiten.Tick()))
+		g.nds.InputHandler(justKeys, keys, justButtons, buttons, g.mouse, uint64(ebiten.Tick()))
 		g.nds.Update(g.TargetFps == 60)
 
 	case g.gba != nil:
-		g.gba.InputHandler(keys, buttons)
+		g.gba.InputHandler(justKeys, keys, justButtons, buttons)
 		g.gba.Update(int64(ebiten.TPS()))
 
 	case g.gb != nil:

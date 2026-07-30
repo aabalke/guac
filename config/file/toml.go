@@ -79,6 +79,7 @@ type GbBios struct {
 
 type Gba struct {
 	IdleOptimize    bool               `toml:"idle_optimize"`
+	Rotation        int                `toml:"rotation"`
 	SpecialHardware GbaSpecialHardware `toml:"hardware"`
 	Bios            GbaBios            `toml:"bios"`
 	Keyboard        EmulatorInput      `toml:"keyboard"`

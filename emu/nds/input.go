@@ -11,7 +11,7 @@ import (
 
 var _ = fmt.Sprint
 
-func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, buttons []ebiten.StandardGamepadButton, mouse *input.Mouse, frame uint64) {
+func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, justButtons, buttons []ebiten.StandardGamepadButton, mouse *input.Mouse, frame uint64) {
 	var (
 		keyCfg    = config.Conf.Nds.KeyboardConfig
 		buttonCfg = config.Conf.Nds.ControllerConfig
@@ -51,6 +51,8 @@ func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, buttons []ebiten.Stand
 			*k2 &^= 1 << 0
 		case slices.Contains(keyCfg.Y, key):
 			*k2 &^= 1 << 1
+		case slices.Contains(keyCfg.Hinge, key):
+			*k2 &^= 1 << 7
 		}
 	}
 
@@ -93,6 +95,21 @@ func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, buttons []ebiten.Stand
 			*k2 &^= 1 << 0
 		case slices.Contains(buttonCfg.Y, button):
 			*k2 &^= 1 << 1
+		case slices.Contains(buttonCfg.Hinge, button):
+			*k2 &^= 1 << 7
+		}
+	}
+
+	for _, button := range justButtons {
+		switch {
+		case slices.Contains(buttonCfg.LayoutToggle, button):
+			nds.Screen.inputHandler(SCREEN_LAYOUT)
+		case slices.Contains(buttonCfg.SizingToggle, button):
+			nds.Screen.inputHandler(SCREEN_SIZING)
+		case slices.Contains(buttonCfg.RotationToggle, button):
+			nds.Screen.inputHandler(SCREEN_ROTATION)
+		case slices.Contains(buttonCfg.ExportScene, button):
+			nds.ppu.Rasterizer.Export.Export()
 		}
 	}
 

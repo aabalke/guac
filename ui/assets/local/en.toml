@@ -161,6 +161,8 @@ save = "save"
 
 general = "general"
 optimize_idle_loops = "optimize idle loops"
+rotation = "rotation"
+rotations = ["0", "90", "180", "270"]
 
 special_hardware = "hardware"
 force_rtc = "force rtc"
@@ -189,6 +191,7 @@ solar_1 = "solar 25%"
 solar_2 = "solar 50%"
 solar_3 = "solar 75%"
 solar_maximum = "solar maximum"
+rotation_toggle = "rotation toggle"
 
 keyboard_a      = "gba keyboard a"
 keyboard_b      = "gba keyboard b"
@@ -205,6 +208,7 @@ keyboard_solar_1 = "gba keyboard solar 25%"
 keyboard_solar_2 = "gba keyboard solar 50%"
 keyboard_solar_3 = "gba keyboard solar 75%"
 keyboard_solar_maximum = "gba keyboard solar maximum"
+keyboard_rotation_toggle = "gba keyboard rotation toggle"
 
 controller_a      = "gba controller a"
 controller_b      = "gba controller b"
@@ -221,6 +225,7 @@ controller_solar_1 = "gba controller solar 25%"
 controller_solar_2 = "gba controller solar 50%"
 controller_solar_3 = "gba controller solar 75%"
 controller_solar_maximum = "gba controller solar maximum"
+conttoller_rotation_toggle = "gba controller rotation toggle"
 
 save = "save"
 
@@ -287,7 +292,6 @@ keyboard_r      = "nds keyboard r"
 keyboard_x      = "nds keyboard x"
 keyboard_y      = "nds keyboard y"
 keyboard_hinge           = "nds keyboard hinge"
-keyboard_debug           = "nds keyboard debug"
 keyboard_layout_toggle   = "nds keyboard layout toggle"
 keyboard_sizing_toggle   = "nds keyboard sizing toggle"
 keyboard_rotation_toggle = "nds keyboard rotation toggle"
@@ -305,6 +309,12 @@ controller_l      = "nds controller l"
 controller_r      = "nds controller r"
 controller_x      = "nds controller x"
 controller_y      = "nds controller y"
+
+controller_hinge           = "nds controller hinge"
+controller_layout_toggle   = "nds controller layout toggle"
+controller_sizing_toggle   = "nds controller sizing toggle"
+controller_rotation_toggle = "nds controller rotation toggle"
+controller_export_toggle   = "nds controller export toggle"
 
 save = "save"
 

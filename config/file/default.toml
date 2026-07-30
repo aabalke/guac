@@ -95,6 +95,8 @@ down   = ["LeftBottom"]
 # replaces these cpu instructions with a halt, leading to a performance increase
 idle_optimize = true
 
+rotation = 0
+
 [gba.hardware]
 
 force_rtc = false
@@ -128,6 +130,9 @@ solar_25  = ["Numpad1"]
 solar_50  = ["Numpad2"]
 solar_75  = ["Numpad3"]
 solar_max = ["Numpad4"]
+
+# these will increment through selected screen options.
+rotation_toggle = ["F3"]
 
 [gba.controller]
 a      = ["RightRight"]

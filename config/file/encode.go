@@ -188,6 +188,17 @@ func (c *Config) encodeGba() {
 	if c.Gba.Bios.Path == "" {
 		c.Gba.Bios.Direct = true
 	}
+
+	switch c.config.Gba.Rotation {
+	case 1:
+		c.Gba.Rotation = 90
+	case 2:
+		c.Gba.Rotation = 180
+	case 3:
+		c.Gba.Rotation = 270
+	default:
+		c.Gba.Rotation = 0
+	}
 }
 
 func (c *Config) encodeNds() {
