@@ -137,6 +137,7 @@ type Profile struct {
 }
 
 type Gb struct {
+	System           int
 	Palette          [4]color.Color
 	Bios             GbBios
 	KeyboardConfig   EmulatorKeyboard

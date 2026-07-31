@@ -158,12 +158,7 @@ func (gb *GameBoy) renderSpritesDMG(scanline int32) {
 
 			drawPixel := (priority && !gb.bgPriority[scanline][pixel]) || !gb.pixelDrawn[pixel]
 			if drawPixel {
-
-				pal := UNPACKED_OBJ0
-				if (attributes>>4)&1 != 0 {
-					pal = UNPACKED_OBJ1
-				}
-
+				pal := (attributes>>4)&1 + 1
 				gb.Screen[scanline][pixel] = gb.UnpackedMonoPals[pal][colorNum]
 
 			}

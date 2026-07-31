@@ -109,7 +109,9 @@ alphabet = [
 ]
 
 [settings.gb]
-
+general = "general"
+system        = "system"
+systems       = ["automátic", "dmg", "gbc"]
 dmg_palette   = "paleta DMG"
 lightest      = "más claro"
 light         = "claro"

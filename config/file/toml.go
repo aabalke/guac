@@ -65,6 +65,7 @@ type Profile struct {
 }
 
 type Gb struct {
+	System     string        `toml:"system"`
 	Bios       GbBios        `toml:"bios"`
 	Palette    []string      `toml:"dmg_palette"`
 	Keyboard   EmulatorInput `toml:"keyboard"`

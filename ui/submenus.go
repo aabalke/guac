@@ -250,7 +250,26 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 		}
 	)
 
+	parent.RemoveChildren()
+
 	fields := []Field{
+		{WIDGET_HDR, l.General, "", nil, nil},
+		{WIDGET_RAD, l.System, "", &tmp.System, l.Systems},
+	}
+
+	buildSubMenu(g, parent, fields)
+
+	parent.AddChild(
+		NewHeader(l.DmgPalette, g.ui.res), NewSeparator(),
+		NewLabel(l.Lightest), clrInputs[0],
+		NewLabel(l.Light), clrInputs[1],
+		NewLabel(l.Dark), clrInputs[2],
+		NewLabel(l.Darkest), clrInputs[3],
+		NewLabel(l.ApplyPalette),
+		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, dmg_palettes, clrInputs, g.ui.res),
+	)
+
+	fields = []Field{
 		{WIDGET_HDR, l.Bios, "", nil, nil},
 		{WIDGET_FLE, l.DmgPath, "", &tmp.Bios.DmgPath, nil},
 		{WIDGET_FLE, l.GbcPath, "", &tmp.Bios.GbcPath, nil},
@@ -278,18 +297,6 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 		{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, ControllerValidation()},
 		{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, ControllerValidation()},
 	}
-
-	parent.RemoveChildren()
-
-	parent.AddChild(
-		NewHeader(l.DmgPalette, g.ui.res), NewSeparator(),
-		NewLabel(l.Lightest), clrInputs[0],
-		NewLabel(l.Light), clrInputs[1],
-		NewLabel(l.Dark), clrInputs[2],
-		NewLabel(l.Darkest), clrInputs[3],
-		NewLabel(l.ApplyPalette),
-		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, dmg_palettes, clrInputs, g.ui.res),
-	)
 
 	buildSubMenu(g, parent, fields)
 

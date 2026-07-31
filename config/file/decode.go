@@ -199,6 +199,15 @@ func (c *Config) decodeGb() {
 		c.config.Gb.Palette[2] = pals[2]
 		c.config.Gb.Palette[3] = pals[3]
 	}
+
+	switch strings.ToLower(c.Gb.System) {
+	case "dmg", "gb":
+		c.config.Gb.System = 1
+	case "gbc":
+		c.config.Gb.System = 2
+	default:
+		c.config.Gb.System = 0
+	}
 }
 
 func (c *Config) decodeGba() {

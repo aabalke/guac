@@ -58,6 +58,10 @@ start_tick = 0
 end_tick = 1000
 
 [gb]
+
+# valid values are ["auto", "dmg", "gbc"] - used to force behavior of specific console
+system = "auto"
+
 # Define a 4 color palette to replace greyscale using hex values [lightest...darkest]
 # if invalid input, will fall back to greyscale
 dmg_palette = [ "0xE0F8D0", "0x88C070", "0x346856", "0x081820" ]

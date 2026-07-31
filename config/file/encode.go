@@ -168,6 +168,15 @@ func (c *Config) encodeGb() {
 		"0x" + utils.ColorToHex(c.config.Gb.Palette[2]),
 		"0x" + utils.ColorToHex(c.config.Gb.Palette[3]),
 	}
+
+	switch c.config.Gb.System {
+	case 1:
+		c.Gb.System = "dmg"
+	case 2:
+		c.Gb.System = "gbc"
+	default:
+		c.Gb.System = "auto"
+	}
 }
 
 func (c *Config) encodeGba() {

@@ -418,13 +418,27 @@ func (gb *GameBoy) ReadIO(addr uint16) uint8 {
 		return gb.MemoryBus.Hdma.Read()
 
 	case 0xFF68:
-		return gb.bgPalette.Idx
+
+		v := gb.bgPalette.Idx | 0x40
+
+		if gb.bgPalette.Inc {
+			v |= 0x80
+		}
+
+		return v
 
 	case 0xFF69:
 		return gb.bgPalette.Palette[gb.bgPalette.Idx]
 
 	case 0xFF6A:
-		return gb.spPalette.Idx
+
+		v := gb.spPalette.Idx | 0x40
+
+		if gb.spPalette.Inc {
+			v |= 0x80
+		}
+
+		return v
 
 	case 0xFF6B:
 		return gb.spPalette.Palette[gb.spPalette.Idx]
@@ -546,6 +560,14 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		gb.UnpackedMonoPals[0][1] = utils.ColorToUint32(gb.Palette[(v>>2)&3])
 		gb.UnpackedMonoPals[0][2] = utils.ColorToUint32(gb.Palette[(v>>4)&3])
 		gb.UnpackedMonoPals[0][3] = utils.ColorToUint32(gb.Palette[(v>>6)&3])
+
+		if gb.Color {
+			gb.DMGCompPals[0][0] = (v >> 0) & 3
+			gb.DMGCompPals[0][1] = (v >> 2) & 3
+			gb.DMGCompPals[0][2] = (v >> 4) & 3
+			gb.DMGCompPals[0][3] = (v >> 6) & 3
+		}
+
 		io[uint8(addr)] = v
 
 	case 0xFF48: // objpalette mono
@@ -554,6 +576,11 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		gb.UnpackedMonoPals[1][1] = utils.ColorToUint32(gb.Palette[(v>>2)&3])
 		gb.UnpackedMonoPals[1][2] = utils.ColorToUint32(gb.Palette[(v>>4)&3])
 		gb.UnpackedMonoPals[1][3] = utils.ColorToUint32(gb.Palette[(v>>6)&3])
+		if gb.Color {
+			gb.DMGCompPals[1][1] = (v >> 2) & 3
+			gb.DMGCompPals[1][2] = (v >> 4) & 3
+			gb.DMGCompPals[1][3] = (v >> 6) & 3
+		}
 		io[uint8(addr)] = v
 
 	case 0xFF49: // objpalette mono
@@ -562,7 +589,18 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		gb.UnpackedMonoPals[2][1] = utils.ColorToUint32(gb.Palette[(v>>2)&3])
 		gb.UnpackedMonoPals[2][2] = utils.ColorToUint32(gb.Palette[(v>>4)&3])
 		gb.UnpackedMonoPals[2][3] = utils.ColorToUint32(gb.Palette[(v>>6)&3])
+		if gb.Color {
+			gb.DMGCompPals[2][1] = (v >> 2) & 3
+			gb.DMGCompPals[2][2] = (v >> 4) & 3
+			gb.DMGCompPals[2][3] = (v >> 6) & 3
+		}
 		io[uint8(addr)] = v
+
+	case 0xFF4C:
+
+		if gb.Color {
+			gb.DMGCompatibilityMode = v&0x4 != 0
+		}
 
 	case 0xFF4D:
 		if gb.Color {
@@ -574,7 +612,7 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		// if gb.Color && !gb.MemoryBus.Hdma.Enabled {
 		// not sure when memory hdma enabled?
 		if gb.Color {
-			gb.MemoryBus.VRAMBank = v & 0x1
+			gb.MemoryBus.VRAMBank = v & 1
 			return
 		}
 
@@ -611,35 +649,29 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 			gb.MemoryBus.Hdma.Write(v)
 		}
 
-	case 0xFF68:
+	case 0xFF68, 0xFF6A:
 		if gb.Color {
-			gb.bgPalette.Idx = v & 0b111111
-			gb.bgPalette.Inc = (v>>7)&1 != 0
-		}
-
-	case 0xFF69:
-		if gb.Color {
-			gb.bgPalette.Palette[gb.bgPalette.Idx] = v
-			gb.bgPalette.update(gb.bgPalette.Idx)
-
-			if gb.bgPalette.Inc {
-				gb.bgPalette.Idx = (gb.bgPalette.Idx + 1) & 0b111111
+			pal := &gb.bgPalette
+			if addr == 0xFF6A {
+				pal = &gb.spPalette
 			}
+
+			pal.Idx = v & 0x3F
+			pal.Inc = v&0x80 != 0
 		}
 
-	case 0xFF6A:
+	case 0xFF69, 0xFF6B:
 		if gb.Color {
-			gb.spPalette.Idx = v & 0b111111
-			gb.spPalette.Inc = (v>>7)&1 != 0
-		}
+			pal := &gb.bgPalette
+			if addr == 0xFF6B {
+				pal = &gb.spPalette
+			}
 
-	case 0xFF6B:
-		if gb.Color {
-			gb.spPalette.Palette[gb.spPalette.Idx] = v
-			gb.spPalette.update(gb.spPalette.Idx)
+			pal.Palette[pal.Idx] = v
+			pal.update(pal.Idx)
 
-			if gb.spPalette.Inc {
-				gb.spPalette.Idx = (gb.spPalette.Idx + 1) & 0b111111
+			if pal.Inc {
+				pal.Idx = (pal.Idx + 1) & 0x3F
 			}
 		}
 
@@ -654,7 +686,6 @@ func (gb *GameBoy) WriteIO(addr uint16, v uint8) {
 		}
 
 	default:
-
 		io[uint8(addr)] = v
 	}
 }

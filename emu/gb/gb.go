@@ -34,6 +34,10 @@ const (
 	CYCLES_FRAME_SEQ    = 8192
 
 	FPS = 60
+
+	AUTO = 0
+	DMG  = 1
+	GBC  = 2
 )
 
 type GameBoy struct {
@@ -42,11 +46,11 @@ type GameBoy struct {
 
 	DrawOptions ebiten.DrawImageOptions
 
-	Color     bool
 	bgPalette ColorPalette
 	spPalette ColorPalette
 
 	UnpackedMonoPals [3][4]uint32
+	DMGCompPals      [3][4]uint8
 
 	Scheduler *scheduler.Scheduler
 
@@ -76,6 +80,9 @@ type GameBoy struct {
 
 	Paused bool
 	Muted  bool
+
+	Color                bool
+	DMGCompatibilityMode bool
 
 	Apu *apu.Apu
 
@@ -121,7 +128,14 @@ func NewGameBoy(ctx *audio.Context, path string) *GameBoy {
 	gb.bgPalette.Init()
 	gb.spPalette.Init()
 
-	gb.Color = gb.Cartridge.ColorMode
+	switch config.Conf.Gb.System {
+	case DMG:
+		gb.Color = false
+	case GBC:
+		gb.Color = true
+	default:
+		gb.Color = gb.Cartridge.ColorMode
+	}
 
 	gb.MemoryBus.WRAMBank = 1
 	gb.MemoryBus.Hdma.Dst = 0xFFFF
@@ -185,6 +199,13 @@ func (gb *GameBoy) DirectBoot() {
 
 	if gb.Color {
 		gb.Cpu.a = 0x11
+
+		if !gb.Cartridge.ColorMode {
+			gb.DMGCompatibilityMode = true
+			gb.Write(0xFF6C, 1)
+			gb.setCompPalette()
+		}
+
 	}
 
 	// memory

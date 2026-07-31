@@ -3,7 +3,6 @@
 package gb
 
 func (gb *GameBoy) renderTilesGBC(scanline uint8) {
-
 	var (
 		scrollY   = gb.MemoryBus.IO[0x42]
 		scrollX   = gb.MemoryBus.IO[0x43]
@@ -61,7 +60,7 @@ func (gb *GameBoy) renderTilesGBC(scanline uint8) {
 		}
 
 		tileAttr := gb.MemoryBus.VRAM[1][tileAddr]
-		priority := (tileAttr>>7)&1 != 0
+		priority := tileAttr&0x80 != 0
 
 		var line byte
 		if vFlip := (tileAttr>>6)&1 != 0; vFlip {
@@ -72,7 +71,6 @@ func (gb *GameBoy) renderTilesGBC(scanline uint8) {
 
 		addr := tileLocation + uint16(line<<1)
 
-		cgbPalBase := (tileAttr & 7) << 2
 		data1 := gb.MemoryBus.VRAM[(tileAttr>>3)&1][addr+0]
 		data2 := gb.MemoryBus.VRAM[(tileAttr>>3)&1][addr+1]
 
@@ -83,14 +81,21 @@ func (gb *GameBoy) renderTilesGBC(scanline uint8) {
 			colorBit = 7 - (xPos & 7)
 		}
 
-		//colorNum := getVal(data2, uint8(colorBit))
-		//colorNum <<= 1
-		//colorNum |= getVal(data1, uint8(colorBit))
 		colorNum := getColorVal(data2, data1, colorBit, colorBit)
+
 		gb.pixelDrawn[pixel] = colorNum != 0
 
 		if draw := !gb.bgPriority[scanline][pixel]; draw {
-			color := gb.bgPalette.Unpacked[cgbPalBase+colorNum]
+
+			var color uint32
+
+			if gb.DMGCompatibilityMode {
+				color = gb.bgPalette.Unpacked[gb.DMGCompPals[0][colorNum]]
+			} else {
+				cgbPalBase := (tileAttr & 7) << 2
+				color = gb.bgPalette.Unpacked[cgbPalBase+colorNum]
+			}
+
 			gb.Screen[scanline][pixel] = color
 		}
 
@@ -103,14 +108,13 @@ func (gb *GameBoy) renderTilesGBC(scanline uint8) {
 }
 
 func (gb *GameBoy) renderSpritesGBC(scanline int32) {
-
 	var ySize int32 = 8
 	if gb.Lcdc.DoubleHeight {
 		ySize = 16
 	}
 
 	gb.spMinx = [width]int32{}
-	var lineSprites = 0
+	lineSprites := 0
 	for sprite := range uint16(40) {
 		index := sprite * 4
 
@@ -171,6 +175,8 @@ func (gb *GameBoy) renderSpritesGBC(scanline int32) {
 			//colorNum |= getVal(data1, uint8(colorBit))
 			colorNum := getColorVal(data2, data1, colorBit, colorBit)
 
+			//colorNum := ((data2>>colorBit)&1)<<1 | ((data1 >> colorBit) & 1)
+			//colorNum := ((data1>>colorBit)&1)<<1 | ((data2 >> colorBit) & 1)
 			if transparent := colorNum == 0; transparent {
 				continue
 			}
@@ -179,8 +185,17 @@ func (gb *GameBoy) renderSpritesGBC(scanline int32) {
 
 			if drawPixel || !gb.Lcdc.BgMaster {
 
-				cgbPalette := attributes & 0x7
-				color := gb.spPalette.Unpacked[(cgbPalette<<2)+(colorNum)]
+				var color uint32
+
+				if gb.DMGCompatibilityMode {
+					// dmg pals bg, obj0, obj1
+					pal := (attributes>>4)&1 + 1
+					color = gb.spPalette.Unpacked[gb.DMGCompPals[pal][colorNum]]
+				} else {
+					cgbPalette := attributes & 0x7
+					color = gb.spPalette.Unpacked[(cgbPalette<<2)+colorNum]
+				}
+
 				gb.Screen[scanline][pixel] = color
 
 			}
