@@ -64,7 +64,7 @@ func buildSubMenu(g *Game, parent *widget.Container, fields []Field) {
 				NewCheckbox(field.ptr.(*bool)))
 		case WIDGET_KEY:
 			parent.AddChild(NewLabel(field.label),
-				NewKeybindInput(g.ui, field.sublabel, field.ptr, field.other.(func(string) (bool, *string))))
+				NewKeybindInput(g.ui, field.sublabel, field.ptr))
 		case WIDGET_DEC:
 			parent.AddChild(NewLabel(field.label),
 				NewDecimalInput(g.ui, field.sublabel, field.ptr, field.other.(int)))

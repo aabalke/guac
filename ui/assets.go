@@ -43,6 +43,11 @@ var buttonInset = widget.Insets{
 	Bottom: 4,
 }
 
+var paddingSidesInset = widget.Insets{
+	Left:  8,
+	Right: 8,
+}
+
 var radioInset = widget.Insets{
 	Left:   16,
 	Right:  16,
@@ -78,6 +83,15 @@ type Resources struct {
 	localization *Localization
 
 	ui *ebitenui.UI
+}
+
+var transparentButtonImage = widget.ButtonImage{
+	Idle:            transparentNine,
+	Hover:           transparentNine,
+	Pressed:         transparentNine,
+	PressedHover:    transparentNine,
+	Disabled:        transparentNine,
+	PressedDisabled: transparentNine,
 }
 
 func NewUIResources() (*Resources, error) {

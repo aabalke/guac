@@ -2,11 +2,14 @@ package ui
 
 import (
 	"image/color"
+	"strconv"
+	"time"
 
 	"github.com/aabalke/guac/utils"
 	"github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/utilities/mobile"
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 const (
@@ -102,8 +105,104 @@ func NewTextBoxInput(ui *Ui, board int, label string, value any, validation func
 	return input
 }
 
-func NewKeybindInput(ui *Ui, label string, value any, validation func(string) (bool, *string)) *widget.TextInput {
-	return NewTextBoxInput(ui, BOARD_KEYBIND, label, value, validation)
+func NewKeybindInput(ui *Ui, label string, value any) widget.PreferredSizeLocateableWidget {
+	buttonContainerMin := widget.WidgetOpts.MinSize(64, 1)
+
+	buttonText := func(label string) widget.ButtonOpt {
+		return widget.ButtonOpts.Text(
+			label,
+			ui.res.fonts.smallFace,
+			&widget.ButtonTextColor{
+				Idle: *ui.res.fgClr,
+			},
+		)
+	}
+
+	container := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewGridLayout(
+			widget.GridLayoutOpts.Columns(3),
+			widget.GridLayoutOpts.Stretch([]bool{true, false, false}, []bool{true}),
+			widget.GridLayoutOpts.Spacing(4, 0),
+		)),
+	)
+
+	buttonContainer := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewGridLayout(
+			widget.GridLayoutOpts.Columns(2),
+			widget.GridLayoutOpts.Stretch([]bool{false, false}, []bool{true}),
+			widget.GridLayoutOpts.Spacing(4, 0),
+		)),
+
+		widget.ContainerOpts.WidgetOpts(buttonContainerMin),
+	)
+
+	count := 5
+
+	input := NewBindingInput(
+		BindingInputOpts.Placeholder("Click to add binding"),
+
+		BindingInputOpts.ChangedHandler(func(args *BindingInputChangedEventArgs) {
+			if args.TextInput.takingInputs {
+				v := value.(*[]ebiten.Key)
+				*v = utils.AppendKeyUnique(*v, args.Keys)
+				args.TextInput.SetText(toString(v))
+				args.TextInput.takingInputs = false
+				count = 0
+			}
+		}),
+	)
+
+	input.SetText(toString(value))
+
+	clock := widget.NewButton(
+		buttonText(strconv.Itoa(count)),
+		widget.ButtonOpts.WidgetOpts(buttonContainerMin),
+		widget.ButtonOpts.Image(&transparentButtonImage),
+		widget.ButtonOpts.TextPadding(&paddingSidesInset),
+	)
+
+	clockCountDown := func() {
+		for range time.Tick(time.Second) {
+			if count <= 0 {
+				container.RemoveChildren()
+				container.AddChild(input, buttonContainer)
+				input.takingInputs = false
+				count = 5
+				clock.SetText(strconv.Itoa(count))
+				break
+			}
+
+			count--
+			clock.SetText(strconv.Itoa(count))
+
+		}
+	}
+
+	buttonContainer.AddChild(widget.NewButton(
+		buttonText("+"),
+		widget.ButtonOpts.TextPadding(&paddingSidesInset),
+		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+			input.takingInputs = true
+			ui.ui.SetFocusedWidget(input)
+			container.RemoveChildren()
+			container.AddChild(input, clock)
+			go clockCountDown()
+		}),
+	))
+
+	buttonContainer.AddChild(widget.NewButton(
+		buttonText("x"),
+		widget.ButtonOpts.TextPadding(&paddingSidesInset),
+		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+			input.SetText("")
+			*value.(*[]ebiten.Key) = []ebiten.Key{}
+			input.takingInputs = false
+		}),
+	))
+
+	container.AddChild(input, buttonContainer)
+
+	return container
 }
 
 func NewDecimalInput(ui *Ui, label string, value any, maxValue int) *widget.TextInput {
