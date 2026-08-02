@@ -104,51 +104,31 @@ type AboutLocalization struct {
 }
 
 type GeneralLocalization struct {
-	General              string `toml:"general"`
-	Muted                string `toml:"muted"`
-	ShowFps              string `toml:"show_fps"`
-	InitFullscreen       string `toml:"init_fullscreen"`
-	TargetFps            string `toml:"target_fps"`
-	VsyncEnabled         string `toml:"vsync_enabled"`
-	DisableSaves         string `toml:"disable_saves"`
-	IntegerScalingDesc   string `toml:"integer_scaling_desc"`
-	IntegerScaling       string `toml:"integer_scaling"`
-	IntegerScalingRatio  string `toml:"integer_scaling_ratio"`
-	SampleRateDesc       string `toml:"sample_rate_desc"`
-	SampleRate           string `toml:"sample_rate"`
-	Keyboard             string `toml:"keyboard"`
-	Controller           string `toml:"controller"`
-	Select               string `toml:"select"`
-	Return               string `toml:"return"`
-	Mute                 string `toml:"mute"`
-	Pause                string `toml:"pause"`
-	Left                 string `toml:"left"`
-	Right                string `toml:"right"`
-	Up                   string `toml:"up"`
-	Down                 string `toml:"down"`
-	Fullscreen           string `toml:"fullscreen"`
-	Quit                 string `toml:"quit"`
-	KeyboardSelect       string `toml:"keyboard_select"`
-	KeyboardReturn       string `toml:"keyboard_return"`
-	KeyboardMute         string `toml:"keyboard_mute"`
-	KeyboardPause        string `toml:"keyboard_pause"`
-	KeyboardLeft         string `toml:"keyboard_left"`
-	KeyboardRight        string `toml:"keyboard_right"`
-	KeyboardUp           string `toml:"keyboard_up"`
-	KeyboardDown         string `toml:"keyboard_down"`
-	KeyboardFullscreen   string `toml:"keyboard_fullscreen"`
-	KeyboardQuit         string `toml:"keyboard_quit"`
-	ControllerSelect     string `toml:"controller_select"`
-	ControllerReturn     string `toml:"controller_return"`
-	ControllerMute       string `toml:"controller_mute"`
-	ControllerPause      string `toml:"controller_pause"`
-	ControllerLeft       string `toml:"controller_left"`
-	ControllerRight      string `toml:"controller_right"`
-	ControllerUp         string `toml:"controller_up"`
-	ControllerDown       string `toml:"controller_down"`
-	ControllerFullscreen string `toml:"controller_fullscreen"`
-	ControllerQuit       string `toml:"controller_quit"`
-	Save                 string `toml:"save"`
+	General             string `toml:"general"`
+	Muted               string `toml:"muted"`
+	ShowFps             string `toml:"show_fps"`
+	InitFullscreen      string `toml:"init_fullscreen"`
+	TargetFps           string `toml:"target_fps"`
+	VsyncEnabled        string `toml:"vsync_enabled"`
+	DisableSaves        string `toml:"disable_saves"`
+	IntegerScalingDesc  string `toml:"integer_scaling_desc"`
+	IntegerScaling      string `toml:"integer_scaling"`
+	IntegerScalingRatio string `toml:"integer_scaling_ratio"`
+	SampleRateDesc      string `toml:"sample_rate_desc"`
+	SampleRate          string `toml:"sample_rate"`
+	Keyboard            string `toml:"keyboard"`
+	Controller          string `toml:"controller"`
+	Select              string `toml:"select"`
+	Return              string `toml:"return"`
+	Mute                string `toml:"mute"`
+	Pause               string `toml:"pause"`
+	Left                string `toml:"left"`
+	Right               string `toml:"right"`
+	Up                  string `toml:"up"`
+	Down                string `toml:"down"`
+	Fullscreen          string `toml:"fullscreen"`
+	Quit                string `toml:"quit"`
+	Save                string `toml:"save"`
 }
 
 type UiLocalization struct {
@@ -172,50 +152,34 @@ type UiLocalization struct {
 }
 
 type GbLocalization struct {
-	General          string   `toml:"general"`
-	System           string   `toml:"system"`
-	Systems          []string `toml:"systems"`
-	DmgPalette       string   `toml:"dmg_palette"`
-	Lightest         string   `toml:"lightest"`
-	Light            string   `toml:"light"`
-	Dark             string   `toml:"dark"`
-	Darkest          string   `toml:"darkest"`
-	DmgLightest      string   `toml:"dmg_lightest"`
-	DmgLight         string   `toml:"dmg_light"`
-	DmgDark          string   `toml:"dmg_dark"`
-	DmgDarkest       string   `toml:"dmg_darkest"`
-	ApplyPalette     string   `toml:"apply_palette"`
-	Bios             string   `toml:"bios"`
-	DmgPath          string   `toml:"dmg_bios_path"`
-	GbcPath          string   `toml:"gbc_bios_path"`
-	DirectBoot       string   `toml:"direct_boot"`
-	Keyboard         string   `toml:"keyboard"`
-	Controller       string   `toml:"controller"`
-	A                string   `toml:"a"`
-	B                string   `toml:"b"`
-	Select           string   `toml:"select"`
-	Start            string   `toml:"start"`
-	Left             string   `toml:"left"`
-	Right            string   `toml:"right"`
-	Up               string   `toml:"up"`
-	Down             string   `toml:"down"`
-	KeyboardA        string   `toml:"keyboard_a"`
-	KeyboardB        string   `toml:"keyboard_b"`
-	KeyboardSelect   string   `toml:"keyboard_select"`
-	KeyboardStart    string   `toml:"keyboard_start"`
-	KeyboardLeft     string   `toml:"keyboard_left"`
-	KeyboardRight    string   `toml:"keyboard_right"`
-	KeyboardUp       string   `toml:"keyboard_up"`
-	KeyboardDown     string   `toml:"keyboard_down"`
-	ControllerA      string   `toml:"controller_a"`
-	ControllerB      string   `toml:"controller_b"`
-	ControllerSelect string   `toml:"controller_select"`
-	ControllerStart  string   `toml:"controller_start"`
-	ControllerLeft   string   `toml:"controller_left"`
-	ControllerRight  string   `toml:"controller_right"`
-	ControllerUp     string   `toml:"controller_up"`
-	ControllerDown   string   `toml:"controller_down"`
-	Save             string   `toml:"save"`
+	General      string   `toml:"general"`
+	System       string   `toml:"system"`
+	Systems      []string `toml:"systems"`
+	DmgPalette   string   `toml:"dmg_palette"`
+	Lightest     string   `toml:"lightest"`
+	Light        string   `toml:"light"`
+	Dark         string   `toml:"dark"`
+	Darkest      string   `toml:"darkest"`
+	DmgLightest  string   `toml:"dmg_lightest"`
+	DmgLight     string   `toml:"dmg_light"`
+	DmgDark      string   `toml:"dmg_dark"`
+	DmgDarkest   string   `toml:"dmg_darkest"`
+	ApplyPalette string   `toml:"apply_palette"`
+	Bios         string   `toml:"bios"`
+	DmgPath      string   `toml:"dmg_bios_path"`
+	GbcPath      string   `toml:"gbc_bios_path"`
+	DirectBoot   string   `toml:"direct_boot"`
+	Keyboard     string   `toml:"keyboard"`
+	Controller   string   `toml:"controller"`
+	A            string   `toml:"a"`
+	B            string   `toml:"b"`
+	Select       string   `toml:"select"`
+	Start        string   `toml:"start"`
+	Left         string   `toml:"left"`
+	Right        string   `toml:"right"`
+	Up           string   `toml:"up"`
+	Down         string   `toml:"down"`
+	Save         string   `toml:"save"`
 }
 
 type GbaLocalization struct {
@@ -253,40 +217,6 @@ type GbaLocalization struct {
 	Solar3         string `toml:"solar_3"`
 	SolarMax       string `toml:"solar_maximum"`
 	RotationToggle string `toml:"rotation_toggle"`
-
-	KeyboardA              string `toml:"keyboard_a"`
-	KeyboardB              string `toml:"keyboard_b"`
-	KeyboardSelect         string `toml:"keyboard_select"`
-	KeyboardStart          string `toml:"keyboard_start"`
-	KeyboardLeft           string `toml:"keyboard_left"`
-	KeyboardRight          string `toml:"keyboard_right"`
-	KeyboardUp             string `toml:"keyboard_up"`
-	KeyboardDown           string `toml:"keyboard_down"`
-	KeyboardL              string `toml:"keyboard_l"`
-	KeyboardR              string `toml:"keyboard_r"`
-	KeyboardSolarMin       string `toml:"keyboard_solar_minimum"`
-	KeyboardSolar1         string `toml:"keyboard_solar_1"`
-	KeyboardSolar2         string `toml:"keyboard_solar_2"`
-	KeyboardSolar3         string `toml:"keyboard_solar_3"`
-	KeyboardSolarMax       string `toml:"keyboard_solar_maximum"`
-	KeyboardRotationToggle string `toml:"keyboard_rotation_toggle"`
-
-	ControllerA              string `toml:"controller_a"`
-	ControllerB              string `toml:"controller_b"`
-	ControllerSelect         string `toml:"controller_select"`
-	ControllerStart          string `toml:"controller_start"`
-	ControllerLeft           string `toml:"controller_left"`
-	ControllerRight          string `toml:"controller_right"`
-	ControllerUp             string `toml:"controller_up"`
-	ControllerDown           string `toml:"controller_down"`
-	ControllerL              string `toml:"controller_l"`
-	ControllerR              string `toml:"controller_r"`
-	ControllerSolarMin       string `toml:"controller_solar_minimum"`
-	ControllerSolar1         string `toml:"controller_solar_1"`
-	ControllerSolar2         string `toml:"controller_solar_2"`
-	ControllerSolar3         string `toml:"controller_solar_3"`
-	ControllerSolarMax       string `toml:"controller_solar_maximum"`
-	ControllerRotationToggle string `toml:"controller_rotation_toggle"`
 
 	Save string `toml:"save"`
 }
@@ -333,42 +263,6 @@ type NdsLocalization struct {
 	SizingToggle   string `toml:"sizing_toggle"`
 	RotationToggle string `toml:"rotation_toggle"`
 	ExportToggle   string `toml:"export_toggle"`
-
-	KeyboardA              string `toml:"keyboard_a"`
-	KeyboardB              string `toml:"keyboard_b"`
-	KeyboardSelect         string `toml:"keyboard_select"`
-	KeyboardStart          string `toml:"keyboard_start"`
-	KeyboardLeft           string `toml:"keyboard_left"`
-	KeyboardRight          string `toml:"keyboard_right"`
-	KeyboardUp             string `toml:"keyboard_up"`
-	KeyboardDown           string `toml:"keyboard_down"`
-	KeyboardL              string `toml:"keyboard_l"`
-	KeyboardR              string `toml:"keyboard_r"`
-	KeyboardX              string `toml:"keyboard_x"`
-	KeyboardY              string `toml:"keyboard_y"`
-	KeyboardHinge          string `toml:"keyboard_hinge"`
-	KeyboardLayoutToggle   string `toml:"keyboard_layout_toggle"`
-	KeyboardSizingToggle   string `toml:"keyboard_sizing_toggle"`
-	KeyboardRotationToggle string `toml:"keyboard_rotation_toggle"`
-	KeyboardExportToggle   string `toml:"keyboard_export_toggle"`
-
-	ControllerA              string `toml:"controller_a"`
-	ControllerB              string `toml:"controller_b"`
-	ControllerSelect         string `toml:"controller_select"`
-	ControllerStart          string `toml:"controller_start"`
-	ControllerLeft           string `toml:"controller_left"`
-	ControllerRight          string `toml:"controller_right"`
-	ControllerUp             string `toml:"controller_up"`
-	ControllerDown           string `toml:"controller_down"`
-	ControllerL              string `toml:"controller_l"`
-	ControllerR              string `toml:"controller_r"`
-	ControllerX              string `toml:"controller_x"`
-	ControllerY              string `toml:"controller_y"`
-	ControllerHinge          string `toml:"controller_hinge"`
-	ControllerLayoutToggle   string `toml:"controller_layout_toggle"`
-	ControllerSizingToggle   string `toml:"controller_sizing_toggle"`
-	ControllerRotationToggle string `toml:"controller_rotation_toggle"`
-	ControllerExportToggle   string `toml:"controller_export_toggle"`
 
 	Save string `toml:"save"`
 }

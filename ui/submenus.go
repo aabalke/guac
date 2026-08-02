@@ -5,6 +5,7 @@ import (
 	"github.com/aabalke/guac/config/file"
 	"github.com/aabalke/guac/emu/gba/gpio"
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 const (
@@ -63,8 +64,9 @@ func buildSubMenu(g *Game, parent *widget.Container, fields []Field) {
 			parent.AddChild(NewLabel(field.label),
 				NewCheckbox(field.ptr.(*bool)))
 		case WIDGET_KEY:
-			parent.AddChild(NewLabel(field.label),
-				NewKeybindInput(g.ui, field.sublabel, field.ptr))
+			panic("widget_key")
+			//parent.AddChild(NewLabel(field.label),
+			//	NewKeybindInput(g.ui, field.sublabel, field.ptr))
 		case WIDGET_DEC:
 			parent.AddChild(NewLabel(field.label),
 				NewDecimalInput(g.ui, field.sublabel, field.ptr, field.other.(int)))
@@ -97,6 +99,10 @@ func buildSubMenu(g *Game, parent *widget.Container, fields []Field) {
 	}
 }
 
+func buildBinding(ui *Ui, parent *widget.Container, label string, src *[]ebiten.Key) {
+	parent.AddChild(NewLabel(label), NewKeybindInput(ui, src))
+}
+
 func NewAboutMenu(g *Game, parent *widget.Container) {
 	l := g.ui.res.localization.Settings.About
 
@@ -116,7 +122,7 @@ func NewGeneralMenu(g *Game, parent *widget.Container) {
 	var (
 		tmp = config.Conf.General
 		k   = &tmp.Keyboard
-		c   = &tmp.Controller
+		//c   = &tmp.Controller
 
 		l = g.ui.res.localization.Settings.General
 	)
@@ -136,34 +142,38 @@ func NewGeneralMenu(g *Game, parent *widget.Container) {
 		{WIDGET_DEC, l.SampleRate, "", &tmp.SampleRate, 192000},
 
 		{WIDGET_HDR, l.Keyboard, "", nil, nil},
-		{WIDGET_LNK, "", "", nil, keybindsLink},
-		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, KeyValidation()},
-		{WIDGET_KEY, l.Return, l.KeyboardReturn, &k.Return, KeyValidation()},
-		{WIDGET_KEY, l.Mute, l.KeyboardMute, &k.Mute, KeyValidation()},
-		{WIDGET_KEY, l.Pause, l.KeyboardPause, &k.Pause, KeyValidation()},
-		{WIDGET_KEY, l.Left, l.KeyboardLeft, &k.Left, KeyValidation()},
-		{WIDGET_KEY, l.Right, l.KeyboardRight, &k.Right, KeyValidation()},
-		{WIDGET_KEY, l.Up, l.KeyboardUp, &k.Up, KeyValidation()},
-		{WIDGET_KEY, l.Down, l.KeyboardDown, &k.Down, KeyValidation()},
-		{WIDGET_KEY, l.Fullscreen, l.KeyboardFullscreen, &k.Fullscreen, KeyValidation()},
-		{WIDGET_KEY, l.Quit, l.KeyboardQuit, &k.Quit, KeyValidation()},
-
-		{WIDGET_HDR, l.Controller, "", nil, nil},
-		{WIDGET_LNK, "", "", nil, controllerLink},
-		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, ControllerValidation()},
-		{WIDGET_KEY, l.Return, l.ControllerReturn, &c.Return, ControllerValidation()},
-		{WIDGET_KEY, l.Mute, l.ControllerMute, &c.Mute, ControllerValidation()},
-		{WIDGET_KEY, l.Pause, l.ControllerPause, &c.Pause, ControllerValidation()},
-		{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, ControllerValidation()},
-		{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, ControllerValidation()},
-		{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, ControllerValidation()},
-		{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, ControllerValidation()},
-		{WIDGET_KEY, l.Fullscreen, l.ControllerFullscreen, &c.Fullscreen, ControllerValidation()},
-		{WIDGET_KEY, l.Quit, l.ControllerQuit, &c.Quit, ControllerValidation()},
 	}
 
 	parent.RemoveChildren()
 	buildSubMenu(g, parent, fields)
+
+	buildBinding(g.ui, parent, l.Select, &k.Select)
+	buildBinding(g.ui, parent, l.Return, &k.Return)
+	buildBinding(g.ui, parent, l.Mute, &k.Mute)
+	buildBinding(g.ui, parent, l.Pause, &k.Pause)
+	buildBinding(g.ui, parent, l.Left, &k.Left)
+	buildBinding(g.ui, parent, l.Right, &k.Right)
+	buildBinding(g.ui, parent, l.Up, &k.Up)
+	buildBinding(g.ui, parent, l.Down, &k.Down)
+	buildBinding(g.ui, parent, l.Fullscreen, &k.Fullscreen)
+	buildBinding(g.ui, parent, l.Quit, &k.Quit)
+
+	//fields = []Field{
+	//	{WIDGET_HDR, l.Controller, "", nil, nil},
+	//}
+
+	//buildBinding(g.ui, parent, l.Select, &c.Select)
+	//buildBinding(g.ui, parent, l.Return, &c.Return)
+	//buildBinding(g.ui, parent, l.Mute, &c.Mute)
+	//buildBinding(g.ui, parent, l.Pause, &c.Pause)
+	//buildBinding(g.ui, parent, l.Left, &c.Left)
+	//buildBinding(g.ui, parent, l.Right, &c.Right)
+	//buildBinding(g.ui, parent, l.Up, &c.Up)
+	//buildBinding(g.ui, parent, l.Down, &c.Down)
+	//buildBinding(g.ui, parent, l.Fullscreen, &c.Fullscreen)
+	//buildBinding(g.ui, parent, l.Quit, &c.Quit)
+
+	//buildSubMenu(g, parent, fields)
 
 	parent.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.General = tmp
@@ -237,7 +247,7 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 	var (
 		tmp = config.Conf.Gb
 		k   = &tmp.KeyboardConfig
-		c   = &tmp.ControllerConfig
+		//c   = &tmp.ControllerConfig
 		pal = &tmp.Palette
 
 		l = g.ui.res.localization.Settings.Gb
@@ -276,29 +286,28 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 		{WIDGET_CBX, l.DirectBoot, "", &tmp.Bios.Direct, nil},
 
 		{WIDGET_HDR, l.Keyboard, "", nil, nil},
-		{WIDGET_LNK, "", "", nil, keybindsLink},
-		{WIDGET_KEY, l.A, l.KeyboardA, &k.A, KeyValidation()},
-		{WIDGET_KEY, l.B, l.KeyboardB, &k.B, KeyValidation()},
-		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, KeyValidation()},
-		{WIDGET_KEY, l.Start, l.KeyboardStart, &k.Start, KeyValidation()},
-		{WIDGET_KEY, l.Left, l.KeyboardLeft, &k.Left, KeyValidation()},
-		{WIDGET_KEY, l.Right, l.KeyboardRight, &k.Right, KeyValidation()},
-		{WIDGET_KEY, l.Up, l.KeyboardUp, &k.Up, KeyValidation()},
-		{WIDGET_KEY, l.Down, l.KeyboardDown, &k.Down, KeyValidation()},
-
-		{WIDGET_HDR, l.Controller, "", nil, nil},
-		{WIDGET_LNK, "", "", nil, controllerLink},
-		{WIDGET_KEY, l.A, l.ControllerA, &c.A, ControllerValidation()},
-		{WIDGET_KEY, l.B, l.ControllerB, &c.B, ControllerValidation()},
-		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, ControllerValidation()},
-		{WIDGET_KEY, l.Start, l.ControllerStart, &c.Start, ControllerValidation()},
-		{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, ControllerValidation()},
-		{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, ControllerValidation()},
-		{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, ControllerValidation()},
-		{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, ControllerValidation()},
 	}
 
 	buildSubMenu(g, parent, fields)
+
+	buildBinding(g.ui, parent, l.A, &k.A)
+	buildBinding(g.ui, parent, l.B, &k.B)
+	buildBinding(g.ui, parent, l.Select, &k.Select)
+	buildBinding(g.ui, parent, l.Start, &k.Start)
+	buildBinding(g.ui, parent, l.Left, &k.Left)
+	buildBinding(g.ui, parent, l.Right, &k.Right)
+	buildBinding(g.ui, parent, l.Up, &k.Up)
+	buildBinding(g.ui, parent, l.Down, &k.Down)
+
+	//{WIDGET_HDR, l.Controller, "", nil, nil},
+	//buildBinding(g.ui, parent, l.A, &c.A)
+	//buildBinding(g.ui, parent, l.B, &c.B)
+	//buildBinding(g.ui, parent, l.Select, &c.Select)
+	//buildBinding(g.ui, parent, l.Start, &c.Start)
+	//buildBinding(g.ui, parent, l.Left, &c.Left)
+	//buildBinding(g.ui, parent, l.Right, &c.Right)
+	//buildBinding(g.ui, parent, l.Up, &c.Up)
+	//buildBinding(g.ui, parent, l.Down, &c.Down)
 
 	parent.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Gb = tmp
@@ -320,7 +329,7 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 	var (
 		tmp = config.Conf.Gba
 		k   = &tmp.KeyboardConfig
-		c   = &tmp.ControllerConfig
+		//c   = &tmp.ControllerConfig
 
 		l = g.ui.res.localization.Settings.Gba
 	)
@@ -341,48 +350,45 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 		{WIDGET_CBX, l.DirectBoot, "", &tmp.Bios.Direct, nil},
 
 		{WIDGET_HDR, l.Keyboard, "", nil, nil},
-		{WIDGET_LNK, "", "", nil, keybindsLink},
-		{WIDGET_KEY, l.A, l.KeyboardA, &k.A, KeyValidation()},
-		{WIDGET_KEY, l.B, l.KeyboardB, &k.B, KeyValidation()},
-		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, KeyValidation()},
-		{WIDGET_KEY, l.Start, l.KeyboardStart, &k.Start, KeyValidation()},
-		{WIDGET_KEY, l.Left, l.KeyboardLeft, &k.Left, KeyValidation()},
-		{WIDGET_KEY, l.Right, l.KeyboardRight, &k.Right, KeyValidation()},
-		{WIDGET_KEY, l.Up, l.KeyboardUp, &k.Up, KeyValidation()},
-		{WIDGET_KEY, l.Down, l.KeyboardDown, &k.Down, KeyValidation()},
-		{WIDGET_KEY, l.L, l.KeyboardL, &k.L, KeyValidation()},
-		{WIDGET_KEY, l.R, l.KeyboardR, &k.R, KeyValidation()},
 
-		{WIDGET_KEY, l.SolarMin, l.KeyboardSolarMin, &k.SolarLevel0, KeyValidation()},
-		{WIDGET_KEY, l.Solar1, l.KeyboardSolar1, &k.SolarLevel1, KeyValidation()},
-		{WIDGET_KEY, l.Solar2, l.KeyboardSolar2, &k.SolarLevel2, KeyValidation()},
-		{WIDGET_KEY, l.Solar3, l.KeyboardSolar3, &k.SolarLevel3, KeyValidation()},
-		{WIDGET_KEY, l.SolarMax, l.KeyboardSolarMax, &k.SolarLevel4, KeyValidation()},
-		{WIDGET_KEY, l.RotationToggle, l.KeyboardRotationToggle, &k.RotationToggle, KeyValidation()},
-
-		{WIDGET_HDR, l.Controller, "", nil, nil},
-		{WIDGET_LNK, "", "", nil, controllerLink},
-		{WIDGET_KEY, l.A, l.ControllerA, &c.A, ControllerValidation()},
-		{WIDGET_KEY, l.B, l.ControllerB, &c.B, ControllerValidation()},
-		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, ControllerValidation()},
-		{WIDGET_KEY, l.Start, l.ControllerStart, &c.Start, ControllerValidation()},
-		{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, ControllerValidation()},
-		{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, ControllerValidation()},
-		{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, ControllerValidation()},
-		{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, ControllerValidation()},
-		{WIDGET_KEY, l.L, l.ControllerL, &c.L, ControllerValidation()},
-		{WIDGET_KEY, l.R, l.ControllerR, &c.R, ControllerValidation()},
-
-		{WIDGET_KEY, l.SolarMin, l.ControllerSolarMin, &c.SolarLevel0, ControllerValidation()},
-		{WIDGET_KEY, l.Solar1, l.ControllerSolar1, &c.SolarLevel1, ControllerValidation()},
-		{WIDGET_KEY, l.Solar2, l.ControllerSolar2, &c.SolarLevel2, ControllerValidation()},
-		{WIDGET_KEY, l.Solar3, l.ControllerSolar3, &c.SolarLevel3, ControllerValidation()},
-		{WIDGET_KEY, l.SolarMax, l.ControllerSolarMax, &c.SolarLevel4, ControllerValidation()},
-		{WIDGET_KEY, l.RotationToggle, l.ControllerRotationToggle, &c.RotationToggle, ControllerValidation()},
+		//{WIDGET_HDR, l.Controller, "", nil, nil},
+		//{WIDGET_KEY, l.A, l.ControllerA, &c.A, nil},
+		//{WIDGET_KEY, l.B, l.ControllerB, &c.B, nil},
+		//{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, nil},
+		//{WIDGET_KEY, l.Start, l.ControllerStart, &c.Start, nil},
+		//{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, nil},
+		//{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, nil},
+		//{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, nil},
+		//{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, nil},
+		//{WIDGET_KEY, l.L, l.ControllerL, &c.L, nil},
+		//{WIDGET_KEY, l.R, l.ControllerR, &c.R, nil},
+		//{WIDGET_KEY, l.SolarMin, l.ControllerSolarMin, &c.SolarLevel0, nil},
+		//{WIDGET_KEY, l.Solar1, l.ControllerSolar1, &c.SolarLevel1, nil},
+		//{WIDGET_KEY, l.Solar2, l.ControllerSolar2, &c.SolarLevel2, nil},
+		//{WIDGET_KEY, l.Solar3, l.ControllerSolar3, &c.SolarLevel3, nil},
+		//{WIDGET_KEY, l.SolarMax, l.ControllerSolarMax, &c.SolarLevel4, nil},
+		//{WIDGET_KEY, l.RotationToggle, l.ControllerRotationToggle, &c.RotationToggle, nil},
 	}
 
 	parent.RemoveChildren()
 	buildSubMenu(g, parent, fields)
+
+	buildBinding(g.ui, parent, l.A, &k.A)
+	buildBinding(g.ui, parent, l.B, &k.B)
+	buildBinding(g.ui, parent, l.Select, &k.Select)
+	buildBinding(g.ui, parent, l.Start, &k.Start)
+	buildBinding(g.ui, parent, l.Left, &k.Left)
+	buildBinding(g.ui, parent, l.Right, &k.Right)
+	buildBinding(g.ui, parent, l.Up, &k.Up)
+	buildBinding(g.ui, parent, l.Down, &k.Down)
+	buildBinding(g.ui, parent, l.L, &k.L)
+	buildBinding(g.ui, parent, l.R, &k.R)
+	buildBinding(g.ui, parent, l.SolarMin, &k.SolarLevel0)
+	buildBinding(g.ui, parent, l.Solar1, &k.SolarLevel1)
+	buildBinding(g.ui, parent, l.Solar2, &k.SolarLevel2)
+	buildBinding(g.ui, parent, l.Solar3, &k.SolarLevel3)
+	buildBinding(g.ui, parent, l.SolarMax, &k.SolarLevel4)
+	buildBinding(g.ui, parent, l.RotationToggle, &k.RotationToggle)
 
 	parent.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		if tmp.Bios.Path == "" {
@@ -420,7 +426,7 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 	var (
 		tmp = config.Conf.Nds
 		k   = &tmp.KeyboardConfig
-		c   = &tmp.ControllerConfig
+		//c   = &tmp.ControllerConfig
 
 		l = g.ui.res.localization.Settings.Nds
 
@@ -451,48 +457,47 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 		{WIDGET_CBX, l.ShadowPolygons, "", &tmp.Export.ShadowPolys, nil},
 
 		{WIDGET_HDR, l.Keyboard, "", nil, nil},
-		{WIDGET_LNK, "", "", nil, keybindsLink},
-		{WIDGET_KEY, l.A, l.KeyboardA, &k.A, KeyValidation()},
-		{WIDGET_KEY, l.B, l.KeyboardB, &k.B, KeyValidation()},
-		{WIDGET_KEY, l.Select, l.KeyboardSelect, &k.Select, KeyValidation()},
-		{WIDGET_KEY, l.Start, l.KeyboardStart, &k.Start, KeyValidation()},
-		{WIDGET_KEY, l.Left, l.KeyboardLeft, &k.Left, KeyValidation()},
-		{WIDGET_KEY, l.Right, l.KeyboardRight, &k.Right, KeyValidation()},
-		{WIDGET_KEY, l.Up, l.KeyboardUp, &k.Up, KeyValidation()},
-		{WIDGET_KEY, l.Down, l.KeyboardDown, &k.Down, KeyValidation()},
-		{WIDGET_KEY, l.L, l.KeyboardL, &k.L, KeyValidation()},
-		{WIDGET_KEY, l.R, l.KeyboardR, &k.R, KeyValidation()},
-		{WIDGET_KEY, l.X, l.KeyboardX, &k.X, KeyValidation()},
-		{WIDGET_KEY, l.Y, l.KeyboardY, &k.Y, KeyValidation()},
-		{WIDGET_KEY, l.Hinge, l.KeyboardHinge, &k.Hinge, KeyValidation()},
-		{WIDGET_KEY, l.LayoutToggle, l.KeyboardLayoutToggle, &k.LayoutToggle, KeyValidation()},
-		{WIDGET_KEY, l.SizingToggle, l.KeyboardSizingToggle, &k.SizingToggle, KeyValidation()},
-		{WIDGET_KEY, l.RotationToggle, l.KeyboardRotationToggle, &k.RotationToggle, KeyValidation()},
-		{WIDGET_KEY, l.ExportToggle, l.KeyboardExportToggle, &k.ExportScene, KeyValidation()},
 
-		{WIDGET_HDR, l.Controller, "", nil, nil},
-		{WIDGET_LNK, "", "", nil, controllerLink},
-		{WIDGET_KEY, l.A, l.ControllerA, &c.A, ControllerValidation()},
-		{WIDGET_KEY, l.B, l.ControllerB, &c.B, ControllerValidation()},
-		{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, ControllerValidation()},
-		{WIDGET_KEY, l.Start, l.ControllerStart, &c.Start, ControllerValidation()},
-		{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, ControllerValidation()},
-		{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, ControllerValidation()},
-		{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, ControllerValidation()},
-		{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, ControllerValidation()},
-		{WIDGET_KEY, l.L, l.ControllerL, &k.L, ControllerValidation()},
-		{WIDGET_KEY, l.R, l.ControllerR, &k.R, ControllerValidation()},
-		{WIDGET_KEY, l.X, l.ControllerX, &k.X, ControllerValidation()},
-		{WIDGET_KEY, l.Y, l.ControllerY, &k.Y, ControllerValidation()},
-		{WIDGET_KEY, l.Hinge, l.ControllerHinge, &k.Hinge, ControllerValidation()},
-		{WIDGET_KEY, l.LayoutToggle, l.ControllerLayoutToggle, &c.LayoutToggle, ControllerValidation()},
-		{WIDGET_KEY, l.SizingToggle, l.ControllerSizingToggle, &c.SizingToggle, ControllerValidation()},
-		{WIDGET_KEY, l.RotationToggle, l.ControllerRotationToggle, &c.RotationToggle, ControllerValidation()},
-		{WIDGET_KEY, l.ExportToggle, l.ControllerExportToggle, &c.ExportScene, ControllerValidation()},
+		//{WIDGET_HDR, l.Controller, "", nil, nil},
+		//{WIDGET_KEY, l.A, l.ControllerA, &c.A, nil},
+		//{WIDGET_KEY, l.B, l.ControllerB, &c.B, nil},
+		//{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, nil},
+		//{WIDGET_KEY, l.Start, l.ControllerStart, &c.Start, nil},
+		//{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, nil},
+		//{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, nil},
+		//{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, nil},
+		//{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, nil},
+		//{WIDGET_KEY, l.L, l.ControllerL, &k.L, nil},
+		//{WIDGET_KEY, l.R, l.ControllerR, &k.R, nil},
+		//{WIDGET_KEY, l.X, l.ControllerX, &k.X, nil},
+		//{WIDGET_KEY, l.Y, l.ControllerY, &k.Y, nil},
+		//{WIDGET_KEY, l.Hinge, l.ControllerHinge, &k.Hinge, nil},
+		//{WIDGET_KEY, l.LayoutToggle, l.ControllerLayoutToggle, &c.LayoutToggle, nil},
+		//{WIDGET_KEY, l.SizingToggle, l.ControllerSizingToggle, &c.SizingToggle, nil},
+		//{WIDGET_KEY, l.RotationToggle, l.ControllerRotationToggle, &c.RotationToggle, nil},
+		//{WIDGET_KEY, l.ExportToggle, l.ControllerExportToggle, &c.ExportScene, nil},
 	}
 
 	parent.RemoveChildren()
 	buildSubMenu(g, parent, fields)
+
+	buildBinding(g.ui, parent, l.A, &k.A)
+	buildBinding(g.ui, parent, l.B, &k.B)
+	buildBinding(g.ui, parent, l.Select, &k.Select)
+	buildBinding(g.ui, parent, l.Start, &k.Start)
+	buildBinding(g.ui, parent, l.Left, &k.Left)
+	buildBinding(g.ui, parent, l.Right, &k.Right)
+	buildBinding(g.ui, parent, l.Up, &k.Up)
+	buildBinding(g.ui, parent, l.Down, &k.Down)
+	buildBinding(g.ui, parent, l.L, &k.L)
+	buildBinding(g.ui, parent, l.R, &k.R)
+	buildBinding(g.ui, parent, l.X, &k.X)
+	buildBinding(g.ui, parent, l.Y, &k.Y)
+	buildBinding(g.ui, parent, l.Hinge, &k.Hinge)
+	buildBinding(g.ui, parent, l.LayoutToggle, &k.LayoutToggle)
+	buildBinding(g.ui, parent, l.SizingToggle, &k.SizingToggle)
+	buildBinding(g.ui, parent, l.RotationToggle, &k.RotationToggle)
+	buildBinding(g.ui, parent, l.ExportToggle, &k.ExportScene)
 
 	parent.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Nds = tmp

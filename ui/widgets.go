@@ -105,7 +105,7 @@ func NewTextBoxInput(ui *Ui, board int, label string, value any, validation func
 	return input
 }
 
-func NewKeybindInput(ui *Ui, label string, value any) widget.PreferredSizeLocateableWidget {
+func NewKeybindInput(ui *Ui, v *[]ebiten.Key) widget.PreferredSizeLocateableWidget {
 	buttonContainerMin := widget.WidgetOpts.MinSize(64, 1)
 
 	buttonText := func(label string) widget.ButtonOpt {
@@ -143,7 +143,6 @@ func NewKeybindInput(ui *Ui, label string, value any) widget.PreferredSizeLocate
 
 		BindingInputOpts.ChangedHandler(func(args *BindingInputChangedEventArgs) {
 			if args.TextInput.takingInputs {
-				v := value.(*[]ebiten.Key)
 				*v = utils.AppendKeyUnique(*v, args.Keys)
 				args.TextInput.SetText(toString(v))
 				args.TextInput.takingInputs = false
@@ -152,7 +151,7 @@ func NewKeybindInput(ui *Ui, label string, value any) widget.PreferredSizeLocate
 		}),
 	)
 
-	input.SetText(toString(value))
+	input.SetText(toString(v))
 
 	clock := widget.NewButton(
 		buttonText(strconv.Itoa(count)),
@@ -195,7 +194,7 @@ func NewKeybindInput(ui *Ui, label string, value any) widget.PreferredSizeLocate
 		widget.ButtonOpts.TextPadding(&paddingSidesInset),
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
 			input.SetText("")
-			*value.(*[]ebiten.Key) = []ebiten.Key{}
+			*v = []ebiten.Key{}
 			input.takingInputs = false
 		}),
 	))
