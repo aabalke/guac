@@ -5,7 +5,6 @@ import (
 	"github.com/aabalke/guac/config/file"
 	"github.com/aabalke/guac/emu/gba/gpio"
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/hajimehoshi/ebiten/v2"
 )
 
 const (
@@ -18,14 +17,6 @@ const (
 	MENU_RETURN
 )
 
-type Field struct {
-	widgettype int
-	label      string
-	sublabel   string
-	ptr        any
-	other      any
-}
-
 type SidebarField struct {
 	label string
 	f     func(g *Game)
@@ -35,12 +26,30 @@ func NewSidebarFields(res *Resources) []SidebarField {
 	l := res.localization.Settings.Sidebar
 
 	return []SidebarField{
-		{l.General, func(g *Game) { NewGeneralMenu(g, g.ui.content) }},
-		{l.Ui, func(g *Game) { NewUiMenu(g, g.ui.content) }},
-		{l.Gb, func(g *Game) { NewGbMenu(g, g.ui.content) }},
-		{l.Gba, func(g *Game) { NewGbaMenu(g, g.ui.content) }},
-		{l.Nds, func(g *Game) { NewNdsMenu(g, g.ui.content) }},
-		{l.About, func(g *Game) { NewAboutMenu(g, g.ui.content) }},
+		{l.General, func(g *Game) {
+			g.ui.content.RemoveChildren()
+			g.ui.content.AddChild(NewGeneralMenu(g))
+		}},
+		{l.Ui, func(g *Game) {
+			g.ui.content.RemoveChildren()
+			g.ui.content.AddChild(NewUiMenu(g))
+		}},
+		{l.Gb, func(g *Game) {
+			g.ui.content.RemoveChildren()
+			g.ui.content.AddChild(NewGbMenu(g))
+		}},
+		{l.Gba, func(g *Game) {
+			g.ui.content.RemoveChildren()
+			g.ui.content.AddChild(NewGbaMenu(g))
+		}},
+		{l.Nds, func(g *Game) {
+			g.ui.content.RemoveChildren()
+			g.ui.content.AddChild(NewNdsMenu(g))
+		}},
+		{l.About, func(g *Game) {
+			g.ui.content.RemoveChildren()
+			g.ui.content.AddChild(NewAboutMenu(g))
+		}},
 		{
 			l.Return, func(g *Game) {
 				switch g.ui.PrevPageId {
@@ -54,132 +63,92 @@ func NewSidebarFields(res *Resources) []SidebarField {
 	}
 }
 
-func buildSubMenu(g *Game, parent *widget.Container, fields []Field) {
-	for _, field := range fields {
-		switch field.widgettype {
-		case WIDGET_HDR:
-			parent.AddChild(NewHeader(field.label, g.ui.res),
-				NewSeparator())
-		case WIDGET_CBX:
-			parent.AddChild(NewLabel(field.label),
-				NewCheckbox(field.ptr.(*bool)))
-		case WIDGET_KEY:
-			panic("widget_key")
-			//parent.AddChild(NewLabel(field.label),
-			//	NewKeybindInput(g.ui, field.sublabel, field.ptr))
-		case WIDGET_DEC:
-			parent.AddChild(NewLabel(field.label),
-				NewDecimalInput(g.ui, field.sublabel, field.ptr, field.other.(int)))
-		case WIDGET_HEX:
-			parent.AddChild(NewLabel(field.label),
-				NewHexInput(g.ui, field.sublabel, field.ptr, field.other.(int)))
-		case WIDGET_FLE:
-			parent.AddChild(NewLabel(field.label),
-				NewFileInput(field.ptr.(*string)))
-		case WIDGET_DIR:
-			parent.AddChild(NewLabel(field.label),
-				NewDirectoryInput(field.ptr.(*string), field.other.(string)))
-		case WIDGET_TXT:
-			parent.AddChild(NewLabel(field.label),
-				NewTextBoxInput(g.ui, BOARD_ALPHA, field.sublabel, field.ptr, field.other.(func(s string) (bool, *string))))
-		case WIDGET_LNK:
-			parent.AddChild(NewSeparator(),
-				NewLinkText(field.other.(string)))
-		case WIDGET_RAD:
-			parent.AddChild(
-				NewLabel(field.label),
-				NewRadioInput(
-					&g.ui.focus.horizontalGroup,
-					field.ptr.(*int),
-					field.other.([]string),
-					g.ui.res,
-				),
-			)
-		}
-	}
+func NewMenu() *widget.Container {
+	return widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewGridLayout(
+			widget.GridLayoutOpts.Columns(1),
+			widget.GridLayoutOpts.Stretch(
+				[]bool{true},
+				[]bool{true},
+			),
+		)),
+	)
 }
 
-func buildBinding(ui *Ui, parent *widget.Container, label string, src *[]ebiten.Key) {
-	parent.AddChild(NewLabel(label), NewKeybindInput(ui, src))
+func NewOneCol() *widget.Container {
+	return widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewGridLayout(
+			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(24)),
+			widget.GridLayoutOpts.Spacing(32, 16),
+			widget.GridLayoutOpts.Columns(1),
+			widget.GridLayoutOpts.Stretch(
+				[]bool{true},
+				[]bool{},
+			),
+		)),
+	)
 }
 
-func NewAboutMenu(g *Game, parent *widget.Container) {
-	l := g.ui.res.localization.Settings.About
-
-	parent.RemoveChildren()
-
-	parent.AddChild(NewSeparator(), NewHeader(l.About, g.ui.res))
-	parent.AddChild(NewSeparator(), NewLinkText(mainLink))
-	parent.AddChild(NewSeparator(), NewLinkText(l.Version))
-	parent.AddChild(NewSeparator(), NewLinkText(l.Copyright))
-	parent.AddChild(NewSeparator(), NewLinkText(l.ThankYous))
-
-	g.ui.focus.submenu = parent.GetFocusers()
-	g.ui.focus.BuildFocus(g.ui.ui)
+func NewTwoCol() *widget.Container {
+	return widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewGridLayout(
+			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(24)),
+			widget.GridLayoutOpts.Spacing(32, 16),
+			widget.GridLayoutOpts.Columns(2),
+			widget.GridLayoutOpts.Stretch(
+				[]bool{false, true},
+				[]bool{},
+			),
+		)),
+	)
 }
 
-func NewGeneralMenu(g *Game, parent *widget.Container) {
-	var (
-		tmp = config.Conf.General
-		k   = &tmp.Keyboard
-		//c   = &tmp.Controller
+func NewGeneralMenu(g *Game) *widget.Container {
+	tmp := config.Conf.General
+	l := g.ui.res.localization.Settings.General
 
-		l = g.ui.res.localization.Settings.General
+	menu := NewMenu()
+
+	general := NewTwoCol()
+	menu.AddChild(NewHeader(l.General, g.ui.res), general)
+
+	general.AddChild(
+		NewLabel(l.Muted), NewCheckbox(&tmp.Muted),
+		NewLabel(l.ShowFps), NewCheckbox(&tmp.ShowFps),
+		NewLabel(l.InitFullscreen), NewCheckbox(&tmp.InitFullscreen),
+		NewLabel(l.TargetFps), NewDecimalInput(g.ui, l.TargetFps, &tmp.TargetFps, 1_000_000),
+		NewLabel(l.VsyncEnabled), NewCheckbox(&tmp.Vsync),
+		NewLabel(l.DisableSaves), NewCheckbox(&tmp.DisableSaves),
+		NewLabel(l.IntegerScaling), NewCheckbox(&tmp.IntegerScaling),
+		NewSeparator(), NewLinkText(l.IntegerScalingDesc),
+		NewLabel(l.IntegerScalingRatio), NewDecimalInput(g.ui, l.IntegerScalingRatio, &tmp.IntegerScalingRatio, 10),
+		NewSeparator(), NewLinkText(l.SampleRateDesc),
+		NewLabel(l.SampleRate), NewDecimalInput(g.ui, l.SampleRate, &tmp.SampleRate, 192000),
 	)
 
-	fields := []Field{
-		{WIDGET_HDR, l.General, "", nil, nil},
-		{WIDGET_CBX, l.Muted, "", &tmp.Muted, nil},
-		{WIDGET_CBX, l.ShowFps, "", &tmp.ShowFps, nil},
-		{WIDGET_CBX, l.InitFullscreen, "", &tmp.InitFullscreen, nil},
-		{WIDGET_DEC, l.TargetFps, l.TargetFps, &tmp.TargetFps, 1_000_000},
-		{WIDGET_CBX, l.VsyncEnabled, "", &tmp.Vsync, nil},
-		{WIDGET_CBX, l.DisableSaves, "", &tmp.DisableSaves, nil},
-		{WIDGET_CBX, l.IntegerScaling, "", &tmp.IntegerScaling, nil},
-		{WIDGET_LNK, "", "", nil, l.IntegerScalingDesc},
-		{WIDGET_DEC, l.IntegerScalingRatio, "", &tmp.IntegerScalingRatio, 10},
-		{WIDGET_LNK, "", "", nil, l.SampleRateDesc},
-		{WIDGET_DEC, l.SampleRate, "", &tmp.SampleRate, 192000},
+	keys := NewTwoCol()
+	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
+	k := &tmp.Keyboard
+	keys.AddChild(
+		NewLabel(l.Select), NewKeybindInput(g.ui, &k.Select),
+		NewLabel(l.Return), NewKeybindInput(g.ui, &k.Return),
+		NewLabel(l.Mute), NewKeybindInput(g.ui, &k.Mute),
+		NewLabel(l.Pause), NewKeybindInput(g.ui, &k.Pause),
+		NewLabel(l.Left), NewKeybindInput(g.ui, &k.Left),
+		NewLabel(l.Right), NewKeybindInput(g.ui, &k.Right),
+		NewLabel(l.Up), NewKeybindInput(g.ui, &k.Up),
+		NewLabel(l.Down), NewKeybindInput(g.ui, &k.Down),
+		NewLabel(l.Fullscreen), NewKeybindInput(g.ui, &k.Fullscreen),
+		NewLabel(l.Quit), NewKeybindInput(g.ui, &k.Quit),
+	)
 
-		{WIDGET_HDR, l.Keyboard, "", nil, nil},
-	}
+	//c   = &tmp.Controller
 
-	parent.RemoveChildren()
-	buildSubMenu(g, parent, fields)
-
-	buildBinding(g.ui, parent, l.Select, &k.Select)
-	buildBinding(g.ui, parent, l.Return, &k.Return)
-	buildBinding(g.ui, parent, l.Mute, &k.Mute)
-	buildBinding(g.ui, parent, l.Pause, &k.Pause)
-	buildBinding(g.ui, parent, l.Left, &k.Left)
-	buildBinding(g.ui, parent, l.Right, &k.Right)
-	buildBinding(g.ui, parent, l.Up, &k.Up)
-	buildBinding(g.ui, parent, l.Down, &k.Down)
-	buildBinding(g.ui, parent, l.Fullscreen, &k.Fullscreen)
-	buildBinding(g.ui, parent, l.Quit, &k.Quit)
-
-	//fields = []Field{
-	//	{WIDGET_HDR, l.Controller, "", nil, nil},
-	//}
-
-	//buildBinding(g.ui, parent, l.Select, &c.Select)
-	//buildBinding(g.ui, parent, l.Return, &c.Return)
-	//buildBinding(g.ui, parent, l.Mute, &c.Mute)
-	//buildBinding(g.ui, parent, l.Pause, &c.Pause)
-	//buildBinding(g.ui, parent, l.Left, &c.Left)
-	//buildBinding(g.ui, parent, l.Right, &c.Right)
-	//buildBinding(g.ui, parent, l.Up, &c.Up)
-	//buildBinding(g.ui, parent, l.Down, &c.Down)
-	//buildBinding(g.ui, parent, l.Fullscreen, &c.Fullscreen)
-	//buildBinding(g.ui, parent, l.Quit, &c.Quit)
-
-	//buildSubMenu(g, parent, fields)
-
-	parent.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
+	menu.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.General = tmp
 
-		parent.RemoveChildren()
-		NewGeneralMenu(g, parent)
+		g.ui.content.RemoveChildren()
+		g.ui.content.AddChild(NewGeneralMenu(g))
 
 		file.Encode()
 
@@ -190,11 +159,12 @@ func NewGeneralMenu(g *Game, parent *widget.Container) {
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
 
-	g.ui.focus.submenu = parent.GetFocusers()
-	g.ui.focus.BuildFocus(g.ui.ui)
+	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, keys)
+
+	return menu
 }
 
-func NewUiMenu(g *Game, parent *widget.Container) {
+func NewUiMenu(g *Game) *widget.Container {
 	var (
 		res   = g.ui.res
 		tmp   = config.Conf.Ui
@@ -209,10 +179,13 @@ func NewUiMenu(g *Game, parent *widget.Container) {
 			NewColorInput(g.ui, l.UiAccentColor, &tmp.MenuSecondaryColor, HexValidation(0xFFFFFF)),
 		}
 	)
-	parent.RemoveChildren()
 
-	parent.AddChild(
-		NewHeader(l.Ui, res), NewSeparator(),
+	menu := NewMenu()
+
+	ui := NewTwoCol()
+	menu.AddChild(NewHeader(l.Ui, res), ui)
+
+	ui.AddChild(
 		NewLabel(l.Language), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.Language, l.Languages, res),
 		NewLabel(l.Backdrop), clrInputs[0],
 		NewLabel(l.BgColor), clrInputs[1],
@@ -220,6 +193,9 @@ func NewUiMenu(g *Game, parent *widget.Container) {
 		NewLabel(l.AccentColor), clrInputs[3],
 		NewLabel(l.ApplyTheme),
 		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, theme_palettes, clrInputs, res),
+	)
+
+	menu.AddChild(
 		NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 			config.Conf.Ui = tmp
 			g.ui.res.localization = NewLocalization(LangOptions(config.Conf.Ui.Language))
@@ -239,14 +215,15 @@ func NewUiMenu(g *Game, parent *widget.Container) {
 			g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 		}),
 	)
-	g.ui.focus.submenu = parent.GetFocusers()
-	g.ui.focus.BuildFocus(g.ui.ui)
+
+	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, nil)
+
+	return menu
 }
 
-func NewGbMenu(g *Game, parent *widget.Container) {
+func NewGbMenu(g *Game) *widget.Container {
 	var (
 		tmp = config.Conf.Gb
-		k   = &tmp.KeyboardConfig
 		//c   = &tmp.ControllerConfig
 		pal = &tmp.Palette
 
@@ -260,17 +237,17 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 		}
 	)
 
-	parent.RemoveChildren()
+	menu := NewMenu()
 
-	fields := []Field{
-		{WIDGET_HDR, l.General, "", nil, nil},
-		{WIDGET_RAD, l.System, "", &tmp.System, l.Systems},
-	}
+	general := NewTwoCol()
+	menu.AddChild(NewHeader(l.General, g.ui.res), general)
+	general.AddChild(
+		NewLabel(l.System), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.System, l.Systems, g.ui.res),
+	)
 
-	buildSubMenu(g, parent, fields)
-
-	parent.AddChild(
-		NewHeader(l.DmgPalette, g.ui.res), NewSeparator(),
+	palette := NewTwoCol()
+	menu.AddChild(NewHeader(l.DmgPalette, g.ui.res), palette)
+	palette.AddChild(
 		NewLabel(l.Lightest), clrInputs[0],
 		NewLabel(l.Light), clrInputs[1],
 		NewLabel(l.Dark), clrInputs[2],
@@ -279,41 +256,34 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, dmg_palettes, clrInputs, g.ui.res),
 	)
 
-	fields = []Field{
-		{WIDGET_HDR, l.Bios, "", nil, nil},
-		{WIDGET_FLE, l.DmgPath, "", &tmp.Bios.DmgPath, nil},
-		{WIDGET_FLE, l.GbcPath, "", &tmp.Bios.GbcPath, nil},
-		{WIDGET_CBX, l.DirectBoot, "", &tmp.Bios.Direct, nil},
+	bios := NewTwoCol()
+	menu.AddChild(NewHeader(l.Bios, g.ui.res), bios)
+	bios.AddChild(
+		NewLabel(l.DmgPath), NewFileInput(&tmp.Bios.DmgPath),
+		NewLabel(l.GbcPath), NewFileInput(&tmp.Bios.GbcPath),
+		NewLabel(l.DirectBoot), NewCheckbox(&tmp.Bios.Direct),
+	)
 
-		{WIDGET_HDR, l.Keyboard, "", nil, nil},
-	}
+	keys := NewTwoCol()
+	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
+	k := &tmp.KeyboardConfig
+	keys.AddChild(
+		NewLabel(l.A), NewKeybindInput(g.ui, &k.A),
+		NewLabel(l.B), NewKeybindInput(g.ui, &k.B),
+		NewLabel(l.Select), NewKeybindInput(g.ui, &k.Select),
+		NewLabel(l.Start), NewKeybindInput(g.ui, &k.Start),
+		NewLabel(l.Left), NewKeybindInput(g.ui, &k.Left),
+		NewLabel(l.Right), NewKeybindInput(g.ui, &k.Right),
+		NewLabel(l.Up), NewKeybindInput(g.ui, &k.Up),
+		NewLabel(l.Down), NewKeybindInput(g.ui, &k.Down),
+	)
 
-	buildSubMenu(g, parent, fields)
-
-	buildBinding(g.ui, parent, l.A, &k.A)
-	buildBinding(g.ui, parent, l.B, &k.B)
-	buildBinding(g.ui, parent, l.Select, &k.Select)
-	buildBinding(g.ui, parent, l.Start, &k.Start)
-	buildBinding(g.ui, parent, l.Left, &k.Left)
-	buildBinding(g.ui, parent, l.Right, &k.Right)
-	buildBinding(g.ui, parent, l.Up, &k.Up)
-	buildBinding(g.ui, parent, l.Down, &k.Down)
-
-	//{WIDGET_HDR, l.Controller, "", nil, nil},
-	//buildBinding(g.ui, parent, l.A, &c.A)
-	//buildBinding(g.ui, parent, l.B, &c.B)
-	//buildBinding(g.ui, parent, l.Select, &c.Select)
-	//buildBinding(g.ui, parent, l.Start, &c.Start)
-	//buildBinding(g.ui, parent, l.Left, &c.Left)
-	//buildBinding(g.ui, parent, l.Right, &c.Right)
-	//buildBinding(g.ui, parent, l.Up, &c.Up)
-	//buildBinding(g.ui, parent, l.Down, &c.Down)
-
-	parent.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
+	menu.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Gb = tmp
 
-		parent.RemoveChildren()
-		NewGbMenu(g, parent)
+		g.ui.content.RemoveChildren()
+		g.ui.content.AddChild(NewGbMenu(g))
+
 		file.Encode()
 
 		if len(g.gamepadIds) != 0 {
@@ -321,76 +291,71 @@ func NewGbMenu(g *Game, parent *widget.Container) {
 		}
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
-	g.ui.focus.submenu = parent.GetFocusers()
-	g.ui.focus.BuildFocus(g.ui.ui)
+
+	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, keys)
+
+	return menu
 }
 
-func NewGbaMenu(g *Game, parent *widget.Container) {
+func NewGbaMenu(g *Game) *widget.Container {
 	var (
 		tmp = config.Conf.Gba
-		k   = &tmp.KeyboardConfig
 		//c   = &tmp.ControllerConfig
 
 		l = g.ui.res.localization.Settings.Gba
 	)
 
-	fields := []Field{
-		{WIDGET_HDR, l.General, "", nil, nil},
-		{WIDGET_CBX, l.OptmizeIdleLoops, "", &tmp.IdleOptimize, nil},
-		{WIDGET_RAD, l.Rotation, "", &tmp.Rotation, l.Rotations},
+	menu := NewMenu()
 
-		{WIDGET_HDR, l.Hardware, "", nil, nil},
-		{WIDGET_RAD, l.BackupType, "", &tmp.Hardware.BackupType, l.BackupTypes},
-		{WIDGET_CBX, l.ForceRtc, "", &tmp.Hardware.ForceRtc, nil},
-		{WIDGET_CBX, l.ForceSolarSensor, "", &tmp.Hardware.ForceSolarSensor, nil},
-		{WIDGET_DEC, l.SolarSensorLevel, l.SolarSensorLevel, &tmp.Hardware.SolarSensorLevel, 100},
+	general := NewTwoCol()
+	menu.AddChild(NewHeader(l.General, g.ui.res), general)
 
-		{WIDGET_HDR, l.Bios, "", nil, nil},
-		{WIDGET_FLE, l.BiosPath, "", &tmp.Bios.Path, nil},
-		{WIDGET_CBX, l.DirectBoot, "", &tmp.Bios.Direct, nil},
+	general.AddChild(
+		NewLabel(l.OptmizeIdleLoops), NewCheckbox(&tmp.IdleOptimize),
+		NewLabel(l.Rotation), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.Rotation, l.Rotations, g.ui.res),
+	)
 
-		{WIDGET_HDR, l.Keyboard, "", nil, nil},
+	hardware := NewTwoCol()
+	menu.AddChild(NewHeader(l.Hardware, g.ui.res), hardware)
 
-		//{WIDGET_HDR, l.Controller, "", nil, nil},
-		//{WIDGET_KEY, l.A, l.ControllerA, &c.A, nil},
-		//{WIDGET_KEY, l.B, l.ControllerB, &c.B, nil},
-		//{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, nil},
-		//{WIDGET_KEY, l.Start, l.ControllerStart, &c.Start, nil},
-		//{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, nil},
-		//{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, nil},
-		//{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, nil},
-		//{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, nil},
-		//{WIDGET_KEY, l.L, l.ControllerL, &c.L, nil},
-		//{WIDGET_KEY, l.R, l.ControllerR, &c.R, nil},
-		//{WIDGET_KEY, l.SolarMin, l.ControllerSolarMin, &c.SolarLevel0, nil},
-		//{WIDGET_KEY, l.Solar1, l.ControllerSolar1, &c.SolarLevel1, nil},
-		//{WIDGET_KEY, l.Solar2, l.ControllerSolar2, &c.SolarLevel2, nil},
-		//{WIDGET_KEY, l.Solar3, l.ControllerSolar3, &c.SolarLevel3, nil},
-		//{WIDGET_KEY, l.SolarMax, l.ControllerSolarMax, &c.SolarLevel4, nil},
-		//{WIDGET_KEY, l.RotationToggle, l.ControllerRotationToggle, &c.RotationToggle, nil},
-	}
+	hardware.AddChild(
+		NewLabel(l.BackupType), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.Hardware.BackupType, l.BackupTypes, g.ui.res),
+		NewLabel(l.ForceRtc), NewCheckbox(&tmp.Hardware.ForceRtc),
+		NewLabel(l.ForceSolarSensor), NewCheckbox(&tmp.Hardware.ForceSolarSensor),
+		NewLabel(l.SolarSensorLevel), NewDecimalInput(g.ui, l.SolarSensorLevel, &tmp.Hardware.SolarSensorLevel, 100),
+	)
 
-	parent.RemoveChildren()
-	buildSubMenu(g, parent, fields)
+	bios := NewTwoCol()
+	menu.AddChild(NewHeader(l.Bios, g.ui.res), bios)
 
-	buildBinding(g.ui, parent, l.A, &k.A)
-	buildBinding(g.ui, parent, l.B, &k.B)
-	buildBinding(g.ui, parent, l.Select, &k.Select)
-	buildBinding(g.ui, parent, l.Start, &k.Start)
-	buildBinding(g.ui, parent, l.Left, &k.Left)
-	buildBinding(g.ui, parent, l.Right, &k.Right)
-	buildBinding(g.ui, parent, l.Up, &k.Up)
-	buildBinding(g.ui, parent, l.Down, &k.Down)
-	buildBinding(g.ui, parent, l.L, &k.L)
-	buildBinding(g.ui, parent, l.R, &k.R)
-	buildBinding(g.ui, parent, l.SolarMin, &k.SolarLevel0)
-	buildBinding(g.ui, parent, l.Solar1, &k.SolarLevel1)
-	buildBinding(g.ui, parent, l.Solar2, &k.SolarLevel2)
-	buildBinding(g.ui, parent, l.Solar3, &k.SolarLevel3)
-	buildBinding(g.ui, parent, l.SolarMax, &k.SolarLevel4)
-	buildBinding(g.ui, parent, l.RotationToggle, &k.RotationToggle)
+	bios.AddChild(
+		NewLabel(l.BiosPath), NewFileInput(&tmp.Bios.Path),
+		NewLabel(l.DirectBoot), NewCheckbox(&tmp.Bios.Direct),
+	)
 
-	parent.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
+	keys := NewTwoCol()
+	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
+	k := &tmp.KeyboardConfig
+	keys.AddChild(
+		NewLabel(l.A), NewKeybindInput(g.ui, &k.A),
+		NewLabel(l.B), NewKeybindInput(g.ui, &k.B),
+		NewLabel(l.Select), NewKeybindInput(g.ui, &k.Select),
+		NewLabel(l.Start), NewKeybindInput(g.ui, &k.Start),
+		NewLabel(l.Left), NewKeybindInput(g.ui, &k.Left),
+		NewLabel(l.Right), NewKeybindInput(g.ui, &k.Right),
+		NewLabel(l.Up), NewKeybindInput(g.ui, &k.Up),
+		NewLabel(l.Down), NewKeybindInput(g.ui, &k.Down),
+		NewLabel(l.L), NewKeybindInput(g.ui, &k.L),
+		NewLabel(l.R), NewKeybindInput(g.ui, &k.R),
+		NewLabel(l.SolarMin), NewKeybindInput(g.ui, &k.SolarLevel0),
+		NewLabel(l.Solar1), NewKeybindInput(g.ui, &k.SolarLevel1),
+		NewLabel(l.Solar2), NewKeybindInput(g.ui, &k.SolarLevel2),
+		NewLabel(l.Solar3), NewKeybindInput(g.ui, &k.SolarLevel3),
+		NewLabel(l.SolarMax), NewKeybindInput(g.ui, &k.SolarLevel4),
+		NewLabel(l.RotationToggle), NewKeybindInput(g.ui, &k.RotationToggle),
+	)
+
+	menu.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		if tmp.Bios.Path == "" {
 			tmp.Bios.Direct = true
 		}
@@ -409,8 +374,9 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 			}
 		}
 
-		parent.RemoveChildren()
-		NewGbaMenu(g, parent)
+		g.ui.content.RemoveChildren()
+		g.ui.content.AddChild(NewGbaMenu(g))
+
 		file.Encode()
 
 		if len(g.gamepadIds) != 0 {
@@ -418,14 +384,15 @@ func NewGbaMenu(g *Game, parent *widget.Container) {
 		}
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
-	g.ui.focus.submenu = parent.GetFocusers()
-	g.ui.focus.BuildFocus(g.ui.ui)
+
+	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, keys)
+
+	return menu
 }
 
-func NewNdsMenu(g *Game, parent *widget.Container) {
+func NewNdsMenu(g *Game) *widget.Container {
 	var (
 		tmp = config.Conf.Nds
-		k   = &tmp.KeyboardConfig
 		//c   = &tmp.ControllerConfig
 
 		l = g.ui.res.localization.Settings.Nds
@@ -433,78 +400,79 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 		favColor = config.ColorNames[tmp.Firmware.Color]
 	)
 
-	fields := []Field{
-		{WIDGET_HDR, l.Screen, "", nil, nil},
-		{WIDGET_RAD, l.Layout, "", &tmp.Screen.Layout, l.Layouts},
-		{WIDGET_RAD, l.Sizing, "", &tmp.Screen.Sizing, l.Sizings},
-		{WIDGET_RAD, l.Rotation, "", &tmp.Screen.Rotation, l.Rotations},
+	menu := NewMenu()
 
-		{WIDGET_HDR, l.Rtc, "", nil, nil},
-		{WIDGET_DEC, l.AdditionalHours, l.AdditionalHours, &tmp.Rtc.AdditionalHours, 24},
+	screen := NewTwoCol()
+	menu.AddChild(NewHeader(l.Screen, g.ui.res), screen)
 
-		{WIDGET_HDR, l.Bios, "", nil, nil},
-		{WIDGET_FLE, l.Arm7Path, "", &tmp.Bios.Arm7Path, nil},
-		{WIDGET_FLE, l.Arm9Path, "", &tmp.Bios.Arm9Path, nil},
+	screen.AddChild(
+		NewLabel(l.Layout), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.Screen.Layout, l.Layouts, g.ui.res),
+		NewLabel(l.Sizing), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.Screen.Sizing, l.Sizings, g.ui.res),
+		NewLabel(l.Rotation), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.Screen.Rotation, l.Rotations, g.ui.res),
+	)
 
-		{WIDGET_HDR, l.Firmware, "", nil, nil},
-		{WIDGET_FLE, l.FilePath, "", &tmp.Firmware.FilePath, nil},
-		{WIDGET_TXT, l.Nickname, l.Nickname, &tmp.Firmware.Nickname, StringValidation(10)},
-		{WIDGET_TXT, l.Message, l.Message, &tmp.Firmware.Message, StringValidation(26)},
-		{WIDGET_TXT, l.FavoriteColor, l.FavoriteColor, &favColor, ColorNdsValidation()},
+	rtc := NewTwoCol()
+	menu.AddChild(NewHeader(l.Rtc, g.ui.res), rtc)
 
-		{WIDGET_HDR, l.SceneExport, "", nil, nil},
-		{WIDGET_DIR, l.OutputDirectory, "", &tmp.Export.Directory, "./export"},
-		{WIDGET_CBX, l.ShadowPolygons, "", &tmp.Export.ShadowPolys, nil},
+	rtc.AddChild(
+		NewLabel(l.AdditionalHours), NewDecimalInput(g.ui, l.AdditionalHours, &tmp.Rtc.AdditionalHours, 24),
+	)
 
-		{WIDGET_HDR, l.Keyboard, "", nil, nil},
+	bios := NewTwoCol()
+	menu.AddChild(NewHeader(l.Bios, g.ui.res), bios)
 
-		//{WIDGET_HDR, l.Controller, "", nil, nil},
-		//{WIDGET_KEY, l.A, l.ControllerA, &c.A, nil},
-		//{WIDGET_KEY, l.B, l.ControllerB, &c.B, nil},
-		//{WIDGET_KEY, l.Select, l.ControllerSelect, &c.Select, nil},
-		//{WIDGET_KEY, l.Start, l.ControllerStart, &c.Start, nil},
-		//{WIDGET_KEY, l.Left, l.ControllerLeft, &c.Left, nil},
-		//{WIDGET_KEY, l.Right, l.ControllerRight, &c.Right, nil},
-		//{WIDGET_KEY, l.Up, l.ControllerUp, &c.Up, nil},
-		//{WIDGET_KEY, l.Down, l.ControllerDown, &c.Down, nil},
-		//{WIDGET_KEY, l.L, l.ControllerL, &k.L, nil},
-		//{WIDGET_KEY, l.R, l.ControllerR, &k.R, nil},
-		//{WIDGET_KEY, l.X, l.ControllerX, &k.X, nil},
-		//{WIDGET_KEY, l.Y, l.ControllerY, &k.Y, nil},
-		//{WIDGET_KEY, l.Hinge, l.ControllerHinge, &k.Hinge, nil},
-		//{WIDGET_KEY, l.LayoutToggle, l.ControllerLayoutToggle, &c.LayoutToggle, nil},
-		//{WIDGET_KEY, l.SizingToggle, l.ControllerSizingToggle, &c.SizingToggle, nil},
-		//{WIDGET_KEY, l.RotationToggle, l.ControllerRotationToggle, &c.RotationToggle, nil},
-		//{WIDGET_KEY, l.ExportToggle, l.ControllerExportToggle, &c.ExportScene, nil},
-	}
+	bios.AddChild(
+		NewLabel(l.Arm7Path), NewFileInput(&tmp.Bios.Arm7Path),
+		NewLabel(l.Arm9Path), NewFileInput(&tmp.Bios.Arm9Path),
+	)
 
-	parent.RemoveChildren()
-	buildSubMenu(g, parent, fields)
+	firmware := NewTwoCol()
+	menu.AddChild(NewHeader(l.Firmware, g.ui.res), firmware)
 
-	buildBinding(g.ui, parent, l.A, &k.A)
-	buildBinding(g.ui, parent, l.B, &k.B)
-	buildBinding(g.ui, parent, l.Select, &k.Select)
-	buildBinding(g.ui, parent, l.Start, &k.Start)
-	buildBinding(g.ui, parent, l.Left, &k.Left)
-	buildBinding(g.ui, parent, l.Right, &k.Right)
-	buildBinding(g.ui, parent, l.Up, &k.Up)
-	buildBinding(g.ui, parent, l.Down, &k.Down)
-	buildBinding(g.ui, parent, l.L, &k.L)
-	buildBinding(g.ui, parent, l.R, &k.R)
-	buildBinding(g.ui, parent, l.X, &k.X)
-	buildBinding(g.ui, parent, l.Y, &k.Y)
-	buildBinding(g.ui, parent, l.Hinge, &k.Hinge)
-	buildBinding(g.ui, parent, l.LayoutToggle, &k.LayoutToggle)
-	buildBinding(g.ui, parent, l.SizingToggle, &k.SizingToggle)
-	buildBinding(g.ui, parent, l.RotationToggle, &k.RotationToggle)
-	buildBinding(g.ui, parent, l.ExportToggle, &k.ExportScene)
+	firmware.AddChild(
+		NewLabel(l.FilePath), NewFileInput(&tmp.Firmware.FilePath),
+		NewLabel(l.Nickname), NewTextBoxInput(g.ui, BOARD_ALPHA, l.Nickname, &tmp.Firmware.Nickname, StringValidation(10)),
+		NewLabel(l.Message), NewTextBoxInput(g.ui, BOARD_ALPHA, l.Message, &tmp.Firmware.Message, StringValidation(26)),
+		NewLabel(l.FavoriteColor), NewTextBoxInput(g.ui, BOARD_ALPHA, l.FavoriteColor, &favColor, ColorNdsValidation()),
+	)
 
-	parent.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
+	export := NewTwoCol()
+	menu.AddChild(NewHeader(l.SceneExport, g.ui.res), export)
+
+	export.AddChild(
+		NewLabel(l.OutputDirectory), NewDirectoryInput(&tmp.Export.Directory, "./export"),
+		NewLabel(l.ShadowPolygons), NewCheckbox(&tmp.Export.ShadowPolys),
+	)
+
+	keys := NewTwoCol()
+	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
+	k := &tmp.KeyboardConfig
+	keys.AddChild(
+		NewLabel(l.A), NewKeybindInput(g.ui, &k.A),
+		NewLabel(l.B), NewKeybindInput(g.ui, &k.B),
+		NewLabel(l.Select), NewKeybindInput(g.ui, &k.Select),
+		NewLabel(l.Start), NewKeybindInput(g.ui, &k.Start),
+		NewLabel(l.Left), NewKeybindInput(g.ui, &k.Left),
+		NewLabel(l.Right), NewKeybindInput(g.ui, &k.Right),
+		NewLabel(l.Up), NewKeybindInput(g.ui, &k.Up),
+		NewLabel(l.Down), NewKeybindInput(g.ui, &k.Down),
+		NewLabel(l.L), NewKeybindInput(g.ui, &k.L),
+		NewLabel(l.R), NewKeybindInput(g.ui, &k.R),
+		NewLabel(l.X), NewKeybindInput(g.ui, &k.X),
+		NewLabel(l.Y), NewKeybindInput(g.ui, &k.Y),
+		NewLabel(l.Hinge), NewKeybindInput(g.ui, &k.Hinge),
+		NewLabel(l.LayoutToggle), NewKeybindInput(g.ui, &k.LayoutToggle),
+		NewLabel(l.SizingToggle), NewKeybindInput(g.ui, &k.SizingToggle),
+		NewLabel(l.RotationToggle), NewKeybindInput(g.ui, &k.RotationToggle),
+		NewLabel(l.ExportToggle), NewKeybindInput(g.ui, &k.ExportScene),
+	)
+
+	menu.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Nds = tmp
 		config.Conf.Nds.Firmware.Color = config.ColorNameToId[favColor]
 
-		parent.RemoveChildren()
-		NewNdsMenu(g, parent)
+		g.ui.content.RemoveChildren()
+		g.ui.content.AddChild(NewNdsMenu(g))
 
 		file.Encode()
 
@@ -514,6 +482,25 @@ func NewNdsMenu(g *Game, parent *widget.Container) {
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
 
-	g.ui.focus.submenu = parent.GetFocusers()
-	g.ui.focus.BuildFocus(g.ui.ui)
+	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, keys)
+	return menu
+}
+
+func NewAboutMenu(g *Game) *widget.Container {
+	l := g.ui.res.localization.Settings.About
+
+	menu := NewMenu()
+
+	about := NewOneCol()
+	menu.AddChild(NewHeader(l.About, g.ui.res))
+	menu.AddChild(about)
+
+	about.AddChild(NewLinkText(mainLink))
+	about.AddChild(NewLinkText(l.Version))
+	about.AddChild(NewLinkText(l.Copyright))
+	about.AddChild(NewLinkText(l.ThankYous))
+
+	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, nil)
+
+	return menu
 }

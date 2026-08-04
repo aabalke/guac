@@ -8,7 +8,6 @@ import (
 )
 
 func NewSettings(g *Game, oldId PageId, initMenu int) {
-
 	g.ui.focus.ClearFocus()
 	g.ui.PrevPageId = oldId
 
@@ -38,10 +37,8 @@ func NewSettings(g *Game, oldId PageId, initMenu int) {
 
 	g.ui.content = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
-			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(24)),
-			widget.GridLayoutOpts.Spacing(32, 16),
-			widget.GridLayoutOpts.Columns(2),
-			widget.GridLayoutOpts.Stretch([]bool{false, true}, []bool{}),
+			widget.GridLayoutOpts.Columns(1),
+			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),
 		)),
 	)
 
@@ -56,16 +53,9 @@ func NewSettings(g *Game, oldId PageId, initMenu int) {
 		Container:    root,
 		PrimaryTheme: NewTheme(g.ui.res),
 	}
-
-	//ui.SetDebugMode(true)
-
-	g.ui.focus.sidebar = g.ui.sidebar.GetFocusers()
-	g.ui.focus.BuildFocus(g.ui.ui)
-	g.ui.focus.FocusSidebar(0)
 }
 
 func NewScrollableContainer(ui *Ui) *widget.Container {
-
 	root := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(2),
@@ -81,7 +71,6 @@ func NewScrollableContainer(ui *Ui) *widget.Container {
 	)
 
 	pageSizeFunc := func() int {
-
 		scrollableHeight := ui.scrollable.ViewRect().Dy()
 		contentHeight := ui.content.GetWidget().Rect.Dy()
 		if scrollableHeight >= contentHeight {
@@ -93,7 +82,8 @@ func NewScrollableContainer(ui *Ui) *widget.Container {
 		return int(math.Round(
 			float64(scrollableHeight) /
 				float64(contentHeight) *
-				1000))
+				1000,
+		))
 	}
 
 	ui.slider = widget.NewSlider(
@@ -102,7 +92,6 @@ func NewScrollableContainer(ui *Ui) *widget.Container {
 		widget.SliderOpts.MinMax(0, 1000),
 		widget.SliderOpts.PageSizeFunc(pageSizeFunc),
 		widget.SliderOpts.ChangedHandler(func(args *widget.SliderChangedEventArgs) {
-
 			if args.Dragging {
 				ui.focus.DeFocus()
 			}
@@ -112,7 +101,6 @@ func NewScrollableContainer(ui *Ui) *widget.Container {
 
 		widget.SliderOpts.WidgetOpts(
 			widget.WidgetOpts.OnUpdate(func(args widget.HasWidget) {
-
 				scrollableHeight := ui.scrollable.ViewRect().Dy()
 				contentHeight := ui.content.GetWidget().Rect.Dy()
 
@@ -126,7 +114,6 @@ func NewScrollableContainer(ui *Ui) *widget.Container {
 	)
 
 	ui.scrollable.GetWidget().ScrolledEvent.AddHandler(func(args any) {
-
 		ui.focus.DeFocus()
 
 		scrollableHeight := ui.scrollable.ViewRect().Dy()
@@ -154,7 +141,6 @@ func NewScrollableContainer(ui *Ui) *widget.Container {
 }
 
 func NewSidebar(g *Game, initMenu int) {
-
 	g.ui.sidebar = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(24)),
@@ -181,13 +167,11 @@ func NewSidebar(g *Game, initMenu int) {
 	)
 
 	// initialize first menu
+	g.ui.focus.sidebar = g.ui.sidebar.GetFocusers()
 	sidebarFields[initMenu].f(g)
-	g.ui.focus.submenu = g.ui.content.GetFocusers()
-	g.ui.focus.BuildFocus(g.ui.ui)
 }
 
 func NewSidebarButton(g *Game, sf SidebarField) *widget.Button {
-
 	b := widget.NewButton(
 		widget.ButtonOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{

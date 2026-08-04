@@ -610,27 +610,31 @@ func (t *BindingInput) renderImage(screen *ebiten.Image) {
 		return
 	}
 
-	pressed := (t.pressing && t.hovering)
+	//pressed := (t.pressing && t.hovering)
 	i := t.computedParams.Image.Idle
 
-	switch {
-	case t.widget.Disabled && t.computedParams.Image.Disabled != nil:
-		if pressed && t.computedParams.Image.PressedDisabled != nil {
-			i = t.computedParams.Image.PressedDisabled
-		} else {
-			i = t.computedParams.Image.Disabled
-		}
-	case (t.focused || t.hovering) && t.computedParams.Image.Hover != nil:
-		if pressed && t.computedParams.Image.PressedHover != nil {
-			i = t.computedParams.Image.PressedHover
-		} else {
-			i = t.computedParams.Image.Hover
-		}
-	case pressed:
-		if t.computedParams.Image.Pressed != nil {
-			i = t.computedParams.Image.Pressed
-		}
+	if t.focused && t.computedParams.Image.Hover != nil {
+		i = t.computedParams.Image.Hover
 	}
+
+	//switch {
+	//	case t.widget.Disabled && t.computedParams.Image.Disabled != nil:
+	//		if pressed && t.computedParams.Image.PressedDisabled != nil {
+	//			i = t.computedParams.Image.PressedDisabled
+	//		} else {
+	//			i = t.computedParams.Image.Disabled
+	//		}
+	//case (t.focused || t.hovering) && t.computedParams.Image.Hover != nil:
+	//		if pressed && t.computedParams.Image.PressedHover != nil {
+	//			i = t.computedParams.Image.PressedHover
+	//		} else {
+	//			i = t.computedParams.Image.Hover
+	//		}
+	//	case pressed:
+	//		if t.computedParams.Image.Pressed != nil {
+	//			i = t.computedParams.Image.Pressed
+	//		}
+	//	}
 
 	rect := t.widget.Rect
 	i.Draw(screen, rect.Dx(), rect.Dy(), func(opts *ebiten.DrawImageOptions) {
@@ -734,7 +738,15 @@ func (t *BindingInput) SetText(text string) {
 
 /** Focuser Interface - Start **/
 
+// Focus this is used by ebitenui to focus the element - however it cannot be focused
+// directly - only through "append" button selection
 func (t *BindingInput) Focus(focused bool) {
+	//t.init.Do()
+	//t.GetWidget().FireFocusEvent(t, focused, img.Point{-1, -1})
+	//t.focused = focused
+}
+
+func (t *BindingInput) FocusExplicit(focused bool) {
 	t.init.Do()
 	t.GetWidget().FireFocusEvent(t, focused, img.Point{-1, -1})
 	t.focused = focused
@@ -742,6 +754,10 @@ func (t *BindingInput) Focus(focused bool) {
 
 func (t *BindingInput) IsFocused() bool {
 	return t.focused
+}
+
+func (t *BindingInput) FocusClearAll() {
+	t.focusMap = map[widget.FocusDirection]widget.Focuser{}
 }
 
 func (t *BindingInput) TabOrder() int {
@@ -755,6 +771,14 @@ func (t *BindingInput) GetFocus(direction widget.FocusDirection) widget.Focuser 
 func (t *BindingInput) AddFocus(direction widget.FocusDirection, focus widget.Focuser) {
 	t.focusMap[direction] = focus
 }
+
+func (t *BindingInput) GetFocuses() map[widget.FocusDirection]widget.Focuser {
+	return t.focusMap
+}
+
+//func (t *BindingInput) RemoveFocus() {
+//
+//}
 
 /** Focuser Interface - End **/
 

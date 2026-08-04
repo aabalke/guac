@@ -8,7 +8,6 @@ import (
 )
 
 func NewHome(g *Game) {
-
 	g.ui.focus.ClearFocus()
 
 	l := g.ui.res.localization.Main
@@ -43,7 +42,6 @@ func NewHome(g *Game) {
 }
 
 func NewPause(g *Game) {
-
 	g.ui.focus.ClearFocus()
 
 	l := g.ui.res.localization.Pause
@@ -86,7 +84,6 @@ func NewPause(g *Game) {
 }
 
 func NewCenteredPage(bg *image.NineSlice, buttons ...*widget.Button) *widget.Container {
-
 	root := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(bg),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
@@ -117,11 +114,10 @@ func NewCenteredPage(bg *image.NineSlice, buttons ...*widget.Button) *widget.Con
 }
 
 func NewCenteredButton(text string, f func()) *widget.Button {
-
 	b := widget.NewButton(
 		widget.ButtonOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-				//MaxWidth: BUTTON_WIDTH,
+				// MaxWidth: BUTTON_WIDTH,
 				Stretch: true,
 			}),
 

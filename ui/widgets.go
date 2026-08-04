@@ -17,25 +17,18 @@ const (
 	BUTTON_WIDTH = 256
 )
 
-const (
-	WIDGET_HDR = iota // header
-	WIDGET_CBX        // checkbox
-	WIDGET_KEY        // keybinding
-	WIDGET_DEC        // decimal
-	WIDGET_HEX        // hexadecimal
-	WIDGET_FLE        // file
-	WIDGET_DIR        // directory
-	WIDGET_TXT        // text
-	WIDGET_LNK        // link
-	WIDGET_RAD        // radio
-)
-
 func NewHeader(text string, res *Resources) *widget.Text {
-	return widget.NewText(widget.TextOpts.Text(text, res.fonts.face, *res.fgClr))
+	return widget.NewText(
+		widget.TextOpts.Text(text, res.fonts.face, *res.fgClr),
+		widget.TextOpts.Padding(&widget.Insets{24, 24, 24, 0}),
+	)
 }
 
 func NewLabel(text string) *widget.Text {
-	t := widget.NewText()
+	t := widget.NewText(
+		widget.TextOpts.Position(widget.TextPositionStart, widget.TextPositionCenter),
+	)
+
 	t.Label = text
 	return t
 }
@@ -120,20 +113,32 @@ func NewKeybindInput(ui *Ui, v *[]ebiten.Key) widget.PreferredSizeLocateableWidg
 
 	container := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
-			widget.GridLayoutOpts.Columns(3),
-			widget.GridLayoutOpts.Stretch([]bool{true, false, false}, []bool{true}),
+			widget.GridLayoutOpts.Columns(2),
+			widget.GridLayoutOpts.Stretch([]bool{true, false}, []bool{true}),
 			widget.GridLayoutOpts.Spacing(4, 0),
 		)),
 	)
 
+	sideContainer := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+		widget.ContainerOpts.WidgetOpts(buttonContainerMin),
+	)
+
 	buttonContainer := widget.NewContainer(
+		widget.ContainerOpts.WidgetOpts(
+			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+				HorizontalPosition: widget.AnchorLayoutPositionCenter,
+				VerticalPosition:   widget.AnchorLayoutPositionCenter,
+				StretchVertical:    true,
+				StretchHorizontal:  true,
+			}),
+		),
+
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(2),
-			widget.GridLayoutOpts.Stretch([]bool{false, false}, []bool{true}),
+			widget.GridLayoutOpts.Stretch([]bool{true, true}, []bool{true}),
 			widget.GridLayoutOpts.Spacing(4, 0),
 		)),
-
-		widget.ContainerOpts.WidgetOpts(buttonContainerMin),
 	)
 
 	count := 5
@@ -153,43 +158,61 @@ func NewKeybindInput(ui *Ui, v *[]ebiten.Key) widget.PreferredSizeLocateableWidg
 
 	input.SetText(toString(v))
 
-	clock := widget.NewButton(
-		buttonText(strconv.Itoa(count)),
-		widget.ButtonOpts.WidgetOpts(buttonContainerMin),
-		widget.ButtonOpts.Image(&transparentButtonImage),
-		widget.ButtonOpts.TextPadding(&paddingSidesInset),
+	clock := widget.NewText(
+
+		widget.TextOpts.WidgetOpts(
+			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+				HorizontalPosition: widget.AnchorLayoutPositionCenter,
+				VerticalPosition:   widget.AnchorLayoutPositionCenter,
+				StretchVertical:    true,
+				StretchHorizontal:  true,
+			}),
+		),
+
+		widget.TextOpts.Text(
+			strconv.Itoa(count),
+			ui.res.fonts.smallFace,
+			*ui.res.fgClr,
+		),
+		widget.TextOpts.WidgetOpts(buttonContainerMin),
+		widget.TextOpts.Padding(&paddingSidesInset),
+		widget.TextOpts.Position(widget.TextPositionCenter, widget.TextPositionCenter),
 	)
+
+	var appendButton, cancelButton *widget.Button
 
 	clockCountDown := func() {
 		for range time.Tick(time.Second) {
 			if count <= 0 {
-				container.RemoveChildren()
-				container.AddChild(input, buttonContainer)
 				input.takingInputs = false
 				count = 5
-				clock.SetText(strconv.Itoa(count))
+				clock.Label = strconv.Itoa(count)
+				ui.ui.SetFocusedWidget(appendButton)
+				input.FocusExplicit(false)
+				clock.GetWidget().SetVisibility(widget.Visibility_Hide_Blocking)
+				buttonContainer.GetWidget().SetVisibility(widget.Visibility_Show)
 				break
 			}
 
 			count--
-			clock.SetText(strconv.Itoa(count))
-
+			clock.Label = strconv.Itoa(count)
 		}
 	}
 
-	buttonContainer.AddChild(widget.NewButton(
+	appendButton = widget.NewButton(
 		buttonText("+"),
 		widget.ButtonOpts.TextPadding(&paddingSidesInset),
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
 			input.takingInputs = true
 			ui.ui.SetFocusedWidget(input)
-			container.RemoveChildren()
-			container.AddChild(input, clock)
+			input.FocusExplicit(true)
+			clock.GetWidget().SetVisibility(widget.Visibility_Show)
+			buttonContainer.GetWidget().SetVisibility(widget.Visibility_Hide_Blocking)
 			go clockCountDown()
 		}),
-	))
+	)
 
-	buttonContainer.AddChild(widget.NewButton(
+	cancelButton = widget.NewButton(
 		buttonText("x"),
 		widget.ButtonOpts.TextPadding(&paddingSidesInset),
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
@@ -197,9 +220,13 @@ func NewKeybindInput(ui *Ui, v *[]ebiten.Key) widget.PreferredSizeLocateableWidg
 			*v = []ebiten.Key{}
 			input.takingInputs = false
 		}),
-	))
+	)
 
-	container.AddChild(input, buttonContainer)
+	buttonContainer.AddChild(appendButton, cancelButton)
+	sideContainer.AddChild(buttonContainer, clock)
+	container.AddChild(input, sideContainer)
+
+	clock.GetWidget().SetVisibility(widget.Visibility_Hide_Blocking)
 
 	return container
 }
