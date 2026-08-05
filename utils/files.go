@@ -2,7 +2,10 @@ package utils
 
 import (
 	"bufio"
+	"fmt"
 	"os"
+	"os/exec"
+	"runtime"
 
 	"github.com/sqweek/dialog"
 )
@@ -16,7 +19,6 @@ func ReadFile(path string) (buf []uint8, length int, ok bool) {
 }
 
 func WriteFile(path string, buf []uint8) bool {
-
 	f, err := os.Create(path)
 	if err != nil {
 		return false
@@ -26,15 +28,10 @@ func WriteFile(path string, buf []uint8) bool {
 	writer := bufio.NewWriter(f)
 
 	_, err = writer.Write(buf)
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err == nil
 }
 
 func OpenFile(title, desc string, extensions ...string) string {
-
 	if len(extensions) == 0 {
 		extensions = append(extensions, "*")
 	}
@@ -48,7 +45,6 @@ func OpenFile(title, desc string, extensions ...string) string {
 }
 
 func OpenDirectory(title, defaultPath string) string {
-
 	directory, err := dialog.Directory().Title(title).Browse()
 	if err != nil {
 		return defaultPath
@@ -72,4 +68,27 @@ func IsDirectory(path string) bool {
 	}
 
 	return info.IsDir()
+}
+
+func openBrowser(url string) error {
+	var cmd *exec.Cmd
+
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "linux":
+		cmd = exec.Command("xdg-open", url)
+	default:
+		return fmt.Errorf("unsupported platform")
+	}
+
+	return cmd.Start()
+}
+
+func OpenLink(path string) {
+	if err := openBrowser(path); err != nil {
+		panic(err)
+	}
 }

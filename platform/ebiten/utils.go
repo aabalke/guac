@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"image/color"
 	"strconv"
 	"strings"
@@ -17,21 +18,16 @@ func toString(value any) string {
 		return *v
 	case *[]string:
 		return join(*v, ", ", func(s string) string { return s })
-
 	case *[]int:
 		return join(*v, ", ", strconv.Itoa)
-
 	case *[]ebiten.Key:
 		return join(*v, ", ", utils.KeyToString)
-
 	case *[]ebiten.StandardGamepadButton:
 		return join(*v, ", ", utils.GamepadButtonToString)
-
 	case *color.Color:
 		return utils.ColorToHex(*v)
-
 	default:
-		panic("not supported text box input")
+		panic(fmt.Sprintf("not supported toString input type %T", value))
 	}
 }
 
@@ -97,7 +93,7 @@ func fromString(original any, value string) {
 		}
 
 	default:
-		panic("not supported text box input")
+		panic(fmt.Sprintf("not supported fromString input type %T", original))
 	}
 }
 
