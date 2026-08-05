@@ -149,8 +149,8 @@ func (c *Config) encodeProfile() {
 }
 
 func (c *Config) encodeGb() {
-	c.encodeKeyboard(&c.Gb.Keyboard, &c.config.Gb.KeyboardConfig)
-	c.encodeController(&c.Gb.Controller, &c.config.Gb.ControllerConfig)
+	c.encodeKeyboard(&c.Gb.Keyboard, &c.config.Gb.Keyboard)
+	c.encodeController(&c.Gb.Controller, &c.config.Gb.Controller)
 
 	if utils.IsFile(c.config.Gb.Bios.DmgPath) {
 		c.Gb.Bios.DmgPath = c.config.Gb.Bios.DmgPath
@@ -180,8 +180,8 @@ func (c *Config) encodeGb() {
 }
 
 func (c *Config) encodeGba() {
-	c.encodeKeyboard(&c.Gba.Keyboard, &c.config.Gba.KeyboardConfig)
-	c.encodeController(&c.Gba.Controller, &c.config.Gba.ControllerConfig)
+	c.encodeKeyboard(&c.Gba.Keyboard, &c.config.Gba.Keyboard)
+	c.encodeController(&c.Gba.Controller, &c.config.Gba.Controller)
 	c.Gba.IdleOptimize = c.config.Gba.IdleOptimize
 
 	c.Gba.Hardware.ForceRtc = c.config.Gba.Hardware.ForceRtc
@@ -222,8 +222,8 @@ func (c *Config) encodeGba() {
 }
 
 func (c *Config) encodeNds() {
-	c.encodeKeyboard(&c.Nds.Keyboard, &c.config.Nds.KeyboardConfig)
-	c.encodeController(&c.Nds.Controller, &c.config.Nds.ControllerConfig)
+	c.encodeKeyboard(&c.Nds.Keyboard, &c.config.Nds.Keyboard)
+	c.encodeController(&c.Nds.Controller, &c.config.Nds.Controller)
 
 	if utils.IsFile(c.Nds.Bios.Arm7Path) {
 		c.Nds.Bios.Arm7Path = c.config.Nds.Bios.Arm7Path

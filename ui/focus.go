@@ -22,10 +22,11 @@ func (f *Focus) ClearFocus() {
 	f.horizontalGroup = [][]widget.Focuser{}
 }
 
-func (f *Focus) BuildMenuFocus(ui *ebitenui.UI, menu, keys *widget.Container) {
+func (f *Focus) BuildMenuFocus(ui *ebitenui.UI, menu, keys, gamepad *widget.Container) {
 	f.submenu = menu.GetFocusers()
 	f.BuildFocus(ui)
-	f.buildBindings(keys)
+	f.buildBinding(keys)
+	f.buildBinding(gamepad)
 }
 
 func (f *Focus) BuildFocus(ui *ebitenui.UI) {
@@ -43,7 +44,7 @@ func (f *Focus) BuildFocus(ui *ebitenui.UI) {
 	f.buildSubFocus()
 }
 
-func (f *Focus) buildBindings(keybinds *widget.Container) {
+func (f *Focus) buildBinding(keybinds *widget.Container) {
 	if keybinds == nil {
 		return
 	}

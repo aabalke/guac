@@ -142,7 +142,21 @@ func NewGeneralMenu(g *Game) *widget.Container {
 		NewLabel(l.Quit), NewKeybindInput(g.ui, &k.Quit),
 	)
 
-	//c   = &tmp.Controller
+	gamepad := NewTwoCol()
+	menu.AddChild(NewHeader(l.Controller, g.ui.res), gamepad)
+	c := &tmp.Controller
+	gamepad.AddChild(
+		NewLabel(l.Select), NewGamepadInput(g.ui, &c.Select),
+		NewLabel(l.Return), NewGamepadInput(g.ui, &c.Return),
+		NewLabel(l.Mute), NewGamepadInput(g.ui, &c.Mute),
+		NewLabel(l.Pause), NewGamepadInput(g.ui, &c.Pause),
+		NewLabel(l.Left), NewGamepadInput(g.ui, &c.Left),
+		NewLabel(l.Right), NewGamepadInput(g.ui, &c.Right),
+		NewLabel(l.Up), NewGamepadInput(g.ui, &c.Up),
+		NewLabel(l.Down), NewGamepadInput(g.ui, &c.Down),
+		NewLabel(l.Fullscreen), NewGamepadInput(g.ui, &c.Fullscreen),
+		NewLabel(l.Quit), NewGamepadInput(g.ui, &c.Quit),
+	)
 
 	menu.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.General = tmp
@@ -152,14 +166,14 @@ func NewGeneralMenu(g *Game) *widget.Container {
 
 		file.Encode()
 
-		if len(g.gamepadIds) != 0 {
+		if len(g.ui.gamepadIds) != 0 {
 			g.ui.focus.FocusLastSubMenu()
 		}
 
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
 
-	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, keys)
+	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, keys, gamepad)
 
 	return menu
 }
@@ -208,7 +222,7 @@ func NewUiMenu(g *Game) *widget.Container {
 
 			file.Encode()
 
-			if len(g.gamepadIds) != 0 {
+			if len(g.ui.gamepadIds) != 0 {
 				g.ui.focus.FocusLastSubMenu()
 			}
 
@@ -216,26 +230,21 @@ func NewUiMenu(g *Game) *widget.Container {
 		}),
 	)
 
-	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, nil)
+	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, nil, nil)
 
 	return menu
 }
 
 func NewGbMenu(g *Game) *widget.Container {
-	var (
-		tmp = config.Conf.Gb
-		//c   = &tmp.ControllerConfig
-		pal = &tmp.Palette
-
-		l = g.ui.res.localization.Settings.Gb
-
-		clrInputs = [4]widget.PreferredSizeLocateableWidget{
-			NewColorInput(g.ui, l.DmgLightest, &pal[0], HexValidation(0xFFFFFF)),
-			NewColorInput(g.ui, l.DmgLight, &pal[1], HexValidation(0xFFFFFF)),
-			NewColorInput(g.ui, l.DmgDark, &pal[2], HexValidation(0xFFFFFF)),
-			NewColorInput(g.ui, l.DmgDarkest, &pal[3], HexValidation(0xFFFFFF)),
-		}
-	)
+	tmp := config.Conf.Gb
+	l := g.ui.res.localization.Settings.Gb
+	pal := &tmp.Palette
+	clrInputs := [4]widget.PreferredSizeLocateableWidget{
+		NewColorInput(g.ui, l.DmgLightest, &pal[0], HexValidation(0xFFFFFF)),
+		NewColorInput(g.ui, l.DmgLight, &pal[1], HexValidation(0xFFFFFF)),
+		NewColorInput(g.ui, l.DmgDark, &pal[2], HexValidation(0xFFFFFF)),
+		NewColorInput(g.ui, l.DmgDarkest, &pal[3], HexValidation(0xFFFFFF)),
+	}
 
 	menu := NewMenu()
 
@@ -266,7 +275,7 @@ func NewGbMenu(g *Game) *widget.Container {
 
 	keys := NewTwoCol()
 	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
-	k := &tmp.KeyboardConfig
+	k := &tmp.Keyboard
 	keys.AddChild(
 		NewLabel(l.A), NewKeybindInput(g.ui, &k.A),
 		NewLabel(l.B), NewKeybindInput(g.ui, &k.B),
@@ -278,6 +287,20 @@ func NewGbMenu(g *Game) *widget.Container {
 		NewLabel(l.Down), NewKeybindInput(g.ui, &k.Down),
 	)
 
+	gamepad := NewTwoCol()
+	menu.AddChild(NewHeader(l.Controller, g.ui.res), gamepad)
+	c := &tmp.Controller
+	gamepad.AddChild(
+		NewLabel(l.A), NewGamepadInput(g.ui, &c.A),
+		NewLabel(l.B), NewGamepadInput(g.ui, &c.B),
+		NewLabel(l.Select), NewGamepadInput(g.ui, &c.Select),
+		NewLabel(l.Start), NewGamepadInput(g.ui, &c.Start),
+		NewLabel(l.Left), NewGamepadInput(g.ui, &c.Left),
+		NewLabel(l.Right), NewGamepadInput(g.ui, &c.Right),
+		NewLabel(l.Up), NewGamepadInput(g.ui, &c.Up),
+		NewLabel(l.Down), NewGamepadInput(g.ui, &c.Down),
+	)
+
 	menu.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Gb = tmp
 
@@ -286,24 +309,20 @@ func NewGbMenu(g *Game) *widget.Container {
 
 		file.Encode()
 
-		if len(g.gamepadIds) != 0 {
+		if len(g.ui.gamepadIds) != 0 {
 			g.ui.focus.FocusLastSubMenu()
 		}
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
 
-	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, keys)
+	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, keys, gamepad)
 
 	return menu
 }
 
 func NewGbaMenu(g *Game) *widget.Container {
-	var (
-		tmp = config.Conf.Gba
-		//c   = &tmp.ControllerConfig
-
-		l = g.ui.res.localization.Settings.Gba
-	)
+	tmp := config.Conf.Gba
+	l := g.ui.res.localization.Settings.Gba
 
 	menu := NewMenu()
 
@@ -335,7 +354,7 @@ func NewGbaMenu(g *Game) *widget.Container {
 
 	keys := NewTwoCol()
 	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
-	k := &tmp.KeyboardConfig
+	k := &tmp.Keyboard
 	keys.AddChild(
 		NewLabel(l.A), NewKeybindInput(g.ui, &k.A),
 		NewLabel(l.B), NewKeybindInput(g.ui, &k.B),
@@ -353,6 +372,28 @@ func NewGbaMenu(g *Game) *widget.Container {
 		NewLabel(l.Solar3), NewKeybindInput(g.ui, &k.SolarLevel3),
 		NewLabel(l.SolarMax), NewKeybindInput(g.ui, &k.SolarLevel4),
 		NewLabel(l.RotationToggle), NewKeybindInput(g.ui, &k.RotationToggle),
+	)
+
+	gamepad := NewTwoCol()
+	menu.AddChild(NewHeader(l.Controller, g.ui.res), gamepad)
+	c := &tmp.Controller
+	gamepad.AddChild(
+		NewLabel(l.A), NewGamepadInput(g.ui, &c.A),
+		NewLabel(l.B), NewGamepadInput(g.ui, &c.B),
+		NewLabel(l.Select), NewGamepadInput(g.ui, &c.Select),
+		NewLabel(l.Start), NewGamepadInput(g.ui, &c.Start),
+		NewLabel(l.Left), NewGamepadInput(g.ui, &c.Left),
+		NewLabel(l.Right), NewGamepadInput(g.ui, &c.Right),
+		NewLabel(l.Up), NewGamepadInput(g.ui, &c.Up),
+		NewLabel(l.Down), NewGamepadInput(g.ui, &c.Down),
+		NewLabel(l.L), NewGamepadInput(g.ui, &c.L),
+		NewLabel(l.R), NewGamepadInput(g.ui, &c.R),
+		NewLabel(l.SolarMin), NewGamepadInput(g.ui, &c.SolarLevel0),
+		NewLabel(l.Solar1), NewGamepadInput(g.ui, &c.SolarLevel1),
+		NewLabel(l.Solar2), NewGamepadInput(g.ui, &c.SolarLevel2),
+		NewLabel(l.Solar3), NewGamepadInput(g.ui, &c.SolarLevel3),
+		NewLabel(l.SolarMax), NewGamepadInput(g.ui, &c.SolarLevel4),
+		NewLabel(l.RotationToggle), NewGamepadInput(g.ui, &c.RotationToggle),
 	)
 
 	menu.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
@@ -379,26 +420,20 @@ func NewGbaMenu(g *Game) *widget.Container {
 
 		file.Encode()
 
-		if len(g.gamepadIds) != 0 {
+		if len(g.ui.gamepadIds) != 0 {
 			g.ui.focus.FocusLastSubMenu()
 		}
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
 
-	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, keys)
+	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, keys, gamepad)
 
 	return menu
 }
 
 func NewNdsMenu(g *Game) *widget.Container {
-	var (
-		tmp = config.Conf.Nds
-		//c   = &tmp.ControllerConfig
-
-		l = g.ui.res.localization.Settings.Nds
-
-		favColor = config.ColorNames[tmp.Firmware.Color]
-	)
+	tmp := config.Conf.Nds
+	l := g.ui.res.localization.Settings.Nds
 
 	menu := NewMenu()
 
@@ -428,6 +463,7 @@ func NewNdsMenu(g *Game) *widget.Container {
 
 	firmware := NewTwoCol()
 	menu.AddChild(NewHeader(l.Firmware, g.ui.res), firmware)
+	favColor := config.ColorNames[tmp.Firmware.Color]
 
 	firmware.AddChild(
 		NewLabel(l.FilePath), NewFileInput(&tmp.Firmware.FilePath),
@@ -446,7 +482,7 @@ func NewNdsMenu(g *Game) *widget.Container {
 
 	keys := NewTwoCol()
 	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
-	k := &tmp.KeyboardConfig
+	k := &tmp.Keyboard
 	keys.AddChild(
 		NewLabel(l.A), NewKeybindInput(g.ui, &k.A),
 		NewLabel(l.B), NewKeybindInput(g.ui, &k.B),
@@ -467,6 +503,29 @@ func NewNdsMenu(g *Game) *widget.Container {
 		NewLabel(l.ExportToggle), NewKeybindInput(g.ui, &k.ExportScene),
 	)
 
+	gamepad := NewTwoCol()
+	menu.AddChild(NewHeader(l.Controller, g.ui.res), gamepad)
+	c := &tmp.Controller
+	gamepad.AddChild(
+		NewLabel(l.A), NewGamepadInput(g.ui, &c.A),
+		NewLabel(l.B), NewGamepadInput(g.ui, &c.B),
+		NewLabel(l.Select), NewGamepadInput(g.ui, &c.Select),
+		NewLabel(l.Start), NewGamepadInput(g.ui, &c.Start),
+		NewLabel(l.Left), NewGamepadInput(g.ui, &c.Left),
+		NewLabel(l.Right), NewGamepadInput(g.ui, &c.Right),
+		NewLabel(l.Up), NewGamepadInput(g.ui, &c.Up),
+		NewLabel(l.Down), NewGamepadInput(g.ui, &c.Down),
+		NewLabel(l.L), NewGamepadInput(g.ui, &c.L),
+		NewLabel(l.R), NewGamepadInput(g.ui, &c.R),
+		NewLabel(l.X), NewGamepadInput(g.ui, &c.X),
+		NewLabel(l.Y), NewGamepadInput(g.ui, &c.Y),
+		NewLabel(l.Hinge), NewGamepadInput(g.ui, &c.Hinge),
+		NewLabel(l.LayoutToggle), NewGamepadInput(g.ui, &c.LayoutToggle),
+		NewLabel(l.SizingToggle), NewGamepadInput(g.ui, &c.SizingToggle),
+		NewLabel(l.RotationToggle), NewGamepadInput(g.ui, &c.RotationToggle),
+		NewLabel(l.ExportToggle), NewGamepadInput(g.ui, &c.ExportScene),
+	)
+
 	menu.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Nds = tmp
 		config.Conf.Nds.Firmware.Color = config.ColorNameToId[favColor]
@@ -476,13 +535,13 @@ func NewNdsMenu(g *Game) *widget.Container {
 
 		file.Encode()
 
-		if len(g.gamepadIds) != 0 {
+		if len(g.ui.gamepadIds) != 0 {
 			g.ui.focus.FocusLastSubMenu()
 		}
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
 
-	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, keys)
+	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, keys, gamepad)
 	return menu
 }
 
@@ -500,7 +559,7 @@ func NewAboutMenu(g *Game) *widget.Container {
 	about.AddChild(NewLinkText(l.Copyright))
 	about.AddChild(NewLinkText(l.ThankYous))
 
-	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, nil)
+	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, nil, nil)
 
 	return menu
 }

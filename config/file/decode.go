@@ -166,8 +166,8 @@ func (c *Config) decodeProfile() {
 }
 
 func (c *Config) decodeGb() {
-	c.decodeKeyboard(&c.Gb.Keyboard, &c.config.Gb.KeyboardConfig)
-	c.decodeController(&c.Gb.Controller, &c.config.Gb.ControllerConfig)
+	c.decodeKeyboard(&c.Gb.Keyboard, &c.config.Gb.Keyboard)
+	c.decodeController(&c.Gb.Controller, &c.config.Gb.Controller)
 
 	if utils.IsFile(c.Gb.Bios.DmgPath) {
 		c.config.Gb.Bios.DmgPath = c.Gb.Bios.DmgPath
@@ -211,8 +211,8 @@ func (c *Config) decodeGb() {
 }
 
 func (c *Config) decodeGba() {
-	c.decodeKeyboard(&c.Gba.Keyboard, &c.config.Gba.KeyboardConfig)
-	c.decodeController(&c.Gba.Controller, &c.config.Gba.ControllerConfig)
+	c.decodeKeyboard(&c.Gba.Keyboard, &c.config.Gba.Keyboard)
+	c.decodeController(&c.Gba.Controller, &c.config.Gba.Controller)
 
 	c.config.Gba.IdleOptimize = c.Gba.IdleOptimize
 
@@ -258,8 +258,8 @@ func (c *Config) decodeGba() {
 }
 
 func (c *Config) decodeNds() {
-	c.decodeKeyboard(&c.Nds.Keyboard, &c.config.Nds.KeyboardConfig)
-	c.decodeController(&c.Nds.Controller, &c.config.Nds.ControllerConfig)
+	c.decodeKeyboard(&c.Nds.Keyboard, &c.config.Nds.Keyboard)
+	c.decodeController(&c.Nds.Controller, &c.config.Nds.Controller)
 
 	if utils.IsFile(c.Nds.Bios.Arm7Path) {
 		c.config.Nds.Bios.Arm7Path = c.Nds.Bios.Arm7Path

@@ -13,8 +13,8 @@ var _ = fmt.Sprint
 
 func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, justButtons, buttons []ebiten.StandardGamepadButton, mouse *input.Mouse, frame uint64) {
 	var (
-		keyCfg    = config.Conf.Nds.KeyboardConfig
-		buttonCfg = config.Conf.Nds.ControllerConfig
+		keyCfg    = config.Conf.Nds.Keyboard
+		buttonCfg = config.Conf.Nds.Controller
 		k         = &nds.mem.Keypad.KEYINPUT
 		k2        = &nds.mem.Keypad.KEYINPUT2
 	)

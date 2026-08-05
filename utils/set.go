@@ -56,3 +56,19 @@ outer:
 
 	return dst
 }
+
+func AppendButtonUnique(dst, src []ebiten.StandardGamepadButton) []ebiten.StandardGamepadButton {
+outer:
+	for i := range src {
+		for j := range dst {
+			if src[i] == dst[j] {
+				continue outer
+			}
+		}
+
+		dst = append(dst, src[i])
+
+	}
+
+	return dst
+}

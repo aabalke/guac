@@ -99,6 +99,15 @@ func NewTextBoxInput(ui *Ui, board int, label string, value any, validation func
 }
 
 func NewKeybindInput(ui *Ui, v *[]ebiten.Key) widget.PreferredSizeLocateableWidget {
+	return _NewBindingInput(ui, v, nil)
+}
+
+func NewGamepadInput(ui *Ui, v *[]ebiten.StandardGamepadButton) widget.PreferredSizeLocateableWidget {
+	return _NewBindingInput(ui, nil, v)
+}
+
+func _NewBindingInput(ui *Ui, keys *[]ebiten.Key, buttons *[]ebiten.StandardGamepadButton) widget.PreferredSizeLocateableWidget {
+	placeholder := ""
 	buttonContainerMin := widget.WidgetOpts.MinSize(64, 1)
 
 	buttonText := func(label string) widget.ButtonOpt {
@@ -144,19 +153,28 @@ func NewKeybindInput(ui *Ui, v *[]ebiten.Key) widget.PreferredSizeLocateableWidg
 	count := 5
 
 	input := NewBindingInput(
-		BindingInputOpts.Placeholder("Click to add binding"),
+		BindingInputOpts.Placeholder(placeholder),
 
 		BindingInputOpts.ChangedHandler(func(args *BindingInputChangedEventArgs) {
-			if args.TextInput.takingInputs {
-				*v = utils.AppendKeyUnique(*v, args.Keys)
-				args.TextInput.SetText(toString(v))
-				args.TextInput.takingInputs = false
+			if args.BindingInput.takingInputs {
+				if keys != nil {
+					*keys = utils.AppendKeyUnique(*keys, args.Keys)
+					args.BindingInput.SetText(toString(keys))
+				} else {
+					*buttons = utils.AppendButtonUnique(*buttons, args.Buttons)
+					args.BindingInput.SetText(toString(buttons))
+				}
+				args.BindingInput.takingInputs = false
 				count = 0
 			}
 		}),
 	)
 
-	input.SetText(toString(v))
+	if keys != nil {
+		input.SetText(toString(keys))
+	} else {
+		input.SetText(toString(buttons))
+	}
 
 	clock := widget.NewText(
 
@@ -217,7 +235,11 @@ func NewKeybindInput(ui *Ui, v *[]ebiten.Key) widget.PreferredSizeLocateableWidg
 		widget.ButtonOpts.TextPadding(&paddingSidesInset),
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
 			input.SetText("")
-			*v = []ebiten.Key{}
+			if keys != nil {
+				*keys = []ebiten.Key{}
+			} else {
+				*buttons = []ebiten.StandardGamepadButton{}
+			}
 			input.takingInputs = false
 		}),
 	)
@@ -227,6 +249,10 @@ func NewKeybindInput(ui *Ui, v *[]ebiten.Key) widget.PreferredSizeLocateableWidg
 	container.AddChild(input, sideContainer)
 
 	clock.GetWidget().SetVisibility(widget.Visibility_Hide_Blocking)
+
+	if buttons != nil {
+		input.SetGamepadBinding(&ui.gamepadIds)
+	}
 
 	return container
 }

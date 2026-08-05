@@ -12,7 +12,7 @@ func (gba *GBA) InputHandler(justKeys, keys []ebiten.Key, justButtons, buttons [
 	k := &gba.Keypad.Input
 	*k = 0x3FF
 
-	keyConfig := config.Conf.Gba.KeyboardConfig
+	keyConfig := config.Conf.Gba.Keyboard
 	for _, key := range keys {
 		switch {
 		case slices.Contains(keyConfig.A, key):
@@ -45,7 +45,7 @@ func (gba *GBA) InputHandler(justKeys, keys []ebiten.Key, justButtons, buttons [
 		}
 	}
 
-	buttonConfig := config.Conf.Gba.ControllerConfig
+	buttonConfig := config.Conf.Gba.Controller
 	for _, button := range buttons {
 		switch {
 		case slices.Contains(buttonConfig.A, button):
@@ -84,7 +84,7 @@ func (gba *GBA) InputHandler(justKeys, keys []ebiten.Key, justButtons, buttons [
 			if !ok {
 				continue
 			}
-			keyConfig := config.Conf.Gba.KeyboardConfig
+			keyConfig := config.Conf.Gba.Keyboard
 			for _, key := range keys {
 				switch {
 				case slices.Contains(keyConfig.SolarLevel0, key):
@@ -99,7 +99,7 @@ func (gba *GBA) InputHandler(justKeys, keys []ebiten.Key, justButtons, buttons [
 					d.SetLevel(100)
 				}
 			}
-			buttonConfig := config.Conf.Gba.ControllerConfig
+			buttonConfig := config.Conf.Gba.Controller
 			for _, button := range buttons {
 				switch {
 				case slices.Contains(buttonConfig.SolarLevel0, button):

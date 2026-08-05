@@ -12,29 +12,29 @@ import (
 )
 
 func (g *Game) GetGamepadButtons() (justButtons, buttons []ebiten.StandardGamepadButton) {
-	g.gamepadIdBuf = inpututil.AppendJustConnectedGamepadIDs(g.gamepadIdBuf[:0])
+	g.ui.gamepadIdBuf = inpututil.AppendJustConnectedGamepadIDs(g.ui.gamepadIdBuf[:0])
 
-	for _, id := range g.gamepadIdBuf {
+	for _, id := range g.ui.gamepadIdBuf {
 		fmt.Printf("Gamepad Connected id %d\n", id)
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.ControllerConnected)
-		g.gamepadIds[id] = struct{}{}
+		g.ui.gamepadIds[id] = struct{}{}
 
 		g.ui.focus.FocusSidebar(0)
 	}
 
-	for id := range g.gamepadIds {
+	for id := range g.ui.gamepadIds {
 		if inpututil.IsGamepadJustDisconnected(id) {
 			fmt.Printf("Gamepad Disconnected id %d\n", id)
 			g.ui.toast.AddMessage(g.ui.res.localization.Toast.ControllerDisconnected)
-			delete(g.gamepadIds, id)
+			delete(g.ui.gamepadIds, id)
 
-			if len(g.gamepadIds) == 0 {
+			if len(g.ui.gamepadIds) == 0 {
 				g.ui.focus.DeFocus()
 			}
 		}
 	}
 
-	for id := range g.gamepadIds {
+	for id := range g.ui.gamepadIds {
 		if !ebiten.IsStandardGamepadLayoutAvailable(id) {
 			continue
 		}
@@ -175,7 +175,7 @@ func (g *Game) getFastFocus(buttons []ebiten.StandardGamepadButton) {
 
 	inputAcc -= inputHz
 
-	for gp := range g.gamepadIds {
+	for gp := range g.ui.gamepadIds {
 		for _, button := range buttons {
 			if inpututil.StandardGamepadButtonPressDuration(gp, button) < int(60) {
 				continue

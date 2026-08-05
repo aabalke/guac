@@ -37,8 +37,6 @@ type Game struct {
 	gb           *gb.GameBoy
 	mouse        *input.Mouse
 	audioCtx     *audio.Context
-	gamepadIdBuf []ebiten.GamepadID
-	gamepadIds   map[ebiten.GamepadID]struct{}
 	pauseEndTick int64
 	TargetFps    int
 	vsync        bool
@@ -48,8 +46,10 @@ type Game struct {
 }
 
 type Ui struct {
-	res   *Resources
-	focus *Focus
+	gamepadIdBuf []ebiten.GamepadID
+	gamepadIds   map[ebiten.GamepadID]struct{}
+	res          *Resources
+	focus        *Focus
 
 	PageId     PageId
 	PrevPageId PageId
@@ -95,17 +95,17 @@ func StartEngine() {
 
 func NewGame(res *Resources) *Game {
 	g := &Game{
-		audioCtx:     audio.NewContext(config.Conf.General.SampleRate),
-		mouse:        input.NewMouse(),
-		vsync:        config.Conf.General.Vsync,
-		gamepadIds:   make(map[ebiten.GamepadID]struct{}),
-		gamepadIdBuf: make([]ebiten.GamepadID, 0),
-		muted:        config.Conf.General.Muted,
+		audioCtx: audio.NewContext(config.Conf.General.SampleRate),
+		mouse:    input.NewMouse(),
+		vsync:    config.Conf.General.Vsync,
+		muted:    config.Conf.General.Muted,
 		ui: &Ui{
-			res:      res,
-			focus:    &Focus{},
-			toast:    NewToast(res),
-			keyboard: NewKeyboard(res, res.localization.Settings.Ui.Alphabet),
+			gamepadIds:   make(map[ebiten.GamepadID]struct{}),
+			gamepadIdBuf: make([]ebiten.GamepadID, 0),
+			res:          res,
+			focus:        &Focus{},
+			toast:        NewToast(res),
+			keyboard:     NewKeyboard(res, res.localization.Settings.Ui.Alphabet),
 		},
 	}
 
@@ -139,7 +139,7 @@ func (g *Game) Update() error {
 	case g.ui.ui != nil:
 
 		if ebiten.Tick() < 1 &&
-			len(g.gamepadIds) != 0 &&
+			len(g.ui.gamepadIds) != 0 &&
 			g.ui.ui != nil && g.ui.ui.Container != nil &&
 			len(g.ui.ui.Container.GetFocusers()) != 0 {
 			g.ui.ui.SetFocusedWidget(g.ui.ui.Container.GetFocusers()[0])
@@ -151,7 +151,7 @@ func (g *Game) Update() error {
 			return nil
 		}
 
-		if g.ui.scrollable != nil && len(g.gamepadIds) != 0 {
+		if g.ui.scrollable != nil && len(g.ui.gamepadIds) != 0 {
 			g.ui.focus.KeepFocusedInView(g.ui.slider)
 		}
 

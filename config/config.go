@@ -137,11 +137,11 @@ type Profile struct {
 }
 
 type Gb struct {
-	System           int
-	Palette          [4]color.Color
-	Bios             GbBios
-	KeyboardConfig   EmulatorKeyboard
-	ControllerConfig EmulatorController
+	System     int
+	Palette    [4]color.Color
+	Bios       GbBios
+	Keyboard   EmulatorKeyboard
+	Controller EmulatorController
 }
 
 type GbBios struct {
@@ -151,12 +151,12 @@ type GbBios struct {
 }
 
 type Gba struct {
-	IdleOptimize     bool
-	Rotation         int
-	Hardware         GbaHardware
-	Bios             GbaBios
-	KeyboardConfig   EmulatorKeyboard
-	ControllerConfig EmulatorController
+	IdleOptimize bool
+	Rotation     int
+	Hardware     GbaHardware
+	Bios         GbaBios
+	Keyboard     EmulatorKeyboard
+	Controller   EmulatorController
 }
 
 type GbaHardware struct {
@@ -172,14 +172,14 @@ type GbaBios struct {
 }
 
 type NdsConfig struct {
-	Screen           NdsScreen
-	Firmware         NdsFirmware
-	Rtc              NdsRtc
-	Export           NdsExport
-	Bios             NdsBios
-	Jit              NdsJit
-	KeyboardConfig   EmulatorKeyboard
-	ControllerConfig EmulatorController
+	Screen     NdsScreen
+	Firmware   NdsFirmware
+	Rtc        NdsRtc
+	Export     NdsExport
+	Bios       NdsBios
+	Jit        NdsJit
+	Keyboard   EmulatorKeyboard
+	Controller EmulatorController
 }
 
 type NdsBios struct {

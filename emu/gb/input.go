@@ -9,8 +9,8 @@ import (
 
 func (gb *GameBoy) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadButton) {
 	var (
-		keyConfig    = config.Conf.Gb.KeyboardConfig
-		buttonConfig = config.Conf.Gb.ControllerConfig
+		keyConfig    = config.Conf.Gb.Keyboard
+		buttonConfig = config.Conf.Gb.Controller
 		k            = &gb.Joypad
 	)
 
