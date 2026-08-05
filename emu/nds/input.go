@@ -5,13 +5,12 @@ import (
 	"slices"
 
 	"github.com/aabalke/guac/config"
-	"github.com/aabalke/guac/input"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 var _ = fmt.Sprint
 
-func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, justButtons, buttons []ebiten.StandardGamepadButton, mouse *input.Mouse, frame uint64) {
+func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, justButtons, buttons []ebiten.StandardGamepadButton, frame uint64) {
 	var (
 		keyCfg    = config.Conf.Nds.Keyboard
 		buttonCfg = config.Conf.Nds.Controller
@@ -23,7 +22,7 @@ func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, justButtons, buttons [
 	*k2 |= 0b0100_1011
 	*k2 &^= 0b1000_0000
 
-	mouseInput(nds, mouse, k2)
+	mouseInput(nds, k2)
 
 	for _, key := range keys {
 		switch {
@@ -119,73 +118,76 @@ func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, justButtons, buttons [
 	}
 }
 
-func mouseInput(nds *Nds, mouse *input.Mouse, k2 *uint16) {
+func mouseInput(nds *Nds, k2 *uint16) {
+	dragged := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
+	x, y := ebiten.CursorPosition()
+
 	abs := nds.Screen.BtmAbs
 	tsc := &nds.mem.Spi.Tsc
 
-	if !mouse.Dragged {
+	if !dragged {
 		tsc.TouchActive = false
 		return
 	}
 
-	// effectively rot, translate of real mouse coords to rotated bottom screen coords
+	// effectively rot, translate of real coords to rotated bottom screen coords
 
 	switch *nds.Screen.Rotation {
 	case ROT_0:
 
-		if inBounds := (mouse.X >= abs.L &&
-			mouse.X < abs.R &&
-			mouse.Y >= abs.T &&
-			mouse.Y < abs.B); !inBounds {
+		if inBounds := (x >= abs.L &&
+			x < abs.R &&
+			y >= abs.T &&
+			y < abs.B); !inBounds {
 			tsc.TouchActive = false
 			return
 		}
 
 		s := float32(SCREEN_WIDTH) / float32(abs.W)
-		tsc.TouchX = uint16(float32(mouse.X-abs.L)*s) - 1
-		tsc.TouchY = uint16(float32(mouse.Y-abs.T)*s) - 1
+		tsc.TouchX = uint16(float32(x-abs.L)*s) - 1
+		tsc.TouchY = uint16(float32(y-abs.T)*s) - 1
 
 	case ROT_90:
 
-		if inBounds := (mouse.X >= abs.B &&
-			mouse.X < abs.T &&
-			mouse.Y >= abs.L &&
-			mouse.Y < abs.R); !inBounds {
+		if inBounds := (x >= abs.B &&
+			x < abs.T &&
+			y >= abs.L &&
+			y < abs.R); !inBounds {
 			tsc.TouchActive = false
 			return
 		}
 
 		s := float32(SCREEN_WIDTH) / float32(abs.H)
-		tsc.TouchX = uint16(float32(mouse.Y-abs.L)*s) - 1
-		tsc.TouchY = uint16(float32(abs.T-mouse.X)*s) - 1
+		tsc.TouchX = uint16(float32(y-abs.L)*s) - 1
+		tsc.TouchY = uint16(float32(abs.T-x)*s) - 1
 
 	case ROT_180:
 
-		if inBounds := (mouse.X >= abs.R &&
-			mouse.X < abs.L &&
-			mouse.Y >= abs.B &&
-			mouse.Y < abs.T); !inBounds {
+		if inBounds := (x >= abs.R &&
+			x < abs.L &&
+			y >= abs.B &&
+			y < abs.T); !inBounds {
 			tsc.TouchActive = false
 			return
 		}
 
 		s := float32(SCREEN_WIDTH) / float32(abs.W)
-		tsc.TouchX = uint16(float32(abs.L-mouse.X)*s) - 1
-		tsc.TouchY = uint16(float32(abs.T-mouse.Y)*s) - 1
+		tsc.TouchX = uint16(float32(abs.L-x)*s) - 1
+		tsc.TouchY = uint16(float32(abs.T-y)*s) - 1
 
 	case ROT_270:
 
-		if inBounds := (mouse.X >= abs.T &&
-			mouse.X < abs.B &&
-			mouse.Y >= abs.R &&
-			mouse.Y < abs.L); !inBounds {
+		if inBounds := (x >= abs.T &&
+			x < abs.B &&
+			y >= abs.R &&
+			y < abs.L); !inBounds {
 			tsc.TouchActive = false
 			return
 		}
 
 		s := float32(SCREEN_WIDTH) / float32(abs.H)
-		tsc.TouchX = uint16(float32(abs.L-mouse.Y)*s) - 1
-		tsc.TouchY = uint16(float32(mouse.X-abs.T)*s) - 1
+		tsc.TouchX = uint16(float32(abs.L-y)*s) - 1
+		tsc.TouchY = uint16(float32(x-abs.T)*s) - 1
 	}
 
 	tsc.TouchActive = true

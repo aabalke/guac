@@ -20,8 +20,11 @@ func (f *Focus) ClearFocus() {
 
 func (f *Focus) BuildMenuFocus(menu *widget.Container, bindings ...*widget.Container) {
 	f.submenu = menu.GetFocusers()
-	f.buildSidebarFocus()
-	f.buildSubFocus()
+
+	if f.sidebar != nil && f.submenu != nil {
+		f.buildSidebarFocus()
+		f.buildSubFocus()
+	}
 
 	for _, binding := range bindings {
 		buildBinding(binding)

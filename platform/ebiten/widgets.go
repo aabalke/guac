@@ -32,7 +32,8 @@ func NewLabel(text string) *widget.Text {
 }
 
 func NewLinkText(text string) *widget.Text {
-	t := widget.NewText(
+	return widget.NewText(
+		widget.TextOpts.TextLabel(text),
 		widget.TextOpts.LinkClickedHandler(func(args *widget.LinkEventArgs) {
 			utils.OpenLink(args.Id)
 		}),
@@ -47,10 +48,6 @@ func NewLinkText(text string) *widget.Text {
 			}),
 		),
 	)
-
-	t.Label = text
-
-	return t
 }
 
 func NewSeparator() *widget.Container { return widget.NewContainer() }
@@ -271,10 +268,6 @@ func NewHexInput(ui *Ui, label string, value any, maxValue int) *widget.TextInpu
 	return NewTextBoxInput(ui, BOARD_HEX, label, value, NumberValidation(maxValue))
 }
 
-func NewTextInput(ui *Ui, label string, value any) *widget.TextInput {
-	return NewTextBoxInput(ui, BOARD_ALPHA, label, value, NoValidation())
-}
-
 func NewSaveButton(text string, f func(*widget.ButtonClickedEventArgs)) widget.PreferredSizeLocateableWidget {
 	return widget.NewButton(
 		widget.ButtonOpts.TextLabel(text),
@@ -283,8 +276,6 @@ func NewSaveButton(text string, f func(*widget.ButtonClickedEventArgs)) widget.P
 }
 
 func NewColorInput(ui *Ui, label string, v *color.Color, validation func(s string) (bool, *string)) widget.PreferredSizeLocateableWidget {
-	colorBox := widget.NewContainer()
-
 	container := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(2),
@@ -293,6 +284,7 @@ func NewColorInput(ui *Ui, label string, v *color.Color, validation func(s strin
 		)),
 	)
 
+	colorBox := widget.NewContainer()
 	var input *widget.TextInput
 
 	input = widget.NewTextInput(
@@ -373,8 +365,6 @@ func NewDirectoryInput(v *string, defaultPath string) widget.PreferredSizeLocate
 }
 
 func dialogInput(v *string, dialogFunc func() string) widget.PreferredSizeLocateableWidget {
-	var input *widget.TextInput
-
 	onClick := func(input *widget.TextInput) {
 		f := dialogFunc()
 		*v = f
@@ -382,6 +372,7 @@ func dialogInput(v *string, dialogFunc func() string) widget.PreferredSizeLocate
 		input.CursorMoveStart()
 	}
 
+	var input *widget.TextInput
 	input = widget.NewTextInput(
 
 		widget.TextInputOpts.CaretWidth(0),

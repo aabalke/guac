@@ -15,7 +15,6 @@ import (
 	"github.com/aabalke/guac/emu/gb"
 	"github.com/aabalke/guac/emu/gba"
 	"github.com/aabalke/guac/emu/nds"
-	"github.com/aabalke/guac/input"
 	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -36,7 +35,6 @@ type Game struct {
 	nds          *nds.Nds
 	gba          *gba.GBA
 	gb           *gb.GameBoy
-	mouse        *input.Mouse
 	audioCtx     *audio.Context
 	pauseEndTick int64
 	TargetFps    int
@@ -98,7 +96,6 @@ func StartEngine() {
 func NewGame(res *Resources) *Game {
 	g := &Game{
 		audioCtx: audio.NewContext(config.Conf.General.SampleRate),
-		mouse:    input.NewMouse(),
 		vsync:    config.Conf.General.Vsync,
 		muted:    config.Conf.General.Muted,
 		ui: &Ui{
@@ -132,8 +129,6 @@ func (g *Game) Update() error {
 	}
 
 	g.Profile()
-
-	g.mouse.Update()
 
 	switch {
 	case g.quit:
@@ -171,7 +166,7 @@ func (g *Game) Update() error {
 		keys := inpututil.AppendPressedKeys([]ebiten.Key{})
 		justButtons, buttons := g.GetGamepadButtons()
 		g.HandleGlobalInputs(justKeys, justButtons, buttons)
-		g.nds.InputHandler(justKeys, keys, justButtons, buttons, g.mouse, uint64(ebiten.Tick()))
+		g.nds.InputHandler(justKeys, keys, justButtons, buttons, uint64(ebiten.Tick()))
 		g.nds.Update(g.TargetFps == 60)
 
 	case g.gba != nil:

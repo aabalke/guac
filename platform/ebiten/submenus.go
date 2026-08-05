@@ -5,6 +5,7 @@ import (
 	"github.com/aabalke/guac/config/file"
 	"github.com/aabalke/guac/emu/gba/gpio"
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 func newMenu() *widget.Container {
@@ -64,43 +65,59 @@ func NewGeneralMenu(g *Game) *widget.Container {
 		NewLabel(l.VsyncEnabled), NewCheckbox(&tmp.Vsync),
 		NewLabel(l.DisableSaves), NewCheckbox(&tmp.DisableSaves),
 		NewLabel(l.IntegerScaling), NewCheckbox(&tmp.IntegerScaling),
-		NewSeparator(), NewLinkText(l.IntegerScalingDesc),
 		NewLabel(l.IntegerScalingRatio), NewDecimalInput(g.ui, l.IntegerScalingRatio, &tmp.IntegerScalingRatio, 10),
-		NewSeparator(), NewLinkText(l.SampleRateDesc),
+		NewSeparator(), NewLinkText(l.IntegerScalingDesc),
 		NewLabel(l.SampleRate), NewDecimalInput(g.ui, l.SampleRate, &tmp.SampleRate, 192000),
+		NewSeparator(), NewLinkText(l.SampleRateDesc),
 	)
 
-	keys := newTwoCol()
+	inputLabels := []string{
+		l.Select,
+		l.Return,
+		l.Mute,
+		l.Pause,
+		l.Left,
+		l.Right,
+		l.Up,
+		l.Down,
+		l.Fullscreen,
+		l.Quit,
+	}
+
+	keyPtrs := []*[]ebiten.Key{
+		&tmp.Keyboard.Select,
+		&tmp.Keyboard.Return,
+		&tmp.Keyboard.Mute,
+		&tmp.Keyboard.Pause,
+		&tmp.Keyboard.Left,
+		&tmp.Keyboard.Right,
+		&tmp.Keyboard.Up,
+		&tmp.Keyboard.Down,
+		&tmp.Keyboard.Fullscreen,
+		&tmp.Keyboard.Quit,
+	}
+
+	butPtrs := []*[]ebiten.StandardGamepadButton{
+		&tmp.Controller.Select,
+		&tmp.Controller.Return,
+		&tmp.Controller.Mute,
+		&tmp.Controller.Pause,
+		&tmp.Controller.Left,
+		&tmp.Controller.Right,
+		&tmp.Controller.Up,
+		&tmp.Controller.Down,
+		&tmp.Controller.Fullscreen,
+		&tmp.Controller.Quit,
+	}
+
+	keys, gamepad := newTwoCol(), newTwoCol()
 	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
-	k := &tmp.Keyboard
-	keys.AddChild(
-		NewLabel(l.Select), NewKeybindInput(g.ui, &k.Select),
-		NewLabel(l.Return), NewKeybindInput(g.ui, &k.Return),
-		NewLabel(l.Mute), NewKeybindInput(g.ui, &k.Mute),
-		NewLabel(l.Pause), NewKeybindInput(g.ui, &k.Pause),
-		NewLabel(l.Left), NewKeybindInput(g.ui, &k.Left),
-		NewLabel(l.Right), NewKeybindInput(g.ui, &k.Right),
-		NewLabel(l.Up), NewKeybindInput(g.ui, &k.Up),
-		NewLabel(l.Down), NewKeybindInput(g.ui, &k.Down),
-		NewLabel(l.Fullscreen), NewKeybindInput(g.ui, &k.Fullscreen),
-		NewLabel(l.Quit), NewKeybindInput(g.ui, &k.Quit),
-	)
-
-	gamepad := newTwoCol()
 	menu.AddChild(NewHeader(l.Controller, g.ui.res), gamepad)
-	c := &tmp.Controller
-	gamepad.AddChild(
-		NewLabel(l.Select), NewGamepadInput(g.ui, &c.Select),
-		NewLabel(l.Return), NewGamepadInput(g.ui, &c.Return),
-		NewLabel(l.Mute), NewGamepadInput(g.ui, &c.Mute),
-		NewLabel(l.Pause), NewGamepadInput(g.ui, &c.Pause),
-		NewLabel(l.Left), NewGamepadInput(g.ui, &c.Left),
-		NewLabel(l.Right), NewGamepadInput(g.ui, &c.Right),
-		NewLabel(l.Up), NewGamepadInput(g.ui, &c.Up),
-		NewLabel(l.Down), NewGamepadInput(g.ui, &c.Down),
-		NewLabel(l.Fullscreen), NewGamepadInput(g.ui, &c.Fullscreen),
-		NewLabel(l.Quit), NewGamepadInput(g.ui, &c.Quit),
-	)
+
+	for i := range inputLabels {
+		keys.AddChild(NewLabel(inputLabels[i]), NewKeybindInput(g.ui, keyPtrs[i]))
+		gamepad.AddChild(NewLabel(inputLabels[i]), NewGamepadInput(g.ui, butPtrs[i]))
+	}
 
 	menu.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.General = tmp
@@ -162,7 +179,6 @@ func NewUiMenu(g *Game) *widget.Container {
 			g.ui.keyboard = NewKeyboard(g.ui.res, g.ui.res.localization.Settings.Ui.Alphabet)
 
 			NewSettings(g, oldId, MENU_UI)
-			// should this be somewhere else?
 
 			file.Encode()
 
@@ -217,33 +233,47 @@ func NewGbMenu(g *Game) *widget.Container {
 		NewLabel(l.DirectBoot), NewCheckbox(&tmp.Bios.Direct),
 	)
 
-	keys := newTwoCol()
-	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
-	k := &tmp.Keyboard
-	keys.AddChild(
-		NewLabel(l.A), NewKeybindInput(g.ui, &k.A),
-		NewLabel(l.B), NewKeybindInput(g.ui, &k.B),
-		NewLabel(l.Select), NewKeybindInput(g.ui, &k.Select),
-		NewLabel(l.Start), NewKeybindInput(g.ui, &k.Start),
-		NewLabel(l.Left), NewKeybindInput(g.ui, &k.Left),
-		NewLabel(l.Right), NewKeybindInput(g.ui, &k.Right),
-		NewLabel(l.Up), NewKeybindInput(g.ui, &k.Up),
-		NewLabel(l.Down), NewKeybindInput(g.ui, &k.Down),
-	)
+	inputLabels := []string{
+		l.A,
+		l.B,
+		l.Select,
+		l.Start,
+		l.Left,
+		l.Right,
+		l.Up,
+		l.Down,
+	}
 
-	gamepad := newTwoCol()
+	keyPtrs := []*[]ebiten.Key{
+		&tmp.Keyboard.A,
+		&tmp.Keyboard.B,
+		&tmp.Keyboard.Select,
+		&tmp.Keyboard.Start,
+		&tmp.Keyboard.Left,
+		&tmp.Keyboard.Right,
+		&tmp.Keyboard.Up,
+		&tmp.Keyboard.Down,
+	}
+
+	butPtrs := []*[]ebiten.StandardGamepadButton{
+		&tmp.Controller.A,
+		&tmp.Controller.B,
+		&tmp.Controller.Select,
+		&tmp.Controller.Start,
+		&tmp.Controller.Left,
+		&tmp.Controller.Right,
+		&tmp.Controller.Up,
+		&tmp.Controller.Down,
+	}
+
+	keys, gamepad := newTwoCol(), newTwoCol()
+	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
 	menu.AddChild(NewHeader(l.Controller, g.ui.res), gamepad)
-	c := &tmp.Controller
-	gamepad.AddChild(
-		NewLabel(l.A), NewGamepadInput(g.ui, &c.A),
-		NewLabel(l.B), NewGamepadInput(g.ui, &c.B),
-		NewLabel(l.Select), NewGamepadInput(g.ui, &c.Select),
-		NewLabel(l.Start), NewGamepadInput(g.ui, &c.Start),
-		NewLabel(l.Left), NewGamepadInput(g.ui, &c.Left),
-		NewLabel(l.Right), NewGamepadInput(g.ui, &c.Right),
-		NewLabel(l.Up), NewGamepadInput(g.ui, &c.Up),
-		NewLabel(l.Down), NewGamepadInput(g.ui, &c.Down),
-	)
+
+	for i := range inputLabels {
+		keys.AddChild(NewLabel(inputLabels[i]), NewKeybindInput(g.ui, keyPtrs[i]))
+		gamepad.AddChild(NewLabel(inputLabels[i]), NewGamepadInput(g.ui, butPtrs[i]))
+	}
 
 	menu.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Gb = tmp
@@ -296,49 +326,71 @@ func NewGbaMenu(g *Game) *widget.Container {
 		NewLabel(l.DirectBoot), NewCheckbox(&tmp.Bios.Direct),
 	)
 
-	keys := newTwoCol()
-	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
-	k := &tmp.Keyboard
-	keys.AddChild(
-		NewLabel(l.A), NewKeybindInput(g.ui, &k.A),
-		NewLabel(l.B), NewKeybindInput(g.ui, &k.B),
-		NewLabel(l.Select), NewKeybindInput(g.ui, &k.Select),
-		NewLabel(l.Start), NewKeybindInput(g.ui, &k.Start),
-		NewLabel(l.Left), NewKeybindInput(g.ui, &k.Left),
-		NewLabel(l.Right), NewKeybindInput(g.ui, &k.Right),
-		NewLabel(l.Up), NewKeybindInput(g.ui, &k.Up),
-		NewLabel(l.Down), NewKeybindInput(g.ui, &k.Down),
-		NewLabel(l.L), NewKeybindInput(g.ui, &k.L),
-		NewLabel(l.R), NewKeybindInput(g.ui, &k.R),
-		NewLabel(l.SolarMin), NewKeybindInput(g.ui, &k.SolarLevel0),
-		NewLabel(l.Solar1), NewKeybindInput(g.ui, &k.SolarLevel1),
-		NewLabel(l.Solar2), NewKeybindInput(g.ui, &k.SolarLevel2),
-		NewLabel(l.Solar3), NewKeybindInput(g.ui, &k.SolarLevel3),
-		NewLabel(l.SolarMax), NewKeybindInput(g.ui, &k.SolarLevel4),
-		NewLabel(l.RotationToggle), NewKeybindInput(g.ui, &k.RotationToggle),
-	)
+	inputLabels := []string{
+		l.A,
+		l.B,
+		l.Select,
+		l.Start,
+		l.Left,
+		l.Right,
+		l.Up,
+		l.Down,
+		l.L,
+		l.R,
+		l.SolarMin,
+		l.Solar1,
+		l.Solar2,
+		l.Solar3,
+		l.SolarMax,
+		l.RotationToggle,
+	}
 
-	gamepad := newTwoCol()
+	keyPtrs := []*[]ebiten.Key{
+		&tmp.Keyboard.A,
+		&tmp.Keyboard.B,
+		&tmp.Keyboard.Select,
+		&tmp.Keyboard.Start,
+		&tmp.Keyboard.Left,
+		&tmp.Keyboard.Right,
+		&tmp.Keyboard.Up,
+		&tmp.Keyboard.Down,
+		&tmp.Keyboard.L,
+		&tmp.Keyboard.R,
+		&tmp.Keyboard.SolarLevel0,
+		&tmp.Keyboard.SolarLevel1,
+		&tmp.Keyboard.SolarLevel2,
+		&tmp.Keyboard.SolarLevel3,
+		&tmp.Keyboard.SolarLevel4,
+		&tmp.Keyboard.RotationToggle,
+	}
+
+	butPtrs := []*[]ebiten.StandardGamepadButton{
+		&tmp.Controller.A,
+		&tmp.Controller.B,
+		&tmp.Controller.Select,
+		&tmp.Controller.Start,
+		&tmp.Controller.Left,
+		&tmp.Controller.Right,
+		&tmp.Controller.Up,
+		&tmp.Controller.Down,
+		&tmp.Controller.L,
+		&tmp.Controller.R,
+		&tmp.Controller.SolarLevel0,
+		&tmp.Controller.SolarLevel1,
+		&tmp.Controller.SolarLevel2,
+		&tmp.Controller.SolarLevel3,
+		&tmp.Controller.SolarLevel4,
+		&tmp.Controller.RotationToggle,
+	}
+
+	keys, gamepad := newTwoCol(), newTwoCol()
+	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
 	menu.AddChild(NewHeader(l.Controller, g.ui.res), gamepad)
-	c := &tmp.Controller
-	gamepad.AddChild(
-		NewLabel(l.A), NewGamepadInput(g.ui, &c.A),
-		NewLabel(l.B), NewGamepadInput(g.ui, &c.B),
-		NewLabel(l.Select), NewGamepadInput(g.ui, &c.Select),
-		NewLabel(l.Start), NewGamepadInput(g.ui, &c.Start),
-		NewLabel(l.Left), NewGamepadInput(g.ui, &c.Left),
-		NewLabel(l.Right), NewGamepadInput(g.ui, &c.Right),
-		NewLabel(l.Up), NewGamepadInput(g.ui, &c.Up),
-		NewLabel(l.Down), NewGamepadInput(g.ui, &c.Down),
-		NewLabel(l.L), NewGamepadInput(g.ui, &c.L),
-		NewLabel(l.R), NewGamepadInput(g.ui, &c.R),
-		NewLabel(l.SolarMin), NewGamepadInput(g.ui, &c.SolarLevel0),
-		NewLabel(l.Solar1), NewGamepadInput(g.ui, &c.SolarLevel1),
-		NewLabel(l.Solar2), NewGamepadInput(g.ui, &c.SolarLevel2),
-		NewLabel(l.Solar3), NewGamepadInput(g.ui, &c.SolarLevel3),
-		NewLabel(l.SolarMax), NewGamepadInput(g.ui, &c.SolarLevel4),
-		NewLabel(l.RotationToggle), NewGamepadInput(g.ui, &c.RotationToggle),
-	)
+
+	for i := range inputLabels {
+		keys.AddChild(NewLabel(inputLabels[i]), NewKeybindInput(g.ui, keyPtrs[i]))
+		gamepad.AddChild(NewLabel(inputLabels[i]), NewGamepadInput(g.ui, butPtrs[i]))
+	}
 
 	menu.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		if tmp.Bios.Path == "" {
@@ -424,51 +476,74 @@ func NewNdsMenu(g *Game) *widget.Container {
 		NewLabel(l.ShadowPolygons), NewCheckbox(&tmp.Export.ShadowPolys),
 	)
 
-	keys := newTwoCol()
-	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
-	k := &tmp.Keyboard
-	keys.AddChild(
-		NewLabel(l.A), NewKeybindInput(g.ui, &k.A),
-		NewLabel(l.B), NewKeybindInput(g.ui, &k.B),
-		NewLabel(l.Select), NewKeybindInput(g.ui, &k.Select),
-		NewLabel(l.Start), NewKeybindInput(g.ui, &k.Start),
-		NewLabel(l.Left), NewKeybindInput(g.ui, &k.Left),
-		NewLabel(l.Right), NewKeybindInput(g.ui, &k.Right),
-		NewLabel(l.Up), NewKeybindInput(g.ui, &k.Up),
-		NewLabel(l.Down), NewKeybindInput(g.ui, &k.Down),
-		NewLabel(l.L), NewKeybindInput(g.ui, &k.L),
-		NewLabel(l.R), NewKeybindInput(g.ui, &k.R),
-		NewLabel(l.X), NewKeybindInput(g.ui, &k.X),
-		NewLabel(l.Y), NewKeybindInput(g.ui, &k.Y),
-		NewLabel(l.Hinge), NewKeybindInput(g.ui, &k.Hinge),
-		NewLabel(l.LayoutToggle), NewKeybindInput(g.ui, &k.LayoutToggle),
-		NewLabel(l.SizingToggle), NewKeybindInput(g.ui, &k.SizingToggle),
-		NewLabel(l.RotationToggle), NewKeybindInput(g.ui, &k.RotationToggle),
-		NewLabel(l.ExportToggle), NewKeybindInput(g.ui, &k.ExportScene),
-	)
+	inputLabels := []string{
+		l.A,
+		l.B,
+		l.Select,
+		l.Start,
+		l.Left,
+		l.Right,
+		l.Up,
+		l.Down,
+		l.L,
+		l.R,
+		l.X,
+		l.Y,
+		l.Hinge,
+		l.LayoutToggle,
+		l.SizingToggle,
+		l.RotationToggle,
+		l.ExportToggle,
+	}
 
-	gamepad := newTwoCol()
+	keyPtrs := []*[]ebiten.Key{
+		&tmp.Keyboard.A,
+		&tmp.Keyboard.B,
+		&tmp.Keyboard.Select,
+		&tmp.Keyboard.Start,
+		&tmp.Keyboard.Left,
+		&tmp.Keyboard.Right,
+		&tmp.Keyboard.Up,
+		&tmp.Keyboard.Down,
+		&tmp.Keyboard.L,
+		&tmp.Keyboard.R,
+		&tmp.Keyboard.X,
+		&tmp.Keyboard.Y,
+		&tmp.Keyboard.Hinge,
+		&tmp.Keyboard.LayoutToggle,
+		&tmp.Keyboard.SizingToggle,
+		&tmp.Keyboard.RotationToggle,
+		&tmp.Keyboard.ExportScene,
+	}
+
+	butPtrs := []*[]ebiten.StandardGamepadButton{
+		&tmp.Controller.A,
+		&tmp.Controller.B,
+		&tmp.Controller.Select,
+		&tmp.Controller.Start,
+		&tmp.Controller.Left,
+		&tmp.Controller.Right,
+		&tmp.Controller.Up,
+		&tmp.Controller.Down,
+		&tmp.Controller.L,
+		&tmp.Controller.R,
+		&tmp.Controller.X,
+		&tmp.Controller.Y,
+		&tmp.Controller.Hinge,
+		&tmp.Controller.LayoutToggle,
+		&tmp.Controller.SizingToggle,
+		&tmp.Controller.RotationToggle,
+		&tmp.Controller.ExportScene,
+	}
+
+	keys, gamepad := newTwoCol(), newTwoCol()
+	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
 	menu.AddChild(NewHeader(l.Controller, g.ui.res), gamepad)
-	c := &tmp.Controller
-	gamepad.AddChild(
-		NewLabel(l.A), NewGamepadInput(g.ui, &c.A),
-		NewLabel(l.B), NewGamepadInput(g.ui, &c.B),
-		NewLabel(l.Select), NewGamepadInput(g.ui, &c.Select),
-		NewLabel(l.Start), NewGamepadInput(g.ui, &c.Start),
-		NewLabel(l.Left), NewGamepadInput(g.ui, &c.Left),
-		NewLabel(l.Right), NewGamepadInput(g.ui, &c.Right),
-		NewLabel(l.Up), NewGamepadInput(g.ui, &c.Up),
-		NewLabel(l.Down), NewGamepadInput(g.ui, &c.Down),
-		NewLabel(l.L), NewGamepadInput(g.ui, &c.L),
-		NewLabel(l.R), NewGamepadInput(g.ui, &c.R),
-		NewLabel(l.X), NewGamepadInput(g.ui, &c.X),
-		NewLabel(l.Y), NewGamepadInput(g.ui, &c.Y),
-		NewLabel(l.Hinge), NewGamepadInput(g.ui, &c.Hinge),
-		NewLabel(l.LayoutToggle), NewGamepadInput(g.ui, &c.LayoutToggle),
-		NewLabel(l.SizingToggle), NewGamepadInput(g.ui, &c.SizingToggle),
-		NewLabel(l.RotationToggle), NewGamepadInput(g.ui, &c.RotationToggle),
-		NewLabel(l.ExportToggle), NewGamepadInput(g.ui, &c.ExportScene),
-	)
+
+	for i := range inputLabels {
+		keys.AddChild(NewLabel(inputLabels[i]), NewKeybindInput(g.ui, keyPtrs[i]))
+		gamepad.AddChild(NewLabel(inputLabels[i]), NewGamepadInput(g.ui, butPtrs[i]))
+	}
 
 	menu.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Nds = tmp

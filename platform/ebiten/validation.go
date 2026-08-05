@@ -63,12 +63,6 @@ func HexValidation(maxValue int) func(string) (bool, *string) {
 	}
 }
 
-func NoValidation() func(string) (bool, *string) {
-	return func(s string) (bool, *string) {
-		return true, &s
-	}
-}
-
 func StringValidation(maxLength int) func(string) (bool, *string) {
 	return func(s string) (bool, *string) {
 		if len(s) >= maxLength {

@@ -4,7 +4,8 @@ import (
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/config/file"
 	"github.com/aabalke/guac/config/flags"
-	"github.com/aabalke/guac/ui"
+	ebiten "github.com/aabalke/guac/platform/ebiten"
+	"github.com/aabalke/guac/platform/headless"
 )
 
 func main() {
@@ -12,9 +13,9 @@ func main() {
 	flags.Decode()
 
 	if config.Conf.General.Headless {
-		StartHeadless()
+		headless.StartHeadless()
 		return
 	}
 
-	ui.StartEngine()
+	ebiten.StartEngine()
 }

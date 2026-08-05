@@ -1,4 +1,4 @@
-package main
+package headless
 
 import (
 	"github.com/aabalke/guac/config"

@@ -10,7 +10,6 @@ import (
 	"github.com/aabalke/guac/config"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 
-	"github.com/ebitenui/ebitenui"
 	"github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
 
@@ -54,13 +53,11 @@ var radioInset = widget.Insets{
 	Top:    4,
 	Bottom: 4,
 }
-var mainLink = "[link=https://guacemulator.com]guacemulator.com[/link]"
-var (
-	controllerLink = "see [link=https://guacemulator.com/docs/configuration/controller]guacemulator.com[/link] for valid keybinds"
-	keybindsLink   = "see [link=https://guacemulator.com/docs/configuration/keys]guacemulator.com[/link] for valid keybinds"
-)
 
-var transparentNine = image.NewNineSliceColor(color.Transparent)
+var (
+	mainLink        = "[link=https://guacemulator.com]guacemulator.com[/link]"
+	transparentNine = image.NewNineSliceColor(color.Transparent)
+)
 
 var scrollContainerImage = widget.ScrollContainerImage{
 	Mask: image.NewNineSliceColor(color.Black),
@@ -81,17 +78,6 @@ type Resources struct {
 	icon []img.Image
 
 	localization *Localization
-
-	ui *ebitenui.UI
-}
-
-var transparentButtonImage = widget.ButtonImage{
-	Idle:            transparentNine,
-	Hover:           transparentNine,
-	Pressed:         transparentNine,
-	PressedHover:    transparentNine,
-	Disabled:        transparentNine,
-	PressedDisabled: transparentNine,
 }
 
 func NewUIResources() (*Resources, error) {
