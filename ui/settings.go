@@ -3,9 +3,23 @@ package ui
 import (
 	"math"
 
-	"github.com/ebitenui/ebitenui"
 	"github.com/ebitenui/ebitenui/widget"
 )
+
+const (
+	MENU_GENERAL = iota
+	MENU_UI
+	MENU_GB
+	MENU_GBA
+	MENU_NDS
+	MENU_ABOUT
+	MENU_RETURN
+)
+
+type SidebarField struct {
+	label string
+	f     func(g *Game)
+}
 
 func NewSettings(g *Game, oldId PageId, initMenu int) {
 	g.ui.focus.ClearFocus()
@@ -43,20 +57,94 @@ func NewSettings(g *Game, oldId PageId, initMenu int) {
 	)
 
 	scr := NewScrollableContainer(g.ui)
-	NewSidebar(g, initMenu)
+
+	// sidebar start
+
+	g.ui.sidebar = widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(24)),
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+		)),
+	)
+
+	l := g.ui.res.localization.Settings.Sidebar
+
+	fields := []SidebarField{
+		{l.General, func(g *Game) {
+			g.ui.content.RemoveChildren()
+			g.ui.content.AddChild(NewGeneralMenu(g))
+		}},
+		{l.Ui, func(g *Game) {
+			g.ui.content.RemoveChildren()
+			g.ui.content.AddChild(NewUiMenu(g))
+		}},
+		{l.Gb, func(g *Game) {
+			g.ui.content.RemoveChildren()
+			g.ui.content.AddChild(NewGbMenu(g))
+		}},
+		{l.Gba, func(g *Game) {
+			g.ui.content.RemoveChildren()
+			g.ui.content.AddChild(NewGbaMenu(g))
+		}},
+		{l.Nds, func(g *Game) {
+			g.ui.content.RemoveChildren()
+			g.ui.content.AddChild(NewNdsMenu(g))
+		}},
+		{l.About, func(g *Game) {
+			g.ui.content.RemoveChildren()
+			g.ui.content.AddChild(NewAboutMenu(g))
+		}},
+		{
+			l.Return, func(g *Game) {
+				switch g.ui.PrevPageId {
+				case PAGE_HOME:
+					NewHome(g)
+				case PAGE_PAUSE:
+					NewPause(g)
+				}
+			},
+		},
+	}
+
+	var (
+		radios     []widget.RadioGroupElement
+		initButton *widget.Button
+	)
+	for i, field := range fields {
+		b := NewSidebarButton(g, field.label, field.f)
+		g.ui.sidebar.AddChild(b)
+		radios = append(radios, b)
+
+		if i == initMenu {
+			initButton = b
+		}
+	}
+
+	widget.NewRadioGroup(
+		widget.RadioGroupOpts.Elements(radios...),
+		widget.RadioGroupOpts.InitialElement(initButton),
+	)
+
+	// init first menu
+	g.ui.focus.sidebar = g.ui.sidebar.GetFocusers()
+	fields[initMenu].f(g)
+
+	// sidebar end
 
 	c.AddChild(g.ui.sidebar, scr)
 	root.AddChild(c)
 
 	g.ui.PageId = PAGE_SETTINGS
-	g.ui.ui = &ebitenui.UI{
-		Container:    root,
-		PrimaryTheme: NewTheme(g.ui.res),
-	}
+
+	newUi(g, root)
+
+	g.ui.focus.ui = g.ui.ui
+
+	g.ui.focus.FocusSidebar(0)
 }
 
 func NewScrollableContainer(ui *Ui) *widget.Container {
-	root := widget.NewContainer(
+	scr := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(2),
 			widget.GridLayoutOpts.Spacing(2, 0),
@@ -100,7 +188,7 @@ func NewScrollableContainer(ui *Ui) *widget.Container {
 		}),
 
 		widget.SliderOpts.WidgetOpts(
-			widget.WidgetOpts.OnUpdate(func(args widget.HasWidget) {
+			widget.WidgetOpts.OnUpdate(func(widget.HasWidget) {
 				scrollableHeight := ui.scrollable.ViewRect().Dy()
 				contentHeight := ui.content.GetWidget().Rect.Dy()
 
@@ -129,50 +217,13 @@ func NewScrollableContainer(ui *Ui) *widget.Container {
 		}
 	})
 
-	if ui.scrollable != nil {
-		root.AddChild(ui.scrollable)
-	}
-
-	if ui.slider != nil {
-		root.AddChild(ui.slider)
-	}
-
-	return root
+	scr.AddChild(ui.scrollable, ui.slider)
+	return scr
 }
 
-func NewSidebar(g *Game, initMenu int) {
-	g.ui.sidebar = widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(24)),
-			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-		)),
-	)
-
-	radios := []widget.RadioGroupElement{}
-	var initButton *widget.Button
-	sidebarFields := NewSidebarFields(g.ui.res)
-	for i, field := range sidebarFields {
-		b := NewSidebarButton(g, field)
-		g.ui.sidebar.AddChild(b)
-		radios = append(radios, b)
-
-		if i == initMenu {
-			initButton = b
-		}
-	}
-
-	widget.NewRadioGroup(
-		widget.RadioGroupOpts.Elements(radios...),
-		widget.RadioGroupOpts.InitialElement(initButton),
-	)
-
-	// initialize first menu
-	g.ui.focus.sidebar = g.ui.sidebar.GetFocusers()
-	sidebarFields[initMenu].f(g)
-}
-
-func NewSidebarButton(g *Game, sf SidebarField) *widget.Button {
-	b := widget.NewButton(
+func NewSidebarButton(g *Game, label string, f func(g *Game)) *widget.Button {
+	return widget.NewButton(
+		widget.ButtonOpts.TextLabel(label),
 		widget.ButtonOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
 				Stretch: true,
@@ -185,13 +236,9 @@ func NewSidebarButton(g *Game, sf SidebarField) *widget.Button {
 		),
 
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
-			sf.f(g)
+			f(g)
 			g.ui.scrollable.ScrollTop = 0
 			g.ui.slider.Current = 0
 		}),
 	)
-
-	b.SetText(sf.label)
-
-	return b
 }

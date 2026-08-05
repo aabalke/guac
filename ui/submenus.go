@@ -7,63 +7,7 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 )
 
-const (
-	MENU_GENERAL = iota
-	MENU_UI
-	MENU_GB
-	MENU_GBA
-	MENU_NDS
-	MENU_ABOUT
-	MENU_RETURN
-)
-
-type SidebarField struct {
-	label string
-	f     func(g *Game)
-}
-
-func NewSidebarFields(res *Resources) []SidebarField {
-	l := res.localization.Settings.Sidebar
-
-	return []SidebarField{
-		{l.General, func(g *Game) {
-			g.ui.content.RemoveChildren()
-			g.ui.content.AddChild(NewGeneralMenu(g))
-		}},
-		{l.Ui, func(g *Game) {
-			g.ui.content.RemoveChildren()
-			g.ui.content.AddChild(NewUiMenu(g))
-		}},
-		{l.Gb, func(g *Game) {
-			g.ui.content.RemoveChildren()
-			g.ui.content.AddChild(NewGbMenu(g))
-		}},
-		{l.Gba, func(g *Game) {
-			g.ui.content.RemoveChildren()
-			g.ui.content.AddChild(NewGbaMenu(g))
-		}},
-		{l.Nds, func(g *Game) {
-			g.ui.content.RemoveChildren()
-			g.ui.content.AddChild(NewNdsMenu(g))
-		}},
-		{l.About, func(g *Game) {
-			g.ui.content.RemoveChildren()
-			g.ui.content.AddChild(NewAboutMenu(g))
-		}},
-		{
-			l.Return, func(g *Game) {
-				switch g.ui.PrevPageId {
-				case PAGE_HOME:
-					NewHome(g)
-				case PAGE_PAUSE:
-					NewPause(g)
-				}
-			},
-		},
-	}
-}
-
-func NewMenu() *widget.Container {
+func newMenu() *widget.Container {
 	return widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
@@ -75,7 +19,7 @@ func NewMenu() *widget.Container {
 	)
 }
 
-func NewOneCol() *widget.Container {
+func newOneCol() *widget.Container {
 	return widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(24)),
@@ -89,7 +33,7 @@ func NewOneCol() *widget.Container {
 	)
 }
 
-func NewTwoCol() *widget.Container {
+func newTwoCol() *widget.Container {
 	return widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(24)),
@@ -107,9 +51,9 @@ func NewGeneralMenu(g *Game) *widget.Container {
 	tmp := config.Conf.General
 	l := g.ui.res.localization.Settings.General
 
-	menu := NewMenu()
+	menu := newMenu()
 
-	general := NewTwoCol()
+	general := newTwoCol()
 	menu.AddChild(NewHeader(l.General, g.ui.res), general)
 
 	general.AddChild(
@@ -126,7 +70,7 @@ func NewGeneralMenu(g *Game) *widget.Container {
 		NewLabel(l.SampleRate), NewDecimalInput(g.ui, l.SampleRate, &tmp.SampleRate, 192000),
 	)
 
-	keys := NewTwoCol()
+	keys := newTwoCol()
 	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
 	k := &tmp.Keyboard
 	keys.AddChild(
@@ -142,7 +86,7 @@ func NewGeneralMenu(g *Game) *widget.Container {
 		NewLabel(l.Quit), NewKeybindInput(g.ui, &k.Quit),
 	)
 
-	gamepad := NewTwoCol()
+	gamepad := newTwoCol()
 	menu.AddChild(NewHeader(l.Controller, g.ui.res), gamepad)
 	c := &tmp.Controller
 	gamepad.AddChild(
@@ -173,7 +117,7 @@ func NewGeneralMenu(g *Game) *widget.Container {
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
 
-	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, keys, gamepad)
+	g.ui.focus.BuildMenuFocus(menu, keys, gamepad)
 
 	return menu
 }
@@ -194,9 +138,9 @@ func NewUiMenu(g *Game) *widget.Container {
 		}
 	)
 
-	menu := NewMenu()
+	menu := newMenu()
 
-	ui := NewTwoCol()
+	ui := newTwoCol()
 	menu.AddChild(NewHeader(l.Ui, res), ui)
 
 	ui.AddChild(
@@ -230,7 +174,7 @@ func NewUiMenu(g *Game) *widget.Container {
 		}),
 	)
 
-	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, nil, nil)
+	g.ui.focus.BuildMenuFocus(menu, nil, nil)
 
 	return menu
 }
@@ -246,15 +190,15 @@ func NewGbMenu(g *Game) *widget.Container {
 		NewColorInput(g.ui, l.DmgDarkest, &pal[3], HexValidation(0xFFFFFF)),
 	}
 
-	menu := NewMenu()
+	menu := newMenu()
 
-	general := NewTwoCol()
+	general := newTwoCol()
 	menu.AddChild(NewHeader(l.General, g.ui.res), general)
 	general.AddChild(
 		NewLabel(l.System), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.System, l.Systems, g.ui.res),
 	)
 
-	palette := NewTwoCol()
+	palette := newTwoCol()
 	menu.AddChild(NewHeader(l.DmgPalette, g.ui.res), palette)
 	palette.AddChild(
 		NewLabel(l.Lightest), clrInputs[0],
@@ -265,7 +209,7 @@ func NewGbMenu(g *Game) *widget.Container {
 		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, dmg_palettes, clrInputs, g.ui.res),
 	)
 
-	bios := NewTwoCol()
+	bios := newTwoCol()
 	menu.AddChild(NewHeader(l.Bios, g.ui.res), bios)
 	bios.AddChild(
 		NewLabel(l.DmgPath), NewFileInput(&tmp.Bios.DmgPath),
@@ -273,7 +217,7 @@ func NewGbMenu(g *Game) *widget.Container {
 		NewLabel(l.DirectBoot), NewCheckbox(&tmp.Bios.Direct),
 	)
 
-	keys := NewTwoCol()
+	keys := newTwoCol()
 	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
 	k := &tmp.Keyboard
 	keys.AddChild(
@@ -287,7 +231,7 @@ func NewGbMenu(g *Game) *widget.Container {
 		NewLabel(l.Down), NewKeybindInput(g.ui, &k.Down),
 	)
 
-	gamepad := NewTwoCol()
+	gamepad := newTwoCol()
 	menu.AddChild(NewHeader(l.Controller, g.ui.res), gamepad)
 	c := &tmp.Controller
 	gamepad.AddChild(
@@ -315,7 +259,7 @@ func NewGbMenu(g *Game) *widget.Container {
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
 
-	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, keys, gamepad)
+	g.ui.focus.BuildMenuFocus(menu, keys, gamepad)
 
 	return menu
 }
@@ -324,9 +268,9 @@ func NewGbaMenu(g *Game) *widget.Container {
 	tmp := config.Conf.Gba
 	l := g.ui.res.localization.Settings.Gba
 
-	menu := NewMenu()
+	menu := newMenu()
 
-	general := NewTwoCol()
+	general := newTwoCol()
 	menu.AddChild(NewHeader(l.General, g.ui.res), general)
 
 	general.AddChild(
@@ -334,7 +278,7 @@ func NewGbaMenu(g *Game) *widget.Container {
 		NewLabel(l.Rotation), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.Rotation, l.Rotations, g.ui.res),
 	)
 
-	hardware := NewTwoCol()
+	hardware := newTwoCol()
 	menu.AddChild(NewHeader(l.Hardware, g.ui.res), hardware)
 
 	hardware.AddChild(
@@ -344,7 +288,7 @@ func NewGbaMenu(g *Game) *widget.Container {
 		NewLabel(l.SolarSensorLevel), NewDecimalInput(g.ui, l.SolarSensorLevel, &tmp.Hardware.SolarSensorLevel, 100),
 	)
 
-	bios := NewTwoCol()
+	bios := newTwoCol()
 	menu.AddChild(NewHeader(l.Bios, g.ui.res), bios)
 
 	bios.AddChild(
@@ -352,7 +296,7 @@ func NewGbaMenu(g *Game) *widget.Container {
 		NewLabel(l.DirectBoot), NewCheckbox(&tmp.Bios.Direct),
 	)
 
-	keys := NewTwoCol()
+	keys := newTwoCol()
 	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
 	k := &tmp.Keyboard
 	keys.AddChild(
@@ -374,7 +318,7 @@ func NewGbaMenu(g *Game) *widget.Container {
 		NewLabel(l.RotationToggle), NewKeybindInput(g.ui, &k.RotationToggle),
 	)
 
-	gamepad := NewTwoCol()
+	gamepad := newTwoCol()
 	menu.AddChild(NewHeader(l.Controller, g.ui.res), gamepad)
 	c := &tmp.Controller
 	gamepad.AddChild(
@@ -426,7 +370,7 @@ func NewGbaMenu(g *Game) *widget.Container {
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
 
-	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, keys, gamepad)
+	g.ui.focus.BuildMenuFocus(menu, keys, gamepad)
 
 	return menu
 }
@@ -435,9 +379,9 @@ func NewNdsMenu(g *Game) *widget.Container {
 	tmp := config.Conf.Nds
 	l := g.ui.res.localization.Settings.Nds
 
-	menu := NewMenu()
+	menu := newMenu()
 
-	screen := NewTwoCol()
+	screen := newTwoCol()
 	menu.AddChild(NewHeader(l.Screen, g.ui.res), screen)
 
 	screen.AddChild(
@@ -446,14 +390,14 @@ func NewNdsMenu(g *Game) *widget.Container {
 		NewLabel(l.Rotation), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.Screen.Rotation, l.Rotations, g.ui.res),
 	)
 
-	rtc := NewTwoCol()
+	rtc := newTwoCol()
 	menu.AddChild(NewHeader(l.Rtc, g.ui.res), rtc)
 
 	rtc.AddChild(
 		NewLabel(l.AdditionalHours), NewDecimalInput(g.ui, l.AdditionalHours, &tmp.Rtc.AdditionalHours, 24),
 	)
 
-	bios := NewTwoCol()
+	bios := newTwoCol()
 	menu.AddChild(NewHeader(l.Bios, g.ui.res), bios)
 
 	bios.AddChild(
@@ -461,7 +405,7 @@ func NewNdsMenu(g *Game) *widget.Container {
 		NewLabel(l.Arm9Path), NewFileInput(&tmp.Bios.Arm9Path),
 	)
 
-	firmware := NewTwoCol()
+	firmware := newTwoCol()
 	menu.AddChild(NewHeader(l.Firmware, g.ui.res), firmware)
 	favColor := config.ColorNames[tmp.Firmware.Color]
 
@@ -472,7 +416,7 @@ func NewNdsMenu(g *Game) *widget.Container {
 		NewLabel(l.FavoriteColor), NewTextBoxInput(g.ui, BOARD_ALPHA, l.FavoriteColor, &favColor, ColorNdsValidation()),
 	)
 
-	export := NewTwoCol()
+	export := newTwoCol()
 	menu.AddChild(NewHeader(l.SceneExport, g.ui.res), export)
 
 	export.AddChild(
@@ -480,7 +424,7 @@ func NewNdsMenu(g *Game) *widget.Container {
 		NewLabel(l.ShadowPolygons), NewCheckbox(&tmp.Export.ShadowPolys),
 	)
 
-	keys := NewTwoCol()
+	keys := newTwoCol()
 	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
 	k := &tmp.Keyboard
 	keys.AddChild(
@@ -503,7 +447,7 @@ func NewNdsMenu(g *Game) *widget.Container {
 		NewLabel(l.ExportToggle), NewKeybindInput(g.ui, &k.ExportScene),
 	)
 
-	gamepad := NewTwoCol()
+	gamepad := newTwoCol()
 	menu.AddChild(NewHeader(l.Controller, g.ui.res), gamepad)
 	c := &tmp.Controller
 	gamepad.AddChild(
@@ -541,16 +485,16 @@ func NewNdsMenu(g *Game) *widget.Container {
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
 
-	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, keys, gamepad)
+	g.ui.focus.BuildMenuFocus(menu, keys, gamepad)
 	return menu
 }
 
 func NewAboutMenu(g *Game) *widget.Container {
 	l := g.ui.res.localization.Settings.About
 
-	menu := NewMenu()
+	menu := newMenu()
 
-	about := NewOneCol()
+	about := newOneCol()
 	menu.AddChild(NewHeader(l.About, g.ui.res))
 	menu.AddChild(about)
 
@@ -559,7 +503,7 @@ func NewAboutMenu(g *Game) *widget.Container {
 	about.AddChild(NewLinkText(l.Copyright))
 	about.AddChild(NewLinkText(l.ThankYous))
 
-	g.ui.focus.BuildMenuFocus(g.ui.ui, menu, nil, nil)
+	g.ui.focus.BuildMenuFocus(menu, nil, nil)
 
 	return menu
 }

@@ -104,8 +104,8 @@ func NewGame(res *Resources) *Game {
 		ui: &Ui{
 			gamepadIds:   make(map[ebiten.GamepadID]struct{}),
 			gamepadIdBuf: make([]ebiten.GamepadID, 0),
-			res:          res,
 			focus:        &Focus{},
+			res:          res,
 			toast:        NewToast(res),
 			keyboard:     NewKeyboard(res, res.localization.Settings.Ui.Alphabet),
 		},
@@ -161,7 +161,7 @@ func (g *Game) Update() error {
 		}
 
 		if g.ui.scrollable != nil && len(g.ui.gamepadIds) != 0 {
-			g.ui.focus.KeepFocusedInView(g.ui.slider)
+			g.ui.focus.KeepFocusedInView(g.ui.slider, g.ui.ui)
 		}
 
 		g.ui.ui.Update()

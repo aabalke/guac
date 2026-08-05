@@ -6,104 +6,26 @@ import (
 )
 
 type Focus struct {
-	ui *ebitenui.UI
-
-	other   []widget.Focuser
-	sidebar []widget.Focuser
-	submenu []widget.Focuser
-
+	ui              *ebitenui.UI
+	sidebar         []widget.Focuser
+	submenu         []widget.Focuser
 	horizontalGroup [][]widget.Focuser
 }
 
 func (f *Focus) ClearFocus() {
-	f.other = []widget.Focuser{}
 	f.sidebar = []widget.Focuser{}
 	f.submenu = []widget.Focuser{}
 	f.horizontalGroup = [][]widget.Focuser{}
 }
 
-func (f *Focus) BuildMenuFocus(ui *ebitenui.UI, menu, keys, gamepad *widget.Container) {
+func (f *Focus) BuildMenuFocus(menu *widget.Container, bindings ...*widget.Container) {
 	f.submenu = menu.GetFocusers()
-	f.BuildFocus(ui)
-	f.buildBinding(keys)
-	f.buildBinding(gamepad)
-}
-
-func (f *Focus) BuildFocus(ui *ebitenui.UI) {
-	f.ui = ui
-	f.buildFocusGroup(&f.other)
-
-	if len(f.sidebar) == 0 {
-		return
-	}
-	if len(f.submenu) == 0 {
-		return
-	}
-
 	f.buildSidebarFocus()
 	f.buildSubFocus()
-}
 
-func (f *Focus) buildBinding(keybinds *widget.Container) {
-	if keybinds == nil {
-		return
+	for _, binding := range bindings {
+		buildBinding(binding)
 	}
-
-	focusers := keybinds.GetFocusers()
-
-	if len(focusers) == 0 {
-		return
-	}
-
-	lastIdx := len(focusers) - 1
-
-	prev := focusers[0].GetFocus(widget.FOCUS_NORTH)
-	next := focusers[lastIdx].GetFocus(widget.FOCUS_SOUTH)
-
-	// each binding is 3 focusers, text input, append button, cancel button
-	for i := 0; i < len(focusers); i += 2 {
-		if i == 0 {
-			focusers[i+0].AddFocus(widget.FOCUS_NORTH, prev)
-			focusers[i+1].AddFocus(widget.FOCUS_NORTH, prev)
-		} else {
-			focusers[i+0].AddFocus(widget.FOCUS_NORTH, focusers[i-2+0])
-			focusers[i+1].AddFocus(widget.FOCUS_NORTH, focusers[i-2+1])
-			focusers[i+1].AddFocus(widget.FOCUS_PREVIOUS, focusers[i-2+2])
-		}
-
-		if i == len(focusers)-2 {
-			focusers[i+0].AddFocus(widget.FOCUS_SOUTH, next)
-			focusers[i+1].AddFocus(widget.FOCUS_SOUTH, next)
-		} else {
-			focusers[i+0].AddFocus(widget.FOCUS_SOUTH, focusers[i+2+0])
-			focusers[i+1].AddFocus(widget.FOCUS_SOUTH, focusers[i+2+1])
-			focusers[i+1].AddFocus(widget.FOCUS_NEXT, focusers[i+2+1])
-		}
-
-		focusers[i+1].AddFocus(widget.FOCUS_WEST, focusers[i+0])
-		focusers[i+0].AddFocus(widget.FOCUS_EAST, focusers[i+1])
-	}
-
-	// focus on append button
-	prev.AddFocus(widget.FOCUS_SOUTH, focusers[0])
-	next.AddFocus(widget.FOCUS_NORTH, focusers[lastIdx])
-	prev.AddFocus(widget.FOCUS_NEXT, focusers[0])
-	next.AddFocus(widget.FOCUS_PREVIOUS, focusers[lastIdx])
-}
-
-func (f *Focus) buildFocusGroup(group *[]widget.Focuser) {
-	if len(*group) <= 0 {
-		return
-	}
-
-	(*group)[0].AddFocus(widget.FOCUS_SOUTH, (*group)[1])
-
-	for i := 1; i < len(*group)-1; i++ {
-		(*group)[i].AddFocus(widget.FOCUS_NORTH, (*group)[i-1])
-		(*group)[i].AddFocus(widget.FOCUS_SOUTH, (*group)[i+1])
-	}
-
-	(*group)[len(*group)-1].AddFocus(widget.FOCUS_NORTH, (*group)[len(*group)-2])
 }
 
 func (f *Focus) buildSidebarFocus() {
@@ -170,12 +92,6 @@ func (f *Focus) buildHorizontalGroupOverride() {
 	}
 }
 
-func (f *Focus) FocusLast() {
-	if len(f.other) > 0 {
-		f.ui.SetFocusedWidget(f.other[len(f.other)-1])
-	}
-}
-
 func (f *Focus) FocusLastSubMenu() {
 	if len(f.submenu) > 0 {
 		f.ui.SetFocusedWidget(f.submenu[len(f.submenu)-1])
@@ -206,7 +122,7 @@ func (f *Focus) DeFocus() {
 	}
 }
 
-func (f *Focus) KeepFocusedInView(slider *widget.Slider) {
+func (f *Focus) KeepFocusedInView(slider *widget.Slider, ui *ebitenui.UI) {
 	if len(f.submenu) == 0 ||
 		slider == nil ||
 		f.ui == nil ||
@@ -232,4 +148,66 @@ func (f *Focus) KeepFocusedInView(slider *widget.Slider) {
 	case focusedBottom > rootBottom:
 		slider.Current += focusedBottom - rootBottom
 	}
+}
+
+func buildBinding(keybinds *widget.Container) {
+	if keybinds == nil {
+		return
+	}
+
+	focusers := keybinds.GetFocusers()
+
+	if len(focusers) == 0 {
+		return
+	}
+
+	lastIdx := len(focusers) - 1
+
+	prev := focusers[0].GetFocus(widget.FOCUS_NORTH)
+	next := focusers[lastIdx].GetFocus(widget.FOCUS_SOUTH)
+
+	// each binding is 3 focusers, text input, append button, cancel button
+	for i := 0; i < len(focusers); i += 2 {
+		if i == 0 {
+			focusers[i+0].AddFocus(widget.FOCUS_NORTH, prev)
+			focusers[i+1].AddFocus(widget.FOCUS_NORTH, prev)
+		} else {
+			focusers[i+0].AddFocus(widget.FOCUS_NORTH, focusers[i-2+0])
+			focusers[i+1].AddFocus(widget.FOCUS_NORTH, focusers[i-2+1])
+			focusers[i+1].AddFocus(widget.FOCUS_PREVIOUS, focusers[i-2+2])
+		}
+
+		if i == len(focusers)-2 {
+			focusers[i+0].AddFocus(widget.FOCUS_SOUTH, next)
+			focusers[i+1].AddFocus(widget.FOCUS_SOUTH, next)
+		} else {
+			focusers[i+0].AddFocus(widget.FOCUS_SOUTH, focusers[i+2+0])
+			focusers[i+1].AddFocus(widget.FOCUS_SOUTH, focusers[i+2+1])
+			focusers[i+1].AddFocus(widget.FOCUS_NEXT, focusers[i+2+1])
+		}
+
+		focusers[i+1].AddFocus(widget.FOCUS_WEST, focusers[i+0])
+		focusers[i+0].AddFocus(widget.FOCUS_EAST, focusers[i+1])
+	}
+
+	// focus on append button
+	prev.AddFocus(widget.FOCUS_SOUTH, focusers[0])
+	next.AddFocus(widget.FOCUS_NORTH, focusers[lastIdx])
+	prev.AddFocus(widget.FOCUS_NEXT, focusers[0])
+	next.AddFocus(widget.FOCUS_PREVIOUS, focusers[lastIdx])
+}
+
+func buildOtherFocus(group []widget.Focuser) {
+	if len(group) <= 0 {
+		return
+	}
+
+	group[0].AddFocus(widget.FOCUS_SOUTH, group[1])
+
+	for i := 1; i < len(group)-1; i++ {
+		group[i].AddFocus(widget.FOCUS_NORTH, group[i-1])
+		group[i].AddFocus(widget.FOCUS_SOUTH, group[i+1])
+	}
+
+	group[len(group)-1].AddFocus(widget.FOCUS_NORTH, group[len(group)-2])
 }

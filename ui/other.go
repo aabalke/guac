@@ -12,7 +12,7 @@ func NewHome(g *Game) {
 
 	l := g.ui.res.localization.Main
 
-	b1 := NewCenteredButton(l.Open, func() {
+	b1 := NewCenteredButton(l.Open, func(*widget.ButtonClickedEventArgs) {
 		file := utils.OpenFile(
 			l.DialogTitle,
 			l.DialogDesc,
@@ -22,23 +22,18 @@ func NewHome(g *Game) {
 		g.InitConsole(file)
 	})
 
-	b2 := NewCenteredButton(l.Settings, func() {
+	b2 := NewCenteredButton(l.Settings, func(*widget.ButtonClickedEventArgs) {
 		NewSettings(g, g.ui.PageId, MENU_GENERAL)
 	})
 
-	b3 := NewCenteredButton(l.Quit, func() {
+	b3 := NewCenteredButton(l.Quit, func(*widget.ButtonClickedEventArgs) {
 		g.quit = true
 	})
 
 	root := NewCenteredPage(g.ui.res.bg, b1, b2, b3)
-
 	g.ui.PageId = PAGE_HOME
-	g.ui.ui = &ebitenui.UI{
-		Container:    root,
-		PrimaryTheme: NewTheme(g.ui.res),
-	}
-	g.ui.focus.other = g.ui.ui.Container.GetFocusers()
-	g.ui.focus.BuildFocus(g.ui.ui)
+	newUi(g, root)
+	buildOtherFocus(g.ui.ui.Container.GetFocusers())
 }
 
 func NewPause(g *Game) {
@@ -46,15 +41,15 @@ func NewPause(g *Game) {
 
 	l := g.ui.res.localization.Pause
 
-	b1 := NewCenteredButton(l.Resume, func() {
+	b1 := NewCenteredButton(l.Resume, func(*widget.ButtonClickedEventArgs) {
 		g.TogglePause()
 	})
 
-	b2 := NewCenteredButton(l.Settings, func() {
+	b2 := NewCenteredButton(l.Settings, func(*widget.ButtonClickedEventArgs) {
 		NewSettings(g, g.ui.PageId, MENU_GENERAL)
 	})
 
-	b3 := NewCenteredButton(l.Main, func() {
+	b3 := NewCenteredButton(l.Main, func(*widget.ButtonClickedEventArgs) {
 		NewHome(g)
 
 		if g.nds != nil {
@@ -75,12 +70,8 @@ func NewPause(g *Game) {
 
 	root := NewCenteredPage(g.ui.res.bg, b1, b2, b3)
 	g.ui.PageId = PAGE_PAUSE
-	g.ui.ui = &ebitenui.UI{
-		Container:    root,
-		PrimaryTheme: NewTheme(g.ui.res),
-	}
-	g.ui.focus.other = g.ui.ui.Container.GetFocusers()
-	g.ui.focus.BuildFocus(g.ui.ui)
+	newUi(g, root)
+	buildOtherFocus(g.ui.ui.Container.GetFocusers())
 }
 
 func NewCenteredPage(bg *image.NineSlice, buttons ...*widget.Button) *widget.Container {
@@ -113,23 +104,25 @@ func NewCenteredPage(bg *image.NineSlice, buttons ...*widget.Button) *widget.Con
 	return root
 }
 
-func NewCenteredButton(text string, f func()) *widget.Button {
-	b := widget.NewButton(
+func NewCenteredButton(text string, f func(*widget.ButtonClickedEventArgs)) *widget.Button {
+	return widget.NewButton(
+		widget.ButtonOpts.TextLabel(text),
 		widget.ButtonOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-				// MaxWidth: BUTTON_WIDTH,
 				Stretch: true,
 			}),
 
 			widget.WidgetOpts.MinSize(BUTTON_WIDTH, 0),
 		),
 
-		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
-			f()
-		}),
+		widget.ButtonOpts.ClickedHandler(f),
 	)
+}
 
-	b.SetText(text)
-
-	return b
+func newUi(g *Game, root *widget.Container) {
+	g.ui.ui = &ebitenui.UI{
+		Container:    root,
+		PrimaryTheme: NewTheme(g.ui.res),
+	}
+	g.ui.focus.ui = g.ui.ui
 }

@@ -102,7 +102,9 @@ func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) 
 					b.Click()
 				}
 			case slices.Contains(buttonConfig.Return, button):
-				g.ui.focus.FocusLast()
+				if focusers := g.ui.ui.Container.GetFocusers(); len(focusers) > 0 {
+					g.ui.ui.SetFocusedWidget(focusers[len(focusers)-1])
+				}
 			}
 		}
 

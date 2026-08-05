@@ -25,12 +25,10 @@ func NewHeader(text string, res *Resources) *widget.Text {
 }
 
 func NewLabel(text string) *widget.Text {
-	t := widget.NewText(
+	return widget.NewText(
+		widget.TextOpts.TextLabel(text),
 		widget.TextOpts.Position(widget.TextPositionStart, widget.TextPositionCenter),
 	)
-
-	t.Label = text
-	return t
 }
 
 func NewLinkText(text string) *widget.Text {
@@ -55,9 +53,7 @@ func NewLinkText(text string) *widget.Text {
 	return t
 }
 
-func NewSeparator() *widget.Container {
-	return widget.NewContainer()
-}
+func NewSeparator() *widget.Container { return widget.NewContainer() }
 
 func NewCheckbox(value *bool) widget.PreferredSizeLocateableWidget {
 	state := widget.WidgetUnchecked
@@ -66,7 +62,6 @@ func NewCheckbox(value *bool) widget.PreferredSizeLocateableWidget {
 	}
 
 	return widget.NewCheckbox(
-
 		widget.CheckboxOpts.StateChangedHandler(func(args *widget.CheckboxChangedEventArgs) {
 			*value = args.State == widget.WidgetChecked
 		}),
@@ -107,14 +102,14 @@ func NewTextBoxInput(ui *Ui, board int, label string, value any, validation func
 }
 
 func NewKeybindInput(ui *Ui, v *[]ebiten.Key) widget.PreferredSizeLocateableWidget {
-	return _NewBindingInput(ui, v, nil)
+	return _newBindingInput(ui, v, nil)
 }
 
 func NewGamepadInput(ui *Ui, v *[]ebiten.StandardGamepadButton) widget.PreferredSizeLocateableWidget {
-	return _NewBindingInput(ui, nil, v)
+	return _newBindingInput(ui, nil, v)
 }
 
-func _NewBindingInput(ui *Ui, keys *[]ebiten.Key, buttons *[]ebiten.StandardGamepadButton) widget.PreferredSizeLocateableWidget {
+func _newBindingInput(ui *Ui, keys *[]ebiten.Key, buttons *[]ebiten.StandardGamepadButton) widget.PreferredSizeLocateableWidget {
 	placeholder := ""
 	buttonContainerMin := widget.WidgetOpts.MinSize(64, 1)
 
@@ -280,10 +275,11 @@ func NewTextInput(ui *Ui, label string, value any) *widget.TextInput {
 	return NewTextBoxInput(ui, BOARD_ALPHA, label, value, NoValidation())
 }
 
-func NewSaveButton(text string, f func(args *widget.ButtonClickedEventArgs)) widget.PreferredSizeLocateableWidget {
-	b := widget.NewButton(widget.ButtonOpts.ClickedHandler(f))
-	b.SetText(text)
-	return b
+func NewSaveButton(text string, f func(*widget.ButtonClickedEventArgs)) widget.PreferredSizeLocateableWidget {
+	return widget.NewButton(
+		widget.ButtonOpts.TextLabel(text),
+		widget.ButtonOpts.ClickedHandler(f),
+	)
 }
 
 func NewColorInput(ui *Ui, label string, v *color.Color, validation func(s string) (bool, *string)) widget.PreferredSizeLocateableWidget {
