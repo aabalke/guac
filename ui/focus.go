@@ -55,46 +55,40 @@ func (f *Focus) buildBinding(keybinds *widget.Container) {
 		return
 	}
 
+	lastIdx := len(focusers) - 1
+
 	prev := focusers[0].GetFocus(widget.FOCUS_NORTH)
-	next := focusers[len(focusers)-1].GetFocus(widget.FOCUS_SOUTH)
+	next := focusers[lastIdx].GetFocus(widget.FOCUS_SOUTH)
 
 	// each binding is 3 focusers, text input, append button, cancel button
-	for i := 0; i < len(focusers); i += 3 {
+	for i := 0; i < len(focusers); i += 2 {
 		if i == 0 {
 			focusers[i+0].AddFocus(widget.FOCUS_NORTH, prev)
 			focusers[i+1].AddFocus(widget.FOCUS_NORTH, prev)
-			focusers[i+2].AddFocus(widget.FOCUS_NORTH, prev)
 		} else {
-			focusers[i+0].AddFocus(widget.FOCUS_NORTH, focusers[i-3+0])
-			focusers[i+1].AddFocus(widget.FOCUS_NORTH, focusers[i-3+1])
-			focusers[i+2].AddFocus(widget.FOCUS_NORTH, focusers[i-3+2])
-
-			focusers[i+1].AddFocus(widget.FOCUS_PREVIOUS, focusers[i-3+2])
+			focusers[i+0].AddFocus(widget.FOCUS_NORTH, focusers[i-2+0])
+			focusers[i+1].AddFocus(widget.FOCUS_NORTH, focusers[i-2+1])
+			focusers[i+1].AddFocus(widget.FOCUS_PREVIOUS, focusers[i-2+2])
 		}
 
-		if i == len(focusers)-3 {
+		if i == len(focusers)-2 {
 			focusers[i+0].AddFocus(widget.FOCUS_SOUTH, next)
 			focusers[i+1].AddFocus(widget.FOCUS_SOUTH, next)
-			focusers[i+2].AddFocus(widget.FOCUS_SOUTH, next)
 		} else {
-			focusers[i+0].AddFocus(widget.FOCUS_SOUTH, focusers[i+3+0])
-			focusers[i+1].AddFocus(widget.FOCUS_SOUTH, focusers[i+3+1])
-			focusers[i+2].AddFocus(widget.FOCUS_SOUTH, focusers[i+3+2])
-
-			focusers[i+2].AddFocus(widget.FOCUS_NEXT, focusers[i+3+1])
+			focusers[i+0].AddFocus(widget.FOCUS_SOUTH, focusers[i+2+0])
+			focusers[i+1].AddFocus(widget.FOCUS_SOUTH, focusers[i+2+1])
+			focusers[i+1].AddFocus(widget.FOCUS_NEXT, focusers[i+2+1])
 		}
 
-		focusers[i+0].(*BindingInput).FocusClearAll()
-
-		focusers[i+2].AddFocus(widget.FOCUS_WEST, focusers[i+1])
-		focusers[i+1].AddFocus(widget.FOCUS_EAST, focusers[i+2])
+		focusers[i+1].AddFocus(widget.FOCUS_WEST, focusers[i+0])
+		focusers[i+0].AddFocus(widget.FOCUS_EAST, focusers[i+1])
 	}
 
 	// focus on append button
-	prev.AddFocus(widget.FOCUS_SOUTH, focusers[1])
-	next.AddFocus(widget.FOCUS_NORTH, focusers[len(focusers)-2])
-	prev.AddFocus(widget.FOCUS_NEXT, focusers[1])
-	next.AddFocus(widget.FOCUS_PREVIOUS, focusers[len(focusers)-2])
+	prev.AddFocus(widget.FOCUS_SOUTH, focusers[0])
+	next.AddFocus(widget.FOCUS_NORTH, focusers[lastIdx])
+	prev.AddFocus(widget.FOCUS_NEXT, focusers[0])
+	next.AddFocus(widget.FOCUS_PREVIOUS, focusers[lastIdx])
 }
 
 func (f *Focus) buildFocusGroup(group *[]widget.Focuser) {

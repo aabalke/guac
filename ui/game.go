@@ -19,6 +19,7 @@ import (
 	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 type PageId int
@@ -50,6 +51,7 @@ type Ui struct {
 	gamepadIds   map[ebiten.GamepadID]struct{}
 	res          *Resources
 	focus        *Focus
+	ActiveInputs int
 
 	PageId     PageId
 	PrevPageId PageId
@@ -131,12 +133,19 @@ func (g *Game) Update() error {
 
 	g.Profile()
 
-	justKeys, keys, justButtons, buttons := g.GetInput()
+	g.mouse.Update()
 
 	switch {
 	case g.quit:
 		return ebiten.Termination
 	case g.ui.ui != nil:
+
+		justButtons, buttons := g.GetGamepadButtons()
+		g.ButtonInput(justButtons, buttons)
+		if g.ui.ActiveInputs <= 0 {
+			justKeys := inpututil.AppendJustPressedKeys([]ebiten.Key{})
+			g.HandleGlobalInputs(justKeys, justButtons, buttons)
+		}
 
 		if ebiten.Tick() < 1 &&
 			len(g.ui.gamepadIds) != 0 &&
@@ -158,14 +167,26 @@ func (g *Game) Update() error {
 		g.ui.ui.Update()
 
 	case g.nds != nil:
+		justKeys := inpututil.AppendJustPressedKeys([]ebiten.Key{})
+		keys := inpututil.AppendPressedKeys([]ebiten.Key{})
+		justButtons, buttons := g.GetGamepadButtons()
+		g.HandleGlobalInputs(justKeys, justButtons, buttons)
 		g.nds.InputHandler(justKeys, keys, justButtons, buttons, g.mouse, uint64(ebiten.Tick()))
 		g.nds.Update(g.TargetFps == 60)
 
 	case g.gba != nil:
+		justKeys := inpututil.AppendJustPressedKeys([]ebiten.Key{})
+		keys := inpututil.AppendPressedKeys([]ebiten.Key{})
+		justButtons, buttons := g.GetGamepadButtons()
+		g.HandleGlobalInputs(justKeys, justButtons, buttons)
 		g.gba.InputHandler(justKeys, keys, justButtons, buttons)
 		g.gba.Update(int64(ebiten.TPS()))
 
 	case g.gb != nil:
+		justKeys := inpututil.AppendJustPressedKeys([]ebiten.Key{})
+		keys := inpututil.AppendPressedKeys([]ebiten.Key{})
+		justButtons, buttons := g.GetGamepadButtons()
+		g.HandleGlobalInputs(justKeys, justButtons, buttons)
 		g.gb.InputHandler(keys, buttons)
 		g.gb.Update(int64(ebiten.TPS()))
 	}

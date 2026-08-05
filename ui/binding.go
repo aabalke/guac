@@ -24,17 +24,16 @@ type BindingInput struct {
 	definedParams  BindingInputParams
 	computedParams BindingInputParams
 
-	takingInputs bool
-	dirty        bool
-	inputText    string
+	inputText       string
+	placeholderText string
+	takingInputs    bool
+	dirty           bool
 
 	isButtonInput bool
 	gamepadIds    *map[ebiten.GamepadID]struct{}
 	inputKeys     []ebiten.Key
 	inputButtons  []ebiten.StandardGamepadButton
-	// inputMouse   []ebiten.MouseButton
 
-	placeholderText string
 	mobileInputMode mobile.InputMode
 
 	ChangedEvent *event.Event
@@ -46,10 +45,7 @@ type BindingInput struct {
 	renderBuf  *image.MaskedRenderBuffer
 	mask       *image.NineSlice
 	state      bindingInputState
-
-	tabOrder int
-	focused  bool
-	focusMap map[widget.FocusDirection]widget.Focuser
+	focused    bool
 }
 
 type BindingInputOpt func(t *BindingInput)
@@ -87,7 +83,6 @@ func NewBindingInput(opts ...BindingInputOpt) *BindingInput {
 		init:            &widget.MultiOnce{},
 		renderBuf:       image.NewMaskedRenderBuffer(),
 		mobileInputMode: mobile.TEXT,
-		focusMap:        make(map[widget.FocusDirection]widget.Focuser),
 	}
 	t.state = t.idleState()
 	t.init.Append(t.createWidget)
@@ -108,7 +103,6 @@ func (t *BindingInput) createWidget() {
 	t.widget = widget.NewWidget(append([]widget.WidgetOpt{
 		widget.WidgetOpts.TrackHover(true),
 	}, t.widgetOpts...)...)
-	t.widget.SetFocusable(t)
 	t.mask = image.NewNineSliceColor(color.NRGBA{255, 0, 255, 255})
 }
 
@@ -221,12 +215,6 @@ func (o BindingInputOptions) Face(f *text.Face) BindingInputOpt {
 func (o BindingInputOptions) Placeholder(s string) BindingInputOpt {
 	return func(t *BindingInput) {
 		t.placeholderText = s
-	}
-}
-
-func (o BindingInputOptions) TabOrder(to int) BindingInputOpt {
-	return func(t *BindingInput) {
-		t.tabOrder = to
 	}
 }
 
@@ -411,32 +399,8 @@ func (t *BindingInput) SetText(text string) {
 	t.inputText = text
 }
 
-// Focus this is used by ebitenui to focus the element - however it cannot be focused
-// directly - only through "append" button selection
-func (t *BindingInput) Focus(focused bool) {}
-
-func (t *BindingInput) FocusExplicit(focused bool) {
+func (t *BindingInput) SetFocus(focused bool) {
 	t.init.Do()
-	t.GetWidget().FireFocusEvent(t, focused, img.Point{-1, -1})
+	//t.GetWidget().FireFocusEvent(t, focused, img.Point{-1, -1})
 	t.focused = focused
-}
-
-func (t *BindingInput) IsFocused() bool {
-	return t.focused
-}
-
-func (t *BindingInput) FocusClearAll() {
-	t.focusMap = map[widget.FocusDirection]widget.Focuser{}
-}
-
-func (t *BindingInput) TabOrder() int {
-	return t.tabOrder
-}
-
-func (t *BindingInput) GetFocus(direction widget.FocusDirection) widget.Focuser {
-	return t.focusMap[direction]
-}
-
-func (t *BindingInput) AddFocus(direction widget.FocusDirection, focus widget.Focuser) {
-	t.focusMap[direction] = focus
 }

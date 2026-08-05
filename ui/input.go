@@ -49,13 +49,7 @@ func (g *Game) GetGamepadButtons() (justButtons, buttons []ebiten.StandardGamepa
 	return justButtons, buttons
 }
 
-func (g *Game) GetInput() (justKeys, keys []ebiten.Key, justButtons, buttons []ebiten.StandardGamepadButton) {
-	g.mouse.Update()
-
-	justKeys = inpututil.AppendJustPressedKeys(justKeys)
-	keys = inpututil.AppendPressedKeys(keys)
-	justButtons, buttons = g.GetGamepadButtons()
-
+func (g *Game) HandleGlobalInputs(justKeys []ebiten.Key, justButtons, buttons []ebiten.StandardGamepadButton) {
 	if !ebiten.IsFocused() {
 		return
 	}
@@ -76,10 +70,6 @@ func (g *Game) GetInput() (justKeys, keys []ebiten.Key, justButtons, buttons []e
 		}
 	}
 
-	if g.ui.ui != nil {
-		g.ButtonInput(justButtons, buttons)
-	}
-
 	for _, button := range justButtons {
 		switch {
 		case slices.Contains(buttonConfig.Fullscreen, button):
@@ -92,8 +82,6 @@ func (g *Game) GetInput() (justKeys, keys []ebiten.Key, justButtons, buttons []e
 			g.ToggleMute()
 		}
 	}
-
-	return justKeys, keys, justButtons, buttons
 }
 
 func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) {

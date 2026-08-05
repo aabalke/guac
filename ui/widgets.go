@@ -91,6 +91,14 @@ func NewTextBoxInput(ui *Ui, board int, label string, value any, validation func
 		widget.TextInputOpts.ChangedHandler(func(args *widget.TextInputChangedEventArgs) {
 			fromString(value, args.InputText)
 		}),
+
+		widget.TextInputOpts.FocusHandler(func(args *widget.TextInputFocusEventArgs) {
+			if args.Focused {
+				ui.ActiveInputs++
+			} else {
+				ui.ActiveInputs--
+			}
+		}),
 	)
 
 	input.SetText(toString(value))
@@ -203,10 +211,11 @@ func _NewBindingInput(ui *Ui, keys *[]ebiten.Key, buttons *[]ebiten.StandardGame
 		for range time.Tick(time.Second) {
 			if count <= 0 {
 				input.takingInputs = false
+				ui.ActiveInputs--
 				count = 5
 				clock.Label = strconv.Itoa(count)
 				ui.ui.SetFocusedWidget(appendButton)
-				input.FocusExplicit(false)
+				input.SetFocus(false)
 				clock.GetWidget().SetVisibility(widget.Visibility_Hide_Blocking)
 				buttonContainer.GetWidget().SetVisibility(widget.Visibility_Show)
 				break
@@ -222,8 +231,9 @@ func _NewBindingInput(ui *Ui, keys *[]ebiten.Key, buttons *[]ebiten.StandardGame
 		widget.ButtonOpts.TextPadding(&paddingSidesInset),
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
 			input.takingInputs = true
-			ui.ui.SetFocusedWidget(input)
-			input.FocusExplicit(true)
+			ui.ActiveInputs++
+			ui.focus.DeFocus()
+			input.SetFocus(true)
 			clock.GetWidget().SetVisibility(widget.Visibility_Show)
 			buttonContainer.GetWidget().SetVisibility(widget.Visibility_Hide_Blocking)
 			go clockCountDown()
@@ -241,6 +251,7 @@ func _NewBindingInput(ui *Ui, keys *[]ebiten.Key, buttons *[]ebiten.StandardGame
 				*buttons = []ebiten.StandardGamepadButton{}
 			}
 			input.takingInputs = false
+			ui.ActiveInputs--
 		}),
 	)
 
