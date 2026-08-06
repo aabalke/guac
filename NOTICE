@@ -1,18 +1,12 @@
 This project includes code adapted from third party code under the following licenses:
 
-GBA
-
-- APU and HLE Bios from akatsuki105/magia 005c616 (MIT License)
-- Cartridge and VideoUpdate from RidgeX/ygba a30c442 (BSD-3 Clause License)
-
 NDS
-
 - Bios files Copyright (c) 2013, Gilead Kutnick "Drastic" (MIT License)
 - Serial Interfaces and Other Perpheral implimentations from rasky/ndsemu (MIT License)
 
 All other code is @ 2025 Aaron Balke, licensed under a BSD-3 Clause License
 
-The Guac Emulator Logo / Icon, splash screen, sound effects and other branded works are copyrighted and not
+The Guac Emulator Logo / Icon, sound effects and other branded works are copyrighted and not
 licensed.
 
 Pause Menu icons are sourced from Google Material Symbols, licensed under 

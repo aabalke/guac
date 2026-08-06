@@ -159,7 +159,9 @@ func (g *Game) Update() error {
 			g.ui.focus.KeepFocusedInView(g.ui.slider, g.ui.ui)
 		}
 
-		g.ui.ui.Update()
+		if g.ui.ui != nil {
+			g.ui.ui.Update()
+		}
 
 	case g.nds != nil:
 		justKeys := inpututil.AppendJustPressedKeys([]ebiten.Key{})

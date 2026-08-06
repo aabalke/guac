@@ -259,21 +259,6 @@ func (gba *GBA) Draw(screen *ebiten.Image) {
 	screen.DrawImage(gba.Image, &gba.DrawOptions)
 }
 
-//func (gba *GBA) Draw(screen *ebiten.Image) {
-//	var (
-//		sw      = float64(screen.Bounds().Dx())
-//		sh      = float64(screen.Bounds().Dy())
-//		scale   = utils.ScaleImage(sw, sh, SCREEN_WIDTH, SCREEN_HEIGHT)
-//		offsetX = (sw - (SCREEN_WIDTH * scale)) / 2
-//		offsetY = (sh - (SCREEN_HEIGHT * scale)) / 2
-//	)
-//
-//	gba.DrawOptions.GeoM.Reset()
-//	gba.DrawOptions.GeoM.Scale(scale, scale)
-//	gba.DrawOptions.GeoM.Translate(offsetX, offsetY)
-//	screen.DrawImage(gba.Image, &gba.DrawOptions)
-//}
-
 func (gba *GBA) DirectBoot() {
 	reg := &gba.Cpu.Reg
 
