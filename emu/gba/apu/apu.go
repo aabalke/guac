@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/aabalke/guac/emu/gb/apu"
+	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 )
 
@@ -27,8 +28,10 @@ func NewApu(ctx *audio.Context, bufferSize time.Duration) *Apu {
 
 		a.Ctx = ctx
 
+		a.Stream = utils.NewStream(bufferSize, ctx.SampleRate())
+
 		var err error
-		a.Player, err = a.Ctx.NewPlayer(&a.Stream)
+		a.Player, err = a.Ctx.NewPlayer(a.Stream)
 		if err != nil {
 			panic(err)
 		}

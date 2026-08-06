@@ -29,7 +29,7 @@ type Mem interface {
 }
 
 type Snd struct {
-	stream utils.Stream
+	Stream *utils.Stream
 	Ctx    *audio.Context
 	player *audio.Player
 
@@ -59,8 +59,10 @@ func NewSnd(ctx *audio.Context, bufferSize time.Duration) *Snd {
 
 		s.Ctx = ctx
 
+		s.Stream = utils.NewStream(bufferSize, ctx.SampleRate())
+
 		var err error
-		s.player, err = s.Ctx.NewPlayer(&s.stream)
+		s.player, err = s.Ctx.NewPlayer(s.Stream)
 		if err != nil {
 			panic(err)
 		}
@@ -143,7 +145,7 @@ func (s *Snd) SoundClock(cycles uint32) {
 		l *= 50
 		r *= 50
 
-		s.stream.Write(int16(clip(int32(l))), int16(clip(int32(r))))
+		s.Stream.Write(int16(clip(int32(l))), int16(clip(int32(r))))
 
 		s.sndCycles -= uint32(s.SampCycles)
 	}
