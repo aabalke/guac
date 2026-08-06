@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"runtime"
 
-	"github.com/sqweek/dialog"
+	"github.com/hajimehoshi/dialog"
 )
 
 func ReadFile(path string) (buf []uint8, length int, ok bool) {
