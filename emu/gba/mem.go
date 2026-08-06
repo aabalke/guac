@@ -654,7 +654,7 @@ func (m *Memory) Write32(addr uint32, v uint32) {
 }
 
 func CheckEeprom(gba *GBA, addr uint32) bool {
-	if notEeprom := gba.Cartridge.Id != 1; notEeprom {
+	if notEeprom := gba.Cartridge.Id != cart.EEPROM; notEeprom {
 		return false
 	}
 
