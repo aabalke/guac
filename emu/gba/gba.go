@@ -15,21 +15,38 @@ import (
 )
 
 const (
+	// gba is fps 59.727500569606
 	FPS             = 60
 	SCREEN_WIDTH    = 240
 	SCREEN_HEIGHT   = 160
+	MAX_SCANLINE    = 228
 	BUFFER_SIZE     = 20 * time.Millisecond
 	CPU_SPEED       = 16777216
-	CYCLES_HDRAW    = 1007
+	CYCLES_HDRAW    = 1006
 	CYCLES_HBLANK   = 226
 	CYCLES_SCANLINE = CYCLES_HDRAW + CYCLES_HBLANK
 	CYCLES_VDRAW    = CYCLES_SCANLINE * SCREEN_HEIGHT
-	CYCLES_VBLANK   = CYCLES_SCANLINE * 68
+	CYCLES_VBLANK   = CYCLES_SCANLINE * (MAX_SCANLINE - SCREEN_HEIGHT)
 	CYCLES_FRAME    = CYCLES_VDRAW + CYCLES_VBLANK
 
 	// dmg is 8192, needs to be 4x to match 512hz clocking
 	CYCLES_PER_FRAME_SEQ = 8192 * 4
 )
+
+// this is to ensure nothing stupid has occured in development
+func init() {
+	if CPU_SPEED != 16777216 {
+		panic("gba: cpu speed is wrong")
+	}
+
+	if CYCLES_FRAME != 280896 {
+		panic("gba: cycles per frame is wrong")
+	}
+
+	if CYCLES_SCANLINE != 1232 {
+		panic("gba: cycles per scanline is wrong")
+	}
+}
 
 type GBA struct {
 	Cpu               *cpu.Cpu
