@@ -55,14 +55,12 @@ func (f *Fifo) Load() {
 		f.pipe.size = 4
 	}
 
-	sample := int8(uint8(f.pipe.word))
+	f.Latched = int8(uint8(f.pipe.word))
 
 	if f.pipe.size > 0 {
 		f.pipe.word >>= 8
 		f.pipe.size--
 	}
-
-	f.Latched = sample
 }
 
 func (f *Fifo) Get() int8 {

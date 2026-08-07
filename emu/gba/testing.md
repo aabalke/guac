@@ -64,6 +64,17 @@ Additionally, other ARMv5 instructions will fail.
 👍 Dma Start Delay [8/8]
 👍 Timer Basic [10/10]
 
+### png183/gba-tests
+❌ arm
+❌ branches
+❌ data_swp
+❌ halfword_transfer
+❌ multiply
+👍 dma_repeat_immediate
+❌ memory
+❌ psr2
+👍 timer_check_count_up_presence
+
 ### Other
  
 👍 deadbody Cpu Test

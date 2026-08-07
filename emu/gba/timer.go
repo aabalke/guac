@@ -120,7 +120,7 @@ func (t *Timer) ControlEvent(late int64, argz any) {
 	}
 
 	prevEnabled := t.Cnt&0x80 != 0
-	t.Cnt = v
+	t.Cnt = v &^ 0b11_1000
 
 	t.FreqShift = freqShifts[t.Cnt&3]
 	t.Cascade = t.Cnt&0x4 != 0
