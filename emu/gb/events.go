@@ -91,7 +91,9 @@ func (gb *GameBoy) eventScanlineEnd(late int64, arg any) {
 		gb.SetIrq(IRQ_VBL)
 
 		if !config.Conf.General.Headless {
+			gb.Mu.Lock()
 			gb.Image.WritePixels(gb.Pixels)
+			gb.Mu.Unlock()
 		}
 	}
 }

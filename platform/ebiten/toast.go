@@ -27,7 +27,6 @@ func NewToast(res *Resources) *Toast {
 }
 
 func (t *Toast) AddMessage(message string) {
-
 	container := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(t.res.sec),
 		widget.ContainerOpts.WidgetOpts(
@@ -48,7 +47,8 @@ func (t *Toast) AddMessage(message string) {
 			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 				HorizontalPosition: widget.AnchorLayoutPositionCenter,
 				VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			})),
+			}),
+		),
 
 		widget.TextOpts.Text(
 			message,

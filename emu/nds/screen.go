@@ -2,6 +2,7 @@ package nds
 
 import (
 	"math"
+	"sync"
 
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/utils"
@@ -49,6 +50,7 @@ const (
 )
 
 type Screen struct {
+	Mu       sync.Mutex
 	Layout   *int
 	Sizing   *int
 	Rotation *int
@@ -155,7 +157,10 @@ func (s *Screen) FillOnly(screen, image *ebiten.Image, bottom bool) {
 	s.Options.GeoM.Translate(rotX, rotY)
 	s.Options.GeoM.Scale(scale, scale)
 	s.Options.GeoM.Translate(offsetX, offsetY)
+
+	s.Mu.Lock()
 	screen.DrawImage(image, &s.Options)
+	s.Mu.Unlock()
 
 	if !bottom {
 		s.BtmAbs = BtmAbs{}
@@ -192,21 +197,27 @@ func (s *Screen) FillHybrid(screen *ebiten.Image) {
 	s.Options.GeoM.Translate(SCREEN_WIDTH, 0)
 	s.Options.GeoM.Scale(scale, scale)
 	s.Options.GeoM.Translate(offsetX, offsetY)
+	s.Mu.Lock()
 	screen.DrawImage(s.Top, &s.Options)
+	s.Mu.Unlock()
 
 	s.Options.GeoM.Reset()
 	s.Options.GeoM.Scale(0.5, 0.5)
 	s.Options.GeoM.Translate(SCREEN_WIDTH, SCREEN_HEIGHT/2)
 	s.Options.GeoM.Scale(scale, scale)
 	s.Options.GeoM.Translate(offsetX, offsetY)
+	s.Mu.Lock()
 	screen.DrawImage(s.Bottom, &s.Options)
+	s.Mu.Unlock()
 
 	if *s.Sizing == SIZING_ONLY_BOTTOM {
 
 		s.Options.GeoM.Reset()
 		s.Options.GeoM.Scale(scale, scale)
 		s.Options.GeoM.Translate(offsetX, offsetY)
+		s.Mu.Lock()
 		screen.DrawImage(s.Bottom, &s.Options)
+		s.Mu.Unlock()
 
 		realX := int(offsetX)
 		realY := int(offsetY)
@@ -228,7 +239,9 @@ func (s *Screen) FillHybrid(screen *ebiten.Image) {
 	s.Options.GeoM.Reset()
 	s.Options.GeoM.Scale(scale, scale)
 	s.Options.GeoM.Translate(offsetX, offsetY)
+	s.Mu.Lock()
 	screen.DrawImage(s.Top, &s.Options)
+	s.Mu.Unlock()
 
 	realW := int(scale * bottomW * 0.5)
 	realH := int(scale * bottomH * 0.5)
@@ -306,7 +319,9 @@ func (s *Screen) FillEvenVertical(screen *ebiten.Image) {
 	s.Options.GeoM.Translate(0, topOff)
 	s.Options.GeoM.Scale(scale, scale)
 	s.Options.GeoM.Translate(offsetX, offsetY)
+	s.Mu.Lock()
 	screen.DrawImage(s.Top, &s.Options)
+	s.Mu.Unlock()
 
 	s.Options.GeoM.Reset()
 	s.Options.GeoM.Rotate(rotRadians)
@@ -314,7 +329,9 @@ func (s *Screen) FillEvenVertical(screen *ebiten.Image) {
 	s.Options.GeoM.Translate(0, botOff)
 	s.Options.GeoM.Scale(scale, scale)
 	s.Options.GeoM.Translate(offsetX, offsetY)
+	s.Mu.Lock()
 	screen.DrawImage(s.Bottom, &s.Options)
+	s.Mu.Unlock()
 
 	var (
 		realX = int(offsetX)
@@ -392,7 +409,9 @@ func (s *Screen) FillEvenHorizontal(screen *ebiten.Image) {
 	s.Options.GeoM.Translate(topOff, 0)
 	s.Options.GeoM.Scale(scale, scale)
 	s.Options.GeoM.Translate(offsetX, offsetY)
+	s.Mu.Lock()
 	screen.DrawImage(s.Top, &s.Options)
+	s.Mu.Unlock()
 
 	s.Options.GeoM.Reset()
 	s.Options.GeoM.Rotate(rotRadians)
@@ -401,6 +420,9 @@ func (s *Screen) FillEvenHorizontal(screen *ebiten.Image) {
 	s.Options.GeoM.Scale(scale, scale)
 	s.Options.GeoM.Translate(offsetX, offsetY)
 	screen.DrawImage(s.Bottom, &s.Options)
+	s.Mu.Lock()
+	screen.DrawImage(s.Bottom, &s.Options)
+	s.Mu.Unlock()
 
 	var (
 		realX = int(offsetX + (scale * botOff))

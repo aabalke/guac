@@ -158,7 +158,11 @@ func (gba *GBA) ScanlineEndEvent(late int64, arg any) {
 		*vcount = 0
 
 		gba.Frame++
+
+		gba.Mu.Lock()
 		gba.Image.WritePixels(gba.Pixels)
+		gba.Mu.Unlock()
+
 		gba.PPU.Backgrounds[2].BgAffineReset()
 		gba.PPU.Backgrounds[3].BgAffineReset()
 	}

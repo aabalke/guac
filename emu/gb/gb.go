@@ -1,10 +1,13 @@
 package gb
 
 import (
+	"context"
 	"image/color"
+	"sync"
 	"time"
 	"unsafe"
 
+	"github.com/aabalke/guac/common/bus"
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gb/apu"
 	"github.com/aabalke/guac/emu/gb/cart"
@@ -33,7 +36,7 @@ const (
 	CYCLES_HBLANK       = 80 + 172
 	CYCLES_FRAME_SEQ    = 8192
 
-	FPS = 60
+	FPS = float64(59.727500569606)
 
 	AUTO = 0
 	DMG  = 1
@@ -41,22 +44,19 @@ const (
 )
 
 type GameBoy struct {
-	// Palette [][]uint8
-	Palette *[4]color.Color
-
-	DrawOptions ebiten.DrawImageOptions
-
-	bgPalette ColorPalette
-	spPalette ColorPalette
-
-	UnpackedMonoPals [3][4]uint32
-	DMGCompPals      [3][4]uint8
-
 	Scheduler *scheduler.Scheduler
-
+	Apu       *apu.Apu
 	Cartridge *cart.Cartridge
 	Cpu       *Cpu
 	MemoryBus MemoryBus
+
+	Palette          *[4]color.Color
+	bgPalette        ColorPalette
+	spPalette        ColorPalette
+	UnpackedMonoPals [3][4]uint32
+	DMGCompPals      [3][4]uint8
+
+	Mu sync.Mutex
 
 	Stat Stat
 	Lcdc Lcdc
@@ -64,7 +64,6 @@ type GameBoy struct {
 	WindowLY uint8 // windows internal line counter
 
 	// cycles are tcycles, 1/4 mcycles
-	Clock              int
 	DoubleSpeedFlag    uint8
 	PrepareSpeedToggle bool
 	Timer              Timer
@@ -78,18 +77,12 @@ type GameBoy struct {
 	bgPriority [height][width]bool
 	pixelDrawn [width]bool
 
-	Paused bool
-	Muted  bool
-
 	Color                bool
 	DMGCompatibilityMode bool
-
-	Apu *apu.Apu
 
 	InstInjectionFunc func(gb *GameBoy, op uint8)
 
 	CyclesPerSndGen int64
-	CurrFps         int64
 }
 
 type Timer struct {
@@ -105,13 +98,12 @@ type Timer struct {
 	BCycle          bool
 }
 
-func NewGameBoy(ctx *audio.Context, path string) *GameBoy {
+func NewGameBoy(ctx *audio.Context, path string, muted bool) *GameBoy {
 	img := ebiten.NewImage(width, height)
 
 	gb := &GameBoy{
 		Image:     img,
 		Cpu:       NewCpu(),
-		Clock:     CPU_SPEED, // t cycle count
 		Joypad:    0xFF,
 		Cartridge: cart.NewCartridge(path, path+".save"),
 		Palette:   &config.Conf.Gb.Palette,
@@ -157,6 +149,8 @@ func NewGameBoy(ctx *audio.Context, path string) *GameBoy {
 		gb.Scheduler.Schedule(EVENT_SND_FRAME_SEQ, 1, 0, gb.ClockFrameSequencerEvent, nil)
 		gb.Scheduler.Schedule(EVENT_SND_SAMPLE_GEN, 1, 0, gb.AudioSampleEvent, nil)
 	}
+
+	gb.Apu.ToggleMute(muted)
 
 	return gb
 }
@@ -248,43 +242,63 @@ func (gb *GameBoy) DirectBoot() {
 	gb.Write(0xFFFF, 0x00)
 }
 
-func (gb *GameBoy) UpdateFromConfig() {
-	v := gb.MemoryBus.IO[0x47]
-	gb.UnpackedMonoPals[0][0] = utils.ColorToUint32(gb.Palette[(v>>0)&3])
-	gb.UnpackedMonoPals[0][1] = utils.ColorToUint32(gb.Palette[(v>>2)&3])
-	gb.UnpackedMonoPals[0][2] = utils.ColorToUint32(gb.Palette[(v>>4)&3])
-	gb.UnpackedMonoPals[0][3] = utils.ColorToUint32(gb.Palette[(v>>6)&3])
+func (gb *GameBoy) Run(ctx context.Context, eventBus *bus.EventBus) {
+	var (
+		inputCh, unSubInputCh   = eventBus.Subscribe(bus.INPUT, 64)
+		muteCh, unSubMuteCh     = eventBus.Subscribe(bus.MUTE, 1)
+		pauseCh, unSubPauseCh   = eventBus.Subscribe(bus.PAUSE, 1)
+		setFpsCh, unSubSetFpsCh = eventBus.Subscribe(bus.SET_FPS, 1)
+	)
 
-	v = gb.MemoryBus.IO[0x48]
-	gb.UnpackedMonoPals[1][1] = utils.ColorToUint32(gb.Palette[(v>>2)&3])
-	gb.UnpackedMonoPals[1][2] = utils.ColorToUint32(gb.Palette[(v>>4)&3])
-	gb.UnpackedMonoPals[1][3] = utils.ColorToUint32(gb.Palette[(v>>6)&3])
+	defer unSubInputCh()
+	defer unSubMuteCh()
+	defer unSubPauseCh()
+	defer unSubSetFpsCh()
 
-	v = gb.MemoryBus.IO[0x49]
-	gb.UnpackedMonoPals[2][1] = utils.ColorToUint32(gb.Palette[(v>>2)&3])
-	gb.UnpackedMonoPals[2][2] = utils.ColorToUint32(gb.Palette[(v>>4)&3])
-	gb.UnpackedMonoPals[2][3] = utils.ColorToUint32(gb.Palette[(v>>6)&3])
-}
-
-func (gb *GameBoy) GetSize() (int32, int32) {
-	return height, width
-}
-
-func (gb *GameBoy) GetPixels() []byte {
-	return gb.Pixels
-}
-
-func (gb *GameBoy) Update(fps int64) {
-	if gb.Paused {
-		return
+	if gb.Apu != nil {
+		defer gb.Apu.Close()
 	}
 
-	gb.CurrFps = fps
+	if L != nil {
+		defer L.Close()
+	}
 
 	if gb.Apu.Ctx != nil {
-		gb.CyclesPerSndGen = (int64(CPU_SPEED/gb.Apu.Ctx.SampleRate()) * fps) / 60
+		gb.CyclesPerSndGen = int64(((float64(CPU_SPEED) / float64(gb.Apu.Ctx.SampleRate())) * float64(config.Conf.General.TargetFps)) / FPS)
 	}
 
+	paused := false
+
+	for {
+
+		for drained := false; !drained; {
+			select {
+			case <-ctx.Done():
+				return
+			case e := <-inputCh:
+				gb.InputHandler(e.Data.(bus.InputData).Keys, e.Data.(bus.InputData).Buttons)
+			case muted := <-muteCh:
+				gb.Apu.ToggleMute(muted.Data.(bool))
+			case pause := <-pauseCh:
+				paused = pause.Data.(bool)
+				gb.Apu.TogglePause(paused)
+			case <-setFpsCh:
+				if gb.Apu.Ctx != nil {
+					gb.CyclesPerSndGen = int64(((float64(CPU_SPEED) / float64(gb.Apu.Ctx.SampleRate())) * float64(config.Conf.General.TargetFps)) / FPS)
+				}
+
+			default:
+				drained = true
+			}
+		}
+
+		if !paused {
+			gb.Update()
+		}
+	}
+}
+
+func (gb *GameBoy) Update() {
 	nextFrame := gb.Scheduler.CurrentCycle + CYCLES_FRAME
 	for gb.Scheduler.CurrentCycle < nextFrame {
 		if gb.Cpu.Halted {
@@ -314,18 +328,6 @@ func (gb *GameBoy) Tick(tCycles int64) {
 	if gb.MemoryBus.Oam.Pending || gb.MemoryBus.Oam.IsActive {
 		gb.MemoryBus.Oam.Tick(gb, tCycles)
 	}
-}
-
-func (gb *GameBoy) ToggleMute() bool {
-	gb.Muted = !gb.Muted
-	gb.Apu.ToggleMute(gb.Muted)
-	return gb.Muted
-}
-
-func (gb *GameBoy) TogglePause() bool {
-	gb.Paused = !gb.Paused
-	gb.Apu.TogglePause(gb.Paused)
-	return gb.Paused
 }
 
 var IRQ_SRC = [...]uint16{0x40, 0x48, 0x50, 0x58, 0x60}
@@ -437,26 +439,4 @@ func (gb *GameBoy) toggleDoubleSpeed() {
 }
 
 func (gb *GameBoy) Close() {
-	gb.Muted = true
-	gb.Paused = true
-	gb.Apu.Close()
-
-	if L != nil {
-		L.Close()
-	}
-}
-
-func (gb *GameBoy) Draw(screen *ebiten.Image) {
-	var (
-		sw      = float64(screen.Bounds().Dx())
-		sh      = float64(screen.Bounds().Dy())
-		scale   = utils.ScaleImage(sw, sh, width, height)
-		offsetX = (sw - (width * scale)) / 2
-		offsetY = (sh - (height * scale)) / 2
-	)
-
-	gb.DrawOptions.GeoM.Reset()
-	gb.DrawOptions.GeoM.Scale(scale, scale)
-	gb.DrawOptions.GeoM.Translate(offsetX, offsetY)
-	screen.DrawImage(gb.Image, &gb.DrawOptions)
 }

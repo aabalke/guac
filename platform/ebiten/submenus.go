@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"github.com/aabalke/guac/common/bus"
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/config/file"
 	"github.com/aabalke/guac/emu/gba/gpio"
@@ -121,6 +122,12 @@ func NewGeneralMenu(g *Game) *widget.Container {
 
 	menu.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.General = tmp
+
+		g.Bus.Publish(bus.Event{
+			Type: bus.SET_FPS,
+		})
+
+		ebiten.SetVsyncEnabled(config.Conf.General.Vsync)
 
 		g.ui.content.RemoveChildren()
 		g.ui.content.AddChild(NewGeneralMenu(g))

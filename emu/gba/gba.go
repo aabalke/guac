@@ -1,9 +1,12 @@
 package gba
 
 import (
+	"context"
 	"math"
+	"sync"
 	"time"
 
+	"github.com/aabalke/guac/common/bus"
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gba/apu"
 	"github.com/aabalke/guac/emu/gba/cart"
@@ -15,8 +18,8 @@ import (
 )
 
 const (
-	// gba is fps 59.727500569606
-	FPS             = 60
+	FPS = float64(59.727500569606)
+	// FPS             = 60
 	SCREEN_WIDTH    = 240
 	SCREEN_HEIGHT   = 160
 	MAX_SCANLINE    = 228
@@ -49,6 +52,8 @@ func init() {
 }
 
 type GBA struct {
+	Mu sync.Mutex
+
 	Cpu               *cpu.Cpu
 	Scheduler         *scheduler.Scheduler
 	Mem               *Memory
@@ -65,15 +70,14 @@ type GBA struct {
 	Image       *ebiten.Image
 	DrawOptions ebiten.DrawImageOptions
 
-	vsyncAddr                   uint32
-	Frame                       uint64
-	Paused, Muted, Save, Booted bool
-	IdleOptimize                bool
-	CyclesPerSndGen             int64
-	CurrFps                     int64
+	vsyncAddr       uint32
+	Frame           uint64
+	Save, Booted    bool
+	IdleOptimize    bool
+	CyclesPerSndGen int64
 }
 
-func NewGBA(ctx *audio.Context, path string) *GBA {
+func NewGBA(ctx *audio.Context, path string, muted bool) *GBA {
 	gba := &GBA{
 		Pixels:       make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
 		Image:        ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
@@ -121,21 +125,69 @@ func NewGBA(ctx *audio.Context, path string) *GBA {
 	}
 
 	gba.Booted = true
+	gba.Apu.ToggleMute(muted)
 
 	return gba
 }
 
-func (gba *GBA) Update(fps int64) {
-	if gba.Paused {
-		return
-	}
+func (gba *GBA) Run(ctx context.Context, eventBus *bus.EventBus) {
+	var (
+		inputCh, unSubInputCh   = eventBus.Subscribe(bus.INPUT, 64)
+		muteCh, unSubMuteCh     = eventBus.Subscribe(bus.MUTE, 1)
+		pauseCh, unSubPauseCh   = eventBus.Subscribe(bus.PAUSE, 1)
+		setFpsCh, unSubSetFpsCh = eventBus.Subscribe(bus.SET_FPS, 1)
+	)
 
-	gba.CurrFps = fps
+	defer unSubInputCh()
+	defer unSubMuteCh()
+	defer unSubPauseCh()
+	defer unSubSetFpsCh()
+
+	if gba.Apu != nil {
+		defer gba.Apu.Close()
+	}
 
 	if gba.Apu.Ctx != nil {
-		gba.CyclesPerSndGen = (int64(CPU_SPEED/gba.Apu.Ctx.SampleRate()) * fps) / 60
+		gba.CyclesPerSndGen = int64(((float64(CPU_SPEED) / float64(gba.Apu.Ctx.SampleRate())) * float64(config.Conf.General.TargetFps)) / FPS)
 	}
 
+	paused := false
+
+	for {
+
+		for drained := false; !drained; {
+			select {
+			case <-ctx.Done():
+				return
+			case e := <-inputCh:
+				gba.InputHandler(
+					e.Data.(bus.InputData).JustKeys,
+					e.Data.(bus.InputData).Keys,
+					e.Data.(bus.InputData).JustButtons,
+					e.Data.(bus.InputData).Buttons,
+				)
+			case muted := <-muteCh:
+				gba.Apu.ToggleMute(muted.Data.(bool))
+			case pause := <-pauseCh:
+				paused = pause.Data.(bool)
+				gba.Apu.TogglePause(paused)
+			case <-setFpsCh:
+				if gba.Apu.Ctx != nil {
+					gba.CyclesPerSndGen = int64(((float64(CPU_SPEED) / float64(gba.Apu.Ctx.SampleRate())) * float64(config.Conf.General.TargetFps)) / FPS)
+				}
+
+			default:
+				drained = true
+			}
+		}
+
+		if !paused {
+			gba.Update()
+		}
+	}
+}
+
+func (gba *GBA) Update() {
 	nextFrame := gba.Scheduler.CurrentCycle + CYCLES_FRAME
 	for gba.Scheduler.CurrentCycle < nextFrame {
 		if gba.Cpu.Halted {
@@ -185,24 +237,6 @@ func (gba *GBA) CheckIdleLoopOptimization() {
 		}
 		gba.Irq.IdleIrq = gba.Irq.IF
 	}
-}
-
-func (gba *GBA) ToggleMute() bool {
-	gba.Muted = !gba.Muted
-	gba.Apu.ToggleMute(gba.Muted)
-	return gba.Muted
-}
-
-func (gba *GBA) TogglePause() bool {
-	gba.Paused = !gba.Paused
-	gba.Apu.TogglePause(gba.Paused)
-	return gba.Paused
-}
-
-func (gba *GBA) Close() {
-	gba.Muted = true
-	gba.Paused = true
-	gba.Apu.Close()
 }
 
 func (gba *GBA) LoadGame(path string) {
@@ -273,7 +307,9 @@ func (gba *GBA) Draw(screen *ebiten.Image) {
 	gba.DrawOptions.GeoM.Translate(rotX, rotY)
 	gba.DrawOptions.GeoM.Scale(scale, scale)
 	gba.DrawOptions.GeoM.Translate(offsetX, offsetY)
+	gba.Mu.Lock()
 	screen.DrawImage(gba.Image, &gba.DrawOptions)
+	gba.Mu.Unlock()
 }
 
 func (gba *GBA) DirectBoot() {

@@ -8,6 +8,8 @@ import (
 )
 
 func (gb *GameBoy) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGamepadButton) {
+	gb.Mu.Lock()
+	defer gb.Mu.Unlock()
 	var (
 		keyConfig    = config.Conf.Gb.Keyboard
 		buttonConfig = config.Conf.Gb.Controller
@@ -64,6 +66,8 @@ func (gb *GameBoy) InputHandler(keys []ebiten.Key, buttons []ebiten.StandardGame
 }
 
 func (gb *GameBoy) getJoypad() uint8 {
+	gb.Mu.Lock()
+	defer gb.Mu.Unlock()
 	joyp := gb.MemoryBus.JoypadReg
 	if dpad := (joyp>>4)&1 == 0; dpad {
 		return (joyp & 0x30) | (gb.Joypad & 0xF) | 0xC0

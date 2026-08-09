@@ -1,11 +1,13 @@
 package nds
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/aabalke/guac/common/bus"
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/cpu/arm7"
@@ -59,7 +61,7 @@ type Nds struct {
 	dma7 [4]dma.DMA
 	dma9 [4]dma.DMA
 
-	Muted, Paused, Drawn bool
+	Muted, Drawn bool
 
 	AccCycles   uint32
 	TimerCycles uint8
@@ -68,7 +70,7 @@ type Nds struct {
 	Frame uint64
 }
 
-func NewNds(ctx *audio.Context, path string) *Nds {
+func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 	nds := Nds{}
 
 	nds.mem = &mem.Mem{}
@@ -127,20 +129,73 @@ func NewNds(ctx *audio.Context, path string) *Nds {
 	if config.Conf.General.Logger {
 		debug.Init("./log.csv")
 	}
+	nds.ToggleMute(muted)
 
 	return &nds
 }
 
-func (nds *Nds) Update(stdFps bool) {
-	if nds.Paused {
-		return
-	}
+func (nds *Nds) Run(ctx context.Context, eventBus *bus.EventBus) {
+	var (
+		inputCh, unSubInputCh   = eventBus.Subscribe(bus.INPUT, 64)
+		muteCh, unSubMuteCh     = eventBus.Subscribe(bus.MUTE, 1)
+		pauseCh, unSubPauseCh   = eventBus.Subscribe(bus.PAUSE, 1)
+		setFpsCh, unSubSetFpsCh = eventBus.Subscribe(bus.SET_FPS, 1)
+	)
 
+	defer unSubInputCh()
+	defer unSubMuteCh()
+	defer unSubPauseCh()
+	defer unSubSetFpsCh()
+	defer nds.Close()
+
+	//if nds.Apu.Ctx != nil {
+	//	nds.CyclesPerSndGen = int64(((float64(CPU_SPEED) / float64(nds.Apu.Ctx.SampleRate())) * float64(config.Conf.General.TargetFps)) / FPS)
+	//}
+
+	paused := false
+
+	for {
+
+		for drained := false; !drained; {
+			select {
+			case <-ctx.Done():
+				return
+			case e := <-inputCh:
+				nds.InputHandler(
+					e.Data.(bus.InputData).JustKeys,
+					e.Data.(bus.InputData).Keys,
+					e.Data.(bus.InputData).JustButtons,
+					e.Data.(bus.InputData).Buttons,
+				)
+			case muted := <-muteCh:
+				nds.mem.Snd.ToggleMute(muted.Data.(bool))
+			case pause := <-pauseCh:
+				paused = pause.Data.(bool)
+				nds.mem.Snd.TogglePause(paused)
+			case <-setFpsCh:
+				//if nds.Apu.Ctx != nil {
+				//	nds.CyclesPerSndGen = int64(((float64(CPU_SPEED) / float64(nds.Apu.Ctx.SampleRate())) * float64(config.Conf.General.TargetFps)) / FPS)
+				//}
+
+			default:
+				drained = true
+			}
+		}
+
+		if !paused {
+			nds.Update(false)
+		}
+	}
+}
+
+func (nds *Nds) Update(stdFps bool) {
 	if !nds.ppu.EngineA.Dispcnt.Is3D {
 		nds.UpdateFrame(stdFps)
 		t, b := nds.GetScreens()
+		nds.Screen.Mu.Lock()
 		nds.Screen.Top.WritePixels(*t)
 		nds.Screen.Bottom.WritePixels(*b)
+		nds.Screen.Mu.Unlock()
 		return
 	}
 
@@ -148,8 +203,10 @@ func (nds *Nds) Update(stdFps bool) {
 		nds.UpdateFrame(stdFps)
 		nds.ppu.Rasterizer.Render.UpdateRender()
 		t, b := nds.GetScreens()
+		nds.Screen.Mu.Lock()
 		nds.Screen.Top.WritePixels(*t)
 		nds.Screen.Bottom.WritePixels(*b)
+		nds.Screen.Mu.Unlock()
 		return
 	}
 
@@ -168,8 +225,10 @@ func (nds *Nds) Update(stdFps bool) {
 	RASTERIZE_WG.Wait()
 
 	t, b := nds.GetScreens()
+	nds.Screen.Mu.Lock()
 	nds.Screen.Top.WritePixels(*t)
 	nds.Screen.Bottom.WritePixels(*b)
+	nds.Screen.Mu.Unlock()
 }
 
 func (nds *Nds) UpdateFrame(stdFps bool) {
@@ -271,16 +330,10 @@ func (nds *Nds) StepArm7() uint32 {
 	return uint32(cycles)
 }
 
-func (nds *Nds) ToggleMute() bool {
-	nds.Muted = !nds.Muted
+func (nds *Nds) ToggleMute(muted bool) bool {
+	nds.Muted = muted
 	nds.mem.Snd.ToggleMute(nds.Muted)
 	return nds.Muted
-}
-
-func (nds *Nds) TogglePause() bool {
-	nds.Paused = !nds.Paused
-	nds.mem.Snd.TogglePause(nds.Paused)
-	return nds.Paused
 }
 
 func (nds *Nds) GetScreens() (t, b *[]byte) {
@@ -298,7 +351,6 @@ func (nds *Nds) Close() {
 	RASTERIZE_WG.Wait()
 
 	nds.Muted = true
-	nds.Paused = true
 
 	nds.mem.Snd.Close()
 	if debug.L != nil {

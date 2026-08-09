@@ -27,7 +27,7 @@ func TestAlyosha(t *testing.T) {
 		finish := false
 		passed := false
 
-		gba := NewGBA(nil, file)
+		gba := NewGBA(nil, file, true)
 
 		gba.InstInjectionFunc = func(op uint32) {
 			if op == 0xEAFF_FFFE {
@@ -44,15 +44,13 @@ func TestAlyosha(t *testing.T) {
 			}()
 
 			for range 60 * 10 {
-				gba.Update(0x10000)
+				gba.Update()
 
 				if finish {
 					break
 				}
 			}
 		}()
-
-		gba.Close()
 
 		p, _ := filepath.Rel(directory, file)
 

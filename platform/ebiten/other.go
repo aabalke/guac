@@ -52,14 +52,8 @@ func NewPause(g *Game) {
 	b3 := NewCenteredButton(l.Main, func(*widget.ButtonClickedEventArgs) {
 		NewHome(g)
 
-		if g.nds != nil {
-			g.nds.Close()
-		}
-		if g.gba != nil {
-			g.gba.Close()
-		}
-		if g.gb != nil {
-			g.gb.Close()
+		if g.nds != nil || g.gba != nil || g.gb != nil {
+			g.emuClose()
 		}
 
 		g.nds = nil

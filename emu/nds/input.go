@@ -1,16 +1,13 @@
 package nds
 
 import (
-	"fmt"
 	"slices"
 
 	"github.com/aabalke/guac/config"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-var _ = fmt.Sprint
-
-func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, justButtons, buttons []ebiten.StandardGamepadButton, frame uint64) {
+func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, justButtons, buttons []ebiten.StandardGamepadButton) {
 	var (
 		keyCfg    = config.Conf.Nds.Keyboard
 		buttonCfg = config.Conf.Nds.Controller

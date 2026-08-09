@@ -13,18 +13,18 @@ func StartHeadless() {
 
 	switch romType := utils.GetRomType(path); romType {
 	case utils.GB:
-		gb := gb.NewGameBoy(nil, path)
+		gb := gb.NewGameBoy(nil, path, true)
 		for {
-			gb.Update(0x10000)
+			gb.Update()
 		}
 
 	case utils.GBA:
-		gba := gba.NewGBA(nil, path)
+		gba := gba.NewGBA(nil, path, true)
 		for {
-			gba.Update(0x10000)
+			gba.Update()
 		}
 	case utils.NDS:
-		nds := nds.NewNds(nil, path)
+		nds := nds.NewNds(nil, path, true)
 		for {
 			nds.Update(false)
 		}
