@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/aabalke/guac/common/bus"
+	"github.com/aabalke/guac/common/stats"
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/cpu/arm7"
@@ -51,6 +52,7 @@ const (
 var RASTERIZE_WG = sync.WaitGroup{}
 
 type Nds struct {
+	Stats     *stats.Stats
 	mem       *mem.Mem
 	arm7      *arm7.Cpu
 	arm9      *arm9.Cpu
@@ -66,8 +68,6 @@ type Nds struct {
 	AccCycles   uint32
 	TimerCycles uint8
 	GeoCycles   uint8
-
-	Frame uint64
 }
 
 func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
@@ -142,6 +142,9 @@ func (nds *Nds) Run(ctx context.Context, eventBus *bus.EventBus) {
 		setFpsCh, unSubSetFpsCh = eventBus.Subscribe(bus.SET_FPS, 1)
 	)
 
+	nds.Stats = stats.NewStats()
+	go nds.Stats.RunSampler(ctx)
+
 	defer unSubInputCh()
 	defer unSubMuteCh()
 	defer unSubPauseCh()
@@ -184,7 +187,9 @@ func (nds *Nds) Run(ctx context.Context, eventBus *bus.EventBus) {
 
 		if !paused {
 			nds.Update(false)
+			nds.Stats.TickFrame()
 		}
+
 	}
 }
 
@@ -272,8 +277,6 @@ func (nds *Nds) UpdateFrame(stdFps bool) {
 		nds.arm7.Jit.DeletePages()
 		nds.arm9.Jit.DeletePages()
 	}
-
-	nds.Frame++
 }
 
 func (nds *Nds) StepOther() {
@@ -408,7 +411,7 @@ func (nds *Nds) VideoUpdate(cycles uint32) {
 		}
 
 		if vcount < SCREEN_HEIGHT {
-			nds.ppu.Graphics(vcount, uint32(nds.Frame))
+			nds.ppu.Graphics(vcount)
 			nds.CheckDmas(dma.ARM9_DMA_MODE_HBL, true)
 		}
 	}
@@ -544,4 +547,20 @@ func (nds *Nds) UpdateTimers(cycles uint32) {
 			}
 		}
 	}
+}
+
+func (nds *Nds) Frame() uint64 {
+	if nds.Stats != nil {
+		return nds.Stats.Frame()
+	}
+
+	return 0
+}
+
+func (nds *Nds) FPS() float64 {
+	if nds.Stats != nil {
+		return nds.Stats.FPS()
+	}
+
+	return 0
 }

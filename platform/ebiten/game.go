@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 
 	"github.com/ebitenui/ebitenui"
 	"github.com/ebitenui/ebitenui/widget"
@@ -177,6 +178,20 @@ func (g *Game) Update() error {
 	return nil
 }
 
+const (
+	ROT_0 = iota
+	ROT_90
+	ROT_180
+	ROT_270
+)
+
+const (
+	RAD_0   = float64(math.Pi/180) * 0
+	RAD_90  = float64(math.Pi/180) * 90
+	RAD_180 = float64(math.Pi/180) * 180
+	RAD_270 = float64(math.Pi/180) * 270
+)
+
 func (g *Game) Draw(screen *ebiten.Image) {
 	screen.Fill(config.Conf.Ui.Backdrop)
 
@@ -206,7 +221,37 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.gb.Mu.Unlock()
 
 	case g.gba != nil:
-		g.gba.Draw(screen)
+
+		const (
+			canvasW = float64(gba.SCREEN_WIDTH)
+			canvasH = float64(gba.SCREEN_HEIGHT)
+		)
+
+		var (
+			rotation = config.Conf.Gba.Rotation
+			radians  = float64(rotation) * math.Pi / 2
+			screenW  = float64(screen.Bounds().Dx())
+			screenH  = float64(screen.Bounds().Dy())
+			fitW     = canvasW
+			fitH     = canvasH
+		)
+
+		if rot := rotation == ROT_90 || rotation == ROT_270; rot {
+			fitW, fitH = canvasH, canvasW
+		}
+
+		scale := utils.ScaleImage(screenW, screenH, fitW, fitH)
+
+		g.DrawOptions.GeoM.Reset()
+		g.DrawOptions.GeoM.Translate(-canvasW/2, -canvasH/2)
+		g.DrawOptions.GeoM.Rotate(radians)
+		g.DrawOptions.GeoM.Scale(scale, scale)
+		g.DrawOptions.GeoM.Translate(screenW/2, screenH/2)
+
+		g.gba.Mu.Lock()
+		screen.DrawImage(g.gba.Image, &g.DrawOptions)
+		g.gba.Mu.Unlock()
+
 	case g.nds != nil:
 		g.nds.Screen.FillScreen(screen)
 	}
@@ -216,7 +261,21 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if config.Conf.General.ShowFps {
-		ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %.2f, TPS: %.2f", ebiten.ActualFPS(), ebiten.ActualTPS()))
+
+		target := config.Conf.General.TargetFps
+
+		switch {
+		case g.ui.ui != nil:
+			ebitenutil.DebugPrint(screen, fmt.Sprintf("Target FPS: %d.00 Engine FPS: %.2f, TPS: %.2f", target, ebiten.ActualFPS(), ebiten.ActualTPS()))
+		case g.gb != nil:
+			ebitenutil.DebugPrint(screen, fmt.Sprintf("Target FPS: %d.00 Engine FPS: %.2f, TPS: %.2f\nEmulated FPS: %.2f Frame: %08d", target, ebiten.ActualFPS(), ebiten.ActualTPS(), g.gb.FPS(), g.gb.Frame()))
+		case g.gba != nil:
+			ebitenutil.DebugPrint(screen, fmt.Sprintf("Target FPS: %d.00 Engine FPS: %.2f, TPS: %.2f\nEmulated FPS: %.2f Frame: %08d", target, ebiten.ActualFPS(), ebiten.ActualTPS(), g.gba.FPS(), g.gba.Frame()))
+		case g.nds != nil:
+			ebitenutil.DebugPrint(screen, fmt.Sprintf("Target FPS: %d.00 Engine FPS: %.2f, TPS: %.2f\nEmulated FPS: %.2f Frame: %08d", target, ebiten.ActualFPS(), ebiten.ActualTPS(), g.nds.FPS(), g.nds.Frame()))
+		default:
+			ebitenutil.DebugPrint(screen, fmt.Sprintf("Target FPS: %d.00 Engine FPS: %.2f, TPS: %.2f", target, ebiten.ActualFPS(), ebiten.ActualTPS()))
+		}
 	}
 }
 

@@ -2,17 +2,16 @@ package gba
 
 import (
 	"context"
-	"math"
 	"sync"
 	"time"
 
 	"github.com/aabalke/guac/common/bus"
+	"github.com/aabalke/guac/common/stats"
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gba/apu"
 	"github.com/aabalke/guac/emu/gba/cart"
 	"github.com/aabalke/guac/emu/gba/cpu"
 	"github.com/aabalke/guac/emu/scheduler"
-	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 )
@@ -52,7 +51,8 @@ func init() {
 }
 
 type GBA struct {
-	Mu sync.Mutex
+	Mu    sync.Mutex
+	Stats *stats.Stats
 
 	Cpu               *cpu.Cpu
 	Scheduler         *scheduler.Scheduler
@@ -66,12 +66,10 @@ type GBA struct {
 	InstInjectionFunc func(op uint32)
 	Keypad            Key
 
-	Pixels      []byte
-	Image       *ebiten.Image
-	DrawOptions ebiten.DrawImageOptions
+	Pixels []byte
+	Image  *ebiten.Image
 
 	vsyncAddr       uint32
-	Frame           uint64
 	Save, Booted    bool
 	IdleOptimize    bool
 	CyclesPerSndGen int64
@@ -138,6 +136,9 @@ func (gba *GBA) Run(ctx context.Context, eventBus *bus.EventBus) {
 		setFpsCh, unSubSetFpsCh = eventBus.Subscribe(bus.SET_FPS, 1)
 	)
 
+	gba.Stats = stats.NewStats()
+	go gba.Stats.RunSampler(ctx)
+
 	defer unSubInputCh()
 	defer unSubMuteCh()
 	defer unSubPauseCh()
@@ -183,6 +184,7 @@ func (gba *GBA) Run(ctx context.Context, eventBus *bus.EventBus) {
 
 		if !paused {
 			gba.Update()
+			gba.Stats.TickFrame()
 		}
 	}
 }
@@ -243,75 +245,6 @@ func (gba *GBA) LoadGame(path string) {
 	gba.Cartridge = cart.NewCartridge(path, path+".save")
 }
 
-const (
-	ROT_0 = iota
-	ROT_90
-	ROT_180
-	ROT_270
-)
-
-const (
-	RAD_0   = float64(math.Pi/180) * 0
-	RAD_90  = float64(math.Pi/180) * 90
-	RAD_180 = float64(math.Pi/180) * 180
-	RAD_270 = float64(math.Pi/180) * 270
-)
-
-func (gba *GBA) Draw(screen *ebiten.Image) {
-	var (
-		rot        bool
-		rotRadians float64
-		rotX, rotY float64
-	)
-
-	switch config.Conf.Gba.Rotation {
-	case ROT_0: // skip
-		rotRadians = RAD_0
-	case ROT_90:
-		rotX = SCREEN_HEIGHT
-		rot = true
-		rotRadians = RAD_90
-	case ROT_180:
-		rotX = SCREEN_WIDTH
-		rotY = SCREEN_HEIGHT
-		rotRadians = RAD_180
-	case ROT_270:
-		rotY = SCREEN_WIDTH
-		rot = true
-		rotRadians = RAD_270
-	default:
-		panic("unallowed nds rotation value")
-	}
-
-	var (
-		screenW = float64(screen.Bounds().Dx())
-		screenH = float64(screen.Bounds().Dy())
-		canvasW = float64(SCREEN_WIDTH)
-		canvasH = float64(SCREEN_HEIGHT)
-	)
-
-	if rot {
-		screenH, screenW = screenW, screenH
-	}
-
-	scale := utils.ScaleImage(screenW, screenH, canvasW, canvasH)
-	offsetX := (screenW - (canvasW * scale)) / 2
-	offsetY := (screenH - (canvasH * scale)) / 2
-
-	if rot {
-		offsetX, offsetY = offsetY, offsetX
-	}
-
-	gba.DrawOptions.GeoM.Reset()
-	gba.DrawOptions.GeoM.Rotate(rotRadians)
-	gba.DrawOptions.GeoM.Translate(rotX, rotY)
-	gba.DrawOptions.GeoM.Scale(scale, scale)
-	gba.DrawOptions.GeoM.Translate(offsetX, offsetY)
-	gba.Mu.Lock()
-	screen.DrawImage(gba.Image, &gba.DrawOptions)
-	gba.Mu.Unlock()
-}
-
 func (gba *GBA) DirectBoot() {
 	reg := &gba.Cpu.Reg
 
@@ -339,4 +272,20 @@ func (gba *GBA) DirectBoot() {
 
 func (gba *GBA) BiosBoot() {
 	gba.Cpu.Exception(cpu.VEC_RESET, cpu.MODE_SYS)
+}
+
+func (gba *GBA) Frame() uint64 {
+	if gba.Stats != nil {
+		return gba.Stats.Frame()
+	}
+
+	return 0
+}
+
+func (gba *GBA) FPS() float64 {
+	if gba.Stats != nil {
+		return gba.Stats.FPS()
+	}
+
+	return 0
 }

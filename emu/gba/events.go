@@ -157,8 +157,6 @@ func (gba *GBA) ScanlineEndEvent(late int64, arg any) {
 	case 228:
 		*vcount = 0
 
-		gba.Frame++
-
 		gba.Mu.Lock()
 		gba.Image.WritePixels(gba.Pixels)
 		gba.Mu.Unlock()

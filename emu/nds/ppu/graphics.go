@@ -5,7 +5,7 @@ import (
 	"unsafe"
 )
 
-func (ppu *PPU) Graphics(y, frame uint32) {
+func (ppu *PPU) Graphics(y uint32) {
 	a := &ppu.EngineA
 	b := &ppu.EngineB
 

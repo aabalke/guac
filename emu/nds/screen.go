@@ -108,56 +108,31 @@ func (s *Screen) ApplyTouchPositions(x, y, w, h int) {
 }
 
 func (s *Screen) FillOnly(screen, image *ebiten.Image, bottom bool) {
-	var (
-		rot        bool
-		rotRadians float64
-		rotX, rotY float64
-	)
-
-	switch *s.Rotation {
-	case ROT_0: // skip
-		rotRadians = RAD_0
-	case ROT_90:
-		rotX = SCREEN_HEIGHT
-		rot = true
-		rotRadians = RAD_90
-	case ROT_180:
-		rotX = SCREEN_WIDTH
-		rotY = SCREEN_HEIGHT
-		rotRadians = RAD_180
-	case ROT_270:
-		rotY = SCREEN_WIDTH
-		rot = true
-		rotRadians = RAD_270
-	default:
-		panic("unallowed nds rotation value")
-	}
-
-	var (
-		screenW = float64(screen.Bounds().Dx())
-		screenH = float64(screen.Bounds().Dy())
+	const (
 		canvasW = float64(SCREEN_WIDTH)
 		canvasH = float64(SCREEN_HEIGHT)
 	)
 
-	if rot {
-		screenH, screenW = screenW, screenH
+	var (
+		rotation = config.Conf.Nds.Screen.Rotation
+		radians  = float64(rotation) * math.Pi / 2
+		screenW  = float64(screen.Bounds().Dx())
+		screenH  = float64(screen.Bounds().Dy())
+		fitW     = canvasW
+		fitH     = canvasH
+	)
+
+	if rot := rotation == ROT_90 || rotation == ROT_270; rot {
+		fitW, fitH = canvasH, canvasW
 	}
 
-	scale := utils.ScaleImage(screenW, screenH, canvasW, canvasH)
-	offsetX := (screenW - (canvasW * scale)) / 2
-	offsetY := (screenH - (canvasH * scale)) / 2
-
-	if rot {
-		offsetX, offsetY = offsetY, offsetX
-	}
+	scale := utils.ScaleImage(screenW, screenH, fitW, fitH)
 
 	s.Options.GeoM.Reset()
-	s.Options.GeoM.Rotate(rotRadians)
-	s.Options.GeoM.Translate(rotX, rotY)
+	s.Options.GeoM.Translate(-canvasW/2, -canvasH/2)
+	s.Options.GeoM.Rotate(radians)
 	s.Options.GeoM.Scale(scale, scale)
-	s.Options.GeoM.Translate(offsetX, offsetY)
-
+	s.Options.GeoM.Translate(screenW/2, screenH/2)
 	s.Mu.Lock()
 	screen.DrawImage(image, &s.Options)
 	s.Mu.Unlock()
@@ -168,13 +143,13 @@ func (s *Screen) FillOnly(screen, image *ebiten.Image, bottom bool) {
 	}
 
 	var (
-		realX = int(offsetX)
-		realY = int(offsetY)
-		realW = int(scale * canvasW)
-		realH = int(scale * canvasH)
+		x = int((screenW - scale*fitW) / 2)
+		y = int((screenH - scale*fitH) / 2)
+		w = int(scale * canvasW)
+		h = int(scale * canvasH)
 	)
 
-	s.ApplyTouchPositions(realX, realY, realW, realH)
+	s.ApplyTouchPositions(x, y, w, h)
 }
 
 func (s *Screen) FillHybrid(screen *ebiten.Image) {

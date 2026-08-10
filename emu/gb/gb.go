@@ -8,6 +8,7 @@ import (
 	"unsafe"
 
 	"github.com/aabalke/guac/common/bus"
+	"github.com/aabalke/guac/common/stats"
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gb/apu"
 	"github.com/aabalke/guac/emu/gb/cart"
@@ -45,6 +46,7 @@ const (
 
 type GameBoy struct {
 	Scheduler *scheduler.Scheduler
+	Stats     *stats.Stats
 	Apu       *apu.Apu
 	Cartridge *cart.Cartridge
 	Cpu       *Cpu
@@ -242,6 +244,22 @@ func (gb *GameBoy) DirectBoot() {
 	gb.Write(0xFFFF, 0x00)
 }
 
+func (gb *GameBoy) Frame() uint64 {
+	if gb.Stats != nil {
+		return gb.Stats.Frame()
+	}
+
+	return 0
+}
+
+func (gb *GameBoy) FPS() float64 {
+	if gb.Stats != nil {
+		return gb.Stats.FPS()
+	}
+
+	return 0
+}
+
 func (gb *GameBoy) Run(ctx context.Context, eventBus *bus.EventBus) {
 	var (
 		inputCh, unSubInputCh   = eventBus.Subscribe(bus.INPUT, 64)
@@ -249,6 +267,9 @@ func (gb *GameBoy) Run(ctx context.Context, eventBus *bus.EventBus) {
 		pauseCh, unSubPauseCh   = eventBus.Subscribe(bus.PAUSE, 1)
 		setFpsCh, unSubSetFpsCh = eventBus.Subscribe(bus.SET_FPS, 1)
 	)
+
+	gb.Stats = stats.NewStats()
+	go gb.Stats.RunSampler(ctx)
 
 	defer unSubInputCh()
 	defer unSubMuteCh()
@@ -294,7 +315,9 @@ func (gb *GameBoy) Run(ctx context.Context, eventBus *bus.EventBus) {
 
 		if !paused {
 			gb.Update()
+			gb.Stats.TickFrame()
 		}
+
 	}
 }
 
