@@ -5,6 +5,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/aabalke/guac/config"
+	"github.com/aabalke/guac/emu/gba/cart"
 	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -209,16 +210,20 @@ func (c *Config) encodeGba() {
 		c.Gba.Rotation = 0
 	}
 
-	backupType := [...]string{
-		"auto",
-		"none",
-		"eeprom",
-		"sram",
-		"flash",
-		"flash128",
+	switch c.config.Gba.Hardware.BackupType {
+	case cart.AUTO:
+		c.Gba.Hardware.BackupType = "auto"
+	case cart.NONE:
+		c.Gba.Hardware.BackupType = "none"
+	case cart.EEPROM:
+		c.Gba.Hardware.BackupType = "eeprom"
+	case cart.SRAM:
+		c.Gba.Hardware.BackupType = "sram"
+	case cart.FLASH:
+		c.Gba.Hardware.BackupType = "flash"
+	case cart.FLASH128:
+		c.Gba.Hardware.BackupType = "flash128"
 	}
-
-	c.Gba.Hardware.BackupType = backupType[c.config.Gba.Hardware.BackupType]
 }
 
 func (c *Config) encodeNds() {

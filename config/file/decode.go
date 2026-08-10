@@ -8,6 +8,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/aabalke/guac/config"
+	"github.com/aabalke/guac/emu/gba/cart"
 	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -243,17 +244,17 @@ func (c *Config) decodeGba() {
 
 	switch strings.ToLower(c.Gba.Hardware.BackupType) {
 	case "none":
-		c.config.Gba.Hardware.BackupType = 1
+		c.config.Gba.Hardware.BackupType = cart.NONE
 	case "eeprom":
-		c.config.Gba.Hardware.BackupType = 2
+		c.config.Gba.Hardware.BackupType = cart.EEPROM
 	case "sram":
-		c.config.Gba.Hardware.BackupType = 3
+		c.config.Gba.Hardware.BackupType = cart.SRAM
 	case "flash":
-		c.config.Gba.Hardware.BackupType = 4
+		c.config.Gba.Hardware.BackupType = cart.FLASH
 	case "flash128":
-		c.config.Gba.Hardware.BackupType = 5
+		c.config.Gba.Hardware.BackupType = cart.FLASH128
 	default:
-		c.config.Gba.Hardware.BackupType = 0
+		c.config.Gba.Hardware.BackupType = cart.AUTO
 	}
 }
 

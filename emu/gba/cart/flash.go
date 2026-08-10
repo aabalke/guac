@@ -63,7 +63,7 @@ func (c *Cartridge) WriteFlash(addr uint32, v uint8) {
 		c.FlashStage = 0
 
 	case FL_BANKSWITCH:
-		if addr == 0 && c.FlashType == FLASH128 {
+		if addr == 0 && c.Id == FLASH128 {
 			c.FlashBank = uint32(v & 1)
 		}
 	}

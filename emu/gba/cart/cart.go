@@ -16,7 +16,6 @@ type Cartridge struct {
 	Title      string
 	Code       string
 	Id         int
-	FlashType  int
 	FlashMode  int
 	FlashBank  uint32
 	Device     [2]uint8
@@ -46,19 +45,8 @@ const (
 	FLASH128
 )
 
-const (
-	TYPE_SST = iota
-	TYPE_MACRONIX64
-	TYPE_PANASONIC
-	TYPE_ATMEL
-	TYPE_SANYO
-	TYPE_MACRONIX128
-)
-
-var idType = [...]string{"auto", "none", "eeprom", "sram", "flash", "flash128"}
-
 func (c *Cartridge) String() string {
-	return fmt.Sprintf("Gba Header: Title %12s, Code %4s, Id %8s", c.Title, c.Code, idType[c.Id])
+	return fmt.Sprintf("Gba Header: Title %12s, Code %4s, Id %d", c.Title, c.Code, c.Id)
 }
 
 func NewCartridge(rom, sav string) *Cartridge {
@@ -149,12 +137,12 @@ func (c *Cartridge) getCartBackupId() int {
 
 func (c *Cartridge) setFlashDevice(flash128 bool) {
 	if flash128 {
+		// sanyo
 		c.Device = [2]uint8{0x62, 0x13}
-		c.FlashType = TYPE_SANYO
 		return
 	}
+	// sst
 	c.Device = [2]uint8{0xBF, 0xD4}
-	c.FlashType = TYPE_SST
 }
 
 func (c *Cartridge) Save() {
