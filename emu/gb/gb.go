@@ -8,6 +8,7 @@ import (
 	"unsafe"
 
 	"github.com/aabalke/guac/common/bus"
+	"github.com/aabalke/guac/common/profiler"
 	"github.com/aabalke/guac/common/stats"
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gb/apu"
@@ -292,6 +293,10 @@ func (gb *GameBoy) Run(ctx context.Context, eventBus *bus.EventBus) {
 
 	for {
 
+		if config.Conf.Profile.Enabled {
+			profiler.Profile(gb.Stats.Frame())
+		}
+
 		for drained := false; !drained; {
 			select {
 			case <-ctx.Done():
@@ -307,7 +312,6 @@ func (gb *GameBoy) Run(ctx context.Context, eventBus *bus.EventBus) {
 				if gb.Apu.Ctx != nil {
 					gb.CyclesPerSndGen = int64(((float64(CPU_SPEED) / float64(gb.Apu.Ctx.SampleRate())) * float64(config.Conf.General.TargetFps)) / FPS)
 				}
-
 			default:
 				drained = true
 			}
@@ -317,7 +321,6 @@ func (gb *GameBoy) Run(ctx context.Context, eventBus *bus.EventBus) {
 			gb.Update()
 			gb.Stats.TickFrame()
 		}
-
 	}
 }
 

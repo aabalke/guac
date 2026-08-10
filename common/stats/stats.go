@@ -13,8 +13,7 @@ type Stats struct {
 }
 
 func NewStats() *Stats {
-	s := &Stats{}
-	return s
+	return &Stats{}
 }
 
 func (s *Stats) TickFrame() { s.frameCnt.Add(1) }

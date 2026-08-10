@@ -60,8 +60,8 @@ type Ui struct {
 type Profile struct {
 	Enabled   bool   `toml:"enabled"`
 	FilePath  string `toml:"file_path"`
-	StartTick int64  `toml:"start_tick"`
-	EndTick   int64  `toml:"end_tick"`
+	StartTick uint64 `toml:"start_tick"`
+	EndTick   uint64 `toml:"end_tick"`
 }
 
 type Gb struct {

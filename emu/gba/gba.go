@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/aabalke/guac/common/bus"
+	"github.com/aabalke/guac/common/profiler"
 	"github.com/aabalke/guac/common/stats"
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/gba/apu"
@@ -155,6 +156,9 @@ func (gba *GBA) Run(ctx context.Context, eventBus *bus.EventBus) {
 	paused := false
 
 	for {
+		if config.Conf.Profile.Enabled {
+			profiler.Profile(gba.Stats.Frame())
+		}
 
 		for drained := false; !drained; {
 			select {

@@ -132,8 +132,8 @@ type Ui struct {
 type Profile struct {
 	Enabled   bool
 	FilePath  string
-	StartTick int64
-	EndTick   int64
+	StartTick uint64
+	EndTick   uint64
 }
 
 type Gb struct {
