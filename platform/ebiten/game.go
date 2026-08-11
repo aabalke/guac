@@ -129,9 +129,9 @@ func (g *Game) Update() error {
 		return ebiten.Termination
 	case g.ui.ui != nil:
 
-		justButtons, buttons := g.GetGamepadButtons()
-		g.ButtonInput(justButtons, buttons)
 		if g.ui.ActiveInputs <= 0 {
+			justButtons, buttons := g.GetGamepadButtons()
+			g.ButtonInput(justButtons, buttons)
 			justKeys := inpututil.AppendJustPressedKeys([]ebiten.Key{})
 			g.HandleGlobalInputs(justKeys, justButtons, buttons)
 		}
@@ -177,20 +177,6 @@ func (g *Game) Update() error {
 	return nil
 }
 
-const (
-	ROT_0 = iota
-	ROT_90
-	ROT_180
-	ROT_270
-)
-
-const (
-	RAD_0   = float64(math.Pi/180) * 0
-	RAD_90  = float64(math.Pi/180) * 90
-	RAD_180 = float64(math.Pi/180) * 180
-	RAD_270 = float64(math.Pi/180) * 270
-)
-
 func (g *Game) Draw(screen *ebiten.Image) {
 	screen.Fill(config.Conf.Ui.Backdrop)
 
@@ -215,6 +201,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.DrawOptions.GeoM.Reset()
 		g.DrawOptions.GeoM.Scale(scale, scale)
 		g.DrawOptions.GeoM.Translate(offsetX, offsetY)
+
 		g.gb.Mu.Lock()
 		screen.DrawImage(g.gb.Image, &g.DrawOptions)
 		g.gb.Mu.Unlock()
@@ -235,7 +222,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			fitH     = canvasH
 		)
 
-		if rot := rotation == ROT_90 || rotation == ROT_270; rot {
+		if rot := rotation == config.ROT_90 || rotation == config.ROT_270; rot {
 			fitW, fitH = canvasH, canvasW
 		}
 

@@ -10,6 +10,13 @@ var Conf Config
 
 const DYNAMIC_INT_SCALING = 0
 
+const (
+	ROT_0 = iota
+	ROT_90
+	ROT_180
+	ROT_270
+)
+
 type FirmwareColor = int
 
 const (

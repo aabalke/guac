@@ -28,6 +28,8 @@ const (
 	SCREEN_WIDTH  = 256
 	SCREEN_HEIGHT = 192
 
+	FPS = float64(59.8261)
+
 	// the graphics run zt 33Mhz ( arm7 speed, so arm9 runs twice every cycle)
 	NUM_SCANLINES   = SCREEN_HEIGHT + 70 // or 71
 	CYCLES_HDRAW    = 1606
@@ -96,9 +98,6 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 	nds.arm9 = arm9.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem.Bus9, &irq9, cp15)
 
 	s := snd.NewSnd(ctx, BUFFER_SIZE)
-	if ctx != nil {
-		s.SampCycles = CPU_FREQ_HZ / ctx.SampleRate()
-	}
 
 	nds.mem.InitMemory(
 		&nds.arm7.Reg.R[15],
@@ -152,9 +151,9 @@ func (nds *Nds) Run(ctx context.Context, eventBus *bus.EventBus) {
 	defer unSubSetFpsCh()
 	defer nds.Close()
 
-	//if nds.Apu.Ctx != nil {
-	//	nds.CyclesPerSndGen = int64(((float64(CPU_SPEED) / float64(nds.Apu.Ctx.SampleRate())) * float64(config.Conf.General.TargetFps)) / FPS)
-	//}
+	if nds.mem.Snd.Ctx != nil {
+		nds.mem.Snd.SampCycles = int(((float64(CPU_FREQ_HZ) / float64(nds.mem.Snd.Ctx.SampleRate())) * float64(config.Conf.General.TargetFps)) / FPS)
+	}
 
 	paused := false
 
@@ -180,9 +179,9 @@ func (nds *Nds) Run(ctx context.Context, eventBus *bus.EventBus) {
 				paused = pause.Data.(bool)
 				nds.mem.Snd.TogglePause(paused)
 			case <-setFpsCh:
-				//if nds.Apu.Ctx != nil {
-				//	nds.CyclesPerSndGen = int64(((float64(CPU_SPEED) / float64(nds.Apu.Ctx.SampleRate())) * float64(config.Conf.General.TargetFps)) / FPS)
-				//}
+				if nds.mem.Snd.Ctx != nil {
+					nds.mem.Snd.SampCycles = int(((float64(CPU_FREQ_HZ) / float64(nds.mem.Snd.Ctx.SampleRate())) * float64(config.Conf.General.TargetFps)) / FPS)
+				}
 
 			default:
 				drained = true
