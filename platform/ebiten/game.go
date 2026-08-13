@@ -282,6 +282,10 @@ func (g *Game) TogglePause() {
 	}
 
 	if !g.paused && (g.nds != nil || g.gba != nil || g.gb != nil) {
+
+		if g.gb != nil {
+			g.gb.UpdateFromConfig() // this will get called every pause, better method?
+		}
 		g.pauseEndTick = ebiten.Tick()
 		g.ui.ui = nil
 	}

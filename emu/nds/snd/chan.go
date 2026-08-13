@@ -50,9 +50,9 @@ type Channel struct {
 	Hold       bool
 
 	SrcAddr       uint32
+	SndLength     uint32
 	TimerValue    uint16
 	StartPosition uint16
-	SndLength     uint32
 
 	SamplePos float64
 
@@ -62,7 +62,6 @@ type Channel struct {
 	lfsr    uint32
 
 	isDuty bool
-	phase  float64
 }
 
 func NewChannel(idx int, s *Snd) Channel {

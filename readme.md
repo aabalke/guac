@@ -5,6 +5,9 @@ Guac is an Emulator written in golang for Gameboy, Gameboy Color, Gameboy Advanc
 ![gb500](https://github.com/user-attachments/assets/e65c8cd3-c7c6-4ee4-9b8e-8ea3d1c5d5ea)![gba500](https://github.com/user-attachments/assets/bc770659-3f35-4c90-b295-9e0c994ad929)![nds500](https://github.com/user-attachments/assets/5c4c34d7-3665-4b84-94d7-8e56ee803fec)
 
 # Update Videos
+
+[Cycle Accurate GBA (v0.0.4)](https://youtu.be/ycGuHSbyCYw)
+
 [UI Update (v0.0.3)](https://www.youtube.com/watch?v=dVdIM_bPQrY)
 
 [NDS Update (v0.0.2)](https://youtu.be/AsWBItlGmZg)
@@ -14,10 +17,13 @@ Guac is an Emulator written in golang for Gameboy, Gameboy Color, Gameboy Advanc
 # Features
 
 ## Emulation out of the box
-guac does not require any bios or firmware files (but you can provide!), just the roms you are interested in using. It also has full controller support even in menus, with on screen keyboards.
+guac does not require any bios or firmware files (but you can provide!), just the roms you are interested in using. It also has full controller support even in menus.
+
+## Accuracy
+GBA emulation is highly accurate, having a cycle accurate cpu, and other subsystems. Real-Time Clocks, Solar Sensors and more are properly emulated as well.
 
 ## Performance
-Nintendo DS emulation on guac comes with a one-of-a-kind jit compiler. This allows cpu emulation to be 2-5x faster depending on workloads. This is the first jit compiler that can interop with (more like confuse) the golang runtime to allow calls to go functions from jit code. Additionally, this is the first arm64 jit compiler written in golang. For more information please see [gojit](https://github.com/aabalke/gojit/).
+Nintendo DS emulation on guac comes with a one-of-a-kind jit compiler. This allows cpu emulation to be 2-5x faster depending on workloads. This is the first jit compiler that can interop with (more like confuse) the golang runtime to allow calls to go functions from jit code. Additionally, this is the first ever arm64 jit compiler written in golang. For more information please see [gojit](https://github.com/aabalke/gojit/).
 
 ## Customizable
 guac comes with a TON of customizable options. The ui has customizable colors, hotkeys, and localization in english or spanish. All consoles have customizable inputs. Nintendo DS has customizable screen layouts, Real-Time Clock, and Firmware.
@@ -38,7 +44,7 @@ If you are interested in specific flags and configuration options please see [gu
 
 # Building
 
-Building from source is possible with golang > 1.26.2, using:
+Building from source is possible with golang > 1.26.5, using:
 
 ```
 go build .

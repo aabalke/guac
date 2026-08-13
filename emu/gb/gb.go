@@ -158,6 +158,24 @@ func NewGameBoy(ctx *audio.Context, path string, muted bool) *GameBoy {
 	return gb
 }
 
+func (gb *GameBoy) UpdateFromConfig() {
+	v := gb.MemoryBus.IO[0x47]
+	gb.UnpackedMonoPals[0][0] = utils.ColorToUint32(gb.Palette[(v>>0)&3])
+	gb.UnpackedMonoPals[0][1] = utils.ColorToUint32(gb.Palette[(v>>2)&3])
+	gb.UnpackedMonoPals[0][2] = utils.ColorToUint32(gb.Palette[(v>>4)&3])
+	gb.UnpackedMonoPals[0][3] = utils.ColorToUint32(gb.Palette[(v>>6)&3])
+
+	v = gb.MemoryBus.IO[0x48]
+	gb.UnpackedMonoPals[1][1] = utils.ColorToUint32(gb.Palette[(v>>2)&3])
+	gb.UnpackedMonoPals[1][2] = utils.ColorToUint32(gb.Palette[(v>>4)&3])
+	gb.UnpackedMonoPals[1][3] = utils.ColorToUint32(gb.Palette[(v>>6)&3])
+
+	v = gb.MemoryBus.IO[0x49]
+	gb.UnpackedMonoPals[2][1] = utils.ColorToUint32(gb.Palette[(v>>2)&3])
+	gb.UnpackedMonoPals[2][2] = utils.ColorToUint32(gb.Palette[(v>>4)&3])
+	gb.UnpackedMonoPals[2][3] = utils.ColorToUint32(gb.Palette[(v>>6)&3])
+}
+
 func (gb *GameBoy) BiosBoot() {
 	if gb.Color {
 		if p := config.Conf.Gb.Bios.GbcPath; p != "" {

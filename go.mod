@@ -1,16 +1,24 @@
 module github.com/aabalke/guac
 
-replace github.com/ebitenui/ebitenui => C:\dev\repos\emulators\ebitenui
+// local development
+//replace github.com/hajimehoshi/dialog => C:\dev\repos\emulators\dialog
+//replace github.com/ebitenui/ebitenui => C:\dev\repos\emulators\ebitenui
+//replace github.com/aabalke/gojit => C:\dev\repos\jit\gojit
 
-replace github.com/aabalke/gojit => C:\dev\repos\jit\gojit
+// release version
+replace github.com/ebitenui/ebitenui => github.com/aabalke/ebitenui v0.0.0-20260507040224-7e5cd031ea7d
 
-replace github.com/hajimehoshi/dialog => C:\dev\repos\emulators\dialog
+replace github.com/hajimehoshi/dialog => github.com/aabalke/dialog v0.0.0-20260806052813-02b04fc6c149
 
-go 1.26.2
+// gojit, ebitenui, and dialog will need to be updated to proper versioning
+// before release. unversioned packaged are v0.0.0-YYYYMMDD______-CCCCCCCCCCCC
+// where C is the beginning of the commit
+
+go 1.26.5
 
 require (
 	github.com/BurntSushi/toml v1.5.0
-	github.com/aabalke/gojit v0.0.0-20260508030348-14e750bc9cc5
+	github.com/aabalke/gojit v0.0.0-20260616021404-5808a49d96fc
 	github.com/ebitenui/ebitenui v0.7.3
 	github.com/hajimehoshi/dialog v0.0.0-20260703050910-dfca0e7cf198
 	github.com/hajimehoshi/ebiten/v2 v2.9.7

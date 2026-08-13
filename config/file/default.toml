@@ -97,11 +97,10 @@ down   = ["LeftBottom"]
 
 # many gba games will idle loop until the end of a frame, this optimization
 # replaces these cpu instructions with a halt, leading to a performance increase
-idle_optimize = true
+idle_optimize = false
 
 # screen rotation, valid values [0, 90, 180, 270]
 # rotation = 0
-
 
 [gba.hardware]
 
