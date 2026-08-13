@@ -23,7 +23,7 @@ const (
 	SCREEN_WIDTH    = 240
 	SCREEN_HEIGHT   = 160
 	MAX_SCANLINE    = 228
-	BUFFER_SIZE     = 20 * time.Millisecond
+	BUFFER_SIZE     = 40 * time.Millisecond // low power machines need at least 40ms, may need to make controllable
 	CPU_SPEED       = 16777216
 	CYCLES_HDRAW    = 1006
 	CYCLES_HBLANK   = 226

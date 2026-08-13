@@ -30,7 +30,7 @@ const (
 	IRQ_JPD = 1 << 4
 
 	CPU_SPEED           = 4194304
-	BUFFER_SIZE         = 20 * time.Millisecond
+	BUFFER_SIZE         = 40 * time.Millisecond // low power machines need at least 40ms, may need to make controllable
 	CYCLES_FRAME        = 70224
 	CYCLES_END_SCANLINE = CYCLES_FRAME / 154
 	CYCLES_VBLANK       = CYCLES_FRAME / 154 * 144

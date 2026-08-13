@@ -41,7 +41,7 @@ const (
 
 	// sound
 	CPU_FREQ_HZ = 33513982
-	BUFFER_SIZE = 20 * time.Millisecond
+	BUFFER_SIZE = 40 * time.Millisecond // low power machines need at least 40ms, may need to make controllable
 
 	// timer and geo shouldn't be checked every inst
 	// these should probably be replaced with a less lazy method
