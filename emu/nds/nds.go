@@ -116,8 +116,7 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 	}
 
 	nds.Cartridge = cart.NewCartridge(
-		path, path+".save",
-		nds.mem.Arm7Bios,
+		path, nds.mem.Arm7Bios,
 		&irq7, &irq9,
 		&nds.dma7, &nds.dma9,
 	)

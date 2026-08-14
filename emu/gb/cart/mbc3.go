@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 	"unsafe"
+
+	"github.com/aabalke/guac/common/file"
 )
 
 // rtc uses https://bgb.bircd.org/rtcsave.html
@@ -32,7 +34,7 @@ type Mbc3 struct {
 
 var bitMask = [...]uint8{0x3F, 0x3F, 0x1F, 0xFF, 0xFF}
 
-func NewMbc3(c *Cartridge) *Mbc3 {
+func NewMbc3(c *Cartridge, rtc *[]byte) *Mbc3 {
 	fmt.Printf("Cartridge MBC3 %02X\n", c.Type)
 
 	m := &Mbc3{
@@ -41,13 +43,11 @@ func NewMbc3(c *Cartridge) *Mbc3 {
 		MBC30:     c.RomSize > 1<<21 || c.RamSize > 1<<15,
 	}
 
-	if buf, err := ReadRam(c.RomPath + ".rtc"); err != nil {
-		m.last = time.Now().Unix()
+	if rtc != nil {
+		m.Parse(*rtc)
 	} else {
-		m.Parse(buf)
+		m.last = time.Now().Unix()
 	}
-
-	m.UpdateAddrs()
 
 	return m
 }
@@ -85,7 +85,7 @@ func (m *Mbc3) Save() {
 	buf[36] = uint8(m.latchedtime[4])
 	binary.LittleEndian.PutUint32(buf[40:], uint32(m.last))
 
-	WriteRam(m.Cartridge.RomPath+".rtc", buf)
+	file.WriteRtc(m.Cartridge.RomPath, &buf)
 }
 
 func (m *Mbc3) Read(addr uint16) uint8 {

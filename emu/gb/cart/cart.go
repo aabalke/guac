@@ -2,15 +2,15 @@ package cart
 
 import (
 	"fmt"
-	"os"
 	"slices"
 	"strings"
+
+	"github.com/aabalke/guac/common/file"
 )
 
 type Cartridge struct {
 	Title     string
 	RomPath   string
-	SavPath   string
 	Data      []uint8
 	RamData   []uint8
 	Type      uint8
@@ -34,31 +34,26 @@ const (
 	SUM  = 0x14D
 )
 
-func NewCartridge(rompath, savpath string) *Cartridge {
+func NewCartridge(path string) *Cartridge {
 	c := &Cartridge{
-		RomPath: rompath,
-		SavPath: savpath,
+		RomPath: path,
 	}
 
-	buf, err := os.ReadFile(rompath)
-	if err != nil {
-		panic(err)
+	rom, sav, rtc := file.Read(path)
+	if rom == nil {
+		panic(fmt.Sprintf("gb: rom path is invalid, could not load %s", path))
 	}
 
-	c.ParseHeader(buf)
+	c.ParseHeader(*rom)
 
 	c.Data = make([]uint8, c.RomSize)
-	copy(c.Data, buf)
+	copy(c.Data, *rom)
 
 	if c.RamSize != 0 {
-
-		buf, err = ReadRam(savpath)
-		if err != nil {
-			buf = make([]uint8, c.RamSize)
+		c.RamData = make([]uint8, c.RamSize)
+		if sav != nil {
+			copy(c.RamData, *sav)
 		}
-
-		c.RamData = make([]uint8, c.RomSize)
-		copy(c.RamData, buf)
 	}
 
 	fmt.Printf("Title: %s\n", c.Title)
@@ -71,7 +66,7 @@ func NewCartridge(rompath, savpath string) *Cartridge {
 	case 0x05, 0x06:
 		c.Mbc = NewMbc2(c)
 	case 0x0F, 0x10, 0x11, 0x12, 0x13:
-		c.Mbc = NewMbc3(c)
+		c.Mbc = NewMbc3(c, rtc)
 	case 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E:
 		c.Mbc = NewMbc5(c)
 	default:

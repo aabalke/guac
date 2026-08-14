@@ -39,10 +39,9 @@ const (
 )
 
 func setBiosRam(mem *Mem, chipId [4]uint8) {
-
 	chip := binary.LittleEndian.Uint32(chipId[:])
 
-	c := &mem.Cartridge.Rom
+	c := mem.Cartridge.Rom
 	f := &mem.Spi.Firmware.Data
 	h := &mem.Cartridge.Header
 
@@ -50,87 +49,87 @@ func setBiosRam(mem *Mem, chipId [4]uint8) {
 	mem.Spi.Tsc.Firmware = &mem.Spi.Firmware
 
 	for i := range h.Arm9Size {
-		v := mem.Cartridge.Rom[h.Arm9Offset+i]
+		v := (*c)[h.Arm9Offset+i]
 		mem.Write(h.Arm9RamAddr+i, v, true)
 	}
 
 	for i := range h.Arm7Size {
-		v := mem.Cartridge.Rom[h.Arm7Offset+i]
+		v := (*c)[h.Arm7Offset+i]
 		mem.Write(h.Arm7RamAddr+i, v, false)
 	}
 
 	// if these are updated, update gamecard version
-	//27FF800h 4     NDS Gamecart Chip ID 1
+	// 27FF800h 4     NDS Gamecart Chip ID 1
 	mem.Write32(0x27FF800, chip, true)
-	//27FF804h 4     NDS Gamecart Chip ID 2
+	// 27FF804h 4     NDS Gamecart Chip ID 2
 	mem.Write32(0x27FF804, chip, true)
 
-	//27FF808h 2     NDS Cart Header CRC (verified)            ;hdr[15Eh]
+	// 27FF808h 2     NDS Cart Header CRC (verified)            ;hdr[15Eh]
 	mem.Write(RAM_CART_HDR_CRC, (*c)[0x15E], true)
 	mem.Write(RAM_CART_HDR_CRC+1, (*c)[0x15F], true)
 
-	//27FF80Ah 2     NDS Cart Secure Area CRC (not verified ?) ;hdr[06Ch]
+	// 27FF80Ah 2     NDS Cart Secure Area CRC (not verified ?) ;hdr[06Ch]
 	mem.Write(RAM_CART_SEC_CRC, (*c)[0x6C], true)
 	mem.Write(RAM_CART_SEC_CRC+1, (*c)[0x6D], true)
 
-	//27FF810h 2     Boot handler task number (usually FFFFh at cart boot time)
+	// 27FF810h 2     Boot handler task number (usually FFFFh at cart boot time)
 	mem.Write(RAM_BOOT_HANDLER, 0xFF, true)
 	mem.Write(RAM_BOOT_HANDLER+1, 0xFF, true)
 
-	//27FF812h 2     Secure disable (0=Normal, 1=Disable; Cart[078h]=BIOS[1088h])
+	// 27FF812h 2     Secure disable (0=Normal, 1=Disable; Cart[078h]=BIOS[1088h])
 
 	//if secDisabled := c[0x78] == b9[0x1088]; secDisabled {
 	//    mem.Write(RAM_SEC_DISABLED, 1, true)
 	//}
 
-	//27FF850h 2     NDS7 BIOS CRC (5835h)
+	// 27FF850h 2     NDS7 BIOS CRC (5835h)
 	mem.Write16(0x27FF850, 0x5835, true)
 
-	//27FF868h 4     Wifi FLASH User Settings FLASH Address (fmw[20h]*8)
+	// 27FF868h 4     Wifi FLASH User Settings FLASH Address (fmw[20h]*8)
 	v := uint32((*f)[0x20]) * 8
 	mem.Write32(RAM_WIFI_USER_SET, v, true)
 
-	//27FF874h 2     Wifi FLASH firmware part5 crc16 (359Ah) (fmw[026h])
+	// 27FF874h 2     Wifi FLASH firmware part5 crc16 (359Ah) (fmw[026h])
 	mem.Write(RAM_WIFI_FLASH_P3, (*f)[0x26], true)
 
-	//27FF876h 2     Wifi FLASH firmware part3/part4 crc16 (fmw[004h] or ZERO) usually zero
+	// 27FF876h 2     Wifi FLASH firmware part3/part4 crc16 (fmw[004h] or ZERO) usually zero
 	mem.Write(RAM_WIFI_FLASH_P3, 0x0, true)
 
-	//27FF880h 4     Message from NDS9 to NDS7  (=7 at cart boot time)
+	// 27FF880h 4     Message from NDS9 to NDS7  (=7 at cart boot time)
 	mem.Write(RAM_MESSAGE, 7, true)
 
-	//27FF884h 4     NDS7 Boot Task (also checked by NDS9) (=6 at cart boot time)
+	// 27FF884h 4     NDS7 Boot Task (also checked by NDS9) (=6 at cart boot time)
 	mem.Write(RAM_BOOT_TASK, 6, true)
 
 	// if these are updated, update gamecard version
-	//27FFC00h 4     NDS Gamecart Chip ID 1   (copy of 27FF800h)
+	// 27FFC00h 4     NDS Gamecart Chip ID 1   (copy of 27FF800h)
 	mem.Write32(0x27FFC00, chip, true)
-	//27FFC04h 4     NDS Gamecart Chip ID 2   (copy of 27FF804h)
+	// 27FFC04h 4     NDS Gamecart Chip ID 2   (copy of 27FF804h)
 	mem.Write32(0x27FFC04, chip, true)
 
-	//27FFC08h 2     NDS Cart Header CRC      (copy of 27FF808h)
+	// 27FFC08h 2     NDS Cart Header CRC      (copy of 27FF808h)
 	mem.Write(0x027FFC08, (*c)[0x15E], true)
 	mem.Write(0x027FFC08+1, (*c)[0x15F], true)
 
-	//27FFC0Ah 2     NDS Cart Secure Area CRC (copy of 27FF80Ah)
+	// 27FFC0Ah 2     NDS Cart Secure Area CRC (copy of 27FF80Ah)
 	mem.Write(0x27FFC0A, (*c)[0x6C], true)
 	mem.Write(0x27FFC0A+1, (*c)[0x6D], true)
 
-	//27FFC0Ch 2     NDS Cart Missing/Bad CRC (copy of 27FF80Ch)
-	//27FFC0Eh 2     NDS Cart Secure Area Bad (copy of 27FF80Eh)
+	// 27FFC0Ch 2     NDS Cart Missing/Bad CRC (copy of 27FF80Ch)
+	// 27FFC0Eh 2     NDS Cart Secure Area Bad (copy of 27FF80Eh)
 
-	//27FFC10h 2     NDS7 BIOS CRC (5835h)    (copy of <27FF850h>)
+	// 27FFC10h 2     NDS7 BIOS CRC (5835h)    (copy of <27FF850h>)
 	mem.Write16(0x27FFC10, 0x5835, true)
 
-	//27FFC12h 2     Secure Disable           (copy of 27FF812h)
+	// 27FFC12h 2     Secure Disable           (copy of 27FF812h)
 
-	//27FFC3Ch 4     Frame Counter (eg. 00000332h in no$gba with original firmware)
+	// 27FFC3Ch 4     Frame Counter (eg. 00000332h in no$gba with original firmware)
 	mem.Write32(RAM_FRAME_CNT, 0x332, true)
 
-	//27FFC40h 2     Boot Indicator (1=normal; required for some NDS games, 2=wifi)
+	// 27FFC40h 2     Boot Indicator (1=normal; required for some NDS games, 2=wifi)
 	mem.Write(RAM_BOOT_IND, 1, true)
 
-	//27FFC80h 70h   Wifi FLASH User Settings (fmw[newest_user_settings])
+	// 27FFC80h 70h   Wifi FLASH User Settings (fmw[newest_user_settings])
 
 	const (
 		USER_SETTING_RAM = 0x27FFC80
@@ -142,21 +141,21 @@ func setBiosRam(mem *Mem, chipId [4]uint8) {
 		mem.Write(USER_SETTING_RAM+i, v, true)
 	}
 
-	//27FFE00h 170h  NDS Cart Header at 27FFE00h+0..16Fh
+	// 27FFE00h 170h  NDS Cart Header at 27FFE00h+0..16Fh
 	const CART_HEADER_RAM = 0x27FFE00
 
 	for i := range uint32(0x170) {
-		v := mem.Cartridge.Rom[i]
+		v := (*c)[i]
 		mem.Write(CART_HEADER_RAM+i, v, true)
 	}
 
 	// temp adc calibration to match nocash
-	//mem.Write(USER_SETTING_RAM + 0x58, 0xDF, true)
-	//mem.Write(USER_SETTING_RAM + 0x59, 0x02, true)
-	//mem.Write(USER_SETTING_RAM + 0x5A, 0x2C, true)
-	//mem.Write(USER_SETTING_RAM + 0x5B, 0x03, true)
-	//mem.Write(USER_SETTING_RAM + 0x5C, 0x20, true)
-	//mem.Write(USER_SETTING_RAM + 0x5D, 0x20, true)
+	// mem.Write(USER_SETTING_RAM + 0x58, 0xDF, true)
+	// mem.Write(USER_SETTING_RAM + 0x59, 0x02, true)
+	// mem.Write(USER_SETTING_RAM + 0x5A, 0x2C, true)
+	// mem.Write(USER_SETTING_RAM + 0x5B, 0x03, true)
+	// mem.Write(USER_SETTING_RAM + 0x5C, 0x20, true)
+	// mem.Write(USER_SETTING_RAM + 0x5D, 0x20, true)
 
 	//mem.Write(USER_SETTING_RAM + 0x5E, 0x3B, true)
 	//mem.Write(USER_SETTING_RAM + 0x5F, 0x0D, true)
@@ -170,18 +169,17 @@ func setBiosRam(mem *Mem, chipId [4]uint8) {
 	initTempUnimplimented()
 }
 
-//27FFFF8h 2     NDS9 Scratch addr for SWI IsDebugger check
-//27FFFFAh 2     NDS7 Scratch addr for SWI IsDebugger check
-//27FFFFEh 2     Main Memory Control (on-chip power-down I/O port)
-//DTCM+3FF8h 4   NDS9 IRQ IF Check Bits (hardcoded RAM address)
-//DTCM+3FFCh 4   NDS9 IRQ Handler (hardcoded RAM address)
-//37F8000h FE00h ARM7 bootcode can be loaded here (37F8000h..3807DFFh)
-//380FFF8h 4     NDS7 IRQ IF Check Bits (hardcoded RAM address)
-//380FFFCh 4     NDS7 IRQ Handler (hardcoded RAM address)
+// 27FFFF8h 2     NDS9 Scratch addr for SWI IsDebugger check
+// 27FFFFAh 2     NDS7 Scratch addr for SWI IsDebugger check
+// 27FFFFEh 2     Main Memory Control (on-chip power-down I/O port)
+// DTCM+3FF8h 4   NDS9 IRQ IF Check Bits (hardcoded RAM address)
+// DTCM+3FFCh 4   NDS9 IRQ Handler (hardcoded RAM address)
+// 37F8000h FE00h ARM7 bootcode can be loaded here (37F8000h..3807DFFh)
+// 380FFF8h 4     NDS7 IRQ IF Check Bits (hardcoded RAM address)
+// 380FFFCh 4     NDS7 IRQ Handler (hardcoded RAM address)
 
 // this is to check if cartridge reads unimplimented ramusage
 func ramUsageUnimplimented(addr uint32) {
-
 	_, in := tempUnimplimented[addr]
 
 	if !in {

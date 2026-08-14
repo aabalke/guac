@@ -99,7 +99,7 @@ func NewGBA(ctx *audio.Context, path string, muted bool) *GBA {
 
 	gba.Dma = NewDma(gba)
 	gba.Mem.LoadBios()
-	gba.LoadGame(path)
+	gba.Cartridge = cart.NewCartridge(path)
 	gba.AddGpios()
 
 	if ctx != nil {
@@ -243,10 +243,6 @@ func (gba *GBA) CheckIdleLoopOptimization() {
 		}
 		gba.Irq.IdleIrq = gba.Irq.IF
 	}
-}
-
-func (gba *GBA) LoadGame(path string) {
-	gba.Cartridge = cart.NewCartridge(path, path+".save")
 }
 
 func (gba *GBA) DirectBoot() {

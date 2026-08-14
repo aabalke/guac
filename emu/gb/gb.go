@@ -3,6 +3,7 @@ package gb
 import (
 	"context"
 	"image/color"
+	"os"
 	"sync"
 	"time"
 	"unsafe"
@@ -108,7 +109,7 @@ func NewGameBoy(ctx *audio.Context, path string, muted bool) *GameBoy {
 		Image:     img,
 		Cpu:       NewCpu(),
 		Joypad:    0xFF,
-		Cartridge: cart.NewCartridge(path, path+".save"),
+		Cartridge: cart.NewCartridge(path),
 		Palette:   &config.Conf.Gb.Palette,
 		Scheduler: scheduler.NewScheduler(),
 		Apu:       apu.NewApu(ctx, BUFFER_SIZE),
@@ -177,15 +178,18 @@ func (gb *GameBoy) UpdateFromConfig() {
 }
 
 func (gb *GameBoy) BiosBoot() {
-	if gb.Color {
-		if p := config.Conf.Gb.Bios.GbcPath; p != "" {
-			buf, _, _ := utils.ReadFile(p)
+	gbcPath := config.Conf.Gb.Bios.GbcPath
+	dmgPath := config.Conf.Gb.Bios.DmgPath
+
+	if gb.Color && gbcPath != "" {
+		if buf, err := os.ReadFile(gbcPath); err == nil {
 			gb.MemoryBus.Boot = &buf
 			return
 		}
-	} else {
-		if p := config.Conf.Gb.Bios.DmgPath; p != "" {
-			buf, _, _ := utils.ReadFile(p)
+	}
+
+	if !gb.Color && dmgPath != "" {
+		if buf, err := os.ReadFile(dmgPath); err == nil {
 			gb.MemoryBus.Boot = &buf
 			return
 		}

@@ -3,23 +3,22 @@ package cart
 import (
 	"encoding/binary"
 	"fmt"
-	"log"
 	"time"
 
+	"github.com/aabalke/guac/common/file"
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
-	"github.com/aabalke/guac/utils"
 )
 
 type Cartridge struct {
-	Rom     []uint8
-	RomPath string
-	RomLen  int
+	Path string
 
-	Sav     []uint8
-	SavPath string
-	SavLen  int
+	Rom *[]uint8
+	Sav *[]uint8
+
+	RomLen int
+	SavLen int
 
 	// io
 	Header  Header
@@ -40,31 +39,31 @@ type Cartridge struct {
 	ChipId         [4]uint8
 }
 
-func NewCartridge(romPath, savPath string, bios *[]uint8, irq7, irq9 *cpu.Irq, dma7, dma9 *[4]dma.DMA) *Cartridge {
+func NewCartridge(path string, bios *[]uint8, irq7, irq9 *cpu.Irq, dma7, dma9 *[4]dma.DMA) *Cartridge {
 	c := &Cartridge{
-		RomPath: romPath,
-		SavPath: savPath,
-		irq7:    irq7,
-		irq9:    irq9,
-		dma7:    dma7,
-		dma9:    dma9,
+		Path: path,
+		irq7: irq7,
+		irq9: irq9,
+		dma7: dma7,
+		dma9: dma9,
 	}
 
-	var ok bool
-	c.Rom, c.RomLen, ok = utils.ReadFile(romPath)
-	if !ok {
-		panic("could not read rom path")
+	rom, sav, _ := file.Read(path)
+	if rom == nil {
+		panic(fmt.Sprintf("nds: rom path is invalid, could not load %s", path))
 	}
+
+	c.Rom = rom
 
 	c.Header = NewHeader(c)
 
 	if !c.Header.Decrypted {
-		NewKey1(bios, &c.Rom).DecryptCard()
+		NewKey1(bios, c.Rom).DecryptCard()
 	}
 
 	code := binary.LittleEndian.Uint32(c.Header.GameCode)
 	c.Backup = NewBackup(c)
-	c.readSave(savPath, code)
+	c.readSave(sav, code)
 	c.Backup.setCartType()
 
 	// matches no cash nitrofs test
@@ -92,7 +91,7 @@ func (c *Cartridge) checkAccessRights(arm9 bool) bool {
 	return allowed7 || allowed9
 }
 
-func (c *Cartridge) readSave(savPath string, gamecode uint32) {
+func (c *Cartridge) readSave(sav *[]byte, gamecode uint32) {
 	if romData, ok := roms[gamecode]; ok {
 		// in db
 		c.Backup.Size = romData.Size
@@ -103,17 +102,21 @@ func (c *Cartridge) readSave(savPath string, gamecode uint32) {
 		c.Backup.MemType = 0
 	}
 
-	c.Sav = make([]uint8, c.Backup.Size)
-	for i := range c.Sav {
-		c.Sav[i] = 0xFF
-	}
+	expectedLen := int(c.Backup.Size)
 
-	sav, length, ok := utils.ReadFile(savPath)
-	if ok {
-		for i := range length {
-			c.Sav[i] = sav[i]
+	if sav == nil && expectedLen != 0 {
+		s := make([]uint8, expectedLen)
+		sav = &s
+		for i := range len(s) {
+			s[i] = 0xFF
 		}
 	}
+
+	if expectedLen != len(*sav) {
+		panic(fmt.Sprintf("nds: Sav Size != Save File Size %d != %d\n", expectedLen, len(*sav)))
+	}
+
+	c.Sav = sav
 }
 
 const (
@@ -195,7 +198,7 @@ func (c *Cartridge) RunRom(arm9 bool) {
 			}
 
 			for i := range uint32(len(buffer)) {
-				buffer[i] = c.Rom[addr+i]
+				buffer[i] = (*c.Rom)[addr+i]
 			}
 
 			// todo
@@ -277,8 +280,7 @@ func (c *Cartridge) InitSaveLoop() {
 			}
 
 			if c.SaveFlag {
-				log.Printf("Saving Game Path: %s\n", c.SavPath)
-				utils.WriteFile(c.SavPath, c.Sav[:])
+				file.Write(c.Path, c.Sav)
 				c.SaveFlag = false
 			}
 		}

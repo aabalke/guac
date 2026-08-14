@@ -2,6 +2,7 @@ package gba
 
 import (
 	"encoding/binary"
+	"os"
 	"time"
 	"unsafe"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/aabalke/guac/emu/bios"
 	"github.com/aabalke/guac/emu/gba/cart"
 	"github.com/aabalke/guac/emu/gba/gpio"
-	"github.com/aabalke/guac/utils"
 )
 
 type Memory struct {
@@ -54,11 +54,12 @@ func NewMemory(gba *GBA) *Memory {
 }
 
 func (m *Memory) LoadBios() {
+	m.BIOS = &bios.BiosGba
+
 	if p := config.Conf.Gba.Bios.Path; p != "" {
-		buf, _, _ := utils.ReadFile(p)
-		m.BIOS = &buf
-	} else {
-		m.BIOS = &bios.BiosGba
+		if buf, err := os.ReadFile(p); err == nil {
+			m.BIOS = &buf
+		}
 	}
 }
 

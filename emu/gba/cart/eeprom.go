@@ -79,7 +79,7 @@ func (c *Cartridge) EepromWrite(v uint16) {
 		c.EepromReadBits = 0
 		c.EepromReadBitsCount = 68
 		for i := range 8 {
-			b := c.Sav[int(c.EepromAddr)+i]
+			b := (*c.Sav)[int(c.EepromAddr)+i]
 			for j := 7; j >= 0; j-- {
 				c.EepromReadBits <<= 1
 				c.EepromReadBits |= uint64(b>>j) & 1
@@ -106,7 +106,7 @@ func (c *Cartridge) EepromWrite(v uint16) {
 				panic("TOO BIG")
 			}
 
-			c.Sav[c.EepromAddr+uint32(i)] = uint8(b)
+			(*c.Sav)[c.EepromAddr+uint32(i)] = uint8(b)
 		}
 
 		c.EepromState = 1

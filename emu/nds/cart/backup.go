@@ -170,7 +170,6 @@ func (b *Backup) checkSize() {
 //}
 
 func (b *Backup) Transfer(data []uint8) (reply []uint8, stat uint8) {
-
 	//if b.Type == TYPE_FLASH {
 	//    return b.TransferFlash(data)
 	//}
@@ -222,9 +221,9 @@ func (b *Backup) Transfer(data []uint8) (reply []uint8, stat uint8) {
 		b.checkSize()
 
 		buf := make([]uint8, 256)
-		sz := min(256, uint32(len(b.Cartridge.Sav))-b.Addr)
+		sz := min(256, uint32(len(*b.Cartridge.Sav))-b.Addr)
 
-		copy(buf[:sz], b.Cartridge.Sav[b.Addr:b.Addr+sz])
+		copy(buf[:sz], (*b.Cartridge.Sav)[b.Addr:b.Addr+sz])
 
 		//for i := range data {
 		//    fmt.Printf("%02X ", data[i])
@@ -251,7 +250,7 @@ func (b *Backup) Transfer(data []uint8) (reply []uint8, stat uint8) {
 
 		b.Cartridge.SaveFlag = true
 
-		copy(b.Cartridge.Sav[b.Addr:], data[1+b.AddrSize:])
+		copy((*b.Cartridge.Sav)[b.Addr:], data[1+b.AddrSize:])
 
 		return nil, STAT_CONT
 

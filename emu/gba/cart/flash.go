@@ -19,7 +19,7 @@ func (c *Cartridge) ReadFlash(addr uint32) uint8 {
 			return 0xFF
 		}
 	} else {
-		return c.Sav[(c.FlashBank*0x1_0000)+addr]
+		return (*c.Sav)[(c.FlashBank*0x1_0000)+addr]
 	}
 }
 
@@ -36,12 +36,12 @@ func (c *Cartridge) WriteFlash(addr uint32, v uint8) {
 		bankAddr := (c.FlashBank * 0x1_0000) + addr
 
 		// The target memory location must have been previously erased.
-		c.Sav[bankAddr] &= v
+		(*c.Sav)[bankAddr] &= v
 
 	case FL_ERASE_ALL:
 
-		for i := range len(c.Sav) {
-			c.Sav[i] = 0xFF
+		for i := range len((*c.Sav)) {
+			(*c.Sav)[i] = 0xFF
 		}
 
 		c.FlashMode = FL_READ
@@ -56,7 +56,7 @@ func (c *Cartridge) WriteFlash(addr uint32, v uint8) {
 
 		bankAddr := (c.FlashBank * 0x1_0000) + addr
 		for i := range uint32(0x1000) {
-			c.Sav[bankAddr+i] = 0xFF
+			(*c.Sav)[bankAddr+i] = 0xFF
 		}
 
 		c.FlashMode = FL_READ

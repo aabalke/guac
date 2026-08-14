@@ -4,8 +4,8 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/aabalke/guac/common/file"
 	"github.com/aabalke/guac/config"
-	"github.com/aabalke/guac/emu/gb/cart"
 	"github.com/aabalke/guac/utils"
 )
 
@@ -166,24 +166,22 @@ func (h *Hdma) Transfer(length uint16) {
 	}
 }
 
-func (gb *GameBoy) SaveRam() {
+func (gb *GameBoy) Save() {
 	if config.Conf.General.DisableSaves {
 		return
 	}
 
 	if !gb.MemoryBus.ramSaved {
-		cart.WriteRam(gb.Cartridge.SavPath, gb.Cartridge.RamData)
+		file.Write(gb.Cartridge.RomPath, &gb.Cartridge.RamData)
 		gb.Cartridge.Mbc.Save()
 		gb.MemoryBus.ramSaved = true
 	}
 }
 
 func (gb *GameBoy) InitSaveLoop() {
-	saveTicker := time.Tick(time.Second)
-
 	go func() {
-		for range saveTicker {
-			gb.SaveRam()
+		for range time.Tick(time.Second) {
+			gb.Save()
 		}
 	}()
 }

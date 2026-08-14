@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,27 +8,6 @@ import (
 
 	"github.com/hajimehoshi/dialog"
 )
-
-func ReadFile(path string) (buf []uint8, length int, ok bool) {
-	buf, err := os.ReadFile(path)
-	if err != nil {
-		return nil, 0, false
-	}
-	return buf, len(buf), true
-}
-
-func WriteFile(path string, buf []uint8) bool {
-	f, err := os.Create(path)
-	if err != nil {
-		return false
-	}
-	defer f.Close()
-
-	writer := bufio.NewWriter(f)
-
-	_, err = writer.Write(buf)
-	return err == nil
-}
 
 func OpenFile(title, desc string, extensions ...string) string {
 	if len(extensions) == 0 {

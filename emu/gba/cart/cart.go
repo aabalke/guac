@@ -1,18 +1,16 @@
 package cart
 
 import (
-	"bufio"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 
+	"github.com/aabalke/guac/common/file"
 	"github.com/aabalke/guac/config"
 )
 
 type Cartridge struct {
-	RomPath    string
-	SavPath    string
+	path       string
 	Title      string
 	Code       string
 	Id         int
@@ -33,7 +31,7 @@ type Cartridge struct {
 	Mirrored bool
 
 	Rom *[]uint8
-	Sav []uint8
+	Sav *[]uint8
 }
 
 const (
@@ -49,19 +47,18 @@ func (c *Cartridge) String() string {
 	return fmt.Sprintf("Gba Header: Title %12s, Code %4s, Id %d", c.Title, c.Code, c.Id)
 }
 
-func NewCartridge(rom, sav string) *Cartridge {
+func NewCartridge(path string) *Cartridge {
 	c := Cartridge{
-		RomPath: rom,
-		SavPath: sav,
+		path:    path,
 		RomMask: 0x1FF_FFFF,
 	}
 
-	buf, err := os.ReadFile(c.RomPath)
-	if err != nil {
-		panic(err)
+	rom, sav, _ := file.Read(path)
+	if rom == nil {
+		panic(fmt.Sprintf("gba: rom path is invalid, could not load %s", path))
 	}
 
-	c.Rom = &buf
+	c.Rom = rom
 
 	c.Id = config.Conf.Gba.Hardware.BackupType
 	if c.Id == AUTO {
@@ -72,31 +69,34 @@ func NewCartridge(rom, sav string) *Cartridge {
 		c.setFlashDevice(c.Id == FLASH128)
 	}
 
+	expectedLen := 0
 	switch c.Id {
 	case SRAM:
-		c.Sav = make([]uint8, 0x10000)
+		expectedLen = 0x10000
 	case EEPROM:
-		c.Sav = make([]uint8, 0x2000)
+		expectedLen = 0x2000
 	case FLASH, FLASH128:
-		c.Sav = make([]uint8, 0x20000)
+		expectedLen = 0x20000
 	}
 
-	if sBuf, err := os.ReadFile(c.SavPath); err != nil {
-		for i := range len(c.Sav) {
-			c.Sav[i] = 0xFF
+	if sav == nil && expectedLen != 0 {
+		s := make([]uint8, expectedLen)
+		sav = &s
+		for i := range len(s) {
+			s[i] = 0xFF
 		}
-	} else {
-		if len(c.Sav) != len(sBuf) {
-			panic(fmt.Sprintf("Sav Size != Save File Size %d != %d\n", len(c.Sav), len(sBuf)))
-		}
-
-		c.Sav = sBuf
 	}
+
+	if expectedLen != len(*sav) {
+		panic(fmt.Sprintf("gba: Sav Size != Save File Size %d != %d\n", expectedLen, len(*sav)))
+	}
+
+	c.Sav = sav
 
 	c.Title = strings.ToUpper(strings.ReplaceAll(string((*c.Rom)[0xA0:0xA0+12]), "\x00", " "))
 	c.Code = strings.ToUpper(string((*c.Rom)[0xAC : 0xAC+4]))
 
-	// some dumps of classic nes games are only 1mb etc, since mirrored the rest
+	// some dumps of classic nes games are only 1mb, since mirrored the rest of 4mb minimum
 	// to fix we lower rom mask to fit smaller carts
 	if classic := (*c.Rom)[0xAC] == 'F'; classic {
 		c.RomMask = RoundPowerOfTwo(uint32(len(*c.Rom))) - 1
@@ -146,25 +146,13 @@ func (c *Cartridge) setFlashDevice(flash128 bool) {
 }
 
 func (c *Cartridge) Save() {
-	log.Printf("Saving Game Path: %s\n", c.SavPath)
-
-	f, err := os.Create(c.SavPath)
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-
-	writer := bufio.NewWriter(f)
-	_, err = writer.Write(c.Sav[:])
-	if err != nil {
-		panic(err)
-	}
+	file.Write(c.path, c.Sav)
 }
 
 func (c *Cartridge) Read(addr uint32) uint8 {
 	switch c.Id {
 	case SRAM:
-		return c.Sav[addr]
+		return (*c.Sav)[addr]
 	case EEPROM:
 		log.Printf("Attempted GPIO Read with EEPROM. Not supported.\n")
 		return 0
@@ -178,7 +166,7 @@ func (c *Cartridge) Read(addr uint32) uint8 {
 func (c *Cartridge) Write(addr uint32, v uint8) {
 	switch c.Id {
 	case SRAM:
-		c.Sav[addr] = v
+		(*c.Sav)[addr] = v
 	case EEPROM:
 		log.Printf("Attempted GPIO Write with EEPROM. Not supported.\n")
 	case FLASH, FLASH128:

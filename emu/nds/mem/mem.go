@@ -3,6 +3,7 @@ package mem
 import (
 	"encoding/binary"
 	"fmt"
+	"os"
 	"unsafe"
 
 	"github.com/aabalke/guac/config"
@@ -14,7 +15,6 @@ import (
 	"github.com/aabalke/guac/emu/nds/mem/wifi"
 	"github.com/aabalke/guac/emu/nds/ppu"
 	"github.com/aabalke/guac/emu/nds/snd"
-	"github.com/aabalke/guac/utils"
 )
 
 type Mem struct {
@@ -156,13 +156,15 @@ func (mem *Mem) LoadBios() {
 	b := &config.Conf.Nds.Bios
 
 	if b.Arm7Path != "" {
-		buf, _, _ := utils.ReadFile(b.Arm7Path)
-		mem.Arm7Bios = &buf
+		if buf, err := os.ReadFile(b.Arm7Path); err == nil {
+			mem.Arm7Bios = &buf
+		}
 	}
 
 	if b.Arm9Path != "" {
-		buf, _, _ := utils.ReadFile(b.Arm9Path)
-		mem.Arm9Bios = &buf
+		if buf, err := os.ReadFile(b.Arm9Path); err == nil {
+			mem.Arm9Bios = &buf
+		}
 	}
 }
 

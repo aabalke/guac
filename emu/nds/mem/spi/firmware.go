@@ -4,9 +4,9 @@ import (
 	_ "embed"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/aabalke/guac/config"
-	"github.com/aabalke/guac/utils"
 )
 
 const (
@@ -30,22 +30,30 @@ type Firmware struct {
 }
 
 func (f *Firmware) Load() {
-
 	f.Data = make([]uint8, 0x4_0000)
 
-	if path := config.Conf.Nds.Firmware.FilePath; path == "" {
-		FirmwareSetHeader(&f.Data)
-		FirmwareSetAccessPoints(&f.Data)
-	} else {
-		f.Data, _, _ = utils.ReadFile(path)
-	}
+	path := config.Conf.Nds.Firmware.FilePath
 
 	// user settings come from config and should override firmware file
-	FirmwareSetUserSettings(&f.Data)
+	defer FirmwareSetUserSettings(&f.Data)
+
+	if path == "" {
+		FirmwareSetHeader(&f.Data)
+		FirmwareSetAccessPoints(&f.Data)
+		return
+	}
+
+	b, err := os.ReadFile(path)
+	if err != nil {
+		FirmwareSetHeader(&f.Data)
+		FirmwareSetAccessPoints(&f.Data)
+		return
+	}
+
+	f.Data = b
 }
 
 func (f *Firmware) Transfer(data []uint8) (reply []uint8, stat uint8) {
-
 	switch inst := data[0]; inst {
 	case INST_NONE:
 
@@ -60,16 +68,16 @@ func (f *Firmware) Transfer(data []uint8) (reply []uint8, stat uint8) {
 			return nil, STAT_CONT
 		}
 
-		//ID 20h,40h,11h - ST 45PE10V6 - 128 Kbytes (Nintendo DSi) (nocash)
+		// ID 20h,40h,11h - ST 45PE10V6 - 128 Kbytes (Nintendo DSi) (nocash)
 
 		return []uint8{0x20, 0x40, 0x11}, STAT_DONE
 
 	case INST_RDSR:
 
-		//05h  RDSR Read Status Register (Read Status Register, endless repeated)
-		//Bit7-2  Not used (zero)
-		//Bit1    WEL Write Enable Latch             (0=No, 1=Enable)
-		//Bit0    WIP Write/Program/Erase in Progess (0=No, 1=Busy)
+		// 05h  RDSR Read Status Register (Read Status Register, endless repeated)
+		// Bit7-2  Not used (zero)
+		// Bit1    WEL Write Enable Latch             (0=No, 1=Enable)
+		// Bit0    WIP Write/Program/Erase in Progess (0=No, 1=Busy)
 
 		if f.WriteEnabled {
 			return []uint8{2}, STAT_DONE
@@ -144,7 +152,6 @@ func (f *Firmware) Transfer(data []uint8) (reply []uint8, stat uint8) {
 }
 
 func (f *Firmware) Write() {
-
 	if f.WriteBuffer == nil {
 		return
 	}
