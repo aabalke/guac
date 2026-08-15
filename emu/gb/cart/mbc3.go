@@ -85,7 +85,7 @@ func (m *Mbc3) Save() {
 	buf[36] = uint8(m.latchedtime[4])
 	binary.LittleEndian.PutUint32(buf[40:], uint32(m.last))
 
-	file.WriteRtc(m.Cartridge.RomPath, &buf)
+	file.WriteRtc(m.Cartridge.RomPath, m.Cartridge.RomName, &buf)
 }
 
 func (m *Mbc3) Read(addr uint16) uint8 {

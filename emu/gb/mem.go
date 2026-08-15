@@ -172,7 +172,7 @@ func (gb *GameBoy) Save() {
 	}
 
 	if !gb.MemoryBus.ramSaved {
-		file.Write(gb.Cartridge.RomPath, &gb.Cartridge.RamData)
+		file.Write(gb.Cartridge.RomPath, gb.Cartridge.RomName, &gb.Cartridge.RamData)
 		gb.Cartridge.Mbc.Save()
 		gb.MemoryBus.ramSaved = true
 	}

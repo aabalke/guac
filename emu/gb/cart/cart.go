@@ -11,6 +11,7 @@ import (
 type Cartridge struct {
 	Title     string
 	RomPath   string
+	RomName   string
 	Data      []uint8
 	RamData   []uint8
 	Type      uint8
@@ -39,10 +40,12 @@ func NewCartridge(path string) *Cartridge {
 		RomPath: path,
 	}
 
-	rom, sav, rtc := file.Read(path)
+	name, rom, sav, rtc := file.Read(path)
 	if rom == nil {
 		panic(fmt.Sprintf("gb: rom path is invalid, could not load %s", path))
 	}
+
+	c.RomName = name
 
 	c.ParseHeader(*rom)
 

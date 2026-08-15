@@ -44,6 +44,14 @@ var savSize = [...]uint32{
 	MB * 64,
 }
 
+func getRamSize(backupType uint32) uint32 {
+	if backupType > 10 {
+		backupType = 0
+	}
+
+	return savSize[backupType]
+}
+
 const (
 	TYPE_NONE = iota
 	TYPE_EEPROM_SM

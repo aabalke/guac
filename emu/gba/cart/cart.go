@@ -11,6 +11,7 @@ import (
 
 type Cartridge struct {
 	path       string
+	romName    string
 	Title      string
 	Code       string
 	Id         int
@@ -53,11 +54,12 @@ func NewCartridge(path string) *Cartridge {
 		RomMask: 0x1FF_FFFF,
 	}
 
-	rom, sav, _ := file.Read(path)
+	name, rom, sav, _ := file.Read(path)
 	if rom == nil {
 		panic(fmt.Sprintf("gba: rom path is invalid, could not load %s", path))
 	}
 
+	c.romName = name
 	c.Rom = rom
 
 	c.Id = config.Conf.Gba.Hardware.BackupType
@@ -79,15 +81,18 @@ func NewCartridge(path string) *Cartridge {
 		expectedLen = 0x20000
 	}
 
+	println("sav", sav == nil, "id", c.Id)
 	if sav == nil && expectedLen != 0 {
 		s := make([]uint8, expectedLen)
 		sav = &s
 		for i := range len(s) {
 			s[i] = 0xFF
 		}
+
+		println("here")
 	}
 
-	if expectedLen != len(*sav) {
+	if sav != nil && expectedLen != len(*sav) {
 		panic(fmt.Sprintf("gba: Sav Size != Save File Size %d != %d\n", expectedLen, len(*sav)))
 	}
 
@@ -146,7 +151,7 @@ func (c *Cartridge) setFlashDevice(flash128 bool) {
 }
 
 func (c *Cartridge) Save() {
-	file.Write(c.path, c.Sav)
+	file.Write(c.path, c.romName, c.Sav)
 }
 
 func (c *Cartridge) Read(addr uint32) uint8 {

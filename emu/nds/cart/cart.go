@@ -12,7 +12,8 @@ import (
 )
 
 type Cartridge struct {
-	Path string
+	Path    string
+	RomName string
 
 	Rom *[]uint8
 	Sav *[]uint8
@@ -48,12 +49,14 @@ func NewCartridge(path string, bios *[]uint8, irq7, irq9 *cpu.Irq, dma7, dma9 *[
 		dma9: dma9,
 	}
 
-	rom, sav, _ := file.Read(path)
+	name, rom, sav, _ := file.Read(path)
 	if rom == nil {
 		panic(fmt.Sprintf("nds: rom path is invalid, could not load %s", path))
 	}
 
+	c.RomName = name
 	c.Rom = rom
+	c.RomLen = len(*rom)
 
 	c.Header = NewHeader(c)
 
@@ -94,7 +97,8 @@ func (c *Cartridge) checkAccessRights(arm9 bool) bool {
 func (c *Cartridge) readSave(sav *[]byte, gamecode uint32) {
 	if romData, ok := roms[gamecode]; ok {
 		// in db
-		c.Backup.Size = romData.Size
+		// c.Backup.Size = romData.RomSize
+		c.Backup.Size = getRamSize(romData.BackupType)
 		c.Backup.MemType = romData.BackupType
 	} else {
 		// i believe this are good values
@@ -112,9 +116,9 @@ func (c *Cartridge) readSave(sav *[]byte, gamecode uint32) {
 		}
 	}
 
-	if expectedLen != len(*sav) {
-		panic(fmt.Sprintf("nds: Sav Size != Save File Size %d != %d\n", expectedLen, len(*sav)))
-	}
+	//if sav != nil && expectedLen != len(*sav) {
+	//	panic(fmt.Sprintf("nds: Sav Size != Save File Size expected=%08X != is=%08X\n", expectedLen, len(*sav)))
+	//}
 
 	c.Sav = sav
 }
@@ -280,7 +284,7 @@ func (c *Cartridge) InitSaveLoop() {
 			}
 
 			if c.SaveFlag {
-				file.Write(c.Path, c.Sav)
+				file.Write(c.Path, c.RomName, c.Sav)
 				c.SaveFlag = false
 			}
 		}

@@ -331,5 +331,9 @@ func (g *Game) InitConsole(file string) bool {
 		return true
 	}
 
+	if romType == utils.NONE_ZIP {
+		g.ui.toast.AddMessage("Invalid Zip File")
+	}
+
 	return false
 }

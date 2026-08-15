@@ -16,7 +16,7 @@ func NewHome(g *Game) {
 		file := utils.OpenFile(
 			l.DialogTitle,
 			l.DialogDesc,
-			"gb", "gbc", "gba", "nds",
+			"gb", "gbc", "gba", "nds", "zip",
 		)
 
 		g.InitConsole(file)
