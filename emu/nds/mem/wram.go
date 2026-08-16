@@ -29,7 +29,6 @@ func (w *WRAM) Write9(addr uint32, v uint8) {
 }
 
 func (w *WRAM) Write7(addr uint32, v uint8) {
-
 	if addr >= 0x380_0000 {
 		w.WRAM7[addr&0xFFFF] = v
 		return
@@ -48,7 +47,6 @@ func (w *WRAM) Write7(addr uint32, v uint8) {
 }
 
 func (w *WRAM) Read9(addr uint32) uint8 {
-
 	switch w.CNT {
 	case 0:
 		return w.Wram[addr&0x7FFF]
@@ -64,7 +62,6 @@ func (w *WRAM) Read9(addr uint32) uint8 {
 }
 
 func (w *WRAM) Read7(addr uint32) uint8 {
-
 	if addr >= 0x380_0000 {
 		return w.WRAM7[addr&0xFFFF]
 	}
@@ -83,43 +80,41 @@ func (w *WRAM) Read7(addr uint32) uint8 {
 	return 0
 }
 
-func (w *WRAM) ReadPtr9(addr uint32) (unsafe.Pointer, bool) {
-
+func (w *WRAM) ReadPtr9(addr uint32) unsafe.Pointer {
 	switch w.CNT {
 	case 0:
 		// this fails tcm test rockwrestler
-		return unsafe.Add(unsafe.Pointer(&w.Wram), addr&0x7FFF), true
+		return unsafe.Add(unsafe.Pointer(&w.Wram), addr&0x7FFF)
 	case 1:
-		return unsafe.Add(unsafe.Pointer(&w.Wram), 0x4000+(addr&0x3FFF)), true
+		return unsafe.Add(unsafe.Pointer(&w.Wram), 0x4000+(addr&0x3FFF))
 	case 2:
-		return unsafe.Add(unsafe.Pointer(&w.Wram), addr&0x3FFF), true
+		return unsafe.Add(unsafe.Pointer(&w.Wram), addr&0x3FFF)
 	case 3:
-		return nil, false
+		return nil
 	}
 
-	return nil, false
+	return nil
 }
 
-func (w *WRAM) ReadPtr7(addr uint32) (unsafe.Pointer, bool) {
-
+func (w *WRAM) ReadPtr7(addr uint32) unsafe.Pointer {
 	switch {
 	case addr >= 0x380_0000:
-		return unsafe.Add(unsafe.Pointer(&w.WRAM7), addr&0xFFFF), true
+		return unsafe.Add(unsafe.Pointer(&w.WRAM7), addr&0xFFFF)
 	case addr >= 0x380_0000-0x20:
 		// sonic brotherhood has arm7 use wram at 0x37F_FFFA -> 0x380_0000. Need to cancel read ptr near 0x380_0000
-		return nil, false
+		return nil
 	}
 
 	switch w.CNT {
 	case 0:
-		return unsafe.Add(unsafe.Pointer(&w.WRAM7), addr&0xFFFF), true
+		return unsafe.Add(unsafe.Pointer(&w.WRAM7), addr&0xFFFF)
 	case 1:
-		return unsafe.Add(unsafe.Pointer(&w.Wram), addr&0x3FFF), true
+		return unsafe.Add(unsafe.Pointer(&w.Wram), addr&0x3FFF)
 	case 2:
-		return unsafe.Add(unsafe.Pointer(&w.Wram), 0x4000+(addr&0x3FFF)), true
+		return unsafe.Add(unsafe.Pointer(&w.Wram), 0x4000+(addr&0x3FFF))
 	case 3:
-		return unsafe.Add(unsafe.Pointer(&w.Wram), addr&0x7FFF), true
+		return unsafe.Add(unsafe.Pointer(&w.Wram), addr&0x7FFF)
 	}
 
-	return nil, false
+	return nil
 }

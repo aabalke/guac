@@ -1,13 +1,18 @@
-package gba
+package timer
+
+import (
+	"github.com/aabalke/guac/emu/scheduler"
+)
 
 var freqShifts = [...]uint8{0, 6, 8, 10}
 
 type Timer struct {
-	Gba     *GBA
-	Idx     int
-	From    int64
-	Counter uint32
-	Reload  uint16
+	scheduler       *scheduler.Scheduler
+	OnTimerOverflow func(t *Timer, late int64)
+	Idx             int
+	From            int64
+	Counter         uint32
+	Reload          uint16
 
 	FreqShift uint8
 	Cnt       uint8
@@ -15,17 +20,27 @@ type Timer struct {
 	Cascade   bool
 	Enabled   bool
 	Running   bool
+
+	events Events
 }
 
-func NewTimer(gba *GBA, idx int) *Timer {
+type Events struct {
+	Reload   scheduler.Event
+	Control  scheduler.Event
+	Overflow []scheduler.Event
+}
+
+func NewTimer(scheduler *scheduler.Scheduler, events Events, OnTimerOverflow func(t *Timer, late int64), idx int) *Timer {
 	return &Timer{
-		Gba: gba,
-		Idx: idx,
+		scheduler:       scheduler,
+		OnTimerOverflow: OnTimerOverflow,
+		Idx:             idx,
+		events:          events,
 	}
 }
 
 func (t *Timer) Delta(late int64) uint32 {
-	return uint32((t.Gba.Scheduler.Now()-late)-t.From) >> t.FreqShift
+	return uint32((t.scheduler.Now()-late)-t.From) >> t.FreqShift
 }
 
 func (t *Timer) GetCounter() uint32 {
@@ -66,17 +81,17 @@ func (t *Timer) Read16(idx int) uint16 {
 func (t *Timer) Write(idx int, v uint8) {
 	switch idx {
 	case 0:
-		t.Gba.Scheduler.Schedule(EVENT_TIMER_RELOAD, 1, 1, t.ReloadEventLo, v)
+		t.scheduler.Schedule(t.events.Reload, 1, 1, t.ReloadEventLo, v)
 	case 1:
-		t.Gba.Scheduler.Schedule(EVENT_TIMER_RELOAD, 1, 1, t.ReloadEventHi, v)
+		t.scheduler.Schedule(t.events.Reload, 1, 1, t.ReloadEventHi, v)
 	case 2:
-		t.Gba.Scheduler.Schedule(EVENT_TIMER_CONTROL, 2, 1, t.ControlEvent, v)
+		t.scheduler.Schedule(t.events.Control, 2, 1, t.ControlEvent, v)
 	}
 }
 
 func (t *Timer) Write16(idx uint32, v uint16) {
 	if idx == 2 {
-		t.Gba.Scheduler.Schedule(EVENT_TIMER_RELOAD, 1, 1, func(late int64, a any) {
+		t.scheduler.Schedule(t.events.Control, 1, 1, func(late int64, a any) {
 			v := a.(uint16)
 			t.ControlEvent(late, uint8(v))
 		}, v)
@@ -84,7 +99,7 @@ func (t *Timer) Write16(idx uint32, v uint16) {
 		return
 	}
 
-	t.Gba.Scheduler.Schedule(EVENT_TIMER_RELOAD, 1, 1, func(late int64, a any) {
+	t.scheduler.Schedule(t.events.Reload, 1, 1, func(late int64, a any) {
 		v := a.(uint16)
 		t.ReloadEventLo(late, uint8(v))
 		t.ReloadEventHi(late, uint8(v>>8))
@@ -92,7 +107,7 @@ func (t *Timer) Write16(idx uint32, v uint16) {
 }
 
 func (t *Timer) Write32(v uint32) {
-	t.Gba.Scheduler.Schedule(EVENT_TIMER_CONTROL, 1, 1, func(late int64, a any) {
+	t.scheduler.Schedule(t.events.Control, 1, 1, func(late int64, a any) {
 		v := a.(uint32)
 		t.ReloadEventLo(late, uint8(v))
 		t.ReloadEventHi(late, uint8(v>>8))
@@ -131,7 +146,7 @@ func (t *Timer) ControlEvent(late int64, argz any) {
 		return
 	}
 
-	offset := (t.Gba.Scheduler.Now() - late) & ((int64(1) << t.FreqShift) - 1)
+	offset := (t.scheduler.Now() - late) & ((int64(1) << t.FreqShift) - 1)
 
 	if prevEnabled {
 		if t.Cnt&0x4 == 0 {
@@ -152,72 +167,28 @@ func (t *Timer) ControlEvent(late int64, argz any) {
 
 func (t *Timer) Start(cycles int64) {
 	t.Running = true
-	t.From = t.Gba.Scheduler.Now() - cycles
+	t.From = t.scheduler.Now() - cycles
 	until := int64((0x10000-t.Counter)<<t.FreqShift) - cycles
-	t.Gba.Scheduler.Schedule(OVERFLOW_EVENTS[t.Idx], 0, until, t.Overflow, nil)
+	t.scheduler.Schedule(t.events.Overflow[t.Idx], 0, until, t.Overflow, nil)
 }
 
 func (t *Timer) Stop(late int64) {
 	t.Counter += t.Delta(late)
 	if t.Counter >= 0x10000 {
-		t._Overflow(late)
+		t.OverflowHandle(late)
 	}
 
-	t.Gba.Scheduler.Cancel(OVERFLOW_EVENTS[t.Idx])
+	t.scheduler.Cancel(t.events.Overflow[t.Idx])
 
 	t.Running = false
 }
 
 func (t *Timer) Overflow(late int64, _ any) {
-	t._Overflow(late)
+	t.OverflowHandle(late)
 	t.Start(late)
 }
 
-func (t *Timer) _Overflow(late int64) {
+func (t *Timer) OverflowHandle(late int64) {
 	t.Counter = uint32(t.Reload)
-	t.OnTimerOverflow(late)
-}
-
-func (t *Timer) OnTimerOverflow(late int64) {
-	if t.Irq {
-		t.Gba.Irq.SetIRQ(3 + uint32(t.Idx))
-	}
-
-	if t.Idx < 2 && t.Gba.Apu.Enabled {
-		if aTick := (t.Gba.Apu.SoundCntH>>10)&1 == uint16(t.Idx); aTick {
-			fifo := &t.Gba.Apu.FifoA
-
-			fifo.Load()
-
-			if refill := fifo.Count <= 3; refill {
-				ch := t.Gba.Dma.Chs[1]
-				if ch.Enabled && ch.Mode == DMA_MODE_SPE {
-					t.Gba.Scheduler.Schedule(DMA_EVENTS[1], 0, 2-late, ch.Start, nil)
-				}
-			}
-		}
-
-		if bTick := (t.Gba.Apu.SoundCntH>>14)&1 == uint16(t.Idx); bTick {
-
-			fifo := &t.Gba.Apu.FifoB
-			fifo.Load()
-
-			if refill := fifo.Count <= 3; refill {
-				ch := t.Gba.Dma.Chs[2]
-				if ch.Enabled && ch.Mode == DMA_MODE_SPE {
-					t.Gba.Scheduler.Schedule(DMA_EVENTS[2], 0, 2-late, ch.Start, nil)
-				}
-			}
-
-		}
-	}
-
-	if t.Idx != 3 {
-		if next := t.Gba.Timers[t.Idx+1]; next.Enabled && next.Cascade {
-			next.Counter++
-			if next.Counter >= 0x10000 {
-				next._Overflow(late)
-			}
-		}
-	}
+	t.OnTimerOverflow(t, late)
 }

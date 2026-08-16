@@ -12,6 +12,7 @@ import (
 	"github.com/aabalke/guac/emu/gba/apu"
 	"github.com/aabalke/guac/emu/gba/cart"
 	"github.com/aabalke/guac/emu/gba/cpu"
+	"github.com/aabalke/guac/emu/gba/timer"
 	"github.com/aabalke/guac/emu/scheduler"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
@@ -60,7 +61,7 @@ type GBA struct {
 	Mem               *Memory
 	Cartridge         *cart.Cartridge
 	PPU               *PPU
-	Timers            [4]*Timer
+	Timers            [4]*timer.Timer
 	Dma               *Dma
 	Apu               *apu.Apu
 	Irq               *Irq
@@ -94,7 +95,7 @@ func NewGBA(ctx *audio.Context, path string, muted bool) *GBA {
 	gba.Irq.IME = true
 
 	for i := range 4 {
-		gba.Timers[i] = NewTimer(gba, i)
+		gba.Timers[i] = timer.NewTimer(gba.Scheduler, TimerEvents, gba.OnTimerOverflow, i)
 	}
 
 	gba.Dma = NewDma(gba)
@@ -288,4 +289,48 @@ func (gba *GBA) FPS() float64 {
 	}
 
 	return 0
+}
+
+func (gba *GBA) OnTimerOverflow(t *timer.Timer, late int64) {
+	if t.Irq {
+		gba.Irq.SetIRQ(3 + uint32(t.Idx))
+	}
+
+	if t.Idx < 2 && gba.Apu.Enabled {
+		if aTick := (gba.Apu.SoundCntH>>10)&1 == uint16(t.Idx); aTick {
+			fifo := &gba.Apu.FifoA
+
+			fifo.Load()
+
+			if refill := fifo.Count <= 3; refill {
+				ch := gba.Dma.Chs[1]
+				if ch.Enabled && ch.Mode == DMA_MODE_SPE {
+					gba.Scheduler.Schedule(DMA_EVENTS[1], 0, 2-late, ch.Start, nil)
+				}
+			}
+		}
+
+		if bTick := (gba.Apu.SoundCntH>>14)&1 == uint16(t.Idx); bTick {
+
+			fifo := &gba.Apu.FifoB
+			fifo.Load()
+
+			if refill := fifo.Count <= 3; refill {
+				ch := gba.Dma.Chs[2]
+				if ch.Enabled && ch.Mode == DMA_MODE_SPE {
+					gba.Scheduler.Schedule(DMA_EVENTS[2], 0, 2-late, ch.Start, nil)
+				}
+			}
+
+		}
+	}
+
+	if t.Idx != 3 {
+		if next := gba.Timers[t.Idx+1]; next.Enabled && next.Cascade {
+			next.Counter++
+			if next.Counter >= 0x10000 {
+				next.OverflowHandle(late)
+			}
+		}
+	}
 }

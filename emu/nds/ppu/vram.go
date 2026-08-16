@@ -42,7 +42,6 @@ type VRAM struct {
 }
 
 func (v *VRAM) Init(t *rast.TextureCache, a, b *Engine) {
-
 	v.engineA = a
 	v.engineB = b
 	v.TextureCache = t
@@ -92,7 +91,6 @@ func (vc *VramCnt) Write(v uint8) {
 }
 
 func (vm *VRAM) WriteCnt(addr uint32, v uint8) {
-
 	switch addr {
 	case 0x240:
 
@@ -316,7 +314,6 @@ func (vm *VRAM) WriteCnt(addr uint32, v uint8) {
 }
 
 func (vm *VRAM) Write7(addr uint32, v uint8) {
-
 	addr &= 0xFF_FFFF
 
 	cnt := &vm.Cnt[C]
@@ -333,7 +330,6 @@ func (vm *VRAM) Write7(addr uint32, v uint8) {
 }
 
 func (vm *VRAM) Write9(addr uint32, v uint8) {
-
 	addr &= 0xFF_FFFF
 
 	for i := range len(vm.Cnt) {
@@ -357,7 +353,6 @@ func (vm *VRAM) Write9(addr uint32, v uint8) {
 }
 
 func (vm *VRAM) Read7(addr uint32) uint8 {
-
 	addr &= 0xFF_FFFF
 
 	cnt := &vm.Cnt[C]
@@ -374,7 +369,6 @@ func (vm *VRAM) Read7(addr uint32) uint8 {
 }
 
 func (vm *VRAM) Read9(addr uint32) uint8 {
-
 	addr &= 0xFF_FFFF
 
 	for i := range len(vm.Cnt) {
@@ -393,25 +387,23 @@ func (vm *VRAM) Read9(addr uint32) uint8 {
 	return 0
 }
 
-func (vm *VRAM) ReadPtr7(addr uint32) (unsafe.Pointer, bool) {
-
+func (vm *VRAM) ReadPtr7(addr uint32) unsafe.Pointer {
 	addr &= 0xFF_FFFF
 
 	cnt := &vm.Cnt[C]
 	if cnt.Enabled && cnt.arm7 && addr >= (cnt.Ofs*cnt.Size) {
-		return unsafe.Add(cnt.bank, addr&0x1FFFF), true
+		return unsafe.Add(cnt.bank, addr&0x1FFFF)
 	}
 
 	cnt = &vm.Cnt[D]
 	if cnt.Enabled && cnt.arm7 && addr >= (cnt.Ofs*cnt.Size) {
-		return unsafe.Add(cnt.bank, addr&0x1FFFF), true
+		return unsafe.Add(cnt.bank, addr&0x1FFFF)
 	}
 
-	return nil, false
+	return nil
 }
 
-func (vm *VRAM) ReadPtr9(addr uint32) (unsafe.Pointer, bool) {
-
+func (vm *VRAM) ReadPtr9(addr uint32) unsafe.Pointer {
 	addr &= 0xFF_FFFF
 
 	for i := range len(vm.Cnt) {
@@ -423,15 +415,14 @@ func (vm *VRAM) ReadPtr9(addr uint32) (unsafe.Pointer, bool) {
 		}
 
 		if addr >= cnt.Base && addr < cnt.Base+cnt.Size {
-			return unsafe.Add(cnt.bank, addr-cnt.Base), true
+			return unsafe.Add(cnt.bank, addr-cnt.Base)
 		}
 	}
 
-	return nil, false
+	return nil
 }
 
 func (vm *VRAM) ReadGraphicalPtr(addr uint32) unsafe.Pointer {
-
 	for i := range len(vm.Cnt) {
 
 		cnt := &vm.Cnt[i]
@@ -453,7 +444,6 @@ func (vm *VRAM) ReadGraphicalPtr(addr uint32) unsafe.Pointer {
 }
 
 func (vm *VRAM) Read16(addr uint32) uint16 {
-
 	// only should be used in 2d graphics
 
 	for i := range len(vm.Cnt) {
@@ -477,7 +467,6 @@ func (vm *VRAM) Read16(addr uint32) uint16 {
 }
 
 func (vm *VRAM) ReadTexture(addr uint32) uint8 {
-
 	region := addr >> 17
 
 	if region >= 4 {
@@ -492,7 +481,6 @@ func (vm *VRAM) ReadTexture(addr uint32) uint8 {
 }
 
 func (vm *VRAM) ReadPalTexture(addr uint32) uint8 {
-
 	region := addr >> 14
 
 	if region >= 6 {

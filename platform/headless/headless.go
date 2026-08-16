@@ -26,7 +26,7 @@ func StartHeadless() {
 	case utils.NDS:
 		nds := nds.NewNds(nil, path, true)
 		for {
-			nds.Update(false)
+			nds.Update()
 		}
 	}
 }

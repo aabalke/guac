@@ -1,6 +1,9 @@
 package gba
 
-import "github.com/aabalke/guac/emu/scheduler"
+import (
+	"github.com/aabalke/guac/emu/gba/timer"
+	"github.com/aabalke/guac/emu/scheduler"
+)
 
 const (
 	EVENT_VBK scheduler.Event = iota
@@ -28,10 +31,20 @@ const (
 	EVENT_APU_NOISE
 )
 
+var TimerEvents = timer.Events{
+	Reload:  EVENT_TIMER_RELOAD,
+	Control: EVENT_TIMER_CONTROL,
+	Overflow: []scheduler.Event{
+		EVENT_TIMER_OVERFLOW0,
+		EVENT_TIMER_OVERFLOW1,
+		EVENT_TIMER_OVERFLOW2,
+		EVENT_TIMER_OVERFLOW3,
+	},
+}
+
 var (
-	APU_EVENTS      = [4]scheduler.Event{EVENT_APU_TONE1, EVENT_APU_TONE2, EVENT_APU_WAVE, EVENT_APU_NOISE}
-	DMA_EVENTS      = [4]scheduler.Event{EVENT_DMA0, EVENT_DMA1, EVENT_DMA2, EVENT_DMA3}
-	OVERFLOW_EVENTS = [4]scheduler.Event{EVENT_TIMER_OVERFLOW0, EVENT_TIMER_OVERFLOW1, EVENT_TIMER_OVERFLOW2, EVENT_TIMER_OVERFLOW3}
+	APU_EVENTS = [4]scheduler.Event{EVENT_APU_TONE1, EVENT_APU_TONE2, EVENT_APU_WAVE, EVENT_APU_NOISE}
+	DMA_EVENTS = [4]scheduler.Event{EVENT_DMA0, EVENT_DMA1, EVENT_DMA2, EVENT_DMA3}
 )
 
 func (gba *GBA) ClockApuChannel(late int64, arg any) {

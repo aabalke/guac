@@ -105,7 +105,6 @@ func (dma *DMA) WriteDst(v uint8, byte uint32) {
 }
 
 func (dma *DMA) WriteCount(v uint8, hi bool) {
-
 	if hi {
 		dma.WordCount = (dma.WordCount & 0xFF) | (uint32(v) << 8)
 		return
@@ -115,7 +114,6 @@ func (dma *DMA) WriteCount(v uint8, hi bool) {
 }
 
 func (dma *DMA) WriteControl(v uint8, hi bool) {
-
 	if hi {
 		wasDisabled := !dma.Enabled
 		dma.Control = (dma.Control & 0xFF) | uint32(v)<<8
@@ -150,7 +148,6 @@ func (dma *DMA) disable() {
 }
 
 func (dma *DMA) Transfer() {
-
 	var (
 		mem       = dma.mem
 		count     = dma.WordCount
@@ -191,18 +188,18 @@ func (dma *DMA) Transfer() {
 		panic("DMA SRC SET TO PROHIBITTED")
 	}
 
-	srcPtr, _ := mem.ReadPtr(tmpSrc, dma.arm9)
+	srcPtr := mem.ReadPtr(tmpSrc, dma.arm9)
 	if srcPtr != nil {
 		top := uint32(int(tmpSrc) + srcOffset*int(count))
-		if _, ok := mem.ReadPtr(top, dma.arm9); !ok {
+		if srcTop := mem.ReadPtr(top, dma.arm9); srcTop == nil {
 			srcPtr = nil
 		}
 	}
 
-	dstPtr, _ := mem.WritePtr(tmpDst, dma.arm9)
+	dstPtr := mem.WritePtr(tmpDst, dma.arm9)
 	if dstPtr != nil {
 		top := uint32(int(tmpDst) + dstOffset*int(count))
-		if _, ok := mem.WritePtr(top, dma.arm9); !ok {
+		if dstTop := mem.WritePtr(top, dma.arm9); dstTop == nil {
 			dstPtr = nil
 		}
 	}
@@ -277,7 +274,6 @@ func (dma *DMA) CheckMode(mode uint32) bool {
 }
 
 func (dma *DMA) GamecartTransfer(arm9, initial bool) {
-
 	const GC_SRC = 0x4100010
 
 	if !dma.Enabled {
@@ -331,7 +327,6 @@ func (dma *DMA) GamecartTransfer(arm9, initial bool) {
 }
 
 func (dma *DMA) GxTransfer() {
-
 	if dma.Dst != 0x400_0400 || dma.DstAdj != DMA_ADJ_NON || !dma.isWord {
 		dma.Transfer()
 		return
@@ -358,8 +353,8 @@ func (dma *DMA) GxTransfer() {
 	mem := dma.mem
 	tmpSrc := int(dma.Src &^ 0b11)
 
-	ptr, ok := mem.ReadPtr(uint32(tmpSrc), dma.arm9)
-	if !ok {
+	ptr := mem.ReadPtr(uint32(tmpSrc), dma.arm9)
+	if ptr == nil {
 		for range count {
 			mem.WriteGXFIFO(mem.Read32(uint32(tmpSrc), dma.arm9))
 			tmpSrc += srcOffset
@@ -391,11 +386,11 @@ type MemoryInterface interface {
 	Write8(addr uint32, v uint8, arm9 bool)
 	Write16(addr uint32, v uint16, arm9 bool)
 	Write32(addr uint32, v uint32, arm9 bool)
-	WritePtr(addr uint32, arm9 bool) (unsafe.Pointer, bool)
+	WritePtr(addr uint32, arm9 bool) unsafe.Pointer
 	WriteGXFIFO(v uint32)
 
 	Read8(addr uint32, arm9 bool) uint32
 	Read16(addr uint32, arm9 bool) uint32
 	Read32(addr uint32, arm9 bool) uint32
-	ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool)
+	ReadPtr(addr uint32, arm9 bool) unsafe.Pointer
 }

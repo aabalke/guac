@@ -260,7 +260,7 @@ func (cpu *Cpu) GetOpArm() (uint32, int) {
 
 	if sequential := cpu.PcPtr == nil; sequential {
 		cpu.BranchPc = r[PC]
-		if p, ok := cpu.mem.ReadPtr(r[PC]); ok {
+		if p := cpu.mem.ReadPtr(r[PC]); p != nil {
 			cpu.PcPtr = p
 		} else {
 			return cpu.mem.Read32(r[PC]), 0
@@ -294,7 +294,7 @@ func (cpu *Cpu) GetOpThumb() (uint16, int) {
 	}
 
 	if sequential := cpu.PcPtr == nil; sequential {
-		if p, ok := cpu.mem.ReadPtr(r[PC]); ok {
+		if p := cpu.mem.ReadPtr(r[PC]); p != nil {
 			cpu.BranchPc = r[PC]
 			cpu.PcPtr = p
 		} else {

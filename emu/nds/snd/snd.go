@@ -46,10 +46,6 @@ type Snd struct {
 
 	Channels [16]Channel
 	Capture  [2]Capture
-
-	sndCycles uint32
-
-	SampCycles int
 }
 
 func NewSnd(ctx *audio.Context, bufferSize time.Duration) *Snd {
@@ -115,40 +111,32 @@ func (s *Snd) Close() {
 	}
 }
 
-func (s *Snd) SoundClock(cycles uint32) {
-	s.sndCycles += cycles
+func (s *Snd) SoundClock() {
+	l, r := float64(0), float64(0)
 
-	for s.sndCycles >= uint32(s.SampCycles) {
-
-		l := float64(0)
-		r := float64(0)
-
-		if s.Enabled {
-			for i := range 16 {
-				c := &s.Channels[i]
-				cl, cr := c.GetSample()
-				l += float64(cl)
-				r += float64(cr)
-			}
-
-			if mixCapture := !s.Capture[0].ChanSrc; mixCapture {
-				s.Capture[0].Capture(l)
-			}
-			if mixCapture := !s.Capture[1].ChanSrc; mixCapture {
-				s.Capture[1].Capture(r)
-			}
-
-			l = (float64(l) * float64(s.VolMaster))
-			r = (float64(r) * float64(s.VolMaster))
+	if s.Enabled {
+		for i := range 16 {
+			c := &s.Channels[i]
+			cl, cr := c.GetSample()
+			l += float64(cl)
+			r += float64(cr)
 		}
 
-		l *= 50
-		r *= 50
+		if mixCapture := !s.Capture[0].ChanSrc; mixCapture {
+			s.Capture[0].Capture(l)
+		}
+		if mixCapture := !s.Capture[1].ChanSrc; mixCapture {
+			s.Capture[1].Capture(r)
+		}
 
-		s.Stream.Write(int16(clip(int32(l))), int16(clip(int32(r))))
-
-		s.sndCycles -= uint32(s.SampCycles)
+		l = (float64(l) * float64(s.VolMaster))
+		r = (float64(r) * float64(s.VolMaster))
 	}
+
+	l *= 50
+	r *= 50
+
+	s.Stream.Write(int16(clip(int32(l))), int16(clip(int32(r))))
 }
 
 //go:inline

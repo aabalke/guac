@@ -9,6 +9,7 @@ import (
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/bios"
 	"github.com/aabalke/guac/emu/cpu"
+	"github.com/aabalke/guac/emu/gba/timer"
 	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/nds/mem/spi"
@@ -52,7 +53,7 @@ type Mem struct {
 	PowCnt      PowCnt
 	BiosProt    BiosProt
 	WifiWaitCnt WifiWaitCnt
-	Timers      [8]Timer
+	Timers      [8]*timer.Timer
 
 	Jit7, Jit9 Jit
 
@@ -64,27 +65,27 @@ type Bus7 struct {
 	M *Mem
 }
 
-func (b *Bus7) Read8(addr uint32) uint32                    { return b.M.Read8(addr, false) }
-func (b *Bus7) Read16(addr uint32) uint32                   { return b.M.Read16(addr, false) }
-func (b *Bus7) Read32(addr uint32) uint32                   { return b.M.Read32(addr, false) }
-func (b *Bus7) ReadPtr(addr uint32) (unsafe.Pointer, bool)  { return b.M.ReadPtr(addr, false) }
-func (b *Bus7) Write8(addr uint32, v uint8)                 { b.M.Write8(addr, v, false) }
-func (b *Bus7) Write16(addr uint32, v uint16)               { b.M.Write16(addr, v, false) }
-func (b *Bus7) Write32(addr, v uint32)                      { b.M.Write32(addr, v, false) }
-func (b *Bus7) WritePtr(addr uint32) (unsafe.Pointer, bool) { return b.M.WritePtr(addr, false) }
+func (b *Bus7) Read8(addr uint32) uint32            { return b.M.Read8(addr, false) }
+func (b *Bus7) Read16(addr uint32) uint32           { return b.M.Read16(addr, false) }
+func (b *Bus7) Read32(addr uint32) uint32           { return b.M.Read32(addr, false) }
+func (b *Bus7) ReadPtr(addr uint32) unsafe.Pointer  { return b.M.ReadPtr(addr, false) }
+func (b *Bus7) Write8(addr uint32, v uint8)         { b.M.Write8(addr, v, false) }
+func (b *Bus7) Write16(addr uint32, v uint16)       { b.M.Write16(addr, v, false) }
+func (b *Bus7) Write32(addr, v uint32)              { b.M.Write32(addr, v, false) }
+func (b *Bus7) WritePtr(addr uint32) unsafe.Pointer { return b.M.WritePtr(addr, false) }
 
 type Bus9 struct {
 	M *Mem
 }
 
-func (b *Bus9) Read8(addr uint32) uint32                    { return b.M.Read8(addr, true) }
-func (b *Bus9) Read16(addr uint32) uint32                   { return b.M.Read16(addr, true) }
-func (b *Bus9) Read32(addr uint32) uint32                   { return b.M.Read32(addr, true) }
-func (b *Bus9) ReadPtr(addr uint32) (unsafe.Pointer, bool)  { return b.M.ReadPtr(addr, true) }
-func (b *Bus9) Write8(addr uint32, v uint8)                 { b.M.Write8(addr, v, true) }
-func (b *Bus9) Write16(addr uint32, v uint16)               { b.M.Write16(addr, v, true) }
-func (b *Bus9) Write32(addr, v uint32)                      { b.M.Write32(addr, v, true) }
-func (b *Bus9) WritePtr(addr uint32) (unsafe.Pointer, bool) { return b.M.WritePtr(addr, true) }
+func (b *Bus9) Read8(addr uint32) uint32            { return b.M.Read8(addr, true) }
+func (b *Bus9) Read16(addr uint32) uint32           { return b.M.Read16(addr, true) }
+func (b *Bus9) Read32(addr uint32) uint32           { return b.M.Read32(addr, true) }
+func (b *Bus9) ReadPtr(addr uint32) unsafe.Pointer  { return b.M.ReadPtr(addr, true) }
+func (b *Bus9) Write8(addr uint32, v uint8)         { b.M.Write8(addr, v, true) }
+func (b *Bus9) Write16(addr uint32, v uint16)       { b.M.Write16(addr, v, true) }
+func (b *Bus9) Write32(addr, v uint32)              { b.M.Write32(addr, v, true) }
+func (b *Bus9) WritePtr(addr uint32) unsafe.Pointer { return b.M.WritePtr(addr, true) }
 
 type (
 	BiosProt    uint16
@@ -228,10 +229,34 @@ func (mem *Mem) Read8(addr uint32, arm9 bool) uint32 {
 }
 
 func (mem *Mem) Read16(addr uint32, arm9 bool) uint32 {
+	if arm9 {
+		switch addr {
+		case 0x400_0100, 0x400_0102:
+			return uint32(mem.Timers[0].Read16(int(addr & 3)))
+		case 0x400_0104, 0x400_0106:
+			return uint32(mem.Timers[1].Read16(int(addr & 3)))
+		case 0x400_0108, 0x400_010A:
+			return uint32(mem.Timers[2].Read16(int(addr & 3)))
+		case 0x400_010c, 0x400_010E:
+			return uint32(mem.Timers[3].Read16(int(addr & 3)))
+		}
+	} else {
+		switch addr {
+		case 0x400_0100, 0x400_0102:
+			return uint32(mem.Timers[4].Read16(int(addr & 3)))
+		case 0x400_0104, 0x400_0106:
+			return uint32(mem.Timers[5].Read16(int(addr & 3)))
+		case 0x400_0108, 0x400_010A:
+			return uint32(mem.Timers[6].Read16(int(addr & 3)))
+		case 0x400_010c, 0x400_010E:
+			return uint32(mem.Timers[7].Read16(int(addr & 3)))
+		}
+	}
+
 	if !arm9 && addr >= 0x480_0000 && addr < 0x490_0000 {
 		return uint32(mem.Wifi.Read16(addr))
 	}
-	if ptr, ok := mem.ReadPtr(addr, arm9); ok {
+	if ptr := mem.ReadPtr(addr, arm9); ptr != nil {
 		return uint32(binary.LittleEndian.Uint16((*[4]uint8)(ptr)[:]))
 	}
 	return uint32(mem.Read(addr, arm9)) | (uint32(mem.Read(addr+1, arm9)) << 8)
@@ -245,7 +270,7 @@ func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
 		return mem.Cartridge.ReadCmdIn(arm9)
 	default:
 
-		if ptr, ok := mem.ReadPtr(addr, arm9); ok {
+		if ptr := mem.ReadPtr(addr, arm9); ptr != nil {
 			return binary.LittleEndian.Uint32((*[4]uint8)(ptr)[:])
 		}
 
@@ -256,86 +281,86 @@ func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
 	}
 }
 
-func (mem *Mem) WritePtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
+func (mem *Mem) WritePtr(addr uint32, arm9 bool) unsafe.Pointer {
 	mem.Jit7.InvalidatePage(addr)
 	mem.Jit9.InvalidatePage(addr)
 
 	if arm9 {
 
-		if v, ok := mem.Tcm.ReadTcmWindowPtr(addr); ok {
-			return v, ok
+		if ptr := mem.Tcm.ReadTcmWindowPtr(addr); ptr != nil {
+			return ptr
 		}
 
 		switch addr >> 24 {
 		case 0x0, 0x1:
 			return mem.Tcm.ReadPtr(addr)
 		case 0x2:
-			return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr&0x3F_FFFF), true
+			return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr&0x3F_FFFF)
 		case 0x3:
 			return mem.WRAM.ReadPtr9(addr)
 		case 0x6:
 			return mem.Ppu.Vram.ReadPtr9(addr) // this may break things
 		}
 
-		return nil, false
+		return nil
 	}
 
 	switch addr >> 24 {
 	case 0x2:
-		return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr&0x3F_FFFF), true
+		return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr&0x3F_FFFF)
 	case 0x3:
 		return mem.WRAM.ReadPtr7(addr)
 	case 0x6:
 		return mem.Ppu.Vram.ReadPtr7(addr)
 	default:
-		return nil, false
+		return nil
 	}
 }
 
-func (mem *Mem) ReadPtr(addr uint32, arm9 bool) (unsafe.Pointer, bool) {
+func (mem *Mem) ReadPtr(addr uint32, arm9 bool) unsafe.Pointer {
 	if arm9 {
 
-		if v, ok := mem.Tcm.ReadTcmWindowPtr(addr); ok {
-			return v, ok
+		if ptr := mem.Tcm.ReadTcmWindowPtr(addr); ptr != nil {
+			return ptr
 		}
 
 		switch addr >> 24 {
 		case 0x0, 0x1:
 			return mem.Tcm.ReadPtr(addr)
 		case 0x2:
-			return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr&0x3F_FFFF), true
+			return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr&0x3F_FFFF)
 		case 0x3:
 			return mem.WRAM.ReadPtr9(addr)
 		case 0x5:
-			return nil, false
+			return nil
 		case 0x6:
 			return mem.Ppu.Vram.ReadPtr9(addr)
 		case 0x7:
-			return unsafe.Add(unsafe.Pointer(&mem.Oam), addr&0x7FF), true
+			return unsafe.Add(unsafe.Pointer(&mem.Oam), addr&0x7FF)
 		case 0xFF:
-			return unsafe.Add(unsafe.Pointer(&(*mem.Arm9Bios)[0]), addr&0x0FFF), true
+			return unsafe.Add(unsafe.Pointer(&(*mem.Arm9Bios)[0]), addr&0x0FFF)
 		}
 
-		return nil, false
+		return nil
 	}
 
 	switch addr >> 24 {
 	case 0x0:
 
 		if addr < 0x4000 { // do not limit based on pc, messes up jit arm7
-			return unsafe.Add(unsafe.Pointer(&(*mem.Arm7Bios)[0]), addr), true
+			return unsafe.Add(unsafe.Pointer(&(*mem.Arm7Bios)[0]), addr)
 		}
 
-		return nil, false
+		return nil
 
 	case 0x2:
-		return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr&0x3F_FFFF), true
+		return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr&0x3F_FFFF)
 	case 0x3:
 		return mem.WRAM.ReadPtr7(addr)
 	case 0x6:
 		return mem.Ppu.Vram.ReadPtr7(addr)
 	default:
-		return nil, false
+		return nil
 	}
 }
 
@@ -389,12 +414,44 @@ func (mem *Mem) Write8(addr uint32, v uint8, arm9 bool) {
 }
 
 func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
-	if !arm9 && addr >= 0x480_0000 && addr < 0x490_0000 {
-		mem.Wifi.Write16(addr, v)
-		return
+	if arm9 {
+		switch addr {
+		case 0x400_0100, 0x400_0102:
+			mem.Timers[0].Write16(addr&3, v)
+			return
+		case 0x400_0104, 0x400_0106:
+			mem.Timers[1].Write16(addr&3, v)
+			return
+		case 0x400_0108, 0x400_010A:
+			mem.Timers[2].Write16(addr&3, v)
+			return
+		case 0x400_010C, 0x400_010E:
+			mem.Timers[3].Write16(addr&3, v)
+			return
+		}
+	} else {
+		switch addr {
+		case 0x400_0100, 0x400_0102:
+			mem.Timers[4].Write16(addr&3, v)
+			return
+		case 0x400_0104, 0x400_0106:
+			mem.Timers[5].Write16(addr&3, v)
+			return
+		case 0x400_0108, 0x400_010A:
+			mem.Timers[6].Write16(addr&3, v)
+			return
+		case 0x400_010C, 0x400_010E:
+			mem.Timers[7].Write16(addr&3, v)
+			return
+		}
+
+		if addr >= 0x480_0000 && addr < 0x490_0000 {
+			mem.Wifi.Write16(addr, v)
+			return
+		}
 	}
 
-	if ptr, ok := mem.WritePtr(addr, arm9); ok {
+	if ptr := mem.WritePtr(addr, arm9); ptr != nil {
 		binary.LittleEndian.PutUint16((*[4]uint8)(ptr)[:], v)
 		return
 	}
@@ -405,7 +462,6 @@ func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
 
 func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
 	if arm9 {
-
 		if geo := addr >= 0x4000440 && addr < 0x4000600; geo {
 			mem.Ppu.Rasterizer.GeoCmd(addr, v)
 			return
@@ -415,13 +471,43 @@ func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
 			mem.Ppu.Rasterizer.GeoEngine.Fifo(v)
 			return
 		}
+
+		switch addr {
+		case 0x400_0100:
+			mem.Timers[0].Write32(v)
+			return
+		case 0x400_0104:
+			mem.Timers[1].Write32(v)
+			return
+		case 0x400_0108:
+			mem.Timers[2].Write32(v)
+			return
+		case 0x400_010c:
+			mem.Timers[3].Write32(v)
+			return
+		}
+	} else {
+		switch addr {
+		case 0x400_0100:
+			mem.Timers[4].Write32(v)
+			return
+		case 0x400_0104:
+			mem.Timers[5].Write32(v)
+			return
+		case 0x400_0108:
+			mem.Timers[6].Write32(v)
+			return
+		case 0x400_010c:
+			mem.Timers[7].Write32(v)
+			return
+		}
 	}
 
 	switch addr {
 	case 0x400_0188:
 		mem.Ipc.WriteFifo(v, arm9)
 	default:
-		if ptr, ok := mem.WritePtr(addr, arm9); ok {
+		if ptr := mem.WritePtr(addr, arm9); ptr != nil {
 			binary.LittleEndian.PutUint32((*[4]uint8)(ptr)[:], v)
 			return
 		}
@@ -454,6 +540,14 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 		return mem.ReadDma(mem.dma9, addr)
 	case (addr >= 0x320 && addr < 0x6A3) || (addr&^1 == 0x60):
 		return mem.Ppu.Rasterizer.Read(addr)
+
+	case addr >= 0x100 && addr < 0x110:
+
+		addr -= 0x100
+		i := addr / 4
+		addr &= 3
+
+		return mem.Timers[i].Read(int(addr))
 	}
 
 	switch addr {
@@ -486,39 +580,6 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 		return mem.Ppu.EngineB.MasterBright.Read(0)
 	case 0x106D:
 		return mem.Ppu.EngineB.MasterBright.Read(1)
-
-	case 0x100:
-		return mem.Timers[0].ReadD(false)
-	case 0x101:
-		return mem.Timers[0].ReadD(true)
-	case 0x102:
-		return mem.Timers[0].ReadCnt(false)
-	case 0x103:
-		return mem.Timers[0].ReadCnt(true)
-	case 0x104:
-		return mem.Timers[1].ReadD(false)
-	case 0x105:
-		return mem.Timers[1].ReadD(true)
-	case 0x106:
-		return mem.Timers[1].ReadCnt(false)
-	case 0x107:
-		return mem.Timers[1].ReadCnt(true)
-	case 0x108:
-		return mem.Timers[2].ReadD(false)
-	case 0x109:
-		return mem.Timers[2].ReadD(true)
-	case 0x10A:
-		return mem.Timers[2].ReadCnt(false)
-	case 0x10B:
-		return mem.Timers[2].ReadCnt(true)
-	case 0x10C:
-		return mem.Timers[3].ReadD(false)
-	case 0x10D:
-		return mem.Timers[3].ReadD(true)
-	case 0x10E:
-		return mem.Timers[3].ReadCnt(false)
-	case 0x10F:
-		return mem.Timers[3].ReadCnt(true)
 
 	case 0x130:
 		return mem.Keypad.readINPUT(false)
@@ -651,6 +712,12 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 	case addr >= 0xB0 && addr < 0xE0:
 		mem.WriteDma(mem.dma9, addr, v)
 		return
+	case addr >= 0x100 && addr < 0x110:
+		addr -= 0x100
+		i := addr / 4
+		idx := addr & 3
+		mem.Timers[i].Write(int(idx), v)
+		return
 	case (addr >= 0x320 && addr < 0x6A3) || (addr&^1 == 0x60):
 		if addr >= 0x440 && addr < 0x600 {
 			panic(fmt.Sprintf("WRITE HALF or BYTE TO 3D %08X\n", addr))
@@ -775,39 +842,6 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 	case 0x100013:
 		mem.Cartridge.WriteCmdIn(v, 3, true)
 
-	case 0x100:
-		mem.Timers[0].WriteD(v, false)
-	case 0x101:
-		mem.Timers[0].WriteD(v, true)
-	case 0x102:
-		mem.Timers[0].WriteCnt(v)
-	case 0x103:
-		return
-	case 0x104:
-		mem.Timers[1].WriteD(v, false)
-	case 0x105:
-		mem.Timers[1].WriteD(v, true)
-	case 0x106:
-		mem.Timers[1].WriteCnt(v)
-	case 0x107:
-		return
-	case 0x108:
-		mem.Timers[2].WriteD(v, false)
-	case 0x109:
-		mem.Timers[2].WriteD(v, true)
-	case 0x10A:
-		mem.Timers[2].WriteCnt(v)
-	case 0x10B:
-		return
-	case 0x10C:
-		mem.Timers[3].WriteD(v, false)
-	case 0x10D:
-		mem.Timers[3].WriteD(v, true)
-	case 0x10E:
-		mem.Timers[3].WriteCnt(v)
-	case 0x10F:
-		return
-
 	case 0x204:
 		mem.Cartridge.WriteExMem(v, 0)
 	case 0x205:
@@ -887,6 +921,13 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 		return mem.ReadDma(mem.dma7, addr)
 	case addr >= 0x400 && addr < 0x600:
 		return mem.Snd.Read(addr)
+	case addr >= 0x100 && addr < 0x110:
+
+		addr -= 0x100
+		i := addr / 4
+		addr &= 3
+
+		return mem.Timers[4+i].Read(int(addr))
 	}
 
 	switch addr {
@@ -898,39 +939,6 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 		return uint8(mem.Vcount)
 	case 0x7:
 		return uint8(mem.Vcount >> 8)
-
-	case 0x100:
-		return mem.Timers[4].ReadD(false)
-	case 0x101:
-		return mem.Timers[4].ReadD(true)
-	case 0x102:
-		return mem.Timers[4].ReadCnt(false)
-	case 0x103:
-		return mem.Timers[4].ReadCnt(true)
-	case 0x104:
-		return mem.Timers[5].ReadD(false)
-	case 0x105:
-		return mem.Timers[5].ReadD(true)
-	case 0x106:
-		return mem.Timers[5].ReadCnt(false)
-	case 0x107:
-		return mem.Timers[5].ReadCnt(true)
-	case 0x108:
-		return mem.Timers[6].ReadD(false)
-	case 0x109:
-		return mem.Timers[6].ReadD(true)
-	case 0x10A:
-		return mem.Timers[6].ReadCnt(false)
-	case 0x10B:
-		return mem.Timers[6].ReadCnt(true)
-	case 0x10C:
-		return mem.Timers[7].ReadD(false)
-	case 0x10D:
-		return mem.Timers[7].ReadD(true)
-	case 0x10E:
-		return mem.Timers[7].ReadCnt(false)
-	case 0x10F:
-		return mem.Timers[7].ReadCnt(true)
 
 	case 0x130:
 		return mem.Keypad.readINPUT(false)
@@ -1087,6 +1095,13 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 	case addr >= 0x400 && addr < 0x600:
 		mem.Snd.Write(addr, v)
 		return
+
+	case addr >= 0x100 && addr < 0x110:
+		addr -= 0x100
+		i := addr / 4
+		idx := addr & 3
+		mem.Timers[4+i].Write(int(idx), v)
+		return
 	}
 
 	switch addr {
@@ -1101,39 +1116,6 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 	case 0x7:
 		mem.Vcount &= 0xFF
 		mem.Vcount |= uint32(v) << 8
-
-	case 0x100:
-		mem.Timers[4].WriteD(v, false)
-	case 0x101:
-		mem.Timers[4].WriteD(v, true)
-	case 0x102:
-		mem.Timers[4].WriteCnt(v)
-	case 0x103:
-		return
-	case 0x104:
-		mem.Timers[5].WriteD(v, false)
-	case 0x105:
-		mem.Timers[5].WriteD(v, true)
-	case 0x106:
-		mem.Timers[5].WriteCnt(v)
-	case 0x107:
-		return
-	case 0x108:
-		mem.Timers[6].WriteD(v, false)
-	case 0x109:
-		mem.Timers[6].WriteD(v, true)
-	case 0x10A:
-		mem.Timers[6].WriteCnt(v)
-	case 0x10B:
-		return
-	case 0x10C:
-		mem.Timers[7].WriteD(v, false)
-	case 0x10D:
-		mem.Timers[7].WriteD(v, true)
-	case 0x10E:
-		mem.Timers[7].WriteCnt(v)
-	case 0x10F:
-		return
 
 	case 0x130:
 		return

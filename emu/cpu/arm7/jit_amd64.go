@@ -98,8 +98,8 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 	tempPc := pc
 	var length, op, i uint32
 
-	p, ok := j.Cpu.mem.ReadPtr(tempPc)
-	if !ok {
+	p := j.Cpu.mem.ReadPtr(tempPc)
+	if p == nil {
 
 		if tempPc&0xF00_0000 == 0x600_0000 {
 			panic("need to setup VRAM as work ram")
@@ -134,8 +134,8 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 
 				i = 0
 
-				p, ok = j.Cpu.mem.ReadPtr(tempPc)
-				if !ok {
+				p = j.Cpu.mem.ReadPtr(tempPc)
+				if p == nil {
 					j.BlockCache.PushTail(newBlock)
 					page.Blocks[blockIdx] = j.BlockCache.SkipBlock
 					return
@@ -181,8 +181,8 @@ func (j *Jit) CreateBlock(pc uint32, thumb bool) {
 
 				i = 0
 
-				p, ok = j.Cpu.mem.ReadPtr(tempPc)
-				if !ok {
+				p = j.Cpu.mem.ReadPtr(tempPc)
+				if p == nil {
 					j.BlockCache.PushTail(newBlock)
 					page.Blocks[blockIdx] = j.BlockCache.SkipBlock
 					return
