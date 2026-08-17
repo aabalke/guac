@@ -52,7 +52,7 @@ func NewGeoEngine(buffers *Buffers, irq *cpu.Irq, vram VRAM) *GeoEngine {
 		Irq:       irq,
 		Buffers:   buffers,
 		MtxStacks: NewMtxStacks(),
-		//Color: gl.Transparent,
+		// Color: gl.Transparent,
 		TextureCache: make(map[key]*[]gl.Color, 0),
 		Vertex:       &gl.Vertex{},
 	}
@@ -63,7 +63,6 @@ func NewGeoEngine(buffers *Buffers, irq *cpu.Irq, vram VRAM) *GeoEngine {
 }
 
 func (g *GeoEngine) Fifo(v uint32) {
-
 	//fmt.Printf("FIFO %08X\n", v)
 
 	// this will be buggy, need to handle if packed cmd sets data to 0 ( add cmd???)
@@ -108,7 +107,6 @@ func (g *GeoEngine) Fifo(v uint32) {
 }
 
 func (g *GeoEngine) PackedFifo() {
-
 	g.Cmd(true, g.Data)
 
 	if len(g.Data) != 0 {
@@ -131,7 +129,6 @@ func (g *GeoEngine) PackedFifo() {
 }
 
 func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
-
 	if !g.ValidParamCount(fifo) {
 		return
 	}
@@ -384,8 +381,8 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 				continue
 			}
 
-			diffuseLevel := max(0, -(v.Vector.Dot(*n)))
-			shininessLevel := float32(math.Pow(float64(max(0, -(v.HalfVector.Dot(*n)))), 2))
+			diffuseLevel := max(0, -v.Vector.Dot(*n))
+			shininessLevel := float32(math.Pow(float64(max(0, -v.HalfVector.Dot(*n))), 2))
 
 			if ld.UseSpecularTbl {
 				shininessLevel = ld.ShininessTbl[uint32(shininessLevel)]
@@ -488,7 +485,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
 		var i uint32
 		for _, v := range data[1:] {
-			sTbl[i+0] = float32((v)&0xFF) / 256
+			sTbl[i+0] = float32(v&0xFF) / 256
 			sTbl[i+1] = float32((v>>8)&0xFF) / 256
 			sTbl[i+2] = float32((v>>16)&0xFF) / 256
 			sTbl[i+3] = float32((v>>24)&0xFF) / 256
@@ -504,7 +501,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 		g.ActivePoly = g.PrepPoly
 
 		// do not clear poly - need state of params for next
-		//g.PrepPoly = Polygon{}
+		// g.PrepPoly = Polygon{}
 
 		g.ActivePoly.PrimitiveType = uint8(data[1] & 0b11)
 
@@ -544,7 +541,6 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 }
 
 func (g *GeoEngine) UpdateClipMtx() {
-
 	// position is world space transform
 	// perspective is perspecitve space transform
 
@@ -558,7 +554,6 @@ func (g *GeoEngine) UpdateClipMtx() {
 }
 
 func (g *GeoEngine) ValidParamCount(fifo bool) bool {
-
 	cmd := g.Data[0]
 	params := len(g.Data) - 1
 
@@ -592,7 +587,7 @@ func (g *GeoEngine) AddPolygon() {
 
 func Write15BitColor(v uint32) gl.Color {
 	return gl.MakeColorFrom15Bit(
-		uint8((v)&0x1F),
+		uint8(v&0x1F),
 		uint8((v>>5)&0x1F),
 		uint8((v>>10)&0x1F),
 	)

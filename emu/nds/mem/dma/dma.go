@@ -328,7 +328,6 @@ func (dma *DMA) GamecartTransfer(arm9, initial bool) {
 
 func (dma *DMA) GxTransfer() {
 	if dma.Dst != 0x400_0400 || dma.DstAdj != DMA_ADJ_NON || !dma.isWord {
-		dma.Transfer()
 		return
 	}
 
@@ -351,19 +350,17 @@ func (dma *DMA) GxTransfer() {
 	}
 
 	mem := dma.mem
-	tmpSrc := int(dma.Src &^ 0b11)
+	tmpSrc := int(dma.Src &^ 3)
 
-	ptr := mem.ReadPtr(uint32(tmpSrc), dma.arm9)
+	ptr := mem.ReadPtr(uint32(tmpSrc), true)
 	if ptr == nil {
 		for range count {
-			mem.WriteGXFIFO(mem.Read32(uint32(tmpSrc), dma.arm9))
+			mem.WriteGXFIFO(mem.Read32(uint32(tmpSrc), true))
 			tmpSrc += srcOffset
 		}
 	} else {
 		for range count {
-			v := *(*uint32)(ptr)
-			mem.WriteGXFIFO(v)
-
+			mem.WriteGXFIFO(*(*uint32)(ptr))
 			ptr = unsafe.Add(ptr, srcOffset)
 		}
 

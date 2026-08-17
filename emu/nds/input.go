@@ -8,19 +8,14 @@ import (
 )
 
 func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, justButtons, buttons []ebiten.StandardGamepadButton) {
-	var (
-		keyCfg    = config.Conf.Nds.Keyboard
-		buttonCfg = config.Conf.Nds.Controller
-		k         = &nds.mem.Keypad.KEYINPUT
-		k2        = &nds.mem.Keypad.KEYINPUT2
-	)
-
+	k := &nds.mem.Key.Input
+	k2 := &nds.mem.Key.Input2
 	*k = 0x3FF
-	*k2 |= 0b0100_1011
-	*k2 &^= 0b1000_0000
+	*k2 = 0x4B
 
-	mouseInput(nds, k2)
+	nds.mouseInput()
 
+	keyCfg := config.Conf.Nds.Keyboard
 	for _, key := range keys {
 		switch {
 		case slices.Contains(keyCfg.A, key):
@@ -55,16 +50,17 @@ func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, justButtons, buttons [
 	for _, key := range justKeys {
 		switch {
 		case slices.Contains(keyCfg.LayoutToggle, key):
-			nds.Screen.inputHandler(SCREEN_LAYOUT)
+			*nds.Screen.Layout = (*nds.Screen.Layout + 1) % 3
 		case slices.Contains(keyCfg.SizingToggle, key):
-			nds.Screen.inputHandler(SCREEN_SIZING)
+			*nds.Screen.Sizing = (*nds.Screen.Sizing + 1) % 3
 		case slices.Contains(keyCfg.RotationToggle, key):
-			nds.Screen.inputHandler(SCREEN_ROTATION)
+			*nds.Screen.Rotation = (*nds.Screen.Rotation + 1) % 4
 		case slices.Contains(keyCfg.ExportScene, key):
 			nds.ppu.Rasterizer.Export.Export()
 		}
 	}
 
+	buttonCfg := config.Conf.Nds.Controller
 	for _, button := range buttons {
 		switch {
 		case slices.Contains(buttonCfg.A, button):
@@ -99,23 +95,20 @@ func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, justButtons, buttons [
 	for _, button := range justButtons {
 		switch {
 		case slices.Contains(buttonCfg.LayoutToggle, button):
-			nds.Screen.inputHandler(SCREEN_LAYOUT)
+			*nds.Screen.Layout = (*nds.Screen.Layout + 1) % 3
 		case slices.Contains(buttonCfg.SizingToggle, button):
-			nds.Screen.inputHandler(SCREEN_SIZING)
+			*nds.Screen.Sizing = (*nds.Screen.Sizing + 1) % 3
 		case slices.Contains(buttonCfg.RotationToggle, button):
-			nds.Screen.inputHandler(SCREEN_ROTATION)
+			*nds.Screen.Rotation = (*nds.Screen.Rotation + 1) % 4
 		case slices.Contains(buttonCfg.ExportScene, button):
 			nds.ppu.Rasterizer.Export.Export()
 		}
 	}
 
-	if nds.mem.Keypad.KeyIRQ() {
-		nds.arm9.Irq.SetIRQ(12)
-		nds.arm7.Irq.SetIRQ(12)
-	}
+	nds.mem.Key.KeyIRQ()
 }
 
-func mouseInput(nds *Nds, k2 *uint16) {
+func (nds *Nds) mouseInput() {
 	dragged := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
 	x, y := ebiten.CursorPosition()
 
@@ -188,5 +181,5 @@ func mouseInput(nds *Nds, k2 *uint16) {
 	}
 
 	tsc.TouchActive = true
-	*k2 &^= 0b100_0000
+	nds.mem.Key.Input2 &^= 0x40
 }

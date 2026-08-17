@@ -1,58 +1,75 @@
 package mem
 
-type Keypad struct {
-	KEYINPUT  uint16
-	KEYINPUT2 uint16
-	KEYCNT    uint16
+import "github.com/aabalke/guac/emu/cpu"
+
+type Key struct {
+	Irq     [2]*cpu.Irq
+	Input   uint16
+	Cnt     uint16
+	Input2  uint8
+	Enabled bool
+	AndMode bool
 }
 
-func (k *Keypad) readINPUT2() uint8 {
-	return uint8(k.KEYINPUT2)
+func NewKey(irq7, irq9 *cpu.Irq) *Key {
+	return &Key{
+		Irq: [2]*cpu.Irq{
+			irq7, irq9,
+		},
+		Input:  0x3FF,
+		Input2: 0x43,
+	}
 }
 
-func (k *Keypad) readINPUT(hi bool) uint8 {
+func (k *Key) ReadINPUT2() uint8 {
+	return uint8(k.Input2)
+}
 
-	if hi {
-		return uint8(k.KEYINPUT >> 8)
+func (k *Key) Read(addr uint32) uint8 {
+	switch addr & 3 {
+	case 0:
+		return uint8(k.Input)
+	case 1:
+		return uint8(k.Input >> 8)
+	case 2:
+		return uint8(k.Cnt)
+	case 3:
+		return uint8(k.Cnt >> 8)
+	default:
+		return 0
+	}
+}
+
+func (k *Key) Write(addr uint32, v uint8) {
+	switch addr & 3 {
+	case 2:
+		k.Cnt = (k.Cnt &^ 0xFF) | uint16(v)
+	case 3:
+		k.Cnt = (k.Cnt & 0xFF) | (uint16(v&3) << 8)
+
+		k.Enabled = v&0x40 != 0
+		k.AndMode = v&0x80 != 0
 	}
 
-	return uint8(k.KEYINPUT)
+	k.KeyIRQ()
 }
 
-func (k *Keypad) readCNT(hi bool) uint8 {
-
-	if hi {
-		return uint8(k.KEYCNT >> 8)
-	}
-
-	return uint8(k.KEYCNT)
-}
-
-func (k *Keypad) writeCNT(v uint8, hi bool) {
-
-	if hi {
-		k.KEYCNT = k.KEYCNT&0xFF | (uint16(v) << 8)
+func (k *Key) KeyIRQ() {
+	if !k.Enabled {
 		return
 	}
 
-	k.KEYCNT = k.KEYCNT&^0xFF | uint16(v)
-}
+	if k.AndMode {
+		if (^k.Cnt & 0x3FF) == k.Input {
+			k.Irq[0].SetIRQ(12)
+			k.Irq[1].SetIRQ(12)
+		}
 
-func (k *Keypad) KeyIRQ() bool {
-
-	if disabled := (k.KEYCNT>>14)&1 != 0; disabled {
-		return false
+		return
 	}
 
-	andFlag := (k.KEYCNT>>15)&1 != 0
-
-	if or := !andFlag && ^(k.KEYCNT)&k.KEYINPUT != 0; or {
-		return true
+	if (^k.Cnt&k.Input)&0x3FF != 0 {
+		k.Irq[0].SetIRQ(12)
+		k.Irq[1].SetIRQ(12)
 	}
-
-	if and := andFlag && ^(k.KEYCNT)&^k.KEYINPUT == 0; and {
-		return true
-	}
-
-	return false
 }

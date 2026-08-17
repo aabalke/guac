@@ -43,7 +43,7 @@ type Mem struct {
 
 	Vcount      uint32
 	Dispstat    Dispstat
-	Keypad      Keypad
+	Key         Key
 	div         Div
 	sqrt        Sqrt
 	Ipc         IPC
@@ -124,8 +124,7 @@ func (m *Mem) InitMemory(
 	m.BiosProt = 0x1204
 	m.WifiWaitCnt = 0x30
 
-	m.Keypad.KEYINPUT = 0x3FF
-	m.Keypad.KEYINPUT2 = 0b100_0011
+	m.Key = *NewKey(irq7, irq9)
 
 	m.Ipc.Init(irq7, irq9)
 
@@ -548,6 +547,9 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 		addr &= 3
 
 		return mem.Timers[i].Read(int(addr))
+
+	case addr >= 0x130 && addr < 0x134:
+		return mem.Key.Read(addr)
 	}
 
 	switch addr {
@@ -580,15 +582,6 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 		return mem.Ppu.EngineB.MasterBright.Read(0)
 	case 0x106D:
 		return mem.Ppu.EngineB.MasterBright.Read(1)
-
-	case 0x130:
-		return mem.Keypad.readINPUT(false)
-	case 0x131:
-		return mem.Keypad.readINPUT(true)
-	case 0x132:
-		return mem.Keypad.readCNT(false)
-	case 0x133:
-		return mem.Keypad.readCNT(true)
 
 	case 0x180:
 		return mem.Ipc.ReadSync(0, true)
@@ -725,6 +718,9 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 
 		mem.Ppu.Rasterizer.Write(addr, v)
 		return
+	case addr >= 0x130 && addr < 0x134:
+		mem.Key.Write(addr, v)
+		return
 	}
 
 	switch addr {
@@ -760,15 +756,6 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 		mem.Ipc.WriteCnt(v, 2, true)
 	case 0x187:
 		mem.Ipc.WriteCnt(v, 3, true)
-
-	case 0x130:
-		return
-	case 0x131:
-		return
-	case 0x132:
-		mem.Keypad.writeCNT(v, false)
-	case 0x133:
-		mem.Keypad.writeCNT(v, true)
 
 	case 0x180:
 		mem.Ipc.WriteSync(v, 0, true)
@@ -928,6 +915,8 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 		addr &= 3
 
 		return mem.Timers[4+i].Read(int(addr))
+	case addr >= 0x130 && addr < 0x134:
+		return mem.Key.Read(addr)
 	}
 
 	switch addr {
@@ -940,22 +929,13 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 	case 0x7:
 		return uint8(mem.Vcount >> 8)
 
-	case 0x130:
-		return mem.Keypad.readINPUT(false)
-	case 0x131:
-		return mem.Keypad.readINPUT(true)
-	case 0x132:
-		return mem.Keypad.readCNT(false)
-	case 0x133:
-		return mem.Keypad.readCNT(true)
-
 	case 0x134:
 		return 0x0F
 	case 0x135:
 		return 0x80
 
 	case 0x136:
-		return mem.Keypad.readINPUT2()
+		return uint8(mem.Key.Input2)
 
 	case 0x138:
 		return mem.Rtc.Read()
@@ -1102,6 +1082,9 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 		idx := addr & 3
 		mem.Timers[4+i].Write(int(idx), v)
 		return
+	case addr >= 0x130 && addr < 0x134:
+		mem.Key.Write(addr, v)
+		return
 	}
 
 	switch addr {
@@ -1116,15 +1099,6 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 	case 0x7:
 		mem.Vcount &= 0xFF
 		mem.Vcount |= uint32(v) << 8
-
-	case 0x130:
-		return
-	case 0x131:
-		return
-	case 0x132:
-		mem.Keypad.writeCNT(v, false)
-	case 0x133:
-		mem.Keypad.writeCNT(v, true)
 
 	case 0x138:
 		mem.Rtc.Write(v)

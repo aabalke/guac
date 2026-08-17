@@ -48,7 +48,7 @@ type Snd struct {
 	Capture  [2]Capture
 }
 
-func NewSnd(ctx *audio.Context, bufferSize time.Duration) *Snd {
+func NewSnd(ctx *audio.Context, mem Mem, bufferSize time.Duration) *Snd {
 	s := &Snd{}
 
 	if ctx != nil {

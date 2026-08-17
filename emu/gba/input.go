@@ -117,5 +117,5 @@ func (gba *GBA) InputHandler(justKeys, keys []ebiten.Key, justButtons, buttons [
 		}
 	}
 
-	gba.Keypad.keyIRQ()
+	gba.Keypad.KeyIRQ()
 }

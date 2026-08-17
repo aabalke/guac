@@ -3,14 +3,13 @@ package mem
 import "unsafe"
 
 type WRAM struct {
-	Wram [0x8000]uint8
-	CNT  uint8
-
+	Wram  [0x8000]uint8
 	WRAM7 [0x1_0000]uint8
+	CNT   uint8
 }
 
 func (w *WRAM) WriteCNT(v uint8) {
-	w.CNT = v & 0b11
+	w.CNT = v & 3
 }
 
 func (w *WRAM) ReadCNT() uint8 {
@@ -57,7 +56,6 @@ func (w *WRAM) Read9(addr uint32) uint8 {
 	case 3:
 		return 0 // should this clear ram?
 	}
-
 	return 0
 }
 

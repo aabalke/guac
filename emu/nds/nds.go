@@ -83,7 +83,7 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 	nds.arm7 = arm7.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem.Bus7, &irq7)
 	nds.arm9 = arm9.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem.Bus9, &irq9, cp15)
 
-	s := snd.NewSnd(ctx, BUFFER_SIZE)
+	s := snd.NewSnd(ctx, nds.mem, BUFFER_SIZE)
 
 	nds.mem.InitMemory(
 		&nds.arm7.Reg.R[15],
@@ -93,8 +93,6 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 		nds.arm7.Jit, nds.arm9.Jit,
 		nds.Cartridge, nds.ppu, s,
 	)
-
-	s.Mem = nds.mem
 
 	for i := range 4 {
 		nds.dma9[i].Init(i, nds.mem, &irq9, true)
@@ -217,11 +215,10 @@ func (nds *Nds) UpdateFrame() {
 			for i := range 4 {
 				if d := &nds.dma9[i]; d.Enabled && d.Mode == dma.ARM9_DMA_MODE_GEO {
 					d.GxTransfer()
+					if nds.ppu.Rasterizer.GeoEngine.GxStat.FifoIrq != 0 {
+						nds.arm9.Irq.SetIRQ(cpu.IRQ_GEO_CMD_FIFO)
+					}
 				}
-			}
-
-			if nds.ppu.Rasterizer.GeoEngine.GxStat.FifoIrq != 0 {
-				nds.arm9.Irq.SetIRQ(cpu.IRQ_GEO_CMD_FIFO)
 			}
 		}
 
@@ -341,11 +338,13 @@ func (nds *Nds) OnTimerOverflow(t *timer.Timer, late int64) {
 		return
 	}
 
+	idx := t.Idx & 3
+
 	if t.Irq {
-		nds.arm7.Irq.SetIRQ(3 + uint32(t.Idx-4))
+		nds.arm7.Irq.SetIRQ(3 + uint32(idx))
 	}
 
-	if t.Idx != 7 {
+	if idx != 3 {
 		if next := nds.mem.Timers[t.Idx+1]; next.Enabled && next.Cascade {
 			next.Counter++
 			if next.Counter >= 0x10000 {

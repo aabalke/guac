@@ -34,10 +34,10 @@ func (k *Key) Write(addr uint32, v uint8) {
 		k.AndMode = v&0x80 != 0
 	}
 
-	k.keyIRQ()
+	k.KeyIRQ()
 }
 
-func (k *Key) keyIRQ() {
+func (k *Key) KeyIRQ() {
 	if !k.Enabled {
 		return
 	}

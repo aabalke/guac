@@ -408,14 +408,3 @@ func (s *Screen) FillEvenHorizontal(screen *ebiten.Image) {
 
 	s.ApplyTouchPositions(realX, realY, realW, realH)
 }
-
-func (s *Screen) inputHandler(field int) {
-	switch field {
-	case SCREEN_LAYOUT:
-		*s.Layout = (*s.Layout + 1) % 3
-	case SCREEN_SIZING:
-		*s.Sizing = (*s.Sizing + 1) % 3
-	case SCREEN_ROTATION:
-		*s.Rotation = (*s.Rotation + 1) % 4
-	}
-}
