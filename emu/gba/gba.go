@@ -100,6 +100,9 @@ func NewGBA(ctx *audio.Context, path string, muted bool) *GBA {
 
 	for i := range 4 {
 		gba.Timers[i] = timer.NewTimer(gba.Scheduler, gba.OnTimerOverflow, i)
+		if i > 0 {
+			gba.Timers[i-1].Next = gba.Timers[i]
+		}
 	}
 
 	gba.Dma = NewDma(gba)
@@ -330,7 +333,7 @@ func (gba *GBA) OnTimerOverflow(t *timer.Timer, late int64) {
 	}
 
 	if t.Idx != 3 {
-		if next := gba.Timers[t.Idx+1]; next.Enabled && next.Cascade {
+		if next := t.Next; next.Enabled && next.Cascade {
 			next.Counter++
 			if next.Counter >= 0x10000 {
 				next.OverflowHandle(late)

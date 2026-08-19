@@ -76,8 +76,14 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 
 	nds.registerEvents()
 
-	for i := range 8 {
-		nds.mem.Timers[i] = timer.NewTimer(nds.Scheduler, nds.OnTimerOverflow, i)
+	for i := range 4 {
+		nds.mem.Timers7[i] = timer.NewTimer(nds.Scheduler, nds.OnTimerOverflow, i)
+		nds.mem.Timers9[i] = timer.NewTimer(nds.Scheduler, nds.OnTimerOverflow, i)
+		nds.mem.Timers9[i].IsArm9 = true
+		if i > 0 {
+			nds.mem.Timers7[i-1].Next = nds.mem.Timers7[i]
+			nds.mem.Timers9[i-1].Next = nds.mem.Timers9[i]
+		}
 	}
 
 	cp15 := &cp15.Cp15{}
@@ -324,31 +330,16 @@ func (nds *Nds) FPS() float64 {
 }
 
 func (nds *Nds) OnTimerOverflow(t *timer.Timer, late int64) {
-	if t.Idx < 4 {
-		if t.Irq {
-			nds.arm9.Irq.SetIRQ(3 + uint32(t.Idx))
-		}
-
-		if t.Idx != 3 {
-			if next := nds.mem.Timers[t.Idx+1]; next.Enabled && next.Cascade {
-				next.Counter++
-				if next.Counter >= 0x10000 {
-					next.OverflowHandle(late)
-				}
-			}
-		}
-
-		return
-	}
-
-	idx := t.Idx & 3
-
 	if t.Irq {
-		nds.arm7.Irq.SetIRQ(3 + uint32(idx))
+		if t.IsArm9 {
+			nds.arm9.Irq.SetIRQ(3 + uint32(t.Idx))
+		} else {
+			nds.arm7.Irq.SetIRQ(3 + uint32(t.Idx))
+		}
 	}
 
-	if idx != 3 {
-		if next := nds.mem.Timers[t.Idx+1]; next.Enabled && next.Cascade {
+	if t.Idx != 3 {
+		if next := t.Next; next.Enabled && next.Cascade {
 			next.Counter++
 			if next.Counter >= 0x10000 {
 				next.OverflowHandle(late)

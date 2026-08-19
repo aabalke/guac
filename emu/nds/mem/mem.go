@@ -53,7 +53,8 @@ type Mem struct {
 	PowCnt      PowCnt
 	BiosProt    BiosProt
 	WifiWaitCnt WifiWaitCnt
-	Timers      [8]*timer.Timer
+	Timers7     [4]*timer.Timer
+	Timers9     [4]*timer.Timer
 
 	Jit7, Jit9 Jit
 
@@ -228,33 +229,28 @@ func (mem *Mem) Read8(addr uint32, arm9 bool) uint32 {
 }
 
 func (mem *Mem) Read16(addr uint32, arm9 bool) uint32 {
-	if arm9 {
-		switch addr {
-		case 0x400_0100, 0x400_0102:
-			return uint32(mem.Timers[0].Read16(int(addr & 3)))
-		case 0x400_0104, 0x400_0106:
-			return uint32(mem.Timers[1].Read16(int(addr & 3)))
-		case 0x400_0108, 0x400_010A:
-			return uint32(mem.Timers[2].Read16(int(addr & 3)))
-		case 0x400_010c, 0x400_010E:
-			return uint32(mem.Timers[3].Read16(int(addr & 3)))
+	if io := addr>>24 == 4; io {
+
+		timers := &mem.Timers7
+		if arm9 {
+			timers = &mem.Timers9
 		}
-	} else {
+
 		switch addr {
 		case 0x400_0100, 0x400_0102:
-			return uint32(mem.Timers[4].Read16(int(addr & 3)))
+			return uint32(timers[0].Read16(int(addr & 3)))
 		case 0x400_0104, 0x400_0106:
-			return uint32(mem.Timers[5].Read16(int(addr & 3)))
+			return uint32(timers[1].Read16(int(addr & 3)))
 		case 0x400_0108, 0x400_010A:
-			return uint32(mem.Timers[6].Read16(int(addr & 3)))
+			return uint32(timers[2].Read16(int(addr & 3)))
 		case 0x400_010c, 0x400_010E:
-			return uint32(mem.Timers[7].Read16(int(addr & 3)))
+			return uint32(timers[3].Read16(int(addr & 3)))
+		}
+		if !arm9 && addr >= 0x480_0000 && addr < 0x490_0000 {
+			return uint32(mem.Wifi.Read16(addr))
 		}
 	}
 
-	if !arm9 && addr >= 0x480_0000 && addr < 0x490_0000 {
-		return uint32(mem.Wifi.Read16(addr))
-	}
 	if ptr := mem.ReadPtr(addr, arm9); ptr != nil {
 		return uint32(binary.LittleEndian.Uint16((*[4]uint8)(ptr)[:]))
 	}
@@ -413,38 +409,29 @@ func (mem *Mem) Write8(addr uint32, v uint8, arm9 bool) {
 }
 
 func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
-	if arm9 {
-		switch addr {
-		case 0x400_0100, 0x400_0102:
-			mem.Timers[0].Write16(addr&3, v)
-			return
-		case 0x400_0104, 0x400_0106:
-			mem.Timers[1].Write16(addr&3, v)
-			return
-		case 0x400_0108, 0x400_010A:
-			mem.Timers[2].Write16(addr&3, v)
-			return
-		case 0x400_010C, 0x400_010E:
-			mem.Timers[3].Write16(addr&3, v)
-			return
+	if io := addr>>24 == 4; io {
+
+		timers := &mem.Timers7
+		if arm9 {
+			timers = &mem.Timers9
 		}
-	} else {
+
 		switch addr {
 		case 0x400_0100, 0x400_0102:
-			mem.Timers[4].Write16(addr&3, v)
+			timers[0].Write16(addr&3, v)
 			return
 		case 0x400_0104, 0x400_0106:
-			mem.Timers[5].Write16(addr&3, v)
+			timers[1].Write16(addr&3, v)
 			return
 		case 0x400_0108, 0x400_010A:
-			mem.Timers[6].Write16(addr&3, v)
+			timers[2].Write16(addr&3, v)
 			return
 		case 0x400_010C, 0x400_010E:
-			mem.Timers[7].Write16(addr&3, v)
+			timers[3].Write16(addr&3, v)
 			return
 		}
 
-		if addr >= 0x480_0000 && addr < 0x490_0000 {
+		if !arm9 && addr >= 0x480_0000 && addr < 0x490_0000 {
 			mem.Wifi.Write16(addr, v)
 			return
 		}
@@ -460,61 +447,50 @@ func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
 }
 
 func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
-	if arm9 {
-		if geo := addr >= 0x4000440 && addr < 0x4000600; geo {
+	if io := addr>>24 == 4; io {
+
+		timers := &mem.Timers7
+		if arm9 {
+			timers = &mem.Timers9
+		}
+
+		if geo := arm9 && addr >= 0x4000440 && addr < 0x4000600; geo {
 			mem.Ppu.Rasterizer.GeoCmd(addr, v)
 			return
 		}
 
-		if gxfifo := addr >= 0x400_0400 && addr < 0x4000440; gxfifo {
+		if gxfifo := arm9 && addr >= 0x400_0400 && addr < 0x4000440; gxfifo {
 			mem.Ppu.Rasterizer.GeoEngine.Fifo(v)
 			return
 		}
 
 		switch addr {
 		case 0x400_0100:
-			mem.Timers[0].Write32(v)
+			timers[0].Write32(v)
 			return
 		case 0x400_0104:
-			mem.Timers[1].Write32(v)
+			timers[1].Write32(v)
 			return
 		case 0x400_0108:
-			mem.Timers[2].Write32(v)
+			timers[2].Write32(v)
 			return
 		case 0x400_010c:
-			mem.Timers[3].Write32(v)
+			timers[3].Write32(v)
 			return
-		}
-	} else {
-		switch addr {
-		case 0x400_0100:
-			mem.Timers[4].Write32(v)
-			return
-		case 0x400_0104:
-			mem.Timers[5].Write32(v)
-			return
-		case 0x400_0108:
-			mem.Timers[6].Write32(v)
-			return
-		case 0x400_010c:
-			mem.Timers[7].Write32(v)
+		case 0x400_0188:
+			mem.Ipc.WriteFifo(v, arm9)
 			return
 		}
 	}
 
-	switch addr {
-	case 0x400_0188:
-		mem.Ipc.WriteFifo(v, arm9)
-	default:
-		if ptr := mem.WritePtr(addr, arm9); ptr != nil {
-			binary.LittleEndian.PutUint32((*[4]uint8)(ptr)[:], v)
-			return
-		}
-		mem.Write(addr+0, uint8(v), arm9)
-		mem.Write(addr+1, uint8(v>>8), arm9)
-		mem.Write(addr+2, uint8(v>>16), arm9)
-		mem.Write(addr+3, uint8(v>>24), arm9)
+	if ptr := mem.WritePtr(addr, arm9); ptr != nil {
+		binary.LittleEndian.PutUint32((*[4]uint8)(ptr)[:], v)
+		return
 	}
+	mem.Write(addr+0, uint8(v), arm9)
+	mem.Write(addr+1, uint8(v>>8), arm9)
+	mem.Write(addr+2, uint8(v>>16), arm9)
+	mem.Write(addr+3, uint8(v>>24), arm9)
 }
 
 func (mem *Mem) WriteGXFIFO(v uint32) {
@@ -541,12 +517,8 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 		return mem.Ppu.Rasterizer.Read(addr)
 
 	case addr >= 0x100 && addr < 0x110:
-
 		addr -= 0x100
-		i := addr / 4
-		addr &= 3
-
-		return mem.Timers[i].Read(int(addr))
+		return mem.Timers9[addr/4].Read(int(addr & 3))
 
 	case addr >= 0x130 && addr < 0x134:
 		return mem.Key.Read(addr)
@@ -707,9 +679,7 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 		return
 	case addr >= 0x100 && addr < 0x110:
 		addr -= 0x100
-		i := addr / 4
-		idx := addr & 3
-		mem.Timers[i].Write(int(idx), v)
+		mem.Timers9[addr/4].Write(int(addr&3), v)
 		return
 	case (addr >= 0x320 && addr < 0x6A3) || (addr&^1 == 0x60):
 		if addr >= 0x440 && addr < 0x600 {
@@ -909,12 +879,8 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 	case addr >= 0x400 && addr < 0x600:
 		return mem.Snd.Read(addr)
 	case addr >= 0x100 && addr < 0x110:
-
 		addr -= 0x100
-		i := addr / 4
-		addr &= 3
-
-		return mem.Timers[4+i].Read(int(addr))
+		return mem.Timers7[addr/4].Read(int(addr & 3))
 	case addr >= 0x130 && addr < 0x134:
 		return mem.Key.Read(addr)
 	}
@@ -1078,9 +1044,7 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 
 	case addr >= 0x100 && addr < 0x110:
 		addr -= 0x100
-		i := addr / 4
-		idx := addr & 3
-		mem.Timers[4+i].Write(int(idx), v)
+		mem.Timers7[addr/4].Write(int(addr&3), v)
 		return
 	case addr >= 0x130 && addr < 0x134:
 		mem.Key.Write(addr, v)

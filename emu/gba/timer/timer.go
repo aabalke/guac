@@ -7,6 +7,7 @@ import (
 var freqShifts = [...]uint8{0, 6, 8, 10}
 
 type Timer struct {
+	Next            *Timer
 	scheduler       *scheduler.Scheduler
 	OnTimerOverflow func(t *Timer, late int64)
 	Idx             int
@@ -20,6 +21,8 @@ type Timer struct {
 	Cascade   bool
 	Enabled   bool
 	Running   bool
+
+	IsArm9 bool
 
 	events struct {
 		Reload   scheduler.EventIdx
