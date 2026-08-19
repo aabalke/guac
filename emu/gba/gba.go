@@ -75,6 +75,8 @@ type GBA struct {
 	Save, Booted    bool
 	IdleOptimize    bool
 	CyclesPerSndGen int64
+
+	RegisteredEvents RegisteredEvents
 }
 
 func NewGBA(ctx *audio.Context, path string, muted bool) *GBA {
@@ -94,8 +96,10 @@ func NewGBA(ctx *audio.Context, path string, muted bool) *GBA {
 	gba.Irq.CpuIrqLine = &gba.Cpu.IrqLine
 	gba.Irq.IME = true
 
+	gba.registerEvents()
+
 	for i := range 4 {
-		gba.Timers[i] = timer.NewTimer(gba.Scheduler, TimerEvents, gba.OnTimerOverflow, i)
+		gba.Timers[i] = timer.NewTimer(gba.Scheduler, gba.OnTimerOverflow, i)
 	}
 
 	gba.Dma = NewDma(gba)
@@ -105,15 +109,15 @@ func NewGBA(ctx *audio.Context, path string, muted bool) *GBA {
 
 	if ctx != nil {
 		gba.CyclesPerSndGen = int64(CPU_SPEED / ctx.SampleRate())
-		gba.Scheduler.Schedule(EVENT_SND_FRAME_SEQ, 1, 0, gba.ClockFrameSequencerEvent, nil)
-		gba.Scheduler.Schedule(EVENT_SND_SAMPLE_GEN, 1, 0, gba.AudioSampleEvent, nil)
+		gba.Scheduler.Schedule(gba.RegisteredEvents.FrameSeq, 0, nil)
+		gba.Scheduler.Schedule(gba.RegisteredEvents.AudioSample, 0, nil)
 	}
 
 	// matches nanoboy
 	gba.Mem.IO[6] = 225
 	gba.Mem.Dispstat |= DISP_HBL
 	gba.Mem.Dispstat |= DISP_VBL
-	gba.Scheduler.Schedule(EVENT_END_SCANLINE, 1, CYCLES_HBLANK, gba.ScanlineEndEvent, nil)
+	gba.Scheduler.Schedule(gba.RegisteredEvents.ScanlineEnd, CYCLES_HBLANK, nil)
 
 	gba.SetIdleAddr()
 	gba.Apu.SoundBias = 0x0200
@@ -305,7 +309,7 @@ func (gba *GBA) OnTimerOverflow(t *timer.Timer, late int64) {
 			if refill := fifo.Count <= 3; refill {
 				ch := gba.Dma.Chs[1]
 				if ch.Enabled && ch.Mode == DMA_MODE_SPE {
-					gba.Scheduler.Schedule(DMA_EVENTS[1], 0, 2-late, ch.Start, nil)
+					gba.Scheduler.Schedule(ch.startEvent, 2-late, nil)
 				}
 			}
 		}
@@ -318,7 +322,7 @@ func (gba *GBA) OnTimerOverflow(t *timer.Timer, late int64) {
 			if refill := fifo.Count <= 3; refill {
 				ch := gba.Dma.Chs[2]
 				if ch.Enabled && ch.Mode == DMA_MODE_SPE {
-					gba.Scheduler.Schedule(DMA_EVENTS[2], 0, 2-late, ch.Start, nil)
+					gba.Scheduler.Schedule(ch.startEvent, 2-late, nil)
 				}
 			}
 

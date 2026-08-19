@@ -6,7 +6,7 @@ import (
 
 	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/nds/rast/gl"
-	"github.com/aabalke/guac/emu/nds/utils"
+	"github.com/aabalke/guac/utils"
 )
 
 var paramCnt = [0x73]int{}

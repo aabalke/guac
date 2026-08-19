@@ -45,18 +45,19 @@ const (
 )
 
 type Nds struct {
-	Stats           *stats.Stats
-	Scheduler       *scheduler.Scheduler
-	mem             *mem.Mem
-	arm7            *arm7.Cpu
-	arm9            *arm9.Cpu
-	ppu             *ppu.PPU
-	Cartridge       *cart.Cartridge
-	Screen          *Screen
-	dma7            [4]dma.DMA
-	dma9            [4]dma.DMA
-	CyclesPerSndGen int64
-	Muted           bool
+	Stats            *stats.Stats
+	Scheduler        *scheduler.Scheduler
+	mem              *mem.Mem
+	arm7             *arm7.Cpu
+	arm9             *arm9.Cpu
+	ppu              *ppu.PPU
+	Cartridge        *cart.Cartridge
+	Screen           *Screen
+	dma7             [4]dma.DMA
+	dma9             [4]dma.DMA
+	CyclesPerSndGen  int64
+	Muted            bool
+	RegisteredEvents RegisteredEvents
 }
 
 func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
@@ -73,8 +74,10 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 
 	nds.ppu = ppu.NewPPU(&irq9)
 
+	nds.registerEvents()
+
 	for i := range 8 {
-		nds.mem.Timers[i] = timer.NewTimer(nds.Scheduler, TimerEvents, nds.OnTimerOverflow, i)
+		nds.mem.Timers[i] = timer.NewTimer(nds.Scheduler, nds.OnTimerOverflow, i)
 	}
 
 	cp15 := &cp15.Cp15{}
@@ -116,10 +119,10 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 
 	if ctx != nil {
 		nds.CyclesPerSndGen = int64(CPU_FREQ_HZ / ctx.SampleRate())
-		nds.Scheduler.Schedule(EVENT_SND_SAMPLE_GEN, 1, 0, nds.AudioSampleEvent, nil)
+		nds.Scheduler.Schedule(nds.RegisteredEvents.AudioSample, 0, nil)
 	}
 
-	nds.Scheduler.Schedule(EVENT_END_SCANLINE, 1, CYCLES_HBLANK, nds.ScanlineEndEvent, nil)
+	nds.Scheduler.Schedule(nds.RegisteredEvents.ScanlineEnd, CYCLES_HBLANK, nil)
 
 	return &nds
 }

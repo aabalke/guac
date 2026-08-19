@@ -1,56 +1,27 @@
 package nds
 
 import (
-	"github.com/aabalke/guac/emu/gba/timer"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/scheduler"
 )
 
-const (
-	EVENT_VBK scheduler.Event = iota
-	EVENT_HBK
-	EVENT_END_SCANLINE
-	EVENT_SND_SAMPLE_GEN
-	EVENT_TIMER_RELOAD
-	EVENT_TIMER_CONTROL
-	EVENT_TIMER_OVERFLOW0
-	EVENT_TIMER_OVERFLOW1
-	EVENT_TIMER_OVERFLOW2
-	EVENT_TIMER_OVERFLOW3
-	EVENT_TIMER_OVERFLOW4
-	EVENT_TIMER_OVERFLOW5
-	EVENT_TIMER_OVERFLOW6
-	EVENT_TIMER_OVERFLOW7
-
-	EVENT_DMA0
-	EVENT_DMA1
-	EVENT_DMA2
-	EVENT_DMA3
-	EVENT_IRQ_SET
-	EVENT_SIO
-	EVENT_SND_FRAME_SEQ
-)
-
-var TimerEvents = timer.Events{
-	Reload:  EVENT_TIMER_RELOAD,
-	Control: EVENT_TIMER_CONTROL,
-	Overflow: []scheduler.Event{
-		EVENT_TIMER_OVERFLOW0,
-		EVENT_TIMER_OVERFLOW1,
-		EVENT_TIMER_OVERFLOW2,
-		EVENT_TIMER_OVERFLOW3,
-		EVENT_TIMER_OVERFLOW4,
-		EVENT_TIMER_OVERFLOW5,
-		EVENT_TIMER_OVERFLOW6,
-		EVENT_TIMER_OVERFLOW7,
-	},
+type RegisteredEvents struct {
+	Hblank      scheduler.EventIdx
+	ScanlineEnd scheduler.EventIdx
+	AudioSample scheduler.EventIdx
 }
 
-var DMA_EVENTS = [4]scheduler.Event{EVENT_DMA0, EVENT_DMA1, EVENT_DMA2, EVENT_DMA3}
+func (nds *Nds) registerEvents() {
+	nds.RegisteredEvents = RegisteredEvents{
+		Hblank:      nds.Scheduler.Register(nds.HblankEvent, 1),
+		ScanlineEnd: nds.Scheduler.Register(nds.ScanlineEndEvent, 1),
+		AudioSample: nds.Scheduler.Register(nds.AudioSampleEvent, 1),
+	}
+}
 
 func (nds *Nds) AudioSampleEvent(late int64, arg any) {
 	nds.mem.Snd.SoundClock()
-	nds.Scheduler.Schedule(EVENT_SND_SAMPLE_GEN, 1, nds.CyclesPerSndGen-late, nds.AudioSampleEvent, nil)
+	nds.Scheduler.Schedule(nds.RegisteredEvents.AudioSample, nds.CyclesPerSndGen-late, nil)
 }
 
 func (nds *Nds) HblankEvent(late int64, arg any) {
@@ -132,6 +103,6 @@ func (nds *Nds) ScanlineEndEvent(late int64, arg any) {
 		nds.arm7.Irq.SetIRQ(2)
 	}
 
-	nds.Scheduler.Schedule(EVENT_END_SCANLINE, 1, CYCLES_SCANLINE-late, nds.ScanlineEndEvent, nil)
-	nds.Scheduler.Schedule(EVENT_HBK, 1, CYCLES_HDRAW-late, nds.HblankEvent, nil)
+	nds.Scheduler.Schedule(nds.RegisteredEvents.ScanlineEnd, CYCLES_SCANLINE-late, nil)
+	nds.Scheduler.Schedule(nds.RegisteredEvents.Hblank, CYCLES_HDRAW-late, nil)
 }

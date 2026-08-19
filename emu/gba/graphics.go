@@ -3,7 +3,7 @@ package gba
 import (
 	"encoding/binary"
 
-	"github.com/aabalke/guac/emu/nds/utils"
+	"github.com/aabalke/guac/utils"
 )
 
 const (

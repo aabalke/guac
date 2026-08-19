@@ -8,7 +8,7 @@ import (
 
 	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/nds/rast"
-	"github.com/aabalke/guac/emu/nds/utils"
+	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 

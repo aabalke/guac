@@ -2,11 +2,10 @@ package rast
 
 import (
 	"github.com/aabalke/guac/emu/nds/rast/gl"
-	"github.com/aabalke/guac/emu/nds/utils"
+	"github.com/aabalke/guac/utils"
 )
 
 func (g *GeoEngine) BoxTest(data []uint32, clipMtx *gl.Matrix) {
-
 	// returns true if any face is within view volume
 	// cur do not have "return false if whole volume is located in box" may need
 	var (
@@ -33,7 +32,6 @@ func (g *GeoEngine) BoxTest(data []uint32, clipMtx *gl.Matrix) {
 
 //go:inline
 func frustumPlaneTest(verts []gl.VectorW) bool {
-
 	for plane := range 6 {
 		allOutside := true
 
@@ -50,7 +48,6 @@ func frustumPlaneTest(verts []gl.VectorW) bool {
 	}
 
 	return true
-
 }
 
 //go:inline
@@ -74,7 +71,6 @@ func insidePlane(v gl.VectorW, plane int) bool {
 }
 
 func (g *GeoEngine) PosTest(data []uint32, clipMtx *gl.Matrix) [4]uint32 {
-
 	x := utils.Convert16ToFloat(uint16(data[1]), 12)
 	y := utils.Convert16ToFloat(uint16(data[1]>>16), 12)
 	z := utils.Convert16ToFloat(uint16(data[2]), 12)
@@ -90,7 +86,6 @@ func (g *GeoEngine) PosTest(data []uint32, clipMtx *gl.Matrix) [4]uint32 {
 }
 
 func (g *GeoEngine) VecTest(data []uint32, dirMtx *gl.Matrix) [3]uint16 {
-
 	x := utils.Convert10ToFloat(uint16(data[1]), 9)
 	y := utils.Convert10ToFloat(uint16(data[1]>>10), 9)
 	z := utils.Convert10ToFloat(uint16(data[1]>>20), 9)

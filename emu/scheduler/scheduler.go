@@ -1,42 +1,69 @@
 package scheduler
 
-type Event int
+type EventIdx int
 
 type Scheduler struct {
+	Registered    []RegisteredEvent
+	RegisteredCnt EventIdx
+
 	Events       [64]ScheduledEvent
 	Cnt          int
 	CurrentCycle int64
 }
 
+type RegisteredEvent struct {
+	Func     func(late int64, args any)
+	Idx      EventIdx
+	Priority int
+}
+
 type ScheduledEvent struct {
-	Event     Event
-	Priority  int
-	InitCycle int64
-	Func      func(late int64, args any)
-	Args      any
+	RegisteredEvent *RegisteredEvent
+	InitCycle       int64
+	Args            any
 }
 
 func NewScheduler() *Scheduler {
-	return &Scheduler{}
+	return &Scheduler{
+		Registered: []RegisteredEvent{},
+	}
 }
 
 func (s *Scheduler) Now() int64 {
 	return s.CurrentCycle
 }
 
-func (s *Scheduler) Schedule(e Event, priority int, cyclesUntil int64, f func(int64, any), args any) {
+func (s *Scheduler) Register(f func(int64, any), priority int) EventIdx {
+	eventIdx := s.RegisteredCnt
+
+	s.Registered = append(s.Registered, RegisteredEvent{
+		Func:     f,
+		Idx:      eventIdx,
+		Priority: priority,
+	})
+
+	s.RegisteredCnt++
+
+	return eventIdx
+}
+
+func (s *Scheduler) Schedule(idx EventIdx, cyclesUntil int64, args any) {
 	// is this needed?
 	cyclesUntil = max(cyclesUntil, 0)
 
-	s.ScheduleAt(e, priority, s.Now()+cyclesUntil, f, args)
+	s.ScheduleAt(idx, s.Now()+cyclesUntil, args)
 }
 
-func (s *Scheduler) ScheduleAt(e Event, priority int, initCycle int64, f func(int64, any), args any) {
+func (s *Scheduler) ScheduleAt(idx EventIdx, initCycle int64, args any) {
 	if s.Cnt >= len(s.Events) {
-		panic("gba: scheduler reached hard limit")
+		panic("scheduler reached hard limit")
 	}
 
-	es := ScheduledEvent{Event: e, Priority: priority, InitCycle: initCycle, Func: f, Args: args}
+	es := ScheduledEvent{
+		RegisteredEvent: &s.Registered[idx],
+		InitCycle:       initCycle,
+		Args:            args,
+	}
 
 	var i int
 	for ; i < s.Cnt; i++ {
@@ -46,7 +73,7 @@ func (s *Scheduler) ScheduleAt(e Event, priority int, initCycle int64, f func(in
 			break
 		}
 
-		if es.InitCycle == s.Events[i].InitCycle && priority <= s.Events[i].Priority {
+		if es.InitCycle == s.Events[i].InitCycle && es.RegisteredEvent.Priority <= s.Events[i].RegisteredEvent.Priority {
 			copy(s.Events[i+1:s.Cnt+1], s.Events[i:s.Cnt])
 			break
 		}
@@ -71,9 +98,9 @@ func (s *Scheduler) popNext() ScheduledEvent {
 	return next
 }
 
-func (s *Scheduler) Cancel(e Event) {
+func (s *Scheduler) Cancel(idx EventIdx) {
 	for i := range s.Cnt {
-		if s.Events[i].Event == e {
+		if s.Events[i].RegisteredEvent.Idx == idx {
 			copy(s.Events[i:s.Cnt-1], s.Events[i+1:s.Cnt])
 			s.Cnt--
 			return
@@ -81,7 +108,7 @@ func (s *Scheduler) Cancel(e Event) {
 	}
 }
 
-// nanoboy rewinds cuu cycle for event handling
+// nanoboy rewinds curr cycle for event handling
 // would not require explicit "late" amount but otherwise I do not think it matters
 //func (s *Scheduler) Add(cycles int64) {
 //	nextCycle := s.CurrentCycle + cycles
@@ -110,7 +137,7 @@ func (s *Scheduler) Add(cycles int64) {
 
 		event := s.popNext()
 		late := s.CurrentCycle - event.InitCycle
-		event.Func(late, event.Args)
+		event.RegisteredEvent.Func(late, event.Args)
 	}
 }
 

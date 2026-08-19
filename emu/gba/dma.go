@@ -5,6 +5,7 @@ import (
 	"unsafe"
 
 	"github.com/aabalke/guac/emu/gba/cpu"
+	"github.com/aabalke/guac/emu/scheduler"
 )
 
 const (
@@ -58,6 +59,8 @@ type Channel struct {
 		dst    uint32
 		cnt    uint32
 	}
+
+	startEvent scheduler.EventIdx
 }
 
 func NewDma(gba *GBA) *Dma {
@@ -66,15 +69,11 @@ func NewDma(gba *GBA) *Dma {
 		Tick: gba.Tick,
 	}
 
-	d.Chs[0].Idx = 0
-	d.Chs[1].Idx = 1
-	d.Chs[2].Idx = 2
-	d.Chs[3].Idx = 3
-
-	d.Chs[0].dma = d
-	d.Chs[1].dma = d
-	d.Chs[2].dma = d
-	d.Chs[3].dma = d
+	for i := range 4 {
+		d.Chs[i].Idx = i
+		d.Chs[i].dma = d
+		d.Chs[i].startEvent = gba.Scheduler.Register(d.Chs[i].Start, 0)
+	}
 
 	return d
 }
@@ -203,7 +202,7 @@ func (ch *Channel) Write(addr uint32, v uint8) {
 				ch.dma.EepromDma(ch.latched.cnt, dst)
 
 				if ch.Mode == DMA_MODE_IMM {
-					ch.dma.Gba.Scheduler.Schedule(DMA_EVENTS[ch.Idx], 0, 2, ch.Start, nil)
+					ch.dma.Gba.Scheduler.Schedule(ch.startEvent, 2, nil)
 				}
 			}
 
@@ -212,7 +211,7 @@ func (ch *Channel) Write(addr uint32, v uint8) {
 
 		if prev && !ch.Enabled {
 			ch.disable()
-			ch.dma.Gba.Scheduler.Cancel(DMA_EVENTS[ch.Idx])
+			ch.dma.Gba.Scheduler.Cancel(ch.startEvent)
 			return
 		}
 	}
@@ -440,7 +439,7 @@ func (d *Dma) videoDma(vcount uint8, late int64) {
 		}
 
 		if ch.InVideoMode {
-			d.Gba.Scheduler.Schedule(EVENT_DMA3, 0, 2-late, ch.Start, nil)
+			ch.dma.Gba.Scheduler.Schedule(ch.startEvent, 2-late, nil)
 		}
 	}
 }
@@ -453,7 +452,7 @@ func (d *Dma) IsRunning() bool {
 func (d *Dma) raise(mode uint8, late int64) {
 	for i := range 4 {
 		if ch := &d.Chs[i]; ch.Enabled && ch.Mode == mode {
-			d.Gba.Scheduler.Schedule(DMA_EVENTS[ch.Idx], 0, 2-late, ch.Start, nil)
+			d.Gba.Scheduler.Schedule(ch.startEvent, 2-late, nil)
 		}
 	}
 }

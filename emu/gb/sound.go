@@ -93,12 +93,16 @@ func (gb *GameBoy) WriteSound(addr, v uint8, a *apu.Apu) {
 			if (v & 0x80) != 0 {
 				ch.Trigger()
 
+				registered := gb.RegisteredEvents.ApuTone1
 				if tone2 {
-					gb.Scheduler.Cancel(EVENT_APU_TONE2)
-					gb.ScheduleApuChannel(gb.Scheduler.CurrentCycle, 1)
-				} else {
-					gb.Scheduler.Cancel(EVENT_APU_TONE1)
-					gb.ScheduleApuChannel(gb.Scheduler.CurrentCycle, 0)
+					registered = gb.RegisteredEvents.ApuTone2
+				}
+
+				gb.Scheduler.Cancel(registered)
+
+				if ch.ChannelEnabled {
+					period := int64(2048 - ch.Shadow)
+					gb.Scheduler.Schedule(registered, period, nil)
 				}
 			}
 		}
@@ -139,8 +143,13 @@ func (gb *GameBoy) WriteSound(addr, v uint8, a *apu.Apu) {
 
 			if v&0x80 != 0 {
 				ch.Trigger()
-				gb.Scheduler.Cancel(EVENT_APU_WAVE)
-				gb.ScheduleApuChannel(gb.Scheduler.CurrentCycle, 2)
+
+				gb.Scheduler.Cancel(gb.RegisteredEvents.ApuWave)
+
+				if ch.ChannelEnabled {
+					period := int64(2048-ch.Shadow) << 1
+					gb.Scheduler.Schedule(gb.RegisteredEvents.ApuWave, period, nil)
+				}
 			}
 		}
 
@@ -183,8 +192,17 @@ func (gb *GameBoy) WriteSound(addr, v uint8, a *apu.Apu) {
 
 			if v&0x80 != 0 {
 				ch.Trigger()
-				gb.Scheduler.Cancel(EVENT_APU_NOISE)
-				gb.ScheduleApuChannel(gb.Scheduler.CurrentCycle, 3)
+				gb.Scheduler.Cancel(gb.RegisteredEvents.ApuNoise)
+				if ch.ChannelEnabled {
+
+					period := int64(8)
+					if ch.Divider > 0 {
+						period = int64(ch.Divider) << 4
+					}
+
+					period <<= int64(ch.Shift)
+					gb.Scheduler.Schedule(gb.RegisteredEvents.ApuNoise, period, nil)
+				}
 			}
 		}
 

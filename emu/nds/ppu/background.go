@@ -3,11 +3,10 @@ package ppu
 import (
 	"unsafe"
 
-	"github.com/aabalke/guac/emu/nds/utils"
+	"github.com/aabalke/guac/utils"
 )
 
 func (e *Engine) getBgPriority(y uint32) {
-
 	priorities := &e.BgPriorities
 	priorities[0].Cnt = 0
 	priorities[1].Cnt = 0
@@ -25,7 +24,7 @@ func (e *Engine) getBgPriority(y uint32) {
 		case bg.Affine:
 			// need to setup scanline check here
 		case !bg.Affine:
-			top := (int(y) - int(bg.YOffset)) & int((bg.H)-1)
+			top := (int(y) - int(bg.YOffset)) & int(bg.H-1)
 			if top < 0 || top-int(bg.H) >= 0 {
 				bg.MasterEnabled = false
 				continue
@@ -40,11 +39,10 @@ func (e *Engine) getBgPriority(y uint32) {
 }
 
 func (ppu *PPU) threeScanline(e *Engine, bgIdx, y uint32) {
-
 	wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
 
-	yIdx := (y + bg.YOffset) & ((bg.H) - 1)
+	yIdx := (y + bg.YOffset) & (bg.H - 1)
 
 	if yIdx >= SCREEN_HEIGHT {
 		return
@@ -60,7 +58,7 @@ func (ppu *PPU) threeScanline(e *Engine, bgIdx, y uint32) {
 			continue
 		}
 
-		xIdx := (x + bg.XOffset) & ((bg.W) - 1)
+		xIdx := (x + bg.XOffset) & (bg.W - 1)
 		i := (xIdx + (yIdx * SCREEN_WIDTH))
 
 		if xIdx >= SCREEN_WIDTH {
@@ -95,7 +93,6 @@ func (ppu *PPU) threeScanline(e *Engine, bgIdx, y uint32) {
 }
 
 func (ppu *PPU) affineScanline(e *Engine, bgIdx, y uint32) {
-
 	wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
 	pa := float64(utils.Convert16ToFloat(uint16(bg.Pa), 8))
@@ -139,8 +136,8 @@ func (ppu *PPU) affineScanline(e *Engine, bgIdx, y uint32) {
 		}
 
 		var (
-			map_x  = (uint32(xIdx)) & (bg.W - 1) >> 3
-			map_y  = (((uint32(yIdx)) & (bg.H - 1)) >> 3) * (bg.W >> 3)
+			map_x  = uint32(xIdx) & (bg.W - 1) >> 3
+			map_y  = ((uint32(yIdx) & (bg.H - 1)) >> 3) * (bg.W >> 3)
 			mapIdx = map_y + map_x
 			data   = uint32(ppu.Vram.Read9(base + mapIdx))
 		)
@@ -183,7 +180,6 @@ func (ppu *PPU) affineScanline(e *Engine, bgIdx, y uint32) {
 }
 
 func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, y uint32) {
-
 	wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
 
@@ -236,8 +232,8 @@ func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, y uint32) {
 
 		const BYTE_SHIFT = 1
 
-		map_x := (uint32(xIdx)) & (bg.W - 1) >> 3
-		map_y := ((uint32(yIdx)) & (bg.H - 1)) >> 3
+		map_x := uint32(xIdx) & (bg.W - 1) >> 3
+		map_y := (uint32(yIdx) & (bg.H - 1)) >> 3
 		map_y *= bg.W >> 3
 		mapIdx := map_y + map_x
 		mapIdx <<= BYTE_SHIFT
@@ -291,7 +287,6 @@ func (ppu *PPU) affine16Scanline(e *Engine, bgIdx, y uint32) {
 }
 
 func (ppu *PPU) directBmpScanline(e *Engine, bgIdx, y uint32) {
-
 	wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
 
@@ -356,7 +351,6 @@ func (ppu *PPU) directBmpScanline(e *Engine, bgIdx, y uint32) {
 }
 
 func (ppu *PPU) bmpScanline(e *Engine, bgIdx, y uint32) {
-
 	wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
 
@@ -426,7 +420,6 @@ func (ppu *PPU) bmpScanline(e *Engine, bgIdx, y uint32) {
 }
 
 func (ppu *PPU) tiledScanline(e *Engine, bgIdx, y uint32) {
-
 	const (
 		TILE_SIZE     = 8
 		TILE_MASK     = TILE_SIZE - 1
@@ -437,7 +430,7 @@ func (ppu *PPU) tiledScanline(e *Engine, bgIdx, y uint32) {
 	wins := &e.Windows
 	bg := &e.Backgrounds[bgIdx]
 
-	bgY := (y + bg.YOffset) & ((bg.H) - 1)
+	bgY := (y + bg.YOffset) & (bg.H - 1)
 	if bg.Mosaic && e.Mosaic.BgV != 0 {
 		bgY -= bgY % (e.Mosaic.BgV + 1)
 	}

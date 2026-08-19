@@ -21,22 +21,37 @@ type Timer struct {
 	Enabled   bool
 	Running   bool
 
-	events Events
+	events struct {
+		Reload   scheduler.EventIdx
+		ReloadHi scheduler.EventIdx
+		ReloadLo scheduler.EventIdx
+		Control  scheduler.EventIdx
+		Overflow scheduler.EventIdx
+	}
 }
 
-type Events struct {
-	Reload   scheduler.Event
-	Control  scheduler.Event
-	Overflow []scheduler.Event
-}
-
-func NewTimer(scheduler *scheduler.Scheduler, events Events, OnTimerOverflow func(t *Timer, late int64), idx int) *Timer {
-	return &Timer{
-		scheduler:       scheduler,
+func NewTimer(sch *scheduler.Scheduler, OnTimerOverflow func(t *Timer, late int64), idx int) *Timer {
+	t := &Timer{
+		scheduler:       sch,
 		OnTimerOverflow: OnTimerOverflow,
 		Idx:             idx,
-		events:          events,
 	}
+
+	t.events = struct {
+		Reload   scheduler.EventIdx
+		ReloadHi scheduler.EventIdx
+		ReloadLo scheduler.EventIdx
+		Control  scheduler.EventIdx
+		Overflow scheduler.EventIdx
+	}{
+		sch.Register(t.ReloadEvent, 1),
+		sch.Register(t.ReloadEventHi, 1),
+		sch.Register(t.ReloadEventLo, 1),
+		sch.Register(t.ControlEvent, 2),
+		sch.Register(t.Overflow, 0),
+	}
+
+	return t
 }
 
 func (t *Timer) Delta(late int64) uint32 {
@@ -81,50 +96,43 @@ func (t *Timer) Read16(idx int) uint16 {
 func (t *Timer) Write(idx int, v uint8) {
 	switch idx {
 	case 0:
-		t.scheduler.Schedule(t.events.Reload, 1, 1, t.ReloadEventLo, v)
+		t.scheduler.Schedule(t.events.ReloadLo, 1, v)
 	case 1:
-		t.scheduler.Schedule(t.events.Reload, 1, 1, t.ReloadEventHi, v)
+		t.scheduler.Schedule(t.events.ReloadHi, 1, v)
 	case 2:
-		t.scheduler.Schedule(t.events.Control, 2, 1, t.ControlEvent, v)
+		t.scheduler.Schedule(t.events.Control, 1, v)
 	}
 }
 
 func (t *Timer) Write16(idx uint32, v uint16) {
 	if idx == 2 {
-		t.scheduler.Schedule(t.events.Control, 1, 1, func(late int64, a any) {
-			v := a.(uint16)
-			t.ControlEvent(late, uint8(v))
-		}, v)
-
+		t.scheduler.Schedule(t.events.Control, 1, uint8(v))
 		return
 	}
 
-	t.scheduler.Schedule(t.events.Reload, 1, 1, func(late int64, a any) {
-		v := a.(uint16)
-		t.ReloadEventLo(late, uint8(v))
-		t.ReloadEventHi(late, uint8(v>>8))
-	}, v)
+	t.scheduler.Schedule(t.events.Reload, 1, v)
 }
 
 func (t *Timer) Write32(v uint32) {
-	t.scheduler.Schedule(t.events.Control, 1, 1, func(late int64, a any) {
-		v := a.(uint32)
-		t.ReloadEventLo(late, uint8(v))
-		t.ReloadEventHi(late, uint8(v>>8))
-		t.ControlEvent(late, uint8(v>>16))
-	}, v)
+	t.scheduler.Schedule(t.events.Reload, 1, uint16(v))
+	t.scheduler.Schedule(t.events.Control, 1, uint8(v>>16))
 }
 
-func (t *Timer) ReloadEventLo(_ int64, argz any) {
-	t.Reload = (t.Reload &^ 0xFF) | uint16(argz.(uint8))
+func (t *Timer) ReloadEvent(late int64, a any) {
+	t.ReloadEventLo(late, uint8(a.(uint16)))
+	t.ReloadEventHi(late, uint8(a.(uint16)>>8))
 }
 
-func (t *Timer) ReloadEventHi(_ int64, argz any) {
-	t.Reload = (t.Reload & 0xFF) | (uint16(argz.(uint8)) << 8)
+func (t *Timer) ReloadEventLo(_ int64, a any) {
+	t.Reload = (t.Reload &^ 0xFF) | uint16(a.(uint8))
 }
 
-func (t *Timer) ControlEvent(late int64, argz any) {
-	v := argz.(uint8)
+func (t *Timer) ReloadEventHi(_ int64, a any) {
+	t.Reload = (t.Reload & 0xFF) | (uint16(a.(uint8)) << 8)
+}
+
+func (t *Timer) ControlEvent(late int64, a any) {
+	v := a.(uint8)
 
 	if t.Running {
 		t.Stop(late)
@@ -169,7 +177,7 @@ func (t *Timer) Start(cycles int64) {
 	t.Running = true
 	t.From = t.scheduler.Now() - cycles
 	until := int64((0x10000-t.Counter)<<t.FreqShift) - cycles
-	t.scheduler.Schedule(t.events.Overflow[t.Idx], 0, until, t.Overflow, nil)
+	t.scheduler.Schedule(t.events.Overflow, until, nil)
 }
 
 func (t *Timer) Stop(late int64) {
@@ -178,7 +186,7 @@ func (t *Timer) Stop(late int64) {
 		t.OverflowHandle(late)
 	}
 
-	t.scheduler.Cancel(t.events.Overflow[t.Idx])
+	t.scheduler.Cancel(t.events.Overflow)
 
 	t.Running = false
 }

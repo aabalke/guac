@@ -2,7 +2,7 @@ package rast
 
 import (
 	"github.com/aabalke/guac/emu/nds/rast/gl"
-	"github.com/aabalke/guac/emu/nds/utils"
+	"github.com/aabalke/guac/utils"
 )
 
 const (
@@ -55,7 +55,7 @@ func (p *Polygon) WriteAttrs(v uint32) {
 	p.RenderBehind1Dot = (v>>13)&1 != 0
 	p.DrawEqualDepthPixels = (v>>14)&1 != 0
 	p.FogEnabled = (v>>15)&1 != 0
-	p.Alpha = (float32((v >> 16) & 0x1F)) / 31 // 0 is wireframe
+	p.Alpha = float32((v>>16)&0x1F) / 31 // 0 is wireframe
 	p.AlphaV = (v >> 16) & 0x1F
 	p.Id = (v >> 24) & 0x3F
 
@@ -81,42 +81,42 @@ const (
 )
 
 var coordFuncs = [...]func(data []uint32, prev *gl.Vertex) (float32, float32, float32){
-	//V_16:
+	// V_16:
 	func(data []uint32, _ *gl.Vertex) (float32, float32, float32) {
 		x := utils.Convert16ToFloat(uint16(data[1]), 12)
 		y := utils.Convert16ToFloat(uint16(data[1]>>16), 12)
 		z := utils.Convert16ToFloat(uint16(data[2]), 12)
 		return x, y, z
 	},
-	//V_10:
+	// V_10:
 	func(data []uint32, _ *gl.Vertex) (float32, float32, float32) {
 		x := utils.Convert10ToFloat(uint16(data[1]), 6)
 		y := utils.Convert10ToFloat(uint16(data[1]>>10), 6)
 		z := utils.Convert10ToFloat(uint16(data[1]>>20), 6)
 		return x, y, z
 	},
-	//V_XY:
+	// V_XY:
 	func(data []uint32, prev *gl.Vertex) (float32, float32, float32) {
 		x := utils.Convert16ToFloat(uint16(data[1]), 12)
 		y := utils.Convert16ToFloat(uint16(data[1]>>16), 12)
 		z := prev.Position.Z
 		return x, y, z
 	},
-	//V_XZ:
+	// V_XZ:
 	func(data []uint32, prev *gl.Vertex) (float32, float32, float32) {
 		x := utils.Convert16ToFloat(uint16(data[1]), 12)
 		y := prev.Position.Y
 		z := utils.Convert16ToFloat(uint16(data[1]>>16), 12)
 		return x, y, z
 	},
-	//V_YZ:
+	// V_YZ:
 	func(data []uint32, prev *gl.Vertex) (float32, float32, float32) {
 		x := prev.Position.X
 		y := utils.Convert16ToFloat(uint16(data[1]), 12)
 		z := utils.Convert16ToFloat(uint16(data[1]>>16), 12)
 		return x, y, z
 	},
-	//V_DF:
+	// V_DF:
 	func(data []uint32, prev *gl.Vertex) (float32, float32, float32) {
 		convert := func(v uint32) float32 {
 			v &= 0x3FF
@@ -173,7 +173,6 @@ func (p *Polygon) GetVertex(g *GeoEngine, x, y, z float32) gl.Vertex {
 }
 
 func (p *Polygon) GetTexture(g *GeoEngine) *gl.Texture {
-
 	// texture has to be copy
 	t := g.Texture
 
@@ -205,7 +204,6 @@ func (p *Polygon) GetTexture(g *GeoEngine) *gl.Texture {
 }
 
 func (p *Polygon) valid1DotDepth(depth float32) bool {
-
 	if p.RenderBehind1Dot {
 		return true
 	}
@@ -217,7 +215,6 @@ func (p *Polygon) valid1DotDepth(depth float32) bool {
 	}
 
 	return false
-
 }
 
 func (p *Polygon) isAlpha() bool {

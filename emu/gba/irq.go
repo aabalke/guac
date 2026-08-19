@@ -31,13 +31,30 @@ type Irq struct {
 	IrqLine              bool
 
 	CpuIrqLine *bool
+
+	events struct {
+		OnWrite       scheduler.EventIdx
+		UpdateIEAndIF scheduler.EventIdx
+		UpdateIRQLine scheduler.EventIdx
+	}
 }
 
 func NewIrq(gba *GBA, s *scheduler.Scheduler) *Irq {
-	return &Irq{
-		gba: gba,
-		sch: s,
+	i := &Irq{}
+
+	i.gba = gba
+	i.sch = s
+	i.events = struct {
+		OnWrite       scheduler.EventIdx
+		UpdateIEAndIF scheduler.EventIdx
+		UpdateIRQLine scheduler.EventIdx
+	}{
+		s.Register(i.OnWrite, 0),
+		s.Register(i.UpdateIEAndIF, 0),
+		s.Register(i.UpdateIRQLine, 0),
 	}
+
+	return i
 }
 
 func (i *Irq) Read(addr uint32) uint8 {
@@ -72,7 +89,7 @@ func (i *Irq) Write8(addr uint32, v uint8) {
 		i.pendingIME = v&1 != 0
 	}
 
-	i.sch.Schedule(EVENT_IRQ_SET, 1, 1, i.OnWrite, nil)
+	i.sch.Schedule(i.events.OnWrite, 1, nil)
 }
 
 func (i *Irq) Write16(addr uint32, v uint16) {
@@ -85,12 +102,12 @@ func (i *Irq) Write16(addr uint32, v uint16) {
 		i.pendingIME = v&1 != 0
 	}
 
-	i.sch.Schedule(EVENT_IRQ_SET, 1, 1, i.OnWrite, nil)
+	i.sch.Schedule(i.events.OnWrite, 1, nil)
 }
 
 func (i *Irq) SetIRQ(irq uint32) {
 	i.pendingIF |= (1 << irq)
-	i.sch.Schedule(EVENT_IRQ_SET, 0, 1, i.OnWrite, nil)
+	i.sch.Schedule(i.events.OnWrite, 1, nil)
 }
 
 func (i *Irq) OnWrite(late int64, argz any) {
@@ -101,13 +118,13 @@ func (i *Irq) OnWrite(late int64, argz any) {
 	irqAvailableNew := i.IF&i.IE != 0
 
 	if i.IrqAvailable != irqAvailableNew {
-		i.sch.Schedule(EVENT_IRQ_SET, 0, 1, i.UpdateIEAndIF, irqAvailableNew)
+		i.sch.Schedule(i.events.UpdateIEAndIF, 1, irqAvailableNew)
 	}
 
 	irqLineNew := i.IME && irqAvailableNew
 
 	if i.IrqLine != irqLineNew {
-		i.sch.Schedule(EVENT_IRQ_SET, 0, 2, i.UpdateIRQLine, irqLineNew)
+		i.sch.Schedule(i.events.UpdateIRQLine, 2, irqLineNew)
 		i.IrqLine = irqLineNew
 	}
 }

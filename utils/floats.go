@@ -33,7 +33,6 @@ func Convert10ToFloat(v uint16, bitFractional uint8) float32 {
 }
 
 func ConvertFromFloat4_0_12(f float32) uint16 {
-
 	const (
 		bitFractional = 12
 		totalBits     = 16

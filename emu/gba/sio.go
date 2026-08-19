@@ -8,13 +8,19 @@ type Sio struct {
 	Cnt uint16
 	irq *Irq
 	sch *scheduler.Scheduler
+
+	completeTransferEvent scheduler.EventIdx
 }
 
 func NewSio(irq *Irq, sch *scheduler.Scheduler) *Sio {
-	return &Sio{
+	s := &Sio{
 		irq: irq,
 		sch: sch,
 	}
+
+	s.completeTransferEvent = s.sch.Register(s.CompleteSioTransfer, 3)
+
+	return s
 }
 
 func (s *Sio) Write(idx uint32, v uint8) {
@@ -29,7 +35,7 @@ func (s *Sio) Write(idx uint32, v uint8) {
 		bytes := ((s.Cnt >> 12) & 1) << 2
 		cycles <<= bytes
 
-		s.sch.Schedule(EVENT_SIO, 3, cycles, s.CompleteSioTransfer, nil)
+		s.sch.Schedule(s.completeTransferEvent, cycles, nil)
 	}
 }
 

@@ -2,7 +2,7 @@ package rast
 
 import (
 	"github.com/aabalke/guac/emu/nds/rast/gl"
-	"github.com/aabalke/guac/emu/nds/utils"
+	"github.com/aabalke/guac/utils"
 )
 
 const (

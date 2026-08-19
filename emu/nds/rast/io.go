@@ -3,11 +3,10 @@ package rast
 import (
 	"fmt"
 
-	"github.com/aabalke/guac/emu/nds/utils"
+	"github.com/aabalke/guac/utils"
 )
 
 func (r *Rasterizer) Read(addr uint32) uint8 {
-
 	if addr >= 0x358 && addr < 0x380 {
 		return r.ReadFog(addr)
 	}
@@ -91,7 +90,6 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
 }
 
 func (r *Rasterizer) ReadPosTest(addr uint32) uint8 {
-
 	d := &r.GeoEngine.PosTestData
 
 	switch addr {
@@ -133,7 +131,6 @@ func (r *Rasterizer) ReadPosTest(addr uint32) uint8 {
 }
 
 func (r *Rasterizer) ReadVecTest(addr uint32) uint8 {
-
 	d := &r.GeoEngine.VecTestData
 
 	switch addr {
@@ -155,7 +152,6 @@ func (r *Rasterizer) ReadVecTest(addr uint32) uint8 {
 }
 
 func (r *Rasterizer) ReadClipMtx(addr uint32) uint8 {
-
 	mtx := &r.GeoEngine.ClipMatrix
 
 	switch addr {
@@ -295,7 +291,6 @@ func (r *Rasterizer) ReadClipMtx(addr uint32) uint8 {
 }
 
 func (r *Rasterizer) ReadVecMtx(addr uint32) uint8 {
-
 	mtx := &r.GeoEngine.MtxStacks.Stacks[2].CurrMtx
 
 	switch addr {
@@ -379,7 +374,6 @@ func (r *Rasterizer) ReadVecMtx(addr uint32) uint8 {
 }
 
 func (r *Rasterizer) Write(addr uint32, v uint8) {
-
 	switch {
 	case addr >= 0x350 && addr < 0x358:
 		r.RearPlane.Write(addr, v)
@@ -439,7 +433,6 @@ func (r *Rasterizer) Write(addr uint32, v uint8) {
 }
 
 func (r *Rasterizer) WriteFog(addr uint32, v uint8) {
-
 	f := &r.GeoEngine.Fog
 
 	if addr >= 0x360 && addr < 0x380 {
@@ -469,7 +462,6 @@ func (r *Rasterizer) WriteFog(addr uint32, v uint8) {
 }
 
 func (r *Rasterizer) ReadFog(addr uint32) uint8 {
-
 	f := &r.GeoEngine.Fog
 
 	if addr >= 0x360 && addr < 0x380 {
@@ -491,7 +483,6 @@ func (r *Rasterizer) ReadFog(addr uint32) uint8 {
 }
 
 func (r *Rasterizer) GeoCmd(addr, v uint32) {
-
 	d := &r.GeoEngine.Data
 
 	addr &= 0xFF_FFFF

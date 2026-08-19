@@ -87,6 +87,8 @@ type GameBoy struct {
 	InstInjectionFunc func(gb *GameBoy, op uint8)
 
 	CyclesPerSndGen int64
+
+	RegisteredEvents RegisteredEvents
 }
 
 type Timer struct {
@@ -137,6 +139,7 @@ func NewGameBoy(ctx *audio.Context, path string, muted bool) *GameBoy {
 	gb.MemoryBus.Hdma.Dst = 0xFFFF
 	gb.MemoryBus.Hdma.Src = 0xFFFF
 	gb.InitSaveLoop()
+	gb.registerEvents()
 
 	if config.Conf.Gb.Bios.Direct {
 		gb.DirectBoot()
@@ -150,8 +153,8 @@ func NewGameBoy(ctx *audio.Context, path string, muted bool) *GameBoy {
 
 	if ctx != nil {
 		gb.CyclesPerSndGen = int64(CPU_SPEED / ctx.SampleRate())
-		gb.Scheduler.Schedule(EVENT_SND_FRAME_SEQ, 1, 0, gb.ClockFrameSequencerEvent, nil)
-		gb.Scheduler.Schedule(EVENT_SND_SAMPLE_GEN, 1, 0, gb.AudioSampleEvent, nil)
+		gb.Scheduler.Schedule(gb.RegisteredEvents.FrameSeq, 0, nil)
+		gb.Scheduler.Schedule(gb.RegisteredEvents.AudioSample, 0, nil)
 	}
 
 	gb.Apu.ToggleMute(muted)

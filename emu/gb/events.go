@@ -5,20 +5,31 @@ import (
 	"github.com/aabalke/guac/emu/scheduler"
 )
 
-const (
-	EVENT_VBK scheduler.Event = iota
-	EVENT_HBK
-	EVENT_DRW
-	EVENT_END_SCANLINE
-	EVENT_SND_SAMPLE_GEN
-	EVENT_SND_FRAME_SEQ
-	EVENT_APU_TONE1
-	EVENT_APU_TONE2
-	EVENT_APU_WAVE
-	EVENT_APU_NOISE
-)
+type RegisteredEvents struct {
+	Draw        scheduler.EventIdx
+	Hblank      scheduler.EventIdx
+	Scanline    scheduler.EventIdx
+	ApuTone1    scheduler.EventIdx
+	ApuTone2    scheduler.EventIdx
+	ApuWave     scheduler.EventIdx
+	ApuNoise    scheduler.EventIdx
+	FrameSeq    scheduler.EventIdx
+	AudioSample scheduler.EventIdx
+}
 
-var APU_EVENTS = [4]scheduler.Event{EVENT_APU_TONE1, EVENT_APU_TONE2, EVENT_APU_WAVE, EVENT_APU_NOISE}
+func (gb *GameBoy) registerEvents() {
+	gb.RegisteredEvents = RegisteredEvents{
+		Draw:        gb.Scheduler.Register(gb.eventDraw, 1),
+		Hblank:      gb.Scheduler.Register(gb.eventHblank, 1),
+		Scanline:    gb.Scheduler.Register(gb.eventScanlineEnd, 1),
+		ApuTone1:    gb.Scheduler.Register(gb.ClockTone1, 1),
+		ApuTone2:    gb.Scheduler.Register(gb.ClockTone2, 1),
+		ApuWave:     gb.Scheduler.Register(gb.ClockWave, 1),
+		ApuNoise:    gb.Scheduler.Register(gb.ClockNoise, 1),
+		FrameSeq:    gb.Scheduler.Register(gb.ClockFrameSequencerEvent, 1),
+		AudioSample: gb.Scheduler.Register(gb.AudioSampleEvent, 1),
+	}
+}
 
 func (gb *GameBoy) eventDraw(late int64, arg any) {
 	if !gb.Lcdc.Enabled {
@@ -71,12 +82,12 @@ func (gb *GameBoy) eventScanlineEnd(late int64, arg any) {
 		gb.SetIrq(IRQ_LCD)
 	}
 
-	gb.Scheduler.Schedule(EVENT_END_SCANLINE, 1, CYCLES_END_SCANLINE-late, gb.eventScanlineEnd, nil)
+	gb.Scheduler.Schedule(gb.RegisteredEvents.Scanline, CYCLES_END_SCANLINE-late, nil)
 
 	switch {
 	case *ly < height:
-		gb.Scheduler.Schedule(EVENT_DRW, 1, CYCLES_DRAW-late, gb.eventDraw, nil)
-		gb.Scheduler.Schedule(EVENT_HBK, 1, CYCLES_HBLANK-late, gb.eventHblank, nil)
+		gb.Scheduler.Schedule(gb.RegisteredEvents.Draw, CYCLES_DRAW-late, nil)
+		gb.Scheduler.Schedule(gb.RegisteredEvents.Hblank, CYCLES_HBLANK-late, nil)
 
 		gb.Stat.Mode = PPU_OAM
 		if gb.Stat.IrqOam {
@@ -98,77 +109,64 @@ func (gb *GameBoy) eventScanlineEnd(late int64, arg any) {
 	}
 }
 
-func (gb *GameBoy) ClockApuChannel(late int64, arg any) {
-	// clock apu channels based on internal div in gb
-	// fifo does not need to be clocked since clocked externally by timers
+func (gb *GameBoy) ClockTone1(late int64, arg any) {
+	ch := &gb.Apu.ToneChannel1
+	ch.Clock()
 
-	idx := arg.(uint8)
-
-	switch idx {
-	case 0:
-		gb.Apu.ToneChannel1.Clock()
-	case 1:
-		gb.Apu.ToneChannel2.Clock()
-	case 2:
-		gb.Apu.WaveChannel.Clock()
-	case 3:
-		gb.Apu.NoiseChannel.Clock()
+	if !ch.ChannelEnabled {
+		return
 	}
-
-	gb.ScheduleApuChannel(late, idx)
+	period := int64(2048 - ch.Shadow)
+	gb.Scheduler.Schedule(gb.RegisteredEvents.ApuTone1, period-late, nil)
 }
 
-func (gb *GameBoy) ScheduleApuChannel(late int64, idx uint8) {
-	period := int64(0)
+func (gb *GameBoy) ClockTone2(late int64, arg any) {
+	ch := &gb.Apu.ToneChannel2
+	ch.Clock()
 
-	switch idx {
-	case 0, 1:
-		ch := &gb.Apu.ToneChannel1
-		if idx == 1 {
-			ch = &gb.Apu.ToneChannel2
-		}
+	if !ch.ChannelEnabled {
+		return
+	}
+	period := int64(2048 - ch.Shadow)
+	gb.Scheduler.Schedule(gb.RegisteredEvents.ApuTone2, period-late, nil)
+}
 
-		if !ch.ChannelEnabled {
-			return
-		}
-		period = int64(2048 - ch.Shadow)
+func (gb *GameBoy) ClockWave(late int64, arg any) {
+	ch := &gb.Apu.WaveChannel
 
-	case 2:
-		ch := &gb.Apu.WaveChannel
-		if !ch.ChannelEnabled {
-			return
-		}
-		period = int64(2048-ch.Shadow) << 1
+	ch.Clock()
+	if !ch.ChannelEnabled {
+		return
+	}
+	period := int64(2048-ch.Shadow) << 1
+	gb.Scheduler.Schedule(gb.RegisteredEvents.ApuWave, period-late, nil)
+}
 
-	case 3:
-		ch := &gb.Apu.NoiseChannel
-		if !ch.ChannelEnabled {
-			return
-		}
-
-		period = 8
-
-		if ch.Divider > 0 {
-			period = int64(ch.Divider) << 4
-		}
-
-		period <<= int64(ch.Shift)
+func (gb *GameBoy) ClockNoise(late int64, arg any) {
+	ch := &gb.Apu.NoiseChannel
+	ch.Clock()
+	if !ch.ChannelEnabled {
+		return
 	}
 
-	// this will keep same pitch
-	// period = (period * gb.CurrFps) / FPS
+	period := int64(8)
 
-	gb.Scheduler.Schedule(APU_EVENTS[idx], 1, period-late, gb.ClockApuChannel, idx)
+	if ch.Divider > 0 {
+		period = int64(ch.Divider) << 4
+	}
+
+	period <<= int64(ch.Shift)
+	gb.Scheduler.Schedule(gb.RegisteredEvents.ApuNoise, period-late, nil)
 }
 
 func (gb *GameBoy) ClockFrameSequencerEvent(late int64, arg any) {
 	// I believe this is based on div, and will need to be reset based on div falling edge
 	// see polling version, but confirm
 	gb.Apu.ClockFrameSequencer()
-	gb.Scheduler.Schedule(EVENT_SND_FRAME_SEQ, 1, CYCLES_FRAME_SEQ-late, gb.ClockFrameSequencerEvent, nil)
+	gb.Scheduler.Schedule(gb.RegisteredEvents.FrameSeq, CYCLES_FRAME_SEQ-late, nil)
 }
 
 func (gb *GameBoy) AudioSampleEvent(late int64, arg any) {
 	gb.Apu.SoundClock()
-	gb.Scheduler.Schedule(EVENT_SND_SAMPLE_GEN, 1, gb.CyclesPerSndGen-late, gb.AudioSampleEvent, nil)
+	gb.Scheduler.Schedule(gb.RegisteredEvents.AudioSample, gb.CyclesPerSndGen-late, nil)
 }

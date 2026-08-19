@@ -119,12 +119,17 @@ func (gba *GBA) WriteSound(addr uint32, v uint8) {
 
 			if (v & 0x80) != 0 {
 				ch.Trigger()
+
+				registered := gba.RegisteredEvents.ApuTone1
 				if tone2 {
-					gba.Scheduler.Cancel(EVENT_APU_TONE2)
-					gba.ScheduleApuChannel(0, 1)
-				} else {
-					gba.Scheduler.Cancel(EVENT_APU_TONE1)
-					gba.ScheduleApuChannel(0, 0)
+					registered = gba.RegisteredEvents.ApuTone2
+				}
+
+				gba.Scheduler.Cancel(registered)
+
+				if ch.ChannelEnabled {
+					period := int64(2048 - ch.Shadow)
+					gba.Scheduler.Schedule(registered, period, nil)
 				}
 			}
 
@@ -170,8 +175,13 @@ func (gba *GBA) WriteSound(addr uint32, v uint8) {
 
 			if v&0x80 != 0 {
 				ch.Trigger()
-				gba.Scheduler.Cancel(EVENT_APU_WAVE)
-				gba.ScheduleApuChannel(0, 2)
+
+				gba.Scheduler.Cancel(gba.RegisteredEvents.ApuWave)
+
+				if ch.ChannelEnabled {
+					period := int64(2048-ch.Shadow) << 1
+					gba.Scheduler.Schedule(gba.RegisteredEvents.ApuWave, period, nil)
+				}
 			}
 		}
 
@@ -222,8 +232,18 @@ func (gba *GBA) WriteSound(addr uint32, v uint8) {
 
 			if v&0x80 != 0 {
 				ch.Trigger()
-				gba.Scheduler.Cancel(EVENT_APU_NOISE)
-				gba.ScheduleApuChannel(0, 3)
+
+				gba.Scheduler.Cancel(gba.RegisteredEvents.ApuNoise)
+				if ch.ChannelEnabled {
+
+					period := int64(8)
+					if ch.Divider > 0 {
+						period = int64(ch.Divider) << 4
+					}
+
+					period <<= int64(ch.Shift)
+					gba.Scheduler.Schedule(gba.RegisteredEvents.ApuNoise, period, nil)
+				}
 			}
 		}
 

@@ -1,125 +1,99 @@
 package gba
 
 import (
-	"github.com/aabalke/guac/emu/gba/timer"
 	"github.com/aabalke/guac/emu/scheduler"
 )
 
-const (
-	EVENT_VBK scheduler.Event = iota
-	EVENT_HBK
-	EVENT_DRW
-	EVENT_END_FRAME
-	EVENT_END_SCANLINE
-	EVENT_SND_SAMPLE_GEN
-	EVENT_TIMER_RELOAD
-	EVENT_TIMER_OVERFLOW0
-	EVENT_TIMER_OVERFLOW1
-	EVENT_TIMER_OVERFLOW2
-	EVENT_TIMER_OVERFLOW3
-	EVENT_TIMER_CONTROL
-	EVENT_DMA0
-	EVENT_DMA1
-	EVENT_DMA2
-	EVENT_DMA3
-	EVENT_IRQ_SET
-	EVENT_SIO
-	EVENT_SND_FRAME_SEQ
-	EVENT_APU_TONE1
-	EVENT_APU_TONE2
-	EVENT_APU_WAVE
-	EVENT_APU_NOISE
-)
-
-var TimerEvents = timer.Events{
-	Reload:  EVENT_TIMER_RELOAD,
-	Control: EVENT_TIMER_CONTROL,
-	Overflow: []scheduler.Event{
-		EVENT_TIMER_OVERFLOW0,
-		EVENT_TIMER_OVERFLOW1,
-		EVENT_TIMER_OVERFLOW2,
-		EVENT_TIMER_OVERFLOW3,
-	},
+type RegisteredEvents struct {
+	HblankVDraw  scheduler.EventIdx
+	HblankVBlank scheduler.EventIdx
+	ScanlineEnd  scheduler.EventIdx
+	ApuTone1     scheduler.EventIdx
+	ApuTone2     scheduler.EventIdx
+	ApuWave      scheduler.EventIdx
+	ApuNoise     scheduler.EventIdx
+	FrameSeq     scheduler.EventIdx
+	AudioSample  scheduler.EventIdx
 }
 
-var (
-	APU_EVENTS = [4]scheduler.Event{EVENT_APU_TONE1, EVENT_APU_TONE2, EVENT_APU_WAVE, EVENT_APU_NOISE}
-	DMA_EVENTS = [4]scheduler.Event{EVENT_DMA0, EVENT_DMA1, EVENT_DMA2, EVENT_DMA3}
-)
-
-func (gba *GBA) ClockApuChannel(late int64, arg any) {
-	// clock apu channels based on internal div in gb
-	// fifo does not need to be clocked since clocked externally by timers
-
-	idx := arg.(uint8)
-
-	switch idx {
-	case 0:
-		gba.Apu.ToneChannel1.Clock()
-	case 1:
-		gba.Apu.ToneChannel2.Clock()
-	case 2:
-		gba.Apu.WaveChannel.Clock()
-	case 3:
-		gba.Apu.NoiseChannel.Clock()
+func (gba *GBA) registerEvents() {
+	gba.RegisteredEvents = RegisteredEvents{
+		HblankVDraw:  gba.Scheduler.Register(gba.HblankVDrawEvent, 1),
+		HblankVBlank: gba.Scheduler.Register(gba.HblankVBlankEvent, 1),
+		ScanlineEnd:  gba.Scheduler.Register(gba.ScanlineEndEvent, 1),
+		ApuTone1:     gba.Scheduler.Register(gba.ClockTone1, 1),
+		ApuTone2:     gba.Scheduler.Register(gba.ClockTone2, 1),
+		ApuWave:      gba.Scheduler.Register(gba.ClockWave, 1),
+		ApuNoise:     gba.Scheduler.Register(gba.ClockNoise, 1),
+		FrameSeq:     gba.Scheduler.Register(gba.ClockFrameSequencerEvent, 1),
+		AudioSample:  gba.Scheduler.Register(gba.AudioSampleEvent, 1),
 	}
-
-	gba.ScheduleApuChannel(late, idx)
 }
 
-func (gba *GBA) ScheduleApuChannel(late int64, idx uint8) {
-	period := int64(0)
+func (gba *GBA) ClockTone1(late int64, arg any) {
+	ch := &gba.Apu.ToneChannel1
+	ch.Clock()
 
-	switch idx {
-	case 0, 1:
-		ch := &gba.Apu.ToneChannel1
-		if idx == 1 {
-			ch = &gba.Apu.ToneChannel2
-		}
-
-		if !ch.ChannelEnabled {
-			return
-		}
-		period = int64(2048 - ch.Shadow)
-
-	case 2:
-		ch := &gba.Apu.WaveChannel
-		if !ch.ChannelEnabled {
-			return
-		}
-		period = int64(2048-ch.Shadow) << 1
-
-	case 3:
-		ch := &gba.Apu.NoiseChannel
-		if !ch.ChannelEnabled {
-			return
-		}
-
-		period = 8
-
-		if ch.Divider > 0 {
-			period = int64(ch.Divider) << 4
-		}
-
-		period <<= int64(ch.Shift)
+	if !ch.ChannelEnabled {
+		return
 	}
-
-	// period * 4 since gba is 4x speed
+	period := int64(2048 - ch.Shadow)
 	period <<= 2
+	gba.Scheduler.Schedule(gba.RegisteredEvents.ApuTone1, period-late, nil)
+}
 
-	// this will keep same pitch
-	// period = (period * gba.CurrFps) / FPS
-	gba.Scheduler.Schedule(APU_EVENTS[idx], 1, period-late, gba.ClockApuChannel, idx)
+func (gba *GBA) ClockTone2(late int64, arg any) {
+	ch := &gba.Apu.ToneChannel2
+	ch.Clock()
+
+	if !ch.ChannelEnabled {
+		return
+	}
+	period := int64(2048 - ch.Shadow)
+	period <<= 2
+	gba.Scheduler.Schedule(gba.RegisteredEvents.ApuTone2, period-late, nil)
+}
+
+func (gba *GBA) ClockWave(late int64, arg any) {
+	ch := &gba.Apu.WaveChannel
+
+	ch.Clock()
+	if !ch.ChannelEnabled {
+		return
+	}
+	period := int64(2048-ch.Shadow) << 1
+	period <<= 2
+	gba.Scheduler.Schedule(gba.RegisteredEvents.ApuWave, period-late, nil)
+}
+
+func (gba *GBA) ClockNoise(late int64, arg any) {
+	ch := &gba.Apu.NoiseChannel
+	ch.Clock()
+	if !ch.ChannelEnabled {
+		return
+	}
+
+	period := int64(8)
+
+	if ch.Divider > 0 {
+		period = int64(ch.Divider) << 4
+	}
+
+	period <<= int64(ch.Shift)
+	period <<= 2
+	gba.Scheduler.Schedule(gba.RegisteredEvents.ApuNoise, period-late, nil)
 }
 
 func (gba *GBA) ClockFrameSequencerEvent(late int64, arg any) {
+	// I believe this is based on div, and will need to be reset based on div falling edge
+	// see polling version, but confirm
 	gba.Apu.ClockFrameSequencer()
-	gba.Scheduler.Schedule(EVENT_SND_FRAME_SEQ, 1, CYCLES_PER_FRAME_SEQ-late, gba.ClockFrameSequencerEvent, nil)
+	gba.Scheduler.Schedule(gba.RegisteredEvents.FrameSeq, CYCLES_PER_FRAME_SEQ-late, nil)
 }
 
 func (gba *GBA) AudioSampleEvent(late int64, arg any) {
 	gba.Apu.SoundClock()
-	gba.Scheduler.Schedule(EVENT_SND_SAMPLE_GEN, 1, gba.CyclesPerSndGen-late, gba.AudioSampleEvent, nil)
+	gba.Scheduler.Schedule(gba.RegisteredEvents.AudioSample, gba.CyclesPerSndGen-late, nil)
 }
 
 func (gba *GBA) HblankVDrawEvent(late int64, arg any) {
@@ -188,11 +162,10 @@ func (gba *GBA) ScanlineEndEvent(late int64, arg any) {
 		}
 	}
 
-	gba.Scheduler.Schedule(EVENT_END_SCANLINE, 1, CYCLES_SCANLINE-late, gba.ScanlineEndEvent, nil)
-
+	gba.Scheduler.Schedule(gba.RegisteredEvents.ScanlineEnd, CYCLES_SCANLINE-late, nil)
 	if *vcount < SCREEN_HEIGHT {
-		gba.Scheduler.Schedule(EVENT_HBK, 1, CYCLES_HDRAW-late, gba.HblankVDrawEvent, nil)
+		gba.Scheduler.Schedule(gba.RegisteredEvents.HblankVDraw, CYCLES_HDRAW-late, nil)
 	} else {
-		gba.Scheduler.Schedule(EVENT_HBK, 1, CYCLES_HDRAW-late, gba.HblankVBlankEvent, nil)
+		gba.Scheduler.Schedule(gba.RegisteredEvents.HblankVBlank, CYCLES_HDRAW-late, nil)
 	}
 }

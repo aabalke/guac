@@ -1,8 +1,8 @@
 # Alyosha Tas Gba Tests
 
-Results generated 2026-08-09T23:19:52-06:00
+Results generated 2026-08-18T21:14:50-06:00
 
-Passing 52/119 43%
+Passing 53/119 44%
 
 Disclaimer: These Test Results are automated and may not be completely accurate.
 👍 DMA\DMA_Mode_Change
@@ -105,7 +105,7 @@ Disclaimer: These Test Results are automated and may not be completely accurate.
 ❌ prefetcher\prefetcher_full_arm_2
 👍 prefetcher\prefetcher_full_thumb
 ❌ psr\psr
-❌ save\flash128
+👍 save\flash128
 👍 save\flash64
 👍 save\none
 👍 save\sram

@@ -1,6 +1,6 @@
 package gl
 
-import "github.com/aabalke/guac/emu/nds/utils"
+import "github.com/aabalke/guac/utils"
 
 type Shader struct {
 	Texture *Texture
@@ -62,7 +62,6 @@ var blendFunc = [...]func(texture *Texture, vColor, tColor Color) Color{
 		return Modulate(vColor, tColor)
 
 		con := func(iv, it float32) float32 {
-
 			v := uint32(min(1, max(0, iv))*0x1F) << 1
 			t := uint32(min(1, max(0, it))*0x1F) << 1
 
@@ -82,7 +81,6 @@ var blendFunc = [...]func(texture *Texture, vColor, tColor Color) Color{
 		return vColor
 	},
 	func(texture *Texture, vColor, tColor Color) Color {
-
 		return Decal(vColor, tColor)
 
 		//con := func(v, t, at float32) float32 {
@@ -98,7 +96,6 @@ var blendFunc = [...]func(texture *Texture, vColor, tColor Color) Color{
 		//return vColor
 	},
 	func(texture *Texture, vColor, tColor Color) Color {
-
 		if texture.IsHighlight {
 
 			con := func(s, t float32) float32 {
@@ -106,7 +103,7 @@ var blendFunc = [...]func(texture *Texture, vColor, tColor Color) Color{
 				sb := s
 				s *= FACTOR
 				t *= FACTOR
-				return max(0, min(1, ((t)*(s)-1)/(FACTOR*FACTOR)+sb))
+				return max(0, min(1, (t*s-1)/(FACTOR*FACTOR)+sb))
 			}
 
 			toon := texture.ToonTbl[uint32(vColor.R*FACTOR)&0x1F]
@@ -123,7 +120,7 @@ var blendFunc = [...]func(texture *Texture, vColor, tColor Color) Color{
 		con := func(s, t float32) float32 {
 			s *= FACTOR
 			t *= FACTOR
-			return max(0, min(1, ((t)*(s)-1)/(FACTOR*FACTOR)))
+			return max(0, min(1, (t*s-1)/(FACTOR*FACTOR)))
 		}
 
 		toon := texture.ToonTbl[uint32(vColor.R*FACTOR)&0x1F]
@@ -140,7 +137,6 @@ var blendFunc = [...]func(texture *Texture, vColor, tColor Color) Color{
 }
 
 func (s *Shader) Fragment(v *Vertex) {
-
 	if s.Texture == nil {
 		return
 	}

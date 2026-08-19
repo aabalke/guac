@@ -88,14 +88,14 @@ func (l *Lcdc) Write(v uint8) {
 		l.gb.MemoryBus.IO[LY] = 0
 		l.gb.Stat.Mode = PPU_HBLANK
 
-		l.gb.Scheduler.Cancel(EVENT_HBK)
-		l.gb.Scheduler.Cancel(EVENT_VBK)
-		l.gb.Scheduler.Cancel(EVENT_END_SCANLINE)
+		l.gb.Scheduler.Cancel(l.gb.RegisteredEvents.Hblank)
+		l.gb.Scheduler.Cancel(l.gb.RegisteredEvents.Draw)
+		l.gb.Scheduler.Cancel(l.gb.RegisteredEvents.Scanline)
 	}
 
 	if l.Enabled && !wasEnabled {
 		// is this timing accurate?
-		l.gb.Scheduler.Schedule(EVENT_END_SCANLINE, 1, 0, l.gb.eventScanlineEnd, nil)
+		l.gb.Scheduler.Schedule(l.gb.RegisteredEvents.Scanline, 0, nil)
 	}
 }
 
