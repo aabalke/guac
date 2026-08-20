@@ -46,11 +46,11 @@ type Mem struct {
 	Key         *Key
 	div         Div
 	sqrt        Sqrt
-	Ipc         IPC
+	Ipc         *Ipc
 	Spi         *spi.Spi
 	Rtc         Rtc
 	PostFlg     PostFlg
-	PowCnt      PowCnt
+	PowCnt      *PowCnt
 	BiosProt    BiosProt
 	WifiWaitCnt WifiWaitCnt
 	Timers7     [4]*timer.Timer
@@ -98,7 +98,7 @@ func (m *Mem) InitMemory(
 	irq7, irq9 *cpu.Irq,
 	jit7, jit9 Jit,
 	c *cart.Cartridge,
-	Ppu *ppu.PPU,
+	ppu *ppu.PPU,
 	snd *snd.Snd,
 ) {
 	m.halted7 = halted7
@@ -108,7 +108,7 @@ func (m *Mem) InitMemory(
 	m.irq9 = irq9
 	m.irq7 = irq7
 	m.Cartridge = c
-	m.Ppu = Ppu
+	m.Ppu = ppu
 	m.arm7Pc = arm7Pc
 	m.Snd = snd
 	m.Jit7 = jit7
@@ -117,26 +117,18 @@ func (m *Mem) InitMemory(
 	// i believe this is default
 	m.WRAM.WriteCNT(3)
 
-	m.WriteArm9IO(0x304, 0x0F)
-	m.WriteArm9IO(0x305, 0x82)
-
 	m.BiosProt = 0x1204
 	m.WifiWaitCnt = 0x30
 
 	m.Key = NewKey(irq7, irq9)
-
-	m.Ipc.Init(irq7, irq9)
+	m.Ipc = NewIpc(irq7, irq9)
+	m.PowCnt = NewPowCnt(ppu)
+	m.Spi = spi.NewSpi(&m.Key.Input2)
+	m.Wifi = wifi.NewWifi()
 
 	m.LoadBios()
 
 	m.Rtc.InitRtc()
-
-	m.PowCnt.WriteCNT1(0, 0x0F, Ppu)
-	m.PowCnt.WriteCNT1(1, 0x82, Ppu)
-
-	m.Spi = spi.NewSpi(&m.Key.Input2)
-
-	m.Wifi = wifi.NewWifi()
 
 	m.Bus7 = Bus7{M: m}
 	m.Bus9 = Bus9{M: m}
@@ -849,9 +841,9 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 		mem.PostFlg.Write(v, true)
 
 	case 0x304:
-		mem.PowCnt.WriteCNT1(0, uint32(v), mem.Ppu)
+		mem.PowCnt.WriteCnt1(0, v)
 	case 0x305:
-		mem.PowCnt.WriteCNT1(1, uint32(v), mem.Ppu)
+		mem.PowCnt.WriteCnt1(1, v)
 
 	default:
 		//panic(fmt.Sprintf("WRTE UNKNOWN ARM9 IO ADDR %08X", addr))
@@ -1201,7 +1193,7 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 			panic(fmt.Sprintf("UNKNOWN HALTCNT VALUE ARM7 %d", v))
 		}
 	case 0x304:
-		mem.PowCnt.WriteCNT2(v)
+		mem.PowCnt.WriteCnt2(v)
 
 	case 0x308:
 		return

@@ -114,10 +114,6 @@ func (nds *Nds) mouseInput() {
 	}
 
 	inv := nds.Screen.TouchGeoM
-	if !inv.IsInvertible() {
-		return
-	}
-
 	inv.Invert()
 	x, y := ebiten.CursorPosition()
 	tx, ty := inv.Apply(float64(x), float64(y))
