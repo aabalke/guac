@@ -16,13 +16,14 @@ type Pmd struct {
 	RegBacklit uint8
 }
 
-func (p *Pmd) Init() {
-	p.RegPowermg = 0xD
-	p.RegMicgain = 0x1
+func NewPmd() *Pmd {
+	return &Pmd{
+		RegPowermg: 0xD,
+		RegMicgain: 0x1,
+	}
 }
 
 func (p *Pmd) Transfer(data []uint8) (reply []uint8, stat uint8) {
-
 	idx := data[0]
 	//log.Printf("SPI Power % 02X\n", data)
 

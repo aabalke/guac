@@ -43,11 +43,11 @@ type Mem struct {
 
 	Vcount      uint32
 	Dispstat    Dispstat
-	Key         Key
+	Key         *Key
 	div         Div
 	sqrt        Sqrt
 	Ipc         IPC
-	Spi         spi.Spi
+	Spi         *spi.Spi
 	Rtc         Rtc
 	PostFlg     PostFlg
 	PowCnt      PowCnt
@@ -55,11 +55,9 @@ type Mem struct {
 	WifiWaitCnt WifiWaitCnt
 	Timers7     [4]*timer.Timer
 	Timers9     [4]*timer.Timer
-
-	Jit7, Jit9 Jit
-
-	Bus7 Bus7
-	Bus9 Bus9
+	Jit7, Jit9  Jit
+	Bus7        Bus7
+	Bus9        Bus9
 }
 
 type Bus7 struct {
@@ -125,7 +123,7 @@ func (m *Mem) InitMemory(
 	m.BiosProt = 0x1204
 	m.WifiWaitCnt = 0x30
 
-	m.Key = *NewKey(irq7, irq9)
+	m.Key = NewKey(irq7, irq9)
 
 	m.Ipc.Init(irq7, irq9)
 
@@ -136,7 +134,7 @@ func (m *Mem) InitMemory(
 	m.PowCnt.WriteCNT1(0, 0x0F, Ppu)
 	m.PowCnt.WriteCNT1(1, 0x82, Ppu)
 
-	m.Spi.Init()
+	m.Spi = spi.NewSpi(&m.Key.Input2)
 
 	m.Wifi = wifi.NewWifi()
 
@@ -901,7 +899,7 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 		return 0x80
 
 	case 0x136:
-		return uint8(mem.Key.Input2)
+		return mem.Key.Input2
 
 	case 0x138:
 		return mem.Rtc.Read()

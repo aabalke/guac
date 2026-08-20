@@ -30,14 +30,13 @@ type Firmware struct {
 }
 
 func (f *Firmware) Load() {
-	f.Data = make([]uint8, 0x4_0000)
-
 	path := config.Conf.Nds.Firmware.FilePath
 
 	// user settings come from config and should override firmware file
 	defer FirmwareSetUserSettings(&f.Data)
 
 	if path == "" {
+		f.Data = make([]uint8, 0x4_0000)
 		FirmwareSetHeader(&f.Data)
 		FirmwareSetAccessPoints(&f.Data)
 		return
@@ -45,6 +44,7 @@ func (f *Firmware) Load() {
 
 	b, err := os.ReadFile(path)
 	if err != nil {
+		f.Data = make([]uint8, 0x4_0000)
 		FirmwareSetHeader(&f.Data)
 		FirmwareSetAccessPoints(&f.Data)
 		return

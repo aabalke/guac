@@ -10,7 +10,7 @@ type CpRegister struct {
 
 type Cp15 struct {
 	R   map[CpRegister]uint32
-	mem *mem.Mem
+	tcm *mem.Tcm
 }
 
 var (
@@ -30,9 +30,11 @@ var (
 	HALT2 = CpRegister{Op: 0, Cn: 7, Cm: 8, Cp: 2, Pn: 15}
 )
 
-func (c *Cp15) Init(mem *mem.Mem) {
+func NewCp15(tcm *mem.Tcm) *Cp15 {
+	c := &Cp15{}
+
 	c.R = make(map[CpRegister]uint32)
-	c.mem = mem
+	c.tcm = tcm
 
 	// these register values match no$gba
 	c.R[CTRL] = 0x00012078
@@ -59,6 +61,7 @@ func (c *Cp15) Init(mem *mem.Mem) {
 	c.R[TCMP] = 0x00140180
 	c.R[DTCM] = 0x0300000A
 	c.R[ITCM] = 0x00000020
+	return c
 }
 
 func (c *Cp15) Read(reg *CpRegister) uint32 {
@@ -66,7 +69,6 @@ func (c *Cp15) Read(reg *CpRegister) uint32 {
 }
 
 func (c *Cp15) Write(reg *CpRegister, lowVector *bool, v uint32) {
-
 	if reg.Cn == 6 {
 		return
 	}
@@ -83,23 +85,23 @@ func (c *Cp15) Write(reg *CpRegister, lowVector *bool, v uint32) {
 		c.R[*reg] |= v
 
 		*lowVector = (c.R[*reg]>>13)&1 == 0
-		c.mem.Tcm.DtcmEnabled = (c.R[*reg]>>16)&1 != 0
-		c.mem.Tcm.DtcmLoadMode = (c.R[*reg]>>17)&1 != 0
-		c.mem.Tcm.ItcmEnabled = (c.R[*reg]>>18)&1 != 0
-		c.mem.Tcm.ItcmLoadMode = (c.R[*reg]>>19)&1 != 0
+		c.tcm.DtcmEnabled = (c.R[*reg]>>16)&1 != 0
+		c.tcm.DtcmLoadMode = (c.R[*reg]>>17)&1 != 0
+		c.tcm.ItcmEnabled = (c.R[*reg]>>18)&1 != 0
+		c.tcm.ItcmLoadMode = (c.R[*reg]>>19)&1 != 0
 
 		//if v & 1 == 1 { panic("PU MODE")}
 
 	case DTCM:
 		v &^= 0b1111_1100_0001
-		c.mem.Tcm.DtcmSize = 512 << ((v >> 1) & 0x3F)
-		c.mem.Tcm.DtcmBase = v & 0xFFFF_F000
+		c.tcm.DtcmSize = 512 << ((v >> 1) & 0x3F)
+		c.tcm.DtcmBase = v & 0xFFFF_F000
 
 		// base must be size aligned
 
 	case ITCM:
 		v &= 0b111110
-		c.mem.Tcm.ItcmSize = 512 << ((v >> 1) & 0x3F)
+		c.tcm.ItcmSize = 512 << ((v >> 1) & 0x3F)
 	}
 
 	c.R[*reg] = v

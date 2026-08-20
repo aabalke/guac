@@ -10,13 +10,13 @@ const (
 )
 
 type Spi struct {
+	Pmd                *Pmd
+	Tsc                *Tsc
 	CNT                uint16
 	Device             uint8
 	Hold, Irq, Enabled bool
 
-	Pmd      *Pmd
 	Firmware Firmware
-	Tsc      Tsc
 
 	// pointer in order to nil when not used, not sure if better method
 	TransferDevice *uint8
@@ -25,15 +25,15 @@ type Spi struct {
 	Req, Res []uint8
 }
 
-func (s *Spi) Init() {
-	s.Pmd = &Pmd{}
-	s.Pmd.Init()
-	s.TransferDevice = nil
-	//FirmwareConfig()
+func NewSpi(input2 *uint8) *Spi {
+	return &Spi{
+		Pmd: NewPmd(),
+		Tsc: NewTsc(input2),
+	}
+	// FirmwareConfig() why was this here?
 }
 
 func (s *Spi) WriteCNT(b, v uint8) {
-
 	switch b {
 	case 0:
 
@@ -62,7 +62,6 @@ func (s *Spi) ReadCNT(b uint8) uint8 {
 }
 
 func (s *Spi) WriteData(v uint8) {
-
 	//fmt.Printf("SPI WRITE DATA % 02X\n", v)
 
 	if s.Enabled {

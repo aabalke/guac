@@ -29,11 +29,12 @@ type Mem interface {
 }
 
 type Snd struct {
-	Stream *utils.Stream
-	Ctx    *audio.Context
-	player *audio.Player
-
-	Mem Mem
+	Mem      Mem
+	Stream   *utils.Stream
+	Ctx      *audio.Context
+	player   *audio.Player
+	Channels [16]Channel
+	Capture  [2]Capture
 
 	VolMaster float64
 	LOut      uint8
@@ -43,13 +44,12 @@ type Snd struct {
 	NoOutCh3 bool
 	Enabled  bool
 	Bias     uint32
-
-	Channels [16]Channel
-	Capture  [2]Capture
 }
 
 func NewSnd(ctx *audio.Context, mem Mem, bufferSize time.Duration) *Snd {
-	s := &Snd{}
+	s := &Snd{
+		Mem: mem,
+	}
 
 	if ctx != nil {
 

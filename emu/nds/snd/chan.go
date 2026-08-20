@@ -36,7 +36,6 @@ var (
 type Channel struct {
 	Idx int
 	Snd *Snd
-	Mem *Mem
 
 	Start   bool
 	Playing bool

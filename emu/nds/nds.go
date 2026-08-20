@@ -55,24 +55,20 @@ type Nds struct {
 	Screen           *Screen
 	dma7             [4]dma.DMA
 	dma9             [4]dma.DMA
+	RegisteredEvents RegisteredEvents
 	CyclesPerSndGen  int64
 	Muted            bool
-	RegisteredEvents RegisteredEvents
 }
 
 func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
-	nds := Nds{
+	irq7, irq9 := &cpu.Irq{}, &cpu.Irq{}
+
+	nds := &Nds{
 		Scheduler: scheduler.NewScheduler(),
+		mem:       &mem.Mem{},
+		Screen:    NewScreen(),
+		ppu:       ppu.NewPPU(irq9),
 	}
-
-	nds.mem = &mem.Mem{}
-
-	nds.Screen = NewScreen()
-
-	irq7 := cpu.Irq{}
-	irq9 := cpu.Irq{}
-
-	nds.ppu = ppu.NewPPU(&irq9)
 
 	nds.registerEvents()
 
@@ -84,43 +80,35 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 			nds.mem.Timers7[i-1].Next = nds.mem.Timers7[i]
 			nds.mem.Timers9[i-1].Next = nds.mem.Timers9[i]
 		}
+
+		nds.dma9[i].Init(i, nds.mem, irq9, true)
+		nds.dma7[i].Init(i, nds.mem, irq7, false)
 	}
 
-	cp15 := &cp15.Cp15{}
-	cp15.Init(nds.mem)
+	nds.arm7 = arm7.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem.Bus7, irq7)
+	nds.arm9 = arm9.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem.Bus9, irq9, cp15.NewCp15(&nds.mem.Tcm))
 
-	nds.arm7 = arm7.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem.Bus7, &irq7)
-	nds.arm9 = arm9.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem.Bus9, &irq9, cp15)
-
-	s := snd.NewSnd(ctx, nds.mem, BUFFER_SIZE)
+	nds.Cartridge = cart.NewCartridge(
+		path, nds.mem.Arm7Bios,
+		irq7, irq9,
+		&nds.dma7, &nds.dma9,
+	)
 
 	nds.mem.InitMemory(
 		&nds.arm7.Reg.R[15],
 		&nds.arm7.Halted, &nds.arm9.Halted,
 		&nds.dma7, &nds.dma9,
-		&irq7, &irq9,
+		irq7, irq9,
 		nds.arm7.Jit, nds.arm9.Jit,
-		nds.Cartridge, nds.ppu, s,
+		nds.Cartridge, nds.ppu, snd.NewSnd(ctx, nds.mem, BUFFER_SIZE),
 	)
-
-	for i := range 4 {
-		nds.dma9[i].Init(i, nds.mem, &irq9, true)
-		nds.dma7[i].Init(i, nds.mem, &irq7, false)
-	}
-
-	nds.Cartridge = cart.NewCartridge(
-		path, nds.mem.Arm7Bios,
-		&irq7, &irq9,
-		&nds.dma7, &nds.dma9,
-	)
-
-	nds.mem.Cartridge = nds.Cartridge
 
 	nds.DirectBoot()
 
 	if config.Conf.General.Logger {
 		debug.Init("./log.csv")
 	}
+
 	nds.ToggleMute(muted)
 
 	if ctx != nil {
@@ -130,7 +118,7 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 
 	nds.Scheduler.Schedule(nds.RegisteredEvents.ScanlineEnd, CYCLES_HBLANK, nil)
 
-	return &nds
+	return nds
 }
 
 func (nds *Nds) Run(ctx context.Context, eventBus *bus.EventBus) {
@@ -224,10 +212,11 @@ func (nds *Nds) UpdateFrame() {
 			for i := range 4 {
 				if d := &nds.dma9[i]; d.Enabled && d.Mode == dma.ARM9_DMA_MODE_GEO {
 					d.GxTransfer()
-					if nds.ppu.Rasterizer.GeoEngine.GxStat.FifoIrq != 0 {
-						nds.arm9.Irq.SetIRQ(cpu.IRQ_GEO_CMD_FIFO)
-					}
 				}
+			}
+
+			if nds.ppu.Rasterizer.GeoEngine.GxStat.FifoIrq != 0 {
+				nds.arm9.Irq.SetIRQ(cpu.IRQ_GEO_CMD_FIFO)
 			}
 		}
 
@@ -338,12 +327,10 @@ func (nds *Nds) OnTimerOverflow(t *timer.Timer, late int64) {
 		}
 	}
 
-	if t.Idx != 3 {
-		if next := t.Next; next.Enabled && next.Cascade {
-			next.Counter++
-			if next.Counter >= 0x10000 {
-				next.OverflowHandle(late)
-			}
+	if next := t.Next; next != nil && next.Enabled && next.Cascade {
+		next.Counter++
+		if next.Counter >= 0x10000 {
+			next.OverflowHandle(late)
 		}
 	}
 }

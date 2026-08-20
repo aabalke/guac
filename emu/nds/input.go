@@ -109,77 +109,24 @@ func (nds *Nds) InputHandler(justKeys, keys []ebiten.Key, justButtons, buttons [
 }
 
 func (nds *Nds) mouseInput() {
-	dragged := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
-	x, y := ebiten.CursorPosition()
-
-	abs := nds.Screen.BtmAbs
-	tsc := &nds.mem.Spi.Tsc
-
-	if !dragged {
-		tsc.TouchActive = false
+	if dragged := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft); !dragged {
 		return
 	}
 
-	// effectively rot, translate of real coords to rotated bottom screen coords
-
-	switch *nds.Screen.Rotation {
-	case ROT_0:
-
-		if inBounds := (x >= abs.L &&
-			x < abs.R &&
-			y >= abs.T &&
-			y < abs.B); !inBounds {
-			tsc.TouchActive = false
-			return
-		}
-
-		s := float32(SCREEN_WIDTH) / float32(abs.W)
-		tsc.TouchX = uint16(float32(x-abs.L)*s) - 1
-		tsc.TouchY = uint16(float32(y-abs.T)*s) - 1
-
-	case ROT_90:
-
-		if inBounds := (x >= abs.B &&
-			x < abs.T &&
-			y >= abs.L &&
-			y < abs.R); !inBounds {
-			tsc.TouchActive = false
-			return
-		}
-
-		s := float32(SCREEN_WIDTH) / float32(abs.H)
-		tsc.TouchX = uint16(float32(y-abs.L)*s) - 1
-		tsc.TouchY = uint16(float32(abs.T-x)*s) - 1
-
-	case ROT_180:
-
-		if inBounds := (x >= abs.R &&
-			x < abs.L &&
-			y >= abs.B &&
-			y < abs.T); !inBounds {
-			tsc.TouchActive = false
-			return
-		}
-
-		s := float32(SCREEN_WIDTH) / float32(abs.W)
-		tsc.TouchX = uint16(float32(abs.L-x)*s) - 1
-		tsc.TouchY = uint16(float32(abs.T-y)*s) - 1
-
-	case ROT_270:
-
-		if inBounds := (x >= abs.T &&
-			x < abs.B &&
-			y >= abs.R &&
-			y < abs.L); !inBounds {
-			tsc.TouchActive = false
-			return
-		}
-
-		s := float32(SCREEN_WIDTH) / float32(abs.H)
-		tsc.TouchX = uint16(float32(abs.L-y)*s) - 1
-		tsc.TouchY = uint16(float32(x-abs.T)*s) - 1
+	inv := nds.Screen.TouchGeoM
+	if !inv.IsInvertible() {
+		return
 	}
 
-	tsc.TouchActive = true
+	inv.Invert()
+	x, y := ebiten.CursorPosition()
+	tx, ty := inv.Apply(float64(x), float64(y))
+
+	if tx < 0 || tx >= SCREEN_WIDTH || ty < 0 || ty >= SCREEN_HEIGHT {
+		return
+	}
+
+	nds.mem.Spi.Tsc.TouchX = uint16(tx)
+	nds.mem.Spi.Tsc.TouchY = uint16(ty)
 	nds.mem.Key.Input2 &^= 0x40
 }

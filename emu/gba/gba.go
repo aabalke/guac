@@ -304,9 +304,10 @@ func (gba *GBA) OnTimerOverflow(t *timer.Timer, late int64) {
 	}
 
 	if t.Idx < 2 && gba.Apu.Enabled {
-		if aTick := (gba.Apu.SoundCntH>>10)&1 == uint16(t.Idx); aTick {
-			fifo := &gba.Apu.FifoA
 
+		if aTick := (gba.Apu.SoundCntH>>10)&1 == uint16(t.Idx); aTick {
+
+			fifo := &gba.Apu.FifoA
 			fifo.Load()
 
 			if refill := fifo.Count <= 3; refill {
@@ -328,16 +329,13 @@ func (gba *GBA) OnTimerOverflow(t *timer.Timer, late int64) {
 					gba.Scheduler.Schedule(ch.startEvent, 2-late, nil)
 				}
 			}
-
 		}
 	}
 
-	if t.Idx != 3 {
-		if next := t.Next; next.Enabled && next.Cascade {
-			next.Counter++
-			if next.Counter >= 0x10000 {
-				next.OverflowHandle(late)
-			}
+	if next := t.Next; next != nil && next.Enabled && next.Cascade {
+		next.Counter++
+		if next.Counter >= 0x10000 {
+			next.OverflowHandle(late)
 		}
 	}
 }

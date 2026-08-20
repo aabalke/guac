@@ -14,8 +14,7 @@ import (
 // layout: "vertical", "horizontal", "hybrid"
 // rotation: 0, 90, 180, 270
 // sizing: "even", "only top", "only bottom"
-
-// unsetup: gap, emphasized screen, hybrid with bottom
+// unsetup: gap, emphasized screen
 
 const (
 	SCREEN_LAYOUT = iota
@@ -25,7 +24,7 @@ const (
 
 const (
 	LAYOUT_VERTICAL = iota
-	LAYOUT_HORZONTAL
+	LAYOUT_HORIZONTAL
 	LAYOUT_HYBRID
 )
 
@@ -42,13 +41,6 @@ const (
 	ROT_270
 )
 
-const (
-	RAD_0   = float64(math.Pi/180) * 0
-	RAD_90  = float64(math.Pi/180) * 90
-	RAD_180 = float64(math.Pi/180) * 180
-	RAD_270 = float64(math.Pi/180) * 270
-)
-
 type Screen struct {
 	Mu       sync.Mutex
 	Layout   *int
@@ -56,13 +48,8 @@ type Screen struct {
 	Rotation *int
 
 	Top, Bottom *ebiten.Image
-	BtmAbs      BtmAbs
-
-	Options ebiten.DrawImageOptions
-}
-
-type BtmAbs struct {
-	T, B, L, R, W, H int
+	opts        ebiten.DrawImageOptions
+	TouchGeoM   ebiten.GeoM
 }
 
 func NewScreen() *Screen {
@@ -83,38 +70,27 @@ func (s *Screen) FillScreen(screen *ebiten.Image) {
 		s.FillOnly(screen, s.Top, false)
 	case *s.Sizing == SIZING_ONLY_BOTTOM:
 		s.FillOnly(screen, s.Bottom, true)
-	case *s.Layout == LAYOUT_VERTICAL:
-		s.FillEvenVertical(screen)
-	case *s.Layout == LAYOUT_HORZONTAL:
-		s.FillEvenHorizontal(screen)
 	default:
-		panic("nds screen fill not possible")
+		s.FillEven(screen, *s.Layout == LAYOUT_HORIZONTAL)
 	}
 }
 
-func (s *Screen) ApplyTouchPositions(x, y, w, h int) {
-	switch *s.Rotation {
-	case ROT_0:
-		s.BtmAbs = BtmAbs{T: y, B: y + h, L: x, R: x + w, W: w, H: h}
-	case ROT_90:
-		s.BtmAbs = BtmAbs{L: y, R: y + w, B: x, T: x + h, H: w, W: h}
-	case ROT_180:
-		s.BtmAbs = BtmAbs{B: y, T: y + h, R: x, L: x + w, W: w, H: h}
-	case ROT_270:
-		s.BtmAbs = BtmAbs{R: y, L: y + w, T: x, B: x + h, H: w, W: h}
-	default:
-		panic("unallowed nds rotation value")
-	}
-}
-
-func (s *Screen) FillOnly(screen, image *ebiten.Image, bottom bool) {
+func (s *Screen) FillEven(screen *ebiten.Image, horizontal bool) {
 	const (
-		canvasW = float64(SCREEN_WIDTH)
-		canvasH = float64(SCREEN_HEIGHT)
+		singleW = float64(SCREEN_WIDTH)
+		singleH = float64(SCREEN_HEIGHT)
 	)
 
+	canvasW := singleW
+	canvasH := singleH * 2
+
+	if horizontal {
+		canvasW = singleW * 2
+		canvasH = singleH
+	}
+
 	var (
-		rotation = config.Conf.Nds.Screen.Rotation
+		rotation = *s.Rotation
 		radians  = float64(rotation) * math.Pi / 2
 		screenW  = float64(screen.Bounds().Dx())
 		screenH  = float64(screen.Bounds().Dy())
@@ -128,283 +104,135 @@ func (s *Screen) FillOnly(screen, image *ebiten.Image, bottom bool) {
 
 	scale := utils.ScaleImage(screenW, screenH, fitW, fitH)
 
-	s.Options.GeoM.Reset()
-	s.Options.GeoM.Translate(-canvasW/2, -canvasH/2)
-	s.Options.GeoM.Rotate(radians)
-	s.Options.GeoM.Scale(scale, scale)
-	s.Options.GeoM.Translate(screenW/2, screenH/2)
-	s.Mu.Lock()
-	screen.DrawImage(image, &s.Options)
-	s.Mu.Unlock()
+	s.opts.GeoM.Reset()
 
-	if !bottom {
-		s.BtmAbs = BtmAbs{}
-		return
+	if horizontal {
+		s.opts.GeoM.Translate(0, -singleH/2)
+	} else {
+		s.opts.GeoM.Translate(-singleW/2, -singleH)
 	}
 
-	var (
-		x = int((screenW - scale*fitW) / 2)
-		y = int((screenH - scale*fitH) / 2)
-		w = int(scale * canvasW)
-		h = int(scale * canvasH)
+	s.opts.GeoM.Rotate(radians)
+	s.opts.GeoM.Scale(scale, scale)
+	s.opts.GeoM.Translate(screenW/2, screenH/2)
+
+	s.Mu.Lock()
+	screen.DrawImage(s.Top, &s.opts)
+	s.Mu.Unlock()
+
+	s.opts.GeoM.Reset()
+
+	if horizontal {
+		s.opts.GeoM.Translate(-singleW, -singleH/2)
+	} else {
+		s.opts.GeoM.Translate(-singleW/2, 0)
+	}
+
+	s.opts.GeoM.Rotate(radians)
+	s.opts.GeoM.Scale(scale, scale)
+	s.opts.GeoM.Translate(screenW/2, screenH/2)
+
+	s.Mu.Lock()
+	screen.DrawImage(s.Bottom, &s.opts)
+	s.Mu.Unlock()
+
+	s.TouchGeoM = s.opts.GeoM
+}
+
+func (s *Screen) FillOnly(screen, image *ebiten.Image, bottom bool) {
+	const (
+		canvasW = float64(SCREEN_WIDTH)
+		canvasH = float64(SCREEN_HEIGHT)
 	)
 
-	s.ApplyTouchPositions(x, y, w, h)
+	var (
+		rotation = *s.Rotation
+		radians  = float64(rotation) * math.Pi / 2
+		screenW  = float64(screen.Bounds().Dx())
+		screenH  = float64(screen.Bounds().Dy())
+		fitW     = canvasW
+		fitH     = canvasH
+	)
+
+	if rot := rotation == ROT_90 || rotation == ROT_270; rot {
+		fitW, fitH = canvasH, canvasW
+	}
+
+	scale := utils.ScaleImage(screenW, screenH, fitW, fitH)
+
+	s.opts.GeoM.Reset()
+	s.opts.GeoM.Translate(-canvasW/2, -canvasH/2)
+	s.opts.GeoM.Rotate(radians)
+	s.opts.GeoM.Scale(scale, scale)
+	s.opts.GeoM.Translate(screenW/2, screenH/2)
+	s.Mu.Lock()
+	screen.DrawImage(image, &s.opts)
+	s.Mu.Unlock()
+
+	if bottom {
+		s.TouchGeoM = s.opts.GeoM
+	} else {
+		s.TouchGeoM = ebiten.GeoM{}
+	}
 }
 
 func (s *Screen) FillHybrid(screen *ebiten.Image) {
-	var (
-		bottomW = float64(SCREEN_WIDTH)
-		bottomH = float64(SCREEN_HEIGHT)
-		canvasW = float64(SCREEN_WIDTH) * 1.5
-		canvasH = float64(SCREEN_HEIGHT)
-		screenW = float64(screen.Bounds().Dx())
-		screenH = float64(screen.Bounds().Dy())
-		scale   = utils.ScaleImage(screenW, screenH, canvasW, canvasH)
-		scaledH = scale * SCREEN_HEIGHT
-		scaledW = scale * SCREEN_WIDTH
-		offsetX = (screenW - (canvasW * scale)) / 2
-		offsetY = (screenH - (canvasH * scale)) / 2
+	const (
+		singleW = float64(SCREEN_WIDTH)
+		singleH = float64(SCREEN_HEIGHT)
 	)
 
-	s.Options.GeoM.Reset()
-	s.Options.GeoM.Scale(0.5, 0.5)
-	s.Options.GeoM.Translate(SCREEN_WIDTH, 0)
-	s.Options.GeoM.Scale(scale, scale)
-	s.Options.GeoM.Translate(offsetX, offsetY)
+	var (
+		canvasW  = singleW * 3
+		canvasH  = singleH * 2
+		rotation = *s.Rotation
+		radians  = float64(rotation) * math.Pi / 2
+		screenW  = float64(screen.Bounds().Dx())
+		screenH  = float64(screen.Bounds().Dy())
+		fitW     = canvasW
+		fitH     = canvasH
+	)
+
+	if rot := rotation == ROT_90 || rotation == ROT_270; rot {
+		fitW, fitH = canvasH, canvasW
+	}
+
+	scale := utils.ScaleImage(screenW, screenH, fitW, fitH)
+
+	s.opts.GeoM.Reset()
+	s.opts.GeoM.Translate(singleW*2, 0)
+	s.opts.GeoM.Translate(-canvasW/2, -canvasH/2)
+	s.opts.GeoM.Rotate(radians)
+	s.opts.GeoM.Scale(scale, scale)
+	s.opts.GeoM.Translate(screenW/2, screenH/2)
 	s.Mu.Lock()
-	screen.DrawImage(s.Top, &s.Options)
+	screen.DrawImage(s.Top, &s.opts)
 	s.Mu.Unlock()
 
-	s.Options.GeoM.Reset()
-	s.Options.GeoM.Scale(0.5, 0.5)
-	s.Options.GeoM.Translate(SCREEN_WIDTH, SCREEN_HEIGHT/2)
-	s.Options.GeoM.Scale(scale, scale)
-	s.Options.GeoM.Translate(offsetX, offsetY)
+	s.opts.GeoM.Reset()
+	s.opts.GeoM.Translate(singleW*2, singleH)
+	s.opts.GeoM.Translate(-canvasW/2, -canvasH/2)
+	s.opts.GeoM.Rotate(radians)
+	s.opts.GeoM.Scale(scale, scale)
+	s.opts.GeoM.Translate(screenW/2, screenH/2)
 	s.Mu.Lock()
-	screen.DrawImage(s.Bottom, &s.Options)
+	screen.DrawImage(s.Bottom, &s.opts)
+	s.TouchGeoM = s.opts.GeoM
 	s.Mu.Unlock()
 
+	s.opts.GeoM.Reset()
+	s.opts.GeoM.Scale(2, 2)
+	s.opts.GeoM.Translate(-canvasW/2, -canvasH/2)
+	s.opts.GeoM.Rotate(radians)
+	s.opts.GeoM.Scale(scale, scale)
+	s.opts.GeoM.Translate(screenW/2, screenH/2)
+
+	s.Mu.Lock()
 	if *s.Sizing == SIZING_ONLY_BOTTOM {
-
-		s.Options.GeoM.Reset()
-		s.Options.GeoM.Scale(scale, scale)
-		s.Options.GeoM.Translate(offsetX, offsetY)
-		s.Mu.Lock()
-		screen.DrawImage(s.Bottom, &s.Options)
-		s.Mu.Unlock()
-
-		realX := int(offsetX)
-		realY := int(offsetY)
-		realW := int(scale * bottomW)
-		realH := int(scale * bottomH)
-
-		s.BtmAbs = BtmAbs{
-			T: realY,
-			B: realY + realH,
-			L: realX,
-			R: realX + realW,
-			W: realW,
-			H: realH,
-		}
-
-		return
-	}
-
-	s.Options.GeoM.Reset()
-	s.Options.GeoM.Scale(scale, scale)
-	s.Options.GeoM.Translate(offsetX, offsetY)
-	s.Mu.Lock()
-	screen.DrawImage(s.Top, &s.Options)
-	s.Mu.Unlock()
-
-	realW := int(scale * bottomW * 0.5)
-	realH := int(scale * bottomH * 0.5)
-
-	s.BtmAbs = BtmAbs{
-		T: int((scaledH / 2) + offsetY),
-		B: int(scaledH + offsetY),
-		L: int(scaledW + offsetX),
-		R: int((scaledW * 1.5) + offsetX),
-		W: realW,
-		H: realH,
-	}
-}
-
-func (s *Screen) FillEvenVertical(screen *ebiten.Image) {
-	var (
-		screenW = float64(screen.Bounds().Dx())
-		screenH = float64(screen.Bounds().Dy())
-		bottomW = float64(SCREEN_WIDTH)
-		bottomH = float64(SCREEN_HEIGHT)
-
-		rotRadians float64
-		rotX       float64
-		rotY       float64
-		rot        bool
-		topOff     float64
-		botOff     float64
-		canvasW    float64
-		canvasH    float64
-	)
-
-	switch *s.Rotation {
-	case ROT_0: // skip
-		botOff = SCREEN_HEIGHT
-		rotRadians = RAD_0
-	case ROT_90:
-		topOff = SCREEN_WIDTH
-		rotX = SCREEN_HEIGHT
-		rot = true
-		rotRadians = RAD_90
-	case ROT_180:
-		topOff = SCREEN_HEIGHT
-		rotX = SCREEN_WIDTH
-		rotY = SCREEN_HEIGHT
-		rotRadians = RAD_180
-	case ROT_270:
-		botOff = SCREEN_WIDTH
-		rotY = SCREEN_WIDTH
-		rot = true
-		rotRadians = RAD_270
-	default:
-		panic("unallowed nds rotation value")
-	}
-
-	if rot {
-		screenH, screenW = screenW, screenH
-		canvasW = bottomW * 2
-		canvasH = bottomH
+		screen.DrawImage(s.Bottom, &s.opts)
+		s.TouchGeoM = s.opts.GeoM
 	} else {
-		canvasH = bottomH * 2
-		canvasW = bottomW
+		screen.DrawImage(s.Top, &s.opts)
 	}
-
-	scale := utils.ScaleImage(screenW, screenH, canvasW, canvasH)
-	offsetX := (screenW - (canvasW * scale)) / 2
-	offsetY := (screenH - (canvasH * scale)) / 2
-
-	if rot {
-		offsetX, offsetY = offsetY, offsetX
-	}
-
-	s.Options.GeoM.Reset()
-	s.Options.GeoM.Rotate(rotRadians)
-	s.Options.GeoM.Translate(rotX, rotY)
-	s.Options.GeoM.Translate(0, topOff)
-	s.Options.GeoM.Scale(scale, scale)
-	s.Options.GeoM.Translate(offsetX, offsetY)
-	s.Mu.Lock()
-	screen.DrawImage(s.Top, &s.Options)
 	s.Mu.Unlock()
-
-	s.Options.GeoM.Reset()
-	s.Options.GeoM.Rotate(rotRadians)
-	s.Options.GeoM.Translate(rotX, rotY)
-	s.Options.GeoM.Translate(0, botOff)
-	s.Options.GeoM.Scale(scale, scale)
-	s.Options.GeoM.Translate(offsetX, offsetY)
-	s.Mu.Lock()
-	screen.DrawImage(s.Bottom, &s.Options)
-	s.Mu.Unlock()
-
-	var (
-		realX = int(offsetX)
-		realY = int(offsetY + (scale * botOff))
-		realW = int(scale * bottomW)
-		realH = int(scale * bottomH)
-	)
-
-	s.ApplyTouchPositions(realX, realY, realW, realH)
-}
-
-func (s *Screen) FillEvenHorizontal(screen *ebiten.Image) {
-	var (
-		screenW = float64(screen.Bounds().Dx())
-		screenH = float64(screen.Bounds().Dy())
-		bottomW = float64(SCREEN_WIDTH)
-		bottomH = float64(SCREEN_HEIGHT)
-
-		rotRadians float64
-		rotX       float64
-		rotY       float64
-		rot        bool
-		topOff     float64
-		botOff     float64
-		canvasW    float64
-		canvasH    float64
-	)
-
-	switch *s.Rotation {
-	case ROT_0:
-		botOff = SCREEN_WIDTH
-		rotRadians = RAD_0
-	case ROT_90:
-		topOff = SCREEN_HEIGHT
-
-		rotX = SCREEN_HEIGHT
-		rot = true
-		rotRadians = RAD_90
-	case ROT_180:
-		topOff = SCREEN_WIDTH
-
-		rotX = SCREEN_WIDTH
-		rotY = SCREEN_HEIGHT
-		rotRadians = RAD_180
-	case ROT_270:
-		botOff = SCREEN_HEIGHT
-
-		rotY = SCREEN_WIDTH
-		rot = true
-		rotRadians = RAD_270
-	default:
-		panic("unallowed nds rotation value")
-	}
-
-	if rot {
-		screenH, screenW = screenW, screenH
-		canvasW = bottomW
-		canvasH = bottomH * 2
-	} else {
-		canvasH = bottomH
-		canvasW = bottomW * 2
-	}
-
-	scale := utils.ScaleImage(screenW, screenH, canvasW, canvasH)
-	offsetX := (screenW - (canvasW * scale)) / 2
-	offsetY := (screenH - (canvasH * scale)) / 2
-
-	if rot {
-		offsetX, offsetY = offsetY, offsetX
-	}
-
-	s.Options.GeoM.Reset()
-	s.Options.GeoM.Rotate(rotRadians)
-	s.Options.GeoM.Translate(rotX, rotY)
-	s.Options.GeoM.Translate(topOff, 0)
-	s.Options.GeoM.Scale(scale, scale)
-	s.Options.GeoM.Translate(offsetX, offsetY)
-	s.Mu.Lock()
-	screen.DrawImage(s.Top, &s.Options)
-	s.Mu.Unlock()
-
-	s.Options.GeoM.Reset()
-	s.Options.GeoM.Rotate(rotRadians)
-	s.Options.GeoM.Translate(rotX, rotY)
-	s.Options.GeoM.Translate(botOff, 0)
-	s.Options.GeoM.Scale(scale, scale)
-	s.Options.GeoM.Translate(offsetX, offsetY)
-	screen.DrawImage(s.Bottom, &s.Options)
-	s.Mu.Lock()
-	screen.DrawImage(s.Bottom, &s.Options)
-	s.Mu.Unlock()
-
-	var (
-		realX = int(offsetX + (scale * botOff))
-		realY = int(offsetY)
-		realW = int(scale * bottomW)
-		realH = int(scale * bottomH)
-	)
-
-	s.ApplyTouchPositions(realX, realY, realW, realH)
 }

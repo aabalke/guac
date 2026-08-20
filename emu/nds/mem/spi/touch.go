@@ -24,26 +24,28 @@ type Tsc struct {
 
 	Control uint8
 
-	//Temp0 uint16
-	//Temp1 uint16
-	//Aux uint16
+	// Temp0 uint16
+	// Temp1 uint16
+	// Aux uint16
 
 	TouchX uint16
 	TouchY uint16
 
 	IrqEnabled bool
 
-	TouchActive bool
+	Input2 *uint8
+}
+
+func NewTsc(input2 *uint8) *Tsc {
+	return &Tsc{
+		Input2: input2,
+	}
 }
 
 func (t *Tsc) Transfer(data []uint8) (reply []uint8, stat uint8) {
-
 	inst := data[0]
 
-	//log.Printf("SPI Touchscr % 02X\n", data)
-
-	if invalidStart := (inst>>7)&1 == 0; invalidStart {
-		//panic("INVALID START TO TOUCH TRANSFER")
+	if invalidStart := inst&0x80 == 0; invalidStart {
 		return nil, STAT_DONE
 	}
 
@@ -52,38 +54,33 @@ func (t *Tsc) Transfer(data []uint8) (reply []uint8, stat uint8) {
 		conv8 = (inst>>3)&1 != 0
 	)
 
-	switch ch := (inst >> 4) & 0b111; ch {
+	switch ch := (inst >> 4) & 7; ch {
 	case CH_TEMP0:
 		out = 0x800
 	case CH_TOUCHY:
 
-		if t.TouchActive {
-			adcY1 := binary.LittleEndian.Uint16(t.Firmware.Data[0x3FE00+0x5A:])
-			scrY1 := t.Firmware.Data[0x3FE00+0x5D]
-			adcY2 := binary.LittleEndian.Uint16(t.Firmware.Data[0x3FE00+0x60:])
-			scrY2 := t.Firmware.Data[0x3FE00+0x63]
-			out = uint16((int(t.TouchY)-int(scrY1)+1)*int(adcY2-adcY1)/int(scrY2-scrY1) + int(adcY1))
+		if pressed := *t.Input2&0x40 == 0; pressed {
+			adcY1 := int(binary.LittleEndian.Uint16(t.Firmware.Data[0x3FE00+0x5A:]))
+			scrY1 := int(t.Firmware.Data[0x3FE00+0x5D])
+			adcY2 := int(binary.LittleEndian.Uint16(t.Firmware.Data[0x3FE00+0x60:]))
+			scrY2 := int(t.Firmware.Data[0x3FE00+0x63])
+			out = uint16((int(t.TouchY)-scrY1+1)*(adcY2-adcY1)/(scrY2-scrY1) + adcY1)
 		} else {
 			out = 0xFFF
 		}
 
 	case CH_TOUCHX:
-		if t.TouchActive {
-			adcX1 := binary.LittleEndian.Uint16(t.Firmware.Data[0x3FE00+0x58:])
-			scrX1 := t.Firmware.Data[0x3FE00+0x5C]
-			adcX2 := binary.LittleEndian.Uint16(t.Firmware.Data[0x3FE00+0x5E:])
-			scrX2 := t.Firmware.Data[0x3FE00+0x62]
-			out = uint16((int(t.TouchX)-int(scrX1)+1)*int(adcX2-adcX1)/int(scrX2-scrX1) + int(adcX1))
+		if pressed := *t.Input2&0x40 == 0; pressed {
+			adcX1 := int(binary.LittleEndian.Uint16(t.Firmware.Data[0x3FE00+0x58:]))
+			scrX1 := int(t.Firmware.Data[0x3FE00+0x5C])
+			adcX2 := int(binary.LittleEndian.Uint16(t.Firmware.Data[0x3FE00+0x5E:]))
+			scrX2 := int(t.Firmware.Data[0x3FE00+0x62])
+			out = uint16((int(t.TouchX)-scrX1+1)*(adcX2-adcX1)/(scrX2-scrX1) + adcX1)
 		} else {
 			out = 0x0
 		}
 
-	case CH_TOUCHZ1, CH_TOUCHZ2:
-
-		out = 0x0
-
-	case CH_AUX:
-
+	case CH_TOUCHZ1, CH_TOUCHZ2, CH_AUX:
 		out = 0x0
 
 	default:
