@@ -16,103 +16,52 @@ type Tcm struct {
 	DtcmLoadMode bool
 }
 
-func (t *Tcm) ReadDtcm(addr uint32) (uint8, bool) {
-	if t.DtcmLoadMode || !t.DtcmEnabled {
-		return 0, false
-	}
-
-	return t.Dtcm[(addr-t.DtcmBase)&0x3FFF], true
-}
-
 func (t *Tcm) Read(addr uint32) (uint8, bool) {
-	if addr < t.ItcmSize {
-
-		if t.ItcmLoadMode || !t.ItcmEnabled {
-			return 0, false
-		}
-
+	if t.ItcmEnabled && !t.ItcmLoadMode && addr < t.ItcmSize {
 		return t.Itcm[addr&0x7FFF], true
-
 	}
 
-	if addr >= t.DtcmBase && addr < t.DtcmBase+t.DtcmSize {
-		return t.ReadDtcm(addr)
+	if t.DtcmEnabled && !t.DtcmLoadMode && addr >= t.DtcmBase && addr < t.DtcmBase+t.DtcmSize {
+		return t.Dtcm[(addr-t.DtcmBase)&0x3FFF], true
 	}
 
 	return 0, false
 }
 
-func (t *Tcm) ReadTcmWindow(addr uint32) (uint8, bool) {
-	if dtcm := (addr >= t.DtcmBase && addr < t.DtcmBase+t.DtcmSize); !dtcm {
-		return 0, false
-	}
-
-	return t.Read(addr)
-}
-
-func (t *Tcm) ReadTcmWindowPtr(addr uint32) unsafe.Pointer {
-	if dtcm := (addr >= t.DtcmBase && addr < t.DtcmBase+t.DtcmSize); !dtcm {
-		return nil
-	}
-
-	return t.ReadPtr(addr)
-}
-
 func (t *Tcm) ReadPtr(addr uint32) unsafe.Pointer {
-	if addr < t.ItcmSize {
-
-		if t.ItcmLoadMode || !t.ItcmEnabled {
-			return nil
-		}
-
+	if t.ItcmEnabled && !t.ItcmLoadMode && addr < t.ItcmSize {
 		return unsafe.Add(unsafe.Pointer(&t.Itcm), addr&0x7FFF)
+	}
 
-	} else if addr >= t.DtcmBase && addr < t.DtcmBase+t.DtcmSize {
-		return t.ReadDtcmPtr(addr)
+	if t.DtcmEnabled && !t.DtcmLoadMode && addr >= t.DtcmBase && addr < t.DtcmBase+t.DtcmSize {
+		return unsafe.Add(unsafe.Pointer(&t.Dtcm), (addr-t.DtcmBase)&0x3FFF)
 	}
 
 	return nil
 }
 
-func (t *Tcm) ReadDtcmPtr(addr uint32) unsafe.Pointer {
-	if t.DtcmLoadMode || !t.DtcmEnabled {
-		return nil
-	}
-
-	return unsafe.Add(unsafe.Pointer(&t.Dtcm), (addr-t.DtcmBase)&0x3FFF)
-}
-
-func (t *Tcm) WriteDtcm(addr uint32, v uint8) bool {
-	if !t.DtcmEnabled {
-		return false
-	}
-
-	t.Dtcm[(addr-t.DtcmBase)&0x3FFF] = v
-	return true
-}
-
 func (t *Tcm) Write(addr uint32, v uint8) bool {
-	if addr < t.ItcmSize {
-
-		if !t.ItcmEnabled {
-			return false
-		}
-
+	if t.ItcmEnabled && addr < t.ItcmSize {
 		t.Itcm[addr&0x7FFF] = v
 		return true
 	}
 
-	if addr >= t.DtcmBase && addr < t.DtcmBase+t.DtcmSize {
-		return t.WriteDtcm(addr, v)
+	if t.DtcmEnabled && addr >= t.DtcmBase && addr < t.DtcmBase+t.DtcmSize {
+		t.Dtcm[(addr-t.DtcmBase)&0x3FFF] = v
+		return true
 	}
 
 	return false
 }
 
-func (t *Tcm) WriteTcmWindow(addr uint32, v uint8) bool {
-	if dtcm := (addr >= t.DtcmBase && addr < t.DtcmBase+t.DtcmSize); !dtcm {
-		return false
+func (t *Tcm) WritePtr(addr uint32) unsafe.Pointer {
+	if t.ItcmEnabled && addr < t.ItcmSize {
+		return unsafe.Add(unsafe.Pointer(&t.Itcm), addr&0x7FFF)
 	}
 
-	return t.Write(addr, v)
+	if t.DtcmEnabled && addr >= t.DtcmBase && addr < t.DtcmBase+t.DtcmSize {
+		return unsafe.Add(unsafe.Pointer(&t.Dtcm), (addr-t.DtcmBase)&0x3FFF)
+	}
+
+	return nil
 }

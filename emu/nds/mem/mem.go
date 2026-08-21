@@ -162,22 +162,19 @@ func (mem *Mem) LoadBios() {
 func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 	if arm9 {
 
-		if v, ok := mem.Tcm.ReadTcmWindow(addr); ok {
+		if v, ok := mem.Tcm.Read(addr); ok {
 			return v
 		}
 
 		switch addr >> 24 {
-		case 0x0, 0x1:
-			v, _ := mem.Tcm.Read(addr)
-			return v
 		case 0x2:
 			return mem.MainRam[addr&0x3F_FFFF]
 		case 0x3:
 			return mem.WRAM.Read9(addr)
 		case 0x4:
-			return mem.ReadArm9IO(addr - 0x400_0000)
+			return mem.ReadArm9IO(addr & 0xFF_FFFF)
 		case 0x5:
-			return mem.Ppu.ReadPram(addr, mem.Ppu)
+			return mem.Ppu.ReadPram(addr)
 		case 0x6:
 			return mem.Ppu.Vram.Read9(addr)
 		case 0x7:
@@ -191,7 +188,7 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 		}
 	}
 	switch addr >> 24 {
-	case 0x0, 0x1:
+	case 0x0:
 
 		if addr < 0x4000 && (*mem.arm7Pc) < 0x4000 {
 			return (*mem.Arm7Bios)[addr]
@@ -199,12 +196,15 @@ func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
 
 		return 0xFF
 
+	case 0x1:
+		return 0xFF
+
 	case 0x2:
 		return mem.MainRam[addr&0x3F_FFFF]
 	case 0x3:
 		return mem.WRAM.Read7(addr)
 	case 0x4:
-		return mem.ReadArm7IO(addr - 0x400_0000)
+		return mem.ReadArm7IO(addr & 0xFF_FFFF)
 	case 0x6:
 		return mem.Ppu.Vram.Read7(addr)
 	case 0x8, 0x9, 0xA:
@@ -272,13 +272,11 @@ func (mem *Mem) WritePtr(addr uint32, arm9 bool) unsafe.Pointer {
 
 	if arm9 {
 
-		if ptr := mem.Tcm.ReadTcmWindowPtr(addr); ptr != nil {
+		if ptr := mem.Tcm.WritePtr(addr); ptr != nil {
 			return ptr
 		}
 
 		switch addr >> 24 {
-		case 0x0, 0x1:
-			return mem.Tcm.ReadPtr(addr)
 		case 0x2:
 			return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr&0x3F_FFFF)
 		case 0x3:
@@ -305,13 +303,11 @@ func (mem *Mem) WritePtr(addr uint32, arm9 bool) unsafe.Pointer {
 func (mem *Mem) ReadPtr(addr uint32, arm9 bool) unsafe.Pointer {
 	if arm9 {
 
-		if ptr := mem.Tcm.ReadTcmWindowPtr(addr); ptr != nil {
+		if ptr := mem.Tcm.ReadPtr(addr); ptr != nil {
 			return ptr
 		}
 
 		switch addr >> 24 {
-		case 0x0, 0x1:
-			return mem.Tcm.ReadPtr(addr)
 		case 0x2:
 			return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr&0x3F_FFFF)
 		case 0x3:
@@ -355,13 +351,11 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 
 	if arm9 {
 
-		if ok := mem.Tcm.WriteTcmWindow(addr, v); ok {
+		if ok := mem.Tcm.Write(addr, v); ok {
 			return
 		}
 
 		switch addr >> 24 {
-		case 0x0, 0x1:
-			mem.Tcm.Write(addr, v)
 		case 0x2:
 			//clearTempUnimplimented(addr)
 			mem.MainRam[addr&0x3F_FFFF] = v
@@ -370,7 +364,7 @@ func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
 		case 0x4:
 			mem.WriteArm9IO(addr-0x400_0000, v)
 		case 0x5:
-			mem.Ppu.WritePram(addr, v, mem.Ppu)
+			mem.Ppu.WritePram(addr, v)
 		case 0x6:
 			mem.Ppu.Vram.Write9(addr, v)
 		case 0x7:

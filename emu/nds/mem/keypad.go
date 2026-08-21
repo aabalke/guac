@@ -4,8 +4,8 @@ import "github.com/aabalke/guac/emu/cpu"
 
 type Key struct {
 	Irq     [2]*cpu.Irq
-	Input   uint16
 	Cnt     uint16
+	Input   uint16
 	Input2  uint8
 	Enabled bool
 	AndMode bool

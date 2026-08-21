@@ -19,6 +19,10 @@ const (
 )
 
 type VRAM struct {
+	engineA      *Engine
+	engineB      *Engine
+	TextureCache *rast.TextureCache
+
 	a [0x2_0000]uint8
 	b [0x2_0000]uint8
 	c [0x2_0000]uint8
@@ -34,11 +38,6 @@ type VRAM struct {
 
 	TextureSlots [4]*[0x2_0000]uint8
 	TexPalSlots  [6]*[0x4000]uint8
-
-	TextureCache *rast.TextureCache
-
-	engineA *Engine
-	engineB *Engine
 }
 
 func (v *VRAM) Init(t *rast.TextureCache, a, b *Engine) {
@@ -72,22 +71,21 @@ func (v *VRAM) Init(t *rast.TextureCache, a, b *Engine) {
 }
 
 type VramCnt struct {
-	V       uint8
-	Mst     uint8
-	Enabled bool
+	bank    unsafe.Pointer
 	Ofs     uint32
 	Base    uint32
 	Size    uint32
-	bank    unsafe.Pointer
-
-	arm7 bool
+	V       uint8
+	Mst     uint8
+	Enabled bool
+	arm7    bool
 }
 
 func (vc *VramCnt) Write(v uint8) {
 	vc.V = v & 0b1001_1111
-	vc.Mst = v & 0b111
-	vc.Ofs = uint32(v>>3) & 0b11
-	vc.Enabled = (v>>7)&1 != 0
+	vc.Mst = v & 7
+	vc.Ofs = uint32(v>>3) & 3
+	vc.Enabled = v&0x80 != 0
 }
 
 func (vm *VRAM) WriteCnt(addr uint32, v uint8) {

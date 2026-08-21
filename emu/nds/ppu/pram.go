@@ -11,37 +11,34 @@ const (
 	PRAM_B_OBJ
 )
 
-func (p *PPU) ReadPram(addr uint32, ppu *PPU) uint8 {
-
-	hi := addr&1 != 0
+func (p *PPU) ReadPram(addr uint32) uint8 {
 	addr &= 0x7FF
 
-	bankIdx := addr >> 9
-
 	var bank *[0x100]uint16
-
-	switch bankIdx {
+	switch bankIdx := addr >> 9; bankIdx {
 	case PRAM_A_BG:
 		bank = &p.EngineA.Pram.Bg
-		if !ppu.EngineA2D {
+		if !p.EngineA2D {
 			return 0
 		}
 	case PRAM_A_OBJ:
 		bank = &p.EngineA.Pram.Obj
-		if !ppu.EngineA2D {
+		if !p.EngineA2D {
 			return 0
 		}
 	case PRAM_B_BG:
 		bank = &p.EngineB.Pram.Bg
-		if !ppu.EngineB2D {
+		if !p.EngineB2D {
 			return 0
 		}
 	case PRAM_B_OBJ:
 		bank = &p.EngineB.Pram.Obj
-		if !ppu.EngineB2D {
+		if !p.EngineB2D {
 			return 0
 		}
 	}
+
+	hi := addr&1 != 0
 
 	addr &= 0x1FF
 	addr >>= 1
@@ -53,47 +50,41 @@ func (p *PPU) ReadPram(addr uint32, ppu *PPU) uint8 {
 	return uint8(bank[addr])
 }
 
-func (p *PPU) WritePram(addr uint32, v uint8, ppu *PPU) {
-
-	hi := addr&1 != 0
+func (p *PPU) WritePram(addr uint32, v uint8) {
 	addr &= 0x7FF
 
-	bankIdx := addr >> 9
-
 	var bank *[0x100]uint16
-
-	switch bankIdx {
+	switch bankIdx := addr >> 9; bankIdx {
 	case PRAM_A_BG:
 		bank = &p.EngineA.Pram.Bg
-		if !ppu.EngineA2D {
+		if !p.EngineA2D {
 			return
 		}
 	case PRAM_A_OBJ:
 		bank = &p.EngineA.Pram.Obj
-		if !ppu.EngineA2D {
+		if !p.EngineA2D {
 			return
 		}
 	case PRAM_B_BG:
 		bank = &p.EngineB.Pram.Bg
-		if !ppu.EngineB2D {
+		if !p.EngineB2D {
 			return
 		}
 	case PRAM_B_OBJ:
 		bank = &p.EngineB.Pram.Obj
-		if !ppu.EngineB2D {
+		if !p.EngineB2D {
 			return
 		}
 	}
 
+	hi := addr&1 != 0
 	addr &= 0x1FF
 	addr >>= 1
 
 	if hi {
-		bank[addr] &= 0xFF
-		bank[addr] |= uint16(v) << 8
+		bank[addr] = (bank[addr] & 0x00FF) | (uint16(v) << 8)
 		return
 	}
 
-	bank[addr] &^= 0xFF
-	bank[addr] |= uint16(v)
+	bank[addr] = (bank[addr] & 0xFF00) | (uint16(v) << 0)
 }

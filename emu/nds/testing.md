@@ -1,6 +1,6 @@
 # Testing
 
-❌ RockPolish/rockwrestler fails Memory / Tcm 0x12 (MelonDS + no$gba fails 0x10)
+👍 RockPolish/rockwrestler
 👍 Atem2069/armwrestler-fixed
 👍 arm7wrestler
 👍 Imran Nazar & LiraNuna / TinyFB

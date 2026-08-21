@@ -4,7 +4,7 @@ import "unsafe"
 
 type WRAM struct {
 	Wram  [0x8000]uint8
-	WRAM7 [0x1_0000]uint8
+	WRAM7 [0x10000]uint8
 	CNT   uint8
 }
 
@@ -81,7 +81,6 @@ func (w *WRAM) Read7(addr uint32) uint8 {
 func (w *WRAM) ReadPtr9(addr uint32) unsafe.Pointer {
 	switch w.CNT {
 	case 0:
-		// this fails tcm test rockwrestler
 		return unsafe.Add(unsafe.Pointer(&w.Wram), addr&0x7FFF)
 	case 1:
 		return unsafe.Add(unsafe.Pointer(&w.Wram), 0x4000+(addr&0x3FFF))

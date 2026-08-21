@@ -93,15 +93,15 @@ func (c *Cp15) Write(reg *CpRegister, lowVector *bool, v uint32) {
 		//if v & 1 == 1 { panic("PU MODE")}
 
 	case DTCM:
-		v &^= 0b1111_1100_0001
-		c.tcm.DtcmSize = 512 << ((v >> 1) & 0x3F)
+		v &= 0xFFFF_F07E
+		sizeShift := max(3, min(((v>>1)&0x1F), 23))
+		c.tcm.DtcmSize = 512 << sizeShift
 		c.tcm.DtcmBase = v & 0xFFFF_F000
 
-		// base must be size aligned
-
 	case ITCM:
-		v &= 0b111110
-		c.tcm.ItcmSize = 512 << ((v >> 1) & 0x3F)
+		v &= 0xFFFF_F07E
+		sizeShift := max(3, min(((v>>1)&0x1F), 23))
+		c.tcm.ItcmSize = 512 << sizeShift
 	}
 
 	c.R[*reg] = v
