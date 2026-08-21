@@ -1,332 +1,222 @@
 package snd
 
 func (s *Snd) Write(addr uint32, v uint8) {
+	addr &= 0xFFF
 
-	addr &= 0xFFFF
-
-	switch {
-	case addr < 0x400:
+	if addr < 0x500 {
+		s.Channels[(addr/16)&0xF].Write(addr, v)
 		return
-	case addr < 0x500:
-		i := (addr & 0xF0) >> 4
-		s.Channels[i].Write(addr, v)
+	}
 
-	case addr < 0x600:
+	c0 := &s.Capture[0]
+	c1 := &s.Capture[1]
 
-		c0 := &s.Capture[0]
-		c1 := &s.Capture[1]
+	switch addr {
+	case 0x500:
+		s.VolMaster = float64(v&0x7F) / 127
 
-		switch addr {
-		case 0x500:
+	case 0x501:
 
-			s.VolMaster = float64(v&0b111_1111) / 127
+		s.LOut = (v & 3) >> 0
+		s.ROut = (v & 3) >> 2
+		s.NoOutCh1 = (v>>4)&1 != 0
+		s.NoOutCh3 = (v>>5)&1 != 0
+		s.Enabled = v&0x80 != 0
 
-		case 0x501:
+	case 0x504, 0x505:
+		offset := (addr & 1) * 8
+		s.Bias = ((s.Bias &^ (0xFF << offset)) | (uint16(v) << offset))
 
-			s.LOut = (v & 0b11) >> 0
-			s.ROut = (v & 0b11) >> 2
-			s.NoOutCh1 = (v>>4)&1 != 0
-			s.NoOutCh3 = (v>>5)&1 != 0
-			s.Enabled = (v>>7)&1 != 0
+	case 0x508:
+		c0.Add = v&(1<<0) != 0
+		c0.ChanSrc = v&(1<<1) != 0
+		c0.OneShot = v&(1<<2) != 0
+		c0.PCM8 = v&(1<<3) != 0
+		busy := v&(1<<7) != 0
 
-		case 0x504:
+		c0.Start = busy
 
-			s.Bias &^= 0xFF
-			s.Bias |= uint32(v)
-
-		case 0x505:
-
-			s.Bias &= 0xFF
-			s.Bias |= uint32(v&0b11) << 8
-
-		case 0x508:
-			c0.Add = v&(1<<0) != 0
-			c0.ChanSrc = v&(1<<1) != 0
-			c0.OneShot = v&(1<<2) != 0
-			c0.PCM8 = v&(1<<3) != 0
-			busy := v&(1<<7) != 0
-
-			c0.Start = busy
-
-			if !busy {
-				c0.Playing = false
-			}
-
-			if c0.Add {
-				panic("UNSETUP SND CAP 0 ADD")
-			}
-
-		case 0x509:
-			c1.Add = v&(1<<0) != 0
-			c1.ChanSrc = v&(1<<1) != 0
-			c1.OneShot = v&(1<<2) != 0
-			c1.PCM8 = v&(1<<3) != 0
-			busy := v&(1<<7) != 0
-
-			c1.Start = busy
-
-			if !busy {
-				c1.Playing = false
-			}
-
-			if c1.Add {
-				panic("UNSETUP SND CAP 1 ADD")
-			}
-		case 0x510:
-			c0.Dest &^= 0xFF
-			c0.Dest |= uint32(v &^ 0b11)
-		case 0x511:
-			c0.Dest &^= 0xFF << 8
-			c0.Dest |= uint32(v) << 8
-		case 0x512:
-			c0.Dest &^= 0xFF << 16
-			c0.Dest |= uint32(v) << 16
-		case 0x513:
-			c0.Dest &^= 0xFF << 24
-			c0.Dest |= uint32(v&0b111) << 24
-		case 0x514:
-			c0.Len &^= 0xFF
-			c0.Len |= uint16(v)
-		case 0x515:
-			c0.Len &^= 0xFF << 8
-			c0.Len |= uint16(v) << 8
-		case 0x518:
-			c1.Dest &^= 0xFF
-			c1.Dest |= uint32(v &^ 0b11)
-		case 0x519:
-			c1.Dest &^= 0xFF << 8
-			c1.Dest |= uint32(v) << 8
-		case 0x51A:
-			c1.Dest &^= 0xFF << 16
-			c1.Dest |= uint32(v) << 16
-		case 0x51B:
-			c1.Dest &^= 0xFF << 24
-			c1.Dest |= uint32(v&0b111) << 24
-		case 0x51C:
-			c1.Len &^= 0xFF
-			c1.Len |= uint16(v)
-		case 0x51D:
-			c1.Len &^= 0xFF << 8
-			c1.Len |= uint16(v) << 8
+		if !busy {
+			c0.Playing = false
 		}
 
-		return
+		if c0.Add {
+			panic("UNSETUP SND CAP 0 ADD")
+		}
+
+	case 0x509:
+		c1.Add = v&(1<<0) != 0
+		c1.ChanSrc = v&(1<<1) != 0
+		c1.OneShot = v&(1<<2) != 0
+		c1.PCM8 = v&(1<<3) != 0
+		busy := v&(1<<7) != 0
+
+		c1.Start = busy
+
+		if !busy {
+			c1.Playing = false
+		}
+
+		if c1.Add {
+			panic("UNSETUP SND CAP 1 ADD")
+		}
+
+	case 0x510, 0x511, 0x512, 0x513:
+		offset := (addr & 3) * 8
+		c0.Dest = ((c0.Dest &^ (0xFF << offset)) | (uint32(v) << offset)) & 0x07FFFFFC
+
+	case 0x514, 0x515:
+		offset := (addr & 1) * 8
+		c0.Len = ((c0.Len &^ (0xFF << offset)) | (uint16(v) << offset))
+
+	case 0x518, 0x519, 0x51A, 0x51B:
+		offset := (addr & 3) * 8
+		c1.Dest = ((c1.Dest &^ (0xFF << offset)) | (uint32(v) << offset)) & 0x07FFFFFC
+
+	case 0x51C, 0x51D:
+		offset := (addr & 1) * 8
+		c1.Len = ((c1.Len &^ (0xFF << offset)) | (uint16(v) << offset))
 	}
 }
 
 func (c *Channel) Write(addr uint32, v uint8) {
-
-	addr &= 0xF
-
-	switch addr {
+	switch addr & 0xF {
 	case 0x0:
-		c.VolMul = uint32(v & 0b111_1111)
+		c.VolMul = v & 0x7F
 	case 0x1:
-		c.VolDiv = uint32(v & 0b11)
-		c.Hold = (v>>7)&1 != 0
+		c.VolDiv = v & 3
+		c.Hold = v&0x80 != 0
 	case 0x2:
-		c.Panning = uint32(v & 0b111_1111)
+		c.Panning = v & 0x7F
 	case 0x3:
 
-		c.Duty = uint32(v & 0b111)
-		c.RepeatMode = uint32(v>>3) & 0b11
-		c.Format = uint32(v>>5) & 0b11
-		busy := (v>>7)&1 != 0
+		c.Duty = v & 7
+		c.RepeatMode = (v >> 3) & 3
+		c.Format = (v >> 5) & 3
+		c.Start = v&0x80 != 0
 
-		c.Start = busy
-
-		if !busy {
+		if !c.Start {
 			c.Playing = false
 		}
 
-	case 0x4:
+	case 0x4, 0x5, 0x6, 0x7:
+		offset := (addr & 3) * 8
+		c.SrcAddr = ((c.SrcAddr &^ (0xFF << offset)) | (uint32(v) << offset)) & 0x07FFFFFC
 
-		c.SrcAddr &^= 0xFF
-		c.SrcAddr |= uint32(v &^ 0b11)
+	case 0x8, 0x9:
+		offset := (addr & 1) * 8
+		c.TimerValue = ((c.TimerValue &^ (0xFF << offset)) | (uint16(v) << offset))
 
-	case 0x5:
+	case 0xA, 0xB:
+		offset := (addr & 1) * 8
+		c.StartPosition = ((c.StartPosition &^ (0xFF << offset)) | (uint16(v) << offset))
 
-		c.SrcAddr &^= 0xFF << 8
-		c.SrcAddr |= uint32(v) << 8
-
-	case 0x6:
-
-		c.SrcAddr &^= 0xFF << 16
-		c.SrcAddr |= uint32(v) << 16
-
-	case 0x7:
-
-		c.SrcAddr &^= 0xFF << 24
-		c.SrcAddr |= uint32(v&0b111) << 24
-
-	case 0x8:
-
-		c.TimerValue &^= 0xFF
-		c.TimerValue |= uint16(v)
-
-	case 0x9:
-
-		c.TimerValue &^= 0xFF << 8
-		c.TimerValue |= uint16(v) << 8
-
-	case 0xA:
-
-		c.StartPosition &^= 0xFF
-		c.StartPosition |= uint16(v)
-
-	case 0xB:
-
-		c.StartPosition &^= 0xFF << 8
-		c.StartPosition |= uint16(v) << 8
-
-	case 0xC:
-
-		c.SndLength &^= 0xFF
-		c.SndLength |= uint32(v)
-
-	case 0xD:
-
-		c.SndLength &^= 0xFF << 8
-		c.SndLength |= uint32(v) << 8
-
-	case 0xE:
-
-		c.SndLength &^= 0xFF << 16
-		c.SndLength |= uint32(v&0b11_1111) << 16
+	case 0xC, 0xD, 0xE:
+		offset := (addr & 3) * 8
+		c.SndLength = ((c.SndLength &^ (0xFF << offset)) | (uint32(v) << offset)) & 0x003FFFFF
 	}
 }
 
 func (s *Snd) Read(addr uint32) uint8 {
-
 	addr &= 0xFFF
 
-	if addr >= 0x500 {
-
-		c0 := &s.Capture[0]
-		c1 := &s.Capture[1]
-
-		switch addr {
-		case 0x500:
-
-			return uint8(s.VolMaster)
-
-		case 0x501:
-
-			v := s.LOut
-			v |= s.ROut << 2
-
-			if s.NoOutCh1 {
-				v |= 1 << 4
-			}
-
-			if s.NoOutCh3 {
-				v |= 1 << 5
-			}
-
-			if s.Enabled {
-				v |= 1 << 7
-			}
-
-			return v
-
-		case 0x504:
-
-			return uint8(s.Bias)
-
-		case 0x505:
-
-			return uint8(s.Bias >> 8)
-
-		case 0x508:
-
-			var v uint8
-
-			if c0.Add {
-				v |= (1 << 0)
-			}
-			if c0.ChanSrc {
-				v |= (1 << 1)
-			}
-			if c0.OneShot {
-				v |= (1 << 2)
-			}
-			if c0.PCM8 {
-				v |= (1 << 3)
-			}
-			if c0.Playing {
-				v |= (1 << 7)
-			}
-
-			return v
-
-		case 0x509:
-
-			var v uint8
-
-			if c1.Add {
-				v |= (1 << 0)
-			}
-			if c1.ChanSrc {
-				v |= (1 << 1)
-			}
-			if c1.OneShot {
-				v |= (1 << 2)
-			}
-			if c1.PCM8 {
-				v |= (1 << 3)
-			}
-			if c1.Playing {
-				v |= (1 << 7)
-			}
-
-			return v
-
-		case 0x510:
-			return uint8(c0.Dest)
-		case 0x511:
-			return uint8(c0.Dest >> 8)
-		case 0x512:
-			return uint8(c0.Dest >> 16)
-		case 0x513:
-			return uint8(c0.Dest >> 24)
-		case 0x514:
-			return uint8(c0.Len)
-		case 0x515:
-			return uint8(c0.Len >> 8)
-		case 0x518:
-			return uint8(c1.Dest)
-		case 0x519:
-			return uint8(c1.Dest >> 8)
-		case 0x51A:
-			return uint8(c1.Dest >> 16)
-		case 0x51B:
-			return uint8(c1.Dest >> 24)
-		case 0x51C:
-			return uint8(c1.Len)
-		case 0x51D:
-			return uint8(c1.Len >> 8)
-		}
-
-		return 0
+	if addr < 0x500 {
+		return s.Channels[(addr/16)&0xF].Read(addr)
 	}
 
-	i := (addr & 0xF0) >> 4
+	c0 := &s.Capture[0]
+	c1 := &s.Capture[1]
 
-	return s.Channels[i].Read(addr)
+	switch addr {
+	case 0x500:
+		return uint8(s.VolMaster)
+
+	case 0x501:
+
+		v := s.LOut
+		v |= s.ROut << 2
+
+		if s.NoOutCh1 {
+			v |= 1 << 4
+		}
+
+		if s.NoOutCh3 {
+			v |= 1 << 5
+		}
+
+		if s.Enabled {
+			v |= 1 << 7
+		}
+
+		return v
+
+	case 0x504, 0x505:
+		return uint8(s.Bias >> ((addr & 1) * 8))
+
+	case 0x508:
+
+		var v uint8
+
+		if c0.Add {
+			v |= (1 << 0)
+		}
+		if c0.ChanSrc {
+			v |= (1 << 1)
+		}
+		if c0.OneShot {
+			v |= (1 << 2)
+		}
+		if c0.PCM8 {
+			v |= (1 << 3)
+		}
+		if c0.Playing {
+			v |= (1 << 7)
+		}
+
+		return v
+
+	case 0x509:
+
+		var v uint8
+
+		if c1.Add {
+			v |= (1 << 0)
+		}
+		if c1.ChanSrc {
+			v |= (1 << 1)
+		}
+		if c1.OneShot {
+			v |= (1 << 2)
+		}
+		if c1.PCM8 {
+			v |= (1 << 3)
+		}
+		if c1.Playing {
+			v |= (1 << 7)
+		}
+
+		return v
+
+	case 0x510, 0x511, 0x512, 0x513:
+		return uint8(c0.Dest >> ((addr & 3) * 8))
+	case 0x514, 0x515:
+		return uint8(c0.Len >> ((addr & 1) * 8))
+	case 0x518, 0x519, 0x51A, 0x51B:
+		return uint8(c1.Dest >> ((addr & 3) * 8))
+	case 0x51C, 0x51D:
+		return uint8(c1.Len >> ((addr & 1) * 8))
+	}
+	return 0
 }
 
 func (c *Channel) Read(addr uint32) uint8 {
-
-	addr &= 0xF
-
-	switch addr {
+	switch addr & 0xF {
 	case 0x0:
-
-		return uint8(c.VolMul)
+		return c.VolMul
 
 	case 0x1:
 
-		v := uint8(c.VolDiv)
+		v := c.VolDiv
 
 		if c.Hold {
 			v |= 1 << 7
@@ -335,8 +225,7 @@ func (c *Channel) Read(addr uint32) uint8 {
 		return v
 
 	case 0x2:
-
-		return uint8(c.Panning)
+		return c.Panning
 
 	case 0x3:
 

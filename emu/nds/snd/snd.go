@@ -29,21 +29,19 @@ type Mem interface {
 }
 
 type Snd struct {
-	Mem      Mem
-	Stream   *utils.Stream
-	Ctx      *audio.Context
-	player   *audio.Player
-	Channels [16]Channel
-	Capture  [2]Capture
-
+	Mem       Mem
+	Stream    *utils.Stream
+	Ctx       *audio.Context
+	player    *audio.Player
+	Channels  [16]Channel
+	Capture   [2]Capture
 	VolMaster float64
+	Bias      uint16
 	LOut      uint8
 	ROut      uint8
-
-	NoOutCh1 bool
-	NoOutCh3 bool
-	Enabled  bool
-	Bias     uint32
+	NoOutCh1  bool
+	NoOutCh3  bool
+	Enabled   bool
 }
 
 func NewSnd(ctx *audio.Context, mem Mem, bufferSize time.Duration) *Snd {
@@ -70,12 +68,10 @@ func NewSnd(ctx *audio.Context, mem Mem, bufferSize time.Duration) *Snd {
 
 		s.Channels[i] = NewChannel(i, s)
 
-		switch {
-		case i < 8:
-			continue
-		case i < 14:
+		switch i {
+		case 8, 9, 10, 11, 12, 13:
 			s.Channels[i].isDuty = true
-		default:
+		case 14, 15:
 			s.Channels[i].isNoise = true
 		}
 	}
@@ -129,12 +125,13 @@ func (s *Snd) SoundClock() {
 			s.Capture[1].Capture(r)
 		}
 
-		l = (float64(l) * float64(s.VolMaster))
-		r = (float64(r) * float64(s.VolMaster))
-	}
+		l *= s.VolMaster
+		r *= s.VolMaster
 
-	l *= 50
-	r *= 50
+		l *= 50
+		r *= 50
+
+	}
 
 	s.Stream.Write(int16(clip(int32(l))), int16(clip(int32(r))))
 }

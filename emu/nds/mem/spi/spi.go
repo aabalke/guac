@@ -30,7 +30,6 @@ func NewSpi(input2 *uint8) *Spi {
 		Pmd: NewPmd(),
 		Tsc: NewTsc(input2),
 	}
-	// FirmwareConfig() why was this here?
 }
 
 func (s *Spi) WriteCNT(b, v uint8) {
@@ -62,8 +61,6 @@ func (s *Spi) ReadCNT(b uint8) uint8 {
 }
 
 func (s *Spi) WriteData(v uint8) {
-	//fmt.Printf("SPI WRITE DATA % 02X\n", v)
-
 	if s.Enabled {
 
 		if s.TransferDevice == nil || *s.TransferDevice != s.Device {
@@ -121,6 +118,5 @@ func (s *Spi) WriteData(v uint8) {
 }
 
 func (s *Spi) ReadData() uint8 {
-	//fmt.Printf("READING SPI %02X\n", s.Value)
 	return s.Value
 }

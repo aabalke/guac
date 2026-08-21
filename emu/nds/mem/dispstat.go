@@ -1,6 +1,9 @@
 package mem
 
 type Dispstat struct {
+	A9LYC uint32
+	A7LYC uint32
+
 	V bool // shared
 	H bool // shared
 
@@ -8,17 +11,14 @@ type Dispstat struct {
 	A9VIrq  bool
 	A9HIrq  bool
 	A9VCIrq bool
-	A9LYC   uint32
 
 	A7VC    bool
 	A7VIrq  bool
 	A7HIrq  bool
 	A7VCIrq bool
-	A7LYC   uint32
 }
 
 func (d *Dispstat) Read(hi, arm9 bool) uint8 {
-
 	if hi {
 		if arm9 {
 			return uint8(d.A9LYC)
@@ -81,7 +81,6 @@ func (d *Dispstat) Read(hi, arm9 bool) uint8 {
 }
 
 func (d *Dispstat) Write7(v uint8, hi bool) {
-
 	if hi {
 		d.A7LYC = (d.A7LYC &^ 0xFF) | uint32(v)
 		return
@@ -98,7 +97,6 @@ func (d *Dispstat) Write7(v uint8, hi bool) {
 }
 
 func (d *Dispstat) Write9(v uint8, hi bool) {
-
 	if hi {
 		d.A9LYC = (d.A9LYC &^ 0xFF) | uint32(v)
 		return

@@ -5,7 +5,8 @@ const (
 	MIN = -128
 
 	AMPLIFICATION = 0.125
-	BASE_FREQ     = 33_513_982 / 2
+	//BASE_FREQ     = 33_513_982 / 2
+	BASE_FREQ = 33554432 / 2
 )
 
 var (
@@ -34,43 +35,34 @@ var (
 )
 
 type Channel struct {
-	Idx int
-	Snd *Snd
-
-	Start   bool
-	Playing bool
-
-	VolMul     uint32
-	VolDiv     uint32
-	Panning    uint32
-	Duty       uint32
-	RepeatMode uint32
-	Format     uint32
-	Hold       bool
-
+	Idx           int
+	Snd           *Snd
+	SamplePos     float64
+	Samples       []int16
 	SrcAddr       uint32
 	SndLength     uint32
+	lfsr          uint32
 	TimerValue    uint16
 	StartPosition uint16
-
-	SamplePos float64
-
-	Samples []int16
-
-	isNoise bool
-	lfsr    uint32
-
-	isDuty bool
+	VolDiv        uint8
+	Duty          uint8
+	RepeatMode    uint8
+	Format        uint8
+	VolMul        uint8
+	Panning       uint8
+	Hold          bool
+	Start         bool
+	Playing       bool
+	isNoise       bool
+	isDuty        bool
 }
 
 func NewChannel(idx int, s *Snd) Channel {
-	c := Channel{
+	return Channel{
 		Idx:  idx,
 		Snd:  s,
 		lfsr: 0x7FFF,
 	}
-
-	return c
 }
 
 func (c *Channel) GetSample() (int8, int8) {
@@ -271,9 +263,7 @@ func (c *Channel) GetPSG() float64 {
 }
 
 func (c *Channel) GetNoise() float64 {
-	// untested
-
-	carry := c.lfsr&1 == 1
+	carry := c.lfsr&1 != 0
 	c.lfsr >>= 1
 
 	if carry {

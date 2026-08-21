@@ -839,16 +839,9 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 		//panic(fmt.Sprintf("WRTE UNKNOWN ARM9 IO ADDR %08X", addr))
 		mem.IO[addr] = v
 	}
-
-	//if addr >= 0x1000 && addr <= 0x1004 {
-	//    fmt.Printf("DISPSTAT %08X\n", binary.LittleEndian.Uint32(mem.IO[0x1000:]))
-	//}
 }
 
 func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
-	//if addr != 0x180 && addr != 0x181 && addr < 0x3000 {
-	//	fmt.Printf("READ ADDR %08X\n", addr)
-	//}
 	if addr >= 0x188 && addr < 0x190 {
 		panic("READ IPC FIFO FROM BYTE OR HALF")
 	}
@@ -1005,10 +998,6 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 	if addr >= 0x188 && addr < 0x190 {
 		panic("WRITE IPC FIFO FROM BYTE OR HALF")
 	}
-
-	//if !(addr >= 0x208 && addr < 0x240) {
-	//    fmt.Printf("ARM7 WRITE ADDR %08X V %02X\n", addr, v)
-	//}
 
 	switch {
 	case addr < 0x4:
