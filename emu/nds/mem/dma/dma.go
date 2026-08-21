@@ -4,6 +4,7 @@ import (
 	"unsafe"
 
 	"github.com/aabalke/guac/emu/cpu"
+	"github.com/aabalke/guac/emu/scheduler"
 )
 
 const (
@@ -36,6 +37,7 @@ type DMA struct {
 	Idx  int
 	arm9 bool
 
+	sch *scheduler.Scheduler
 	mem MemoryInterface
 	irq *cpu.Irq
 
@@ -62,6 +64,8 @@ type DMA struct {
 
 	InitialGc bool
 	GcDst     uint32
+
+	gxTransferEvent scheduler.EventIdx
 }
 
 //go:inline
@@ -70,11 +74,15 @@ func ReplaceByte(value uint32, newByte uint32, byteOffset uint32) uint32 {
 	return (value &^ (0xFF << bitOffset)) | (newByte << bitOffset)
 }
 
-func (dma *DMA) Init(idx int, mem MemoryInterface, irq *cpu.Irq, arm9 bool) {
+func (dma *DMA) Init(idx int, mem MemoryInterface, scheduler *scheduler.Scheduler, irq *cpu.Irq, arm9 bool) {
 	dma.Idx = idx
 	dma.mem = mem
 	dma.irq = irq
 	dma.arm9 = arm9
+
+	dma.sch = scheduler
+
+	dma.gxTransferEvent = scheduler.Register(dma.GxTransfer, 1)
 
 	switch {
 	case arm9:
@@ -132,6 +140,10 @@ func (dma *DMA) WriteControl(v uint8, hi bool) {
 
 		if isImmediate := wasDisabled && dma.CheckMode(DMA_MODE_IMM); isImmediate {
 			dma.Transfer()
+		}
+
+		if wasDisabled && dma.Enabled && dma.Mode == ARM9_DMA_MODE_GEO {
+			dma.sch.Schedule(dma.gxTransferEvent, 1, nil)
 		}
 		return
 	}
@@ -326,7 +338,7 @@ func (dma *DMA) GamecartTransfer(arm9, initial bool) {
 	}
 }
 
-func (dma *DMA) GxTransfer() {
+func (dma *DMA) GxTransfer(late int64, _ any) {
 	if dma.Dst != 0x400_0400 || dma.DstAdj != DMA_ADJ_NON || !dma.isWord {
 		return
 	}
@@ -377,6 +389,7 @@ func (dma *DMA) GxTransfer() {
 	}
 
 	dma.Src = uint32(tmpSrc)
+	dma.sch.Schedule(dma.gxTransferEvent, 1, nil)
 }
 
 type MemoryInterface interface {

@@ -1,6 +1,7 @@
 package nds
 
 import (
+	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/scheduler"
 )
@@ -62,6 +63,18 @@ func (nds *Nds) ScanlineEndEvent(late int64, arg any) {
 
 		if nds.ppu.Rasterizer.Buffers.SwapSet {
 			nds.ppu.Rasterizer.Buffers.Swap()
+		}
+
+		if !config.Conf.General.Headless {
+			if nds.ppu.EngineA.Dispcnt.Is3D {
+				nds.ppu.Rasterizer.Render.UpdateRender()
+			}
+
+			t, b := nds.GetScreens()
+			nds.Screen.Mu.Lock()
+			nds.Screen.Top.WritePixels(*t)
+			nds.Screen.Bottom.WritePixels(*b)
+			nds.Screen.Mu.Unlock()
 		}
 
 	case SCREEN_HEIGHT + 1:

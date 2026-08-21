@@ -30,9 +30,9 @@ type Mem struct {
 	// this size is temp
 	IO [0x100_0000]uint8
 
-	halted7, halted9 *bool
-	irq7, irq9       *cpu.Irq
-	dma7, dma9       *[4]dma.DMA
+	halted7    *bool
+	irq7, irq9 *cpu.Irq
+	dma7, dma9 *[4]dma.DMA
 
 	arm7Pc *uint32
 
@@ -93,7 +93,7 @@ type (
 
 func (m *Mem) InitMemory(
 	arm7Pc *uint32,
-	halted7, halted9 *bool,
+	halted7 *bool,
 	dma7, dma9 *[4]dma.DMA,
 	irq7, irq9 *cpu.Irq,
 	jit7, jit9 Jit,
@@ -102,7 +102,6 @@ func (m *Mem) InitMemory(
 	snd *snd.Snd,
 ) {
 	m.halted7 = halted7
-	m.halted9 = halted9
 	m.dma7 = dma7
 	m.dma9 = dma9
 	m.irq9 = irq9
@@ -134,11 +133,8 @@ func (m *Mem) InitMemory(
 	m.Bus9 = Bus9{M: m}
 }
 
-var lockWrites bool
-
 func (mem *Mem) DirectBootMemory() {
 	setBiosRam(mem, mem.Cartridge.ChipId)
-	lockWrites = true
 }
 
 func (mem *Mem) LoadBios() {

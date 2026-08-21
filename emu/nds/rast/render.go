@@ -5,8 +5,6 @@ import (
 	"math"
 	"sort"
 
-	"sync"
-
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 )
 
@@ -21,7 +19,6 @@ type Render struct {
 	Context    *gl.Context
 	Buffers    *Buffers
 	RearPlane  *RearPlane
-	lock       sync.Mutex
 }
 
 type Pixels struct {
@@ -39,7 +36,6 @@ func (p *Pixels) InitPixels() {
 }
 
 func NewRender(rast *Rasterizer, buffers *Buffers, rp *RearPlane) *Render {
-
 	r := &Render{
 		Rasterizer: rast,
 		Buffers:    buffers,
@@ -54,7 +50,6 @@ func NewRender(rast *Rasterizer, buffers *Buffers, rp *RearPlane) *Render {
 }
 
 func (r *Render) ResetRasterizer() {
-
 	r.Context.AlphaBlending = r.Rasterizer.GeoEngine.Disp3dCnt.AlphaBlending
 	r.Context.EdgeEnabled = r.Rasterizer.GeoEngine.Disp3dCnt.EdgeMarking
 	r.Context.ClearColor = gl.Transparent
@@ -100,7 +95,6 @@ func (r *Render) ResetRasterizer() {
 }
 
 func (r *Render) ClearBitmapPlane() {
-
 	const (
 		WIDTH = 256
 	)
@@ -113,8 +107,8 @@ func (r *Render) ClearBitmapPlane() {
 	for y := range dc.Height {
 		for x := range dc.Width {
 
-			xIdx := (x) //+ int(rp.OffsetX)) & 255
-			yIdx := (y) //+ int(rp.OffsetY)) & 255
+			xIdx := x //+ int(rp.OffsetX)) & 255
+			yIdx := y //+ int(rp.OffsetY)) & 255
 
 			i := xIdx + yIdx*WIDTH
 
@@ -127,7 +121,6 @@ func (r *Render) ClearBitmapPlane() {
 }
 
 func (r *Render) UpdateRender() {
-
 	r.ResetRasterizer()
 
 	buffer := r.Buffers.GetBuffer()
@@ -138,7 +131,6 @@ func (r *Render) UpdateRender() {
 	// solid polygons sorted first, followed by translucent (unless manual sort alpha)
 
 	sort.SliceStable(polygons, func(i, j int) bool {
-
 		isolid := !polygons[i].isAlpha()
 		jsolid := !polygons[j].isAlpha()
 		if isolid && !jsolid {
@@ -176,11 +168,9 @@ func (r *Render) UpdateRender() {
 		// Polygons have the same sorting properties.
 		// Return false so that stable sorting keeps them in the right order
 		return false
-
 	})
 
 	for i := range len(polygons) {
-
 		// 1 dot check seems unneeded
 		//if !p.valid1DotDepth(r.Rasterizer.Disp1Dot.V) {
 		//    return
@@ -201,7 +191,6 @@ func (r *Render) UpdateRender() {
 }
 
 func (r *Render) ApplyFog(depthW bool) {
-
 	fog := &r.Rasterizer.GeoEngine.Fog
 
 	for y := range r.Context.Height {
@@ -233,7 +222,6 @@ func (r *Render) ApplyFog(depthW bool) {
 }
 
 func (r *Render) ApplyEdge(depthW bool) {
-
 	for y := range r.Context.Height {
 		for x := range r.Context.Width {
 			id, ok := r.Context.EdgeId(x, y, depthW)
@@ -250,7 +238,6 @@ func (r *Render) ApplyEdge(depthW bool) {
 }
 
 func (r *Render) RenderPolygon(p *Polygon) {
-
 	if len(p.Vertices) == 0 {
 		return
 	}
@@ -288,7 +275,8 @@ func (r *Render) RenderPolygon(p *Polygon) {
 			tri := gl.NewTriangle(
 				p.Vertices[i+2],
 				p.Vertices[i+1],
-				p.Vertices[i+0])
+				p.Vertices[i+0],
+			)
 
 			r.Context.DrawTriangle(tri)
 		}
@@ -316,7 +304,8 @@ func (r *Render) RenderPolygon(p *Polygon) {
 				p.Vertices[i+3],
 				p.Vertices[i+2],
 				p.Vertices[i+1],
-				p.Vertices[i+0])
+				p.Vertices[i+0],
+			)
 
 			r.Context.DrawQuad(quad)
 		}
@@ -339,7 +328,8 @@ func (r *Render) RenderPolygon(p *Polygon) {
 				tri := gl.NewTriangle(
 					p.Vertices[i-2],
 					p.Vertices[i-1],
-					p.Vertices[i-0])
+					p.Vertices[i-0],
+				)
 
 				r.Context.DrawTriangle(tri)
 				continue
@@ -348,7 +338,8 @@ func (r *Render) RenderPolygon(p *Polygon) {
 			tri := gl.NewTriangle(
 				p.Vertices[i-0],
 				p.Vertices[i-1],
-				p.Vertices[i-2])
+				p.Vertices[i-2],
+			)
 
 			r.Context.DrawTriangle(tri)
 		}
@@ -381,7 +372,12 @@ func (r *Render) RenderPolygon(p *Polygon) {
 }
 
 func (r *Render) ImageToPixels(img []gl.Color) {
-	//r.lock.Lock()
+	palettes := &r.Pixels.PalettesA
+	alphas := &r.Pixels.AlphaA
+	if r.Rasterizer.Buffers.BisRendering {
+		palettes = &r.Pixels.PalettesB
+		alphas = &r.Pixels.AlphaB
+	}
 
 	for y := range HEIGHT {
 		for x := range WIDTH {
@@ -390,19 +386,8 @@ func (r *Render) ImageToPixels(img []gl.Color) {
 			r5 := uint32(min(0x1F, max(0, c.R*0x1F)))
 			g5 := uint32(min(0x1F, max(0, c.G*0x1F)))
 			b5 := uint32(min(0x1F, max(0, c.B*0x1F)))
-			a5 := uint32(min(0x1F, max(0, c.A*0x1F)))
-
-			v := r5 | g5<<5 | b5<<10
-
-			if r.Rasterizer.Buffers.BisRendering {
-				r.Pixels.PalettesB[i] = v
-				r.Pixels.AlphaB[i] = a5
-			} else {
-				r.Pixels.PalettesA[i] = v
-				r.Pixels.AlphaA[i] = a5
-			}
+			(*palettes)[i] = r5 | g5<<5 | b5<<10
+			(*alphas)[i] = uint32(min(0x1F, max(0, c.A*0x1F)))
 		}
 	}
-
-	//r.lock.Unlock()
 }

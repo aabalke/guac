@@ -58,6 +58,8 @@ type Nds struct {
 	RegisteredEvents RegisteredEvents
 	CyclesPerSndGen  int64
 	Muted            bool
+
+	Arm7Cycles int64
 }
 
 func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
@@ -81,8 +83,8 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 			nds.mem.Timers9[i-1].Next = nds.mem.Timers9[i]
 		}
 
-		nds.dma9[i].Init(i, nds.mem, irq9, true)
-		nds.dma7[i].Init(i, nds.mem, irq7, false)
+		nds.dma9[i].Init(i, nds.mem, nds.Scheduler, irq9, true)
+		nds.dma7[i].Init(i, nds.mem, nds.Scheduler, irq7, false)
 	}
 
 	nds.arm7 = arm7.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem.Bus7, irq7)
@@ -96,7 +98,7 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 
 	nds.mem.InitMemory(
 		&nds.arm7.Reg.R[15],
-		&nds.arm7.Halted, &nds.arm9.Halted,
+		&nds.arm7.Halted,
 		&nds.dma7, &nds.dma9,
 		irq7, irq9,
 		nds.arm7.Jit, nds.arm9.Jit,
@@ -183,24 +185,8 @@ func (nds *Nds) Run(ctx context.Context, eventBus *bus.EventBus) {
 }
 
 func (nds *Nds) Update() {
-	nds.UpdateFrame()
-	if nds.ppu.EngineA.Dispcnt.Is3D {
-		nds.ppu.Rasterizer.Render.UpdateRender()
-	}
-
-	t, b := nds.GetScreens()
-	nds.Screen.Mu.Lock()
-	nds.Screen.Top.WritePixels(*t)
-	nds.Screen.Bottom.WritePixels(*b)
-	nds.Screen.Mu.Unlock()
-}
-
-func (nds *Nds) UpdateFrame() {
-	var arm7 bool
-
 	nextFrame := nds.Scheduler.CurrentCycle + CYCLES_FRAME
 	for nds.Scheduler.CurrentCycle < nextFrame {
-
 		nds.arm9.CheckIrq()
 
 		if !nds.arm9.Halted {
@@ -209,34 +195,32 @@ func (nds *Nds) UpdateFrame() {
 				panic(fmt.Sprintf("ARM9 Decode Error: PC %08X\n", nds.arm9.Reg.R[15]))
 			}
 
-			for i := range 4 {
-				if d := &nds.dma9[i]; d.Enabled && d.Mode == dma.ARM9_DMA_MODE_GEO {
-					d.GxTransfer()
-				}
-			}
-
 			if nds.ppu.Rasterizer.GeoEngine.GxStat.FifoIrq != 0 {
 				nds.arm9.Irq.SetIRQ(cpu.IRQ_GEO_CMD_FIFO)
 			}
 		}
 
-		if arm7 {
-			nds.arm7.CheckIrq()
-
-			if !nds.arm7.Halted {
-				if _, ok := nds.arm7.Execute(); !ok {
-					panic(fmt.Sprintf("ARM7 Decode Error: PC %08X\n", nds.arm7.Reg.R[15]))
-				}
-			}
-		}
-
 		nds.Tick(1)
-		arm7 = !arm7
 	}
 }
 
 func (nds *Nds) Tick(cycles int64) {
 	nds.Scheduler.Add(cycles)
+
+	for nds.Arm7Cycles < nds.Scheduler.Now()>>1 {
+		nds.Run7()
+		nds.Arm7Cycles++
+	}
+}
+
+func (nds *Nds) Run7() {
+	nds.arm7.CheckIrq()
+
+	if !nds.arm7.Halted {
+		if _, ok := nds.arm7.Execute(); !ok {
+			panic(fmt.Sprintf("ARM7 Decode Error: PC %08X\n", nds.arm7.Reg.R[15]))
+		}
+	}
 }
 
 func (nds *Nds) ToggleMute(muted bool) bool {
