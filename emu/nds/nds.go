@@ -83,8 +83,8 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 			nds.mem.Timers9[i-1].Next = nds.mem.Timers9[i]
 		}
 
-		nds.dma9[i].Init(i, nds.mem, nds.Scheduler, irq9, true)
-		nds.dma7[i].Init(i, nds.mem, nds.Scheduler, irq7, false)
+		nds.dma7[i].Init(i, &nds.mem.Bus7, nds.Scheduler, irq7, false)
+		nds.dma9[i].Init(i, &nds.mem.Bus9, nds.Scheduler, irq9, true)
 	}
 
 	nds.arm7 = arm7.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem.Bus7, irq7)
@@ -102,7 +102,7 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 		&nds.dma7, &nds.dma9,
 		irq7, irq9,
 		nds.arm7.Jit, nds.arm9.Jit,
-		nds.Cartridge, nds.ppu, snd.NewSnd(ctx, nds.mem, BUFFER_SIZE),
+		nds.Cartridge, nds.ppu, snd.NewSnd(ctx, &nds.mem.Bus7, BUFFER_SIZE),
 	)
 
 	nds.DirectBoot()

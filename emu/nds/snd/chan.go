@@ -157,7 +157,7 @@ func (c *Channel) GetPCM8() float64 {
 	}
 
 	addr := c.SrcAddr + uint32(c.SamplePos)
-	return float64(int8(c.Snd.Mem.Read(addr, false))) / 128
+	return float64(int8(c.Snd.Mem.Read8(addr))) / 128
 }
 
 func (c *Channel) GetPCM16() float64 {
@@ -171,10 +171,7 @@ func (c *Channel) GetPCM16() float64 {
 		}
 	}
 
-	v := int16(uint16(c.Snd.Mem.Read16(
-		c.SrcAddr+(uint32(c.SamplePos)*2),
-		false,
-	)))
+	v := int16(uint16(c.Snd.Mem.Read16(c.SrcAddr + (uint32(c.SamplePos) * 2))))
 
 	return float64(v) / 32768
 }
@@ -184,7 +181,7 @@ func (c *Channel) DecompressADPCM() {
 	length := ((c.SndLength * 4) + uint32(4*c.StartPosition) - 4)
 	c.Samples = make([]int16, 0, length)
 
-	head := c.Snd.Mem.Read32(addr, false)
+	head := c.Snd.Mem.Read32(addr)
 
 	addr += 4
 
@@ -218,7 +215,7 @@ func (c *Channel) DecompressADPCM() {
 
 	for i := range length {
 
-		v := c.Snd.Mem.Read(addr+i, false)
+		v := uint8(c.Snd.Mem.Read8(addr + i))
 
 		dec(v & 0xF)
 		a := uint16(pcm & 0xFF)

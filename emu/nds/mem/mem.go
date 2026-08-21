@@ -64,27 +64,398 @@ type Bus7 struct {
 	M *Mem
 }
 
-func (b *Bus7) Read8(addr uint32) uint32            { return b.M.Read8(addr, false) }
-func (b *Bus7) Read16(addr uint32) uint32           { return b.M.Read16(addr, false) }
-func (b *Bus7) Read32(addr uint32) uint32           { return b.M.Read32(addr, false) }
-func (b *Bus7) ReadPtr(addr uint32) unsafe.Pointer  { return b.M.ReadPtr(addr, false) }
-func (b *Bus7) Write8(addr uint32, v uint8)         { b.M.Write8(addr, v, false) }
-func (b *Bus7) Write16(addr uint32, v uint16)       { b.M.Write16(addr, v, false) }
-func (b *Bus7) Write32(addr, v uint32)              { b.M.Write32(addr, v, false) }
-func (b *Bus7) WritePtr(addr uint32) unsafe.Pointer { return b.M.WritePtr(addr, false) }
+func (b *Bus7) Read8(addr uint32) uint32 {
+	switch addr >> 24 {
+	case 0x0:
+
+		if addr < 0x4000 && (*b.M.arm7Pc) < 0x4000 {
+			return uint32((*b.M.Arm7Bios)[addr])
+		}
+
+		return uint32(0xFF)
+
+	case 0x1:
+		return uint32(0xFF)
+
+	case 0x2:
+		return uint32(b.M.MainRam[addr&0x3F_FFFF])
+	case 0x3:
+		return uint32(b.M.WRAM.Read7(addr))
+	case 0x4:
+		return uint32(b.M.ReadArm7IO(addr & 0xFF_FFFF))
+	case 0x6:
+		return uint32(b.M.Ppu.Vram.Read7(addr))
+	case 0x8, 0x9, 0xA:
+		return uint32(b.M.Cartridge.ReadGbaSlot(addr, false))
+	default:
+		return uint32(0)
+	}
+}
+
+func (b *Bus7) Read16(addr uint32) uint32 {
+	if io := addr>>24 == 4; io {
+
+		switch addr {
+		case 0x400_0100, 0x400_0102:
+			return uint32(b.M.Timers7[0].Read16(int(addr & 3)))
+		case 0x400_0104, 0x400_0106:
+			return uint32(b.M.Timers7[1].Read16(int(addr & 3)))
+		case 0x400_0108, 0x400_010A:
+			return uint32(b.M.Timers7[2].Read16(int(addr & 3)))
+		case 0x400_010c, 0x400_010E:
+			return uint32(b.M.Timers7[3].Read16(int(addr & 3)))
+		}
+		if addr >= 0x480_0000 && addr < 0x490_0000 {
+			return uint32(b.M.Wifi.Read16(addr))
+		}
+	}
+
+	if ptr := b.ReadPtr(addr); ptr != nil {
+		return uint32(binary.LittleEndian.Uint16((*[4]uint8)(ptr)[:]))
+	}
+
+	return b.Read8(addr) | (b.Read8(addr+1) << 8)
+}
+
+func (b *Bus7) Read32(addr uint32) uint32 {
+	switch addr {
+	case 0x410_0000:
+		return b.M.Ipc.ReadFifo(false)
+	case 0x410_0010:
+		return b.M.Cartridge.ReadCmdIn(false)
+	default:
+
+		if ptr := b.ReadPtr(addr); ptr != nil {
+			return binary.LittleEndian.Uint32((*[4]uint8)(ptr)[:])
+		}
+
+		return b.Read16(addr) | (b.Read16(addr+2) << 16)
+	}
+}
+
+func (b *Bus7) ReadPtr(addr uint32) unsafe.Pointer {
+	switch addr >> 24 {
+	case 0x0:
+
+		if addr < 0x4000 { // do not limit based on pc, messes up jit arm7
+			return unsafe.Add(unsafe.Pointer(&(*b.M.Arm7Bios)[0]), addr)
+		}
+
+		return nil
+
+	case 0x2:
+		return unsafe.Add(unsafe.Pointer(&b.M.MainRam), addr&0x3F_FFFF)
+	case 0x3:
+		return b.M.WRAM.ReadPtr7(addr)
+	case 0x6:
+		return b.M.Ppu.Vram.ReadPtr7(addr)
+	default:
+		return nil
+	}
+}
+
+func (b *Bus7) Write8(addr uint32, v uint8) {
+	// there may be the ability to invalidate only arm7 or arm9  -
+	// for example wram is special
+	b.M.Jit7.InvalidatePage(addr)
+	b.M.Jit9.InvalidatePage(addr)
+
+	switch addr >> 24 {
+	case 0x2:
+		//clearTempUnimplimented(addr)
+		b.M.MainRam[addr&0x3F_FFFF] = v
+	case 0x3:
+		b.M.WRAM.Write7(addr, v)
+	case 0x4:
+		b.M.WriteArm7IO(addr-0x400_0000, v)
+	case 0x6:
+		b.M.Ppu.Vram.Write7(addr, v)
+	}
+}
+
+func (b *Bus7) Write16(addr uint32, v uint16) {
+	if io := addr>>24 == 4; io {
+		switch addr {
+		case 0x400_0100, 0x400_0102:
+			b.M.Timers7[0].Write16(addr&3, v)
+			return
+		case 0x400_0104, 0x400_0106:
+			b.M.Timers7[1].Write16(addr&3, v)
+			return
+		case 0x400_0108, 0x400_010A:
+			b.M.Timers7[2].Write16(addr&3, v)
+			return
+		case 0x400_010C, 0x400_010E:
+			b.M.Timers7[3].Write16(addr&3, v)
+			return
+		}
+
+		if addr >= 0x480_0000 && addr < 0x490_0000 {
+			b.M.Wifi.Write16(addr, v)
+			return
+		}
+	}
+
+	if ptr := b.WritePtr(addr); ptr != nil {
+		binary.LittleEndian.PutUint16((*[4]uint8)(ptr)[:], v)
+		return
+	}
+
+	b.Write8(addr, uint8(v))
+	b.Write8(addr+1, uint8(v>>8))
+}
+
+func (b *Bus7) Write32(addr, v uint32) {
+	if io := addr>>24 == 4; io {
+		switch addr {
+		case 0x400_0100:
+			b.M.Timers7[0].Write32(v)
+			return
+		case 0x400_0104:
+			b.M.Timers7[1].Write32(v)
+			return
+		case 0x400_0108:
+			b.M.Timers7[2].Write32(v)
+			return
+		case 0x400_010c:
+			b.M.Timers7[3].Write32(v)
+			return
+		case 0x400_0188:
+			b.M.Ipc.WriteFifo(v, false)
+			return
+		}
+	}
+
+	if ptr := b.WritePtr(addr); ptr != nil {
+		binary.LittleEndian.PutUint32((*[4]uint8)(ptr)[:], v)
+		return
+	}
+	b.Write16(addr+0, uint16(v))
+	b.Write16(addr+2, uint16(v>>16))
+}
+
+func (b *Bus7) WritePtr(addr uint32) unsafe.Pointer {
+	b.M.Jit7.InvalidatePage(addr)
+	b.M.Jit9.InvalidatePage(addr)
+
+	switch addr >> 24 {
+	case 0x2:
+		return unsafe.Add(unsafe.Pointer(&b.M.MainRam), addr&0x3F_FFFF)
+	case 0x3:
+		return b.M.WRAM.ReadPtr7(addr)
+	case 0x6:
+		return b.M.Ppu.Vram.ReadPtr7(addr)
+	default:
+		return nil
+	}
+}
+func (b *Bus7) WriteGXFIFO(v uint32) {}
 
 type Bus9 struct {
 	M *Mem
 }
 
-func (b *Bus9) Read8(addr uint32) uint32            { return b.M.Read8(addr, true) }
-func (b *Bus9) Read16(addr uint32) uint32           { return b.M.Read16(addr, true) }
-func (b *Bus9) Read32(addr uint32) uint32           { return b.M.Read32(addr, true) }
-func (b *Bus9) ReadPtr(addr uint32) unsafe.Pointer  { return b.M.ReadPtr(addr, true) }
-func (b *Bus9) Write8(addr uint32, v uint8)         { b.M.Write8(addr, v, true) }
-func (b *Bus9) Write16(addr uint32, v uint16)       { b.M.Write16(addr, v, true) }
-func (b *Bus9) Write32(addr, v uint32)              { b.M.Write32(addr, v, true) }
-func (b *Bus9) WritePtr(addr uint32) unsafe.Pointer { return b.M.WritePtr(addr, true) }
+func (b *Bus9) Read8(addr uint32) uint32 {
+	if v, ok := b.M.Tcm.Read(addr); ok {
+		return uint32(v)
+	}
+
+	switch addr >> 24 {
+	case 0x2:
+		return uint32(b.M.MainRam[addr&0x3F_FFFF])
+	case 0x3:
+		return uint32(b.M.WRAM.Read9(addr))
+	case 0x4:
+		return uint32(b.M.ReadArm9IO(addr & 0xFF_FFFF))
+	case 0x5:
+		return uint32(b.M.Ppu.ReadPram(addr))
+	case 0x6:
+		return uint32(b.M.Ppu.Vram.Read9(addr))
+	case 0x7:
+		return uint32(b.M.Oam[addr&0x7FF])
+	case 0x8, 0x9, 0xA:
+		return uint32(b.M.Cartridge.ReadGbaSlot(addr, true))
+	case 0xFF:
+		return uint32((*b.M.Arm9Bios)[addr&0x0FFF])
+	default:
+		return uint32(0)
+	}
+}
+
+func (b *Bus9) Read16(addr uint32) uint32 {
+	if io := addr>>24 == 4; io {
+		switch addr {
+		case 0x400_0100, 0x400_0102:
+			return uint32(b.M.Timers9[0].Read16(int(addr & 3)))
+		case 0x400_0104, 0x400_0106:
+			return uint32(b.M.Timers9[1].Read16(int(addr & 3)))
+		case 0x400_0108, 0x400_010A:
+			return uint32(b.M.Timers9[2].Read16(int(addr & 3)))
+		case 0x400_010c, 0x400_010E:
+			return uint32(b.M.Timers9[3].Read16(int(addr & 3)))
+		}
+	}
+
+	if ptr := b.ReadPtr(addr); ptr != nil {
+		return uint32(binary.LittleEndian.Uint16((*[4]uint8)(ptr)[:]))
+	}
+
+	return b.Read8(addr) | (b.Read8(addr+1) << 8)
+}
+
+func (b *Bus9) Read32(addr uint32) uint32 {
+	switch addr {
+	case 0x410_0000:
+		return b.M.Ipc.ReadFifo(true)
+	case 0x410_0010:
+		return b.M.Cartridge.ReadCmdIn(true)
+	default:
+
+		if ptr := b.ReadPtr(addr); ptr != nil {
+			return binary.LittleEndian.Uint32((*[4]uint8)(ptr)[:])
+		}
+
+		return b.Read16(addr) | (b.Read16(addr+2) << 16)
+	}
+}
+
+func (b *Bus9) ReadPtr(addr uint32) unsafe.Pointer {
+	if ptr := b.M.Tcm.ReadPtr(addr); ptr != nil {
+		return ptr
+	}
+
+	switch addr >> 24 {
+	case 0x2:
+		return unsafe.Add(unsafe.Pointer(&b.M.MainRam), addr&0x3F_FFFF)
+	case 0x3:
+		return b.M.WRAM.ReadPtr9(addr)
+	case 0x5:
+		return nil
+	case 0x6:
+		return b.M.Ppu.Vram.ReadPtr9(addr)
+	case 0x7:
+		return unsafe.Add(unsafe.Pointer(&b.M.Oam), addr&0x7FF)
+	case 0xFF:
+		return unsafe.Add(unsafe.Pointer(&(*b.M.Arm9Bios)[0]), addr&0x0FFF)
+	}
+
+	return nil
+}
+
+func (b *Bus9) Write8(addr uint32, v uint8) {
+	b.M.Jit7.InvalidatePage(addr)
+	b.M.Jit9.InvalidatePage(addr)
+
+	if ok := b.M.Tcm.Write(addr, v); ok {
+		return
+	}
+
+	switch addr >> 24 {
+	case 0x2:
+		//clearTempUnimplimented(addr)
+		b.M.MainRam[addr&0x3F_FFFF] = v
+	case 0x3:
+		b.M.WRAM.Write9(addr, v)
+	case 0x4:
+		b.M.WriteArm9IO(addr-0x400_0000, v)
+	case 0x5:
+		b.M.Ppu.WritePram(addr, v)
+	case 0x6:
+		b.M.Ppu.Vram.Write9(addr, v)
+	case 0x7:
+		b.M.Oam[addr&0x7FF] = v
+		b.M.Ppu.UpdateOAM(addr, v, &b.M.Oam)
+	}
+}
+
+func (b *Bus9) Write16(addr uint32, v uint16) {
+	if io := addr>>24 == 4; io {
+		switch addr {
+		case 0x400_0100, 0x400_0102:
+			b.M.Timers9[0].Write16(addr&3, v)
+			return
+		case 0x400_0104, 0x400_0106:
+			b.M.Timers9[1].Write16(addr&3, v)
+			return
+		case 0x400_0108, 0x400_010A:
+			b.M.Timers9[2].Write16(addr&3, v)
+			return
+		case 0x400_010C, 0x400_010E:
+			b.M.Timers9[3].Write16(addr&3, v)
+			return
+		}
+	}
+
+	if ptr := b.WritePtr(addr); ptr != nil {
+		binary.LittleEndian.PutUint16((*[4]uint8)(ptr)[:], v)
+		return
+	}
+
+	b.Write8(addr, uint8(v))
+	b.Write8(addr+1, uint8(v>>8))
+}
+
+func (b *Bus9) Write32(addr, v uint32) {
+	if io := addr>>24 == 4; io {
+
+		if geo := addr >= 0x4000440 && addr < 0x4000600; geo {
+			b.M.Ppu.Rasterizer.GeoCmd(addr, v)
+			return
+		}
+
+		if gxfifo := addr >= 0x400_0400 && addr < 0x4000440; gxfifo {
+			b.M.Ppu.Rasterizer.GeoEngine.Fifo(v)
+			return
+		}
+
+		switch addr {
+		case 0x400_0100:
+			b.M.Timers9[0].Write32(v)
+			return
+		case 0x400_0104:
+			b.M.Timers9[1].Write32(v)
+			return
+		case 0x400_0108:
+			b.M.Timers9[2].Write32(v)
+			return
+		case 0x400_010c:
+			b.M.Timers9[3].Write32(v)
+			return
+		case 0x400_0188:
+			b.M.Ipc.WriteFifo(v, true)
+			return
+		}
+	}
+
+	if ptr := b.WritePtr(addr); ptr != nil {
+		binary.LittleEndian.PutUint32((*[4]uint8)(ptr)[:], v)
+		return
+	}
+
+	b.Write16(addr+0, uint16(v))
+	b.Write16(addr+2, uint16(v>>16))
+}
+
+func (b *Bus9) WritePtr(addr uint32) unsafe.Pointer {
+	b.M.Jit7.InvalidatePage(addr)
+	b.M.Jit9.InvalidatePage(addr)
+
+	if ptr := b.M.Tcm.WritePtr(addr); ptr != nil {
+		return ptr
+	}
+
+	switch addr >> 24 {
+	case 0x2:
+		return unsafe.Add(unsafe.Pointer(&b.M.MainRam), addr&0x3F_FFFF)
+	case 0x3:
+		return b.M.WRAM.ReadPtr9(addr)
+	case 0x6:
+		return b.M.Ppu.Vram.ReadPtr9(addr)
+	}
+
+	return nil
+}
+func (b *Bus9) WriteGXFIFO(v uint32) { b.M.Ppu.Rasterizer.GeoEngine.Fifo(v) }
 
 type (
 	BiosProt    uint16
@@ -153,328 +524,6 @@ func (mem *Mem) LoadBios() {
 			mem.Arm9Bios = &buf
 		}
 	}
-}
-
-func (mem *Mem) Read(addr uint32, arm9 bool) uint8 {
-	if arm9 {
-
-		if v, ok := mem.Tcm.Read(addr); ok {
-			return v
-		}
-
-		switch addr >> 24 {
-		case 0x2:
-			return mem.MainRam[addr&0x3F_FFFF]
-		case 0x3:
-			return mem.WRAM.Read9(addr)
-		case 0x4:
-			return mem.ReadArm9IO(addr & 0xFF_FFFF)
-		case 0x5:
-			return mem.Ppu.ReadPram(addr)
-		case 0x6:
-			return mem.Ppu.Vram.Read9(addr)
-		case 0x7:
-			return mem.Oam[addr&0x7FF]
-		case 0x8, 0x9, 0xA:
-			return mem.Cartridge.ReadGbaSlot(addr, arm9)
-		case 0xFF:
-			return (*mem.Arm9Bios)[addr&0x0FFF]
-		default:
-			return 0
-		}
-	}
-	switch addr >> 24 {
-	case 0x0:
-
-		if addr < 0x4000 && (*mem.arm7Pc) < 0x4000 {
-			return (*mem.Arm7Bios)[addr]
-		}
-
-		return 0xFF
-
-	case 0x1:
-		return 0xFF
-
-	case 0x2:
-		return mem.MainRam[addr&0x3F_FFFF]
-	case 0x3:
-		return mem.WRAM.Read7(addr)
-	case 0x4:
-		return mem.ReadArm7IO(addr & 0xFF_FFFF)
-	case 0x6:
-		return mem.Ppu.Vram.Read7(addr)
-	case 0x8, 0x9, 0xA:
-		return mem.Cartridge.ReadGbaSlot(addr, arm9)
-	default:
-		return 0
-	}
-}
-
-func (mem *Mem) Read8(addr uint32, arm9 bool) uint32 {
-	return uint32(mem.Read(addr, arm9))
-}
-
-func (mem *Mem) Read16(addr uint32, arm9 bool) uint32 {
-	if io := addr>>24 == 4; io {
-
-		timers := &mem.Timers7
-		if arm9 {
-			timers = &mem.Timers9
-		}
-
-		switch addr {
-		case 0x400_0100, 0x400_0102:
-			return uint32(timers[0].Read16(int(addr & 3)))
-		case 0x400_0104, 0x400_0106:
-			return uint32(timers[1].Read16(int(addr & 3)))
-		case 0x400_0108, 0x400_010A:
-			return uint32(timers[2].Read16(int(addr & 3)))
-		case 0x400_010c, 0x400_010E:
-			return uint32(timers[3].Read16(int(addr & 3)))
-		}
-		if !arm9 && addr >= 0x480_0000 && addr < 0x490_0000 {
-			return uint32(mem.Wifi.Read16(addr))
-		}
-	}
-
-	if ptr := mem.ReadPtr(addr, arm9); ptr != nil {
-		return uint32(binary.LittleEndian.Uint16((*[4]uint8)(ptr)[:]))
-	}
-	return uint32(mem.Read(addr, arm9)) | (uint32(mem.Read(addr+1, arm9)) << 8)
-}
-
-func (mem *Mem) Read32(addr uint32, arm9 bool) uint32 {
-	switch addr {
-	case 0x410_0000:
-		return mem.Ipc.ReadFifo(arm9)
-	case 0x410_0010:
-		return mem.Cartridge.ReadCmdIn(arm9)
-	default:
-
-		if ptr := mem.ReadPtr(addr, arm9); ptr != nil {
-			return binary.LittleEndian.Uint32((*[4]uint8)(ptr)[:])
-		}
-
-		return ((uint32(mem.Read(addr+3, arm9)) << 24) |
-			(uint32(mem.Read(addr+2, arm9)) << 16) |
-			(uint32(mem.Read(addr+1, arm9)) << 8) |
-			uint32(mem.Read(addr+0, arm9)))
-	}
-}
-
-func (mem *Mem) WritePtr(addr uint32, arm9 bool) unsafe.Pointer {
-	mem.Jit7.InvalidatePage(addr)
-	mem.Jit9.InvalidatePage(addr)
-
-	if arm9 {
-
-		if ptr := mem.Tcm.WritePtr(addr); ptr != nil {
-			return ptr
-		}
-
-		switch addr >> 24 {
-		case 0x2:
-			return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr&0x3F_FFFF)
-		case 0x3:
-			return mem.WRAM.ReadPtr9(addr)
-		case 0x6:
-			return mem.Ppu.Vram.ReadPtr9(addr) // this may break things
-		}
-
-		return nil
-	}
-
-	switch addr >> 24 {
-	case 0x2:
-		return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr&0x3F_FFFF)
-	case 0x3:
-		return mem.WRAM.ReadPtr7(addr)
-	case 0x6:
-		return mem.Ppu.Vram.ReadPtr7(addr)
-	default:
-		return nil
-	}
-}
-
-func (mem *Mem) ReadPtr(addr uint32, arm9 bool) unsafe.Pointer {
-	if arm9 {
-
-		if ptr := mem.Tcm.ReadPtr(addr); ptr != nil {
-			return ptr
-		}
-
-		switch addr >> 24 {
-		case 0x2:
-			return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr&0x3F_FFFF)
-		case 0x3:
-			return mem.WRAM.ReadPtr9(addr)
-		case 0x5:
-			return nil
-		case 0x6:
-			return mem.Ppu.Vram.ReadPtr9(addr)
-		case 0x7:
-			return unsafe.Add(unsafe.Pointer(&mem.Oam), addr&0x7FF)
-		case 0xFF:
-			return unsafe.Add(unsafe.Pointer(&(*mem.Arm9Bios)[0]), addr&0x0FFF)
-		}
-
-		return nil
-	}
-
-	switch addr >> 24 {
-	case 0x0:
-
-		if addr < 0x4000 { // do not limit based on pc, messes up jit arm7
-			return unsafe.Add(unsafe.Pointer(&(*mem.Arm7Bios)[0]), addr)
-		}
-
-		return nil
-
-	case 0x2:
-		return unsafe.Add(unsafe.Pointer(&mem.MainRam), addr&0x3F_FFFF)
-	case 0x3:
-		return mem.WRAM.ReadPtr7(addr)
-	case 0x6:
-		return mem.Ppu.Vram.ReadPtr7(addr)
-	default:
-		return nil
-	}
-}
-
-func (mem *Mem) Write(addr uint32, v uint8, arm9 bool) {
-	mem.Jit7.InvalidatePage(addr)
-	mem.Jit9.InvalidatePage(addr)
-
-	if arm9 {
-
-		if ok := mem.Tcm.Write(addr, v); ok {
-			return
-		}
-
-		switch addr >> 24 {
-		case 0x2:
-			//clearTempUnimplimented(addr)
-			mem.MainRam[addr&0x3F_FFFF] = v
-		case 0x3:
-			mem.WRAM.Write9(addr, v)
-		case 0x4:
-			mem.WriteArm9IO(addr-0x400_0000, v)
-		case 0x5:
-			mem.Ppu.WritePram(addr, v)
-		case 0x6:
-			mem.Ppu.Vram.Write9(addr, v)
-		case 0x7:
-			mem.Oam[addr&0x7FF] = v
-			mem.Ppu.UpdateOAM(addr, v, &mem.Oam)
-		}
-
-		return
-	}
-
-	switch addr >> 24 {
-	case 0x2:
-		//clearTempUnimplimented(addr)
-		mem.MainRam[addr&0x3F_FFFF] = v
-	case 0x3:
-		mem.WRAM.Write7(addr, v)
-	case 0x4:
-		mem.WriteArm7IO(addr-0x400_0000, v)
-	case 0x6:
-		mem.Ppu.Vram.Write7(addr, v)
-	}
-}
-
-func (mem *Mem) Write8(addr uint32, v uint8, arm9 bool) {
-	mem.Write(addr, v, arm9)
-}
-
-func (mem *Mem) Write16(addr uint32, v uint16, arm9 bool) {
-	if io := addr>>24 == 4; io {
-
-		timers := &mem.Timers7
-		if arm9 {
-			timers = &mem.Timers9
-		}
-
-		switch addr {
-		case 0x400_0100, 0x400_0102:
-			timers[0].Write16(addr&3, v)
-			return
-		case 0x400_0104, 0x400_0106:
-			timers[1].Write16(addr&3, v)
-			return
-		case 0x400_0108, 0x400_010A:
-			timers[2].Write16(addr&3, v)
-			return
-		case 0x400_010C, 0x400_010E:
-			timers[3].Write16(addr&3, v)
-			return
-		}
-
-		if !arm9 && addr >= 0x480_0000 && addr < 0x490_0000 {
-			mem.Wifi.Write16(addr, v)
-			return
-		}
-	}
-
-	if ptr := mem.WritePtr(addr, arm9); ptr != nil {
-		binary.LittleEndian.PutUint16((*[4]uint8)(ptr)[:], v)
-		return
-	}
-
-	mem.Write(addr, uint8(v), arm9)
-	mem.Write(addr+1, uint8(v>>8), arm9)
-}
-
-func (mem *Mem) Write32(addr uint32, v uint32, arm9 bool) {
-	if io := addr>>24 == 4; io {
-
-		timers := &mem.Timers7
-		if arm9 {
-			timers = &mem.Timers9
-		}
-
-		if geo := arm9 && addr >= 0x4000440 && addr < 0x4000600; geo {
-			mem.Ppu.Rasterizer.GeoCmd(addr, v)
-			return
-		}
-
-		if gxfifo := arm9 && addr >= 0x400_0400 && addr < 0x4000440; gxfifo {
-			mem.Ppu.Rasterizer.GeoEngine.Fifo(v)
-			return
-		}
-
-		switch addr {
-		case 0x400_0100:
-			timers[0].Write32(v)
-			return
-		case 0x400_0104:
-			timers[1].Write32(v)
-			return
-		case 0x400_0108:
-			timers[2].Write32(v)
-			return
-		case 0x400_010c:
-			timers[3].Write32(v)
-			return
-		case 0x400_0188:
-			mem.Ipc.WriteFifo(v, arm9)
-			return
-		}
-	}
-
-	if ptr := mem.WritePtr(addr, arm9); ptr != nil {
-		binary.LittleEndian.PutUint32((*[4]uint8)(ptr)[:], v)
-		return
-	}
-	mem.Write(addr+0, uint8(v), arm9)
-	mem.Write(addr+1, uint8(v>>8), arm9)
-	mem.Write(addr+2, uint8(v>>16), arm9)
-	mem.Write(addr+3, uint8(v>>24), arm9)
-}
-
-func (mem *Mem) WriteGXFIFO(v uint32) {
-	mem.Ppu.Rasterizer.GeoEngine.Fifo(v)
 }
 
 func (mem *Mem) ReadArm9IO(addr uint32) uint8 {

@@ -58,7 +58,7 @@ func (c *Capture) Capture(sample float64) {
 			c.SamplePos = float64(0)
 		}
 
-		c.Snd.Mem.Write(c.Dest+uint32(c.SamplePos), uint8(int8(sample)), false)
+		c.Snd.Mem.Write8(c.Dest+uint32(c.SamplePos), uint8(int8(sample)))
 
 		return
 	}
@@ -73,5 +73,5 @@ func (c *Capture) Capture(sample float64) {
 		c.SamplePos = float64(0)
 	}
 
-	c.Snd.Mem.Write16(c.Dest+uint32(c.SamplePos)*2, uint16(int16(sample)), false)
+	c.Snd.Mem.Write16(c.Dest+uint32(c.SamplePos)*2, uint16(int16(sample)))
 }

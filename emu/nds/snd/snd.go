@@ -20,12 +20,12 @@ const (
 )
 
 type Mem interface {
-	Read(addr uint32, arm9 bool) uint8
-	Read16(addr uint32, arm9 bool) uint32
-	Read32(addr uint32, arm9 bool) uint32
+	Read8(addr uint32) uint32
+	Read16(addr uint32) uint32
+	Read32(addr uint32) uint32
 
-	Write(addr uint32, v uint8, arm9 bool)
-	Write16(addr uint32, v uint16, arm9 bool)
+	Write8(addr uint32, v uint8)
+	Write16(addr uint32, v uint16)
 }
 
 type Snd struct {

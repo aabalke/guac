@@ -35,17 +35,18 @@ func (nds *Nds) LogCpu(arm9 bool) {
 		r = cpu.Reg.R
 		cpsr = cpu.Reg.CPSR.Get()
 		thumb = cpu.Reg.CPSR.T
+		opcode = nds.mem.Bus9.Read32(r[15])
+
 	} else {
 		cpu := nds.arm7
 		r = cpu.Reg.R
 		cpsr = cpu.Reg.CPSR.Get()
 		thumb = cpu.Reg.CPSR.T
+		opcode = nds.mem.Bus7.Read32(r[15])
 	}
 
 	if thumb {
-		opcode = nds.mem.Read16(r[15], arm9)
-	} else {
-		opcode = nds.mem.Read32(r[15], arm9)
+		opcode &= 0xFFFF
 	}
 
 	s := fmt.Sprintf("R %08X ", r)
