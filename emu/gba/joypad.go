@@ -1,7 +1,9 @@
 package gba
 
+import "github.com/aabalke/guac/emu/gba/irq"
+
 type Key struct {
-	Irq     *Irq
+	Irq     *irq.Irq
 	Input   uint16
 	Cnt     uint16
 	Enabled bool

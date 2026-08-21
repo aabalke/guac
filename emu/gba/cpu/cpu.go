@@ -26,7 +26,6 @@ type Mem interface {
 	Write16(addr uint32, v uint16)
 	Write32(addr uint32, v uint32)
 	ReadPtr(addr uint32) unsafe.Pointer
-	// WritePtr(addr uint32) unsafe.Pointer
 }
 
 type Reg struct {
@@ -36,7 +35,7 @@ type Reg struct {
 	SP   [6]uint32
 	LR   [6]uint32
 	FIQ  [5]uint32 // r8 - r12
-	USR  [5]uint32 // r8 - r12 // tmp to restore after FIQ
+	USR  [5]uint32 // r8 - r12
 	SPSR [6]Cond
 }
 
@@ -136,11 +135,8 @@ const (
 	VEC_RESET     ExceptionVector = 0x00
 	VEC_UNDEFINED ExceptionVector = 0x04
 	VEC_SWI       ExceptionVector = 0x08
-	// VEC_PREFETCH_ABORT ExceptionVector = 0x0C
-	// VEC_DATA_ABORT     ExceptionVector = 0x10
-	// VEC_ADDR_26BIT     ExceptionVector = 0x14
-	VEC_IRQ ExceptionVector = 0x18
-	VEC_FIQ ExceptionVector = 0x1C
+	VEC_IRQ       ExceptionVector = 0x18
+	VEC_FIQ       ExceptionVector = 0x1C
 )
 
 func (c *Cond) CheckCond(cond uint32) bool {

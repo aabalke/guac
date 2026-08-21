@@ -12,6 +12,7 @@ import (
 	"github.com/aabalke/guac/emu/gba/apu"
 	"github.com/aabalke/guac/emu/gba/cart"
 	"github.com/aabalke/guac/emu/gba/cpu"
+	"github.com/aabalke/guac/emu/gba/irq"
 	"github.com/aabalke/guac/emu/gba/timer"
 	"github.com/aabalke/guac/emu/scheduler"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -64,7 +65,7 @@ type GBA struct {
 	Timers            [4]*timer.Timer
 	Dma               *Dma
 	Apu               *apu.Apu
-	Irq               *Irq
+	Irq               *irq.Irq
 	InstInjectionFunc func(op uint32)
 	Keypad            Key
 
@@ -89,12 +90,10 @@ func NewGBA(ctx *audio.Context, path string, muted bool) *GBA {
 	}
 
 	gba.PPU = &PPU{gba: gba}
-	gba.Irq = NewIrq(gba, gba.Scheduler)
 	gba.Mem = NewMemory(gba)
 	gba.Cpu = cpu.NewCpu(gba.Mem, gba.Cycles, gba.Idle)
+	gba.Irq = irq.NewIrq(gba.Scheduler, &gba.Cpu.IrqLine)
 	gba.Keypad = Key{Irq: gba.Irq, Input: 0x3FF}
-	gba.Irq.CpuIrqLine = &gba.Cpu.IrqLine
-	gba.Irq.IME = true
 
 	gba.registerEvents()
 

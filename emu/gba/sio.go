@@ -1,18 +1,21 @@
 package gba
 
-import "github.com/aabalke/guac/emu/scheduler"
+import (
+	"github.com/aabalke/guac/emu/gba/irq"
+	"github.com/aabalke/guac/emu/scheduler"
+)
 
 var sioClock = [...]int64{512, 64}
 
 type Sio struct {
 	Cnt uint16
-	irq *Irq
+	irq *irq.Irq
 	sch *scheduler.Scheduler
 
 	completeTransferEvent scheduler.EventIdx
 }
 
-func NewSio(irq *Irq, sch *scheduler.Scheduler) *Sio {
+func NewSio(irq *irq.Irq, sch *scheduler.Scheduler) *Sio {
 	s := &Sio{
 		irq: irq,
 		sch: sch,

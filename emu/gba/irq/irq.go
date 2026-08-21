@@ -1,36 +1,16 @@
-package gba
+package irq
 
 import "github.com/aabalke/guac/emu/scheduler"
 
-const (
-	IRQ_VBL  = 0
-	IRQ_HBL  = 1
-	IRQ_VCT  = 2
-	IRQ_TMR0 = 3
-	IRQ_TMR1 = 4
-	IRQ_TMR2 = 5
-	IRQ_TMR3 = 6
-	IRQ_SER  = 7
-	IRQ_DMA0 = 8
-	IRQ_DMA1 = 9
-	IRQ_DMA2 = 10
-	IRQ_DMA3 = 11
-	IRQ_KEY  = 12
-	IRQ_GBA  = 13
-)
-
 type Irq struct {
-	gba                  *GBA
 	sch                  *scheduler.Scheduler
+	IrqLine              *bool
 	pendingIF, pendingIE uint32
 	IF, IE               uint32
 	IdleIrq              uint32
 	IME                  bool
 	pendingIME           bool
 	IrqAvailable         bool
-	IrqLine              bool
-
-	CpuIrqLine *bool
 
 	events struct {
 		OnWrite       scheduler.EventIdx
@@ -39,11 +19,12 @@ type Irq struct {
 	}
 }
 
-func NewIrq(gba *GBA, s *scheduler.Scheduler) *Irq {
-	i := &Irq{}
+func NewIrq(s *scheduler.Scheduler, irqLine *bool) *Irq {
+	i := &Irq{
+		IME: true,
+		sch: s,
+	}
 
-	i.gba = gba
-	i.sch = s
 	i.events = struct {
 		OnWrite       scheduler.EventIdx
 		UpdateIEAndIF scheduler.EventIdx
@@ -58,12 +39,11 @@ func NewIrq(gba *GBA, s *scheduler.Scheduler) *Irq {
 }
 
 func (i *Irq) Read(addr uint32) uint8 {
-	byte := addr & 1
 	switch addr {
 	case 0x200, 0x201:
-		return uint8(i.IE >> (byte << 3))
+		return uint8(i.IE >> ((addr & 1) * 8))
 	case 0x202, 0x203:
-		return uint8(i.IF >> (byte << 3))
+		return uint8(i.IF >> ((addr & 1) * 8))
 	case 0x208:
 		if i.IME {
 			return 1
@@ -76,15 +56,12 @@ func (i *Irq) Read(addr uint32) uint8 {
 }
 
 func (i *Irq) Write8(addr uint32, v uint8) {
-	byte := addr & 1
-
 	switch addr {
 	case 0x200, 0x201:
-		i.pendingIE &^= 0xFF << (byte << 3)
-		i.pendingIE |= (uint32(v) << (byte << 3))
-		i.pendingIE &= 0x3FFF
+		offset := (addr & 1) * 8
+		i.pendingIE = ((i.pendingIE &^ (0xFF << offset)) | (uint32(v) << offset)) & 0x3FFF
 	case 0x202, 0x203:
-		i.pendingIF &^= uint32(v) << (byte << 3)
+		i.pendingIF &^= uint32(v) << ((addr & 1) * 8)
 	case 0x208:
 		i.pendingIME = v&1 != 0
 	}
@@ -123,9 +100,8 @@ func (i *Irq) OnWrite(late int64, argz any) {
 
 	irqLineNew := i.IME && irqAvailableNew
 
-	if i.IrqLine != irqLineNew {
+	if *i.IrqLine != irqLineNew {
 		i.sch.Schedule(i.events.UpdateIRQLine, 2, irqLineNew)
-		i.IrqLine = irqLineNew
 	}
 }
 
@@ -134,5 +110,5 @@ func (i *Irq) UpdateIEAndIF(late int64, argz any) {
 }
 
 func (i *Irq) UpdateIRQLine(late int64, argz any) {
-	*i.CpuIrqLine = argz.(bool)
+	*i.IrqLine = argz.(bool)
 }
