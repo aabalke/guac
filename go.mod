@@ -14,15 +14,13 @@ replace github.com/hajimehoshi/dialog => github.com/aabalke/dialog v0.0.0-202608
 // before release. unversioned packaged are v0.0.0-YYYYMMDD______-CCCCCCCCCCCC
 // where C is the beginning of the commit
 
-go 1.26.5
+go 1.27.0
 
 require (
 	github.com/BurntSushi/toml v1.5.0
-	github.com/aabalke/gojit v0.0.0-20260616021404-5808a49d96fc
 	github.com/ebitenui/ebitenui v0.7.3
 	github.com/hajimehoshi/dialog v0.0.0-20260703050910-dfca0e7cf198
 	github.com/hajimehoshi/ebiten/v2 v2.9.7
-	golang.org/x/sys v0.46.0
 )
 
 require (
@@ -30,7 +28,6 @@ require (
 	github.com/ebitengine/hideconsole v1.0.0 // indirect
 	github.com/ebitengine/oto/v3 v3.4.0 // indirect
 	github.com/ebitengine/purego v0.10.1 // indirect
-	github.com/edsrzf/mmap-go v1.2.0 // indirect
 	github.com/frustra/bbcode v0.0.0-20201127003707-6ef347fbe1c8 // indirect
 	github.com/go-text/typesetting v0.3.0 // indirect
 	github.com/jezek/xgb v1.1.1 // indirect
@@ -38,5 +35,6 @@ require (
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
 	golang.org/x/image v0.31.0 // indirect
 	golang.org/x/sync v0.17.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
 )

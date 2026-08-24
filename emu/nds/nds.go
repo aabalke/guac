@@ -195,7 +195,8 @@ func (nds *Nds) Update() {
 		if nds.arm9.Halted {
 
 			for nds.Scheduler.CurrentCycle < nextFrame && !nds.irq9.IrqAvailable {
-				// cant get remaining - believe since arm7 uses same scheduler itd skip new arm7 events
+				// cant use get remaining - believe since arm7 uses same scheduler itd skip new arm7 events
+				// will need to fix when arm7 scheduler situation is handled
 				nds.Tick(1)
 			}
 
@@ -232,6 +233,9 @@ func (nds *Nds) Tick(cycles int64) {
 		}
 
 		nds.Arm7Cycles++
+
+		// maybe get all new arm7 events with scheduler cycles < current arm9 and catch up every time
+		// would need to calc scheduler cycle based on arm7 time not arm9
 	}
 }
 
