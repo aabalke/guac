@@ -38,7 +38,6 @@ func (s *Irq) WriteIME(v uint8) {
 }
 
 func (s *Irq) ReadIME() uint8 {
-
 	if s.IME {
 		return 1
 	}

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 	"github.com/aabalke/guac/utils"
 )
@@ -12,7 +11,7 @@ import (
 var paramCnt = [0x73]int{}
 
 type GeoEngine struct {
-	Irq     *cpu.Irq
+	Irq     Irq
 	Buffers *Buffers
 	Data    []uint32
 
@@ -46,7 +45,7 @@ type GeoEngine struct {
 	Fog gl.Fog
 }
 
-func NewGeoEngine(buffers *Buffers, irq *cpu.Irq, vram VRAM) *GeoEngine {
+func NewGeoEngine(buffers *Buffers, irq Irq, vram VRAM) *GeoEngine {
 	g := &GeoEngine{
 		Vram:      vram,
 		Irq:       irq,

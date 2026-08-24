@@ -11,12 +11,17 @@ import (
 	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/gba/timer"
 	"github.com/aabalke/guac/emu/nds/cart"
+	"github.com/aabalke/guac/emu/nds/irq"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/nds/mem/spi"
 	"github.com/aabalke/guac/emu/nds/mem/wifi"
 	"github.com/aabalke/guac/emu/nds/ppu"
 	"github.com/aabalke/guac/emu/nds/snd"
 )
+
+type Irq interface {
+	SetIRQ(irq uint32)
+}
 
 type Mem struct {
 	Tcm     Tcm
@@ -31,7 +36,8 @@ type Mem struct {
 	IO [0x100_0000]uint8
 
 	halted7    *bool
-	irq7, irq9 *cpu.Irq
+	irq7       *cpu.Irq
+	irq9       *irq.Irq
 	dma7, dma9 *[4]dma.DMA
 
 	arm7Pc *uint32
@@ -55,7 +61,6 @@ type Mem struct {
 	WifiWaitCnt WifiWaitCnt
 	Timers7     [4]*timer.Timer
 	Timers9     [4]*timer.Timer
-	Jit7, Jit9  Jit
 	Bus7        Bus7
 	Bus9        Bus9
 }
@@ -157,8 +162,6 @@ func (b *Bus7) ReadPtr(addr uint32) unsafe.Pointer {
 func (b *Bus7) Write8(addr uint32, v uint8) {
 	// there may be the ability to invalidate only arm7 or arm9  -
 	// for example wram is special
-	b.M.Jit7.InvalidatePage(addr)
-	b.M.Jit9.InvalidatePage(addr)
 
 	switch addr >> 24 {
 	case 0x2:
@@ -235,9 +238,6 @@ func (b *Bus7) Write32(addr, v uint32) {
 }
 
 func (b *Bus7) WritePtr(addr uint32) unsafe.Pointer {
-	b.M.Jit7.InvalidatePage(addr)
-	b.M.Jit9.InvalidatePage(addr)
-
 	switch addr >> 24 {
 	case 0x2:
 		return unsafe.Add(unsafe.Pointer(&b.M.MainRam), addr&0x3F_FFFF)
@@ -343,9 +343,6 @@ func (b *Bus9) ReadPtr(addr uint32) unsafe.Pointer {
 }
 
 func (b *Bus9) Write8(addr uint32, v uint8) {
-	b.M.Jit7.InvalidatePage(addr)
-	b.M.Jit9.InvalidatePage(addr)
-
 	if ok := b.M.Tcm.Write(addr, v); ok {
 		return
 	}
@@ -437,9 +434,6 @@ func (b *Bus9) Write32(addr, v uint32) {
 }
 
 func (b *Bus9) WritePtr(addr uint32) unsafe.Pointer {
-	b.M.Jit7.InvalidatePage(addr)
-	b.M.Jit9.InvalidatePage(addr)
-
 	if ptr := b.M.Tcm.WritePtr(addr); ptr != nil {
 		return ptr
 	}
@@ -466,8 +460,8 @@ func (m *Mem) InitMemory(
 	arm7Pc *uint32,
 	halted7 *bool,
 	dma7, dma9 *[4]dma.DMA,
-	irq7, irq9 *cpu.Irq,
-	jit7, jit9 Jit,
+	irq7 *cpu.Irq,
+	irq9 *irq.Irq,
 	c *cart.Cartridge,
 	ppu *ppu.PPU,
 	snd *snd.Snd,
@@ -481,8 +475,6 @@ func (m *Mem) InitMemory(
 	m.Ppu = ppu
 	m.arm7Pc = arm7Pc
 	m.Snd = snd
-	m.Jit7 = jit7
-	m.Jit9 = jit9
 
 	// i believe this is default
 	m.WRAM.WriteCNT(3)
@@ -551,6 +543,9 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 
 	case addr >= 0x130 && addr < 0x134:
 		return mem.Key.Read(addr)
+
+	case addr >= 0x208 && addr < 0x218:
+		return mem.irq9.Read(addr)
 	}
 
 	switch addr {
@@ -628,26 +623,6 @@ func (mem *Mem) ReadArm9IO(addr uint32) uint8 {
 		return mem.Cartridge.ReadExMem(0)
 	case 0x205:
 		return mem.Cartridge.ReadExMem(1)
-	case 0x208:
-		return mem.irq9.ReadIME()
-	case 0x209:
-		return 0
-	case 0x210:
-		return mem.irq9.ReadIE(0)
-	case 0x211:
-		return mem.irq9.ReadIE(1)
-	case 0x212:
-		return mem.irq9.ReadIE(2)
-	case 0x213:
-		return mem.irq9.ReadIE(3)
-	case 0x214:
-		return mem.irq9.ReadIF(0)
-	case 0x215:
-		return mem.irq9.ReadIF(1)
-	case 0x216:
-		return mem.irq9.ReadIF(2)
-	case 0x217:
-		return mem.irq9.ReadIF(3)
 	case 0x240:
 		return mem.Ppu.Vram.Cnt[ppu.A].V
 	case 0x241:
@@ -719,6 +694,10 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 		return
 	case addr >= 0x130 && addr < 0x134:
 		mem.Key.Write(addr, v)
+		return
+
+	case addr >= 0x208 && addr < 0x218:
+		mem.irq9.Write8(addr, v)
 		return
 	}
 
@@ -832,27 +811,6 @@ func (mem *Mem) WriteArm9IO(addr uint32, v uint8) {
 		mem.Cartridge.WriteExMem(v, 0)
 	case 0x205:
 		mem.Cartridge.WriteExMem(v, 1)
-
-	case 0x208:
-		mem.irq9.WriteIME(v)
-	case 0x209:
-		return
-	case 0x210:
-		mem.irq9.WriteIE(v, 0)
-	case 0x211:
-		mem.irq9.WriteIE(v, 1)
-	case 0x212:
-		mem.irq9.WriteIE(v, 2)
-	case 0x213:
-		mem.irq9.WriteIE(v, 3)
-	case 0x214:
-		mem.irq9.WriteIF(v, 0)
-	case 0x215:
-		mem.irq9.WriteIF(v, 1)
-	case 0x216:
-		mem.irq9.WriteIF(v, 2)
-	case 0x217:
-		mem.irq9.WriteIF(v, 3)
 
 	// vram reads - gbatek says read only, needed to match no$gba
 	case 0x240:

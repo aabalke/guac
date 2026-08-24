@@ -2,7 +2,6 @@
 package arm7
 
 import (
-	"fmt"
 	"unsafe"
 
 	"github.com/aabalke/guac/emu/cpu"
@@ -18,9 +17,6 @@ type Cpu struct {
 	PcOff       int
 	isBranching bool
 	BranchPc    uint32
-
-	Jit        *Jit
-	jitEnabled bool
 }
 
 const (
@@ -95,17 +91,14 @@ var BANK_ID = map[uint32]uint32{
 	MODE_UND: 5,
 }
 
-func NewCpu(jitEnabled bool, m cpu.MemoryInterface, irq *cpu.Irq) *Cpu {
+func NewCpu(m cpu.MemoryInterface, irq *cpu.Irq) *Cpu {
 	c := &Cpu{
-		mem:        m,
-		Irq:        irq,
-		jitEnabled: jitEnabled,
+		mem: m,
+		Irq: irq,
 	}
 
 	// skip bios
 	c.Irq.IME = true
-
-	c.Jit = NewJit(c)
 
 	return c
 }
@@ -204,139 +197,6 @@ func (cpu *Cpu) CheckIrq() {
 	}
 }
 
-//go:inline
-func (cpu *Cpu) jitFunction(pc uint32, thumb bool) (uint32, int, bool) {
-	pageIdx := pc >> cpu.Jit.PageShift
-	blockIdx := (pc & cpu.Jit.PageMask) >> 1
-
-	page := cpu.Jit.Pages[pageIdx]
-
-	if page == nil || page.dead {
-		return 0, 0, false
-	}
-
-	block := page.Blocks[blockIdx]
-
-	if block == nil || block.Skip || block.f == nil {
-		return 0, 0, false
-	}
-
-	//if block.Thumb != thumb {
-	//    panic(fmt.Sprintf("called thumb block %t from %t\n", block.Thumb, thumb))
-	//}
-
-	block.f()
-	cpu.isBranching = true
-	cpu.Jit.BlockCache.TouchBlock(block)
-	return block.finalOp, int(block.Length), true
-}
-
-func (cpu *Cpu) GetOpArm() (uint32, int) {
-	r := &cpu.Reg.R
-
-	if cpu.isBranching {
-		cpu.isBranching = false
-		cpu.PcOff = 0
-
-		if cpu.jitEnabled {
-			pc := r[PC]
-			if finalOp, length, ok := cpu.jitFunction(pc, false); ok {
-				return finalOp, length
-			}
-
-			cpu.Jit.UpdateMetrics(pc, false)
-		}
-
-		if r[PC] != cpu.BranchPc {
-			cpu.PcPtr = nil
-			// imm loop ended
-		}
-	}
-
-	if sequential := cpu.PcPtr == nil; sequential {
-		cpu.BranchPc = r[PC]
-		if p := cpu.mem.ReadPtr(r[PC]); p != nil {
-			cpu.PcPtr = p
-		} else {
-			return cpu.mem.Read32(r[PC]), 0
-		}
-	}
-
-	op := *(*uint32)(unsafe.Add(cpu.PcPtr, cpu.PcOff))
-	cpu.PcOff += 4
-	cpu.isBranching = ((op>>27)&1 != 0) || (op>>12)&0xF == 0xF
-
-	return op, 0
-}
-
-func (cpu *Cpu) GetOpThumb() (uint16, int) {
-	r := &cpu.Reg.R
-
-	if cpu.isBranching {
-		cpu.isBranching = false
-		cpu.PcOff = 0
-		if cpu.jitEnabled {
-			pc := r[PC]
-			if finalOp, length, ok := cpu.jitFunction(pc, true); ok {
-				return uint16(finalOp), length
-			}
-
-			cpu.Jit.UpdateMetrics(pc, true)
-		}
-		if r[PC] != cpu.BranchPc {
-			cpu.PcPtr = nil
-		}
-	}
-
-	if sequential := cpu.PcPtr == nil; sequential {
-		if p := cpu.mem.ReadPtr(r[PC]); p != nil {
-			cpu.BranchPc = r[PC]
-			cpu.PcPtr = p
-		} else {
-			return uint16(cpu.mem.Read16(r[PC])), 0
-		}
-	}
-
-	op := *(*uint16)(unsafe.Add(cpu.PcPtr, cpu.PcOff))
-	cpu.PcOff += 2
-	//cpu.isBranching = (op >> 14) != 0
-	cpu.isBranching = !DecodeTHUMBBranch(op)
-
-	return op, 0
-}
-
-var (
-	t_rpc uint32
-	t_sav Reg
-	t_sta Reg
-)
-
-func (c *Cpu) TestStart(op uint32, f func(op uint32), compare bool) {
-	if !compare {
-		return
-	}
-
-	t_rpc = c.Reg.R[15]
-	t_sta = c.Reg
-
-	f(op)
-
-	t_sav = c.Reg
-
-	c.Reg = t_sta
-}
-
-func (c *Cpu) EndTest(op uint32, compare bool) {
-	if !(compare && c.Reg != t_sav) {
-		return
-	}
-
-	fmt.Printf("STA REG %08X CPSR %08X\n", t_sta.R, t_sta.CPSR.Get())
-	fmt.Printf("NEW REG %08X CPSR %08X\n", t_sav.R, t_sav.CPSR.Get())
-	fmt.Printf("ORI REG %08X CPSR %08X\n", c.Reg.R, c.Reg.CPSR.Get())
-	panic(fmt.Sprintf("Bad Compare %08X %08X", t_rpc, op))
-}
-
 func DecodeTHUMBBranch(op uint16) bool {
 	switch {
 	case isthumbSWI(op):
@@ -409,4 +269,14 @@ func DecodeTHUMBBranch(op uint16) bool {
 	}
 
 	return false
+}
+
+func (cpu *Cpu) GetOpArm() (uint32, int) {
+	r := &cpu.Reg.R
+	return cpu.mem.Read32(r[PC]), 0
+}
+
+func (cpu *Cpu) GetOpThumb() (uint16, int) {
+	r := &cpu.Reg.R
+	return uint16(cpu.mem.Read16(r[PC])), 0
 }

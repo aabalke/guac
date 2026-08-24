@@ -27,7 +27,7 @@ type Cartridge struct {
 	AuxSpi  AuxSpi
 	RomCtrl RomCtrl
 
-	irq7, irq9 *cpu.Irq
+	irq7, irq9 Irq
 	dma7, dma9 *[4]dma.DMA
 	Backup     *Backup
 
@@ -40,7 +40,11 @@ type Cartridge struct {
 	ChipId         [4]uint8
 }
 
-func NewCartridge(path string, bios *[]uint8, irq7, irq9 *cpu.Irq, dma7, dma9 *[4]dma.DMA) *Cartridge {
+type Irq interface {
+	SetIRQ(irq uint32)
+}
+
+func NewCartridge(path string, bios *[]uint8, irq7, irq9 Irq, dma7, dma9 *[4]dma.DMA) *Cartridge {
 	c := &Cartridge{
 		Path: path,
 		irq7: irq7,
@@ -60,9 +64,9 @@ func NewCartridge(path string, bios *[]uint8, irq7, irq9 *cpu.Irq, dma7, dma9 *[
 
 	c.Header = NewHeader(c)
 
-	if !c.Header.Decrypted {
-		NewKey1(bios, c.Rom).DecryptCard()
-	}
+	//if !c.Header.Decrypted {
+	//	NewKey1(bios, c.Rom).DecryptCard()
+	//}
 
 	code := binary.LittleEndian.Uint32(c.Header.GameCode)
 	c.Backup = NewBackup(c)

@@ -6,7 +6,6 @@ import (
 	"math/bits"
 	"time"
 
-	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/nds/rast"
 	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -188,7 +187,11 @@ type Object struct {
 	BmpBoundaryMask   uint32
 }
 
-func NewPPU(irq *cpu.Irq) *PPU {
+type Irq interface {
+	SetIRQ(irq uint32)
+}
+
+func NewPPU(irq Irq) *PPU {
 	p := &PPU{}
 
 	p.EngineA.Pixels = make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)

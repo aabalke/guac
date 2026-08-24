@@ -16,6 +16,7 @@ import (
 	"github.com/aabalke/guac/emu/gba/timer"
 	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/debug"
+	"github.com/aabalke/guac/emu/nds/irq"
 	"github.com/aabalke/guac/emu/nds/mem"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 	"github.com/aabalke/guac/emu/nds/ppu"
@@ -50,6 +51,8 @@ type Nds struct {
 	mem              *mem.Mem
 	arm7             *arm7.Cpu
 	arm9             *arm9.Cpu
+	irq7             *cpu.Irq
+	irq9             *irq.Irq
 	ppu              *ppu.PPU
 	Cartridge        *cart.Cartridge
 	Screen           *Screen
@@ -63,14 +66,18 @@ type Nds struct {
 }
 
 func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
-	irq7, irq9 := &cpu.Irq{}, &cpu.Irq{}
-
 	nds := &Nds{
 		Scheduler: scheduler.NewScheduler(),
 		mem:       &mem.Mem{},
 		Screen:    NewScreen(),
-		ppu:       ppu.NewPPU(irq9),
 	}
+
+	nds.arm9 = arm9.NewCpu(&nds.mem.Bus9, cp15.NewCp15(&nds.mem.Tcm))
+
+	nds.irq7 = &cpu.Irq{}
+	nds.irq9 = irq.NewIrq(nds.Scheduler, &nds.arm9.IrqLine)
+
+	nds.ppu = ppu.NewPPU(nds.irq9)
 
 	nds.registerEvents()
 
@@ -83,16 +90,15 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 			nds.mem.Timers9[i-1].Next = nds.mem.Timers9[i]
 		}
 
-		nds.dma7[i].Init(i, &nds.mem.Bus7, nds.Scheduler, irq7, false)
-		nds.dma9[i].Init(i, &nds.mem.Bus9, nds.Scheduler, irq9, true)
+		nds.dma7[i].Init(i, &nds.mem.Bus7, nds.Scheduler, nds.irq7, false)
+		nds.dma9[i].Init(i, &nds.mem.Bus9, nds.Scheduler, nds.irq9, true)
 	}
 
-	nds.arm7 = arm7.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem.Bus7, irq7)
-	nds.arm9 = arm9.NewCpu(config.Conf.Nds.Jit.Enabled, &nds.mem.Bus9, irq9, cp15.NewCp15(&nds.mem.Tcm))
+	nds.arm7 = arm7.NewCpu(&nds.mem.Bus7, nds.irq7)
 
 	nds.Cartridge = cart.NewCartridge(
 		path, nds.mem.Arm7Bios,
-		irq7, irq9,
+		nds.irq7, nds.irq9,
 		&nds.dma7, &nds.dma9,
 	)
 
@@ -100,8 +106,7 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 		&nds.arm7.Reg.R[15],
 		&nds.arm7.Halted,
 		&nds.dma7, &nds.dma9,
-		irq7, irq9,
-		nds.arm7.Jit, nds.arm9.Jit,
+		nds.irq7, nds.irq9,
 		nds.Cartridge, nds.ppu, snd.NewSnd(ctx, &nds.mem.Bus7, BUFFER_SIZE),
 	)
 
@@ -187,20 +192,30 @@ func (nds *Nds) Run(ctx context.Context, eventBus *bus.EventBus) {
 func (nds *Nds) Update() {
 	nextFrame := nds.Scheduler.CurrentCycle + CYCLES_FRAME
 	for nds.Scheduler.CurrentCycle < nextFrame {
-		nds.arm9.CheckIrq()
+		if nds.arm9.Halted {
 
-		if !nds.arm9.Halted {
+			for nds.Scheduler.CurrentCycle < nextFrame && !nds.irq9.IrqAvailable {
+				// cant get remaining - believe since arm7 uses same scheduler itd skip new arm7 events
+				nds.Tick(1)
+			}
+
+			if nds.irq9.IrqAvailable {
+				nds.Tick(1)
+				nds.arm9.Halted = false
+			}
+
+		} else {
 
 			if _, ok := nds.arm9.Execute(); !ok {
 				panic(fmt.Sprintf("ARM9 Decode Error: PC %08X\n", nds.arm9.Reg.R[15]))
 			}
 
 			if nds.ppu.Rasterizer.GeoEngine.GxStat.FifoIrq != 0 {
-				nds.arm9.Irq.SetIRQ(cpu.IRQ_GEO_CMD_FIFO)
+				nds.irq9.SetIRQ(cpu.IRQ_GEO_CMD_FIFO)
 			}
-		}
 
-		nds.Tick(1)
+			nds.Tick(1)
+		}
 	}
 }
 
@@ -208,18 +223,15 @@ func (nds *Nds) Tick(cycles int64) {
 	nds.Scheduler.Add(cycles)
 
 	for nds.Arm7Cycles < nds.Scheduler.Now()>>1 {
-		nds.Run7()
-		nds.Arm7Cycles++
-	}
-}
+		nds.arm7.CheckIrq()
 
-func (nds *Nds) Run7() {
-	nds.arm7.CheckIrq()
-
-	if !nds.arm7.Halted {
-		if _, ok := nds.arm7.Execute(); !ok {
-			panic(fmt.Sprintf("ARM7 Decode Error: PC %08X\n", nds.arm7.Reg.R[15]))
+		if !nds.arm7.Halted {
+			if _, ok := nds.arm7.Execute(); !ok {
+				panic(fmt.Sprintf("ARM7 Decode Error: PC %08X\n", nds.arm7.Reg.R[15]))
+			}
 		}
+
+		nds.Arm7Cycles++
 	}
 }
 
@@ -246,8 +258,6 @@ func (nds *Nds) Close() {
 	if debug.L != nil {
 		debug.L.Close()
 	}
-	nds.arm7.Jit.Close()
-	nds.arm9.Jit.Close()
 }
 
 func (nds *Nds) DirectBoot() {
@@ -305,7 +315,7 @@ func (nds *Nds) FPS() float64 {
 func (nds *Nds) OnTimerOverflow(t *timer.Timer, late int64) {
 	if t.Irq {
 		if t.IsArm9 {
-			nds.arm9.Irq.SetIRQ(3 + uint32(t.Idx))
+			nds.irq9.SetIRQ(3 + uint32(t.Idx))
 		} else {
 			nds.arm7.Irq.SetIRQ(3 + uint32(t.Idx))
 		}

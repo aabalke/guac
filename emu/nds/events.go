@@ -30,11 +30,11 @@ func (nds *Nds) HblankEvent(late int64, arg any) {
 
 	dispstat.H = true
 	if dispstat.A9HIrq {
-		nds.arm9.Irq.SetIRQ(1)
+		nds.irq9.SetIRQ(1)
 	}
 
 	if dispstat.A7HIrq {
-		nds.arm7.Irq.SetIRQ(1)
+		nds.irq7.SetIRQ(1)
 	}
 
 	if vcount := nds.mem.Vcount; vcount < SCREEN_HEIGHT {
@@ -79,11 +79,11 @@ func (nds *Nds) ScanlineEndEvent(late int64, arg any) {
 
 	case SCREEN_HEIGHT + 1:
 		if dispstat.A9VIrq {
-			nds.arm9.Irq.SetIRQ(0)
+			nds.irq9.SetIRQ(0)
 		}
 
 		if dispstat.A7VIrq {
-			nds.arm7.Irq.SetIRQ(0)
+			nds.irq7.SetIRQ(0)
 		}
 	case NUM_SCANLINES - 1:
 		dispstat.V = false
@@ -107,13 +107,13 @@ func (nds *Nds) ScanlineEndEvent(late int64, arg any) {
 	match := dispstat.A9LYC == *vcount
 	dispstat.A9VC = match
 	if dispstat.A9VCIrq && match {
-		nds.arm9.Irq.SetIRQ(2)
+		nds.irq9.SetIRQ(2)
 	}
 
 	match = dispstat.A7LYC == *vcount
 	dispstat.A7VC = match
 	if dispstat.A7VCIrq && match {
-		nds.arm7.Irq.SetIRQ(2)
+		nds.irq7.SetIRQ(2)
 	}
 
 	nds.Scheduler.Schedule(nds.RegisteredEvents.ScanlineEnd, CYCLES_SCANLINE-late, nil)

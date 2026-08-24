@@ -3,9 +3,12 @@ package dma
 import (
 	"unsafe"
 
-	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/scheduler"
 )
+
+type Irq interface {
+	SetIRQ(irq uint32)
+}
 
 const (
 	DMA_MODE_IMM = 0
@@ -38,7 +41,7 @@ type DMA struct {
 
 	sch *scheduler.Scheduler
 	mem MemoryInterface
-	irq *cpu.Irq
+	irq Irq
 
 	Src     uint32
 	Dst     uint32
@@ -73,7 +76,7 @@ func ReplaceByte(value uint32, newByte uint32, byteOffset uint32) uint32 {
 	return (value &^ (0xFF << bitOffset)) | (newByte << bitOffset)
 }
 
-func (dma *DMA) Init(idx int, mem MemoryInterface, scheduler *scheduler.Scheduler, irq *cpu.Irq, arm9 bool) {
+func (dma *DMA) Init(idx int, mem MemoryInterface, scheduler *scheduler.Scheduler, irq Irq, arm9 bool) {
 	dma.Idx = idx
 	dma.mem = mem
 	dma.irq = irq

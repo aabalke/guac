@@ -1,9 +1,7 @@
 package mem
 
-import "github.com/aabalke/guac/emu/cpu"
-
 type Key struct {
-	Irq     [2]*cpu.Irq
+	Irq     [2]Irq
 	Cnt     uint16
 	Input   uint16
 	Input2  uint8
@@ -11,9 +9,9 @@ type Key struct {
 	AndMode bool
 }
 
-func NewKey(irq7, irq9 *cpu.Irq) *Key {
+func NewKey(irq7, irq9 Irq) *Key {
 	return &Key{
-		Irq: [2]*cpu.Irq{
+		Irq: [2]Irq{
 			irq7, irq9,
 		},
 		Input:  0x3FF,

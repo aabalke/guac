@@ -2,7 +2,6 @@ package rast
 
 import (
 	"github.com/aabalke/guac/config"
-	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 )
 
@@ -26,12 +25,16 @@ type Rasterizer struct {
 	Export     *Export
 }
 
+type Irq interface {
+	SetIRQ(irq uint32)
+}
+
 type VRAM interface {
 	ReadTexture(uint32) uint8
 	ReadPalTexture(uint32) uint8
 }
 
-func NewRasterizer(vram VRAM, irq *cpu.Irq) *Rasterizer {
+func NewRasterizer(vram VRAM, irq Irq) *Rasterizer {
 	r := &Rasterizer{}
 	r.VRAM = vram
 	r.GeoEngine = NewGeoEngine(&r.Buffers, irq, vram)
@@ -70,7 +73,6 @@ func (d *Disp3dCnt) Read(b uint8) uint8 {
 }
 
 func (d *Disp3dCnt) Write(v, b uint8) {
-
 	if b == 0 {
 
 		d.TextureMapping = (v>>0)&1 != 0
@@ -119,12 +121,12 @@ const (
 
 type GXSTAT struct {
 	GeoEngine *GeoEngine
-	//TestBusy bool
+	// TestBusy bool
 	TestInView bool
 
-	//StackBusy bool
+	// StackBusy bool
 	FifoEntries uint16
-	//GXBusy bool
+	// GXBusy bool
 
 	FifoIrq uint8
 }
@@ -144,7 +146,6 @@ func (g *GXSTAT) Write(v, b uint8) {
 }
 
 func (g *GXSTAT) Read(b uint32) uint8 {
-
 	var v uint8
 
 	switch b {
@@ -219,7 +220,6 @@ type Edge struct {
 }
 
 func (e *Edge) Write(addr uint32, v uint8) {
-
 	addr -= 0x330
 
 	i := addr / 2
@@ -247,7 +247,6 @@ func (e *Edge) Write(addr uint32, v uint8) {
 }
 
 func (e *Edge) Read(addr uint32) uint8 {
-
 	addr -= 0x330
 
 	i := addr / 2

@@ -9,7 +9,7 @@ type Ipc struct {
 	Fifo9to7 Fifo
 }
 
-func NewIpc(irq7, irq9 *cpu.Irq) *Ipc {
+func NewIpc(irq7, irq9 Irq) *Ipc {
 	ipc := &Ipc{}
 
 	ipc.Fifo7to9.Irq = irq7
@@ -19,7 +19,7 @@ func NewIpc(irq7, irq9 *cpu.Irq) *Ipc {
 }
 
 type Fifo struct {
-	Irq                *cpu.Irq
+	Irq                Irq
 	Buffer             [0x10]uint32
 	Value              uint32
 	Length, Head, Tail uint8
