@@ -110,3 +110,10 @@ Pokemon Diamond / Pearl
 - Blend Capture at Legendary Reveal
 New Super Mario Bros
 Super Mario 64
+
+
+
+
+# todo
+
+rockwrestler blx test is bad - can be off by +4 +8 etc and it still counts - this is rough when handling pipelining or offset calc

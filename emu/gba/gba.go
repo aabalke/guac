@@ -94,6 +94,7 @@ func NewGBA(ctx *audio.Context, path string, muted bool) *GBA {
 	gba.Cpu = cpu.NewCpu(gba.Mem, gba.Cycles, gba.Idle)
 	gba.Irq = irq.NewIrq(gba.Scheduler, &gba.Cpu.IrqLine)
 	gba.Keypad = Key{Irq: gba.Irq, Input: 0x3FF}
+	gba.Mem.Sio = NewSio(gba.Irq, gba.Scheduler)
 
 	gba.registerEvents()
 

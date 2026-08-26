@@ -1,6 +1,8 @@
 package irq
 
-import "github.com/aabalke/guac/emu/scheduler"
+import (
+	"github.com/aabalke/guac/emu/scheduler"
+)
 
 type Irq struct {
 	Sch                  *scheduler.Scheduler

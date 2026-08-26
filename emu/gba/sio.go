@@ -8,9 +8,9 @@ import (
 var sioClock = [...]int64{512, 64}
 
 type Sio struct {
-	Cnt uint16
 	irq *irq.Irq
 	sch *scheduler.Scheduler
+	Cnt uint16
 
 	completeTransferEvent scheduler.EventIdx
 }

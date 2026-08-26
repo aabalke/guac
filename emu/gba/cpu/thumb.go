@@ -398,110 +398,48 @@ const (
 )
 
 func (c *Cpu) HiRegBX(op uint16) {
-	var (
-		r    = &c.Reg.R
-		cpsr = &c.Reg.CPSR
+	if nop := op == 0x46C0; nop {
+		return
+	}
 
-		inst = (op >> 8) & 0b11
-		mSBd = (op>>7)&1 != 0
-		mSBs = (op>>6)&1 != 0
-		rs   = (op >> 3) & 0xF
-		rd   = op & 0x7
+	var (
+		r  = &c.Reg.R
+		rd = (op & 7) | (((op >> 7) & 1) << 3)
+		rs = (op >> 3) & 0xF
 	)
 
-	if inst != 3 && mSBd {
-		rd |= 0b1000
-	}
-
-	if mSBs {
-		rs |= 0b1000
-	}
-
-	switch inst {
+	switch inst := (op >> 8) & 3; inst {
 	case HI_ADD:
 
-		rsv := r[rs]
-		rdv := r[rd]
-
-		//if rs == PC {
-		//	rsv += 4
-		//}
-
-		res := uint64(rsv) + uint64(rdv)
+		r[rd] += r[rs]
 
 		if rd == PC {
-			r[rd] = uint32(res &^ 1)
-			//c.P.Reload = true
 			c.Reload16()
-		} else {
-			r[rd] = uint32(res)
 		}
-		return
 
 	case HI_CMP:
 
 		rsv := r[rs]
 		rdv := r[rd]
-
-		//if rs == PC {
-		//	rsv += 4
-		//}
-
 		res := uint64(rdv) - uint64(rsv)
 
-		//if rd != PC {
-		//}
-
+		cpsr := &c.Reg.CPSR
 		cpsr.N = (uint32(res)>>31)&1 != 0
 		cpsr.Z = uint32(res) == 0
 		cpsr.C = res < 0x1_0000_0000
 		cpsr.V = ((rdv^rsv)&(rdv^uint32(res)))>>31 != 0
-		return
 
 	case HI_MOV:
 
-		if nop := rs == 8 && rd == 8; nop {
-			return
-		}
-
 		r[rd] = r[rs]
-		//if rs == PC {
-		//	rsv += 4
-		//}
 
 		if rd == PC {
-			r[rd] &^= 1
-			//c.P.Reload = true
 			c.Reload16()
-			return
 		}
-
-		return
 
 	case HI_BX:
-
-		if blx := mSBd; blx {
-			if rs == LR {
-				panic("Setup Thumb Blx LR, LR")
-			}
-
-			r[LR] = r[PC] // + 3
-		}
-
-		if thumb := r[rs]&1 != 0; thumb {
-			r[PC] = r[rs] &^ 1
-			//c.P.Reload = true
-			c.Reload16()
-			return
-		}
-
-		cpsr.T = false
-		r[PC] = r[rs] &^ 3
-
-		//c.P.Reload = true
-		c.Reload32()
-
-		return
+		r[PC] = r[rs]
+		c.ToggleThumb()
 	}
 }
 
@@ -640,17 +578,14 @@ func (c *Cpu) ThumbSdt(op uint16) {
 			c.Write16(addr, uint16(r[rd]))
 
 		case THUMB_LDSB:
-
 			// sign-expand byte value
 			r[rd] = uint32(int32(int8(c.Read8(addr))))
 
 		case THUMB_LDRH:
-
 			v := c.Read16(addr)
 			r[rd] = bits.RotateLeft32(v, -int((addr&1)<<3))
 
 		case THUMB_LDSH:
-
 			// On ARM7 aka ARMv4 aka NDS7/GBA:
 			// LDRSH Rd,[odd]  -->  LDRSB Rd,[odd];sign-expand BYTE value
 			if misaligned := addr&1 != 0; misaligned {
@@ -685,7 +620,7 @@ func (c *Cpu) ThumbLPC(op uint16) {
 		r    = &c.Reg.R
 		rd   = (op >> 8) & 0x7
 		nn   = uint32(op&0xFF) << 2
-		addr = (r[PC] &^ 0b11) + nn
+		addr = (r[PC] &^ 3) + nn
 	)
 
 	r[rd] = c.Read32(addr)
@@ -710,7 +645,6 @@ func (c *Cpu) ThumbLSImm(op uint16) {
 
 	switch inst {
 	case THUMB_STR_IMM:
-
 		addr := r[rb] + (nn << 2)
 		c.Write32(addr, r[rd])
 	case THUMB_LDR_IMM:
@@ -718,7 +652,6 @@ func (c *Cpu) ThumbLSImm(op uint16) {
 		v := c.Read32(addr)
 		is := (addr & 3) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
-
 	case THUMB_STRB_IMM:
 		addr := r[rb] + nn
 		c.Write8(addr, uint8(r[rd]))
@@ -808,7 +741,7 @@ func (c *Cpu) ThumbRelative(op uint16) {
 		return
 	}
 
-	r[rd] = (r[PC] &^ 0b11) + nn
+	r[rd] = (r[PC] &^ 3) + nn
 }
 
 func (c *Cpu) ThumbJumpCalls(op uint16) {
@@ -821,16 +754,11 @@ func (c *Cpu) ThumbJumpCalls(op uint16) {
 
 	nn := int(int8(op&0xFF)) << 1
 	r[PC] = uint32(int(r[PC]) + nn)
-	//c.P.Reload = true
 	c.Reload16()
 }
 
 func (c *Cpu) ThumbB(op uint16) {
-	r := &c.Reg.R
-
-	offset := int16((op&0x7FF)<<5) >> 4
-	r[15] += uint32(offset)
-	//c.P.Reload = true
+	c.Reg.R[15] += uint32(int16((op&0x7FF)<<5) >> 4)
 	c.Reload16()
 }
 
@@ -839,10 +767,10 @@ func (c *Cpu) ThumbShifted(op uint16) {
 		cpsr = &c.Reg.CPSR
 		r    = &c.Reg.R
 
-		shType = (op >> 11) & 0b11
+		shType = (op >> 11) & 3
 		is     = (op >> 6) & 0x1F
-		rsv    = r[(op>>3)&0x7]
-		rd     = op & 0x7
+		rsv    = r[(op>>3)&7]
+		rd     = op & 7
 
 		res uint32
 	)
@@ -889,7 +817,6 @@ func (c *Cpu) ThumbShifted(op uint16) {
 func (c *Cpu) ThumbStack(op uint16) {
 	r := &c.Reg.R
 	nn := int(op&0x7F) << 2
-
 	if sub := (op>>7)&1 != 0; sub {
 		nn = -nn
 	}
@@ -898,19 +825,14 @@ func (c *Cpu) ThumbStack(op uint16) {
 }
 
 func (c *Cpu) ThumbLongBranch(op uint16) {
-	r := &c.Reg.R
-	offset := int32(uint32(op&0x7FF)<<21) >> 9
-	r[14] = r[15] + uint32(offset)
+	c.Reg.R[LR] = c.Reg.R[PC] + uint32(int32(uint32(op&0x7FF)<<21)>>9)
 }
 
 func (c *Cpu) ThumbShortLongBranch(op uint16) {
 	r := &c.Reg.R
-
-	nn := uint32(op&0x7FF) << 1
-	tmp := (r[15] - 2) | 1
-	r[15] = r[14] + nn
-	r[14] = tmp
-
+	ret := (r[PC] - 2) | 1
+	r[PC] = r[LR] + (uint32(op&0x7FF) << 1)
+	r[LR] = ret
 	c.Reload16()
 }
 

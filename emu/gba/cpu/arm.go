@@ -6,9 +6,7 @@ import (
 )
 
 func (c *Cpu) DecodeARM(op uint32) {
-	r := &c.Reg.R
-
-	if cond := op >> 28; cond != 0xE && !c.Reg.CPSR.CheckCond(cond) {
+	if cond := op >> 28; !c.Reg.CPSR.CheckCond(cond) {
 		c.Seq = SEQ
 		return
 	}
@@ -16,40 +14,41 @@ func (c *Cpu) DecodeARM(op uint32) {
 	switch {
 	case (op>>24)&0xF == 0xF:
 		c.Exception(VEC_SWI, MODE_SWI)
-	case isB(op):
+	case IsB(op):
 		c.B(op)
-	case isBX(op):
+	case IsBX(op):
 		c.BX(op)
-	case isSDT(op):
+	case IsSDT(op):
 		c.Sdt(op)
-	case isBlock(op):
+	case IsBlock(op):
 		c.Block(op)
-	case isHalf(op):
+	case IsHalf(op):
 		c.Half(op)
-	case isUD(op):
-		panic("unsetup undefined instruction")
-	case isPSR(op):
+	case IsUD(op):
+		c.Exception(VEC_UNDEFINED, MODE_UND)
+	case IsPSR(op):
 		c.Psr(op)
-	case isSWP(op):
+	case IsSWP(op):
 		c.Swp(op)
-	case isM(op):
+	case IsMul(op):
 		c.Mul(op)
-	case isALU(op):
+	case IsALU(op):
 		c.Alu(op)
+		c.SetAluPC(op)
 
 	default:
-		panic(fmt.Sprintf("Unable to Decode ARM false %08X, at PC %08X\n", op, r[PC]))
+		panic(fmt.Sprintf("Unable to Decode ARM false %08X, at PC %08X\n", op, c.Reg.R[PC]))
 	}
 }
 
 //go:inline
-func isOpFormat(op, mask, format uint32) bool {
+func IsOpFormat(op, mask, format uint32) bool {
 	return op&mask == format
 }
 
 //go:inline
-func isSWP(op uint32) bool {
-	return isOpFormat(
+func IsSWP(op uint32) bool {
+	return IsOpFormat(
 		op,
 		0b0000_1111_1011_0000_0000_1111_1111_0000,
 		0b0000_0001_0000_0000_0000_0000_1001_0000,
@@ -57,16 +56,16 @@ func isSWP(op uint32) bool {
 }
 
 //go:inline
-func isBlock(op uint32) bool {
+func IsBlock(op uint32) bool {
 	is := false
 
-	is = is || isOpFormat(
+	is = is || IsOpFormat(
 		op,
 		0b0000_1110_0001_0000_0000_0000_0000_0000,
 		0b0000_1000_0001_0000_0000_0000_0000_0000,
 	)
 
-	is = is || isOpFormat(
+	is = is || IsOpFormat(
 		op,
 		0b0000_1110_0001_0000_0000_0000_0000_0000,
 		0b0000_1000_0000_0000_0000_0000_0000_0000,
@@ -76,16 +75,16 @@ func isBlock(op uint32) bool {
 }
 
 //go:inline
-func isHalf(op uint32) bool {
+func IsHalf(op uint32) bool {
 	is := false
 
-	is = is || isOpFormat(
+	is = is || IsOpFormat(
 		op,
 		0b0000_1110_0000_0000_0000_0000_1101_0000,
 		0b0000_0000_0000_0000_0000_0000_1101_0000,
 	)
 
-	is = is || isOpFormat(
+	is = is || IsOpFormat(
 		op,
 		0b0000_1110_0000_0000_0000_0000_1011_0000,
 		0b0000_0000_0000_0000_0000_0000_1011_0000,
@@ -94,18 +93,38 @@ func isHalf(op uint32) bool {
 	return is
 }
 
-//go:inline
-func isALU(op uint32) bool {
-	return isOpFormat(
+func IsAluImm(op uint32) bool {
+	return IsOpFormat(
 		op,
-		0b0000_1100_0000_0000_0000_0000_0000_0000,
-		0b0000_0000_0000_0000_0000_0000_0000_0000,
+		0b1110_0000_0000_0000_0000_0000_0000,
+		0b0010_0000_0000_0000_0000_0000_0000,
+	)
+}
+
+func IsAluShiftReg(op uint32) bool {
+	return IsOpFormat(
+		op,
+		0b1110_0000_0000_0000_0000_1001_0000,
+		0b0000_0000_0000_0000_0000_0001_0000,
+	)
+}
+
+func IsAluShiftImm(op uint32) bool {
+	return IsOpFormat(
+		op,
+		0b1110_0000_0000_0000_0000_0001_0000,
+		0b0000_0000_0000_0000_0000_0000_0000,
 	)
 }
 
 //go:inline
-func isBX(op uint32) bool {
-	return isOpFormat(
+func IsALU(op uint32) bool {
+	return IsAluImm(op) || IsAluShiftImm(op) || IsAluShiftReg(op)
+}
+
+//go:inline
+func IsBX(op uint32) bool {
+	return IsOpFormat(
 		op,
 		0b0000_1111_1111_1111_1111_1111_1101_0000,
 		0b0000_0001_0010_1111_1111_1111_0001_0000,
@@ -113,8 +132,8 @@ func isBX(op uint32) bool {
 }
 
 //go:inline
-func isB(op uint32) bool {
-	return isOpFormat(
+func IsB(op uint32) bool {
+	return IsOpFormat(
 		op,
 		0b0000_1110_0000_0000_0000_0000_0000_0000,
 		0b0000_1010_0000_0000_0000_0000_0000_0000,
@@ -122,32 +141,17 @@ func isB(op uint32) bool {
 }
 
 //go:inline
-func isM(op uint32) bool {
-	is := false
-
-	is = is || isOpFormat(
+func IsMul(op uint32) bool {
+	return IsOpFormat(
 		op,
-		0b0000_1110_1000_0000_0000_0000_1111_0000,
-		0b0000_0000_0000_0000_0000_0000_1001_0000,
+		0b1110_0000_0000_0000_0000_1111_0000,
+		0b0000_0000_0000_0000_0000_1001_0000,
 	)
-	is = is || isOpFormat(
-		op,
-		0b0000_1110_1000_0000_0000_0000_1111_0000,
-		0b0000_0000_1000_0000_0000_0000_1001_0000,
-	)
-
-	is = is || isOpFormat(
-		op,
-		0b0000_1111_1001_0000_0000_0000_1001_0000,
-		0b0000_0001_0000_0000_0000_0000_1000_0000,
-	)
-
-	return is
 }
 
 //go:inline
-func isUD(op uint32) bool {
-	return isOpFormat(
+func IsUD(op uint32) bool {
+	return IsOpFormat(
 		op,
 		0b0000_1110_0000_0000_0000_0000_0000_0000,
 		0b0000_0110_0000_0000_0000_0000_0000_0000,
@@ -155,14 +159,14 @@ func isUD(op uint32) bool {
 }
 
 //go:inline
-func isSDT(op uint32) bool {
+func IsSDT(op uint32) bool {
 	is := false
-	is = is || isOpFormat(
+	is = is || IsOpFormat(
 		op,
 		0b0000_1100_0001_0000_0000_0000_0000_0000,
 		0b0000_0100_0001_0000_0000_0000_0000_0000,
 	)
-	is = is || isOpFormat(
+	is = is || IsOpFormat(
 		op,
 		0b0000_1100_0001_0000_0000_0000_0000_0000,
 		0b0000_0100_0000_0000_0000_0000_0000_0000,
@@ -172,16 +176,16 @@ func isSDT(op uint32) bool {
 }
 
 //go:inline
-func isPSR(op uint32) bool {
+func IsPSR(op uint32) bool {
 	is := false
 
-	is = is || isOpFormat(
+	is = is || IsOpFormat(
 		op,
 		0b0000_1111_1011_1111_0000_1111_1111_1111,
 		0b0000_0001_0000_1111_0000_0000_0000_0000,
 	)
 
-	is = is || isOpFormat(
+	is = is || IsOpFormat(
 		op,
 		0b0000_1101_1011_0000_1111_0000_0000_0000,
 		0b0000_0001_0010_0000_1111_0000_0000_0000,
@@ -373,26 +377,28 @@ func (c *Cpu) Alu(op uint32) {
 			cpsr.Z = uint32(res) == 0
 		}
 	}
+}
 
-	if rd == PC {
+func (c *Cpu) SetAluPC(op uint32) {
+	if rd := (op >> 12) & 0xF; rd == PC {
+		inst := (op >> 21) & 0xF
 
 		if op&(1<<20) != 0 {
-			c.ExitException(cpsr.Mode)
+			c.ExitException(c.Reg.CPSR.Mode)
 		}
 
-		if cpsr.T {
-			r[PC] &^= 1
+		if c.Reg.CPSR.T {
+			c.Reg.R[PC] &^= 1
 		} else {
-			r[PC] &^= 3
+			c.Reg.R[PC] &^= 3
 		}
 		if inst < 0b1000 || inst > 0b1011 {
-			if cpsr.T {
+			if c.Reg.CPSR.T {
 				c.Reload16()
 			} else {
 				c.Reload32()
 			}
 		}
-
 	}
 }
 
@@ -534,8 +540,8 @@ func (c *Cpu) getShiftedAluReg(op uint32) uint32 {
 }
 
 const (
-	MUL   = 0b0
-	MLA   = 0b1
+	MUL   = 0b000
+	MLA   = 0b001
 	UMAAL = 0b010
 	UMULL = 0b100
 	UMLAL = 0b101
@@ -602,6 +608,7 @@ func (c *Cpu) Mul(op uint32) {
 			cpsr.C = false
 			// FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
 		}
+		return
 
 	case SMULL, SMLAL:
 
@@ -623,6 +630,8 @@ func (c *Cpu) Mul(op uint32) {
 			// FLAG_C "destroyed" ARM <5, ignored ARM >=5
 			// FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
 		}
+
+		return
 
 	}
 }
@@ -721,7 +730,6 @@ func (c *Cpu) Sdt(op uint32) {
 
 			if rd == PC {
 				c.ToggleThumb() // this is arm9 - not sure if arm7
-				c.Reload32()
 			}
 		}
 	} else {
@@ -737,7 +745,7 @@ func (c *Cpu) Sdt(op uint32) {
 		}
 	}
 
-	if wb && !(load && rn == rd) {
+	if wb && (!load || rn != rd) {
 		r[rn] = post
 	}
 }
@@ -770,11 +778,6 @@ func (c *Cpu) BX(op uint32) {
 	case INST_BX:
 		r[PC] = r[rn]
 		c.ToggleThumb()
-		if c.Reg.CPSR.T {
-			c.Reload16()
-			return
-		}
-		c.Reload32()
 
 	case INST_BXJ:
 		panic("Unsupported BXJ Instruction")
@@ -877,7 +880,6 @@ func (c *Cpu) Half(op uint32) {
 			// sign-expand half value
 			r[rd] = uint32(int32(int16(c.Read16(pre))))
 		}
-
 	}
 }
 

@@ -15,7 +15,6 @@ import (
 	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
 	"github.com/aabalke/guac/emu/gba/timer"
 	"github.com/aabalke/guac/emu/nds/cart"
-	"github.com/aabalke/guac/emu/nds/debug"
 	"github.com/aabalke/guac/emu/nds/irq"
 	"github.com/aabalke/guac/emu/nds/mem"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
@@ -72,7 +71,7 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 		Screen:    NewScreen(),
 	}
 
-	nds.arm9 = arm9.NewCpu(&nds.mem.Bus9, cp15.NewCp15(&nds.mem.Tcm))
+	nds.arm9 = arm9.NewCpu(&nds.mem.Bus9, nds.Cycles, nds.Idle, cp15.NewCp15(&nds.mem.Tcm))
 
 	nds.irq7 = &cpu.Irq{}
 	nds.irq9 = irq.NewIrq(nds.Scheduler, &nds.arm9.IrqLine)
@@ -112,9 +111,9 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 
 	nds.DirectBoot()
 
-	if config.Conf.General.Logger {
-		debug.Init("./log.csv")
-	}
+	//if config.Conf.General.Logger {
+	//	debug.Init("./log.csv")
+	//}
 
 	nds.ToggleMute(muted)
 
@@ -207,9 +206,7 @@ func (nds *Nds) Update() {
 
 		} else {
 
-			if _, ok := nds.arm9.Execute(); !ok {
-				panic(fmt.Sprintf("ARM9 Decode Error: PC %08X\n", nds.arm9.Reg.R[15]))
-			}
+			nds.arm9.Step()
 
 			if nds.ppu.Rasterizer.GeoEngine.GxStat.FifoIrq != 0 {
 				nds.irq9.SetIRQ(cpu.IRQ_GEO_CMD_FIFO)
@@ -236,6 +233,7 @@ func (nds *Nds) Tick(cycles int64) {
 
 		// maybe get all new arm7 events with scheduler cycles < current arm9 and catch up every time
 		// would need to calc scheduler cycle based on arm7 time not arm9
+		// bus is 33mhz - should I use a 33mhz scheduler?
 	}
 }
 
@@ -259,9 +257,9 @@ func (nds *Nds) GetScreens() (t, b *[]byte) {
 func (nds *Nds) Close() {
 	nds.Muted = true
 	nds.mem.Snd.Close()
-	if debug.L != nil {
-		debug.L.Close()
-	}
+	//if debug.L != nil {
+	//	debug.L.Close()
+	//}
 }
 
 func (nds *Nds) DirectBoot() {
@@ -281,6 +279,14 @@ func (nds *Nds) DirectBoot() {
 
 	nds.arm7.Halted = false
 	nds.arm9.Halted = false
+
+	nds.arm9.Op[0] = 0xF000_0000
+	nds.arm9.Op[1] = 0xF000_0000
+
+	// these are temp and should be removed
+	nds.arm9.Step()
+	nds.arm9.Step()
+	nds.Scheduler.CurrentCycle = 0
 }
 
 func (nds *Nds) CheckDmas(mode uint32, arm9 bool) {
@@ -331,4 +337,11 @@ func (nds *Nds) OnTimerOverflow(t *timer.Timer, late int64) {
 			next.OverflowHandle(late)
 		}
 	}
+}
+
+func (nds *Nds) Idle(cycles int64) {
+	//nds.Tick(cycles)
+}
+
+func (nds *Nds) Cycles(addr, width, seq uint32, inst bool) {
 }

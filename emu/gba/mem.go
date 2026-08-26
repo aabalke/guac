@@ -37,7 +37,6 @@ func NewMemory(gba *GBA) *Memory {
 	m := &Memory{GBA: gba}
 	m.ProtectedValue = 0xE129F000
 	m.Timings = NewTimings()
-	m.Sio = NewSio(gba.Irq, gba.Scheduler)
 
 	m.initReadRegions()
 	m.initWriteRegions()

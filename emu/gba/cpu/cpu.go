@@ -5,7 +5,7 @@ import (
 )
 
 type Cpu struct {
-	mem        Mem
+	Mem        Mem
 	Cycles     func(addr, width, seq uint32, inst bool)
 	Idle       func(cycles int64)
 	PcPtr      unsafe.Pointer
@@ -16,6 +16,7 @@ type Cpu struct {
 	LastWasDma bool
 	IrqLine    bool
 	Reloaded   bool
+	LowVector  bool
 }
 
 type Mem interface {
@@ -132,11 +133,12 @@ var ModeBank = map[CpuMode]uint32{
 type ExceptionVector uint32
 
 const (
-	VEC_RESET     ExceptionVector = 0x00
-	VEC_UNDEFINED ExceptionVector = 0x04
-	VEC_SWI       ExceptionVector = 0x08
-	VEC_IRQ       ExceptionVector = 0x18
-	VEC_FIQ       ExceptionVector = 0x1C
+	VEC_RESET     ExceptionVector = 0xFFFF0000
+	VEC_UNDEFINED ExceptionVector = 0xFFFF0004
+	VEC_SWI       ExceptionVector = 0xFFFF0008
+	VEC_PREFETCH  ExceptionVector = 0xFFFF000C
+	VEC_IRQ       ExceptionVector = 0xFFFF0018
+	VEC_FIQ       ExceptionVector = 0xFFFF001C
 )
 
 func (c *Cond) CheckCond(cond uint32) bool {
@@ -178,9 +180,10 @@ func (c *Cond) CheckCond(cond uint32) bool {
 
 func NewCpu(mem Mem, cycles func(addr, width, seq uint32, inst bool), idle func(cycles int64)) *Cpu {
 	return &Cpu{
-		mem:    mem,
-		Cycles: cycles,
-		Idle:   idle,
+		Mem:       mem,
+		Cycles:    cycles,
+		Idle:      idle,
+		LowVector: true,
 	}
 }
 
@@ -202,10 +205,10 @@ func (c *Cpu) Step() {
 
 			if thumb {
 				c.Cycles(c.Reg.R[PC], 2, seq, true)
-				c.mem.Read16(c.Reg.R[PC])
+				c.Mem.Read16(c.Reg.R[PC])
 			} else {
 				c.Cycles(c.Reg.R[PC], 4, seq, true)
-				c.mem.Read32(c.Reg.R[PC])
+				c.Mem.Read32(c.Reg.R[PC])
 			}
 
 			c.ModeSwitch(cpsr.Mode, mode)
@@ -226,6 +229,10 @@ func (c *Cpu) Step() {
 			cpsr.T = false
 			cpsr.I = true
 
+			if c.LowVector {
+				addr &= 0xFFFF
+			}
+
 			c.Reg.R[PC] = addr
 
 			c.Reload32()
@@ -242,7 +249,7 @@ func (c *Cpu) Step() {
 		c.Cycles(c.Reg.R[PC], 2, seq, true)
 
 		if c.PcPtr == nil {
-			c.Op[1] = c.mem.Read16(c.Reg.R[PC])
+			c.Op[1] = c.Mem.Read16(c.Reg.R[PC])
 		} else {
 			c.Op[1] = *(*uint32)(c.PcPtr) & 0xFFFF
 		}
@@ -260,7 +267,7 @@ func (c *Cpu) Step() {
 
 		c.Cycles(c.Reg.R[PC], 4, seq, true)
 		if c.PcPtr == nil {
-			c.Op[1] = c.mem.Read32(c.Reg.R[PC])
+			c.Op[1] = c.Mem.Read32(c.Reg.R[PC])
 		} else {
 			c.Op[1] = *(*uint32)(c.PcPtr)
 		}
@@ -281,14 +288,14 @@ func (c *Cpu) Step() {
 func (c *Cpu) Reload16() {
 	pc := c.Reg.R[PC] &^ 1
 
-	c.PcPtr = c.mem.ReadPtr(pc)
+	c.PcPtr = c.Mem.ReadPtr(pc)
 
 	c.Cycles(pc+0, 2, NONSEQ, true)
 	c.Cycles(pc+2, 2, SEQ, true)
 
 	if c.PcPtr == nil {
-		c.Op[0] = c.mem.Read16(pc + 0)
-		c.Op[1] = c.mem.Read16(pc + 2)
+		c.Op[0] = c.Mem.Read16(pc + 0)
+		c.Op[1] = c.Mem.Read16(pc + 2)
 	} else {
 		c.Op[0] = *(*uint32)(c.PcPtr) & 0xFFFF
 		c.PcPtr = unsafe.Add(c.PcPtr, 2)
@@ -304,14 +311,14 @@ func (c *Cpu) Reload16() {
 func (c *Cpu) Reload32() {
 	pc := c.Reg.R[PC] &^ 3
 
-	c.PcPtr = c.mem.ReadPtr(pc)
+	c.PcPtr = c.Mem.ReadPtr(pc)
 
 	c.Cycles(pc+0, 4, NONSEQ, true)
 	c.Cycles(pc+4, 4, SEQ, true)
 
 	if c.PcPtr == nil {
-		c.Op[0] = c.mem.Read32(pc + 0)
-		c.Op[1] = c.mem.Read32(pc + 4)
+		c.Op[0] = c.Mem.Read32(pc + 0)
+		c.Op[1] = c.Mem.Read32(pc + 4)
 	} else {
 		c.Op[0] = *(*uint32)(c.PcPtr)
 		c.PcPtr = unsafe.Add(c.PcPtr, 4)
@@ -330,15 +337,17 @@ func (c *Cpu) ToggleThumb() {
 
 	if c.Reg.CPSR.T {
 		c.Reg.R[PC] &^= 1
+		c.Reload16()
 		return
 	}
 	c.Reg.R[PC] &^= 3
+	c.Reload32()
 }
 
 //go:nosplit
 func (c *Cpu) Write8(addr uint32, v uint8) {
 	c.Cycles(addr, 1, NONSEQ, false)
-	c.mem.Write8(addr, v)
+	c.Mem.Write8(addr, v)
 	c.Seq = NONSEQ
 	c.LastWasDma = false
 }
@@ -346,7 +355,7 @@ func (c *Cpu) Write8(addr uint32, v uint8) {
 //go:nosplit
 func (c *Cpu) Write16(addr uint32, v uint16) {
 	c.Cycles(addr, 2, NONSEQ, false)
-	c.mem.Write16(addr, v)
+	c.Mem.Write16(addr, v)
 	c.Seq = NONSEQ
 	c.LastWasDma = false
 }
@@ -354,7 +363,7 @@ func (c *Cpu) Write16(addr uint32, v uint16) {
 //go:nosplit
 func (c *Cpu) Write32(addr, v uint32) {
 	c.Cycles(addr, 4, NONSEQ, false)
-	c.mem.Write32(addr, v)
+	c.Mem.Write32(addr, v)
 	c.Seq = NONSEQ
 	c.LastWasDma = false
 }
@@ -362,7 +371,7 @@ func (c *Cpu) Write32(addr, v uint32) {
 //go:nosplit
 func (c *Cpu) Write32Block(addr, v, seq uint32) {
 	c.Cycles(addr, 4, seq, false)
-	c.mem.Write32(addr, v)
+	c.Mem.Write32(addr, v)
 	c.Seq = NONSEQ
 	c.LastWasDma = false
 }
@@ -370,7 +379,7 @@ func (c *Cpu) Write32Block(addr, v, seq uint32) {
 //go:nosplit
 func (c *Cpu) Read8(addr uint32) uint32 {
 	c.Cycles(addr, 1, NONSEQ, false)
-	v := c.mem.Read8(addr)
+	v := c.Mem.Read8(addr)
 	c.Idle(1)
 	c.LastWasDma = false
 	return v
@@ -379,7 +388,7 @@ func (c *Cpu) Read8(addr uint32) uint32 {
 //go:nosplit
 func (c *Cpu) Read16(addr uint32) uint32 {
 	c.Cycles(addr, 2, NONSEQ, false)
-	v := c.mem.Read16(addr)
+	v := c.Mem.Read16(addr)
 	c.Idle(1)
 	c.LastWasDma = false
 	return v
@@ -388,7 +397,7 @@ func (c *Cpu) Read16(addr uint32) uint32 {
 //go:nosplit
 func (c *Cpu) Read32(addr uint32) uint32 {
 	c.Cycles(addr, 4, NONSEQ, false)
-	v := c.mem.Read32(addr)
+	v := c.Mem.Read32(addr)
 	c.Idle(1)
 	c.LastWasDma = false
 	return v
@@ -397,7 +406,7 @@ func (c *Cpu) Read32(addr uint32) uint32 {
 //go:nosplit
 func (c *Cpu) Read32Block(addr, seq uint32) uint32 {
 	c.Cycles(addr, 4, seq, false)
-	v := c.mem.Read32(addr)
+	v := c.Mem.Read32(addr)
 	c.LastWasDma = false
 	return v
 }
@@ -480,6 +489,10 @@ func (c *Cpu) Exception(addr ExceptionVector, mode CpuMode) {
 	cpsr.I = true
 	if mode == MODE_FIQ {
 		cpsr.F = true
+	}
+
+	if c.LowVector {
+		addr &= 0xFFFF
 	}
 
 	c.Reg.R[PC] = uint32(addr)
