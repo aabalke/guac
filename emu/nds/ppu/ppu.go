@@ -4,11 +4,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/bits"
-	"time"
 
 	"github.com/aabalke/guac/emu/nds/rast"
 	"github.com/aabalke/guac/utils"
-	"github.com/hajimehoshi/ebiten/v2"
 )
 
 var _ = fmt.Sprintf
@@ -22,6 +20,8 @@ type PPU struct {
 	EngineA    Engine
 	EngineB    Engine
 	Rasterizer *rast.Rasterizer
+	Vram       VRAM
+	Capture    Capture
 
 	// these values are updated in PowCnt1
 	// need to impliment port disabling
@@ -30,13 +30,7 @@ type PPU struct {
 	RenderingEngine, GeometryEngine bool
 	TopA                            bool
 
-	Vram VRAM
-
-	Capture Capture
-
 	WHITE_SCANLINE []uint8
-
-	FrameSkipMask uint32
 }
 
 type Engine struct {
@@ -151,13 +145,13 @@ type Background struct {
 }
 
 const (
-	BG_TYPE_TEX = 0
-	BG_TYPE_AFF = 1
-	BG_TYPE_LAR = 2
-	BG_TYPE_3D  = 3
-	BG_TYPE_BGM = 4
-	BG_TYPE_256 = 5
-	BG_TYPE_DIR = 6
+	BG_TYPE_TEX = iota
+	BG_TYPE_AFF
+	BG_TYPE_LAR
+	BG_TYPE_3D
+	BG_TYPE_BGM
+	BG_TYPE_256
+	BG_TYPE_DIR
 )
 
 type Object struct {
@@ -227,14 +221,6 @@ func NewPPU(irq Irq) *PPU {
 	p.EngineB.Blend = NewBlend()
 
 	return p
-}
-
-func (p *PPU) updateFrameSkip() {
-	t := time.NewTicker(time.Second / 2)
-	for range t.C {
-		tps := NextPow2(uint32(ebiten.ActualTPS()))
-		p.FrameSkipMask = tps - 1
-	}
 }
 
 func NextPow2(n uint32) uint32 {

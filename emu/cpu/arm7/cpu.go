@@ -87,7 +87,7 @@ func (c *Cond) Set(v uint32) {
 	c.I = (v>>I)&1 != 0
 	c.F = (v>>F)&1 != 0
 	c.T = (v>>T)&1 != 0
-	c.Mode = CpuMode(v & 0x1F)
+	c.Mode = CpuMode((v & 0x1F) | 0x10)
 }
 
 const (
@@ -187,57 +187,60 @@ func NewCpu(mem Mem, cycles func(addr, width, seq uint32, inst bool), idle func(
 	}
 }
 
-func (c *Cpu) Step() {
-	if c.IrqLine {
-		c.Halted = false
-
-		if !c.Reg.CPSR.I {
-
-			var (
-				cpsr  = &c.Reg.CPSR
-				thumb = cpsr.T
-				addr  = uint32(VEC_IRQ)
-				mode  = MODE_IRQ
-				seq   = c.Seq
-			)
-
-			c.Seq = SEQ
-
-			if thumb {
-				c.Cycles(c.Reg.R[PC], 2, seq, true)
-				c.Mem.Read16(c.Reg.R[PC])
-			} else {
-				c.Cycles(c.Reg.R[PC], 4, seq, true)
-				c.Mem.Read32(c.Reg.R[PC])
-			}
-
-			c.ModeSwitch(cpsr.Mode, mode)
-
-			i := ModeBank[mode]
-			c.Reg.SPSR[i] = *cpsr
-
-			if thumb {
-				c.Reg.R[LR] = c.Reg.R[PC]
-				c.Reg.LR[i] = c.Reg.R[PC]
-
-			} else {
-				c.Reg.R[LR] = c.Reg.R[PC] - 4
-				c.Reg.LR[i] = c.Reg.R[PC] - 4
-			}
-
-			cpsr.Mode = mode
-			cpsr.T = false
-			cpsr.I = true
-
-			if c.LowVector {
-				addr &= 0xFFFF
-			}
-
-			c.Reg.R[PC] = addr
-
-			c.Reload32()
-		}
+func (c *Cpu) CheckIrq() {
+	if !c.IrqLine {
+		return
 	}
+	c.Halted = false
+
+	if c.Reg.CPSR.I {
+		return
+	}
+
+	var (
+		cpsr  = &c.Reg.CPSR
+		thumb = cpsr.T
+		addr  = uint32(VEC_IRQ)
+		mode  = MODE_IRQ
+		seq   = c.Seq
+	)
+
+	c.Seq = SEQ
+
+	if thumb {
+		c.Cycles(c.Reg.R[PC], 2, seq, true)
+		c.Mem.Read16(c.Reg.R[PC])
+	} else {
+		c.Cycles(c.Reg.R[PC], 4, seq, true)
+		c.Mem.Read32(c.Reg.R[PC])
+	}
+
+	c.ModeSwitch(cpsr.Mode, mode)
+
+	i := ModeBank[mode]
+	c.Reg.SPSR[i] = *cpsr
+
+	if thumb {
+		c.Reg.R[LR] = c.Reg.R[PC]
+	} else {
+		c.Reg.R[LR] = c.Reg.R[PC] - 4
+	}
+
+	cpsr.Mode = mode
+	cpsr.T = false
+	cpsr.I = true
+
+	if c.LowVector {
+		addr &= 0xFFFF
+	}
+
+	c.Reg.R[PC] = addr
+
+	c.Reload32()
+}
+
+func (c *Cpu) Step() {
+	c.CheckIrq()
 
 	inst := c.Op[0]
 	seq := c.Seq
@@ -254,7 +257,7 @@ func (c *Cpu) Step() {
 			c.Op[1] = *(*uint32)(c.PcPtr) & 0xFFFF
 		}
 
-		c.DecodeTHUMB(uint16(inst))
+		c.DecodeThumb(uint16(inst))
 
 		if !c.Reloaded {
 			c.Reg.R[PC] += 2
@@ -272,7 +275,7 @@ func (c *Cpu) Step() {
 			c.Op[1] = *(*uint32)(c.PcPtr)
 		}
 
-		c.DecodeARM(inst)
+		c.DecodeArm(inst)
 
 		if !c.Reloaded {
 			c.Reg.R[PC] += 4
@@ -431,36 +434,35 @@ func idleMul(rs uint32, sign bool) int64 {
 func (c *Cpu) ModeSwitch(curr, next CpuMode) {
 	// DO NOT RELOAD PIPE AFTER CALLING ModeSwitch
 
-	reg := &c.Reg
 	r := &c.Reg.R
 
 	if curr != MODE_FIQ {
 		for i := range 5 {
-			reg.USR[i] = r[8+i]
+			c.Reg.USR[i] = r[8+i]
 		}
 	}
 
-	reg.SP[ModeBank[curr]] = r[SP]
-	reg.LR[ModeBank[curr]] = r[LR]
+	c.Reg.SP[ModeBank[curr]] = r[SP]
+	c.Reg.LR[ModeBank[curr]] = r[LR]
 
 	if curr == MODE_FIQ {
 		for i := range 5 {
-			reg.FIQ[i] = r[8+i]
+			c.Reg.FIQ[i] = r[8+i]
 		}
 	}
 
 	if next != MODE_FIQ {
 		for i := range 5 {
-			r[8+i] = reg.USR[i]
+			r[8+i] = c.Reg.USR[i]
 		}
 	}
 
-	r[SP] = reg.SP[ModeBank[next]]
-	r[LR] = reg.LR[ModeBank[next]]
+	r[SP] = c.Reg.SP[ModeBank[next]]
+	r[LR] = c.Reg.LR[ModeBank[next]]
 
 	if next == MODE_FIQ {
 		for i := range 5 {
-			r[8+i] = reg.FIQ[i]
+			r[8+i] = c.Reg.FIQ[i]
 		}
 	}
 }
@@ -476,12 +478,8 @@ func (c *Cpu) Exception(addr ExceptionVector, mode CpuMode) {
 
 	if thumb {
 		c.Reg.R[LR] = c.Reg.R[PC] - 2
-		c.Reg.LR[i] = c.Reg.R[PC] - 2
-
 	} else {
 		c.Reg.R[LR] = c.Reg.R[PC] - 4
-		c.Reg.LR[i] = c.Reg.R[PC] - 4
-
 	}
 
 	cpsr.Mode = mode

@@ -8,7 +8,7 @@ import (
 	"github.com/aabalke/guac/emu/cpu/arm7"
 )
 
-func (c *Cpu) DecodeTHUMB(op uint16) {
+func (c *Cpu) DecodeThumb(op uint16) {
 	switch {
 	case IsThumbBkpt(op):
 		c.Exception(arm7.VEC_PREFETCH, arm7.MODE_ABT)
@@ -89,14 +89,13 @@ func (c *Cpu) ThumbShortBlx(op uint16) {
 func (c *Cpu) ThumbSdt(op uint16) {
 	var (
 		r    = &c.Reg.R
-		inst = (op >> 10) & 3
-		rd   = op & 0x7
+		rd   = op & 7
 		addr = r[(op>>3)&7] + r[(op>>6)&7]
 	)
 
 	if signed := (op>>9)&1 != 0; signed {
 
-		switch inst {
+		switch inst := (op >> 10) & 3; inst {
 		case arm7.THUMB_STRH:
 			c.Write16(addr, uint16(r[rd]))
 
@@ -105,7 +104,7 @@ func (c *Cpu) ThumbSdt(op uint16) {
 
 		case arm7.THUMB_LDRH:
 			v := c.Read16(addr)
-			r[rd] = bits.RotateLeft32(v, -int((addr&1)<<3))
+			r[rd] = bits.RotateLeft32(v, -int((addr&1)*8))
 
 		case arm7.THUMB_LDSH:
 			// arm9 sign extend
@@ -115,15 +114,14 @@ func (c *Cpu) ThumbSdt(op uint16) {
 		return
 	}
 
-	switch inst {
+	switch inst := (op >> 10) & 3; inst {
 	case arm7.THUMB_STR_REG:
 		c.Write32(addr, r[rd])
 	case arm7.THUMB_STRB_REG:
 		c.Write8(addr, uint8(r[rd]))
 	case arm7.THUMB_LDR_REG:
 		v := c.Read32(addr)
-		is := (addr & 3) << 3
-		r[rd] = bits.RotateLeft32(v, -int(is))
+		r[rd] = bits.RotateLeft32(v, -int((addr&3)*8))
 	case arm7.THUMB_LDRB_REG:
 		r[rd] = c.Read8(addr)
 	}
@@ -182,7 +180,7 @@ func (c *Cpu) ThumbPushPop(op uint16) {
 
 		if pclr {
 			r[SP] -= 4
-			c.Write32Block(r[SP], r[14], seq)
+			c.Write32Block(r[SP], r[LR], seq)
 		}
 
 		for reg := 7; reg >= 0; reg-- {
@@ -199,10 +197,6 @@ func (c *Cpu) ThumbPushPop(op uint16) {
 }
 
 func (c *Cpu) HiRegBX(op uint16) {
-	if nop := op == 0x46C0; nop {
-		return
-	}
-
 	var (
 		r  = &c.Reg.R
 		rd = (op & 7) | (((op >> 7) & 1) << 3)
@@ -231,6 +225,9 @@ func (c *Cpu) HiRegBX(op uint16) {
 		cpsr.V = ((rdv^rsv)&(rdv^uint32(res)))>>31 != 0
 
 	case arm7.HI_MOV:
+		if nop := op == 0x46C0; nop {
+			return
+		}
 
 		r[rd] = r[rs]
 

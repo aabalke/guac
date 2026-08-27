@@ -96,6 +96,8 @@ func (b *Bus7) Read8(addr uint32) uint32 {
 }
 
 func (b *Bus7) Read16(addr uint32) uint32 {
+	addr &^= 1
+
 	if io := addr>>24 == 4; io {
 
 		switch addr {
@@ -121,6 +123,7 @@ func (b *Bus7) Read16(addr uint32) uint32 {
 }
 
 func (b *Bus7) Read32(addr uint32) uint32 {
+	addr &^= 3
 	switch addr {
 	case 0x410_0000:
 		return b.M.Ipc.ReadFifo(false)
@@ -175,6 +178,7 @@ func (b *Bus7) Write8(addr uint32, v uint8) {
 }
 
 func (b *Bus7) Write16(addr uint32, v uint16) {
+	addr &^= 1
 	if io := addr>>24 == 4; io {
 		switch addr {
 		case 0x400_0100, 0x400_0102:
@@ -207,6 +211,7 @@ func (b *Bus7) Write16(addr uint32, v uint16) {
 }
 
 func (b *Bus7) Write32(addr, v uint32) {
+	addr &^= 3
 	if io := addr>>24 == 4; io {
 		switch addr {
 		case 0x400_0100:

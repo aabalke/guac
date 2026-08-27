@@ -4,12 +4,12 @@ import "math"
 
 //go:inline
 func w(d *uint64, v uint8, b uint32) {
-	*d = (*d &^ (0xFF << (b << 3))) | (uint64(v) << (b << 3))
+	*d = (*d &^ (0xFF << (b * 8))) | (uint64(v) << (b * 8))
 }
 
 //go:inline
 func r(d uint64, b uint32) uint8 {
-	return uint8(d >> (b << 3))
+	return uint8(d >> (b * 8))
 }
 
 type Div struct {
@@ -17,7 +17,6 @@ type Div struct {
 }
 
 func (d *Div) Write(addr uint32, v uint8) {
-
 	switch {
 	case addr < 0x280:
 		return
@@ -58,14 +57,13 @@ func (d *Div) Read(addr uint32) uint8 {
 }
 
 func (d *Div) Calc() {
-
 	d.cnt &^= 1 << 14
 
 	if d.den == 0 {
 		d.cnt |= 1 << 14
 	}
 
-	switch mode := d.cnt & 0b11; mode {
+	switch mode := d.cnt & 3; mode {
 	case 1:
 
 		if uint32(d.den) == 0 {
@@ -83,7 +81,7 @@ func (d *Div) Calc() {
 		rem := int64(d.num) % int64(int32(d.den))
 
 		d.res = uint64(res)
-		d.rem = uint64((int32(rem)))
+		d.rem = uint64(int32(rem))
 
 	case 2:
 
@@ -136,7 +134,6 @@ type Sqrt struct {
 }
 
 func (s *Sqrt) Write(addr uint32, v uint8) {
-
 	switch {
 	case addr == 0x2B0:
 		s.is64 = v&1 != 0
@@ -152,7 +149,6 @@ func (s *Sqrt) Write(addr uint32, v uint8) {
 }
 
 func (s *Sqrt) Read(addr uint32) uint8 {
-
 	switch {
 	case addr == 0x2B0:
 
@@ -174,7 +170,6 @@ func (s *Sqrt) Read(addr uint32) uint8 {
 }
 
 func (s *Sqrt) Calc() {
-
 	if s.is64 {
 		s.res = uint32(sqrt(s.param))
 		return
@@ -183,7 +178,6 @@ func (s *Sqrt) Calc() {
 }
 
 func sqrt(input uint64) uint64 {
-
 	if input == 0 {
 		return 0
 	}

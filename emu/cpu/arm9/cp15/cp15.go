@@ -31,12 +31,11 @@ var (
 )
 
 func NewCp15(tcm *mem.Tcm) *Cp15 {
-	c := &Cp15{}
+	c := &Cp15{
+		R:   make(map[CpRegister]uint32),
+		tcm: tcm,
+	}
 
-	c.R = make(map[CpRegister]uint32)
-	c.tcm = tcm
-
-	// these register values match no$gba
 	c.R[CTRL] = 0x00012078
 	c.R[CpRegister{Op: 0, Cn: 2, Cm: 0, Cp: 0, Pn: 15}] = 0x00000042
 	c.R[CpRegister{Op: 0, Cn: 2, Cm: 0, Cp: 1, Pn: 15}] = 0x00000042

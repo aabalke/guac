@@ -10,7 +10,7 @@ import (
 	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
 )
 
-func (c *Cpu) DecodeARM(op uint32) {
+func (c *Cpu) DecodeArm(op uint32) {
 	cond := op >> 28
 
 	if cond == 0xF {
@@ -35,11 +35,11 @@ func (c *Cpu) DecodeARM(op uint32) {
 		c.Exception(arm7.VEC_PREFETCH, arm7.MODE_ABT)
 	case IsCoDataReg(op):
 		c.CoDataReg(op)
-	case arm7.IsB(op):
+	case arm7.IsBranch(op):
 		c.B(op)
-	case arm7.IsBX(op):
-		c.BX(op)
-	case arm7.IsSDT(op):
+	case arm7.IsBranchExchange(op):
+		c.BranchExchange(op)
+	case arm7.IsSdt(op):
 		c.Sdt(op)
 	case arm7.IsBlock(op):
 		c.Block(op)
@@ -47,9 +47,11 @@ func (c *Cpu) DecodeARM(op uint32) {
 		c.Half(op)
 	case arm7.IsUndefined(op):
 		c.Exception(arm7.VEC_UNDEFINED, arm7.MODE_UND)
-	case arm7.IsPSR(op):
-		c.Psr(op)
-	case arm7.IsSWP(op):
+	case arm7.IsMrs(op):
+		c.Mrs(op)
+	case arm7.IsMsr(op):
+		c.Msr(op)
+	case arm7.IsSwp(op):
 		c.Swp(op)
 	case arm7.IsMul(op):
 		c.Mul(op)
@@ -59,9 +61,7 @@ func (c *Cpu) DecodeARM(op uint32) {
 		c.Qalu(op)
 	case IsExtMul(op):
 		c.ExtendedMul(op)
-	case arm7.IsALU(op):
-		// if alu is moved higher, breaks on overlap since compare inst need Set always
-		// probably best to just build a decoded table and jump instead of decode on the fly
+	case arm7.IsAlu(op):
 		c.Alu(op)
 	default:
 		panic(fmt.Sprintf("nds: unable to decode arm9 arm pc=%08X op=%08X", c.Reg.R[PC], op))
@@ -141,20 +141,19 @@ const (
 
 func (c *Cpu) ExtendedMul(op uint32) {
 	var (
-		rd = (op >> 16) & 0xF
-		rn = (op >> 12) & 0xF
-		rs = (op >> 8) & 0xF
-		rm = (op >> 0) & 0xF
-		r  = &c.Reg.R
-		x  = (op >> 5) & 1
-		y  = (op >> 6) & 1
+		r   = &c.Reg.R
+		rd  = (op >> 16) & 0xF
+		rn  = (op >> 12) & 0xF
+		rs  = (op >> 8) & 0xF
+		rm  = (op >> 0) & 0xF
+		x   = (op >> 5) & 1
+		y   = (op >> 6) & 1
+		rsV = int64(int16((r[rs] >> (16 * y)) & 0xFFFF))
 	)
 
 	switch inst := (op >> 21) & 3; inst {
 	case SMLAxy:
-
 		rmV := int64(int16((r[rm] >> (16 * x)) & 0xFFFF))
-		rsV := int64(int16((r[rs] >> (16 * y)) & 0xFFFF))
 		rnV := int64(int32(r[rn]))
 		res := (rmV * rsV) + rnV
 		r[rd] = uint32(res)
@@ -164,8 +163,6 @@ func (c *Cpu) ExtendedMul(op uint32) {
 		}
 
 	case SMLAWySMLALWy:
-
-		rsV := int64(int16((r[rs] >> (16 * y) & 0xFFFF)))
 		rmV := int64(int32(r[rm]))
 		res := (rmV * rsV) >> 16
 
@@ -180,21 +177,14 @@ func (c *Cpu) ExtendedMul(op uint32) {
 		r[rd] = uint32(res)
 
 	case SMLALxy:
-
-		rsV := int64(int16((r[rs] >> (16 * y) & 0xFFFF)))
 		rmV := int64(int16((r[rm] >> (16 * x) & 0xFFFF)))
-		add := int64(int32(r[rd]))<<32 | int64(int32(r[rn]))
-		res := (rsV * rmV) + add
+		res := (rsV * rmV) + (int64(int32(r[rd]))<<32 | int64(int32(r[rn])))
 		r[rd] = uint32(res >> 32)
 		r[rn] = uint32(res)
 
 	case SMULxy:
-
 		rmV := int64(int16((r[rm] >> (16 * x)) & 0xFFFF))
-		rsV := int64(int16((r[rs] >> (16 * y)) & 0xFFFF))
-		res := rmV * rsV
-
-		r[rd] = uint32(res)
+		r[rd] = uint32(rmV * rsV)
 	}
 }
 
@@ -210,7 +200,7 @@ func (c *Cpu) Blx(op uint32) {
 	c.Reload16()
 }
 
-func (c *Cpu) BX(op uint32) {
+func (c *Cpu) BranchExchange(op uint32) {
 	var (
 		r  = &c.Reg.R
 		rn = op & 0xF
@@ -220,10 +210,10 @@ func (c *Cpu) BX(op uint32) {
 	case arm7.INST_BX:
 		r[PC] = r[rn]
 	case arm7.INST_BXJ:
-		panic("Unsupported BXJ Instruction")
+		panic("unsupported bxj instruction")
 	case arm7.INST_BLX:
 
-		if rn == 14 {
+		if rn == LR {
 			// Using BLX R14 is possible (sets PC=Old_LR, and New_LR=retadr).
 			tmp := r[LR]
 			r[LR] = r[PC] - 4
@@ -273,7 +263,6 @@ func (c *Cpu) Half(op uint32) {
 		rdv := r[rd]
 
 		var rd2v uint32
-
 		if inst == arm7.STRD {
 			rd2v = r[rd+1]
 		}
@@ -307,7 +296,7 @@ func (c *Cpu) Half(op uint32) {
 
 	switch inst {
 	case arm7.LDRH:
-		r[rd] = uint32(c.Read16(addr))
+		r[rd] = c.Read16(addr)
 	case arm7.LDRSB:
 		r[rd] = uint32(int32(int8(c.Read8(addr))))
 	case arm7.LDRSH:
@@ -473,7 +462,6 @@ func (c *Cpu) Block(op uint32) {
 
 	if wb {
 		if load && rnIncluded {
-			// ARMv5 LDM: writeback only if Rb is the only reg, or not last.
 			if isOnly || !isLast {
 				r[rn] = rnNew
 			}
@@ -492,15 +480,15 @@ func (c *Cpu) Block(op uint32) {
 		return
 	}
 
+	if !psr {
+		// required for pop {pc}
+		c.ToggleThumb()
+		return
+	}
 	if c.Reg.CPSR.T {
 		c.Reload16()
 	} else {
 		c.Reload32()
-	}
-
-	if !psr {
-		//c.ToggleThumb()
-		return
 	}
 	var (
 		curr = c.Reg.CPSR.Mode

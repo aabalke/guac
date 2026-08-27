@@ -5,7 +5,7 @@ import (
 	"math/bits"
 )
 
-func (c *Cpu) DecodeARM(op uint32) {
+func (c *Cpu) DecodeArm(op uint32) {
 	if cond := op >> 28; !c.Reg.CPSR.CheckCond(cond) {
 		c.Seq = SEQ
 		return
@@ -14,11 +14,11 @@ func (c *Cpu) DecodeARM(op uint32) {
 	switch {
 	case (op>>24)&0xF == 0xF:
 		c.Exception(VEC_SWI, MODE_SWI)
-	case IsB(op):
+	case IsBranch(op):
 		c.B(op)
-	case IsBX(op):
-		c.BX(op)
-	case IsSDT(op):
+	case IsBranchExchange(op):
+		c.BranchExchange(op)
+	case IsSdt(op):
 		c.Sdt(op)
 	case IsBlock(op):
 		c.Block(op)
@@ -26,13 +26,15 @@ func (c *Cpu) DecodeARM(op uint32) {
 		c.Half(op)
 	case IsUndefined(op):
 		c.Exception(VEC_UNDEFINED, MODE_UND)
-	case IsPSR(op):
-		c.Psr(op)
-	case IsSWP(op):
+	case IsMrs(op):
+		c.Mrs(op)
+	case IsMsr(op):
+		c.Msr(op)
+	case IsSwp(op):
 		c.Swp(op)
 	case IsMul(op):
 		c.Mul(op)
-	case IsALU(op):
+	case IsAlu(op):
 		c.Alu(op)
 	default:
 		panic(fmt.Sprintf("Unable to Decode ARM false %08X, at PC %08X\n", op, c.Reg.R[PC]))
@@ -45,11 +47,11 @@ func IsOpFormat(op, mask, format uint32) bool {
 }
 
 //go:inline
-func IsSWP(op uint32) bool {
+func IsSwp(op uint32) bool {
 	return IsOpFormat(
 		op,
-		0b0000_1111_1011_0000_0000_1111_1111_0000,
-		0b0000_0001_0000_0000_0000_0000_1001_0000,
+		0b1111_1011_0000_0000_1111_1111_0000,
+		0b0001_0000_0000_0000_0000_1001_0000,
 	)
 }
 
@@ -59,14 +61,14 @@ func IsBlock(op uint32) bool {
 
 	is = is || IsOpFormat(
 		op,
-		0b0000_1110_0001_0000_0000_0000_0000_0000,
-		0b0000_1000_0001_0000_0000_0000_0000_0000,
+		0b1110_0001_0000_0000_0000_0000_0000,
+		0b1000_0001_0000_0000_0000_0000_0000,
 	)
 
 	is = is || IsOpFormat(
 		op,
-		0b0000_1110_0001_0000_0000_0000_0000_0000,
-		0b0000_1000_0000_0000_0000_0000_0000_0000,
+		0b1110_0001_0000_0000_0000_0000_0000,
+		0b1000_0000_0000_0000_0000_0000_0000,
 	)
 
 	return is
@@ -78,14 +80,14 @@ func IsHalf(op uint32) bool {
 
 	is = is || IsOpFormat(
 		op,
-		0b0000_1110_0000_0000_0000_0000_1101_0000,
-		0b0000_0000_0000_0000_0000_0000_1101_0000,
+		0b1110_0000_0000_0000_0000_1101_0000,
+		0b0000_0000_0000_0000_0000_1101_0000,
 	)
 
 	is = is || IsOpFormat(
 		op,
-		0b0000_1110_0000_0000_0000_0000_1011_0000,
-		0b0000_0000_0000_0000_0000_0000_1011_0000,
+		0b1110_0000_0000_0000_0000_1011_0000,
+		0b0000_0000_0000_0000_0000_1011_0000,
 	)
 
 	return is
@@ -116,25 +118,25 @@ func IsAluShiftImm(op uint32) bool {
 }
 
 //go:inline
-func IsALU(op uint32) bool {
+func IsAlu(op uint32) bool {
 	return IsAluImm(op) || IsAluShiftImm(op) || IsAluShiftReg(op)
 }
 
 //go:inline
-func IsBX(op uint32) bool {
+func IsBranchExchange(op uint32) bool {
 	return IsOpFormat(
 		op,
-		0b0000_1111_1111_1111_1111_1111_1101_0000,
-		0b0000_0001_0010_1111_1111_1111_0001_0000,
+		0b1111_1111_1111_1111_1111_1101_0000,
+		0b0001_0010_1111_1111_1111_0001_0000,
 	)
 }
 
 //go:inline
-func IsB(op uint32) bool {
+func IsBranch(op uint32) bool {
 	return IsOpFormat(
 		op,
-		0b0000_1110_0000_0000_0000_0000_0000_0000,
-		0b0000_1010_0000_0000_0000_0000_0000_0000,
+		0b1110_0000_0000_0000_0000_0000_0000,
+		0b1010_0000_0000_0000_0000_0000_0000,
 	)
 }
 
@@ -151,45 +153,44 @@ func IsMul(op uint32) bool {
 func IsUndefined(op uint32) bool {
 	return IsOpFormat(
 		op,
-		0b0000_1110_0000_0000_0000_0000_0001_0000,
-		0b0000_0110_0000_0000_0000_0000_0001_0000,
+		0b1110_0000_0000_0000_0000_0001_0000,
+		0b0110_0000_0000_0000_0000_0001_0000,
 	)
 }
 
 //go:inline
-func IsSDT(op uint32) bool {
+func IsSdt(op uint32) bool {
 	is := false
 	is = is || IsOpFormat(
 		op,
-		0b0000_1100_0001_0000_0000_0000_0000_0000,
-		0b0000_0100_0001_0000_0000_0000_0000_0000,
+		0b1100_0001_0000_0000_0000_0000_0000,
+		0b0100_0001_0000_0000_0000_0000_0000,
 	)
 	is = is || IsOpFormat(
 		op,
-		0b0000_1100_0001_0000_0000_0000_0000_0000,
-		0b0000_0100_0000_0000_0000_0000_0000_0000,
+		0b1100_0001_0000_0000_0000_0000_0000,
+		0b0100_0000_0000_0000_0000_0000_0000,
 	)
 
 	return is
 }
 
 //go:inline
-func IsPSR(op uint32) bool {
-	is := false
-
-	is = is || IsOpFormat(
+func IsMrs(op uint32) bool {
+	return IsOpFormat(
 		op,
-		0b0000_1111_1011_1111_0000_1111_1111_1111,
-		0b0000_0001_0000_1111_0000_0000_0000_0000,
+		0b1111_1011_1111_0000_1111_1111_1111,
+		0b0001_0000_1111_0000_0000_0000_0000,
 	)
+}
 
-	is = is || IsOpFormat(
+//go:inline
+func IsMsr(op uint32) bool {
+	return IsOpFormat(
 		op,
-		0b0000_1101_1011_0000_1111_0000_0000_0000,
-		0b0000_0001_0010_0000_1111_0000_0000_0000,
+		0b1101_1011_0000_1111_0000_0000_0000,
+		0b0001_0010_0000_1111_0000_0000_0000,
 	)
-
-	return is
 }
 
 const (
@@ -399,24 +400,17 @@ func (c *Cpu) Alu(op uint32) {
 
 func (c *Cpu) getShiftedAluReg(op uint32) uint32 {
 	var (
-		r = &c.Reg.R
-
-		carry = c.Reg.CPSR.C
-
-		shReg  = (op>>4)&1 != 0
-		shType = (op >> 5) & 0b11
-
+		r        = &c.Reg.R
+		carry    = c.Reg.CPSR.C
 		inst     = (op >> 21) & 0xF
-		logical  = inst&0b0110 == 0b0000 || inst&0b1100 == 0b1100
+		logical  = inst&0b0110 == 0 || inst&0b1100 == 0b1100
 		setCarry = (op>>20)&1 != 0 && logical
-
-		rm  = op & 0xF
-		op2 = r[rm]
-
-		shift uint32
+		rm       = op & 0xF
+		op2      = r[rm]
+		shift    uint32
 	)
 
-	if shReg {
+	if shReg := (op>>4)&1 != 0; shReg {
 		rs := (op >> 8) & 0xF
 		shift = r[rs] & 0xFF
 
@@ -431,7 +425,7 @@ func (c *Cpu) getShiftedAluReg(op uint32) uint32 {
 		shift = (op >> 7) & 0x1F
 
 		if special := shift == 0; special {
-			switch shType {
+			switch shType := (op >> 5) & 3; shType {
 			case LSL:
 				return op2
 			case LSR:
@@ -472,20 +466,17 @@ func (c *Cpu) getShiftedAluReg(op uint32) uint32 {
 		return op2
 	}
 
-	switch shType {
+	switch shType := (op >> 5) & 3; shType {
 	case LSL:
-
-		switch {
-		case shift > 32:
+		if shift > 32 {
 			op2 = 0
 			carry = false
-		default:
+		} else {
 			carry = op2&(1<<(32-shift)) != 0
 			op2 <<= shift
 		}
 
 	case LSR:
-
 		switch {
 		case shift > 32:
 			op2 = 0
@@ -499,9 +490,7 @@ func (c *Cpu) getShiftedAluReg(op uint32) uint32 {
 		}
 
 	case ASR:
-
-		switch {
-		case shift >= 32:
+		if shift >= 32 {
 			signed := op2&0x8000_0000 != 0
 			carry = signed
 
@@ -510,16 +499,13 @@ func (c *Cpu) getShiftedAluReg(op uint32) uint32 {
 			} else {
 				op2 = 0x0
 			}
-
-		default:
+		} else {
 			carry = op2&(1<<(shift-1)) != 0
 			op2 = uint32(int32(op2) >> shift)
 		}
 
 	case ROR:
-
 		if shift == 32 {
-			// op2 unchanges
 			carry = op2&0x8000_0000 != 0
 		} else {
 			carry = (op2>>((shift-1)&31))&1 != 0
@@ -636,7 +622,7 @@ func (c *Cpu) Sdt(op uint32) {
 		rn   = (op >> 16) & 0xF
 		rd   = (op >> 12) & 0xF
 
-		offset, prev uint32
+		offset, addr uint32
 	)
 
 	if reg {
@@ -646,10 +632,9 @@ func (c *Cpu) Sdt(op uint32) {
 		}
 
 		shift := (op >> 7) & 0x1F
-		sType := (op >> 5) & 3
 		rm := op & 0xF
 
-		switch sType {
+		switch sType := (op >> 5) & 3; sType {
 		case LSL:
 
 			offset = r[rm] << shift
@@ -697,19 +682,18 @@ func (c *Cpu) Sdt(op uint32) {
 	}
 
 	if pre {
-		prev = post
+		addr = post
 	} else {
-		prev = r[rn]
+		addr = r[rn]
 	}
 
 	if load {
 		if byte {
-			// DO NOT WORD ALIGN
-			r[rd] = c.Read8(prev)
+			r[rd] = c.Read8(addr)
 		} else {
 
-			v := c.Read32(prev)
-			is := ((prev & 3) << 3) & 0x1F
+			v := c.Read32(addr)
+			is := ((addr & 3) * 8) & 0x1F
 			r[rd] = bits.RotateLeft32(v, -int(is))
 
 			if rd == PC {
@@ -718,14 +702,16 @@ func (c *Cpu) Sdt(op uint32) {
 		}
 	} else {
 		v := r[rd]
+
+		// TODO: is this proper with pipelining?
 		if rd == PC {
 			v += 4
 		}
 
 		if byte {
-			c.Write8(prev, uint8(v))
+			c.Write8(addr, uint8(v))
 		} else {
-			c.Write32(prev, v)
+			c.Write32(addr, v)
 		}
 	}
 
@@ -751,14 +737,14 @@ const (
 	INST_BLX
 )
 
-func (c *Cpu) BX(op uint32) {
+func (c *Cpu) BranchExchange(op uint32) {
 	switch inst := (op >> 4) & 0xF; inst {
 	case INST_BX:
 		c.Reg.R[PC] = c.Reg.R[op&0xF]
 		c.ToggleThumb()
 
 	case INST_BXJ:
-		panic("Unsupported BXJ Instruction")
+		panic("unsupported bxj instruction")
 	case INST_BLX:
 		panic("unsupported arm7 blx instruction")
 	}
@@ -769,10 +755,9 @@ const (
 	STRH     = 1
 	LDRD     = 2
 	STRD     = 3
-
-	LDRH  = 1
-	LDRSB = 2
-	LDRSH = 3
+	LDRH     = 1
+	LDRSB    = 2
+	LDRSH    = 3
 )
 
 func (c *Cpu) Half(op uint32) {
@@ -782,7 +767,7 @@ func (c *Cpu) Half(op uint32) {
 		rd      = (op >> 12) & 0xF
 		preFlag = (op>>24)&1 != 0
 		load    = (op>>20)&1 != 0
-		inst    = (op >> 5) & 0b11
+		inst    = (op >> 5) & 3
 		wb      = (op>>21)&1 != 0 || !preFlag
 		rnv     = r[rn]
 		post    = rnv
@@ -808,10 +793,6 @@ func (c *Cpu) Half(op uint32) {
 		pre = rnv
 	}
 
-	if inst == RESERVED {
-		panic("unsupported half (reserved)")
-	}
-
 	if !load {
 		rdv := r[rd]
 
@@ -819,16 +800,11 @@ func (c *Cpu) Half(op uint32) {
 			r[rn] = post
 		}
 
-		switch inst {
-		case STRH:
+		if inst == STRH {
 			c.Write16(pre, uint16(rdv))
-
-		case LDRD:
-			panic("unsupported arm7 ldrd instruction")
-		case STRD:
-			panic("unsupported arm7 strd instruction")
+		} else {
+			panic("unsupported arm7 instruction (ldrd, strd, reserved)")
 		}
-
 		return
 	}
 
@@ -838,39 +814,28 @@ func (c *Cpu) Half(op uint32) {
 
 	switch inst {
 	case LDRH:
-		//  LDRH Rd,[odd]   -->  LDRH Rd,[odd-1] ROR 8  ;read to bit0-7 and bit24-31
 		v := uint32(c.Read16(pre))
-		is := (pre & 1) << 3
-		r[rd] = bits.RotateLeft32(v, -int(is))
+		r[rd] = bits.RotateLeft32(v, -int((pre&1)*8))
 	case LDRSB:
-		// sign-expand byte value
 		r[rd] = uint32(int32(int8(c.Read8(pre))))
 
 	case LDRSH:
-		// On ARM7 aka ARMv4 aka NDS7/GBA:
-		// LDRSH Rd,[odd]  -->  LDRSB Rd,[odd];sign-expand BYTE value
 		if misaligned := pre&1 != 0; misaligned {
-			// sign-expand byte value
 			r[rd] = uint32(int32(int8(c.Read8(pre))))
 		} else {
-			// sign-expand half value
 			r[rd] = uint32(int32(int16(c.Read16(pre))))
 		}
+	default:
+		panic("unsupported arm7 instruction (ldrd, strd, reserved)")
 	}
 }
 
-func (c *Cpu) Psr(op uint32) {
-	if msr := (op>>21)&1 != 0; msr {
-		c.msr(op)
-		return
-	}
-
+func (c *Cpu) Mrs(op uint32) {
 	r := &c.Reg.R
 	rd := (op >> 12) & 0xF
 
 	if spsr := (op>>22)&1 != 0; spsr {
-		mode := c.Reg.CPSR.Mode
-		r[rd] = c.Reg.SPSR[ModeBank[mode]].Get()
+		r[rd] = c.Reg.SPSR[ModeBank[c.Reg.CPSR.Mode]].Get()
 		return
 	}
 
@@ -888,19 +853,18 @@ const (
 	STATE_MASK uint32 = 0x0100_0020
 )
 
-func (c *Cpu) msr(op uint32) {
+func (c *Cpu) Msr(op uint32) {
 	r := &c.Reg.R
 
 	var v uint32
 	if imm := (op>>25)&1 != 0; imm {
 		shift := ((op >> 8) & 0xF) << 1
 		v = bits.RotateLeft32(op&0xFF, -int(shift))
-
 	} else {
 		v = r[op&0xF]
 	}
 
-	mask := uint32(0)
+	var mask uint32
 	if C := (op>>16)&1 != 0; C {
 		mask |= 0x0000_00FF
 	}
@@ -914,55 +878,46 @@ func (c *Cpu) msr(op uint32) {
 		mask |= 0xFF00_0000
 	}
 
-	secMask := PRIV_MASK
 	curr := c.Reg.CPSR.Mode
 
+	secMask := PRIV_MASK
 	if curr == MODE_USR {
 		secMask = USR_MASK
 	}
 
-	spsrFlag := (op>>22)&1 != 0
+	if spsrFlag := (op>>22)&1 != 0; spsrFlag {
 
-	if spsrFlag {
 		secMask |= STATE_MASK
+		mask &= secMask
+
+		var spsr uint32
+		if curr == MODE_USR || curr == MODE_SYS {
+			spsr = c.Reg.CPSR.Get()
+		} else {
+			spsr = c.Reg.SPSR[ModeBank[curr]].Get()
+		}
+
+		spsr = (spsr &^ mask) | (v & mask)
+		c.Reg.SPSR[ModeBank[curr]].Set(spsr)
+		return
 	}
 
 	mask &= secMask
 
-	reg := &c.Reg
-
-	if spsrFlag {
-
-		var spsr uint32
-
-		if curr == MODE_USR || curr == MODE_SYS {
-			spsr = uint32(reg.CPSR.Get()) &^ mask
-		} else {
-			spsr = uint32(reg.SPSR[ModeBank[curr]].Get()) &^ mask
-		}
-
-		spsr |= v & mask
-		reg.SPSR[ModeBank[curr]].Set(spsr)
-
-		return
-	}
+	cpsr := c.Reg.CPSR.Get()
+	cpsr = (cpsr &^ mask) | (v & mask)
+	c.Reg.CPSR.Set(cpsr)
 
 	next := CpuMode(v&0x1F | 0x10)
-	cpsr := uint32(reg.CPSR.Get()) &^ mask
 
-	cpsr |= v & mask
+	if ModeBank[curr] != ModeBank[next] {
 
-	reg.CPSR.Set(cpsr)
+		if curr == MODE_USR {
+			panic("user mode msr")
+		}
 
-	if skip := ModeBank[curr] == ModeBank[next]; skip {
-		return
+		c.ModeSwitch(curr, next)
 	}
-
-	if curr == MODE_USR {
-		panic("USER MODE MSR")
-	}
-
-	c.ModeSwitch(curr, next)
 }
 
 func (c *Cpu) Swp(op uint32) {
@@ -978,8 +933,7 @@ func (c *Cpu) Swp(op uint32) {
 		c.Write8(rnv, uint8(rmv))
 	} else {
 		v := c.Read32(rnv)
-		is := (rnv & 3) << 3
-		r[rd] = bits.RotateLeft32(v, -int(is))
+		r[rd] = bits.RotateLeft32(v, -int((rnv&3)*8))
 		c.Write32(rnv, rmv)
 	}
 }
@@ -1055,7 +1009,7 @@ func (c *Cpu) Block(op uint32) {
 		} else {
 
 			v := r[i]
-			if i == 15 {
+			if i == PC {
 				v += 4
 			}
 
