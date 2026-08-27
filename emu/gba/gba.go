@@ -9,9 +9,9 @@ import (
 	"github.com/aabalke/guac/common/profiler"
 	"github.com/aabalke/guac/common/stats"
 	"github.com/aabalke/guac/config"
+	"github.com/aabalke/guac/emu/cpu/arm7"
 	"github.com/aabalke/guac/emu/gba/apu"
 	"github.com/aabalke/guac/emu/gba/cart"
-	"github.com/aabalke/guac/emu/gba/cpu"
 	"github.com/aabalke/guac/emu/gba/irq"
 	"github.com/aabalke/guac/emu/gba/timer"
 	"github.com/aabalke/guac/emu/scheduler"
@@ -57,7 +57,7 @@ type GBA struct {
 	Mu    sync.Mutex
 	Stats *stats.Stats
 
-	Cpu               *cpu.Cpu
+	Cpu               *arm7.Cpu
 	Scheduler         *scheduler.Scheduler
 	Mem               *Memory
 	Cartridge         *cart.Cartridge
@@ -91,7 +91,7 @@ func NewGBA(ctx *audio.Context, path string, muted bool) *GBA {
 
 	gba.PPU = &PPU{gba: gba}
 	gba.Mem = NewMemory(gba)
-	gba.Cpu = cpu.NewCpu(gba.Mem, gba.Cycles, gba.Idle)
+	gba.Cpu = arm7.NewCpu(gba.Mem, gba.Cycles, gba.Idle)
 	gba.Irq = irq.NewIrq(gba.Scheduler, &gba.Cpu.IrqLine)
 	gba.Keypad = Key{Irq: gba.Irq, Input: 0x3FF}
 	gba.Mem.Sio = NewSio(gba.Irq, gba.Scheduler)
@@ -259,18 +259,18 @@ func (gba *GBA) DirectBoot() {
 	gba.Irq.IME = true
 
 	reg.CPSR.Set(0x1F)
-	reg.SPSR[cpu.ModeBank[cpu.MODE_IRQ]].Set(0x10)
+	reg.SPSR[arm7.ModeBank[arm7.MODE_IRQ]].Set(0x10)
 
-	reg.R[cpu.PC] = 0x800_0000
-	reg.R[cpu.LR] = 0x800_0000
-	reg.LR[cpu.ModeBank[cpu.MODE_SYS]] = 0x800_0000
-	reg.LR[cpu.ModeBank[cpu.MODE_IRQ]] = 0x800_0000
-	reg.LR[cpu.ModeBank[cpu.MODE_SWI]] = 0x800_0000
+	reg.R[arm7.PC] = 0x800_0000
+	reg.R[arm7.LR] = 0x800_0000
+	reg.LR[arm7.ModeBank[arm7.MODE_SYS]] = 0x800_0000
+	reg.LR[arm7.ModeBank[arm7.MODE_IRQ]] = 0x800_0000
+	reg.LR[arm7.ModeBank[arm7.MODE_SWI]] = 0x800_0000
 
-	reg.R[cpu.SP] = 0x300_7F00
-	reg.SP[cpu.ModeBank[cpu.MODE_SYS]] = 0x300_7F00
-	reg.SP[cpu.ModeBank[cpu.MODE_IRQ]] = 0x300_7FA0
-	reg.SP[cpu.ModeBank[cpu.MODE_SWI]] = 0x300_7FE0
+	reg.R[arm7.SP] = 0x300_7F00
+	reg.SP[arm7.ModeBank[arm7.MODE_SYS]] = 0x300_7F00
+	reg.SP[arm7.ModeBank[arm7.MODE_IRQ]] = 0x300_7FA0
+	reg.SP[arm7.ModeBank[arm7.MODE_SWI]] = 0x300_7FE0
 
 	gba.Cpu.Op[0] = 0xF000_0000
 	gba.Cpu.Op[1] = 0xF000_0000
@@ -279,7 +279,7 @@ func (gba *GBA) DirectBoot() {
 }
 
 func (gba *GBA) BiosBoot() {
-	gba.Cpu.Exception(cpu.VEC_RESET, cpu.MODE_SYS)
+	gba.Cpu.Exception(arm7.VEC_RESET, arm7.MODE_SYS)
 }
 
 func (gba *GBA) Frame() uint64 {

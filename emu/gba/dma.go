@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"unsafe"
 
-	"github.com/aabalke/guac/emu/gba/cpu"
+	"github.com/aabalke/guac/emu/cpu/arm7"
 	"github.com/aabalke/guac/emu/scheduler"
 )
 
@@ -285,16 +285,16 @@ func (ch *Channel) transfer() {
 		var (
 			src    = ch.latched.src
 			dst    = ch.latched.dst
-			srcSeq = uint32(cpu.SEQ)
-			dstSeq = uint32(cpu.SEQ)
+			srcSeq = uint32(arm7.SEQ)
+			dstSeq = uint32(arm7.SEQ)
 		)
 
 		if !accessRom {
 			if src >= 0x800_0000 {
-				srcSeq = cpu.NONSEQ
+				srcSeq = arm7.NONSEQ
 				accessRom = true
 			} else if dst >= 0x800_0000 {
-				dstSeq = cpu.NONSEQ
+				dstSeq = arm7.NONSEQ
 				accessRom = true
 			}
 		}

@@ -2,14 +2,12 @@ package nds
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/aabalke/guac/common/bus"
 	"github.com/aabalke/guac/common/profiler"
 	"github.com/aabalke/guac/common/stats"
 	"github.com/aabalke/guac/config"
-	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/cpu/arm7"
 	"github.com/aabalke/guac/emu/cpu/arm9"
 	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
@@ -50,8 +48,7 @@ type Nds struct {
 	mem              *mem.Mem
 	arm7             *arm7.Cpu
 	arm9             *arm9.Cpu
-	irq7             *cpu.Irq
-	irq9             *irq.Irq
+	irq7, irq9       *irq.Irq
 	ppu              *ppu.PPU
 	Cartridge        *cart.Cartridge
 	Screen           *Screen
@@ -71,9 +68,10 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 		Screen:    NewScreen(),
 	}
 
+	nds.arm7 = arm7.NewCpu(&nds.mem.Bus7, nds.Cycles7, nds.Idle7)
 	nds.arm9 = arm9.NewCpu(&nds.mem.Bus9, nds.Cycles, nds.Idle, cp15.NewCp15(&nds.mem.Tcm))
 
-	nds.irq7 = &cpu.Irq{}
+	nds.irq7 = irq.NewIrq(nds.Scheduler, &nds.arm7.IrqLine)
 	nds.irq9 = irq.NewIrq(nds.Scheduler, &nds.arm9.IrqLine)
 
 	nds.ppu = ppu.NewPPU(nds.irq9)
@@ -92,8 +90,6 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 		nds.dma7[i].Init(i, &nds.mem.Bus7, nds.Scheduler, nds.irq7, false)
 		nds.dma9[i].Init(i, &nds.mem.Bus9, nds.Scheduler, nds.irq9, true)
 	}
-
-	nds.arm7 = arm7.NewCpu(&nds.mem.Bus7, nds.irq7)
 
 	nds.Cartridge = cart.NewCartridge(
 		path, nds.mem.Arm7Bios,
@@ -209,10 +205,10 @@ func (nds *Nds) Update() {
 			nds.arm9.Step()
 
 			if nds.ppu.Rasterizer.GeoEngine.GxStat.FifoIrq != 0 {
-				nds.irq9.SetIRQ(cpu.IRQ_GEO_CMD_FIFO)
+				nds.irq9.SetIRQ(21)
 			}
 
-			nds.Tick(1)
+			//nds.Tick(1)
 		}
 	}
 }
@@ -221,19 +217,18 @@ func (nds *Nds) Tick(cycles int64) {
 	nds.Scheduler.Add(cycles)
 
 	for nds.Arm7Cycles < nds.Scheduler.Now()>>1 {
-		nds.arm7.CheckIrq()
+		if nds.arm7.Halted {
 
-		if !nds.arm7.Halted {
-			if _, ok := nds.arm7.Execute(); !ok {
-				panic(fmt.Sprintf("ARM7 Decode Error: PC %08X\n", nds.arm7.Reg.R[15]))
+			nds.Tick7(1)
+
+			if nds.irq7.IrqAvailable {
+				nds.arm7.Halted = false
 			}
+
+		} else {
+			nds.arm7.Step()
+			//nds.Tick(1)
 		}
-
-		nds.Arm7Cycles++
-
-		// maybe get all new arm7 events with scheduler cycles < current arm9 and catch up every time
-		// would need to calc scheduler cycle based on arm7 time not arm9
-		// bus is 33mhz - should I use a 33mhz scheduler?
 	}
 }
 
@@ -277,16 +272,15 @@ func (nds *Nds) DirectBoot() {
 	nds.arm7.Reg.R[15] = nds.Cartridge.Header.Arm7EntryAddr
 	nds.arm7.Reg.CPSR.Set(0x1F)
 
-	nds.arm7.Halted = false
-	nds.arm9.Halted = false
-
 	nds.arm9.Op[0] = 0xF000_0000
 	nds.arm9.Op[1] = 0xF000_0000
+	nds.arm7.Op[0] = 0xF000_0000
+	nds.arm7.Op[1] = 0xF000_0000
 
 	// these are temp and should be removed
-	nds.arm9.Step()
-	nds.arm9.Step()
-	nds.Scheduler.CurrentCycle = 0
+	// nds.arm9.Step()
+	// nds.arm9.Step()
+	// nds.Scheduler.CurrentCycle = 0
 }
 
 func (nds *Nds) CheckDmas(mode uint32, arm9 bool) {
@@ -327,7 +321,7 @@ func (nds *Nds) OnTimerOverflow(t *timer.Timer, late int64) {
 		if t.IsArm9 {
 			nds.irq9.SetIRQ(3 + uint32(t.Idx))
 		} else {
-			nds.arm7.Irq.SetIRQ(3 + uint32(t.Idx))
+			nds.irq7.SetIRQ(3 + uint32(t.Idx))
 		}
 	}
 
@@ -340,8 +334,57 @@ func (nds *Nds) OnTimerOverflow(t *timer.Timer, late int64) {
 }
 
 func (nds *Nds) Idle(cycles int64) {
-	//nds.Tick(cycles)
+	nds.Tick(cycles)
 }
 
 func (nds *Nds) Cycles(addr, width, seq uint32, inst bool) {
+	nds.Tick(1)
+	// if inst {
+
+	//	switch addr >> 24 {
+	//	case 0, 1:
+	//		nds.Tick(1)
+	//	case 2:
+	//		nds.Tick(2 * int64(width*2))
+	//	case 5, 6:
+	//		nds.Tick(2 * int64(width))
+	//	default:
+	//		nds.Tick(2 * int64(width))
+	//	}
+
+	//	return
+	//}
+
+	// if seq != 0 {
+
+	//	if addr>>24 == 0 || addr>>24 == 1 {
+	//		nds.Tick(1)
+	//	} else {
+	//		nds.Tick(2)
+	//	}
+	//	return
+	//}
+
+	//switch addr >> 24 {
+	//case 0, 1:
+	//	nds.Tick(1)
+	//case 2:
+	//	nds.Tick(2 * int64(10))
+	//case 5, 6:
+	//	nds.Tick(2 * int64(5))
+	//default:
+	//	nds.Tick(2 * int64(4))
+	//}
+}
+
+func (nds *Nds) Tick7(cycles int64) {
+	nds.Arm7Cycles += cycles
+}
+
+func (nds *Nds) Idle7(cycles int64) {
+	nds.Tick7(cycles)
+}
+
+func (nds *Nds) Cycles7(addr, width, seq uint32, inst bool) {
+	nds.Tick7(1)
 }

@@ -7,7 +7,6 @@ import (
 
 	"github.com/aabalke/guac/common/file"
 	"github.com/aabalke/guac/config"
-	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
 )
 
@@ -256,10 +255,10 @@ func (c *Cartridge) RomTransfer(initial bool, arm9 bool) {
 		case !c.RomTransferIrq:
 			return
 		case arm9:
-			c.irq9.SetIRQ(cpu.IRQ_CARD_TRANS_COMPLETE)
+			c.irq9.SetIRQ(19)
 			return
 		default:
-			c.irq7.SetIRQ(cpu.IRQ_CARD_TRANS_COMPLETE)
+			c.irq7.SetIRQ(19)
 			return
 		}
 	}
@@ -278,10 +277,10 @@ func (c *Cartridge) RomTransfer(initial bool, arm9 bool) {
 }
 
 func (c *Cartridge) InitSaveLoop() {
-	saveTicker := time.Tick(time.Second)
+	saveTicker := time.NewTicker(time.Second)
 
 	go func() {
-		for range saveTicker {
+		for range saveTicker.C {
 
 			if config.Conf.General.DisableSaves {
 				continue

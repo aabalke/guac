@@ -5,52 +5,52 @@ import (
 	"fmt"
 	"math/bits"
 
-	"github.com/aabalke/guac/emu/gba/cpu"
+	"github.com/aabalke/guac/emu/cpu/arm7"
 )
 
 func (c *Cpu) DecodeTHUMB(op uint16) {
 	switch {
 	case IsThumbBkpt(op):
-		c.Exception(cpu.VEC_PREFETCH, cpu.MODE_ABT)
-	case cpu.IsthumbSWI(op):
-		c.Exception(cpu.VEC_SWI, cpu.MODE_SWI)
-	case cpu.IsThumbAddSub(op):
+		c.Exception(arm7.VEC_PREFETCH, arm7.MODE_ABT)
+	case arm7.IsthumbSWI(op):
+		c.Exception(arm7.VEC_SWI, arm7.MODE_SWI)
+	case arm7.IsThumbAddSub(op):
 		c.ThumbAddSub(op)
-	case cpu.IsThumbShift(op):
+	case arm7.IsThumbShift(op):
 		c.ThumbShifted(op)
-	case cpu.IsThumbImm(op):
+	case arm7.IsThumbImm(op):
 		c.ThumbImm(op)
-	case cpu.IsThumbAlu(op):
+	case arm7.IsThumbAlu(op):
 		c.ThumbAlu(op)
-	case cpu.IsThumbHiReg(op):
+	case arm7.IsThumbHiReg(op):
 		c.HiRegBX(op)
-	case cpu.IsLSHalf(op):
+	case arm7.IsLSHalf(op):
 		c.ThumbLSHalf(op)
-	case cpu.IsThumbSdt(op):
+	case arm7.IsThumbSdt(op):
 		c.ThumbSdt(op)
-	case cpu.IsLPC(op):
+	case arm7.IsLPC(op):
 		c.ThumbLPC(op)
-	case cpu.IsLSImm(op):
+	case arm7.IsLSImm(op):
 		c.ThumbLSImm(op)
-	case cpu.IsPushPop(op):
+	case arm7.IsPushPop(op):
 		c.ThumbPushPop(op)
-	case cpu.IsRelative(op):
+	case arm7.IsRelative(op):
 		c.ThumbRelative(op)
-	case cpu.IsThumbB(op):
+	case arm7.IsThumbB(op):
 		c.ThumbB(op)
-	case cpu.IsJumpCall(op):
+	case arm7.IsJumpCall(op):
 		c.ThumbJumpCalls(op)
-	case cpu.IsStack(op):
+	case arm7.IsStack(op):
 		c.ThumbStack(op)
-	case cpu.IsLongBranch(op):
+	case arm7.IsLongBranch(op):
 		c.ThumbLongBranch(op)
-	case cpu.IsShortLongBranch(op):
+	case arm7.IsShortLongBranch(op):
 		c.ThumbShortLongBranch(op)
 	case IsThumbShortBlx(op):
 		c.ThumbShortBlx(op)
-	case cpu.IsLSSP(op):
+	case arm7.IsLSSP(op):
 		c.ThumbLSSP(op)
-	case cpu.IsMulti(op):
+	case arm7.IsMulti(op):
 		c.ThumbBlock(op)
 	default:
 		panic(fmt.Sprintf("nds: unable to decode arm9 thumb pc=%08X op=%08X", c.Reg.R[PC], op))
@@ -59,7 +59,7 @@ func (c *Cpu) DecodeTHUMB(op uint16) {
 
 //go:inline
 func IsThumbBkpt(op uint16) bool {
-	return cpu.IsThumbOpFormat(
+	return arm7.IsThumbOpFormat(
 		op,
 		0b1011_1110_0000_0000,
 		0b1111_1111_0000_0000,
@@ -68,7 +68,7 @@ func IsThumbBkpt(op uint16) bool {
 
 //go:inline
 func IsThumbShortBlx(op uint16) bool {
-	return cpu.IsThumbOpFormat(
+	return arm7.IsThumbOpFormat(
 		op,
 		0b1111_1000_0000_0000,
 		0b1110_1000_0000_0000,
@@ -97,18 +97,18 @@ func (c *Cpu) ThumbSdt(op uint16) {
 	if signed := (op>>9)&1 != 0; signed {
 
 		switch inst {
-		case cpu.THUMB_STRH:
+		case arm7.THUMB_STRH:
 			c.Write16(addr, uint16(r[rd]))
 
-		case cpu.THUMB_LDSB:
+		case arm7.THUMB_LDSB:
 			// sign-expand byte value
 			r[rd] = uint32(int32(int8(c.Read8(addr))))
 
-		case cpu.THUMB_LDRH:
+		case arm7.THUMB_LDRH:
 			v := c.Read16(addr)
 			r[rd] = bits.RotateLeft32(v, -int((addr&1)<<3))
 
-		case cpu.THUMB_LDSH:
+		case arm7.THUMB_LDSH:
 			// On ARM9 aka NDS9 sign extend:
 			r[rd] = uint32(int32(int16(c.Read16(addr))))
 		}
@@ -117,15 +117,15 @@ func (c *Cpu) ThumbSdt(op uint16) {
 	}
 
 	switch inst {
-	case cpu.THUMB_STR_REG:
+	case arm7.THUMB_STR_REG:
 		c.Write32(addr, r[rd])
-	case cpu.THUMB_STRB_REG:
+	case arm7.THUMB_STRB_REG:
 		c.Write8(addr, uint8(r[rd]))
-	case cpu.THUMB_LDR_REG:
+	case arm7.THUMB_LDR_REG:
 		v := c.Read32(addr)
 		is := (addr & 3) << 3
 		r[rd] = bits.RotateLeft32(v, -int(is))
-	case cpu.THUMB_LDRB_REG:
+	case arm7.THUMB_LDRB_REG:
 		r[rd] = c.Read8(addr)
 	}
 }
@@ -136,7 +136,7 @@ func (c *Cpu) ThumbPushPop(op uint16) {
 		pclr  = (op>>8)&1 != 0
 		rlist = op & 0xFF
 		pop   = (op>>11)&1 != 0
-		seq   = uint32(cpu.NONSEQ)
+		seq   = uint32(arm7.NONSEQ)
 	)
 
 	// thank you nano
@@ -164,7 +164,7 @@ func (c *Cpu) ThumbPushPop(op uint16) {
 			r[reg] = c.Read32Block(r[SP], seq)
 			r[SP] += 4
 
-			seq = cpu.SEQ
+			seq = arm7.SEQ
 		}
 
 		if pclr {
@@ -194,7 +194,7 @@ func (c *Cpu) ThumbPushPop(op uint16) {
 			r[SP] -= 4
 			c.Write32Block(r[SP], r[reg], seq)
 
-			seq = cpu.SEQ
+			seq = arm7.SEQ
 		}
 	}
 }
@@ -211,7 +211,7 @@ func (c *Cpu) HiRegBX(op uint16) {
 	)
 
 	switch inst := (op >> 8) & 3; inst {
-	case cpu.HI_ADD:
+	case arm7.HI_ADD:
 
 		r[rd] += r[rs]
 
@@ -219,7 +219,7 @@ func (c *Cpu) HiRegBX(op uint16) {
 			c.Reload16()
 		}
 
-	case cpu.HI_CMP:
+	case arm7.HI_CMP:
 
 		rsv := r[rs]
 		rdv := r[rd]
@@ -231,7 +231,7 @@ func (c *Cpu) HiRegBX(op uint16) {
 		cpsr.C = res < 0x1_0000_0000
 		cpsr.V = ((rdv^rsv)&(rdv^uint32(res)))>>31 != 0
 
-	case cpu.HI_MOV:
+	case arm7.HI_MOV:
 
 		r[rd] = r[rs]
 
@@ -239,7 +239,7 @@ func (c *Cpu) HiRegBX(op uint16) {
 			c.Reload16()
 		}
 
-	case cpu.HI_BX:
+	case arm7.HI_BX:
 
 		if blx := op&(1<<7) != 0; blx {
 

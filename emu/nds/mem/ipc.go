@@ -1,7 +1,7 @@
 package mem
 
 import (
-	"github.com/aabalke/guac/emu/cpu"
+	"github.com/aabalke/guac/emu/nds/irq"
 )
 
 type Ipc struct {
@@ -9,17 +9,15 @@ type Ipc struct {
 	Fifo9to7 Fifo
 }
 
-func NewIpc(irq7, irq9 Irq) *Ipc {
+func NewIpc(irq7, irq9 *irq.Irq) *Ipc {
 	ipc := &Ipc{}
-
 	ipc.Fifo7to9.Irq = irq7
 	ipc.Fifo9to7.Irq = irq9
-
 	return ipc
 }
 
 type Fifo struct {
-	Irq                Irq
+	Irq                *irq.Irq
 	Buffer             [0x10]uint32
 	Value              uint32
 	Length, Head, Tail uint8
@@ -74,8 +72,8 @@ func (i *Ipc) WriteSync(v, b uint8, arm9 bool) {
 	src.Sync = (src.Sync &^ 0x4F00) | ((uint16(v) << 8) & 0x4F00)
 	dst.Sync = (dst.Sync &^ 0x000F) | uint16(v&0x000F)
 
-	if irq := (v>>5)&1 != 0 && (dst.Sync>>14)&1 != 0; irq {
-		dst.Irq.SetIRQ(cpu.IRQ_IPC_SYNC)
+	if (v>>5)&1 != 0 && (dst.Sync>>14)&1 != 0 {
+		dst.Irq.SetIRQ(irq.IRQ_IPC_SYNC)
 	}
 }
 
@@ -213,11 +211,11 @@ func (i *Ipc) updateIRQs() {
 		isNotEmptyIrq := !dst.Empty() && dst.IrqNotEmpty
 
 		if !src.wasEmptyIrq && isEmptyIrq {
-			src.Irq.SetIRQ(cpu.IRQ_IPC_SEND_FIFO)
+			src.Irq.SetIRQ(irq.IRQ_IPC_SEND_FIFO)
 		}
 
 		if !src.wasNotEmptyIrq && isNotEmptyIrq {
-			src.Irq.SetIRQ(cpu.IRQ_IPC_RECV_FIFO)
+			src.Irq.SetIRQ(irq.IRQ_IPC_RECV_FIFO)
 		}
 
 		src.wasEmptyIrq = isEmptyIrq

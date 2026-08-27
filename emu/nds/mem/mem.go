@@ -8,7 +8,6 @@ import (
 
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/bios"
-	"github.com/aabalke/guac/emu/cpu"
 	"github.com/aabalke/guac/emu/gba/timer"
 	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/irq"
@@ -36,8 +35,7 @@ type Mem struct {
 	IO [0x100_0000]uint8
 
 	halted7    *bool
-	irq7       *cpu.Irq
-	irq9       *irq.Irq
+	irq7, irq9 *irq.Irq
 	dma7, dma9 *[4]dma.DMA
 
 	arm7Pc *uint32
@@ -466,8 +464,7 @@ func (m *Mem) InitMemory(
 	arm7Pc *uint32,
 	halted7 *bool,
 	dma7, dma9 *[4]dma.DMA,
-	irq7 *cpu.Irq,
-	irq9 *irq.Irq,
+	irq7, irq9 *irq.Irq,
 	c *cart.Cartridge,
 	ppu *ppu.PPU,
 	snd *snd.Snd,
@@ -869,6 +866,8 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 		return mem.Timers7[addr/4].Read(int(addr & 3))
 	case addr >= 0x130 && addr < 0x134:
 		return mem.Key.Read(addr)
+	case addr >= 0x208 && addr < 0x218:
+		return mem.irq7.Read(addr)
 	}
 
 	switch addr {
@@ -956,27 +955,6 @@ func (mem *Mem) ReadArm7IO(addr uint32) uint8 {
 	case 0x207:
 		return 0
 
-	case 0x208:
-		return mem.irq7.ReadIME()
-	case 0x209:
-		return 0
-	case 0x210:
-		return mem.irq7.ReadIE(0)
-	case 0x211:
-		return mem.irq7.ReadIE(1)
-	case 0x212:
-		return mem.irq7.ReadIE(2)
-	case 0x213:
-		return mem.irq7.ReadIE(3)
-	case 0x214:
-		return mem.irq7.ReadIF(0)
-	case 0x215:
-		return mem.irq7.ReadIF(1)
-	case 0x216:
-		return mem.irq7.ReadIF(2)
-	case 0x217:
-		return mem.irq7.ReadIF(3)
-
 	case 0x240:
 		return mem.Ppu.Vram.Cnt_7
 	case 0x241:
@@ -1030,6 +1008,9 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 		return
 	case addr >= 0x130 && addr < 0x134:
 		mem.Key.Write(addr, v)
+		return
+	case addr >= 0x208 && addr < 0x218:
+		mem.irq7.Write8(addr, v)
 		return
 	}
 
@@ -1147,27 +1128,6 @@ func (mem *Mem) WriteArm7IO(addr uint32, v uint8) {
 
 	case 0x204:
 		mem.Cartridge.WriteExMem(v, 0)
-
-	case 0x208:
-		mem.irq7.WriteIME(v)
-	case 0x209:
-		return
-	case 0x210:
-		mem.irq7.WriteIE(v, 0)
-	case 0x211:
-		mem.irq7.WriteIE(v, 1)
-	case 0x212:
-		mem.irq7.WriteIE(v, 2)
-	case 0x213:
-		mem.irq7.WriteIE(v, 3)
-	case 0x214:
-		mem.irq7.WriteIF(v, 0)
-	case 0x215:
-		mem.irq7.WriteIF(v, 1)
-	case 0x216:
-		mem.irq7.WriteIF(v, 2)
-	case 0x217:
-		mem.irq7.WriteIF(v, 3)
 
 	case 0x300:
 		mem.PostFlg.Write(v, false)

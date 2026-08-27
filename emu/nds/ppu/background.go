@@ -67,7 +67,7 @@ func (ppu *PPU) threeScanline(e *Engine, bgIdx, y uint32) {
 
 		r := ppu.Rasterizer.Render
 		pal, alpha := uint16(0), uint32(0)
-		if r.Rasterizer.Buffers.BisRendering {
+		if !r.Rasterizer.Buffers.BisRendering {
 			pal, alpha = uint16(r.Pixels.PalettesA[i]), r.Pixels.AlphaA[i]
 		} else {
 			pal, alpha = uint16(r.Pixels.PalettesB[i]), r.Pixels.AlphaB[i]

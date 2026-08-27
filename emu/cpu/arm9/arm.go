@@ -6,51 +6,53 @@ import (
 	"math"
 	"math/bits"
 
+	"github.com/aabalke/guac/emu/cpu/arm7"
 	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
-	"github.com/aabalke/guac/emu/gba/cpu"
 )
 
 func (c *Cpu) DecodeARM(op uint32) {
-	if cond := op >> 28; cond == 0xF {
+	cond := op >> 28
+
+	if cond == 0xF {
 		switch {
 		case IsBlx(op):
 			c.Blx(op)
 			return
-		case cpu.IsSDT(op):
+		case arm7.IsSDT(op):
 			c.Sdt(op)
 			return
 		}
 	}
 
-	if cond := op >> 28; !c.Reg.CPSR.CheckCond(cond) {
-		c.Seq = cpu.SEQ
+	if !c.Reg.CPSR.CheckCond(cond) {
+		c.Seq = arm7.SEQ
 		return
 	}
 
 	switch {
 	case (op>>24)&0xF == 0xF:
-		c.Exception(cpu.VEC_SWI, cpu.MODE_SWI)
+		c.Exception(arm7.VEC_SWI, arm7.MODE_SWI)
 	case IsBkpt(op):
-		c.Exception(cpu.VEC_PREFETCH, cpu.MODE_ABT)
+		c.Exception(arm7.VEC_PREFETCH, arm7.MODE_ABT)
 	case IsCoDataReg(op):
 		c.CoDataReg(op)
-	case cpu.IsB(op):
+	case arm7.IsB(op):
 		c.B(op)
-	case cpu.IsBX(op):
+	case arm7.IsBX(op):
 		c.BX(op)
-	case cpu.IsSDT(op):
+	case arm7.IsSDT(op):
 		c.Sdt(op)
-	case cpu.IsBlock(op):
+	case arm7.IsBlock(op):
 		c.Block(op)
-	case cpu.IsHalf(op):
+	case arm7.IsHalf(op):
 		c.Half(op)
-	case cpu.IsUD(op):
-		c.Exception(cpu.VEC_UNDEFINED, cpu.MODE_UND)
-	case cpu.IsPSR(op):
+	case arm7.IsUD(op):
+		c.Exception(arm7.VEC_UNDEFINED, arm7.MODE_UND)
+	case arm7.IsPSR(op):
 		c.Psr(op)
-	case cpu.IsSWP(op):
+	case arm7.IsSWP(op):
 		c.Swp(op)
-	case cpu.IsMul(op):
+	case arm7.IsMul(op):
 		c.Mul(op)
 	case IsCLZ(op):
 		c.Clz(op)
@@ -58,11 +60,10 @@ func (c *Cpu) DecodeARM(op uint32) {
 		c.Qalu(op)
 	case IsExtMul(op):
 		c.ExtendedMul(op)
-	case cpu.IsALU(op):
+	case arm7.IsALU(op):
 		// if alu is moved higher, breaks on overlap since compare inst need Set always
 		// probably best to just build a decoded table and jump instead of decode on the fly
 		c.Alu(op)
-		c.SetAluPC(op)
 	default:
 		panic(fmt.Sprintf("nds: unable to decode arm9 arm pc=%08X op=%08X", c.Reg.R[PC], op))
 	}
@@ -70,7 +71,7 @@ func (c *Cpu) DecodeARM(op uint32) {
 
 //go:inline
 func IsBlx(op uint32) bool {
-	return cpu.IsOpFormat(
+	return arm7.IsOpFormat(
 		op,
 		0b1111_1110_0000_0000_0000_0000_0000_0000,
 		0b1111_1010_0000_0000_0000_0000_0000_0000,
@@ -79,7 +80,7 @@ func IsBlx(op uint32) bool {
 
 //go:inline
 func IsBkpt(op uint32) bool {
-	return cpu.IsOpFormat(
+	return arm7.IsOpFormat(
 		op,
 		0b1111_1111_1111_0000_0000_0000_1111_0000,
 		0b1110_0001_0010_0000_0000_0000_0111_0000,
@@ -88,7 +89,7 @@ func IsBkpt(op uint32) bool {
 
 //go:inline
 func IsCLZ(op uint32) bool {
-	return cpu.IsOpFormat(
+	return arm7.IsOpFormat(
 		op,
 		0b1111_1111_1111_0000_1111_1111_0000,
 		0b0001_0110_1111_0000_1111_0001_0000,
@@ -97,7 +98,7 @@ func IsCLZ(op uint32) bool {
 
 //go:inline
 func IsQAlu(op uint32) bool {
-	return cpu.IsOpFormat(
+	return arm7.IsOpFormat(
 		op,
 		0b1111_1001_0000_0000_1111_1111_0000,
 		0b0001_0000_0000_0000_0000_0101_0000,
@@ -106,7 +107,7 @@ func IsQAlu(op uint32) bool {
 
 //go:inline
 func IsCoDataReg(op uint32) bool {
-	return cpu.IsOpFormat(
+	return arm7.IsOpFormat(
 		op,
 		0b1111_0000_0000_0000_0000_0001_0000,
 		0b1110_0000_0000_0000_0000_0001_0000,
@@ -115,34 +116,11 @@ func IsCoDataReg(op uint32) bool {
 
 //go:inline
 func IsExtMul(op uint32) bool {
-	return cpu.IsOpFormat(
+	return arm7.IsOpFormat(
 		op,
 		0b1111_1001_0000_0000_0000_1001_0000,
 		0b0001_0000_0000_0000_0000_1000_0000,
 	)
-}
-
-func (c *Cpu) SetAluPC(op uint32) {
-	if rd := (op >> 12) & 0xF; rd == PC {
-		inst := (op >> 21) & 0xF
-
-		if op&(1<<20) != 0 {
-			c.ExitException(c.Reg.CPSR.Mode)
-		}
-
-		//if c.Reg.CPSR.T {
-		//	c.Reg.R[PC] &^= 1
-		//} else {
-		//	c.Reg.R[PC] &^= 3
-		//}
-		if inst < 0b1000 || inst > 0b1011 {
-			if c.Reg.CPSR.T {
-				c.Reload16()
-			} else {
-				c.Reload32()
-			}
-		}
-	}
 }
 
 const (
@@ -226,7 +204,6 @@ func (c *Cpu) ExtendedMul(op uint32) {
 func (c *Cpu) Blx(op uint32) {
 	r := &c.Reg.R
 	r[LR] = r[PC] - 4
-
 	r[PC] += uint32((int32(op) << 8) >> 6)
 
 	// half offset
@@ -244,11 +221,11 @@ func (c *Cpu) BX(op uint32) {
 	)
 
 	switch inst {
-	case cpu.INST_BX:
+	case arm7.INST_BX:
 		r[PC] = r[rn]
-	case cpu.INST_BXJ:
+	case arm7.INST_BXJ:
 		panic("Unsupported BXJ Instruction")
-	case cpu.INST_BLX:
+	case arm7.INST_BLX:
 
 		if rn == 14 {
 			// Using BLX R14 is possible (sets PC=Old_LR, and New_LR=retadr).
@@ -297,7 +274,7 @@ func (c *Cpu) Half(op uint32) {
 		pre = rnv
 	}
 
-	if inst == cpu.RESERVED {
+	if inst == arm7.RESERVED {
 		panic("unsupported half (reserved)")
 	}
 
@@ -306,7 +283,7 @@ func (c *Cpu) Half(op uint32) {
 
 		var rd2v uint32
 
-		if inst == cpu.STRD {
+		if inst == arm7.STRD {
 			rd2v = r[rd+1]
 		}
 
@@ -315,14 +292,14 @@ func (c *Cpu) Half(op uint32) {
 		}
 
 		switch inst {
-		case cpu.STRH:
+		case arm7.STRH:
 			c.Write16(pre, uint16(rdv))
 
-		case cpu.LDRD:
+		case arm7.LDRD:
 			addr := pre &^ 7
 			r[rd+0] = c.Read32(addr + 0)
 			r[rd+1] = c.Read32(addr + 4)
-		case cpu.STRD:
+		case arm7.STRD:
 			addr := pre &^ 7
 			c.Write32(addr+0, rdv)
 			c.Write32(addr+4, rd2v)
@@ -336,11 +313,11 @@ func (c *Cpu) Half(op uint32) {
 	}
 
 	switch inst {
-	case cpu.LDRH:
+	case arm7.LDRH:
 		r[rd] = uint32(c.Read16(pre))
-	case cpu.LDRSB:
+	case arm7.LDRSB:
 		r[rd] = uint32(int32(int8(c.Read8(pre))))
-	case cpu.LDRSH:
+	case arm7.LDRSH:
 		r[rd] = uint32(int32(int16(c.Read16(pre))))
 	}
 }
@@ -459,22 +436,11 @@ func (c *Cpu) Block(op uint32) {
 		psr        = (op>>22)&1 != 0
 		wb         = (op>>21)&1 != 0
 		load       = (op>>20)&1 != 0
-		forceUser  = psr && (c.Reg.CPSR.Mode != cpu.MODE_USR) && (!load || !pcIncluded)
+		forceUser  = psr && (c.Reg.CPSR.Mode != arm7.MODE_USR) && (!load || !pcIncluded)
 		wbValue    = r[rn]
 		// fiq switch has additional r8 - r12 use mode switch registers
-		forceFIQSwitch = forceUser && c.Reg.CPSR.Mode == cpu.MODE_FIQ
+		forceFIQSwitch = forceUser && c.Reg.CPSR.Mode == arm7.MODE_FIQ
 	)
-
-	if op == 0xE8A00004 {
-
-		v := r[1]
-
-		defer func() {
-			if v != r[1] {
-				fmt.Printf("R1 Before %08X After %08X\n", v, r[1])
-			}
-		}()
-	}
 
 	if up {
 		wbValue += regCount * 4
@@ -488,9 +454,9 @@ func (c *Cpu) Block(op uint32) {
 
 		switch {
 		case rn == 13:
-			rnRef = &c.Reg.SP[cpu.ModeBank[cpu.MODE_USR]]
+			rnRef = &c.Reg.SP[arm7.ModeBank[arm7.MODE_USR]]
 		case rn == 14:
-			rnRef = &c.Reg.LR[cpu.ModeBank[cpu.MODE_USR]]
+			rnRef = &c.Reg.LR[arm7.ModeBank[arm7.MODE_USR]]
 		case rn >= 8:
 			rnRef = &c.Reg.USR[rn-8]
 
@@ -499,9 +465,9 @@ func (c *Cpu) Block(op uint32) {
 	case forceUser:
 		switch {
 		case rn == 13:
-			rnRef = &c.Reg.SP[cpu.ModeBank[cpu.MODE_USR]]
+			rnRef = &c.Reg.SP[arm7.ModeBank[arm7.MODE_USR]]
 		case rn == 14:
-			rnRef = &c.Reg.LR[cpu.ModeBank[cpu.MODE_USR]]
+			rnRef = &c.Reg.LR[arm7.ModeBank[arm7.MODE_USR]]
 		}
 	}
 
@@ -531,9 +497,9 @@ func (c *Cpu) Block(op uint32) {
 
 			switch {
 			case reg == 13:
-				ref = &c.Reg.SP[cpu.ModeBank[cpu.MODE_USR]]
+				ref = &c.Reg.SP[arm7.ModeBank[arm7.MODE_USR]]
 			case reg == 14:
-				ref = &c.Reg.LR[cpu.ModeBank[cpu.MODE_USR]]
+				ref = &c.Reg.LR[arm7.ModeBank[arm7.MODE_USR]]
 			case reg >= 8:
 				ref = &c.Reg.USR[reg-8]
 			}
@@ -541,9 +507,9 @@ func (c *Cpu) Block(op uint32) {
 		case forceUser:
 			switch {
 			case reg == 13:
-				ref = &c.Reg.SP[cpu.ModeBank[cpu.MODE_USR]]
+				ref = &c.Reg.SP[arm7.ModeBank[arm7.MODE_USR]]
 			case reg == 14:
-				ref = &c.Reg.LR[cpu.ModeBank[cpu.MODE_USR]]
+				ref = &c.Reg.LR[arm7.ModeBank[arm7.MODE_USR]]
 			}
 		}
 
@@ -612,13 +578,13 @@ func (c *Cpu) Block(op uint32) {
 
 	var (
 		curr = c.Reg.CPSR.Mode
-		spsr = c.Reg.SPSR[cpu.ModeBank[curr]]
+		spsr = c.Reg.SPSR[arm7.ModeBank[curr]]
 		next = spsr.Mode
 	)
 
 	c.Reg.CPSR = spsr
 
-	if curr == cpu.MODE_USR {
+	if curr == arm7.MODE_USR {
 		panic("USER MODE LDM PC CHANGE")
 	}
 

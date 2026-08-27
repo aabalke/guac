@@ -3,8 +3,8 @@ package arm9
 import (
 	"unsafe"
 
+	"github.com/aabalke/guac/emu/cpu/arm7"
 	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
-	"github.com/aabalke/guac/emu/gba/cpu"
 )
 
 const (
@@ -14,13 +14,13 @@ const (
 )
 
 type Cpu struct {
-	*cpu.Cpu
+	*arm7.Cpu
 	Cp15 *cp15.Cp15
 }
 
-func NewCpu(m cpu.Mem, cycles func(addr, width, seq uint32, inst bool), idle func(cycles int64), cp15 *cp15.Cp15) *Cpu {
+func NewCpu(m arm7.Mem, cycles func(addr, width, seq uint32, inst bool), idle func(cycles int64), cp15 *cp15.Cp15) *Cpu {
 	c := &Cpu{
-		Cpu:  cpu.NewCpu(m, cycles, idle),
+		Cpu:  arm7.NewCpu(m, cycles, idle),
 		Cp15: cp15,
 	}
 
@@ -39,11 +39,11 @@ func (c *Cpu) Step() {
 			var (
 				cpsr  = &c.Reg.CPSR
 				thumb = cpsr.T
-				mode  = cpu.MODE_IRQ
+				mode  = arm7.MODE_IRQ
 				seq   = c.Seq
 			)
 
-			c.Seq = cpu.SEQ
+			c.Seq = arm7.SEQ
 
 			if thumb {
 				c.Cycles(c.Reg.R[PC], 2, seq, true)
@@ -55,7 +55,7 @@ func (c *Cpu) Step() {
 
 			c.ModeSwitch(cpsr.Mode, mode)
 
-			i := cpu.ModeBank[mode]
+			i := arm7.ModeBank[mode]
 			c.Reg.SPSR[i] = *cpsr
 
 			if thumb {
@@ -71,7 +71,7 @@ func (c *Cpu) Step() {
 			cpsr.T = false
 			cpsr.I = true
 
-			addr := uint32(cpu.VEC_IRQ)
+			addr := uint32(arm7.VEC_IRQ)
 			if c.LowVector {
 				addr &= 0xFFFF
 			}
@@ -83,27 +83,8 @@ func (c *Cpu) Step() {
 	}
 
 	inst := c.Op[0]
-
-	//if c.Reg.CPSR.T {
-	//	fmt.Printf("%08X %08X %08X %08X\n", c.Reg.R[15]-4, inst, c.Reg.R, c.Reg.CPSR.Get())
-	//} else {
-	//	fmt.Printf("%08X %08X %08X %08X\n", c.Reg.R[15]-8, inst, c.Reg.R, c.Reg.CPSR.Get())
-	//}
-
-	//debug.B[0] = false
-	//if debug.V[0] >= 22687 && debug.V[0] < 22723 {
-	//	debug.B[0] = true
-	//	if c.Reg.CPSR.T {
-	//		fmt.Printf("%08X %08X %08X %08X\n", c.Reg.R[15]-4, inst, c.Reg.R, c.Reg.CPSR.Get())
-	//	} else {
-	//		fmt.Printf("%08X %08X %08X %08X\n", c.Reg.R[15]-8, inst, c.Reg.R, c.Reg.CPSR.Get())
-	//	}
-	//}
-
-	//debug.V[0]++
-
 	seq := c.Seq
-	c.Seq = cpu.SEQ
+	c.Seq = arm7.SEQ
 	c.Op[0] = c.Op[1]
 
 	if c.Reg.CPSR.T {

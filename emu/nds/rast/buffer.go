@@ -4,7 +4,7 @@ type Buffers struct {
 	A, B         Buffer
 	BisRendering bool
 
-	//SwapBuffers isn't executed until next VBlank
+	// SwapBuffers isn't executed until next VBlank
 	SwapSet bool
 }
 
@@ -16,7 +16,6 @@ type Buffer struct {
 }
 
 func (b *Buffers) Append(p Polygon) {
-
 	if b.BisRendering {
 		b.A.Polys = append(b.A.Polys, p)
 		return
@@ -26,7 +25,6 @@ func (b *Buffers) Append(p Polygon) {
 }
 
 func (b *Buffers) GetBuffer() *Buffer {
-
 	if b.BisRendering {
 		return &b.B
 	}
@@ -35,7 +33,6 @@ func (b *Buffers) GetBuffer() *Buffer {
 }
 
 func (b *Buffers) Swap() {
-
 	b.BisRendering = !b.BisRendering
 
 	buf := &b.B
@@ -49,7 +46,6 @@ func (b *Buffers) Swap() {
 }
 
 func (b *Buffers) SwapCmd(data uint32) {
-
 	buf := &b.B
 	if b.BisRendering {
 		buf = &b.A
@@ -61,7 +57,6 @@ func (b *Buffers) SwapCmd(data uint32) {
 }
 
 func (b *Buffer) GetCnts() (int, int) {
-
 	// will need to handle culling as well in cnt
 	// will need box test to remove
 

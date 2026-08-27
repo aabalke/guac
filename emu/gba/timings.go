@@ -1,6 +1,6 @@
 package gba
 
-import "github.com/aabalke/guac/emu/gba/cpu"
+import "github.com/aabalke/guac/emu/cpu/arm7"
 
 var (
 	NonSeqWait = [4]uint8{4, 3, 2, 8}
@@ -169,7 +169,7 @@ func (g *GBA) CyclesDma(addr, width, seq uint32) {
 	case region < 0x10:
 
 		if region < 14 && addr&0x1FFFF == 0 {
-			seq = cpu.NONSEQ
+			seq = arm7.NONSEQ
 		}
 
 		if t.Active {
@@ -256,15 +256,15 @@ func (g *GBA) Cycles(addr, width, seq uint32, inst bool) {
 		}
 
 		if addr&0x1FFFF == 0 || g.Cpu.LastWasDma {
-			seq = cpu.NONSEQ
+			seq = arm7.NONSEQ
 		}
 
 		cycles := t.Timings[flag32][seq][region]
 
 		if t.Disabled {
 
-			if cycles == t.Timings[flag32][cpu.SEQ][region] {
-				cycles = t.Timings[flag32][cpu.NONSEQ][8]
+			if cycles == t.Timings[flag32][arm7.SEQ][region] {
+				cycles = t.Timings[flag32][arm7.NONSEQ][8]
 			}
 			t.Disabled = false
 		}
@@ -290,7 +290,7 @@ func (g *GBA) Cycles(addr, width, seq uint32, inst bool) {
 		case region < 14:
 
 			if addr&0x1FFFF == 0 || g.Cpu.LastWasDma {
-				seq = cpu.NONSEQ
+				seq = arm7.NONSEQ
 			}
 
 			if t.Active {
@@ -317,7 +317,7 @@ func (gba *GBA) Idle(cycles int64) {
 
 	if gba.Dma.ParallelDmaCycles == 0 {
 		gba.Tick(cycles)
-		gba.Cpu.Seq = cpu.NONSEQ
+		gba.Cpu.Seq = arm7.NONSEQ
 	} else {
 		gba.Dma.ParallelDmaCycles--
 	}
