@@ -89,9 +89,9 @@ func (c *Cpu) ThumbShortBlx(op uint16) {
 func (c *Cpu) ThumbSdt(op uint16) {
 	var (
 		r    = &c.Reg.R
-		inst = (op >> 10) & 0b11
+		inst = (op >> 10) & 3
 		rd   = op & 0x7
-		addr = r[(op>>3)&0x7] + r[(op>>6)&0x7]
+		addr = r[(op>>3)&7] + r[(op>>6)&7]
 	)
 
 	if signed := (op>>9)&1 != 0; signed {
@@ -101,7 +101,6 @@ func (c *Cpu) ThumbSdt(op uint16) {
 			c.Write16(addr, uint16(r[rd]))
 
 		case arm7.THUMB_LDSB:
-			// sign-expand byte value
 			r[rd] = uint32(int32(int8(c.Read8(addr))))
 
 		case arm7.THUMB_LDRH:
@@ -109,7 +108,7 @@ func (c *Cpu) ThumbSdt(op uint16) {
 			r[rd] = bits.RotateLeft32(v, -int((addr&1)<<3))
 
 		case arm7.THUMB_LDSH:
-			// On ARM9 aka NDS9 sign extend:
+			// arm9 sign extend
 			r[rd] = uint32(int32(int16(c.Read16(addr))))
 		}
 
@@ -244,7 +243,7 @@ func (c *Cpu) HiRegBX(op uint16) {
 		if blx := op&(1<<7) != 0; blx {
 
 			// need tmp ret for blx LR (pc = old LR, lr = calc ret)
-			ret := r[PC] - 1
+			ret := (r[PC] - 2) | 1
 			r[PC] = r[rs]
 			r[LR] = ret
 			c.ToggleThumb()

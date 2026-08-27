@@ -454,36 +454,31 @@ func (c *Cpu) ThumbAddSub(op uint16) {
 	var (
 		r    = &c.Reg.R
 		cpsr = &c.Reg.CPSR
-
-		inst = (op >> 9) & 0b11
-		rsv  = uint32(r[(op>>3)&0x7])
-		rd   = op & 0x7
-
-		res uint64
+		inst = (op >> 9) & 3
+		rsv  = uint32(r[(op>>3)&7])
+		rd   = op & 7
+		res  uint64
 	)
 
 	var op2 uint32
 	if reg := inst < 2; reg {
-		op2 = uint32(r[(op>>6)&0x7])
+		op2 = uint32(r[(op>>6)&7])
 	} else {
-		op2 = uint32((op >> 6) & 0x7)
+		op2 = uint32((op >> 6) & 7)
 	}
 
 	switch inst {
 	case THUMB_ADD, THUMB_ADDImm:
 		res = uint64(rsv) + uint64(op2)
-
 		cpsr.V = ((^(rsv ^ op2))&(rsv^uint32(res)))>>31 != 0
 		cpsr.C = res >= 0x1_0000_0000
 	case THUMB_SUB, THUMB_SUBImm:
 		res = uint64(rsv) - uint64(op2)
-
 		cpsr.V = ((rsv^op2)&(rsv^uint32(res)))>>31 != 0
 		cpsr.C = res < 0x1_0000_0000
 	}
 
 	r[rd] = uint32(res)
-
 	cpsr.N = (uint32(res)>>31)&1 != 0
 	cpsr.Z = uint32(res) == 0
 }
@@ -503,8 +498,7 @@ func (c *Cpu) ThumbImm(op uint16) {
 		rd   = (op >> 8) & 0x7
 		nn   = uint32(op & 0xFF)
 		rdv  = r[rd]
-
-		res uint64
+		res  uint64
 	)
 
 	switch inst {
@@ -533,11 +527,9 @@ func (c *Cpu) ThumbImm(op uint16) {
 
 func (c *Cpu) ThumbLSHalf(op uint16) {
 	var (
-		r = &c.Reg.R
-
-		offset = uint32((op >> 6) & 0x1F << 1)
-		addr   = r[(op>>3)&0x7] + offset
-		rd     = op & 0x7
+		r    = &c.Reg.R
+		addr = r[(op>>3)&0x7] + uint32((op>>6)&0x1F<<1)
+		rd   = op & 0x7
 	)
 
 	if ldr := (op>>11)&1 != 0; ldr {
@@ -578,7 +570,6 @@ func (c *Cpu) ThumbSdt(op uint16) {
 			c.Write16(addr, uint16(r[rd]))
 
 		case THUMB_LDSB:
-			// sign-expand byte value
 			r[rd] = uint32(int32(int8(c.Read8(addr))))
 
 		case THUMB_LDRH:
@@ -616,14 +607,8 @@ func (c *Cpu) ThumbSdt(op uint16) {
 }
 
 func (c *Cpu) ThumbLPC(op uint16) {
-	var (
-		r    = &c.Reg.R
-		rd   = (op >> 8) & 0x7
-		nn   = uint32(op&0xFF) << 2
-		addr = (r[PC] &^ 3) + nn
-	)
-
-	r[rd] = c.Read32(addr)
+	addr := (c.Reg.R[PC] &^ 3) + uint32(op&0xFF)<<2
+	c.Reg.R[(op>>8)&7] = c.Read32(addr)
 }
 
 const (
@@ -635,8 +620,7 @@ const (
 
 func (c *Cpu) ThumbLSImm(op uint16) {
 	var (
-		r = &c.Reg.R
-
+		r    = &c.Reg.R
 		inst = (op >> 11) & 3
 		rd   = op & 7
 		rb   = (op >> 3) & 7

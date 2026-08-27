@@ -18,9 +18,8 @@ func (c *Cpu) DecodeARM(op uint32) {
 		case IsBlx(op):
 			c.Blx(op)
 			return
-		case arm7.IsSDT(op):
-			c.Sdt(op)
-			return
+		case IsPld(op):
+			panic("unsetup pld instruction")
 		}
 	}
 
@@ -46,7 +45,7 @@ func (c *Cpu) DecodeARM(op uint32) {
 		c.Block(op)
 	case arm7.IsHalf(op):
 		c.Half(op)
-	case arm7.IsUD(op):
+	case arm7.IsUndefined(op):
 		c.Exception(arm7.VEC_UNDEFINED, arm7.MODE_UND)
 	case arm7.IsPSR(op):
 		c.Psr(op)
@@ -67,6 +66,14 @@ func (c *Cpu) DecodeARM(op uint32) {
 	default:
 		panic(fmt.Sprintf("nds: unable to decode arm9 arm pc=%08X op=%08X", c.Reg.R[PC], op))
 	}
+}
+
+func IsPld(op uint32) bool {
+	return arm7.IsOpFormat(
+		op,
+		0b1111_1101_0111_0000_1111_0000_0000_0000,
+		0b1111_0101_0101_0000_1111_0000_0000_0000,
+	)
 }
 
 //go:inline
@@ -134,30 +141,26 @@ const (
 
 func (c *Cpu) ExtendedMul(op uint32) {
 	var (
-		inst = (op >> 21) & 0x3
-		rd   = (op >> 16) & 0xF
-		rn   = (op >> 12) & 0xF
-		rs   = (op >> 8) & 0xF
-		rm   = (op >> 0) & 0xF
-		r    = &c.Reg.R
-		cpsr = &c.Reg.CPSR
-		x    = (op >> 5) & 1
-		y    = (op >> 6) & 1
+		rd = (op >> 16) & 0xF
+		rn = (op >> 12) & 0xF
+		rs = (op >> 8) & 0xF
+		rm = (op >> 0) & 0xF
+		r  = &c.Reg.R
+		x  = (op >> 5) & 1
+		y  = (op >> 6) & 1
 	)
 
-	switch inst {
+	switch inst := (op >> 21) & 3; inst {
 	case SMLAxy:
 
 		rmV := int64(int16((r[rm] >> (16 * x)) & 0xFFFF))
 		rsV := int64(int16((r[rs] >> (16 * y)) & 0xFFFF))
 		rnV := int64(int32(r[rn]))
-		res := rmV * rsV
-		res += rnV
-
+		res := (rmV * rsV) + rnV
 		r[rd] = uint32(res)
 
 		if res > math.MaxInt32 || res < math.MinInt32 {
-			cpsr.Q = true
+			c.Reg.CPSR.Q = true
 		}
 
 	case SMLAWySMLALWy:
@@ -167,13 +170,11 @@ func (c *Cpu) ExtendedMul(op uint32) {
 		res := (rmV * rsV) >> 16
 
 		if smulwa := x == 0; smulwa {
-			add := int64(int32(r[rn]))
+			res += int64(int32(r[rn]))
 
-			if res+add > math.MaxInt32 || res+add < math.MinInt32 {
-				cpsr.Q = true
+			if res > math.MaxInt32 || res < math.MinInt32 {
+				c.Reg.CPSR.Q = true
 			}
-
-			res += add
 		}
 
 		r[rd] = uint32(res)
@@ -182,11 +183,8 @@ func (c *Cpu) ExtendedMul(op uint32) {
 
 		rsV := int64(int16((r[rs] >> (16 * y) & 0xFFFF)))
 		rmV := int64(int16((r[rm] >> (16 * x) & 0xFFFF)))
-
-		res := rsV * rmV
 		add := int64(int32(r[rd]))<<32 | int64(int32(r[rn]))
-		res += add
-
+		res := (rsV * rmV) + add
 		r[rd] = uint32(res >> 32)
 		r[rn] = uint32(res)
 
@@ -194,7 +192,6 @@ func (c *Cpu) ExtendedMul(op uint32) {
 
 		rmV := int64(int16((r[rm] >> (16 * x)) & 0xFFFF))
 		rsV := int64(int16((r[rs] >> (16 * y)) & 0xFFFF))
-
 		res := rmV * rsV
 
 		r[rd] = uint32(res)
@@ -215,12 +212,11 @@ func (c *Cpu) Blx(op uint32) {
 
 func (c *Cpu) BX(op uint32) {
 	var (
-		r    = &c.Reg.R
-		inst = (op >> 4) & 0xF
-		rn   = op & 0xF
+		r  = &c.Reg.R
+		rn = op & 0xF
 	)
 
-	switch inst {
+	switch inst := (op >> 4) & 0xF; inst {
 	case arm7.INST_BX:
 		r[PC] = r[rn]
 	case arm7.INST_BXJ:
@@ -229,11 +225,11 @@ func (c *Cpu) BX(op uint32) {
 
 		if rn == 14 {
 			// Using BLX R14 is possible (sets PC=Old_LR, and New_LR=retadr).
-			tmp := r[14]
-			r[14] = r[PC] - 4
+			tmp := r[LR]
+			r[LR] = r[PC] - 4
 			r[PC] = tmp
 		} else {
-			r[14] = r[PC] - 4
+			r[LR] = r[PC] - 4
 			r[PC] = r[rn]
 		}
 	}
@@ -247,15 +243,13 @@ func (c *Cpu) Half(op uint32) {
 		rn      = (op >> 16) & 0xF
 		rd      = (op >> 12) & 0xF
 		preFlag = (op>>24)&1 != 0
-		load    = (op>>20)&1 != 0
-		inst    = (op >> 5) & 0b11
+		inst    = (op >> 5) & 3
 		wb      = (op>>21)&1 != 0 || !preFlag
 		rnv     = r[rn]
 		post    = rnv
-
-		pre, offset uint32
 	)
 
+	var offset uint32
 	if imm := (op>>22)&1 != 0; imm {
 		offset = (op & 0xF) | ((op >> 4) & 0xF0)
 	} else {
@@ -268,17 +262,14 @@ func (c *Cpu) Half(op uint32) {
 		post -= offset
 	}
 
+	var addr uint32
 	if preFlag {
-		pre = post
+		addr = post
 	} else {
-		pre = rnv
+		addr = rnv
 	}
 
-	if inst == arm7.RESERVED {
-		panic("unsupported half (reserved)")
-	}
-
-	if !load {
+	if load := (op>>20)&1 != 0; !load {
 		rdv := r[rd]
 
 		var rd2v uint32
@@ -293,16 +284,18 @@ func (c *Cpu) Half(op uint32) {
 
 		switch inst {
 		case arm7.STRH:
-			c.Write16(pre, uint16(rdv))
+			c.Write16(addr, uint16(rdv))
 
 		case arm7.LDRD:
-			addr := pre &^ 7
+			addr &^= 7
 			r[rd+0] = c.Read32(addr + 0)
 			r[rd+1] = c.Read32(addr + 4)
 		case arm7.STRD:
-			addr := pre &^ 7
+			addr &^= 7
 			c.Write32(addr+0, rdv)
 			c.Write32(addr+4, rd2v)
+		default:
+			panic("unsupported half store reserved")
 		}
 
 		return
@@ -314,11 +307,13 @@ func (c *Cpu) Half(op uint32) {
 
 	switch inst {
 	case arm7.LDRH:
-		r[rd] = uint32(c.Read16(pre))
+		r[rd] = uint32(c.Read16(addr))
 	case arm7.LDRSB:
-		r[rd] = uint32(int32(int8(c.Read8(pre))))
+		r[rd] = uint32(int32(int8(c.Read8(addr))))
 	case arm7.LDRSH:
-		r[rd] = uint32(int32(int16(c.Read16(pre))))
+		r[rd] = uint32(int32(int16(c.Read16(addr))))
+	default:
+		panic("unsupported half load reserved")
 	}
 }
 
@@ -341,12 +336,11 @@ func (c *Cpu) Qalu(op uint32) {
 
 		rnV *= 2
 
-		if rnV > math.MaxInt32 {
+		switch {
+		case rnV > math.MaxInt32:
 			c.Reg.CPSR.Q = true
 			rnV = math.MaxInt32
-		}
-
-		if rnV < math.MinInt32 {
+		case rnV < math.MinInt32:
 			c.Reg.CPSR.Q = true
 			rnV = math.MinInt32
 		}
@@ -358,12 +352,11 @@ func (c *Cpu) Qalu(op uint32) {
 		rnV = rmV - rnV
 	}
 
-	if rnV > math.MaxInt32 {
+	switch {
+	case rnV > math.MaxInt32:
 		c.Reg.CPSR.Q = true
 		rnV = math.MaxInt32
-	}
-
-	if rnV < math.MinInt32 {
+	case rnV < math.MinInt32:
 		c.Reg.CPSR.Q = true
 		rnV = math.MinInt32
 	}
@@ -394,7 +387,7 @@ func (c *Cpu) CoDataReg(op uint32) {
 		panic("MRC2/MCR2")
 	}
 
-	if mrc := (op>>20)&1 == 1; mrc {
+	if mrc := (op>>20)&1 != 0; mrc {
 		r[rd] = c.Cp15.Read(&reg)
 		return
 	}
@@ -407,192 +400,118 @@ func (c *Cpu) CoDataReg(op uint32) {
 	c.Cp15.Write(&reg, &c.LowVector, r[rd])
 }
 
-// TODO: This needs to be "modernized"
 func (c *Cpu) Block(op uint32) {
 	var (
-		r        = &c.Reg.R
-		rlist    = op & 0xFFFF
-		regCount = uint32(bits.OnesCount32(rlist))
-		rn       = (op >> 16) & 0xF
-		addr     = r[rn] &^ 0b11
-		up       = (op>>23)&1 != 0
+		r     = &c.Reg.R
+		rlist = op & 0xFFFF
+		rn    = (op >> 16) & 0xF
+		up    = (op>>23)&1 != 0
 	)
 
 	if rlist == 0 {
-
 		if up {
 			r[rn] += 0x40
-			return
+		} else {
+			r[rn] -= 0x40
 		}
-
-		r[rn] -= 0x40
 		return
 	}
 
 	var (
-		pcIncluded = rlist&0x8000 != 0
-		rnIncluded = (rlist>>rn)&1 != 0
 		pre        = (op>>24)&1 != 0
 		psr        = (op>>22)&1 != 0
 		wb         = (op>>21)&1 != 0
 		load       = (op>>20)&1 != 0
-		forceUser  = psr && (c.Reg.CPSR.Mode != arm7.MODE_USR) && (!load || !pcIncluded)
-		wbValue    = r[rn]
-		// fiq switch has additional r8 - r12 use mode switch registers
-		forceFIQSwitch = forceUser && c.Reg.CPSR.Mode == arm7.MODE_FIQ
+		pcIncluded = rlist&0x8000 != 0
+		rnIncluded = (rlist>>rn)&1 != 0
+		regCount   = uint32(bits.OnesCount32(rlist))
+		bytes      = regCount * 4
+		first      = bits.TrailingZeros32(rlist)
+		last       = bits.Len32(rlist) - 1
+		isOnly     = regCount == 1
+		isLast     = uint32(last) == rn
+		addr       = r[rn]
 	)
 
+	mode := c.Reg.CPSR.Mode
+	forceUser := psr && (mode != arm7.MODE_USR && mode != arm7.MODE_SYS) && (!load || !pcIncluded)
+	if forceUser {
+		c.ModeSwitch(mode, arm7.MODE_USR)
+	}
+
+	rnNew := addr
 	if up {
-		wbValue += regCount * 4
+		rnNew += bytes
 	} else {
-		wbValue -= regCount * 4
+		pre = !pre
+		rnNew -= bytes
+		addr -= bytes
 	}
 
-	rnRef := &c.Reg.R[rn]
-	switch {
-	case forceFIQSwitch:
-
-		switch {
-		case rn == 13:
-			rnRef = &c.Reg.SP[arm7.ModeBank[arm7.MODE_USR]]
-		case rn == 14:
-			rnRef = &c.Reg.LR[arm7.ModeBank[arm7.MODE_USR]]
-		case rn >= 8:
-			rnRef = &c.Reg.USR[rn-8]
-
-		}
-
-	case forceUser:
-		switch {
-		case rn == 13:
-			rnRef = &c.Reg.SP[arm7.ModeBank[arm7.MODE_USR]]
-		case rn == 14:
-			rnRef = &c.Reg.LR[arm7.ModeBank[arm7.MODE_USR]]
-		}
-	}
-
-	var (
-		rnv = *rnRef
-		reg = uint32(0)
-	)
-
-	if !up {
-		reg = 15
-	}
-
-	for range 16 {
-
-		if disabled := (rlist>>reg)&1 == 0; disabled {
-			if up {
-				reg++
-			} else {
-				reg--
-			}
+	seq := uint32(arm7.NONSEQ)
+	for i := first; i < 0x10; i++ {
+		if disabled := rlist&(1<<i) == 0; disabled {
 			continue
 		}
-
-		ref := &c.Reg.R[reg]
-		switch {
-		case forceFIQSwitch:
-
-			switch {
-			case reg == 13:
-				ref = &c.Reg.SP[arm7.ModeBank[arm7.MODE_USR]]
-			case reg == 14:
-				ref = &c.Reg.LR[arm7.ModeBank[arm7.MODE_USR]]
-			case reg >= 8:
-				ref = &c.Reg.USR[reg-8]
-			}
-
-		case forceUser:
-			switch {
-			case reg == 13:
-				ref = &c.Reg.SP[arm7.ModeBank[arm7.MODE_USR]]
-			case reg == 14:
-				ref = &c.Reg.LR[arm7.ModeBank[arm7.MODE_USR]]
-			}
-		}
-
 		if pre {
-			if up {
-				addr += 4
-			} else {
-				addr -= 4
-			}
+			addr += 4
 		}
-
 		if load {
-			*ref = c.Read32(addr)
+			r[i] = c.Read32Block(addr, seq)
 		} else {
-			switch reg {
-			case rn:
-				c.Write32(addr, rnv)
-			default:
-				c.Write32(addr, *ref)
-			}
+			c.Write32Block(addr, r[i], seq)
 		}
-
 		if !pre {
-			if up {
-				addr += 4
-			} else {
-				addr -= 4
-			}
+			addr += 4
 		}
+		seq = arm7.SEQ
+	}
 
-		if up {
-			reg++
+	if forceUser {
+		c.ModeSwitch(arm7.MODE_USR, mode)
+	}
+
+	if wb {
+		if load && rnIncluded {
+			// ARMv5 LDM: writeback only if Rb is the only reg, or not last.
+			if isOnly || !isLast {
+				r[rn] = rnNew
+			}
 		} else {
-			reg--
+			r[rn] = rnNew
 		}
 	}
 
 	if !load {
-		if wb {
-			r[rn] = wbValue
-		}
-
 		return
 	}
 
-	if wb {
-		if rnIncluded {
-			isLast := (rlist < (1 << (rn + 1)))
-			isOnly := regCount == 1
-			if !isLast || isOnly {
-				r[rn] = wbValue
-			}
-		} else {
-			r[rn] = wbValue
-		}
-	}
+	c.Idle(1)
 
 	if !pcIncluded {
 		return
 	}
-
-	if !psr {
-		c.ToggleThumb()
-		return
-	}
-
-	var (
-		curr = c.Reg.CPSR.Mode
-		spsr = c.Reg.SPSR[arm7.ModeBank[curr]]
-		next = spsr.Mode
-	)
-
-	c.Reg.CPSR = spsr
-
-	if curr == arm7.MODE_USR {
-		panic("USER MODE LDM PC CHANGE")
-	}
-
-	c.ModeSwitch(curr, next)
 
 	if c.Reg.CPSR.T {
 		c.Reload16()
 	} else {
 		c.Reload32()
 	}
+
+	if !psr {
+		//c.ToggleThumb()
+		return
+	}
+	var (
+		curr = c.Reg.CPSR.Mode
+		spsr = c.Reg.SPSR[arm7.ModeBank[curr]]
+		next = spsr.Mode
+	)
+
+	if curr == arm7.MODE_USR {
+		panic("user mode ldm^")
+	}
+
+	c.Reg.CPSR = spsr
+	c.ModeSwitch(curr, next)
 }

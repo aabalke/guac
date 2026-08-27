@@ -24,7 +24,7 @@ func (c *Cpu) DecodeARM(op uint32) {
 		c.Block(op)
 	case IsHalf(op):
 		c.Half(op)
-	case IsUD(op):
+	case IsUndefined(op):
 		c.Exception(VEC_UNDEFINED, MODE_UND)
 	case IsPSR(op):
 		c.Psr(op)
@@ -34,7 +34,6 @@ func (c *Cpu) DecodeARM(op uint32) {
 		c.Mul(op)
 	case IsALU(op):
 		c.Alu(op)
-
 	default:
 		panic(fmt.Sprintf("Unable to Decode ARM false %08X, at PC %08X\n", op, c.Reg.R[PC]))
 	}
@@ -149,11 +148,11 @@ func IsMul(op uint32) bool {
 }
 
 //go:inline
-func IsUD(op uint32) bool {
+func IsUndefined(op uint32) bool {
 	return IsOpFormat(
 		op,
-		0b0000_1110_0000_0000_0000_0000_0000_0000,
-		0b0000_0110_0000_0000_0000_0000_0000_0000,
+		0b0000_1110_0000_0000_0000_0000_0001_0000,
+		0b0000_0110_0000_0000_0000_0000_0001_0000,
 	)
 }
 
@@ -547,7 +546,6 @@ const (
 
 func (c *Cpu) Mul(op uint32) {
 	var (
-		inst = (op >> 21) & 0xF
 		set  = (op>>20)&1 != 0
 		rd   = (op >> 16) & 0xF
 		rn   = (op >> 12) & 0xF
@@ -557,7 +555,7 @@ func (c *Cpu) Mul(op uint32) {
 		cpsr = &c.Reg.CPSR
 	)
 
-	switch inst {
+	switch inst := (op >> 21) & 0xF; inst {
 	case MUL, MLA:
 
 		res := r[rm] * r[rs]
@@ -577,8 +575,6 @@ func (c *Cpu) Mul(op uint32) {
 			// FLAG_C "destroyed" ARM <5, ignored ARM >=5
 			// cpsr.C = false
 		}
-
-		return
 
 	case UMAAL:
 		panic("unsupported umaal instruction")
@@ -604,7 +600,6 @@ func (c *Cpu) Mul(op uint32) {
 			cpsr.C = false
 			// FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
 		}
-		return
 
 	case SMULL, SMLAL:
 
@@ -626,17 +621,10 @@ func (c *Cpu) Mul(op uint32) {
 			// FLAG_C "destroyed" ARM <5, ignored ARM >=5
 			// FLAG_V maybe destroyed on ARM <5. ignored ARM <=5
 		}
-
-		return
-
 	}
 }
 
 func (c *Cpu) Sdt(op uint32) {
-	if valid := (op>>26)&3 == 1; !valid {
-		panic("Malformed Sdt Instruction")
-	}
-
 	var (
 		r    = &c.Reg.R
 		reg  = (op>>25)&1 != 0
@@ -654,7 +642,7 @@ func (c *Cpu) Sdt(op uint32) {
 	if reg {
 
 		if (op>>4)&1 != 0 {
-			panic("Malformed Single Data Transfer O_o")
+			panic("malformed single data transfer reg")
 		}
 
 		shift := (op >> 7) & 0x1F
@@ -750,7 +738,7 @@ func (c *Cpu) B(op uint32) {
 	r := &c.Reg.R
 
 	if link := (op>>24)&1 != 0; link {
-		r[14] = r[15] - 4
+		r[LR] = r[PC] - 4
 	}
 
 	r[PC] += uint32((int32(op) << 8) >> 6)
@@ -758,29 +746,21 @@ func (c *Cpu) B(op uint32) {
 }
 
 const (
-	INST_BX  = 1
-	INST_BXJ = 2
-	INST_BLX = 3
+	INST_BX = iota + 1
+	INST_BXJ
+	INST_BLX
 )
 
 func (c *Cpu) BX(op uint32) {
-	var (
-		r    = &c.Reg.R
-		inst = (op >> 4) & 0xF
-		rn   = op & 0xF
-	)
-
-	switch inst {
+	switch inst := (op >> 4) & 0xF; inst {
 	case INST_BX:
-		r[PC] = r[rn]
+		c.Reg.R[PC] = c.Reg.R[op&0xF]
 		c.ToggleThumb()
 
 	case INST_BXJ:
 		panic("Unsupported BXJ Instruction")
 	case INST_BLX:
-
 		panic("unsupported arm7 blx instruction")
-
 	}
 }
 
@@ -880,13 +860,12 @@ func (c *Cpu) Half(op uint32) {
 }
 
 func (c *Cpu) Psr(op uint32) {
-	r := &c.Reg.R
-
 	if msr := (op>>21)&1 != 0; msr {
 		c.msr(op)
 		return
 	}
 
+	r := &c.Reg.R
 	rd := (op >> 12) & 0xF
 
 	if spsr := (op>>22)&1 != 0; spsr {
@@ -988,16 +967,13 @@ func (c *Cpu) msr(op uint32) {
 
 func (c *Cpu) Swp(op uint32) {
 	var (
-		r      = &c.Reg.R
-		isByte = (op>>22)&1 != 0
-		rn     = (op >> 16) & 0xF
-		rd     = (op >> 12) & 0xF
-		rm     = op & 0xF
-		rmv    = r[rm]
-		rnv    = r[rn]
+		r   = &c.Reg.R
+		rd  = (op >> 12) & 0xF
+		rmv = r[op&0xF]
+		rnv = r[(op>>16)&0xF]
 	)
 
-	if isByte {
+	if isByte := (op>>22)&1 != 0; isByte {
 		r[rd] = c.Read8(rnv)
 		c.Write8(rnv, uint8(rmv))
 	} else {
@@ -1033,14 +1009,7 @@ func (c *Cpu) Block(op uint32) {
 		pcIncluded = true
 	} else {
 		bytes = uint32(bits.OnesCount32(rlist)) * 4
-
-		// can this be sped up? Its just log2(rlist & -rlist)
-		// first = int(math.Log2(float64(rlist & -rlist)))
-		for i := 0xF; i >= 0; i-- {
-			if rlist&(1<<i) != 0 {
-				first = i
-			}
-		}
+		first = bits.TrailingZeros32(rlist)
 	}
 
 	mode := c.Reg.CPSR.Mode
@@ -1134,11 +1103,10 @@ func (c *Cpu) Block(op uint32) {
 		next = spsr.Mode
 	)
 
-	c.Reg.CPSR = spsr
-
 	if curr == MODE_USR {
-		panic("USER MODE LDM PC CHANGE")
+		panic("user mode ldm^")
 	}
 
+	c.Reg.CPSR = spsr
 	c.ModeSwitch(curr, next)
 }

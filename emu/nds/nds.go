@@ -70,10 +70,8 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 
 	nds.arm7 = arm7.NewCpu(&nds.mem.Bus7, nds.Cycles7, nds.Idle7)
 	nds.arm9 = arm9.NewCpu(&nds.mem.Bus9, nds.Cycles, nds.Idle, cp15.NewCp15(&nds.mem.Tcm))
-
 	nds.irq7 = irq.NewIrq(nds.Scheduler, &nds.arm7.IrqLine)
 	nds.irq9 = irq.NewIrq(nds.Scheduler, &nds.arm9.IrqLine)
-
 	nds.ppu = ppu.NewPPU(nds.irq9)
 
 	nds.registerEvents()
@@ -205,7 +203,7 @@ func (nds *Nds) Update() {
 			nds.arm9.Step()
 
 			if nds.ppu.Rasterizer.GeoEngine.GxStat.FifoIrq != 0 {
-				nds.irq9.SetIRQ(21)
+				nds.irq9.SetIRQ(irq.IRQ_GEO_CMD_FIFO)
 			}
 
 			//nds.Tick(1)
