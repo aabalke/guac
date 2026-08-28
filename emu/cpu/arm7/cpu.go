@@ -17,6 +17,8 @@ type Cpu struct {
 	IrqLine    bool
 	Reloaded   bool
 	LowVector  bool
+	Timestamp  int64
+	Leftover   int64
 }
 
 type Mem interface {

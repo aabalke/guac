@@ -31,16 +31,26 @@ const (
 	// the graphics run zt 33Mhz ( arm7 speed, so arm9 runs twice every cycle)
 	NUM_SCANLINES   = SCREEN_HEIGHT + 70
 	CYCLES_HDRAW    = 1606
-	CYCLES_HBLANK   = 526 // or 524 need to verify
+	CYCLES_HBLANK   = 524
 	CYCLES_SCANLINE = CYCLES_HDRAW + CYCLES_HBLANK
 	CYCLES_VDRAW    = CYCLES_SCANLINE * SCREEN_HEIGHT
-	CYCLES_VBLANK   = CYCLES_SCANLINE * 70 // or 71
+	CYCLES_VBLANK   = CYCLES_SCANLINE * 71 // or 71
 	CYCLES_FRAME    = CYCLES_VDRAW + CYCLES_VBLANK
 
 	// sound
 	CPU_FREQ_HZ = 33554432
 	BUFFER_SIZE = 40 * time.Millisecond // low power machines need at least 40ms, may need to make controllable
 )
+
+func init() {
+	if CYCLES_SCANLINE != 2130 {
+		panic("scanline cycles must be 2130")
+	}
+
+	if CYCLES_FRAME != 560190 {
+		panic("frame cycles must be 560190")
+	}
+}
 
 type Nds struct {
 	Stats            *stats.Stats
@@ -57,8 +67,6 @@ type Nds struct {
 	RegisteredEvents RegisteredEvents
 	CyclesPerSndGen  int64
 	Muted            bool
-
-	Arm7Cycles int64
 }
 
 func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
@@ -190,11 +198,11 @@ func (nds *Nds) Update() {
 			for nds.Scheduler.CurrentCycle < nextFrame && !nds.irq9.IrqAvailable {
 				// cant use get remaining - believe since arm7 uses same scheduler itd skip new arm7 events
 				// will need to fix when arm7 scheduler situation is handled
-				nds.Tick(1)
+				nds.Tick9(1)
 			}
 
 			if nds.irq9.IrqAvailable {
-				nds.Tick(1)
+				nds.Tick9(1)
 				nds.arm9.Halted = false
 			}
 
@@ -205,30 +213,85 @@ func (nds *Nds) Update() {
 			if nds.ppu.Rasterizer.GeoEngine.GxStat.FifoIrq != 0 {
 				nds.irq9.SetIRQ(irq.IRQ_GEO_CMD_FIFO)
 			}
-
-			//nds.Tick(1)
 		}
 	}
 }
 
-func (nds *Nds) Tick(cycles int64) {
-	nds.Scheduler.Add(cycles)
+func (nds *Nds) Tick9(cycles int64) {
+	// in 66mhz cycles
+	nds.arm9.Timestamp += cycles
 
-	for nds.Arm7Cycles < nds.Scheduler.Now()>>1 {
+	for nds.arm7.Timestamp < nds.arm9.Timestamp>>1 {
 		if nds.arm7.Halted {
 
-			nds.Tick7(1)
+			for nds.arm7.Timestamp < nds.arm9.Timestamp>>1 && !nds.irq7.IrqAvailable {
+				nds.Tick7((nds.arm9.Timestamp >> 1) - nds.arm7.Timestamp)
+			}
 
 			if nds.irq7.IrqAvailable {
+				nds.Tick7(1)
 				nds.arm7.Halted = false
 			}
 
 		} else {
 			nds.arm7.Step()
-			//nds.Tick(1)
 		}
 	}
+
+	cycles += nds.arm7.Leftover
+	nds.arm7.Leftover = cycles & 1
+	nds.Scheduler.Add(cycles >> 1)
 }
+
+func (nds *Nds) Idle(cycles int64) {
+	nds.Tick9(cycles)
+}
+
+func (nds *Nds) Cycles(addr, width, seq uint32, inst bool) {
+	region := addr >> 24
+
+	cycles := int64(1)
+	if region < uint32(len(timings9)) {
+		cycles = timings9[region]
+	}
+
+	if width == 2 {
+		cycles >>= 1
+		cycles = max(cycles, 1)
+	}
+
+	nds.Tick9(cycles)
+}
+
+func (nds *Nds) Tick7(cycles int64) {
+	// int 33mhz cycles
+	nds.arm7.Timestamp += cycles
+}
+
+func (nds *Nds) Idle7(cycles int64) {
+	nds.Tick7(cycles)
+}
+
+func (nds *Nds) Cycles7(addr, width, seq uint32, inst bool) {
+	region := addr >> 24
+
+	cycles := int64(1)
+	if region < uint32(len(timings7)) {
+		cycles = timings7[region]
+	}
+
+	if width == 2 {
+		cycles >>= 1
+		cycles = max(cycles, 1)
+	}
+
+	nds.Tick7(cycles)
+}
+
+var (
+	timings7 = [...]int64{1, 1, 6, 1, 1, 2, 2, 1, 16, 16, 16, 16}
+	timings9 = [...]int64{1, 1, 1, 4, 4, 5, 5, 4, 20, 20, 20, 20}
+)
 
 func (nds *Nds) ToggleMute(muted bool) bool {
 	nds.Muted = muted
@@ -329,60 +392,4 @@ func (nds *Nds) OnTimerOverflow(t *timer.Timer, late int64) {
 			next.OverflowHandle(late)
 		}
 	}
-}
-
-func (nds *Nds) Idle(cycles int64) {
-	nds.Tick(cycles)
-}
-
-func (nds *Nds) Cycles(addr, width, seq uint32, inst bool) {
-	nds.Tick(1)
-	// if inst {
-
-	//	switch addr >> 24 {
-	//	case 0, 1:
-	//		nds.Tick(1)
-	//	case 2:
-	//		nds.Tick(2 * int64(width*2))
-	//	case 5, 6:
-	//		nds.Tick(2 * int64(width))
-	//	default:
-	//		nds.Tick(2 * int64(width))
-	//	}
-
-	//	return
-	//}
-
-	// if seq != 0 {
-
-	//	if addr>>24 == 0 || addr>>24 == 1 {
-	//		nds.Tick(1)
-	//	} else {
-	//		nds.Tick(2)
-	//	}
-	//	return
-	//}
-
-	//switch addr >> 24 {
-	//case 0, 1:
-	//	nds.Tick(1)
-	//case 2:
-	//	nds.Tick(2 * int64(10))
-	//case 5, 6:
-	//	nds.Tick(2 * int64(5))
-	//default:
-	//	nds.Tick(2 * int64(4))
-	//}
-}
-
-func (nds *Nds) Tick7(cycles int64) {
-	nds.Arm7Cycles += cycles
-}
-
-func (nds *Nds) Idle7(cycles int64) {
-	nds.Tick7(cycles)
-}
-
-func (nds *Nds) Cycles7(addr, width, seq uint32, inst bool) {
-	nds.Tick7(1)
 }
