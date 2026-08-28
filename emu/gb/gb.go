@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	width  = 160
-	height = 144
+	SCREEN_WIDTH  = 160
+	SCREEN_HEIGHT = 144
 
 	IRQ_VBL = 1 << 0
 	IRQ_LCD = 1 << 1
@@ -76,10 +76,10 @@ type GameBoy struct {
 
 	Image      *ebiten.Image
 	Pixels     []byte
-	Screen     [height][width]uint32
-	spMinx     [width]int32
-	bgPriority [height][width]bool
-	pixelDrawn [width]bool
+	Screen     [SCREEN_HEIGHT][SCREEN_WIDTH]uint32
+	spMinx     [SCREEN_WIDTH]int32
+	bgPriority [SCREEN_HEIGHT][SCREEN_WIDTH]bool
+	pixelDrawn [SCREEN_WIDTH]bool
 
 	Color                bool
 	DMGCompatibilityMode bool
@@ -105,7 +105,7 @@ type Timer struct {
 }
 
 func NewGameBoy(ctx *audio.Context, path string, muted bool) *GameBoy {
-	img := ebiten.NewImage(width, height)
+	img := ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT)
 
 	gb := &GameBoy{
 		Image:     img,
@@ -119,7 +119,7 @@ func NewGameBoy(ctx *audio.Context, path string, muted bool) *GameBoy {
 
 	// ebiten engine requires a slice, Screen is easier to edit as an array of arrays
 	// instead of building an intermediate rep, pixels will just point to Screen
-	gb.Pixels = unsafe.Slice((*byte)(unsafe.Pointer(&gb.Screen[0])), height*width*4)
+	gb.Pixels = unsafe.Slice((*byte)(unsafe.Pointer(&gb.Screen[0])), SCREEN_HEIGHT*SCREEN_WIDTH*4)
 
 	gb.Lcdc.gb = gb
 	gb.MemoryBus.Hdma.gb = gb

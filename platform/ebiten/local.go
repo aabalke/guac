@@ -76,13 +76,14 @@ type PauseLocalization struct {
 }
 
 type SettingsLocalization struct {
-	Sidebar SidebarLocalization `toml:"sidebar"`
-	General GeneralLocalization `toml:"general"`
-	Ui      UiLocalization      `toml:"ui"`
-	Gb      GbLocalization      `toml:"gb"`
-	Gba     GbaLocalization     `toml:"gba"`
-	Nds     NdsLocalization     `toml:"nds"`
-	About   AboutLocalization   `toml:"about"`
+	Sidebar         SidebarLocalization `toml:"sidebar"`
+	General         GeneralLocalization `toml:"general"`
+	Ui              UiLocalization      `toml:"ui"`
+	Gb              GbLocalization      `toml:"gb"`
+	Gba             GbaLocalization     `toml:"gba"`
+	Nds             NdsLocalization     `toml:"nds"`
+	About           AboutLocalization   `toml:"about"`
+	ColorCorrection ColorCorrection     `toml:"color_correction"`
 }
 
 type SidebarLocalization struct {
@@ -265,4 +266,11 @@ type NdsLocalization struct {
 	ExportToggle   string `toml:"export_toggle"`
 
 	Save string `toml:"save"`
+}
+
+type ColorCorrection struct {
+	ColorCorrection string   `toml:"color_correction"`
+	Type            string   `toml:"type"`
+	Types           []string `toml:"types"`
+	Strength        string   `toml:"strength"`
 }

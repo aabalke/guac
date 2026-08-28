@@ -66,6 +66,12 @@ system = "auto"
 # if invalid input, will fall back to greyscale
 dmg_palette = [ "0xE0F8D0", "0x88C070", "0x346856", "0x081820" ]
 
+[gb.color_correction]
+
+# valid vaules are ["none", auto", "gbc", "gba", "higan"]
+type = "higan"
+strength = 1.0
+
 [gb.bios]
 
 direct_boot = true
@@ -101,6 +107,12 @@ idle_optimize = false
 
 # screen rotation, valid values [0, 90, 180, 270]
 # rotation = 0
+
+[gba.color_correction]
+
+# valid vaules are ["none", auto", "gbc", "gba", "higan"]
+type = "auto"
+strength = 1.0
 
 [gba.hardware]
 
@@ -175,6 +187,12 @@ l = ["FrontTopLeft"]
 layout = "vertical" # "vertical", "horizontal", "Hybrid"
 sizing = "even"     # "even", "only top", "only bottom"
 rotation = 0        # 0, 90, 180, 270
+
+[nds.color_correction]
+# valid vaules are ["none", auto", "gbc", "gba", "higan"]
+type = "auto"
+strength = 1.0
+
 
 [nds.keyboard]
 a = ["J"]

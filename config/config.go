@@ -144,11 +144,12 @@ type Profile struct {
 }
 
 type Gb struct {
-	System     int
-	Palette    [4]color.Color
-	Bios       GbBios
-	Keyboard   EmulatorKeyboard
-	Controller EmulatorController
+	System          int
+	Palette         [4]color.Color
+	ColorCorrection ColorCorrection
+	Bios            GbBios
+	Keyboard        EmulatorKeyboard
+	Controller      EmulatorController
 }
 
 type GbBios struct {
@@ -158,12 +159,13 @@ type GbBios struct {
 }
 
 type Gba struct {
-	IdleOptimize bool
-	Rotation     int
-	Hardware     GbaHardware
-	Bios         GbaBios
-	Keyboard     EmulatorKeyboard
-	Controller   EmulatorController
+	IdleOptimize    bool
+	ColorCorrection ColorCorrection
+	Rotation        int
+	Hardware        GbaHardware
+	Bios            GbaBios
+	Keyboard        EmulatorKeyboard
+	Controller      EmulatorController
 }
 
 type GbaHardware struct {
@@ -179,14 +181,15 @@ type GbaBios struct {
 }
 
 type NdsConfig struct {
-	Screen     NdsScreen
-	Firmware   NdsFirmware
-	Rtc        NdsRtc
-	Export     NdsExport
-	Bios       NdsBios
-	Jit        NdsJit
-	Keyboard   EmulatorKeyboard
-	Controller EmulatorController
+	Screen          NdsScreen
+	ColorCorrection ColorCorrection
+	Firmware        NdsFirmware
+	Rtc             NdsRtc
+	Export          NdsExport
+	Bios            NdsBios
+	Jit             NdsJit
+	Keyboard        EmulatorKeyboard
+	Controller      EmulatorController
 }
 
 type NdsBios struct {
@@ -278,4 +281,17 @@ type EmulatorController struct {
 	SolarLevel2 []ebiten.StandardGamepadButton
 	SolarLevel3 []ebiten.StandardGamepadButton
 	SolarLevel4 []ebiten.StandardGamepadButton
+}
+
+const (
+	CLR_CORR_NONE = iota
+	CLR_CORR_SKY_GBC
+	CLR_CORR_SKY_GBA
+	CLR_CORR_HIGAN
+	ColorCorrectionTypeCnt
+)
+
+type ColorCorrection struct {
+	Type     int
+	Strength float32
 }

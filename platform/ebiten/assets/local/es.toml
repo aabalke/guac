@@ -218,3 +218,9 @@ about = "sobre"
 version = "Versión de lanzamiento a la v0.0.4"
 copyright = "© 2024 - 2026 Aaron Balke,\ncon licencia BSD de 3 cláusulas.\nGame Boy, Game Boy Advance, y Nintendo DS\nson marcas comercial registrada de Nintendo Co., Ltd."
 thank_yous = "Gracias a Giovanni Bajo, Mireille Meyer,\nVicki Pfau, Martin Korth y muchos más."
+
+[settings.color_correction]
+color_correction = "corrección de color"
+type = "tipo"
+types = ["ninguna", "gbc", "gba", "higan"]
+strength = "intensidad"

@@ -60,6 +60,7 @@ func NewPause(g *Game) {
 		g.gba = nil
 		g.gb = nil
 		g.paused = false
+		g.ColorCorrectionShader = nil
 	})
 
 	root := NewCenteredPage(g.ui.res.bg, b1, b2, b3)

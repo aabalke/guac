@@ -209,6 +209,8 @@ func (c *Config) decodeGb() {
 	default:
 		c.config.Gb.System = 0
 	}
+
+	c.decodeColorCorrection(&c.Gb.ColorCorrection, &c.config.Gb.ColorCorrection, config.CLR_CORR_SKY_GBC)
 }
 
 func (c *Config) decodeGba() {
@@ -256,6 +258,8 @@ func (c *Config) decodeGba() {
 	default:
 		c.config.Gba.Hardware.BackupType = cart.AUTO
 	}
+
+	c.decodeColorCorrection(&c.Gba.ColorCorrection, &c.config.Gba.ColorCorrection, config.CLR_CORR_SKY_GBA)
 }
 
 func (c *Config) decodeNds() {
@@ -310,6 +314,7 @@ func (c *Config) decodeNds() {
 
 	c.decodeNdsFirmware()
 	c.decodeNdsJit()
+	c.decodeColorCorrection(&c.Nds.ColorCorrection, &c.config.Nds.ColorCorrection, config.CLR_CORR_NONE)
 }
 
 func (c *Config) decodeNdsFirmware() {
@@ -507,4 +512,21 @@ func (c *Config) decodeController(in *EmulatorInput, conf *config.EmulatorContro
 			}
 		}
 	}
+}
+
+func (c *Config) decodeColorCorrection(in *ColorCorrection, conf *config.ColorCorrection, preferredType int) {
+	switch strings.ToLower(in.Type) {
+	case "auto":
+		conf.Type = preferredType
+	case "gbc":
+		conf.Type = config.CLR_CORR_SKY_GBC
+	case "gba":
+		conf.Type = config.CLR_CORR_SKY_GBA
+	case "higan":
+		conf.Type = config.CLR_CORR_HIGAN
+	default:
+		conf.Type = config.CLR_CORR_NONE
+	}
+
+	conf.Strength = in.Strength
 }

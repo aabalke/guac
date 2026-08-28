@@ -232,6 +232,13 @@ func NewGbMenu(g *Game) *widget.Container {
 		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, dmg_palettes, clrInputs, g.ui.res),
 	)
 
+	cc := newTwoCol()
+	ccl := g.ui.res.localization.Settings.ColorCorrection
+	strength := int(tmp.ColorCorrection.Strength * 100)
+	menu.AddChild(NewHeader(ccl.ColorCorrection, g.ui.res), cc)
+	cc.AddChild(NewLabel(ccl.Type), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.ColorCorrection.Type, ccl.Types, g.ui.res))
+	cc.AddChild(NewLabel(ccl.Strength), NewDecimalInput(g.ui, ccl.Strength, &strength, 100))
+
 	bios := newTwoCol()
 	menu.AddChild(NewHeader(l.Bios, g.ui.res), bios)
 	bios.AddChild(
@@ -284,6 +291,7 @@ func NewGbMenu(g *Game) *widget.Container {
 
 	menu.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Gb = tmp
+		config.Conf.Gb.ColorCorrection.Strength = float32(strength) / 100
 
 		g.ui.content.RemoveChildren()
 		g.ui.content.AddChild(NewGbMenu(g))
@@ -324,6 +332,13 @@ func NewGbaMenu(g *Game) *widget.Container {
 		NewLabel(l.ForceSolarSensor), NewCheckbox(&tmp.Hardware.ForceSolarSensor),
 		NewLabel(l.SolarSensorLevel), NewDecimalInput(g.ui, l.SolarSensorLevel, &tmp.Hardware.SolarSensorLevel, 100),
 	)
+
+	cc := newTwoCol()
+	ccl := g.ui.res.localization.Settings.ColorCorrection
+	strength := int(tmp.ColorCorrection.Strength * 100)
+	menu.AddChild(NewHeader(ccl.ColorCorrection, g.ui.res), cc)
+	cc.AddChild(NewLabel(ccl.Type), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.ColorCorrection.Type, ccl.Types, g.ui.res))
+	cc.AddChild(NewLabel(ccl.Strength), NewDecimalInput(g.ui, ccl.Strength, &strength, 100))
 
 	bios := newTwoCol()
 	menu.AddChild(NewHeader(l.Bios, g.ui.res), bios)
@@ -405,6 +420,7 @@ func NewGbaMenu(g *Game) *widget.Container {
 		}
 
 		config.Conf.Gba = tmp
+		config.Conf.Gba.ColorCorrection.Strength = float32(strength) / 100
 
 		if g.gba != nil {
 			g.gba.IdleOptimize = tmp.IdleOptimize
@@ -455,6 +471,13 @@ func NewNdsMenu(g *Game) *widget.Container {
 	rtc.AddChild(
 		NewLabel(l.AdditionalHours), NewDecimalInput(g.ui, l.AdditionalHours, &tmp.Rtc.AdditionalHours, 24),
 	)
+
+	cc := newTwoCol()
+	ccl := g.ui.res.localization.Settings.ColorCorrection
+	strength := int(tmp.ColorCorrection.Strength * 100)
+	menu.AddChild(NewHeader(ccl.ColorCorrection, g.ui.res), cc)
+	cc.AddChild(NewLabel(ccl.Type), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.ColorCorrection.Type, ccl.Types, g.ui.res))
+	cc.AddChild(NewLabel(ccl.Strength), NewDecimalInput(g.ui, ccl.Strength, &strength, 100))
 
 	bios := newTwoCol()
 	menu.AddChild(NewHeader(l.Bios, g.ui.res), bios)
@@ -555,6 +578,7 @@ func NewNdsMenu(g *Game) *widget.Container {
 	menu.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Nds = tmp
 		config.Conf.Nds.Firmware.Color = config.ColorNameToId[favColor]
+		config.Conf.Nds.ColorCorrection.Strength = float32(strength) / 100
 
 		g.ui.content.RemoveChildren()
 		g.ui.content.AddChild(NewNdsMenu(g))

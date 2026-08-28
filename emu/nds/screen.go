@@ -62,20 +62,20 @@ func NewScreen() *Screen {
 	}
 }
 
-func (s *Screen) FillScreen(screen *ebiten.Image) {
+func (s *Screen) FillScreen(dst, top, bottom *ebiten.Image) {
 	switch {
 	case *s.Layout == LAYOUT_HYBRID:
-		s.FillHybrid(screen)
+		s.FillHybrid(dst, top, bottom)
 	case *s.Sizing == SIZING_ONLY_TOP:
-		s.FillOnly(screen, s.Top, false)
+		s.FillOnly(dst, top, false)
 	case *s.Sizing == SIZING_ONLY_BOTTOM:
-		s.FillOnly(screen, s.Bottom, true)
+		s.FillOnly(dst, bottom, true)
 	default:
-		s.FillEven(screen, *s.Layout == LAYOUT_HORIZONTAL)
+		s.FillEven(dst, top, bottom, *s.Layout == LAYOUT_HORIZONTAL)
 	}
 }
 
-func (s *Screen) FillEven(screen *ebiten.Image, horizontal bool) {
+func (s *Screen) FillEven(screen, top, bottom *ebiten.Image, horizontal bool) {
 	const (
 		singleW = float64(SCREEN_WIDTH)
 		singleH = float64(SCREEN_HEIGHT)
@@ -117,7 +117,7 @@ func (s *Screen) FillEven(screen *ebiten.Image, horizontal bool) {
 	s.opts.GeoM.Translate(screenW/2, screenH/2)
 
 	s.Mu.Lock()
-	screen.DrawImage(s.Top, &s.opts)
+	screen.DrawImage(top, &s.opts)
 	s.Mu.Unlock()
 
 	s.opts.GeoM.Reset()
@@ -133,7 +133,7 @@ func (s *Screen) FillEven(screen *ebiten.Image, horizontal bool) {
 	s.opts.GeoM.Translate(screenW/2, screenH/2)
 
 	s.Mu.Lock()
-	screen.DrawImage(s.Bottom, &s.opts)
+	screen.DrawImage(bottom, &s.opts)
 	s.Mu.Unlock()
 
 	s.TouchGeoM = s.opts.GeoM
@@ -176,7 +176,7 @@ func (s *Screen) FillOnly(screen, image *ebiten.Image, bottom bool) {
 	}
 }
 
-func (s *Screen) FillHybrid(screen *ebiten.Image) {
+func (s *Screen) FillHybrid(dst, top, bottom *ebiten.Image) {
 	const (
 		singleW = float64(SCREEN_WIDTH)
 		singleH = float64(SCREEN_HEIGHT)
@@ -187,8 +187,8 @@ func (s *Screen) FillHybrid(screen *ebiten.Image) {
 		canvasH  = singleH * 2
 		rotation = *s.Rotation
 		radians  = float64(rotation) * math.Pi / 2
-		screenW  = float64(screen.Bounds().Dx())
-		screenH  = float64(screen.Bounds().Dy())
+		screenW  = float64(dst.Bounds().Dx())
+		screenH  = float64(dst.Bounds().Dy())
 		fitW     = canvasW
 		fitH     = canvasH
 	)
@@ -206,7 +206,7 @@ func (s *Screen) FillHybrid(screen *ebiten.Image) {
 	s.opts.GeoM.Scale(scale, scale)
 	s.opts.GeoM.Translate(screenW/2, screenH/2)
 	s.Mu.Lock()
-	screen.DrawImage(s.Top, &s.opts)
+	dst.DrawImage(top, &s.opts)
 	s.Mu.Unlock()
 
 	s.opts.GeoM.Reset()
@@ -216,7 +216,7 @@ func (s *Screen) FillHybrid(screen *ebiten.Image) {
 	s.opts.GeoM.Scale(scale, scale)
 	s.opts.GeoM.Translate(screenW/2, screenH/2)
 	s.Mu.Lock()
-	screen.DrawImage(s.Bottom, &s.opts)
+	dst.DrawImage(bottom, &s.opts)
 	s.TouchGeoM = s.opts.GeoM
 	s.Mu.Unlock()
 
@@ -229,10 +229,10 @@ func (s *Screen) FillHybrid(screen *ebiten.Image) {
 
 	s.Mu.Lock()
 	if *s.Sizing == SIZING_ONLY_BOTTOM {
-		screen.DrawImage(s.Bottom, &s.opts)
+		dst.DrawImage(bottom, &s.opts)
 		s.TouchGeoM = s.opts.GeoM
 	} else {
-		screen.DrawImage(s.Top, &s.opts)
+		dst.DrawImage(top, &s.opts)
 	}
 	s.Mu.Unlock()
 }

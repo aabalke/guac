@@ -28,7 +28,7 @@ func (gb *GameBoy) renderTilesGBC(scanline uint8) {
 
 	windowRendered := false
 
-	for pixel := range width {
+	for pixel := range SCREEN_WIDTH {
 
 		var yPos uint8
 		var xPos uint8
@@ -113,7 +113,7 @@ func (gb *GameBoy) renderSpritesGBC(scanline int32) {
 		ySize = 16
 	}
 
-	gb.spMinx = [width]int32{}
+	gb.spMinx = [SCREEN_WIDTH]int32{}
 	lineSprites := 0
 	for sprite := range uint16(40) {
 		index := sprite * 4
@@ -157,7 +157,7 @@ func (gb *GameBoy) renderSpritesGBC(scanline int32) {
 
 		for tilePixel := range uint8(8) {
 			pixel := int16(xPos) + 7 - int16(tilePixel)
-			if pixel < 0 || pixel >= width {
+			if pixel < 0 || pixel >= SCREEN_WIDTH {
 				continue
 			}
 

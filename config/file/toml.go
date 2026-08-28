@@ -65,11 +65,12 @@ type Profile struct {
 }
 
 type Gb struct {
-	System     string        `toml:"system"`
-	Bios       GbBios        `toml:"bios"`
-	Palette    []string      `toml:"dmg_palette"`
-	Keyboard   EmulatorInput `toml:"keyboard"`
-	Controller EmulatorInput `toml:"controller"`
+	System          string          `toml:"system"`
+	Bios            GbBios          `toml:"bios"`
+	Palette         []string        `toml:"dmg_palette"`
+	ColorCorrection ColorCorrection `toml:"color_correction"`
+	Keyboard        EmulatorInput   `toml:"keyboard"`
+	Controller      EmulatorInput   `toml:"controller"`
 }
 
 type GbBios struct {
@@ -79,12 +80,13 @@ type GbBios struct {
 }
 
 type Gba struct {
-	IdleOptimize bool          `toml:"idle_optimize"`
-	Rotation     int           `toml:"rotation"`
-	Hardware     GbaHardware   `toml:"hardware"`
-	Bios         GbaBios       `toml:"bios"`
-	Keyboard     EmulatorInput `toml:"keyboard"`
-	Controller   EmulatorInput `toml:"controller"`
+	IdleOptimize    bool            `toml:"idle_optimize"`
+	ColorCorrection ColorCorrection `toml:"color_correction"`
+	Rotation        int             `toml:"rotation"`
+	Hardware        GbaHardware     `toml:"hardware"`
+	Bios            GbaBios         `toml:"bios"`
+	Keyboard        EmulatorInput   `toml:"keyboard"`
+	Controller      EmulatorInput   `toml:"controller"`
 }
 
 type GbaHardware struct {
@@ -100,14 +102,15 @@ type GbaBios struct {
 }
 
 type Nds struct {
-	Keyboard   EmulatorInput `toml:"keyboard"`
-	Controller EmulatorInput `toml:"controller"`
-	Bios       NdsBios       `toml:"bios"`
-	Rtc        NdsRtc        `toml:"rtc"`
-	Export     NdsExport     `toml:"export"`
-	Screen     NdsScreen     `toml:"screen"`
-	Firmware   NdsFirmware   `toml:"firmware"`
-	Jit        NdsJit        `toml:"jit"`
+	Keyboard        EmulatorInput   `toml:"keyboard"`
+	Controller      EmulatorInput   `toml:"controller"`
+	Bios            NdsBios         `toml:"bios"`
+	Rtc             NdsRtc          `toml:"rtc"`
+	Export          NdsExport       `toml:"export"`
+	Screen          NdsScreen       `toml:"screen"`
+	ColorCorrection ColorCorrection `toml:"color_correction"`
+	Firmware        NdsFirmware     `toml:"firmware"`
+	Jit             NdsJit          `toml:"jit"`
 }
 
 type NdsBios struct {
@@ -171,4 +174,9 @@ type EmulatorInput struct {
 	SolarLevel2 []string `toml:"solar_50"`
 	SolarLevel3 []string `toml:"solar_75"`
 	SolarLevel4 []string `toml:"solar_max"`
+}
+
+type ColorCorrection struct {
+	Type     string  `toml:"type"`
+	Strength float32 `toml:"strength"`
 }

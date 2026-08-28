@@ -44,6 +44,8 @@ type Game struct {
 	paused       bool
 	muted        bool
 	quit         bool
+
+	ColorCorrectionShader *ColorCorrectionShader
 }
 
 type Ui struct {
@@ -185,17 +187,22 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.ui.ui.Draw(screen)
 	case g.gb != nil:
 
+		image := g.gb.Image
+		if g.gb.Color && *g.ColorCorrectionShader.Type != config.CLR_CORR_NONE {
+			image = g.ColorCorrectionShader.Draw(image)
+		}
+
 		const (
-			width  = 160
-			height = 144
+			w = gb.SCREEN_WIDTH
+			h = gb.SCREEN_HEIGHT
 		)
 
 		var (
 			sw      = float64(screen.Bounds().Dx())
 			sh      = float64(screen.Bounds().Dy())
-			scale   = utils.ScaleImage(sw, sh, width, height)
-			offsetX = (sw - (width * scale)) / 2
-			offsetY = (sh - (height * scale)) / 2
+			scale   = utils.ScaleImage(sw, sh, w, h)
+			offsetX = (sw - (w * scale)) / 2
+			offsetY = (sh - (h * scale)) / 2
 		)
 
 		g.DrawOptions.GeoM.Reset()
@@ -203,10 +210,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.DrawOptions.GeoM.Translate(offsetX, offsetY)
 
 		g.gb.Mu.Lock()
-		screen.DrawImage(g.gb.Image, &g.DrawOptions)
+		screen.DrawImage(image, &g.DrawOptions)
 		g.gb.Mu.Unlock()
 
 	case g.gba != nil:
+
+		image := g.gba.Image
+		if *g.ColorCorrectionShader.Type != config.CLR_CORR_NONE {
+			image = g.ColorCorrectionShader.Draw(image)
+		}
 
 		const (
 			canvasW = float64(gba.SCREEN_WIDTH)
@@ -235,11 +247,19 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.DrawOptions.GeoM.Translate(screenW/2, screenH/2)
 
 		g.gba.Mu.Lock()
-		screen.DrawImage(g.gba.Image, &g.DrawOptions)
+		screen.DrawImage(image, &g.DrawOptions)
 		g.gba.Mu.Unlock()
 
 	case g.nds != nil:
-		g.nds.Screen.FillScreen(screen)
+
+		top := g.nds.Screen.Top
+		bottom := g.nds.Screen.Bottom
+		if *g.ColorCorrectionShader.Type != config.CLR_CORR_NONE {
+			top = g.ColorCorrectionShader.Draw(top)
+			bottom = g.ColorCorrectionShader.DrawAlt(bottom)
+		}
+
+		g.nds.Screen.FillScreen(screen, top, bottom)
 	}
 
 	if g.ui.toast.enabled {
@@ -317,14 +337,26 @@ func (g *Game) InitConsole(file string) bool {
 		switch romType := utils.GetRomType(file); romType {
 		case utils.GB:
 			g.gb = gb.NewGameBoy(g.audioCtx, file, g.muted)
+
+			cc := &config.Conf.Gb.ColorCorrection
+			g.ColorCorrectionShader = NewColorCorrectionShader(gb.SCREEN_WIDTH, gb.SCREEN_HEIGHT, &cc.Type, &cc.Strength)
+
 			go g.gb.Run(ctx, g.Bus)
 
 		case utils.GBA:
 			g.gba = gba.NewGBA(g.audioCtx, file, g.muted)
+
+			cc := &config.Conf.Gba.ColorCorrection
+			g.ColorCorrectionShader = NewColorCorrectionShader(gba.SCREEN_WIDTH, gba.SCREEN_HEIGHT, &cc.Type, &cc.Strength)
+
 			go g.gba.Run(ctx, g.Bus)
 
 		case utils.NDS:
 			g.nds = nds.NewNds(g.audioCtx, file, g.muted)
+
+			cc := &config.Conf.Nds.ColorCorrection
+			g.ColorCorrectionShader = NewColorCorrectionShader(nds.SCREEN_WIDTH, nds.SCREEN_HEIGHT, &cc.Type, &cc.Strength)
+
 			go g.nds.Run(ctx, g.Bus)
 		}
 

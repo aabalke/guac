@@ -72,7 +72,7 @@ func (gb *GameBoy) eventScanlineEnd(late int64, arg any) {
 	*ly++
 
 	if *ly == 154 {
-		gb.bgPriority = [height][width]bool{}
+		gb.bgPriority = [SCREEN_HEIGHT][SCREEN_WIDTH]bool{}
 		*ly = 0
 		gb.WindowLY = 0
 	}
@@ -85,7 +85,7 @@ func (gb *GameBoy) eventScanlineEnd(late int64, arg any) {
 	gb.Scheduler.Schedule(gb.RegisteredEvents.Scanline, CYCLES_END_SCANLINE-late, nil)
 
 	switch {
-	case *ly < height:
+	case *ly < SCREEN_HEIGHT:
 		gb.Scheduler.Schedule(gb.RegisteredEvents.Draw, CYCLES_DRAW-late, nil)
 		gb.Scheduler.Schedule(gb.RegisteredEvents.Hblank, CYCLES_HBLANK-late, nil)
 

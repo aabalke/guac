@@ -178,6 +178,8 @@ func (c *Config) encodeGb() {
 	default:
 		c.Gb.System = "auto"
 	}
+
+	c.encodeColorCorrection(&c.Gb.ColorCorrection, &c.config.Gb.ColorCorrection)
 }
 
 func (c *Config) encodeGba() {
@@ -224,6 +226,7 @@ func (c *Config) encodeGba() {
 	case cart.FLASH128:
 		c.Gba.Hardware.BackupType = "flash128"
 	}
+	c.encodeColorCorrection(&c.Gba.ColorCorrection, &c.config.Gba.ColorCorrection)
 }
 
 func (c *Config) encodeNds() {
@@ -277,6 +280,7 @@ func (c *Config) encodeNds() {
 
 	c.encodeNdsFirmware()
 	c.encodeNdsJit()
+	c.encodeColorCorrection(&c.Nds.ColorCorrection, &c.config.Nds.ColorCorrection)
 }
 
 func (c *Config) encodeNdsFirmware() {
@@ -423,4 +427,19 @@ func (c *Config) encodeController(file *EmulatorInput, conf *config.EmulatorCont
 			*files[i] = append(*files[i], str)
 		}
 	}
+}
+
+func (c *Config) encodeColorCorrection(file *ColorCorrection, conf *config.ColorCorrection) {
+	switch conf.Type {
+	case config.CLR_CORR_SKY_GBC:
+		file.Type = "gbc"
+	case config.CLR_CORR_SKY_GBA:
+		file.Type = "gba"
+	case config.CLR_CORR_HIGAN:
+		file.Type = "higan"
+	default:
+		file.Type = "none"
+	}
+
+	file.Strength = conf.Strength
 }
