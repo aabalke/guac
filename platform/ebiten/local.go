@@ -273,4 +273,5 @@ type ColorCorrection struct {
 	Type            string   `toml:"type"`
 	Types           []string `toml:"types"`
 	Strength        string   `toml:"strength"`
+	ScreenGhosting  string   `toml:"screen_ghosting"`
 }

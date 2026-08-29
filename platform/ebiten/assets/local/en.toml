@@ -224,3 +224,4 @@ color_correction = "color correction"
 type = "type"
 types = ["none", "gbc", "gba", "higan"]
 strength = "strength"
+screen_ghosting = "screen ghosting"

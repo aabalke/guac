@@ -529,4 +529,5 @@ func (c *Config) decodeColorCorrection(in *ColorCorrection, conf *config.ColorCo
 	}
 
 	conf.Strength = in.Strength
+	conf.ScreenGhosting = in.ScreenGhosting
 }

@@ -1,4 +1,4 @@
-package ui
+package shader
 
 import (
 	"github.com/aabalke/guac/config"

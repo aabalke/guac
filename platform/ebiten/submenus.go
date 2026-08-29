@@ -235,9 +235,11 @@ func NewGbMenu(g *Game) *widget.Container {
 	cc := newTwoCol()
 	ccl := g.ui.res.localization.Settings.ColorCorrection
 	strength := int(tmp.ColorCorrection.Strength * 100)
+	ghosting := tmp.ColorCorrection.ScreenGhosting
 	menu.AddChild(NewHeader(ccl.ColorCorrection, g.ui.res), cc)
 	cc.AddChild(NewLabel(ccl.Type), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.ColorCorrection.Type, ccl.Types, g.ui.res))
 	cc.AddChild(NewLabel(ccl.Strength), NewDecimalInput(g.ui, ccl.Strength, &strength, 100))
+	cc.AddChild(NewLabel(ccl.ScreenGhosting), NewCheckbox(&ghosting))
 
 	bios := newTwoCol()
 	menu.AddChild(NewHeader(l.Bios, g.ui.res), bios)
@@ -293,6 +295,11 @@ func NewGbMenu(g *Game) *widget.Container {
 		config.Conf.Gb = tmp
 		config.Conf.Gb.ColorCorrection.Strength = float32(strength) / 100
 
+		config.Conf.Gb.ColorCorrection.ScreenGhosting = ghosting
+		if g.gb != nil {
+			g.gb.UpdateGhosting()
+		}
+
 		g.ui.content.RemoveChildren()
 		g.ui.content.AddChild(NewGbMenu(g))
 
@@ -336,9 +343,11 @@ func NewGbaMenu(g *Game) *widget.Container {
 	cc := newTwoCol()
 	ccl := g.ui.res.localization.Settings.ColorCorrection
 	strength := int(tmp.ColorCorrection.Strength * 100)
+	ghosting := tmp.ColorCorrection.ScreenGhosting
 	menu.AddChild(NewHeader(ccl.ColorCorrection, g.ui.res), cc)
 	cc.AddChild(NewLabel(ccl.Type), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.ColorCorrection.Type, ccl.Types, g.ui.res))
 	cc.AddChild(NewLabel(ccl.Strength), NewDecimalInput(g.ui, ccl.Strength, &strength, 100))
+	cc.AddChild(NewLabel(ccl.ScreenGhosting), NewCheckbox(&ghosting))
 
 	bios := newTwoCol()
 	menu.AddChild(NewHeader(l.Bios, g.ui.res), bios)
@@ -421,6 +430,10 @@ func NewGbaMenu(g *Game) *widget.Container {
 
 		config.Conf.Gba = tmp
 		config.Conf.Gba.ColorCorrection.Strength = float32(strength) / 100
+		config.Conf.Gba.ColorCorrection.ScreenGhosting = ghosting
+		if g.gba != nil {
+			g.gba.UpdateGhosting()
+		}
 
 		if g.gba != nil {
 			g.gba.IdleOptimize = tmp.IdleOptimize
@@ -475,9 +488,11 @@ func NewNdsMenu(g *Game) *widget.Container {
 	cc := newTwoCol()
 	ccl := g.ui.res.localization.Settings.ColorCorrection
 	strength := int(tmp.ColorCorrection.Strength * 100)
+	ghosting := tmp.ColorCorrection.ScreenGhosting
 	menu.AddChild(NewHeader(ccl.ColorCorrection, g.ui.res), cc)
 	cc.AddChild(NewLabel(ccl.Type), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.ColorCorrection.Type, ccl.Types, g.ui.res))
 	cc.AddChild(NewLabel(ccl.Strength), NewDecimalInput(g.ui, ccl.Strength, &strength, 100))
+	cc.AddChild(NewLabel(ccl.ScreenGhosting), NewCheckbox(&ghosting))
 
 	bios := newTwoCol()
 	menu.AddChild(NewHeader(l.Bios, g.ui.res), bios)
@@ -579,6 +594,10 @@ func NewNdsMenu(g *Game) *widget.Container {
 		config.Conf.Nds = tmp
 		config.Conf.Nds.Firmware.Color = config.ColorNameToId[favColor]
 		config.Conf.Nds.ColorCorrection.Strength = float32(strength) / 100
+		config.Conf.Nds.ColorCorrection.ScreenGhosting = ghosting
+		if g.nds != nil {
+			g.nds.Screen.UpdateGhosting()
+		}
 
 		g.ui.content.RemoveChildren()
 		g.ui.content.AddChild(NewNdsMenu(g))

@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/aabalke/guac/config"
+	"github.com/aabalke/guac/platform/ebiten/shader"
 	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -47,22 +48,56 @@ type Screen struct {
 	Sizing   *int
 	Rotation *int
 
-	Top, Bottom *ebiten.Image
-	opts        ebiten.DrawImageOptions
-	TouchGeoM   ebiten.GeoM
+	Top, Bottom           *ebiten.Image
+	TopGhost, BottomGhost *ebiten.Image
+	opts, ghostOpts       *ebiten.DrawImageOptions
+	TouchGeoM             ebiten.GeoM
+	ColorCorrectionShader *shader.ColorCorrectionShader
 }
 
 func NewScreen() *Screen {
-	return &Screen{
-		Top:      ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
-		Bottom:   ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
-		Layout:   &config.Conf.Nds.Screen.Layout,
-		Sizing:   &config.Conf.Nds.Screen.Sizing,
-		Rotation: &config.Conf.Nds.Screen.Rotation,
+	s := &Screen{
+		Top:         ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
+		Bottom:      ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
+		TopGhost:    ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
+		BottomGhost: ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
+		Layout:      &config.Conf.Nds.Screen.Layout,
+		Sizing:      &config.Conf.Nds.Screen.Sizing,
+		Rotation:    &config.Conf.Nds.Screen.Rotation,
+		ColorCorrectionShader: shader.NewColorCorrectionShader(
+			SCREEN_WIDTH,
+			SCREEN_HEIGHT,
+			&config.Conf.Nds.ColorCorrection.Type,
+			&config.Conf.Nds.ColorCorrection.Strength),
+	}
+
+	s.opts = &ebiten.DrawImageOptions{}
+	s.UpdateGhosting()
+
+	return s
+}
+
+func (s *Screen) UpdateGhosting() {
+	if config.Conf.Nds.ColorCorrection.ScreenGhosting {
+		s.ghostOpts = &ebiten.DrawImageOptions{}
+		s.ghostOpts.ColorScale.ScaleAlpha(0.5)
+	} else {
+		s.ghostOpts = nil
 	}
 }
 
-func (s *Screen) FillScreen(dst, top, bottom *ebiten.Image) {
+func (s *Screen) Draw(dst *ebiten.Image) {
+	top, bottom := s.Top, s.Bottom
+	if s.ghostOpts != nil {
+		top.DrawImage(s.TopGhost, s.ghostOpts)
+		bottom.DrawImage(s.BottomGhost, s.ghostOpts)
+	}
+
+	if *s.ColorCorrectionShader.Type != config.CLR_CORR_NONE {
+		top = s.ColorCorrectionShader.Draw(top)
+		bottom = s.ColorCorrectionShader.DrawAlt(bottom)
+	}
+
 	switch {
 	case *s.Layout == LAYOUT_HYBRID:
 		s.FillHybrid(dst, top, bottom)
@@ -117,7 +152,7 @@ func (s *Screen) FillEven(screen, top, bottom *ebiten.Image, horizontal bool) {
 	s.opts.GeoM.Translate(screenW/2, screenH/2)
 
 	s.Mu.Lock()
-	screen.DrawImage(top, &s.opts)
+	screen.DrawImage(top, s.opts)
 	s.Mu.Unlock()
 
 	s.opts.GeoM.Reset()
@@ -133,7 +168,7 @@ func (s *Screen) FillEven(screen, top, bottom *ebiten.Image, horizontal bool) {
 	s.opts.GeoM.Translate(screenW/2, screenH/2)
 
 	s.Mu.Lock()
-	screen.DrawImage(bottom, &s.opts)
+	screen.DrawImage(bottom, s.opts)
 	s.Mu.Unlock()
 
 	s.TouchGeoM = s.opts.GeoM
@@ -166,7 +201,7 @@ func (s *Screen) FillOnly(screen, image *ebiten.Image, bottom bool) {
 	s.opts.GeoM.Scale(scale, scale)
 	s.opts.GeoM.Translate(screenW/2, screenH/2)
 	s.Mu.Lock()
-	screen.DrawImage(image, &s.opts)
+	screen.DrawImage(image, s.opts)
 	s.Mu.Unlock()
 
 	if bottom {
@@ -206,7 +241,7 @@ func (s *Screen) FillHybrid(dst, top, bottom *ebiten.Image) {
 	s.opts.GeoM.Scale(scale, scale)
 	s.opts.GeoM.Translate(screenW/2, screenH/2)
 	s.Mu.Lock()
-	dst.DrawImage(top, &s.opts)
+	dst.DrawImage(top, s.opts)
 	s.Mu.Unlock()
 
 	s.opts.GeoM.Reset()
@@ -216,7 +251,7 @@ func (s *Screen) FillHybrid(dst, top, bottom *ebiten.Image) {
 	s.opts.GeoM.Scale(scale, scale)
 	s.opts.GeoM.Translate(screenW/2, screenH/2)
 	s.Mu.Lock()
-	dst.DrawImage(bottom, &s.opts)
+	dst.DrawImage(bottom, s.opts)
 	s.TouchGeoM = s.opts.GeoM
 	s.Mu.Unlock()
 
@@ -229,10 +264,10 @@ func (s *Screen) FillHybrid(dst, top, bottom *ebiten.Image) {
 
 	s.Mu.Lock()
 	if *s.Sizing == SIZING_ONLY_BOTTOM {
-		dst.DrawImage(bottom, &s.opts)
+		dst.DrawImage(bottom, s.opts)
 		s.TouchGeoM = s.opts.GeoM
 	} else {
-		dst.DrawImage(top, &s.opts)
+		dst.DrawImage(top, s.opts)
 	}
 	s.Mu.Unlock()
 }

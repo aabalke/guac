@@ -72,8 +72,13 @@ func (nds *Nds) ScanlineEndEvent(late int64, arg any) {
 
 			t, b := nds.GetScreens()
 			nds.Screen.Mu.Lock()
-			nds.Screen.Top.WritePixels(*t)
-			nds.Screen.Bottom.WritePixels(*b)
+			if nds.Screen.ghostOpts != nil && nds.Stats.Frame()&1 != 0 {
+				nds.Screen.TopGhost.WritePixels(*t)
+				nds.Screen.BottomGhost.WritePixels(*b)
+			} else {
+				nds.Screen.Top.WritePixels(*t)
+				nds.Screen.Bottom.WritePixels(*b)
+			}
 			nds.Screen.Mu.Unlock()
 		}
 

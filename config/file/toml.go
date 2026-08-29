@@ -177,6 +177,7 @@ type EmulatorInput struct {
 }
 
 type ColorCorrection struct {
-	Type     string  `toml:"type"`
-	Strength float32 `toml:"strength"`
+	Type           string  `toml:"type"`
+	Strength       float32 `toml:"strength"`
+	ScreenGhosting bool    `toml:"screen_ghosting"`
 }

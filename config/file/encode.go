@@ -442,4 +442,5 @@ func (c *Config) encodeColorCorrection(file *ColorCorrection, conf *config.Color
 	}
 
 	file.Strength = conf.Strength
+	file.ScreenGhosting = conf.ScreenGhosting
 }

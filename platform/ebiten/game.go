@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math"
 
 	"github.com/ebitenui/ebitenui"
 	"github.com/ebitenui/ebitenui/widget"
@@ -31,21 +30,18 @@ const (
 )
 
 type Game struct {
-	ui          *Ui
-	Bus         *bus.EventBus
-	DrawOptions ebiten.DrawImageOptions
-	nds         *nds.Nds
-	gba         *gba.GBA
-	gb          *gb.GameBoy
-	emuClose    func()
+	ui       *Ui
+	Bus      *bus.EventBus
+	nds      *nds.Nds
+	gba      *gba.GBA
+	gb       *gb.GameBoy
+	emuClose func()
 
 	audioCtx     *audio.Context
 	pauseEndTick int64
 	paused       bool
 	muted        bool
 	quit         bool
-
-	ColorCorrectionShader *ColorCorrectionShader
 }
 
 type Ui struct {
@@ -179,91 +175,22 @@ func (g *Game) Update() error {
 	return nil
 }
 
-func (g *Game) Draw(screen *ebiten.Image) {
-	screen.Fill(config.Conf.Ui.Backdrop)
+func (g *Game) Draw(dst *ebiten.Image) {
+	dst.Fill(config.Conf.Ui.Backdrop)
 
 	switch {
 	case g.ui.ui != nil:
-		g.ui.ui.Draw(screen)
+		g.ui.ui.Draw(dst)
 	case g.gb != nil:
-
-		image := g.gb.Image
-		if g.gb.Color && *g.ColorCorrectionShader.Type != config.CLR_CORR_NONE {
-			image = g.ColorCorrectionShader.Draw(image)
-		}
-
-		const (
-			w = gb.SCREEN_WIDTH
-			h = gb.SCREEN_HEIGHT
-		)
-
-		var (
-			sw      = float64(screen.Bounds().Dx())
-			sh      = float64(screen.Bounds().Dy())
-			scale   = utils.ScaleImage(sw, sh, w, h)
-			offsetX = (sw - (w * scale)) / 2
-			offsetY = (sh - (h * scale)) / 2
-		)
-
-		g.DrawOptions.GeoM.Reset()
-		g.DrawOptions.GeoM.Scale(scale, scale)
-		g.DrawOptions.GeoM.Translate(offsetX, offsetY)
-
-		g.gb.Mu.Lock()
-		screen.DrawImage(image, &g.DrawOptions)
-		g.gb.Mu.Unlock()
-
+		g.gb.Draw(dst)
 	case g.gba != nil:
-
-		image := g.gba.Image
-		if *g.ColorCorrectionShader.Type != config.CLR_CORR_NONE {
-			image = g.ColorCorrectionShader.Draw(image)
-		}
-
-		const (
-			canvasW = float64(gba.SCREEN_WIDTH)
-			canvasH = float64(gba.SCREEN_HEIGHT)
-		)
-
-		var (
-			rotation = config.Conf.Gba.Rotation
-			radians  = float64(rotation) * math.Pi / 2
-			screenW  = float64(screen.Bounds().Dx())
-			screenH  = float64(screen.Bounds().Dy())
-			fitW     = canvasW
-			fitH     = canvasH
-		)
-
-		if rot := rotation == config.ROT_90 || rotation == config.ROT_270; rot {
-			fitW, fitH = canvasH, canvasW
-		}
-
-		scale := utils.ScaleImage(screenW, screenH, fitW, fitH)
-
-		g.DrawOptions.GeoM.Reset()
-		g.DrawOptions.GeoM.Translate(-canvasW/2, -canvasH/2)
-		g.DrawOptions.GeoM.Rotate(radians)
-		g.DrawOptions.GeoM.Scale(scale, scale)
-		g.DrawOptions.GeoM.Translate(screenW/2, screenH/2)
-
-		g.gba.Mu.Lock()
-		screen.DrawImage(image, &g.DrawOptions)
-		g.gba.Mu.Unlock()
-
+		g.gba.Draw(dst)
 	case g.nds != nil:
-
-		top := g.nds.Screen.Top
-		bottom := g.nds.Screen.Bottom
-		if *g.ColorCorrectionShader.Type != config.CLR_CORR_NONE {
-			top = g.ColorCorrectionShader.Draw(top)
-			bottom = g.ColorCorrectionShader.DrawAlt(bottom)
-		}
-
-		g.nds.Screen.FillScreen(screen, top, bottom)
+		g.nds.Screen.Draw(dst)
 	}
 
 	if g.ui.toast.enabled {
-		g.ui.toast.ui.Draw(screen)
+		g.ui.toast.ui.Draw(dst)
 	}
 
 	if config.Conf.General.ShowFps {
@@ -272,15 +199,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 		switch {
 		case g.ui.ui != nil:
-			ebitenutil.DebugPrint(screen, fmt.Sprintf("Target FPS: %d.00 Engine FPS: %.2f, TPS: %.2f", target, ebiten.ActualFPS(), ebiten.ActualTPS()))
+			ebitenutil.DebugPrint(dst, fmt.Sprintf("Target FPS: %d.00 Engine FPS: %.2f, TPS: %.2f", target, ebiten.ActualFPS(), ebiten.ActualTPS()))
 		case g.gb != nil:
-			ebitenutil.DebugPrint(screen, fmt.Sprintf("Target FPS: %d.00 Engine FPS: %.2f, TPS: %.2f\nEmulated FPS: %.2f Frame: %08d", target, ebiten.ActualFPS(), ebiten.ActualTPS(), g.gb.FPS(), g.gb.Frame()))
+			ebitenutil.DebugPrint(dst, fmt.Sprintf("Target FPS: %d.00 Engine FPS: %.2f, TPS: %.2f\nEmulated FPS: %.2f Frame: %08d", target, ebiten.ActualFPS(), ebiten.ActualTPS(), g.gb.FPS(), g.gb.Frame()))
 		case g.gba != nil:
-			ebitenutil.DebugPrint(screen, fmt.Sprintf("Target FPS: %d.00 Engine FPS: %.2f, TPS: %.2f\nEmulated FPS: %.2f Frame: %08d", target, ebiten.ActualFPS(), ebiten.ActualTPS(), g.gba.FPS(), g.gba.Frame()))
+			ebitenutil.DebugPrint(dst, fmt.Sprintf("Target FPS: %d.00 Engine FPS: %.2f, TPS: %.2f\nEmulated FPS: %.2f Frame: %08d", target, ebiten.ActualFPS(), ebiten.ActualTPS(), g.gba.FPS(), g.gba.Frame()))
 		case g.nds != nil:
-			ebitenutil.DebugPrint(screen, fmt.Sprintf("Target FPS: %d.00 Engine FPS: %.2f, TPS: %.2f\nEmulated FPS: %.2f Frame: %08d", target, ebiten.ActualFPS(), ebiten.ActualTPS(), g.nds.FPS(), g.nds.Frame()))
+			ebitenutil.DebugPrint(dst, fmt.Sprintf("Target FPS: %d.00 Engine FPS: %.2f, TPS: %.2f\nEmulated FPS: %.2f Frame: %08d", target, ebiten.ActualFPS(), ebiten.ActualTPS(), g.nds.FPS(), g.nds.Frame()))
 		default:
-			ebitenutil.DebugPrint(screen, fmt.Sprintf("Target FPS: %d.00 Engine FPS: %.2f, TPS: %.2f", target, ebiten.ActualFPS(), ebiten.ActualTPS()))
+			ebitenutil.DebugPrint(dst, fmt.Sprintf("Target FPS: %d.00 Engine FPS: %.2f, TPS: %.2f", target, ebiten.ActualFPS(), ebiten.ActualTPS()))
 		}
 	}
 }
@@ -337,26 +264,14 @@ func (g *Game) InitConsole(file string) bool {
 		switch romType := utils.GetRomType(file); romType {
 		case utils.GB:
 			g.gb = gb.NewGameBoy(g.audioCtx, file, g.muted)
-
-			cc := &config.Conf.Gb.ColorCorrection
-			g.ColorCorrectionShader = NewColorCorrectionShader(gb.SCREEN_WIDTH, gb.SCREEN_HEIGHT, &cc.Type, &cc.Strength)
-
 			go g.gb.Run(ctx, g.Bus)
 
 		case utils.GBA:
 			g.gba = gba.NewGBA(g.audioCtx, file, g.muted)
-
-			cc := &config.Conf.Gba.ColorCorrection
-			g.ColorCorrectionShader = NewColorCorrectionShader(gba.SCREEN_WIDTH, gba.SCREEN_HEIGHT, &cc.Type, &cc.Strength)
-
 			go g.gba.Run(ctx, g.Bus)
 
 		case utils.NDS:
 			g.nds = nds.NewNds(g.audioCtx, file, g.muted)
-
-			cc := &config.Conf.Nds.ColorCorrection
-			g.ColorCorrectionShader = NewColorCorrectionShader(nds.SCREEN_WIDTH, nds.SCREEN_HEIGHT, &cc.Type, &cc.Strength)
-
 			go g.nds.Run(ctx, g.Bus)
 		}
 

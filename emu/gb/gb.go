@@ -15,6 +15,7 @@ import (
 	"github.com/aabalke/guac/emu/gb/apu"
 	"github.com/aabalke/guac/emu/gb/cart"
 	"github.com/aabalke/guac/emu/scheduler"
+	"github.com/aabalke/guac/platform/ebiten/shader"
 	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
@@ -74,12 +75,12 @@ type GameBoy struct {
 
 	Joypad uint8
 
-	Image      *ebiten.Image
-	Pixels     []byte
-	Screen     [SCREEN_HEIGHT][SCREEN_WIDTH]uint32
-	spMinx     [SCREEN_WIDTH]int32
-	bgPriority [SCREEN_HEIGHT][SCREEN_WIDTH]bool
-	pixelDrawn [SCREEN_WIDTH]bool
+	Image, Ghost *ebiten.Image
+	Pixels       []byte
+	Screen       [SCREEN_HEIGHT][SCREEN_WIDTH]uint32
+	spMinx       [SCREEN_WIDTH]int32
+	bgPriority   [SCREEN_HEIGHT][SCREEN_WIDTH]bool
+	pixelDrawn   [SCREEN_WIDTH]bool
 
 	Color                bool
 	DMGCompatibilityMode bool
@@ -89,6 +90,9 @@ type GameBoy struct {
 	CyclesPerSndGen int64
 
 	RegisteredEvents RegisteredEvents
+
+	imageOpts, ghostOpts  *ebiten.DrawImageOptions
+	ColorCorrectionShader *shader.ColorCorrectionShader
 }
 
 type Timer struct {
@@ -104,18 +108,34 @@ type Timer struct {
 	BCycle          bool
 }
 
-func NewGameBoy(ctx *audio.Context, path string, muted bool) *GameBoy {
-	img := ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT)
+func (gb *GameBoy) UpdateGhosting() {
+	if config.Conf.Gb.ColorCorrection.ScreenGhosting {
+		gb.ghostOpts = &ebiten.DrawImageOptions{}
+		gb.ghostOpts.ColorScale.ScaleAlpha(0.5)
+	} else {
+		gb.ghostOpts = nil
+	}
+}
 
+func NewGameBoy(ctx *audio.Context, path string, muted bool) *GameBoy {
 	gb := &GameBoy{
-		Image:     img,
+		Image:     ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
+		Ghost:     ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 		Cpu:       NewCpu(),
 		Joypad:    0xFF,
 		Cartridge: cart.NewCartridge(path),
 		Palette:   &config.Conf.Gb.Palette,
 		Scheduler: scheduler.NewScheduler(),
 		Apu:       apu.NewApu(ctx, BUFFER_SIZE),
+		ColorCorrectionShader: shader.NewColorCorrectionShader(
+			SCREEN_WIDTH,
+			SCREEN_HEIGHT,
+			&config.Conf.Gb.ColorCorrection.Type,
+			&config.Conf.Gb.ColorCorrection.Strength),
 	}
+
+	gb.imageOpts = &ebiten.DrawImageOptions{}
+	gb.UpdateGhosting()
 
 	// ebiten engine requires a slice, Screen is easier to edit as an array of arrays
 	// instead of building an intermediate rep, pixels will just point to Screen
@@ -489,5 +509,46 @@ func (gb *GameBoy) toggleDoubleSpeed() {
 	}
 }
 
-func (gb *GameBoy) Close() {
+func (gb *GameBoy) Close() {}
+
+func (gb *GameBoy) Draw(dst *ebiten.Image) {
+	image := gb.Image
+
+	if gb.ghostOpts != nil {
+		image.DrawImage(gb.Ghost, gb.ghostOpts)
+	}
+
+	if *gb.ColorCorrectionShader.Type != config.CLR_CORR_NONE {
+		image = gb.ColorCorrectionShader.Draw(image)
+	}
+
+	const (
+		canvasW = float64(SCREEN_WIDTH)
+		canvasH = float64(SCREEN_HEIGHT)
+	)
+
+	var (
+		//rotation = config.Conf.gb.Rotation
+		//radians  = float64(rotation) * math.Pi / 2
+		screenW = float64(dst.Bounds().Dx())
+		screenH = float64(dst.Bounds().Dy())
+		fitW    = canvasW
+		fitH    = canvasH
+	)
+
+	//if rot := rotation == config.ROT_90 || rotation == config.ROT_270; rot {
+	//	fitW, fitH = canvasH, canvasW
+	//}
+
+	scale := utils.ScaleImage(screenW, screenH, fitW, fitH)
+
+	gb.imageOpts.GeoM.Reset()
+	gb.imageOpts.GeoM.Translate(-canvasW/2, -canvasH/2)
+	//gb.imageOpts.GeoM.Rotate(radians)
+	gb.imageOpts.GeoM.Scale(scale, scale)
+	gb.imageOpts.GeoM.Translate(screenW/2, screenH/2)
+
+	gb.Mu.Lock()
+	dst.DrawImage(image, gb.imageOpts)
+	gb.Mu.Unlock()
 }

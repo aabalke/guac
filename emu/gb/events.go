@@ -103,7 +103,11 @@ func (gb *GameBoy) eventScanlineEnd(late int64, arg any) {
 
 		if !config.Conf.General.Headless {
 			gb.Mu.Lock()
-			gb.Image.WritePixels(gb.Pixels)
+			if gb.ghostOpts != nil && gb.Stats.Frame()&1 != 0 {
+				gb.Ghost.WritePixels(gb.Pixels)
+			} else {
+				gb.Image.WritePixels(gb.Pixels)
+			}
 			gb.Mu.Unlock()
 		}
 	}

@@ -2,6 +2,7 @@ package gba
 
 import (
 	"context"
+	"math"
 	"sync"
 	"time"
 
@@ -15,6 +16,8 @@ import (
 	"github.com/aabalke/guac/emu/gba/irq"
 	"github.com/aabalke/guac/emu/gba/timer"
 	"github.com/aabalke/guac/emu/scheduler"
+	"github.com/aabalke/guac/platform/ebiten/shader"
+	"github.com/aabalke/guac/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 )
@@ -69,8 +72,8 @@ type GBA struct {
 	InstInjectionFunc func(op uint32)
 	Keypad            Key
 
-	Pixels []byte
-	Image  *ebiten.Image
+	Pixels       []byte
+	Image, Ghost *ebiten.Image
 
 	vsyncAddr       uint32
 	Save, Booted    bool
@@ -78,16 +81,37 @@ type GBA struct {
 	CyclesPerSndGen int64
 
 	RegisteredEvents RegisteredEvents
+
+	imageOpts, ghostOpts  *ebiten.DrawImageOptions
+	ColorCorrectionShader *shader.ColorCorrectionShader
+}
+
+func (gba *GBA) UpdateGhosting() {
+	if config.Conf.Gba.ColorCorrection.ScreenGhosting {
+		gba.ghostOpts = &ebiten.DrawImageOptions{}
+		gba.ghostOpts.ColorScale.ScaleAlpha(0.5)
+	} else {
+		gba.ghostOpts = nil
+	}
 }
 
 func NewGBA(ctx *audio.Context, path string, muted bool) *GBA {
 	gba := &GBA{
 		Pixels:       make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
 		Image:        ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
+		Ghost:        ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
 		Apu:          apu.NewApu(ctx, BUFFER_SIZE),
 		Scheduler:    scheduler.NewScheduler(),
 		IdleOptimize: config.Conf.Gba.IdleOptimize,
+		ColorCorrectionShader: shader.NewColorCorrectionShader(
+			SCREEN_WIDTH,
+			SCREEN_HEIGHT,
+			&config.Conf.Gba.ColorCorrection.Type,
+			&config.Conf.Gba.ColorCorrection.Strength),
 	}
+
+	gba.imageOpts = &ebiten.DrawImageOptions{}
+	gba.UpdateGhosting()
 
 	gba.PPU = &PPU{gba: gba}
 	gba.Mem = NewMemory(gba)
@@ -338,4 +362,46 @@ func (gba *GBA) OnTimerOverflow(t *timer.Timer, late int64) {
 			next.OverflowHandle(late)
 		}
 	}
+}
+
+func (gba *GBA) Draw(dst *ebiten.Image) {
+	image := gba.Image
+
+	if gba.ghostOpts != nil {
+		image.DrawImage(gba.Ghost, gba.ghostOpts)
+	}
+
+	if *gba.ColorCorrectionShader.Type != config.CLR_CORR_NONE {
+		image = gba.ColorCorrectionShader.Draw(image)
+	}
+
+	const (
+		canvasW = float64(SCREEN_WIDTH)
+		canvasH = float64(SCREEN_HEIGHT)
+	)
+
+	var (
+		rotation = config.Conf.Gba.Rotation
+		radians  = float64(rotation) * math.Pi / 2
+		screenW  = float64(dst.Bounds().Dx())
+		screenH  = float64(dst.Bounds().Dy())
+		fitW     = canvasW
+		fitH     = canvasH
+	)
+
+	if rot := rotation == config.ROT_90 || rotation == config.ROT_270; rot {
+		fitW, fitH = canvasH, canvasW
+	}
+
+	scale := utils.ScaleImage(screenW, screenH, fitW, fitH)
+
+	gba.imageOpts.GeoM.Reset()
+	gba.imageOpts.GeoM.Translate(-canvasW/2, -canvasH/2)
+	gba.imageOpts.GeoM.Rotate(radians)
+	gba.imageOpts.GeoM.Scale(scale, scale)
+	gba.imageOpts.GeoM.Translate(screenW/2, screenH/2)
+
+	gba.Mu.Lock()
+	dst.DrawImage(image, gba.imageOpts)
+	gba.Mu.Unlock()
 }

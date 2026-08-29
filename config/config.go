@@ -292,6 +292,7 @@ const (
 )
 
 type ColorCorrection struct {
-	Type     int
-	Strength float32
+	Type           int
+	Strength       float32
+	ScreenGhosting bool
 }

@@ -145,7 +145,11 @@ func (gba *GBA) ScanlineEndEvent(late int64, arg any) {
 		*vcount = 0
 
 		gba.Mu.Lock()
-		gba.Image.WritePixels(gba.Pixels)
+		if gba.ghostOpts != nil && gba.Stats.Frame()&1 != 0 {
+			gba.Ghost.WritePixels(gba.Pixels)
+		} else {
+			gba.Image.WritePixels(gba.Pixels)
+		}
 		gba.Mu.Unlock()
 
 		gba.PPU.Backgrounds[2].BgAffineReset()

@@ -224,3 +224,4 @@ color_correction = "corrección de color"
 type = "tipo"
 types = ["ninguna", "gbc", "gba", "higan"]
 strength = "intensidad"
+screen_ghosting = "efecto fantasma en pantalla"

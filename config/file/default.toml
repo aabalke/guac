@@ -71,6 +71,7 @@ dmg_palette = [ "0xE0F8D0", "0x88C070", "0x346856", "0x081820" ]
 # valid vaules are ["none", auto", "gbc", "gba", "higan"]
 type = "higan"
 strength = 1.0
+screen_ghosting = false
 
 [gb.bios]
 
@@ -113,6 +114,7 @@ idle_optimize = false
 # valid vaules are ["none", auto", "gbc", "gba", "higan"]
 type = "auto"
 strength = 1.0
+screen_ghosting = false
 
 [gba.hardware]
 
@@ -192,7 +194,7 @@ rotation = 0        # 0, 90, 180, 270
 # valid vaules are ["none", auto", "gbc", "gba", "higan"]
 type = "auto"
 strength = 1.0
-
+screen_ghosting = false
 
 [nds.keyboard]
 a = ["J"]
