@@ -34,10 +34,8 @@ func (b *Bus9) ReadIO(addr uint32) uint8 {
 	}
 
 	switch addr {
-	case 0x4:
-		return mem.Dispstat.Read(false, true)
-	case 0x5:
-		return mem.Dispstat.Read(true, true)
+	case 0x4, 0x5:
+		return mem.Dispstat.Read9(addr & 1)
 	case 0x6:
 		return uint8(mem.Vcount)
 	case 0x7:
@@ -107,7 +105,6 @@ func (b *Bus9) ReadIO(addr uint32) uint8 {
 		return uint8(mem.PowCnt.V >> 8)
 
 	default:
-		//panic(fmt.Sprintf("READ UNKNOWN ARM9 IO ADDR %08X", addr))
 		return mem.IO[addr]
 	}
 }
@@ -154,11 +151,8 @@ func (b *Bus9) WriteIO(addr uint32, v uint8) {
 	}
 
 	switch addr {
-	case 0x4:
-		mem.Dispstat.Write9(v, false)
-	case 0x5:
-		mem.Dispstat.Write9(v, true)
-
+	case 0x4, 0x5:
+		mem.Dispstat.Write9(addr&1, v)
 	case 0x6:
 		mem.Vcount = (mem.Vcount & 0xFF00) | uint32(v)
 	case 0x7:
@@ -249,10 +243,8 @@ func (b *Bus7) ReadIO(addr uint32) uint8 {
 	}
 
 	switch addr {
-	case 0x4:
-		return mem.Dispstat.Read(false, false)
-	case 0x5:
-		return mem.Dispstat.Read(true, false)
+	case 0x4, 0x5:
+		return mem.Dispstat.Read7(addr & 1)
 	case 0x6:
 		return uint8(mem.Vcount)
 	case 0x7:
@@ -360,11 +352,8 @@ func (b *Bus7) WriteIO(addr uint32, v uint8) {
 	}
 
 	switch addr {
-	case 0x4:
-		mem.Dispstat.Write7(v, false)
-	case 0x5:
-		mem.Dispstat.Write7(v, true)
-
+	case 0x4, 0x5:
+		mem.Dispstat.Write7(addr&1, v)
 	case 0x6:
 		mem.Vcount = (mem.Vcount & 0xFF00) | uint32(v)
 	case 0x7:

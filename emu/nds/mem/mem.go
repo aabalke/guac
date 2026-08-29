@@ -104,24 +104,24 @@ func (m *Mem) InitMemory(
 	m.Bus9 = Bus9{M: m}
 }
 
-func (mem *Mem) DirectBootMemory() {
-	setBiosRam(mem, mem.Cartridge.ChipId)
+func (m *Mem) DirectBootMemory() {
+	setBiosRam(m, m.Cartridge.ChipId)
 }
 
-func (mem *Mem) LoadBios() {
-	mem.Arm7Bios = &bios.BiosNtrArm7
-	mem.Arm9Bios = &bios.BiosNtrArm9
+func (m *Mem) LoadBios() {
+	m.Arm7Bios = &bios.BiosNtrArm7
+	m.Arm9Bios = &bios.BiosNtrArm9
 	b := &config.Conf.Nds.Bios
 
 	if b.Arm7Path != "" {
 		if buf, err := os.ReadFile(b.Arm7Path); err == nil {
-			mem.Arm7Bios = &buf
+			m.Arm7Bios = &buf
 		}
 	}
 
 	if b.Arm9Path != "" {
 		if buf, err := os.ReadFile(b.Arm9Path); err == nil {
-			mem.Arm9Bios = &buf
+			m.Arm9Bios = &buf
 		}
 	}
 }

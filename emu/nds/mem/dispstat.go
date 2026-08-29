@@ -18,26 +18,20 @@ type Dispstat struct {
 	A7VCIrq bool
 }
 
-func (d *Dispstat) Read(hi, arm9 bool) uint8 {
-	if hi {
-		if arm9 {
-			return uint8(d.A9LYC)
+func (d *Dispstat) Read9(b uint32) uint8 {
+	switch b {
+	case 0:
+
+		v := uint8(d.A9LYC>>8) << 7
+
+		if d.V {
+			v |= 1 << 0
 		}
 
-		return uint8(d.A7LYC)
-	}
+		if d.H {
+			v |= 1 << 1
+		}
 
-	v := uint8(0)
-
-	if d.V {
-		v |= 1 << 0
-	}
-
-	if d.H {
-		v |= 1 << 1
-	}
-
-	if arm9 {
 		if d.A9VC {
 			v |= 1 << 2
 		}
@@ -54,60 +48,84 @@ func (d *Dispstat) Read(hi, arm9 bool) uint8 {
 			v |= 1 << 5
 		}
 
-		v |= uint8(d.A9LYC>>8) << 7
+		return v
+
+	case 1:
+		return uint8(d.A9LYC)
+	default:
+		panic("not possible")
+	}
+}
+
+func (d *Dispstat) Read7(b uint32) uint8 {
+	switch b {
+	case 0:
+
+		v := uint8(d.A7LYC>>8) << 7
+
+		if d.V {
+			v |= 1 << 0
+		}
+
+		if d.H {
+			v |= 1 << 1
+		}
+
+		if d.A7VC {
+			v |= 1 << 2
+		}
+
+		if d.A7VIrq {
+			v |= 1 << 3
+		}
+
+		if d.A7HIrq {
+			v |= 1 << 4
+		}
+
+		if d.A7VCIrq {
+			v |= 1 << 5
+		}
 
 		return v
+
+	case 1:
+		return uint8(d.A7LYC)
+	default:
+		panic("not possible")
 	}
-
-	if d.A7VC {
-		v |= 1 << 2
-	}
-
-	if d.A7VIrq {
-		v |= 1 << 3
-	}
-
-	if d.A7HIrq {
-		v |= 1 << 4
-	}
-
-	if d.A7VCIrq {
-		v |= 1 << 5
-	}
-
-	v |= uint8(d.A7LYC>>8) << 7
-
-	return v
 }
 
-func (d *Dispstat) Write7(v uint8, hi bool) {
-	if hi {
+func (d *Dispstat) Write7(b uint32, v uint8) {
+	switch b {
+	case 0:
+		d.V = v&(1<<0) != 0
+		d.H = v&(1<<1) != 0
+
+		d.A7VC = v&(1<<2) != 0
+		d.A7VIrq = v&(1<<3) != 0
+		d.A7HIrq = v&(1<<4) != 0
+		d.A7VCIrq = v&(1<<5) != 0
+		d.A7LYC = (d.A7LYC & 0xFF) | (uint32(v&0x80) << 8)
+	case 1:
 		d.A7LYC = (d.A7LYC &^ 0xFF) | uint32(v)
-		return
 	}
-
-	d.V = v&(1<<0) != 0
-	d.H = v&(1<<1) != 0
-
-	d.A7VC = v&(1<<2) != 0
-	d.A7VIrq = v&(1<<3) != 0
-	d.A7HIrq = v&(1<<4) != 0
-	d.A7VCIrq = v&(1<<5) != 0
-	d.A7LYC = (d.A7LYC & 0xFF) | (uint32(v&0x80) << 8)
 }
 
-func (d *Dispstat) Write9(v uint8, hi bool) {
-	if hi {
+func (d *Dispstat) Write9(b uint32, v uint8) {
+	switch b {
+	case 0:
+
+		d.V = v&(1<<0) != 0
+		d.H = v&(1<<1) != 0
+
+		d.A9VC = v&(1<<2) != 0
+		d.A9VIrq = v&(1<<3) != 0
+		d.A9HIrq = v&(1<<4) != 0
+		d.A9VCIrq = v&(1<<5) != 0
+		d.A9LYC = (d.A9LYC & 0xFF) | (uint32(v&0x80) << 8)
+	case 1:
 		d.A9LYC = (d.A9LYC &^ 0xFF) | uint32(v)
-		return
+
 	}
-
-	d.V = v&(1<<0) != 0
-	d.H = v&(1<<1) != 0
-
-	d.A9VC = v&(1<<2) != 0
-	d.A9VIrq = v&(1<<3) != 0
-	d.A9HIrq = v&(1<<4) != 0
-	d.A9VCIrq = v&(1<<5) != 0
-	d.A9LYC = (d.A9LYC & 0xFF) | (uint32(v&0x80) << 8)
 }

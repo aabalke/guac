@@ -70,12 +70,6 @@ type DMA struct {
 	gxTransferEvent scheduler.EventIdx
 }
 
-//go:inline
-func ReplaceByte(value uint32, newByte uint32, byteOffset uint32) uint32 {
-	bitOffset := 8 * byteOffset
-	return (value &^ (0xFF << bitOffset)) | (newByte << bitOffset)
-}
-
 func (dma *DMA) Init(idx int, mem MemoryInterface, scheduler *scheduler.Scheduler, irq Irq, arm9 bool) {
 	dma.Idx = idx
 	dma.mem = mem

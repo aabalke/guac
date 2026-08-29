@@ -15,7 +15,8 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
 	case addr < 0x620:
 		// fall
 	case addr < 0x630:
-		return r.ReadPosTest(addr)
+		addr -= 0x620
+		return uint8(r.GeoEngine.PosTestData[addr/4] >> ((addr & 3) * 8))
 	case addr < 0x640:
 		return r.ReadVecTest(addr)
 	case addr < 0x680:
@@ -35,14 +36,8 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
 	case 0x63:
 		return 0
 
-	case 0x600:
-		return r.GeoEngine.GxStat.Read(0)
-	case 0x601:
-		return r.GeoEngine.GxStat.Read(1)
-	case 0x602:
-		return r.GeoEngine.GxStat.Read(2)
-	case 0x603:
-		return r.GeoEngine.GxStat.Read(3)
+	case 0x600, 0x601, 0x602, 0x603:
+		return r.GeoEngine.GxStat.Read(addr & 3)
 	case 0x604:
 
 		buf := &r.GeoEngine.Buffers.A
@@ -82,49 +77,6 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
 
 		_, vert := buf.GetCnts()
 		return uint8(vert >> 8)
-	}
-
-	//fmt.Printf("READ UNSETUP 3D IO %08X\n", addr)
-	//panic(fmt.Sprintf("READ UNSETUP 3D IO %08X\n", addr))
-	return 0
-}
-
-func (r *Rasterizer) ReadPosTest(addr uint32) uint8 {
-	d := &r.GeoEngine.PosTestData
-
-	switch addr {
-	case 0x620:
-		return uint8(d[0] >> 0)
-	case 0x621:
-		return uint8(d[0] >> 8)
-	case 0x622:
-		return uint8(d[0] >> 16)
-	case 0x623:
-		return uint8(d[0] >> 24)
-	case 0x624:
-		return uint8(d[1] >> 0)
-	case 0x625:
-		return uint8(d[1] >> 8)
-	case 0x626:
-		return uint8(d[1] >> 16)
-	case 0x627:
-		return uint8(d[1] >> 24)
-	case 0x628:
-		return uint8(d[2] >> 0)
-	case 0x629:
-		return uint8(d[2] >> 8)
-	case 0x62A:
-		return uint8(d[2] >> 16)
-	case 0x62B:
-		return uint8(d[2] >> 24)
-	case 0x62C:
-		return uint8(d[3] >> 0)
-	case 0x62D:
-		return uint8(d[3] >> 8)
-	case 0x62E:
-		return uint8(d[3] >> 16)
-	case 0x62F:
-		return uint8(d[3] >> 24)
 	}
 
 	return 0

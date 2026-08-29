@@ -8,41 +8,12 @@ type WRAM struct {
 	cnt   uint8
 }
 
-func (w *WRAM) WriteCNT(v uint8) {
-	w.cnt = v & 3
-}
-
 func (w *WRAM) ReadCNT() uint8 {
 	return w.cnt
 }
 
-func (w *WRAM) Write9(addr uint32, v uint8) {
-	switch w.cnt {
-	case 0:
-		w.wram[addr&0x7FFF] = v
-	case 1:
-		w.wram[0x4000+(addr&0x3FFF)] = v
-	case 2:
-		w.wram[addr&0x3FFF] = v
-	}
-}
-
-func (w *WRAM) Write7(addr uint32, v uint8) {
-	if addr >= 0x380_0000 {
-		w.wram7[addr&0xFFFF] = v
-		return
-	}
-
-	switch w.cnt {
-	case 0:
-		w.wram7[addr&0xFFFF] = v
-	case 1:
-		w.wram[addr&0x3FFF] = v
-	case 2:
-		w.wram[0x4000+(addr&0x3FFF)] = v
-	case 3:
-		w.wram[addr&0x7FFF] = v
-	}
+func (w *WRAM) WriteCNT(v uint8) {
+	w.cnt = v & 3
 }
 
 func (w *WRAM) Read9(addr uint32) uint8 {
@@ -57,6 +28,17 @@ func (w *WRAM) Read9(addr uint32) uint8 {
 		return 0 // should this clear ram?
 	}
 	return 0
+}
+
+func (w *WRAM) Write9(addr uint32, v uint8) {
+	switch w.cnt {
+	case 0:
+		w.wram[addr&0x7FFF] = v
+	case 1:
+		w.wram[0x4000+(addr&0x3FFF)] = v
+	case 2:
+		w.wram[addr&0x3FFF] = v
+	}
 }
 
 func (w *WRAM) Read7(addr uint32) uint8 {
@@ -76,6 +58,24 @@ func (w *WRAM) Read7(addr uint32) uint8 {
 	}
 
 	return 0
+}
+
+func (w *WRAM) Write7(addr uint32, v uint8) {
+	if addr >= 0x380_0000 {
+		w.wram7[addr&0xFFFF] = v
+		return
+	}
+
+	switch w.cnt {
+	case 0:
+		w.wram7[addr&0xFFFF] = v
+	case 1:
+		w.wram[addr&0x3FFF] = v
+	case 2:
+		w.wram[0x4000+(addr&0x3FFF)] = v
+	case 3:
+		w.wram[addr&0x7FFF] = v
+	}
 }
 
 func (w *WRAM) ReadPtr9(addr uint32) unsafe.Pointer {
