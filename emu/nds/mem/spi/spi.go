@@ -32,8 +32,8 @@ func NewSpi(input2 *uint8) *Spi {
 	}
 }
 
-func (s *Spi) WriteCNT(b, v uint8) {
-	switch b {
+func (s *Spi) Write(addr uint32, v uint8) {
+	switch addr & 3 {
 	case 0:
 
 		v &= 0b1000_0011
@@ -53,11 +53,22 @@ func (s *Spi) WriteCNT(b, v uint8) {
 		s.Hold = (v>>3)&1 != 0
 		s.Irq = (v>>6)&1 != 0
 		s.Enabled = (v>>7)&1 != 0
+	case 2:
+		s.WriteData(v)
 	}
 }
 
-func (s *Spi) ReadCNT(b uint8) uint8 {
-	return uint8(s.CNT >> (8 * b))
+func (s *Spi) Read(addr uint32) uint8 {
+	switch addr & 3 {
+	case 0:
+		return uint8(s.CNT)
+	case 1:
+		return uint8(s.CNT >> 8)
+	case 2:
+		return s.Value
+	}
+
+	return 0
 }
 
 func (s *Spi) WriteData(v uint8) {
@@ -115,8 +126,4 @@ func (s *Spi) WriteData(v uint8) {
 
 		s.TransferDevice = nil
 	}
-}
-
-func (s *Spi) ReadData() uint8 {
-	return s.Value
 }

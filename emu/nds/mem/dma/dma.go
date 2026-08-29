@@ -95,42 +95,50 @@ func (dma *DMA) Init(idx int, mem MemoryInterface, scheduler *scheduler.Schedule
 	}
 }
 
-func (dma *DMA) ReadControl(hi bool) uint8 {
-	if hi {
+func (dma *DMA) Read(addr uint32) uint8 {
+	switch addr {
+	case 10:
+		return uint8(dma.Control)
+	case 11:
 		return uint8(dma.Control >> 8)
+	default:
+		return 0
 	}
-	return uint8(dma.Control)
 }
 
-func (dma *DMA) WriteSrc(v uint8, byte uint32) {
-	dma.Src = ReplaceByte(dma.Src, uint32(v), byte)
-	dma.InitSrc = dma.Src
-}
+func (dma *DMA) Write(addr uint32, v uint8) {
+	switch addr {
+	case 0, 1, 2, 3:
+		dma.Src = (dma.Src &^ (0xFF << (addr << 3))) | (uint32(v) << (addr << 3))
+		dma.InitSrc = dma.Src
 
-func (dma *DMA) WriteDst(v uint8, byte uint32) {
-	dma.Dst = ReplaceByte(dma.Dst, uint32(v), byte)
-	dma.InitDst = dma.Dst
-	dma.GcDst = dma.Dst
-}
+	case 4, 5, 6, 7:
+		addr -= 4
+		dma.Dst = (dma.Dst &^ (0xFF << (addr << 3))) | (uint32(v) << (addr << 3))
+		dma.InitDst = dma.Dst
+		dma.GcDst = dma.Dst
 
-func (dma *DMA) WriteCount(v uint8, hi bool) {
-	if hi {
+	case 8:
+		dma.WordCount = (dma.WordCount &^ 0xFF) | uint32(v)
+
+	case 9:
 		dma.WordCount = (dma.WordCount & 0xFF) | (uint32(v) << 8)
-		return
-	}
 
-	dma.WordCount = (dma.WordCount &^ 0xFF) | uint32(v)
-}
+	case 10:
 
-func (dma *DMA) WriteControl(v uint8, hi bool) {
-	if hi {
+		v &= 0xE0
+		dma.Control = (dma.Control &^ 0xFF) | uint32(v)
+		dma.DstAdj = uint32(v>>5) & 3
+		dma.SrcAdj = (dma.SrcAdj &^ 1) | (uint32(v) >> 7)
+
+	case 11:
 		wasDisabled := !dma.Enabled
 		dma.Control = (dma.Control & 0xFF) | uint32(v)<<8
 		dma.SrcAdj = (dma.SrcAdj & 1) | uint32(v&1)<<1
 		dma.Repeat = (v>>1)&1 != 0
 
 		dma.isWord = (v>>2)&1 != 0
-		dma.Mode = uint32(v>>3) & 0b111
+		dma.Mode = uint32(v>>3) & 7
 		dma.IRQ = (v>>6)&1 != 0
 		dma.Enabled = (v>>7)&1 != 0
 
@@ -146,13 +154,7 @@ func (dma *DMA) WriteControl(v uint8, hi bool) {
 		if wasDisabled && dma.Enabled && dma.Mode == ARM9_DMA_MODE_GEO {
 			dma.sch.Schedule(dma.gxTransferEvent, 1, nil)
 		}
-		return
 	}
-
-	a := uint32(v) & 0xE0
-	dma.Control = (dma.Control &^ 0xFF) | a
-	dma.DstAdj = (uint32(a) >> 5) & 0b11
-	dma.SrcAdj = (dma.SrcAdj &^ 1) | ((uint32(a) >> 7) & 1)
 }
 
 func (dma *DMA) disable() {

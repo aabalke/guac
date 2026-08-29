@@ -77,7 +77,7 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 	}
 
 	nds.arm7 = arm7.NewCpu(&nds.mem.Bus7, nds.Cycles7, nds.Idle7)
-	nds.arm9 = arm9.NewCpu(&nds.mem.Bus9, nds.Cycles, nds.Idle, cp15.NewCp15(&nds.mem.Tcm))
+	nds.arm9 = arm9.NewCpu(&nds.mem.Bus9, nds.Cycles9, nds.Idle9, cp15.NewCp15(&nds.mem.Tcm))
 	nds.irq7 = irq.NewIrq(nds.Scheduler, &nds.arm7.IrqLine)
 	nds.irq9 = irq.NewIrq(nds.Scheduler, &nds.arm9.IrqLine)
 	nds.ppu = ppu.NewPPU(nds.irq9)
@@ -243,11 +243,11 @@ func (nds *Nds) Tick9(cycles int64) {
 	nds.Scheduler.Add(cycles >> 1)
 }
 
-func (nds *Nds) Idle(cycles int64) {
+func (nds *Nds) Idle9(cycles int64) {
 	nds.Tick9(cycles)
 }
 
-func (nds *Nds) Cycles(addr, width, seq uint32, inst bool) {
+func (nds *Nds) Cycles9(addr, width, seq uint32, inst bool) {
 	region := addr >> 24
 
 	cycles := int64(1)
