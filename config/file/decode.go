@@ -201,6 +201,17 @@ func (c *Config) decodeGb() {
 		c.config.Gb.Palette[3] = pals[3]
 	}
 
+	switch c.Gb.Rotation {
+	case 90:
+		c.config.Gb.Rotation = 1
+	case 180:
+		c.config.Gb.Rotation = 2
+	case 270:
+		c.config.Gb.Rotation = 3
+	default:
+		c.config.Gb.Rotation = 0
+	}
+
 	switch strings.ToLower(c.Gb.System) {
 	case "dmg", "gb":
 		c.config.Gb.System = 1

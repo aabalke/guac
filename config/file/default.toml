@@ -66,6 +66,8 @@ system = "auto"
 # if invalid input, will fall back to greyscale
 dmg_palette = [ "0xE0F8D0", "0x88C070", "0x346856", "0x081820" ]
 
+rotation = 0        # 0, 90, 180, 270
+
 [gb.color_correction]
 
 # valid vaules are ["none", auto", "gbc", "gba", "higan"]

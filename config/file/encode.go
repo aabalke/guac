@@ -170,6 +170,17 @@ func (c *Config) encodeGb() {
 		"0x" + utils.ColorToHex(c.config.Gb.Palette[3]),
 	}
 
+	switch c.config.Gb.Rotation {
+	case 1:
+		c.Gb.Rotation = 90
+	case 2:
+		c.Gb.Rotation = 180
+	case 3:
+		c.Gb.Rotation = 270
+	default:
+		c.Gb.Rotation = 0
+	}
+
 	switch c.config.Gb.System {
 	case 1:
 		c.Gb.System = "dmg"

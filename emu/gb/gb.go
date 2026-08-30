@@ -3,6 +3,7 @@ package gb
 import (
 	"context"
 	"image/color"
+	"math"
 	"os"
 	"sync"
 	"time"
@@ -512,43 +513,40 @@ func (gb *GameBoy) toggleDoubleSpeed() {
 func (gb *GameBoy) Close() {}
 
 func (gb *GameBoy) Draw(dst *ebiten.Image) {
-	image := gb.Image
+	src := gb.Image
 
 	if gb.ghostOpts != nil {
-		image.DrawImage(gb.Ghost, gb.ghostOpts)
+		src.DrawImage(gb.Ghost, gb.ghostOpts)
 	}
 
-	if *gb.ColorCorrectionShader.Type != config.CLR_CORR_NONE {
-		image = gb.ColorCorrectionShader.Draw(image)
+	if gb.Color && *gb.ColorCorrectionShader.Type != config.CLR_CORR_NONE {
+		src = gb.ColorCorrectionShader.Draw(src)
 	}
-
-	const (
-		canvasW = float64(SCREEN_WIDTH)
-		canvasH = float64(SCREEN_HEIGHT)
-	)
 
 	var (
-		//rotation = config.Conf.gb.Rotation
-		//radians  = float64(rotation) * math.Pi / 2
-		screenW = float64(dst.Bounds().Dx())
-		screenH = float64(dst.Bounds().Dy())
-		fitW    = canvasW
-		fitH    = canvasH
+		canvasW  = float64(src.Bounds().Dx())
+		canvasH  = float64(src.Bounds().Dy())
+		rotation = config.Conf.Gb.Rotation
+		radians  = float64(rotation) * math.Pi / 2
+		screenW  = float64(dst.Bounds().Dx())
+		screenH  = float64(dst.Bounds().Dy())
+		fitW     = canvasW
+		fitH     = canvasH
 	)
 
-	//if rot := rotation == config.ROT_90 || rotation == config.ROT_270; rot {
-	//	fitW, fitH = canvasH, canvasW
-	//}
+	if rot := rotation == config.ROT_90 || rotation == config.ROT_270; rot {
+		fitW, fitH = canvasH, canvasW
+	}
 
 	scale := utils.ScaleImage(screenW, screenH, fitW, fitH)
 
 	gb.imageOpts.GeoM.Reset()
 	gb.imageOpts.GeoM.Translate(-canvasW/2, -canvasH/2)
-	//gb.imageOpts.GeoM.Rotate(radians)
+	gb.imageOpts.GeoM.Rotate(radians)
 	gb.imageOpts.GeoM.Scale(scale, scale)
 	gb.imageOpts.GeoM.Translate(screenW/2, screenH/2)
 
 	gb.Mu.Lock()
-	dst.DrawImage(image, gb.imageOpts)
+	dst.DrawImage(src, gb.imageOpts)
 	gb.Mu.Unlock()
 }

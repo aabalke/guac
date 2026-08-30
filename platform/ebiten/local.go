@@ -156,6 +156,8 @@ type GbLocalization struct {
 	General      string   `toml:"general"`
 	System       string   `toml:"system"`
 	Systems      []string `toml:"systems"`
+	Rotation     string   `toml:"rotation"`
+	Rotations    []string `toml:"rotations"`
 	DmgPalette   string   `toml:"dmg_palette"`
 	Lightest     string   `toml:"lightest"`
 	Light        string   `toml:"light"`

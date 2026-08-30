@@ -146,6 +146,7 @@ type Profile struct {
 type Gb struct {
 	System          int
 	Palette         [4]color.Color
+	Rotation        int
 	ColorCorrection ColorCorrection
 	Bios            GbBios
 	Keyboard        EmulatorKeyboard

@@ -68,6 +68,7 @@ type Gb struct {
 	System          string          `toml:"system"`
 	Bios            GbBios          `toml:"bios"`
 	Palette         []string        `toml:"dmg_palette"`
+	Rotation        int             `toml:"rotation"`
 	ColorCorrection ColorCorrection `toml:"color_correction"`
 	Keyboard        EmulatorInput   `toml:"keyboard"`
 	Controller      EmulatorInput   `toml:"controller"`

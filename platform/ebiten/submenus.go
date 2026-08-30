@@ -217,9 +217,11 @@ func NewGbMenu(g *Game) *widget.Container {
 
 	general := newTwoCol()
 	menu.AddChild(NewHeader(l.General, g.ui.res), general)
-	general.AddChild(
-		NewLabel(l.System), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.System, l.Systems, g.ui.res),
-	)
+	general.AddChild(NewLabel(l.System), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.System, l.Systems, g.ui.res))
+
+	graphics := newTwoCol()
+	menu.AddChild(graphics)
+	graphics.AddChild(NewLabel(l.Rotation), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.Rotation, l.Rotations, g.ui.res))
 
 	palette := newTwoCol()
 	menu.AddChild(NewHeader(l.DmgPalette, g.ui.res), palette)

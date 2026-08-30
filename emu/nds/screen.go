@@ -110,12 +110,9 @@ func (s *Screen) Draw(dst *ebiten.Image) {
 	}
 }
 
-func (s *Screen) FillEven(screen, top, bottom *ebiten.Image, horizontal bool) {
-	const (
-		singleW = float64(SCREEN_WIDTH)
-		singleH = float64(SCREEN_HEIGHT)
-	)
-
+func (s *Screen) FillEven(dst, top, bottom *ebiten.Image, horizontal bool) {
+	singleW := float64(top.Bounds().Dx())
+	singleH := float64(top.Bounds().Dy())
 	canvasW := singleW
 	canvasH := singleH * 2
 
@@ -127,8 +124,8 @@ func (s *Screen) FillEven(screen, top, bottom *ebiten.Image, horizontal bool) {
 	var (
 		rotation = *s.Rotation
 		radians  = float64(rotation) * math.Pi / 2
-		screenW  = float64(screen.Bounds().Dx())
-		screenH  = float64(screen.Bounds().Dy())
+		dstW     = float64(dst.Bounds().Dx())
+		dstH     = float64(dst.Bounds().Dy())
 		fitW     = canvasW
 		fitH     = canvasH
 	)
@@ -137,7 +134,7 @@ func (s *Screen) FillEven(screen, top, bottom *ebiten.Image, horizontal bool) {
 		fitW, fitH = canvasH, canvasW
 	}
 
-	scale := utils.ScaleImage(screenW, screenH, fitW, fitH)
+	scale := utils.ScaleImage(dstW, dstH, fitW, fitH)
 
 	s.opts.GeoM.Reset()
 
@@ -149,10 +146,10 @@ func (s *Screen) FillEven(screen, top, bottom *ebiten.Image, horizontal bool) {
 
 	s.opts.GeoM.Rotate(radians)
 	s.opts.GeoM.Scale(scale, scale)
-	s.opts.GeoM.Translate(screenW/2, screenH/2)
+	s.opts.GeoM.Translate(dstW/2, dstH/2)
 
 	s.Mu.Lock()
-	screen.DrawImage(top, s.opts)
+	dst.DrawImage(top, s.opts)
 	s.Mu.Unlock()
 
 	s.opts.GeoM.Reset()
@@ -165,43 +162,40 @@ func (s *Screen) FillEven(screen, top, bottom *ebiten.Image, horizontal bool) {
 
 	s.opts.GeoM.Rotate(radians)
 	s.opts.GeoM.Scale(scale, scale)
-	s.opts.GeoM.Translate(screenW/2, screenH/2)
+	s.opts.GeoM.Translate(dstW/2, dstH/2)
 
 	s.Mu.Lock()
-	screen.DrawImage(bottom, s.opts)
+	dst.DrawImage(bottom, s.opts)
 	s.Mu.Unlock()
 
 	s.TouchGeoM = s.opts.GeoM
 }
 
-func (s *Screen) FillOnly(screen, image *ebiten.Image, bottom bool) {
-	const (
-		canvasW = float64(SCREEN_WIDTH)
-		canvasH = float64(SCREEN_HEIGHT)
-	)
-
+func (s *Screen) FillOnly(dst, src *ebiten.Image, bottom bool) {
 	var (
-		rotation = *s.Rotation
-		radians  = float64(rotation) * math.Pi / 2
-		screenW  = float64(screen.Bounds().Dx())
-		screenH  = float64(screen.Bounds().Dy())
+		canvasW  = float64(src.Bounds().Dx())
+		canvasH  = float64(src.Bounds().Dy())
+		dstW     = float64(dst.Bounds().Dx())
+		dstH     = float64(dst.Bounds().Dy())
 		fitW     = canvasW
 		fitH     = canvasH
+		rotation = *s.Rotation
+		radians  = float64(rotation) * math.Pi / 2
 	)
 
 	if rot := rotation == ROT_90 || rotation == ROT_270; rot {
 		fitW, fitH = canvasH, canvasW
 	}
 
-	scale := utils.ScaleImage(screenW, screenH, fitW, fitH)
+	scale := utils.ScaleImage(dstW, dstH, fitW, fitH)
 
 	s.opts.GeoM.Reset()
 	s.opts.GeoM.Translate(-canvasW/2, -canvasH/2)
 	s.opts.GeoM.Rotate(radians)
 	s.opts.GeoM.Scale(scale, scale)
-	s.opts.GeoM.Translate(screenW/2, screenH/2)
+	s.opts.GeoM.Translate(dstW/2, dstH/2)
 	s.Mu.Lock()
-	screen.DrawImage(image, s.opts)
+	dst.DrawImage(src, s.opts)
 	s.Mu.Unlock()
 
 	if bottom {
@@ -212,10 +206,8 @@ func (s *Screen) FillOnly(screen, image *ebiten.Image, bottom bool) {
 }
 
 func (s *Screen) FillHybrid(dst, top, bottom *ebiten.Image) {
-	const (
-		singleW = float64(SCREEN_WIDTH)
-		singleH = float64(SCREEN_HEIGHT)
-	)
+	singleW := float64(top.Bounds().Dx())
+	singleH := float64(top.Bounds().Dy())
 
 	var (
 		canvasW  = singleW * 3

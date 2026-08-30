@@ -365,22 +365,19 @@ func (gba *GBA) OnTimerOverflow(t *timer.Timer, late int64) {
 }
 
 func (gba *GBA) Draw(dst *ebiten.Image) {
-	image := gba.Image
+	src := gba.Image
 
 	if gba.ghostOpts != nil {
-		image.DrawImage(gba.Ghost, gba.ghostOpts)
+		src.DrawImage(gba.Ghost, gba.ghostOpts)
 	}
 
 	if *gba.ColorCorrectionShader.Type != config.CLR_CORR_NONE {
-		image = gba.ColorCorrectionShader.Draw(image)
+		src = gba.ColorCorrectionShader.Draw(src)
 	}
 
-	const (
-		canvasW = float64(SCREEN_WIDTH)
-		canvasH = float64(SCREEN_HEIGHT)
-	)
-
 	var (
+		canvasW  = float64(src.Bounds().Dx())
+		canvasH  = float64(src.Bounds().Dy())
 		rotation = config.Conf.Gba.Rotation
 		radians  = float64(rotation) * math.Pi / 2
 		screenW  = float64(dst.Bounds().Dx())
@@ -402,6 +399,6 @@ func (gba *GBA) Draw(dst *ebiten.Image) {
 	gba.imageOpts.GeoM.Translate(screenW/2, screenH/2)
 
 	gba.Mu.Lock()
-	dst.DrawImage(image, gba.imageOpts)
+	dst.DrawImage(src, gba.imageOpts)
 	gba.Mu.Unlock()
 }
