@@ -380,8 +380,8 @@ func (gba *GBA) Draw(dst *ebiten.Image) {
 		canvasH  = float64(src.Bounds().Dy())
 		rotation = config.Conf.Gba.Rotation
 		radians  = float64(rotation) * math.Pi / 2
-		screenW  = float64(dst.Bounds().Dx())
-		screenH  = float64(dst.Bounds().Dy())
+		dstW     = float64(dst.Bounds().Dx())
+		dstH     = float64(dst.Bounds().Dy())
 		fitW     = canvasW
 		fitH     = canvasH
 	)
@@ -390,13 +390,13 @@ func (gba *GBA) Draw(dst *ebiten.Image) {
 		fitW, fitH = canvasH, canvasW
 	}
 
-	scale := utils.ScaleImage(screenW, screenH, fitW, fitH)
+	scale := utils.ScaleImage(dstW, dstH, fitW, fitH)
 
 	gba.imageOpts.GeoM.Reset()
 	gba.imageOpts.GeoM.Translate(-canvasW/2, -canvasH/2)
 	gba.imageOpts.GeoM.Rotate(radians)
 	gba.imageOpts.GeoM.Scale(scale, scale)
-	gba.imageOpts.GeoM.Translate(screenW/2, screenH/2)
+	gba.imageOpts.GeoM.Translate(dstW/2, dstH/2)
 
 	gba.Mu.Lock()
 	dst.DrawImage(src, gba.imageOpts)

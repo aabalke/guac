@@ -677,6 +677,7 @@ func (c *Cpu) ThumbPushPop(op uint16) {
 		if pclr {
 			r[SP] -= 4
 			c.Write32Block(r[SP], r[LR], seq)
+			seq = SEQ
 		}
 
 		for reg := 7; reg >= 0; reg-- {

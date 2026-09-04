@@ -244,11 +244,11 @@ func (c *Config) encodeNds() {
 	c.encodeKeyboard(&c.Nds.Keyboard, &c.config.Nds.Keyboard)
 	c.encodeController(&c.Nds.Controller, &c.config.Nds.Controller)
 
-	if utils.IsFile(c.Nds.Bios.Arm7Path) {
+	if utils.IsFile(c.config.Nds.Bios.Arm7Path) {
 		c.Nds.Bios.Arm7Path = c.config.Nds.Bios.Arm7Path
 	}
 
-	if utils.IsFile(c.Nds.Bios.Arm9Path) {
+	if utils.IsFile(c.config.Nds.Bios.Arm9Path) {
 		c.Nds.Bios.Arm9Path = c.config.Nds.Bios.Arm9Path
 	}
 

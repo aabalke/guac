@@ -17,8 +17,10 @@ type Cpu struct {
 	IrqLine    bool
 	Reloaded   bool
 	LowVector  bool
-	Timestamp  int64
-	Leftover   int64
+
+	Timestamp int64
+	Leftover  int64
+	IsArm9    bool
 }
 
 type Mem interface {
@@ -385,7 +387,9 @@ func (c *Cpu) Write32Block(addr, v, seq uint32) {
 func (c *Cpu) Read8(addr uint32) uint32 {
 	c.Cycles(addr, 1, NONSEQ, false)
 	v := c.Mem.Read8(addr)
-	c.Idle(1)
+	if !c.IsArm9 {
+		c.Idle(1)
+	}
 	c.LastWasDma = false
 	return v
 }
@@ -394,7 +398,9 @@ func (c *Cpu) Read8(addr uint32) uint32 {
 func (c *Cpu) Read16(addr uint32) uint32 {
 	c.Cycles(addr, 2, NONSEQ, false)
 	v := c.Mem.Read16(addr)
-	c.Idle(1)
+	if !c.IsArm9 {
+		c.Idle(1)
+	}
 	c.LastWasDma = false
 	return v
 }
@@ -403,7 +409,9 @@ func (c *Cpu) Read16(addr uint32) uint32 {
 func (c *Cpu) Read32(addr uint32) uint32 {
 	c.Cycles(addr, 4, NONSEQ, false)
 	v := c.Mem.Read32(addr)
-	c.Idle(1)
+	if !c.IsArm9 {
+		c.Idle(1)
+	}
 	c.LastWasDma = false
 	return v
 }

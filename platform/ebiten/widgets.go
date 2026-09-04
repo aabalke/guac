@@ -361,6 +361,7 @@ func NewDirectoryInput(v *string, defaultPath string) widget.PreferredSizeLocate
 func dialogInput(v *string, dialogFunc func() string) widget.PreferredSizeLocateableWidget {
 	onClick := func(input *widget.TextInput) {
 		f := dialogFunc()
+
 		*v = f
 		input.SetText(trim(f, MAX_DIALOG_LEN))
 		input.CursorMoveStart()
