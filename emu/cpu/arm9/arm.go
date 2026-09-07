@@ -7,7 +7,6 @@ import (
 	"math/bits"
 
 	"github.com/aabalke/guac/emu/cpu/arm7"
-	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
 )
 
 func (c *Cpu) DecodeArm(op uint32) {
@@ -192,12 +191,10 @@ func (c *Cpu) Blx(op uint32) {
 	r := &c.Reg.R
 	r[LR] = r[PC] - 4
 	r[PC] += uint32((int32(op) << 8) >> 6)
-
-	// half offset
 	r[PC] += ((op >> 24) & 1) << 1
 
 	c.Reg.CPSR.T = true
-	c.Reload16()
+	c.Reload = true
 }
 
 func (c *Cpu) BranchExchange(op uint32) {
@@ -360,15 +357,10 @@ func (c *Cpu) Clz(op uint32) {
 
 func (c *Cpu) CoDataReg(op uint32) {
 	var (
-		reg = cp15.CpRegister{
-			Op: uint8((op >> 21) & 0x7),
-			Cn: uint8((op >> 16) & 0xF),
-			Pn: uint8((op >> 8) & 0xF),
-			Cp: uint8((op >> 5) & 0x7),
-			Cm: uint8((op >> 0) & 0xF),
-		}
-
 		r  = &c.Reg.R
+		cn = (op >> 16) & 0xF
+		cp = (op >> 5) & 7
+		cm = (op >> 0) & 0xF
 		rd = (op >> 12) & 0xF
 	)
 
@@ -376,17 +368,24 @@ func (c *Cpu) CoDataReg(op uint32) {
 		panic("MRC2/MCR2")
 	}
 
+	if processor := uint8((op >> 8) & 0xF); processor != 15 {
+		panic("co data register with pn != cp15")
+	}
+
+	if cpopc := (op >> 21) & 7; cpopc != 0 {
+		panic("co data register with cpopc != 0")
+	}
+
+	idx := (cn << 8) | (cm << 4) | cp
+
 	if mrc := (op>>20)&1 != 0; mrc {
-		r[rd] = c.Cp15.Read(&reg)
+		r[rd] = c.Cp15.Read(idx)
+		c.Idle(3) // matches melondds
 		return
 	}
 
-	if rd == 0 && (reg == cp15.HALT || reg == cp15.HALT2) {
-		c.Halted = true
-		return
-	}
-
-	c.Cp15.Write(&reg, &c.LowVector, r[rd])
+	c.Cp15.Write(idx, r[rd])
+	c.Idle(2) // matches melondds
 }
 
 func (c *Cpu) Block(op uint32) {
@@ -474,22 +473,20 @@ func (c *Cpu) Block(op uint32) {
 		return
 	}
 
-	c.Idle(1)
+	//c.Idle(1) // gba has, not sure if arm9
 
 	if !pcIncluded {
 		return
 	}
+
+	c.Reload = true
 
 	if !psr {
 		// required for pop {pc}
 		c.ToggleThumb()
 		return
 	}
-	if c.Reg.CPSR.T {
-		c.Reload16()
-	} else {
-		c.Reload32()
-	}
+
 	var (
 		curr = c.Reg.CPSR.Mode
 		spsr = c.Reg.SPSR[arm7.ModeBank[curr]]

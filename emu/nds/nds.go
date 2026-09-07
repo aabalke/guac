@@ -10,7 +10,6 @@ import (
 	"github.com/aabalke/guac/config"
 	"github.com/aabalke/guac/emu/cpu/arm7"
 	"github.com/aabalke/guac/emu/cpu/arm9"
-	"github.com/aabalke/guac/emu/cpu/arm9/cp15"
 	"github.com/aabalke/guac/emu/gba/timer"
 	"github.com/aabalke/guac/emu/nds/cart"
 	"github.com/aabalke/guac/emu/nds/irq"
@@ -77,7 +76,7 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 	}
 
 	nds.arm7 = arm7.NewCpu(&nds.mem.Bus7, nds.Cycles7, nds.Idle7)
-	nds.arm9 = arm9.NewCpu(&nds.mem.Bus9, nds.Cycles9, nds.Idle9, cp15.NewCp15(&nds.mem.Tcm))
+	nds.arm9 = arm9.NewCpu(&nds.mem.Bus9, nds.Tick9)
 	nds.irq7 = irq.NewIrq(nds.Scheduler, &nds.arm7.IrqLine)
 	nds.irq9 = irq.NewIrq(nds.Scheduler, &nds.arm9.IrqLine)
 	nds.ppu = ppu.NewPPU(nds.irq9)
@@ -243,26 +242,6 @@ func (nds *Nds) Tick9(cycles int64) {
 	nds.Scheduler.Add(cycles >> 1)
 }
 
-func (nds *Nds) Idle9(cycles int64) {
-	nds.Tick9(cycles)
-}
-
-func (nds *Nds) Cycles9(addr, width, seq uint32, inst bool) {
-	region := addr >> 24
-
-	cycles := int64(1)
-	if region < uint32(len(timings9)) {
-		cycles = timings9[region]
-	}
-
-	if width == 2 {
-		cycles >>= 1
-		cycles = max(cycles, 1)
-	}
-
-	nds.Tick9(cycles)
-}
-
 func (nds *Nds) Tick7(cycles int64) {
 	// int 33mhz cycles
 	nds.arm7.Timestamp += cycles
@@ -273,25 +252,8 @@ func (nds *Nds) Idle7(cycles int64) {
 }
 
 func (nds *Nds) Cycles7(addr, width, seq uint32, inst bool) {
-	region := addr >> 24
-
-	cycles := int64(1)
-	if region < uint32(len(timings7)) {
-		cycles = timings7[region]
-	}
-
-	if width == 2 {
-		cycles >>= 1
-		cycles = max(cycles, 1)
-	}
-
-	nds.Tick7(cycles)
+	nds.Tick7(1)
 }
-
-var (
-	timings7 = [...]int64{1, 1, 6, 1, 1, 2, 2, 1, 16, 16, 16, 16}
-	timings9 = [...]int64{1, 1, 1, 4, 4, 5, 5, 4, 20, 20, 20, 20}
-)
 
 func (nds *Nds) ToggleMute(muted bool) bool {
 	nds.Muted = muted
@@ -333,15 +295,14 @@ func (nds *Nds) DirectBoot() {
 	nds.arm7.Reg.R[15] = nds.Cartridge.Header.Arm7EntryAddr
 	nds.arm7.Reg.CPSR.Set(0x1F)
 
-	nds.arm9.Op[0] = 0xF000_0000
-	nds.arm9.Op[1] = 0xF000_0000
-	nds.arm7.Op[0] = 0xF000_0000
-	nds.arm7.Op[1] = 0xF000_0000
+	nds.arm7.Reload32()
+	nds.arm9.Reload32()
 
-	// these are temp and should be removed
-	// nds.arm9.Step()
-	// nds.arm9.Step()
-	// nds.Scheduler.CurrentCycle = 0
+	nds.arm9.Reload = false
+	nds.arm9.Timestamp = 0
+	nds.arm9.InstCycles = 0
+	nds.arm9.DataCycles = 0
+	nds.arm9.IdleCycles = 0
 }
 
 func (nds *Nds) CheckDmas(mode uint32, arm9 bool) {

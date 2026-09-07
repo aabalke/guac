@@ -5,6 +5,7 @@ import (
 )
 
 type Cpu struct {
+	Bus        Bus
 	Mem        Mem
 	Cycles     func(addr, width, seq uint32, inst bool)
 	Idle       func(cycles int64)
@@ -15,12 +16,22 @@ type Cpu struct {
 	Halted     bool
 	LastWasDma bool
 	IrqLine    bool
-	Reloaded   bool
+	Reload     bool
 	LowVector  bool
 
 	Timestamp int64
 	Leftover  int64
-	IsArm9    bool
+}
+
+type Bus interface {
+	Read8(addr uint32) uint32
+	Read16(addr uint32) uint32
+	Read32(addr uint32) uint32
+	Read32Block(addr, seq uint32) uint32
+	Write8(addr uint32, v uint8)
+	Write16(addr uint32, v uint16)
+	Write32(addr uint32, v uint32)
+	Write32Block(addr, v, seq uint32)
 }
 
 type Mem interface {
@@ -183,24 +194,21 @@ func (c *Cond) CheckCond(cond uint32) bool {
 }
 
 func NewCpu(mem Mem, cycles func(addr, width, seq uint32, inst bool), idle func(cycles int64)) *Cpu {
-	return &Cpu{
+	c := &Cpu{
 		Mem:       mem,
 		Cycles:    cycles,
 		Idle:      idle,
 		LowVector: true,
 	}
+
+	c.Bus = &Bus7{
+		c: c,
+	}
+
+	return c
 }
 
 func (c *Cpu) CheckIrq() {
-	if !c.IrqLine {
-		return
-	}
-	c.Halted = false
-
-	if c.Reg.CPSR.I {
-		return
-	}
-
 	var (
 		cpsr  = &c.Reg.CPSR
 		thumb = cpsr.T
@@ -239,12 +247,18 @@ func (c *Cpu) CheckIrq() {
 	}
 
 	c.Reg.R[PC] = addr
-
-	c.Reload32()
 }
 
 func (c *Cpu) Step() {
-	c.CheckIrq()
+	if c.IrqLine {
+
+		c.Halted = false
+
+		if !c.Reg.CPSR.I {
+			c.CheckIrq()
+			c.ReloadPipe()
+		}
+	}
 
 	inst := c.Op[0]
 	seq := c.Seq
@@ -263,7 +277,9 @@ func (c *Cpu) Step() {
 
 		c.DecodeThumb(uint16(inst))
 
-		if !c.Reloaded {
+		if c.Reload {
+			c.ReloadPipe()
+		} else {
 			c.Reg.R[PC] += 2
 			if c.PcPtr != nil {
 				c.PcPtr = unsafe.Add(c.PcPtr, 2)
@@ -281,15 +297,26 @@ func (c *Cpu) Step() {
 
 		c.DecodeArm(inst)
 
-		if !c.Reloaded {
+		if c.Reload {
+			c.ReloadPipe()
+		} else {
 			c.Reg.R[PC] += 4
 			if c.PcPtr != nil {
 				c.PcPtr = unsafe.Add(c.PcPtr, 4)
 			}
 		}
 	}
+}
 
-	c.Reloaded = false
+func (c *Cpu) ReloadPipe() {
+	c.Reload = false
+
+	if c.Reg.CPSR.T {
+		c.Reload16()
+		return
+	}
+
+	c.Reload32()
 }
 
 func (c *Cpu) Reload16() {
@@ -311,7 +338,6 @@ func (c *Cpu) Reload16() {
 	}
 
 	c.Reg.R[PC] += 4
-	c.Reloaded = true
 	c.Seq = SEQ
 }
 
@@ -334,7 +360,6 @@ func (c *Cpu) Reload32() {
 	}
 
 	c.Reg.R[PC] += 8
-	c.Reloaded = true
 	c.Seq = SEQ
 }
 
@@ -342,86 +367,53 @@ func (c *Cpu) Reload32() {
 func (c *Cpu) ToggleThumb() {
 	c.Reg.CPSR.T = c.Reg.R[PC]&1 != 0
 
+	c.Reload = true
+
 	if c.Reg.CPSR.T {
 		c.Reg.R[PC] &^= 1
-		c.Reload16()
 		return
 	}
 	c.Reg.R[PC] &^= 3
-	c.Reload32()
 }
 
 //go:nosplit
 func (c *Cpu) Write8(addr uint32, v uint8) {
-	c.Cycles(addr, 1, NONSEQ, false)
-	c.Mem.Write8(addr, v)
-	c.Seq = NONSEQ
-	c.LastWasDma = false
+	c.Bus.Write8(addr, v)
 }
 
 //go:nosplit
 func (c *Cpu) Write16(addr uint32, v uint16) {
-	c.Cycles(addr, 2, NONSEQ, false)
-	c.Mem.Write16(addr, v)
-	c.Seq = NONSEQ
-	c.LastWasDma = false
+	c.Bus.Write16(addr, v)
 }
 
 //go:nosplit
 func (c *Cpu) Write32(addr, v uint32) {
-	c.Cycles(addr, 4, NONSEQ, false)
-	c.Mem.Write32(addr, v)
-	c.Seq = NONSEQ
-	c.LastWasDma = false
+	c.Bus.Write32(addr, v)
 }
 
 //go:nosplit
 func (c *Cpu) Write32Block(addr, v, seq uint32) {
-	c.Cycles(addr, 4, seq, false)
-	c.Mem.Write32(addr, v)
-	c.Seq = NONSEQ
-	c.LastWasDma = false
+	c.Bus.Write32Block(addr, v, seq)
 }
 
 //go:nosplit
 func (c *Cpu) Read8(addr uint32) uint32 {
-	c.Cycles(addr, 1, NONSEQ, false)
-	v := c.Mem.Read8(addr)
-	if !c.IsArm9 {
-		c.Idle(1)
-	}
-	c.LastWasDma = false
-	return v
+	return c.Bus.Read8(addr)
 }
 
 //go:nosplit
 func (c *Cpu) Read16(addr uint32) uint32 {
-	c.Cycles(addr, 2, NONSEQ, false)
-	v := c.Mem.Read16(addr)
-	if !c.IsArm9 {
-		c.Idle(1)
-	}
-	c.LastWasDma = false
-	return v
+	return c.Bus.Read16(addr)
 }
 
 //go:nosplit
 func (c *Cpu) Read32(addr uint32) uint32 {
-	c.Cycles(addr, 4, NONSEQ, false)
-	v := c.Mem.Read32(addr)
-	if !c.IsArm9 {
-		c.Idle(1)
-	}
-	c.LastWasDma = false
-	return v
+	return c.Bus.Read32(addr)
 }
 
 //go:nosplit
 func (c *Cpu) Read32Block(addr, seq uint32) uint32 {
-	c.Cycles(addr, 4, seq, false)
-	v := c.Mem.Read32(addr)
-	c.LastWasDma = false
-	return v
+	return c.Bus.Read32Block(addr, seq)
 }
 
 func idleMul(rs uint32, sign bool) int64 {
@@ -504,7 +496,8 @@ func (c *Cpu) Exception(addr ExceptionVector, mode CpuMode) {
 	}
 
 	c.Reg.R[PC] = uint32(addr)
-	c.Reload32()
+
+	c.Reload = true
 }
 
 func (c *Cpu) ExitException(mode CpuMode) {

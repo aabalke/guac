@@ -201,10 +201,6 @@ type Bus9 struct {
 }
 
 func (b *Bus9) Read8(addr uint32) uint32 {
-	if v, ok := b.M.Tcm.Read(addr); ok {
-		return uint32(v)
-	}
-
 	switch addr >> 24 {
 	case 0x2:
 		return uint32(b.M.MainRam[addr&0x3F_FFFF])
@@ -267,10 +263,6 @@ func (b *Bus9) Read32(addr uint32) uint32 {
 }
 
 func (b *Bus9) ReadPtr(addr uint32) unsafe.Pointer {
-	if ptr := b.M.Tcm.ReadPtr(addr); ptr != nil {
-		return ptr
-	}
-
 	switch addr >> 24 {
 	case 0x2:
 		return unsafe.Add(unsafe.Pointer(&b.M.MainRam), addr&0x3F_FFFF)
@@ -290,10 +282,6 @@ func (b *Bus9) ReadPtr(addr uint32) unsafe.Pointer {
 }
 
 func (b *Bus9) Write8(addr uint32, v uint8) {
-	if ok := b.M.Tcm.Write(addr, v); ok {
-		return
-	}
-
 	switch addr >> 24 {
 	case 0x2:
 		//clearTempUnimplimented(addr)
@@ -385,10 +373,6 @@ func (b *Bus9) Write32(addr, v uint32) {
 }
 
 func (b *Bus9) WritePtr(addr uint32) unsafe.Pointer {
-	if ptr := b.M.Tcm.WritePtr(addr); ptr != nil {
-		return ptr
-	}
-
 	switch addr >> 24 {
 	case 0x2:
 		return unsafe.Add(unsafe.Pointer(&b.M.MainRam), addr&0x3F_FFFF)
@@ -400,4 +384,5 @@ func (b *Bus9) WritePtr(addr uint32) unsafe.Pointer {
 
 	return nil
 }
+
 func (b *Bus9) WriteGXFIFO(v uint32) { b.M.Ppu.Rasterizer.GeoEngine.Fifo(v) }

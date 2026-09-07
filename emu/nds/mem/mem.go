@@ -20,7 +20,6 @@ type Irq interface {
 }
 
 type Mem struct {
-	Tcm     Tcm
 	MainRam [0x40_0000]uint8
 	WRAM    WRAM
 	Oam     [0x800]uint8
@@ -43,7 +42,8 @@ type Mem struct {
 	Snd       *snd.Snd
 
 	Vcount      uint32
-	Dispstat    Dispstat
+	Dispstat7   Dispstat
+	Dispstat9   Dispstat
 	Key         *Key
 	div         Div
 	sqrt        Sqrt

@@ -389,11 +389,7 @@ func (c *Cpu) Alu(op uint32) {
 			c.Reg.R[PC] &^= 3
 		}
 		if inst < 0b1000 || inst > 0b1011 {
-			if c.Reg.CPSR.T {
-				c.Reload16()
-			} else {
-				c.Reload32()
-			}
+			c.Reload = true
 		}
 	}
 }
@@ -728,7 +724,7 @@ func (c *Cpu) B(op uint32) {
 	}
 
 	r[PC] += uint32((int32(op) << 8) >> 6)
-	c.Reload32()
+	c.Reload = true
 }
 
 const (
@@ -1040,12 +1036,7 @@ func (c *Cpu) Block(op uint32) {
 	if !pcIncluded {
 		return
 	}
-
-	if c.Reg.CPSR.T {
-		c.Reload16()
-	} else {
-		c.Reload32()
-	}
+	c.Reload = true
 
 	if !psr {
 		return

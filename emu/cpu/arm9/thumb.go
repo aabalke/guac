@@ -140,7 +140,7 @@ func (c *Cpu) ThumbPushPop(op uint16) {
 	if rlist == 0 && !pclr {
 		if pop {
 			r[PC] = c.Read32Block(r[SP], seq)
-			c.Reload16()
+			c.Reload = true
 			r[SP] += 0x40
 		} else {
 			// alyosha test fails this.
@@ -169,7 +169,7 @@ func (c *Cpu) ThumbPushPop(op uint16) {
 			r[PC] = c.Read32Block(r[SP], seq)
 			// arm9 toggle thumb switch based on bit 0, arm7 force aligned
 			r[SP] += 4
-			c.Idle(1)
+			//c.Idle(1) // gba has, not sure if arm9
 			c.ToggleThumb()
 			return
 		}
@@ -181,6 +181,7 @@ func (c *Cpu) ThumbPushPop(op uint16) {
 		if pclr {
 			r[SP] -= 4
 			c.Write32Block(r[SP], r[LR], seq)
+			seq = arm7.SEQ
 		}
 
 		for reg := 7; reg >= 0; reg-- {
@@ -209,7 +210,7 @@ func (c *Cpu) HiRegBX(op uint16) {
 		r[rd] += r[rs]
 
 		if rd == PC {
-			c.Reload16()
+			c.Reload = true
 		}
 
 	case arm7.HI_CMP:
@@ -232,7 +233,7 @@ func (c *Cpu) HiRegBX(op uint16) {
 		r[rd] = r[rs]
 
 		if rd == PC {
-			c.Reload16()
+			c.Reload = true
 		}
 
 	case arm7.HI_BX:

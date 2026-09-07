@@ -403,7 +403,7 @@ func (c *Cpu) HiRegBX(op uint16) {
 		r[rd] += r[rs]
 
 		if rd == PC {
-			c.Reload16()
+			c.Reload = true
 		}
 
 	case HI_CMP:
@@ -425,7 +425,7 @@ func (c *Cpu) HiRegBX(op uint16) {
 		r[rd] = r[rs]
 
 		if rd == PC {
-			c.Reload16()
+			c.Reload = true
 		}
 
 	case HI_BX:
@@ -640,7 +640,7 @@ func (c *Cpu) ThumbPushPop(op uint16) {
 	if rlist == 0 && !pclr {
 		if pop {
 			r[PC] = c.Read32Block(r[SP], seq)
-			c.Reload16()
+			c.Reload = true
 			r[SP] += 0x40
 		} else {
 			r[SP] -= 0x40
@@ -666,7 +666,7 @@ func (c *Cpu) ThumbPushPop(op uint16) {
 			r[PC] = c.Read32Block(r[SP], seq) &^ 1
 			r[SP] += 4
 			c.Idle(1)
-			c.Reload16()
+			c.Reload = true
 			return
 		}
 
@@ -719,12 +719,12 @@ func (c *Cpu) ThumbJumpCalls(op uint16) {
 
 	nn := int(int8(op&0xFF)) << 1
 	r[PC] = uint32(int(r[PC]) + nn)
-	c.Reload16()
+	c.Reload = true
 }
 
 func (c *Cpu) ThumbB(op uint16) {
 	c.Reg.R[PC] += uint32(int16((op&0x7FF)<<5) >> 4)
-	c.Reload16()
+	c.Reload = true
 }
 
 func (c *Cpu) ThumbShifted(op uint16) {
@@ -796,7 +796,7 @@ func (c *Cpu) ThumbShortLongBranch(op uint16) {
 	ret := (r[PC] - 2) | 1
 	r[PC] = r[LR] + (uint32(op&0x7FF) << 1)
 	r[LR] = ret
-	c.Reload16()
+	c.Reload = true
 }
 
 func (c *Cpu) ThumbLSSP(op uint16) {
@@ -825,7 +825,7 @@ func (c *Cpu) ThumbBlock(op uint16) {
 			c.Write32(r[rb], r[PC]+2)
 		} else {
 			r[PC] = c.Read32Block(r[rb], NONSEQ)
-			c.Reload16()
+			c.Reload = true
 		}
 		r[rb] += 0x40
 		return

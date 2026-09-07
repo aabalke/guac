@@ -26,15 +26,16 @@ func (nds *Nds) AudioSampleEvent(late int64, arg any) {
 }
 
 func (nds *Nds) HblankEvent(late int64, arg any) {
-	dispstat := &nds.mem.Dispstat
+	d7 := &nds.mem.Dispstat7
+	d9 := &nds.mem.Dispstat9
 
-	dispstat.H = true
-	if dispstat.A9HIrq {
-		nds.irq9.SetIRQ(1)
-	}
-
-	if dispstat.A7HIrq {
+	d7.H = true
+	d9.H = true
+	if d7.HIrq {
 		nds.irq7.SetIRQ(1)
+	}
+	if d9.HIrq {
+		nds.irq9.SetIRQ(1)
 	}
 
 	if vcount := nds.mem.Vcount; vcount < SCREEN_HEIGHT {
@@ -44,10 +45,12 @@ func (nds *Nds) HblankEvent(late int64, arg any) {
 }
 
 func (nds *Nds) ScanlineEndEvent(late int64, arg any) {
-	dispstat := &nds.mem.Dispstat
+	d7 := &nds.mem.Dispstat7
+	d9 := &nds.mem.Dispstat9
 	vcount := &nds.mem.Vcount
 
-	dispstat.H = false
+	d7.H = false
+	d9.H = false
 
 	*vcount++
 
@@ -57,7 +60,8 @@ func (nds *Nds) ScanlineEndEvent(late int64, arg any) {
 			capture.EndCapture()
 		}
 
-		dispstat.V = true
+		d7.V = true
+		d9.V = true
 		nds.CheckDmas(dma.DMA_MODE_VBL, true)
 		nds.CheckDmas(dma.DMA_MODE_VBL, false)
 
@@ -83,15 +87,16 @@ func (nds *Nds) ScanlineEndEvent(late int64, arg any) {
 		}
 
 	case SCREEN_HEIGHT + 1:
-		if dispstat.A9VIrq {
+		if d7.VIrq {
+			nds.irq7.SetIRQ(0)
+		}
+		if d9.VIrq {
 			nds.irq9.SetIRQ(0)
 		}
 
-		if dispstat.A7VIrq {
-			nds.irq7.SetIRQ(0)
-		}
 	case NUM_SCANLINES - 1:
-		dispstat.V = false
+		d7.V = false
+		d9.V = false
 	case NUM_SCANLINES:
 		*vcount = 0
 
@@ -109,16 +114,16 @@ func (nds *Nds) ScanlineEndEvent(late int64, arg any) {
 		}
 	}
 
-	match := dispstat.A9LYC == *vcount
-	dispstat.A9VC = match
-	if dispstat.A9VCIrq && match {
-		nds.irq9.SetIRQ(2)
+	match := d7.LYC == *vcount
+	d7.VC = match
+	if d7.VCIrq && match {
+		nds.irq7.SetIRQ(2)
 	}
 
-	match = dispstat.A7LYC == *vcount
-	dispstat.A7VC = match
-	if dispstat.A7VCIrq && match {
-		nds.irq7.SetIRQ(2)
+	match = d9.LYC == *vcount
+	d9.VC = match
+	if d9.VCIrq && match {
+		nds.irq9.SetIRQ(2)
 	}
 
 	nds.Scheduler.Schedule(nds.RegisteredEvents.ScanlineEnd, CYCLES_SCANLINE-late, nil)
