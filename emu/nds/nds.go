@@ -295,8 +295,8 @@ func (nds *Nds) DirectBoot() {
 	nds.arm7.Reg.R[15] = nds.Cartridge.Header.Arm7EntryAddr
 	nds.arm7.Reg.CPSR.Set(0x1F)
 
-	nds.arm7.Reload32()
-	nds.arm9.Reload32()
+	nds.arm7.ReloadPipe()
+	nds.arm9.ReloadPipe()
 
 	nds.arm9.Reload = false
 	nds.arm9.Timestamp = 0

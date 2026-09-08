@@ -208,37 +208,34 @@ func NewCpu(mem Mem, cycles func(addr, width, seq uint32, inst bool), idle func(
 	return c
 }
 
-func (c *Cpu) CheckIrq() {
+func (c *Cpu) DoIrq() {
 	var (
 		cpsr  = &c.Reg.CPSR
 		thumb = cpsr.T
 		addr  = uint32(VEC_IRQ)
-		mode  = MODE_IRQ
 		seq   = c.Seq
 	)
 
 	c.Seq = SEQ
 
+	// prefetch next instruction for proper timing
 	if thumb {
 		c.Cycles(c.Reg.R[PC], 2, seq, true)
-		c.Mem.Read16(c.Reg.R[PC])
 	} else {
 		c.Cycles(c.Reg.R[PC], 4, seq, true)
-		c.Mem.Read32(c.Reg.R[PC])
 	}
 
-	c.ModeSwitch(cpsr.Mode, mode)
+	c.ModeSwitch(cpsr.Mode, MODE_IRQ)
 
-	i := ModeBank[mode]
+	i := ModeBank[MODE_IRQ]
 	c.Reg.SPSR[i] = *cpsr
 
-	if thumb {
-		c.Reg.R[LR] = c.Reg.R[PC]
-	} else {
-		c.Reg.R[LR] = c.Reg.R[PC] - 4
+	c.Reg.R[LR] = c.Reg.R[PC]
+	if !thumb {
+		c.Reg.R[LR] -= 4
 	}
 
-	cpsr.Mode = mode
+	cpsr.Mode = MODE_IRQ
 	cpsr.T = false
 	cpsr.I = true
 
@@ -255,7 +252,7 @@ func (c *Cpu) Step() {
 		c.Halted = false
 
 		if !c.Reg.CPSR.I {
-			c.CheckIrq()
+			c.DoIrq()
 			c.ReloadPipe()
 		}
 	}
@@ -265,102 +262,68 @@ func (c *Cpu) Step() {
 	c.Seq = SEQ
 	c.Op[0] = c.Op[1]
 
+	w := uint32(4)
 	if c.Reg.CPSR.T {
+		w = 2
+	}
 
-		c.Cycles(c.Reg.R[PC], 2, seq, true)
+	c.Cycles(c.Reg.R[PC], w, seq, true)
 
-		if c.PcPtr == nil {
-			c.Op[1] = c.Mem.Read16(c.Reg.R[PC])
-		} else {
-			c.Op[1] = *(*uint32)(c.PcPtr) & 0xFFFF
-		}
-
-		c.DecodeThumb(uint16(inst))
-
-		if c.Reload {
-			c.ReloadPipe()
-		} else {
-			c.Reg.R[PC] += 2
-			if c.PcPtr != nil {
-				c.PcPtr = unsafe.Add(c.PcPtr, 2)
-			}
-		}
-
-	} else {
-
-		c.Cycles(c.Reg.R[PC], 4, seq, true)
-		if c.PcPtr == nil {
+	if c.PcPtr == nil {
+		if w == 4 {
 			c.Op[1] = c.Mem.Read32(c.Reg.R[PC])
 		} else {
-			c.Op[1] = *(*uint32)(c.PcPtr)
+			c.Op[1] = c.Mem.Read16(c.Reg.R[PC])
 		}
+	} else {
+		// 0xFFFF_FFFF uint32, 0xFFFF uint16
+		mask := uint32(0xFFFF_FFFF >> ((w & 2) * 8))
+		c.Op[1] = *(*uint32)(c.PcPtr) & mask
+	}
 
+	if w == 4 {
 		c.DecodeArm(inst)
+	} else {
+		c.DecodeThumb(uint16(inst))
+	}
 
-		if c.Reload {
-			c.ReloadPipe()
-		} else {
-			c.Reg.R[PC] += 4
-			if c.PcPtr != nil {
-				c.PcPtr = unsafe.Add(c.PcPtr, 4)
-			}
+	if c.Reload {
+		c.ReloadPipe()
+	} else {
+		c.Reg.R[PC] += w
+		if c.PcPtr != nil {
+			c.PcPtr = unsafe.Add(c.PcPtr, w)
 		}
 	}
 }
 
 func (c *Cpu) ReloadPipe() {
-	c.Reload = false
-
+	w := uint32(4)
 	if c.Reg.CPSR.T {
-		c.Reload16()
-		return
+		w = 2
 	}
-
-	c.Reload32()
-}
-
-func (c *Cpu) Reload16() {
-	pc := c.Reg.R[PC] &^ 1
+	pc := c.Reg.R[PC] &^ (w - 1)
 
 	c.PcPtr = c.Mem.ReadPtr(pc)
 
-	c.Cycles(pc+0, 2, NONSEQ, true)
-	c.Cycles(pc+2, 2, SEQ, true)
-
-	if c.PcPtr == nil {
-		c.Op[0] = c.Mem.Read16(pc + 0)
-		c.Op[1] = c.Mem.Read16(pc + 2)
-	} else {
-		c.Op[0] = *(*uint32)(c.PcPtr) & 0xFFFF
-		c.PcPtr = unsafe.Add(c.PcPtr, 2)
-		c.Op[1] = *(*uint32)(c.PcPtr) & 0xFFFF
-		c.PcPtr = unsafe.Add(c.PcPtr, 2)
-	}
-
-	c.Reg.R[PC] += 4
-	c.Seq = SEQ
-}
-
-func (c *Cpu) Reload32() {
-	pc := c.Reg.R[PC] &^ 3
-
-	c.PcPtr = c.Mem.ReadPtr(pc)
-
-	c.Cycles(pc+0, 4, NONSEQ, true)
-	c.Cycles(pc+4, 4, SEQ, true)
+	c.Cycles(pc+0, w, NONSEQ, true)
+	c.Cycles(pc+w, w, SEQ, true)
 
 	if c.PcPtr == nil {
 		c.Op[0] = c.Mem.Read32(pc + 0)
-		c.Op[1] = c.Mem.Read32(pc + 4)
+		c.Op[1] = c.Mem.Read32(pc + w)
 	} else {
-		c.Op[0] = *(*uint32)(c.PcPtr)
-		c.PcPtr = unsafe.Add(c.PcPtr, 4)
-		c.Op[1] = *(*uint32)(c.PcPtr)
-		c.PcPtr = unsafe.Add(c.PcPtr, 4)
+		// 0xFFFF_FFFF uint32, 0xFFFF uint16
+		mask := uint32(0xFFFF_FFFF >> ((w & 2) * 8))
+		c.Op[0] = *(*uint32)(c.PcPtr) & mask
+		c.PcPtr = unsafe.Add(c.PcPtr, w)
+		c.Op[1] = *(*uint32)(c.PcPtr) & mask
+		c.PcPtr = unsafe.Add(c.PcPtr, w)
 	}
 
-	c.Reg.R[PC] += 8
+	c.Reg.R[PC] += w * 2
 	c.Seq = SEQ
+	c.Reload = false
 }
 
 //go:nosplit

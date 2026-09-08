@@ -37,16 +37,13 @@ func NewCpu(m arm7.Mem, tick func(cycles int64)) *Cpu {
 	}
 
 	c.Mem = m
-	c.Cycles = c.Cycles9
-	c.Idle = c.Idle9
-
 	c.Timings = NewTimings()
 	c.Itcm = NewTcm(0x8000)
 	c.Dtcm = NewTcm(0x4000)
 	c.Cp15 = NewCp15(c)
-
 	c.LowVector = false
-
+	c.Cycles = c.Cycles9
+	c.Idle = c.Idle9
 	c.Bus = &Bus9{
 		c: c,
 	}
@@ -60,10 +57,8 @@ func (c *Cpu) Step() {
 		c.Halted = false
 
 		if !c.Reg.CPSR.I {
-			c.CheckIrq()
+			c.DoIrq()
 			c.ReloadPipe()
-			//c.tick(max(c.InstCycles, c.DataCycles) + c.IdleCycles)
-			//c.InstCycles, c.DataCycles, c.IdleCycles = 0, 0, 0
 		}
 	}
 
@@ -74,68 +69,50 @@ func (c *Cpu) Step() {
 	c.Seq = arm7.SEQ
 	c.Op[0] = c.Op[1]
 
+	w := uint32(4)
 	if c.Reg.CPSR.T {
+		w = 2
+	}
 
-		if c.Reg.R[PC]&2 == 0 {
-			if c.Itcm.Readable(c.Reg.R[PC]) {
-				c.InstCycles++
-			} else {
-				c.InstCycles += c.CyclesPerInst
-			}
-		}
+	bus := c.Mem
+	if c.Itcm.Readable(c.Reg.R[PC], w) {
+		bus = c.Itcm
+	}
 
-		if c.PcPtr == nil {
-			if v, ok := c.Itcm.Read16(c.Reg.R[PC]); ok {
-				c.Op[1] = v
-			} else {
-				c.Op[1] = c.Mem.Read16(c.Reg.R[PC])
-			}
-		} else {
-			c.Op[1] = *(*uint32)(c.PcPtr) & 0xFFFF
-		}
-
-		c.DecodeThumb(uint16(inst))
-
-		if c.Reload {
-			c.ReloadPipe()
-		} else {
-			c.Reg.R[PC] += 2
-			if c.PcPtr != nil {
-				c.PcPtr = unsafe.Add(c.PcPtr, 2)
-			}
-		}
-
-	} else {
-
-		if c.Itcm.Readable(c.Reg.R[PC]) {
+	if w == 4 || c.Reg.R[PC]&2 == 0 {
+		if _, ok := bus.(*Tcm); ok {
 			c.InstCycles++
 		} else {
 			c.InstCycles += c.CyclesPerInst
 		}
-
-		if c.PcPtr == nil {
-			if v, ok := c.Itcm.Read32(c.Reg.R[PC]); ok {
-				c.Op[1] = v
-			} else {
-				c.Op[1] = c.Mem.Read32(c.Reg.R[PC])
-			}
-		} else {
-			c.Op[1] = *(*uint32)(c.PcPtr)
-		}
-
-		c.DecodeArm(inst)
-
-		if c.Reload {
-			c.ReloadPipe()
-		} else {
-			c.Reg.R[PC] += 4
-			if c.PcPtr != nil {
-				c.PcPtr = unsafe.Add(c.PcPtr, 4)
-			}
-		}
 	}
 
-	c.Reload = false
+	if c.PcPtr == nil {
+		if w == 4 {
+			c.Op[1] = bus.Read32(c.Reg.R[PC])
+		} else {
+			c.Op[1] = bus.Read16(c.Reg.R[PC])
+		}
+	} else {
+		// 0xFFFF_FFFF uint32, 0xFFFF uint16
+		mask := uint32(0xFFFF_FFFF >> ((w & 2) * 8))
+		c.Op[1] = *(*uint32)(c.PcPtr) & mask
+	}
+
+	if w == 4 {
+		c.DecodeArm(inst)
+	} else {
+		c.DecodeThumb(uint16(inst))
+	}
+
+	if c.Reload {
+		c.ReloadPipe()
+	} else {
+		c.Reg.R[PC] += w
+		if c.PcPtr != nil {
+			c.PcPtr = unsafe.Add(c.PcPtr, w)
+		}
+	}
 
 	c.print()
 	c.tick(max(c.InstCycles, c.DataCycles) + c.IdleCycles)
@@ -143,116 +120,53 @@ func (c *Cpu) Step() {
 	c.InstCycles, c.DataCycles, c.IdleCycles = 0, 0, 0
 }
 
-var prev int64
-
-func (c *Cpu) print() {
-	//if !debug.B[0] {
-	//	return
-	//}
-	//fmt.Printf("PC %08X Stamp %08d Diff %08d: %02d %02d %02d\n", c.Reg.R[15], c.Timestamp, c.Timestamp-prev, c.InstCycles, c.DataCycles, c.IdleCycles)
-	fmt.Printf("PC %08X Diff %08d: %02d %02d %02d\n", c.Reg.R[15], c.Timestamp-prev, c.InstCycles, c.DataCycles, c.IdleCycles)
-	prev = c.Timestamp
-}
-
-func (c *Cpu) print2(inst uint32) {
-	fmt.Printf("OP %08X\n", inst)
-	if debug.V[0] > 10000 {
-		os.Exit(0)
-	} else {
-		debug.V[0]++
-	}
-}
-
 func (c *Cpu) ReloadPipe() {
+	w := uint32(4)
 	if c.Reg.CPSR.T {
-		c.Reload16()
-	} else {
-		c.Reload32()
+		w = 2
 	}
-}
+	pc := c.Reg.R[PC] &^ (w - 1)
 
-func (c *Cpu) Reload16() {
-	pc := c.Reg.R[PC] &^ 1
+	bus := c.Mem
+	if c.Itcm.Readable(pc, w) {
+		bus = c.Itcm
+	}
 
-	if c.Itcm.Readable(pc) {
-		c.PcPtr = c.Itcm.ReadPtr(pc)
+	c.PcPtr = bus.ReadPtr(pc)
 
+	if _, itcm := bus.(*Tcm); itcm {
 		c.InstCycles++
-
-		if c.PcPtr == nil {
-			c.Op[0], _ = c.Itcm.Read16(pc + 0)
-			c.Op[1], _ = c.Itcm.Read16(pc + 2)
-		} else {
-			c.Op[0] = *(*uint32)(c.PcPtr) & 0xFFFF
-			c.PcPtr = unsafe.Add(c.PcPtr, 2)
-			c.Op[1] = *(*uint32)(c.PcPtr) & 0xFFFF
-			c.PcPtr = unsafe.Add(c.PcPtr, 2)
-		}
-
 	} else {
-
-		c.PcPtr = c.Mem.ReadPtr(pc)
 
 		c.SetCyclesPerInst(pc)
+
 		c.InstCycles += c.CyclesPerInst // pc + 0
-		if pc&2 != 0 {
-			c.InstCycles += c.CyclesPerInst // pc + 2
-		}
 
-		if c.PcPtr == nil {
-			c.Op[0] = c.Mem.Read16(pc + 0)
-			c.Op[1] = c.Mem.Read16(pc + 2)
-		} else {
-			c.Op[0] = *(*uint32)(c.PcPtr) & 0xFFFF
-			c.PcPtr = unsafe.Add(c.PcPtr, 2)
-			c.Op[1] = *(*uint32)(c.PcPtr) & 0xFFFF
-			c.PcPtr = unsafe.Add(c.PcPtr, 2)
+		if w == 4 || pc&2 != 0 {
+			c.InstCycles += c.CyclesPerInst // pc + 2 or pc + 4
 		}
 	}
 
-	c.Reg.R[PC] += 4
-	c.Seq = arm7.SEQ
-}
-
-func (c *Cpu) Reload32() {
-	pc := c.Reg.R[PC] &^ 3
-
-	if c.Itcm.Readable(pc) {
-		c.PcPtr = c.Itcm.ReadPtr(pc)
-
-		c.InstCycles++
-
-		if c.PcPtr == nil {
-			c.Op[0], _ = c.Itcm.Read32(pc + 0)
-			c.Op[1], _ = c.Itcm.Read32(pc + 4)
-
+	if c.PcPtr == nil {
+		if w == 4 {
+			c.Op[0] = bus.Read32(pc + 0)
+			c.Op[1] = bus.Read32(pc + w)
 		} else {
-			c.Op[0] = *(*uint32)(c.PcPtr)
-			c.PcPtr = unsafe.Add(c.PcPtr, 4)
-			c.Op[1] = *(*uint32)(c.PcPtr)
-			c.PcPtr = unsafe.Add(c.PcPtr, 4)
+			c.Op[0] = bus.Read16(pc + 0)
+			c.Op[1] = bus.Read16(pc + w)
 		}
-
 	} else {
-
-		c.PcPtr = c.Mem.ReadPtr(pc)
-
-		c.SetCyclesPerInst(pc)
-		c.InstCycles += c.CyclesPerInst * 2 // pc + 0, pc + 4
-
-		if c.PcPtr == nil {
-			c.Op[0] = c.Mem.Read32(pc + 0)
-			c.Op[1] = c.Mem.Read32(pc + 4)
-		} else {
-			c.Op[0] = *(*uint32)(c.PcPtr)
-			c.PcPtr = unsafe.Add(c.PcPtr, 4)
-			c.Op[1] = *(*uint32)(c.PcPtr)
-			c.PcPtr = unsafe.Add(c.PcPtr, 4)
-		}
+		// 0xFFFF_FFFF uint32, 0xFFFF uint16
+		mask := uint32(0xFFFF_FFFF >> ((w & 2) * 8))
+		c.Op[0] = *(*uint32)(c.PcPtr) & mask
+		c.PcPtr = unsafe.Add(c.PcPtr, w)
+		c.Op[1] = *(*uint32)(c.PcPtr) & mask
+		c.PcPtr = unsafe.Add(c.PcPtr, w)
 	}
 
-	c.Reg.R[PC] += 8
+	c.Reg.R[PC] += w * 2
 	c.Seq = arm7.SEQ
+	c.Reload = false
 }
 
 //go:nosplit
@@ -327,6 +241,11 @@ func (c *Cpu) Idle9(cycles int64) {
 
 func (c *Cpu) Cycles9(addr, width, seq uint32, inst bool) {
 	if inst {
+
+		// only for DoIrq, not sure if better method
+
+		// what about tcm?
+
 		c.InstCycles += c.CyclesPerInst
 		return
 	}
@@ -353,4 +272,20 @@ func (c *Cpu) Cycles9(addr, width, seq uint32, inst bool) {
 	}
 
 	c.DataCycles += cycles
+}
+
+var prev int64
+
+func (c *Cpu) print() {
+	fmt.Printf("PC %08X Diff %08d: %02d %02d %02d\n", c.Reg.R[15], c.Timestamp-prev, c.InstCycles, c.DataCycles, c.IdleCycles)
+	prev = c.Timestamp
+}
+
+func (c *Cpu) print2(inst uint32) {
+	fmt.Printf("OP %08X\n", inst)
+	if debug.V[0] > 10000 {
+		os.Exit(0)
+	} else {
+		debug.V[0]++
+	}
 }
