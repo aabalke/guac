@@ -1,14 +1,12 @@
 package dma
 
 import (
+	"fmt"
 	"unsafe"
 
+	"github.com/aabalke/guac/emu/cpu/arm7"
 	"github.com/aabalke/guac/emu/scheduler"
 )
-
-type Irq interface {
-	SetIRQ(irq uint32)
-}
 
 const (
 	DMA_MODE_IMM = 0
@@ -28,7 +26,7 @@ const (
 	DMA_ADJ_INC = 0
 	DMA_ADJ_DEC = 1
 	DMA_ADJ_NON = 2
-	DMA_ADJ_RES = 3
+	DMA_ADJ_REL = 3
 
 	IRQ_DMA_0 = 8
 	IRQ_DMA_1 = 9
@@ -36,368 +34,458 @@ const (
 	IRQ_DMA_3 = 11
 )
 
-type DMA struct {
-	Idx int
+type Dma struct {
+	Mem           Mem
+	Scheduler     Scheduler
+	Irq           Irq
+	Tick          func(cycles int64)
+	Cycles        func(addr, width, seq uint32)
+	Chs           [4]Channel
+	ActiveDma     int
+	Runnable      uint8
+	ShouldReEnter bool
 
-	sch *scheduler.Scheduler
-	mem MemoryInterface
-	irq Irq
+	IsArm9 bool
 
+	// hades/dma-latch.gba / https://mgba.io/2020/01/25/infinite-loop-holy-grail/
+	LatchValue uint32
+
+	// ParallelDmaCycles uint32
+}
+
+type Scheduler interface {
+	Now() int64
+	Register(f func(int64, any), priority int) scheduler.EventIdx
+	Schedule(idx scheduler.EventIdx, cyclesUntil int64, args any)
+	Cancel(idx scheduler.EventIdx)
+}
+
+type Mem interface {
+	Read8(addr uint32) uint32
+	Read16(addr uint32) uint32
+	Read32(addr uint32) uint32
+	Write8(addr uint32, v uint8)
+	Write16(addr uint32, v uint16)
+	Write32(addr uint32, v uint32)
+	ReadPtr(addr uint32) unsafe.Pointer
+	WritePtr(addr uint32) unsafe.Pointer
+}
+
+type Irq interface {
+	SetIRQ(irq uint32)
+}
+
+type Channel struct {
+	dma     *Dma
+	Idx     int
 	Src     uint32
 	Dst     uint32
-	InitSrc uint32
-	InitDst uint32
-
-	Control   uint32
-	WordCount uint32
-
-	DefaultCount uint32
-
+	Value   uint32
+	Control uint32
+	Cnt     uint32
 	DstAdj  uint32
 	SrcAdj  uint32
+	Mode    uint8
 	Repeat  bool
 	isWord  bool
-	DRQ     bool
-	Mode    uint32
 	IRQ     bool
 	Enabled bool
 
-	Value uint32
-
-	InitialGc bool
-	GcDst     uint32
-
-	gxTransferEvent scheduler.EventIdx
-}
-
-func (dma *DMA) Init(idx int, mem MemoryInterface, scheduler *scheduler.Scheduler, irq Irq, arm9 bool) {
-	dma.Idx = idx
-	dma.mem = mem
-	dma.irq = irq
-
-	dma.sch = scheduler
-
-	dma.gxTransferEvent = scheduler.Register(dma.GxTransfer, 1)
-
-	switch {
-	case arm9:
-		dma.DefaultCount = 0x200000
-	case idx == 3:
-		dma.DefaultCount = 0x10000
-	default:
-		dma.DefaultCount = 0x4000
+	latched struct {
+		srcPtr unsafe.Pointer
+		dstPtr unsafe.Pointer
+		src    uint32
+		dst    uint32
+		cnt    uint32
 	}
+
+	startEvent scheduler.EventIdx
 }
 
-func (dma *DMA) Read(addr uint32) uint8 {
+func NewDma(mem Mem, sch Scheduler, irq Irq, tick func(int64), cycles func(addr, w, seq uint32)) *Dma {
+	d := &Dma{
+		Mem:       mem,
+		Scheduler: sch,
+		Irq:       irq,
+		Tick:      tick,
+		Cycles:    cycles,
+	}
+
+	for i := range 4 {
+		d.Chs[i].Idx = i
+		d.Chs[i].dma = d
+		d.Chs[i].startEvent = sch.Register(d.Chs[i].Start, 0)
+	}
+
+	return d
+}
+
+func (ch *Channel) Read(addr uint32) uint8 {
 	switch addr {
 	case 10:
-		return uint8(dma.Control)
+		return uint8(ch.Control)
 	case 11:
-		return uint8(dma.Control >> 8)
+		return uint8(ch.Control >> 8)
 	default:
 		return 0
 	}
 }
 
-func (dma *DMA) Write(addr uint32, v uint8) {
+func (ch *Channel) Write(addr uint32, v uint8) {
 	switch addr {
-	case 0, 1, 2, 3:
-		dma.Src = (dma.Src &^ (0xFF << (addr << 3))) | (uint32(v) << (addr << 3))
-		dma.InitSrc = dma.Src
+	case 0, 1, 2:
+		ch.Src = (ch.Src &^ (0xFF << (addr << 3))) | (uint32(v) << (addr << 3))
 
-	case 4, 5, 6, 7:
+	case 3:
+
+		v &= 0xF
+		if ch.Idx == 0 {
+			v &= 0x7
+		}
+
+		ch.Src = (ch.Src &^ (0xFF << 24)) | (uint32(v) << 24)
+
+	case 4, 5, 6:
+
 		addr -= 4
-		dma.Dst = (dma.Dst &^ (0xFF << (addr << 3))) | (uint32(v) << (addr << 3))
-		dma.InitDst = dma.Dst
-		dma.GcDst = dma.Dst
+
+		ch.Dst = (ch.Dst &^ (0xFF << (addr << 3))) | (uint32(v) << (addr << 3))
+
+	case 7:
+
+		v &= 0xF
+		if ch.Idx != 3 {
+			v &= 0x7
+		}
+
+		ch.Dst = (ch.Dst &^ (0xFF << 24)) | (uint32(v) << 24)
 
 	case 8:
-		dma.WordCount = (dma.WordCount &^ 0xFF) | uint32(v)
+		ch.Cnt = (ch.Cnt &^ 0xFF) | uint32(v)
 
 	case 9:
-		dma.WordCount = (dma.WordCount & 0xFF) | (uint32(v) << 8)
+
+		if !ch.dma.IsArm9 && ch.Idx != 3 {
+			v &= 0x3F
+		}
+
+		ch.Cnt = (ch.Cnt &^ 0xFF00) | (uint32(v) << 8)
 
 	case 10:
 
-		v &= 0xE0
-		dma.Control = (dma.Control &^ 0xFF) | uint32(v)
-		dma.DstAdj = uint32(v>>5) & 3
-		dma.SrcAdj = (dma.SrcAdj &^ 1) | (uint32(v) >> 7)
+		if ch.dma.IsArm9 {
+			ch.Cnt = (ch.Cnt & 0xFFFF) | (uint32(v&0x1F) << 16)
+		} else {
+			v &= 0xE0
+		}
+
+		ch.Control = (ch.Control &^ 0xFF) | uint32(v)
+		ch.DstAdj = uint32(v>>5) & 3
+		ch.SrcAdj = (ch.SrcAdj &^ 1) | (uint32(v) >> 7)
 
 	case 11:
-		wasDisabled := !dma.Enabled
-		dma.Control = (dma.Control & 0xFF) | uint32(v)<<8
-		dma.SrcAdj = (dma.SrcAdj & 1) | uint32(v&1)<<1
-		dma.Repeat = (v>>1)&1 != 0
 
-		dma.isWord = (v>>2)&1 != 0
-		dma.Mode = uint32(v>>3) & 7
-		dma.IRQ = (v>>6)&1 != 0
-		dma.Enabled = (v>>7)&1 != 0
-
-		if wasDisabled && dma.Enabled {
-			dma.Src = dma.InitSrc
-			dma.Dst = dma.InitDst
+		if !ch.dma.IsArm9 {
+			v &= 0xF7
 		}
 
-		if isImmediate := wasDisabled && dma.CheckMode(DMA_MODE_IMM); isImmediate {
-			dma.Transfer()
+		prev := ch.Enabled
+
+		ch.Repeat = (v>>1)&1 != 0
+		ch.isWord = (v>>2)&1 != 0
+
+		if ch.dma.IsArm9 {
+			ch.Mode = (v >> 3) & 7
+
+			if ch.Mode > 3 {
+				ch.Mode &= 3
+			}
+		} else {
+			ch.Mode = (v >> 4) & 3
+		}
+		ch.IRQ = (v>>6)&1 != 0
+		ch.Enabled = (v>>7)&1 != 0
+		ch.Control = (ch.Control & 0xFF) | (uint32(v) << 8)
+		ch.SrcAdj = (ch.SrcAdj & 1) | (uint32(v)&1)<<1
+
+		if !prev && ch.Enabled {
+
+			ch.latched.src = ch.Src
+			ch.latched.dst = ch.Dst
+
+			var (
+				src = ch.Src
+				dst = ch.Dst
+				cnt = ch.Cnt
+			)
+
+			if ch.isWord {
+				dst &^= 3
+				src &^= 3
+			} else {
+				dst &^= 1
+				src &^= 1
+			}
+
+			if cnt == 0 {
+				switch {
+				case ch.dma.IsArm9:
+					cnt = 0x200000
+				case ch.Idx == 3:
+					cnt = 0x10000
+				default:
+					cnt = 0x4000
+				}
+			}
+
+			ch.latched.src = src
+			ch.latched.dst = dst
+			ch.latched.cnt = cnt
+			ch.latched.srcPtr = ch.dma.Mem.ReadPtr(src)
+			ch.latched.dstPtr = ch.dma.Mem.WritePtr(dst)
+
+			//ch.dma.EepromDma(ch.latched.cnt, dst)
+
+			if ch.Mode == DMA_MODE_IMM {
+				ch.dma.Scheduler.Schedule(ch.startEvent, 2, nil)
+			}
+
+			return
 		}
 
-		if wasDisabled && dma.Enabled && dma.Mode == ARM9_DMA_MODE_GEO {
-			dma.sch.Schedule(dma.gxTransferEvent, 1, nil)
+		if prev && !ch.Enabled {
+			ch.disable()
+			ch.dma.Scheduler.Cancel(ch.startEvent)
+			return
 		}
 	}
 }
 
-func (dma *DMA) disable() {
-	dma.Enabled = false
-	dma.Control &^= 0x8000
+func (ch *Channel) Start(late int64, _ any) {
+	switch {
+	case ch.dma.Runnable == 0:
+		ch.dma.ActiveDma = ch.Idx
+	case ch.Idx < ch.dma.ActiveDma:
+		ch.dma.ActiveDma = ch.Idx
+		ch.dma.ShouldReEnter = true
+	}
+
+	ch.dma.Runnable |= 1 << ch.Idx
 }
 
-func (dma *DMA) Transfer() {
+func (ch *Channel) disable() {
+	ch.Enabled = false
+	ch.Control &^= 0x8000
+	ch.dma.Runnable &^= 1 << ch.Idx
+}
+
+func (ch *Channel) transfer() {
 	var (
-		mem       = dma.mem
-		count     = dma.WordCount
-		dstOffset int
-		srcOffset int
-		tmpDst    = dma.Dst
-		tmpSrc    = dma.Src
-		ofs       int
+		mem       = ch.dma.Mem
+		accessRom = false
+		srcOffset = 2
+		dstOffset = 2
 	)
 
-	if count == 0 {
-		count = dma.DefaultCount
+	if ch.isWord {
+		dstOffset = 4
+		srcOffset = 4
 	}
 
-	if dma.isWord {
-		tmpDst &^= 0b11
-		tmpSrc &^= 0b11
-		ofs = 4
-	} else {
-		tmpDst &^= 0b1
-		tmpSrc &^= 0b1
-		ofs = 2
-	}
-
-	switch dma.DstAdj {
-	case DMA_ADJ_INC, DMA_ADJ_RES:
-		dstOffset = ofs
-	case DMA_ADJ_DEC:
-		dstOffset = -ofs
-	}
-
-	switch dma.SrcAdj {
-	case DMA_ADJ_INC:
-		srcOffset = ofs
-	case DMA_ADJ_DEC:
-		srcOffset = -ofs
-	case DMA_ADJ_RES:
-		panic("DMA SRC SET TO PROHIBITTED")
-	}
-
-	srcPtr := mem.ReadPtr(tmpSrc)
-	if srcPtr != nil {
-		top := uint32(int(tmpSrc) + srcOffset*int(count))
-		if srcTop := mem.ReadPtr(top); srcTop == nil {
-			srcPtr = nil
+	if rom := ch.latched.src >= 0x800_0000 && ch.latched.src < 0xE00_0000; !rom {
+		switch ch.SrcAdj {
+		case DMA_ADJ_NON:
+			srcOffset = 0
+		case DMA_ADJ_DEC:
+			srcOffset = -srcOffset
+		case DMA_ADJ_REL:
+			panic(fmt.Sprintf("invalid dma src method. idx=%d src=%08X dst=%08X", ch.Idx, ch.Src, ch.Dst))
 		}
 	}
 
-	dstPtr := mem.WritePtr(tmpDst)
-	if dstPtr != nil {
-		top := uint32(int(tmpDst) + dstOffset*int(count))
-		if dstTop := mem.WritePtr(top); dstTop == nil {
-			dstPtr = nil
+	if rom := ch.latched.dst >= 0x800_0000 && ch.latched.dst < 0xE00_0000; !rom {
+		switch ch.DstAdj {
+		case DMA_ADJ_NON:
+			dstOffset = 0
+		case DMA_ADJ_DEC:
+			dstOffset = -dstOffset
 		}
 	}
 
-	for range uint32(count) {
-		if dma.isWord {
-			if srcPtr == nil {
-				dma.Value = mem.Read32(tmpSrc &^ 3)
+	for ch.latched.cnt > 0 {
+		if ch.dma.ShouldReEnter {
+			ch.dma.ShouldReEnter = false
+			return
+		}
+		var (
+			src    = ch.latched.src
+			dst    = ch.latched.dst
+			srcSeq = uint32(arm7.SEQ)
+			dstSeq = uint32(arm7.SEQ)
+		)
+
+		if !accessRom {
+			if src >= 0x800_0000 && src < 0xE00_0000 {
+				srcSeq = arm7.NONSEQ
+				accessRom = true
+			} else if dst >= 0x800_0000 && dst < 0xE00_0000 {
+				dstSeq = arm7.NONSEQ
+				accessRom = true
+			}
+		}
+
+		if src>>24 == 0x2 && dst>>24 == 0x2 {
+			srcSeq = arm7.NONSEQ
+			dstSeq = arm7.NONSEQ
+		}
+
+		if ch.isWord {
+
+			if src < 0x200_0000 {
+				ch.dma.Tick(1)
 			} else {
-				dma.Value = *(*uint32)(srcPtr)
+
+				ch.dma.Cycles(src, 4, srcSeq)
+				if ch.latched.srcPtr == nil {
+					ch.Value = mem.Read32(src)
+				} else {
+					ch.Value = *(*uint32)(ch.latched.srcPtr)
+				}
+				//ch.dma.Gba.Cpu.LastWasDma = true
+				ch.dma.LatchValue = ch.Value
 			}
 
-			if dstPtr == nil {
-				mem.Write32(tmpDst&^3, dma.Value)
+			ch.dma.Cycles(dst, 4, dstSeq)
+			if ch.latched.dstPtr == nil {
+				mem.Write32(dst, ch.Value)
 			} else {
-				*(*uint32)(dstPtr) = dma.Value
+				*(*uint32)(ch.latched.dstPtr) = ch.Value
 			}
+			//ch.dma.Gba.Cpu.LastWasDma = true
 
 		} else {
-			if srcPtr == nil {
-				dma.Value = mem.Read16(tmpSrc &^ 1)
+
+			v := uint32(0)
+
+			if src < 0x200_0000 {
+
+				// required for ngba-suite/latch.gba
+				if dst&2 != 0 {
+					v = ch.Value >> 16
+				} else {
+					v = ch.Value & 0xFFFF
+				}
+
+				ch.dma.Tick(1)
+
 			} else {
-				dma.Value = uint32(*(*uint16)(srcPtr))
+
+				ch.dma.Cycles(src, 2, srcSeq)
+				if ch.latched.srcPtr == nil {
+					v = mem.Read16(src)
+				} else {
+					v = *(*uint32)(ch.latched.srcPtr) & 0xFFFF
+				}
+				//ch.dma.Gba.Cpu.LastWasDma = true
+
+				ch.Value = v | (v << 16)
+				ch.dma.LatchValue = ch.Value
 			}
 
-			dma.Value |= (dma.Value << 16)
-
-			if dstPtr == nil {
-				mem.Write16(tmpDst&^1, uint16(dma.Value))
+			ch.dma.Cycles(dst, 2, dstSeq)
+			if ch.latched.dstPtr == nil {
+				mem.Write16(dst, uint16(v))
 			} else {
-				*(*uint16)(dstPtr) = uint16(dma.Value)
+				*(*uint16)(ch.latched.dstPtr) = uint16(v)
 			}
-
-			dma.Value = mem.Read16(tmpSrc &^ 1)
-			dma.Value |= (dma.Value << 16)
-			mem.Write16(tmpDst&^1, uint16(dma.Value))
+			//ch.dma.Gba.Cpu.LastWasDma = true
 		}
 
-		tmpDst = uint32(int(tmpDst) + dstOffset)
-		tmpSrc = uint32(int(tmpSrc) + srcOffset)
-
-		if srcPtr != nil {
-			srcPtr = unsafe.Add(srcPtr, srcOffset)
+		ch.latched.src = uint32(int(ch.latched.src) + srcOffset)
+		ch.latched.dst = uint32(int(ch.latched.dst) + dstOffset)
+		if ch.latched.srcPtr != nil {
+			ch.latched.srcPtr = unsafe.Add(ch.latched.srcPtr, srcOffset)
 		}
-		if dstPtr != nil {
-			dstPtr = unsafe.Add(dstPtr, dstOffset)
+		if ch.latched.dstPtr != nil {
+			ch.latched.dstPtr = unsafe.Add(ch.latched.dstPtr, dstOffset)
 		}
+
+		ch.latched.cnt--
 	}
 
-	if dma.IRQ {
-		dma.irq.SetIRQ(8 + uint32(dma.Idx))
+	ch.dma.Runnable &^= 1 << ch.Idx
+
+	if ch.IRQ {
+		ch.dma.Irq.SetIRQ(8 + uint32(ch.Idx))
 	}
 
-	if !dma.Repeat {
-		// DO NOT WRITEBACK DST AND SRC UNLESS REPEAT
-		dma.disable()
-		return
-	}
+	if ch.Repeat && ch.Mode != DMA_MODE_IMM {
+		cnt := ch.Cnt
 
-	if dma.DstAdj == DMA_ADJ_RES {
-		dma.Dst = dma.InitDst
-		dma.Src = tmpSrc
-		return
-	}
+		if cnt == 0 {
+			switch {
+			case ch.dma.IsArm9:
+				cnt = 0x200000
+			case ch.Idx == 3:
+				cnt = 0x10000
+			default:
+				cnt = 0x4000
+			}
+		}
 
-	dma.Src = tmpSrc
-	dma.Dst = tmpDst
-}
+		ch.latched.cnt = cnt
 
-func (dma *DMA) CheckMode(mode uint32) bool {
-	return mode == dma.Mode && dma.Enabled
-}
-
-func (dma *DMA) GamecartTransfer(arm9, initial bool) {
-	const GC_SRC = 0x4100010
-
-	if !dma.Enabled {
-		return
-	}
-
-	if arm9 && dma.Mode != ARM9_DMA_MODE_DSC {
-		return
-	}
-	if !arm9 && dma.Mode != ARM7_DMA_MODE_DSC {
-		return
-	}
-
-	if notGamecart := (dma.Src == GC_SRC &&
-		dma.SrcAdj == DMA_ADJ_NON &&
-		dma.WordCount == 1 &&
-		dma.isWord &&
-		dma.Repeat); !notGamecart {
-		return
-	}
-
-	mem := dma.mem
-
-	// gamecard transfer requires recursive access.
-	// Therefore, GcDst is incremented before access to not cause same dst loop
-
-	if initial {
-		dma.GcDst = dma.Dst &^ 0b11
-	} else {
-		dma.GcDst += 4
-	}
-
-	tmpDst := dma.GcDst &^ 0b11
-
-	dstOffset := 4
-	switch dma.DstAdj {
-	case DMA_ADJ_NON:
-		dstOffset = 0
-	case DMA_ADJ_DEC:
-		dstOffset = -4
-	}
-
-	v := mem.Read32(GC_SRC)
-	mem.Write32(tmpDst, v)
-
-	dma.Dst = uint32(int(tmpDst) + dstOffset)
-
-	if dma.IRQ {
-		dma.irq.SetIRQ(8 + uint32(dma.Idx))
-	}
-}
-
-func (dma *DMA) GxTransfer(late int64, _ any) {
-	if dma.Dst != 0x400_0400 || dma.DstAdj != DMA_ADJ_NON || !dma.isWord {
-		return
-	}
-
-	count := dma.WordCount
-	if count == 0 {
-		count = dma.DefaultCount
-	}
-
-	ofs := int(2)
-	if dma.isWord {
-		ofs = 4
-	}
-
-	srcOffset := int(0)
-	switch dma.SrcAdj {
-	case DMA_ADJ_INC:
-		srcOffset = ofs
-	case DMA_ADJ_DEC:
-		srcOffset = -ofs
-	}
-
-	mem := dma.mem
-	tmpSrc := int(dma.Src &^ 3)
-
-	ptr := mem.ReadPtr(uint32(tmpSrc))
-	if ptr == nil {
-		for range count {
-			mem.WriteGXFIFO(mem.Read32(uint32(tmpSrc)))
-			tmpSrc += srcOffset
+		if ch.DstAdj == DMA_ADJ_REL {
+			dst := ch.Dst
+			if ch.isWord {
+				dst &^= 3
+			} else {
+				dst &^= 1
+			}
+			ch.latched.dst = dst
+			ch.latched.dstPtr = ch.dma.Mem.WritePtr(dst)
 		}
 	} else {
-		for range count {
-			mem.WriteGXFIFO(*(*uint32)(ptr))
-			ptr = unsafe.Add(ptr, srcOffset)
-		}
-
-		tmpSrc += srcOffset * int(count)
+		ch.disable()
 	}
 
-	if dma.IRQ {
-		dma.irq.SetIRQ(8 + uint32(dma.Idx))
-	}
-
-	if !dma.Repeat {
-		dma.disable()
-		return
-	}
-
-	dma.Src = uint32(tmpSrc)
-	dma.sch.Schedule(dma.gxTransferEvent, 1, nil)
+	ch.dma.SelectNextChannel(ch.Idx)
 }
 
-type MemoryInterface interface {
-	Write8(addr uint32, v uint8)
-	Write16(addr uint32, v uint16)
-	Write32(addr uint32, v uint32)
-	WritePtr(addr uint32) unsafe.Pointer
-	WriteGXFIFO(v uint32)
+func (d *Dma) SelectNextChannel(curr int) {
+	for i := range 4 {
+		if d.Runnable&(1<<i) != 0 {
+			d.ActiveDma = i
+			return
+		}
+	}
 
-	Read8(addr uint32) uint32
-	Read16(addr uint32) uint32
-	Read32(addr uint32) uint32
-	ReadPtr(addr uint32) unsafe.Pointer
+	d.ActiveDma = -1
+}
+
+//go:inline
+func (d *Dma) IsRunning() bool {
+	return d.Runnable != 0
+}
+
+func (d *Dma) Raise(mode uint8, late int64) {
+	for i := range 4 {
+		if ch := &d.Chs[i]; ch.Enabled && ch.Mode == mode {
+			d.Scheduler.Schedule(ch.startEvent, 2-late, nil)
+		}
+	}
+}
+
+func (d *Dma) CheckDmas() uint32 {
+	start := d.Scheduler.Now()
+
+	d.Tick(1)
+
+	for d.IsRunning() {
+		d.Chs[d.ActiveDma].transfer()
+	}
+
+	d.Tick(1)
+
+	return uint32(d.Scheduler.Now() - start)
 }

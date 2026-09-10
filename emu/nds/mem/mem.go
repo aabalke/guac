@@ -32,7 +32,7 @@ type Mem struct {
 
 	halted7    *bool
 	irq7, irq9 *irq.Irq
-	dma7, dma9 *[4]dma.DMA
+	dma7, dma9 *dma.Dma
 
 	arm7Pc *uint32
 
@@ -68,7 +68,7 @@ type (
 func (m *Mem) InitMemory(
 	arm7Pc *uint32,
 	halted7 *bool,
-	dma7, dma9 *[4]dma.DMA,
+	dma7, dma9 *dma.Dma,
 	irq7, irq9 *irq.Irq,
 	c *cart.Cartridge,
 	ppu *ppu.PPU,

@@ -22,28 +22,28 @@ type Cpu struct {
 	Dtcm    *Tcm
 	Timings *Timings
 
+	tick func(cycles int64)
+
 	InstCycles    int64
 	DataCycles    int64
 	IdleCycles    int64
 	CyclesPerInst int64
-
-	tick func(cycles int64)
 }
 
-func NewCpu(m arm7.Mem, tick func(cycles int64)) *Cpu {
+func NewCpu(m arm7.Mem, idle, tick func(int64), cycles func(addr, width, seq uint32, inst bool)) *Cpu {
 	c := &Cpu{
-		Cpu:  &arm7.Cpu{},
-		tick: tick,
+		Cpu:     &arm7.Cpu{},
+		Timings: NewTimings(),
+		Itcm:    NewTcm(0x8000),
+		Dtcm:    NewTcm(0x4000),
 	}
 
 	c.Mem = m
-	c.Timings = NewTimings()
-	c.Itcm = NewTcm(0x8000)
-	c.Dtcm = NewTcm(0x4000)
 	c.Cp15 = NewCp15(c)
 	c.LowVector = false
-	c.Cycles = c.Cycles9
-	c.Idle = c.Idle9
+	c.Cycles = cycles
+	c.Idle = idle
+	c.tick = tick
 	c.Bus = &Bus9{
 		c: c,
 	}
@@ -80,11 +80,7 @@ func (c *Cpu) Step() {
 	}
 
 	if w == 4 || c.Reg.R[PC]&2 == 0 {
-		if _, ok := bus.(*Tcm); ok {
-			c.InstCycles++
-		} else {
-			c.InstCycles += c.CyclesPerInst
-		}
+		c.Cycles(c.Reg.R[PC], w, 0, true)
 	}
 
 	if c.PcPtr == nil {
@@ -125,27 +121,24 @@ func (c *Cpu) ReloadPipe() {
 	if c.Reg.CPSR.T {
 		w = 2
 	}
+
 	pc := c.Reg.R[PC] &^ (w - 1)
 
 	bus := c.Mem
 	if c.Itcm.Readable(pc, w) {
 		bus = c.Itcm
+		c.Cycles(pc, w, 0, true)
+	} else {
+		c.SetCyclesPerInst(pc)
+
+		c.Cycles(pc, w, 0, true) // pc + 0
+
+		if w == 4 || pc&2 != 0 {
+			c.Cycles(pc, w, 0, true) // pc + 2 or pc + 4
+		}
 	}
 
 	c.PcPtr = bus.ReadPtr(pc)
-
-	if _, itcm := bus.(*Tcm); itcm {
-		c.InstCycles++
-	} else {
-
-		c.SetCyclesPerInst(pc)
-
-		c.InstCycles += c.CyclesPerInst // pc + 0
-
-		if w == 4 || pc&2 != 0 {
-			c.InstCycles += c.CyclesPerInst // pc + 2 or pc + 4
-		}
-	}
 
 	if c.PcPtr == nil {
 		if w == 4 {
@@ -167,49 +160,6 @@ func (c *Cpu) ReloadPipe() {
 	c.Reg.R[PC] += w * 2
 	c.Seq = arm7.SEQ
 	c.Reload = false
-}
-
-//go:nosplit
-func (c *Cpu) ToggleThumb() {
-	c.Reg.CPSR.T = c.Reg.R[PC]&1 != 0
-	c.Reload = true
-
-	if c.Reg.CPSR.T {
-		c.Reg.R[PC] &^= 1
-		return
-	}
-	c.Reg.R[PC] &^= 3
-}
-
-func (c *Cpu) Exception(addr arm7.ExceptionVector, mode arm7.CpuMode) {
-	cpsr := &c.Reg.CPSR
-	thumb := cpsr.T
-
-	c.ModeSwitch(cpsr.Mode, mode)
-
-	i := arm7.ModeBank[mode]
-	c.Reg.SPSR[i] = *cpsr
-
-	if thumb {
-		c.Reg.R[LR] = c.Reg.R[PC] - 2
-	} else {
-		c.Reg.R[LR] = c.Reg.R[PC] - 4
-	}
-
-	cpsr.Mode = mode
-	cpsr.T = false
-	cpsr.I = true
-	if mode == arm7.MODE_FIQ {
-		cpsr.F = true
-	}
-
-	if c.LowVector {
-		addr &= 0xFFFF
-	}
-
-	c.Reg.R[PC] = uint32(addr)
-
-	c.Reload = true
 }
 
 func (c *Cpu) SetCyclesPerInst(addr uint32) {
@@ -234,54 +184,16 @@ func (c *Cpu) SetCyclesPerInst(addr uint32) {
 	c.CyclesPerInst = cycles
 }
 
-func (c *Cpu) Idle9(cycles int64) {
-	// idle 9 is provided as 66mhz cycles
-	c.IdleCycles += int64(cycles)
-}
-
-func (c *Cpu) Cycles9(addr, width, seq uint32, inst bool) {
-	if inst {
-
-		// only for DoIrq, not sure if better method
-
-		// what about tcm?
-
-		c.InstCycles += c.CyclesPerInst
-		return
-	}
-
-	// >> 12 4KB pages, uint64 bitmask, 1bit per 4kb page
-	idx := (addr >> 12) / 64
-	bit := (addr >> 12) & 63
-
-	if c.Cp15.ProtectionUnit.DataCache.Pages[idx]&(1<<bit) != 0 {
-
-		if seq == arm7.SEQ {
-			c.DataCycles++
-		} else {
-			c.DataCycles += 3 // this is rough estimate
-		}
-		return
-	}
-
-	region := addr >> 24
-	cycles := int64(c.Timings[region][((width>>2)<<1)|seq]) << 1
-
-	if penalty := region != 2 && seq == arm7.NONSEQ; penalty {
-		cycles += 6
-	}
-
-	c.DataCycles += cycles
-}
-
 var prev int64
 
 func (c *Cpu) print() {
+	return
 	fmt.Printf("PC %08X Diff %08d: %02d %02d %02d\n", c.Reg.R[15], c.Timestamp-prev, c.InstCycles, c.DataCycles, c.IdleCycles)
 	prev = c.Timestamp
 }
 
 func (c *Cpu) print2(inst uint32) {
+	return
 	fmt.Printf("OP %08X\n", inst)
 	if debug.V[0] > 10000 {
 		os.Exit(0)

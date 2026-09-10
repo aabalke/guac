@@ -40,7 +40,7 @@ func (nds *Nds) HblankEvent(late int64, arg any) {
 
 	if vcount := nds.mem.Vcount; vcount < SCREEN_HEIGHT {
 		nds.ppu.Graphics(vcount)
-		nds.CheckDmas(dma.ARM9_DMA_MODE_HBL, true)
+		nds.dma9.Raise(dma.ARM9_DMA_MODE_HBL, late)
 	}
 }
 
@@ -62,8 +62,8 @@ func (nds *Nds) ScanlineEndEvent(late int64, arg any) {
 
 		d7.V = true
 		d9.V = true
-		nds.CheckDmas(dma.DMA_MODE_VBL, true)
-		nds.CheckDmas(dma.DMA_MODE_VBL, false)
+		nds.dma7.Raise(dma.DMA_MODE_VBL, late)
+		nds.dma9.Raise(dma.DMA_MODE_VBL, late)
 
 		if nds.ppu.Rasterizer.Buffers.SwapSet {
 			nds.ppu.Rasterizer.Buffers.Swap()
@@ -103,7 +103,7 @@ func (nds *Nds) ScanlineEndEvent(late int64, arg any) {
 		if capture := &nds.ppu.Capture; capture.Enabled {
 			capture.StartCapture()
 		}
-		nds.CheckDmas(dma.ARM9_DMA_MODE_STA, true)
+		nds.dma9.Raise(dma.ARM9_DMA_MODE_STA, late)
 		nds.ppu.EngineA.Backgrounds[2].BgAffineReset()
 		nds.ppu.EngineA.Backgrounds[3].BgAffineReset()
 		nds.ppu.EngineB.Backgrounds[2].BgAffineReset()

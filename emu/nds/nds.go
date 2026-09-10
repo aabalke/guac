@@ -61,11 +61,13 @@ type Nds struct {
 	ppu              *ppu.PPU
 	Cartridge        *cart.Cartridge
 	Screen           *Screen
-	dma7             [4]dma.DMA
-	dma9             [4]dma.DMA
+	dma7             *dma.Dma
+	dma9             *dma.Dma
 	RegisteredEvents RegisteredEvents
 	CyclesPerSndGen  int64
 	Muted            bool
+
+	Timings7, Timings9 *Timings
 }
 
 func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
@@ -73,10 +75,12 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 		Scheduler: scheduler.NewScheduler(),
 		mem:       &mem.Mem{},
 		Screen:    NewScreen(),
+		Timings7:  NewTimings(),
+		Timings9:  NewTimings(),
 	}
 
 	nds.arm7 = arm7.NewCpu(&nds.mem.Bus7, nds.Cycles7, nds.Idle7)
-	nds.arm9 = arm9.NewCpu(&nds.mem.Bus9, nds.Tick9)
+	nds.arm9 = arm9.NewCpu(&nds.mem.Bus9, nds.Idle9, nds.Tick9, nds.Cycles9)
 	nds.irq7 = irq.NewIrq(nds.Scheduler, &nds.arm7.IrqLine)
 	nds.irq9 = irq.NewIrq(nds.Scheduler, &nds.arm9.IrqLine)
 	nds.ppu = ppu.NewPPU(nds.irq9)
@@ -92,20 +96,23 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 			nds.mem.Timers9[i-1].Next = nds.mem.Timers9[i]
 		}
 
-		nds.dma7[i].Init(i, &nds.mem.Bus7, nds.Scheduler, nds.irq7, false)
-		nds.dma9[i].Init(i, &nds.mem.Bus9, nds.Scheduler, nds.irq9, true)
 	}
+
+	nds.dma7 = dma.NewDma(&nds.mem.Bus7, nds.Scheduler, nds.irq7, nds.Tick7, nds.CyclesDma7)
+	nds.dma9 = dma.NewDma(&nds.mem.Bus9, nds.Scheduler, nds.irq9, nds.Tick9, nds.CyclesDma9)
+
+	nds.dma9.IsArm9 = true
 
 	nds.Cartridge = cart.NewCartridge(
 		path, nds.mem.Arm7Bios,
 		nds.irq7, nds.irq9,
-		&nds.dma7, &nds.dma9,
+		nds.dma7, nds.dma9,
 	)
 
 	nds.mem.InitMemory(
 		&nds.arm7.Reg.R[15],
 		&nds.arm7.Halted,
-		&nds.dma7, &nds.dma9,
+		nds.dma7, nds.dma9,
 		nds.irq7, nds.irq9,
 		nds.Cartridge, nds.ppu, snd.NewSnd(ctx, &nds.mem.Bus7, BUFFER_SIZE),
 	)
@@ -248,11 +255,25 @@ func (nds *Nds) Tick7(cycles int64) {
 }
 
 func (nds *Nds) Idle7(cycles int64) {
+	if nds.dma7.IsRunning() {
+		nds.dma7.CheckDmas()
+	}
+
 	nds.Tick7(cycles)
 }
 
 func (nds *Nds) Cycles7(addr, width, seq uint32, inst bool) {
-	nds.Tick7(1)
+	if nds.dma7.IsRunning() {
+		nds.dma7.CheckDmas()
+	}
+
+	cycles := int64(nds.Timings7[addr>>24][((width>>2)<<1)|seq])
+
+	if !inst && addr>>24 == 2 {
+		cycles++
+	}
+
+	nds.Tick7(cycles)
 }
 
 func (nds *Nds) ToggleMute(muted bool) bool {
@@ -298,28 +319,14 @@ func (nds *Nds) DirectBoot() {
 	nds.arm7.ReloadPipe()
 	nds.arm9.ReloadPipe()
 
+	nds.arm7.Reload = false
+	nds.arm7.Timestamp = 0
+
 	nds.arm9.Reload = false
 	nds.arm9.Timestamp = 0
 	nds.arm9.InstCycles = 0
 	nds.arm9.DataCycles = 0
 	nds.arm9.IdleCycles = 0
-}
-
-func (nds *Nds) CheckDmas(mode uint32, arm9 bool) {
-	if arm9 {
-		for i := range 4 {
-			if ok := nds.dma9[i].CheckMode(mode); ok {
-				nds.dma9[i].Transfer()
-			}
-		}
-		return
-	}
-
-	for i := range 4 {
-		if ok := nds.dma7[i].CheckMode(mode); ok {
-			nds.dma7[i].Transfer()
-		}
-	}
 }
 
 func (nds *Nds) Frame() uint64 {

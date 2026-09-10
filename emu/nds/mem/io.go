@@ -15,7 +15,7 @@ func (b *Bus9) ReadIO(addr uint32) uint8 {
 		return mem.sqrt.Read(addr)
 	case addr >= 0xB0 && addr < 0xE0:
 		addr -= 0xB0
-		return mem.dma9[addr/12].Read(addr % 12)
+		return mem.dma9.Chs[addr/12].Read(addr % 12)
 	case (addr >= 0x320 && addr < 0x6A3) || (addr&^1 == 0x60):
 		return mem.Ppu.Rasterizer.Read(addr)
 
@@ -125,7 +125,7 @@ func (b *Bus9) WriteIO(addr uint32, v uint8) {
 		return
 	case addr >= 0xB0 && addr < 0xE0:
 		addr -= 0xB0
-		mem.dma9[addr/12].Write(addr%12, v)
+		mem.dma9.Chs[addr/12].Write(addr%12, v)
 		return
 	case addr >= 0x100 && addr < 0x110:
 		addr -= 0x100
@@ -227,7 +227,7 @@ func (b *Bus7) ReadIO(addr uint32) uint8 {
 	switch {
 	case addr >= 0xB0 && addr < 0xE0:
 		addr -= 0xB0
-		return mem.dma7[addr/12].Read(addr % 12)
+		return mem.dma7.Chs[addr/12].Read(addr % 12)
 
 	case addr >= 0x400 && addr < 0x600:
 		return mem.Snd.Read(addr)
@@ -329,7 +329,7 @@ func (b *Bus7) WriteIO(addr uint32, v uint8) {
 
 	case addr >= 0xB0 && addr < 0xE0:
 		addr -= 0xB0
-		mem.dma7[addr/12].Write(addr%12, v)
+		mem.dma7.Chs[addr/12].Write(addr%12, v)
 		return
 
 	case addr >= 0x400 && addr < 0x600:

@@ -27,7 +27,7 @@ type Cartridge struct {
 	RomCtrl RomCtrl
 
 	irq7, irq9 Irq
-	dma7, dma9 *[4]dma.DMA
+	dma7, dma9 *dma.Dma
 	Backup     *Backup
 
 	// fields
@@ -43,7 +43,7 @@ type Irq interface {
 	SetIRQ(irq uint32)
 }
 
-func NewCartridge(path string, bios *[]uint8, irq7, irq9 Irq, dma7, dma9 *[4]dma.DMA) *Cartridge {
+func NewCartridge(path string, bios *[]uint8, irq7, irq9 Irq, dma7, dma9 *dma.Dma) *Cartridge {
 	c := &Cartridge{
 		Path: path,
 		irq7: irq7,
@@ -270,10 +270,8 @@ func (c *Cartridge) RomTransfer(initial bool, arm9 bool) {
 
 	c.RomCtrl.isReady = true
 
-	for i := range 4 {
-		c.dma7[i].GamecartTransfer(false, initial)
-		c.dma9[i].GamecartTransfer(true, initial)
-	}
+	c.dma7.Raise(dma.ARM7_DMA_MODE_DSC, 0)
+	c.dma9.Raise(dma.ARM9_DMA_MODE_DSC, 0)
 }
 
 func (c *Cartridge) InitSaveLoop() {
