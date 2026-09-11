@@ -139,7 +139,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
 	switch cmd := data[0]; cmd {
 	case 0x10:
-		g.MtxStacks.Mode = data[1] & 0b11
+		g.MtxStacks.Mode = data[1] & 3
 
 	case 0x11:
 		g.MtxStacks.Push()
@@ -189,10 +189,10 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 		}
 		arr := (*gl.MatrixArray)(unsafe.Pointer(&m))
 
-		j := 1
+		j := 0
 		for i := range 16 {
 			if notLastCol := i&3 != 3; notLastCol {
-				arr[i] = utils.ConvertToFloat(data[j], 12)
+				arr[i] = utils.ConvertToFloat(data[j+1], 12)
 				j++
 			}
 		}
@@ -208,7 +208,7 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 		m := gl.Matrix{}
 		arr := (*gl.MatrixArray)(unsafe.Pointer(&m))
 
-		for i := range 15 {
+		for i := range 16 {
 			arr[i] = utils.ConvertToFloat(data[i+1], 12)
 		}
 
@@ -225,10 +225,10 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 		}
 		arr := (*gl.MatrixArray)(unsafe.Pointer(&m))
 
-		j := 1
+		j := 0
 		for i := range 16 {
 			if notLastCol := i&3 != 3; notLastCol {
-				arr[i] = utils.ConvertToFloat(data[j], 12)
+				arr[i] = utils.ConvertToFloat(data[j+1], 12)
 				j++
 			}
 		}
@@ -247,10 +247,10 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 		}
 		arr := (*gl.MatrixArray)(unsafe.Pointer(&m))
 
-		j := 1
-		for i := range 9 {
+		j := 0
+		for i := range 12 {
 			if notLastCol := i&3 != 3; notLastCol {
-				arr[i] = utils.ConvertToFloat(data[j], 12)
+				arr[i] = utils.ConvertToFloat(data[j+1], 12)
 				j++
 			}
 		}

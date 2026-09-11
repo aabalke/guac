@@ -6,10 +6,10 @@ import (
 )
 
 const (
-	MTX_PJT = 0
-	MTX_POS = 1
-	MTX_SIM = 2
-	MTX_TEX = 3
+	MTX_PJT = iota
+	MTX_POS
+	MTX_SIM
+	MTX_TEX
 )
 
 type Rasterizer struct {
@@ -223,7 +223,7 @@ func (e *Edge) Write(addr uint32, v uint8) {
 	addr -= 0x330
 
 	i := addr / 2
-	hi := addr&1 == 1
+	hi := addr&1 != 0
 
 	c := e.Color[i]
 
@@ -237,24 +237,13 @@ func (e *Edge) Write(addr uint32, v uint8) {
 	//}
 
 	if hi {
-		e.V[i] &= 0xFF
-		e.V[i] |= uint16(v) << 8
-
+		e.V[i] = (e.V[i] & 0x00FF) | (uint16(v) << 8)
 	} else {
-		e.V[i] &^= 0xFF
-		e.V[i] |= uint16(v)
+		e.V[i] = (e.V[i] & 0xFF00) | uint16(v)
 	}
 }
 
 func (e *Edge) Read(addr uint32) uint8 {
 	addr -= 0x330
-
-	i := addr / 2
-	hi := addr&1 == 1
-
-	if hi {
-		return uint8(e.V[i] >> 8)
-	}
-
-	return uint8(e.V[i])
+	return uint8(e.V[addr/2] >> (addr & 1))
 }

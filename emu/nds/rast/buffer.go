@@ -9,10 +9,9 @@ type Buffers struct {
 }
 
 type Buffer struct {
+	Polys        []Polygon
 	DepthBufferW bool
 	ManualSort   bool
-
-	Polys []Polygon
 }
 
 func (b *Buffers) Append(p Polygon) {

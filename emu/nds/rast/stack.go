@@ -15,6 +15,8 @@ type MtxStacks struct {
 	Mode     uint32
 	Stacks   [4]MtxStack
 	Overflow bool
+
+	psp, csp, tsp int
 }
 
 type MtxStack struct {
@@ -33,21 +35,17 @@ func (m *MtxStack) Init(size, pointerMask int, pointer *int) {
 }
 
 func NewMtxStacks() *MtxStacks {
-
 	s := &MtxStacks{}
-
 	// csp is shared
-	psp, csp, tsp := 0, 0, 0
-	s.Stacks[0].Init(1, 0, &psp)
-	s.Stacks[1].Init(31, 63, &csp)
-	s.Stacks[2].Init(31, 63, &csp)
-	s.Stacks[3].Init(1, 0, &tsp)
+	s.Stacks[0].Init(1, 0, &s.psp)
+	s.Stacks[1].Init(31, 63, &s.csp)
+	s.Stacks[2].Init(31, 63, &s.csp)
+	s.Stacks[3].Init(1, 0, &s.tsp)
 
 	return s
 }
 
 func (m *MtxStacks) Push() {
-
 	s := &m.Stacks[m.Mode]
 	idx := int(*s.Pointer) % len(s.Mtxs)
 
@@ -65,7 +63,6 @@ func (m *MtxStacks) Push() {
 }
 
 func (m *MtxStacks) Pop(param uint32) {
-
 	switch m.Mode {
 	case 1, 2:
 
@@ -104,7 +101,6 @@ func (m *MtxStacks) Pop(param uint32) {
 }
 
 func (m *MtxStacks) Store(param uint32) {
-
 	switch m.Mode {
 	case 1, 2:
 		idx := int(param & 0x1F)
@@ -125,7 +121,6 @@ func (m *MtxStacks) Store(param uint32) {
 }
 
 func (m *MtxStacks) Restore(param uint32) {
-
 	switch m.Mode {
 	case 1, 2:
 		idx := int(param & 0x1F)

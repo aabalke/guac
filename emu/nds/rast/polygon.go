@@ -6,10 +6,17 @@ import (
 )
 
 const (
-	PRIM_SEP_TRI    = 0
-	PRIM_SEP_QUAD   = 1
-	PRIM_TRI_STRIP  = 2
-	PRIM_QUAD_STRIP = 3
+	PRIM_SEP_TRI = iota
+	PRIM_SEP_QUAD
+	PRIM_TRI_STRIP
+	PRIM_QUAD_STRIP
+)
+
+const (
+	RENDER_NONE = iota
+	RENDER_BACK
+	RENDER_FRNT
+	RENDER_BOTH
 )
 
 type Polygon struct {
@@ -33,13 +40,6 @@ type Polygon struct {
 
 	Texture Texture
 }
-
-const (
-	RENDER_NONE = iota
-	RENDER_BACK
-	RENDER_FRNT
-	RENDER_BOTH
-)
 
 func (p *Polygon) WriteAttrs(v uint32) {
 	p.v = v
