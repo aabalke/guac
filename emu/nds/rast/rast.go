@@ -31,7 +31,7 @@ type Irq interface {
 
 type VRAM interface {
 	ReadTexture(uint32) uint8
-	ReadPalTexture(uint32) uint8
+	ReadPalTexture(uint32) uint16
 }
 
 func NewRasterizer(vram VRAM, irq Irq) *Rasterizer {

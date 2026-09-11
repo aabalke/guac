@@ -3,6 +3,7 @@ package rast
 import (
 	"fmt"
 	"math"
+	"unsafe"
 
 	"github.com/aabalke/guac/emu/nds/rast/gl"
 	"github.com/aabalke/guac/utils"
@@ -167,23 +168,11 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
 	case 0x16:
 
-		m := gl.Matrix{
-			X00: utils.ConvertToFloat(data[1], 12),
-			X01: utils.ConvertToFloat(data[2], 12),
-			X02: utils.ConvertToFloat(data[3], 12),
-			X03: utils.ConvertToFloat(data[4], 12),
-			X10: utils.ConvertToFloat(data[5], 12),
-			X11: utils.ConvertToFloat(data[6], 12),
-			X12: utils.ConvertToFloat(data[7], 12),
-			X13: utils.ConvertToFloat(data[8], 12),
-			X20: utils.ConvertToFloat(data[9], 12),
-			X21: utils.ConvertToFloat(data[10], 12),
-			X22: utils.ConvertToFloat(data[11], 12),
-			X23: utils.ConvertToFloat(data[12], 12),
-			X30: utils.ConvertToFloat(data[13], 12),
-			X31: utils.ConvertToFloat(data[14], 12),
-			X32: utils.ConvertToFloat(data[15], 12),
-			X33: utils.ConvertToFloat(data[16], 12),
+		m := gl.Matrix{}
+		arr := (*gl.MatrixArray)(unsafe.Pointer(&m))
+
+		for i := range 16 {
+			arr[i] = utils.ConvertToFloat(data[i+1], 12)
 		}
 
 		s.CurrMtx = m
@@ -196,19 +185,16 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 	case 0x17:
 
 		m := gl.Matrix{
-			X00: utils.ConvertToFloat(data[1], 12),
-			X01: utils.ConvertToFloat(data[2], 12),
-			X02: utils.ConvertToFloat(data[3], 12),
-			X10: utils.ConvertToFloat(data[4], 12),
-			X11: utils.ConvertToFloat(data[5], 12),
-			X12: utils.ConvertToFloat(data[6], 12),
-			X20: utils.ConvertToFloat(data[7], 12),
-			X21: utils.ConvertToFloat(data[8], 12),
-			X22: utils.ConvertToFloat(data[9], 12),
-			X30: utils.ConvertToFloat(data[10], 12),
-			X31: utils.ConvertToFloat(data[11], 12),
-			X32: utils.ConvertToFloat(data[12], 12),
-			X33: 1.0,
+			X33: 1,
+		}
+		arr := (*gl.MatrixArray)(unsafe.Pointer(&m))
+
+		j := 1
+		for i := range 16 {
+			if notLastCol := i&3 != 3; notLastCol {
+				arr[i] = utils.ConvertToFloat(data[j], 12)
+				j++
+			}
 		}
 
 		s.CurrMtx = m
@@ -219,23 +205,11 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 
 	case 0x18:
 
-		m := gl.Matrix{
-			X00: utils.ConvertToFloat(data[1], 12),
-			X01: utils.ConvertToFloat(data[2], 12),
-			X02: utils.ConvertToFloat(data[3], 12),
-			X03: utils.ConvertToFloat(data[4], 12),
-			X10: utils.ConvertToFloat(data[5], 12),
-			X11: utils.ConvertToFloat(data[6], 12),
-			X12: utils.ConvertToFloat(data[7], 12),
-			X13: utils.ConvertToFloat(data[8], 12),
-			X20: utils.ConvertToFloat(data[9], 12),
-			X21: utils.ConvertToFloat(data[10], 12),
-			X22: utils.ConvertToFloat(data[11], 12),
-			X23: utils.ConvertToFloat(data[12], 12),
-			X30: utils.ConvertToFloat(data[13], 12),
-			X31: utils.ConvertToFloat(data[14], 12),
-			X32: utils.ConvertToFloat(data[15], 12),
-			X33: utils.ConvertToFloat(data[16], 12),
+		m := gl.Matrix{}
+		arr := (*gl.MatrixArray)(unsafe.Pointer(&m))
+
+		for i := range 15 {
+			arr[i] = utils.ConvertToFloat(data[i+1], 12)
 		}
 
 		s.CurrMtx = m.Mul(s.CurrMtx)
@@ -247,19 +221,16 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 	case 0x19:
 
 		m := gl.Matrix{
-			X00: utils.ConvertToFloat(data[1], 12),
-			X01: utils.ConvertToFloat(data[2], 12),
-			X02: utils.ConvertToFloat(data[3], 12),
-			X10: utils.ConvertToFloat(data[4], 12),
-			X11: utils.ConvertToFloat(data[5], 12),
-			X12: utils.ConvertToFloat(data[6], 12),
-			X20: utils.ConvertToFloat(data[7], 12),
-			X21: utils.ConvertToFloat(data[8], 12),
-			X22: utils.ConvertToFloat(data[9], 12),
-			X30: utils.ConvertToFloat(data[10], 12),
-			X31: utils.ConvertToFloat(data[11], 12),
-			X32: utils.ConvertToFloat(data[12], 12),
-			X33: 1.0,
+			X33: 1,
+		}
+		arr := (*gl.MatrixArray)(unsafe.Pointer(&m))
+
+		j := 1
+		for i := range 16 {
+			if notLastCol := i&3 != 3; notLastCol {
+				arr[i] = utils.ConvertToFloat(data[j], 12)
+				j++
+			}
 		}
 
 		s.CurrMtx = m.Mul(s.CurrMtx)
@@ -272,16 +243,16 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 	case 0x1A:
 
 		m := gl.Matrix{
-			X00: utils.ConvertToFloat(data[1], 12),
-			X01: utils.ConvertToFloat(data[2], 12),
-			X02: utils.ConvertToFloat(data[3], 12),
-			X10: utils.ConvertToFloat(data[4], 12),
-			X11: utils.ConvertToFloat(data[5], 12),
-			X12: utils.ConvertToFloat(data[6], 12),
-			X20: utils.ConvertToFloat(data[7], 12),
-			X21: utils.ConvertToFloat(data[8], 12),
-			X22: utils.ConvertToFloat(data[9], 12),
-			X33: 1.0,
+			X33: 1,
+		}
+		arr := (*gl.MatrixArray)(unsafe.Pointer(&m))
+
+		j := 1
+		for i := range 9 {
+			if notLastCol := i&3 != 3; notLastCol {
+				arr[i] = utils.ConvertToFloat(data[j], 12)
+				j++
+			}
 		}
 
 		s.CurrMtx = m.Mul(s.CurrMtx)

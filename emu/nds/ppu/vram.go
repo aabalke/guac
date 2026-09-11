@@ -1,6 +1,7 @@
 package ppu
 
 import (
+	"encoding/binary"
 	"unsafe"
 
 	"github.com/aabalke/guac/emu/nds/rast"
@@ -478,16 +479,12 @@ func (vm *VRAM) ReadTexture(addr uint32) uint8 {
 	return vm.TextureSlots[region][addr&0x1FFFF]
 }
 
-func (vm *VRAM) ReadPalTexture(addr uint32) uint8 {
+func (vm *VRAM) ReadPalTexture(addr uint32) uint16 {
 	region := addr >> 14
 
-	if region >= 6 {
+	if region >= 6 || vm.TexPalSlots[region] == nil {
 		return 0
 	}
 
-	if vm.TexPalSlots[region] == nil {
-		return 0
-	}
-
-	return vm.TexPalSlots[region][addr&0x3FFF]
+	return binary.LittleEndian.Uint16(vm.TexPalSlots[region][addr&0x3FFF:])
 }

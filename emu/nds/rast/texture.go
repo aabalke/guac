@@ -20,15 +20,15 @@ type Texture struct {
 	Sv, Tv             float32
 	S, T               float32
 	VramOffset         uint32
-	RepeatS, RepeatT   bool
-	FlipS, FlipT       bool
 	SizeS, SizeT       uint32
 	Format             uint32
-	TransparentZero    bool
 	TransformationMode uint32
 	PaletteBaseAddr    uint32
 	PitchShift         uint32
 	param              uint32
+	RepeatS, RepeatT   bool
+	FlipS, FlipT       bool
+	TransparentZero    bool
 }
 
 func (tex *Texture) WriteCoord(v uint32, g *GeoEngine) {
@@ -61,18 +61,18 @@ func (tex *Texture) WriteParam(v uint32) {
 	tex.FlipS = (v>>18)&1 != 0
 	tex.FlipT = (v>>19)&1 != 0
 
-	tex.PitchShift = ((v >> 20) & 0b111) + 3
-	tex.SizeS = 8 << ((v >> 20) & 0b111)
-	tex.SizeT = 8 << ((v >> 23) & 0b111)
-	tex.Format = (v >> 26) & 0b111
+	tex.PitchShift = ((v >> 20) & 7) + 3
+	tex.SizeS = 8 << ((v >> 20) & 7)
+	tex.SizeT = 8 << ((v >> 23) & 7)
+	tex.Format = (v >> 26) & 7
 	tex.TransparentZero = (v>>29)&1 != 0
-	tex.TransformationMode = (v >> 30) & 0b11
+	tex.TransformationMode = (v >> 30) & 3
 
 	if tex.TransformationMode == 3 {
 		//panic("VTX TEXT MODE WHICH I THINK IS GOOD BUT YOU SHOULD CHECK")
 	}
 }
 
-func (text *Texture) WritePalBase(v uint32) {
-	text.PaletteBaseAddr = (v & 0x1FFF)
+func (tex *Texture) WritePalBase(v uint32) {
+	tex.PaletteBaseAddr = (v & 0x1FFF)
 }

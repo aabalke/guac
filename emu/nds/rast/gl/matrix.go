@@ -7,12 +7,15 @@ type Matrix struct {
 	X30, X31, X32, X33 float32
 }
 
+type MatrixArray [16]float32
+
 func Identity() Matrix {
 	return Matrix{
 		1, 0, 0, 0,
 		0, 1, 0, 0,
 		0, 0, 1, 0,
-		0, 0, 0, 1}
+		0, 0, 0, 1,
+	}
 }
 
 func Translate(v Vector) Matrix {
@@ -21,11 +24,12 @@ func Translate(v Vector) Matrix {
 		1, 0, 0, 0,
 		0, 1, 0, 0,
 		0, 0, 1, 0,
-		v.X, v.Y, v.Z, 1}
-	//1, 0, 0, v.X,
-	//0, 1, 0, v.Y,
-	//0, 0, 1, v.Z,
-	//0,0,0, 1}
+		v.X, v.Y, v.Z, 1,
+	}
+	// 1, 0, 0, v.X,
+	// 0, 1, 0, v.Y,
+	// 0, 0, 1, v.Z,
+	// 0,0,0, 1}
 }
 
 func Scale(v Vector) Matrix {
@@ -33,7 +37,8 @@ func Scale(v Vector) Matrix {
 		v.X, 0, 0, 0,
 		0, v.Y, 0, 0,
 		0, 0, v.Z, 0,
-		0, 0, 0, 1}
+		0, 0, 0, 1,
+	}
 }
 
 func Screen(w, h int) Matrix {

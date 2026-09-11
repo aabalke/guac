@@ -6,7 +6,7 @@ import (
 
 type VRAM interface {
 	ReadTexture(uint32) uint8
-	ReadPalTexture(uint32) uint8
+	ReadPalTexture(uint32) uint16
 }
 
 type Texture struct {
