@@ -14,27 +14,27 @@ replace github.com/hajimehoshi/dialog => github.com/aabalke/dialog v0.0.0-202608
 // before release. unversioned packaged are v0.0.0-YYYYMMDD______-CCCCCCCCCCCC
 // where C is the beginning of the commit
 
-go 1.27.0
+go 1.27.1
 
 require (
-	github.com/BurntSushi/toml v1.5.0
+	github.com/BurntSushi/toml v1.6.0
 	github.com/ebitenui/ebitenui v0.7.3
 	github.com/hajimehoshi/dialog v0.0.0-20260703050910-dfca0e7cf198
-	github.com/hajimehoshi/ebiten/v2 v2.9.7
+	github.com/hajimehoshi/ebiten/v2 v2.10.1
 )
 
 require (
-	github.com/ebitengine/gomobile v0.0.0-20250923094054-ea854a63cce1 // indirect
+	github.com/ebitengine/gomobile v0.0.0-20260820040257-d11f821a26a6 // indirect
 	github.com/ebitengine/hideconsole v1.0.0 // indirect
-	github.com/ebitengine/oto/v3 v3.4.0 // indirect
-	github.com/ebitengine/purego v0.10.1 // indirect
+	github.com/ebitengine/oto/v3 v3.5.0 // indirect
+	github.com/ebitengine/purego v0.11.0 // indirect
 	github.com/frustra/bbcode v0.0.0-20201127003707-6ef347fbe1c8 // indirect
-	github.com/go-text/typesetting v0.3.0 // indirect
-	github.com/jezek/xgb v1.1.1 // indirect
-	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/go-text/typesetting v0.3.5 // indirect
+	github.com/jfreymuth/pulse v0.1.3 // indirect
+	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
-	golang.org/x/image v0.31.0 // indirect
-	golang.org/x/sync v0.17.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/text v0.29.0 // indirect
+	golang.org/x/image v0.45.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 )
