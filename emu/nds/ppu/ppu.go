@@ -192,7 +192,7 @@ func NewPPU(irq Irq) *PPU {
 	p.EngineB.Pixels = make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)
 	p.EngineB.IsB = true
 
-	p.Rasterizer = rast.NewRasterizer(&p.Vram, irq)
+	p.Rasterizer = rast.NewRasterizer(irq)
 
 	texCache := &p.Rasterizer.GeoEngine.TextureCache
 	p.Vram.Init(texCache, &p.EngineA, &p.EngineB)
@@ -238,7 +238,6 @@ func (p *PPU) Update(addr, v uint32) {
 	}
 
 	if capture := addr >= 0x60 && addr < 0x68; capture {
-		//fmt.Printf("CAPTURE %08X %02X\n", addr, v)
 		return
 	}
 
@@ -822,32 +821,21 @@ func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
 	engine := &p.EngineA
 	if relAddr >= 0x400 {
 		engine = &p.EngineB
-		//relAddr -= 0x400
 	}
 
-	attrIdx := relAddr % 8
-
-	if affineParam := attrIdx == 6 || attrIdx == 7; affineParam {
-		p.UpdateAffine(relAddr, engine, oam)
-		return
-	}
-
-	objIdx := (relAddr & 0x3FF) / 8
-
-	obj := &engine.Objects[objIdx]
-
+	obj := &engine.Objects[(relAddr&0x3FF)/8]
 	attr := uint32(oam[relAddr])
 
-	switch attrIdx {
+	switch relAddr & 7 {
 	case 0:
 		obj.Y = attr
 	case 1:
 
 		obj.RotScale = (attr>>0)&1 != 0
-		obj.Mode = (attr >> 2) & 0b11
+		obj.Mode = (attr >> 2) & 3
 		obj.Mosaic = (attr>>4)&1 != 0
 		obj.Palette256 = (attr>>5)&1 != 0
-		obj.Shape = (attr >> 6) & 0b11
+		obj.Shape = (attr >> 6) & 3
 		obj.SetSize(obj.Shape, obj.Size)
 
 		if obj.RotScale {
@@ -858,35 +846,42 @@ func (p *PPU) UpdateOAM(relAddr uint32, v uint8, oam *[0x800]uint8) {
 		}
 
 	case 2:
-		obj.X &^= 0xFF
-		obj.X |= attr
+		obj.X = (obj.X & 0xFF00) | attr
+
 	case 3:
-		obj.X &= 0xFF
-		obj.X |= (attr & 0b1) << 8
-		obj.Size = (attr >> 6) & 0b11
+		obj.X = (obj.X & 0xFF) | ((attr & 1) << 8)
+		obj.HFlip = (attr>>4)&1 != 0
+		obj.VFlip = (attr>>5)&1 != 0
+
+		obj.Size = (attr >> 6) & 3
 		obj.SetSize(obj.Shape, obj.Size)
 
 		if obj.RotScale {
 			obj.RotParams = (attr >> 1) & 0x1F
 			UpdateAffineParams(obj, oam, engine.IsB)
 		}
-		obj.HFlip = (attr>>4)&1 != 0
-		obj.VFlip = (attr>>5)&1 != 0
 
 	case 4:
-		obj.CharName &^= 0xFF
-		obj.CharName |= attr
+		obj.CharName = (obj.CharName & 0xFF00) | attr
+
 	case 5:
-		obj.CharName &= 0xFF
-		obj.CharName |= (attr & 0b11) << 8
-		obj.Priority = (attr >> 2) & 0b11
+		obj.CharName = (obj.CharName & 0xFF) | ((attr & 3) << 8)
+		obj.Priority = (attr >> 2) & 3
 		obj.Palette = (attr >> 4) & 0xF
+
+	case 6, 7:
+		paramIdx := (relAddr &^ 1) / 0x20
+
+		for i := range 128 {
+			if obj := &engine.Objects[i]; obj.RotScale && obj.RotParams == paramIdx {
+				UpdateAffineParams(obj, oam, engine.IsB)
+			}
+		}
 	}
 }
 
 func UpdateAffineParams(obj *Object, oam *[0x800]uint8, isB bool) {
 	paramsAddr := obj.RotParams * 0x20
-
 	if isB {
 		paramsAddr += 0x400
 	}
@@ -895,25 +890,6 @@ func UpdateAffineParams(obj *Object, oam *[0x800]uint8, isB bool) {
 	obj.Pb = float32(int16(binary.LittleEndian.Uint16(oam[paramsAddr+0x0E:]))) / 256
 	obj.Pc = float32(int16(binary.LittleEndian.Uint16(oam[paramsAddr+0x16:]))) / 256
 	obj.Pd = float32(int16(binary.LittleEndian.Uint16(oam[paramsAddr+0x1E:]))) / 256
-}
-
-func (p *PPU) UpdateAffine(relAddr uint32, engine *Engine, oam *[0x800]uint8) {
-	paramIdx := (relAddr &^ 0b1) / 0x20
-
-	for i := range 128 {
-
-		obj := &engine.Objects[i]
-
-		if !obj.RotScale {
-			continue
-		}
-
-		if obj.RotParams != paramIdx {
-			continue
-		}
-
-		UpdateAffineParams(obj, oam, engine.IsB)
-	}
 }
 
 const (

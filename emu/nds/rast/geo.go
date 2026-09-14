@@ -41,12 +41,12 @@ type GeoEngine struct {
 	ToonTbl     [32]gl.Color
 
 	TextureCache TextureCache
-	Vram         VRAM
+	Vram         *Vram
 
 	Fog gl.Fog
 }
 
-func NewGeoEngine(buffers *Buffers, irq Irq, vram VRAM) *GeoEngine {
+func NewGeoEngine(buffers *Buffers, irq Irq, vram *Vram) *GeoEngine {
 	g := &GeoEngine{
 		Vram:      vram,
 		Irq:       irq,

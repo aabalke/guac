@@ -41,6 +41,30 @@ func (t *Timings) setMemTimings(region int, busSize, n, s uint8) {
 	}
 }
 
+func (nds *Nds) SetCyclesPerInst(addr uint32) {
+	c := nds.arm9
+
+	// since always at reload, always instruction, nonseq, width 4
+
+	// >> 12 4KB pages, uint64 bitmask, 1bit per 4kb page
+	idx := (addr >> 12) / 64
+	bit := (addr >> 12) & 63
+
+	if c.Cp15.ProtectionUnit.InstCache.Pages[idx]&(1<<bit) != 0 {
+		c.CyclesPerInst = 1
+		return
+	}
+
+	region := addr >> 24
+	cycles := int64(nds.Timings9[region][2]) << 1
+
+	if penalty := region != 0x2; penalty {
+		cycles += 6
+	}
+
+	c.CyclesPerInst = cycles
+}
+
 func (nds *Nds) Idle9(cycles int64) {
 	if nds.dma9.IsRunning() {
 		nds.dma9.CheckDmas()
@@ -82,7 +106,7 @@ func (nds *Nds) Cycles9(addr, width, seq uint32, inst bool) {
 	}
 
 	region := addr >> 24
-	cycles := int64(c.Timings[region][((width>>2)<<1)|seq]) << 1
+	cycles := int64(nds.Timings9[region][((width>>2)<<1)|seq]) << 1
 
 	if penalty := region != 2 && seq == arm7.NONSEQ; penalty {
 		cycles += 6
@@ -109,7 +133,7 @@ func (nds *Nds) CyclesDma9(addr, width, seq uint32) {
 	}
 
 	region := addr >> 24
-	cycles := int64(c.Timings[region][((width>>2)<<1)|seq]) << 1
+	cycles := int64(nds.Timings9[region][((width>>2)<<1)|seq]) << 1
 
 	if penalty := region != 2 && seq == arm7.NONSEQ; penalty {
 		cycles += 6
@@ -120,4 +144,59 @@ func (nds *Nds) CyclesDma9(addr, width, seq uint32) {
 
 func (nds *Nds) CyclesDma7(addr, width, seq uint32) {
 	nds.Tick7(1)
+}
+
+func (nds *Nds) Tick9(cycles int64) {
+	// in 66mhz cycles
+	nds.arm9.Timestamp += cycles
+
+	for nds.arm7.Timestamp < nds.arm9.Timestamp>>1 {
+		if nds.arm7.Halted {
+
+			for nds.arm7.Timestamp < nds.arm9.Timestamp>>1 && !nds.irq7.IrqAvailable {
+				nds.Tick7((nds.arm9.Timestamp >> 1) - nds.arm7.Timestamp)
+			}
+
+			if nds.irq7.IrqAvailable {
+				nds.Tick7(1)
+				nds.arm7.Halted = false
+			}
+
+		} else {
+			nds.arm7.Step()
+		}
+	}
+
+	cycles += nds.arm7.Leftover
+	nds.arm7.Leftover = cycles & 1
+	nds.Scheduler.Add(cycles >> 1)
+}
+
+func (nds *Nds) Tick7(cycles int64) {
+	// int 33mhz cycles
+	nds.arm7.Timestamp += cycles
+}
+
+func (nds *Nds) Idle7(cycles int64) {
+	if nds.dma7.IsRunning() {
+		nds.dma7.CheckDmas()
+	}
+
+	nds.Tick7(cycles)
+}
+
+func (nds *Nds) Cycles7(addr, width, seq uint32, inst bool) {
+	if nds.dma7.IsRunning() {
+		nds.dma7.CheckDmas()
+	}
+
+	region := addr >> 24
+
+	cycles := int64(nds.Timings7[region][((width>>2)<<1)|seq])
+
+	if !inst && region == 0x2 {
+		cycles++
+	}
+
+	nds.Tick7(cycles)
 }

@@ -19,7 +19,7 @@ type Rasterizer struct {
 	Render     *Render
 	ClearColor gl.Color
 	RearPlane  RearPlane
-	VRAM       VRAM
+	Vram       Vram
 	Disp1Dot   Disp1Dot
 	Edge       Edge
 	Export     *Export
@@ -29,17 +29,11 @@ type Irq interface {
 	SetIRQ(irq uint32)
 }
 
-type VRAM interface {
-	ReadTexture(uint32) uint8
-	ReadPalTexture(uint32) uint16
-}
-
-func NewRasterizer(vram VRAM, irq Irq) *Rasterizer {
+func NewRasterizer(irq Irq) *Rasterizer {
 	r := &Rasterizer{}
-	r.VRAM = vram
-	r.GeoEngine = NewGeoEngine(&r.Buffers, irq, vram)
+	r.GeoEngine = NewGeoEngine(&r.Buffers, irq, &r.Vram)
 	r.Render = NewRender(r, &r.Buffers, &r.RearPlane)
-	r.RearPlane.VRAM = vram
+	r.RearPlane.VRAM = &r.Vram
 
 	for i := range len(r.Edge.Color) {
 		r.Edge.Color[i] = gl.Color{A: 1}

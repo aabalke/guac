@@ -49,6 +49,10 @@ func (nds *Nds) ScanlineEndEvent(late int64, arg any) {
 	d9 := &nds.mem.Dispstat9
 	vcount := &nds.mem.Vcount
 
+	if *vcount >= 2 && *vcount < 194 {
+		nds.dma9.Raise(dma.ARM9_DMA_MODE_HDR, late)
+	}
+
 	d7.H = false
 	d9.H = false
 
@@ -70,10 +74,6 @@ func (nds *Nds) ScanlineEndEvent(late int64, arg any) {
 		}
 
 		if !config.Conf.General.Headless {
-			if nds.ppu.EngineA.Dispcnt.Is3D {
-				nds.ppu.Rasterizer.Render.UpdateRender()
-			}
-
 			t, b := nds.GetScreens()
 			nds.Screen.Mu.Lock()
 			if nds.Screen.ghostOpts != nil && nds.Stats.Frame()&1 != 0 {
@@ -94,6 +94,15 @@ func (nds *Nds) ScanlineEndEvent(late int64, arg any) {
 			nds.irq9.SetIRQ(0)
 		}
 
+	case 215:
+		if nds.ppu.EngineA.Dispcnt.Is3D {
+			nds.ppu.Rasterizer.Vram.SyncTextures(
+				&nds.ppu.Vram.TextureSlots,
+				&nds.ppu.Vram.TexPalSlots,
+			)
+			nds.ppu.Rasterizer.Render.UpdateRender()
+		}
+
 	case NUM_SCANLINES - 1:
 		d7.V = false
 		d9.V = false
@@ -103,7 +112,6 @@ func (nds *Nds) ScanlineEndEvent(late int64, arg any) {
 		if capture := &nds.ppu.Capture; capture.Enabled {
 			capture.StartCapture()
 		}
-		nds.dma9.Raise(dma.ARM9_DMA_MODE_STA, late)
 		nds.ppu.EngineA.Backgrounds[2].BgAffineReset()
 		nds.ppu.EngineA.Backgrounds[3].BgAffineReset()
 		nds.ppu.EngineB.Backgrounds[2].BgAffineReset()

@@ -1,7 +1,6 @@
 package ppu
 
 import (
-	"encoding/binary"
 	"unsafe"
 
 	"github.com/aabalke/guac/emu/nds/rast"
@@ -37,6 +36,7 @@ type VRAM struct {
 	Cnt   [9]VramCnt
 	Cnt_7 uint8
 
+	// these get synced / copied to rasterizer
 	TextureSlots [4]*[0x2_0000]uint8
 	TexPalSlots  [6]*[0x4000]uint8
 }
@@ -465,26 +465,26 @@ func (vm *VRAM) Read16(addr uint32) uint16 {
 	return 0
 }
 
-func (vm *VRAM) ReadTexture(addr uint32) uint8 {
-	region := addr >> 17
-
-	if region >= 4 {
-		return 0
-	}
-
-	if vm.TextureSlots[region] == nil {
-		return 0
-	}
-
-	return vm.TextureSlots[region][addr&0x1FFFF]
-}
-
-func (vm *VRAM) ReadPalTexture(addr uint32) uint16 {
-	region := addr >> 14
-
-	if region >= 6 || vm.TexPalSlots[region] == nil {
-		return 0
-	}
-
-	return binary.LittleEndian.Uint16(vm.TexPalSlots[region][addr&0x3FFF:])
-}
+//func (vm *VRAM) ReadTexture(addr uint32) uint8 {
+//	region := addr >> 17
+//
+//	if region >= 4 {
+//		return 0
+//	}
+//
+//	if vm.TextureSlots[region] == nil {
+//		return 0
+//	}
+//
+//	return vm.TextureSlots[region][addr&0x1FFFF]
+//}
+//
+//func (vm *VRAM) ReadPalTexture(addr uint32) uint16 {
+//	region := addr >> 14
+//
+//	if region >= 6 || vm.TexPalSlots[region] == nil {
+//		return 0
+//	}
+//
+//	return binary.LittleEndian.Uint16(vm.TexPalSlots[region][addr&0x3FFF:])
+//}

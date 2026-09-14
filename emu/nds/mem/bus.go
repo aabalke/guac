@@ -385,4 +385,6 @@ func (b *Bus9) WritePtr(addr uint32) unsafe.Pointer {
 	return nil
 }
 
-func (b *Bus9) WriteGXFIFO(v uint32) { b.M.Ppu.Rasterizer.GeoEngine.Fifo(v) }
+func (b *Bus9) WriteGXFIFO(v uint32) {
+	b.M.Ppu.Rasterizer.GeoEngine.Fifo(v)
+}

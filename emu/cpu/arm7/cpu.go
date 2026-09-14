@@ -263,7 +263,7 @@ func (c *Cpu) Step() {
 
 	inst := c.Op[0]
 
-	c.print2(inst)
+	//c.print2(inst)
 
 	seq := c.Seq
 	c.Seq = SEQ
@@ -303,7 +303,7 @@ func (c *Cpu) Step() {
 		}
 	}
 
-	c.print()
+	//c.print()
 }
 
 func (c *Cpu) ReloadPipe() {
@@ -477,16 +477,12 @@ func (c *Cpu) ExitException(mode CpuMode) {
 	c.ModeSwitch(mode, c.Reg.CPSR.Mode)
 }
 
-var prev int64
-
 func (c *Cpu) print() {
-	//return
-	fmt.Printf("PC %08X Diff %08d\n", c.Reg.R[15], c.Timestamp-prev)
-	prev = c.Timestamp
+	fmt.Printf("PC %08X Diff %08d\n", c.Reg.R[15], c.Timestamp-debug.Vi64[0])
+	debug.Vi64[0] = c.Timestamp
 }
 
 func (c *Cpu) print2(inst uint32) {
-	//return
 	fmt.Printf("OP %08X\n", inst)
 	if debug.V[0] > 10000 {
 		os.Exit(0)

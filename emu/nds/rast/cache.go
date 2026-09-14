@@ -12,37 +12,37 @@ func (t *TextureCache) Reset() {
 	clear(*t)
 }
 
-func (t *TextureCache) Add(vram VRAM, tex *Texture, key key) {
+func (t *TextureCache) Add(vram *Vram, tex *Texture, key key) *[]gl.Color {
 	switch tex.Format {
 	case TEX_FMT_4_PAL:
-		(*t)[key] = t.getPaletted(vram, tex, 2, 2)
+		return t.getPaletted(vram, tex, 2, 2)
 	case TEX_FMT_16_PAL:
-		(*t)[key] = t.getPaletted(vram, tex, 4, 1)
+		return t.getPaletted(vram, tex, 4, 1)
 	case TEX_FMT_256_PAL:
-		(*t)[key] = t.getPaletted(vram, tex, 8, 0)
+		return t.getPaletted(vram, tex, 8, 0)
 	case TEX_FMT_A3I5:
-		(*t)[key] = t.getTranslucent(vram, tex, 5)
+		return t.getTranslucent(vram, tex, 5)
 	case TEX_FMT_A5I3:
-		(*t)[key] = t.getTranslucent(vram, tex, 3)
+		return t.getTranslucent(vram, tex, 3)
 	case TEX_FMT_4X4:
-		(*t)[key] = t.getCompressed(vram, tex)
+		return t.getCompressed(vram, tex)
 	case TEX_FMT_DIRECT:
-		(*t)[key] = t.getDirect(vram, tex)
+		return t.getDirect(vram, tex)
 	default:
-		panic("UNSETUP TEX CACHE METHOD")
+		return nil
 	}
 }
 
-func (t *TextureCache) Get(vram VRAM, tex *Texture) *[]gl.Color {
+func (t *TextureCache) Get(vram *Vram, tex *Texture) *[]gl.Color {
 	key := key{tex.PaletteBaseAddr, tex.VramOffset}
 	if v, ok := (*t)[key]; ok {
 		return v
 	}
-	t.Add(vram, tex, key)
+	(*t)[key] = t.Add(vram, tex, key)
 	return (*t)[key]
 }
 
-func (t *TextureCache) getDirect(vram VRAM, tex *Texture) *[]gl.Color {
+func (t *TextureCache) getDirect(vram *Vram, tex *Texture) *[]gl.Color {
 	out := make([]gl.Color, tex.SizeS*tex.SizeT)
 
 	for y := range tex.SizeT {
@@ -68,7 +68,7 @@ func (t *TextureCache) getDirect(vram VRAM, tex *Texture) *[]gl.Color {
 	return &out
 }
 
-func (t *TextureCache) getPaletted(vram VRAM, tex *Texture, bitsPerTexel, bitsPerTexelShift uint32) *[]gl.Color {
+func (t *TextureCache) getPaletted(vram *Vram, tex *Texture, bitsPerTexel, bitsPerTexelShift uint32) *[]gl.Color {
 	out := make([]gl.Color, tex.SizeS*tex.SizeT)
 
 	palBase := tex.PaletteBaseAddr
@@ -107,7 +107,7 @@ func (t *TextureCache) getPaletted(vram VRAM, tex *Texture, bitsPerTexel, bitsPe
 	return &out
 }
 
-func (t *TextureCache) getTranslucent(vram VRAM, tex *Texture, colorBits uint8) *[]gl.Color {
+func (t *TextureCache) getTranslucent(vram *Vram, tex *Texture, colorBits uint8) *[]gl.Color {
 	out := make([]gl.Color, tex.SizeS*tex.SizeT)
 
 	tex.PaletteBaseAddr *= 0x10
@@ -142,7 +142,7 @@ func (t *TextureCache) getTranslucent(vram VRAM, tex *Texture, colorBits uint8) 
 
 // rasky/ndsemu
 
-func (t *TextureCache) getCompressed(vram VRAM, tex *Texture) *[]gl.Color {
+func (t *TextureCache) getCompressed(vram *Vram, tex *Texture) *[]gl.Color {
 	off := tex.VramOffset
 	out := make([]gl.Color, tex.SizeS*tex.SizeT)
 

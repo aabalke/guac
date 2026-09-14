@@ -80,7 +80,7 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 	}
 
 	nds.arm7 = arm7.NewCpu(&nds.mem.Bus7, nds.Cycles7, nds.Idle7)
-	nds.arm9 = arm9.NewCpu(&nds.mem.Bus9, nds.Idle9, nds.Tick9, nds.Cycles9)
+	nds.arm9 = arm9.NewCpu(&nds.mem.Bus9, nds.Idle9, nds.Tick9, nds.Cycles9, nds.SetCyclesPerInst)
 	nds.irq7 = irq.NewIrq(nds.Scheduler, &nds.arm7.IrqLine)
 	nds.irq9 = irq.NewIrq(nds.Scheduler, &nds.arm9.IrqLine)
 	nds.ppu = ppu.NewPPU(nds.irq9)
@@ -216,6 +216,8 @@ func (nds *Nds) Update() {
 
 			nds.arm9.Step()
 
+			nds.CheckGeoDmas()
+
 			if nds.ppu.Rasterizer.GeoEngine.GxStat.FifoIrq != 0 {
 				nds.irq9.SetIRQ(irq.IRQ_GEO_CMD_FIFO)
 			}
@@ -223,57 +225,12 @@ func (nds *Nds) Update() {
 	}
 }
 
-func (nds *Nds) Tick9(cycles int64) {
-	// in 66mhz cycles
-	nds.arm9.Timestamp += cycles
-
-	for nds.arm7.Timestamp < nds.arm9.Timestamp>>1 {
-		if nds.arm7.Halted {
-
-			for nds.arm7.Timestamp < nds.arm9.Timestamp>>1 && !nds.irq7.IrqAvailable {
-				nds.Tick7((nds.arm9.Timestamp >> 1) - nds.arm7.Timestamp)
-			}
-
-			if nds.irq7.IrqAvailable {
-				nds.Tick7(1)
-				nds.arm7.Halted = false
-			}
-
-		} else {
-			nds.arm7.Step()
+func (nds *Nds) CheckGeoDmas() {
+	for i := range 4 {
+		if ch := &nds.dma9.Chs[i]; ch.Enabled && ch.Mode == dma.ARM9_DMA_MODE_GEO {
+			nds.dma9.Chs[i].GxTransfer(0, 0)
 		}
 	}
-
-	cycles += nds.arm7.Leftover
-	nds.arm7.Leftover = cycles & 1
-	nds.Scheduler.Add(cycles >> 1)
-}
-
-func (nds *Nds) Tick7(cycles int64) {
-	// int 33mhz cycles
-	nds.arm7.Timestamp += cycles
-}
-
-func (nds *Nds) Idle7(cycles int64) {
-	if nds.dma7.IsRunning() {
-		nds.dma7.CheckDmas()
-	}
-
-	nds.Tick7(cycles)
-}
-
-func (nds *Nds) Cycles7(addr, width, seq uint32, inst bool) {
-	if nds.dma7.IsRunning() {
-		nds.dma7.CheckDmas()
-	}
-
-	cycles := int64(nds.Timings7[addr>>24][((width>>2)<<1)|seq])
-
-	if !inst && addr>>24 == 2 {
-		cycles++
-	}
-
-	nds.Tick7(cycles)
 }
 
 func (nds *Nds) ToggleMute(muted bool) bool {

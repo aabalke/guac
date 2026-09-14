@@ -12,7 +12,7 @@ type RearPlane struct {
 	Id               uint32
 	ClearDepth       uint32
 	OffsetX, OffsetY uint32
-	VRAM             VRAM
+	VRAM             *Vram
 
 	Color [256 * 256]gl.Color
 	Depth [256 * 256]float64
@@ -20,7 +20,6 @@ type RearPlane struct {
 }
 
 func (r *RearPlane) Write(addr uint32, v uint8) {
-
 	// disable rearplane if all zero
 	r.paramActive[addr-0x350] = v != 0
 	r.Enabled = false
@@ -64,7 +63,6 @@ func (r *RearPlane) Write(addr uint32, v uint8) {
 }
 
 func (r *RearPlane) Cache() {
-
 	vram := r.VRAM
 
 	const (

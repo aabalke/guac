@@ -13,7 +13,7 @@ const (
 	DMA_MODE_VBL = 1
 
 	ARM9_DMA_MODE_HBL = 2
-	ARM9_DMA_MODE_STA = 3
+	ARM9_DMA_MODE_HDR = 3
 	ARM9_DMA_MODE_DSC = 5
 	ARM9_DMA_MODE_MAI = 4
 	ARM9_DMA_MODE_GBA = 6
@@ -196,10 +196,6 @@ func (ch *Channel) Write(addr uint32, v uint8) {
 
 		if ch.dma.IsArm9 {
 			ch.Mode = (v >> 3) & 7
-
-			if ch.Mode > 3 {
-				ch.Mode &= 3
-			}
 		} else {
 			ch.Mode = (v >> 4) & 3
 		}
@@ -488,4 +484,58 @@ func (d *Dma) CheckDmas() uint32 {
 	d.Tick(1)
 
 	return uint32(d.Scheduler.Now() - start)
+}
+
+func (ch *Channel) GxTransfer(late int64, _ any) {
+	if ch.Dst != 0x400_0400 || ch.DstAdj != DMA_ADJ_NON || !ch.isWord {
+		return
+	}
+
+	count := ch.Cnt
+	if count == 0 {
+		count = 0x200000
+	}
+
+	ofs := int(2)
+	if ch.isWord {
+		ofs = 4
+	}
+
+	srcOffset := int(0)
+	switch ch.SrcAdj {
+	case DMA_ADJ_INC:
+		srcOffset = ofs
+	case DMA_ADJ_DEC:
+		srcOffset = -ofs
+	}
+
+	mem := ch.dma.Mem
+	tmpSrc := int(ch.Src &^ 3)
+
+	ptr := mem.ReadPtr(uint32(tmpSrc))
+	if ptr == nil {
+		for range count {
+			mem.Write32(0x400_0400, mem.Read32(uint32(tmpSrc)))
+			tmpSrc += srcOffset
+		}
+	} else {
+		for range count {
+			mem.Write32(0x400_0400, *(*uint32)(ptr))
+			ptr = unsafe.Add(ptr, srcOffset)
+		}
+
+		tmpSrc += srcOffset * int(count)
+	}
+
+	if ch.IRQ {
+		ch.dma.Irq.SetIRQ(8 + uint32(ch.Idx))
+	}
+
+	if !ch.Repeat {
+		ch.disable()
+		return
+	}
+
+	ch.Src = uint32(tmpSrc)
+	//ch.sch.Schedule(ch.gxTransferEvent, 1, nil)
 }
