@@ -18,6 +18,7 @@ go 1.27.1
 
 require (
 	github.com/BurntSushi/toml v1.6.0
+	github.com/aabalke/gojit v0.0.0-20260616021404-5808a49d96fc
 	github.com/ebitenui/ebitenui v0.7.3
 	github.com/hajimehoshi/dialog v0.0.0-20260703050910-dfca0e7cf198
 	github.com/hajimehoshi/ebiten/v2 v2.10.1
@@ -28,6 +29,7 @@ require (
 	github.com/ebitengine/hideconsole v1.0.0 // indirect
 	github.com/ebitengine/oto/v3 v3.5.0 // indirect
 	github.com/ebitengine/purego v0.11.0 // indirect
+	github.com/edsrzf/mmap-go v1.2.0 // indirect
 	github.com/frustra/bbcode v0.0.0-20201127003707-6ef347fbe1c8 // indirect
 	github.com/go-text/typesetting v0.3.5 // indirect
 	github.com/jfreymuth/pulse v0.1.3 // indirect

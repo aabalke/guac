@@ -15,8 +15,8 @@ import (
 type Memory struct {
 	GBA   *GBA
 	BIOS  *[]uint8
-	WRAM1 [0x40000]uint8
-	WRAM2 [0x8000]uint8
+	EWRAM [0x40000]uint8
+	IWRAM [0x8000]uint8
 	PRAM  [0x200]uint16
 	VRAM  [0x18001]uint8 // required for some objects (see ags test with only 0x18000), not sure if better method or sign of problem
 	OAM   [0x400]uint8
@@ -87,11 +87,11 @@ func (m *Memory) initWriteRegions() {
 	}
 
 	m.writeRegions[0x2] = func(m *Memory, addr uint32, v uint8, _ bool) {
-		m.WRAM1[addr&0x3FFFF] = v
+		m.EWRAM[addr&0x3FFFF] = v
 	}
 
 	m.writeRegions[0x3] = func(m *Memory, addr uint32, v uint8, _ bool) {
-		m.WRAM2[addr&0x7FFF] = v
+		m.IWRAM[addr&0x7FFF] = v
 	}
 
 	m.writeRegions[0x4] = func(m *Memory, addr uint32, v uint8, _ bool) {
@@ -193,11 +193,11 @@ func (m *Memory) initReadRegions() {
 	}
 
 	m.readRegions[0x2] = func(m *Memory, addr uint32) uint8 {
-		return m.WRAM1[addr&0x3FFFF]
+		return m.EWRAM[addr&0x3FFFF]
 	}
 
 	m.readRegions[0x3] = func(m *Memory, addr uint32) uint8 {
-		return m.WRAM2[addr&0x7FFF]
+		return m.IWRAM[addr&0x7FFF]
 	}
 
 	m.readRegions[0x4] = func(m *Memory, addr uint32) uint8 {
@@ -251,9 +251,9 @@ func (m *Memory) ReadPtr(addr uint32) unsafe.Pointer {
 
 		return unsafe.Add(unsafe.Pointer(&(*m.BIOS)[0]), addr&0x3FFF)
 	case 2:
-		return unsafe.Add(unsafe.Pointer(&m.WRAM1), addr&0x3FFFF)
+		return unsafe.Add(unsafe.Pointer(&m.EWRAM), addr&0x3FFFF)
 	case 3:
-		return unsafe.Add(unsafe.Pointer(&m.WRAM2), addr&0x7FFF)
+		return unsafe.Add(unsafe.Pointer(&m.IWRAM), addr&0x7FFF)
 	case 5:
 		return unsafe.Add(unsafe.Pointer(&m.PRAM), addr&0x3FF)
 	case 6:
@@ -306,9 +306,9 @@ func (m *Memory) ReadPtr(addr uint32) unsafe.Pointer {
 func (m *Memory) WritePtr(addr uint32) unsafe.Pointer {
 	switch addr >> 24 {
 	case 2:
-		return unsafe.Add(unsafe.Pointer(&m.WRAM1), addr&0x3FFFF)
+		return unsafe.Add(unsafe.Pointer(&m.EWRAM), addr&0x3FFFF)
 	case 3:
-		return unsafe.Add(unsafe.Pointer(&m.WRAM2), addr&0x7FFF)
+		return unsafe.Add(unsafe.Pointer(&m.IWRAM), addr&0x7FFF)
 	case 5:
 		return unsafe.Add(unsafe.Pointer(&m.PRAM), addr&0x3FF)
 	case 6:

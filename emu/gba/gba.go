@@ -255,6 +255,7 @@ func (gba *GBA) Update() {
 }
 
 func (gba *GBA) Tick(cycles int64) {
+	gba.Cpu.Timestamp += cycles
 	gba.Scheduler.Add(cycles)
 
 	if gba.Mem.Timings.Active {

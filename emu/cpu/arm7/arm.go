@@ -227,12 +227,10 @@ func (c *Cpu) Alu(op uint32) {
 		rn    = (op >> 16) & 0xF
 		carry = cpsr.C
 		rnv   = r[rn]
-		imm   = (op>>25)&1 != 0
-
-		op2 uint32
+		op2   uint32
 	)
 
-	if imm {
+	if imm := (op>>25)&1 != 0; imm {
 
 		ro := ((op >> 8) & 0xF) << 1
 		op2 = bits.RotateLeft32(op&0xFF, -int(ro))
@@ -518,12 +516,12 @@ func (c *Cpu) getShiftedAluReg(op uint32) uint32 {
 
 const (
 	MUL   = 0b000
-	MLA   = 0b001
+	MLA   = 0b001 //
 	UMAAL = 0b010
 	UMULL = 0b100
-	UMLAL = 0b101
+	UMLAL = 0b101 //
 	SMULL = 0b110
-	SMLAL = 0b111
+	SMLAL = 0b111 //
 )
 
 func (c *Cpu) Mul(op uint32) {
@@ -535,6 +533,7 @@ func (c *Cpu) Mul(op uint32) {
 		rm   = (op >> 0) & 0xF
 		r    = &c.Reg.R
 		cpsr = &c.Reg.CPSR
+		add  = (op>>21)&1 != 0
 	)
 
 	switch inst := (op >> 21) & 0xF; inst {
@@ -544,7 +543,7 @@ func (c *Cpu) Mul(op uint32) {
 
 		c.Idle(idleMul(r[rs], true))
 
-		if inst == MLA {
+		if add {
 			res += r[rn]
 			c.Idle(1)
 		}
@@ -566,7 +565,7 @@ func (c *Cpu) Mul(op uint32) {
 		c.Idle(idleMul(r[rs], false) + 1)
 		res := uint64(r[rm]) * uint64(r[rs])
 
-		if inst == UMLAL {
+		if add {
 			res += uint64(r[rd])<<32 | uint64(r[rn])
 			c.Idle(1)
 		}
@@ -588,7 +587,7 @@ func (c *Cpu) Mul(op uint32) {
 		c.Idle(idleMul(r[rs], true) + 1)
 
 		res := int64(int32(r[rm])) * int64(int32(r[rs]))
-		if inst == SMLAL {
+		if add {
 			res += int64(r[rd])<<32 | int64(r[rn])
 			c.Idle(1)
 		}
@@ -790,17 +789,18 @@ func (c *Cpu) Half(op uint32) {
 	}
 
 	if !load {
+
+		if inst != STRH {
+			panic("unsupported arm7 instruction (ldrd, strd, reserved)")
+		}
+
 		rdv := r[rd]
 
 		if wb {
 			r[rn] = post
 		}
 
-		if inst == STRH {
-			c.Write16(pre, uint16(rdv))
-		} else {
-			panic("unsupported arm7 instruction (ldrd, strd, reserved)")
-		}
+		c.Write16(pre, uint16(rdv))
 		return
 	}
 

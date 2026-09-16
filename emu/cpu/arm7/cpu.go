@@ -11,6 +11,7 @@ import (
 type Cpu struct {
 	Bus        Bus
 	Mem        Mem
+	Jit        *Jit
 	Cycles     func(addr, width, seq uint32, inst bool)
 	Idle       func(cycles int64)
 	PcPtr      unsafe.Pointer
@@ -205,6 +206,7 @@ func NewCpu(mem Mem, cycles func(addr, width, seq uint32, inst bool), idle func(
 		LowVector: true,
 	}
 
+	c.Jit = NewJit(c)
 	c.Bus = &Bus7{
 		c: c,
 	}
@@ -388,6 +390,7 @@ func (c *Cpu) Read32Block(addr, seq uint32) uint32 {
 	return c.Bus.Read32Block(addr, seq)
 }
 
+//go:nosplit
 func idleMul(rs uint32, sign bool) int64 {
 	cycles := int64(1)
 	mask := uint32(0xFFFFFF00)
