@@ -729,53 +729,36 @@ func (c *Cpu) ThumbB(op uint16) {
 
 func (c *Cpu) ThumbShifted(op uint16) {
 	var (
-		cpsr = &c.Reg.CPSR
-		r    = &c.Reg.R
-
-		is  = (op >> 6) & 0x1F
-		rsv = r[(op>>3)&7]
-		rd  = op & 7
-
-		res uint32
+		shift = (op >> 6) & 0x1F
+		v     = c.Reg.R[(op>>3)&7]
 	)
 
 	switch shType := (op >> 11) & 3; shType {
 	case LSL:
 
-		switch {
-		case is == 0:
-			res = rsv
-		case is > 32:
-			res = 0
-			cpsr.C = false
-		default:
-			res = rsv << is
-			cpsr.C = rsv&(1<<(32-is)) != 0
+		if shift != 0 {
+			c.Reg.CPSR.C = v&(1<<(32-shift)) != 0
+			v <<= shift
 		}
 
-	case LSR:
+	case LSR, ASR:
 
-		if is == 0 {
-			is = 32
+		if shift == 0 {
+			shift = 32
 		}
 
-		cpsr.C = rsv&(1<<(is-1)) != 0
-		res = rsv >> is
+		c.Reg.CPSR.C = v&(1<<(shift-1)) != 0
 
-	case ASR:
-
-		if (is == 0) || is > 32 {
-			is = 32
+		if shType == ASR {
+			v = uint32(int32(v) >> shift)
+		} else {
+			v >>= shift
 		}
-
-		cpsr.C = rsv&(1<<(is-1)) != 0
-		res = uint32(int32(rsv) >> is)
 	}
 
-	cpsr.N = (res>>31)&1 != 0
-	cpsr.Z = uint32(res) == 0
-
-	r[rd] = res
+	c.Reg.CPSR.N = (v>>31)&1 != 0
+	c.Reg.CPSR.Z = uint32(v) == 0
+	c.Reg.R[op&7] = v
 }
 
 func (c *Cpu) ThumbStack(op uint16) {
@@ -821,6 +804,7 @@ func (c *Cpu) ThumbBlock(op uint16) {
 	)
 
 	if rlist == 0 {
+
 		if !ldmia {
 			c.Write32(r[rb], r[PC]+2)
 		} else {
@@ -834,10 +818,9 @@ func (c *Cpu) ThumbBlock(op uint16) {
 	if !ldmia {
 
 		var (
-			count   = uint32(bits.OnesCount16(rlist))
-			first   = 0
-			addr    = r[rb]
-			baseNew = addr + count*4
+			count = uint32(bits.OnesCount16(rlist))
+			first = 0
+			addr  = r[rb]
 		)
 
 		// can this be sped up? Its just log2(rlist & -rlist)
@@ -849,7 +832,7 @@ func (c *Cpu) ThumbBlock(op uint16) {
 		}
 
 		c.Write32Block(addr, r[first], NONSEQ)
-		r[rb] = baseNew
+		r[rb] = addr + count*4
 		addr += 4
 
 		for reg := first + 1; reg < 8; reg++ {
@@ -861,6 +844,7 @@ func (c *Cpu) ThumbBlock(op uint16) {
 
 	} else {
 		addr := r[rb]
+
 		seq := uint32(NONSEQ)
 
 		for reg := range 8 {

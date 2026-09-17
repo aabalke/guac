@@ -76,18 +76,18 @@ func (j *Jit) RunTest[T constraints.Unsigned](op T, f func(op T)) func() {
 	start := cpu.Reg
 	staStamp := j.cpu.Timestamp
 
-	//ewramPtr := j.cpu.Mem.ReadPtr(0x200_0000)
-	//iwramPtr := j.cpu.Mem.ReadPtr(0x300_0000)
-	//ewram := *(*[0x40000]uint8)(ewramPtr)
-	//iwram := *(*[0x8000]uint8)(iwramPtr)
+	ewramPtr := j.cpu.Mem.ReadPtr(0x200_0000)
+	iwramPtr := j.cpu.Mem.ReadPtr(0x300_0000)
+	ewram := *(*[0x40000]uint8)(ewramPtr)
+	iwram := *(*[0x8000]uint8)(iwramPtr)
 
 	j.UseJit(op, f)
 
 	sav := cpu.Reg
 	savStamp := cpu.Timestamp
 
-	//*(*[0x40000]uint8)(ewramPtr) = ewram
-	//*(*[0x8000]uint8)(iwramPtr) = iwram
+	*(*[0x40000]uint8)(ewramPtr) = ewram
+	*(*[0x8000]uint8)(iwramPtr) = iwram
 
 	cpu.Reg = start
 
