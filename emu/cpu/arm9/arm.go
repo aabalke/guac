@@ -489,7 +489,7 @@ func (c *Cpu) Block(op uint32) {
 
 	var (
 		curr = c.Reg.CPSR.Mode
-		spsr = c.Reg.SPSR[arm7.ModeBank[curr]]
+		spsr = c.Reg.SPSR[arm7.ModeBank(curr)]
 		next = spsr.Mode
 	)
 

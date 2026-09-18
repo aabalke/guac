@@ -327,55 +327,39 @@ func (c *Cpu) ThumbAlu(op uint16) {
 
 		r[rd] = uint32(res)
 
-	case THUMB_LSL:
+	case THUMB_LSL, THUMB_LSR, THUMB_ASR, THUMB_ROR:
 
 		c.Idle(1)
 
 		rsv &= 0xFF
 
-		if rsv > 32 {
-			res = 0
-			cpsr.C = false
-		} else {
+		switch inst {
+		case THUMB_LSL:
 			res = uint64(rdv) << rsv
 			if rsv != 0 {
 				cpsr.C = rdv&(1<<(32-rsv)) != 0
 			}
-		}
-		r[rd] = uint32(res)
 
-	case THUMB_LSR:
-		c.Idle(1)
-		rsv &= 0xFF
+		case THUMB_LSR:
+			res = uint64(rdv) >> rsv
+			if rsv != 0 {
+				cpsr.C = rdv&(1<<(rsv-1)) != 0
+			}
 
-		res = uint64(rdv) >> rsv
-		r[rd] = uint32(res)
+		case THUMB_ASR:
+			rsv = min(rsv, 32)
+			res = uint64(int32(rdv) >> rsv)
+			if rsv != 0 {
+				cpsr.C = rdv&(1<<(rsv-1)) != 0
+			}
 
-		if rsv != 0 {
-			cpsr.C = rdv&(1<<(rsv-1)) != 0
-		}
-
-	case THUMB_ASR:
-		c.Idle(1)
-
-		rsv = min(rsv&0xFF, 32)
-
-		if rsv != 0 {
-			cpsr.C = rdv&(1<<(rsv-1)) != 0
+		case THUMB_ROR:
+			res = uint64(bits.RotateLeft32(rdv, -int(rsv)))
+			if rsv != 0 {
+				cpsr.C = (rdv>>((rsv-1)%32))&1 != 0
+			}
 		}
 
-		res = uint64(int32(rdv) >> rsv)
-		r[rd] = uint32(res)
-
-	case THUMB_ROR:
-		c.Idle(1)
-		rsv &= 0xFF
-
-		if rsv != 0 {
-			cpsr.C = (rdv>>((rsv-1)%32))&1 != 0
-		}
-
-		res = uint64(bits.RotateLeft32(rdv, -int(rsv)))
 		r[rd] = uint32(res)
 	}
 
@@ -728,34 +712,8 @@ func (c *Cpu) ThumbB(op uint16) {
 }
 
 func (c *Cpu) ThumbShifted(op uint16) {
-	var (
-		shift = (op >> 6) & 0x1F
-		v     = c.Reg.R[(op>>3)&7]
-	)
-
-	switch shType := (op >> 11) & 3; shType {
-	case LSL:
-
-		if shift != 0 {
-			c.Reg.CPSR.C = v&(1<<(32-shift)) != 0
-			v <<= shift
-		}
-
-	case LSR, ASR:
-
-		if shift == 0 {
-			shift = 32
-		}
-
-		c.Reg.CPSR.C = v&(1<<(shift-1)) != 0
-
-		if shType == ASR {
-			v = uint32(int32(v) >> shift)
-		} else {
-			v >>= shift
-		}
-	}
-
+	v := c.Reg.R[(op>>3)&7]
+	v = c.ImmShift(uint32(op>>11)&3, v, uint32(op>>6)&0x1F, &c.Reg.CPSR.C)
 	c.Reg.CPSR.N = (v>>31)&1 != 0
 	c.Reg.CPSR.Z = uint32(v) == 0
 	c.Reg.R[op&7] = v
@@ -843,6 +801,7 @@ func (c *Cpu) ThumbBlock(op uint16) {
 		}
 
 	} else {
+
 		addr := r[rb]
 
 		seq := uint32(NONSEQ)

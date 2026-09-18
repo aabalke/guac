@@ -284,18 +284,18 @@ func (gba *GBA) DirectBoot() {
 	gba.Irq.IME = true
 
 	reg.CPSR.Set(0x1F)
-	reg.SPSR[arm7.ModeBank[arm7.MODE_IRQ]].Set(0x10)
+	reg.SPSR[arm7.ModeBank(arm7.MODE_IRQ)].Set(0x10)
 
 	reg.R[arm7.PC] = 0x800_0000
 	reg.R[arm7.LR] = 0x800_0000
-	reg.LR[arm7.ModeBank[arm7.MODE_SYS]] = 0x800_0000
-	reg.LR[arm7.ModeBank[arm7.MODE_IRQ]] = 0x800_0000
-	reg.LR[arm7.ModeBank[arm7.MODE_SWI]] = 0x800_0000
+	reg.LR[arm7.ModeBank(arm7.MODE_SYS)] = 0x800_0000
+	reg.LR[arm7.ModeBank(arm7.MODE_IRQ)] = 0x800_0000
+	reg.LR[arm7.ModeBank(arm7.MODE_SWI)] = 0x800_0000
 
 	reg.R[arm7.SP] = 0x300_7F00
-	reg.SP[arm7.ModeBank[arm7.MODE_SYS]] = 0x300_7F00
-	reg.SP[arm7.ModeBank[arm7.MODE_IRQ]] = 0x300_7FA0
-	reg.SP[arm7.ModeBank[arm7.MODE_SWI]] = 0x300_7FE0
+	reg.SP[arm7.ModeBank(arm7.MODE_SYS)] = 0x300_7F00
+	reg.SP[arm7.ModeBank(arm7.MODE_IRQ)] = 0x300_7FA0
+	reg.SP[arm7.ModeBank(arm7.MODE_SWI)] = 0x300_7FE0
 
 	gba.Cpu.Op[0] = 0xF000_0000
 	gba.Cpu.Op[1] = 0xF000_0000

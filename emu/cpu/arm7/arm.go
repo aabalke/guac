@@ -232,31 +232,28 @@ func (c *Cpu) Alu(op uint32) {
 
 	if imm := (op>>25)&1 != 0; imm {
 
-		ro := ((op >> 8) & 0xF) << 1
-		op2 = bits.RotateLeft32(op&0xFF, -int(ro))
+		op2 = op & 0xFF
 
-		if setCarry := ro != 0 && (op>>20)&1 != 0; setCarry {
-			// I believe this matches
-			// carry := (nn >> (ro-1)) & 1 != 0 // this line must be before op
-			cpsr.C = (op2>>31)&1 != 0
+		if shift := ((op >> 8) & 0xF) << 1; shift != 0 {
+			carry = (op2>>(shift-1))&1 != 0
+			op2 = bits.RotateLeft32(op&0xFF, -int(shift))
 		}
 
 	} else {
-		op2 = c.getShiftedAluReg(op)
+		op2 = c.getShiftedAluReg(op, &carry)
 
 		if regShift := (op>>4)&1 != 0; regShift && rn == PC {
 			rnv += 4
 		}
 	}
 
-	inst := (op >> 21) & 0xF
-
-	switch {
+	switch inst := (op >> 21) & 0xF; {
 	case inst == MOV:
 		res := op2
 		r[rd] = res
 
 		if set := (op>>20)&1 != 0; set {
+			cpsr.C = carry
 			cpsr.N = (uint32(res)>>31)&1 != 0
 			cpsr.Z = uint32(res) == 0
 		}
@@ -296,6 +293,8 @@ func (c *Cpu) Alu(op uint32) {
 			case CMP:
 				cpsr.V = ((rnv^op2)&(rnv^uint32(res)))>>31 != 0
 				cpsr.C = res < 0x1_0000_0000
+			case TST, TEQ:
+				cpsr.C = carry
 			}
 
 			cpsr.N = (uint32(res)>>31)&1 != 0
@@ -323,6 +322,7 @@ func (c *Cpu) Alu(op uint32) {
 		r[rd] = res
 
 		if set := (op>>20)&1 != 0; set {
+			cpsr.C = carry
 			cpsr.N = (uint32(res)>>31)&1 != 0
 			cpsr.Z = uint32(res) == 0
 		}
@@ -339,17 +339,17 @@ func (c *Cpu) Alu(op uint32) {
 			res = uint64(rnv) + uint64(op2)
 		case ADC:
 			res = uint64(rnv) + uint64(op2)
-			if carry {
+			if c.Reg.CPSR.C {
 				res++
 			}
 		case SBC:
 			res = uint64(rnv) - uint64(op2) - 1
-			if carry {
+			if c.Reg.CPSR.C {
 				res++
 			}
 		case RSC:
 			res = uint64(op2) - uint64(rnv) - 1
-			if carry {
+			if c.Reg.CPSR.C {
 				res++
 			}
 		}
@@ -374,6 +374,7 @@ func (c *Cpu) Alu(op uint32) {
 			cpsr.Z = uint32(res) == 0
 		}
 	}
+
 	if rd := (op >> 12) & 0xF; rd == PC {
 		inst := (op >> 21) & 0xF
 
@@ -392,123 +393,46 @@ func (c *Cpu) Alu(op uint32) {
 	}
 }
 
-func (c *Cpu) getShiftedAluReg(op uint32) uint32 {
+func (c *Cpu) getShiftedAluReg(op uint32, carry *bool) uint32 {
+	// https://iitd-plos.github.io/col718/ref/arm-instructionset.pdf
 	var (
-		r        = &c.Reg.R
-		carry    = c.Reg.CPSR.C
-		inst     = (op >> 21) & 0xF
-		logical  = inst&0b0110 == 0 || inst&0b1100 == 0b1100
-		setCarry = (op>>20)&1 != 0 && logical
-		rm       = op & 0xF
-		op2      = r[rm]
-		shift    uint32
+		rm  = op & 0xF
+		op2 = c.Reg.R[rm]
 	)
 
-	if shReg := (op>>4)&1 != 0; shReg {
-		rs := (op >> 8) & 0xF
-		shift = r[rs] & 0xFF
+	if imm := (op>>4)&1 == 0; imm {
+		shift := (op >> 7) & 0x1F
 
-		c.Idle(1)
-
-		if rm == PC {
-			op2 += 4
-		}
-
-	} else {
-
-		shift = (op >> 7) & 0x1F
-
-		if special := shift == 0; special {
-			switch shType := (op >> 5) & 3; shType {
-			case LSL:
-				return op2
-			case LSR:
-				c.Reg.CPSR.C = op2&0x8000_0000 != 0
-				return 0
-			case ASR:
-
-				signed := op2&0x8000_0000 != 0
-
-				if setCarry {
-					c.Reg.CPSR.C = signed
-				}
-
-				if signed {
-					return 0xFFFF_FFFF
-				}
-
-				return 0
-
-			case ROR:
-
-				c.Reg.CPSR.C = op2&1 != 0
-
-				op2 >>= 1
-				if carry {
-					op2 |= 0x8000_0000
-				}
-
-				return op2
-			}
-		}
+		return c.ImmShift((op>>5)&3, op2, shift, carry)
 	}
 
-	// https://iitd-plos.github.io/col718/ref/arm-instructionset.pdf
+	rs := (op >> 8) & 0xF
+	shift := c.Reg.R[rs] & 0xFF
 
-	if regZero := shift == 0; regZero {
-		// op2 unchanges, carry is set to original carry (no change)
-		return op2
+	c.Idle(1)
+
+	if rm == PC {
+		op2 += 4
 	}
 
-	switch shType := (op >> 5) & 3; shType {
-	case LSL:
-		if shift > 32 {
-			op2 = 0
-			carry = false
-		} else {
-			carry = op2&(1<<(32-shift)) != 0
+	if regZero := shift != 0; regZero {
+		switch shType := (op >> 5) & 3; shType {
+		case LSL:
+			*carry = op2&(1<<(32-shift)) != 0
 			op2 <<= shift
-		}
 
-	case LSR:
-		switch {
-		case shift > 32:
-			op2 = 0
-			carry = false
-		case shift == 32:
-			carry = op2&0x8000_0000 != 0
-			op2 = 0
-		default:
-			carry = op2&(1<<(shift-1)) != 0
+		case LSR:
+			*carry = op2&(1<<(shift-1)) != 0
 			op2 >>= shift
-		}
 
-	case ASR:
-		if shift >= 32 {
-			signed := op2&0x8000_0000 != 0
-			carry = signed
-
-			if signed {
-				op2 = 0xFFFF_FFFF
-			} else {
-				op2 = 0x0
-			}
-		} else {
-			carry = op2&(1<<(shift-1)) != 0
+		case ASR:
+			*carry = op2&(1<<min(31, shift-1)) != 0
 			op2 = uint32(int32(op2) >> shift)
-		}
 
-	case ROR:
-		if shift == 32 {
-			carry = op2&0x8000_0000 != 0
-		} else {
-			carry = (op2>>((shift-1)&31))&1 != 0
+		case ROR:
+			*carry = (op2>>((shift-1)&31))&1 != 0
 			op2 = bits.RotateLeft32(op2, -int(shift))
 		}
-	}
-
-	if setCarry {
-		c.Reg.CPSR.C = carry
 	}
 
 	return op2
@@ -605,6 +529,52 @@ func (c *Cpu) Mul(op uint32) {
 	}
 }
 
+func (c *Cpu) ImmShift(sType, v, shift uint32, carry *bool) uint32 {
+	switch sType {
+	case LSL:
+
+		if shift != 0 {
+			*carry = v&(1<<(32-shift)) != 0
+			v <<= shift
+		}
+
+	case LSR, ASR:
+
+		if shift == 0 {
+			shift = 32
+		}
+
+		*carry = v&(1<<(shift-1)) != 0
+
+		if sType == ASR {
+			v = uint32(int32(v) >> shift)
+		} else {
+			v >>= shift
+		}
+
+	case ROR:
+
+		if shift == 0 {
+
+			c := v&1 != 0
+
+			v >>= 1
+
+			if *carry {
+				v |= 0x8000_0000
+			}
+
+			*carry = c
+
+		} else {
+			*carry = (v>>((shift-1)&31))&1 != 0
+			v = bits.RotateLeft32(v, -int(shift))
+		}
+
+	}
+	return v
+}
+
 func (c *Cpu) Sdt(op uint32) {
 	var (
 		r    = &c.Reg.R
@@ -617,7 +587,7 @@ func (c *Cpu) Sdt(op uint32) {
 		rn   = (op >> 16) & 0xF
 		rd   = (op >> 12) & 0xF
 
-		offset, addr uint32
+		offset uint32
 	)
 
 	if reg {
@@ -626,49 +596,15 @@ func (c *Cpu) Sdt(op uint32) {
 			panic("malformed single data transfer reg")
 		}
 
-		shift := (op >> 7) & 0x1F
-		rm := op & 0xF
-
-		switch sType := (op >> 5) & 3; sType {
-		case LSL:
-
-			offset = r[rm] << shift
-
-		case LSR:
-
-			if shift == 0 {
-				shift = 32
-			}
-
-			offset = r[rm] >> shift
-
-		case ASR:
-
-			if shift == 0 {
-				shift = 32
-			}
-
-			offset = uint32(int32(r[rm]) >> shift)
-
-		case ROR:
-
-			if shift == 0 {
-
-				offset = r[rm] >> 1
-
-				if c.Reg.CPSR.C {
-					offset |= 0x8000_0000
-				}
-			} else {
-				offset = bits.RotateLeft32(r[rm], -int(shift))
-			}
-		}
+		carry := c.Reg.CPSR.C
+		offset = c.ImmShift((op>>5)&3, r[op&0xF], (op>>7)&0x1F, &carry)
 
 	} else {
 		offset = op & 0xFFF
 	}
 
-	post := r[rn]
+	addr := r[rn]
+	post := addr
 
 	if up {
 		post += offset
@@ -678,8 +614,12 @@ func (c *Cpu) Sdt(op uint32) {
 
 	if pre {
 		addr = post
-	} else {
-		addr = r[rn]
+	}
+
+	v := r[rd]
+
+	if wb {
+		r[rn] = post
 	}
 
 	if load {
@@ -696,9 +636,7 @@ func (c *Cpu) Sdt(op uint32) {
 			}
 		}
 	} else {
-		v := r[rd]
 
-		// TODO: is this proper with pipelining?
 		if rd == PC {
 			v += 4
 		}
@@ -708,10 +646,6 @@ func (c *Cpu) Sdt(op uint32) {
 		} else {
 			c.Write32(addr, v)
 		}
-	}
-
-	if wb && (!load || rn != rd) {
-		r[rn] = post
 	}
 }
 
@@ -757,17 +691,17 @@ const (
 
 func (c *Cpu) Half(op uint32) {
 	var (
-		r       = &c.Reg.R
-		rn      = (op >> 16) & 0xF
-		rd      = (op >> 12) & 0xF
-		preFlag = (op>>24)&1 != 0
-		load    = (op>>20)&1 != 0
-		inst    = (op >> 5) & 3
-		wb      = (op>>21)&1 != 0 || !preFlag
-		rnv     = r[rn]
-		post    = rnv
+		r    = &c.Reg.R
+		rn   = (op >> 16) & 0xF
+		rd   = (op >> 12) & 0xF
+		pre  = (op>>24)&1 != 0
+		load = (op>>20)&1 != 0
+		inst = (op >> 5) & 3
+		wb   = (op>>21)&1 != 0 || !pre
+		addr = r[rn]
+		post = addr
 
-		pre, offset uint32
+		offset uint32
 	)
 
 	if imm := (op>>22)&1 != 0; imm {
@@ -782,10 +716,14 @@ func (c *Cpu) Half(op uint32) {
 		post -= offset
 	}
 
-	if preFlag {
-		pre = post
-	} else {
-		pre = rnv
+	if pre {
+		addr = post
+	}
+
+	v := r[rd]
+
+	if wb {
+		r[rn] = post
 	}
 
 	if !load {
@@ -794,32 +732,22 @@ func (c *Cpu) Half(op uint32) {
 			panic("unsupported arm7 instruction (ldrd, strd, reserved)")
 		}
 
-		rdv := r[rd]
-
-		if wb {
-			r[rn] = post
-		}
-
-		c.Write16(pre, uint16(rdv))
+		c.Write16(addr, uint16(v))
 		return
-	}
-
-	if wb {
-		r[rn] = post
 	}
 
 	switch inst {
 	case LDRH:
-		v := uint32(c.Read16(pre))
-		r[rd] = bits.RotateLeft32(v, -int((pre&1)*8))
+		v := uint32(c.Read16(addr))
+		r[rd] = bits.RotateLeft32(v, -int((addr&1)*8))
 	case LDRSB:
-		r[rd] = uint32(int32(int8(c.Read8(pre))))
+		r[rd] = uint32(int32(int8(c.Read8(addr))))
 
 	case LDRSH:
-		if misaligned := pre&1 != 0; misaligned {
-			r[rd] = uint32(int32(int8(c.Read8(pre))))
+		if misaligned := addr&1 != 0; misaligned {
+			r[rd] = uint32(int32(int8(c.Read8(addr))))
 		} else {
-			r[rd] = uint32(int32(int16(c.Read16(pre))))
+			r[rd] = uint32(int32(int16(c.Read16(addr))))
 		}
 	default:
 		panic("unsupported arm7 instruction (ldrd, strd, reserved)")
@@ -831,7 +759,7 @@ func (c *Cpu) Mrs(op uint32) {
 	rd := (op >> 12) & 0xF
 
 	if spsr := (op>>22)&1 != 0; spsr {
-		r[rd] = c.Reg.SPSR[ModeBank[c.Reg.CPSR.Mode]].Get()
+		r[rd] = c.GetSPSR(c.Reg.CPSR.Mode)
 		return
 	}
 
@@ -890,11 +818,11 @@ func (c *Cpu) Msr(op uint32) {
 		if curr == MODE_USR || curr == MODE_SYS {
 			spsr = c.Reg.CPSR.Get()
 		} else {
-			spsr = c.Reg.SPSR[ModeBank[curr]].Get()
+			spsr = c.Reg.SPSR[ModeBank(curr)].Get()
 		}
 
 		spsr = (spsr &^ mask) | (v & mask)
-		c.Reg.SPSR[ModeBank[curr]].Set(spsr)
+		c.Reg.SPSR[ModeBank(curr)].Set(spsr)
 		return
 	}
 
@@ -906,7 +834,7 @@ func (c *Cpu) Msr(op uint32) {
 
 	next := CpuMode(v&0x1F | 0x10)
 
-	if ModeBank[curr] != ModeBank[next] {
+	if ModeBank(curr) != ModeBank(next) {
 
 		if curr == MODE_USR {
 			panic("user mode msr")
@@ -1044,7 +972,7 @@ func (c *Cpu) Block(op uint32) {
 
 	var (
 		curr = c.Reg.CPSR.Mode
-		spsr = c.Reg.SPSR[ModeBank[curr]]
+		spsr = c.Reg.SPSR[ModeBank(curr)]
 		next = spsr.Mode
 	)
 

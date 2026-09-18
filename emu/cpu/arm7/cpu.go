@@ -140,14 +140,24 @@ const (
 	MODE_SYS CpuMode = 0x1F
 )
 
-var ModeBank = map[CpuMode]uint32{
-	MODE_USR: 0,
-	MODE_SYS: 0,
-	MODE_FIQ: 1,
-	MODE_IRQ: 2,
-	MODE_SWI: 3,
-	MODE_ABT: 4,
-	MODE_UND: 5,
+func ModeBank(mode CpuMode) uint32 {
+	switch mode {
+	case MODE_USR, MODE_SYS:
+		return 0
+	case MODE_FIQ:
+		return 1
+	case MODE_IRQ:
+		return 2
+	case MODE_SWI:
+		return 3
+	case MODE_ABT:
+		return 4
+	case MODE_UND:
+		return 5
+	default:
+		panic("not possible")
+
+	}
 }
 
 type ExceptionVector uint32
@@ -233,7 +243,7 @@ func (c *Cpu) DoIrq() {
 
 	c.ModeSwitch(cpsr.Mode, MODE_IRQ)
 
-	i := ModeBank[MODE_IRQ]
+	i := ModeBank(MODE_IRQ)
 	c.Reg.SPSR[i] = *cpsr
 
 	c.Reg.R[LR] = c.Reg.R[PC]
@@ -391,6 +401,11 @@ func (c *Cpu) Read32Block(addr, seq uint32) uint32 {
 }
 
 //go:nosplit
+func (c *Cpu) GetSPSR(mode CpuMode) uint32 {
+	return c.Reg.SPSR[ModeBank(mode)].Get()
+}
+
+//go:nosplit
 func idleMul(rs uint32, sign bool) int64 {
 	cycles := int64(1)
 	mask := uint32(0xFFFFFF00)
@@ -408,6 +423,7 @@ func idleMul(rs uint32, sign bool) int64 {
 	return cycles
 }
 
+//go:nosplit
 func (c *Cpu) ModeSwitch(curr, next CpuMode) {
 	// DO NOT RELOAD PIPE AFTER CALLING ModeSwitch
 
@@ -419,8 +435,8 @@ func (c *Cpu) ModeSwitch(curr, next CpuMode) {
 		}
 	}
 
-	c.Reg.SP[ModeBank[curr]] = r[SP]
-	c.Reg.LR[ModeBank[curr]] = r[LR]
+	c.Reg.SP[ModeBank(curr)] = r[SP]
+	c.Reg.LR[ModeBank(curr)] = r[LR]
 
 	if curr == MODE_FIQ {
 		for i := range 5 {
@@ -434,8 +450,8 @@ func (c *Cpu) ModeSwitch(curr, next CpuMode) {
 		}
 	}
 
-	r[SP] = c.Reg.SP[ModeBank[next]]
-	r[LR] = c.Reg.LR[ModeBank[next]]
+	r[SP] = c.Reg.SP[ModeBank(next)]
+	r[LR] = c.Reg.LR[ModeBank(next)]
 
 	if next == MODE_FIQ {
 		for i := range 5 {
@@ -450,7 +466,7 @@ func (c *Cpu) Exception(addr ExceptionVector, mode CpuMode) {
 
 	c.ModeSwitch(cpsr.Mode, mode)
 
-	i := ModeBank[mode]
+	i := ModeBank(mode)
 	c.Reg.SPSR[i] = *cpsr
 
 	if thumb {
@@ -476,7 +492,7 @@ func (c *Cpu) Exception(addr ExceptionVector, mode CpuMode) {
 }
 
 func (c *Cpu) ExitException(mode CpuMode) {
-	c.Reg.CPSR = c.Reg.SPSR[ModeBank[mode]]
+	c.Reg.CPSR = c.Reg.SPSR[ModeBank(mode)]
 	c.ModeSwitch(mode, c.Reg.CPSR.Mode)
 }
 

@@ -10,22 +10,16 @@ import (
 )
 
 var (
-	CpuPtr      *Cpu
-	CPU         = gojit.R9
-	REG         = int32(unsafe.Offsetof(Cpu{}.Reg))
-	R           = REG + int32(unsafe.Offsetof(Reg{}.R))
-	CPSR        = REG + int32(unsafe.Offsetof(Reg{}.CPSR))
-	HALTED_FLAG = gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Halted)), Bits: 8}
+	CPU  = gojit.R9
+	REG  = int32(unsafe.Offsetof(Cpu{}.Reg))
+	R    = REG + int32(unsafe.Offsetof(Reg{}.R))
+	CPSR = REG + int32(unsafe.Offsetof(Reg{}.CPSR))
 
 	MODE = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.Mode)), Bits: 32}
 	jN   = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.N)), Bits: 8}
 	jZ   = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.Z)), Bits: 8}
 	jC   = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.C)), Bits: 8}
 	jV   = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.V)), Bits: 8}
-	jQ   = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.Q)), Bits: 8}
-	jI   = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.I)), Bits: 8}
-	jF   = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.F)), Bits: 8}
-	jT   = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.T)), Bits: 8}
 
 	FALSE = gojit.Imm(0)
 	TRUE  = gojit.Imm(1)
@@ -33,12 +27,14 @@ var (
 
 type Jit struct {
 	*gojit.Assembler
-	cpu        *Cpu
+	cpu *Cpu
+
+	EndBlock bool
+
 	TestingCnt int
 }
 
 func NewJit(cpu *Cpu) *Jit {
-	CpuPtr = cpu
 	return &Jit{
 		cpu: cpu,
 	}
@@ -56,7 +52,7 @@ func (j *Jit) UseJit[T constraints.Unsigned](op T, f func(op T)) {
 
 	j.Assembler = asm
 
-	j.MovAbs(uint64(uintptr(unsafe.Pointer(CpuPtr))), CPU)
+	j.MovAbs(uint64(uintptr(unsafe.Pointer(j.cpu))), CPU)
 
 	f(op)
 
@@ -147,86 +143,7 @@ func (j *Jit) REG(i uint32) gojit.Indirect {
 	}
 }
 
-func (j *Jit) UserBankReg(reg uint32) gojit.Indirect {
-	// sp and lr banks have user bank first, no need to add offsets
-
-	if reg < 8 {
-		panic("usr bank reg jit called for < 8")
-	}
-
-	switch reg {
-	case 13:
-		return gojit.Indirect{
-			Base:   CPU,
-			Offset: REG + int32(unsafe.Offsetof(Reg{}.SP)),
-			Bits:   32,
-		}
-	case 14:
-		return gojit.Indirect{
-			Base:   CPU,
-			Offset: REG + int32(unsafe.Offsetof(Reg{}.LR)),
-			Bits:   32,
-		}
-	default:
-		return gojit.Indirect{
-			Base:   CPU,
-			Offset: REG + int32(unsafe.Offsetof(Reg{}.USR)) + int32(reg-8)*4,
-			Bits:   32,
-		}
-	}
-}
-
 //go:nosplit
-func Idle(cycles int64) {
-	CpuPtr.Idle(cycles)
-}
-
-//go:nosplit
-func Write8(addr uint32, v uint8) {
-	CpuPtr.Bus.Write8(addr, v)
-}
-
-//go:nosplit
-func Write16(addr uint32, v uint16) {
-	CpuPtr.Bus.Write16(addr, v)
-}
-
-//go:nosplit
-func Write32(addr, v uint32) {
-	CpuPtr.Bus.Write32(addr, v)
-}
-
-//go:nosplit
-func Write32Block(addr, v, seq uint32) {
-	CpuPtr.Bus.Write32Block(addr, v, seq)
-}
-
-//go:nosplit
-func Read8(addr uint32) uint32 {
-	return CpuPtr.Bus.Read8(addr)
-}
-
-//go:nosplit
-func Read16(addr uint32) uint32 {
-	return CpuPtr.Bus.Read16(addr)
-}
-
-//go:nosplit
-func Read32(addr uint32) uint32 {
-	return CpuPtr.Bus.Read32(addr)
-}
-
-//go:nosplit
-func Read32Block(addr, seq uint32) uint32 {
-	return CpuPtr.Bus.Read32Block(addr, seq)
-}
-
-//go:nosplit
-func GetSpsr(mode CpuMode) uint32 {
-	return CpuPtr.Reg.SPSR[ModeBank[mode]].Get()
-}
-
-//go:nosplit
-func ModeSwitch(curr, next CpuMode) {
-	CpuPtr.ModeSwitch(curr, next)
+func Idle(c *Cpu, cycles int64) {
+	c.Idle(cycles)
 }
