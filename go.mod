@@ -18,10 +18,11 @@ go 1.27.1
 
 require (
 	github.com/BurntSushi/toml v1.6.0
-	github.com/aabalke/gojit v0.0.0-20260616021404-5808a49d96fc
+	github.com/aabalke/gojit v0.0.0-20260919011104-e8574bd413ce
 	github.com/ebitenui/ebitenui v0.7.3
 	github.com/hajimehoshi/dialog v0.0.0-20260703050910-dfca0e7cf198
 	github.com/hajimehoshi/ebiten/v2 v2.10.1
+	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394
 )
 
 require (
@@ -34,7 +35,6 @@ require (
 	github.com/go-text/typesetting v0.3.5 // indirect
 	github.com/jfreymuth/pulse v0.1.3 // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
-	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
 	golang.org/x/image v0.45.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect

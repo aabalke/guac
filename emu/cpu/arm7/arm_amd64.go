@@ -29,8 +29,8 @@ func (j *Jit) emitMul(op uint32) {
 		}
 
 		j.Movl(gojit.Eax, gojit.Ebx)
-		j.Mov(CPU, gojit.Rax)
-		j.CallFunc(Idle)
+		j.Mov(JIT, gojit.Rax)
+		j.CallFunc((*Jit).Idle)
 
 		// multiply
 		j.Movl(j.REG(rs), gojit.Eax)
@@ -65,8 +65,8 @@ func (j *Jit) emitMul(op uint32) {
 		}
 
 		j.Movl(gojit.Eax, gojit.Ebx)
-		j.Mov(CPU, gojit.Rax)
-		j.CallFunc(Idle)
+		j.Mov(JIT, gojit.Rax)
+		j.CallFunc((*Jit).Idle)
 
 		// multiply
 		j.Movl(j.REG(rs), gojit.Eax)
@@ -106,8 +106,8 @@ func (j *Jit) emitMul(op uint32) {
 		}
 
 		j.Movl(gojit.Eax, gojit.Ebx)
-		j.Mov(CPU, gojit.Rax)
-		j.CallFunc(Idle)
+		j.Mov(JIT, gojit.Rax)
+		j.CallFunc((*Jit).Idle)
 
 		// multiply
 		j.Movl(j.REG(rs), gojit.Eax)
@@ -146,26 +146,26 @@ func (j *Jit) emitSwp(op uint32) {
 	rm := op & 0xF
 
 	j.Movl(j.REG(rn), gojit.R8d)
-	j.Movl(j.REG(rm), gojit.Esi)
+	j.Movl(j.REG(rm), gojit.R10d)
 
-	j.Mov(CPU, gojit.Rax)
+	j.Mov(JIT, gojit.Rax)
 	j.Movl(gojit.R8d, gojit.Ebx)
 
 	if isByte := (op>>22)&1 != 0; isByte {
 
-		j.CallFunc((*Cpu).Read8)
+		j.CallFunc((*Jit).Read8)
 
 		j.Movl(gojit.Eax, j.REG(rd))
 
-		j.Mov(CPU, gojit.Rax)
+		j.Mov(JIT, gojit.Rax)
 		j.Movl(gojit.R8d, gojit.Ebx)
-		j.Movl(gojit.Esi, gojit.Ecx)
+		j.Movl(gojit.R10d, gojit.Ecx)
 
-		j.CallFunc((*Cpu).Write8)
+		j.CallFunc((*Jit).Write8)
 		return
 	}
 
-	j.CallFunc((*Cpu).Read32)
+	j.CallFunc((*Jit).Read32)
 
 	j.Movl(gojit.R8d, gojit.Ecx)
 	j.And(gojit.Imm(3), gojit.Ecx)
@@ -174,10 +174,10 @@ func (j *Jit) emitSwp(op uint32) {
 
 	j.Movl(gojit.Eax, j.REG(rd))
 
-	j.Mov(CPU, gojit.Rax)
+	j.Mov(JIT, gojit.Rax)
 	j.Movl(gojit.R8d, gojit.Ebx)
-	j.Movl(gojit.Esi, gojit.Ecx)
-	j.CallFunc((*Cpu).Write32)
+	j.Movl(gojit.R10d, gojit.Ecx)
+	j.CallFunc((*Jit).Write32)
 }
 
 func (j *Jit) emitHalf(op uint32) {
@@ -194,7 +194,7 @@ func (j *Jit) emitHalf(op uint32) {
 
 	// cpu rax, addr rbx, rdv rcx, post rdx
 
-	j.Mov(CPU, gojit.Rax)
+	j.Mov(JIT, gojit.Rax)
 	j.Movl(j.REG(rn), gojit.Ebx)
 	j.Movl(gojit.Ebx, gojit.Edx)
 
@@ -225,14 +225,14 @@ func (j *Jit) emitHalf(op uint32) {
 			panic("unsupported arm7 instruction (ldrd, strd, reserved)")
 		}
 
-		j.CallFunc((*Cpu).Write16)
+		j.CallFunc((*Jit).Write16)
 		return
 	}
 
 	switch inst {
 	case LDRH:
 		j.Movl(gojit.Ebx, gojit.R8d)
-		j.CallFunc((*Cpu).Read16)
+		j.CallFunc((*Jit).Read16)
 
 		j.Movl(gojit.R8d, gojit.Ecx)
 		j.And(gojit.Imm(1), gojit.Ecx)
@@ -242,7 +242,7 @@ func (j *Jit) emitHalf(op uint32) {
 
 	case LDRSB:
 		// sign-expand byte value
-		j.CallFunc((*Cpu).Read8)
+		j.CallFunc((*Jit).Read8)
 		j.Movsx(gojit.Al, gojit.Eax)
 		j.Movl(gojit.Eax, j.REG(rd))
 
@@ -252,14 +252,14 @@ func (j *Jit) emitHalf(op uint32) {
 		half := j.JccForward(gojit.CC_NC)
 
 		// sign-expand byte value
-		j.CallFunc((*Cpu).Read8)
+		j.CallFunc((*Jit).Read8)
 		j.Movsx(gojit.Al, gojit.Eax)
 		j.Movl(gojit.Eax, j.REG(rd))
 		byte := j.JmpForward()
 
 		// sign-expand half value
 		half()
-		j.CallFunc((*Cpu).Read16)
+		j.CallFunc((*Jit).Read16)
 		j.Movsx(gojit.Ax, gojit.Eax)
 		j.Movl(gojit.Eax, j.REG(rd))
 
@@ -319,17 +319,17 @@ func (j *Jit) emitSdt(op uint32) {
 		j.Movl(gojit.Ecx, j.REG(rn))
 	}
 
-	j.Mov(CPU, gojit.Rax)
+	j.Mov(JIT, gojit.Rax)
 
 	if load {
 		if byte {
-			j.CallFunc((*Cpu).Read8)
+			j.CallFunc((*Jit).Read8)
 			j.Movl(gojit.Eax, j.REG(rd))
 		} else {
 
 			j.Movl(gojit.Ebx, gojit.R8d)
 
-			j.CallFunc((*Cpu).Read32)
+			j.CallFunc((*Jit).Read32)
 
 			j.Movl(gojit.R8d, gojit.Ecx)
 			j.And(gojit.Imm(3), gojit.Ecx)
@@ -349,9 +349,9 @@ func (j *Jit) emitSdt(op uint32) {
 		}
 
 		if byte {
-			j.CallFunc((*Cpu).Write8)
+			j.CallFunc((*Jit).Write8)
 		} else {
-			j.CallFunc((*Cpu).Write32)
+			j.CallFunc((*Jit).Write32)
 		}
 	}
 }
@@ -408,9 +408,9 @@ func (j *Jit) emitMrs(op uint32) {
 	rd := (op >> 12) & 0xF
 
 	if spsr := (op>>22)&1 != 0; spsr {
-		j.Mov(CPU, gojit.Rax)
+		j.Mov(JIT, gojit.Rax)
 		j.Movl(MODE, gojit.Ebx)
-		j.CallFunc((*Cpu).GetSPSR)
+		j.CallFunc((*Jit).GetSPSR)
 		j.Movl(gojit.Eax, j.REG(rd))
 		return
 	}
@@ -459,9 +459,9 @@ func (j *Jit) emitAluOp2Reg(op uint32) {
 		return
 	}
 
-	j.Mov(CPU, gojit.Rax)
+	j.Mov(JIT, gojit.Rax)
 	j.Movl(gojit.Imm(1), gojit.Ebx)
-	j.CallFunc(Idle)
+	j.CallFunc((*Jit).Idle)
 
 	j.Movl(j.REG(op&0xF), gojit.Eax)
 	if op&0xF == PC {
@@ -877,10 +877,10 @@ func (j *Jit) emitBlock(op uint32) {
 
 		sys := j.JccForward(gojit.CC_Z)
 
-		j.Mov(CPU, gojit.Rax)
+		j.Mov(JIT, gojit.Rax)
 		j.Movl(gojit.Ebx, gojit.R8d)
 		j.Movl(gojit.Imm(MODE_USR), gojit.Ecx)
-		j.CallFunc((*Cpu).ModeSwitch)
+		j.CallFunc((*Jit).ModeSwitch)
 
 		usr()
 		sys()
@@ -917,9 +917,9 @@ func (j *Jit) emitBlock(op uint32) {
 		if load {
 
 			j.Movl(gojit.Eax, gojit.Ebx)
-			j.Mov(CPU, gojit.Rax)
+			j.Mov(JIT, gojit.Rax)
 			j.Movl(gojit.Imm(seq), gojit.Ecx)
-			j.CallFunc((*Cpu).Read32Block)
+			j.CallFunc((*Jit).Read32Block)
 
 			if wb && i == first {
 				j.Movl(gojit.R10d, j.REG(rn))
@@ -939,9 +939,9 @@ func (j *Jit) emitBlock(op uint32) {
 
 			j.Movl(gojit.Imm(seq), gojit.Edx)
 
-			j.Mov(CPU, gojit.Rax)
+			j.Mov(JIT, gojit.Rax)
 
-			j.CallFunc((*Cpu).Write32Block)
+			j.CallFunc((*Jit).Write32Block)
 
 			if wb && i == first {
 				j.Movl(gojit.R10d, j.REG(rn))
@@ -963,19 +963,19 @@ func (j *Jit) emitBlock(op uint32) {
 
 		notForceUser := j.JccForward(gojit.CC_Z)
 
-		j.Mov(CPU, gojit.Rax)
+		j.Mov(JIT, gojit.Rax)
 		j.Movl(gojit.Imm(MODE_USR), gojit.Ebx)
 		j.Movl(gojit.R8d, gojit.Ecx)
-		j.CallFunc((*Cpu).ModeSwitch)
+		j.CallFunc((*Jit).ModeSwitch)
 
 		notForceUser()
 	}
 
 	if load {
 
-		j.Mov(CPU, gojit.Rax)
+		j.Mov(JIT, gojit.Rax)
 		j.Movl(gojit.Imm(1), gojit.Ebx)
-		j.CallFunc(Idle)
+		j.CallFunc((*Jit).Idle)
 
 		if pcIncluded {
 			panic("load with pc")

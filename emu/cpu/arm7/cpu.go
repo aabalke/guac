@@ -2,10 +2,7 @@ package arm7
 
 import (
 	"fmt"
-	"os"
 	"unsafe"
-
-	"github.com/aabalke/guac/common/debug"
 )
 
 type Cpu struct {
@@ -23,9 +20,8 @@ type Cpu struct {
 	IrqLine    bool
 	Reload     bool
 	LowVector  bool
-
-	Timestamp int64
-	Leftover  int64
+	Timestamp  int64
+	Leftover   int64
 }
 
 type Bus interface {
@@ -155,8 +151,7 @@ func ModeBank(mode CpuMode) uint32 {
 	case MODE_UND:
 		return 5
 	default:
-		panic("not possible")
-
+		panic(fmt.Sprintf("not possible mode bank %02X", mode))
 	}
 }
 
@@ -270,6 +265,7 @@ func (c *Cpu) Step() {
 		if !c.Reg.CPSR.I {
 			c.DoIrq()
 			c.ReloadPipe()
+			c.DoJit()
 		}
 	}
 
@@ -308,6 +304,7 @@ func (c *Cpu) Step() {
 
 	if c.Reload {
 		c.ReloadPipe()
+		c.DoJit()
 	} else {
 		c.Reg.R[PC] += w
 		if c.PcPtr != nil {
@@ -316,6 +313,22 @@ func (c *Cpu) Step() {
 	}
 
 	//c.print()
+}
+
+func (c *Cpu) DoJit() {
+	w := uint32(4)
+	if c.Reg.CPSR.T {
+		w = 2
+	}
+
+	//fmt.Printf("R %08X OP %08X STAMP %08d\n", c.Reg.R, c.Op[0], c.Timestamp)
+
+	if ok := c.TryJit(c.Reg.R[PC]); ok {
+		// TODO: jit emit final instruction
+		return
+	}
+
+	c.Jit.UpdateMetrics(c.Reg.R[PC], w)
 }
 
 func (c *Cpu) ReloadPipe() {
@@ -496,16 +509,37 @@ func (c *Cpu) ExitException(mode CpuMode) {
 	c.ModeSwitch(mode, c.Reg.CPSR.Mode)
 }
 
-func (c *Cpu) print() {
-	fmt.Printf("PC %08X Diff %08d\n", c.Reg.R[15], c.Timestamp-debug.Vi64[0])
-	debug.Vi64[0] = c.Timestamp
-}
+//func (c *Cpu) print() {
+//	fmt.Printf("PC %08X Diff %08d\n", c.Reg.R[15], c.Timestamp-debug.Vi64[0])
+//	debug.Vi64[0] = c.Timestamp
+//}
+//
+//func (c *Cpu) print2(inst uint32) {
+//	fmt.Printf("OP %08X\n", inst)
+//	if debug.V[0] > 10000 {
+//		os.Exit(0)
+//	} else {
+//		debug.V[0]++
+//	}
+//}
 
-func (c *Cpu) print2(inst uint32) {
-	fmt.Printf("OP %08X\n", inst)
-	if debug.V[0] > 10000 {
-		os.Exit(0)
-	} else {
-		debug.V[0]++
+func (c *Cpu) TryJit(pc uint32) bool {
+	pageIdx := pc >> c.Jit.PageShift
+	blockIdx := (pc & c.Jit.PageMask) >> 1
+
+	page := c.Jit.Pages[pageIdx]
+
+	if page == nil || page.dead {
+		return false
 	}
+
+	block := page.Blocks[blockIdx]
+
+	if block == nil || block.Skip || block.f == nil {
+		return false
+	}
+
+	block.f()
+	c.Jit.BlockCache.TouchBlock(block)
+	return true
 }

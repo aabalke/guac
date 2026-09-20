@@ -181,6 +181,10 @@ func (gba *GBA) Run(ctx context.Context, eventBus *bus.EventBus) {
 		defer gba.Apu.Close()
 	}
 
+	if gba.Cpu.Jit != nil {
+		defer gba.Cpu.Jit.Close()
+	}
+
 	if gba.Apu.Ctx != nil {
 		gba.CyclesPerSndGen = int64(((float64(CPU_SPEED) / float64(gba.Apu.Ctx.SampleRate())) * float64(config.Conf.General.TargetFps)) / FPS)
 	}
@@ -251,6 +255,11 @@ func (gba *GBA) Update() {
 
 			gba.Cpu.Step()
 		}
+	}
+
+	// TODO: might be better place for this
+	if gba.Cpu.Jit != nil {
+		gba.Cpu.Jit.DeletePages()
 	}
 }
 

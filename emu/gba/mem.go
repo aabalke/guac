@@ -303,7 +303,13 @@ func (m *Memory) ReadPtr(addr uint32) unsafe.Pointer {
 	return nil
 }
 
-func (m *Memory) WritePtr(addr uint32) unsafe.Pointer {
+func (m *Memory) WritePtr(addr uint32) (ptr unsafe.Pointer) {
+	defer func() {
+		if ptr != nil && m.GBA.Cpu != nil && m.GBA.Cpu.Jit != nil {
+			m.GBA.Cpu.Jit.InvalidatePage(addr)
+		}
+	}()
+
 	switch addr >> 24 {
 	case 2:
 		return unsafe.Add(unsafe.Pointer(&m.EWRAM), addr&0x3FFFF)
@@ -372,7 +378,7 @@ func (m *Memory) Read16(addr uint32) uint32 {
 		cart := m.GBA.Cartridge
 
 		switch {
-		case addr < uint32(len(*cart.Rom)):
+		case addr+1 < uint32(len(*cart.Rom)):
 			return binary.LittleEndian.Uint32((*cart.Rom)[addr:]) & 0xFFFF
 		case cart.Mirrored && addr&cart.RomMask < uint32(len(*cart.Rom)):
 			return binary.LittleEndian.Uint32((*cart.Rom)[addr&cart.RomMask:]) & 0xFFFF
@@ -554,10 +560,19 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
 }
 
 func (m *Memory) Write8(addr uint32, v uint8) {
+	// TODO: need to only invalidate pages once if Write32 -> Write16 -> Write8 (instead of 7 times)
+	if m.GBA.Cpu != nil && m.GBA.Cpu.Jit != nil {
+		m.GBA.Cpu.Jit.InvalidatePage(addr)
+	}
 	m.Write(addr, v, true)
 }
 
 func (m *Memory) Write16(addr uint32, v uint16) {
+	// TODO: need to only invalidate pages once if Write32 -> Write16 -> Write8 (instead of 7 times)
+	if m.GBA.Cpu != nil && m.GBA.Cpu.Jit != nil {
+		m.GBA.Cpu.Jit.InvalidatePage(addr)
+	}
+
 	region := addr >> 24
 
 	if region >= 0xE {
@@ -615,6 +630,11 @@ func (m *Memory) Write16(addr uint32, v uint16) {
 }
 
 func (m *Memory) Write32(addr uint32, v uint32) {
+	// TODO: need to only invalidate pages once if Write32 -> Write16 -> Write8 (instead of 7 times)
+	if m.GBA.Cpu != nil && m.GBA.Cpu.Jit != nil {
+		m.GBA.Cpu.Jit.InvalidatePage(addr)
+	}
+
 	if addr >= 0xE00_0000 {
 		v = v >> ((addr & 3) << 3)
 		m.Write(addr, uint8(v), false)

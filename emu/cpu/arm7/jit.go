@@ -10,6 +10,7 @@ import (
 )
 
 var (
+	JIT  = gojit.Rsi
 	CPU  = gojit.R9
 	REG  = int32(unsafe.Offsetof(Cpu{}.Reg))
 	R    = REG + int32(unsafe.Offsetof(Reg{}.R))
@@ -25,6 +26,17 @@ var (
 	TRUE  = gojit.Imm(1)
 )
 
+const (
+	ADDRESS_SPACE = 0x1_0000_0000
+	PAGE_SHIFT    = 16
+	PAGE_SIZE     = 0x10000
+	PAGE_MASK     = (1 << PAGE_SHIFT) - 1
+
+	BLOCK_CNT      = 4096
+	BATCH_INST_MAX = 32
+	LOOP_CNT       = 255
+)
+
 type Jit struct {
 	*gojit.Assembler
 	cpu *Cpu
@@ -32,12 +44,93 @@ type Jit struct {
 	EndBlock bool
 
 	TestingCnt int
+
+	BlockCache    *BlockCache
+	Pages         []*Page
+	Metrics       [ADDRESS_SPACE >> PAGE_SHIFT][]uint32
+	invalidPages  []*Page
+	LoopThreshold uint32
+	PageShift     uint32
+	PageMask      uint32
+}
+
+type Page struct {
+	id     uint32
+	Blocks []*JitBlock
+	dead   bool
 }
 
 func NewJit(cpu *Cpu) *Jit {
 	return &Jit{
-		cpu: cpu,
+		cpu:   cpu,
+		Pages: make([]*Page, ADDRESS_SPACE>>PAGE_SHIFT),
+		BlockCache: InitBlockCache(
+			BLOCK_CNT,
+			PAGE_SIZE,
+		),
+		LoopThreshold: LOOP_CNT,
+		PageShift:     PAGE_SHIFT,
+		PageMask:      PAGE_MASK,
 	}
+}
+
+func (j *Jit) Close() {
+	if j.BlockCache != nil {
+		j.BlockCache.Close()
+	}
+}
+
+func (j *Jit) InvalidatePage(addr uint32) {
+	if j.Pages == nil {
+		return
+	}
+
+	page := j.Pages[addr>>j.PageShift]
+	if page == nil || page.dead {
+		return
+	}
+
+	page.dead = true
+
+	j.Pages[addr>>j.PageShift] = nil
+	j.Metrics[addr>>j.PageShift] = make([]uint32, (1<<j.PageShift)>>1)
+	j.invalidPages = append(j.invalidPages, page)
+}
+
+func (j *Jit) DeletePages() {
+	if len(j.invalidPages) == 0 {
+		return
+	}
+
+	for _, page := range j.invalidPages {
+		for i := range page.Blocks {
+			if block := page.Blocks[i]; block != nil {
+				page.Blocks[i] = nil
+
+				if !block.Skip {
+					j.BlockCache.InvalidateBlock(block)
+				}
+			}
+		}
+	}
+
+	j.invalidPages = j.invalidPages[:0]
+}
+
+func (j *Jit) UpdateMetrics(pc, w uint32) {
+	pageIdx := pc >> j.PageShift
+	blockIdx := (pc & j.PageMask) >> 1 // aligned to word for thumb
+
+	if metrics := j.Metrics[pageIdx]; metrics == nil {
+		j.Metrics[pageIdx] = make([]uint32, (1<<j.PageShift)>>1)
+	}
+
+	j.Metrics[pageIdx][blockIdx]++
+	if j.Metrics[pageIdx][blockIdx] <= j.LoopThreshold {
+		return
+	}
+
+	j.CreateBlock(pc, w)
 }
 
 func (j *Jit) UseJit[T constraints.Unsigned](op T, f func(op T)) {
@@ -52,6 +145,7 @@ func (j *Jit) UseJit[T constraints.Unsigned](op T, f func(op T)) {
 
 	j.Assembler = asm
 
+	j.MovAbs(uint64(uintptr(unsafe.Pointer(j))), JIT)
 	j.MovAbs(uint64(uintptr(unsafe.Pointer(j.cpu))), CPU)
 
 	f(op)
@@ -131,10 +225,6 @@ func (j *Jit) RunTest[T constraints.Unsigned](op T, f func(op T)) func() {
 	}
 }
 
-func (j *Jit) CallFunc(f any) {
-	j.InternalCallFunc(f)
-}
-
 func (j *Jit) REG(i uint32) gojit.Indirect {
 	return gojit.Indirect{
 		Base:   CPU,
@@ -144,6 +234,88 @@ func (j *Jit) REG(i uint32) gojit.Indirect {
 }
 
 //go:nosplit
-func Idle(c *Cpu, cycles int64) {
-	c.Idle(cycles)
+func (j *Jit) Idle(cycles int64) {
+	j.cpu.Idle(cycles)
+}
+
+//go:nosplit
+func (j *Jit) Read8(addr uint32) uint32 {
+	return j.cpu.Read8(addr)
+}
+
+//go:nosplit
+func (j *Jit) Read16(addr uint32) uint32 {
+	return j.cpu.Read16(addr)
+}
+
+//go:nosplit
+func (j *Jit) Read32(addr uint32) uint32 {
+	return j.cpu.Read32(addr)
+}
+
+//go:nosplit
+func (j *Jit) Read32Block(addr, seq uint32) uint32 {
+	return j.cpu.Read32Block(addr, seq)
+}
+
+//go:nosplit
+func (j *Jit) Write8(addr uint32, v uint8) {
+	j.cpu.Write8(addr, v)
+}
+
+//go:nosplit
+func (j *Jit) Write16(addr uint32, v uint16) {
+	j.cpu.Write16(addr, v)
+}
+
+//go:nosplit
+func (j *Jit) Write32(addr, v uint32) {
+	j.cpu.Write32(addr, v)
+}
+
+//go:nosplit
+func (j *Jit) Write32Block(addr, v, seq uint32) {
+	j.cpu.Write32Block(addr, seq, v)
+}
+
+//go:nosplit
+func (j *Jit) ModeSwitch(curr, next CpuMode) {
+	j.cpu.ModeSwitch(curr, next)
+}
+
+//go:nosplit
+func (j *Jit) GetSPSR(mode CpuMode) {
+	j.cpu.GetSPSR(mode)
+}
+
+//go:nosplit
+func (j *Jit) Step() {
+	c := j.cpu
+
+	if c.IrqLine {
+		panic("irq called during jit step")
+	}
+
+	seq := c.Seq
+	c.Seq = SEQ
+	c.Op[0] = c.Op[1]
+
+	w := uint32(4)
+	if c.Reg.CPSR.T {
+		w = 2
+	}
+
+	c.Cycles(c.Reg.R[PC], w, seq, true)
+
+	if c.PcPtr == nil {
+		if w == 4 {
+			c.Op[1] = c.Mem.Read32(c.Reg.R[PC])
+		} else {
+			c.Op[1] = c.Mem.Read16(c.Reg.R[PC])
+		}
+	} else {
+		// 0xFFFF_FFFF uint32, 0xFFFF uint16
+		mask := uint32(0xFFFF_FFFF >> ((w & 2) * 8))
+		c.Op[1] = *(*uint32)(c.PcPtr) & mask
+	}
 }
