@@ -403,39 +403,92 @@ func (c *Cpu) getShiftedAluReg(op uint32, carry *bool) uint32 {
 	if imm := (op>>4)&1 == 0; imm {
 		shift := (op >> 7) & 0x1F
 
-		return c.ImmShift((op>>5)&3, op2, shift, carry)
+		return c.ShiftImm((op>>5)&3, op2, shift, carry)
 	}
 
 	rs := (op >> 8) & 0xF
 	shift := c.Reg.R[rs] & 0xFF
-
-	c.Idle(1)
+	shType := (op >> 5) & 3
 
 	if rm == PC {
 		op2 += 4
 	}
 
+	op2 = c.ShiftReg(op2, shift, shType, carry)
+
+	return op2
+}
+
+func (c *Cpu) ShiftImm(sType, v, shift uint32, carry *bool) uint32 {
+	switch sType {
+	case LSL:
+
+		if shift != 0 {
+			*carry = v&(1<<(32-shift)) != 0
+			v <<= shift
+		}
+
+	case LSR, ASR:
+
+		if shift == 0 {
+			shift = 32
+		}
+
+		*carry = v&(1<<(shift-1)) != 0
+
+		if sType == ASR {
+			v = uint32(int32(v) >> shift)
+		} else {
+			v >>= shift
+		}
+
+	case ROR:
+
+		if shift == 0 {
+
+			c := v&1 != 0
+
+			v >>= 1
+
+			if *carry {
+				v |= 0x8000_0000
+			}
+
+			*carry = c
+
+		} else {
+			*carry = (v>>((shift-1)&31))&1 != 0
+			v = bits.RotateLeft32(v, -int(shift))
+		}
+
+	}
+	return v
+}
+
+func (c *Cpu) ShiftReg(v, shift, shType uint32, carry *bool) uint32 {
+	c.Idle(1)
+
 	if regZero := shift != 0; regZero {
-		switch shType := (op >> 5) & 3; shType {
+		switch shType {
 		case LSL:
-			*carry = op2&(1<<(32-shift)) != 0
-			op2 <<= shift
+			*carry = v&(1<<(32-shift)) != 0
+			v <<= shift
 
 		case LSR:
-			*carry = op2&(1<<(shift-1)) != 0
-			op2 >>= shift
+			*carry = v&(1<<(shift-1)) != 0
+			v >>= shift
 
 		case ASR:
-			*carry = op2&(1<<min(31, shift-1)) != 0
-			op2 = uint32(int32(op2) >> shift)
+			*carry = v&(1<<min(31, shift-1)) != 0
+			v = uint32(int32(v) >> shift)
 
 		case ROR:
-			*carry = (op2>>((shift-1)&31))&1 != 0
-			op2 = bits.RotateLeft32(op2, -int(shift))
+			*carry = (v>>((shift-1)&31))&1 != 0
+			v = bits.RotateLeft32(v, -int(shift))
 		}
 	}
 
-	return op2
+	return v
 }
 
 const (
@@ -529,52 +582,6 @@ func (c *Cpu) Mul(op uint32) {
 	}
 }
 
-func (c *Cpu) ImmShift(sType, v, shift uint32, carry *bool) uint32 {
-	switch sType {
-	case LSL:
-
-		if shift != 0 {
-			*carry = v&(1<<(32-shift)) != 0
-			v <<= shift
-		}
-
-	case LSR, ASR:
-
-		if shift == 0 {
-			shift = 32
-		}
-
-		*carry = v&(1<<(shift-1)) != 0
-
-		if sType == ASR {
-			v = uint32(int32(v) >> shift)
-		} else {
-			v >>= shift
-		}
-
-	case ROR:
-
-		if shift == 0 {
-
-			c := v&1 != 0
-
-			v >>= 1
-
-			if *carry {
-				v |= 0x8000_0000
-			}
-
-			*carry = c
-
-		} else {
-			*carry = (v>>((shift-1)&31))&1 != 0
-			v = bits.RotateLeft32(v, -int(shift))
-		}
-
-	}
-	return v
-}
-
 func (c *Cpu) Sdt(op uint32) {
 	var (
 		r    = &c.Reg.R
@@ -597,7 +604,7 @@ func (c *Cpu) Sdt(op uint32) {
 		}
 
 		carry := c.Reg.CPSR.C
-		offset = c.ImmShift((op>>5)&3, r[op&0xF], (op>>7)&0x1F, &carry)
+		offset = c.ShiftImm((op>>5)&3, r[op&0xF], (op>>7)&0x1F, &carry)
 
 	} else {
 		offset = op & 0xFFF

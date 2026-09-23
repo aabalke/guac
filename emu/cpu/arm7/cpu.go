@@ -3,25 +3,27 @@ package arm7
 import (
 	"fmt"
 	"unsafe"
+
+	"github.com/aabalke/guac/config"
 )
 
 type Cpu struct {
-	Bus        Bus
-	Mem        Mem
-	Jit        *Jit
-	Cycles     func(addr, width, seq uint32, inst bool)
-	Idle       func(cycles int64)
-	PcPtr      unsafe.Pointer
-	Reg        Reg
-	Op         [2]uint32
-	Seq        uint32
-	Halted     bool
-	LastWasDma bool
-	IrqLine    bool
-	Reload     bool
-	LowVector  bool
-	Timestamp  int64
-	Leftover   int64
+	Bus          Bus
+	Mem          Mem
+	TestJit, Jit *Jit
+	Cycles       func(addr, width, seq uint32, inst bool)
+	Idle         func(cycles int64)
+	PcPtr        unsafe.Pointer
+	Reg          Reg
+	Op           [2]uint32
+	Seq          uint32
+	Halted       bool
+	LastWasDma   bool
+	IrqLine      bool
+	Reload       bool
+	LowVector    bool
+	Timestamp    int64
+	Leftover     int64
 }
 
 type Bus interface {
@@ -211,7 +213,12 @@ func NewCpu(mem Mem, cycles func(addr, width, seq uint32, inst bool), idle func(
 		LowVector: true,
 	}
 
-	c.Jit = NewJit(c)
+	if config.Conf.Nds.Jit.Enabled {
+		c.Jit = NewJit(c)
+	} else {
+		c.TestJit = NewTestJit(c)
+	}
+
 	c.Bus = &Bus7{
 		c: c,
 	}
@@ -271,6 +278,10 @@ func (c *Cpu) Step() {
 
 	inst := c.Op[0]
 
+	//if debug.B[0] {
+	//	fmt.Printf("New Inst R %08X OP %08X\n", c.Reg.R, inst)
+	//}
+
 	//c.print2(inst)
 
 	seq := c.Seq
@@ -316,6 +327,10 @@ func (c *Cpu) Step() {
 }
 
 func (c *Cpu) DoJit() {
+	if c.Jit == nil {
+		return
+	}
+
 	w := uint32(4)
 	if c.Reg.CPSR.T {
 		w = 2
@@ -337,6 +352,10 @@ func (c *Cpu) ReloadPipe() {
 		w = 2
 	}
 	pc := c.Reg.R[PC] &^ (w - 1)
+
+	//if debug.B[0] {
+	//	fmt.Printf("New Reload PC %08X\n", c.Reg.R[PC])
+	//}
 
 	c.PcPtr = c.Mem.ReadPtr(pc)
 
@@ -373,47 +392,38 @@ func (c *Cpu) ToggleThumb() {
 	c.Reg.R[PC] &^= 3
 }
 
-//go:nosplit
 func (c *Cpu) Write8(addr uint32, v uint8) {
 	c.Bus.Write8(addr, v)
 }
 
-//go:nosplit
 func (c *Cpu) Write16(addr uint32, v uint16) {
 	c.Bus.Write16(addr, v)
 }
 
-//go:nosplit
 func (c *Cpu) Write32(addr, v uint32) {
 	c.Bus.Write32(addr, v)
 }
 
-//go:nosplit
 func (c *Cpu) Write32Block(addr, v, seq uint32) {
 	c.Bus.Write32Block(addr, v, seq)
 }
 
-//go:nosplit
 func (c *Cpu) Read8(addr uint32) uint32 {
 	return c.Bus.Read8(addr)
 }
 
-//go:nosplit
 func (c *Cpu) Read16(addr uint32) uint32 {
 	return c.Bus.Read16(addr)
 }
 
-//go:nosplit
 func (c *Cpu) Read32(addr uint32) uint32 {
 	return c.Bus.Read32(addr)
 }
 
-//go:nosplit
 func (c *Cpu) Read32Block(addr, seq uint32) uint32 {
 	return c.Bus.Read32Block(addr, seq)
 }
 
-//go:nosplit
 func (c *Cpu) GetSPSR(mode CpuMode) uint32 {
 	return c.Reg.SPSR[ModeBank(mode)].Get()
 }
@@ -436,7 +446,6 @@ func idleMul(rs uint32, sign bool) int64 {
 	return cycles
 }
 
-//go:nosplit
 func (c *Cpu) ModeSwitch(curr, next CpuMode) {
 	// DO NOT RELOAD PIPE AFTER CALLING ModeSwitch
 

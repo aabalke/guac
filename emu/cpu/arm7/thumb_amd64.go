@@ -376,8 +376,9 @@ func (j *Jit) emitThumbAlu(op uint16) {
 		j.Movl(gojit.Ebx, j.REG(rd))
 
 	case THUMB_NEG:
-		j.Sub(gojit.Ebx, gojit.Eax)
-		j.Movl(gojit.Eax, j.REG(rd))
+
+		j.Neg(gojit.Ebx)
+		j.Movl(gojit.Ebx, j.REG(rd))
 
 		j.SETcc(gojit.CC_O, jV)
 		j.SETcc(gojit.CC_NC, jC)
@@ -405,193 +406,30 @@ func (j *Jit) emitThumbAlu(op uint16) {
 
 		j.Movl(gojit.Eax, j.REG(rd))
 
-	case THUMB_LSL:
+	case THUMB_LSL, THUMB_LSR, THUMB_ASR, THUMB_ROR:
 
 		j.And(gojit.Imm(0xFF), gojit.Ebx)
 
-		j.Movl(gojit.Ebx, gojit.Ecx)
-		j.Movl(gojit.Eax, gojit.Ebx)
+		shType := ROR
+		switch inst {
+		case THUMB_LSL:
+			shType = LSL
+		case THUMB_LSR:
+			shType = LSR
+		case THUMB_ASR:
+			shType = ASR
+		}
 
-		j.Cmp(gojit.Imm(32), gojit.Ecx)
-		shift32 := j.JccForward(gojit.CC_A)
-		equal := j.JccForward(gojit.CC_Z)
+		// carry to dl
+		j.Movb(jC, gojit.Dl)
 
-		j.Cmp(gojit.Imm(0), gojit.Ecx)
-		zero := j.JccForward(gojit.CC_Z)
+		// shift reg ebx, v eax
+		j.ShiftReg(uint32(shType))
 
-		// carry = op2 & (1 << (32-shift)) != 0
-		j.Mov(gojit.Imm(32), gojit.Rax)
-		j.Sub(gojit.Ecx, gojit.Eax)
-		j.Bt(gojit.Eax, gojit.Ebx)
-		j.SETcc(gojit.CC_C, jC)
-
-		zero()
-
-		// op2 <<= shift
-		j.ShlCl(gojit.Ebx)
-
-		done := j.JmpForward()
-		shift32()
-
-		// carry = op2 & 1 != 0
-		j.Mov(gojit.Rbx, gojit.Rdx)
-		j.And(gojit.Imm(1), gojit.Rdx)
 		j.Movb(gojit.Dl, jC)
-		// op2 = 0
-		j.Xor(gojit.Rbx, gojit.Rbx)
+		j.Movl(gojit.Eax, j.REG(rd))
 
-		j.Movb(gojit.Imm(0), jC)
-
-		done2 := j.JmpForward()
-
-		// this causes errors???
-		equal()
-
-		// LSL: carry = op2 & 1 != 0
-		j.Mov(gojit.Rbx, gojit.Rdx)
-		j.And(gojit.Imm(1), gojit.Rdx)
-		j.Movb(gojit.Dl, jC)
-
-		// op2 = 0
-		j.Xor(gojit.Rbx, gojit.Rbx)
-
-		done()
-		done2()
-
-		j.Test(gojit.Ebx, gojit.Ebx)
-		j.Movl(gojit.Ebx, j.REG(rd))
-
-	case THUMB_LSR:
-
-		// rdv = eax, rsv = ebx
-
-		j.And(gojit.Imm(0xFF), gojit.Ebx)
-		j.Movl(gojit.Ebx, gojit.Ecx)
-		j.Movl(gojit.Eax, gojit.Ebx)
-
-		j.Cmp(gojit.Imm(32), gojit.Ecx)
-		greater := j.JccForward(gojit.CC_A)
-		equal := j.JccForward(gojit.CC_Z)
-
-		j.Cmp(gojit.Imm(0), gojit.Ecx)
-		zero := j.JccForward(gojit.CC_Z)
-
-		// carry = op2 & (1 << (shift-1)) != 0
-		j.Mov(gojit.Rcx, gojit.Rax)
-		j.Sub(gojit.Imm(1), gojit.Eax)
-		j.Bt(gojit.Eax, gojit.Ebx)
-		j.SETcc(gojit.CC_C, jC)
-
-		zero()
-
-		// op2 >>= shift
-		j.ShrCl(gojit.Ebx)
-
-		done := j.JmpForward()
-
-		greater()
-
-		// carry = op2 & 1 != 0
-		j.Mov(gojit.Rbx, gojit.Rdx)
-		j.And(gojit.Imm(0), gojit.Rdx)
-		j.Movb(gojit.Dl, jC)
-		// op2 = 0
-		j.Xor(gojit.Rbx, gojit.Rbx)
-
-		done2 := j.JmpForward()
-
-		equal()
-
-		// LSR: carry = op2 & 0x8000_0000 != 0
-		j.Mov(gojit.Rbx, gojit.Rdx)
-		j.Shr(gojit.Imm(31), gojit.Rdx)
-		j.Movb(gojit.Dl, jC)
-
-		// op2 = 0
-		j.Xor(gojit.Rbx, gojit.Rbx)
-
-		done()
-		done2()
-
-		j.Test(gojit.Ebx, gojit.Ebx)
-		j.Movl(gojit.Ebx, j.REG(rd))
-
-	case THUMB_ASR:
-
-		j.And(gojit.Imm(0xFF), gojit.Ebx)
-		j.Movl(gojit.Ebx, gojit.Ecx)
-		j.Movl(gojit.Eax, gojit.Ebx)
-
-		j.Cmp(gojit.Imm(32), gojit.Ecx)
-		shift32ge := j.JccForward(gojit.CC_AE)
-
-		j.Cmp(gojit.Imm(0), gojit.Ecx)
-		zero := j.JccForward(gojit.CC_Z)
-
-		// carry = op2 & (1 << (shift-1)) != 0
-		j.Mov(gojit.Rcx, gojit.Rax)
-		j.Sub(gojit.Imm(1), gojit.Eax)
-		j.Bt(gojit.Eax, gojit.Ebx)
-		j.SETcc(gojit.CC_C, jC)
-
-		zero()
-
-		// op2 <<= shift
-		j.SarCl(gojit.Ebx)
-
-		done := j.JmpForward()
-
-		shift32ge()
-
-		// op and carry == top bit sar
-		j.Sar(gojit.Imm(31), gojit.Ebx)
-		j.Bt(gojit.Imm(0), gojit.Ebx)
-		j.SETcc(gojit.CC_C, jC)
-
-		done()
-
-		j.Test(gojit.Ebx, gojit.Ebx)
-		j.Movl(gojit.Ebx, j.REG(rd))
-
-	case THUMB_ROR:
-
-		j.And(gojit.Imm(0xFF), gojit.Ebx)
-		j.Movl(gojit.Ebx, gojit.Ecx)
-		j.Movl(gojit.Eax, gojit.Ebx)
-
-		j.Cmp(gojit.Imm(32), gojit.Ecx)
-		equal := j.JccForward(gojit.CC_Z)
-
-		j.Cmp(gojit.Imm(0), gojit.Ecx)
-		zero := j.JccForward(gojit.CC_Z)
-
-		// carry = (op2 >> ((shift-1) & 31)) & 1 != 0
-		j.Mov(gojit.Rcx, gojit.Rax)
-		j.Sub(gojit.Imm(1), gojit.Eax)
-		j.And(gojit.Imm(31), gojit.Eax)
-
-		j.Bt(gojit.Eax, gojit.Ebx)
-		j.SETcc(gojit.CC_C, jC)
-
-		zero()
-
-		// op2 ror shift
-		j.RorCl(gojit.Ebx)
-
-		done := j.JmpForward()
-
-		equal()
-
-		// op2 unchanged
-		// carry = op2 & 0x8000_0000 != 0
-		j.Mov(gojit.Rbx, gojit.Rdx)
-		j.Shr(gojit.Imm(31), gojit.Rdx)
-		j.Movb(gojit.Dl, jC)
-
-		done()
-
-		j.Test(gojit.Ebx, gojit.Ebx)
-		j.Movl(gojit.Ebx, j.REG(rd))
+		j.Test(gojit.Eax, gojit.Eax)
 	}
 
 	j.SETcc(gojit.CC_S, jN)
@@ -653,12 +491,12 @@ func (j *Jit) emitThumbPushPop(op uint16) {
 	} else {
 
 		if pclr {
-			j.Sub(gojit.Imm(0x40), j.REG(SP))
+			j.Sub(gojit.Imm(4), j.REG(SP))
 
 			j.Mov(JIT, gojit.Rax)
 			j.Movl(j.REG(SP), gojit.Ebx)
 			j.Movl(j.REG(LR), gojit.Ecx)
-			j.Movl(gojit.Imm(seq), gojit.Edx)
+			j.Movl(gojit.Imm(seq), gojit.Edi)
 
 			j.CallFunc((*Jit).Write32Block)
 
@@ -675,7 +513,7 @@ func (j *Jit) emitThumbPushPop(op uint16) {
 			j.Mov(JIT, gojit.Rax)
 			j.Movl(j.REG(SP), gojit.Ebx)
 			j.Movl(j.REG(uint32(reg)), gojit.Ecx)
-			j.Movl(gojit.Imm(seq), gojit.Edx)
+			j.Movl(gojit.Imm(seq), gojit.Edi)
 
 			j.CallFunc((*Jit).Write32Block)
 
@@ -730,7 +568,7 @@ func (j *Jit) emitThumbShifted(op uint16) {
 	j.Movl(j.REG(uint32(op>>3)&7), gojit.Eax)
 	j.Movb(jC, gojit.Bl)
 
-	j.ImmShift(uint32(op>>11)&3, shift)
+	j.ShiftImm(uint32(op>>11)&3, shift)
 	j.Movb(gojit.Bl, jC)
 
 	j.Movl(gojit.Eax, j.REG(uint32(op&7)))

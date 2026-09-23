@@ -329,35 +329,27 @@ func (c *Cpu) ThumbAlu(op uint16) {
 
 	case THUMB_LSL, THUMB_LSR, THUMB_ASR, THUMB_ROR:
 
-		c.Idle(1)
-
 		rsv &= 0xFF
 
-		switch inst {
-		case THUMB_LSL:
-			res = uint64(rdv) << rsv
-			if rsv != 0 {
-				cpsr.C = rdv&(1<<(32-rsv)) != 0
+		if rsv != 0 {
+
+			var shType uint32
+			switch inst {
+			case THUMB_LSL:
+				shType = LSL
+			case THUMB_LSR:
+				shType = LSR
+			case THUMB_ASR:
+				shType = ASR
+			case THUMB_ROR:
+				shType = ROR
 			}
 
-		case THUMB_LSR:
-			res = uint64(rdv) >> rsv
-			if rsv != 0 {
-				cpsr.C = rdv&(1<<(rsv-1)) != 0
-			}
+			res = uint64(c.ShiftReg(rdv, rsv, shType, &cpsr.C))
 
-		case THUMB_ASR:
-			rsv = min(rsv, 32)
-			res = uint64(int32(rdv) >> rsv)
-			if rsv != 0 {
-				cpsr.C = rdv&(1<<(rsv-1)) != 0
-			}
-
-		case THUMB_ROR:
-			res = uint64(bits.RotateLeft32(rdv, -int(rsv)))
-			if rsv != 0 {
-				cpsr.C = (rdv>>((rsv-1)%32))&1 != 0
-			}
+		} else {
+			c.Idle(1)
+			res = uint64(rdv)
 		}
 
 		r[rd] = uint32(res)
@@ -713,7 +705,7 @@ func (c *Cpu) ThumbB(op uint16) {
 
 func (c *Cpu) ThumbShifted(op uint16) {
 	v := c.Reg.R[(op>>3)&7]
-	v = c.ImmShift(uint32(op>>11)&3, v, uint32(op>>6)&0x1F, &c.Reg.CPSR.C)
+	v = c.ShiftImm(uint32(op>>11)&3, v, uint32(op>>6)&0x1F, &c.Reg.CPSR.C)
 	c.Reg.CPSR.N = (v>>31)&1 != 0
 	c.Reg.CPSR.Z = uint32(v) == 0
 	c.Reg.R[op&7] = v

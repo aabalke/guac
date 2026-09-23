@@ -1,8 +1,10 @@
 package arm7
 
 import (
+	"encoding/binary"
 	"fmt"
 	"os"
+	"reflect"
 	"unsafe"
 
 	"github.com/aabalke/gojit"
@@ -74,6 +76,12 @@ func NewJit(cpu *Cpu) *Jit {
 	}
 }
 
+func NewTestJit(cpu *Cpu) *Jit {
+	return &Jit{
+		cpu: cpu,
+	}
+}
+
 func (j *Jit) Close() {
 	if j.BlockCache != nil {
 		j.BlockCache.Close()
@@ -133,7 +141,7 @@ func (j *Jit) UpdateMetrics(pc, w uint32) {
 	j.CreateBlock(pc, w)
 }
 
-func (j *Jit) UseJit[T constraints.Unsigned](op T, f func(op T)) {
+func (j *Jit) UseJit[T constraints.Unsigned](op T) {
 	j.TestingCnt++
 
 	fmt.Printf("starting test cnt %08d, op %08X\n", j.TestingCnt, op)
@@ -148,7 +156,12 @@ func (j *Jit) UseJit[T constraints.Unsigned](op T, f func(op T)) {
 	j.MovAbs(uint64(uintptr(unsafe.Pointer(j))), JIT)
 	j.MovAbs(uint64(uintptr(unsafe.Pointer(j.cpu))), CPU)
 
-	f(op)
+	switch reflect.TypeOf(op).Kind() {
+	case reflect.Uint16:
+		j.emitThumb(uint16(op))
+	case reflect.Uint32:
+		j.emitArm(uint32(op))
+	}
 
 	asm.Exit()
 
@@ -161,23 +174,28 @@ func (j *Jit) UseJit[T constraints.Unsigned](op T, f func(op T)) {
 	asm.Release()
 }
 
-func (j *Jit) RunTest[T constraints.Unsigned](op T, f func(op T)) func() {
+func (j *Jit) RunTest[T constraints.Unsigned](op T) func() {
 	cpu := j.cpu
 	start := cpu.Reg
 	staStamp := j.cpu.Timestamp
 
 	ewramPtr := j.cpu.Mem.ReadPtr(0x200_0000)
 	iwramPtr := j.cpu.Mem.ReadPtr(0x300_0000)
+	vramPtr := j.cpu.Mem.ReadPtr(0x600_0000)
 	ewram := *(*[0x40000]uint8)(ewramPtr)
 	iwram := *(*[0x8000]uint8)(iwramPtr)
+	vram := *(*[0x18001]uint8)(vramPtr)
 
-	j.UseJit(op, f)
+	j.UseJit(op)
+
+	savedIwram := *(*[0x8000]uint8)(iwramPtr)
 
 	sav := cpu.Reg
 	savStamp := cpu.Timestamp
 
 	*(*[0x40000]uint8)(ewramPtr) = ewram
 	*(*[0x8000]uint8)(iwramPtr) = iwram
+	*(*[0x18001]uint8)(vramPtr) = vram
 
 	cpu.Reg = start
 
@@ -185,6 +203,22 @@ func (j *Jit) RunTest[T constraints.Unsigned](op T, f func(op T)) func() {
 
 	return func() {
 		// do not (Reg) == (Reg), sta = cpu.Reg does not promise padding
+
+		dirty := false
+		for i := 0; i < len(savedIwram); i += 4 {
+			jit := binary.LittleEndian.Uint32(savedIwram[i:])
+			interpreter := binary.LittleEndian.Uint32((*[0x8000]uint8)(iwramPtr)[i:])
+
+			if jit != interpreter {
+				dirty = true
+				fmt.Printf("ADDR 0x300...%04X: Jit %08X Interpreter %08X\n", i, jit, interpreter)
+			}
+		}
+
+		if dirty {
+			panic("invalid memory values")
+		}
+
 		if match := (cpu.Reg.R == sav.R &&
 			cpu.Reg.CPSR == sav.CPSR &&
 			cpu.Reg.SPSR == sav.SPSR &&
@@ -275,7 +309,7 @@ func (j *Jit) Write32(addr, v uint32) {
 
 //go:nosplit
 func (j *Jit) Write32Block(addr, v, seq uint32) {
-	j.cpu.Write32Block(addr, seq, v)
+	j.cpu.Write32Block(addr, v, seq)
 }
 
 //go:nosplit

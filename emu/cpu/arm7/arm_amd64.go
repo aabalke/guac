@@ -291,7 +291,7 @@ func (j *Jit) emitSdt(op uint32) {
 		j.Movl(j.REG(op&0xF), gojit.Eax)
 		j.Movb(jC, gojit.Bl)
 
-		j.ImmShift((op>>5)&3, (op>>7)&0x1F)
+		j.ShiftImm((op>>5)&3, (op>>7)&0x1F)
 		j.Movl(gojit.Eax, gojit.Edx)
 	} else {
 		j.Mov(gojit.Imm(int32(op&0xFFF)), gojit.Edx)
@@ -356,54 +356,6 @@ func (j *Jit) emitSdt(op uint32) {
 	}
 }
 
-func (j *Jit) ImmShift(sType, shift uint32) {
-	// v rax, carry rbx
-
-	switch sType {
-	case LSL:
-		if shift != 0 {
-			j.Bt(gojit.Imm(32-shift), gojit.Eax)
-			j.SETcc(gojit.CC_C, gojit.Ebx)
-
-			j.Shl(gojit.Imm(shift), gojit.Eax)
-		}
-
-	case LSR, ASR:
-
-		if shift == 0 {
-			shift = 32
-		}
-
-		j.Bt(gojit.Imm(shift-1), gojit.Eax)
-		j.SETcc(gojit.CC_C, gojit.Ebx)
-
-		if sType == ASR {
-			// 31 for extending
-			j.Sar(gojit.Imm(min(31, shift)), gojit.Eax)
-		} else {
-			// rax for extending
-			j.Shr(gojit.Imm(shift), gojit.Rax)
-		}
-
-	case ROR:
-
-		if rrx := shift == 0; rrx {
-			// emulated carry flag -> CL -> CF
-			j.Movl(gojit.Ebx, gojit.Ecx)
-			j.Movl(gojit.Imm(1), gojit.Ebx)
-			j.ShrCl(gojit.Ebx)
-			j.Rcr(gojit.Imm(1), gojit.Eax)
-			j.SETcc(gojit.CC_C, gojit.Ebx)
-
-		} else {
-			j.Bt(gojit.Imm((shift-1)&31), gojit.Eax)
-			j.SETcc(gojit.CC_C, gojit.Ebx)
-
-			j.Ror(gojit.Imm(shift), gojit.Eax)
-		}
-	}
-}
-
 func (j *Jit) emitMrs(op uint32) {
 	rd := (op >> 12) & 0xF
 
@@ -451,7 +403,7 @@ func (j *Jit) emitAluOp2Reg(op uint32) {
 		j.Movl(gojit.Edx, gojit.Ebx)
 		j.Movl(j.REG(op&0xF), gojit.Eax)
 
-		j.ImmShift((op>>5)&3, shift)
+		j.ShiftImm((op>>5)&3, shift)
 
 		j.Movl(gojit.Ebx, gojit.Edx)
 		j.Movl(gojit.Eax, gojit.Ebx)
@@ -459,9 +411,14 @@ func (j *Jit) emitAluOp2Reg(op uint32) {
 		return
 	}
 
+	// TODO: have to move carry to not be clobbered, might be better method
+	j.Movl(gojit.Rdx, gojit.R8)
+
 	j.Mov(JIT, gojit.Rax)
 	j.Movl(gojit.Imm(1), gojit.Ebx)
 	j.CallFunc((*Jit).Idle)
+
+	j.Movl(gojit.R8, gojit.Rdx)
 
 	j.Movl(j.REG(op&0xF), gojit.Eax)
 	if op&0xF == PC {
@@ -471,15 +428,73 @@ func (j *Jit) emitAluOp2Reg(op uint32) {
 	// shift bx
 	rs := (op >> 8) & 0xF
 	j.Movl(j.REG(rs), gojit.Ebx)
+
+	shType := (op >> 5) & 3
+	j.ShiftReg(shType)
+
+	j.Movl(gojit.Eax, gojit.Ebx)
+}
+
+func (j *Jit) ShiftImm(sType, shift uint32) {
+	// v rax, carry rbx
+
+	switch sType {
+	case LSL:
+		if shift != 0 {
+			j.Bt(gojit.Imm(32-shift), gojit.Eax)
+			j.SETcc(gojit.CC_C, gojit.Ebx)
+
+			j.Shl(gojit.Imm(shift), gojit.Eax)
+		}
+
+	case LSR, ASR:
+
+		if shift == 0 {
+			shift = 32
+		}
+
+		j.Bt(gojit.Imm(shift-1), gojit.Eax)
+		j.SETcc(gojit.CC_C, gojit.Ebx)
+
+		if sType == ASR {
+			// 31 for extending
+			j.Sar(gojit.Imm(min(31, shift)), gojit.Eax)
+		} else {
+			// rax for extending
+			j.Shr(gojit.Imm(shift), gojit.Rax)
+		}
+
+	case ROR:
+
+		if rrx := shift == 0; rrx {
+			// emulated carry flag -> CL -> CF
+			j.Movl(gojit.Ebx, gojit.Ecx)
+			j.Movl(gojit.Imm(1), gojit.Ebx)
+			j.ShrCl(gojit.Ebx)
+			j.Rcr(gojit.Imm(1), gojit.Eax)
+			j.SETcc(gojit.CC_C, gojit.Ebx)
+
+		} else {
+			j.Bt(gojit.Imm((shift-1)&31), gojit.Eax)
+			j.SETcc(gojit.CC_C, gojit.Ebx)
+
+			j.Ror(gojit.Imm(shift), gojit.Eax)
+		}
+	}
+}
+
+func (j *Jit) ShiftReg(shType uint32) {
+	// v == rax, shift == rbx
+
 	j.And(gojit.Imm(0xFF), gojit.Ebx)
 
-	j.Cmp(gojit.Imm(0), gojit.Ebx)
+	j.Test(gojit.Ebx, gojit.Ebx)
 
 	zero := j.JccForward(gojit.CC_Z)
 
 	j.Movl(gojit.Ebx, gojit.Ecx)
 
-	switch shType := (op >> 5) & 3; shType {
+	switch shType {
 	case LSL, LSR:
 
 		j.Cmp(gojit.Imm(32), gojit.Cl)
@@ -487,18 +502,23 @@ func (j *Jit) emitAluOp2Reg(op uint32) {
 		isg32 := j.JccForward(gojit.CC_A)
 		is32 := j.JccForward(gojit.CC_Z)
 
-		j.ShlCl(gojit.Eax)
+		if shType == LSR {
+			j.ShrCl(gojit.Eax)
+		} else {
+			j.ShlCl(gojit.Eax)
+		}
+
 		j.SETcc(gojit.CC_C, gojit.Dl)
 
 		done := j.JmpForward()
 
 		is32()
 
-		j.Test(gojit.Imm(1), gojit.Eax)
-
 		if shType == LSR {
+			j.Test(gojit.Eax, gojit.Eax)
 			j.SETcc(gojit.CC_S, gojit.Dl)
 		} else {
+			j.Test(gojit.Imm(1), gojit.Eax)
 			j.SETcc(gojit.CC_NZ, gojit.Dl)
 		}
 
@@ -549,8 +569,6 @@ func (j *Jit) emitAluOp2Reg(op uint32) {
 	}
 
 	zero()
-
-	j.Movl(gojit.Eax, gojit.Ebx)
 }
 
 func (j *Jit) emitAlu(op uint32) {
@@ -566,7 +584,7 @@ func (j *Jit) emitAlu(op uint32) {
 
 	// eax rnv
 	// ebx op2
-	// carry to dl
+	// carry to r8d
 	j.Movb(jC, gojit.Dl)
 
 	if imm := (op>>25)&1 != 0; imm {
@@ -594,7 +612,7 @@ func (j *Jit) emitAlu(op uint32) {
 
 	aluInstJit[inst](j, op, rd)
 
-	j.Movl(j.REG(PC), gojit.Eax)
+	//j.Movl(j.REG(PC), gojit.Eax)
 }
 
 var aluInstJit = [...]func(j *Jit, op, rd uint32){
@@ -794,8 +812,8 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32){
 		j.Movl(gojit.Ebx, j.REG(rd))
 
 		if set := (op>>20)&1 != 0; set {
-			j.Test(gojit.Ebx, gojit.Ebx)
 			j.Movb(gojit.Dl, jC)
+			j.Test(gojit.Ebx, gojit.Ebx)
 			j.SETcc(gojit.CC_S, jN)
 			j.SETcc(gojit.CC_Z, jZ)
 		}
@@ -820,8 +838,8 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32){
 		j.Not(gojit.Ebx)
 
 		if set := (op>>20)&1 != 0; set {
-			j.Test(gojit.Ebx, gojit.Ebx)
 			j.Movb(gojit.Dl, jC)
+			j.Test(gojit.Ebx, gojit.Ebx)
 			j.SETcc(gojit.CC_S, jN)
 			j.SETcc(gojit.CC_Z, jZ)
 		}
@@ -859,7 +877,7 @@ func (j *Jit) emitBlock(op uint32) {
 	* 		R8: possible mode prev on user mode force
 	* 		R9: Jit compiler CpuPtr
 	* 		R10: Rn New
-	* 		R11: addr (also Rax)
+	* 		R11: addr (also Ebx)
 	 */
 
 	possibleForceUser := psr && (!load || !pcIncluded)
@@ -886,8 +904,8 @@ func (j *Jit) emitBlock(op uint32) {
 		sys()
 	}
 
-	j.Movl(j.REG(rn), gojit.Eax)
-	j.Movl(gojit.Eax, gojit.R10d)
+	j.Movl(j.REG(rn), gojit.R11d)
+	j.Movl(gojit.R11d, gojit.R10d)
 
 	// even when decrementing, cpu increments from "final" reg
 	// see mgba https://mgba.io/2014/12/28/classic-nes/
@@ -898,7 +916,7 @@ func (j *Jit) emitBlock(op uint32) {
 		pre = !pre
 
 		j.Sub(gojit.Imm(bytes), gojit.R10d)
-		j.Sub(gojit.Imm(bytes), gojit.Eax)
+		j.Sub(gojit.Imm(bytes), gojit.R11d)
 	}
 
 	seq := uint32(NONSEQ)
@@ -909,15 +927,14 @@ func (j *Jit) emitBlock(op uint32) {
 		}
 
 		if pre {
-			j.Add(gojit.Imm(4), gojit.Eax)
+			j.Add(gojit.Imm(4), gojit.R11d)
 		}
 
-		j.Movl(gojit.Eax, gojit.R11d)
+		j.Mov(JIT, gojit.Rax)
+		j.Movl(gojit.R11d, gojit.Ebx)
 
 		if load {
 
-			j.Movl(gojit.Eax, gojit.Ebx)
-			j.Mov(JIT, gojit.Rax)
 			j.Movl(gojit.Imm(seq), gojit.Ecx)
 			j.CallFunc((*Jit).Read32Block)
 
@@ -929,18 +946,12 @@ func (j *Jit) emitBlock(op uint32) {
 
 		} else {
 
-			j.Movl(gojit.Eax, gojit.Ebx)
-
 			j.Movl(j.REG(i), gojit.Ecx)
-
 			if i == PC {
 				j.Add(gojit.Imm(4), gojit.Ecx)
 			}
 
-			j.Movl(gojit.Imm(seq), gojit.Edx)
-
-			j.Mov(JIT, gojit.Rax)
-
+			j.Movl(gojit.Imm(seq), gojit.Edi)
 			j.CallFunc((*Jit).Write32Block)
 
 			if wb && i == first {
@@ -948,10 +959,8 @@ func (j *Jit) emitBlock(op uint32) {
 			}
 		}
 
-		j.Movl(gojit.R11d, gojit.Eax)
-
 		if !pre {
-			j.Add(gojit.Imm(4), gojit.Eax)
+			j.Add(gojit.Imm(4), gojit.R11d)
 		}
 
 		seq = SEQ

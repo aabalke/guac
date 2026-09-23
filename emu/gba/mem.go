@@ -379,9 +379,9 @@ func (m *Memory) Read16(addr uint32) uint32 {
 
 		switch {
 		case addr+1 < uint32(len(*cart.Rom)):
-			return binary.LittleEndian.Uint32((*cart.Rom)[addr:]) & 0xFFFF
-		case cart.Mirrored && addr&cart.RomMask < uint32(len(*cart.Rom)):
-			return binary.LittleEndian.Uint32((*cart.Rom)[addr&cart.RomMask:]) & 0xFFFF
+			return uint32(binary.LittleEndian.Uint16((*cart.Rom)[addr:]))
+		case cart.Mirrored && (addr+1)&cart.RomMask < uint32(len(*cart.Rom)):
+			return uint32(binary.LittleEndian.Uint16((*cart.Rom)[addr&cart.RomMask:]))
 		default:
 			return m.ReadBadRom(addr, 2)
 		}
@@ -423,9 +423,9 @@ func (m *Memory) Read32(addr uint32) uint32 {
 		cart := m.GBA.Cartridge
 
 		switch {
-		case addr < uint32(len(*cart.Rom)):
+		case addr+3 < uint32(len(*cart.Rom)):
 			return binary.LittleEndian.Uint32((*cart.Rom)[addr:])
-		case cart.Mirrored && addr&cart.RomMask < uint32(len(*cart.Rom)):
+		case cart.Mirrored && (addr+3)&cart.RomMask < uint32(len(*cart.Rom)):
 			return binary.LittleEndian.Uint32((*cart.Rom)[addr&cart.RomMask:])
 		default:
 			return m.ReadBadRom(addr, 4)
