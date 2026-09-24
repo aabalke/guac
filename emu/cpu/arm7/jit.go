@@ -323,10 +323,11 @@ func (j *Jit) GetSPSR(mode CpuMode) {
 }
 
 //go:nosplit
-func (j *Jit) Step() {
+func (j *Jit) Step() bool {
 	c := j.cpu
 
 	if c.IrqLine {
+		return true
 		panic("irq called during jit step")
 	}
 
@@ -351,5 +352,15 @@ func (j *Jit) Step() {
 		// 0xFFFF_FFFF uint32, 0xFFFF uint16
 		mask := uint32(0xFFFF_FFFF >> ((w & 2) * 8))
 		c.Op[1] = *(*uint32)(c.PcPtr) & mask
+	}
+
+	return false
+}
+
+//go:nosplit
+func (j *Jit) UpdatePc(w uint32) {
+	j.cpu.Reg.R[PC] += w
+	if j.cpu.PcPtr != nil {
+		j.cpu.PcPtr = unsafe.Add(j.cpu.PcPtr, w)
 	}
 }

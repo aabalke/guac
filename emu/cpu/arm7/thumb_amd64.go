@@ -303,15 +303,7 @@ func (j *Jit) emitThumbAlu(op uint16) {
 		rd   = uint32(op & 7)
 	)
 
-	if inst == THUMB_LSL || inst == THUMB_LSR ||
-		inst == THUMB_ASR || inst == THUMB_ROR {
-		j.Mov(JIT, gojit.Rax)
-		j.Movl(gojit.Imm(1), gojit.Ebx)
-		j.CallFunc((*Jit).Idle)
-	}
-
 	// rdv = eax, rsv = ebx
-
 	j.Movl(j.REG(rd), gojit.Eax)
 	j.Movl(j.REG(uint32(op>>3)&7), gojit.Ebx)
 
@@ -383,32 +375,32 @@ func (j *Jit) emitThumbAlu(op uint16) {
 		j.SETcc(gojit.CC_O, jV)
 		j.SETcc(gojit.CC_NC, jC)
 
-	case THUMB_SBC:
+	case THUMB_SBC, THUMB_ADC:
 		j.Movb(jC, gojit.Cl)
-
 		j.Bt(gojit.Imm(0), gojit.Cl)
-		j.Cmc() // compliment carry (reverse for sub)
-		j.Sbb(gojit.Ebx, gojit.Eax)
+
+		if inst == THUMB_ADC {
+			j.Adc(gojit.Ebx, gojit.Eax)
+		} else {
+			j.Cmc() // compliment carry (reverse for sub)
+			j.Sbb(gojit.Ebx, gojit.Eax)
+		}
 
 		j.SETcc(gojit.CC_O, jV)
 		j.SETcc(gojit.CC_NC, jC)
 
 		j.Movl(gojit.Eax, j.REG(rd))
 
-	case THUMB_ADC:
-		j.Movb(jC, gojit.Cl)
-
-		j.Bt(gojit.Imm(0), gojit.Cl)
-		j.Adc(gojit.Ebx, gojit.Eax)
-
-		j.SETcc(gojit.CC_O, jV)
-		j.SETcc(gojit.CC_C, jC)
-
-		j.Movl(gojit.Eax, j.REG(rd))
-
 	case THUMB_LSL, THUMB_LSR, THUMB_ASR, THUMB_ROR:
 
-		j.And(gojit.Imm(0xFF), gojit.Ebx)
+		j.Mov(JIT, gojit.Rax)
+		j.Movl(gojit.Imm(1), gojit.Ebx)
+		j.CallFunc((*Jit).Idle)
+
+		// rdv = eax, rsv = ebx
+
+		j.Movl(j.REG(rd), gojit.Eax)
+		j.Movl(j.REG(uint32(op>>3)&7), gojit.Ebx)
 
 		shType := ROR
 		switch inst {

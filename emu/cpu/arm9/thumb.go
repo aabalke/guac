@@ -22,8 +22,8 @@ func (c *Cpu) DecodeThumb(op uint16) {
 		c.ThumbImm(op)
 	case arm7.IsThumbAlu(op):
 		c.ThumbAlu(op)
-	case arm7.IsThumbHiReg(op):
-		c.HiRegBX(op)
+	case arm7.IsThumbHi(op):
+		c.ThumbHi(op)
 	case arm7.IsLSHalf(op):
 		c.ThumbLSHalf(op)
 	case arm7.IsThumbSdt(op):
@@ -197,7 +197,7 @@ func (c *Cpu) ThumbPushPop(op uint16) {
 	}
 }
 
-func (c *Cpu) HiRegBX(op uint16) {
+func (c *Cpu) ThumbHi(op uint16) {
 	var (
 		r  = &c.Reg.R
 		rd = (op & 7) | (((op >> 7) & 1) << 3)

@@ -1,7 +1,6 @@
 package arm7
 
 import (
-	"fmt"
 	"unsafe"
 
 	"github.com/aabalke/gojit"
@@ -69,7 +68,7 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 			break
 		}
 
-		fmt.Printf("emitOp PC %08X OP %08X\n", tempPc, op)
+		//fmt.Printf("emitOp PC %08X OP %08X\n", tempPc, op)
 
 		i++
 		length++
@@ -97,7 +96,7 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 
 	page.Blocks[blockIdx] = newBlock
 
-	fmt.Printf("Block Created for PC %08X EXIT PC %08X OP %08X\n", pc, tempPc, op)
+	//fmt.Printf("Block Created for Page %08X PC %08X EXIT PC %08X OP %08X\n", pageIdx, pc, tempPc, op)
 }
 
 func (j *Jit) TryEmitOp(op, w uint32) bool {
@@ -111,6 +110,9 @@ func (j *Jit) TryEmitOp(op, w uint32) bool {
 			j.Mov(JIT, gojit.Rax)
 			j.CallFunc((*Jit).Step)
 
+			j.Test(gojit.Ax, gojit.Ax)
+			irq := j.JccForward(gojit.CC_NZ)
+
 			j.emitArm(op)
 
 			for _, target := range condTargets {
@@ -118,7 +120,10 @@ func (j *Jit) TryEmitOp(op, w uint32) bool {
 			}
 
 			j.Mov(JIT, gojit.Rax)
-			j.CallFunc((*Jit).UpdatePcArm)
+			j.Movl(gojit.Imm(w), gojit.Ebx)
+			j.CallFunc((*Jit).UpdatePc)
+
+			irq()
 		}
 
 		return ok
@@ -129,28 +134,19 @@ func (j *Jit) TryEmitOp(op, w uint32) bool {
 
 			j.Mov(JIT, gojit.Rax)
 			j.CallFunc((*Jit).Step)
+			j.Test(gojit.Ax, gojit.Ax)
+			irq := j.JccForward(gojit.CC_NZ)
 
 			j.emitThumb(uint16(op))
 
 			j.Mov(JIT, gojit.Rax)
-			j.CallFunc((*Jit).UpdatePcThumb)
+			j.Movl(gojit.Imm(w), gojit.Ebx)
+			j.CallFunc((*Jit).UpdatePc)
+
+			irq()
 		}
 
 		return ok
-	}
-}
-
-func (j *Jit) UpdatePcArm() {
-	j.cpu.Reg.R[PC] += 4
-	if j.cpu.PcPtr != nil {
-		j.cpu.PcPtr = unsafe.Add(j.cpu.PcPtr, 4)
-	}
-}
-
-func (j *Jit) UpdatePcThumb() {
-	j.cpu.Reg.R[PC] += 2
-	if j.cpu.PcPtr != nil {
-		j.cpu.PcPtr = unsafe.Add(j.cpu.PcPtr, 2)
 	}
 }
 
@@ -269,7 +265,7 @@ func (j *Jit) IsJittableThumb(op uint16) bool {
 		return false
 	case IsThumbAddSub(op), IsThumbShift(op), IsThumbImm(op), IsThumbAlu(op):
 		return true
-	case IsThumbHiReg(op):
+	case IsThumbHi(op):
 
 		var (
 			inst = (op >> 8) & 0b11
@@ -329,7 +325,7 @@ func (j *Jit) emitThumb(op uint16) {
 		j.emitThumbImm(op)
 	case IsThumbAlu(op):
 		j.emitThumbAlu(op)
-	case IsThumbHiReg(op):
+	case IsThumbHi(op):
 		j.emitThumbHi(op)
 	case IsLSHalf(op):
 		j.emitThumbLSHalf(op)

@@ -17,8 +17,8 @@ func (c *Cpu) DecodeThumb(op uint16) {
 		c.ThumbImm(op)
 	case IsThumbAlu(op):
 		c.ThumbAlu(op)
-	case IsThumbHiReg(op):
-		c.HiRegBX(op)
+	case IsThumbHi(op):
+		c.ThumbHi(op)
 	case IsLSHalf(op):
 		c.ThumbLSHalf(op)
 	case IsThumbSdt(op):
@@ -92,7 +92,7 @@ func IsThumbAlu(op uint16) bool {
 }
 
 //go:inline
-func IsThumbHiReg(op uint16) bool {
+func IsThumbHi(op uint16) bool {
 	return IsThumbOpFormat(
 		op,
 		0b1111_1100_0000_0000,
@@ -366,7 +366,7 @@ const (
 	HI_BX
 )
 
-func (c *Cpu) HiRegBX(op uint16) {
+func (c *Cpu) ThumbHi(op uint16) {
 	var (
 		r  = &c.Reg.R
 		rd = (op & 7) | (((op >> 7) & 1) << 3)
