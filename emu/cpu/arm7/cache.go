@@ -45,7 +45,7 @@ func InitBlockCache(capacity uint32, page_size int) *BlockCache {
 	bc.Head.Next = bc.Tail
 	bc.Tail.Prev = bc.Head
 
-	// TODO: instead of init all same page size, can we mmap and have variable assembler sizes?
+	// TODO: instead of init all same page size, can we mmap once and have variable assembler sizes?
 	// TODO: confirm page_size is reasonable and not insanely overkill
 
 	for i := range len(bc.Blocks) {

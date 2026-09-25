@@ -5,7 +5,6 @@ import (
 	"unsafe"
 
 	"github.com/aabalke/gojit"
-	"github.com/aabalke/guac/config"
 )
 
 func (j *Jit) CreateBlock(pc, w uint32) {
@@ -48,12 +47,6 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 
 	p := j.cpu.Mem.ReadPtr(tempPc)
 	if p == nil {
-
-		if tempPc>>24 == 6 {
-			panic("need to setup VRAM as work ram")
-		}
-
-		//panic(fmt.Sprintf("read ptr bad jit arm7 ADDR %08X", tempPc))
 		j.BlockCache.PushTail(newBlock)
 		page.Blocks[blockIdx] = j.BlockCache.SkipBlock
 		return
@@ -62,7 +55,7 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 	for {
 		op = *(*uint32)(p)
 
-		if length >= config.Conf.Nds.Jit.BatchInstA7 {
+		if length >= MAX_INST_CNT {
 			break
 		}
 
@@ -82,7 +75,8 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 		p = unsafe.Add(p, w)
 	}
 
-	if length == 0 {
+	// if length == 0 {
+	if length < MIN_INST_CNT {
 		j.BlockCache.PushTail(newBlock)
 		page.Blocks[blockIdx] = j.BlockCache.SkipBlock
 		return
@@ -113,10 +107,6 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 func (j *Jit) TryEmitOp(op, w uint32) bool {
 	endBlock := false
 
-	//if w == 4 {
-	//	return true
-	//}
-
 	j.Mov(JIT, gojit.Rax)
 	j.CallFunc((*Jit).Step)
 	j.Test(gojit.Ax, gojit.Ax)
@@ -146,8 +136,6 @@ func (j *Jit) TryEmitOp(op, w uint32) bool {
 		endBlock = true
 		j.Mov(JIT, gojit.Rax)
 		j.CallFunc((*Jit).ReloadPipe)
-		j.Mov(JIT, gojit.Rax)
-		j.CallFunc((*Jit).DoJit)
 
 	case POSSIBLE:
 		endBlock = true
@@ -155,19 +143,17 @@ func (j *Jit) TryEmitOp(op, w uint32) bool {
 		j.Movb(RELOAD_FLAG, gojit.Al)
 		j.Testb(gojit.Al, gojit.Al)
 
+		j.Mov(JIT, gojit.Rax)
+
 		reload := j.JccForward(gojit.CC_NZ)
 
-		j.Mov(JIT, gojit.Rax)
 		j.Movl(gojit.Imm(w), gojit.Ebx)
 		j.CallFunc((*Jit).UpdatePc)
 
 		notReload := j.JmpForward()
 		reload()
 
-		j.Mov(JIT, gojit.Rax)
 		j.CallFunc((*Jit).ReloadPipe)
-		j.Mov(JIT, gojit.Rax)
-		j.CallFunc((*Jit).DoJit)
 
 		notReload()
 	}

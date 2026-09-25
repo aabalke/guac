@@ -272,7 +272,6 @@ func (c *Cpu) Step() {
 		if !c.Reg.CPSR.I {
 			c.DoIrq()
 			c.ReloadPipe()
-			c.DoJit()
 		}
 	}
 
@@ -315,7 +314,6 @@ func (c *Cpu) Step() {
 
 	if c.Reload {
 		c.ReloadPipe()
-		c.DoJit()
 	} else {
 		c.Reg.R[PC] += w
 		if c.PcPtr != nil {
@@ -326,19 +324,10 @@ func (c *Cpu) Step() {
 	//c.print()
 }
 
-func (c *Cpu) DoJit() {
-	if c.Jit == nil {
-		return
-	}
-
-	w := uint32(4)
-	if c.Reg.CPSR.T {
-		w = 2
-	}
-
+func (c *Cpu) DoJit(w uint32) {
 	//fmt.Printf("R %08X OP %08X STAMP %08d\n", c.Reg.R, c.Op[0], c.Timestamp)
 
-	if ok := c.TryJit(c.Reg.R[PC]); ok {
+	if ok := c.Jit.TryJit(c.Reg.R[PC]); ok {
 		return
 	}
 
@@ -376,6 +365,10 @@ func (c *Cpu) ReloadPipe() {
 	c.Reg.R[PC] += w * 2
 	c.Seq = SEQ
 	c.Reload = false
+
+	if c.Jit != nil {
+		c.DoJit(w)
+	}
 }
 
 func (c *Cpu) ToggleThumb() {
@@ -390,37 +383,14 @@ func (c *Cpu) ToggleThumb() {
 	c.Reg.R[PC] &^= 3
 }
 
-func (c *Cpu) Write8(addr uint32, v uint8) {
-	c.Bus.Write8(addr, v)
-}
-
-func (c *Cpu) Write16(addr uint32, v uint16) {
-	c.Bus.Write16(addr, v)
-}
-
-func (c *Cpu) Write32(addr, v uint32) {
-	c.Bus.Write32(addr, v)
-}
-
-func (c *Cpu) Write32Block(addr, v, seq uint32) {
-	c.Bus.Write32Block(addr, v, seq)
-}
-
-func (c *Cpu) Read8(addr uint32) uint32 {
-	return c.Bus.Read8(addr)
-}
-
-func (c *Cpu) Read16(addr uint32) uint32 {
-	return c.Bus.Read16(addr)
-}
-
-func (c *Cpu) Read32(addr uint32) uint32 {
-	return c.Bus.Read32(addr)
-}
-
-func (c *Cpu) Read32Block(addr, seq uint32) uint32 {
-	return c.Bus.Read32Block(addr, seq)
-}
+func (c *Cpu) Write8(addr uint32, v uint8)         { c.Bus.Write8(addr, v) }
+func (c *Cpu) Write16(addr uint32, v uint16)       { c.Bus.Write16(addr, v) }
+func (c *Cpu) Write32(addr, v uint32)              { c.Bus.Write32(addr, v) }
+func (c *Cpu) Write32Block(addr, v, seq uint32)    { c.Bus.Write32Block(addr, v, seq) }
+func (c *Cpu) Read8(addr uint32) uint32            { return c.Bus.Read8(addr) }
+func (c *Cpu) Read16(addr uint32) uint32           { return c.Bus.Read16(addr) }
+func (c *Cpu) Read32(addr uint32) uint32           { return c.Bus.Read32(addr) }
+func (c *Cpu) Read32Block(addr, seq uint32) uint32 { return c.Bus.Read32Block(addr, seq) }
 
 func (c *Cpu) GetSPSR(mode CpuMode) uint32 {
 	return c.Reg.SPSR[ModeBank(mode)].Get()
@@ -530,11 +500,11 @@ func (c *Cpu) ExitException(mode CpuMode) {
 //	}
 //}
 
-func (c *Cpu) TryJit(pc uint32) bool {
-	pageIdx := pc >> c.Jit.PageShift
-	blockIdx := (pc & c.Jit.PageMask) >> 1
+func (j *Jit) TryJit(pc uint32) bool {
+	pageIdx := pc >> j.PageShift
+	blockIdx := (pc & j.PageMask) >> 1
 
-	page := c.Jit.Pages[pageIdx]
+	page := j.Pages[pageIdx]
 
 	if page == nil || page.dead {
 		return false
@@ -549,6 +519,6 @@ func (c *Cpu) TryJit(pc uint32) bool {
 	//fmt.Printf("Running Jit for PC %08X\n", pc)
 
 	block.f()
-	c.Jit.BlockCache.TouchBlock(block)
+	j.BlockCache.TouchBlock(block)
 	return true
 }

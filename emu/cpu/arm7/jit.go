@@ -32,10 +32,18 @@ var (
 )
 
 const (
-	ADDRESS_SPACE = 0x1_0000_0000
-	PAGE_SHIFT    = 16
-	PAGE_SIZE     = 0x10000
-	PAGE_MASK     = (1 << PAGE_SHIFT) - 1
+	// NDS
+	//ADDRESS_SPACE = 0x1_0000_0000
+	//PAGE_SHIFT    = 16
+
+	// GBA
+	ADDRESS_SPACE = 0x1000_0000
+	PAGE_SHIFT    = 8
+
+	PAGE_MASK        = (1 << PAGE_SHIFT) - 1
+	NATIVE_PAGE_SIZE = 0x10000
+	MIN_INST_CNT     = 8
+	MAX_INST_CNT     = 64
 )
 
 type ReloadState uint32
@@ -74,7 +82,7 @@ func NewJit(cpu *Cpu) *Jit {
 		Pages: make([]*Page, ADDRESS_SPACE>>PAGE_SHIFT),
 		BlockCache: InitBlockCache(
 			config.Conf.Nds.Jit.BlockCnt,
-			PAGE_SIZE,
+			NATIVE_PAGE_SIZE,
 		),
 		LoopThreshold: config.Conf.Nds.Jit.LoopCnt,
 		PageShift:     PAGE_SHIFT,
@@ -103,6 +111,8 @@ func (j *Jit) InvalidatePage(addr uint32) {
 	if page == nil || page.dead {
 		return
 	}
+
+	//fmt.Printf("Invalidated Page %08X Addr %08X\n", addr>>j.PageShift, addr)
 
 	page.dead = true
 
@@ -347,6 +357,9 @@ func (j *Jit) Step() bool {
 
 	c.Cycles(c.Reg.R[PC], w, seq, true)
 
+	// TODO: can probably remove every inst pipeline calc in jit
+	// would need to handle end and irq
+
 	if c.PcPtr == nil {
 		if w == 4 {
 			c.Op[1] = c.Mem.Read32(c.Reg.R[PC])
@@ -373,11 +386,6 @@ func (j *Jit) UpdatePc(w uint32) {
 //go:nosplit
 func (j *Jit) ReloadPipe() {
 	j.cpu.ReloadPipe()
-}
-
-//go:nosplit
-func (j *Jit) DoJit() {
-	j.cpu.DoJit()
 }
 
 //go:nosplit
