@@ -65,7 +65,7 @@ type Cond struct {
 
 //go:nosplit
 func (c *Cond) Get() uint32 {
-	v := uint32(c.Mode)
+	v := uint32(c.Mode) | 0x10
 
 	if c.N {
 		v |= 1 << N
@@ -139,7 +139,7 @@ const (
 )
 
 func ModeBank(mode CpuMode) uint32 {
-	switch mode {
+	switch mode | 0x10 {
 	case MODE_USR, MODE_SYS:
 		return 0
 	case MODE_FIQ:
@@ -233,20 +233,20 @@ func GetCpuPtrs(cpu *Cpu) CpuPtrs {
 		reg  = int32(unsafe.Offsetof(Cpu{}.Reg))
 		r    = reg + int32(unsafe.Offsetof(Reg{}.R))
 		cpsr = reg + int32(unsafe.Offsetof(Reg{}.CPSR))
-
-		c = CpuPtrs{
-			Mode:   gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.Mode)), Bits: 32},
-			N:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.N)), Bits: 8},
-			Z:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.Z)), Bits: 8},
-			C:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.C)), Bits: 8},
-			V:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.V)), Bits: 8},
-			T:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.T)), Bits: 8},
-			Reload: gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Reload)), Bits: 8},
-			Seq:    gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Seq)), Bits: 8},
-			Cpsr:   uintptr(unsafe.Pointer(&cpu.Reg.CPSR)),
-			Cpu:    uintptr(unsafe.Pointer(cpu)),
-		}
 	)
+
+	c := CpuPtrs{
+		Mode:   gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.Mode)), Bits: 32},
+		N:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.N)), Bits: 8},
+		Z:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.Z)), Bits: 8},
+		C:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.C)), Bits: 8},
+		V:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.V)), Bits: 8},
+		T:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.T)), Bits: 8},
+		Reload: gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Reload)), Bits: 8},
+		Seq:    gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Seq)), Bits: 8},
+		Cpsr:   uintptr(unsafe.Pointer(&cpu.Reg.CPSR)),
+		Cpu:    uintptr(unsafe.Pointer(cpu)),
+	}
 
 	for i := range 16 {
 		c.R[i] = gojit.Indirect{Base: CPU, Offset: r + int32(i*4), Bits: 32}
@@ -334,6 +334,13 @@ func (c *Cpu) Step() {
 	} else {
 		c.DecodeThumb(uint16(inst))
 	}
+
+	//if debug.B[0] {
+	//	fmt.Printf("CPSR %08X PC %08X\n", c.Reg.CPSR.Get(), c.Reg.R[PC])
+	//}
+	//if c.Reg.R[15]-8 == 0x8000D34 {
+	//	debug.B[0] = false
+	//}
 
 	if c.Reload {
 		c.ReloadPipe()

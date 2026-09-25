@@ -333,8 +333,7 @@ func (j *Jit) emitSdt(op uint32) {
 			j.Movl(gojit.Eax, j.C.R[rd])
 
 			if rd == PC {
-				j.Mov(JIT, gojit.Rax)
-				j.CallFunc((*Jit).ToggleThumb)
+				j.emitToggleThumb()
 				j.emitCondReloadState(op >> 28)
 			}
 		}
@@ -1066,8 +1065,7 @@ func (j *Jit) emitBranchExchange(op uint32) {
 		j.Movl(j.C.R[op&0xF], gojit.Eax)
 		j.Movl(gojit.Eax, j.C.R[PC])
 
-		j.Mov(JIT, gojit.Rax)
-		j.CallFunc((*Jit).ToggleThumb)
+		j.emitToggleThumb()
 		j.emitCondReloadState(op >> 28)
 
 	case INST_BXJ:

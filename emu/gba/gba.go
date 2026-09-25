@@ -101,12 +101,12 @@ func NewGBA(ctx *audio.Context, path string, muted bool) *GBA {
 		AddressSpace:   0xE00_0000,
 		PageShift:      uint32(pageShift),
 		PageMask:       (1 << pageShift) - 1,
-		NativePagesize: 0x10000,
+		NativePageSize: 0x10000,
 		MinInstCnt:     8,
 		MaxInstCnt:     64,
 		BlockCnt:       4096,
 		LoopThreshold:  255,
-		Enabled:        true,
+		Enabled:        false,
 	}
 
 	gba := &GBA{
@@ -306,7 +306,6 @@ func (gba *GBA) DirectBoot() {
 	gba.Irq.IME = true
 
 	reg.CPSR.Set(0x1F)
-	reg.SPSR[arm7.ModeBank(arm7.MODE_IRQ)].Set(0x10)
 
 	reg.R[arm7.PC] = 0x800_0000
 	reg.R[arm7.LR] = 0x800_0000

@@ -298,3 +298,19 @@ func (j *Jit) emitThumb(op uint16) {
 		panic(fmt.Sprintf("unemittable amd64 jit instruction THUMB OP %04X", op))
 	}
 }
+
+func (j *Jit) emitToggleThumb() {
+	j.Movl(j.C.R[PC], gojit.Eax)
+	j.And(gojit.Imm(1), gojit.Eax)
+	j.Movb(gojit.Al, j.C.T)
+
+	j.Movb(gojit.Imm(1), j.C.Reload)
+
+	j.Testb(gojit.Al, gojit.Al)
+
+	j.Movl(gojit.Imm(^1), gojit.Eax)
+	j.Movl(gojit.Imm(^3), gojit.Ebx)
+	j.Cmovcc(gojit.CC_Z, gojit.Ebx, gojit.Eax)
+
+	j.And(gojit.Eax, j.C.R[PC])
+}

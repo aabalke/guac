@@ -25,7 +25,8 @@ const (
 
 type Jit struct {
 	*gojit.Assembler
-	cpu          *Cpu
+	cpu *Cpu
+	// cpu          JittedCpu
 	C            CpuPtrs
 	Metrics      [][]uint32
 	BlockCache   *BlockCache
@@ -36,11 +37,24 @@ type Jit struct {
 	TestingCnt   int
 }
 
+type JittedCpu interface {
+	Idle(int64)
+	Read8(addr uint32) uint32
+	Read16(addr uint32) uint32
+	Read32(addr uint32) uint32
+	Read32Block(addr, seq uint32) uint32
+	Write8(addr uint32, v uint8)
+	Write16(addr uint32, v uint16)
+	Write32(addr, v uint32)
+	Write32Block(addr, v, seq uint32)
+	ModeSwitch(CpuMode, CpuMode)
+}
+
 type JitConfig struct {
 	AddressSpace   int    // addr space with readable instructions
 	PageShift      uint32 // density of pages, in address space
 	PageMask       uint32 // mask used to calc blocks per page
-	NativePagesize int    // byte cnt on native memory per block
+	NativePageSize int    // byte cnt on native memory per block
 	MinInstCnt     uint32 // blocks smaller than this are skipped
 	MaxInstCnt     uint32 // block cannot be more inst than this
 	LoopThreshold  uint32 // how many loops until create block
@@ -75,7 +89,7 @@ func NewJit(cpu *Cpu, config JitConfig, ptrs CpuPtrs) *Jit {
 		Pages: make([]*Page, config.AddressSpace>>config.PageShift),
 		BlockCache: InitBlockCache(
 			uint32(config.BlockCnt),
-			config.NativePagesize,
+			config.NativePageSize,
 		),
 		Metrics: make([][]uint32, config.AddressSpace>>config.PageShift),
 		Config:  config,
@@ -174,7 +188,7 @@ func (j *Jit) UseJit[T constraints.Unsigned](op T) {
 
 	fmt.Printf("starting test cnt %08d, op %08X\n", j.TestingCnt, op)
 
-	asm, err := gojit.New(j.Config.NativePagesize)
+	asm, err := gojit.New(j.Config.NativePageSize)
 	if err != nil {
 		panic(err)
 	}
@@ -315,14 +329,10 @@ func (j *Jit) Write32(addr, v uint32) { j.cpu.Write32(addr, v) }
 func (j *Jit) Write32Block(addr, v, seq uint32) { j.cpu.Write32Block(addr, v, seq) }
 
 //go:nosplit
-func (j *Jit) ModeSwitch(curr, next CpuMode) {
-	j.cpu.ModeSwitch(curr, next)
-}
+func (j *Jit) ModeSwitch(curr, next CpuMode) { j.cpu.ModeSwitch(curr, next) }
 
 //go:nosplit
-func (j *Jit) GetSPSR(mode CpuMode) {
-	j.cpu.GetSPSR(mode)
-}
+func (j *Jit) GetSPSR(mode CpuMode) uint32 { return j.cpu.GetSPSR(mode) }
 
 //go:nosplit
 func (j *Jit) Step() bool {
@@ -367,24 +377,13 @@ func (j *Jit) UpdatePc(p unsafe.Pointer, w uint32) {
 }
 
 //go:nosplit
-func (j *Jit) ReloadPipe() {
-	j.cpu.ReloadPipe()
-}
+func (j *Jit) ReloadPipe() { j.cpu.ReloadPipe() }
 
 //go:nosplit
-func (j *Jit) Exception(addr ExceptionVector, mode CpuMode) {
-	j.cpu.Exception(addr, mode)
-}
+func (j *Jit) Exception(addr ExceptionVector, mode CpuMode) { j.cpu.Exception(addr, mode) }
 
 //go:nosplit
-func (j *Jit) ExitException(mode CpuMode) {
-	j.cpu.ExitException(mode)
-}
-
-//go:nosplit
-func (j *Jit) ToggleThumb() {
-	j.cpu.ToggleThumb()
-}
+func (j *Jit) ExitException(mode CpuMode) { j.cpu.ExitException(mode) }
 
 //go:nosplit
 func (j *Jit) DoMsrModeSwitch(spsrFlag bool, v, mask uint32) {
@@ -392,6 +391,4 @@ func (j *Jit) DoMsrModeSwitch(spsrFlag bool, v, mask uint32) {
 }
 
 //go:nosplit
-func (j *Jit) DoLdmLoadSwitch() {
-	j.cpu.DoLdmLoadSwitch()
-}
+func (j *Jit) DoLdmLoadSwitch() { j.cpu.DoLdmLoadSwitch() }

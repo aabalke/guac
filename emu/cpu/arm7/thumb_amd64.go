@@ -574,8 +574,8 @@ func (j *Jit) emitThumbHi(op uint16) {
 
 		j.Movl(gojit.Eax, j.C.R[PC])
 
-		j.Mov(JIT, gojit.Rax)
-		j.CallFunc((*Jit).ToggleThumb)
+		j.emitToggleThumb()
+
 		j.Movb(gojit.Imm(0), j.C.Reload)
 		j.ReloadState = RELOAD
 	}

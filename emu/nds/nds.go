@@ -76,7 +76,7 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 		AddressSpace:   0x1_0000_0000,
 		PageShift:      uint32(pageShift),
 		PageMask:       (1 << pageShift) - 1,
-		NativePagesize: 0x10000,
+		NativePageSize: 0x10000,
 		MinInstCnt:     8,
 		MaxInstCnt:     64,
 		BlockCnt:       4096,
