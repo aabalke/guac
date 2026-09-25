@@ -1,9 +1,11 @@
 package arm7
 
 import (
+	"fmt"
 	"unsafe"
 
 	"github.com/aabalke/gojit"
+	"github.com/aabalke/guac/config"
 )
 
 func (j *Jit) CreateBlock(pc, w uint32) {
@@ -40,7 +42,7 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 	j.MovAbs(uint64(uintptr(unsafe.Pointer(j.cpu))), CPU)
 
 	// offset for pipelining
-	tempPc := pc - (w * 2)
+	tempPc := (pc - (w * 2)) &^ (w - 1)
 
 	var length, op, i uint32
 
@@ -58,21 +60,26 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 	}
 
 	for {
-		op = *(*uint32)(unsafe.Add(p, i*w))
+		op = *(*uint32)(p)
 
-		if length >= BATCH_INST_MAX {
+		if length >= config.Conf.Nds.Jit.BatchInstA7 {
 			break
 		}
 
-		if ok := j.TryEmitOp(op, w); !ok {
+		if reloaded := j.TryEmitOp(op, w); reloaded {
 			break
 		}
 
-		//fmt.Printf("emitOp PC %08X OP %08X\n", tempPc, op)
+		//if w == 2 {
+		//	fmt.Printf("emitOp PC %08X OP %04X\n", tempPc, uint16(op))
+		//} else {
+		//	fmt.Printf("emitOp PC %08X OP %08X\n", tempPc, op)
+		//}
 
 		i++
 		length++
 		tempPc += w
+		p = unsafe.Add(p, w)
 	}
 
 	if length == 0 {
@@ -96,64 +103,84 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 
 	page.Blocks[blockIdx] = newBlock
 
-	//fmt.Printf("Block Created for Page %08X PC %08X EXIT PC %08X OP %08X\n", pageIdx, pc, tempPc, op)
+	//if w == 2 {
+	//	fmt.Printf("Block Created for Page %08X PC %08X EXIT PC %08X OP %04X\n", pageIdx, pc, tempPc, uint16(op))
+	//} else {
+	//	fmt.Printf("Block Created for Page %08X PC %08X EXIT PC %08X OP %08X\n", pageIdx, pc, tempPc, op)
+	//}
 }
 
 func (j *Jit) TryEmitOp(op, w uint32) bool {
+	endBlock := false
+
+	//if w == 4 {
+	//	return true
+	//}
+
+	j.Mov(JIT, gojit.Rax)
+	j.CallFunc((*Jit).Step)
+	j.Test(gojit.Ax, gojit.Ax)
+	irq := j.JccForward(gojit.CC_NZ)
+
 	if w == 4 {
-
-		ok := j.IsJittableArm(op)
-		if ok {
-
-			condTargets := j.emitCond(op)
-
-			j.Mov(JIT, gojit.Rax)
-			j.CallFunc((*Jit).Step)
-
-			j.Test(gojit.Ax, gojit.Ax)
-			irq := j.JccForward(gojit.CC_NZ)
-
-			j.emitArm(op)
-
-			for _, target := range condTargets {
-				target()
-			}
-
-			j.Mov(JIT, gojit.Rax)
-			j.Movl(gojit.Imm(w), gojit.Ebx)
-			j.CallFunc((*Jit).UpdatePc)
-
-			irq()
+		condTargets := j.emitCond(op >> 28)
+		j.emitArm(op)
+		for _, target := range condTargets {
+			target()
 		}
-
-		return ok
 	} else {
-
-		ok := j.IsJittableThumb(uint16(op))
-		if ok {
-
-			j.Mov(JIT, gojit.Rax)
-			j.CallFunc((*Jit).Step)
-			j.Test(gojit.Ax, gojit.Ax)
-			irq := j.JccForward(gojit.CC_NZ)
-
-			j.emitThumb(uint16(op))
-
-			j.Mov(JIT, gojit.Rax)
-			j.Movl(gojit.Imm(w), gojit.Ebx)
-			j.CallFunc((*Jit).UpdatePc)
-
-			irq()
-		}
-
-		return ok
+		j.emitThumb(uint16(op))
 	}
+
+	// NOTE: condition branching instructions require ending the block
+	// but need to use c.Reload to find out if branch was taken
+	reloadState := j.ReloadState
+	j.ReloadState = NONE
+	switch reloadState {
+	case NONE:
+		endBlock = false
+		j.Mov(JIT, gojit.Rax)
+		j.Movl(gojit.Imm(w), gojit.Ebx)
+		j.CallFunc((*Jit).UpdatePc)
+	case RELOAD:
+		endBlock = true
+		j.Mov(JIT, gojit.Rax)
+		j.CallFunc((*Jit).ReloadPipe)
+		j.Mov(JIT, gojit.Rax)
+		j.CallFunc((*Jit).DoJit)
+
+	case POSSIBLE:
+		endBlock = true
+
+		j.Movb(RELOAD_FLAG, gojit.Al)
+		j.Testb(gojit.Al, gojit.Al)
+
+		reload := j.JccForward(gojit.CC_NZ)
+
+		j.Mov(JIT, gojit.Rax)
+		j.Movl(gojit.Imm(w), gojit.Ebx)
+		j.CallFunc((*Jit).UpdatePc)
+
+		notReload := j.JmpForward()
+		reload()
+
+		j.Mov(JIT, gojit.Rax)
+		j.CallFunc((*Jit).ReloadPipe)
+		j.Mov(JIT, gojit.Rax)
+		j.CallFunc((*Jit).DoJit)
+
+		notReload()
+	}
+
+	irq()
+
+	return endBlock
 }
 
-func (j *Jit) emitCond(op uint32) []func() {
+func (j *Jit) emitCond(cond uint32) []func() {
 	var jcctargets []func()
 
-	switch cond := op >> 28; cond {
+	switch cond {
 	case 0xE, 0xF:
 		// nothing to do, always executed
 	case 0x0: // Z
@@ -214,40 +241,24 @@ func (j *Jit) emitCond(op uint32) []func() {
 	return jcctargets
 }
 
-func (j *Jit) IsJittableArm(op uint32) bool {
-	switch {
-	case (op>>24)&0xF == 0xF, IsBranch(op), IsBranchExchange(op):
-		return false
-	case IsSdt(op), IsHalf(op):
-		load := (op>>20)&1 != 0
-		rdpc := op&0xF000 == 0xF000
-		return !load || !rdpc
-	case IsBlock(op):
-		load := (op>>20)&1 != 0
-		pcIncluded := op&0x8000 != 0
-		rlist := op & 0xFFFF
-		return rlist != 0 && (!load || !pcIncluded)
-	case IsUndefined(op), IsMsr(op):
-		return false
-	case IsMrs(op), IsSwp(op), IsMul(op):
-		return true
-	case IsAlu(op):
-		rdpc := op&0xF000 == 0xF000
-		swiExit := op&0x3F0_000F == 0x3F0_000F
-		return !rdpc && !swiExit
-	default:
-		return false
-	}
-}
-
 func (j *Jit) emitArm(op uint32) {
 	switch {
+	case (op>>24)&0xF == 0xF:
+		j.emitSWI(op)
+	case IsBranch(op):
+		j.emitBranch(op)
+	case IsBranchExchange(op):
+		j.emitBranchExchange(op)
 	case IsSdt(op):
 		j.emitSdt(op)
 	case IsBlock(op):
 		j.emitBlock(op)
 	case IsHalf(op):
 		j.emitHalf(op)
+	case IsUndefined(op):
+		j.emitUndefined(op)
+	case IsMsr(op):
+		j.emitMsr(op)
 	case IsMrs(op):
 		j.emitMrs(op)
 	case IsSwp(op):
@@ -256,67 +267,15 @@ func (j *Jit) emitArm(op uint32) {
 		j.emitMul(op)
 	case IsAlu(op):
 		j.emitAlu(op)
+	default:
+		panic(fmt.Sprintf("unemittable amd64 jit instruction ARM OP %08X", op))
 	}
-}
-
-func (j *Jit) IsJittableThumb(op uint16) bool {
-	switch {
-	case IsthumbSWI(op):
-		return false
-	case IsThumbAddSub(op), IsThumbShift(op), IsThumbImm(op), IsThumbAlu(op):
-		return true
-	case IsThumbHi(op):
-
-		var (
-			inst = (op >> 8) & 0b11
-			mSBd = (op>>7)&1 != 0
-			rd   = op & 0x7
-		)
-
-		if inst != 3 && mSBd {
-			rd |= 0b1000
-		}
-
-		if inst == 3 || rd == PC {
-			return false
-		}
-
-		return true
-
-	case IsLSHalf(op), IsThumbSdt(op), IsLPC(op), IsLSImm(op):
-		return true
-	case IsPushPop(op):
-		pclr := (op>>8)&1 != 0
-		pop := (op>>11)&1 != 0
-		if pop && pclr {
-			return false
-		}
-		return true
-	case IsRelative(op):
-		return true
-	case IsThumbB(op), IsJumpCall(op):
-		return false
-	case IsStack(op):
-		return true
-	case IsLongBranch(op), IsShortLongBranch(op):
-		return false
-	case IsLSSP(op):
-		return true
-	case IsMulti(op):
-		ldmia := (op>>11)&1 != 0
-		rlist := op & 0xFF
-
-		if ldmia && rlist == 0 {
-			return false
-		}
-		return true
-	}
-
-	return false
 }
 
 func (j *Jit) emitThumb(op uint16) {
 	switch {
+	case IsthumbSWI(op):
+		j.emitThumbSWI(op)
 	case IsThumbAddSub(op):
 		j.emitThumbAddSub(op)
 	case IsThumbShift(op):
@@ -339,11 +298,21 @@ func (j *Jit) emitThumb(op uint16) {
 		j.emitThumbPushPop(op)
 	case IsRelative(op):
 		j.emitThumbRelative(op)
+	case IsThumbBranch(op):
+		j.emitThumbBranch(op)
+	case IsJumpCall(op):
+		j.emitJumpCall(op)
 	case IsStack(op):
 		j.emitThumbStack(op)
+	case IsLongBranch(op):
+		j.emitLongBranch(op)
+	case IsShortLongBranch(op):
+		j.emitShortLongBranch(op)
 	case IsLSSP(op):
 		j.emitThumbLSSP(op)
-	case IsMulti(op):
+	case IsThumbBlock(op):
 		j.emitThumbBlock(op)
+	default:
+		panic(fmt.Sprintf("unemittable amd64 jit instruction THUMB OP %04X", op))
 	}
 }

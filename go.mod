@@ -3,7 +3,7 @@ module github.com/aabalke/guac
 // local development
 //replace github.com/hajimehoshi/dialog => C:\dev\repos\emulators\dialog
 //replace github.com/ebitenui/ebitenui => C:\dev\repos\emulators\ebitenui
-//replace github.com/aabalke/gojit => C:\dev\repos\jit\gojit
+replace github.com/aabalke/gojit => C:\dev\repos\jit\gojit
 
 // release version
 replace github.com/ebitenui/ebitenui => github.com/aabalke/ebitenui v0.0.0-20260507040224-7e5cd031ea7d
@@ -21,14 +21,14 @@ require (
 	github.com/aabalke/gojit v0.0.0-20260919011104-e8574bd413ce
 	github.com/ebitenui/ebitenui v0.7.3
 	github.com/hajimehoshi/dialog v0.0.0-20260703050910-dfca0e7cf198
-	github.com/hajimehoshi/ebiten/v2 v2.10.1
+	github.com/hajimehoshi/ebiten/v2 v2.10.0
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394
 )
 
 require (
 	github.com/ebitengine/gomobile v0.0.0-20260820040257-d11f821a26a6 // indirect
 	github.com/ebitengine/hideconsole v1.0.0 // indirect
-	github.com/ebitengine/oto/v3 v3.5.0 // indirect
+	github.com/ebitengine/oto/v3 v3.5.1 // indirect
 	github.com/ebitengine/purego v0.11.0 // indirect
 	github.com/edsrzf/mmap-go v1.2.0 // indirect
 	github.com/frustra/bbcode v0.0.0-20201127003707-6ef347fbe1c8 // indirect

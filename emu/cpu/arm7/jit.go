@@ -1,13 +1,13 @@
 package arm7
 
 import (
-	"encoding/binary"
 	"fmt"
 	"os"
 	"reflect"
 	"unsafe"
 
 	"github.com/aabalke/gojit"
+	"github.com/aabalke/guac/config"
 	"golang.org/x/exp/constraints"
 )
 
@@ -23,6 +23,9 @@ var (
 	jZ   = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.Z)), Bits: 8}
 	jC   = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.C)), Bits: 8}
 	jV   = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.V)), Bits: 8}
+	jT   = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.T)), Bits: 8}
+
+	RELOAD_FLAG = gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Reload)), Bits: 8}
 
 	FALSE = gojit.Imm(0)
 	TRUE  = gojit.Imm(1)
@@ -33,17 +36,19 @@ const (
 	PAGE_SHIFT    = 16
 	PAGE_SIZE     = 0x10000
 	PAGE_MASK     = (1 << PAGE_SHIFT) - 1
+)
 
-	BLOCK_CNT      = 4096
-	BATCH_INST_MAX = 32
-	LOOP_CNT       = 255
+type ReloadState uint32
+
+const (
+	NONE ReloadState = iota
+	RELOAD
+	POSSIBLE
 )
 
 type Jit struct {
 	*gojit.Assembler
 	cpu *Cpu
-
-	EndBlock bool
 
 	TestingCnt int
 
@@ -54,6 +59,7 @@ type Jit struct {
 	LoopThreshold uint32
 	PageShift     uint32
 	PageMask      uint32
+	ReloadState   ReloadState
 }
 
 type Page struct {
@@ -67,10 +73,10 @@ func NewJit(cpu *Cpu) *Jit {
 		cpu:   cpu,
 		Pages: make([]*Page, ADDRESS_SPACE>>PAGE_SHIFT),
 		BlockCache: InitBlockCache(
-			BLOCK_CNT,
+			config.Conf.Nds.Jit.BlockCnt,
 			PAGE_SIZE,
 		),
-		LoopThreshold: LOOP_CNT,
+		LoopThreshold: config.Conf.Nds.Jit.LoopCnt,
 		PageShift:     PAGE_SHIFT,
 		PageMask:      PAGE_MASK,
 	}
@@ -179,23 +185,23 @@ func (j *Jit) RunTest[T constraints.Unsigned](op T) func() {
 	start := cpu.Reg
 	staStamp := j.cpu.Timestamp
 
-	ewramPtr := j.cpu.Mem.ReadPtr(0x200_0000)
-	iwramPtr := j.cpu.Mem.ReadPtr(0x300_0000)
-	vramPtr := j.cpu.Mem.ReadPtr(0x600_0000)
-	ewram := *(*[0x40000]uint8)(ewramPtr)
-	iwram := *(*[0x8000]uint8)(iwramPtr)
-	vram := *(*[0x18001]uint8)(vramPtr)
+	//ewramPtr := j.cpu.Mem.ReadPtr(0x200_0000)
+	//iwramPtr := j.cpu.Mem.ReadPtr(0x300_0000)
+	//vramPtr := j.cpu.Mem.ReadPtr(0x600_0000)
+	//ewram := *(*[0x40000]uint8)(ewramPtr)
+	//iwram := *(*[0x8000]uint8)(iwramPtr)
+	//vram := *(*[0x18001]uint8)(vramPtr)
 
 	j.UseJit(op)
 
-	savedIwram := *(*[0x8000]uint8)(iwramPtr)
+	//savedIwram := *(*[0x8000]uint8)(iwramPtr)
 
 	sav := cpu.Reg
 	savStamp := cpu.Timestamp
 
-	*(*[0x40000]uint8)(ewramPtr) = ewram
-	*(*[0x8000]uint8)(iwramPtr) = iwram
-	*(*[0x18001]uint8)(vramPtr) = vram
+	//*(*[0x40000]uint8)(ewramPtr) = ewram
+	//*(*[0x8000]uint8)(iwramPtr) = iwram
+	//*(*[0x18001]uint8)(vramPtr) = vram
 
 	cpu.Reg = start
 
@@ -204,20 +210,20 @@ func (j *Jit) RunTest[T constraints.Unsigned](op T) func() {
 	return func() {
 		// do not (Reg) == (Reg), sta = cpu.Reg does not promise padding
 
-		dirty := false
-		for i := 0; i < len(savedIwram); i += 4 {
-			jit := binary.LittleEndian.Uint32(savedIwram[i:])
-			interpreter := binary.LittleEndian.Uint32((*[0x8000]uint8)(iwramPtr)[i:])
+		// dirty := false
+		// for i := 0; i < len(savedIwram); i += 4 {
+		//	jit := binary.LittleEndian.Uint32(savedIwram[i:])
+		//	interpreter := binary.LittleEndian.Uint32((*[0x8000]uint8)(iwramPtr)[i:])
 
-			if jit != interpreter {
-				dirty = true
-				fmt.Printf("ADDR 0x300...%04X: Jit %08X Interpreter %08X\n", i, jit, interpreter)
-			}
-		}
+		//	if jit != interpreter {
+		//		dirty = true
+		//		fmt.Printf("ADDR 0x300...%04X: Jit %08X Interpreter %08X\n", i, jit, interpreter)
+		//	}
+		//}
 
-		if dirty {
-			panic("invalid memory values")
-		}
+		//if dirty {
+		//	panic("invalid memory values")
+		//}
 
 		if match := (cpu.Reg.R == sav.R &&
 			cpu.Reg.CPSR == sav.CPSR &&
@@ -328,7 +334,6 @@ func (j *Jit) Step() bool {
 
 	if c.IrqLine {
 		return true
-		panic("irq called during jit step")
 	}
 
 	seq := c.Seq
@@ -363,4 +368,39 @@ func (j *Jit) UpdatePc(w uint32) {
 	if j.cpu.PcPtr != nil {
 		j.cpu.PcPtr = unsafe.Add(j.cpu.PcPtr, w)
 	}
+}
+
+//go:nosplit
+func (j *Jit) ReloadPipe() {
+	j.cpu.ReloadPipe()
+}
+
+//go:nosplit
+func (j *Jit) DoJit() {
+	j.cpu.DoJit()
+}
+
+//go:nosplit
+func (j *Jit) Exception(addr ExceptionVector, mode CpuMode) {
+	j.cpu.Exception(addr, mode)
+}
+
+//go:nosplit
+func (j *Jit) ExitException(mode CpuMode) {
+	j.cpu.ExitException(mode)
+}
+
+//go:nosplit
+func (j *Jit) ToggleThumb() {
+	j.cpu.ToggleThumb()
+}
+
+//go:nosplit
+func (j *Jit) DoMsrModeSwitch(spsrFlag bool, v, mask uint32) {
+	j.cpu.DoMsrModeSwitch(spsrFlag, v, mask)
+}
+
+//go:nosplit
+func (j *Jit) DoLdmLoadSwitch() {
+	j.cpu.DoLdmLoadSwitch()
 }

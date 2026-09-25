@@ -339,7 +339,6 @@ func (c *Cpu) DoJit() {
 	//fmt.Printf("R %08X OP %08X STAMP %08d\n", c.Reg.R, c.Op[0], c.Timestamp)
 
 	if ok := c.TryJit(c.Reg.R[PC]); ok {
-		// TODO: jit emit final instruction
 		return
 	}
 
@@ -379,7 +378,6 @@ func (c *Cpu) ReloadPipe() {
 	c.Reload = false
 }
 
-//go:nosplit
 func (c *Cpu) ToggleThumb() {
 	c.Reg.CPSR.T = c.Reg.R[PC]&1 != 0
 
@@ -547,6 +545,8 @@ func (c *Cpu) TryJit(pc uint32) bool {
 	if block == nil || block.Skip || block.f == nil {
 		return false
 	}
+
+	//fmt.Printf("Running Jit for PC %08X\n", pc)
 
 	block.f()
 	c.Jit.BlockCache.TouchBlock(block)

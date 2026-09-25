@@ -282,11 +282,6 @@ func (j *Jit) emitSdt(op uint32) {
 		rd   = (op >> 12) & 0xF
 	)
 
-	if load && rd == PC {
-		j.EndBlock = true
-		return
-	}
-
 	if reg {
 		j.Movl(j.REG(op&0xF), gojit.Eax)
 		j.Movb(jC, gojit.Bl)
@@ -338,7 +333,9 @@ func (j *Jit) emitSdt(op uint32) {
 			j.Movl(gojit.Eax, j.REG(rd))
 
 			if rd == PC {
-				panic("toggle thumb")
+				j.Mov(JIT, gojit.Rax)
+				j.CallFunc((*Jit).ToggleThumb)
+				j.emitCondReloadState(op >> 28)
 			}
 		}
 	} else {
@@ -391,6 +388,37 @@ func (j *Jit) emitMrs(op uint32) {
 	j.And(gojit.Rbx, gojit.Rax)
 
 	j.Movl(gojit.Eax, j.REG(rd))
+}
+
+func (j *Jit) emitMsr(op uint32) {
+	// v r8
+
+	if imm := (op>>25)&1 != 0; imm {
+		shift := ((op >> 8) & 0xF) << 1
+		v := bits.RotateLeft32(op&0xFF, -int(shift))
+		j.Movl(gojit.Imm(v), gojit.Ecx)
+	} else {
+		j.Movl(j.REG(op&0xF), gojit.Ecx)
+	}
+
+	var mask uint32
+	if C := (op>>16)&1 != 0; C {
+		mask |= 0x0000_00FF
+	}
+	if X := (op>>17)&1 != 0; X {
+		mask |= 0x0000_FF00
+	}
+	if S := (op>>18)&1 != 0; S {
+		mask |= 0x00FF_0000
+	}
+	if F := (op>>19)&1 != 0; F {
+		mask |= 0xFF00_0000
+	}
+
+	j.Mov(JIT, gojit.Rax)
+	j.Movl(gojit.Imm((op>>22)&1), gojit.Ebx)
+	j.MovAbs(uint64(mask), gojit.Edi)
+	j.CallFunc((*Jit).DoMsrModeSwitch)
 }
 
 func (j *Jit) emitAluOp2Reg(op uint32) {
@@ -578,10 +606,6 @@ func (j *Jit) emitAlu(op uint32) {
 		rn   = (op >> 16) & 0xF
 	)
 
-	if rd == PC {
-		panic("rd == pc")
-	}
-
 	// eax rnv
 	// ebx op2
 	// carry to r8d
@@ -612,7 +636,31 @@ func (j *Jit) emitAlu(op uint32) {
 
 	aluInstJit[inst](j, op, rd)
 
-	//j.Movl(j.REG(PC), gojit.Eax)
+	if rd := (op >> 12) & 0xF; rd == PC {
+
+		if op&(1<<20) != 0 {
+			j.Mov(JIT, gojit.Rax)
+			j.Movl(MODE, gojit.Ebx)
+			j.CallFunc((*Jit).ExitException)
+		}
+
+		j.Movb(jT, gojit.Al)
+		j.Testb(gojit.Al, gojit.Al)
+		arm := j.JccForward(gojit.CC_Z)
+
+		j.And(gojit.Imm(^1), j.REG(PC))
+
+		thumb := j.JmpForward()
+		arm()
+
+		j.And(gojit.Imm(^3), j.REG(PC))
+
+		thumb()
+
+		if inst < 0b1000 || inst > 0b1011 {
+			j.emitCondReloadState(op >> 28)
+		}
+	}
 }
 
 var aluInstJit = [...]func(j *Jit, op, rd uint32){
@@ -980,14 +1028,82 @@ func (j *Jit) emitBlock(op uint32) {
 		notForceUser()
 	}
 
-	if load {
+	if !load {
+		return
+	}
+
+	j.Mov(JIT, gojit.Rax)
+	j.Movl(gojit.Imm(1), gojit.Ebx)
+	j.CallFunc((*Jit).Idle)
+
+	if !pcIncluded {
+		return
+	}
+
+	j.emitCondReloadState(op >> 28)
+
+	if !psr {
+		return
+	}
+
+	j.Mov(CPU, gojit.Rax)
+	j.CallFunc((*Cpu).DoLdmLoadSwitch)
+}
+
+func (j *Jit) emitBranch(op uint32) {
+	if link := (op>>24)&1 != 0; link {
+		j.Movl(j.REG(PC), gojit.Eax)
+		j.Sub(gojit.Imm(4), gojit.Eax)
+		j.Movl(gojit.Eax, j.REG(LR))
+	}
+
+	j.Add(gojit.Imm(int32(uint32((int32(op)<<8)>>6))), j.REG(PC))
+
+	j.emitCondReloadState(op >> 28)
+}
+
+func (j *Jit) emitBranchExchange(op uint32) {
+	switch inst := (op >> 4) & 0xF; inst {
+	case INST_BX:
+		j.Movl(j.REG(op&0xF), gojit.Eax)
+		j.Movl(gojit.Eax, j.REG(PC))
 
 		j.Mov(JIT, gojit.Rax)
-		j.Movl(gojit.Imm(1), gojit.Ebx)
-		j.CallFunc((*Jit).Idle)
+		j.CallFunc((*Jit).ToggleThumb)
+		j.emitCondReloadState(op >> 28)
 
-		if pcIncluded {
-			panic("load with pc")
-		}
+	case INST_BXJ:
+		panic("unsupported bxj instruction")
+	case INST_BLX:
+		panic("unsupported arm7 blx instruction")
+	}
+}
+
+func (j *Jit) emitException(addr ExceptionVector, mode CpuMode) {
+	j.Mov(JIT, gojit.Rax)
+	j.MovAbs(uint64(addr), gojit.Rbx)
+	j.Movl(gojit.Imm(mode), gojit.Ecx)
+	j.CallFunc((*Jit).Exception)
+}
+
+func (j *Jit) emitSWI(op uint32) {
+	j.emitException(VEC_SWI, MODE_SWI)
+	j.emitCondReloadState(op >> 28)
+}
+
+func (j *Jit) emitUndefined(op uint32) {
+	j.emitException(VEC_UNDEFINED, MODE_UND)
+	j.emitCondReloadState(op >> 28)
+}
+
+func (j *Jit) emitCondReloadState(cond uint32) {
+	switch cond {
+	case 0xE:
+		j.ReloadState = RELOAD
+	case 0xF:
+		j.ReloadState = NONE
+	default:
+		j.ReloadState = POSSIBLE
+		j.Movb(gojit.Imm(1), RELOAD_FLAG)
 	}
 }

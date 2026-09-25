@@ -36,8 +36,8 @@ func (c *Cpu) DecodeThumb(op uint16) {
 		c.ThumbPushPop(op)
 	case arm7.IsRelative(op):
 		c.ThumbRelative(op)
-	case arm7.IsThumbB(op):
-		c.ThumbB(op)
+	case arm7.IsThumbBranch(op):
+		c.ThumbBranch(op)
 	case arm7.IsJumpCall(op):
 		c.ThumbJumpCalls(op)
 	case arm7.IsStack(op):
@@ -50,7 +50,7 @@ func (c *Cpu) DecodeThumb(op uint16) {
 		c.ThumbShortBlx(op)
 	case arm7.IsLSSP(op):
 		c.ThumbLSSP(op)
-	case arm7.IsMulti(op):
+	case arm7.IsThumbBlock(op):
 		c.ThumbBlock(op)
 	default:
 		panic(fmt.Sprintf("nds: unable to decode arm9 thumb pc=%08X op=%08X", c.Reg.R[PC], op))

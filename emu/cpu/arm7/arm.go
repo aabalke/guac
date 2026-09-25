@@ -809,6 +809,11 @@ func (c *Cpu) Msr(op uint32) {
 		mask |= 0xFF00_0000
 	}
 
+	spsrFlag := (op>>22)&1 != 0
+	c.DoMsrModeSwitch(spsrFlag, v, mask)
+}
+
+func (c *Cpu) DoMsrModeSwitch(spsrFlag bool, v, mask uint32) {
 	curr := c.Reg.CPSR.Mode
 
 	secMask := PRIV_MASK
@@ -816,7 +821,7 @@ func (c *Cpu) Msr(op uint32) {
 		secMask = USR_MASK
 	}
 
-	if spsrFlag := (op>>22)&1 != 0; spsrFlag {
+	if spsrFlag {
 
 		secMask |= STATE_MASK
 		mask &= secMask
@@ -977,6 +982,10 @@ func (c *Cpu) Block(op uint32) {
 		return
 	}
 
+	c.DoLdmLoadSwitch()
+}
+
+func (c *Cpu) DoLdmLoadSwitch() {
 	var (
 		curr = c.Reg.CPSR.Mode
 		spsr = c.Reg.SPSR[ModeBank(curr)]

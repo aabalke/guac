@@ -1,6 +1,10 @@
 package gba
 
-import "github.com/aabalke/guac/emu/cpu/arm7"
+import (
+	"fmt"
+
+	"github.com/aabalke/guac/emu/cpu/arm7"
+)
 
 var (
 	NonSeqWait = [4]uint8{4, 3, 2, 8}
@@ -257,6 +261,10 @@ func (g *GBA) Cycles(addr, width, seq uint32, inst bool) {
 
 		if addr&0x1FFFF == 0 || g.Cpu.LastWasDma {
 			seq = arm7.NONSEQ
+		}
+
+		if region >= 16 {
+			panic(fmt.Sprintf("Invalid Cycle Timing Addr %08X W %d seq %d inst %t\n", addr, width, seq, inst))
 		}
 
 		cycles := t.Timings[flag32][seq][region]

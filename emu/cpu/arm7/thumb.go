@@ -31,8 +31,8 @@ func (c *Cpu) DecodeThumb(op uint16) {
 		c.ThumbPushPop(op)
 	case IsRelative(op):
 		c.ThumbRelative(op)
-	case IsThumbB(op):
-		c.ThumbB(op)
+	case IsThumbBranch(op):
+		c.ThumbBranch(op)
 	case IsJumpCall(op):
 		c.ThumbJumpCalls(op)
 	case IsStack(op):
@@ -43,7 +43,7 @@ func (c *Cpu) DecodeThumb(op uint16) {
 		c.ThumbShortLongBranch(op)
 	case IsLSSP(op):
 		c.ThumbLSSP(op)
-	case IsMulti(op):
+	case IsThumbBlock(op):
 		c.ThumbBlock(op)
 	default:
 		panic(fmt.Sprintf("Unable to Decode ARM false %04X, at PC %08X\n", op, c.Reg.R[PC]))
@@ -164,7 +164,7 @@ func IsJumpCall(op uint16) bool {
 }
 
 //go:inline
-func IsThumbB(op uint16) bool {
+func IsThumbBranch(op uint16) bool {
 	return IsThumbOpFormat(
 		op,
 		0b1111_1000_0000_0000,
@@ -209,7 +209,7 @@ func IsLSSP(op uint16) bool {
 }
 
 //go:inline
-func IsMulti(op uint16) bool {
+func IsThumbBlock(op uint16) bool {
 	return IsThumbOpFormat(
 		op,
 		0b1111_0000_0000_0000,
@@ -373,38 +373,45 @@ func (c *Cpu) ThumbHi(op uint16) {
 		rs = (op >> 3) & 0xF
 	)
 
+	v := r[rs]
+	if rs == PC {
+		v &^= 1
+	}
+
 	switch inst := (op >> 8) & 3; inst {
 	case HI_ADD:
 
-		r[rd] += r[rs]
+		r[rd] += v
 
 		if rd == PC {
+			r[rd] &^= 1
 			c.Reload = true
 		}
 
 	case HI_CMP:
 
-		rsv := r[rs]
 		rdv := r[rd]
-		res := uint64(rdv) - uint64(rsv)
+		res := uint64(rdv) - uint64(v)
 
 		c.Reg.CPSR.N = (uint32(res)>>31)&1 != 0
 		c.Reg.CPSR.Z = uint32(res) == 0
 		c.Reg.CPSR.C = res < 0x1_0000_0000
-		c.Reg.CPSR.V = ((rdv^rsv)&(rdv^uint32(res)))>>31 != 0
+		c.Reg.CPSR.V = ((rdv^v)&(rdv^uint32(res)))>>31 != 0
 
 	case HI_MOV:
 		if nop := op == 0x46C0; nop {
 			return
 		}
 
-		r[rd] = r[rs]
+		r[rd] = v
 
 		if rd == PC {
+			r[rd] &^= 1
 			c.Reload = true
 		}
 
 	case HI_BX:
+
 		r[PC] = r[rs]
 		c.ToggleThumb()
 	}
@@ -698,7 +705,7 @@ func (c *Cpu) ThumbJumpCalls(op uint16) {
 	c.Reload = true
 }
 
-func (c *Cpu) ThumbB(op uint16) {
+func (c *Cpu) ThumbBranch(op uint16) {
 	c.Reg.R[PC] += uint32(int16((op&0x7FF)<<5) >> 4)
 	c.Reload = true
 }
@@ -712,6 +719,7 @@ func (c *Cpu) ThumbShifted(op uint16) {
 }
 
 func (c *Cpu) ThumbStack(op uint16) {
+	// NOTE: not 2s compliment, do not int8 to remove branch
 	nn := int(op&0x7F) << 2
 	if sub := (op>>7)&1 != 0; sub {
 		nn = -nn
@@ -755,11 +763,11 @@ func (c *Cpu) ThumbBlock(op uint16) {
 
 	if rlist == 0 {
 
-		if !ldmia {
-			c.Write32(r[rb], r[PC]+2)
-		} else {
+		if ldmia {
 			r[PC] = c.Read32Block(r[rb], NONSEQ)
 			c.Reload = true
+		} else {
+			c.Write32(r[rb], r[PC]+2)
 		}
 		r[rb] += 0x40
 		return
