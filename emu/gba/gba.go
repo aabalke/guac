@@ -96,6 +96,19 @@ func (gba *GBA) UpdateGhosting() {
 }
 
 func NewGBA(ctx *audio.Context, path string, muted bool) *GBA {
+	pageShift := 8
+	jitConfig := arm7.JitConfig{
+		AddressSpace:   0xE00_0000,
+		PageShift:      uint32(pageShift),
+		PageMask:       (1 << pageShift) - 1,
+		NativePagesize: 0x10000,
+		MinInstCnt:     8,
+		MaxInstCnt:     64,
+		BlockCnt:       4096,
+		LoopThreshold:  255,
+		Enabled:        true,
+	}
+
 	gba := &GBA{
 		Pixels:       make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
 		Image:        ebiten.NewImage(SCREEN_WIDTH, SCREEN_HEIGHT),
@@ -115,7 +128,7 @@ func NewGBA(ctx *audio.Context, path string, muted bool) *GBA {
 
 	gba.PPU = &PPU{gba: gba}
 	gba.Mem = NewMemory(gba)
-	gba.Cpu = arm7.NewCpu(gba.Mem, gba.Cycles, gba.Idle)
+	gba.Cpu = arm7.NewCpu(gba.Mem, jitConfig, gba.Cycles, gba.Idle)
 	gba.Irq = irq.NewIrq(gba.Scheduler, &gba.Cpu.IrqLine)
 	gba.Keypad = Key{Irq: gba.Irq, Input: 0x3FF}
 	gba.Mem.Sio = NewSio(gba.Irq, gba.Scheduler)

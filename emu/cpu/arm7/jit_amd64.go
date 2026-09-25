@@ -8,76 +8,57 @@ import (
 )
 
 func (j *Jit) CreateBlock(pc, w uint32) {
-	pageIdx := pc >> j.PageShift
-	blockIdx := (pc & j.PageMask) >> 1
+	pageIdx := pc >> j.Config.PageShift
+	blockIdx := (pc & j.Config.PageMask) >> 1
 
 	page := j.Pages[pageIdx]
-
 	if page == nil {
+
 		page = &Page{
 			id:     pageIdx,
-			Blocks: make([]*JitBlock, (1<<j.PageShift)>>1),
+			Blocks: make([]*JitBlock, (1<<j.Config.PageShift)>>1),
 		}
 
 		j.Pages[pageIdx] = page
-
 	} else if page.dead {
 		println("page dead, block not created")
 		return
-	}
-
-	if block := page.Blocks[blockIdx]; block != nil && block.Skip {
+	} else if block := page.Blocks[blockIdx]; block != nil && block.Skip {
 		return
 	}
 
-	newBlock := j.BlockCache.AssignBlock(j)
-	if newBlock == nil {
+	block := j.BlockCache.AssignBlock(j)
+	if block == nil {
 		return
 	}
 
-	j.Assembler = newBlock.assembler
+	j.Assembler = block.assembler
 
 	j.MovAbs(uint64(uintptr(unsafe.Pointer(j))), JIT)
-	j.MovAbs(uint64(uintptr(unsafe.Pointer(j.cpu))), CPU)
+	j.MovAbs(uint64(j.C.Cpu), CPU)
 
 	// offset for pipelining
-	tempPc := (pc - (w * 2)) &^ (w - 1)
-
-	var length, op, i uint32
-
-	p := j.cpu.Mem.ReadPtr(tempPc)
+	realPc := (pc - (w * 2)) &^ (w - 1)
+	p := j.cpu.Mem.ReadPtr(realPc)
 	if p == nil {
-		j.BlockCache.PushTail(newBlock)
+		j.BlockCache.PushTail(block)
 		page.Blocks[blockIdx] = j.BlockCache.SkipBlock
 		return
 	}
 
-	for {
-		op = *(*uint32)(p)
+	var size uint32
+	for size < j.Config.MaxInstCnt {
 
-		if length >= MAX_INST_CNT {
+		if reloaded := j.TryEmitOp(p, w); reloaded {
 			break
 		}
 
-		if reloaded := j.TryEmitOp(op, w); reloaded {
-			break
-		}
-
-		//if w == 2 {
-		//	fmt.Printf("emitOp PC %08X OP %04X\n", tempPc, uint16(op))
-		//} else {
-		//	fmt.Printf("emitOp PC %08X OP %08X\n", tempPc, op)
-		//}
-
-		i++
-		length++
-		tempPc += w
+		size++
 		p = unsafe.Add(p, w)
 	}
 
-	// if length == 0 {
-	if length < MIN_INST_CNT {
-		j.BlockCache.PushTail(newBlock)
+	if size < j.Config.MinInstCnt {
+		j.BlockCache.PushTail(block)
 		page.Blocks[blockIdx] = j.BlockCache.SkipBlock
 		return
 	}
@@ -88,14 +69,13 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 		panic(err)
 	}
 
-	newBlock.initPc = pc
-	newBlock.Length = length
-	newBlock.finalOp = op
-	newBlock.f = func() {
-		gojit.CallJit(uintptr(unsafe.Pointer(&newBlock.assembler.Buf[0])))
+	block.initPc = pc
+	block.Size = size
+	block.f = func() {
+		gojit.CallJit(uintptr(unsafe.Pointer(&block.assembler.Buf[0])))
 	}
 
-	page.Blocks[blockIdx] = newBlock
+	page.Blocks[blockIdx] = block
 
 	//if w == 2 {
 	//	fmt.Printf("Block Created for Page %08X PC %08X EXIT PC %08X OP %04X\n", pageIdx, pc, tempPc, uint16(op))
@@ -104,7 +84,9 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 	//}
 }
 
-func (j *Jit) TryEmitOp(op, w uint32) bool {
+func (j *Jit) TryEmitOp(p unsafe.Pointer, w uint32) bool {
+	op := *(*uint32)(p)
+
 	endBlock := false
 
 	j.Mov(JIT, gojit.Rax)
@@ -114,10 +96,18 @@ func (j *Jit) TryEmitOp(op, w uint32) bool {
 
 	if w == 4 {
 		condTargets := j.emitCond(op >> 28)
+
 		j.emitArm(op)
+		done := j.JmpForward()
+
+		j.Movl(gojit.Imm(SEQ), j.C.Seq)
+
 		for _, target := range condTargets {
 			target()
 		}
+
+		done()
+
 	} else {
 		j.emitThumb(uint16(op))
 	}
@@ -130,7 +120,8 @@ func (j *Jit) TryEmitOp(op, w uint32) bool {
 	case NONE:
 		endBlock = false
 		j.Mov(JIT, gojit.Rax)
-		j.Movl(gojit.Imm(w), gojit.Ebx)
+		j.MovAbs(uint64(uintptr(p)), gojit.Rbx)
+		j.Movl(gojit.Imm(w), gojit.Ecx)
 		j.CallFunc((*Jit).UpdatePc)
 	case RELOAD:
 		endBlock = true
@@ -140,25 +131,32 @@ func (j *Jit) TryEmitOp(op, w uint32) bool {
 	case POSSIBLE:
 		endBlock = true
 
-		j.Movb(RELOAD_FLAG, gojit.Al)
+		j.Movb(j.C.Reload, gojit.Al)
 		j.Testb(gojit.Al, gojit.Al)
-
-		j.Mov(JIT, gojit.Rax)
 
 		reload := j.JccForward(gojit.CC_NZ)
 
-		j.Movl(gojit.Imm(w), gojit.Ebx)
+		j.Mov(JIT, gojit.Rax)
+		j.MovAbs(uint64(uintptr(p)), gojit.Rbx)
+		j.Movl(gojit.Imm(w), gojit.Ecx)
 		j.CallFunc((*Jit).UpdatePc)
 
 		notReload := j.JmpForward()
 		reload()
 
+		j.Mov(JIT, gojit.Rax)
 		j.CallFunc((*Jit).ReloadPipe)
 
 		notReload()
 	}
 
 	irq()
+
+	//if w == 2 {
+	//	fmt.Printf("emitOp PC %08X OP %04X\n", tempPc, uint16(op))
+	//} else {
+	//	fmt.Printf("emitOp PC %08X OP %08X\n", tempPc, op)
+	//}
 
 	return endBlock
 }
@@ -170,58 +168,56 @@ func (j *Jit) emitCond(cond uint32) []func() {
 	case 0xE, 0xF:
 		// nothing to do, always executed
 	case 0x0: // Z
-		j.Bt(gojit.Imm(0), jZ)
+		j.Bt(gojit.Imm(0), j.C.Z)
 		jcctargets = append(jcctargets, j.JccForward(gojit.CC_NC))
 	case 0x1: // !Z
-		j.Bt(gojit.Imm(0), jZ)
+		j.Bt(gojit.Imm(0), j.C.Z)
 		jcctargets = append(jcctargets, j.JccForward(gojit.CC_C))
 	case 0x2: // C
-		j.Bt(gojit.Imm(0), jC)
+		j.Bt(gojit.Imm(0), j.C.C)
 		jcctargets = append(jcctargets, j.JccForward(gojit.CC_NC))
 	case 0x3: // !C
-		j.Bt(gojit.Imm(0), jC)
+		j.Bt(gojit.Imm(0), j.C.C)
 		jcctargets = append(jcctargets, j.JccForward(gojit.CC_C))
 	case 0x4: // N
-		j.Bt(gojit.Imm(0), jN)
+		j.Bt(gojit.Imm(0), j.C.N)
 		jcctargets = append(jcctargets, j.JccForward(gojit.CC_NC))
 	case 0x5: // !N
-		j.Bt(gojit.Imm(0), jN)
+		j.Bt(gojit.Imm(0), j.C.N)
 		jcctargets = append(jcctargets, j.JccForward(gojit.CC_C))
 	case 0x6: // V
-		j.Bt(gojit.Imm(0), jV)
+		j.Bt(gojit.Imm(0), j.C.V)
 		jcctargets = append(jcctargets, j.JccForward(gojit.CC_NC))
 	case 0x7: // !V
-		j.Bt(gojit.Imm(0), jV)
+		j.Bt(gojit.Imm(0), j.C.V)
 		jcctargets = append(jcctargets, j.JccForward(gojit.CC_C))
 	case 0x8: // C && !Z
-		j.Bt(gojit.Imm(0), jC)
+		j.Bt(gojit.Imm(0), j.C.C)
 		jcctargets = append(jcctargets, j.JccForward(gojit.CC_NC))
-		j.Bt(gojit.Imm(0), jZ)
+		j.Bt(gojit.Imm(0), j.C.Z)
 		jcctargets = append(jcctargets, j.JccForward(gojit.CC_C))
 	case 0x9: // !C || Z
-		j.Movb(jC, gojit.Al)
+		j.Movb(j.C.C, gojit.Al)
 		j.Xorb(gojit.Imm(1), gojit.Al)
-		j.Orb(jZ, gojit.Al)
+		j.Orb(j.C.Z, gojit.Al)
 		jcctargets = append(jcctargets, j.JccForward(gojit.CC_Z))
 	case 0xC: // !Z && N==V
-		j.Bt(gojit.Imm(0), jZ)
+		j.Bt(gojit.Imm(0), j.C.Z)
 		jcctargets = append(jcctargets, j.JccForward(gojit.CC_C))
 		fallthrough
 	case 0xA, 0xB: // N==V / N!=V
-		j.Movb(jN, gojit.Al)
-		j.Xorb(jV, gojit.Al)
+		j.Movb(j.C.N, gojit.Al)
+		j.Xorb(j.C.V, gojit.Al)
 		if cond == 0xA || cond == 0xC {
 			jcctargets = append(jcctargets, j.JccForward(gojit.CC_NZ))
 		} else {
 			jcctargets = append(jcctargets, j.JccForward(gojit.CC_Z))
 		}
 	case 0xD: // Z || N==V / N!=V
-		j.Movb(jN, gojit.Al)
-		j.Xorb(jV, gojit.Al)
-		j.Orb(jZ, gojit.Al)
+		j.Movb(j.C.N, gojit.Al)
+		j.Xorb(j.C.V, gojit.Al)
+		j.Orb(j.C.Z, gojit.Al)
 		jcctargets = append(jcctargets, j.JccForward(gojit.CC_Z))
-	default:
-		panic("not possible")
 	}
 
 	return jcctargets
@@ -260,7 +256,7 @@ func (j *Jit) emitArm(op uint32) {
 
 func (j *Jit) emitThumb(op uint16) {
 	switch {
-	case IsthumbSWI(op):
+	case IsThumbSWI(op):
 		j.emitThumbSWI(op)
 	case IsThumbAddSub(op):
 		j.emitThumbAddSub(op)

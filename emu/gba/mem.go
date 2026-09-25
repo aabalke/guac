@@ -304,10 +304,7 @@ func (m *Memory) ReadPtr(addr uint32) unsafe.Pointer {
 }
 
 func (m *Memory) WritePtr(addr uint32) (ptr unsafe.Pointer) {
-	region := addr >> 24
-	if m.GBA.Cpu != nil && m.GBA.Cpu.Jit != nil && region >= 2 {
-		m.GBA.Cpu.Jit.InvalidatePage(addr)
-	}
+	m.InvalidatePage(addr)
 
 	switch addr >> 24 {
 	case 2:
@@ -559,27 +556,14 @@ func (m *Memory) Write(addr uint32, v uint8, byteWrite bool) {
 }
 
 func (m *Memory) Write8(addr uint32, v uint8) {
-	region := addr >> 24
-	if region < 2 {
-		return
-	}
-	// TODO: need to only invalidate pages once if Write32 -> Write16 -> Write8 (instead of 7 times)
-	if m.GBA.Cpu != nil && m.GBA.Cpu.Jit != nil {
-		m.GBA.Cpu.Jit.InvalidatePage(addr)
-	}
+	m.InvalidatePage(addr)
 	m.Write(addr, v, true)
 }
 
 func (m *Memory) Write16(addr uint32, v uint16) {
-	region := addr >> 24
-	if region < 2 {
-		return
-	}
+	m.InvalidatePage(addr)
 
-	// TODO: need to only invalidate pages once if Write32 -> Write16 -> Write8 (instead of 7 times)
-	if m.GBA.Cpu != nil && m.GBA.Cpu.Jit != nil {
-		m.GBA.Cpu.Jit.InvalidatePage(addr)
-	}
+	region := addr >> 24
 
 	if region >= 0xE {
 		v = v >> ((addr & 1) << 3)
@@ -636,17 +620,9 @@ func (m *Memory) Write16(addr uint32, v uint16) {
 }
 
 func (m *Memory) Write32(addr uint32, v uint32) {
-	region := addr >> 24
-	if region < 2 {
-		return
-	}
+	m.InvalidatePage(addr)
 
-	// TODO: need to only invalidate pages once if Write32 -> Write16 -> Write8 (instead of 7 times)
-	if m.GBA.Cpu != nil && m.GBA.Cpu.Jit != nil {
-		m.GBA.Cpu.Jit.InvalidatePage(addr)
-	}
-
-	if region >= 0xE {
+	if addr >= 0xE00_0000 {
 		v = v >> ((addr & 3) << 3)
 		m.Write(addr, uint8(v), false)
 		return
@@ -810,5 +786,18 @@ func (m *Memory) WriteIO(addr uint32, v uint8) {
 
 	default:
 		m.IO[addr] = v
+	}
+}
+
+func (m *Memory) InvalidatePage(addr uint32) {
+	// TODO: need to only invalidate pages once if Write32 -> Write16 -> Write8 (instead of 7 times)
+	region := addr >> 24
+
+	if region != 2 && region != 3 && region != 6 {
+		return
+	}
+
+	if m.GBA.Cpu != nil && m.GBA.Cpu.Jit != nil {
+		m.GBA.Cpu.Jit.InvalidatePage(addr)
 	}
 }

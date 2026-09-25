@@ -71,6 +71,19 @@ type Nds struct {
 }
 
 func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
+	pageShift := 16
+	jitConfig := arm7.JitConfig{
+		AddressSpace:   0x1_0000_0000,
+		PageShift:      uint32(pageShift),
+		PageMask:       (1 << pageShift) - 1,
+		NativePagesize: 0x10000,
+		MinInstCnt:     8,
+		MaxInstCnt:     64,
+		BlockCnt:       4096,
+		LoopThreshold:  255,
+		Enabled:        false,
+	}
+
 	nds := &Nds{
 		Scheduler: scheduler.NewScheduler(),
 		mem:       &mem.Mem{},
@@ -79,7 +92,7 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 		Timings9:  NewTimings(),
 	}
 
-	nds.arm7 = arm7.NewCpu(&nds.mem.Bus7, nds.Cycles7, nds.Idle7)
+	nds.arm7 = arm7.NewCpu(&nds.mem.Bus7, jitConfig, nds.Cycles7, nds.Idle7)
 	nds.arm9 = arm9.NewCpu(&nds.mem.Bus9, nds.Idle9, nds.Tick9, nds.Cycles9, nds.SetCyclesPerInst)
 	nds.irq7 = irq.NewIrq(nds.Scheduler, &nds.arm7.IrqLine)
 	nds.irq9 = irq.NewIrq(nds.Scheduler, &nds.arm9.IrqLine)

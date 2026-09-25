@@ -7,7 +7,7 @@ import (
 
 func (c *Cpu) DecodeThumb(op uint16) {
 	switch {
-	case IsthumbSWI(op):
+	case IsThumbSWI(op):
 		c.Exception(VEC_SWI, MODE_SWI)
 	case IsThumbAddSub(op):
 		c.ThumbAddSub(op)
@@ -218,7 +218,7 @@ func IsThumbBlock(op uint16) bool {
 }
 
 //go:inline
-func IsthumbSWI(op uint16) bool {
+func IsThumbSWI(op uint16) bool {
 	return IsThumbOpFormat(
 		op,
 		0b1111_1111_0000_0000,

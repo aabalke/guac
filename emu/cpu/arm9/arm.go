@@ -35,7 +35,7 @@ func (c *Cpu) DecodeArm(op uint32) {
 	case IsCoDataReg(op):
 		c.CoDataReg(op)
 	case arm7.IsBranch(op):
-		c.B(op)
+		c.Branch(op)
 	case arm7.IsBranchExchange(op):
 		c.BranchExchange(op)
 	case arm7.IsSdt(op):

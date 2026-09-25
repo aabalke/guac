@@ -2,7 +2,6 @@ package arm7
 
 import (
 	"math/bits"
-	"unsafe"
 
 	"github.com/aabalke/gojit"
 )
@@ -12,7 +11,7 @@ func (j *Jit) emitThumbLSSP(op uint16) {
 
 	j.Mov(JIT, gojit.Rax)
 
-	j.Movl(j.REG(SP), gojit.Ebx)
+	j.Movl(j.C.R[SP], gojit.Ebx)
 	j.Add(gojit.Imm((op&0xFF)<<2), gojit.Ebx)
 
 	if ldr := (op>>11)&1 != 0; ldr {
@@ -26,10 +25,10 @@ func (j *Jit) emitThumbLSSP(op uint16) {
 		j.Shl(gojit.Imm(3), gojit.Ecx)
 		j.RorCl(gojit.Eax)
 
-		j.Movl(gojit.Eax, j.REG(rd))
+		j.Movl(gojit.Eax, j.C.R[rd])
 
 	} else {
-		j.Movl(j.REG(rd), gojit.Ecx)
+		j.Movl(j.C.R[rd], gojit.Ecx)
 		j.CallFunc((*Jit).Write32)
 	}
 }
@@ -38,22 +37,22 @@ func (j *Jit) emitThumbStack(op uint16) {
 	// NOTE: not 2s compliment, do not int8 to remove branch
 	nn := int(op&0x7F) << 2
 	if sub := (op>>7)&1 != 0; sub {
-		j.Sub(gojit.Imm(nn), j.REG(SP))
+		j.Sub(gojit.Imm(nn), j.C.R[SP])
 	} else {
-		j.Add(gojit.Imm(nn), j.REG(SP))
+		j.Add(gojit.Imm(nn), j.C.R[SP])
 	}
 }
 
 func (j *Jit) emitThumbRelative(op uint16) {
 	if isSP := (op>>11)&1 != 0; isSP {
-		j.Movl(j.REG(SP), gojit.Eax)
+		j.Movl(j.C.R[SP], gojit.Eax)
 	} else {
-		j.Movl(j.REG(PC), gojit.Eax)
+		j.Movl(j.C.R[PC], gojit.Eax)
 		j.And(gojit.Imm(^3), gojit.Eax)
 	}
 
 	j.Add(gojit.Imm(uint32(op&0xFF)<<2), gojit.Eax)
-	j.Movl(gojit.Eax, j.REG(uint32(op>>8)&7))
+	j.Movl(gojit.Eax, j.C.R[uint32(op>>8)&7])
 }
 
 func (j *Jit) emitThumbLPC(op uint16) {
@@ -64,13 +63,13 @@ func (j *Jit) emitThumbLPC(op uint16) {
 
 	j.Mov(JIT, gojit.Rax)
 
-	j.Movl(j.REG(PC), gojit.Ebx)
+	j.Movl(j.C.R[PC], gojit.Ebx)
 	j.And(gojit.Imm(^3), gojit.Ebx)
 	j.Add(gojit.Imm(nn), gojit.Ebx)
 
 	j.CallFunc((*Jit).Read32)
 
-	j.Movl(gojit.Eax, j.REG(rd))
+	j.Movl(gojit.Eax, j.C.R[rd])
 }
 
 func (j *Jit) emitThumbLSImm(op uint16) {
@@ -82,7 +81,7 @@ func (j *Jit) emitThumbLSImm(op uint16) {
 
 	j.Mov(JIT, gojit.Rax)
 
-	j.Movl(j.REG(rb), gojit.Ebx)
+	j.Movl(j.C.R[rb], gojit.Ebx)
 
 	if byte := (op>>12)&1 != 0; byte {
 		j.Add(gojit.Imm(nn), gojit.Ebx)
@@ -93,7 +92,7 @@ func (j *Jit) emitThumbLSImm(op uint16) {
 	switch inst := (op >> 11) & 3; inst {
 	case THUMB_STR_IMM, THUMB_STRB_IMM:
 
-		j.Movl(j.REG(rd), gojit.Ecx)
+		j.Movl(j.C.R[rd], gojit.Ecx)
 
 		if inst == THUMB_STRB_IMM {
 			j.CallFunc((*Jit).Write8)
@@ -111,12 +110,12 @@ func (j *Jit) emitThumbLSImm(op uint16) {
 		j.Shl(gojit.Imm(3), gojit.Ecx)
 		j.RorCl(gojit.Eax)
 
-		j.Movl(gojit.Eax, j.REG(rd))
+		j.Movl(gojit.Eax, j.C.R[rd])
 
 	case THUMB_LDRB_IMM:
 
 		j.CallFunc((*Jit).Read8)
-		j.Movl(gojit.Eax, j.REG(rd))
+		j.Movl(gojit.Eax, j.C.R[rd])
 	}
 }
 
@@ -128,22 +127,22 @@ func (j *Jit) emitThumbSdt(op uint16) {
 
 	j.Mov(JIT, gojit.Rax)
 
-	j.Movl(j.REG(uint32(op>>3)&7), gojit.Ebx)
-	j.Add(j.REG(uint32(op>>6)&7), gojit.Ebx)
+	j.Movl(j.C.R[uint32(op>>3)&7], gojit.Ebx)
+	j.Add(j.C.R[uint32(op>>6)&7], gojit.Ebx)
 
 	if signed := (op>>9)&1 != 0; signed {
 
 		switch inst {
 		case THUMB_STRH:
 
-			j.Movl(j.REG(rd), gojit.Ecx)
+			j.Movl(j.C.R[rd], gojit.Ecx)
 			j.CallFunc((*Jit).Write16)
 
 		case THUMB_LDSB:
 
 			j.CallFunc((*Jit).Read8)
 			j.Movsx(gojit.Al, gojit.Eax)
-			j.Movl(gojit.Eax, j.REG(rd))
+			j.Movl(gojit.Eax, j.C.R[rd])
 
 		case THUMB_LDRH:
 
@@ -155,7 +154,7 @@ func (j *Jit) emitThumbSdt(op uint16) {
 			j.Shl(gojit.Imm(3), gojit.Ecx)
 			j.RorCl(gojit.Eax)
 
-			j.Movl(gojit.Eax, j.REG(rd))
+			j.Movl(gojit.Eax, j.C.R[rd])
 
 		case THUMB_LDSH:
 
@@ -172,7 +171,7 @@ func (j *Jit) emitThumbSdt(op uint16) {
 
 			byte()
 
-			j.Movl(gojit.Eax, j.REG(rd))
+			j.Movl(gojit.Eax, j.C.R[rd])
 
 		}
 		return
@@ -180,7 +179,7 @@ func (j *Jit) emitThumbSdt(op uint16) {
 
 	switch inst {
 	case THUMB_STR_REG:
-		j.Movl(j.REG(rd), gojit.Ecx)
+		j.Movl(j.C.R[rd], gojit.Ecx)
 		j.CallFunc((*Jit).Write32)
 	case THUMB_LDR_REG:
 
@@ -192,15 +191,15 @@ func (j *Jit) emitThumbSdt(op uint16) {
 		j.Shl(gojit.Imm(3), gojit.Ecx)
 		j.RorCl(gojit.Eax)
 
-		j.Movl(gojit.Eax, j.REG(rd))
+		j.Movl(gojit.Eax, j.C.R[rd])
 	case THUMB_STRB_REG:
 
-		j.Movl(j.REG(rd), gojit.Ecx)
+		j.Movl(j.C.R[rd], gojit.Ecx)
 		j.CallFunc((*Jit).Write8)
 	case THUMB_LDRB_REG:
 
 		j.CallFunc((*Jit).Read8)
-		j.Movl(gojit.Eax, j.REG(rd))
+		j.Movl(gojit.Eax, j.C.R[rd])
 	}
 }
 
@@ -212,7 +211,7 @@ func (j *Jit) emitThumbLSHalf(op uint16) {
 
 	j.Mov(JIT, gojit.Rax)
 
-	j.Movl(j.REG(uint32(op>>3)&7), gojit.Ebx)
+	j.Movl(j.C.R[uint32(op>>3)&7], gojit.Ebx)
 	j.Add(gojit.Imm(offset), gojit.Ebx)
 
 	if ldr := (op>>11)&1 != 0; ldr {
@@ -225,11 +224,11 @@ func (j *Jit) emitThumbLSHalf(op uint16) {
 		j.Shl(gojit.Imm(3), gojit.Ecx)
 		j.RorCl(gojit.Eax)
 
-		j.Movl(gojit.Eax, j.REG(rd))
+		j.Movl(gojit.Eax, j.C.R[rd])
 
 	} else {
 
-		j.Movl(j.REG(rd), gojit.Ecx)
+		j.Movl(j.C.R[rd], gojit.Ecx)
 		j.CallFunc((*Jit).Write16)
 	}
 }
@@ -244,29 +243,29 @@ func (j *Jit) emitThumbImm(op uint16) {
 	case THUMB_IMM_MOV:
 
 		j.Movl(gojit.Imm(nn), gojit.Eax)
-		j.Movl(gojit.Eax, j.REG(rd))
+		j.Movl(gojit.Eax, j.C.R[rd])
 		j.Test(gojit.Eax, gojit.Eax)
 
 	case THUMB_IMM_CMP, THUMB_IMM_SUB:
 
-		j.Movl(j.REG(rd), gojit.Eax)
+		j.Movl(j.C.R[rd], gojit.Eax)
 		j.Sub(gojit.Imm(nn), gojit.Eax)
 		if inst == THUMB_IMM_SUB {
-			j.Movl(gojit.Eax, j.REG(rd))
+			j.Movl(gojit.Eax, j.C.R[rd])
 		}
 
-		j.SETcc(gojit.CC_O, jV)
-		j.SETcc(gojit.CC_NC, jC)
+		j.SETcc(gojit.CC_O, j.C.V)
+		j.SETcc(gojit.CC_NC, j.C.C)
 
 	case THUMB_IMM_ADD:
 
-		j.Add(gojit.Imm(nn), j.REG(rd))
-		j.SETcc(gojit.CC_O, jV)
-		j.SETcc(gojit.CC_C, jC)
+		j.Add(gojit.Imm(nn), j.C.R[rd])
+		j.SETcc(gojit.CC_O, j.C.V)
+		j.SETcc(gojit.CC_C, j.C.C)
 	}
 
-	j.SETcc(gojit.CC_S, jN)
-	j.SETcc(gojit.CC_Z, jZ)
+	j.SETcc(gojit.CC_S, j.C.N)
+	j.SETcc(gojit.CC_Z, j.C.Z)
 }
 
 func (j *Jit) emitThumbAddSub(op uint16) {
@@ -275,10 +274,10 @@ func (j *Jit) emitThumbAddSub(op uint16) {
 		rd   = uint32(op & 7)
 	)
 
-	j.Movl(j.REG(uint32(op>>3)&7), gojit.Eax)
+	j.Movl(j.C.R[uint32(op>>3)&7], gojit.Eax)
 
 	if reg := inst < 2; reg {
-		j.Movl(j.REG(uint32(op>>6)&7), gojit.Ebx)
+		j.Movl(j.C.R[uint32(op>>6)&7], gojit.Ebx)
 	} else {
 		j.Movl(gojit.Imm((op>>6)&7), gojit.Ebx)
 	}
@@ -286,17 +285,17 @@ func (j *Jit) emitThumbAddSub(op uint16) {
 	switch inst {
 	case THUMB_ADD, THUMB_ADDImm:
 		j.Add(gojit.Ebx, gojit.Eax)
-		j.SETcc(gojit.CC_C, jC)
+		j.SETcc(gojit.CC_C, j.C.C)
 	case THUMB_SUB, THUMB_SUBImm:
 		j.Sub(gojit.Ebx, gojit.Eax)
-		j.SETcc(gojit.CC_NC, jC)
+		j.SETcc(gojit.CC_NC, j.C.C)
 	}
 
-	j.Movl(gojit.Eax, j.REG(rd))
+	j.Movl(gojit.Eax, j.C.R[rd])
 
-	j.SETcc(gojit.CC_O, jV)
-	j.SETcc(gojit.CC_S, jN)
-	j.SETcc(gojit.CC_Z, jZ)
+	j.SETcc(gojit.CC_O, j.C.V)
+	j.SETcc(gojit.CC_S, j.C.N)
+	j.SETcc(gojit.CC_Z, j.C.Z)
 }
 
 func (j *Jit) emitThumbAlu(op uint16) {
@@ -306,8 +305,8 @@ func (j *Jit) emitThumbAlu(op uint16) {
 	)
 
 	// rdv = eax, rsv = ebx
-	j.Movl(j.REG(rd), gojit.Eax)
-	j.Movl(j.REG(uint32(op>>3)&7), gojit.Ebx)
+	j.Movl(j.C.R[rd], gojit.Eax)
+	j.Movl(j.C.R[uint32(op>>3)&7], gojit.Ebx)
 
 	switch inst {
 	case THUMB_MUL:
@@ -315,7 +314,7 @@ func (j *Jit) emitThumbAlu(op uint16) {
 		j.Movl(gojit.Eax, gojit.R8d)
 		j.Movl(gojit.Ebx, gojit.R10d)
 
-		j.Movl(TRUE, gojit.Ebx)
+		j.Movl(gojit.Imm(1), gojit.Ebx)
 		j.CallFunc(idleMul)
 
 		j.Movl(gojit.Eax, gojit.Ebx)
@@ -326,7 +325,7 @@ func (j *Jit) emitThumbAlu(op uint16) {
 		j.Movl(gojit.R10d, gojit.Ebx)
 
 		j.Mul(gojit.Ebx)
-		j.Movl(gojit.Eax, j.REG(rd))
+		j.Movl(gojit.Eax, j.C.R[rd])
 		j.Test(gojit.Eax, gojit.Eax)
 		// ARM < 4, carry flag destroyed, ARM >= 5, carry flag unchanged
 		// cpsr.C = false
@@ -338,47 +337,47 @@ func (j *Jit) emitThumbAlu(op uint16) {
 	case THUMB_CMN:
 		j.Add(gojit.Ebx, gojit.Eax)
 
-		j.SETcc(gojit.CC_O, jV)
-		j.SETcc(gojit.CC_C, jC)
+		j.SETcc(gojit.CC_O, j.C.V)
+		j.SETcc(gojit.CC_C, j.C.C)
 
 	case THUMB_CMP:
 		j.Cmp(gojit.Ebx, gojit.Eax)
-		j.Movl(gojit.Eax, j.REG(rd))
-		j.SETcc(gojit.CC_O, jV)
-		j.SETcc(gojit.CC_NC, jC)
+		j.Movl(gojit.Eax, j.C.R[rd])
+		j.SETcc(gojit.CC_O, j.C.V)
+		j.SETcc(gojit.CC_NC, j.C.C)
 
 	case THUMB_AND:
 		j.And(gojit.Ebx, gojit.Eax)
-		j.Movl(gojit.Eax, j.REG(rd))
+		j.Movl(gojit.Eax, j.C.R[rd])
 
 	case THUMB_EOR:
 		j.Xor(gojit.Ebx, gojit.Eax)
-		j.Movl(gojit.Eax, j.REG(rd))
+		j.Movl(gojit.Eax, j.C.R[rd])
 
 	case THUMB_ORR:
 		j.Or(gojit.Ebx, gojit.Eax)
-		j.Movl(gojit.Eax, j.REG(rd))
+		j.Movl(gojit.Eax, j.C.R[rd])
 
 	case THUMB_BIC:
 		j.Not(gojit.Ebx)
 		j.And(gojit.Ebx, gojit.Eax)
-		j.Movl(gojit.Eax, j.REG(rd))
+		j.Movl(gojit.Eax, j.C.R[rd])
 
 	case THUMB_MVN:
 		j.Not(gojit.Ebx)
 		j.Test(gojit.Ebx, gojit.Ebx)
-		j.Movl(gojit.Ebx, j.REG(rd))
+		j.Movl(gojit.Ebx, j.C.R[rd])
 
 	case THUMB_NEG:
 
 		j.Neg(gojit.Ebx)
-		j.Movl(gojit.Ebx, j.REG(rd))
+		j.Movl(gojit.Ebx, j.C.R[rd])
 
-		j.SETcc(gojit.CC_O, jV)
-		j.SETcc(gojit.CC_NC, jC)
+		j.SETcc(gojit.CC_O, j.C.V)
+		j.SETcc(gojit.CC_NC, j.C.C)
 
 	case THUMB_SBC, THUMB_ADC:
-		j.Movb(jC, gojit.Cl)
+		j.Movb(j.C.C, gojit.Cl)
 		j.Bt(gojit.Imm(0), gojit.Cl)
 
 		if inst == THUMB_ADC {
@@ -388,10 +387,10 @@ func (j *Jit) emitThumbAlu(op uint16) {
 			j.Sbb(gojit.Ebx, gojit.Eax)
 		}
 
-		j.SETcc(gojit.CC_O, jV)
-		j.SETcc(gojit.CC_NC, jC)
+		j.SETcc(gojit.CC_O, j.C.V)
+		j.SETcc(gojit.CC_NC, j.C.C)
 
-		j.Movl(gojit.Eax, j.REG(rd))
+		j.Movl(gojit.Eax, j.C.R[rd])
 
 	case THUMB_LSL, THUMB_LSR, THUMB_ASR, THUMB_ROR:
 
@@ -401,8 +400,8 @@ func (j *Jit) emitThumbAlu(op uint16) {
 
 		// rdv = eax, rsv = ebx
 
-		j.Movl(j.REG(rd), gojit.Eax)
-		j.Movl(j.REG(uint32(op>>3)&7), gojit.Ebx)
+		j.Movl(j.C.R[rd], gojit.Eax)
+		j.Movl(j.C.R[uint32(op>>3)&7], gojit.Ebx)
 
 		shType := ROR
 		switch inst {
@@ -415,19 +414,19 @@ func (j *Jit) emitThumbAlu(op uint16) {
 		}
 
 		// carry to dl
-		j.Movb(jC, gojit.Dl)
+		j.Movb(j.C.C, gojit.Dl)
 
 		// shift reg ebx, v eax
 		j.ShiftReg(uint32(shType))
 
-		j.Movb(gojit.Dl, jC)
-		j.Movl(gojit.Eax, j.REG(rd))
+		j.Movb(gojit.Dl, j.C.C)
+		j.Movl(gojit.Eax, j.C.R[rd])
 
 		j.Test(gojit.Eax, gojit.Eax)
 	}
 
-	j.SETcc(gojit.CC_S, jN)
-	j.SETcc(gojit.CC_Z, jZ)
+	j.SETcc(gojit.CC_S, j.C.N)
+	j.SETcc(gojit.CC_Z, j.C.Z)
 }
 
 func (j *Jit) emitThumbPushPop(op uint16) {
@@ -443,20 +442,20 @@ func (j *Jit) emitThumbPushPop(op uint16) {
 		if pop {
 
 			j.Mov(JIT, gojit.Rax)
-			j.Movl(j.REG(SP), gojit.Ebx)
+			j.Movl(j.C.R[SP], gojit.Ebx)
 			j.Movl(gojit.Imm(seq), gojit.Ecx)
 
 			j.CallFunc((*Jit).Read32Block)
-			j.Add(gojit.Imm(0x40), j.REG(SP))
+			j.Add(gojit.Imm(0x40), j.C.R[SP])
 			j.ReloadState = RELOAD
 
 		} else {
 
-			j.Sub(gojit.Imm(0x40), j.REG(SP))
+			j.Sub(gojit.Imm(0x40), j.C.R[SP])
 
 			j.Mov(JIT, gojit.Rax)
-			j.Movl(j.REG(SP), gojit.Ebx)
-			j.Movl(j.REG(PC), gojit.Ecx)
+			j.Movl(j.C.R[SP], gojit.Ebx)
+			j.Movl(j.C.R[PC], gojit.Ecx)
 			j.Movl(gojit.Imm(seq), gojit.Edi)
 
 			j.CallFunc((*Jit).Write32Block)
@@ -472,26 +471,26 @@ func (j *Jit) emitThumbPushPop(op uint16) {
 			}
 
 			j.Mov(JIT, gojit.Rax)
-			j.Movl(j.REG(SP), gojit.Ebx)
+			j.Movl(j.C.R[SP], gojit.Ebx)
 			j.Movl(gojit.Imm(seq), gojit.Ecx)
 
 			j.CallFunc((*Jit).Read32Block)
-			j.Movl(gojit.Eax, j.REG(reg))
+			j.Movl(gojit.Eax, j.C.R[reg])
 
-			j.Add(gojit.Imm(4), j.REG(SP))
+			j.Add(gojit.Imm(4), j.C.R[SP])
 
 			seq = SEQ
 		}
 
 		if pclr {
 			j.Mov(JIT, gojit.Rax)
-			j.Movl(j.REG(SP), gojit.Ebx)
+			j.Movl(j.C.R[SP], gojit.Ebx)
 			j.Movl(gojit.Imm(seq), gojit.Ecx)
 
 			j.CallFunc((*Jit).Read32Block)
 			j.And(gojit.Imm(^1), gojit.Eax)
-			j.Movl(gojit.Eax, j.REG(PC))
-			j.Add(gojit.Imm(4), j.REG(SP))
+			j.Movl(gojit.Eax, j.C.R[PC])
+			j.Add(gojit.Imm(4), j.C.R[SP])
 			j.ReloadState = RELOAD
 		}
 
@@ -502,11 +501,11 @@ func (j *Jit) emitThumbPushPop(op uint16) {
 	} else {
 
 		if pclr {
-			j.Sub(gojit.Imm(4), j.REG(SP))
+			j.Sub(gojit.Imm(4), j.C.R[SP])
 
 			j.Mov(JIT, gojit.Rax)
-			j.Movl(j.REG(SP), gojit.Ebx)
-			j.Movl(j.REG(LR), gojit.Ecx)
+			j.Movl(j.C.R[SP], gojit.Ebx)
+			j.Movl(j.C.R[LR], gojit.Ecx)
 			j.Movl(gojit.Imm(seq), gojit.Edi)
 
 			j.CallFunc((*Jit).Write32Block)
@@ -519,11 +518,11 @@ func (j *Jit) emitThumbPushPop(op uint16) {
 				continue
 			}
 
-			j.Sub(gojit.Imm(4), j.REG(SP))
+			j.Sub(gojit.Imm(4), j.C.R[SP])
 
 			j.Mov(JIT, gojit.Rax)
-			j.Movl(j.REG(SP), gojit.Ebx)
-			j.Movl(j.REG(uint32(reg)), gojit.Ecx)
+			j.Movl(j.C.R[SP], gojit.Ebx)
+			j.Movl(j.C.R[uint32(reg)], gojit.Ecx)
 			j.Movl(gojit.Imm(seq), gojit.Edi)
 
 			j.CallFunc((*Jit).Write32Block)
@@ -542,7 +541,7 @@ func (j *Jit) emitThumbHi(op uint16) {
 		return
 	}
 
-	j.Movl(j.REG(rs), gojit.Eax)
+	j.Movl(j.C.R[rs], gojit.Eax)
 	if rs == PC {
 		j.And(gojit.Imm(^1), gojit.Eax)
 	}
@@ -551,7 +550,7 @@ func (j *Jit) emitThumbHi(op uint16) {
 	case HI_ADD, HI_MOV:
 
 		if inst == HI_ADD {
-			j.Add(j.REG(rd), gojit.Eax)
+			j.Add(j.C.R[rd], gojit.Eax)
 		}
 
 		if rd == PC {
@@ -559,25 +558,25 @@ func (j *Jit) emitThumbHi(op uint16) {
 			j.ReloadState = RELOAD
 		}
 
-		j.Movl(gojit.Eax, j.REG(rd))
+		j.Movl(gojit.Eax, j.C.R[rd])
 
 	case HI_CMP:
 
-		j.Movl(j.REG(rd), gojit.Ebx)
+		j.Movl(j.C.R[rd], gojit.Ebx)
 		j.Sub(gojit.Eax, gojit.Ebx)
 
-		j.SETcc(gojit.CC_O, jV)
-		j.SETcc(gojit.CC_NC, jC)
-		j.SETcc(gojit.CC_S, jN)
-		j.SETcc(gojit.CC_Z, jZ)
+		j.SETcc(gojit.CC_O, j.C.V)
+		j.SETcc(gojit.CC_NC, j.C.C)
+		j.SETcc(gojit.CC_S, j.C.N)
+		j.SETcc(gojit.CC_Z, j.C.Z)
 
 	case HI_BX:
 
-		j.Movl(gojit.Eax, j.REG(PC))
+		j.Movl(gojit.Eax, j.C.R[PC])
 
 		j.Mov(JIT, gojit.Rax)
 		j.CallFunc((*Jit).ToggleThumb)
-		j.Movb(gojit.Imm(0), RELOAD_FLAG)
+		j.Movb(gojit.Imm(0), j.C.Reload)
 		j.ReloadState = RELOAD
 	}
 }
@@ -585,17 +584,17 @@ func (j *Jit) emitThumbHi(op uint16) {
 func (j *Jit) emitThumbShifted(op uint16) {
 	shift := uint32(op>>6) & 0x1F
 
-	j.Movl(j.REG(uint32(op>>3)&7), gojit.Eax)
-	j.Movb(jC, gojit.Bl)
+	j.Movl(j.C.R[uint32(op>>3)&7], gojit.Eax)
+	j.Movb(j.C.C, gojit.Bl)
 
 	j.ShiftImm(uint32(op>>11)&3, shift)
-	j.Movb(gojit.Bl, jC)
+	j.Movb(gojit.Bl, j.C.C)
 
-	j.Movl(gojit.Eax, j.REG(uint32(op&7)))
+	j.Movl(gojit.Eax, j.C.R[uint32(op&7)])
 
 	j.Test(gojit.Eax, gojit.Eax)
-	j.SETcc(gojit.CC_S, jN)
-	j.SETcc(gojit.CC_Z, jZ)
+	j.SETcc(gojit.CC_S, j.C.N)
+	j.SETcc(gojit.CC_Z, j.C.Z)
 }
 
 func (j *Jit) emitThumbBlock(op uint16) {
@@ -608,25 +607,25 @@ func (j *Jit) emitThumbBlock(op uint16) {
 	if rlist == 0 {
 
 		j.Mov(JIT, gojit.Rax)
-		j.Movl(j.REG(rb), gojit.Ebx)
+		j.Movl(j.C.R[rb], gojit.Ebx)
 		if ldmia {
 
 			j.Movl(gojit.Imm(NONSEQ), gojit.Ecx)
 
 			j.CallFunc((*Jit).Read32Block)
 
-			j.Movl(gojit.Eax, j.REG(PC))
+			j.Movl(gojit.Eax, j.C.R[PC])
 			j.ReloadState = RELOAD
 
 		} else {
 
-			j.Movl(j.REG(PC), gojit.Ecx)
+			j.Movl(j.C.R[PC], gojit.Ecx)
 			j.Add(gojit.Ecx, gojit.Imm(2))
 
 			j.CallFunc((*Jit).Write32)
 		}
 
-		j.Add(gojit.Imm(0x40), j.REG(rb))
+		j.Add(gojit.Imm(0x40), j.C.R[rb])
 
 		return
 	}
@@ -647,17 +646,17 @@ func (j *Jit) emitThumbBlock(op uint16) {
 
 		// addr stored in r8
 
-		j.Movl(j.REG(rb), gojit.R8d)
+		j.Movl(j.C.R[rb], gojit.R8d)
 
 		j.Mov(JIT, gojit.Rax)
 		j.Movl(gojit.R8d, gojit.Ebx)
-		j.Movl(j.REG(first), gojit.Ecx)
+		j.Movl(j.C.R[first], gojit.Ecx)
 		j.Movl(gojit.Imm(NONSEQ), gojit.Edi)
 		j.CallFunc((*Jit).Write32Block)
 
 		j.Movl(gojit.R8d, gojit.Eax)
 		j.Add(gojit.Imm(count), gojit.Eax)
-		j.Movl(gojit.Eax, j.REG(rb))
+		j.Movl(gojit.Eax, j.C.R[rb])
 
 		j.Add(gojit.Imm(4), gojit.R8d)
 
@@ -666,7 +665,7 @@ func (j *Jit) emitThumbBlock(op uint16) {
 
 				j.Mov(JIT, gojit.Rax)
 				j.Movl(gojit.R8d, gojit.Ebx)
-				j.Movl(j.REG(reg), gojit.Ecx)
+				j.Movl(j.C.R[reg], gojit.Ecx)
 				j.Movl(gojit.Imm(SEQ), gojit.Edi)
 				j.CallFunc((*Jit).Write32Block)
 
@@ -676,7 +675,7 @@ func (j *Jit) emitThumbBlock(op uint16) {
 	} else {
 
 		// addr stored in r8
-		j.Movl(j.REG(rb), gojit.R8d)
+		j.Movl(j.C.R[rb], gojit.R8d)
 
 		seq := uint32(NONSEQ)
 
@@ -689,7 +688,7 @@ func (j *Jit) emitThumbBlock(op uint16) {
 
 				j.CallFunc((*Jit).Read32Block)
 
-				j.Movl(gojit.Eax, j.REG(reg))
+				j.Movl(gojit.Eax, j.C.R[reg])
 
 				j.Add(gojit.Imm(4), gojit.R8d)
 				seq = SEQ
@@ -697,7 +696,7 @@ func (j *Jit) emitThumbBlock(op uint16) {
 		}
 
 		if ^rlist&(1<<rb) != 0 {
-			j.Movl(gojit.R8d, j.REG(rb))
+			j.Movl(gojit.R8d, j.C.R[rb])
 		}
 
 		j.Mov(JIT, gojit.Rax)
@@ -709,7 +708,7 @@ func (j *Jit) emitThumbBlock(op uint16) {
 func (j *Jit) emitThumbBranch(op uint16) {
 	offset := uint32(int16((op&0x7FF)<<5) >> 4)
 
-	j.Add(gojit.Imm(offset), j.REG(PC))
+	j.Add(gojit.Imm(offset), j.C.R[PC])
 	j.ReloadState = RELOAD
 }
 
@@ -717,8 +716,8 @@ func (j *Jit) emitJumpCall(op uint16) {
 	targets := j.emitCond(uint32(op>>8) & 0xF)
 
 	nn := int32(int8(op&0xFF)) << 1
-	j.Add(gojit.Imm(nn), j.REG(PC))
-	j.Movb(gojit.Imm(1), RELOAD_FLAG)
+	j.Add(gojit.Imm(nn), j.C.R[PC])
+	j.Movb(gojit.Imm(1), j.C.Reload)
 
 	done := j.JmpForward()
 
@@ -726,9 +725,7 @@ func (j *Jit) emitJumpCall(op uint16) {
 		target()
 	}
 
-	seq := gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Seq)), Bits: 32}
-	j.Movl(gojit.Imm(SEQ), seq)
-	j.Movb(gojit.Imm(0), RELOAD_FLAG) // TODO: THIS SHOULDNT BE NEEDED?
+	j.Movl(gojit.Imm(SEQ), j.C.Seq)
 
 	done()
 
@@ -738,21 +735,21 @@ func (j *Jit) emitJumpCall(op uint16) {
 }
 
 func (j *Jit) emitLongBranch(op uint16) {
-	j.Movl(j.REG(PC), gojit.Eax)
+	j.Movl(j.C.R[PC], gojit.Eax)
 	j.Add(gojit.Imm(uint32(int32(uint32(op&0x7FF)<<21)>>9)), gojit.Eax)
-	j.Movl(gojit.Eax, j.REG(LR))
+	j.Movl(gojit.Eax, j.C.R[LR])
 }
 
 func (j *Jit) emitShortLongBranch(op uint16) {
-	j.Movl(j.REG(PC), gojit.Eax)
+	j.Movl(j.C.R[PC], gojit.Eax)
 	j.Sub(gojit.Imm(2), gojit.Eax)
 	j.Or(gojit.Imm(1), gojit.Eax)
 
-	j.Movl(j.REG(LR), gojit.Ebx)
+	j.Movl(j.C.R[LR], gojit.Ebx)
 	j.Add(gojit.Imm(uint32(op&0x7FF)<<1), gojit.Ebx)
-	j.Movl(gojit.Ebx, j.REG(PC))
+	j.Movl(gojit.Ebx, j.C.R[PC])
 
-	j.Movl(gojit.Eax, j.REG(LR))
+	j.Movl(gojit.Eax, j.C.R[LR])
 	j.ReloadState = RELOAD
 }
 

@@ -12,7 +12,7 @@ func (c *Cpu) DecodeThumb(op uint16) {
 	switch {
 	case IsThumbBkpt(op):
 		c.Exception(arm7.VEC_PREFETCH, arm7.MODE_ABT)
-	case arm7.IsthumbSWI(op):
+	case arm7.IsThumbSWI(op):
 		c.Exception(arm7.VEC_SWI, arm7.MODE_SWI)
 	case arm7.IsThumbAddSub(op):
 		c.ThumbAddSub(op)

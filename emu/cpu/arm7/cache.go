@@ -16,19 +16,16 @@ type BlockCache struct {
 }
 
 type JitBlock struct {
-	Skip      bool
-	f         func()
-	initPc    uint32
-	finalOp   uint32
-	Length    uint32
-	assembler *gojit.Assembler
-
+	f          func()
+	assembler  *gojit.Assembler
 	Prev, Next *JitBlock
-
-	Thumb bool
+	Thumb      bool
+	Skip       bool
+	initPc     uint32
+	Size       uint32
 }
 
-func InitBlockCache(capacity uint32, page_size int) *BlockCache {
+func InitBlockCache(capacity uint32, pageSize int) *BlockCache {
 	bc := &BlockCache{
 		Blocks:    []*JitBlock{},
 		Head:      &JitBlock{},
@@ -56,7 +53,7 @@ func InitBlockCache(capacity uint32, page_size int) *BlockCache {
 		bc.Head.Next.Prev = bc.Blocks[i]
 		bc.Head.Next = bc.Blocks[i]
 
-		asm, err := gojit.New(page_size)
+		asm, err := gojit.New(pageSize)
 		if err != nil {
 			panic(err)
 		}
@@ -160,19 +157,18 @@ func (bc *BlockCache) PushTail(block *JitBlock) {
 func (bc *BlockCache) AssignBlock(jit *Jit) *JitBlock {
 	block := bc.PopTail()
 
-	if inUse := block.Length != 0; inUse {
+	if inUse := block.Size != 0; inUse {
 		// need to invalidate pc currently using block
 		revokedPC := block.initPc
-		page := jit.Pages[revokedPC>>jit.PageShift]
+		page := jit.Pages[revokedPC>>jit.Config.PageShift]
 		if page != nil {
-			page.Blocks[(revokedPC&jit.PageMask)>>1] = nil
+			page.Blocks[(revokedPC&jit.Config.PageMask)>>1] = nil
 		}
 	}
 
 	block.assembler.Off = 0
 	block.initPc = 0
-	block.Length = 0
-	block.finalOp = 0
+	block.Size = 0
 	block.f = nil
 
 	return block

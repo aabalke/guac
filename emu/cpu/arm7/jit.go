@@ -7,43 +7,12 @@ import (
 	"unsafe"
 
 	"github.com/aabalke/gojit"
-	"github.com/aabalke/guac/config"
 	"golang.org/x/exp/constraints"
 )
 
 var (
-	JIT  = gojit.Rsi
-	CPU  = gojit.R9
-	REG  = int32(unsafe.Offsetof(Cpu{}.Reg))
-	R    = REG + int32(unsafe.Offsetof(Reg{}.R))
-	CPSR = REG + int32(unsafe.Offsetof(Reg{}.CPSR))
-
-	MODE = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.Mode)), Bits: 32}
-	jN   = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.N)), Bits: 8}
-	jZ   = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.Z)), Bits: 8}
-	jC   = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.C)), Bits: 8}
-	jV   = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.V)), Bits: 8}
-	jT   = gojit.Indirect{Base: CPU, Offset: CPSR + int32(unsafe.Offsetof(Cond{}.T)), Bits: 8}
-
-	RELOAD_FLAG = gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Reload)), Bits: 8}
-
-	FALSE = gojit.Imm(0)
-	TRUE  = gojit.Imm(1)
-)
-
-const (
-	// NDS
-	//ADDRESS_SPACE = 0x1_0000_0000
-	//PAGE_SHIFT    = 16
-
-	// GBA
-	ADDRESS_SPACE = 0x1000_0000
-	PAGE_SHIFT    = 8
-
-	PAGE_MASK        = (1 << PAGE_SHIFT) - 1
-	NATIVE_PAGE_SIZE = 0x10000
-	MIN_INST_CNT     = 8
-	MAX_INST_CNT     = 64
+	JIT = gojit.Rsi
+	CPU = gojit.R9
 )
 
 type ReloadState uint32
@@ -56,18 +25,38 @@ const (
 
 type Jit struct {
 	*gojit.Assembler
-	cpu *Cpu
+	cpu          *Cpu
+	C            CpuPtrs
+	Metrics      [][]uint32
+	BlockCache   *BlockCache
+	Pages        []*Page
+	invalidPages []*Page
+	Config       JitConfig
+	ReloadState  ReloadState
+	TestingCnt   int
+}
 
-	TestingCnt int
+type JitConfig struct {
+	AddressSpace   int    // addr space with readable instructions
+	PageShift      uint32 // density of pages, in address space
+	PageMask       uint32 // mask used to calc blocks per page
+	NativePagesize int    // byte cnt on native memory per block
+	MinInstCnt     uint32 // blocks smaller than this are skipped
+	MaxInstCnt     uint32 // block cannot be more inst than this
+	LoopThreshold  uint32 // how many loops until create block
+	BlockCnt       int    // max how many jit blocks
+	Enabled        bool
+}
 
-	BlockCache    *BlockCache
-	Pages         []*Page
-	Metrics       [ADDRESS_SPACE >> PAGE_SHIFT][]uint32
-	invalidPages  []*Page
-	LoopThreshold uint32
-	PageShift     uint32
-	PageMask      uint32
-	ReloadState   ReloadState
+// NOTE: Used so different shaped structs can be used as cpu (arm7, arm9...)
+type CpuPtrs struct {
+	Cpu           uintptr
+	Cpsr          uintptr
+	R             [16]gojit.Indirect
+	Mode          gojit.Indirect
+	N, Z, C, V, T gojit.Indirect
+	Reload        gojit.Indirect
+	Seq           gojit.Indirect
 }
 
 type Page struct {
@@ -76,23 +65,21 @@ type Page struct {
 	dead   bool
 }
 
-func NewJit(cpu *Cpu) *Jit {
+func NewJit(cpu *Cpu, config JitConfig, ptrs CpuPtrs) *Jit {
+	if !config.Enabled { // testing jit
+		return &Jit{cpu: cpu, Config: config, C: ptrs}
+	}
+
 	return &Jit{
 		cpu:   cpu,
-		Pages: make([]*Page, ADDRESS_SPACE>>PAGE_SHIFT),
+		Pages: make([]*Page, config.AddressSpace>>config.PageShift),
 		BlockCache: InitBlockCache(
-			config.Conf.Nds.Jit.BlockCnt,
-			NATIVE_PAGE_SIZE,
+			uint32(config.BlockCnt),
+			config.NativePagesize,
 		),
-		LoopThreshold: config.Conf.Nds.Jit.LoopCnt,
-		PageShift:     PAGE_SHIFT,
-		PageMask:      PAGE_MASK,
-	}
-}
-
-func NewTestJit(cpu *Cpu) *Jit {
-	return &Jit{
-		cpu: cpu,
+		Metrics: make([][]uint32, config.AddressSpace>>config.PageShift),
+		Config:  config,
+		C:       ptrs,
 	}
 }
 
@@ -107,7 +94,9 @@ func (j *Jit) InvalidatePage(addr uint32) {
 		return
 	}
 
-	page := j.Pages[addr>>j.PageShift]
+	pageIdx := addr >> j.Config.PageShift
+
+	page := j.Pages[pageIdx]
 	if page == nil || page.dead {
 		return
 	}
@@ -116,8 +105,8 @@ func (j *Jit) InvalidatePage(addr uint32) {
 
 	page.dead = true
 
-	j.Pages[addr>>j.PageShift] = nil
-	j.Metrics[addr>>j.PageShift] = make([]uint32, (1<<j.PageShift)>>1)
+	j.Pages[pageIdx] = nil
+	j.Metrics[pageIdx] = make([]uint32, (1<<j.Config.PageShift)>>1)
 	j.invalidPages = append(j.invalidPages, page)
 }
 
@@ -142,19 +131,42 @@ func (j *Jit) DeletePages() {
 }
 
 func (j *Jit) UpdateMetrics(pc, w uint32) {
-	pageIdx := pc >> j.PageShift
-	blockIdx := (pc & j.PageMask) >> 1 // aligned to word for thumb
+	pageIdx := pc >> j.Config.PageShift
+	blockIdx := (pc & j.Config.PageMask) >> 1 // aligned to word for thumb
 
 	if metrics := j.Metrics[pageIdx]; metrics == nil {
-		j.Metrics[pageIdx] = make([]uint32, (1<<j.PageShift)>>1)
+		j.Metrics[pageIdx] = make([]uint32, (1<<j.Config.PageShift)>>1)
 	}
 
 	j.Metrics[pageIdx][blockIdx]++
-	if j.Metrics[pageIdx][blockIdx] <= j.LoopThreshold {
+	if j.Metrics[pageIdx][blockIdx] <= j.Config.LoopThreshold {
 		return
 	}
 
 	j.CreateBlock(pc, w)
+}
+
+func (j *Jit) TryJit(pc uint32) bool {
+	pageIdx := pc >> j.Config.PageShift
+	blockIdx := (pc & j.Config.PageMask) >> 1
+
+	page := j.Pages[pageIdx]
+
+	if page == nil || page.dead {
+		return false
+	}
+
+	block := page.Blocks[blockIdx]
+
+	if block == nil || block.Skip || block.f == nil {
+		return false
+	}
+
+	//fmt.Printf("Running Jit for PC %08X\n", pc)
+
+	block.f()
+	j.BlockCache.TouchBlock(block)
+	return true
 }
 
 func (j *Jit) UseJit[T constraints.Unsigned](op T) {
@@ -162,7 +174,7 @@ func (j *Jit) UseJit[T constraints.Unsigned](op T) {
 
 	fmt.Printf("starting test cnt %08d, op %08X\n", j.TestingCnt, op)
 
-	asm, err := gojit.New(gojit.PageSize)
+	asm, err := gojit.New(j.Config.NativePagesize)
 	if err != nil {
 		panic(err)
 	}
@@ -170,7 +182,7 @@ func (j *Jit) UseJit[T constraints.Unsigned](op T) {
 	j.Assembler = asm
 
 	j.MovAbs(uint64(uintptr(unsafe.Pointer(j))), JIT)
-	j.MovAbs(uint64(uintptr(unsafe.Pointer(j.cpu))), CPU)
+	j.MovAbs(uint64(j.C.Cpu), CPU)
 
 	switch reflect.TypeOf(op).Kind() {
 	case reflect.Uint16:
@@ -275,58 +287,32 @@ func (j *Jit) RunTest[T constraints.Unsigned](op T) func() {
 	}
 }
 
-func (j *Jit) REG(i uint32) gojit.Indirect {
-	return gojit.Indirect{
-		Base:   CPU,
-		Offset: R + int32(i*4),
-		Bits:   32,
-	}
-}
+//go:nosplit
+func (j *Jit) Idle(cycles int64) { j.cpu.Idle(cycles) }
 
 //go:nosplit
-func (j *Jit) Idle(cycles int64) {
-	j.cpu.Idle(cycles)
-}
+func (j *Jit) Read8(addr uint32) uint32 { return j.cpu.Read8(addr) }
 
 //go:nosplit
-func (j *Jit) Read8(addr uint32) uint32 {
-	return j.cpu.Read8(addr)
-}
+func (j *Jit) Read16(addr uint32) uint32 { return j.cpu.Read16(addr) }
 
 //go:nosplit
-func (j *Jit) Read16(addr uint32) uint32 {
-	return j.cpu.Read16(addr)
-}
+func (j *Jit) Read32(addr uint32) uint32 { return j.cpu.Read32(addr) }
 
 //go:nosplit
-func (j *Jit) Read32(addr uint32) uint32 {
-	return j.cpu.Read32(addr)
-}
+func (j *Jit) Read32Block(addr, seq uint32) uint32 { return j.cpu.Read32Block(addr, seq) }
 
 //go:nosplit
-func (j *Jit) Read32Block(addr, seq uint32) uint32 {
-	return j.cpu.Read32Block(addr, seq)
-}
+func (j *Jit) Write8(addr uint32, v uint8) { j.cpu.Write8(addr, v) }
 
 //go:nosplit
-func (j *Jit) Write8(addr uint32, v uint8) {
-	j.cpu.Write8(addr, v)
-}
+func (j *Jit) Write16(addr uint32, v uint16) { j.cpu.Write16(addr, v) }
 
 //go:nosplit
-func (j *Jit) Write16(addr uint32, v uint16) {
-	j.cpu.Write16(addr, v)
-}
+func (j *Jit) Write32(addr, v uint32) { j.cpu.Write32(addr, v) }
 
 //go:nosplit
-func (j *Jit) Write32(addr, v uint32) {
-	j.cpu.Write32(addr, v)
-}
-
-//go:nosplit
-func (j *Jit) Write32Block(addr, v, seq uint32) {
-	j.cpu.Write32Block(addr, v, seq)
-}
+func (j *Jit) Write32Block(addr, v, seq uint32) { j.cpu.Write32Block(addr, v, seq) }
 
 //go:nosplit
 func (j *Jit) ModeSwitch(curr, next CpuMode) {
@@ -348,7 +334,6 @@ func (j *Jit) Step() bool {
 
 	seq := c.Seq
 	c.Seq = SEQ
-	c.Op[0] = c.Op[1]
 
 	w := uint32(4)
 	if c.Reg.CPSR.T {
@@ -357,30 +342,28 @@ func (j *Jit) Step() bool {
 
 	c.Cycles(c.Reg.R[PC], w, seq, true)
 
-	// TODO: can probably remove every inst pipeline calc in jit
-	// would need to handle end and irq
-
-	if c.PcPtr == nil {
-		if w == 4 {
-			c.Op[1] = c.Mem.Read32(c.Reg.R[PC])
-		} else {
-			c.Op[1] = c.Mem.Read16(c.Reg.R[PC])
-		}
-	} else {
-		// 0xFFFF_FFFF uint32, 0xFFFF uint16
-		mask := uint32(0xFFFF_FFFF >> ((w & 2) * 8))
-		c.Op[1] = *(*uint32)(c.PcPtr) & mask
-	}
-
 	return false
 }
 
 //go:nosplit
-func (j *Jit) UpdatePc(w uint32) {
+func (j *Jit) UpdatePc(p unsafe.Pointer, w uint32) {
 	j.cpu.Reg.R[PC] += w
 	if j.cpu.PcPtr != nil {
 		j.cpu.PcPtr = unsafe.Add(j.cpu.PcPtr, w)
 	}
+
+	// NOTE: when exiting jit, need pipeline setup properly
+	// ONLY when not reloading. This removes every inst pipeline adjustment
+
+	mask := uint32(0xFFFF_FFFF >> ((w & 2) * 8))
+
+	p = unsafe.Add(p, w)
+	j.cpu.Op[0] = *(*uint32)(p) & mask
+	p = unsafe.Add(p, w)
+	j.cpu.Op[1] = *(*uint32)(p) & mask
+	p = unsafe.Add(p, w)
+
+	j.cpu.PcPtr = p
 }
 
 //go:nosplit

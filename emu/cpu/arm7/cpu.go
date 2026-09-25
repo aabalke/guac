@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"unsafe"
 
-	"github.com/aabalke/guac/config"
+	"github.com/aabalke/gojit"
 )
 
 type Cpu struct {
@@ -33,7 +33,7 @@ type Bus interface {
 	Read32Block(addr, seq uint32) uint32
 	Write8(addr uint32, v uint8)
 	Write16(addr uint32, v uint16)
-	Write32(addr uint32, v uint32)
+	Write32(addr, v uint32)
 	Write32Block(addr, v, seq uint32)
 }
 
@@ -43,7 +43,7 @@ type Mem interface {
 	Read32(addr uint32) uint32
 	Write8(addr uint32, v uint8)
 	Write16(addr uint32, v uint16)
-	Write32(addr uint32, v uint32)
+	Write32(addr, v uint32)
 	ReadPtr(addr uint32) unsafe.Pointer
 }
 
@@ -205,7 +205,7 @@ func (c *Cond) CheckCond(cond uint32) bool {
 	}
 }
 
-func NewCpu(mem Mem, cycles func(addr, width, seq uint32, inst bool), idle func(cycles int64)) *Cpu {
+func NewCpu(mem Mem, jitConfig JitConfig, cycles func(addr, width, seq uint32, inst bool), idle func(cycles int64)) *Cpu {
 	c := &Cpu{
 		Mem:       mem,
 		Cycles:    cycles,
@@ -213,14 +213,43 @@ func NewCpu(mem Mem, cycles func(addr, width, seq uint32, inst bool), idle func(
 		LowVector: true,
 	}
 
-	if config.Conf.Nds.Jit.Enabled {
-		c.Jit = NewJit(c)
+	cpuPtrs := GetCpuPtrs(c)
+
+	if jitConfig.Enabled {
+		c.Jit = NewJit(c, jitConfig, cpuPtrs)
 	} else {
-		c.TestJit = NewTestJit(c)
+		c.TestJit = NewJit(c, jitConfig, cpuPtrs)
 	}
 
 	c.Bus = &Bus7{
 		c: c,
+	}
+
+	return c
+}
+
+func GetCpuPtrs(cpu *Cpu) CpuPtrs {
+	var (
+		reg  = int32(unsafe.Offsetof(Cpu{}.Reg))
+		r    = reg + int32(unsafe.Offsetof(Reg{}.R))
+		cpsr = reg + int32(unsafe.Offsetof(Reg{}.CPSR))
+
+		c = CpuPtrs{
+			Mode:   gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.Mode)), Bits: 32},
+			N:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.N)), Bits: 8},
+			Z:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.Z)), Bits: 8},
+			C:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.C)), Bits: 8},
+			V:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.V)), Bits: 8},
+			T:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.T)), Bits: 8},
+			Reload: gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Reload)), Bits: 8},
+			Seq:    gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Seq)), Bits: 8},
+			Cpsr:   uintptr(unsafe.Pointer(&cpu.Reg.CPSR)),
+			Cpu:    uintptr(unsafe.Pointer(cpu)),
+		}
+	)
+
+	for i := range 16 {
+		c.R[i] = gojit.Indirect{Base: CPU, Offset: r + int32(i*4), Bits: 32}
 	}
 
 	return c
@@ -277,12 +306,6 @@ func (c *Cpu) Step() {
 
 	inst := c.Op[0]
 
-	//if debug.B[0] {
-	//	fmt.Printf("New Inst R %08X OP %08X\n", c.Reg.R, inst)
-	//}
-
-	//c.print2(inst)
-
 	seq := c.Seq
 	c.Seq = SEQ
 	c.Op[0] = c.Op[1]
@@ -320,18 +343,6 @@ func (c *Cpu) Step() {
 			c.PcPtr = unsafe.Add(c.PcPtr, w)
 		}
 	}
-
-	//c.print()
-}
-
-func (c *Cpu) DoJit(w uint32) {
-	//fmt.Printf("R %08X OP %08X STAMP %08d\n", c.Reg.R, c.Op[0], c.Timestamp)
-
-	if ok := c.Jit.TryJit(c.Reg.R[PC]); ok {
-		return
-	}
-
-	c.Jit.UpdateMetrics(c.Reg.R[PC], w)
 }
 
 func (c *Cpu) ReloadPipe() {
@@ -340,10 +351,6 @@ func (c *Cpu) ReloadPipe() {
 		w = 2
 	}
 	pc := c.Reg.R[PC] &^ (w - 1)
-
-	//if debug.B[0] {
-	//	fmt.Printf("New Reload PC %08X\n", c.Reg.R[PC])
-	//}
 
 	c.PcPtr = c.Mem.ReadPtr(pc)
 
@@ -367,7 +374,9 @@ func (c *Cpu) ReloadPipe() {
 	c.Reload = false
 
 	if c.Jit != nil {
-		c.DoJit(w)
+		if jitted := c.Jit.TryJit(c.Reg.R[PC]); !jitted {
+			c.Jit.UpdateMetrics(c.Reg.R[PC], w)
+		}
 	}
 }
 
@@ -415,7 +424,7 @@ func idleMul(rs uint32, sign bool) int64 {
 }
 
 func (c *Cpu) ModeSwitch(curr, next CpuMode) {
-	// DO NOT RELOAD PIPE AFTER CALLING ModeSwitch
+	// NOTE: do not reload pipe after calling mode switch
 
 	r := &c.Reg.R
 
@@ -484,41 +493,4 @@ func (c *Cpu) Exception(addr ExceptionVector, mode CpuMode) {
 func (c *Cpu) ExitException(mode CpuMode) {
 	c.Reg.CPSR = c.Reg.SPSR[ModeBank(mode)]
 	c.ModeSwitch(mode, c.Reg.CPSR.Mode)
-}
-
-//func (c *Cpu) print() {
-//	fmt.Printf("PC %08X Diff %08d\n", c.Reg.R[15], c.Timestamp-debug.Vi64[0])
-//	debug.Vi64[0] = c.Timestamp
-//}
-//
-//func (c *Cpu) print2(inst uint32) {
-//	fmt.Printf("OP %08X\n", inst)
-//	if debug.V[0] > 10000 {
-//		os.Exit(0)
-//	} else {
-//		debug.V[0]++
-//	}
-//}
-
-func (j *Jit) TryJit(pc uint32) bool {
-	pageIdx := pc >> j.PageShift
-	blockIdx := (pc & j.PageMask) >> 1
-
-	page := j.Pages[pageIdx]
-
-	if page == nil || page.dead {
-		return false
-	}
-
-	block := page.Blocks[blockIdx]
-
-	if block == nil || block.Skip || block.f == nil {
-		return false
-	}
-
-	//fmt.Printf("Running Jit for PC %08X\n", pc)
-
-	block.f()
-	j.BlockCache.TouchBlock(block)
-	return true
 }

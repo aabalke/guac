@@ -15,7 +15,7 @@ func (c *Cpu) DecodeArm(op uint32) {
 	case (op>>24)&0xF == 0xF:
 		c.Exception(VEC_SWI, MODE_SWI)
 	case IsBranch(op):
-		c.B(op)
+		c.Branch(op)
 	case IsBranchExchange(op):
 		c.BranchExchange(op)
 	case IsSdt(op):
@@ -656,7 +656,7 @@ func (c *Cpu) Sdt(op uint32) {
 	}
 }
 
-func (c *Cpu) B(op uint32) {
+func (c *Cpu) Branch(op uint32) {
 	r := &c.Reg.R
 
 	if link := (op>>24)&1 != 0; link {
