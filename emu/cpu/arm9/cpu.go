@@ -42,8 +42,8 @@ func NewCpu(m arm7.Mem, idle, tick func(int64), cycles func(addr, width, seq uin
 	c.Mem = m
 	c.Cp15 = NewCp15(c)
 	c.LowVector = false
-	c.Cycles = cycles
-	c.Idle = idle
+	c.CyclesFunc = cycles
+	c.IdleFunc = idle
 
 	c.Bus = &Bus9{
 		c: c,

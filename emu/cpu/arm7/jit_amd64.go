@@ -39,7 +39,7 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 
 	// offset for pipelining
 	realPc := (pc - (w * 2)) &^ (w - 1)
-	p := j.cpu.Mem.ReadPtr(realPc)
+	p := j.Mem.ReadPtr(realPc)
 	if p == nil {
 		j.BlockCache.PushTail(block)
 		page.Blocks[blockIdx] = j.BlockCache.SkipBlock
@@ -89,10 +89,7 @@ func (j *Jit) TryEmitOp(p unsafe.Pointer, w uint32) bool {
 
 	endBlock := false
 
-	j.Mov(JIT, gojit.Rax)
-	j.CallFunc((*Jit).Step)
-	j.Test(gojit.Ax, gojit.Ax)
-	irq := j.JccForward(gojit.CC_NZ)
+	irq := j.emitStep()
 
 	if w == 4 {
 		condTargets := j.emitCond(op >> 28)
@@ -119,10 +116,8 @@ func (j *Jit) TryEmitOp(p unsafe.Pointer, w uint32) bool {
 	switch reloadState {
 	case NONE:
 		endBlock = false
-		j.Mov(JIT, gojit.Rax)
-		j.MovAbs(uint64(uintptr(p)), gojit.Rbx)
-		j.Movl(gojit.Imm(w), gojit.Ecx)
-		j.CallFunc((*Jit).UpdatePc)
+		j.emitStepPc(w)
+
 	case RELOAD:
 		endBlock = true
 		j.Mov(JIT, gojit.Rax)
@@ -136,10 +131,8 @@ func (j *Jit) TryEmitOp(p unsafe.Pointer, w uint32) bool {
 
 		reload := j.JccForward(gojit.CC_NZ)
 
-		j.Mov(JIT, gojit.Rax)
-		j.MovAbs(uint64(uintptr(p)), gojit.Rbx)
-		j.Movl(gojit.Imm(w), gojit.Ecx)
-		j.CallFunc((*Jit).UpdatePc)
+		j.emitStepPc(w)
+		j.emitPipelineUpdate(p, w)
 
 		notReload := j.JmpForward()
 		reload()
@@ -313,4 +306,62 @@ func (j *Jit) emitToggleThumb() {
 	j.Cmovcc(gojit.CC_Z, gojit.Ebx, gojit.Eax)
 
 	j.And(gojit.Eax, j.C.R[PC])
+}
+
+func (j *Jit) emitStep() func() {
+	j.Movb(j.C.IrqLine, gojit.Al)
+
+	j.Testb(gojit.Al, gojit.Al)
+
+	irq := j.JccForward(gojit.CC_NZ)
+
+	j.Mov(JIT, gojit.Rax)
+
+	j.Movl(j.C.R[PC], gojit.Ebx)
+
+	j.Movb(j.C.T, gojit.Cl)
+	j.Test(gojit.Ecx, gojit.Ecx)
+	j.Movl(gojit.Imm(4), gojit.Ecx)
+	j.Movl(gojit.Imm(2), gojit.Edi)
+	j.Cmovcc(gojit.CC_NZ, gojit.Edi, gojit.Ecx)
+
+	j.Movl(j.C.Seq, gojit.Dil)
+
+	j.Movl(gojit.Imm(SEQ), j.C.Seq)
+
+	j.CallFunc((*Jit).InstCycles)
+
+	return irq
+}
+
+func (j *Jit) emitStepPc(w uint32) {
+	j.Add(gojit.Imm(w), j.C.R[PC])
+
+	j.Mov(j.C.PcPtr, gojit.Rax)
+
+	j.Test(gojit.Rax, gojit.Rax)
+
+	noPtr := j.JccForward(gojit.CC_Z)
+
+	j.Add(gojit.Imm(w), j.C.PcPtr)
+
+	noPtr()
+}
+
+func (j *Jit) emitPipelineUpdate(p unsafe.Pointer, w uint32) {
+	// NOTE: when exiting jit, need pipeline setup properly
+	// ONLY when not reloading. This removes every inst pipeline adjustment
+	mask := uint32(0xFFFF_FFFF >> ((w & 2) * 8))
+	j.MovAbs(uint64(uintptr(p)), gojit.Rax)
+	j.Add(gojit.Imm(w), gojit.Rax)
+	ptr := gojit.Indirect{Base: gojit.Rax, Offset: 0, Bits: 32}
+
+	for i := range 2 {
+		j.Movl(ptr, gojit.Ebx)
+		j.And(gojit.Imm(mask), gojit.Ebx)
+		j.Movl(gojit.Ebx, j.C.Op[i])
+		j.Add(gojit.Imm(w), gojit.Rax)
+	}
+
+	j.Mov(gojit.Rax, j.C.PcPtr)
 }

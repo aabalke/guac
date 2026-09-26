@@ -106,7 +106,7 @@ func NewGBA(ctx *audio.Context, path string, muted bool) *GBA {
 		MaxInstCnt:     64,
 		BlockCnt:       4096,
 		LoopThreshold:  255,
-		Enabled:        false,
+		Enabled:        true,
 	}
 
 	gba := &GBA{
@@ -305,7 +305,7 @@ func (gba *GBA) DirectBoot() {
 
 	gba.Irq.IME = true
 
-	reg.CPSR.Set(0x1F)
+	reg.CPSR.Set(uint32(arm7.MODE_SYS))
 
 	reg.R[arm7.PC] = 0x800_0000
 	reg.R[arm7.LR] = 0x800_0000

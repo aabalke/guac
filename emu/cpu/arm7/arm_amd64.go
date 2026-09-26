@@ -2,6 +2,7 @@ package arm7
 
 import (
 	"math/bits"
+	"unsafe"
 
 	"github.com/aabalke/gojit"
 )
@@ -356,9 +357,18 @@ func (j *Jit) emitMrs(op uint32) {
 	rd := (op >> 12) & 0xF
 
 	if spsr := (op>>22)&1 != 0; spsr {
-		j.Mov(JIT, gojit.Rax)
-		j.Movl(j.C.Mode, gojit.Ebx)
-		j.CallFunc((*Jit).GetSPSR)
+
+		// gets spsr
+		j.Movl(j.C.Mode, gojit.Eax)
+		j.CallFunc(ModeBank)
+		size := unsafe.Sizeof(Cond{})
+		j.Movl(gojit.Imm(size), gojit.Ebx)
+		j.Mul(gojit.Ebx)
+
+		j.MovAbs(uint64(j.C.Spsr), gojit.Ebx)
+		j.Add(gojit.Ebx, gojit.Eax)
+		j.CallFunc((*Cond).Get)
+
 		j.Movl(gojit.Eax, j.C.R[rd])
 		return
 	}

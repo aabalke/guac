@@ -766,7 +766,7 @@ func (c *Cpu) Mrs(op uint32) {
 	rd := (op >> 12) & 0xF
 
 	if spsr := (op>>22)&1 != 0; spsr {
-		r[rd] = c.GetSPSR(c.Reg.CPSR.Mode)
+		r[rd] = c.Reg.SPSR[ModeBank(c.Reg.CPSR.Mode)].Get()
 		return
 	}
 

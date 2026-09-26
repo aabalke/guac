@@ -2,17 +2,20 @@ package arm7
 
 import (
 	"fmt"
+	"os"
+	"reflect"
 	"unsafe"
 
 	"github.com/aabalke/gojit"
+	"golang.org/x/exp/constraints"
 )
 
 type Cpu struct {
 	Bus          Bus
 	Mem          Mem
 	TestJit, Jit *Jit
-	Cycles       func(addr, width, seq uint32, inst bool)
-	Idle         func(cycles int64)
+	CyclesFunc   func(addr, width, seq uint32, inst bool)
+	IdleFunc     func(cycles int64)
 	PcPtr        unsafe.Pointer
 	Reg          Reg
 	Op           [2]uint32
@@ -138,6 +141,7 @@ const (
 	MODE_SYS CpuMode = 0x1F
 )
 
+//go:nosplit
 func ModeBank(mode CpuMode) uint32 {
 	switch mode | 0x10 {
 	case MODE_USR, MODE_SYS:
@@ -207,10 +211,10 @@ func (c *Cond) CheckCond(cond uint32) bool {
 
 func NewCpu(mem Mem, jitConfig JitConfig, cycles func(addr, width, seq uint32, inst bool), idle func(cycles int64)) *Cpu {
 	c := &Cpu{
-		Mem:       mem,
-		Cycles:    cycles,
-		Idle:      idle,
-		LowVector: true,
+		Mem:        mem,
+		CyclesFunc: cycles,
+		IdleFunc:   idle,
+		LowVector:  true,
 	}
 
 	cpuPtrs := GetCpuPtrs(c)
@@ -233,23 +237,31 @@ func GetCpuPtrs(cpu *Cpu) CpuPtrs {
 		reg  = int32(unsafe.Offsetof(Cpu{}.Reg))
 		r    = reg + int32(unsafe.Offsetof(Reg{}.R))
 		cpsr = reg + int32(unsafe.Offsetof(Reg{}.CPSR))
+		op   = int32(unsafe.Offsetof(Cpu{}.Op))
 	)
 
 	c := CpuPtrs{
-		Mode:   gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.Mode)), Bits: 32},
-		N:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.N)), Bits: 8},
-		Z:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.Z)), Bits: 8},
-		C:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.C)), Bits: 8},
-		V:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.V)), Bits: 8},
-		T:      gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.T)), Bits: 8},
-		Reload: gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Reload)), Bits: 8},
-		Seq:    gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Seq)), Bits: 8},
-		Cpsr:   uintptr(unsafe.Pointer(&cpu.Reg.CPSR)),
-		Cpu:    uintptr(unsafe.Pointer(cpu)),
+		Mode:    gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.Mode)), Bits: 32},
+		N:       gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.N)), Bits: 8},
+		Z:       gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.Z)), Bits: 8},
+		C:       gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.C)), Bits: 8},
+		V:       gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.V)), Bits: 8},
+		T:       gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.T)), Bits: 8},
+		IrqLine: gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.IrqLine)), Bits: 8},
+		Reload:  gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Reload)), Bits: 8},
+		Seq:     gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Seq)), Bits: 8},
+		PcPtr:   gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.PcPtr)), Bits: 64},
+		Spsr:    uintptr(unsafe.Pointer(&cpu.Reg.SPSR)),
+		Cpsr:    uintptr(unsafe.Pointer(&cpu.Reg.CPSR)),
+		Cpu:     uintptr(unsafe.Pointer(cpu)),
 	}
 
 	for i := range 16 {
 		c.R[i] = gojit.Indirect{Base: CPU, Offset: r + int32(i*4), Bits: 32}
+	}
+
+	for i := range 2 {
+		c.Op[i] = gojit.Indirect{Base: CPU, Offset: op + int32(i*4), Bits: 32}
 	}
 
 	return c
@@ -408,10 +420,6 @@ func (c *Cpu) Read16(addr uint32) uint32           { return c.Bus.Read16(addr) }
 func (c *Cpu) Read32(addr uint32) uint32           { return c.Bus.Read32(addr) }
 func (c *Cpu) Read32Block(addr, seq uint32) uint32 { return c.Bus.Read32Block(addr, seq) }
 
-func (c *Cpu) GetSPSR(mode CpuMode) uint32 {
-	return c.Reg.SPSR[ModeBank(mode)].Get()
-}
-
 //go:nosplit
 func idleMul(rs uint32, sign bool) int64 {
 	cycles := int64(1)
@@ -500,4 +508,125 @@ func (c *Cpu) Exception(addr ExceptionVector, mode CpuMode) {
 func (c *Cpu) ExitException(mode CpuMode) {
 	c.Reg.CPSR = c.Reg.SPSR[ModeBank(mode)]
 	c.ModeSwitch(mode, c.Reg.CPSR.Mode)
+}
+
+func (c *Cpu) Idle(cycles int64)                   { c.IdleFunc(cycles) }
+func (c *Cpu) Cycles(pc, w, seq uint32, inst bool) { c.CyclesFunc(pc, w, seq, inst) }
+
+func (c *Cpu) UseJit[T constraints.Unsigned](op T) {
+	j := c.TestJit
+	j.TestingCnt++
+
+	fmt.Printf("starting test cnt %08d, op %08X\n", j.TestingCnt, op)
+
+	asm, err := gojit.New(j.Config.NativePageSize)
+	if err != nil {
+		panic(err)
+	}
+
+	j.Assembler = asm
+
+	j.MovAbs(uint64(uintptr(unsafe.Pointer(j))), JIT)
+	j.MovAbs(uint64(j.C.Cpu), CPU)
+
+	switch reflect.TypeOf(op).Kind() {
+	case reflect.Uint16:
+		j.emitThumb(uint16(op))
+	case reflect.Uint32:
+		j.emitArm(uint32(op))
+	}
+
+	asm.Exit()
+
+	if err := asm.Error(); err != nil {
+		panic(err)
+	}
+
+	gojit.CallJit(uintptr(unsafe.Pointer(&asm.Buf[0])))
+
+	asm.Release()
+}
+
+func (c *Cpu) RunJitTest[T constraints.Unsigned](op T) func() {
+	start := c.Reg
+	staStamp := c.Timestamp
+
+	//ewramPtr := j.cpu.Mem.ReadPtr(0x200_0000)
+	//iwramPtr := j.cpu.Mem.ReadPtr(0x300_0000)
+	//vramPtr := j.cpu.Mem.ReadPtr(0x600_0000)
+	//ewram := *(*[0x40000]uint8)(ewramPtr)
+	//iwram := *(*[0x8000]uint8)(iwramPtr)
+	//vram := *(*[0x18001]uint8)(vramPtr)
+
+	c.UseJit(op)
+
+	//savedIwram := *(*[0x8000]uint8)(iwramPtr)
+
+	sav := c.Reg
+	savStamp := c.Timestamp
+
+	//*(*[0x40000]uint8)(ewramPtr) = ewram
+	//*(*[0x8000]uint8)(iwramPtr) = iwram
+	//*(*[0x18001]uint8)(vramPtr) = vram
+
+	c.Reg = start
+
+	// returns exit test func, which should be deferred until end of interpreted func
+
+	return func() {
+		// do not (Reg) == (Reg), sta = cpu.Reg does not promise padding
+
+		// dirty := false
+		// for i := 0; i < len(savedIwram); i += 4 {
+		//	jit := binary.LittleEndian.Uint32(savedIwram[i:])
+		//	interpreter := binary.LittleEndian.Uint32((*[0x8000]uint8)(iwramPtr)[i:])
+
+		//	if jit != interpreter {
+		//		dirty = true
+		//		fmt.Printf("ADDR 0x300...%04X: Jit %08X Interpreter %08X\n", i, jit, interpreter)
+		//	}
+		//}
+
+		//if dirty {
+		//	panic("invalid memory values")
+		//}
+
+		if match := (c.Reg.R == sav.R &&
+			c.Reg.CPSR == sav.CPSR &&
+			c.Reg.SPSR == sav.SPSR &&
+			c.Reg.FIQ == sav.FIQ &&
+			c.Reg.LR == sav.LR &&
+			c.Reg.SP == sav.SP &&
+			c.Reg.USR == sav.USR &&
+			c.Timestamp-savStamp == savStamp-staStamp); match {
+			return // match
+		}
+
+		s := ""
+		s += fmt.Sprintf("STA REG %08X CPSR %08X\n", start.R, start.CPSR.Get())
+		s += fmt.Sprintf("JIT REG %08X CPSR %08X\n", sav.R, sav.CPSR.Get())
+		s += fmt.Sprintf("COR REG %08X CPSR %08X\n", c.Reg.R, c.Reg.CPSR.Get())
+
+		s += fmt.Sprintf("Time Diff Cor %08X Jit %08X\n", c.Timestamp-savStamp, savStamp-staStamp)
+
+		s += fmt.Sprintf("STA USRREG %08X\n", start.USR)
+		s += fmt.Sprintf("JIT USRREG %08X\n", sav.USR)
+		s += fmt.Sprintf("COR USRREG %08X\n", c.Reg.USR)
+
+		s += fmt.Sprintf("STA LR %08X\n", start.LR)
+		s += fmt.Sprintf("JIT LR %08X\n", sav.LR)
+		s += fmt.Sprintf("COR LR %08X\n", c.Reg.LR)
+
+		s += fmt.Sprintf("STA SP %08X\n", start.SP)
+		s += fmt.Sprintf("JIT SP %08X\n", sav.SP)
+		s += fmt.Sprintf("COR SP %08X\n", c.Reg.SP)
+
+		s += fmt.Sprintf("STA FIQ %08X\n", start.FIQ)
+		s += fmt.Sprintf("JIT FIQ %08X\n", sav.FIQ)
+		s += fmt.Sprintf("COR FIQ %08X\n", c.Reg.FIQ)
+
+		fmt.Printf("%s", s)
+
+		os.Exit(0)
+	}
 }
