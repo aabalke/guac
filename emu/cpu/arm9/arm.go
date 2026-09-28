@@ -147,19 +147,22 @@ func (c *Cpu) ExtendedMul(op uint32) {
 		rm  = (op >> 0) & 0xF
 		x   = (op >> 5) & 1
 		y   = (op >> 6) & 1
-		rsV = int64(int16((r[rs] >> (16 * y)) & 0xFFFF))
+		rsV = int64(int16(uint16(r[rs] >> (16 * y))))
 	)
 
 	switch inst := (op >> 21) & 3; inst {
-	case SMLAxy:
-		rmV := int64(int16((r[rm] >> (16 * x)) & 0xFFFF))
-		rnV := int64(int32(r[rn]))
-		res := (rmV * rsV) + rnV
-		r[rd] = uint32(res)
+	case SMLAxy, SMULxy:
+		rmV := int64(int16(uint16(r[rm] >> (16 * x))))
+		res := (rmV * rsV)
 
-		if res > math.MaxInt32 || res < math.MinInt32 {
-			c.Reg.CPSR.Q = true
+		if inst == SMLAxy {
+			res += int64(int32(r[rn]))
+			if res > math.MaxInt32 || res < math.MinInt32 {
+				c.Reg.CPSR.Q = true
+			}
 		}
+
+		r[rd] = uint32(res)
 
 	case SMLAWySMLALWy:
 		rmV := int64(int32(r[rm]))
@@ -167,7 +170,6 @@ func (c *Cpu) ExtendedMul(op uint32) {
 
 		if smulwa := x == 0; smulwa {
 			res += int64(int32(r[rn]))
-
 			if res > math.MaxInt32 || res < math.MinInt32 {
 				c.Reg.CPSR.Q = true
 			}
@@ -176,14 +178,10 @@ func (c *Cpu) ExtendedMul(op uint32) {
 		r[rd] = uint32(res)
 
 	case SMLALxy:
-		rmV := int64(int16((r[rm] >> (16 * x) & 0xFFFF)))
+		rmV := int64(int16(uint16(r[rm] >> (16 * x))))
 		res := (rsV * rmV) + (int64(int32(r[rd]))<<32 | int64(int32(r[rn])))
-		r[rd] = uint32(res >> 32)
 		r[rn] = uint32(res)
-
-	case SMULxy:
-		rmV := int64(int16((r[rm] >> (16 * x)) & 0xFFFF))
-		r[rd] = uint32(rmV * rsV)
+		r[rd] = uint32(res >> 32)
 	}
 }
 
@@ -312,13 +310,12 @@ const (
 
 func (c *Cpu) Qalu(op uint32) {
 	var (
-		r    = &c.Reg.R
-		inst = (op >> 20) & 0xF
-		rnV  = int64(int32(r[(op>>16)&0xF]))
-		rmV  = int64(int32(r[op&0xF]))
+		r   = &c.Reg.R
+		rnV = int64(int32(r[(op>>16)&0xF]))
+		rmV = int64(int32(r[op&0xF]))
 	)
 
-	if double := inst >= 4; double {
+	if double := op&(1<<22) != 0; double {
 
 		rnV *= 2
 
@@ -332,10 +329,10 @@ func (c *Cpu) Qalu(op uint32) {
 		}
 	}
 
-	if inst == QADD || inst == QDADD {
-		rnV += rmV
-	} else {
+	if sub := op&(1<<21) != 0; sub {
 		rnV = rmV - rnV
+	} else {
+		rnV += rmV
 	}
 
 	switch {
@@ -487,16 +484,5 @@ func (c *Cpu) Block(op uint32) {
 		return
 	}
 
-	var (
-		curr = c.Reg.CPSR.Mode
-		spsr = c.Reg.SPSR[arm7.ModeBank(curr)]
-		next = spsr.Mode
-	)
-
-	if curr == arm7.MODE_USR {
-		panic("user mode ldm^")
-	}
-
-	c.Reg.CPSR = spsr
-	c.ModeSwitch(curr, next)
+	c.DoLdmLoadSwitch()
 }

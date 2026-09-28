@@ -220,9 +220,9 @@ func NewCpu(mem Mem, jitConfig JitConfig, cycles func(addr, width, seq uint32, i
 	cpuPtrs := GetCpuPtrs(c)
 
 	if jitConfig.Enabled {
-		c.Jit = NewJit(c, jitConfig, cpuPtrs)
+		c.Jit = NewJit(c, mem, jitConfig, cpuPtrs)
 	} else {
-		c.TestJit = NewJit(c, jitConfig, cpuPtrs)
+		c.TestJit = NewJit(c, mem, jitConfig, cpuPtrs)
 	}
 
 	c.Bus = &Bus7{
@@ -246,10 +246,11 @@ func GetCpuPtrs(cpu *Cpu) CpuPtrs {
 		Z:       gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.Z)), Bits: 8},
 		C:       gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.C)), Bits: 8},
 		V:       gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.V)), Bits: 8},
+		Q:       gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.Q)), Bits: 8},
 		T:       gojit.Indirect{Base: CPU, Offset: cpsr + int32(unsafe.Offsetof(Cond{}.T)), Bits: 8},
 		IrqLine: gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.IrqLine)), Bits: 8},
 		Reload:  gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Reload)), Bits: 8},
-		Seq:     gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Seq)), Bits: 8},
+		Seq:     gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.Seq)), Bits: 32},
 		PcPtr:   gojit.Indirect{Base: CPU, Offset: int32(unsafe.Offsetof(Cpu{}.PcPtr)), Bits: 64},
 		Spsr:    uintptr(unsafe.Pointer(&cpu.Reg.SPSR)),
 		Cpsr:    uintptr(unsafe.Pointer(&cpu.Reg.CPSR)),
@@ -515,6 +516,11 @@ func (c *Cpu) Cycles(pc, w, seq uint32, inst bool) { c.CyclesFunc(pc, w, seq, in
 
 func (c *Cpu) UseJit[T constraints.Unsigned](op T) {
 	j := c.TestJit
+
+	if j == nil {
+		panic("attemped to test jit with jit active (no test jit present)")
+	}
+
 	j.TestingCnt++
 
 	fmt.Printf("starting test cnt %08d, op %08X\n", j.TestingCnt, op)
@@ -531,9 +537,9 @@ func (c *Cpu) UseJit[T constraints.Unsigned](op T) {
 
 	switch reflect.TypeOf(op).Kind() {
 	case reflect.Uint16:
-		j.emitThumb(uint16(op))
+		j.EmitThumb(uint16(op))
 	case reflect.Uint32:
-		j.emitArm(uint32(op))
+		j.EmitArm(uint32(op))
 	}
 
 	asm.Exit()
@@ -550,6 +556,7 @@ func (c *Cpu) UseJit[T constraints.Unsigned](op T) {
 func (c *Cpu) RunJitTest[T constraints.Unsigned](op T) func() {
 	start := c.Reg
 	staStamp := c.Timestamp
+	staReload := c.Reload
 
 	//ewramPtr := j.cpu.Mem.ReadPtr(0x200_0000)
 	//iwramPtr := j.cpu.Mem.ReadPtr(0x300_0000)
@@ -564,12 +571,14 @@ func (c *Cpu) RunJitTest[T constraints.Unsigned](op T) func() {
 
 	sav := c.Reg
 	savStamp := c.Timestamp
+	savReload := c.Reload
 
 	//*(*[0x40000]uint8)(ewramPtr) = ewram
 	//*(*[0x8000]uint8)(iwramPtr) = iwram
 	//*(*[0x18001]uint8)(vramPtr) = vram
 
 	c.Reg = start
+	c.Reload = staReload
 
 	// returns exit test func, which should be deferred until end of interpreted func
 
@@ -598,7 +607,8 @@ func (c *Cpu) RunJitTest[T constraints.Unsigned](op T) func() {
 			c.Reg.LR == sav.LR &&
 			c.Reg.SP == sav.SP &&
 			c.Reg.USR == sav.USR &&
-			c.Timestamp-savStamp == savStamp-staStamp); match {
+			c.Timestamp-savStamp == savStamp-staStamp &&
+			c.Reload == savReload); match {
 			return // match
 		}
 
@@ -607,6 +617,7 @@ func (c *Cpu) RunJitTest[T constraints.Unsigned](op T) func() {
 		s += fmt.Sprintf("JIT REG %08X CPSR %08X\n", sav.R, sav.CPSR.Get())
 		s += fmt.Sprintf("COR REG %08X CPSR %08X\n", c.Reg.R, c.Reg.CPSR.Get())
 
+		s += fmt.Sprintf("Reload Prior %t Cor %t Jit %t\n", staReload, c.Reload, savReload)
 		s += fmt.Sprintf("Time Diff Cor %08X Jit %08X\n", c.Timestamp-savStamp, savStamp-staStamp)
 
 		s += fmt.Sprintf("STA USRREG %08X\n", start.USR)

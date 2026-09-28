@@ -3,7 +3,6 @@ package arm9
 
 import (
 	"fmt"
-	"math/bits"
 
 	"github.com/aabalke/guac/emu/cpu/arm7"
 )
@@ -22,16 +21,22 @@ func (c *Cpu) DecodeThumb(op uint16) {
 		c.ThumbImm(op)
 	case arm7.IsThumbAlu(op):
 		c.ThumbAlu(op)
+	case arm7.IsThumbHiBx(op):
+		c.ThumbHiBx(op)
 	case arm7.IsThumbHi(op):
 		c.ThumbHi(op)
 	case arm7.IsLSHalf(op):
 		c.ThumbLSHalf(op)
+	case arm7.IsThumbLDSH(op):
+		c.ThumbLDSH(op)
 	case arm7.IsThumbSdt(op):
 		c.ThumbSdt(op)
 	case arm7.IsLPC(op):
 		c.ThumbLPC(op)
 	case arm7.IsLSImm(op):
 		c.ThumbLSImm(op)
+	case arm7.IsPopPc(op):
+		c.ThumbPopPc(op)
 	case arm7.IsPushPop(op):
 		c.ThumbPushPop(op)
 	case arm7.IsRelative(op):
@@ -86,169 +91,40 @@ func (c *Cpu) ThumbShortBlx(op uint16) {
 	c.ToggleThumb()
 }
 
-func (c *Cpu) ThumbSdt(op uint16) {
-	var (
-		r    = &c.Reg.R
-		rd   = op & 7
-		addr = r[(op>>3)&7] + r[(op>>6)&7]
-	)
-
-	if signed := (op>>9)&1 != 0; signed {
-
-		switch inst := (op >> 10) & 3; inst {
-		case arm7.THUMB_STRH:
-			c.Write16(addr, uint16(r[rd]))
-
-		case arm7.THUMB_LDSB:
-			r[rd] = uint32(int32(int8(c.Read8(addr))))
-
-		case arm7.THUMB_LDRH:
-			v := c.Read16(addr)
-			r[rd] = bits.RotateLeft32(v, -int((addr&1)*8))
-
-		case arm7.THUMB_LDSH:
-			// arm9 sign extend
-			r[rd] = uint32(int32(int16(c.Read16(addr))))
-		}
-
-		return
-	}
-
-	switch inst := (op >> 10) & 3; inst {
-	case arm7.THUMB_STR_REG:
-		c.Write32(addr, r[rd])
-	case arm7.THUMB_STRB_REG:
-		c.Write8(addr, uint8(r[rd]))
-	case arm7.THUMB_LDR_REG:
-		v := c.Read32(addr)
-		r[rd] = bits.RotateLeft32(v, -int((addr&3)*8))
-	case arm7.THUMB_LDRB_REG:
-		r[rd] = c.Read8(addr)
-	}
+func (c *Cpu) ThumbLDSH(op uint16) {
+	r := &c.Reg.R
+	addr := r[(op>>3)&7] + r[(op>>6)&7]
+	r[op&7] = uint32(int32(int16(c.Read16(addr))))
 }
 
-func (c *Cpu) ThumbPushPop(op uint16) {
-	var (
-		r     = &c.Reg.R
-		pclr  = (op>>8)&1 != 0
-		rlist = op & 0xFF
-		pop   = (op>>11)&1 != 0
-		seq   = uint32(arm7.NONSEQ)
-	)
-
-	// thank you nano
-	if rlist == 0 && !pclr {
-		if pop {
-			r[PC] = c.Read32Block(r[SP], seq)
-			c.Reload = true
-			r[SP] += 0x40
-		} else {
-			// alyosha test fails this.
-			// i think it is timing related
-			r[SP] -= 0x40
-			c.Write32Block(r[SP], r[PC], seq)
-		}
-
-		return
-	}
-
-	if pop {
-		for reg := range 8 {
-			if disabled := (rlist>>reg)&1 == 0; disabled {
-				continue
-			}
-
-			r[reg] = c.Read32Block(r[SP], seq)
-			r[SP] += 4
-
-			seq = arm7.SEQ
-		}
-
-		if pclr {
-
-			r[PC] = c.Read32Block(r[SP], seq)
-			// arm9 toggle thumb switch based on bit 0, arm7 force aligned
-			r[SP] += 4
-			//c.Idle(1) // gba has, not sure if arm9
-			c.ToggleThumb()
-			return
-		}
-
-		c.Idle(1)
-
-	} else {
-
-		if pclr {
-			r[SP] -= 4
-			c.Write32Block(r[SP], r[LR], seq)
-			seq = arm7.SEQ
-		}
-
-		for reg := 7; reg >= 0; reg-- {
-			if disabled := (rlist>>reg)&1 == 0; disabled {
-				continue
-			}
-
-			r[SP] -= 4
-			c.Write32Block(r[SP], r[reg], seq)
-
-			seq = arm7.SEQ
-		}
-	}
+func (c *Cpu) ThumbPopPc(op uint16) {
+	r := &c.Reg.R
+	seq := c.ThumbPushPop(op)
+	r[PC] = c.Read32Block(r[SP], seq)
+	r[SP] += 4
+	//c.Idle(1) // gba has, not sure if arm9
+	c.ToggleThumb()
 }
 
-func (c *Cpu) ThumbHi(op uint16) {
+func (c *Cpu) ThumbHiBx(op uint16) {
 	var (
 		r  = &c.Reg.R
-		rd = (op & 7) | (((op >> 7) & 1) << 3)
 		rs = (op >> 3) & 0xF
 	)
 
-	switch inst := (op >> 8) & 3; inst {
-	case arm7.HI_ADD:
-
-		r[rd] += r[rs]
-
-		if rd == PC {
-			c.Reload = true
-		}
-
-	case arm7.HI_CMP:
-
-		rsv := r[rs]
-		rdv := r[rd]
-		res := uint64(rdv) - uint64(rsv)
-
-		cpsr := &c.Reg.CPSR
-		cpsr.N = (uint32(res)>>31)&1 != 0
-		cpsr.Z = uint32(res) == 0
-		cpsr.C = res < 0x1_0000_0000
-		cpsr.V = ((rdv^rsv)&(rdv^uint32(res)))>>31 != 0
-
-	case arm7.HI_MOV:
-		if nop := op == 0x46C0; nop {
-			return
-		}
-
-		r[rd] = r[rs]
-
-		if rd == PC {
-			c.Reload = true
-		}
-
-	case arm7.HI_BX:
-
-		if blx := op&(1<<7) != 0; blx {
-
-			// need tmp ret for blx LR (pc = old LR, lr = calc ret)
-			ret := (r[PC] - 2) | 1
-			r[PC] = r[rs]
-			r[LR] = ret
-			c.ToggleThumb()
-			return
-		}
-
-		r[PC] = r[rs]
-		c.ToggleThumb()
+	v := r[rs]
+	if rs == PC {
+		v &^= 1
 	}
+
+	if blx := op&(1<<7) != 0; blx {
+		// need tmp ret for blx LR (pc = old LR, lr = calc ret)
+		ret := (r[PC] - 2) | 1
+		r[PC] = v
+		r[LR] = ret
+	} else {
+		r[PC] = v
+	}
+
+	c.ToggleThumb()
 }

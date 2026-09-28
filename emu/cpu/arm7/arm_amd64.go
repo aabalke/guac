@@ -7,7 +7,7 @@ import (
 	"github.com/aabalke/gojit"
 )
 
-func (j *Jit) emitMul(op uint32) {
+func (j *Jit) EmitMul(op uint32) {
 	var (
 		set = (op>>20)&1 != 0
 		rd  = (op >> 16) & 0xF
@@ -141,7 +141,7 @@ func (j *Jit) emitMul(op uint32) {
 	}
 }
 
-func (j *Jit) emitSwp(op uint32) {
+func (j *Jit) EmitSwp(op uint32) {
 	rn := (op >> 16) & 0xF
 	rd := (op >> 12) & 0xF
 	rm := op & 0xF
@@ -181,7 +181,7 @@ func (j *Jit) emitSwp(op uint32) {
 	j.CallFunc((*Jit).Write32)
 }
 
-func (j *Jit) emitHalf(op uint32) {
+func (j *Jit) EmitHalf(op uint32) {
 	var (
 		rn   = (op >> 16) & 0xF
 		rd   = (op >> 12) & 0xF
@@ -271,7 +271,7 @@ func (j *Jit) emitHalf(op uint32) {
 	}
 }
 
-func (j *Jit) emitSdt(op uint32) {
+func (j *Jit) EmitSdt(op uint32) {
 	var (
 		reg  = (op>>25)&1 != 0
 		pre  = (op>>24)&1 != 0
@@ -334,8 +334,8 @@ func (j *Jit) emitSdt(op uint32) {
 			j.Movl(gojit.Eax, j.C.R[rd])
 
 			if rd == PC {
-				j.emitToggleThumb()
-				j.emitCondReloadState(op >> 28)
+				j.EmitToggleThumb()
+				j.EmitCondReloadState(op >> 28)
 			}
 		}
 	} else {
@@ -353,7 +353,7 @@ func (j *Jit) emitSdt(op uint32) {
 	}
 }
 
-func (j *Jit) emitMrs(op uint32) {
+func (j *Jit) EmitMrs(op uint32) {
 	rd := (op >> 12) & 0xF
 
 	if spsr := (op>>22)&1 != 0; spsr {
@@ -363,10 +363,11 @@ func (j *Jit) emitMrs(op uint32) {
 		j.CallFunc(ModeBank)
 		size := unsafe.Sizeof(Cond{})
 		j.Movl(gojit.Imm(size), gojit.Ebx)
-		j.Mul(gojit.Ebx)
+		j.Mul(gojit.Rbx)
 
-		j.MovAbs(uint64(j.C.Spsr), gojit.Ebx)
-		j.Add(gojit.Ebx, gojit.Eax)
+		j.MovAbs(uint64(j.C.Spsr), gojit.Rbx)
+
+		j.Add(gojit.Rbx, gojit.Rax)
 		j.CallFunc((*Cond).Get)
 
 		j.Movl(gojit.Eax, j.C.R[rd])
@@ -397,7 +398,7 @@ func (j *Jit) emitMrs(op uint32) {
 	j.Movl(gojit.Eax, j.C.R[rd])
 }
 
-func (j *Jit) emitMsr(op uint32) {
+func (j *Jit) EmitMsr(op uint32) {
 	// v r8
 
 	if imm := (op>>25)&1 != 0; imm {
@@ -428,7 +429,7 @@ func (j *Jit) emitMsr(op uint32) {
 	j.CallFunc((*Jit).DoMsrModeSwitch)
 }
 
-func (j *Jit) emitAluOp2Reg(op uint32) {
+func (j *Jit) EmitAluOp2Reg(op uint32) {
 	// op2 ax, carry dl
 
 	if imm := (op>>4)&1 == 0; imm {
@@ -606,7 +607,7 @@ func (j *Jit) ShiftReg(shType uint32) {
 	zero()
 }
 
-func (j *Jit) emitAlu(op uint32) {
+func (j *Jit) EmitAlu(op uint32) {
 	var (
 		inst = (op >> 21) & 0xF
 		rd   = (op >> 12) & 0xF
@@ -633,7 +634,7 @@ func (j *Jit) emitAlu(op uint32) {
 
 		// get op2, op2 will be in bx
 		// shift
-		j.emitAluOp2Reg(op)
+		j.EmitAluOp2Reg(op)
 
 		j.Movl(j.C.R[rn], gojit.Eax)
 		if regShift := (op>>4)&1 != 0; regShift && rn == PC {
@@ -665,7 +666,7 @@ func (j *Jit) emitAlu(op uint32) {
 		thumb()
 
 		if inst < 0b1000 || inst > 0b1011 {
-			j.emitCondReloadState(op >> 28)
+			j.EmitCondReloadState(op >> 28)
 		}
 	}
 }
@@ -903,7 +904,7 @@ var aluInstJit = [...]func(j *Jit, op, rd uint32){
 	},
 }
 
-func (j *Jit) emitBlock(op uint32) {
+func (j *Jit) EmitBlock(op uint32) {
 	var (
 		rlist      = op & 0xFFFF
 		rn         = (op >> 16) & 0xF
@@ -937,6 +938,9 @@ func (j *Jit) emitBlock(op uint32) {
 
 	possibleForceUser := psr && (!load || !pcIncluded)
 
+	j.Movl(j.C.R[rn], gojit.R11d)
+	j.Movl(gojit.R11d, gojit.R10d)
+
 	j.Movl(gojit.Imm(0), gojit.R8d)
 
 	if possibleForceUser {
@@ -958,9 +962,6 @@ func (j *Jit) emitBlock(op uint32) {
 		usr()
 		sys()
 	}
-
-	j.Movl(j.C.R[rn], gojit.R11d)
-	j.Movl(gojit.R11d, gojit.R10d)
 
 	// even when decrementing, cpu increments from "final" reg
 	// see mgba https://mgba.io/2014/12/28/classic-nes/
@@ -1047,7 +1048,7 @@ func (j *Jit) emitBlock(op uint32) {
 		return
 	}
 
-	j.emitCondReloadState(op >> 28)
+	j.EmitCondReloadState(op >> 28)
 
 	if !psr {
 		return
@@ -1057,7 +1058,7 @@ func (j *Jit) emitBlock(op uint32) {
 	j.CallFunc((*Jit).DoLdmLoadSwitch)
 }
 
-func (j *Jit) emitBranch(op uint32) {
+func (j *Jit) EmitBranch(op uint32) {
 	if link := (op>>24)&1 != 0; link {
 		j.Movl(j.C.R[PC], gojit.Eax)
 		j.Sub(gojit.Imm(4), gojit.Eax)
@@ -1066,17 +1067,17 @@ func (j *Jit) emitBranch(op uint32) {
 
 	j.Add(gojit.Imm(int32(uint32((int32(op)<<8)>>6))), j.C.R[PC])
 
-	j.emitCondReloadState(op >> 28)
+	j.EmitCondReloadState(op >> 28)
 }
 
-func (j *Jit) emitBranchExchange(op uint32) {
+func (j *Jit) EmitBranchExchange(op uint32) {
 	switch inst := (op >> 4) & 0xF; inst {
 	case INST_BX:
 		j.Movl(j.C.R[op&0xF], gojit.Eax)
 		j.Movl(gojit.Eax, j.C.R[PC])
 
-		j.emitToggleThumb()
-		j.emitCondReloadState(op >> 28)
+		j.EmitToggleThumb()
+		j.EmitCondReloadState(op >> 28)
 
 	case INST_BXJ:
 		panic("unsupported bxj instruction")
@@ -1085,31 +1086,63 @@ func (j *Jit) emitBranchExchange(op uint32) {
 	}
 }
 
-func (j *Jit) emitException(addr ExceptionVector, mode CpuMode) {
+func (j *Jit) EmitException(addr ExceptionVector, mode CpuMode) {
 	j.Mov(JIT, gojit.Rax)
 	j.MovAbs(uint64(addr), gojit.Rbx)
 	j.Movl(gojit.Imm(mode), gojit.Ecx)
 	j.CallFunc((*Jit).Exception)
 }
 
-func (j *Jit) emitSWI(op uint32) {
-	j.emitException(VEC_SWI, MODE_SWI)
-	j.emitCondReloadState(op >> 28)
+func (j *Jit) EmitSWI(op uint32) {
+	j.EmitException(VEC_SWI, MODE_SWI)
+	j.EmitCondReloadState(op >> 28)
 }
 
-func (j *Jit) emitUndefined(op uint32) {
-	j.emitException(VEC_UNDEFINED, MODE_UND)
-	j.emitCondReloadState(op >> 28)
+func (j *Jit) EmitUndefined(op uint32) {
+	j.EmitException(VEC_UNDEFINED, MODE_UND)
+	j.EmitCondReloadState(op >> 28)
 }
 
-func (j *Jit) emitCondReloadState(cond uint32) {
+func (j *Jit) EmitCondReloadState(cond uint32) {
 	switch cond {
 	case 0xE:
 		j.ReloadState = RELOAD
+		j.Movb(gojit.Imm(1), j.C.Reload)
 	case 0xF:
 		j.ReloadState = NONE
+		//j.Movb(gojit.Imm(0), j.C.Reload)
 	default:
 		j.ReloadState = POSSIBLE
 		j.Movb(gojit.Imm(1), j.C.Reload)
+	}
+}
+
+func (j *Jit) EmitStructCopy(dst, src uintptr, size uint64) {
+	j.MovAbs(uint64(dst), gojit.Rax)
+	j.MovAbs(uint64(src), gojit.Rbx)
+
+	if word := size&3 == 0; word {
+
+		dstAddr := gojit.Indirect{Base: gojit.Rax, Offset: 0, Bits: 32}
+		srcAddr := gojit.Indirect{Base: gojit.Rbx, Offset: 0, Bits: 32}
+
+		for range size {
+			j.Movl(srcAddr, gojit.Ecx)
+			j.Movl(gojit.Ecx, dstAddr)
+			j.Add(gojit.Imm(4), gojit.Rax)
+			j.Add(gojit.Imm(4), gojit.Rbx)
+		}
+
+		return
+	}
+
+	dstAddr := gojit.Indirect{Base: gojit.Rax, Offset: 0, Bits: 8}
+	srcAddr := gojit.Indirect{Base: gojit.Rbx, Offset: 0, Bits: 8}
+
+	for range size {
+		j.Movb(srcAddr, gojit.Cl)
+		j.Movb(gojit.Cl, dstAddr)
+		j.Add(gojit.Imm(1), gojit.Rax)
+		j.Add(gojit.Imm(1), gojit.Rbx)
 	}
 }

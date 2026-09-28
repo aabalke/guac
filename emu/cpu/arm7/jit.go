@@ -21,7 +21,7 @@ type Jit struct {
 	*gojit.Assembler
 	Mem Mem
 	//cpu *Cpu
-	cpu          JittedCpu
+	Cpu          JittedCpu
 	C            CpuPtrs
 	Metrics      [][]uint32
 	BlockCache   *BlockCache
@@ -69,12 +69,13 @@ type JitConfig struct {
 type CpuPtrs struct {
 	Cpu                  uintptr
 	Cpsr, Spsr           uintptr
+	Cp15                 uintptr
 	R                    [16]gojit.Indirect
+	Op                   [2]gojit.Indirect
 	Mode                 gojit.Indirect
-	N, Z, C, V, T        gojit.Indirect
+	N, Z, C, V, T, Q     gojit.Indirect
 	Reload, Seq, IrqLine gojit.Indirect
 	PcPtr                gojit.Indirect
-	Op                   [2]gojit.Indirect
 }
 
 type Page struct {
@@ -83,14 +84,14 @@ type Page struct {
 	dead   bool
 }
 
-func NewJit(cpu *Cpu, config JitConfig, ptrs CpuPtrs) *Jit {
+func NewJit(cpu JittedCpu, mem Mem, config JitConfig, ptrs CpuPtrs) *Jit {
 	if !config.Enabled { // testing jit
-		return &Jit{cpu: cpu, Mem: cpu.Mem, Config: config, C: ptrs}
+		return &Jit{Cpu: cpu, Mem: mem, Config: config, C: ptrs}
 	}
 
 	return &Jit{
-		cpu:   cpu,
-		Mem:   cpu.Mem,
+		Cpu:   cpu,
+		Mem:   mem,
 		Pages: make([]*Page, config.AddressSpace>>config.PageShift),
 		BlockCache: InitBlockCache(
 			uint32(config.BlockCnt),
@@ -189,51 +190,51 @@ func (j *Jit) TryJit(pc uint32) bool {
 }
 
 //go:nosplit
-func (j *Jit) Idle(cycles int64) { j.cpu.Idle(cycles) }
+func (j *Jit) Idle(cycles int64) { j.Cpu.Idle(cycles) }
 
 //go:nosplit
-func (j *Jit) Read8(addr uint32) uint32 { return j.cpu.Read8(addr) }
+func (j *Jit) Read8(addr uint32) uint32 { return j.Cpu.Read8(addr) }
 
 //go:nosplit
-func (j *Jit) Read16(addr uint32) uint32 { return j.cpu.Read16(addr) }
+func (j *Jit) Read16(addr uint32) uint32 { return j.Cpu.Read16(addr) }
 
 //go:nosplit
-func (j *Jit) Read32(addr uint32) uint32 { return j.cpu.Read32(addr) }
+func (j *Jit) Read32(addr uint32) uint32 { return j.Cpu.Read32(addr) }
 
 //go:nosplit
-func (j *Jit) Read32Block(addr, seq uint32) uint32 { return j.cpu.Read32Block(addr, seq) }
+func (j *Jit) Read32Block(addr, seq uint32) uint32 { return j.Cpu.Read32Block(addr, seq) }
 
 //go:nosplit
-func (j *Jit) Write8(addr uint32, v uint8) { j.cpu.Write8(addr, v) }
+func (j *Jit) Write8(addr uint32, v uint8) { j.Cpu.Write8(addr, v) }
 
 //go:nosplit
-func (j *Jit) Write16(addr uint32, v uint16) { j.cpu.Write16(addr, v) }
+func (j *Jit) Write16(addr uint32, v uint16) { j.Cpu.Write16(addr, v) }
 
 //go:nosplit
-func (j *Jit) Write32(addr, v uint32) { j.cpu.Write32(addr, v) }
+func (j *Jit) Write32(addr, v uint32) { j.Cpu.Write32(addr, v) }
 
 //go:nosplit
-func (j *Jit) Write32Block(addr, v, seq uint32) { j.cpu.Write32Block(addr, v, seq) }
+func (j *Jit) Write32Block(addr, v, seq uint32) { j.Cpu.Write32Block(addr, v, seq) }
 
 //go:nosplit
-func (j *Jit) ModeSwitch(curr, next CpuMode) { j.cpu.ModeSwitch(curr, next) }
+func (j *Jit) ModeSwitch(curr, next CpuMode) { j.Cpu.ModeSwitch(curr, next) }
 
 //go:nosplit
-func (j *Jit) ReloadPipe() { j.cpu.ReloadPipe() }
+func (j *Jit) ReloadPipe() { j.Cpu.ReloadPipe() }
 
 //go:nosplit
-func (j *Jit) Exception(addr ExceptionVector, mode CpuMode) { j.cpu.Exception(addr, mode) }
+func (j *Jit) Exception(addr ExceptionVector, mode CpuMode) { j.Cpu.Exception(addr, mode) }
 
 //go:nosplit
-func (j *Jit) ExitException(mode CpuMode) { j.cpu.ExitException(mode) }
+func (j *Jit) ExitException(mode CpuMode) { j.Cpu.ExitException(mode) }
 
 //go:nosplit
-func (j *Jit) InstCycles(pc, w, seq uint32) { j.cpu.Cycles(pc, w, seq, true) }
+func (j *Jit) InstCycles(pc, w, seq uint32) { j.Cpu.Cycles(pc, w, seq, true) }
 
 //go:nosplit
 func (j *Jit) DoMsrModeSwitch(spsrFlag bool, v, mask uint32) {
-	j.cpu.DoMsrModeSwitch(spsrFlag, v, mask)
+	j.Cpu.DoMsrModeSwitch(spsrFlag, v, mask)
 }
 
 //go:nosplit
-func (j *Jit) DoLdmLoadSwitch() { j.cpu.DoLdmLoadSwitch() }
+func (j *Jit) DoLdmLoadSwitch() { j.Cpu.DoLdmLoadSwitch() }

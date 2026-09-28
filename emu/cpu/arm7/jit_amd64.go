@@ -89,24 +89,24 @@ func (j *Jit) TryEmitOp(p unsafe.Pointer, w uint32) bool {
 
 	endBlock := false
 
-	irq := j.emitStep()
+	irq := j.EmitStep()
 
 	if w == 4 {
-		condTargets := j.emitCond(op >> 28)
+		conds := j.EmitCond(op >> 28)
 
-		j.emitArm(op)
+		j.EmitArm(op)
 		done := j.JmpForward()
 
-		j.Movl(gojit.Imm(SEQ), j.C.Seq)
-
-		for _, target := range condTargets {
-			target()
+		for _, cond := range conds {
+			cond()
 		}
+
+		j.Movl(gojit.Imm(SEQ), j.C.Seq)
 
 		done()
 
 	} else {
-		j.emitThumb(uint16(op))
+		j.EmitThumb(uint16(op))
 	}
 
 	// NOTE: condition branching instructions require ending the block
@@ -116,7 +116,7 @@ func (j *Jit) TryEmitOp(p unsafe.Pointer, w uint32) bool {
 	switch reloadState {
 	case NONE:
 		endBlock = false
-		j.emitStepPc(w)
+		j.EmitStepPc(w)
 
 	case RELOAD:
 		endBlock = true
@@ -131,8 +131,8 @@ func (j *Jit) TryEmitOp(p unsafe.Pointer, w uint32) bool {
 
 		reload := j.JccForward(gojit.CC_NZ)
 
-		j.emitStepPc(w)
-		j.emitPipelineUpdate(p, w)
+		j.EmitStepPc(w)
+		j.EmitPipelineUpdate(p, w)
 
 		notReload := j.JmpForward()
 		reload()
@@ -154,7 +154,7 @@ func (j *Jit) TryEmitOp(p unsafe.Pointer, w uint32) bool {
 	return endBlock
 }
 
-func (j *Jit) emitCond(cond uint32) []func() {
+func (j *Jit) EmitCond(cond uint32) []func() {
 	var jcctargets []func()
 
 	switch cond {
@@ -216,83 +216,89 @@ func (j *Jit) emitCond(cond uint32) []func() {
 	return jcctargets
 }
 
-func (j *Jit) emitArm(op uint32) {
+func (j *Jit) EmitArm(op uint32) {
 	switch {
 	case (op>>24)&0xF == 0xF:
-		j.emitSWI(op)
+		j.EmitSWI(op)
 	case IsBranch(op):
-		j.emitBranch(op)
+		j.EmitBranch(op)
 	case IsBranchExchange(op):
-		j.emitBranchExchange(op)
+		j.EmitBranchExchange(op)
 	case IsSdt(op):
-		j.emitSdt(op)
+		j.EmitSdt(op)
 	case IsBlock(op):
-		j.emitBlock(op)
+		j.EmitBlock(op)
 	case IsHalf(op):
-		j.emitHalf(op)
+		j.EmitHalf(op)
 	case IsUndefined(op):
-		j.emitUndefined(op)
+		j.EmitUndefined(op)
 	case IsMsr(op):
-		j.emitMsr(op)
+		j.EmitMsr(op)
 	case IsMrs(op):
-		j.emitMrs(op)
+		j.EmitMrs(op)
 	case IsSwp(op):
-		j.emitSwp(op)
+		j.EmitSwp(op)
 	case IsMul(op):
-		j.emitMul(op)
+		j.EmitMul(op)
 	case IsAlu(op):
-		j.emitAlu(op)
+		j.EmitAlu(op)
 	default:
 		panic(fmt.Sprintf("unemittable amd64 jit instruction ARM OP %08X", op))
 	}
 }
 
-func (j *Jit) emitThumb(op uint16) {
+func (j *Jit) EmitThumb(op uint16) {
 	switch {
 	case IsThumbSWI(op):
-		j.emitThumbSWI(op)
+		j.EmitThumbSWI(op)
 	case IsThumbAddSub(op):
-		j.emitThumbAddSub(op)
+		j.EmitThumbAddSub(op)
 	case IsThumbShift(op):
-		j.emitThumbShifted(op)
+		j.EmitThumbShifted(op)
 	case IsThumbImm(op):
-		j.emitThumbImm(op)
+		j.EmitThumbImm(op)
 	case IsThumbAlu(op):
-		j.emitThumbAlu(op)
+		j.EmitThumbAlu(op)
+	case IsThumbHiBx(op):
+		j.EmitThumbHiBx(op)
 	case IsThumbHi(op):
-		j.emitThumbHi(op)
+		j.EmitThumbHi(op)
 	case IsLSHalf(op):
-		j.emitThumbLSHalf(op)
+		j.EmitThumbLSHalf(op)
+	case IsThumbLDSH(op):
+		j.EmitThumbLDSH(op)
 	case IsThumbSdt(op):
-		j.emitThumbSdt(op)
+		j.EmitThumbSdt(op)
 	case IsLPC(op):
-		j.emitThumbLPC(op)
+		j.EmitThumbLPC(op)
 	case IsLSImm(op):
-		j.emitThumbLSImm(op)
+		j.EmitThumbLSImm(op)
+	case IsPopPc(op):
+		j.EmitThumbPopPc(op)
 	case IsPushPop(op):
-		j.emitThumbPushPop(op)
+		j.EmitThumbPushPop(op)
 	case IsRelative(op):
-		j.emitThumbRelative(op)
+		j.EmitThumbRelative(op)
 	case IsThumbBranch(op):
-		j.emitThumbBranch(op)
+		j.EmitThumbBranch(op)
 	case IsJumpCall(op):
-		j.emitJumpCall(op)
+		j.EmitJumpCall(op)
 	case IsStack(op):
-		j.emitThumbStack(op)
+		j.EmitThumbStack(op)
 	case IsLongBranch(op):
-		j.emitLongBranch(op)
+		j.EmitLongBranch(op)
 	case IsShortLongBranch(op):
-		j.emitShortLongBranch(op)
+		j.EmitShortLongBranch(op)
 	case IsLSSP(op):
-		j.emitThumbLSSP(op)
+		j.EmitThumbLSSP(op)
 	case IsThumbBlock(op):
-		j.emitThumbBlock(op)
+		j.EmitThumbBlock(op)
 	default:
 		panic(fmt.Sprintf("unemittable amd64 jit instruction THUMB OP %04X", op))
 	}
 }
 
-func (j *Jit) emitToggleThumb() {
+func (j *Jit) EmitToggleThumb() {
 	j.Movl(j.C.R[PC], gojit.Eax)
 	j.And(gojit.Imm(1), gojit.Eax)
 	j.Movb(gojit.Al, j.C.T)
@@ -308,7 +314,7 @@ func (j *Jit) emitToggleThumb() {
 	j.And(gojit.Eax, j.C.R[PC])
 }
 
-func (j *Jit) emitStep() func() {
+func (j *Jit) EmitStep() func() {
 	j.Movb(j.C.IrqLine, gojit.Al)
 
 	j.Testb(gojit.Al, gojit.Al)
@@ -334,7 +340,7 @@ func (j *Jit) emitStep() func() {
 	return irq
 }
 
-func (j *Jit) emitStepPc(w uint32) {
+func (j *Jit) EmitStepPc(w uint32) {
 	j.Add(gojit.Imm(w), j.C.R[PC])
 
 	j.Mov(j.C.PcPtr, gojit.Rax)
@@ -348,7 +354,7 @@ func (j *Jit) emitStepPc(w uint32) {
 	noPtr()
 }
 
-func (j *Jit) emitPipelineUpdate(p unsafe.Pointer, w uint32) {
+func (j *Jit) EmitPipelineUpdate(p unsafe.Pointer, w uint32) {
 	// NOTE: when exiting jit, need pipeline setup properly
 	// ONLY when not reloading. This removes every inst pipeline adjustment
 	mask := uint32(0xFFFF_FFFF >> ((w & 2) * 8))

@@ -17,16 +17,22 @@ func (c *Cpu) DecodeThumb(op uint16) {
 		c.ThumbImm(op)
 	case IsThumbAlu(op):
 		c.ThumbAlu(op)
+	case IsThumbHiBx(op):
+		c.ThumbHiBx(op)
 	case IsThumbHi(op):
 		c.ThumbHi(op)
 	case IsLSHalf(op):
 		c.ThumbLSHalf(op)
+	case IsThumbLDSH(op):
+		c.ThumbLDSH(op)
 	case IsThumbSdt(op):
 		c.ThumbSdt(op)
 	case IsLPC(op):
 		c.ThumbLPC(op)
 	case IsLSImm(op):
 		c.ThumbLSImm(op)
+	case IsPopPc(op):
+		c.ThumbPopPc(op)
 	case IsPushPop(op):
 		c.ThumbPushPop(op)
 	case IsRelative(op):
@@ -101,6 +107,15 @@ func IsThumbHi(op uint16) bool {
 }
 
 //go:inline
+func IsThumbHiBx(op uint16) bool {
+	return IsThumbOpFormat(
+		op,
+		0b1111_1111_0000_0000,
+		0b0100_0111_0000_0000,
+	)
+}
+
+//go:inline
 func IsLSHalf(op uint16) bool {
 	return IsThumbOpFormat(
 		op,
@@ -119,6 +134,15 @@ func IsThumbSdt(op uint16) bool {
 }
 
 //go:inline
+func IsThumbLDSH(op uint16) bool {
+	return IsThumbOpFormat(
+		op,
+		0b1111_1110_0000_0000,
+		0b0101_1110_0000_0000,
+	)
+}
+
+//go:inline
 func IsLPC(op uint16) bool {
 	return IsThumbOpFormat(
 		op,
@@ -133,6 +157,15 @@ func IsLSImm(op uint16) bool {
 		op,
 		0b1110_0000_0000_0000,
 		0b0110_0000_0000_0000,
+	)
+}
+
+//go:inline
+func IsPopPc(op uint16) bool {
+	return IsThumbOpFormat(
+		op,
+		0b1111_1111_0000_0000,
+		0b1011_1101_0000_0000,
 	)
 }
 
@@ -384,7 +417,6 @@ func (c *Cpu) ThumbHi(op uint16) {
 		r[rd] += v
 
 		if rd == PC {
-			r[rd] &^= 1
 			c.Reload = true
 		}
 
@@ -406,15 +438,26 @@ func (c *Cpu) ThumbHi(op uint16) {
 		r[rd] = v
 
 		if rd == PC {
-			r[rd] &^= 1
 			c.Reload = true
 		}
 
 	case HI_BX:
-
-		r[PC] = r[rs]
-		c.ToggleThumb()
+		panic("use thumb hi bx not thumb hi switch case")
 	}
+}
+
+func (c *Cpu) ThumbHiBx(op uint16) {
+	var (
+		r  = &c.Reg.R
+		rs = (op >> 3) & 0xF
+	)
+
+	v := r[rs]
+	if rs == PC {
+		v &^= 1
+	}
+	r[PC] = v
+	c.ToggleThumb()
 }
 
 const (
@@ -550,11 +593,7 @@ func (c *Cpu) ThumbSdt(op uint16) {
 			r[rd] = bits.RotateLeft32(v, -int((addr&1)<<3))
 
 		case THUMB_LDSH:
-			if misaligned := addr&1 != 0; misaligned {
-				r[rd] = uint32(int32(int8(c.Read8(addr))))
-			} else {
-				r[rd] = uint32(int32(int16(c.Read16(addr))))
-			}
+			panic("use ThumbLDRSH function separately")
 		}
 
 		return
@@ -571,6 +610,19 @@ func (c *Cpu) ThumbSdt(op uint16) {
 	case THUMB_LDRB_REG:
 		r[rd] = c.Read8(addr)
 	}
+}
+
+func (c *Cpu) ThumbLDSH(op uint16) {
+	var (
+		r    = &c.Reg.R
+		rd   = op & 7
+		addr = r[(op>>3)&7] + r[(op>>6)&7]
+	)
+	if misaligned := addr&1 != 0; misaligned {
+		r[rd] = uint32(int32(int8(c.Read8(addr))))
+		return
+	}
+	r[rd] = uint32(int32(int16(c.Read16(addr))))
 }
 
 func (c *Cpu) ThumbLPC(op uint16) {
@@ -610,7 +662,16 @@ func (c *Cpu) ThumbLSImm(op uint16) {
 	}
 }
 
-func (c *Cpu) ThumbPushPop(op uint16) {
+func (c *Cpu) ThumbPopPc(op uint16) {
+	r := &c.Reg.R
+	seq := c.ThumbPushPop(op)
+	r[PC] = c.Read32Block(r[SP], seq)
+	r[SP] += 4
+	c.Idle(1) // gba has, not sure if arm9
+	c.ToggleThumb()
+}
+
+func (c *Cpu) ThumbPushPop(op uint16) uint32 {
 	var (
 		r     = &c.Reg.R
 		pclr  = (op>>8)&1 != 0
@@ -626,11 +687,13 @@ func (c *Cpu) ThumbPushPop(op uint16) {
 			c.Reload = true
 			r[SP] += 0x40
 		} else {
+			// alyosha test fails this.
+			// i think it is timing related
 			r[SP] -= 0x40
 			c.Write32Block(r[SP], r[PC], seq)
 		}
 
-		return
+		return seq
 	}
 
 	if pop {
@@ -645,15 +708,9 @@ func (c *Cpu) ThumbPushPop(op uint16) {
 			seq = SEQ
 		}
 
-		if pclr {
-			r[PC] = c.Read32Block(r[SP], seq) &^ 1
-			r[SP] += 4
+		if !pclr {
 			c.Idle(1)
-			c.Reload = true
-			return
 		}
-
-		c.Idle(1)
 
 	} else {
 
@@ -674,6 +731,8 @@ func (c *Cpu) ThumbPushPop(op uint16) {
 			seq = SEQ
 		}
 	}
+
+	return seq
 }
 
 func (c *Cpu) ThumbRelative(op uint16) {

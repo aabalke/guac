@@ -106,7 +106,7 @@ func NewGBA(ctx *audio.Context, path string, muted bool) *GBA {
 		MaxInstCnt:     64,
 		BlockCnt:       4096,
 		LoopThreshold:  255,
-		Enabled:        true,
+		Enabled:        false,
 	}
 
 	gba := &GBA{
