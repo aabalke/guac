@@ -30,8 +30,8 @@ type Mem struct {
 	// this size is temp
 	IO [0x100_0000]uint8
 
-	halted7    *bool
-	irq7, irq9 *irq.Irq
+	halted7 *bool
+	// irq7, irq9 *irq.Irq
 	dma7, dma9 *dma.Dma
 
 	arm7Pc *uint32
@@ -70,6 +70,7 @@ func (m *Mem) InitMemory(
 	halted7 *bool,
 	dma7, dma9 *dma.Dma,
 	irq7, irq9 *irq.Irq,
+	jit7, jit9 Jit,
 	c *cart.Cartridge,
 	ppu *ppu.PPU,
 	snd *snd.Snd,
@@ -77,8 +78,6 @@ func (m *Mem) InitMemory(
 	m.halted7 = halted7
 	m.dma7 = dma7
 	m.dma9 = dma9
-	m.irq9 = irq9
-	m.irq7 = irq7
 	m.Cartridge = c
 	m.Ppu = ppu
 	m.arm7Pc = arm7Pc
@@ -100,8 +99,8 @@ func (m *Mem) InitMemory(
 
 	m.Rtc.InitRtc()
 
-	m.Bus7 = Bus7{M: m}
-	m.Bus9 = Bus9{M: m}
+	m.Bus7 = Bus7{M: m, Jit: jit7, irq: irq7}
+	m.Bus9 = Bus9{M: m, Jit: jit9, irq: irq9}
 }
 
 func (m *Mem) DirectBootMemory() {

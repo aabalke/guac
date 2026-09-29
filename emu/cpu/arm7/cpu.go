@@ -319,6 +319,21 @@ func (c *Cpu) Step() {
 
 	inst := c.Op[0]
 
+	//if c.Reg.R[PC]-8 >= 0x2DDC && c.Reg.R[PC]-8 < 0x3De8 {
+	//	fmt.Printf("PC %08X OP %08X\n", c.Reg.R[PC]-8, inst)
+	//}
+
+	//debug.B[4] = debug.V[4] == 1
+
+	//if c.Reg.R[PC]-8 == 0x2DDC {
+	//	debug.V[4]++
+	//	fmt.Printf("R %08X\n", c.Reg.R)
+	//}
+
+	//if debug.B[4] {
+	//	fmt.Printf("PC %08X INST %08X R %08X\n", c.Reg.R[PC], inst, c.Reg.R)
+	//}
+
 	seq := c.Seq
 	c.Seq = SEQ
 	c.Op[0] = c.Op[1]
@@ -347,13 +362,6 @@ func (c *Cpu) Step() {
 	} else {
 		c.DecodeThumb(uint16(inst))
 	}
-
-	//if debug.B[0] {
-	//	fmt.Printf("CPSR %08X PC %08X\n", c.Reg.CPSR.Get(), c.Reg.R[PC])
-	//}
-	//if c.Reg.R[15]-8 == 0x8000D34 {
-	//	debug.B[0] = false
-	//}
 
 	if c.Reload {
 		c.ReloadPipe()
@@ -394,7 +402,8 @@ func (c *Cpu) ReloadPipe() {
 	c.Reload = false
 
 	if c.Jit != nil {
-		if jitted := c.Jit.TryJit(c.Reg.R[PC]); !jitted {
+		jitted := c.Jit.TryJit(c.Reg.R[PC])
+		if !jitted {
 			c.Jit.UpdateMetrics(c.Reg.R[PC], w)
 		}
 	}

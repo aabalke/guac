@@ -3,10 +3,16 @@ package mem
 import (
 	"encoding/binary"
 	"unsafe"
+
+	"github.com/aabalke/guac/emu/nds/irq"
 )
 
+type Jit interface{ InvalidatePage(addr uint32) }
+
 type Bus7 struct {
-	M *Mem
+	M   *Mem
+	Jit Jit
+	irq *irq.Irq
 }
 
 func (b *Bus7) Read8(addr uint32) uint32 {
@@ -106,6 +112,7 @@ func (b *Bus7) Write8(addr uint32, v uint8) {
 	// there may be the ability to invalidate only arm7 or arm9  -
 	// for example wram is special
 
+	b.InvalidatePage(addr)
 	switch addr >> 24 {
 	case 0x2:
 		//clearTempUnimplimented(addr)
@@ -121,6 +128,7 @@ func (b *Bus7) Write8(addr uint32, v uint8) {
 
 func (b *Bus7) Write16(addr uint32, v uint16) {
 	addr &^= 1
+	b.InvalidatePage(addr)
 	if io := addr>>24 == 4; io {
 		switch addr {
 		case 0x400_0100, 0x400_0102:
@@ -154,6 +162,7 @@ func (b *Bus7) Write16(addr uint32, v uint16) {
 
 func (b *Bus7) Write32(addr, v uint32) {
 	addr &^= 3
+	b.InvalidatePage(addr)
 	if io := addr>>24 == 4; io {
 		switch addr {
 		case 0x400_0100:
@@ -194,10 +203,13 @@ func (b *Bus7) WritePtr(addr uint32) unsafe.Pointer {
 		return nil
 	}
 }
+
 func (b *Bus7) WriteGXFIFO(v uint32) {}
 
 type Bus9 struct {
-	M *Mem
+	M   *Mem
+	Jit Jit
+	irq *irq.Irq
 }
 
 func (b *Bus9) Read8(addr uint32) uint32 {
@@ -282,6 +294,8 @@ func (b *Bus9) ReadPtr(addr uint32) unsafe.Pointer {
 }
 
 func (b *Bus9) Write8(addr uint32, v uint8) {
+	b.InvalidatePage(addr)
+
 	switch addr >> 24 {
 	case 0x2:
 		//clearTempUnimplimented(addr)
@@ -302,6 +316,8 @@ func (b *Bus9) Write8(addr uint32, v uint8) {
 
 func (b *Bus9) Write16(addr uint32, v uint16) {
 	addr &^= 1
+
+	b.InvalidatePage(addr)
 
 	if io := addr>>24 == 4; io {
 		switch addr {
@@ -331,6 +347,8 @@ func (b *Bus9) Write16(addr uint32, v uint16) {
 
 func (b *Bus9) Write32(addr, v uint32) {
 	addr &^= 3
+
+	b.InvalidatePage(addr)
 
 	if io := addr>>24 == 4; io {
 
@@ -373,6 +391,7 @@ func (b *Bus9) Write32(addr, v uint32) {
 }
 
 func (b *Bus9) WritePtr(addr uint32) unsafe.Pointer {
+	b.InvalidatePage(addr)
 	switch addr >> 24 {
 	case 0x2:
 		return unsafe.Add(unsafe.Pointer(&b.M.MainRam), addr&0x3F_FFFF)
@@ -387,4 +406,25 @@ func (b *Bus9) WritePtr(addr uint32) unsafe.Pointer {
 
 func (b *Bus9) WriteGXFIFO(v uint32) {
 	b.M.Ppu.Rasterizer.GeoEngine.Fifo(v)
+}
+
+//go:inline
+func (b *Bus7) InvalidatePage(addr uint32) {
+	// TODO: need to only invalidate pages once if Write32 -> Write16 -> Write8 (instead of 7 times)
+	region := addr >> 24
+
+	if b.Jit != nil && region >= 0x2 && region < 0xE {
+		b.Jit.InvalidatePage(addr)
+	}
+}
+
+//go:inline
+func (b *Bus9) InvalidatePage(addr uint32) {
+	return
+	// TODO: need to only invalidate pages once if Write32 -> Write16 -> Write8 (instead of 7 times)
+	region := addr >> 24
+
+	if b.Jit != nil && region >= 0x2 && region < 0xE {
+		b.Jit.InvalidatePage(addr)
+	}
 }

@@ -2,9 +2,88 @@ package arm9
 
 import (
 	"fmt"
+	"unsafe"
 
+	"github.com/aabalke/gojit"
 	"github.com/aabalke/guac/emu/cpu/arm7"
 )
+
+func (j *Jit) CreateBlock(pc, w uint32) {
+	pageIdx := pc >> j.Config.PageShift
+	blockIdx := (pc & j.Config.PageMask) >> 1
+
+	page := j.Pages[pageIdx]
+	if page == nil {
+
+		page = &arm7.Page{
+			Id:     pageIdx,
+			Blocks: make([]*arm7.JitBlock, (1<<j.Config.PageShift)>>1),
+		}
+
+		j.Pages[pageIdx] = page
+	} else if page.Dead {
+		println("page dead, block not created")
+		return
+	} else if block := page.Blocks[blockIdx]; block != nil && block.Skip {
+		return
+	}
+
+	block := j.BlockCache.AssignBlock(&j.Pages, j.Config.PageShift, j.Config.PageMask)
+	if block == nil {
+		return
+	}
+
+	j.Assembler = block.Assembler
+
+	j.MovAbs(uint64(uintptr(unsafe.Pointer(j))), arm7.JIT)
+	j.MovAbs(uint64(j.C.Cpu), arm7.CPU)
+
+	// offset for pipelining
+	realPc := (pc - (w * 2)) &^ (w - 1)
+	p := j.Mem.ReadPtr(realPc)
+	if p == nil {
+		j.BlockCache.PushTail(block)
+		page.Blocks[blockIdx] = j.BlockCache.SkipBlock
+		return
+	}
+
+	var size uint32
+	for size < j.Config.MaxInstCnt {
+
+		//if reloaded := j.TryEmitOp(p, w, size); reloaded {
+		//	break
+		//}
+
+		size++
+		p = unsafe.Add(p, w)
+	}
+
+	if size < j.Config.MinInstCnt {
+		j.BlockCache.PushTail(block)
+		page.Blocks[blockIdx] = j.BlockCache.SkipBlock
+		return
+	}
+
+	j.Exit()
+
+	if err := j.Error(); err != nil {
+		panic(err)
+	}
+
+	block.InitPc = pc
+	block.Size = size
+	block.F = func() {
+		gojit.CallJit(uintptr(unsafe.Pointer(&block.Assembler.Buf[0])))
+	}
+
+	page.Blocks[blockIdx] = block
+
+	//if w == 2 {
+	//	fmt.Printf("Block Created for Page %08X PC %08X EXIT PC %08X OP %04X\n", pageIdx, pc, tempPc, uint16(op))
+	//} else {
+	//	fmt.Printf("Block Created for Page %08X PC %08X EXIT PC %08X OP %08X\n", pageIdx, pc, tempPc, op)
+	//}
+}
 
 func (j *Jit) EmitArm(op uint32) {
 	// this will have to be placed differently

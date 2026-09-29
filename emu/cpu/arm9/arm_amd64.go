@@ -209,23 +209,19 @@ func (j *Jit) EmitCoDataReg(op uint32) {
 
 func (j *Jit) EmitBranchExchange(op uint32) {
 	rn := op & 0xF
-	switch inst := (op >> 4) & 0xF; inst {
-	case arm7.INST_BX:
-		j.Movl(j.C.R[rn], gojit.Eax)
-		j.Movl(gojit.Eax, j.C.R[PC])
 
+	j.Movl(j.C.R[rn], gojit.Eax)
+
+	switch inst := (op >> 4) & 0xF; inst {
 	case arm7.INST_BXJ:
 		panic("unsupported bxj instruction")
 	case arm7.INST_BLX:
-
-		j.Movl(j.C.R[rn], gojit.Eax)
 		j.Movl(j.C.R[PC], gojit.Ebx)
-
 		j.Sub(gojit.Imm(4), gojit.Ebx)
-
-		j.Movl(gojit.Eax, j.C.R[PC])
 		j.Movl(gojit.Ebx, j.C.R[LR])
 	}
+
+	j.Movl(gojit.Eax, j.C.R[PC])
 
 	j.EmitToggleThumb()
 	j.EmitCondReloadState(op >> 28)

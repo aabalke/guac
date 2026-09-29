@@ -8,7 +8,6 @@ type Bus9 struct {
 	c *Cpu
 }
 
-//go:nosplit
 func (b *Bus9) Write8(addr uint32, v uint8) {
 	defer func() {
 		b.c.Seq = arm7.NONSEQ
@@ -31,7 +30,6 @@ func (b *Bus9) Write8(addr uint32, v uint8) {
 	b.c.Mem.Write8(addr, v)
 }
 
-//go:nosplit
 func (b *Bus9) Write16(addr uint32, v uint16) {
 	defer func() {
 		b.c.Seq = arm7.NONSEQ
@@ -54,12 +52,10 @@ func (b *Bus9) Write16(addr uint32, v uint16) {
 	b.c.Mem.Write16(addr, v)
 }
 
-//go:nosplit
 func (b *Bus9) Write32(addr, v uint32) {
 	b.c.Write32Block(addr, v, arm7.NONSEQ)
 }
 
-//go:nosplit
 func (b *Bus9) Write32Block(addr, v, seq uint32) {
 	defer func() {
 		b.c.Seq = arm7.NONSEQ
@@ -82,7 +78,6 @@ func (b *Bus9) Write32Block(addr, v, seq uint32) {
 	b.c.Mem.Write32(addr, v)
 }
 
-//go:nosplit
 func (b *Bus9) Read8(addr uint32) uint32 {
 	defer func() {
 		b.c.LastWasDma = false
@@ -102,7 +97,6 @@ func (b *Bus9) Read8(addr uint32) uint32 {
 	return b.c.Mem.Read8(addr)
 }
 
-//go:nosplit
 func (b *Bus9) Read16(addr uint32) uint32 {
 	defer func() {
 		b.c.LastWasDma = false
@@ -122,12 +116,10 @@ func (b *Bus9) Read16(addr uint32) uint32 {
 	return b.c.Mem.Read16(addr)
 }
 
-//go:nosplit
 func (b *Bus9) Read32(addr uint32) uint32 {
 	return b.c.Read32Block(addr, arm7.NONSEQ)
 }
 
-//go:nosplit
 func (b *Bus9) Read32Block(addr, seq uint32) uint32 {
 	defer func() {
 		b.c.LastWasDma = false

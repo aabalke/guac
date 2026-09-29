@@ -79,9 +79,9 @@ type CpuPtrs struct {
 }
 
 type Page struct {
-	id     uint32
+	Id     uint32
 	Blocks []*JitBlock
-	dead   bool
+	Dead   bool
 }
 
 func NewJit(cpu JittedCpu, mem Mem, config JitConfig, ptrs CpuPtrs) *Jit {
@@ -117,13 +117,13 @@ func (j *Jit) InvalidatePage(addr uint32) {
 	pageIdx := addr >> j.Config.PageShift
 
 	page := j.Pages[pageIdx]
-	if page == nil || page.dead {
+	if page == nil || page.Dead {
 		return
 	}
 
-	//fmt.Printf("Invalidated Page %08X Addr %08X\n", addr>>j.PageShift, addr)
+	//fmt.Printf("Invalidated Page %08X Addr %08X\n", addr>>j.Config.PageShift, addr)
 
-	page.dead = true
+	page.Dead = true
 
 	j.Pages[pageIdx] = nil
 	j.Metrics[pageIdx] = make([]uint32, (1<<j.Config.PageShift)>>1)
@@ -172,20 +172,23 @@ func (j *Jit) TryJit(pc uint32) bool {
 
 	page := j.Pages[pageIdx]
 
-	if page == nil || page.dead {
+	if page == nil || page.Dead {
 		return false
 	}
 
 	block := page.Blocks[blockIdx]
 
-	if block == nil || block.Skip || block.f == nil {
+	if block == nil || block.Skip || block.F == nil {
 		return false
 	}
 
-	//fmt.Printf("Running Jit for PC %08X\n", pc)
+	//fmt.Printf("Running Jit PRIOR PC %08X\n", j.Cpu.(*Cpu).Reg.R[PC]-8)
 
-	block.f()
+	block.F()
 	j.BlockCache.TouchBlock(block)
+
+	//fmt.Printf("Running Jit AFTER PC %08X\n", j.Cpu.(*Cpu).Reg.R[PC]-8)
+	//debug.B[0] = true
 	return true
 }
 

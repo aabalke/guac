@@ -78,7 +78,7 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 		PageMask:       (1 << pageShift) - 1,
 		NativePageSize: 0x10000,
 		MinInstCnt:     8,
-		MaxInstCnt:     64,
+		MaxInstCnt:     256,
 		BlockCnt:       4096,
 		LoopThreshold:  255,
 		Enabled:        false,
@@ -134,13 +134,25 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 		nds.dma7, nds.dma9,
 	)
 
-	nds.mem.InitMemory(
-		&nds.arm7.Reg.R[15],
-		&nds.arm7.Halted,
-		nds.dma7, nds.dma9,
-		nds.irq7, nds.irq9,
-		nds.Cartridge, nds.ppu, snd.NewSnd(ctx, &nds.mem.Bus7, BUFFER_SIZE),
-	)
+	if nds.arm7.Jit == nil {
+		nds.mem.InitMemory(
+			&nds.arm7.Reg.R[15],
+			&nds.arm7.Halted,
+			nds.dma7, nds.dma9,
+			nds.irq7, nds.irq9,
+			nil, nds.arm9.Jit,
+			nds.Cartridge, nds.ppu, snd.NewSnd(ctx, &nds.mem.Bus7, BUFFER_SIZE),
+		)
+	} else {
+		nds.mem.InitMemory(
+			&nds.arm7.Reg.R[15],
+			&nds.arm7.Halted,
+			nds.dma7, nds.dma9,
+			nds.irq7, nds.irq9,
+			nds.arm7.Jit, nds.arm9.Jit,
+			nds.Cartridge, nds.ppu, snd.NewSnd(ctx, &nds.mem.Bus7, BUFFER_SIZE),
+		)
+	}
 
 	nds.DirectBoot()
 

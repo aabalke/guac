@@ -574,6 +574,7 @@ func (j *Jit) EmitThumbHi(op uint16) {
 
 		if rd == PC {
 			j.And(gojit.Imm(^1), gojit.Eax)
+			j.Movb(gojit.Imm(1), j.C.Reload)
 			j.ReloadState = RELOAD
 		}
 
@@ -603,7 +604,7 @@ func (j *Jit) EmitThumbHiBx(op uint16) {
 
 	j.EmitToggleThumb()
 
-	j.Movb(gojit.Imm(0), j.C.Reload)
+	j.Movb(gojit.Imm(1), j.C.Reload)
 	j.ReloadState = RELOAD
 }
 
@@ -735,6 +736,7 @@ func (j *Jit) EmitThumbBranch(op uint16) {
 	offset := uint32(int16((op&0x7FF)<<5) >> 4)
 
 	j.Add(gojit.Imm(offset), j.C.R[PC])
+	j.Movb(gojit.Imm(1), j.C.Reload)
 	j.ReloadState = RELOAD
 }
 
@@ -776,6 +778,7 @@ func (j *Jit) EmitShortLongBranch(op uint16) {
 	j.Movl(gojit.Ebx, j.C.R[PC])
 
 	j.Movl(gojit.Eax, j.C.R[LR])
+	j.Movb(gojit.Imm(1), j.C.Reload)
 	j.ReloadState = RELOAD
 }
 

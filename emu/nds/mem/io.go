@@ -30,7 +30,7 @@ func (b *Bus9) ReadIO(addr uint32) uint8 {
 		return mem.Key.Read(addr)
 
 	case addr >= 0x208 && addr < 0x218:
-		return mem.irq9.Read(addr)
+		return b.irq.Read(addr)
 	}
 
 	switch addr {
@@ -146,7 +146,7 @@ func (b *Bus9) WriteIO(addr uint32, v uint8) {
 		mem.Ppu.Rasterizer.Write(addr, v)
 		return
 	case addr >= 0x208 && addr < 0x218:
-		mem.irq9.Write8(addr, v)
+		b.irq.Write8(addr, v)
 		return
 	}
 
@@ -239,7 +239,7 @@ func (b *Bus7) ReadIO(addr uint32) uint8 {
 	case addr >= 0x130 && addr < 0x134:
 		return mem.Key.Read(addr)
 	case addr >= 0x208 && addr < 0x218:
-		return mem.irq7.Read(addr)
+		return b.irq.Read(addr)
 	}
 
 	switch addr {
@@ -347,7 +347,7 @@ func (b *Bus7) WriteIO(addr uint32, v uint8) {
 		panic("WRITE IPC FIFO FROM BYTE OR HALF")
 
 	case addr >= 0x208 && addr < 0x218:
-		mem.irq7.Write8(addr, v)
+		b.irq.Write8(addr, v)
 		return
 	}
 

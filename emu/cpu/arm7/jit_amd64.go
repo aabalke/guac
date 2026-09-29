@@ -15,24 +15,24 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 	if page == nil {
 
 		page = &Page{
-			id:     pageIdx,
+			Id:     pageIdx,
 			Blocks: make([]*JitBlock, (1<<j.Config.PageShift)>>1),
 		}
 
 		j.Pages[pageIdx] = page
-	} else if page.dead {
+	} else if page.Dead {
 		println("page dead, block not created")
 		return
 	} else if block := page.Blocks[blockIdx]; block != nil && block.Skip {
 		return
 	}
 
-	block := j.BlockCache.AssignBlock(j)
+	block := j.BlockCache.AssignBlock(&j.Pages, j.Config.PageShift, j.Config.PageMask)
 	if block == nil {
 		return
 	}
 
-	j.Assembler = block.assembler
+	j.Assembler = block.Assembler
 
 	j.MovAbs(uint64(uintptr(unsafe.Pointer(j))), JIT)
 	j.MovAbs(uint64(j.C.Cpu), CPU)
@@ -47,17 +47,14 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 	}
 
 	var size uint32
-	for size < j.Config.MaxInstCnt {
-
-		if reloaded := j.TryEmitOp(p, w); reloaded {
-			break
-		}
-
-		size++
+	for build := true; build; {
+		build = j.TryEmitOp(p, w, realPc, size)
 		p = unsafe.Add(p, w)
+		size++
 	}
 
 	if size < j.Config.MinInstCnt {
+		//fmt.Printf("Rejecting Block Size: %d < %d\n", size, j.Config.MinInstCnt)
 		j.BlockCache.PushTail(block)
 		page.Blocks[blockIdx] = j.BlockCache.SkipBlock
 		return
@@ -69,25 +66,25 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 		panic(err)
 	}
 
-	block.initPc = pc
+	block.InitPc = pc
 	block.Size = size
-	block.f = func() {
-		gojit.CallJit(uintptr(unsafe.Pointer(&block.assembler.Buf[0])))
+	block.F = func() {
+		gojit.CallJit(uintptr(unsafe.Pointer(&block.Assembler.Buf[0])))
 	}
 
 	page.Blocks[blockIdx] = block
 
 	//if w == 2 {
-	//	fmt.Printf("Block Created for Page %08X PC %08X EXIT PC %08X OP %04X\n", pageIdx, pc, tempPc, uint16(op))
+	//	fmt.Printf("Block Created for Page %08X PC %08X EXIT PC %08X\n", pageIdx, pc, realPc)
 	//} else {
-	//	fmt.Printf("Block Created for Page %08X PC %08X EXIT PC %08X OP %08X\n", pageIdx, pc, tempPc, op)
+	//	fmt.Printf("Block Created for Page %08X PC %08X REAL PC %08X\n", pageIdx, pc, realPc)
 	//}
 }
 
-func (j *Jit) TryEmitOp(p unsafe.Pointer, w uint32) bool {
+func (j *Jit) TryEmitOp(p unsafe.Pointer, w uint32, pc, size uint32) bool {
 	op := *(*uint32)(p)
 
-	endBlock := false
+	build := true
 
 	irq := j.EmitStep()
 
@@ -115,16 +112,22 @@ func (j *Jit) TryEmitOp(p unsafe.Pointer, w uint32) bool {
 	j.ReloadState = NONE
 	switch reloadState {
 	case NONE:
-		endBlock = false
+		build = true
 		j.EmitStepPc(w)
+		j.EmitPipelineUpdate(p, w)
+
+		if size >= j.Config.MaxInstCnt {
+			//j.EmitPipelineUpdate(p, w)
+			build = false
+		}
 
 	case RELOAD:
-		endBlock = true
+		build = false
 		j.Mov(JIT, gojit.Rax)
 		j.CallFunc((*Jit).ReloadPipe)
 
 	case POSSIBLE:
-		endBlock = true
+		build = false
 
 		j.Movb(j.C.Reload, gojit.Al)
 		j.Testb(gojit.Al, gojit.Al)
@@ -132,7 +135,9 @@ func (j *Jit) TryEmitOp(p unsafe.Pointer, w uint32) bool {
 		reload := j.JccForward(gojit.CC_NZ)
 
 		j.EmitStepPc(w)
-		j.EmitPipelineUpdate(p, w)
+		if size >= j.Config.MaxInstCnt || true {
+			j.EmitPipelineUpdate(p, w)
+		}
 
 		notReload := j.JmpForward()
 		reload()
@@ -146,12 +151,12 @@ func (j *Jit) TryEmitOp(p unsafe.Pointer, w uint32) bool {
 	irq()
 
 	//if w == 2 {
-	//	fmt.Printf("emitOp PC %08X OP %04X\n", tempPc, uint16(op))
+	//	fmt.Printf("emitOp PC %08X OP %04X END BLOCK %t\n", pc+(size*w), uint16(op), endBlock)
 	//} else {
-	//	fmt.Printf("emitOp PC %08X OP %08X\n", tempPc, op)
+	//	fmt.Printf("emitOp PC %08X OP %08X END BLOCK %t\n", pc+(size*w), op, endBlock)
 	//}
 
-	return endBlock
+	return build
 }
 
 func (j *Jit) EmitCond(cond uint32) []func() {
@@ -331,7 +336,7 @@ func (j *Jit) EmitStep() func() {
 	j.Movl(gojit.Imm(2), gojit.Edi)
 	j.Cmovcc(gojit.CC_NZ, gojit.Edi, gojit.Ecx)
 
-	j.Movl(j.C.Seq, gojit.Dil)
+	j.Movl(j.C.Seq, gojit.Edi)
 
 	j.Movl(gojit.Imm(SEQ), j.C.Seq)
 
