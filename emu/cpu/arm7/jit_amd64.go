@@ -7,6 +7,23 @@ import (
 	"github.com/aabalke/gojit"
 )
 
+type BlockData struct {
+	Size       int
+	BranchSize int
+	Ptr        unsafe.Pointer
+	RealPc, Pc uint32
+	W          uint32
+}
+
+func (bd *BlockData) Set(pc, w uint32) {
+	bd.Size = 0
+	bd.BranchSize = 0
+	// offset for pipelining
+	bd.RealPc = (pc - (w * 2)) &^ (w - 1)
+	bd.Pc = pc
+	bd.W = w
+}
+
 func (j *Jit) CreateBlock(pc, w uint32) {
 	pageIdx := pc >> j.Config.PageShift
 	blockIdx := (pc & j.Config.PageMask) >> 1
@@ -37,23 +54,23 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 	j.MovAbs(uint64(uintptr(unsafe.Pointer(j))), JIT)
 	j.MovAbs(uint64(j.C.Cpu), CPU)
 
-	// offset for pipelining
-	realPc := (pc - (w * 2)) &^ (w - 1)
-	p := j.Mem.ReadPtr(realPc)
-	if p == nil {
+	data := &j.BlockData
+	data.Set(pc, w)
+
+	data.Ptr = j.Mem.ReadPtr(data.RealPc)
+	if data.Ptr == nil {
 		j.BlockCache.PushTail(block)
 		page.Blocks[blockIdx] = j.BlockCache.SkipBlock
 		return
 	}
 
-	var size uint32
 	for build := true; build; {
-		build = j.TryEmitOp(p, w, realPc, size)
-		p = unsafe.Add(p, w)
-		size++
+		build = j.TryEmitOp(data)
+		data.Size++
+		data.BranchSize++
 	}
 
-	if size < j.Config.MinInstCnt {
+	if data.Size < j.Config.MinInstCnt {
 		//fmt.Printf("Rejecting Block Size: %d < %d\n", size, j.Config.MinInstCnt)
 		j.BlockCache.PushTail(block)
 		page.Blocks[blockIdx] = j.BlockCache.SkipBlock
@@ -67,7 +84,7 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 	}
 
 	block.InitPc = pc
-	block.Size = size
+	block.Size = data.Size
 	block.F = func() {
 		gojit.CallJit(uintptr(unsafe.Pointer(&block.Assembler.Buf[0])))
 	}
@@ -75,20 +92,19 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 	page.Blocks[blockIdx] = block
 
 	//if w == 2 {
-	//	fmt.Printf("Block Created for Page %08X PC %08X EXIT PC %08X\n", pageIdx, pc, realPc)
+	//	fmt.Printf("Block Created for Page %08X PC %08X END PC %08X SIZE %08d\n", pageIdx, pc, data.Pc, data.Size)
 	//} else {
-	//	fmt.Printf("Block Created for Page %08X PC %08X REAL PC %08X\n", pageIdx, pc, realPc)
+	//	fmt.Printf("Block Created for Page %08X PC %08X END PC %08X SIZE %08d\n", pageIdx, pc, data.Pc, data.Size)
 	//}
 }
 
-func (j *Jit) TryEmitOp(p unsafe.Pointer, w uint32, pc, size uint32) bool {
-	op := *(*uint32)(p)
-
-	build := true
+func (j *Jit) TryEmitOp(data *BlockData) (build bool) {
+	op := *(*uint32)(data.Ptr)
 
 	irq := j.EmitStep()
 
-	if w == 4 {
+	if data.W == 4 {
+
 		conds := j.EmitCond(op >> 28)
 
 		j.EmitArm(op)
@@ -112,32 +128,26 @@ func (j *Jit) TryEmitOp(p unsafe.Pointer, w uint32, pc, size uint32) bool {
 	j.ReloadState = NONE
 	switch reloadState {
 	case NONE:
-		build = true
-		j.EmitStepPc(w)
-		j.EmitPipelineUpdate(p, w)
+		j.EmitStepPc(data.W)
+		j.EmitPipelineUpdate(data.Ptr, data.W)
 
-		if size >= j.Config.MaxInstCnt {
-			//j.EmitPipelineUpdate(p, w)
-			build = false
-		}
+		build = data.Size < j.Config.MaxInstCnt
+
+		data.Ptr = unsafe.Add(data.Ptr, data.W)
 
 	case RELOAD:
-		build = false
 		j.Mov(JIT, gojit.Rax)
 		j.CallFunc((*Jit).ReloadPipe)
 
 	case POSSIBLE:
-		build = false
 
 		j.Movb(j.C.Reload, gojit.Al)
 		j.Testb(gojit.Al, gojit.Al)
 
 		reload := j.JccForward(gojit.CC_NZ)
 
-		j.EmitStepPc(w)
-		if size >= j.Config.MaxInstCnt || true {
-			j.EmitPipelineUpdate(p, w)
-		}
+		j.EmitStepPc(data.W)
+		j.EmitPipelineUpdate(data.Ptr, data.W)
 
 		notReload := j.JmpForward()
 		reload()

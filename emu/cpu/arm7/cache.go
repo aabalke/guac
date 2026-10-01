@@ -19,10 +19,10 @@ type JitBlock struct {
 	F          func()
 	Assembler  *gojit.Assembler
 	Prev, Next *JitBlock
+	Size       int
+	InitPc     uint32
 	Thumb      bool
 	Skip       bool
-	InitPc     uint32
-	Size       uint32
 }
 
 func InitBlockCache(capacity uint32, pageSize int) *BlockCache {

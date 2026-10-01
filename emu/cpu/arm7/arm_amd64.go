@@ -1068,6 +1068,10 @@ func (j *Jit) EmitBranch(op uint32) {
 	j.Add(gojit.Imm(int32(uint32((int32(op)<<8)>>6))), j.C.R[PC])
 
 	j.EmitCondReloadState(op >> 28)
+
+	if op>>28 == 0xE {
+		j.ReloadState = RELOAD
+	}
 }
 
 func (j *Jit) EmitBranchExchange(op uint32) {
@@ -1091,6 +1095,7 @@ func (j *Jit) EmitException(addr ExceptionVector, mode CpuMode) {
 	j.MovAbs(uint64(addr), gojit.Rbx)
 	j.Movl(gojit.Imm(mode), gojit.Ecx)
 	j.CallFunc((*Jit).Exception)
+	// NOTE: If called ensure reload state updated
 }
 
 func (j *Jit) EmitSWI(op uint32) {
@@ -1110,7 +1115,7 @@ func (j *Jit) EmitCondReloadState(cond uint32) {
 		j.Movb(gojit.Imm(1), j.C.Reload)
 	case 0xF:
 		j.ReloadState = NONE
-		//j.Movb(gojit.Imm(0), j.C.Reload)
+		j.Movb(gojit.Imm(0), j.C.Reload)
 	default:
 		j.ReloadState = POSSIBLE
 		j.Movb(gojit.Imm(1), j.C.Reload)

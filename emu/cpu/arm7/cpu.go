@@ -319,21 +319,6 @@ func (c *Cpu) Step() {
 
 	inst := c.Op[0]
 
-	//if c.Reg.R[PC]-8 >= 0x2DDC && c.Reg.R[PC]-8 < 0x3De8 {
-	//	fmt.Printf("PC %08X OP %08X\n", c.Reg.R[PC]-8, inst)
-	//}
-
-	//debug.B[4] = debug.V[4] == 1
-
-	//if c.Reg.R[PC]-8 == 0x2DDC {
-	//	debug.V[4]++
-	//	fmt.Printf("R %08X\n", c.Reg.R)
-	//}
-
-	//if debug.B[4] {
-	//	fmt.Printf("PC %08X INST %08X R %08X\n", c.Reg.R[PC], inst, c.Reg.R)
-	//}
-
 	seq := c.Seq
 	c.Seq = SEQ
 	c.Op[0] = c.Op[1]
@@ -407,6 +392,35 @@ func (c *Cpu) ReloadPipe() {
 			c.Jit.UpdateMetrics(c.Reg.R[PC], w)
 		}
 	}
+}
+
+func (c *Cpu) ReloadPipeSpecial() {
+	w := uint32(4)
+	if c.Reg.CPSR.T {
+		w = 2
+	}
+	pc := c.Reg.R[PC] &^ (w - 1)
+
+	c.PcPtr = c.Mem.ReadPtr(pc)
+
+	c.Cycles(pc+0, w, NONSEQ, true)
+	c.Cycles(pc+w, w, SEQ, true)
+
+	if c.PcPtr == nil {
+		c.Op[0] = c.Mem.Read32(pc + 0)
+		c.Op[1] = c.Mem.Read32(pc + w)
+	} else {
+		// 0xFFFF_FFFF uint32, 0xFFFF uint16
+		mask := uint32(0xFFFF_FFFF >> ((w & 2) * 8))
+		c.Op[0] = *(*uint32)(c.PcPtr) & mask
+		c.PcPtr = unsafe.Add(c.PcPtr, w)
+		c.Op[1] = *(*uint32)(c.PcPtr) & mask
+		c.PcPtr = unsafe.Add(c.PcPtr, w)
+	}
+
+	c.Reg.R[PC] += w * 2
+	c.Seq = SEQ
+	c.Reload = false
 }
 
 func (c *Cpu) ToggleThumb() {

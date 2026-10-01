@@ -30,6 +30,8 @@ type Jit struct {
 	Config       JitConfig
 	ReloadState  ReloadState
 	TestingCnt   int
+
+	BlockData BlockData
 }
 
 type JittedCpu interface {
@@ -47,6 +49,7 @@ type JittedCpu interface {
 
 	ModeSwitch(CpuMode, CpuMode)
 	ReloadPipe()
+	ReloadPipeSpecial()
 	Exception(ExceptionVector, CpuMode)
 	ExitException(CpuMode)
 	DoMsrModeSwitch(bool, uint32, uint32)
@@ -58,8 +61,8 @@ type JitConfig struct {
 	PageShift      uint32 // density of pages, in address space
 	PageMask       uint32 // mask used to calc blocks per page
 	NativePageSize int    // byte cnt on native memory per block
-	MinInstCnt     uint32 // blocks smaller than this are skipped
-	MaxInstCnt     uint32 // block cannot be more inst than this
+	MinInstCnt     int    // blocks smaller than this are skipped
+	MaxInstCnt     int    // block cannot be more inst than this
 	LoopThreshold  uint32 // how many loops until create block
 	BlockCnt       int    // max how many jit blocks
 	Enabled        bool
@@ -182,7 +185,8 @@ func (j *Jit) TryJit(pc uint32) bool {
 		return false
 	}
 
-	//fmt.Printf("Running Jit PRIOR PC %08X\n", j.Cpu.(*Cpu).Reg.R[PC]-8)
+	//debug.Vi64[0]++
+	//fmt.Printf("Running Jit PC %08X\n", j.Cpu.(*Cpu).Reg.R[PC])
 
 	block.F()
 	j.BlockCache.TouchBlock(block)
@@ -223,7 +227,7 @@ func (j *Jit) Write32Block(addr, v, seq uint32) { j.Cpu.Write32Block(addr, v, se
 func (j *Jit) ModeSwitch(curr, next CpuMode) { j.Cpu.ModeSwitch(curr, next) }
 
 //go:nosplit
-func (j *Jit) ReloadPipe() { j.Cpu.ReloadPipe() }
+func (j *Jit) ReloadPipe() { j.Cpu.ReloadPipeSpecial() }
 
 //go:nosplit
 func (j *Jit) Exception(addr ExceptionVector, mode CpuMode) { j.Cpu.Exception(addr, mode) }

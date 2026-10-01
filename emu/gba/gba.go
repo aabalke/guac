@@ -102,12 +102,14 @@ func NewGBA(ctx *audio.Context, path string, muted bool) *GBA {
 		PageShift:      uint32(pageShift),
 		PageMask:       (1 << pageShift) - 1,
 		NativePageSize: 0x10000,
-		MinInstCnt:     8,
-		MaxInstCnt:     64,
+		MinInstCnt:     4,
+		MaxInstCnt:     1024,
 		BlockCnt:       4096,
 		LoopThreshold:  255,
-		Enabled:        false,
+		Enabled:        true,
 	}
+
+	//go Print()
 
 	gba := &GBA{
 		Pixels:       make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),

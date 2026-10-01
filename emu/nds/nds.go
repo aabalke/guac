@@ -81,7 +81,7 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 		MaxInstCnt:     256,
 		BlockCnt:       4096,
 		LoopThreshold:  255,
-		Enabled:        false,
+		Enabled:        true,
 	}
 
 	jitConfig9 := arm7.JitConfig{

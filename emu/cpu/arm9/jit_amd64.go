@@ -47,7 +47,7 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 		return
 	}
 
-	var size uint32
+	var size int
 	for size < j.Config.MaxInstCnt {
 
 		//if reloaded := j.TryEmitOp(p, w, size); reloaded {
