@@ -558,57 +558,42 @@ func (c *Cpu) ThumbLSHalf(op uint16) {
 }
 
 const (
-	THUMB_STRH = iota
+	THUMB_STR = iota
+	THUMB_STRH
+	THUMB_STRB
 	THUMB_LDSB
+	THUMB_LDR
 	THUMB_LDRH
+	THUMB_LDRB
 	THUMB_LDSH
-)
-
-const (
-	THUMB_STR_REG = iota
-	THUMB_STRB_REG
-	THUMB_LDR_REG
-	THUMB_LDRB_REG
 )
 
 func (c *Cpu) ThumbSdt(op uint16) {
 	var (
 		r    = &c.Reg.R
-		inst = (op >> 10) & 3
 		rd   = op & 7
 		addr = r[(op>>3)&7] + r[(op>>6)&7]
 	)
 
-	if signed := (op>>9)&1 != 0; signed {
-
-		switch inst {
-		case THUMB_STRH:
-			c.Write16(addr, uint16(r[rd]))
-
-		case THUMB_LDSB:
-			r[rd] = uint32(int32(int8(c.Read8(addr))))
-
-		case THUMB_LDRH:
-			v := c.Read16(addr)
-			r[rd] = bits.RotateLeft32(v, -int((addr&1)<<3))
-
-		case THUMB_LDSH:
-			panic("use ThumbLDRSH function separately")
-		}
-
-		return
-	}
-
-	switch inst {
-	case THUMB_STR_REG:
+	switch inst := (op >> 10) & 3; inst {
+	case THUMB_STR:
 		c.Write32(addr, r[rd])
-	case THUMB_STRB_REG:
+	case THUMB_STRH:
+		c.Write16(addr, uint16(r[rd]))
+	case THUMB_STRB:
 		c.Write8(addr, uint8(r[rd]))
-	case THUMB_LDR_REG:
+	case THUMB_LDSB:
+		r[rd] = uint32(int32(int8(c.Read8(addr))))
+	case THUMB_LDR:
 		v := c.Read32(addr)
 		r[rd] = bits.RotateLeft32(v, -int((addr&3)*8))
-	case THUMB_LDRB_REG:
+	case THUMB_LDRH:
+		v := c.Read16(addr)
+		r[rd] = bits.RotateLeft32(v, -int((addr&1)<<3))
+	case THUMB_LDRB:
 		r[rd] = c.Read8(addr)
+	case THUMB_LDSH:
+		panic("use ThumbLDRSH function separately")
 	}
 }
 

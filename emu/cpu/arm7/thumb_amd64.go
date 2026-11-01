@@ -120,53 +120,28 @@ func (j *Jit) EmitThumbLSImm(op uint16) {
 }
 
 func (j *Jit) EmitThumbSdt(op uint16) {
-	var (
-		inst = (op >> 10) & 3
-		rd   = uint32(op & 7)
-	)
+	rd := uint32(op & 7)
 
 	j.Mov(JIT, gojit.Rax)
-
 	j.Movl(j.C.R[uint32(op>>3)&7], gojit.Ebx)
 	j.Add(j.C.R[uint32(op>>6)&7], gojit.Ebx)
 
-	if signed := (op>>9)&1 != 0; signed {
-
-		switch inst {
-		case THUMB_STRH:
-
-			j.Movl(j.C.R[rd], gojit.Ecx)
-			j.CallFunc((*Jit).Write16)
-
-		case THUMB_LDSB:
-
-			j.CallFunc((*Jit).Read8)
-			j.Movsx(gojit.Al, gojit.Eax)
-			j.Movl(gojit.Eax, j.C.R[rd])
-
-		case THUMB_LDRH:
-
-			j.Movl(gojit.Ebx, gojit.R8d)
-			j.CallFunc((*Jit).Read16)
-
-			j.Movl(gojit.R8d, gojit.Ecx)
-			j.And(gojit.Imm(1), gojit.Ecx)
-			j.Shl(gojit.Imm(3), gojit.Ecx)
-			j.RorCl(gojit.Eax)
-
-			j.Movl(gojit.Eax, j.C.R[rd])
-
-		case THUMB_LDSH:
-			panic("use ThumbLDRSH function separately")
-		}
-		return
-	}
-
-	switch inst {
-	case THUMB_STR_REG:
+	switch inst := (op >> 10) & 3; inst {
+	case THUMB_STR:
 		j.Movl(j.C.R[rd], gojit.Ecx)
 		j.CallFunc((*Jit).Write32)
-	case THUMB_LDR_REG:
+	case THUMB_STRH:
+		j.Movl(j.C.R[rd], gojit.Ecx)
+		j.CallFunc((*Jit).Write16)
+	case THUMB_STRB:
+		j.Movl(j.C.R[rd], gojit.Ecx)
+		j.CallFunc((*Jit).Write8)
+	case THUMB_LDSB:
+		j.CallFunc((*Jit).Read8)
+		j.Movsx(gojit.Al, gojit.Eax)
+		j.Movl(gojit.Eax, j.C.R[rd])
+
+	case THUMB_LDR:
 
 		j.Movl(gojit.Ebx, gojit.R8d)
 		j.CallFunc((*Jit).Read32)
@@ -177,14 +152,21 @@ func (j *Jit) EmitThumbSdt(op uint16) {
 		j.RorCl(gojit.Eax)
 
 		j.Movl(gojit.Eax, j.C.R[rd])
-	case THUMB_STRB_REG:
+	case THUMB_LDRH:
+		j.Movl(gojit.Ebx, gojit.R8d)
+		j.CallFunc((*Jit).Read16)
 
-		j.Movl(j.C.R[rd], gojit.Ecx)
-		j.CallFunc((*Jit).Write8)
-	case THUMB_LDRB_REG:
+		j.Movl(gojit.R8d, gojit.Ecx)
+		j.And(gojit.Imm(1), gojit.Ecx)
+		j.Shl(gojit.Imm(3), gojit.Ecx)
+		j.RorCl(gojit.Eax)
 
+		j.Movl(gojit.Eax, j.C.R[rd])
+	case THUMB_LDRB:
 		j.CallFunc((*Jit).Read8)
 		j.Movl(gojit.Eax, j.C.R[rd])
+	case THUMB_LDSH:
+		panic("use ThumbLDRSH function separately")
 	}
 }
 

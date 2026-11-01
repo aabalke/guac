@@ -66,8 +66,8 @@ func (c *Cpu) DecodeThumb(op uint16) {
 func IsThumbBkpt(op uint16) bool {
 	return arm7.IsThumbOpFormat(
 		op,
-		0b1011_1110_0000_0000,
 		0b1111_1111_0000_0000,
+		0b1011_1110_0000_0000,
 	)
 }
 
