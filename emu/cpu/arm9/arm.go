@@ -11,7 +11,10 @@ import (
 
 // NOTE: order of decoders effects order checked and therefore implimentation
 const (
-	INST_SVC arm7.Decoder = iota
+	INST_BLX arm7.Decoder = iota
+	INST_PLD
+	INST_NV
+	INST_SVC
 	INST_BKP
 	INST_CRT
 	INST_BRA
@@ -35,8 +38,11 @@ const (
 
 // other coprocessor instructions are not necessary since cp15 is a control coprocessor not a data one
 var formatters = []arm7.Formatter{
-	INST_SVC:           {0x0F00_0000, 0x0F00_0000},
+	INST_PLD:           {0xFD70_F000, 0xF550_F000},
+	INST_BLX:           {0xFE00_0000, 0xFA00_0000},
+	INST_NV:            {0xF000_0000, 0xF000_0000},
 	INST_BKP:           {0xFFF0_00F0, 0xE120_0070},
+	INST_SVC:           {0x0F00_0000, 0x0F00_0000},
 	INST_BRA:           {0x0E00_0000, 0x0A00_0000},
 	INST_BRX:           {0x0FFF_FF00, 0x012F_FF00},
 	INST_UND:           {0x0E00_0010, 0x0600_0010},
@@ -57,38 +63,8 @@ var formatters = []arm7.Formatter{
 	INST_MSR:           {0x0DB0_F000, 0x0120_F000},
 }
 
-const (
-	INST_BLX arm7.Decoder = iota
-	INST_PLD
-)
-
-var spFormatters = []arm7.Formatter{
-	INST_PLD: {0xFD70_F000, 0xF550_F000},
-	INST_BLX: {0xFE00_0000, 0xFA00_0000},
-}
-
 func (c *Cpu) DecodeArm(op uint32) {
-	cond := op >> 28
-
-	if cond == 0xF {
-		for decoder, desc := range spFormatters {
-
-			if (op & desc.Mask) != desc.Match {
-				continue
-			}
-
-			switch arm7.Decoder(decoder) {
-			case INST_BLX:
-				c.Blx(op)
-			case INST_PLD:
-				panic("unsetup pld instruction")
-			}
-
-			return
-		}
-	}
-
-	if !c.Reg.CPSR.CheckCond(cond) {
+	if cond := op >> 28; !c.Reg.CPSR.CheckCond(cond) {
 		c.Seq = arm7.SEQ
 		return
 	}
@@ -100,6 +76,10 @@ func (c *Cpu) DecodeArm(op uint32) {
 		}
 
 		switch arm7.Decoder(decoder) {
+		case INST_BLX:
+			c.Blx(op)
+		case INST_PLD:
+			panic(fmt.Sprintf("arm9: unsetup pld instruction pc %08X op %08X\n", c.Reg.R[PC], op))
 		case INST_SVC:
 			c.Exception(arm7.VEC_SWI, arm7.MODE_SWI)
 		case INST_BKP:
@@ -134,6 +114,9 @@ func (c *Cpu) DecodeArm(op uint32) {
 			c.ExtendedMul(op)
 		case INST_ALU, INST_ALU_SHIFT_IMM, INST_ALU_SHIFT_REG:
 			c.Alu(op)
+		case INST_NV:
+			c.Seq = arm7.SEQ
+			return
 		}
 		return
 	}

@@ -56,70 +56,71 @@ var thumbFormatters = []Formatter{
 	INST_THUMB_BL_SHORT: {0xE800, 0xE800},
 }
 
+var thumbLut [256]Decoder
+
+func init() {
+	for i := range uint32(len(thumbLut)) {
+		op := i << 8
+		for decoder, desc := range thumbFormatters {
+			if (op & desc.Mask) == desc.Match {
+				thumbLut[i] = Decoder(decoder)
+				break
+			}
+		}
+	}
+}
+
 func (c *Cpu) DecodeThumb(op32 uint32) {
 	op := uint16(op32)
 
-	for decoder, desc := range thumbFormatters {
-
-		if (op32 & desc.Mask) != desc.Match {
-			continue
-		}
-
-		switch Decoder(decoder) {
-		case INST_THUMB_SVC:
-			c.Exception(VEC_SWI, MODE_SWI)
-		case INST_THUMB_ADD:
-			c.ThumbAddSub(op)
-		case INST_THUMB_SHI:
-			c.ThumbShifted(op)
-		case INST_THUMB_IMM:
-			c.ThumbImm(op)
-		case INST_THUMB_ALU:
-			c.ThumbAlu(op)
-		case INST_THUMB_HIBX:
-			c.ThumbHiBx(op)
-		case INST_THUMB_HI:
-			c.ThumbHi(op)
-		case INST_THUMB_SDTH:
-			c.ThumbLSHalf(op)
-		case INST_THUMB_SDTI:
-			c.ThumbLSImm(op)
-		case INST_THUMB_SDTR:
-			c.ThumbSdt(op)
-		case INST_THUMB_POPPC:
-			c.ThumbPopPc(op)
-		case INST_THUMB_PUS:
-			c.ThumbPushPop(op)
-		case INST_THUMB_REL:
-			c.ThumbRelative(op)
-		case INST_THUMB_BRA:
-			c.ThumbBranch(op)
-		case INST_THUMB_BL_SHORT:
-			c.ThumbShortLongBranch(op)
-		case INST_THUMB_BL_LONG:
-			c.ThumbLongBranch(op)
-		case INST_THUMB_BLK:
-			c.ThumbBlock(op)
-		case INST_THUMB_PCR:
-			c.ThumbLPC(op)
-		case INST_THUMB_CBR:
-			c.ThumbJumpCalls(op)
-		case INST_THUMB_SP:
-			c.ThumbStack(op)
-		case INST_THUMB_SPR:
-			c.ThumbLSSP(op)
-		case INST_THUMB_LDSH:
-			c.ThumbLDSH(op)
-		}
-		return
+	switch decoder := Decoder(thumbLut[op>>8]); decoder {
+	case INST_THUMB_SVC:
+		c.Exception(VEC_SWI, MODE_SWI)
+	case INST_THUMB_ADD:
+		c.ThumbAddSub(op)
+	case INST_THUMB_SHI:
+		c.ThumbShifted(op)
+	case INST_THUMB_IMM:
+		c.ThumbImm(op)
+	case INST_THUMB_ALU:
+		c.ThumbAlu(op)
+	case INST_THUMB_HIBX:
+		c.ThumbHiBx(op)
+	case INST_THUMB_HI:
+		c.ThumbHi(op)
+	case INST_THUMB_SDTH:
+		c.ThumbLSHalf(op)
+	case INST_THUMB_SDTI:
+		c.ThumbLSImm(op)
+	case INST_THUMB_SDTR:
+		c.ThumbSdt(op)
+	case INST_THUMB_POPPC:
+		c.ThumbPopPc(op)
+	case INST_THUMB_PUS:
+		c.ThumbPushPop(op)
+	case INST_THUMB_REL:
+		c.ThumbRelative(op)
+	case INST_THUMB_BRA:
+		c.ThumbBranch(op)
+	case INST_THUMB_BL_SHORT:
+		c.ThumbShortLongBranch(op)
+	case INST_THUMB_BL_LONG:
+		c.ThumbLongBranch(op)
+	case INST_THUMB_BLK:
+		c.ThumbBlock(op)
+	case INST_THUMB_PCR:
+		c.ThumbLPC(op)
+	case INST_THUMB_CBR:
+		c.ThumbJumpCalls(op)
+	case INST_THUMB_SP:
+		c.ThumbStack(op)
+	case INST_THUMB_SPR:
+		c.ThumbLSSP(op)
+	case INST_THUMB_LDSH:
+		c.ThumbLDSH(op)
+	default:
+		panic(fmt.Sprintf("arm7: decode failed pc %08X op %04X\n", c.Reg.R[PC], op))
 	}
-
-	panic(fmt.Sprintf("arm7: decode failed pc %08X op %04X\n", c.Reg.R[PC], op))
-}
-
-//go:inline
-func IsThumbOpFormat(op, mask, fmt uint16) bool {
-	return op&mask == fmt
 }
 
 const (

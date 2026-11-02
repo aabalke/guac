@@ -13,7 +13,8 @@ type Formatter struct {
 
 // NOTE: order of decoders effects order checked and therefore implimentation
 const (
-	INST_SVC Decoder = iota
+	INST_NV Decoder = iota
+	INST_SVC
 	INST_BRA
 	INST_BRX
 	INST_SDT_REG
@@ -31,6 +32,7 @@ const (
 )
 
 var formatters = []Formatter{
+	INST_NV:            {0xF000_0000, 0xF000_0000},
 	INST_SVC:           {0x0F00_0000, 0x0F00_0000},
 	INST_BRA:           {0x0E00_0000, 0x0A00_0000},
 	INST_BRX:           {0x0FFF_FF00, 0x012F_FF00},
@@ -85,6 +87,9 @@ func (c *Cpu) DecodeArm(op uint32) {
 			c.Mul(op)
 		case INST_ALU, INST_ALU_SHIFT_IMM, INST_ALU_SHIFT_REG:
 			c.Alu(op)
+		case INST_NV:
+			c.Seq = SEQ
+			return
 		}
 		return
 	}
