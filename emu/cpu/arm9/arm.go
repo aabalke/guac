@@ -9,16 +9,82 @@ import (
 	"github.com/aabalke/guac/emu/cpu/arm7"
 )
 
+// NOTE: order of decoders effects order checked and therefore implimentation
+const (
+	INST_SVC arm7.Decoder = iota
+	INST_BKP
+	INST_CRT
+	INST_BRA
+	INST_BRX
+	INST_SDT_REG
+	INST_SDT_IMM
+	INST_BLK
+	INST_MUL
+	INST_SWP
+	INST_HAL
+	INST_UND
+	INST_MRS
+	INST_MSR
+	INST_HWM
+	INST_CLZ
+	INST_QAL
+	INST_ALU
+	INST_ALU_SHIFT_REG
+	INST_ALU_SHIFT_IMM
+)
+
+// other coprocessor instructions are not necessary since cp15 is a control coprocessor not a data one
+var formatters = []arm7.Formatter{
+	INST_SVC:           {0x0F00_0000, 0x0F00_0000},
+	INST_BKP:           {0xFFF0_00F0, 0xE120_0070},
+	INST_BRA:           {0x0E00_0000, 0x0A00_0000},
+	INST_BRX:           {0x0FFF_FF00, 0x012F_FF00},
+	INST_UND:           {0x0E00_0010, 0x0600_0010},
+	INST_MUL:           {0x0F00_00F0, 0x0000_0090},
+	INST_HWM:           {0x0F90_0090, 0x0100_0080},
+	INST_CLZ:           {0x0FFF_0FF0, 0x016F_0F10},
+	INST_QAL:           {0x0F90_0FF0, 0x0100_0050},
+	INST_SWP:           {0x0FB0_0FF0, 0x0100_0090},
+	INST_BLK:           {0x0E00_0000, 0x0800_0000},
+	INST_HAL:           {0x0E00_0090, 0x0000_0090},
+	INST_SDT_REG:       {0x0E00_0010, 0x0600_0000},
+	INST_SDT_IMM:       {0x0E00_0000, 0x0400_0000},
+	INST_ALU:           {0x0E00_0000, 0x0200_0000},
+	INST_ALU_SHIFT_REG: {0x0E00_0090, 0x0000_0010},
+	INST_ALU_SHIFT_IMM: {0x0E00_0010, 0x0000_0000},
+	INST_CRT:           {0x0F00_0010, 0x0E00_0010},
+	INST_MRS:           {0x0FBF_0FFF, 0x010F_0000},
+	INST_MSR:           {0x0DB0_F000, 0x0120_F000},
+}
+
+const (
+	INST_BLX arm7.Decoder = iota
+	INST_PLD
+)
+
+var spFormatters = []arm7.Formatter{
+	INST_PLD: {0xFD70_F000, 0xF550_F000},
+	INST_BLX: {0xFE00_0000, 0xFA00_0000},
+}
+
 func (c *Cpu) DecodeArm(op uint32) {
 	cond := op >> 28
 
 	if cond == 0xF {
-		switch {
-		case IsBlx(op):
-			c.Blx(op)
+		for decoder, desc := range spFormatters {
+
+			if (op & desc.Mask) != desc.Match {
+				continue
+			}
+
+			switch arm7.Decoder(decoder) {
+			case INST_BLX:
+				c.Blx(op)
+			case INST_PLD:
+				panic("unsetup pld instruction")
+			}
+
 			return
-		case IsPld(op):
-			panic("unsetup pld instruction")
 		}
 	}
 
@@ -27,106 +93,52 @@ func (c *Cpu) DecodeArm(op uint32) {
 		return
 	}
 
-	switch {
-	case (op>>24)&0xF == 0xF:
-		c.Exception(arm7.VEC_SWI, arm7.MODE_SWI)
-	case IsBkpt(op):
-		c.Exception(arm7.VEC_PREFETCH, arm7.MODE_ABT)
-	case IsCoDataReg(op):
-		c.CoDataReg(op)
-	case arm7.IsBranch(op):
-		c.Branch(op)
-	case arm7.IsBranchExchange(op):
-		c.BranchExchange(op)
-	case arm7.IsSdt(op):
-		c.Sdt(op)
-	case arm7.IsBlock(op):
-		c.Block(op)
-	case arm7.IsHalf(op):
-		c.Half(op)
-	case arm7.IsUndefined(op):
-		c.Exception(arm7.VEC_UNDEFINED, arm7.MODE_UND)
-	case arm7.IsMrs(op):
-		c.Mrs(op)
-	case arm7.IsMsr(op):
-		c.Msr(op)
-	case arm7.IsSwp(op):
-		c.Swp(op)
-	case arm7.IsMul(op):
-		c.Mul(op)
-	case IsCLZ(op):
-		c.Clz(op)
-	case IsQAlu(op):
-		c.Qalu(op)
-	case IsExtMul(op):
-		c.ExtendedMul(op)
-	case arm7.IsAlu(op):
-		c.Alu(op)
-	default:
-		panic(fmt.Sprintf("nds: unable to decode arm9 arm pc=%08X op=%08X", c.Reg.R[PC], op))
+	for decoder, desc := range formatters {
+
+		if (op & desc.Mask) != desc.Match {
+			continue
+		}
+
+		switch arm7.Decoder(decoder) {
+		case INST_SVC:
+			c.Exception(arm7.VEC_SWI, arm7.MODE_SWI)
+		case INST_BKP:
+			c.Exception(arm7.VEC_PREFETCH, arm7.MODE_ABT)
+		case INST_CRT:
+			c.CoDataReg(op)
+		case INST_BRA:
+			c.Branch(op)
+		case INST_BRX:
+			c.BranchExchange(op)
+		case INST_SDT_IMM, INST_SDT_REG:
+			c.Sdt(op)
+		case INST_BLK:
+			c.Block(op)
+		case INST_HAL:
+			c.Half(op)
+		case INST_UND:
+			c.Exception(arm7.VEC_UNDEFINED, arm7.MODE_UND)
+		case INST_MRS:
+			c.Mrs(op)
+		case INST_MSR:
+			c.Msr(op)
+		case INST_SWP:
+			c.Swp(op)
+		case INST_MUL:
+			c.Mul(op)
+		case INST_CLZ:
+			c.Clz(op)
+		case INST_QAL:
+			c.Qalu(op)
+		case INST_HWM:
+			c.ExtendedMul(op)
+		case INST_ALU, INST_ALU_SHIFT_IMM, INST_ALU_SHIFT_REG:
+			c.Alu(op)
+		}
+		return
 	}
-}
 
-func IsPld(op uint32) bool {
-	return arm7.IsOpFormat(
-		op,
-		0b1111_1101_0111_0000_1111_0000_0000_0000,
-		0b1111_0101_0101_0000_1111_0000_0000_0000,
-	)
-}
-
-//go:inline
-func IsBlx(op uint32) bool {
-	return arm7.IsOpFormat(
-		op,
-		0b1111_1110_0000_0000_0000_0000_0000_0000,
-		0b1111_1010_0000_0000_0000_0000_0000_0000,
-	)
-}
-
-//go:inline
-func IsBkpt(op uint32) bool {
-	return arm7.IsOpFormat(
-		op,
-		0b1111_1111_1111_0000_0000_0000_1111_0000,
-		0b1110_0001_0010_0000_0000_0000_0111_0000,
-	)
-}
-
-//go:inline
-func IsCLZ(op uint32) bool {
-	return arm7.IsOpFormat(
-		op,
-		0b1111_1111_1111_0000_1111_1111_0000,
-		0b0001_0110_1111_0000_1111_0001_0000,
-	)
-}
-
-//go:inline
-func IsQAlu(op uint32) bool {
-	return arm7.IsOpFormat(
-		op,
-		0b1111_1001_0000_0000_1111_1111_0000,
-		0b0001_0000_0000_0000_0000_0101_0000,
-	)
-}
-
-//go:inline
-func IsCoDataReg(op uint32) bool {
-	return arm7.IsOpFormat(
-		op,
-		0b1111_0000_0000_0000_0000_0001_0000,
-		0b1110_0000_0000_0000_0000_0001_0000,
-	)
-}
-
-//go:inline
-func IsExtMul(op uint32) bool {
-	return arm7.IsOpFormat(
-		op,
-		0b1111_1001_0000_0000_0000_1001_0000,
-		0b0001_0000_0000_0000_0000_1000_0000,
-	)
+	panic(fmt.Sprintf("arm9: decode failed pc %08X op %08X\n", c.Reg.R[PC], op))
 }
 
 const (

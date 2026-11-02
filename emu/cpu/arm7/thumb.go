@@ -5,258 +5,121 @@ import (
 	"math/bits"
 )
 
-func (c *Cpu) DecodeThumb(op uint16) {
-	switch {
-	case IsThumbSWI(op):
-		c.Exception(VEC_SWI, MODE_SWI)
-	case IsThumbAddSub(op):
-		c.ThumbAddSub(op)
-	case IsThumbShift(op):
-		c.ThumbShifted(op)
-	case IsThumbImm(op):
-		c.ThumbImm(op)
-	case IsThumbAlu(op):
-		c.ThumbAlu(op)
-	case IsThumbHiBx(op):
-		c.ThumbHiBx(op)
-	case IsThumbHi(op):
-		c.ThumbHi(op)
-	case IsLSHalf(op):
-		c.ThumbLSHalf(op)
-	case IsThumbLDSH(op):
-		c.ThumbLDSH(op)
-	case IsThumbSdt(op):
-		c.ThumbSdt(op)
-	case IsLPC(op):
-		c.ThumbLPC(op)
-	case IsLSImm(op):
-		c.ThumbLSImm(op)
-	case IsPopPc(op):
-		c.ThumbPopPc(op)
-	case IsPushPop(op):
-		c.ThumbPushPop(op)
-	case IsRelative(op):
-		c.ThumbRelative(op)
-	case IsThumbBranch(op):
-		c.ThumbBranch(op)
-	case IsJumpCall(op):
-		c.ThumbJumpCalls(op)
-	case IsStack(op):
-		c.ThumbStack(op)
-	case IsLongBranch(op):
-		c.ThumbLongBranch(op)
-	case IsShortLongBranch(op):
-		c.ThumbShortLongBranch(op)
-	case IsLSSP(op):
-		c.ThumbLSSP(op)
-	case IsThumbBlock(op):
-		c.ThumbBlock(op)
-	default:
-		panic(fmt.Sprintf("Unable to Decode ARM false %04X, at PC %08X\n", op, c.Reg.R[PC]))
+// NOTE: order of decoders effects order checked and therefore implimentation
+const (
+	INST_THUMB_BRA Decoder = iota
+	INST_THUMB_SVC
+	INST_THUMB_HIBX
+	INST_THUMB_HI
+	INST_THUMB_CBR
+	INST_THUMB_REL
+	INST_THUMB_SP
+	INST_THUMB_PCR
+	INST_THUMB_LDSH
+	INST_THUMB_SDTR
+	INST_THUMB_SDTI
+	INST_THUMB_SDTH
+	INST_THUMB_SPR
+	INST_THUMB_BLK
+	INST_THUMB_POPPC
+	INST_THUMB_PUS
+	INST_THUMB_ADD
+	INST_THUMB_IMM
+	INST_THUMB_SHI
+	INST_THUMB_ALU
+	INST_THUMB_BL_LONG
+	INST_THUMB_BL_SHORT
+)
+
+var thumbFormatters = []Formatter{
+	INST_THUMB_BRA:      {0xF800, 0xE000},
+	INST_THUMB_SVC:      {0xFF00, 0xDF00},
+	INST_THUMB_HIBX:     {0xFF00, 0x4700},
+	INST_THUMB_HI:       {0xFC00, 0x4400},
+	INST_THUMB_CBR:      {0xF000, 0xD000},
+	INST_THUMB_ALU:      {0xFC00, 0x4000},
+	INST_THUMB_IMM:      {0xE000, 0x2000},
+	INST_THUMB_ADD:      {0xF800, 0x1800},
+	INST_THUMB_SHI:      {0xE000, 0x0000},
+	INST_THUMB_POPPC:    {0xFF00, 0xBD00},
+	INST_THUMB_PUS:      {0xF600, 0xB400},
+	INST_THUMB_BLK:      {0xF000, 0xC000},
+	INST_THUMB_REL:      {0xF000, 0xA000},
+	INST_THUMB_SP:       {0xFF00, 0xB000},
+	INST_THUMB_PCR:      {0xF800, 0x4800},
+	INST_THUMB_LDSH:     {0xFE00, 0x5E00},
+	INST_THUMB_SDTR:     {0xF000, 0x5000},
+	INST_THUMB_SDTI:     {0xE000, 0x6000},
+	INST_THUMB_SDTH:     {0xF000, 0x8000},
+	INST_THUMB_SPR:      {0xF000, 0x9000},
+	INST_THUMB_BL_LONG:  {0xF800, 0xF000},
+	INST_THUMB_BL_SHORT: {0xE800, 0xE800},
+}
+
+func (c *Cpu) DecodeThumb(op32 uint32) {
+	op := uint16(op32)
+
+	for decoder, desc := range thumbFormatters {
+
+		if (op32 & desc.Mask) != desc.Match {
+			continue
+		}
+
+		switch Decoder(decoder) {
+		case INST_THUMB_SVC:
+			c.Exception(VEC_SWI, MODE_SWI)
+		case INST_THUMB_ADD:
+			c.ThumbAddSub(op)
+		case INST_THUMB_SHI:
+			c.ThumbShifted(op)
+		case INST_THUMB_IMM:
+			c.ThumbImm(op)
+		case INST_THUMB_ALU:
+			c.ThumbAlu(op)
+		case INST_THUMB_HIBX:
+			c.ThumbHiBx(op)
+		case INST_THUMB_HI:
+			c.ThumbHi(op)
+		case INST_THUMB_SDTH:
+			c.ThumbLSHalf(op)
+		case INST_THUMB_SDTI:
+			c.ThumbLSImm(op)
+		case INST_THUMB_SDTR:
+			c.ThumbSdt(op)
+		case INST_THUMB_POPPC:
+			c.ThumbPopPc(op)
+		case INST_THUMB_PUS:
+			c.ThumbPushPop(op)
+		case INST_THUMB_REL:
+			c.ThumbRelative(op)
+		case INST_THUMB_BRA:
+			c.ThumbBranch(op)
+		case INST_THUMB_BL_SHORT:
+			c.ThumbShortLongBranch(op)
+		case INST_THUMB_BL_LONG:
+			c.ThumbLongBranch(op)
+		case INST_THUMB_BLK:
+			c.ThumbBlock(op)
+		case INST_THUMB_PCR:
+			c.ThumbLPC(op)
+		case INST_THUMB_CBR:
+			c.ThumbJumpCalls(op)
+		case INST_THUMB_SP:
+			c.ThumbStack(op)
+		case INST_THUMB_SPR:
+			c.ThumbLSSP(op)
+		case INST_THUMB_LDSH:
+			c.ThumbLDSH(op)
+		}
+		return
 	}
+
+	panic(fmt.Sprintf("arm7: decode failed pc %08X op %04X\n", c.Reg.R[PC], op))
 }
 
 //go:inline
 func IsThumbOpFormat(op, mask, fmt uint16) bool {
 	return op&mask == fmt
-}
-
-//go:inline
-func IsThumbShift(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1110_0000_0000_0000,
-		0b0000_0000_0000_0000,
-	)
-}
-
-//go:inline
-func IsThumbAddSub(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1111_1000_0000_0000,
-		0b0001_1000_0000_0000,
-	)
-}
-
-//go:inline
-func IsThumbImm(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1110_0000_0000_0000,
-		0b0010_0000_0000_0000,
-	)
-}
-
-//go:inline
-func IsThumbAlu(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1111_1100_0000_0000,
-		0b0100_0000_0000_0000,
-	)
-}
-
-//go:inline
-func IsThumbHi(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1111_1100_0000_0000,
-		0b0100_0100_0000_0000,
-	)
-}
-
-//go:inline
-func IsThumbHiBx(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1111_1111_0000_0000,
-		0b0100_0111_0000_0000,
-	)
-}
-
-//go:inline
-func IsLSHalf(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1111_0000_0000_0000,
-		0b1000_0000_0000_0000,
-	)
-}
-
-//go:inline
-func IsThumbSdt(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1111_0000_0000_0000,
-		0b0101_0000_0000_0000,
-	)
-}
-
-//go:inline
-func IsThumbLDSH(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1111_1110_0000_0000,
-		0b0101_1110_0000_0000,
-	)
-}
-
-//go:inline
-func IsLPC(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1111_1000_0000_0000,
-		0b0100_1000_0000_0000,
-	)
-}
-
-//go:inline
-func IsLSImm(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1110_0000_0000_0000,
-		0b0110_0000_0000_0000,
-	)
-}
-
-//go:inline
-func IsPopPc(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1111_1111_0000_0000,
-		0b1011_1101_0000_0000,
-	)
-}
-
-//go:inline
-func IsPushPop(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1111_0110_0000_0000,
-		0b1011_0100_0000_0000,
-	)
-}
-
-//go:inline
-func IsRelative(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1111_0000_0000_0000,
-		0b1010_0000_0000_0000,
-	)
-}
-
-//go:inline
-func IsJumpCall(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1111_0000_0000_0000,
-		0b1101_0000_0000_0000,
-	)
-}
-
-//go:inline
-func IsThumbBranch(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1111_1000_0000_0000,
-		0b1110_0000_0000_0000,
-	)
-}
-
-//go:inline
-func IsStack(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1111_1111_0000_0000,
-		0b1011_0000_0000_0000,
-	)
-}
-
-//go:inline
-func IsLongBranch(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1111_1000_0000_0000,
-		0b1111_0000_0000_0000,
-	)
-}
-
-//go:inline
-func IsShortLongBranch(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1111_1000_0000_0000,
-		0b1111_1000_0000_0000,
-	)
-}
-
-//go:inline
-func IsLSSP(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1111_0000_0000_0000,
-		0b1001_0000_0000_0000,
-	)
-}
-
-//go:inline
-func IsThumbBlock(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1111_0000_0000_0000,
-		0b1100_0000_0000_0000,
-	)
-}
-
-//go:inline
-func IsThumbSWI(op uint16) bool {
-	return IsThumbOpFormat(
-		op,
-		0b1111_1111_0000_0000,
-		0b1101_1111_0000_0000,
-	)
 }
 
 const (
@@ -575,7 +438,7 @@ func (c *Cpu) ThumbSdt(op uint16) {
 		addr = r[(op>>3)&7] + r[(op>>6)&7]
 	)
 
-	switch inst := (op >> 10) & 3; inst {
+	switch inst := (op >> 9) & 7; inst {
 	case THUMB_STR:
 		c.Write32(addr, r[rd])
 	case THUMB_STRH:

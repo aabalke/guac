@@ -5,192 +5,91 @@ import (
 	"math/bits"
 )
 
+type Decoder int
+
+type Formatter struct {
+	Mask, Match uint32
+}
+
+// NOTE: order of decoders effects order checked and therefore implimentation
+const (
+	INST_SVC Decoder = iota
+	INST_BRA
+	INST_BRX
+	INST_SDT_REG
+	INST_SDT_IMM
+	INST_BLK
+	INST_MUL
+	INST_SWP
+	INST_HAL
+	INST_UND
+	INST_MRS
+	INST_MSR
+	INST_ALU
+	INST_ALU_SHIFT_REG
+	INST_ALU_SHIFT_IMM
+)
+
+var formatters = []Formatter{
+	INST_SVC:           {0x0F00_0000, 0x0F00_0000},
+	INST_BRA:           {0x0E00_0000, 0x0A00_0000},
+	INST_BRX:           {0x0FFF_FF00, 0x012F_FF00},
+	INST_UND:           {0x0E00_0010, 0x0600_0010},
+	INST_MUL:           {0x0F00_00F0, 0x0000_0090},
+	INST_SWP:           {0x0FB0_0FF0, 0x0100_0090},
+	INST_BLK:           {0x0E00_0000, 0x0800_0000},
+	INST_HAL:           {0x0E00_0090, 0x0000_0090},
+	INST_SDT_REG:       {0x0E00_0010, 0x0600_0000},
+	INST_SDT_IMM:       {0x0E00_0000, 0x0400_0000},
+	INST_ALU:           {0x0E00_0000, 0x0200_0000},
+	INST_ALU_SHIFT_REG: {0x0E00_0090, 0x0000_0010},
+	INST_ALU_SHIFT_IMM: {0x0E00_0010, 0x0000_0000},
+	INST_MRS:           {0x0FBF_0FFF, 0x010F_0000},
+	INST_MSR:           {0x0DB0_F000, 0x0120_F000},
+}
+
 func (c *Cpu) DecodeArm(op uint32) {
 	if cond := op >> 28; !c.Reg.CPSR.CheckCond(cond) {
 		c.Seq = SEQ
 		return
 	}
 
-	switch {
-	case (op>>24)&0xF == 0xF:
-		c.Exception(VEC_SWI, MODE_SWI)
-	case IsBranch(op):
-		c.Branch(op)
-	case IsBranchExchange(op):
-		c.BranchExchange(op)
-	case IsSdt(op):
-		c.Sdt(op)
-	case IsBlock(op):
-		c.Block(op)
-	case IsHalf(op):
-		c.Half(op)
-	case IsUndefined(op):
-		c.Exception(VEC_UNDEFINED, MODE_UND)
-	case IsMrs(op):
-		c.Mrs(op)
-	case IsMsr(op):
-		c.Msr(op)
-	case IsSwp(op):
-		c.Swp(op)
-	case IsMul(op):
-		c.Mul(op)
-	case IsAlu(op):
-		c.Alu(op)
-	default:
-		panic(fmt.Sprintf("Unable to Decode ARM false %08X, at PC %08X\n", op, c.Reg.R[PC]))
+	for decoder, desc := range formatters {
+
+		if (op & desc.Mask) != desc.Match {
+			continue
+		}
+
+		switch Decoder(decoder) {
+		case INST_SVC:
+			c.Exception(VEC_SWI, MODE_SWI)
+		case INST_BRA:
+			c.Branch(op)
+		case INST_BRX:
+			c.BranchExchange(op)
+		case INST_SDT_IMM, INST_SDT_REG:
+			c.Sdt(op)
+		case INST_BLK:
+			c.Block(op)
+		case INST_HAL:
+			c.Half(op)
+		case INST_UND:
+			c.Exception(VEC_UNDEFINED, MODE_UND)
+		case INST_MRS:
+			c.Mrs(op)
+		case INST_MSR:
+			c.Msr(op)
+		case INST_SWP:
+			c.Swp(op)
+		case INST_MUL:
+			c.Mul(op)
+		case INST_ALU, INST_ALU_SHIFT_IMM, INST_ALU_SHIFT_REG:
+			c.Alu(op)
+		}
+		return
 	}
-}
 
-//go:inline
-func IsOpFormat(op, mask, format uint32) bool {
-	return op&mask == format
-}
-
-//go:inline
-func IsSwp(op uint32) bool {
-	return IsOpFormat(
-		op,
-		0b1111_1011_0000_0000_1111_1111_0000,
-		0b0001_0000_0000_0000_0000_1001_0000,
-	)
-}
-
-//go:inline
-func IsBlock(op uint32) bool {
-	is := false
-
-	is = is || IsOpFormat(
-		op,
-		0b1110_0001_0000_0000_0000_0000_0000,
-		0b1000_0001_0000_0000_0000_0000_0000,
-	)
-
-	is = is || IsOpFormat(
-		op,
-		0b1110_0001_0000_0000_0000_0000_0000,
-		0b1000_0000_0000_0000_0000_0000_0000,
-	)
-
-	return is
-}
-
-//go:inline
-func IsHalf(op uint32) bool {
-	is := false
-
-	is = is || IsOpFormat(
-		op,
-		0b1110_0000_0000_0000_0000_1101_0000,
-		0b0000_0000_0000_0000_0000_1101_0000,
-	)
-
-	is = is || IsOpFormat(
-		op,
-		0b1110_0000_0000_0000_0000_1011_0000,
-		0b0000_0000_0000_0000_0000_1011_0000,
-	)
-
-	return is
-}
-
-func IsAluImm(op uint32) bool {
-	return IsOpFormat(
-		op,
-		0b1110_0000_0000_0000_0000_0000_0000,
-		0b0010_0000_0000_0000_0000_0000_0000,
-	)
-}
-
-func IsAluShiftReg(op uint32) bool {
-	return IsOpFormat(
-		op,
-		0b1110_0000_0000_0000_0000_1001_0000,
-		0b0000_0000_0000_0000_0000_0001_0000,
-	)
-}
-
-func IsAluShiftImm(op uint32) bool {
-	return IsOpFormat(
-		op,
-		0b1110_0000_0000_0000_0000_0001_0000,
-		0b0000_0000_0000_0000_0000_0000_0000,
-	)
-}
-
-//go:inline
-func IsAlu(op uint32) bool {
-	return IsAluImm(op) || IsAluShiftImm(op) || IsAluShiftReg(op)
-}
-
-//go:inline
-func IsBranchExchange(op uint32) bool {
-	return IsOpFormat(
-		op,
-		0b1111_1111_1111_1111_1111_1101_0000,
-		0b0001_0010_1111_1111_1111_0001_0000,
-	)
-}
-
-//go:inline
-func IsBranch(op uint32) bool {
-	return IsOpFormat(
-		op,
-		0b1110_0000_0000_0000_0000_0000_0000,
-		0b1010_0000_0000_0000_0000_0000_0000,
-	)
-}
-
-//go:inline
-func IsMul(op uint32) bool {
-	return IsOpFormat(
-		op,
-		0b1110_0000_0000_0000_0000_1111_0000,
-		0b0000_0000_0000_0000_0000_1001_0000,
-	)
-}
-
-//go:inline
-func IsUndefined(op uint32) bool {
-	return IsOpFormat(
-		op,
-		0b1110_0000_0000_0000_0000_0001_0000,
-		0b0110_0000_0000_0000_0000_0001_0000,
-	)
-}
-
-//go:inline
-func IsSdt(op uint32) bool {
-	is := false
-	is = is || IsOpFormat(
-		op,
-		0b1100_0001_0000_0000_0000_0000_0000,
-		0b0100_0001_0000_0000_0000_0000_0000,
-	)
-	is = is || IsOpFormat(
-		op,
-		0b1100_0001_0000_0000_0000_0000_0000,
-		0b0100_0000_0000_0000_0000_0000_0000,
-	)
-
-	return is
-}
-
-//go:inline
-func IsMrs(op uint32) bool {
-	return IsOpFormat(
-		op,
-		0b1111_1011_1111_0000_1111_1111_1111,
-		0b0001_0000_1111_0000_0000_0000_0000,
-	)
-}
-
-//go:inline
-func IsMsr(op uint32) bool {
-	return IsOpFormat(
-		op,
-		0b1101_1011_0000_1111_0000_0000_0000,
-		0b0001_0010_0000_1111_0000_0000_0000,
-	)
+	panic(fmt.Sprintf("arm7: decode failed pc %08X op %08X\n", c.Reg.R[PC], op))
 }
 
 const (

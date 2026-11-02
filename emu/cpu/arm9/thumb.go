@@ -7,77 +7,124 @@ import (
 	"github.com/aabalke/guac/emu/cpu/arm7"
 )
 
-func (c *Cpu) DecodeThumb(op uint16) {
-	switch {
-	case IsThumbBkpt(op):
-		c.Exception(arm7.VEC_PREFETCH, arm7.MODE_ABT)
-	case arm7.IsThumbSWI(op):
-		c.Exception(arm7.VEC_SWI, arm7.MODE_SWI)
-	case arm7.IsThumbAddSub(op):
-		c.ThumbAddSub(op)
-	case arm7.IsThumbShift(op):
-		c.ThumbShifted(op)
-	case arm7.IsThumbImm(op):
-		c.ThumbImm(op)
-	case arm7.IsThumbAlu(op):
-		c.ThumbAlu(op)
-	case arm7.IsThumbHiBx(op):
-		c.ThumbHiBx(op)
-	case arm7.IsThumbHi(op):
-		c.ThumbHi(op)
-	case arm7.IsLSHalf(op):
-		c.ThumbLSHalf(op)
-	case arm7.IsThumbLDSH(op):
-		c.ThumbLDSH(op)
-	case arm7.IsThumbSdt(op):
-		c.ThumbSdt(op)
-	case arm7.IsLPC(op):
-		c.ThumbLPC(op)
-	case arm7.IsLSImm(op):
-		c.ThumbLSImm(op)
-	case arm7.IsPopPc(op):
-		c.ThumbPopPc(op)
-	case arm7.IsPushPop(op):
-		c.ThumbPushPop(op)
-	case arm7.IsRelative(op):
-		c.ThumbRelative(op)
-	case arm7.IsThumbBranch(op):
-		c.ThumbBranch(op)
-	case arm7.IsJumpCall(op):
-		c.ThumbJumpCalls(op)
-	case arm7.IsStack(op):
-		c.ThumbStack(op)
-	case arm7.IsLongBranch(op):
-		c.ThumbLongBranch(op)
-	case arm7.IsShortLongBranch(op):
-		c.ThumbShortLongBranch(op)
-	case IsThumbShortBlx(op):
-		c.ThumbShortBlx(op)
-	case arm7.IsLSSP(op):
-		c.ThumbLSSP(op)
-	case arm7.IsThumbBlock(op):
-		c.ThumbBlock(op)
-	default:
-		panic(fmt.Sprintf("nds: unable to decode arm9 thumb pc=%08X op=%08X", c.Reg.R[PC], op))
+// NOTE: order of decoders effects order checked and therefore implimentation
+const (
+	INST_THUMB_BRA arm7.Decoder = iota
+	INST_THUMB_SVC
+	INST_THUMB_BPT       // arm9
+	INST_THUMB_SHORT_BLX // arm9
+	INST_THUMB_HIBX
+	INST_THUMB_HI
+	INST_THUMB_CBR
+	INST_THUMB_REL
+	INST_THUMB_SP
+	INST_THUMB_PCR
+	INST_THUMB_LDSH
+	INST_THUMB_SDTR
+	INST_THUMB_SDTI
+	INST_THUMB_SDTH
+	INST_THUMB_SPR
+	INST_THUMB_BLK
+	INST_THUMB_POPPC
+	INST_THUMB_PUS
+	INST_THUMB_ADD
+	INST_THUMB_IMM
+	INST_THUMB_SHI
+	INST_THUMB_ALU
+	INST_THUMB_BL_LONG
+	INST_THUMB_BL_SHORT
+)
+
+var thumbFormatters = []arm7.Formatter{
+	INST_THUMB_SHORT_BLX: {0xF800, 0xE800},
+	INST_THUMB_BRA:       {0xF800, 0xE000},
+	INST_THUMB_SVC:       {0xFF00, 0xDF00},
+	INST_THUMB_BPT:       {0xFF00, 0xBE00},
+	INST_THUMB_HIBX:      {0xFF00, 0x4700},
+	INST_THUMB_HI:        {0xFC00, 0x4400},
+	INST_THUMB_CBR:       {0xF000, 0xD000},
+	INST_THUMB_ALU:       {0xFC00, 0x4000},
+	INST_THUMB_IMM:       {0xE000, 0x2000},
+	INST_THUMB_ADD:       {0xF800, 0x1800},
+	INST_THUMB_SHI:       {0xE000, 0x0000},
+	INST_THUMB_POPPC:     {0xFF00, 0xBD00},
+	INST_THUMB_PUS:       {0xF600, 0xB400},
+	INST_THUMB_BLK:       {0xF000, 0xC000},
+	INST_THUMB_REL:       {0xF000, 0xA000},
+	INST_THUMB_SP:        {0xFF00, 0xB000},
+	INST_THUMB_PCR:       {0xF800, 0x4800},
+	INST_THUMB_LDSH:      {0xFE00, 0x5E00},
+	INST_THUMB_SDTR:      {0xF000, 0x5000},
+	INST_THUMB_SDTI:      {0xE000, 0x6000},
+	INST_THUMB_SDTH:      {0xF000, 0x8000},
+	INST_THUMB_SPR:       {0xF000, 0x9000},
+	INST_THUMB_BL_LONG:   {0xF800, 0xF000},
+	INST_THUMB_BL_SHORT:  {0xE800, 0xE800},
+}
+
+func (c *Cpu) DecodeThumb(op32 uint32) {
+	op := uint16(op32)
+
+	for decoder, desc := range thumbFormatters {
+
+		if (op32 & desc.Mask) != desc.Match {
+			continue
+		}
+
+		switch arm7.Decoder(decoder) {
+		case INST_THUMB_SVC:
+			c.Exception(arm7.VEC_SWI, arm7.MODE_SWI)
+		case INST_THUMB_BPT:
+			c.Exception(arm7.VEC_PREFETCH, arm7.MODE_ABT)
+		case INST_THUMB_SHORT_BLX:
+			c.ThumbShortBlx(op)
+		case INST_THUMB_ADD:
+			c.ThumbAddSub(op)
+		case INST_THUMB_SHI:
+			c.ThumbShifted(op)
+		case INST_THUMB_IMM:
+			c.ThumbImm(op)
+		case INST_THUMB_ALU:
+			c.ThumbAlu(op)
+		case INST_THUMB_HIBX:
+			c.ThumbHiBx(op)
+		case INST_THUMB_HI:
+			c.ThumbHi(op)
+		case INST_THUMB_SDTH:
+			c.ThumbLSHalf(op)
+		case INST_THUMB_SDTI:
+			c.ThumbLSImm(op)
+		case INST_THUMB_SDTR:
+			c.ThumbSdt(op)
+		case INST_THUMB_POPPC:
+			c.ThumbPopPc(op)
+		case INST_THUMB_PUS:
+			c.ThumbPushPop(op)
+		case INST_THUMB_REL:
+			c.ThumbRelative(op)
+		case INST_THUMB_BRA:
+			c.ThumbBranch(op)
+		case INST_THUMB_BL_SHORT:
+			c.ThumbShortLongBranch(op)
+		case INST_THUMB_BL_LONG:
+			c.ThumbLongBranch(op)
+		case INST_THUMB_BLK:
+			c.ThumbBlock(op)
+		case INST_THUMB_PCR:
+			c.ThumbLPC(op)
+		case INST_THUMB_CBR:
+			c.ThumbJumpCalls(op)
+		case INST_THUMB_SP:
+			c.ThumbStack(op)
+		case INST_THUMB_SPR:
+			c.ThumbLSSP(op)
+		case INST_THUMB_LDSH:
+			c.ThumbLDSH(op)
+		}
+		return
 	}
-}
 
-//go:inline
-func IsThumbBkpt(op uint16) bool {
-	return arm7.IsThumbOpFormat(
-		op,
-		0b1111_1111_0000_0000,
-		0b1011_1110_0000_0000,
-	)
-}
-
-//go:inline
-func IsThumbShortBlx(op uint16) bool {
-	return arm7.IsThumbOpFormat(
-		op,
-		0b1111_1000_0000_0000,
-		0b1110_1000_0000_0000,
-	)
+	panic(fmt.Sprintf("arm9: decode failed pc %08X op %04X\n", c.Reg.R[PC], op))
 }
 
 func (c *Cpu) ThumbShortBlx(op uint16) {
