@@ -7,19 +7,28 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 )
 
+var extensions = []string{
+	"gb", "gbc", "gba", "nds", "zip",
+}
+
 func NewHome(g *Game) {
 	g.ui.focus.ClearFocus()
 
 	l := g.ui.res.localization.Main
 
 	b1 := NewCenteredButton(l.Open, func(*widget.ButtonClickedEventArgs) {
-		file := utils.OpenFile(
-			l.DialogTitle,
-			l.DialogDesc,
-			"gb", "gbc", "gba", "nds", "zip",
-		)
+		if len(g.ui.gamepadIds) != 0 {
+			NewFileMenu(g, g.ui.PageId)
+		} else {
 
-		g.InitConsole(file)
+			file := utils.OpenFile(
+				l.DialogTitle,
+				l.DialogDesc,
+				extensions...,
+			)
+
+			g.InitConsole(file)
+		}
 	})
 
 	b2 := NewCenteredButton(l.Settings, func(*widget.ButtonClickedEventArgs) {

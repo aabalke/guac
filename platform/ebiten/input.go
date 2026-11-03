@@ -108,7 +108,7 @@ func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) 
 			}
 		}
 
-	case PAGE_SETTINGS, PAGE_KEYBOARD:
+	case PAGE_SETTINGS, PAGE_KEYBOARD, PAGE_FILE_SELECT:
 
 		g.getFastFocus(buttons)
 
@@ -127,10 +127,13 @@ func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) 
 				g.ui.ui.ChangeFocus(widget.FOCUS_WEST)
 
 			case slices.Contains(buttonConfig.Return, button):
-				if g.ui.PageId == PAGE_SETTINGS {
+				switch g.ui.PageId {
+				case PAGE_SETTINGS:
 					g.ui.focus.FocusLastSidebar()
-				} else {
+				case PAGE_KEYBOARD:
 					g.ui.ui.SetFocusedWidget(g.ui.keyboard.cancelButtons[g.ui.keyboard.currBoard])
+				case PAGE_FILE_SELECT:
+					g.ui.ui.SetFocusedWidget(g.ui.ui.Container.GetFocusers()[2]) // navbar return is [2]
 				}
 
 			case slices.Contains(buttonConfig.Select, button):

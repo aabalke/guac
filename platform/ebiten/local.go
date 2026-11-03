@@ -50,6 +50,7 @@ type Localization struct {
 	Main     MainLocalization     `toml:"main"`
 	Pause    PauseLocalization    `toml:"pause"`
 	Settings SettingsLocalization `toml:"settings"`
+	FileMenu FileMenuLocalization `toml:"file_menu"`
 	Toast    ToastLocalization    `toml:"toast"`
 }
 
@@ -73,6 +74,13 @@ type PauseLocalization struct {
 	Resume   string `toml:"resume"`
 	Settings string `toml:"settings"`
 	Main     string `toml:"main"`
+}
+
+type FileMenuLocalization struct {
+	OpenRom string `toml:"open_rom"`
+	Choose  string `toml:"choose"`
+	Up      string `toml:"up"`
+	Return  string `toml:"return"`
 }
 
 type SettingsLocalization struct {
@@ -129,6 +137,7 @@ type GeneralLocalization struct {
 	Down                string `toml:"down"`
 	Fullscreen          string `toml:"fullscreen"`
 	Quit                string `toml:"quit"`
+	RomsPath            string `toml:"roms_path"`
 	Save                string `toml:"save"`
 }
 

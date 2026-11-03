@@ -125,7 +125,7 @@ func (f *Focus) DeFocus() {
 	}
 }
 
-func (f *Focus) KeepFocusedInView(slider *widget.Slider, ui *ebitenui.UI) {
+func (f *Focus) KeepFocusedInView(slider *widget.Slider, ui *ebitenui.UI, scr *widget.Container) {
 	if len(f.submenu) == 0 ||
 		slider == nil ||
 		f.ui == nil ||
@@ -136,8 +136,8 @@ func (f *Focus) KeepFocusedInView(slider *widget.Slider, ui *ebitenui.UI) {
 	var (
 		focusedTop    = f.ui.GetFocusedWidget().GetWidget().Rect.Min.Y
 		focusedBottom = f.ui.GetFocusedWidget().GetWidget().Rect.Max.Y
-		rootTop       = f.ui.Container.GetWidget().Rect.Min.Y
-		rootBottom    = f.ui.Container.GetWidget().Rect.Max.Y
+		rootTop       = scr.GetWidget().Rect.Min.Y
+		rootBottom    = scr.GetWidget().Rect.Max.Y
 		firstTop      = f.submenu[0].GetWidget().Rect.Min.Y
 		// bottom  = f.submenu[len(f.submenu)-1].GetWidget().Rect.Max.Y
 		// I don't believe bottom is possible / important
@@ -213,4 +213,37 @@ func buildOtherFocus(group []widget.Focuser) {
 	}
 
 	group[len(group)-1].AddFocus(widget.FOCUS_NORTH, group[len(group)-2])
+}
+
+func (f *Focus) buildFileMenuFocus(navbar, content *widget.Container) {
+	navFocusers := navbar.GetFocusers()
+	focusers := content.GetFocusers()
+	f.submenu = focusers
+
+	for i, focuser := range navFocusers {
+		focuser.AddFocus(widget.FOCUS_SOUTH, focusers[0])
+
+		if i != 0 {
+			focuser.AddFocus(widget.FOCUS_WEST, navFocusers[i-1])
+		}
+
+		if i < len(navFocusers)-1 {
+			focuser.AddFocus(widget.FOCUS_EAST, navFocusers[i+1])
+		}
+	}
+
+	navFocusers[len(navFocusers)-1].AddFocus(widget.FOCUS_NEXT, focusers[0])
+	focusers[0].AddFocus(widget.FOCUS_PREVIOUS, navFocusers[len(navFocusers)-1])
+
+	for i := range len(focusers) {
+		if i != 0 {
+			focusers[i].AddFocus(widget.FOCUS_NORTH, focusers[i-1])
+		} else {
+			focusers[0].AddFocus(widget.FOCUS_NORTH, navFocusers[len(navFocusers)-1])
+		}
+
+		if i != len(focusers)-1 {
+			focusers[i].AddFocus(widget.FOCUS_SOUTH, focusers[i+1])
+		}
+	}
 }

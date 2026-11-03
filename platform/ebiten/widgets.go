@@ -354,8 +354,8 @@ func NewFileInput(v *string) widget.PreferredSizeLocateableWidget {
 	return dialogInput(v, func() string { return utils.OpenFile("Open", "All Files") })
 }
 
-func NewDirectoryInput(v *string, defaultPath string) widget.PreferredSizeLocateableWidget {
-	return dialogInput(v, func() string { return utils.OpenDirectory("Choose", defaultPath) })
+func NewDirectoryInput(v *string, startPath, defaultPath string) widget.PreferredSizeLocateableWidget {
+	return dialogInput(v, func() string { return utils.OpenDirectory("Choose", startPath, defaultPath) })
 }
 
 func dialogInput(v *string, dialogFunc func() string) widget.PreferredSizeLocateableWidget {

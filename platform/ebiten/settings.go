@@ -152,6 +152,8 @@ func NewScrollableContainer(ui *Ui) *widget.Container {
 		)),
 	)
 
+	ui.scrollableContainer = scr
+
 	ui.scrollable = widget.NewScrollContainer(
 		widget.ScrollContainerOpts.Content(ui.content),
 		widget.ScrollContainerOpts.StretchContentWidth(),

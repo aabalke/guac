@@ -88,6 +88,7 @@ type Config struct {
 type General struct {
 	Headless            bool
 	RomPath             string
+	RomsPath            string
 	Muted               bool
 	TargetFps           int
 	ShowFps             bool

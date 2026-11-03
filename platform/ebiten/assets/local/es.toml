@@ -17,6 +17,12 @@ unmuted = "con sonido"
 controller_connected = "controlador conectado"
 controller_disconnected = "controlador desconectado"
 
+[file_menu]
+open_rom = "abrir una rom"
+choose = "eligir"
+up = "arriba"
+return = "volver"
+
 [settings]
 
 [settings.sidebar]
@@ -43,6 +49,7 @@ integer_scaling = "escalado entero"
 integer_scaling_ratio = "proporción de escalado entero"
 sample_rate_desc = "frecuencia de muestreo requiere reiniciar"
 sample_rate = "frecuencia de muestreo"
+roms_path = "directorio de roms"
 
 keyboard        = "teclado"
 controller      = "controlador"

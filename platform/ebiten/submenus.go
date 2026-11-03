@@ -70,6 +70,7 @@ func NewGeneralMenu(g *Game) *widget.Container {
 		NewSeparator(), NewLinkText(l.IntegerScalingDesc),
 		NewLabel(l.SampleRate), NewDecimalInput(g.ui, l.SampleRate, &tmp.SampleRate, 192000),
 		NewSeparator(), NewLinkText(l.SampleRateDesc),
+		NewLabel(l.RomsPath), NewDirectoryInput(&tmp.RomsPath, tmp.RomsPath, "./"),
 	)
 
 	inputLabels := []string{
@@ -519,7 +520,7 @@ func NewNdsMenu(g *Game) *widget.Container {
 	menu.AddChild(NewHeader(l.SceneExport, g.ui.res), export)
 
 	export.AddChild(
-		NewLabel(l.OutputDirectory), NewDirectoryInput(&tmp.Export.Directory, "./export"),
+		NewLabel(l.OutputDirectory), NewDirectoryInput(&tmp.Export.Directory, tmp.Export.Directory, "./export"),
 		NewLabel(l.ShadowPolygons), NewCheckbox(&tmp.Export.ShadowPolys),
 	)
 

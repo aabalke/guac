@@ -22,8 +22,8 @@ func OpenFile(title, desc string, extensions ...string) string {
 	return file
 }
 
-func OpenDirectory(title, defaultPath string) string {
-	directory, err := dialog.Directory().Title(title).Browse()
+func OpenDirectory(title, startDir, defaultPath string) string {
+	directory, err := dialog.Directory().Title(title).SetStartDir(startDir).Browse()
 	if err != nil {
 		return defaultPath
 	}

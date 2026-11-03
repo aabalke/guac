@@ -19,6 +19,12 @@ unmuted = "unmuted"
 controller_connected = "controller connected"
 controller_disconnected = "controller disconnected"
 
+[file_menu]
+open_rom = "open rom"
+choose = "choose"
+up = "up"
+return = "return"
+
 [settings]
 
 [settings.sidebar]
@@ -44,6 +50,7 @@ integer_scaling = "integer scaling"
 integer_scaling_ratio = "integer scaling ratio"
 sample_rate_desc = "sample rate requires restart"
 sample_rate = "sample rate"
+roms_path = "roms path"
 
 keyboard        = "keyboard"
 controller      = "controller"

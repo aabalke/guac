@@ -27,6 +27,7 @@ const (
 	PAGE_PAUSE
 	PAGE_SETTINGS
 	PAGE_KEYBOARD
+	PAGE_FILE_SELECT
 )
 
 type Game struct {
@@ -45,20 +46,21 @@ type Game struct {
 }
 
 type Ui struct {
-	gamepadIdBuf []ebiten.GamepadID
-	gamepadIds   map[ebiten.GamepadID]struct{}
-	res          *Resources
-	focus        *Focus
-	ui           *ebitenui.UI
-	toast        *Toast
-	sidebar      *widget.Container
-	scrollable   *widget.ScrollContainer
-	content      *widget.Container
-	slider       *widget.Slider
-	keyboard     *Keyboard
-	ActiveInputs int
-	PageId       PageId
-	PrevPageId   PageId
+	gamepadIdBuf        []ebiten.GamepadID
+	gamepadIds          map[ebiten.GamepadID]struct{}
+	res                 *Resources
+	focus               *Focus
+	ui                  *ebitenui.UI
+	toast               *Toast
+	sidebar             *widget.Container
+	scrollable          *widget.ScrollContainer
+	content             *widget.Container
+	scrollableContainer *widget.Container
+	slider              *widget.Slider
+	keyboard            *Keyboard
+	ActiveInputs        int
+	PageId              PageId
+	PrevPageId          PageId
 }
 
 func StartEngine() {
@@ -148,7 +150,7 @@ func (g *Game) Update() error {
 		}
 
 		if g.ui.scrollable != nil && len(g.ui.gamepadIds) != 0 {
-			g.ui.focus.KeepFocusedInView(g.ui.slider, g.ui.ui)
+			g.ui.focus.KeepFocusedInView(g.ui.slider, g.ui.ui, g.ui.scrollableContainer)
 		}
 
 		if g.ui.ui != nil {

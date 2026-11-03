@@ -28,6 +28,7 @@ type General struct {
 	InitFullscreen      bool         `toml:"fullscreen"`
 	Vsync               bool         `toml:"vsync_enabled"`
 	RomPath             string       `toml:"rom_path"`
+	RomsPath            string       `toml:"roms_path"`
 	IntegerScaling      bool         `toml:"integer_scaling"`
 	IntegerScalingRatio int          `toml:"integer_scaling_ratio"`
 	SampleRate          int          `toml:"sample_rate"`

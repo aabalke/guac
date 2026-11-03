@@ -51,6 +51,7 @@ func (c *Config) encodeGeneral() {
 		IntegerScaling:      c.config.General.IntegerScaling,
 		IntegerScalingRatio: c.config.General.IntegerScalingRatio,
 		SampleRate:          c.config.General.SampleRate,
+		RomsPath:            c.config.General.RomsPath,
 		// rompath
 		DisableSaves: c.config.General.DisableSaves,
 	}

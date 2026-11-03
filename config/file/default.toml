@@ -13,6 +13,9 @@ integer_scaling = false
 integer_scaling_ratio = 0
 sample_rate = 48000
 
+# used by console "open rom" as initial path to look for roms
+# roms_path = "./"
+
 # only use this if you load the same game constantly
 # otherwise it would be better to use the cli flags or gui
 # rom_path = "./rom/gb/path.gb"

@@ -3,6 +3,7 @@ package file
 import (
 	"image/color"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -61,6 +62,11 @@ func (c *Config) decodeGeneral() {
 	c.config.General.IntegerScaling = c.General.IntegerScaling
 	c.config.General.IntegerScalingRatio = c.General.IntegerScalingRatio
 	c.config.General.SampleRate = c.General.SampleRate
+
+	c.config.General.RomsPath = c.General.RomsPath
+	if !utils.IsDirectory(c.config.General.RomsPath) {
+		c.config.General.RomsPath, _ = filepath.Abs("./")
+	}
 
 	if c.config.General.SampleRate == 0 {
 		c.config.General.SampleRate = 48000
