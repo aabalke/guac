@@ -217,7 +217,7 @@ func _newBindingInput(ui *Ui, keys *[]ebiten.Key, buttons *[]ebiten.StandardGame
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
 			input.takingInputs = true
 			ui.ActiveInputs++
-			ui.focus.DeFocus()
+			//ui.focus.DeFocus()
 			input.SetFocus(true)
 			clock.GetWidget().SetVisibility(widget.Visibility_Show)
 			buttonContainer.GetWidget().SetVisibility(widget.Visibility_Hide_Blocking)
@@ -304,14 +304,12 @@ func NewColorInput(ui *Ui, label string, v *color.Color, validation func(s strin
 	return container
 }
 
-func NewApplyPalettesMenu(focusGroups *[][]widget.Focuser, pals map[string][4]string, clrInputs [4]widget.PreferredSizeLocateableWidget, res *Resources) widget.PreferredSizeLocateableWidget {
+func NewApplyPalettesMenu(pals map[string][4]string, clrInputs [4]widget.PreferredSizeLocateableWidget, res *Resources) widget.PreferredSizeLocateableWidget {
 	c := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
 		)),
 	)
-
-	focusRadio := []widget.Focuser{}
 
 	for label, pal := range pals {
 		b := widget.NewButton(
@@ -341,11 +339,8 @@ func NewApplyPalettesMenu(focusGroups *[][]widget.Focuser, pals map[string][4]st
 			}),
 		)
 
-		focusRadio = append(focusRadio, b)
 		c.AddChild(b)
 	}
-
-	*focusGroups = append(*focusGroups, focusRadio)
 
 	return c
 }
@@ -391,7 +386,7 @@ func dialogInput(v *string, dialogFunc func() string) widget.PreferredSizeLocate
 	return input
 }
 
-func NewRadioInput(focusRadios *[][]widget.Focuser, ptr *int, values []string, res *Resources) widget.PreferredSizeLocateableWidget {
+func NewRadioInput(ptr *int, values []string, res *Resources) widget.PreferredSizeLocateableWidget {
 	radio := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
@@ -399,15 +394,11 @@ func NewRadioInput(focusRadios *[][]widget.Focuser, ptr *int, values []string, r
 	)
 
 	bs := []widget.RadioGroupElement{}
-	focusRadio := []widget.Focuser{}
 	for i := range values {
 		b := NewRadioButton(values[i], ptr, i, res)
 		radio.AddChild(b)
 		bs = append(bs, b)
-		focusRadio = append(focusRadio, b)
 	}
-
-	*focusRadios = append(*focusRadios, focusRadio)
 
 	widget.NewRadioGroup(
 		widget.RadioGroupOpts.Elements(bs...),

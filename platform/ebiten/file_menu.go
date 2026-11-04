@@ -12,8 +12,10 @@ import (
 )
 
 func NewFileMenu(g *Game, oldId PageId) {
-	g.ui.focus.ClearFocus()
 	g.ui.PrevPageId = oldId
+
+	menu := &ScrollableMenu{}
+	g.ui.scrollableMenu = menu
 
 	root := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(g.ui.res.bg),
@@ -36,15 +38,14 @@ func NewFileMenu(g *Game, oldId PageId) {
 		)),
 	)
 
-	g.ui.content = widget.NewContainer(
+	menu.content = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),
 		)),
 	)
 
-	scr := NewScrollableContainer(g.ui)
-	g.ui.scrollableContainer = scr
+	menu.root = NewScrollableContainer(g.ui)
 
 	p := getAbsPath(config.Conf.General.RomsPath)
 	entries, err := os.ReadDir(p)
@@ -53,7 +54,6 @@ func NewFileMenu(g *Game, oldId PageId) {
 	}
 
 	elements := []widget.PreferredSizeLocateableWidget{}
-
 	for _, v := range entries {
 		if v.IsDir() {
 			elements = append(elements, NewFileEntryButton(g.ui, "> "+v.Name(),
@@ -88,19 +88,15 @@ func NewFileMenu(g *Game, oldId PageId) {
 		}
 	}
 
-	navbar := NewNavBar(g)
-
-	g.ui.content.RemoveChildren()
-	g.ui.content.AddChild(elements...)
-	c.AddChild(navbar, scr)
+	menu.content.RemoveChildren()
+	menu.content.AddChild(elements...)
+	c.AddChild(NewNavBar(g), menu.root)
 	root.AddChild(c)
 
 	g.ui.PageId = PAGE_FILE_SELECT
 	newUi(g, root)
-	g.ui.focus.ui = g.ui.ui
 
-	g.ui.focus.buildFileMenuFocus(navbar, g.ui.content)
-	g.ui.ui.SetFocusedWidget(g.ui.content.GetFocusers()[0])
+	g.ui.ui.SetFocusedWidget(menu.content.GetFocusers()[0])
 }
 
 func getAbsPath(p string) string {

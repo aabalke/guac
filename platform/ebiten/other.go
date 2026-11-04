@@ -12,8 +12,6 @@ var extensions = []string{
 }
 
 func NewHome(g *Game) {
-	g.ui.focus.ClearFocus()
-
 	l := g.ui.res.localization.Main
 
 	b1 := NewCenteredButton(l.Open, func(*widget.ButtonClickedEventArgs) {
@@ -42,12 +40,9 @@ func NewHome(g *Game) {
 	root := NewCenteredPage(g.ui.res.bg, b1, b2, b3)
 	g.ui.PageId = PAGE_HOME
 	newUi(g, root)
-	buildOtherFocus(g.ui.ui.Container.GetFocusers())
 }
 
 func NewPause(g *Game) {
-	g.ui.focus.ClearFocus()
-
 	l := g.ui.res.localization.Pause
 
 	b1 := NewCenteredButton(l.Resume, func(*widget.ButtonClickedEventArgs) {
@@ -74,7 +69,6 @@ func NewPause(g *Game) {
 	root := NewCenteredPage(g.ui.res.bg, b1, b2, b3)
 	g.ui.PageId = PAGE_PAUSE
 	newUi(g, root)
-	buildOtherFocus(g.ui.ui.Container.GetFocusers())
 }
 
 func NewCenteredPage(bg *image.NineSlice, buttons ...*widget.Button) *widget.Container {
@@ -127,5 +121,4 @@ func newUi(g *Game, root *widget.Container) {
 		Container:    root,
 		PrimaryTheme: NewTheme(g.ui.res),
 	}
-	g.ui.focus.ui = g.ui.ui
 }

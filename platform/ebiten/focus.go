@@ -1,249 +1,166 @@
 package ui
 
 import (
-	"github.com/ebitenui/ebitenui"
+	"image"
+
 	"github.com/ebitenui/ebitenui/widget"
 )
 
-type Focus struct {
-	ui              *ebitenui.UI
-	sidebar         []widget.Focuser
-	submenu         []widget.Focuser
-	horizontalGroup [][]widget.Focuser
+var dirs = [...]widget.FocusDirection{
+	widget.FOCUS_NORTH,
+	widget.FOCUS_EAST,
+	widget.FOCUS_SOUTH,
+	widget.FOCUS_WEST,
+	//	widget.FOCUS_NORTHEAST,
+	//	widget.FOCUS_SOUTHEAST,
+	//	widget.FOCUS_SOUTHWEST,
+	//	widget.FOCUS_NORTHWEST,
 }
 
-func (f *Focus) ClearFocus() {
-	f.sidebar = []widget.Focuser{}
-	f.submenu = []widget.Focuser{}
-	f.horizontalGroup = [][]widget.Focuser{}
-}
-
-func (f *Focus) BuildMenuFocus(menu *widget.Container, bindings ...*widget.Container) {
-	f.submenu = menu.GetFocusers()
-
-	if f.sidebar != nil && f.submenu != nil {
-		f.buildSidebarFocus()
-		f.buildSubFocus()
+func BuildFocus(ui *Ui) {
+	if ui.scrollableMenu != nil && len(ui.gamepadIds) != 0 {
+		KeepFocusedInView(ui)
 	}
 
-	for _, binding := range bindings {
-		buildBinding(binding)
-	}
-}
+	focusers := ui.ui.Container.GetFocusers()
 
-func (f *Focus) buildSidebarFocus() {
-	for i, focuser := range f.sidebar {
-
-		if i != 0 {
-			focuser.AddFocus(widget.FOCUS_NORTH, f.sidebar[i-1])
-		}
-
-		if i != len(f.sidebar)-1 {
-			focuser.AddFocus(widget.FOCUS_SOUTH, f.sidebar[i+1])
-		}
-
-		focuser.AddFocus(widget.FOCUS_EAST, f.submenu[0])
-	}
-}
-
-func (f *Focus) buildSubFocus() {
-	for i, focuser := range f.submenu {
-
-		if i != 0 {
-			focuser.AddFocus(widget.FOCUS_NORTH, f.submenu[i-1])
-		}
-
-		if i != len(f.submenu)-1 {
-			focuser.AddFocus(widget.FOCUS_SOUTH, f.submenu[i+1])
-		}
-
-		focuser.AddFocus(widget.FOCUS_WEST, f.sidebar[0])
-	}
-
-	f.buildHorizontalGroupOverride()
-}
-
-// this is only allowed in submenus right now
-// since radio groups are [button1][button2][button3]
-// using identical functionality to other elements will cause l, r == up, down
-func (f *Focus) buildHorizontalGroupOverride() {
-	if len(f.sidebar) == 0 {
-		return
-	}
-
-	sidebar := f.sidebar[0]
-
-	for _, group := range f.horizontalGroup {
-		above := group[0].GetFocus(widget.FOCUS_NORTH)
-		below := group[len(group)-1].GetFocus(widget.FOCUS_SOUTH)
-
-		for j, button := range group {
-
-			button.AddFocus(widget.FOCUS_NORTH, above)
-			button.AddFocus(widget.FOCUS_SOUTH, below)
-
-			if j == 0 {
-				button.AddFocus(widget.FOCUS_WEST, sidebar)
-			} else if j < len(group) {
-				button.AddFocus(widget.FOCUS_WEST, group[j-1])
-			}
-
-			if j < len(group)-1 {
-				button.AddFocus(widget.FOCUS_EAST, group[j+1])
+	for _, f := range focusers {
+		for _, d := range dirs {
+			if neighbor := getFocusNeighbor(f, focusers, d); neighbor != nil {
+				f.AddFocus(d, neighbor)
 			}
 		}
 	}
 }
 
-func (f *Focus) FocusLastSubMenu() {
-	if len(f.submenu) > 0 {
-		f.ui.SetFocusedWidget(f.submenu[len(f.submenu)-1])
+func getFocusNeighbor(curr widget.Focuser, fs []widget.Focuser, d widget.FocusDirection) widget.Focuser {
+	const MAJOR_PRIORITY = 13
+
+	var (
+		s     = orient(curr.GetWidget().Rect, d)
+		currX = (s.Min.X + s.Max.X) / 2
+		currY = (s.Min.Y + s.Max.Y) / 2
+
+		best       widget.Focuser
+		bestScore  int64
+		bestInBeam bool
+	)
+
+	for _, cand := range fs {
+
+		if cand == curr {
+			continue
+		}
+
+		w := cand.GetWidget()
+		if hidden := w.Rect.Empty() || !w.IsVisible(); hidden {
+			continue
+		}
+
+		c := orient(w.Rect, d)
+		candX, candY := (c.Min.X+c.Max.X)/2, (c.Min.Y+c.Max.Y)/2
+
+		if wrongDir := candY <= currY; wrongDir {
+			continue
+		}
+
+		var (
+			major  = int64(max(0, c.Min.Y-s.Max.Y))
+			minor  = int64(abs(candX - currX))
+			inBeam = c.Min.X < s.Max.X && c.Max.X > s.Min.X
+			score  = MAJOR_PRIORITY*major*major + minor*minor
+		)
+
+		if best == nil {
+			best, bestScore, bestInBeam = cand, score, inBeam
+			continue
+		}
+
+		if !inBeam {
+			continue
+		}
+
+		if !bestInBeam || score < bestScore {
+			best, bestScore, bestInBeam = cand, score, inBeam
+			continue
+		}
+	}
+
+	return best
+}
+
+func orient(r image.Rectangle, d widget.FocusDirection) image.Rectangle {
+	switch d {
+	case widget.FOCUS_NORTH:
+		return image.Rect(r.Min.X, -r.Max.Y, r.Max.X, -r.Min.Y)
+	case widget.FOCUS_EAST:
+		return image.Rect(r.Min.Y, r.Min.X, r.Max.Y, r.Max.X)
+	case widget.FOCUS_WEST:
+		return image.Rect(r.Min.Y, -r.Max.X, r.Max.Y, -r.Min.X)
+	default:
+		return r
 	}
 }
 
-func (f *Focus) FocusLastSidebar() {
-	if len(f.sidebar) > 0 {
-		f.ui.SetFocusedWidget(f.sidebar[len(f.sidebar)-1])
+func abs(v int) int {
+	if v < 0 {
+		return -v
 	}
+	return v
 }
 
-func (f *Focus) FocusSidebar(idx int) {
-	if len(f.sidebar) > idx {
-		f.ui.SetFocusedWidget(f.sidebar[idx])
-	}
-}
-
-func (f *Focus) FocusSubmenu() {
-	if len(f.submenu) > 0 {
-		f.ui.SetFocusedWidget(f.submenu[0])
-	}
-}
-
-func (f *Focus) DeFocus() {
-	if f.ui != nil {
-		f.ui.ClearFocus()
-	}
-}
-
-func (f *Focus) KeepFocusedInView(slider *widget.Slider, ui *ebitenui.UI, scr *widget.Container) {
-	if len(f.submenu) == 0 ||
-		slider == nil ||
-		f.ui == nil ||
-		f.ui.GetFocusedWidget() == nil {
+func KeepFocusedInView(ui *Ui) {
+	if ui.ui == nil || ui.ui.GetFocusedWidget() == nil {
 		return
 	}
 
 	var (
-		focusedTop    = f.ui.GetFocusedWidget().GetWidget().Rect.Min.Y
-		focusedBottom = f.ui.GetFocusedWidget().GetWidget().Rect.Max.Y
-		rootTop       = scr.GetWidget().Rect.Min.Y
-		rootBottom    = scr.GetWidget().Rect.Max.Y
-		firstTop      = f.submenu[0].GetWidget().Rect.Min.Y
-		// bottom  = f.submenu[len(f.submenu)-1].GetWidget().Rect.Max.Y
-		// I don't believe bottom is possible / important
+		focusedTop    = ui.ui.GetFocusedWidget().GetWidget().Rect.Min.Y
+		focusedBottom = ui.ui.GetFocusedWidget().GetWidget().Rect.Max.Y
+		rootTop       = ui.scrollableMenu.root.GetWidget().Rect.Min.Y
+		rootBottom    = ui.scrollableMenu.root.GetWidget().Rect.Max.Y
 	)
+
+	var firstTop int
+	if fs := ui.scrollableMenu.content.GetFocusers(); len(fs) > 0 {
+		firstTop = ui.scrollableMenu.content.GetFocusers()[0].GetWidget().Rect.Min.Y
+	} else {
+		firstTop = ui.scrollableMenu.content.GetWidget().Rect.Min.Y
+	}
 
 	switch {
 	case focusedTop <= firstTop:
-		slider.Current = slider.Min
+		ui.scrollableMenu.slider.Current = ui.scrollableMenu.slider.Min
 	case focusedTop < rootTop:
-		slider.Current -= rootTop - focusedTop
+		ui.scrollableMenu.slider.Current -= rootTop - focusedTop
+
 	case focusedBottom > rootBottom:
-		slider.Current += focusedBottom - rootBottom
+		ui.scrollableMenu.slider.Current += focusedBottom - rootBottom
 	}
 }
 
-func buildBinding(keybinds *widget.Container) {
-	if keybinds == nil {
-		return
+func DeFocus(ui *Ui) {
+	if ui.ui != nil {
+		ui.ui.ClearFocus()
 	}
-
-	focusers := keybinds.GetFocusers()
-
-	if len(focusers) == 0 {
-		return
-	}
-
-	lastIdx := len(focusers) - 1
-
-	prev := focusers[0].GetFocus(widget.FOCUS_NORTH)
-	next := focusers[lastIdx].GetFocus(widget.FOCUS_SOUTH)
-
-	// each binding is 3 focusers, text input, append button, cancel button
-	for i := 0; i < len(focusers); i += 2 {
-		if i == 0 {
-			focusers[i+0].AddFocus(widget.FOCUS_NORTH, prev)
-			focusers[i+1].AddFocus(widget.FOCUS_NORTH, prev)
-		} else {
-			focusers[i+0].AddFocus(widget.FOCUS_NORTH, focusers[i-2+0])
-			focusers[i+1].AddFocus(widget.FOCUS_NORTH, focusers[i-2+1])
-			focusers[i+1].AddFocus(widget.FOCUS_PREVIOUS, focusers[i-2+2])
-		}
-
-		if i == len(focusers)-2 {
-			focusers[i+0].AddFocus(widget.FOCUS_SOUTH, next)
-			focusers[i+1].AddFocus(widget.FOCUS_SOUTH, next)
-		} else {
-			focusers[i+0].AddFocus(widget.FOCUS_SOUTH, focusers[i+2+0])
-			focusers[i+1].AddFocus(widget.FOCUS_SOUTH, focusers[i+2+1])
-			focusers[i+1].AddFocus(widget.FOCUS_NEXT, focusers[i+2+1])
-		}
-
-		focusers[i+1].AddFocus(widget.FOCUS_WEST, focusers[i+0])
-		focusers[i+0].AddFocus(widget.FOCUS_EAST, focusers[i+1])
-	}
-
-	// focus on append button
-	prev.AddFocus(widget.FOCUS_SOUTH, focusers[0])
-	next.AddFocus(widget.FOCUS_NORTH, focusers[lastIdx])
-	prev.AddFocus(widget.FOCUS_NEXT, focusers[0])
-	next.AddFocus(widget.FOCUS_PREVIOUS, focusers[lastIdx])
 }
 
-func buildOtherFocus(group []widget.Focuser) {
-	if len(group) <= 0 {
+func FocusFirst(ui *Ui) {
+	fs := ui.ui.Container.GetFocusers()
+
+	if len(fs) <= 0 {
 		return
 	}
 
-	group[0].AddFocus(widget.FOCUS_SOUTH, group[1])
-
-	for i := 1; i < len(group)-1; i++ {
-		group[i].AddFocus(widget.FOCUS_NORTH, group[i-1])
-		group[i].AddFocus(widget.FOCUS_SOUTH, group[i+1])
-	}
-
-	group[len(group)-1].AddFocus(widget.FOCUS_NORTH, group[len(group)-2])
+	ui.ui.SetFocusedWidget(fs[0])
 }
 
-func (f *Focus) buildFileMenuFocus(navbar, content *widget.Container) {
-	navFocusers := navbar.GetFocusers()
-	focusers := content.GetFocusers()
-	f.submenu = focusers
+func FocusLast(ui *Ui) {
+	fs := ui.ui.Container.GetFocusers()
 
-	for i, focuser := range navFocusers {
-		focuser.AddFocus(widget.FOCUS_SOUTH, focusers[0])
-
-		if i != 0 {
-			focuser.AddFocus(widget.FOCUS_WEST, navFocusers[i-1])
-		}
-
-		if i < len(navFocusers)-1 {
-			focuser.AddFocus(widget.FOCUS_EAST, navFocusers[i+1])
-		}
+	if len(fs) <= 0 {
+		return
 	}
 
-	navFocusers[len(navFocusers)-1].AddFocus(widget.FOCUS_NEXT, focusers[0])
-	focusers[0].AddFocus(widget.FOCUS_PREVIOUS, navFocusers[len(navFocusers)-1])
-
-	for i := range len(focusers) {
-		if i != 0 {
-			focusers[i].AddFocus(widget.FOCUS_NORTH, focusers[i-1])
-		} else {
-			focusers[0].AddFocus(widget.FOCUS_NORTH, navFocusers[len(navFocusers)-1])
-		}
-
-		if i != len(focusers)-1 {
-			focusers[i].AddFocus(widget.FOCUS_SOUTH, focusers[i+1])
-		}
-	}
+	ui.ui.SetFocusedWidget(fs[len(fs)-1])
 }

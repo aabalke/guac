@@ -33,19 +33,12 @@ func OpenDirectory(title, startDir, defaultPath string) string {
 
 func IsFile(path string) bool {
 	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return !info.IsDir()
+	return err == nil && !info.IsDir()
 }
 
 func IsDirectory(path string) bool {
 	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-
-	return info.IsDir()
+	return err == nil && info.IsDir()
 }
 
 func openBrowser(url string) error {

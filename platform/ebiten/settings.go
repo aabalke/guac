@@ -22,7 +22,6 @@ type SidebarField struct {
 }
 
 func NewSettings(g *Game, oldId PageId, initMenu int) {
-	g.ui.focus.ClearFocus()
 	g.ui.PrevPageId = oldId
 
 	root := widget.NewContainer(
@@ -49,16 +48,7 @@ func NewSettings(g *Game, oldId PageId, initMenu int) {
 		)),
 	)
 
-	g.ui.content = widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewGridLayout(
-			widget.GridLayoutOpts.Columns(1),
-			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),
-		)),
-	)
-
-	scr := NewScrollableContainer(g.ui)
-
-	// sidebar start
+	scrollableRoot := NewScrollableContainer(g.ui)
 
 	g.ui.sidebar = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -71,28 +61,28 @@ func NewSettings(g *Game, oldId PageId, initMenu int) {
 
 	fields := []SidebarField{
 		{l.General, func(g *Game) {
-			g.ui.content.RemoveChildren()
-			g.ui.content.AddChild(NewGeneralMenu(g))
+			g.ui.scrollableMenu.content.RemoveChildren()
+			g.ui.scrollableMenu.content.AddChild(NewGeneralMenu(g))
 		}},
 		{l.Ui, func(g *Game) {
-			g.ui.content.RemoveChildren()
-			g.ui.content.AddChild(NewUiMenu(g))
+			g.ui.scrollableMenu.content.RemoveChildren()
+			g.ui.scrollableMenu.content.AddChild(NewUiMenu(g))
 		}},
 		{l.Gb, func(g *Game) {
-			g.ui.content.RemoveChildren()
-			g.ui.content.AddChild(NewGbMenu(g))
+			g.ui.scrollableMenu.content.RemoveChildren()
+			g.ui.scrollableMenu.content.AddChild(NewGbMenu(g))
 		}},
 		{l.Gba, func(g *Game) {
-			g.ui.content.RemoveChildren()
-			g.ui.content.AddChild(NewGbaMenu(g))
+			g.ui.scrollableMenu.content.RemoveChildren()
+			g.ui.scrollableMenu.content.AddChild(NewGbaMenu(g))
 		}},
 		{l.Nds, func(g *Game) {
-			g.ui.content.RemoveChildren()
-			g.ui.content.AddChild(NewNdsMenu(g))
+			g.ui.scrollableMenu.content.RemoveChildren()
+			g.ui.scrollableMenu.content.AddChild(NewNdsMenu(g))
 		}},
 		{l.About, func(g *Game) {
-			g.ui.content.RemoveChildren()
-			g.ui.content.AddChild(NewAboutMenu(g))
+			g.ui.scrollableMenu.content.RemoveChildren()
+			g.ui.scrollableMenu.content.AddChild(NewAboutMenu(g))
 		}},
 		{
 			l.Return, func(g *Game) {
@@ -126,25 +116,30 @@ func NewSettings(g *Game, oldId PageId, initMenu int) {
 	)
 
 	// init first menu
-	g.ui.focus.sidebar = g.ui.sidebar.GetFocusers()
 	fields[initMenu].f(g)
 
-	// sidebar end
-
-	c.AddChild(g.ui.sidebar, scr)
+	c.AddChild(g.ui.sidebar, scrollableRoot)
 	root.AddChild(c)
 
 	g.ui.PageId = PAGE_SETTINGS
 
 	newUi(g, root)
 
-	g.ui.focus.ui = g.ui.ui
-
-	g.ui.focus.FocusSidebar(0)
+	FocusFirst(g.ui)
 }
 
 func NewScrollableContainer(ui *Ui) *widget.Container {
-	scr := widget.NewContainer(
+	ui.scrollableMenu = &ScrollableMenu{}
+	menu := ui.scrollableMenu
+
+	menu.content = widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewGridLayout(
+			widget.GridLayoutOpts.Columns(1),
+			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),
+		)),
+	)
+
+	menu.root = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(2),
 			widget.GridLayoutOpts.Spacing(2, 0),
@@ -152,20 +147,18 @@ func NewScrollableContainer(ui *Ui) *widget.Container {
 		)),
 	)
 
-	ui.scrollableContainer = scr
-
-	ui.scrollable = widget.NewScrollContainer(
-		widget.ScrollContainerOpts.Content(ui.content),
+	menu.scrollable = widget.NewScrollContainer(
+		widget.ScrollContainerOpts.Content(menu.content),
 		widget.ScrollContainerOpts.StretchContentWidth(),
 		widget.ScrollContainerOpts.Image(&scrollContainerImage),
 	)
 
 	pageSizeFunc := func() int {
-		scrollableHeight := ui.scrollable.ViewRect().Dy()
-		contentHeight := ui.content.GetWidget().Rect.Dy()
+		scrollableHeight := menu.scrollable.ViewRect().Dy()
+		contentHeight := menu.content.GetWidget().Rect.Dy()
 		if scrollableHeight >= contentHeight {
-			ui.scrollable.ScrollTop = 0
-			ui.slider.Current = 0
+			menu.scrollable.ScrollTop = 0
+			menu.slider.Current = 0
 			return 0
 		}
 
@@ -176,51 +169,54 @@ func NewScrollableContainer(ui *Ui) *widget.Container {
 		))
 	}
 
-	ui.slider = widget.NewSlider(
+	menu.slider = widget.NewSlider(
 		widget.SliderOpts.InitialCurrent(0),
 		widget.SliderOpts.Orientation(widget.DirectionVertical),
 		widget.SliderOpts.MinMax(0, 1000),
 		widget.SliderOpts.PageSizeFunc(pageSizeFunc),
 		widget.SliderOpts.ChangedHandler(func(args *widget.SliderChangedEventArgs) {
 			if args.Dragging {
-				ui.focus.DeFocus()
+				DeFocus(ui)
 			}
 
-			ui.scrollable.ScrollTop = float64(args.Slider.Current) / 1000
+			menu.scrollable.ScrollTop = float64(args.Slider.Current) / 1000
 		}),
 
 		widget.SliderOpts.WidgetOpts(
 			widget.WidgetOpts.OnUpdate(func(widget.HasWidget) {
-				scrollableHeight := ui.scrollable.ViewRect().Dy()
-				contentHeight := ui.content.GetWidget().Rect.Dy()
+				scrollableHeight := menu.scrollable.ViewRect().Dy()
+				contentHeight := menu.content.GetWidget().Rect.Dy()
 
+				var v widget.Visibility
 				if scrollableHeight >= contentHeight {
-					ui.slider.GetWidget().SetVisibility(widget.Visibility_Hide)
-					return
+					v = widget.Visibility_Hide
+				} else {
+					v = widget.Visibility_Show
 				}
-				ui.slider.GetWidget().SetVisibility(widget.Visibility_Show)
+
+				menu.slider.GetWidget().SetVisibility(v)
 			}),
 		),
 	)
 
-	ui.scrollable.GetWidget().ScrolledEvent.AddHandler(func(args any) {
-		ui.focus.DeFocus()
+	menu.scrollable.GetWidget().ScrolledEvent.AddHandler(func(args any) {
+		DeFocus(ui)
 
-		scrollableHeight := ui.scrollable.ViewRect().Dy()
-		contentHeight := ui.content.GetWidget().Rect.Dy()
+		scrollableHeight := menu.scrollable.ViewRect().Dy()
+		contentHeight := menu.content.GetWidget().Rect.Dy()
 		if scrollableHeight >= contentHeight {
-			ui.scrollable.ScrollTop = 0
-			ui.slider.Current = 0
+			menu.scrollable.ScrollTop = 0
+			menu.slider.Current = 0
 			return
 		}
 
 		if a, ok := args.(*widget.WidgetScrolledEventArgs); ok {
-			ui.slider.Current -= int(math.Round(a.Y * float64(pageSizeFunc())))
+			menu.slider.Current -= int(math.Round(a.Y * float64(pageSizeFunc())))
 		}
 	})
 
-	scr.AddChild(ui.scrollable, ui.slider)
-	return scr
+	menu.root.AddChild(menu.scrollable, menu.slider)
+	return menu.root
 }
 
 func NewSidebarButton(g *Game, label string, f func(g *Game)) *widget.Button {
@@ -239,8 +235,8 @@ func NewSidebarButton(g *Game, label string, f func(g *Game)) *widget.Button {
 
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
 			f(g)
-			g.ui.scrollable.ScrollTop = 0
-			g.ui.slider.Current = 0
+			g.ui.scrollableMenu.scrollable.ScrollTop = 0
+			g.ui.scrollableMenu.slider.Current = 0
 		}),
 	)
 }

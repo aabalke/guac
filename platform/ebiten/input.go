@@ -18,8 +18,7 @@ func (g *Game) GetGamepadButtons() (justButtons, buttons []ebiten.StandardGamepa
 		fmt.Printf("Gamepad Connected id %d\n", id)
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.ControllerConnected)
 		g.ui.gamepadIds[id] = struct{}{}
-
-		g.ui.focus.FocusSidebar(0)
+		FocusFirst(g.ui)
 	}
 
 	for id := range g.ui.gamepadIds {
@@ -29,7 +28,7 @@ func (g *Game) GetGamepadButtons() (justButtons, buttons []ebiten.StandardGamepa
 			delete(g.ui.gamepadIds, id)
 
 			if len(g.ui.gamepadIds) == 0 {
-				g.ui.focus.DeFocus()
+				DeFocus(g.ui)
 			}
 		}
 	}
@@ -129,7 +128,7 @@ func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) 
 			case slices.Contains(buttonConfig.Return, button):
 				switch g.ui.PageId {
 				case PAGE_SETTINGS:
-					g.ui.focus.FocusLastSidebar()
+					//g.ui.focus.FocusLastSidebar()
 				case PAGE_KEYBOARD:
 					g.ui.ui.SetFocusedWidget(g.ui.keyboard.cancelButtons[g.ui.keyboard.currBoard])
 				case PAGE_FILE_SELECT:

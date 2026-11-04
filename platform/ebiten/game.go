@@ -46,21 +46,24 @@ type Game struct {
 }
 
 type Ui struct {
-	gamepadIdBuf        []ebiten.GamepadID
-	gamepadIds          map[ebiten.GamepadID]struct{}
-	res                 *Resources
-	focus               *Focus
-	ui                  *ebitenui.UI
-	toast               *Toast
-	sidebar             *widget.Container
-	scrollable          *widget.ScrollContainer
-	content             *widget.Container
-	scrollableContainer *widget.Container
-	slider              *widget.Slider
-	keyboard            *Keyboard
-	ActiveInputs        int
-	PageId              PageId
-	PrevPageId          PageId
+	gamepadIdBuf   []ebiten.GamepadID
+	gamepadIds     map[ebiten.GamepadID]struct{}
+	res            *Resources
+	ui             *ebitenui.UI
+	toast          *Toast
+	sidebar        *widget.Container
+	scrollableMenu *ScrollableMenu
+	keyboard       *Keyboard
+	ActiveInputs   int
+	PageId         PageId
+	PrevPageId     PageId
+}
+
+type ScrollableMenu struct {
+	slider     *widget.Slider
+	scrollable *widget.ScrollContainer
+	content    *widget.Container
+	root       *widget.Container
 }
 
 func StartEngine() {
@@ -104,7 +107,6 @@ func NewGame(res *Resources) *Game {
 		ui: &Ui{
 			gamepadIds:   make(map[ebiten.GamepadID]struct{}),
 			gamepadIdBuf: make([]ebiten.GamepadID, 0),
-			focus:        &Focus{},
 			res:          res,
 			toast:        NewToast(res),
 			keyboard:     NewKeyboard(res, res.localization.Settings.Ui.Alphabet),
@@ -136,12 +138,12 @@ func (g *Game) Update() error {
 			g.HandleGlobalInputs(justKeys, justButtons, buttons)
 		}
 
-		if ebiten.Tick() < 1 &&
-			len(g.ui.gamepadIds) != 0 &&
-			g.ui.ui != nil && g.ui.ui.Container != nil &&
-			len(g.ui.ui.Container.GetFocusers()) != 0 {
-			g.ui.ui.SetFocusedWidget(g.ui.ui.Container.GetFocusers()[0])
-		}
+		//if ebiten.Tick() < 1 &&
+		//	len(g.ui.gamepadIds) != 0 &&
+		//	g.ui.ui != nil && g.ui.ui.Container != nil &&
+		//	len(g.ui.ui.Container.GetFocusers()) != 0 {
+		//	g.ui.ui.SetFocusedWidget(g.ui.ui.Container.GetFocusers()[0])
+		//}
 
 		if g.paused && ebiten.Tick()-g.pauseEndTick < 10 {
 			// pressing select on pause can sometimes input into emulator,
@@ -149,11 +151,8 @@ func (g *Game) Update() error {
 			return nil
 		}
 
-		if g.ui.scrollable != nil && len(g.ui.gamepadIds) != 0 {
-			g.ui.focus.KeepFocusedInView(g.ui.slider, g.ui.ui, g.ui.scrollableContainer)
-		}
-
 		if g.ui.ui != nil {
+			BuildFocus(g.ui)
 			g.ui.ui.Update()
 		}
 

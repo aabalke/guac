@@ -130,19 +130,17 @@ func NewGeneralMenu(g *Game) *widget.Container {
 
 		ebiten.SetVsyncEnabled(config.Conf.General.Vsync)
 
-		g.ui.content.RemoveChildren()
-		g.ui.content.AddChild(NewGeneralMenu(g))
+		g.ui.scrollableMenu.content.RemoveChildren()
+		g.ui.scrollableMenu.content.AddChild(NewGeneralMenu(g))
 
 		file.Encode()
 
 		if len(g.ui.gamepadIds) != 0 {
-			g.ui.focus.FocusLastSubMenu()
+			FocusLast(g.ui)
 		}
 
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
-
-	g.ui.focus.BuildMenuFocus(menu, keys, gamepad)
 
 	return menu
 }
@@ -169,13 +167,13 @@ func NewUiMenu(g *Game) *widget.Container {
 	menu.AddChild(NewHeader(l.Ui, res), ui)
 
 	ui.AddChild(
-		NewLabel(l.Language), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.Language, l.Languages, res),
+		NewLabel(l.Language), NewRadioInput(&tmp.Language, l.Languages, res),
 		NewLabel(l.Backdrop), clrInputs[0],
 		NewLabel(l.BgColor), clrInputs[1],
 		NewLabel(l.FgColor), clrInputs[2],
 		NewLabel(l.AccentColor), clrInputs[3],
 		NewLabel(l.ApplyTheme),
-		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, theme_palettes, clrInputs, res),
+		NewApplyPalettesMenu(theme_palettes, clrInputs, res),
 	)
 
 	menu.AddChild(
@@ -191,14 +189,12 @@ func NewUiMenu(g *Game) *widget.Container {
 			file.Encode()
 
 			if len(g.ui.gamepadIds) != 0 {
-				g.ui.focus.FocusLastSubMenu()
+				FocusLast(g.ui)
 			}
 
 			g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 		}),
 	)
-
-	g.ui.focus.BuildMenuFocus(menu, nil, nil)
 
 	return menu
 }
@@ -218,11 +214,11 @@ func NewGbMenu(g *Game) *widget.Container {
 
 	general := newTwoCol()
 	menu.AddChild(NewHeader(l.General, g.ui.res), general)
-	general.AddChild(NewLabel(l.System), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.System, l.Systems, g.ui.res))
+	general.AddChild(NewLabel(l.System), NewRadioInput(&tmp.System, l.Systems, g.ui.res))
 
 	graphics := newTwoCol()
 	menu.AddChild(graphics)
-	graphics.AddChild(NewLabel(l.Rotation), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.Rotation, l.Rotations, g.ui.res))
+	graphics.AddChild(NewLabel(l.Rotation), NewRadioInput(&tmp.Rotation, l.Rotations, g.ui.res))
 
 	palette := newTwoCol()
 	menu.AddChild(NewHeader(l.DmgPalette, g.ui.res), palette)
@@ -232,7 +228,7 @@ func NewGbMenu(g *Game) *widget.Container {
 		NewLabel(l.Dark), clrInputs[2],
 		NewLabel(l.Darkest), clrInputs[3],
 		NewLabel(l.ApplyPalette),
-		NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, dmg_palettes, clrInputs, g.ui.res),
+		// NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, dmg_palettes, clrInputs, g.ui.res),
 	)
 
 	cc := newTwoCol()
@@ -240,7 +236,7 @@ func NewGbMenu(g *Game) *widget.Container {
 	strength := int(tmp.ColorCorrection.Strength * 100)
 	ghosting := tmp.ColorCorrection.ScreenGhosting
 	menu.AddChild(NewHeader(ccl.ColorCorrection, g.ui.res), cc)
-	cc.AddChild(NewLabel(ccl.Type), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.ColorCorrection.Type, ccl.Types, g.ui.res))
+	cc.AddChild(NewLabel(ccl.Type), NewRadioInput(&tmp.ColorCorrection.Type, ccl.Types, g.ui.res))
 	cc.AddChild(NewLabel(ccl.Strength), NewDecimalInput(g.ui, ccl.Strength, &strength, 100))
 	cc.AddChild(NewLabel(ccl.ScreenGhosting), NewCheckbox(&ghosting))
 
@@ -303,18 +299,17 @@ func NewGbMenu(g *Game) *widget.Container {
 			g.gb.UpdateGhosting()
 		}
 
-		g.ui.content.RemoveChildren()
-		g.ui.content.AddChild(NewGbMenu(g))
+		g.ui.scrollableMenu.content.RemoveChildren()
+		g.ui.scrollableMenu.content.AddChild(NewGbMenu(g))
 
 		file.Encode()
 
 		if len(g.ui.gamepadIds) != 0 {
-			g.ui.focus.FocusLastSubMenu()
+			FocusLast(g.ui)
 		}
+
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
-
-	g.ui.focus.BuildMenuFocus(menu, keys, gamepad)
 
 	return menu
 }
@@ -330,14 +325,14 @@ func NewGbaMenu(g *Game) *widget.Container {
 
 	general.AddChild(
 		NewLabel(l.OptmizeIdleLoops), NewCheckbox(&tmp.IdleOptimize),
-		NewLabel(l.Rotation), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.Rotation, l.Rotations, g.ui.res),
+		NewLabel(l.Rotation), NewRadioInput(&tmp.Rotation, l.Rotations, g.ui.res),
 	)
 
 	hardware := newTwoCol()
 	menu.AddChild(NewHeader(l.Hardware, g.ui.res), hardware)
 
 	hardware.AddChild(
-		NewLabel(l.BackupType), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.Hardware.BackupType, l.BackupTypes, g.ui.res),
+		NewLabel(l.BackupType), NewRadioInput(&tmp.Hardware.BackupType, l.BackupTypes, g.ui.res),
 		NewLabel(l.ForceRtc), NewCheckbox(&tmp.Hardware.ForceRtc),
 		NewLabel(l.ForceSolarSensor), NewCheckbox(&tmp.Hardware.ForceSolarSensor),
 		NewLabel(l.SolarSensorLevel), NewDecimalInput(g.ui, l.SolarSensorLevel, &tmp.Hardware.SolarSensorLevel, 100),
@@ -348,7 +343,7 @@ func NewGbaMenu(g *Game) *widget.Container {
 	strength := int(tmp.ColorCorrection.Strength * 100)
 	ghosting := tmp.ColorCorrection.ScreenGhosting
 	menu.AddChild(NewHeader(ccl.ColorCorrection, g.ui.res), cc)
-	cc.AddChild(NewLabel(ccl.Type), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.ColorCorrection.Type, ccl.Types, g.ui.res))
+	cc.AddChild(NewLabel(ccl.Type), NewRadioInput(&tmp.ColorCorrection.Type, ccl.Types, g.ui.res))
 	cc.AddChild(NewLabel(ccl.Strength), NewDecimalInput(g.ui, ccl.Strength, &strength, 100))
 	cc.AddChild(NewLabel(ccl.ScreenGhosting), NewCheckbox(&ghosting))
 
@@ -450,18 +445,17 @@ func NewGbaMenu(g *Game) *widget.Container {
 			}
 		}
 
-		g.ui.content.RemoveChildren()
-		g.ui.content.AddChild(NewGbaMenu(g))
+		g.ui.scrollableMenu.content.RemoveChildren()
+		g.ui.scrollableMenu.content.AddChild(NewGbaMenu(g))
 
 		file.Encode()
 
 		if len(g.ui.gamepadIds) != 0 {
-			g.ui.focus.FocusLastSubMenu()
+			FocusLast(g.ui)
 		}
+
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
-
-	g.ui.focus.BuildMenuFocus(menu, keys, gamepad)
 
 	return menu
 }
@@ -476,9 +470,9 @@ func NewNdsMenu(g *Game) *widget.Container {
 	menu.AddChild(NewHeader(l.Screen, g.ui.res), screen)
 
 	screen.AddChild(
-		NewLabel(l.Layout), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.Screen.Layout, l.Layouts, g.ui.res),
-		NewLabel(l.Sizing), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.Screen.Sizing, l.Sizings, g.ui.res),
-		NewLabel(l.Rotation), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.Screen.Rotation, l.Rotations, g.ui.res),
+		NewLabel(l.Layout), NewRadioInput(&tmp.Screen.Layout, l.Layouts, g.ui.res),
+		NewLabel(l.Sizing), NewRadioInput(&tmp.Screen.Sizing, l.Sizings, g.ui.res),
+		NewLabel(l.Rotation), NewRadioInput(&tmp.Screen.Rotation, l.Rotations, g.ui.res),
 	)
 
 	rtc := newTwoCol()
@@ -493,7 +487,7 @@ func NewNdsMenu(g *Game) *widget.Container {
 	strength := int(tmp.ColorCorrection.Strength * 100)
 	ghosting := tmp.ColorCorrection.ScreenGhosting
 	menu.AddChild(NewHeader(ccl.ColorCorrection, g.ui.res), cc)
-	cc.AddChild(NewLabel(ccl.Type), NewRadioInput(&g.ui.focus.horizontalGroup, &tmp.ColorCorrection.Type, ccl.Types, g.ui.res))
+	cc.AddChild(NewLabel(ccl.Type), NewRadioInput(&tmp.ColorCorrection.Type, ccl.Types, g.ui.res))
 	cc.AddChild(NewLabel(ccl.Strength), NewDecimalInput(g.ui, ccl.Strength, &strength, 100))
 	cc.AddChild(NewLabel(ccl.ScreenGhosting), NewCheckbox(&ghosting))
 
@@ -602,18 +596,18 @@ func NewNdsMenu(g *Game) *widget.Container {
 			g.nds.Screen.UpdateGhosting()
 		}
 
-		g.ui.content.RemoveChildren()
-		g.ui.content.AddChild(NewNdsMenu(g))
+		g.ui.scrollableMenu.content.RemoveChildren()
+		g.ui.scrollableMenu.content.AddChild(NewNdsMenu(g))
 
 		file.Encode()
 
 		if len(g.ui.gamepadIds) != 0 {
-			g.ui.focus.FocusLastSubMenu()
+			FocusLast(g.ui)
 		}
+
 		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
 	}))
 
-	g.ui.focus.BuildMenuFocus(menu, keys, gamepad)
 	return menu
 }
 
@@ -630,8 +624,6 @@ func NewAboutMenu(g *Game) *widget.Container {
 	about.AddChild(NewLinkText(l.Version))
 	about.AddChild(NewLinkText(l.Copyright))
 	about.AddChild(NewLinkText(l.ThankYous))
-
-	g.ui.focus.BuildMenuFocus(menu, nil, nil)
 
 	return menu
 }
