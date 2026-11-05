@@ -21,69 +21,54 @@ func newMenu() *widget.Container {
 	)
 }
 
-func newOneCol() *widget.Container {
+func newRow(stretch []bool) *widget.Container {
 	return widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(24)),
 			widget.GridLayoutOpts.Spacing(32, 16),
-			widget.GridLayoutOpts.Columns(1),
+			widget.GridLayoutOpts.Columns(len(stretch)),
 			widget.GridLayoutOpts.Stretch(
-				[]bool{true},
+				stretch,
 				[]bool{},
-			),
-		)),
-	)
+			))))
 }
 
-func newTwoCol() *widget.Container {
-	return widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewGridLayout(
-			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(24)),
-			widget.GridLayoutOpts.Spacing(32, 16),
-			widget.GridLayoutOpts.Columns(2),
-			widget.GridLayoutOpts.Stretch(
-				[]bool{false, true},
-				[]bool{},
-			),
-		)),
-	)
-}
+func newOneCol() *widget.Container { return newRow([]bool{true}) }
+func newTwoCol() *widget.Container { return newRow([]bool{false, true}) }
 
 func NewGeneralMenu(g *Game) *widget.Container {
 	tmp := config.Conf.General
-	l := g.ui.res.localization.Settings.General
+	l := g.ui.res.localization
 
 	menu := newMenu()
-
 	general := newTwoCol()
-	menu.AddChild(NewHeader(l.General, g.ui.res), general)
-
+	menu.AddChild(NewHeader(l["settings.general"], g.ui.res), general)
 	general.AddChild(
-		NewLabel(l.Muted), NewCheckbox(&tmp.Muted),
-		NewLabel(l.ShowFps), NewCheckbox(&tmp.ShowFps),
-		NewLabel(l.InitFullscreen), NewCheckbox(&tmp.InitFullscreen),
-		NewLabel(l.TargetFps), NewDecimalInput(g.ui, l.TargetFps, &tmp.TargetFps, 1_000_000),
-		NewLabel(l.VsyncEnabled), NewCheckbox(&tmp.Vsync),
-		NewLabel(l.DisableSaves), NewCheckbox(&tmp.DisableSaves),
-		NewLabel(l.IntegerScaling), NewCheckbox(&tmp.IntegerScaling),
-		NewLabel(l.IntegerScalingRatio), NewDecimalInput(g.ui, l.IntegerScalingRatio, &tmp.IntegerScalingRatio, 10),
-		NewSeparator(), NewLinkText(l.IntegerScalingDesc),
-		NewLabel(l.SampleRate), NewDecimalInput(g.ui, l.SampleRate, &tmp.SampleRate, 192000),
-		NewSeparator(), NewLinkText(l.SampleRateDesc),
-		NewLabel(l.RomsPath), NewDirectoryInput(&tmp.RomsPath, tmp.RomsPath, "./"),
+		NewLabel(l["settings.muted"]), NewCheckbox(&tmp.Muted),
+		NewLabel(l["settings.show_fps"]), NewCheckbox(&tmp.ShowFps),
+		NewLabel(l["settings.init_fullscreen"]), NewCheckbox(&tmp.InitFullscreen),
+		NewLabel(l["settings.target_fps"]), NewDecimalInput(g.ui, l["settings.target_fps"], &tmp.TargetFps, 1_000_000),
+		NewLabel(l["settings.vsync_enabled"]), NewCheckbox(&tmp.Vsync),
+		NewLabel(l["settings.disable_saves"]), NewCheckbox(&tmp.DisableSaves),
+		NewLabel(l["settings.integer_scaling"]), NewCheckbox(&tmp.IntegerScaling),
+		NewLabel(l["settings.integer_scaling_ratio"]), NewDecimalInput(g.ui, l["settings.integer_scaling_ratio"], &tmp.IntegerScalingRatio, 10),
+		NewSeparator(), NewLinkText(l["settings.integer_scaling_ratio"]),
+		NewLabel(l["settings.sample_rate"]), NewDecimalInput(g.ui, l["settings.sample_rate"], &tmp.SampleRate, 192000),
+		NewSeparator(), NewLinkText(l["settings.sample_rate_desc"]),
+		NewLabel(l["settings.roms_path"]), NewDirectoryInput(&tmp.RomsPath, tmp.RomsPath, "./"),
 	)
 
 	inputLabels := []string{
-		l.Select,
-		l.Return,
-		l.Mute,
-		l.Pause,
-		l.Left,
-		l.Right,
-		l.Up,
-		l.Down,
-		l.Fullscreen,
-		l.Quit,
+		l["inputs.select"],
+		l["inputs.return"],
+		l["inputs.mute"],
+		l["inputs.pause"],
+		l["inputs.left"],
+		l["inputs.right"],
+		l["inputs.up"],
+		l["inputs.down"],
+		l["inputs.fullscreen"],
+		l["inputs.quit"],
 	}
 
 	keyPtrs := []*[]ebiten.Key{
@@ -113,15 +98,15 @@ func NewGeneralMenu(g *Game) *widget.Container {
 	}
 
 	keys, gamepad := newTwoCol(), newTwoCol()
-	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
-	menu.AddChild(NewHeader(l.Controller, g.ui.res), gamepad)
+	menu.AddChild(NewHeader(l["settings.keyboard"], g.ui.res), keys)
+	menu.AddChild(NewHeader(l["settings.controller"], g.ui.res), gamepad)
 
 	for i := range inputLabels {
 		keys.AddChild(NewLabel(inputLabels[i]), NewKeybindInput(g.ui, keyPtrs[i]))
 		gamepad.AddChild(NewLabel(inputLabels[i]), NewGamepadInput(g.ui, butPtrs[i]))
 	}
 
-	menu.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
+	menu.AddChild(NewSaveButton(l["settings.save"], func(*widget.ButtonClickedEventArgs) {
 		config.Conf.General = tmp
 
 		g.Bus.Publish(bus.Event{
@@ -139,7 +124,7 @@ func NewGeneralMenu(g *Game) *widget.Container {
 			FocusLast(g.ui)
 		}
 
-		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
+		g.ui.toast.AddMessage(l["toast.saved"])
 	}))
 
 	return menu
@@ -151,112 +136,109 @@ func NewUiMenu(g *Game) *widget.Container {
 		tmp   = config.Conf.Ui
 		oldId = g.ui.PrevPageId
 
-		l = g.ui.res.localization.Settings.Ui
+		l = g.ui.res.localization
 
 		clrInputs = [4]widget.PreferredSizeLocateableWidget{
-			NewColorInput(g.ui, l.UiBackdrop, &tmp.Backdrop, HexValidation(0xFFFFFF)),
-			NewColorInput(g.ui, l.UiBgColor, &tmp.MenuBackgroundColor, HexValidation(0xFFFFFF)),
-			NewColorInput(g.ui, l.UiFgColor, &tmp.MenuForegroundColor, HexValidation(0xFFFFFF)),
-			NewColorInput(g.ui, l.UiAccentColor, &tmp.MenuSecondaryColor, HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, l["settings.backdrop"], &tmp.Backdrop, HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, l["settings.bg_color"], &tmp.MenuBackgroundColor, HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, l["settings.fg_color"], &tmp.MenuForegroundColor, HexValidation(0xFFFFFF)),
+			NewColorInput(g.ui, l["settings.accent_color"], &tmp.MenuSecondaryColor, HexValidation(0xFFFFFF)),
 		}
 	)
 
 	menu := newMenu()
 
 	ui := newTwoCol()
-	menu.AddChild(NewHeader(l.Ui, res), ui)
+	menu.AddChild(NewHeader(l["settings.ui"], res), ui)
 
 	ui.AddChild(
-		NewLabel(l.Language), NewRadioInput(&tmp.Language, l.Languages, res),
-		NewLabel(l.Backdrop), clrInputs[0],
-		NewLabel(l.BgColor), clrInputs[1],
-		NewLabel(l.FgColor), clrInputs[2],
-		NewLabel(l.AccentColor), clrInputs[3],
-		NewLabel(l.ApplyTheme),
+		NewLabel(l["settings.language"]), NewRadioInput(&tmp.Language, l.AsSlice("settings.languages"), res),
+		NewLabel(l["settings.backdrop"]), clrInputs[0],
+		NewLabel(l["settings.bg_color"]), clrInputs[1],
+		NewLabel(l["settings.fg_color"]), clrInputs[2],
+		NewLabel(l["settings.accent_color"]), clrInputs[3],
+		NewLabel(l["settings.apply_theme"]),
 		NewApplyPalettesMenu(theme_palettes, clrInputs, res),
 	)
 
-	menu.AddChild(
-		NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
-			config.Conf.Ui = tmp
-			g.ui.res.localization = NewLocalization(LangOptions(config.Conf.Ui.Language))
+	menu.AddChild(NewSaveButton(l["settings.save"], func(*widget.ButtonClickedEventArgs) {
+		config.Conf.Ui = tmp
+		g.ui.res.localization = NewLocalization(LangOptions(config.Conf.Ui.Language))
 
-			res.Update()
-			g.ui.keyboard = NewKeyboard(g.ui.res, g.ui.res.localization.Settings.Ui.Alphabet)
+		res.Update()
+		g.ui.keyboard = NewKeyboard(g.ui.res, l.AsSlice("settings.alphabet"))
 
-			NewSettings(g, oldId, MENU_UI)
+		NewSettings(g, oldId, MENU_UI)
 
-			file.Encode()
+		file.Encode()
 
-			if len(g.ui.gamepadIds) != 0 {
-				FocusLast(g.ui)
-			}
+		if len(g.ui.gamepadIds) != 0 {
+			FocusLast(g.ui)
+		}
 
-			g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
-		}),
-	)
+		g.ui.toast.AddMessage(l["toast.saved"])
+	}))
 
 	return menu
 }
 
 func NewGbMenu(g *Game) *widget.Container {
 	tmp := config.Conf.Gb
-	l := g.ui.res.localization.Settings.Gb
+	l := g.ui.res.localization
 	pal := &tmp.Palette
 	clrInputs := [4]widget.PreferredSizeLocateableWidget{
-		NewColorInput(g.ui, l.DmgLightest, &pal[0], HexValidation(0xFFFFFF)),
-		NewColorInput(g.ui, l.DmgLight, &pal[1], HexValidation(0xFFFFFF)),
-		NewColorInput(g.ui, l.DmgDark, &pal[2], HexValidation(0xFFFFFF)),
-		NewColorInput(g.ui, l.DmgDarkest, &pal[3], HexValidation(0xFFFFFF)),
+		NewColorInput(g.ui, l["settings.dmg_lightest"], &pal[0], HexValidation(0xFFFFFF)),
+		NewColorInput(g.ui, l["settings.dmg_light"], &pal[1], HexValidation(0xFFFFFF)),
+		NewColorInput(g.ui, l["settings.dmg_dark"], &pal[2], HexValidation(0xFFFFFF)),
+		NewColorInput(g.ui, l["settings.dmg_darkest"], &pal[3], HexValidation(0xFFFFFF)),
 	}
 
 	menu := newMenu()
 
 	general := newTwoCol()
-	menu.AddChild(NewHeader(l.General, g.ui.res), general)
-	general.AddChild(NewLabel(l.System), NewRadioInput(&tmp.System, l.Systems, g.ui.res))
+	menu.AddChild(NewHeader(l["settings.general"], g.ui.res), general)
+	general.AddChild(NewLabel(l["settings.system"]), NewRadioInput(&tmp.System, l.AsSlice("settings.systems"), g.ui.res))
 
 	graphics := newTwoCol()
 	menu.AddChild(graphics)
-	graphics.AddChild(NewLabel(l.Rotation), NewRadioInput(&tmp.Rotation, l.Rotations, g.ui.res))
+	graphics.AddChild(NewLabel(l["settings.rotation"]), NewRadioInput(&tmp.Rotation, l.AsSlice("settings.rotations"), g.ui.res))
 
 	palette := newTwoCol()
-	menu.AddChild(NewHeader(l.DmgPalette, g.ui.res), palette)
+	menu.AddChild(NewHeader(l["settings.dmg_palette"], g.ui.res), palette)
 	palette.AddChild(
-		NewLabel(l.Lightest), clrInputs[0],
-		NewLabel(l.Light), clrInputs[1],
-		NewLabel(l.Dark), clrInputs[2],
-		NewLabel(l.Darkest), clrInputs[3],
-		NewLabel(l.ApplyPalette),
-		// NewApplyPalettesMenu(&g.ui.focus.horizontalGroup, dmg_palettes, clrInputs, g.ui.res),
+		NewLabel(l["settings.dmg_lightest"]), clrInputs[0],
+		NewLabel(l["settings.dmg_light"]), clrInputs[1],
+		NewLabel(l["settings.dmg_dark"]), clrInputs[2],
+		NewLabel(l["settings.dmg_darkest"]), clrInputs[3],
+		NewLabel(l["settings.apply_palette"]),
+		NewApplyPalettesMenu(dmg_palettes, clrInputs, g.ui.res),
 	)
 
 	cc := newTwoCol()
-	ccl := g.ui.res.localization.Settings.ColorCorrection
 	strength := int(tmp.ColorCorrection.Strength * 100)
 	ghosting := tmp.ColorCorrection.ScreenGhosting
-	menu.AddChild(NewHeader(ccl.ColorCorrection, g.ui.res), cc)
-	cc.AddChild(NewLabel(ccl.Type), NewRadioInput(&tmp.ColorCorrection.Type, ccl.Types, g.ui.res))
-	cc.AddChild(NewLabel(ccl.Strength), NewDecimalInput(g.ui, ccl.Strength, &strength, 100))
-	cc.AddChild(NewLabel(ccl.ScreenGhosting), NewCheckbox(&ghosting))
+	menu.AddChild(NewHeader(l["settings.color_correction"], g.ui.res), cc)
+	cc.AddChild(NewLabel(l["settings.color_correction_type"]), NewRadioInput(&tmp.ColorCorrection.Type, l.AsSlice("settings.color_correction_types"), g.ui.res))
+	cc.AddChild(NewLabel(l["settings.color_correction_strength"]), NewDecimalInput(g.ui, l["color_correction_strength"], &strength, 100))
+	cc.AddChild(NewLabel(l["settings.color_correction_screen_ghosting"]), NewCheckbox(&ghosting))
 
 	bios := newTwoCol()
-	menu.AddChild(NewHeader(l.Bios, g.ui.res), bios)
+	menu.AddChild(NewHeader(l["settings.bios"], g.ui.res), bios)
 	bios.AddChild(
-		NewLabel(l.DmgPath), NewFileInput(&tmp.Bios.DmgPath),
-		NewLabel(l.GbcPath), NewFileInput(&tmp.Bios.GbcPath),
-		NewLabel(l.DirectBoot), NewCheckbox(&tmp.Bios.Direct),
+		NewLabel(l["settings.dmg_path"]), NewFileInput(&tmp.Bios.DmgPath),
+		NewLabel(l["settings.gbc_path"]), NewFileInput(&tmp.Bios.GbcPath),
+		NewLabel(l["settings.direct_boot"]), NewCheckbox(&tmp.Bios.Direct),
 	)
 
 	inputLabels := []string{
-		l.A,
-		l.B,
-		l.Select,
-		l.Start,
-		l.Left,
-		l.Right,
-		l.Up,
-		l.Down,
+		l["inputs.a"],
+		l["inputs.b"],
+		l["inputs.select"],
+		l["inputs.start"],
+		l["inputs.left"],
+		l["inputs.right"],
+		l["inputs.up"],
+		l["inputs.down"],
 	}
 
 	keyPtrs := []*[]ebiten.Key{
@@ -282,15 +264,15 @@ func NewGbMenu(g *Game) *widget.Container {
 	}
 
 	keys, gamepad := newTwoCol(), newTwoCol()
-	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
-	menu.AddChild(NewHeader(l.Controller, g.ui.res), gamepad)
+	menu.AddChild(NewHeader(l["settings.keyboard"], g.ui.res), keys)
+	menu.AddChild(NewHeader(l["settings.controller"], g.ui.res), gamepad)
 
 	for i := range inputLabels {
 		keys.AddChild(NewLabel(inputLabels[i]), NewKeybindInput(g.ui, keyPtrs[i]))
 		gamepad.AddChild(NewLabel(inputLabels[i]), NewGamepadInput(g.ui, butPtrs[i]))
 	}
 
-	menu.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
+	menu.AddChild(NewSaveButton(l["settings.save"], func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Gb = tmp
 		config.Conf.Gb.ColorCorrection.Strength = float32(strength) / 100
 
@@ -308,7 +290,7 @@ func NewGbMenu(g *Game) *widget.Container {
 			FocusLast(g.ui)
 		}
 
-		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
+		g.ui.toast.AddMessage(l["toast.saved"])
 	}))
 
 	return menu
@@ -316,62 +298,61 @@ func NewGbMenu(g *Game) *widget.Container {
 
 func NewGbaMenu(g *Game) *widget.Container {
 	tmp := config.Conf.Gba
-	l := g.ui.res.localization.Settings.Gba
+	l := g.ui.res.localization
 
 	menu := newMenu()
 
 	general := newTwoCol()
-	menu.AddChild(NewHeader(l.General, g.ui.res), general)
+	menu.AddChild(NewHeader(l["settings.general"], g.ui.res), general)
 
 	general.AddChild(
-		NewLabel(l.OptmizeIdleLoops), NewCheckbox(&tmp.IdleOptimize),
-		NewLabel(l.Rotation), NewRadioInput(&tmp.Rotation, l.Rotations, g.ui.res),
+		NewLabel(l["settings.optimize_idle_loops"]), NewCheckbox(&tmp.IdleOptimize),
+		NewLabel(l["settings.rotation"]), NewRadioInput(&tmp.Rotation, l.AsSlice("settings.rotations"), g.ui.res),
 	)
 
 	hardware := newTwoCol()
-	menu.AddChild(NewHeader(l.Hardware, g.ui.res), hardware)
+	menu.AddChild(NewHeader(l["settings.hardware"], g.ui.res), hardware)
 
 	hardware.AddChild(
-		NewLabel(l.BackupType), NewRadioInput(&tmp.Hardware.BackupType, l.BackupTypes, g.ui.res),
-		NewLabel(l.ForceRtc), NewCheckbox(&tmp.Hardware.ForceRtc),
-		NewLabel(l.ForceSolarSensor), NewCheckbox(&tmp.Hardware.ForceSolarSensor),
-		NewLabel(l.SolarSensorLevel), NewDecimalInput(g.ui, l.SolarSensorLevel, &tmp.Hardware.SolarSensorLevel, 100),
+		NewLabel(l["settings.backup_type"]), NewRadioInput(&tmp.Hardware.BackupType, l.AsSlice("settings.backup_types"), g.ui.res),
+		NewLabel(l["settings.force_rtc"]), NewCheckbox(&tmp.Hardware.ForceRtc),
+		NewLabel(l["settings.force_solar_sensor"]), NewCheckbox(&tmp.Hardware.ForceSolarSensor),
+		NewLabel(l["solar_sensor_level"]), NewDecimalInput(g.ui, l["solar_sensor_level"], &tmp.Hardware.SolarSensorLevel, 100),
 	)
 
 	cc := newTwoCol()
-	ccl := g.ui.res.localization.Settings.ColorCorrection
 	strength := int(tmp.ColorCorrection.Strength * 100)
 	ghosting := tmp.ColorCorrection.ScreenGhosting
-	menu.AddChild(NewHeader(ccl.ColorCorrection, g.ui.res), cc)
-	cc.AddChild(NewLabel(ccl.Type), NewRadioInput(&tmp.ColorCorrection.Type, ccl.Types, g.ui.res))
-	cc.AddChild(NewLabel(ccl.Strength), NewDecimalInput(g.ui, ccl.Strength, &strength, 100))
-	cc.AddChild(NewLabel(ccl.ScreenGhosting), NewCheckbox(&ghosting))
+	menu.AddChild(NewHeader(l["settings.color_correction"], g.ui.res), cc)
+	cc.AddChild(NewLabel(l["settings.color_correction_type"]), NewRadioInput(&tmp.ColorCorrection.Type, l.AsSlice("settings.color_correction_types"), g.ui.res))
+	cc.AddChild(NewLabel(l["settings.color_correction_strength"]), NewDecimalInput(g.ui, l["color_correction_strength"], &strength, 100))
+	cc.AddChild(NewLabel(l["settings.color_correction_screen_ghosting"]), NewCheckbox(&ghosting))
 
 	bios := newTwoCol()
-	menu.AddChild(NewHeader(l.Bios, g.ui.res), bios)
+	menu.AddChild(NewHeader(l["settings.bios"], g.ui.res), bios)
 
 	bios.AddChild(
-		NewLabel(l.BiosPath), NewFileInput(&tmp.Bios.Path),
-		NewLabel(l.DirectBoot), NewCheckbox(&tmp.Bios.Direct),
+		NewLabel(l["settings.bios_path"]), NewFileInput(&tmp.Bios.Path),
+		NewLabel(l["settings.direct_boot"]), NewCheckbox(&tmp.Bios.Direct),
 	)
 
 	inputLabels := []string{
-		l.A,
-		l.B,
-		l.Select,
-		l.Start,
-		l.Left,
-		l.Right,
-		l.Up,
-		l.Down,
-		l.L,
-		l.R,
-		l.SolarMin,
-		l.Solar1,
-		l.Solar2,
-		l.Solar3,
-		l.SolarMax,
-		l.RotationToggle,
+		l["inputs.a"],
+		l["inputs.b"],
+		l["inputs.select"],
+		l["inputs.start"],
+		l["inputs.left"],
+		l["inputs.right"],
+		l["inputs.up"],
+		l["inputs.down"],
+		l["inputs.l"],
+		l["inputs.r"],
+		l["settings.solar_minimum"],
+		l["settings.solar_1"],
+		l["settings.solar_2"],
+		l["settings.solar_3"],
+		l["settings.solar_maximum"],
+		l["settings.rotation_toggle"],
 	}
 
 	keyPtrs := []*[]ebiten.Key{
@@ -413,15 +394,15 @@ func NewGbaMenu(g *Game) *widget.Container {
 	}
 
 	keys, gamepad := newTwoCol(), newTwoCol()
-	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
-	menu.AddChild(NewHeader(l.Controller, g.ui.res), gamepad)
+	menu.AddChild(NewHeader(l["settings.keyboard"], g.ui.res), keys)
+	menu.AddChild(NewHeader(l["settings.controller"], g.ui.res), gamepad)
 
 	for i := range inputLabels {
 		keys.AddChild(NewLabel(inputLabels[i]), NewKeybindInput(g.ui, keyPtrs[i]))
 		gamepad.AddChild(NewLabel(inputLabels[i]), NewGamepadInput(g.ui, butPtrs[i]))
 	}
 
-	menu.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
+	menu.AddChild(NewSaveButton(l["settings.save"], func(*widget.ButtonClickedEventArgs) {
 		if tmp.Bios.Path == "" {
 			tmp.Bios.Direct = true
 		}
@@ -431,9 +412,7 @@ func NewGbaMenu(g *Game) *widget.Container {
 		config.Conf.Gba.ColorCorrection.ScreenGhosting = ghosting
 		if g.gba != nil {
 			g.gba.UpdateGhosting()
-		}
 
-		if g.gba != nil {
 			g.gba.IdleOptimize = tmp.IdleOptimize
 
 			if g.gba.Mem.Gpio != nil {
@@ -454,7 +433,7 @@ func NewGbaMenu(g *Game) *widget.Container {
 			FocusLast(g.ui)
 		}
 
-		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
+		g.ui.toast.AddMessage(l["toast.saved"])
 	}))
 
 	return menu
@@ -462,80 +441,79 @@ func NewGbaMenu(g *Game) *widget.Container {
 
 func NewNdsMenu(g *Game) *widget.Container {
 	tmp := config.Conf.Nds
-	l := g.ui.res.localization.Settings.Nds
+	l := g.ui.res.localization
 
 	menu := newMenu()
 
 	screen := newTwoCol()
-	menu.AddChild(NewHeader(l.Screen, g.ui.res), screen)
+	menu.AddChild(NewHeader(l["settings.screen"], g.ui.res), screen)
 
 	screen.AddChild(
-		NewLabel(l.Layout), NewRadioInput(&tmp.Screen.Layout, l.Layouts, g.ui.res),
-		NewLabel(l.Sizing), NewRadioInput(&tmp.Screen.Sizing, l.Sizings, g.ui.res),
-		NewLabel(l.Rotation), NewRadioInput(&tmp.Screen.Rotation, l.Rotations, g.ui.res),
+		NewLabel(l["settings.layout"]), NewRadioInput(&tmp.Screen.Layout, l.AsSlice("settings.layouts"), g.ui.res),
+		NewLabel(l["settings.sizing"]), NewRadioInput(&tmp.Screen.Sizing, l.AsSlice("settings.sizings"), g.ui.res),
+		NewLabel(l["settings.rotation"]), NewRadioInput(&tmp.Screen.Rotation, l.AsSlice("settings.rotations"), g.ui.res),
 	)
 
 	rtc := newTwoCol()
-	menu.AddChild(NewHeader(l.Rtc, g.ui.res), rtc)
+	menu.AddChild(NewHeader(l["settings.rtc"], g.ui.res), rtc)
 
 	rtc.AddChild(
-		NewLabel(l.AdditionalHours), NewDecimalInput(g.ui, l.AdditionalHours, &tmp.Rtc.AdditionalHours, 24),
+		NewLabel(l["settings.additional_hours"]), NewDecimalInput(g.ui, l["settings.additional_hours"], &tmp.Rtc.AdditionalHours, 24),
 	)
 
 	cc := newTwoCol()
-	ccl := g.ui.res.localization.Settings.ColorCorrection
 	strength := int(tmp.ColorCorrection.Strength * 100)
 	ghosting := tmp.ColorCorrection.ScreenGhosting
-	menu.AddChild(NewHeader(ccl.ColorCorrection, g.ui.res), cc)
-	cc.AddChild(NewLabel(ccl.Type), NewRadioInput(&tmp.ColorCorrection.Type, ccl.Types, g.ui.res))
-	cc.AddChild(NewLabel(ccl.Strength), NewDecimalInput(g.ui, ccl.Strength, &strength, 100))
-	cc.AddChild(NewLabel(ccl.ScreenGhosting), NewCheckbox(&ghosting))
+	menu.AddChild(NewHeader(l["settings.color_correction"], g.ui.res), cc)
+	cc.AddChild(NewLabel(l["settings.color_correction_type"]), NewRadioInput(&tmp.ColorCorrection.Type, l.AsSlice("settings.color_correction_types"), g.ui.res))
+	cc.AddChild(NewLabel(l["settings.color_correction_strength"]), NewDecimalInput(g.ui, l["color_correction_strength"], &strength, 100))
+	cc.AddChild(NewLabel(l["settings.color_correction_screen_ghosting"]), NewCheckbox(&ghosting))
 
 	bios := newTwoCol()
-	menu.AddChild(NewHeader(l.Bios, g.ui.res), bios)
+	menu.AddChild(NewHeader(l["settings.bios"], g.ui.res), bios)
 
 	bios.AddChild(
-		NewLabel(l.Arm7Path), NewFileInput(&tmp.Bios.Arm7Path),
-		NewLabel(l.Arm9Path), NewFileInput(&tmp.Bios.Arm9Path),
+		NewLabel(l["settings.arm7_path"]), NewFileInput(&tmp.Bios.Arm7Path),
+		NewLabel(l["settings.arm9_path"]), NewFileInput(&tmp.Bios.Arm9Path),
 	)
 
 	firmware := newTwoCol()
-	menu.AddChild(NewHeader(l.Firmware, g.ui.res), firmware)
+	menu.AddChild(NewHeader(l["settings.firmware"], g.ui.res), firmware)
 	favColor := config.ColorNames[tmp.Firmware.Color]
 
 	firmware.AddChild(
-		NewLabel(l.FilePath), NewFileInput(&tmp.Firmware.FilePath),
-		NewLabel(l.Nickname), NewTextBoxInput(g.ui, BOARD_ALPHA, l.Nickname, &tmp.Firmware.Nickname, StringValidation(10)),
-		NewLabel(l.Message), NewTextBoxInput(g.ui, BOARD_ALPHA, l.Message, &tmp.Firmware.Message, StringValidation(26)),
-		NewLabel(l.FavoriteColor), NewTextBoxInput(g.ui, BOARD_ALPHA, l.FavoriteColor, &favColor, ColorNdsValidation()),
+		NewLabel(l["settings.file_path"]), NewFileInput(&tmp.Firmware.FilePath),
+		NewLabel(l["settings.nickname"]), NewTextBoxInput(g.ui, BOARD_ALPHA, l["settings.nickname"], &tmp.Firmware.Nickname, StringValidation(10)),
+		NewLabel(l["settings.message"]), NewTextBoxInput(g.ui, BOARD_ALPHA, l["settings.message"], &tmp.Firmware.Message, StringValidation(26)),
+		NewLabel(l["settings.favorite_color"]), NewTextBoxInput(g.ui, BOARD_ALPHA, l["settings.favorite_color"], &favColor, ColorNdsValidation()),
 	)
 
 	export := newTwoCol()
-	menu.AddChild(NewHeader(l.SceneExport, g.ui.res), export)
+	menu.AddChild(NewHeader(l["settings.scene_export"], g.ui.res), export)
 
 	export.AddChild(
-		NewLabel(l.OutputDirectory), NewDirectoryInput(&tmp.Export.Directory, tmp.Export.Directory, "./export"),
-		NewLabel(l.ShadowPolygons), NewCheckbox(&tmp.Export.ShadowPolys),
+		NewLabel(l["settings.output_directory"]), NewDirectoryInput(&tmp.Export.Directory, tmp.Export.Directory, "./export"),
+		NewLabel(l["settings.shadow_polygons"]), NewCheckbox(&tmp.Export.ShadowPolys),
 	)
 
 	inputLabels := []string{
-		l.A,
-		l.B,
-		l.Select,
-		l.Start,
-		l.Left,
-		l.Right,
-		l.Up,
-		l.Down,
-		l.L,
-		l.R,
-		l.X,
-		l.Y,
-		l.Hinge,
-		l.LayoutToggle,
-		l.SizingToggle,
-		l.RotationToggle,
-		l.ExportToggle,
+		l["inputs.a"],
+		l["inputs.b"],
+		l["inputs.select"],
+		l["inputs.start"],
+		l["inputs.left"],
+		l["inputs.right"],
+		l["inputs.up"],
+		l["inputs.down"],
+		l["inputs.l"],
+		l["inputs.r"],
+		l["inputs.x"],
+		l["inputs.y"],
+		l["settings.hinge"],
+		l["settings.layout_toggle"],
+		l["settings.sizing_toggle"],
+		l["settings.rotation_toggle"],
+		l["settings.export_toggle"],
 	}
 
 	keyPtrs := []*[]ebiten.Key{
@@ -579,15 +557,15 @@ func NewNdsMenu(g *Game) *widget.Container {
 	}
 
 	keys, gamepad := newTwoCol(), newTwoCol()
-	menu.AddChild(NewHeader(l.Keyboard, g.ui.res), keys)
-	menu.AddChild(NewHeader(l.Controller, g.ui.res), gamepad)
+	menu.AddChild(NewHeader(l["settings.keyboard"], g.ui.res), keys)
+	menu.AddChild(NewHeader(l["settings.controller"], g.ui.res), gamepad)
 
 	for i := range inputLabels {
 		keys.AddChild(NewLabel(inputLabels[i]), NewKeybindInput(g.ui, keyPtrs[i]))
 		gamepad.AddChild(NewLabel(inputLabels[i]), NewGamepadInput(g.ui, butPtrs[i]))
 	}
 
-	menu.AddChild(NewSaveButton(l.Save, func(*widget.ButtonClickedEventArgs) {
+	menu.AddChild(NewSaveButton(l["settings.save"], func(*widget.ButtonClickedEventArgs) {
 		config.Conf.Nds = tmp
 		config.Conf.Nds.Firmware.Color = config.ColorNameToId[favColor]
 		config.Conf.Nds.ColorCorrection.Strength = float32(strength) / 100
@@ -605,25 +583,25 @@ func NewNdsMenu(g *Game) *widget.Container {
 			FocusLast(g.ui)
 		}
 
-		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Saved)
+		g.ui.toast.AddMessage(l["toast.saved"])
 	}))
 
 	return menu
 }
 
 func NewAboutMenu(g *Game) *widget.Container {
-	l := g.ui.res.localization.Settings.About
+	l := g.ui.res.localization
 
 	menu := newMenu()
 
 	about := newOneCol()
-	menu.AddChild(NewHeader(l.About, g.ui.res))
+	menu.AddChild(NewHeader(l["settings.about"], g.ui.res))
 	menu.AddChild(about)
 
 	about.AddChild(NewLinkText(mainLink))
-	about.AddChild(NewLinkText(l.Version))
-	about.AddChild(NewLinkText(l.Copyright))
-	about.AddChild(NewLinkText(l.ThankYous))
+	about.AddChild(NewLinkText(l["settings.version"]))
+	about.AddChild(NewLinkText(l["settings.copyright"]))
+	about.AddChild(NewLinkText(l["settings.thank_yous"]))
 
 	return menu
 }

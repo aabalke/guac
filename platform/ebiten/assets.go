@@ -77,7 +77,7 @@ type Resources struct {
 
 	icon []img.Image
 
-	localization *Localization
+	localization Localization
 }
 
 func NewUIResources() (*Resources, error) {

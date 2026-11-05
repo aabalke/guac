@@ -7,21 +7,22 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 )
 
+// TODO: LOCALIZE
 var extensions = []string{
 	"gb", "gbc", "gba", "nds", "zip",
 }
 
 func NewHome(g *Game) {
-	l := g.ui.res.localization.Main
+	l := g.ui.res.localization
 
-	b1 := NewCenteredButton(l.Open, func(*widget.ButtonClickedEventArgs) {
+	b1 := NewCenteredButton(l["main.open"], func(*widget.ButtonClickedEventArgs) {
 		if len(g.ui.gamepadIds) != 0 {
 			NewFileMenu(g, g.ui.PageId)
 		} else {
 
 			file := utils.OpenFile(
-				l.DialogTitle,
-				l.DialogDesc,
+				l["main.dialog_title"],
+				l["main.dialog_desc"],
 				extensions...,
 			)
 
@@ -29,11 +30,11 @@ func NewHome(g *Game) {
 		}
 	})
 
-	b2 := NewCenteredButton(l.Settings, func(*widget.ButtonClickedEventArgs) {
+	b2 := NewCenteredButton(l["main.settings"], func(*widget.ButtonClickedEventArgs) {
 		NewSettings(g, g.ui.PageId, MENU_GENERAL)
 	})
 
-	b3 := NewCenteredButton(l.Quit, func(*widget.ButtonClickedEventArgs) {
+	b3 := NewCenteredButton(l["main.quit"], func(*widget.ButtonClickedEventArgs) {
 		g.quit = true
 	})
 
@@ -43,27 +44,24 @@ func NewHome(g *Game) {
 }
 
 func NewPause(g *Game) {
-	l := g.ui.res.localization.Pause
+	l := g.ui.res.localization
 
-	b1 := NewCenteredButton(l.Resume, func(*widget.ButtonClickedEventArgs) {
+	b1 := NewCenteredButton(l["pause.resume"], func(*widget.ButtonClickedEventArgs) {
 		g.TogglePause()
 	})
 
-	b2 := NewCenteredButton(l.Settings, func(*widget.ButtonClickedEventArgs) {
+	b2 := NewCenteredButton(l["pause.settings"], func(*widget.ButtonClickedEventArgs) {
 		NewSettings(g, g.ui.PageId, MENU_GENERAL)
 	})
 
-	b3 := NewCenteredButton(l.Main, func(*widget.ButtonClickedEventArgs) {
+	b3 := NewCenteredButton(l["pause.main"], func(*widget.ButtonClickedEventArgs) {
 		NewHome(g)
 
 		if g.nds != nil || g.gba != nil || g.gb != nil {
 			g.emuClose()
 		}
 
-		g.nds = nil
-		g.gba = nil
-		g.gb = nil
-		g.paused = false
+		g.nds, g.gba, g.gb, g.paused = nil, nil, nil, false
 	})
 
 	root := NewCenteredPage(g.ui.res.bg, b1, b2, b3)

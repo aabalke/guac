@@ -23,9 +23,26 @@ choose = "eligir"
 up = "arriba"
 return = "volver"
 
-[settings]
+[inputs]
+select          = "seleccionar"
+return          = "volver"
+mute            = "silenciar"
+pause           = "pausar"
+left            = "izquierda"
+right           = "derecha"
+up              = "arriba"
+down            = "abajo"
+fullscreen      = "pantalla completa"
+quit            = "salir"
+a      = "a"
+b      = "b"
+l               = "l"
+r               = "r"
+x               = "x"
+y               = "y"
+start  = "iniciar"
 
-[settings.sidebar]
+[settings]
 general = "general"
 ui      = "interfaz"
 gb      = "gb"
@@ -34,11 +51,7 @@ nds     = "nds"
 about   = "sobre"
 return  = "volver"
 
-[settings.general]
-
-general         = "general"
 muted           = "silenciado"
-
 show_fps        = "mostrar FPS"
 init_fullscreen = "iniciar en pantalla completa"
 target_fps      = "FPS objetivo"
@@ -50,26 +63,10 @@ integer_scaling_ratio = "proporción de escalado entero"
 sample_rate_desc = "frecuencia de muestreo requiere reiniciar"
 sample_rate = "frecuencia de muestreo"
 roms_path = "directorio de roms"
-
 keyboard        = "teclado"
 controller      = "controlador"
-
-select          = "seleccionar"
-return          = "volver"
-mute            = "silenciar"
-pause           = "pausar"
-left            = "izquierda"
-right           = "derecha"
-up              = "arriba"
-down            = "abajo"
-fullscreen      = "pantalla completa"
-quit            = "salir"
-
 save = "guardar"
 
-[settings.ui]
-
-ui              = "interfaz"
 language        = "idioma"
 languages       = ["inglés", "español"]
 backdrop        = "fondo"
@@ -81,7 +78,6 @@ ui_backdrop     = "fondo de la interfaz"
 ui_bg_color     = "color de fondo de la interfaz"
 ui_fg_color     = "color de texto de la interfaz"
 ui_accent_color = "color de acento de la interfaz"
-save = "guardar"
 
 alphabet = [
     "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
@@ -93,8 +89,6 @@ alphabet = [
     ",", " ", "¿", "?", "¡", "!"
 ]
 
-[settings.gb]
-general = "general"
 system        = "system"
 systems       = ["automátic", "dmg", "gbc"]
 rotation = "rotación"
@@ -115,26 +109,7 @@ dmg_bios_path = "ruta de bios (dmg)"
 gbc_bios_path = "ruta de bios (gbc)"
 direct_boot = "direct boot"
 
-keyboard   = "teclado"
-controller = "controlador"
-
-a      = "a"
-b      = "b"
-select = "seleccionar"
-start  = "iniciar"
-left   = "izquierda"
-right  = "derecha"
-up     = "arriba"
-down   = "abajo"
-
-save = "guardar"
-
-[settings.gba]
-
-general = "general"
 optimize_idle_loops = "optimizar bucles inactivos"
-rotation = "rotación"
-rotations = ["0", "90", "180", "270"]
 
 hardware = "hardware"
 backup_type = "tipo de backup"
@@ -143,23 +118,8 @@ force_rtc = "forzar el uso del rtc"
 force_solar_sensor = "forzar el uso del sensor solar"
 solar_sensor_level = "nivel del sensor solar"
 
-bios = "bios"
 bios_path = "ruta de bios"
-direct_boot = "arranque directo"
 
-keyboard   = "teclado"
-controller = "controlador"
-
-a      = "a"
-b      = "b"
-select = "seleccionar"
-start  = "iniciar"
-left   = "izquierda"
-right  = "derecha"
-up     = "arriba"
-down   = "abajo"
-l      = "l"
-r      = "r"
 solar_maximum = "solar máxima"
 solar_1       = "solar 25%"
 solar_2       = "solar 50%"
@@ -167,23 +127,16 @@ solar_3       = "solar 75%"
 solar_minimum = "solar mínima"
 rotation_toggle = "cambiar rotación"
 
-save = "guardar"
-
-[settings.nds]
-
 screen   = "pantalla"
 layout   = "disposición"
 sizing   = "tamaño"
-rotation = "rotación"
 
 layouts   = ["vertical", "horizontal", "híbrido"]
 sizings   = ["igual", "solo arriba", "solo abajo"]
-rotations = ["0", "90", "180", "270"]
 
 rtc              = "rtc"
 additional_hours = "horas adicionales"
 
-bios      = "bios"
 arm7_path = "ruta de arm7"
 arm9_path = "ruta de arm9"
 
@@ -197,40 +150,18 @@ scene_export     = "exportar escena"
 output_directory = "directorio de salida"
 shadow_polygons  = "polígonos de sombra"
 
-keyboard   = "teclado"
-controller = "controlador"
-
-a               = "a"
-b               = "b"
-select          = "seleccionar"
-start           = "iniciar"
-left            = "izquierda"
-right           = "derecha"
-up              = "arriba"
-down            = "abajo"
-l               = "l"
-r               = "r"
-x               = "x"
-y               = "y"
 hinge           = "bisagra"
 debug           = "depuración"
 layout_toggle   = "cambiar disposición"
 sizing_toggle   = "cambiar tamaño"
-rotation_toggle = "cambiar rotación"
 export_toggle   = "alternar exportación"
 
-save = "guardar"
-
-[settings.about]
-
-about = "sobre"
 version = "Versión de lanzamiento a la v0.0.4"
 copyright = "© 2024 - 2026 Aaron Balke,\ncon licencia BSD de 3 cláusulas.\nGame Boy, Game Boy Advance, y Nintendo DS\nson marcas comercial registrada de Nintendo Co., Ltd."
 thank_yous = "Gracias a Giovanni Bajo, Mireille Meyer,\nVicki Pfau, Martin Korth y muchos más."
 
-[settings.color_correction]
 color_correction = "corrección de color"
-type = "tipo"
-types = ["ninguna", "gbc", "gba", "higan"]
-strength = "intensidad"
-screen_ghosting = "efecto fantasma en pantalla"
+color_correction_type = "tipo"
+color_correction_types = ["ninguna", "gbc", "gba", "higan"]
+color_correction_strength = "intensidad"
+color_correction_screen_ghosting = "efecto fantasma en pantalla"

@@ -51,19 +51,17 @@ type Ui struct {
 	res            *Resources
 	ui             *ebitenui.UI
 	toast          *Toast
-	sidebar        *widget.Container
 	scrollableMenu *ScrollableMenu
 	keyboard       *Keyboard
 	ActiveInputs   int
-	PageId         PageId
 	PrevPageId     PageId
+	PageId         PageId
 }
 
 type ScrollableMenu struct {
-	slider     *widget.Slider
-	scrollable *widget.ScrollContainer
-	content    *widget.Container
-	root       *widget.Container
+	root    *widget.Container
+	content *widget.Container
+	slider  *widget.Slider
 }
 
 func StartEngine() {
@@ -109,7 +107,7 @@ func NewGame(res *Resources) *Game {
 			gamepadIdBuf: make([]ebiten.GamepadID, 0),
 			res:          res,
 			toast:        NewToast(res),
-			keyboard:     NewKeyboard(res, res.localization.Settings.Ui.Alphabet),
+			// keyboard:     NewKeyboard(res, res.localization.AsSlice("settings.ui.alphabet")),
 		},
 		Bus: bus.NewEventBus(),
 	}
@@ -198,6 +196,7 @@ func (g *Game) Draw(dst *ebiten.Image) {
 
 		target := config.Conf.General.TargetFps
 
+		// TODO: LOCALIZE
 		switch {
 		case g.ui.ui != nil:
 			ebitenutil.DebugPrint(dst, fmt.Sprintf("Target FPS: %d.00 Engine FPS: %.2f, TPS: %.2f", target, ebiten.ActualFPS(), ebiten.ActualTPS()))
@@ -240,6 +239,7 @@ func (g *Game) TogglePause() {
 }
 
 func (g *Game) ToggleMute() {
+	l := g.ui.res.localization
 	g.muted = !g.muted
 
 	g.Bus.Publish(bus.Event{
@@ -248,9 +248,9 @@ func (g *Game) ToggleMute() {
 	})
 
 	if g.muted {
-		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Muted)
+		g.ui.toast.AddMessage(l["toast.muted"])
 	} else {
-		g.ui.toast.AddMessage(g.ui.res.localization.Toast.Unmuted)
+		g.ui.toast.AddMessage(l["toast.unmuted"])
 	}
 }
 
@@ -280,6 +280,7 @@ func (g *Game) InitConsole(file string) bool {
 	}
 
 	if romType == utils.NONE_ZIP {
+		// TODO: LOCALIZE
 		g.ui.toast.AddMessage("Invalid Zip File")
 	}
 

@@ -16,7 +16,7 @@ func (g *Game) GetGamepadButtons() (justButtons, buttons []ebiten.StandardGamepa
 
 	for _, id := range g.ui.gamepadIdBuf {
 		fmt.Printf("Gamepad Connected id %d\n", id)
-		g.ui.toast.AddMessage(g.ui.res.localization.Toast.ControllerConnected)
+		g.ui.toast.AddMessage(g.ui.res.localization["toast.controller_connected"])
 		g.ui.gamepadIds[id] = struct{}{}
 		FocusFirst(g.ui)
 	}
@@ -24,7 +24,7 @@ func (g *Game) GetGamepadButtons() (justButtons, buttons []ebiten.StandardGamepa
 	for id := range g.ui.gamepadIds {
 		if inpututil.IsGamepadJustDisconnected(id) {
 			fmt.Printf("Gamepad Disconnected id %d\n", id)
-			g.ui.toast.AddMessage(g.ui.res.localization.Toast.ControllerDisconnected)
+			g.ui.toast.AddMessage(g.ui.res.localization["toast.controller_disconnected"])
 			delete(g.ui.gamepadIds, id)
 
 			if len(g.ui.gamepadIds) == 0 {
@@ -128,7 +128,8 @@ func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) 
 			case slices.Contains(buttonConfig.Return, button):
 				switch g.ui.PageId {
 				case PAGE_SETTINGS:
-					//g.ui.focus.FocusLastSidebar()
+					// TODO: get focus for last in sidebar
+					// g.ui.focus.FocusLastSidebar()
 				case PAGE_KEYBOARD:
 					g.ui.ui.SetFocusedWidget(g.ui.keyboard.cancelButtons[g.ui.keyboard.currBoard])
 				case PAGE_FILE_SELECT:

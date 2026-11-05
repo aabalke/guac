@@ -6,13 +6,11 @@ dialog_title = "Open"
 dialog_desc = "Roms (*.gb, *.gbc, *.gba, *.nds)"
 
 [pause]
-
 resume   = "resume"
 settings = "settings"
 main     = "main menu"
 
 [toast]
-
 saved = "saved"
 muted = "muted"
 unmuted = "unmuted"
@@ -25,9 +23,26 @@ choose = "choose"
 up = "up"
 return = "return"
 
-[settings]
+[inputs]
+select          = "select"
+return          = "return"
+mute            = "mute"
+pause           = "pause"
+left            = "left"
+right           = "right"
+up              = "up"
+down            = "down"
+fullscreen      = "fullscreen"
+quit            = "quit"
+a      = "a"
+b      = "b"
+l      = "l"
+r      = "r"
+x      = "x"
+y      = "y"
+start  = "start"
 
-[settings.sidebar]
+[settings]
 general = "general"
 ui      = "ui"
 gb      = "gb"
@@ -36,9 +51,6 @@ nds     = "nds"
 about   = "about"
 return  = "return"
 
-[settings.general]
-
-general         = "general"
 muted           = "muted"
 show_fps        = "show fps"
 init_fullscreen = "init fullscreen"
@@ -51,26 +63,10 @@ integer_scaling_ratio = "integer scaling ratio"
 sample_rate_desc = "sample rate requires restart"
 sample_rate = "sample rate"
 roms_path = "roms path"
-
 keyboard        = "keyboard"
 controller      = "controller"
-
-select          = "select"
-return          = "return"
-mute            = "mute"
-pause           = "pause"
-left            = "left"
-right           = "right"
-up              = "up"
-down            = "down"
-fullscreen      = "fullscreen"
-quit            = "quit"
-
 save = "save"
 
-[settings.ui]
-
-ui              = "ui"
 language        = "language"
 languages       = ["english", "spanish"]
 backdrop        = "backdrop"
@@ -82,7 +78,6 @@ ui_backdrop     = "ui backdrop"
 ui_bg_color     = "ui bg color"
 ui_fg_color     = "ui fg color"
 ui_accent_color = "ui accent color"
-save            = "save"
 
 alphabet = [
     "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
@@ -92,9 +87,6 @@ alphabet = [
     "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ",", " ",
 ]
 
-[settings.gb]
-
-general = "general"
 system        = "system"
 systems        = ["auto", "dmg", "gbc"]
 rotation = "rotation"
@@ -115,26 +107,7 @@ dmg_bios_path = "dmg bios path"
 gbc_bios_path = "gbc bios path"
 direct_boot = "direct boot"
 
-keyboard = "keyboard"
-controller = "controller"
-
-a      = "a"
-b      = "b"
-select = "select"
-start  = "start"
-left   = "left"
-right  = "right"
-up     = "up"
-down   = "down"
-
-save = "save"
-
-[settings.gba]
-
-general = "general"
 optimize_idle_loops = "optimize idle loops"
-rotation = "rotation"
-rotations = ["0", "90", "180", "270"]
 
 hardware = "hardware"
 backup_type = "backup type"
@@ -143,23 +116,8 @@ force_rtc = "force rtc"
 force_solar_sensor = "force solar sensor"
 solar_sensor_level = "solar level"
 
-bios = "bios"
 bios_path = "bios path"
-direct_boot = "direct boot"
 
-keyboard = "keyboard"
-controller = "controller"
-
-a      = "a"
-b      = "b"
-select = "select"
-start  = "start"
-left   = "left"
-right  = "right"
-up     = "up"
-down   = "down"
-l      = "l"
-r      = "r"
 solar_minimum = "solar minimum"
 solar_1 = "solar 25%"
 solar_2 = "solar 50%"
@@ -167,23 +125,16 @@ solar_3 = "solar 75%"
 solar_maximum = "solar maximum"
 rotation_toggle = "rotation toggle"
 
-save = "save"
-
-[settings.nds]
-
 screen = "screen"
 layout = "layout"
 sizing = "sizing"
-rotation = "rotation"
 
 layouts = ["vertical", "horizontal", "hybrid"]
 sizings = ["even", "only top", "only bottom"]
-rotations = ["0", "90", "180", "270"]
 
 rtc = "rtc"
 additional_hours = "additional hours"
 
-bios = "bios"
 arm7_path = "arm7 path"
 arm9_path = "arm9 path"
 
@@ -197,40 +148,18 @@ scene_export = "scene export"
 output_directory = "output directory"
 shadow_polygons = "shadow polygons"
 
-keyboard   = "keyboard"
-controller = "controller"
-
-a               = "a"
-b               = "b"
-select          = "select"
-start           = "start"
-left            = "left"
-right           = "right"
-up              = "up"
-down            = "down"
-l               = "l"
-r               = "r"
-x               = "x"
-y               = "y"
 hinge           = "hinge"
 debug           = "debug"
 layout_toggle   = "layout toggle"
 sizing_toggle   = "sizing toggle"
-rotation_toggle = "rotation toggle"
 export_toggle   = "export toggle"
 
-save = "save"
-
-[settings.about]
-
-about = "about"
 version = "Version dev release-v0.0.4"
 copyright = "© 2024 - 2026 Aaron Balke,\nlicensed under BSD 3-Clause License.\nGame Boy, Game Boy Advance, and Nintendo DS\nare registered trademarks of Nintendo Co., Ltd."
 thank_yous = "Thank you Giovanni Bajo, Mireille Meyer,\nVicki Pfau, Martin Korth, and many more."
 
-[settings.color_correction]
 color_correction = "color correction"
-type = "type"
-types = ["none", "gbc", "gba", "higan"]
-strength = "strength"
-screen_ghosting = "screen ghosting"
+color_correction_type = "type"
+color_correction_types = ["none", "gbc", "gba", "higan"]
+color_correction_strength = "strength"
+color_correction_screen_ghosting = "screen ghosting"

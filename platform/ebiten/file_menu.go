@@ -12,11 +12,6 @@ import (
 )
 
 func NewFileMenu(g *Game, oldId PageId) {
-	g.ui.PrevPageId = oldId
-
-	menu := &ScrollableMenu{}
-	g.ui.scrollableMenu = menu
-
 	root := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(g.ui.res.bg),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
@@ -38,15 +33,22 @@ func NewFileMenu(g *Game, oldId PageId) {
 		)),
 	)
 
-	menu.content = widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewGridLayout(
-			widget.GridLayoutOpts.Columns(1),
-			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),
-		)),
-	)
+	scrollableRoot, _ := NewScrollableContainer(g.ui)
 
-	menu.root = NewScrollableContainer(g.ui)
+	NewFileMenuContent(g)
 
+	c.AddChild(NewNavBar(g), scrollableRoot)
+	root.AddChild(c)
+
+	g.ui.PrevPageId = oldId
+	g.ui.PageId = PAGE_FILE_SELECT
+
+	newUi(g, root)
+
+	g.ui.ui.SetFocusedWidget(g.ui.scrollableMenu.content.GetFocusers()[0])
+}
+
+func NewFileMenuContent(g *Game) {
 	p := getAbsPath(config.Conf.General.RomsPath)
 	entries, err := os.ReadDir(p)
 	if err != nil {
@@ -88,15 +90,8 @@ func NewFileMenu(g *Game, oldId PageId) {
 		}
 	}
 
-	menu.content.RemoveChildren()
-	menu.content.AddChild(elements...)
-	c.AddChild(NewNavBar(g), menu.root)
-	root.AddChild(c)
-
-	g.ui.PageId = PAGE_FILE_SELECT
-	newUi(g, root)
-
-	g.ui.ui.SetFocusedWidget(menu.content.GetFocusers()[0])
+	g.ui.scrollableMenu.content.RemoveChildren()
+	g.ui.scrollableMenu.content.AddChild(elements...)
 }
 
 func getAbsPath(p string) string {
@@ -110,7 +105,7 @@ func getAbsPath(p string) string {
 
 func NewNavBar(g *Game) *widget.Container {
 	ui := g.ui
-	l := g.ui.res.localization.FileMenu
+	l := g.ui.res.localization
 	navbar := newOneCol()
 
 	c := widget.NewContainer(
@@ -126,13 +121,13 @@ func NewNavBar(g *Game) *widget.Container {
 	)
 
 	c.AddChild(dialogInput(&config.Conf.General.RomsPath, func() string {
-		s := utils.OpenDirectory(l.Choose, config.Conf.General.RomsPath, config.Conf.General.RomsPath)
+		s := utils.OpenDirectory(l["file_menu.choose"], config.Conf.General.RomsPath, config.Conf.General.RomsPath)
 		config.Conf.General.RomsPath = s
 		NewFileMenu(g, g.ui.PrevPageId)
 		return s
 	}))
 
-	c.AddChild(NewNavBarButton(ui, l.Up,
+	c.AddChild(NewNavBarButton(ui, l["file_menu.up"],
 		func(args *widget.ButtonClickedEventArgs) {
 			p := getAbsPath(config.Conf.General.RomsPath)
 			p = filepath.Dir(strings.Trim(p, "/"))
@@ -141,7 +136,7 @@ func NewNavBar(g *Game) *widget.Container {
 			NewFileMenu(g, g.ui.PrevPageId)
 		}),
 	)
-	c.AddChild(NewNavBarButton(ui, l.Return,
+	c.AddChild(NewNavBarButton(ui, l["file_menu.return"],
 		func(args *widget.ButtonClickedEventArgs) {
 			switch g.ui.PrevPageId {
 			case PAGE_HOME:
@@ -153,7 +148,7 @@ func NewNavBar(g *Game) *widget.Container {
 			file.Encode()
 		}),
 	)
-	navbar.AddChild(NewHeader(l.OpenRom, ui.res), c)
+	navbar.AddChild(NewHeader(l["file_menu.open_rom"], ui.res), c)
 
 	return navbar
 }
