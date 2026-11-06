@@ -107,7 +107,7 @@ func NewGame(res *Resources) *Game {
 			gamepadIdBuf: make([]ebiten.GamepadID, 0),
 			res:          res,
 			toast:        NewToast(res),
-			// keyboard:     NewKeyboard(res, res.localization.AsSlice("settings.ui.alphabet")),
+			keyboard:     NewKeyboard(res, res.localization.AsSlice("settings.alphabet")),
 		},
 		Bus: bus.NewEventBus(),
 	}

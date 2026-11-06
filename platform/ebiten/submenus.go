@@ -36,6 +36,17 @@ func newRow(stretch []bool) *widget.Container {
 func newOneCol() *widget.Container { return newRow([]bool{true}) }
 func newTwoCol() *widget.Container { return newRow([]bool{false, true}) }
 
+func saveSubMenu(ui *Ui) {
+	file.Encode()
+
+	if len(ui.gamepadIds) != 0 {
+		f := ui.scrollableMenu.content.GetFocusers()
+		ui.ui.SetFocusedWidget(f[len(f)-1])
+	}
+
+	ui.toast.AddMessage(ui.res.localization["toast.saved"])
+}
+
 func NewGeneralMenu(g *Game) *widget.Container {
 	tmp := config.Conf.General
 	l := g.ui.res.localization
@@ -118,13 +129,7 @@ func NewGeneralMenu(g *Game) *widget.Container {
 		g.ui.scrollableMenu.content.RemoveChildren()
 		g.ui.scrollableMenu.content.AddChild(NewGeneralMenu(g))
 
-		file.Encode()
-
-		if len(g.ui.gamepadIds) != 0 {
-			FocusLast(g.ui)
-		}
-
-		g.ui.toast.AddMessage(l["toast.saved"])
+		saveSubMenu(g.ui)
 	}))
 
 	return menu
@@ -169,14 +174,7 @@ func NewUiMenu(g *Game) *widget.Container {
 		g.ui.keyboard = NewKeyboard(g.ui.res, l.AsSlice("settings.alphabet"))
 
 		NewSettings(g, oldId, MENU_UI)
-
-		file.Encode()
-
-		if len(g.ui.gamepadIds) != 0 {
-			FocusLast(g.ui)
-		}
-
-		g.ui.toast.AddMessage(l["toast.saved"])
+		saveSubMenu(g.ui)
 	}))
 
 	return menu
@@ -199,9 +197,7 @@ func NewGbMenu(g *Game) *widget.Container {
 	menu.AddChild(NewHeader(l["settings.general"], g.ui.res), general)
 	general.AddChild(NewLabel(l["settings.system"]), NewRadioInput(&tmp.System, l.AsSlice("settings.systems"), g.ui.res))
 
-	graphics := newTwoCol()
-	menu.AddChild(graphics)
-	graphics.AddChild(NewLabel(l["settings.rotation"]), NewRadioInput(&tmp.Rotation, l.AsSlice("settings.rotations"), g.ui.res))
+	general.AddChild(NewLabel(l["settings.rotation"]), NewRadioInput(&tmp.Rotation, l.AsSlice("settings.rotations"), g.ui.res))
 
 	palette := newTwoCol()
 	menu.AddChild(NewHeader(l["settings.dmg_palette"], g.ui.res), palette)
@@ -225,8 +221,8 @@ func NewGbMenu(g *Game) *widget.Container {
 	bios := newTwoCol()
 	menu.AddChild(NewHeader(l["settings.bios"], g.ui.res), bios)
 	bios.AddChild(
-		NewLabel(l["settings.dmg_path"]), NewFileInput(&tmp.Bios.DmgPath),
-		NewLabel(l["settings.gbc_path"]), NewFileInput(&tmp.Bios.GbcPath),
+		NewLabel(l["settings.dmg_bios_path"]), NewFileInput(&tmp.Bios.DmgPath),
+		NewLabel(l["settings.gbc_bios_path"]), NewFileInput(&tmp.Bios.GbcPath),
 		NewLabel(l["settings.direct_boot"]), NewCheckbox(&tmp.Bios.Direct),
 	)
 
@@ -284,13 +280,7 @@ func NewGbMenu(g *Game) *widget.Container {
 		g.ui.scrollableMenu.content.RemoveChildren()
 		g.ui.scrollableMenu.content.AddChild(NewGbMenu(g))
 
-		file.Encode()
-
-		if len(g.ui.gamepadIds) != 0 {
-			FocusLast(g.ui)
-		}
-
-		g.ui.toast.AddMessage(l["toast.saved"])
+		saveSubMenu(g.ui)
 	}))
 
 	return menu
@@ -317,7 +307,7 @@ func NewGbaMenu(g *Game) *widget.Container {
 		NewLabel(l["settings.backup_type"]), NewRadioInput(&tmp.Hardware.BackupType, l.AsSlice("settings.backup_types"), g.ui.res),
 		NewLabel(l["settings.force_rtc"]), NewCheckbox(&tmp.Hardware.ForceRtc),
 		NewLabel(l["settings.force_solar_sensor"]), NewCheckbox(&tmp.Hardware.ForceSolarSensor),
-		NewLabel(l["solar_sensor_level"]), NewDecimalInput(g.ui, l["solar_sensor_level"], &tmp.Hardware.SolarSensorLevel, 100),
+		NewLabel(l["settings.solar_sensor_level"]), NewDecimalInput(g.ui, l["settings.solar_sensor_level"], &tmp.Hardware.SolarSensorLevel, 100),
 	)
 
 	cc := newTwoCol()
@@ -427,13 +417,7 @@ func NewGbaMenu(g *Game) *widget.Container {
 		g.ui.scrollableMenu.content.RemoveChildren()
 		g.ui.scrollableMenu.content.AddChild(NewGbaMenu(g))
 
-		file.Encode()
-
-		if len(g.ui.gamepadIds) != 0 {
-			FocusLast(g.ui)
-		}
-
-		g.ui.toast.AddMessage(l["toast.saved"])
+		saveSubMenu(g.ui)
 	}))
 
 	return menu
@@ -577,13 +561,7 @@ func NewNdsMenu(g *Game) *widget.Container {
 		g.ui.scrollableMenu.content.RemoveChildren()
 		g.ui.scrollableMenu.content.AddChild(NewNdsMenu(g))
 
-		file.Encode()
-
-		if len(g.ui.gamepadIds) != 0 {
-			FocusLast(g.ui)
-		}
-
-		g.ui.toast.AddMessage(l["toast.saved"])
+		saveSubMenu(g.ui)
 	}))
 
 	return menu

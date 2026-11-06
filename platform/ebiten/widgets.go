@@ -58,13 +58,25 @@ func NewCheckbox(value *bool) widget.PreferredSizeLocateableWidget {
 		state = widget.WidgetChecked
 	}
 
-	return widget.NewCheckbox(
+	c := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewGridLayout(
+			widget.GridLayoutOpts.Columns(2),
+			widget.GridLayoutOpts.Stretch(
+				[]bool{false, true},
+				[]bool{},
+			))))
+
+	checkbox := widget.NewCheckbox(
 		widget.CheckboxOpts.StateChangedHandler(func(args *widget.CheckboxChangedEventArgs) {
 			*value = args.State == widget.WidgetChecked
 		}),
 
 		widget.CheckboxOpts.InitialState(state),
 	)
+
+	c.AddChild(checkbox, NewSeparator())
+
+	return c
 }
 
 func NewTextBoxInput(ui *Ui, board int, label string, value any, validation func(s string) (bool, *string)) *widget.TextInput {
@@ -389,15 +401,51 @@ func dialogInput(v *string, dialogFunc func() string) widget.PreferredSizeLocate
 func NewRadioInput(ptr *int, values []string, res *Resources) widget.PreferredSizeLocateableWidget {
 	radio := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 		)),
 	)
 
+	createRow := func() *widget.Container {
+		return widget.NewContainer(
+			widget.ContainerOpts.Layout(widget.NewRowLayout(
+				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			)),
+		)
+	}
+
+	// NOTE: multiple rows allows for overflow on long button names
+	// uses len of button name, plus rough padding size in chars to calc
+	// VERY VERY ROUGHLY if overflowing
+	// this method is dumb as hell but not super important right now
+
+	rows := []*widget.Container{createRow()}
+
+	maxCnt := 35
+	rowCnts := []int{0}
+
 	bs := []widget.RadioGroupElement{}
-	for i := range values {
+	for i, v := range values {
+
+		currRow := len(rowCnts) - 1
+
+		vWeight := len(v) + 3
+
+		newCnt := rowCnts[currRow] + vWeight
+
+		if newCnt < maxCnt {
+			rowCnts[currRow] = newCnt
+		} else {
+			rowCnts = append(rowCnts, vWeight)
+			rows = append(rows, createRow())
+		}
+
 		b := NewRadioButton(values[i], ptr, i, res)
-		radio.AddChild(b)
+		rows[len(rows)-1].AddChild(b)
 		bs = append(bs, b)
+	}
+
+	for _, row := range rows {
+		radio.AddChild(row)
 	}
 
 	widget.NewRadioGroup(

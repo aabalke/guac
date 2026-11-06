@@ -18,11 +18,23 @@ var dirs = [...]widget.FocusDirection{
 }
 
 func BuildFocus(ui *Ui) {
-	if ui.scrollableMenu != nil && len(ui.gamepadIds) != 0 {
-		KeepFocusedInView(ui)
+	if ui.scrollableMenu != nil && ui.ui.GetFocusedWidget() != nil {
+		ui.scrollableMenu.KeepFocusedInView(ui.ui.GetFocusedWidget().GetWidget())
 	}
 
-	focusers := ui.ui.Container.GetFocusers()
+	var focusers []widget.Focuser
+	if ui.scrollableMenu != nil {
+		all := ui.ui.Container.GetFocusers()
+		sliderWidget := ui.scrollableMenu.slider.GetWidget()
+		focusers = make([]widget.Focuser, 0, len(all))
+		for _, f := range all {
+			if f.GetWidget() != sliderWidget {
+				focusers = append(focusers, f)
+			}
+		}
+	} else {
+		focusers = ui.ui.Container.GetFocusers()
+	}
 
 	for _, f := range focusers {
 		for _, d := range dirs {
@@ -33,59 +45,82 @@ func BuildFocus(ui *Ui) {
 	}
 }
 
-func getFocusNeighbor(curr widget.Focuser, fs []widget.Focuser, d widget.FocusDirection) widget.Focuser {
-	const MAJOR_PRIORITY = 13
-
+func (menu *ScrollableMenu) KeepFocusedInView(focused *widget.Widget) {
 	var (
-		s     = orient(curr.GetWidget().Rect, d)
-		currX = (s.Min.X + s.Max.X) / 2
-		currY = (s.Min.Y + s.Max.Y) / 2
-
-		best       widget.Focuser
-		bestScore  int64
-		bestInBeam bool
+		focusedTop    = focused.Rect.Min.Y
+		focusedBottom = focused.Rect.Max.Y
+		rootTop       = menu.root.GetWidget().Rect.Min.Y
+		rootBottom    = menu.root.GetWidget().Rect.Max.Y
 	)
 
-	for _, cand := range fs {
+	var firstTop int
+	if fs := menu.content.GetFocusers(); len(fs) > 0 {
+		firstTop = menu.content.GetFocusers()[0].GetWidget().Rect.Min.Y
+	} else {
+		firstTop = menu.content.GetWidget().Rect.Min.Y
+	}
 
-		if cand == curr {
+	switch {
+	case focusedTop <= firstTop:
+		menu.slider.Current = menu.slider.Min
+	case focusedTop < rootTop:
+		menu.slider.Current -= rootTop - focusedTop
+	case focusedBottom > rootBottom:
+		menu.slider.Current += focusedBottom - rootBottom
+	}
+}
+
+func getFocusNeighbor(src widget.Focuser, pool []widget.Focuser, d widget.FocusDirection) widget.Focuser {
+	var (
+		s  = orient(src.GetWidget().Rect, d)
+		sx = (s.Min.X + s.Max.X) / 2
+
+		best               widget.Focuser
+		bestScore, bestTie int64
+		bestInBeam         bool
+	)
+
+	for _, cand := range pool {
+		if cand == src {
 			continue
 		}
-
 		w := cand.GetWidget()
-		if hidden := w.Rect.Empty() || !w.IsVisible(); hidden {
+		if w.Rect.Empty() || !w.IsVisible() {
 			continue
 		}
 
 		c := orient(w.Rect, d)
-		candX, candY := (c.Min.X+c.Max.X)/2, (c.Min.Y+c.Max.Y)/2
 
-		if wrongDir := candY <= currY; wrongDir {
+		if c.Max.Y <= s.Max.Y {
 			continue
 		}
 
-		var (
-			major  = int64(max(0, c.Min.Y-s.Max.Y))
-			minor  = int64(abs(candX - currX))
-			inBeam = c.Min.X < s.Max.X && c.Max.X > s.Min.X
-			score  = MAJOR_PRIORITY*major*major + minor*minor
-		)
+		major := int64(max(0, c.Min.Y-s.Max.Y))
 
-		if best == nil {
-			best, bestScore, bestInBeam = cand, score, inBeam
+		minor := int64(max(0, max(c.Min.X-s.Max.X, s.Min.X-c.Max.X)))
+
+		if major > 500 || minor > 500 {
 			continue
 		}
 
-		if !inBeam {
+		inBeam := minor == 0
+
+		const slack = 8
+		if !inBeam && minor > major+slack {
 			continue
 		}
+		score := major*major + minor*minor*4
 
-		if !bestInBeam || score < bestScore {
-			best, bestScore, bestInBeam = cand, score, inBeam
-			continue
+		cx := (c.Min.X + c.Max.X) / 2
+		tie := int64(abs(cx - sx))
+
+		switch {
+		case best == nil,
+			inBeam && !bestInBeam,
+			inBeam == bestInBeam && (score < bestScore || (score == bestScore && tie < bestTie)):
+			best, bestScore, bestTie, bestInBeam = cand, score, tie, inBeam
 		}
 	}
-
 	return best
 }
 
@@ -109,36 +144,6 @@ func abs(v int) int {
 	return v
 }
 
-func KeepFocusedInView(ui *Ui) {
-	if ui.ui == nil || ui.ui.GetFocusedWidget() == nil {
-		return
-	}
-
-	var (
-		focusedTop    = ui.ui.GetFocusedWidget().GetWidget().Rect.Min.Y
-		focusedBottom = ui.ui.GetFocusedWidget().GetWidget().Rect.Max.Y
-		rootTop       = ui.scrollableMenu.root.GetWidget().Rect.Min.Y
-		rootBottom    = ui.scrollableMenu.root.GetWidget().Rect.Max.Y
-	)
-
-	var firstTop int
-	if fs := ui.scrollableMenu.content.GetFocusers(); len(fs) > 0 {
-		firstTop = ui.scrollableMenu.content.GetFocusers()[0].GetWidget().Rect.Min.Y
-	} else {
-		firstTop = ui.scrollableMenu.content.GetWidget().Rect.Min.Y
-	}
-
-	switch {
-	case focusedTop <= firstTop:
-		ui.scrollableMenu.slider.Current = ui.scrollableMenu.slider.Min
-	case focusedTop < rootTop:
-		ui.scrollableMenu.slider.Current -= rootTop - focusedTop
-
-	case focusedBottom > rootBottom:
-		ui.scrollableMenu.slider.Current += focusedBottom - rootBottom
-	}
-}
-
 func DeFocus(ui *Ui) {
 	if ui.ui != nil {
 		ui.ui.ClearFocus()
@@ -146,21 +151,13 @@ func DeFocus(ui *Ui) {
 }
 
 func FocusFirst(ui *Ui) {
-	fs := ui.ui.Container.GetFocusers()
-
-	if len(fs) <= 0 {
-		return
+	if fs := ui.ui.Container.GetFocusers(); len(fs) > 0 {
+		ui.ui.SetFocusedWidget(fs[0])
 	}
-
-	ui.ui.SetFocusedWidget(fs[0])
 }
 
 func FocusLast(ui *Ui) {
-	fs := ui.ui.Container.GetFocusers()
-
-	if len(fs) <= 0 {
-		return
+	if fs := ui.ui.Container.GetFocusers(); len(fs) > 0 {
+		ui.ui.SetFocusedWidget(fs[len(fs)-1])
 	}
-
-	ui.ui.SetFocusedWidget(fs[len(fs)-1])
 }
