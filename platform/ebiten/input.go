@@ -16,7 +16,7 @@ func (g *Game) GetGamepadButtons() (justButtons, buttons []ebiten.StandardGamepa
 
 	for _, id := range g.ui.gamepadIdBuf {
 		fmt.Printf("Gamepad Connected id %d\n", id)
-		g.ui.toast.AddMessage(g.ui.res.localization["toast.controller_connected"])
+		g.ui.toast.Message(g.ui.res.localization["toast.controller_connected"])
 		g.ui.gamepadIds[id] = struct{}{}
 		FocusFirst(g.ui)
 	}
@@ -24,7 +24,7 @@ func (g *Game) GetGamepadButtons() (justButtons, buttons []ebiten.StandardGamepa
 	for id := range g.ui.gamepadIds {
 		if inpututil.IsGamepadJustDisconnected(id) {
 			fmt.Printf("Gamepad Disconnected id %d\n", id)
-			g.ui.toast.AddMessage(g.ui.res.localization["toast.controller_disconnected"])
+			g.ui.toast.Message(g.ui.res.localization["toast.controller_disconnected"])
 			delete(g.ui.gamepadIds, id)
 
 			if len(g.ui.gamepadIds) == 0 {
@@ -86,106 +86,75 @@ func (g *Game) HandleGlobalInputs(justKeys []ebiten.Key, justButtons, buttons []
 func (g *Game) ButtonInput(justButtons, buttons []ebiten.StandardGamepadButton) {
 	buttonConfig := config.Conf.General.Controller
 
-	switch g.ui.PageId {
-	case PAGE_HOME, PAGE_PAUSE:
-		for _, button := range justButtons {
-			switch {
-			case slices.Contains(buttonConfig.Up, button):
-				g.ui.ui.ChangeFocus(widget.FOCUS_NORTH)
+	for _, button := range justButtons {
+		switch {
+		case slices.Contains(buttonConfig.Up, button):
+			g.dirFocus(button, widget.FOCUS_NORTH)
 
-			case slices.Contains(buttonConfig.Down, button):
-				g.ui.ui.ChangeFocus(widget.FOCUS_SOUTH)
+		case slices.Contains(buttonConfig.Down, button):
+			g.dirFocus(button, widget.FOCUS_SOUTH)
 
-			case slices.Contains(buttonConfig.Select, button):
-				if b, ok := g.ui.ui.GetFocusedWidget().(*widget.Button); ok {
-					b.Click()
-				}
-			case slices.Contains(buttonConfig.Return, button):
-				if focusers := g.ui.ui.Container.GetFocusers(); len(focusers) > 0 {
-					g.ui.ui.SetFocusedWidget(focusers[len(focusers)-1])
-				}
-			}
-		}
+		case slices.Contains(buttonConfig.Right, button):
+			g.dirFocus(button, widget.FOCUS_EAST)
 
-	case PAGE_SETTINGS, PAGE_KEYBOARD, PAGE_FILE_SELECT:
+		case slices.Contains(buttonConfig.Left, button):
+			g.dirFocus(button, widget.FOCUS_WEST)
 
-		g.getFastFocus(buttons)
+		case slices.Contains(buttonConfig.Return, button):
+			g.ui.ui.SetFocusedWidget(g.ui.returnFocuser)
 
-		for _, button := range justButtons {
-			switch {
-			case slices.Contains(buttonConfig.Up, button):
-				g.ui.ui.ChangeFocus(widget.FOCUS_NORTH)
-
-			case slices.Contains(buttonConfig.Down, button):
-				g.ui.ui.ChangeFocus(widget.FOCUS_SOUTH)
-
-			case slices.Contains(buttonConfig.Right, button):
-				g.ui.ui.ChangeFocus(widget.FOCUS_EAST)
-
-			case slices.Contains(buttonConfig.Left, button):
-				g.ui.ui.ChangeFocus(widget.FOCUS_WEST)
-
-			case slices.Contains(buttonConfig.Return, button):
-				switch g.ui.PageId {
-				case PAGE_SETTINGS:
-					// TODO: get focus for last in sidebar
-					// g.ui.focus.FocusLastSidebar()
-				case PAGE_KEYBOARD:
-					g.ui.ui.SetFocusedWidget(g.ui.keyboard.cancelButtons[g.ui.keyboard.currBoard])
-				case PAGE_FILE_SELECT:
-					g.ui.ui.SetFocusedWidget(g.ui.ui.Container.GetFocusers()[2]) // navbar return is [2]
-				}
-
-			case slices.Contains(buttonConfig.Select, button):
-				switch w := g.ui.ui.GetFocusedWidget().(type) {
-				case *widget.Button:
-					w.Click()
-				case *widget.Checkbox:
-					w.Click()
-				case *widget.TextInput:
-					w.Submit()
-				}
+		case slices.Contains(buttonConfig.Select, button):
+			switch w := g.ui.ui.GetFocusedWidget().(type) {
+			case *widget.Button:
+				w.Click()
+			case *widget.Checkbox:
+				w.Click()
+			case *widget.TextInput:
+				w.Submit()
 			}
 		}
 	}
 }
 
-var (
-	inputAcc float64
-	inputHz  = 1.0 / 60
-)
+func (g *Game) dirFocus(button ebiten.StandardGamepadButton, dir widget.FocusDirection) {
+	g.ui.ui.ChangeFocus(dir)
 
-func (g *Game) getFastFocus(buttons []ebiten.StandardGamepadButton) {
-	// this set is for scrolling through options quickly with the controller
+	const DELAY = 20
 
-	buttonConfig := config.Conf.General.Controller
-	dt := 1.0 / float64(ebiten.ActualTPS())
-	inputAcc += dt
-
-	if inputAcc < inputHz {
-		return
+	e := &TimedEvent{}
+	switch dir {
+	case widget.FOCUS_NORTH:
+		e.eventType = EVENT_FAST_FOCUS_NORTH
+	case widget.FOCUS_SOUTH:
+		e.eventType = EVENT_FAST_FOCUS_SOUTH
+	case widget.FOCUS_EAST:
+		e.eventType = EVENT_FAST_FOCUS_EAST
+	case widget.FOCUS_WEST:
+		e.eventType = EVENT_FAST_FOCUS_WEST
 	}
 
-	inputAcc -= inputHz
+	g.ui.TimedEvents.CancelEventType(e.eventType)
 
-	for gp := range g.ui.gamepadIds {
-		for _, button := range buttons {
-			if inpututil.StandardGamepadButtonPressDuration(gp, button) < int(60) {
-				continue
-			}
-			switch {
-			case slices.Contains(buttonConfig.Up, button):
-				g.ui.ui.ChangeFocus(widget.FOCUS_NORTH)
+	e.TicksLeft = DELAY
+	e.OnTick = func() {
+		if e.TicksLeft > 1 {
+			return
+		}
 
-			case slices.Contains(buttonConfig.Down, button):
-				g.ui.ui.ChangeFocus(widget.FOCUS_SOUTH)
+		var active bool
 
-			case slices.Contains(buttonConfig.Right, button):
-				g.ui.ui.ChangeFocus(widget.FOCUS_EAST)
-
-			case slices.Contains(buttonConfig.Left, button):
-				g.ui.ui.ChangeFocus(widget.FOCUS_WEST)
+		for gp := range g.ui.gamepadIds {
+			if inpututil.StandardGamepadButtonPressDuration(gp, button) != 0 {
+				active = true
+				break
 			}
 		}
+
+		if active {
+			g.ui.ui.ChangeFocus(dir)
+			e.TicksLeft++
+		}
 	}
+
+	g.ui.TimedEvents.AddEvent(e)
 }

@@ -56,6 +56,8 @@ func NewSettings(g *Game, oldId PageId, initMenu int) {
 	g.ui.PrevPageId = oldId
 	g.ui.PageId = PAGE_SETTINGS
 
+	g.ui.returnFocuser = sidebar.GetFocusers()[len(sidebar.GetFocusers())-1]
+
 	newUi(g, root)
 
 	FocusFirst(g.ui)

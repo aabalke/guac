@@ -46,16 +46,19 @@ type Game struct {
 }
 
 type Ui struct {
-	gamepadIdBuf   []ebiten.GamepadID
-	gamepadIds     map[ebiten.GamepadID]struct{}
-	res            *Resources
-	ui             *ebitenui.UI
-	toast          *Toast
-	scrollableMenu *ScrollableMenu
-	keyboard       *Keyboard
-	ActiveInputs   int
-	PrevPageId     PageId
-	PageId         PageId
+	gamepadIdBuf    []ebiten.GamepadID
+	gamepadIds      map[ebiten.GamepadID]struct{}
+	res             *Resources
+	ui              *ebitenui.UI
+	toast           *Toast
+	scrollableMenu  *ScrollableMenu
+	keyboard        *Keyboard
+	ActiveInputs    int
+	PrevPageId      PageId
+	PageId          PageId
+	TimedEvents     *TimedEventBus
+	returnFocuser   widget.Focuser
+	activeFastFocus bool
 }
 
 type ScrollableMenu struct {
@@ -106,11 +109,13 @@ func NewGame(res *Resources) *Game {
 			gamepadIds:   make(map[ebiten.GamepadID]struct{}),
 			gamepadIdBuf: make([]ebiten.GamepadID, 0),
 			res:          res,
-			toast:        NewToast(res),
-			keyboard:     NewKeyboard(res, res.localization.AsSlice("settings.alphabet")),
+			TimedEvents:  NewTimedEventBus(),
 		},
 		Bus: bus.NewEventBus(),
 	}
+
+	g.ui.toast = NewToast(g.ui)
+	g.ui.keyboard = NewKeyboard(res, &g.ui.returnFocuser, res.localization.AsSlice("settings.alphabet"))
 
 	ebiten.SetVsyncEnabled(config.Conf.General.Vsync)
 
@@ -122,8 +127,6 @@ func (g *Game) Layout(outsideWidth int, outsideHeight int) (int, int) {
 }
 
 func (g *Game) Update() error {
-	g.ui.toast.Update()
-
 	switch {
 	case g.quit:
 		return ebiten.Termination
@@ -188,7 +191,7 @@ func (g *Game) Draw(dst *ebiten.Image) {
 		g.nds.Screen.Draw(dst)
 	}
 
-	if g.ui.toast.enabled {
+	if g.ui.toast.active > 0 {
 		g.ui.toast.ui.Draw(dst)
 	}
 
@@ -248,9 +251,9 @@ func (g *Game) ToggleMute() {
 	})
 
 	if g.muted {
-		g.ui.toast.AddMessage(l["toast.muted"])
+		g.ui.toast.Message(l["toast.muted"])
 	} else {
-		g.ui.toast.AddMessage(l["toast.unmuted"])
+		g.ui.toast.Message(l["toast.unmuted"])
 	}
 }
 
@@ -281,7 +284,7 @@ func (g *Game) InitConsole(file string) bool {
 
 	if romType == utils.NONE_ZIP {
 		// TODO: LOCALIZE
-		g.ui.toast.AddMessage("Invalid Zip File")
+		g.ui.toast.Message("Invalid Zip File")
 	}
 
 	return false

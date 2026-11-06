@@ -44,7 +44,7 @@ func saveSubMenu(ui *Ui) {
 		ui.ui.SetFocusedWidget(f[len(f)-1])
 	}
 
-	ui.toast.AddMessage(ui.res.localization["toast.saved"])
+	ui.toast.Message(ui.res.localization["toast.saved"])
 }
 
 func NewGeneralMenu(g *Game) *widget.Container {
@@ -171,7 +171,7 @@ func NewUiMenu(g *Game) *widget.Container {
 		g.ui.res.localization = NewLocalization(LangOptions(config.Conf.Ui.Language))
 
 		res.Update()
-		g.ui.keyboard = NewKeyboard(g.ui.res, l.AsSlice("settings.alphabet"))
+		g.ui.keyboard = NewKeyboard(g.ui.res, &g.ui.returnFocuser, l.AsSlice("settings.alphabet"))
 
 		NewSettings(g, oldId, MENU_UI)
 		saveSubMenu(g.ui)

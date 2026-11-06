@@ -38,6 +38,8 @@ func NewHome(g *Game) {
 		g.quit = true
 	})
 
+	g.ui.returnFocuser = b3
+
 	root := NewCenteredPage(g.ui.res.bg, b1, b2, b3)
 	g.ui.PageId = PAGE_HOME
 	newUi(g, root)
@@ -63,6 +65,8 @@ func NewPause(g *Game) {
 
 		g.nds, g.gba, g.gb, g.paused = nil, nil, nil, false
 	})
+
+	g.ui.returnFocuser = b3
 
 	root := NewCenteredPage(g.ui.res.bg, b1, b2, b3)
 	g.ui.PageId = PAGE_PAUSE

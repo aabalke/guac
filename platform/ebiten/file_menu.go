@@ -37,11 +37,15 @@ func NewFileMenu(g *Game, oldId PageId) {
 
 	NewFileMenuContent(g)
 
-	c.AddChild(NewNavBar(g), scrollableRoot)
+	navbar := NewNavBar(g)
+
+	c.AddChild(navbar, scrollableRoot)
 	root.AddChild(c)
 
 	g.ui.PrevPageId = oldId
 	g.ui.PageId = PAGE_FILE_SELECT
+
+	g.ui.returnFocuser = navbar.GetFocusers()[len(navbar.GetFocusers())-1]
 
 	newUi(g, root)
 

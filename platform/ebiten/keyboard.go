@@ -48,6 +48,9 @@ type Keyboard struct {
 	main       *widget.Container
 	top        *widget.Container
 
+	returnFocuser       *widget.Focuser
+	callerReturnFocuser widget.Focuser
+
 	boards        [4]*widget.Container
 	cancelButtons [4]widget.Focuser
 	currBoard     int
@@ -55,9 +58,10 @@ type Keyboard struct {
 	res *Resources
 }
 
-func NewKeyboard(res *Resources, alphaKeys []string) *Keyboard {
+func NewKeyboard(res *Resources, returnFocuser *widget.Focuser, alphaKeys []string) *Keyboard {
 	k := &Keyboard{
-		res: res,
+		res:           res,
+		returnFocuser: returnFocuser,
 	}
 
 	k.root = widget.NewContainer(
@@ -277,6 +281,9 @@ func (k *Keyboard) Open(ui *Ui, caller *widget.TextInput, board int, label strin
 
 	k.ui.SetFocusedWidget(k.ui.Container.GetFocusers()[1])
 
+	k.callerReturnFocuser = *k.returnFocuser
+	*k.returnFocuser = k.cancelButtons[board]
+
 	k.currBoard = board
 }
 
@@ -284,6 +291,7 @@ func (k *Keyboard) Close(save bool) {
 	k.ui.Container = k.prev
 	*k.pageId = k.prevPageId
 	k.ui.SetFocusedWidget(k.caller)
+	*k.returnFocuser = k.callerReturnFocuser
 	if save {
 		switch input := k.widget.(type) {
 		case *widget.TextInput:

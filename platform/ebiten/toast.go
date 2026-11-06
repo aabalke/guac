@@ -3,38 +3,48 @@ package ui
 import (
 	"github.com/ebitenui/ebitenui"
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
-const TICKS_PER_TOAST = 60
-
 type Toast struct {
-	enabled  bool
-	duration int
-	ui       *ebitenui.UI
-	res      *Resources
+	active int
+	ui     *ebitenui.UI
+	res    *Resources
+	bus    *TimedEventBus
 }
 
-func NewToast(res *Resources) *Toast {
+func NewToast(ui *Ui) *Toast {
 	return &Toast{
-		res: res,
+		res: ui.res,
 		ui: &ebitenui.UI{
 			Container: widget.NewContainer(
-				widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+				widget.ContainerOpts.Layout(NewStaticLayout()),
 			),
-			PrimaryTheme: NewTheme(res),
+			PrimaryTheme: NewTheme(ui.res),
 		},
+		bus: ui.TimedEvents,
 	}
 }
 
-func (t *Toast) AddMessage(message string) {
+func (t *Toast) Message(message string) {
+	e := &TimedEvent{}
+
+	const DURATION = 120
+	const TRANS_DURATION = 40
+	const POS_DT = 1000
+
+	e.TicksLeft = DURATION
+
+	padding := 16
+	data := &StaticLayoutData{}
+	_, bot := ebiten.WindowSize()
+	data.Position.X = padding - int(POS_DT)
+	data.Position.Y = bot - (padding + buttonInset.Bottom + 36)
+
 	container := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(t.res.sec),
 		widget.ContainerOpts.WidgetOpts(
-			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-				HorizontalPosition: widget.AnchorLayoutPositionStart,
-				VerticalPosition:   widget.AnchorLayoutPositionEnd,
-				Padding:            widget.NewInsetsSimple(16),
-			}),
+			widget.WidgetOpts.LayoutData(data),
 		),
 
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout(
@@ -57,12 +67,40 @@ func (t *Toast) AddMessage(message string) {
 		),
 	))
 
-	t.ui.Container.RemoveChildren()
 	t.ui.Container.AddChild(container)
-	t.duration = TICKS_PER_TOAST
+
+	t.active++
+
+	e.OnTick = func() {
+		if e.TicksLeft > DURATION-TRANS_DURATION {
+			transLast := DURATION - TRANS_DURATION
+			mul := (float32(e.TicksLeft-transLast) / TRANS_DURATION)
+			mul = CalcBezierBlend(mul)
+			data.Position.X = padding - int(POS_DT*mul)
+			t.ui.Container.RequestRelayout()
+		}
+
+		if e.TicksLeft < TRANS_DURATION {
+			transLast := TRANS_DURATION
+			mul := (float32(e.TicksLeft-transLast) / TRANS_DURATION)
+			mul = CalcBezierBlend(mul)
+			data.Position.X = padding - int(POS_DT*mul)
+			t.ui.Container.RequestRelayout()
+		}
+
+		_, bot := ebiten.WindowSize()
+		data.Position.Y = bot - (padding + buttonInset.Bottom + 36)
+	}
+
+	e.OnDone = func() {
+		t.ui.Container.RemoveChild(container)
+		t.active--
+	}
+
+	t.bus.AddEvent(e)
 }
 
-func (t *Toast) Update() {
-	t.enabled = t.duration > 0
-	t.duration--
+// https://stackoverflow.com/questions/13462001/ease-in-and-ease-out-animation-formula
+func CalcBezierBlend(t float32) float32 {
+	return t * t * (3.0 - 2.0*t)
 }
