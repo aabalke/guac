@@ -79,7 +79,7 @@ func NewCheckbox(value *bool) widget.PreferredSizeLocateableWidget {
 	return c
 }
 
-func NewTextBoxInput(ui *Ui, board int, label string, value any, validation func(s string) (bool, *string)) *widget.TextInput {
+func NewTextBoxInput(ui *Ui, board BoardType, label string, value any, validation func(s string) (bool, *string)) *widget.TextInput {
 	var input *widget.TextInput
 
 	input = widget.NewTextInput(
@@ -90,7 +90,7 @@ func NewTextBoxInput(ui *Ui, board int, label string, value any, validation func
 		widget.TextInputOpts.AllowDuplicateSubmit(true),
 
 		widget.TextInputOpts.SubmitHandler(func(*widget.TextInputChangedEventArgs) {
-			ui.keyboard.Open(ui, input, board, label, value, validation)
+			openKeyboard(ui, input, board, label, value, validation)
 		}),
 		widget.TextInputOpts.ChangedHandler(func(args *widget.TextInputChangedEventArgs) {
 			fromString(value, args.InputText)
@@ -207,7 +207,7 @@ func _newBindingInput(ui *Ui, keys *[]ebiten.Key, buttons *[]ebiten.StandardGame
 		for range time.Tick(time.Second) {
 			if count <= 0 {
 				input.takingInputs = false
-				ui.ActiveInputs--
+				ui.ActiveBindingInputs--
 				count = 5
 				clock.Label = strconv.Itoa(count)
 				ui.ui.SetFocusedWidget(appendButton)
@@ -228,7 +228,7 @@ func _newBindingInput(ui *Ui, keys *[]ebiten.Key, buttons *[]ebiten.StandardGame
 		widget.ButtonOpts.TextPadding(&paddingSidesInset),
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
 			input.takingInputs = true
-			ui.ActiveInputs++
+			ui.ActiveBindingInputs++
 			//ui.focus.DeFocus()
 			input.SetFocus(true)
 			clock.GetWidget().SetVisibility(widget.Visibility_Show)
@@ -249,7 +249,7 @@ func _newBindingInput(ui *Ui, keys *[]ebiten.Key, buttons *[]ebiten.StandardGame
 				*buttons = []ebiten.StandardGamepadButton{}
 			}
 			input.takingInputs = false
-			ui.ActiveInputs--
+			ui.ActiveBindingInputs--
 		}),
 	)
 
@@ -299,7 +299,7 @@ func NewColorInput(ui *Ui, label string, v *color.Color, validation func(s strin
 		widget.TextInputOpts.SubmitOnEnter(false),
 		widget.TextInputOpts.AllowDuplicateSubmit(true),
 		widget.TextInputOpts.SubmitHandler(func(*widget.TextInputChangedEventArgs) {
-			ui.keyboard.Open(ui, input, BOARD_HEX, label, v, validation)
+			openKeyboard(ui, input, BOARD_HEX, label, v, validation)
 		}),
 		widget.TextInputOpts.ChangedHandler(func(a *widget.TextInputChangedEventArgs) {
 			*v = utils.HexToColor(a.InputText)

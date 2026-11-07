@@ -46,18 +46,16 @@ type Game struct {
 }
 
 type Ui struct {
-	gamepadIdBuf   []ebiten.GamepadID
-	gamepadIds     map[ebiten.GamepadID]struct{}
-	res            *Resources
-	ui             *ebitenui.UI
-	toast          *Toast
-	scrollableMenu *ScrollableMenu
-	keyboard       *Keyboard
-	ActiveInputs   int
-	PrevPageId     PageId
-	PageId         PageId
-	TimedEvents    *TimedEventBus
-	returnFocuser  widget.Focuser
+	gamepadIdBuf        []ebiten.GamepadID
+	gamepadIds          map[ebiten.GamepadID]struct{}
+	res                 *Resources
+	ui                  *ebitenui.UI
+	toast               *Toast
+	scrollableMenu      *ScrollableMenu
+	ActiveBindingInputs int
+	PageId              PageId
+	TimedEvents         *TimedEventBus
+	returnFocuser       widget.Focuser
 }
 
 type ScrollableMenu struct {
@@ -114,7 +112,6 @@ func NewGame(res *Resources) *Game {
 	}
 
 	g.ui.toast = NewToast(g.ui.TimedEvents, g.ui.res.secClr, g.ui.res.fonts.smallFace)
-	g.ui.keyboard = NewKeyboard(res, &g.ui.returnFocuser, res.localization.AsSlice("settings.alphabet"))
 
 	ebiten.SetVsyncEnabled(config.Conf.General.Vsync)
 
@@ -131,7 +128,7 @@ func (g *Game) Update() error {
 		return ebiten.Termination
 	case g.ui.ui != nil:
 
-		if g.ui.ActiveInputs <= 0 {
+		if g.ui.ActiveBindingInputs <= 0 {
 			justButtons, buttons := g.GetGamepadButtons()
 			g.ButtonInput(justButtons, buttons)
 			justKeys := inpututil.AppendJustPressedKeys([]ebiten.Key{})

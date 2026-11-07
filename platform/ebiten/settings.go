@@ -21,12 +21,7 @@ type SidebarButtonData struct {
 	onClick func(*widget.ButtonClickedEventArgs)
 }
 
-func NewSettings(g *Game, oldId PageId, initMenu int) {
-	root := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(g.ui.res.bg),
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
-	)
-
+func NewSettings(g *Game, prevPageId PageId, initMenu int) {
 	c := widget.NewContainer(
 		widget.ContainerOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
@@ -47,23 +42,18 @@ func NewSettings(g *Game, oldId PageId, initMenu int) {
 	)
 
 	scrollRoot, scrollContainer := NewScrollableContainer(g.ui)
-	buttonDatas := NewSidebarButtonDatas(g, scrollContainer)
+	buttonDatas := NewSidebarButtonDatas(g, scrollContainer, prevPageId)
 	sidebar := NewSidebar(g, buttonDatas, initMenu)
-
 	c.AddChild(sidebar, scrollRoot)
+	root := newUi(g)
 	root.AddChild(c)
 
-	g.ui.PrevPageId = oldId
 	g.ui.PageId = PAGE_SETTINGS
-
 	g.ui.returnFocuser = sidebar.GetFocusers()[len(sidebar.GetFocusers())-1]
-
-	newUi(g, root)
-
 	FocusFirst(g.ui)
 }
 
-func NewSidebarButtonDatas(g *Game, scrollContainer *widget.ScrollContainer) []SidebarButtonData {
+func NewSidebarButtonDatas(g *Game, scrollContainer *widget.ScrollContainer, prevPageId PageId) []SidebarButtonData {
 	l := g.ui.res.localization
 
 	labels := []string{
@@ -76,7 +66,7 @@ func NewSidebarButtonDatas(g *Game, scrollContainer *widget.ScrollContainer) []S
 		l["settings.return"],
 	}
 
-	builderFuncs := []func(g *Game) *widget.Container{
+	builderFuncs := []func(g *Game, prevPageId PageId) *widget.Container{
 		NewGeneralMenu,
 		NewUiMenu,
 		NewGbMenu,
@@ -93,7 +83,7 @@ func NewSidebarButtonDatas(g *Game, scrollContainer *widget.ScrollContainer) []S
 			label: labels[i],
 			onClick: func(*widget.ButtonClickedEventArgs) {
 				g.ui.scrollableMenu.content.RemoveChildren()
-				g.ui.scrollableMenu.content.AddChild(f(g))
+				g.ui.scrollableMenu.content.AddChild(f(g, prevPageId))
 				scrollContainer.ScrollTop = 0
 				g.ui.scrollableMenu.slider.Current = 0
 			},
@@ -104,7 +94,7 @@ func NewSidebarButtonDatas(g *Game, scrollContainer *widget.ScrollContainer) []S
 
 	datas[returnIdx].label = labels[returnIdx]
 
-	switch g.ui.PrevPageId {
+	switch prevPageId {
 	case PAGE_HOME:
 		datas[returnIdx].onClick = func(*widget.ButtonClickedEventArgs) { NewHome(g) }
 	case PAGE_PAUSE:

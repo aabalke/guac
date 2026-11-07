@@ -47,7 +47,7 @@ func saveSubMenu(ui *Ui) {
 	ui.toast.Message(ui.res.localization["toast.saved"])
 }
 
-func NewGeneralMenu(g *Game) *widget.Container {
+func NewGeneralMenu(g *Game, prevPageId PageId) *widget.Container {
 	tmp := config.Conf.General
 	l := g.ui.res.localization
 
@@ -127,7 +127,7 @@ func NewGeneralMenu(g *Game) *widget.Container {
 		ebiten.SetVsyncEnabled(config.Conf.General.Vsync)
 
 		g.ui.scrollableMenu.content.RemoveChildren()
-		g.ui.scrollableMenu.content.AddChild(NewGeneralMenu(g))
+		g.ui.scrollableMenu.content.AddChild(NewGeneralMenu(g, prevPageId))
 
 		saveSubMenu(g.ui)
 	}))
@@ -135,11 +135,10 @@ func NewGeneralMenu(g *Game) *widget.Container {
 	return menu
 }
 
-func NewUiMenu(g *Game) *widget.Container {
+func NewUiMenu(g *Game, prevPageId PageId) *widget.Container {
 	var (
-		res   = g.ui.res
-		tmp   = config.Conf.Ui
-		oldId = g.ui.PrevPageId
+		res = g.ui.res
+		tmp = config.Conf.Ui
 
 		l = g.ui.res.localization
 
@@ -171,16 +170,15 @@ func NewUiMenu(g *Game) *widget.Container {
 		g.ui.res.localization = NewLocalization(LangOptions(config.Conf.Ui.Language))
 
 		res.Update()
-		g.ui.keyboard = NewKeyboard(g.ui.res, &g.ui.returnFocuser, l.AsSlice("settings.alphabet"))
 
-		NewSettings(g, oldId, MENU_UI)
+		NewSettings(g, prevPageId, MENU_UI)
 		saveSubMenu(g.ui)
 	}))
 
 	return menu
 }
 
-func NewGbMenu(g *Game) *widget.Container {
+func NewGbMenu(g *Game, prevPageId PageId) *widget.Container {
 	tmp := config.Conf.Gb
 	l := g.ui.res.localization
 	pal := &tmp.Palette
@@ -278,7 +276,7 @@ func NewGbMenu(g *Game) *widget.Container {
 		}
 
 		g.ui.scrollableMenu.content.RemoveChildren()
-		g.ui.scrollableMenu.content.AddChild(NewGbMenu(g))
+		g.ui.scrollableMenu.content.AddChild(NewGbMenu(g, prevPageId))
 
 		saveSubMenu(g.ui)
 	}))
@@ -286,7 +284,7 @@ func NewGbMenu(g *Game) *widget.Container {
 	return menu
 }
 
-func NewGbaMenu(g *Game) *widget.Container {
+func NewGbaMenu(g *Game, prevPageId PageId) *widget.Container {
 	tmp := config.Conf.Gba
 	l := g.ui.res.localization
 
@@ -415,7 +413,7 @@ func NewGbaMenu(g *Game) *widget.Container {
 		}
 
 		g.ui.scrollableMenu.content.RemoveChildren()
-		g.ui.scrollableMenu.content.AddChild(NewGbaMenu(g))
+		g.ui.scrollableMenu.content.AddChild(NewGbaMenu(g, prevPageId))
 
 		saveSubMenu(g.ui)
 	}))
@@ -423,7 +421,7 @@ func NewGbaMenu(g *Game) *widget.Container {
 	return menu
 }
 
-func NewNdsMenu(g *Game) *widget.Container {
+func NewNdsMenu(g *Game, prevPageId PageId) *widget.Container {
 	tmp := config.Conf.Nds
 	l := g.ui.res.localization
 
@@ -559,7 +557,7 @@ func NewNdsMenu(g *Game) *widget.Container {
 		}
 
 		g.ui.scrollableMenu.content.RemoveChildren()
-		g.ui.scrollableMenu.content.AddChild(NewNdsMenu(g))
+		g.ui.scrollableMenu.content.AddChild(NewNdsMenu(g, prevPageId))
 
 		saveSubMenu(g.ui)
 	}))
@@ -567,7 +565,7 @@ func NewNdsMenu(g *Game) *widget.Container {
 	return menu
 }
 
-func NewAboutMenu(g *Game) *widget.Container {
+func NewAboutMenu(g *Game, prevPageId PageId) *widget.Container {
 	l := g.ui.res.localization
 
 	menu := newMenu()

@@ -11,12 +11,7 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 )
 
-func NewFileMenu(g *Game, oldId PageId) {
-	root := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(g.ui.res.bg),
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
-	)
-
+func NewFileMenu(g *Game, prevPageId PageId) {
 	c := widget.NewContainer(
 		widget.ContainerOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
@@ -34,25 +29,18 @@ func NewFileMenu(g *Game, oldId PageId) {
 	)
 
 	scrollableRoot, _ := NewScrollableContainer(g.ui)
-
-	NewFileMenuContent(g)
-
-	navbar := NewNavBar(g)
-
+	NewFileMenuContent(g, prevPageId)
+	navbar := NewNavBar(g, prevPageId)
 	c.AddChild(navbar, scrollableRoot)
+	root := newUi(g)
 	root.AddChild(c)
 
-	g.ui.PrevPageId = oldId
 	g.ui.PageId = PAGE_FILE_SELECT
-
 	g.ui.returnFocuser = navbar.GetFocusers()[len(navbar.GetFocusers())-1]
-
-	newUi(g, root)
-
 	g.ui.ui.SetFocusedWidget(g.ui.scrollableMenu.content.GetFocusers()[0])
 }
 
-func NewFileMenuContent(g *Game) {
+func NewFileMenuContent(g *Game, prevPageId PageId) {
 	p := getAbsPath(config.Conf.General.RomsPath)
 	entries, err := os.ReadDir(p)
 	if err != nil {
@@ -66,7 +54,7 @@ func NewFileMenuContent(g *Game) {
 				func(bcea *widget.ButtonClickedEventArgs) {
 					p := getAbsPath(config.Conf.General.RomsPath)
 					config.Conf.General.RomsPath = filepath.Join(p, v.Name())
-					NewFileMenu(g, g.ui.PrevPageId)
+					NewFileMenu(g, prevPageId)
 				}))
 			continue
 		}
@@ -107,7 +95,7 @@ func getAbsPath(p string) string {
 	return p
 }
 
-func NewNavBar(g *Game) *widget.Container {
+func NewNavBar(g *Game, prevPageId PageId) *widget.Container {
 	ui := g.ui
 	l := g.ui.res.localization
 	navbar := newOneCol()
@@ -127,7 +115,7 @@ func NewNavBar(g *Game) *widget.Container {
 	c.AddChild(dialogInput(&config.Conf.General.RomsPath, func() string {
 		s := utils.OpenDirectory(l["file_menu.choose"], config.Conf.General.RomsPath, config.Conf.General.RomsPath)
 		config.Conf.General.RomsPath = s
-		NewFileMenu(g, g.ui.PrevPageId)
+		NewFileMenu(g, prevPageId)
 		return s
 	}))
 
@@ -137,12 +125,12 @@ func NewNavBar(g *Game) *widget.Container {
 			p = filepath.Dir(strings.Trim(p, "/"))
 
 			config.Conf.General.RomsPath = p
-			NewFileMenu(g, g.ui.PrevPageId)
+			NewFileMenu(g, prevPageId)
 		}),
 	)
 	c.AddChild(NewNavBarButton(ui, l["file_menu.return"],
 		func(args *widget.ButtonClickedEventArgs) {
-			switch g.ui.PrevPageId {
+			switch prevPageId {
 			case PAGE_HOME:
 				NewHome(g)
 			case PAGE_PAUSE:

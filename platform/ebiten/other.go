@@ -40,9 +40,10 @@ func NewHome(g *Game) {
 
 	g.ui.returnFocuser = b3
 
-	root := NewCenteredPage(g.ui.res.bg, b1, b2, b3)
+	c := NewCenteredPage(g.ui.res.bg, b1, b2, b3)
+	root := newUi(g)
+	root.AddChild(c)
 	g.ui.PageId = PAGE_HOME
-	newUi(g, root)
 }
 
 func NewPause(g *Game) {
@@ -68,17 +69,13 @@ func NewPause(g *Game) {
 
 	g.ui.returnFocuser = b3
 
-	root := NewCenteredPage(g.ui.res.bg, b1, b2, b3)
+	c := NewCenteredPage(g.ui.res.bg, b1, b2, b3)
+	root := newUi(g)
+	root.AddChild(c)
 	g.ui.PageId = PAGE_PAUSE
-	newUi(g, root)
 }
 
 func NewCenteredPage(bg *image.NineSlice, buttons ...*widget.Button) *widget.Container {
-	root := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(bg),
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
-	)
-
 	c := widget.NewContainer(
 		widget.ContainerOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
@@ -98,19 +95,14 @@ func NewCenteredPage(bg *image.NineSlice, buttons ...*widget.Button) *widget.Con
 		c.AddChild(b)
 	}
 
-	root.AddChild(c)
-
-	return root
+	return c
 }
 
 func NewCenteredButton(text string, f func(*widget.ButtonClickedEventArgs)) *widget.Button {
 	return widget.NewButton(
 		widget.ButtonOpts.TextLabel(text),
 		widget.ButtonOpts.WidgetOpts(
-			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-				Stretch: true,
-			}),
-
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
 			widget.WidgetOpts.MinSize(BUTTON_WIDTH, 0),
 		),
 
@@ -118,9 +110,16 @@ func NewCenteredButton(text string, f func(*widget.ButtonClickedEventArgs)) *wid
 	)
 }
 
-func newUi(g *Game, root *widget.Container) {
+func newUi(g *Game) widget.Containerer {
+	root := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(g.ui.res.bg),
+		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+	)
+
 	g.ui.ui = &ebitenui.UI{
 		Container:    root,
 		PrimaryTheme: NewTheme(g.ui.res),
 	}
+
+	return root
 }

@@ -32,7 +32,7 @@ func (t *Toast) Draw(dst *ebiten.Image) {
 func (t *Toast) Message(message string) {
 	const (
 		DURATION       = 120
-		TRANS_DURATION = 40
+		TRANS_DURATION = 20
 	)
 
 	var (
