@@ -1,99 +1,100 @@
 package ui
 
 import (
-	"github.com/ebitenui/ebitenui"
-	"github.com/ebitenui/ebitenui/widget"
+	"image/color"
+
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
 type Toast struct {
-	active int
-	ui     *ebitenui.UI
-	res    *Resources
-	bus    *TimedEventBus
+	active  int
+	face    *text.Face
+	bgClr   *color.Color
+	bus     *TimedEventBus
+	drawers []func(dst *ebiten.Image)
 }
 
-func NewToast(ui *Ui) *Toast {
+func NewToast(bus *TimedEventBus, bgColor *color.Color, face *text.Face) *Toast {
 	return &Toast{
-		res: ui.res,
-		ui: &ebitenui.UI{
-			Container: widget.NewContainer(
-				widget.ContainerOpts.Layout(NewStaticLayout()),
-			),
-			PrimaryTheme: NewTheme(ui.res),
-		},
-		bus: ui.TimedEvents,
+		bus:   bus,
+		bgClr: bgColor,
+		face:  face,
+	}
+}
+
+func (t *Toast) Draw(dst *ebiten.Image) {
+	for i := range t.drawers {
+		t.drawers[i](dst)
 	}
 }
 
 func (t *Toast) Message(message string) {
-	e := &TimedEvent{}
-
-	const DURATION = 120
-	const TRANS_DURATION = 40
-	const POS_DT = 1000
-
-	e.TicksLeft = DURATION
-
-	padding := 16
-	data := &StaticLayoutData{}
-	_, bot := ebiten.WindowSize()
-	data.Position.X = padding - int(POS_DT)
-	data.Position.Y = bot - (padding + buttonInset.Bottom + 36)
-
-	container := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(t.res.sec),
-		widget.ContainerOpts.WidgetOpts(
-			widget.WidgetOpts.LayoutData(data),
-		),
-
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout(
-			widget.AnchorLayoutOpts.Padding(&buttonInset),
-		)),
+	const (
+		DURATION       = 120
+		TRANS_DURATION = 40
 	)
 
-	container.AddChild(widget.NewText(
-		widget.TextOpts.WidgetOpts(
-			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-				HorizontalPosition: widget.AnchorLayoutPositionCenter,
-				VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			}),
-		),
+	var (
+		padding = struct{ L, R, T, B int }{32, 32, 4, 4}
+		margin  = float64(16)
+		tw, th  = text.Measure(message, *t.face, 0)
+		iw, ih  = int(tw) + padding.L + padding.R, int(th) + padding.T + padding.B
+		dt      = float64(iw) + margin + margin
+	)
 
-		widget.TextOpts.Text(
-			message,
-			t.res.fonts.smallFace,
-			*t.res.fgClr,
-		),
-	))
+	img := ebiten.NewImage(iw, ih)
+	img.Fill(*t.bgClr)
 
-	t.ui.Container.AddChild(container)
+	textOpts := &text.DrawOptions{}
+	textOpts.GeoM.Translate(float64(padding.L), float64(padding.T))
+	text.Draw(img, message, *t.face, textOpts)
+
+	opts := &ebiten.DrawImageOptions{}
+	if TRANS_DURATION != 0 {
+		opts.GeoM.Translate(margin-dt, 0)
+	} else {
+		opts.GeoM.Translate(margin, 0)
+	}
+
+	e := &TimedEvent{
+		eventType: EVENT_TOAST,
+		TicksLeft: DURATION,
+	}
+
+	t.drawers = append(t.drawers, func(dst *ebiten.Image) {
+		dy := dst.Bounds().Dy() + (-img.Bounds().Dy() - int(margin))
+		opts.GeoM.Translate(0, float64(dy))
+		dst.DrawImage(img, opts)
+	})
 
 	t.active++
 
 	e.OnTick = func() {
-		if e.TicksLeft > DURATION-TRANS_DURATION {
+		opts.GeoM.Reset()
+
+		if TRANS_DURATION == 0 {
+			opts.GeoM.Translate(margin, 0)
+			return
+		}
+		switch {
+		case e.TicksLeft > DURATION-TRANS_DURATION:
 			transLast := DURATION - TRANS_DURATION
-			mul := (float32(e.TicksLeft-transLast) / TRANS_DURATION)
+			mul := (float64(e.TicksLeft-transLast) / TRANS_DURATION)
 			mul = CalcBezierBlend(mul)
-			data.Position.X = padding - int(POS_DT*mul)
-			t.ui.Container.RequestRelayout()
-		}
-
-		if e.TicksLeft < TRANS_DURATION {
+			opts.GeoM.Translate(margin-(dt*mul), 0)
+		case e.TicksLeft < TRANS_DURATION:
 			transLast := TRANS_DURATION
-			mul := (float32(e.TicksLeft-transLast) / TRANS_DURATION)
+			mul := (float64(e.TicksLeft-transLast) / TRANS_DURATION)
 			mul = CalcBezierBlend(mul)
-			data.Position.X = padding - int(POS_DT*mul)
-			t.ui.Container.RequestRelayout()
+			opts.GeoM.Translate(margin-(dt*mul), 0)
+		default:
+			opts.GeoM.Translate(margin, 0)
 		}
-
-		_, bot := ebiten.WindowSize()
-		data.Position.Y = bot - (padding + buttonInset.Bottom + 36)
 	}
 
 	e.OnDone = func() {
-		t.ui.Container.RemoveChild(container)
+		t.drawers = t.drawers[1:]
 		t.active--
 	}
 
@@ -101,6 +102,6 @@ func (t *Toast) Message(message string) {
 }
 
 // https://stackoverflow.com/questions/13462001/ease-in-and-ease-out-animation-formula
-func CalcBezierBlend(t float32) float32 {
+func CalcBezierBlend(t float64) float64 {
 	return t * t * (3.0 - 2.0*t)
 }

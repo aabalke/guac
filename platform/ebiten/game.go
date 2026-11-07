@@ -46,19 +46,18 @@ type Game struct {
 }
 
 type Ui struct {
-	gamepadIdBuf    []ebiten.GamepadID
-	gamepadIds      map[ebiten.GamepadID]struct{}
-	res             *Resources
-	ui              *ebitenui.UI
-	toast           *Toast
-	scrollableMenu  *ScrollableMenu
-	keyboard        *Keyboard
-	ActiveInputs    int
-	PrevPageId      PageId
-	PageId          PageId
-	TimedEvents     *TimedEventBus
-	returnFocuser   widget.Focuser
-	activeFastFocus bool
+	gamepadIdBuf   []ebiten.GamepadID
+	gamepadIds     map[ebiten.GamepadID]struct{}
+	res            *Resources
+	ui             *ebitenui.UI
+	toast          *Toast
+	scrollableMenu *ScrollableMenu
+	keyboard       *Keyboard
+	ActiveInputs   int
+	PrevPageId     PageId
+	PageId         PageId
+	TimedEvents    *TimedEventBus
+	returnFocuser  widget.Focuser
 }
 
 type ScrollableMenu struct {
@@ -114,7 +113,7 @@ func NewGame(res *Resources) *Game {
 		Bus: bus.NewEventBus(),
 	}
 
-	g.ui.toast = NewToast(g.ui)
+	g.ui.toast = NewToast(g.ui.TimedEvents, g.ui.res.secClr, g.ui.res.fonts.smallFace)
 	g.ui.keyboard = NewKeyboard(res, &g.ui.returnFocuser, res.localization.AsSlice("settings.alphabet"))
 
 	ebiten.SetVsyncEnabled(config.Conf.General.Vsync)
@@ -192,7 +191,7 @@ func (g *Game) Draw(dst *ebiten.Image) {
 	}
 
 	if g.ui.toast.active > 0 {
-		g.ui.toast.ui.Draw(dst)
+		g.ui.toast.Draw(dst)
 	}
 
 	if config.Conf.General.ShowFps {

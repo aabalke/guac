@@ -106,26 +106,14 @@ func NewKeyboard(res *Resources, returnFocuser *widget.Focuser, alphaKeys []stri
 	return k
 }
 
-func (k *Keyboard) buildBoard(idx int, columns int, keys []string) {
-	if columns > 8 {
+func (k *Keyboard) buildBoard(idx, cols int, keys []string) {
+	if cols > 8 {
 		panic("keyboard is not setup to handle more than 8 columns")
 	}
 
-	board := widget.NewContainer(
-		widget.ContainerOpts.WidgetOpts(
-			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-				Position: widget.RowLayoutPositionCenter,
-			}),
-		),
-
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Spacing(4),
-		)),
-	)
-
 	l := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
-			widget.GridLayoutOpts.Columns(columns),
+			widget.GridLayoutOpts.Columns(cols),
 			widget.GridLayoutOpts.Spacing(4, 4),
 			widget.GridLayoutOpts.Stretch(
 				[]bool{true, true, true, true, true, true, true, true},
@@ -134,19 +122,8 @@ func (k *Keyboard) buildBoard(idx int, columns int, keys []string) {
 		)),
 	)
 
-	r := widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewGridLayout(
-			widget.GridLayoutOpts.Columns(1),
-			widget.GridLayoutOpts.Spacing(4, 4),
-			widget.GridLayoutOpts.Stretch(
-				[]bool{true},
-				[]bool{},
-			),
-		)),
-	)
-
 	for _, key := range keys {
-		l.AddChild(k.buildKey(key, 64, func() {
+		l.AddChild(NewKey(k.res, key, 64, func() {
 			switch input := k.widget.(type) {
 			case *widget.TextInput:
 				input.SetText(input.GetText() + key)
@@ -162,24 +139,7 @@ func (k *Keyboard) buildBoard(idx int, columns int, keys []string) {
 		}))
 	}
 
-	keyFocusers := l.GetFocusers()
-	keyCnt := len(keyFocusers)
-	for i := range keyFocusers {
-		if north := i - columns; north >= 0 {
-			keyFocusers[i].AddFocus(widget.FOCUS_NORTH, keyFocusers[north])
-		}
-		if south := i + columns; south < keyCnt {
-			keyFocusers[i].AddFocus(widget.FOCUS_SOUTH, keyFocusers[south])
-		}
-		if west := i - 1; west%columns != columns-1 && west >= 0 {
-			keyFocusers[i].AddFocus(widget.FOCUS_WEST, keyFocusers[west])
-		}
-		if east := i + 1; east%columns != 0 && east < keyCnt {
-			keyFocusers[i].AddFocus(widget.FOCUS_EAST, keyFocusers[east])
-		}
-	}
-
-	backspace := k.buildKey("backspace", 160, func() {
+	backspace := NewKey(k.res, "backspace", 160, func() {
 		switch input := k.widget.(type) {
 		case *widget.TextInput:
 			if s := input.GetText(); len(s) != 0 {
@@ -198,30 +158,42 @@ func (k *Keyboard) buildBoard(idx int, columns int, keys []string) {
 			colorBox.SetBackgroundImage(clr)
 		}
 	})
-	cancel := k.buildKey("cancel", 160, func() { k.Close(false) })
-	enter := k.buildKey("enter", 160, func() { k.Close(true) })
 
-	keyFocusers[columns-1].AddFocus(widget.FOCUS_EAST, backspace)
-	backspace.AddFocus(widget.FOCUS_WEST, keyFocusers[columns-1])
-	backspace.AddFocus(widget.FOCUS_SOUTH, cancel)
+	cancel := NewKey(k.res, "cancel", 160, func() { k.Close(false) })
+	enter := NewKey(k.res, "enter", 160, func() { k.Close(true) })
 
-	keyFocusers[(columns*2)-1].AddFocus(widget.FOCUS_EAST, cancel)
-	cancel.AddFocus(widget.FOCUS_WEST, keyFocusers[(columns*2)-1])
-	cancel.AddFocus(widget.FOCUS_SOUTH, enter)
-	cancel.AddFocus(widget.FOCUS_NORTH, backspace)
-
-	keyFocusers[(columns*3)-1].AddFocus(widget.FOCUS_EAST, enter)
-	enter.AddFocus(widget.FOCUS_WEST, keyFocusers[(columns*3)-1])
-	enter.AddFocus(widget.FOCUS_NORTH, cancel)
+	r := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewGridLayout(
+			widget.GridLayoutOpts.Columns(1),
+			widget.GridLayoutOpts.Spacing(4, 4),
+			widget.GridLayoutOpts.Stretch(
+				[]bool{true},
+				[]bool{},
+			),
+		)),
+	)
 
 	r.AddChild(backspace, cancel, enter)
+
+	board := widget.NewContainer(
+		widget.ContainerOpts.WidgetOpts(
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+				Position: widget.RowLayoutPositionCenter,
+			}),
+		),
+
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Spacing(4),
+		)),
+	)
+
 	board.AddChild(l, r)
 
 	k.boards[idx] = board
 	k.cancelButtons[idx] = cancel
 }
 
-func (k *Keyboard) buildKey(key string, minWidth int, f func()) *widget.Button {
+func NewKey(res *Resources, label string, minWidth int, f func()) *widget.Button {
 	return widget.NewButton(
 		widget.ButtonOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.GridLayoutData{
@@ -232,13 +204,13 @@ func (k *Keyboard) buildKey(key string, minWidth int, f func()) *widget.Button {
 			widget.WidgetOpts.MinSize(minWidth, 64),
 		),
 
-		widget.ButtonOpts.Image(k.res.buttonBorderedImage),
+		widget.ButtonOpts.Image(res.buttonBorderedImage),
 
 		widget.ButtonOpts.Text(
-			key,
-			k.res.fonts.smallFace,
+			label,
+			res.fonts.smallFace,
 			&widget.ButtonTextColor{
-				Idle: *k.res.fgClr,
+				Idle: *res.fgClr,
 			},
 		),
 
