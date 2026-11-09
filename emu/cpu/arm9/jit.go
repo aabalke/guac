@@ -25,6 +25,22 @@ func NewJit(cpu arm7.JittedCpu, mem arm7.Mem, config arm7.JitConfig, ptrs arm7.C
 	}
 }
 
+func (j *Jit) UpdateMetrics(pc, w uint32) {
+	pageIdx := pc >> j.Config.PageShift
+	blockIdx := (pc & j.Config.PageMask) >> 1 // aligned to word for thumb
+
+	if metrics := j.Metrics[pageIdx]; metrics == nil {
+		j.Metrics[pageIdx] = make([]uint32, (1<<j.Config.PageShift)>>1)
+	}
+
+	j.Metrics[pageIdx][blockIdx]++
+	if j.Metrics[pageIdx][blockIdx] <= j.Config.LoopThreshold {
+		return
+	}
+
+	j.CreateBlock(pc, w)
+}
+
 // NOTE: Nosplit directive is not applied on inherited struct methods
 // all methods called by arm9 jit inherited from arm7 must be explicitly added
 

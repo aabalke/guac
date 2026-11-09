@@ -9,7 +9,7 @@ import (
 )
 
 func (j *Jit) EmitBKPT(op uint32) {
-	j.EmitException(arm7.VEC_PREFETCH, arm7.MODE_ABT)
+	j.EmitException(arm7.VEC_PRE, arm7.MODE_ABT)
 	j.EmitCondReloadState(op >> 28)
 }
 

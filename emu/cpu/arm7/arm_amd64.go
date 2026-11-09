@@ -1104,7 +1104,7 @@ func (j *Jit) EmitSWI(op uint32) {
 }
 
 func (j *Jit) EmitUndefined(op uint32) {
-	j.EmitException(VEC_UNDEFINED, MODE_UND)
+	j.EmitException(VEC_UND, MODE_UND)
 	j.EmitCondReloadState(op >> 28)
 }
 

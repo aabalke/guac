@@ -106,10 +106,8 @@ func NewGBA(ctx *audio.Context, path string, muted bool) *GBA {
 		MaxInstCnt:     1024,
 		BlockCnt:       4096,
 		LoopThreshold:  255,
-		Enabled:        true,
+		Enabled:        false,
 	}
-
-	//go Print()
 
 	gba := &GBA{
 		Pixels:       make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4),
@@ -273,9 +271,9 @@ func (gba *GBA) Update() {
 	}
 
 	// TODO: might be better place for this
-	if gba.Cpu.Jit != nil {
-		gba.Cpu.Jit.DeletePages()
-	}
+	//if gba.Cpu.Jit != nil {
+	//	gba.Cpu.Jit.DeletePages()
+	//}
 }
 
 func (gba *GBA) Tick(cycles int64) {
@@ -327,7 +325,7 @@ func (gba *GBA) DirectBoot() {
 }
 
 func (gba *GBA) BiosBoot() {
-	gba.Cpu.Exception(arm7.VEC_RESET, arm7.MODE_SYS)
+	gba.Cpu.Exception(arm7.VEC_RES, arm7.MODE_SYS)
 }
 
 func (gba *GBA) Frame() uint64 {

@@ -151,12 +151,19 @@ func DeFocus(ui *Ui) {
 }
 
 func FocusFirst(ui *Ui) {
+	if ui.ui == nil {
+		return
+	}
 	if fs := ui.ui.Container.GetFocusers(); len(fs) > 0 {
 		ui.ui.SetFocusedWidget(fs[0])
 	}
 }
 
 func FocusLast(ui *Ui) {
+	if ui.ui == nil {
+		return
+	}
+
 	if fs := ui.ui.Container.GetFocusers(); len(fs) > 0 {
 		ui.ui.SetFocusedWidget(fs[len(fs)-1])
 	}

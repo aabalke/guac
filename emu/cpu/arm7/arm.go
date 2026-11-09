@@ -51,6 +51,9 @@ var formatters = []Formatter{
 }
 
 func (c *Cpu) DecodeArm(op uint32) {
+	//inst, _ := c.isa.Decode(bytes.NewReader(binary.BigEndian.AppendUint32([]byte{}, op)))
+	//fmt.Printf("OP %08X %s\n", op, inst[0])
+
 	if cond := op >> 28; !c.Reg.CPSR.CheckCond(cond) {
 		c.Seq = SEQ
 		return
@@ -76,7 +79,7 @@ func (c *Cpu) DecodeArm(op uint32) {
 		case INST_HAL:
 			c.Half(op)
 		case INST_UND:
-			c.Exception(VEC_UNDEFINED, MODE_UND)
+			c.Exception(VEC_UND, MODE_UND)
 		case INST_MRS:
 			c.Mrs(op)
 		case INST_MSR:

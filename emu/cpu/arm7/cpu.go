@@ -1,12 +1,14 @@
 package arm7
 
 import (
+	"encoding/binary"
 	"fmt"
 	"os"
 	"reflect"
 	"unsafe"
 
 	"github.com/aabalke/gojit"
+	"github.com/aabalke/queso"
 	"golang.org/x/exp/constraints"
 )
 
@@ -20,6 +22,7 @@ type Cpu struct {
 	Reg          Reg
 	Op           [2]uint32
 	Seq          uint32
+	Isa          queso.Isa
 	Halted       bool
 	LastWasDma   bool
 	IrqLine      bool
@@ -164,17 +167,17 @@ func ModeBank(mode CpuMode) uint32 {
 type ExceptionVector uint32
 
 const (
-	VEC_RESET     ExceptionVector = 0xFFFF0000
-	VEC_UNDEFINED ExceptionVector = 0xFFFF0004
-	VEC_SWI       ExceptionVector = 0xFFFF0008
-	VEC_PREFETCH  ExceptionVector = 0xFFFF000C
-	VEC_IRQ       ExceptionVector = 0xFFFF0018
-	VEC_FIQ       ExceptionVector = 0xFFFF001C
+	VEC_RES ExceptionVector = 0xFFFF0000
+	VEC_UND ExceptionVector = 0xFFFF0004
+	VEC_SWI ExceptionVector = 0xFFFF0008
+	VEC_PRE ExceptionVector = 0xFFFF000C
+	VEC_IRQ ExceptionVector = 0xFFFF0018
+	VEC_FIQ ExceptionVector = 0xFFFF001C
 )
 
 func (c *Cond) CheckCond(cond uint32) bool {
 	switch cond {
-	case 0xE: // AL (always)
+	case 0xE, 0xF: // AL (always) and RESERVED
 		return true
 	case 0x0: // EQ
 		return c.Z
@@ -204,8 +207,8 @@ func (c *Cond) CheckCond(cond uint32) bool {
 		return !c.Z && (c.N == c.V)
 	case 0xD: // LE
 		return c.Z || (c.N != c.V)
-	default: // NV
-		return false
+	default:
+		panic("not possible")
 	}
 }
 
@@ -215,6 +218,12 @@ func NewCpu(mem Mem, jitConfig JitConfig, cycles func(addr, width, seq uint32, i
 		CyclesFunc: cycles,
 		IdleFunc:   idle,
 		LowVector:  true,
+		Isa: queso.Isa{
+			Arch:            queso.ARMv4T,
+			Order:           binary.BigEndian,
+			RegisterNaming:  queso.ConventionNaming,
+			UndefinedOutput: "unknown",
+		},
 	}
 
 	cpuPtrs := GetCpuPtrs(c)
@@ -345,7 +354,7 @@ func (c *Cpu) Step() {
 	if w == 4 {
 		c.DecodeArm(inst)
 	} else {
-		c.DecodeThumb(uint16(inst))
+		c.DecodeThumb(inst)
 	}
 
 	if c.Reload {
@@ -560,7 +569,7 @@ func (c *Cpu) UseJit[T constraints.Unsigned](op T) {
 
 	switch reflect.TypeOf(op).Kind() {
 	case reflect.Uint16:
-		j.EmitThumb(uint16(op))
+		j.EmitThumb(uint32(uint16(op)))
 	case reflect.Uint32:
 		j.EmitArm(uint32(op))
 	}
@@ -631,11 +640,13 @@ func (c *Cpu) RunJitTest[T constraints.Unsigned](op T) func() {
 			c.Reg.SP == sav.SP &&
 			c.Reg.USR == sav.USR &&
 			c.Timestamp-savStamp == savStamp-staStamp &&
-			c.Reload == savReload); match {
+			c.Reload == savReload &&
+			true); match {
 			return // match
 		}
 
 		s := ""
+		s += fmt.Sprintf("OP %08X\n", uint32(op))
 		s += fmt.Sprintf("STA REG %08X CPSR %08X\n", start.R, start.CPSR.Get())
 		s += fmt.Sprintf("JIT REG %08X CPSR %08X\n", sav.R, sav.CPSR.Get())
 		s += fmt.Sprintf("COR REG %08X CPSR %08X\n", c.Reg.R, c.Reg.CPSR.Get())

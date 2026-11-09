@@ -119,7 +119,7 @@ func (j *Jit) TryEmitOp(data *BlockData) (build bool) {
 		done()
 
 	} else {
-		j.EmitThumb(uint16(op))
+		j.EmitThumb(op)
 	}
 
 	// NOTE: condition branching instructions require ending the block
@@ -232,85 +232,103 @@ func (j *Jit) EmitCond(cond uint32) []func() {
 }
 
 func (j *Jit) EmitArm(op uint32) {
-	switch {
-	case (op>>24)&0xF == 0xF:
-		j.EmitSWI(op)
-	case IsBranch(op):
-		j.EmitBranch(op)
-	case IsBranchExchange(op):
-		j.EmitBranchExchange(op)
-	case IsSdt(op):
-		j.EmitSdt(op)
-	case IsBlock(op):
-		j.EmitBlock(op)
-	case IsHalf(op):
-		j.EmitHalf(op)
-	case IsUndefined(op):
-		j.EmitUndefined(op)
-	case IsMsr(op):
-		j.EmitMsr(op)
-	case IsMrs(op):
-		j.EmitMrs(op)
-	case IsSwp(op):
-		j.EmitSwp(op)
-	case IsMul(op):
-		j.EmitMul(op)
-	case IsAlu(op):
-		j.EmitAlu(op)
-	default:
-		panic(fmt.Sprintf("unemittable amd64 jit instruction ARM OP %08X", op))
+	for decoder, desc := range formatters {
+
+		if (op & desc.Mask) != desc.Match {
+			continue
+		}
+
+		switch Decoder(decoder) {
+		case INST_SVC:
+			j.EmitSWI(op)
+		case INST_BRA:
+			j.EmitBranch(op)
+		case INST_BRX:
+			j.EmitBranchExchange(op)
+		case INST_SDT_IMM, INST_SDT_REG:
+			j.EmitSdt(op)
+		case INST_BLK:
+			j.EmitBlock(op)
+		case INST_HAL:
+			j.EmitHalf(op)
+		case INST_UND:
+			j.EmitUndefined(op)
+		case INST_MRS:
+			j.EmitMrs(op)
+		case INST_MSR:
+			j.EmitMsr(op)
+		case INST_SWP:
+			j.EmitSwp(op)
+		case INST_MUL:
+			j.EmitMul(op)
+		case INST_ALU, INST_ALU_SHIFT_IMM, INST_ALU_SHIFT_REG:
+			j.EmitAlu(op)
+		}
+		return
 	}
+
+	panic(fmt.Sprintf("arm7: decode failed op %08X\n", op))
 }
 
-func (j *Jit) EmitThumb(op uint16) {
-	switch {
-	case IsThumbSWI(op):
-		j.EmitThumbSWI(op)
-	case IsThumbAddSub(op):
-		j.EmitThumbAddSub(op)
-	case IsThumbShift(op):
-		j.EmitThumbShifted(op)
-	case IsThumbImm(op):
-		j.EmitThumbImm(op)
-	case IsThumbAlu(op):
-		j.EmitThumbAlu(op)
-	case IsThumbHiBx(op):
-		j.EmitThumbHiBx(op)
-	case IsThumbHi(op):
-		j.EmitThumbHi(op)
-	case IsLSHalf(op):
-		j.EmitThumbLSHalf(op)
-	case IsThumbLDSH(op):
-		j.EmitThumbLDSH(op)
-	case IsThumbSdt(op):
-		j.EmitThumbSdt(op)
-	case IsLPC(op):
-		j.EmitThumbLPC(op)
-	case IsLSImm(op):
-		j.EmitThumbLSImm(op)
-	case IsPopPc(op):
-		j.EmitThumbPopPc(op)
-	case IsPushPop(op):
-		j.EmitThumbPushPop(op)
-	case IsRelative(op):
-		j.EmitThumbRelative(op)
-	case IsThumbBranch(op):
-		j.EmitThumbBranch(op)
-	case IsJumpCall(op):
-		j.EmitJumpCall(op)
-	case IsStack(op):
-		j.EmitThumbStack(op)
-	case IsLongBranch(op):
-		j.EmitLongBranch(op)
-	case IsShortLongBranch(op):
-		j.EmitShortLongBranch(op)
-	case IsLSSP(op):
-		j.EmitThumbLSSP(op)
-	case IsThumbBlock(op):
-		j.EmitThumbBlock(op)
-	default:
-		panic(fmt.Sprintf("unemittable amd64 jit instruction THUMB OP %04X", op))
+func (j *Jit) EmitThumb(op32 uint32) {
+	op := uint16(op32)
+
+	for decoder, desc := range thumbFormatters {
+
+		if (op32 & desc.Mask) != desc.Match {
+			continue
+		}
+
+		switch Decoder(decoder) {
+		case INST_THUMB_SVC:
+			j.EmitThumbSWI(op)
+		case INST_THUMB_ADD:
+			j.EmitThumbAddSub(op)
+		case INST_THUMB_SHI:
+			j.EmitThumbShifted(op)
+		case INST_THUMB_IMM:
+			j.EmitThumbImm(op)
+		case INST_THUMB_ALU:
+			j.EmitThumbAlu(op)
+		case INST_THUMB_HIBX:
+			j.EmitThumbHiBx(op)
+		case INST_THUMB_HI:
+			j.EmitThumbHi(op)
+		case INST_THUMB_SDTH:
+			j.EmitThumbSdth(op)
+		case INST_THUMB_SDTI:
+			j.EmitThumbSdti(op)
+		case INST_THUMB_SDTR:
+			j.EmitThumbSdtr(op)
+		case INST_THUMB_POPPC:
+			j.EmitThumbPopPc(op)
+		case INST_THUMB_PUS:
+			j.EmitThumbPushPop(op)
+		case INST_THUMB_REL:
+			j.EmitThumbRelative(op)
+		case INST_THUMB_BRA:
+			j.EmitThumbBranch(op)
+		case INST_THUMB_BL_SHORT:
+			j.EmitShortLongBranch(op)
+		case INST_THUMB_BL_LONG:
+			j.EmitLongBranch(op)
+		case INST_THUMB_BLK:
+			j.EmitThumbBlock(op)
+		case INST_THUMB_PCR:
+			j.EmitThumbPCR(op)
+		case INST_THUMB_CBR:
+			j.EmitJumpCall(op)
+		case INST_THUMB_SP:
+			j.EmitThumbSP(op)
+		case INST_THUMB_SPR:
+			j.EmitThumbSPR(op)
+		case INST_THUMB_LDSH:
+			j.EmitThumbLDSH(op)
+		}
+		return
 	}
+
+	panic(fmt.Sprintf("arm7: decode failed op %04X\n", op))
 }
 
 func (j *Jit) EmitToggleThumb() {

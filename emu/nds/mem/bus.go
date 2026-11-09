@@ -420,7 +420,6 @@ func (b *Bus7) InvalidatePage(addr uint32) {
 
 //go:inline
 func (b *Bus9) InvalidatePage(addr uint32) {
-	return
 	// TODO: need to only invalidate pages once if Write32 -> Write16 -> Write8 (instead of 7 times)
 	region := addr >> 24
 

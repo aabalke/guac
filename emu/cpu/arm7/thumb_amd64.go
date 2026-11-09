@@ -6,7 +6,7 @@ import (
 	"github.com/aabalke/gojit"
 )
 
-func (j *Jit) EmitThumbLSSP(op uint16) {
+func (j *Jit) EmitThumbSPR(op uint16) {
 	rd := uint32(op>>8) & 7
 
 	j.Mov(JIT, gojit.Rax)
@@ -33,7 +33,7 @@ func (j *Jit) EmitThumbLSSP(op uint16) {
 	}
 }
 
-func (j *Jit) EmitThumbStack(op uint16) {
+func (j *Jit) EmitThumbSP(op uint16) {
 	// NOTE: not 2s compliment, do not int8 to remove branch
 	nn := int(op&0x7F) << 2
 	if sub := (op>>7)&1 != 0; sub {
@@ -55,7 +55,7 @@ func (j *Jit) EmitThumbRelative(op uint16) {
 	j.Movl(gojit.Eax, j.C.R[uint32(op>>8)&7])
 }
 
-func (j *Jit) EmitThumbLPC(op uint16) {
+func (j *Jit) EmitThumbPCR(op uint16) {
 	var (
 		rd = uint32(op>>8) & 7
 		nn = uint32(op&0xFF) << 2
@@ -72,7 +72,7 @@ func (j *Jit) EmitThumbLPC(op uint16) {
 	j.Movl(gojit.Eax, j.C.R[rd])
 }
 
-func (j *Jit) EmitThumbLSImm(op uint16) {
+func (j *Jit) EmitThumbSdti(op uint16) {
 	var (
 		rd = uint32(op & 7)
 		rb = uint32((op >> 3) & 7)
@@ -119,14 +119,14 @@ func (j *Jit) EmitThumbLSImm(op uint16) {
 	}
 }
 
-func (j *Jit) EmitThumbSdt(op uint16) {
+func (j *Jit) EmitThumbSdtr(op uint16) {
 	rd := uint32(op & 7)
 
 	j.Mov(JIT, gojit.Rax)
 	j.Movl(j.C.R[uint32(op>>3)&7], gojit.Ebx)
 	j.Add(j.C.R[uint32(op>>6)&7], gojit.Ebx)
 
-	switch inst := (op >> 10) & 3; inst {
+	switch inst := (op >> 9) & 7; inst {
 	case THUMB_STR:
 		j.Movl(j.C.R[rd], gojit.Ecx)
 		j.CallFunc((*Jit).Write32)
@@ -193,7 +193,7 @@ func (j *Jit) EmitThumbLDSH(op uint16) {
 	j.Movl(gojit.Eax, j.C.R[rd])
 }
 
-func (j *Jit) EmitThumbLSHalf(op uint16) {
+func (j *Jit) EmitThumbSdth(op uint16) {
 	var (
 		offset = uint32((op >> 6) & 0x1F << 1)
 		rd     = uint32(op) & 7
@@ -321,18 +321,15 @@ func (j *Jit) EmitThumbAlu(op uint16) {
 		// cpsr.C = false
 
 	case THUMB_TST:
-
 		j.Test(gojit.Ebx, gojit.Eax)
 
 	case THUMB_CMN:
 		j.Add(gojit.Ebx, gojit.Eax)
-
 		j.SETcc(gojit.CC_O, j.C.V)
 		j.SETcc(gojit.CC_C, j.C.C)
 
 	case THUMB_CMP:
 		j.Cmp(gojit.Ebx, gojit.Eax)
-		j.Movl(gojit.Eax, j.C.R[rd])
 		j.SETcc(gojit.CC_O, j.C.V)
 		j.SETcc(gojit.CC_NC, j.C.C)
 
@@ -372,13 +369,14 @@ func (j *Jit) EmitThumbAlu(op uint16) {
 
 		if inst == THUMB_ADC {
 			j.Adc(gojit.Ebx, gojit.Eax)
+			j.SETcc(gojit.CC_C, j.C.C)
 		} else {
 			j.Cmc() // compliment carry (reverse for sub)
 			j.Sbb(gojit.Ebx, gojit.Eax)
+			j.SETcc(gojit.CC_NC, j.C.C)
 		}
 
 		j.SETcc(gojit.CC_O, j.C.V)
-		j.SETcc(gojit.CC_NC, j.C.C)
 
 		j.Movl(gojit.Eax, j.C.R[rd])
 

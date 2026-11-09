@@ -83,7 +83,7 @@ func (c *Cpu) DecodeArm(op uint32) {
 		case INST_SVC:
 			c.Exception(arm7.VEC_SWI, arm7.MODE_SWI)
 		case INST_BKP:
-			c.Exception(arm7.VEC_PREFETCH, arm7.MODE_ABT)
+			c.Exception(arm7.VEC_PRE, arm7.MODE_ABT)
 		case INST_CRT:
 			c.CoDataReg(op)
 		case INST_BRA:
@@ -97,7 +97,7 @@ func (c *Cpu) DecodeArm(op uint32) {
 		case INST_HAL:
 			c.Half(op)
 		case INST_UND:
-			c.Exception(arm7.VEC_UNDEFINED, arm7.MODE_UND)
+			c.Exception(arm7.VEC_UND, arm7.MODE_UND)
 		case INST_MRS:
 			c.Mrs(op)
 		case INST_MSR:

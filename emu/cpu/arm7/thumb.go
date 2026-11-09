@@ -73,6 +73,8 @@ func init() {
 func (c *Cpu) DecodeThumb(op32 uint32) {
 	op := uint16(op32)
 
+	//defer c.RunJitTest(op)()
+
 	switch decoder := Decoder(thumbLut[op>>8]); decoder {
 	case INST_THUMB_SVC:
 		c.Exception(VEC_SWI, MODE_SWI)
@@ -89,11 +91,11 @@ func (c *Cpu) DecodeThumb(op32 uint32) {
 	case INST_THUMB_HI:
 		c.ThumbHi(op)
 	case INST_THUMB_SDTH:
-		c.ThumbLSHalf(op)
+		c.ThumbSdth(op)
 	case INST_THUMB_SDTI:
-		c.ThumbLSImm(op)
+		c.ThumbSdti(op)
 	case INST_THUMB_SDTR:
-		c.ThumbSdt(op)
+		c.ThumbSdtr(op)
 	case INST_THUMB_POPPC:
 		c.ThumbPopPc(op)
 	case INST_THUMB_PUS:
@@ -109,13 +111,13 @@ func (c *Cpu) DecodeThumb(op32 uint32) {
 	case INST_THUMB_BLK:
 		c.ThumbBlock(op)
 	case INST_THUMB_PCR:
-		c.ThumbLPC(op)
+		c.ThumbPCR(op)
 	case INST_THUMB_CBR:
 		c.ThumbJumpCalls(op)
 	case INST_THUMB_SP:
-		c.ThumbStack(op)
+		c.ThumbSP(op)
 	case INST_THUMB_SPR:
-		c.ThumbLSSP(op)
+		c.ThumbSPR(op)
 	case INST_THUMB_LDSH:
 		c.ThumbLDSH(op)
 	default:
@@ -406,7 +408,7 @@ func (c *Cpu) ThumbImm(op uint16) {
 	cpsr.Z = uint32(res) == 0
 }
 
-func (c *Cpu) ThumbLSHalf(op uint16) {
+func (c *Cpu) ThumbSdth(op uint16) {
 	var (
 		r    = &c.Reg.R
 		addr = r[(op>>3)&7] + uint32((op>>6)&0x1F<<1)
@@ -432,7 +434,7 @@ const (
 	THUMB_LDSH
 )
 
-func (c *Cpu) ThumbSdt(op uint16) {
+func (c *Cpu) ThumbSdtr(op uint16) {
 	var (
 		r    = &c.Reg.R
 		rd   = op & 7
@@ -474,7 +476,7 @@ func (c *Cpu) ThumbLDSH(op uint16) {
 	r[rd] = uint32(int32(int16(c.Read16(addr))))
 }
 
-func (c *Cpu) ThumbLPC(op uint16) {
+func (c *Cpu) ThumbPCR(op uint16) {
 	c.Reg.R[(op>>8)&7] = c.Read32((c.Reg.R[PC] &^ 3) + uint32(op&0xFF)<<2)
 }
 
@@ -485,7 +487,7 @@ const (
 	THUMB_LDRB_IMM
 )
 
-func (c *Cpu) ThumbLSImm(op uint16) {
+func (c *Cpu) ThumbSdti(op uint16) {
 	var (
 		r    = &c.Reg.R
 		inst = (op >> 11) & 3
@@ -626,7 +628,7 @@ func (c *Cpu) ThumbShifted(op uint16) {
 	c.Reg.R[op&7] = v
 }
 
-func (c *Cpu) ThumbStack(op uint16) {
+func (c *Cpu) ThumbSP(op uint16) {
 	// NOTE: not 2s compliment, do not int8 to remove branch
 	nn := int(op&0x7F) << 2
 	if sub := (op>>7)&1 != 0; sub {
@@ -648,7 +650,7 @@ func (c *Cpu) ThumbShortLongBranch(op uint16) {
 	c.Reload = true
 }
 
-func (c *Cpu) ThumbLSSP(op uint16) {
+func (c *Cpu) ThumbSPR(op uint16) {
 	r := &c.Reg.R
 	rd := (op >> 8) & 7
 	addr := r[SP] + (uint32(op&0xFF) << 2)

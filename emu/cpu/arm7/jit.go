@@ -19,8 +19,7 @@ const (
 
 type Jit struct {
 	*gojit.Assembler
-	Mem Mem
-	//cpu *Cpu
+	Mem          Mem
 	Cpu          JittedCpu
 	C            CpuPtrs
 	Metrics      [][]uint32
@@ -55,7 +54,6 @@ type JittedCpu interface {
 	DoMsrModeSwitch(bool, uint32, uint32)
 	DoLdmLoadSwitch()
 }
-
 type JitConfig struct {
 	AddressSpace   int    // addr space with readable instructions
 	PageShift      uint32 // density of pages, in address space
@@ -186,7 +184,7 @@ func (j *Jit) TryJit(pc uint32) bool {
 	}
 
 	//debug.Vi64[0]++
-	//fmt.Printf("Running Jit PC %08X\n", j.Cpu.(*Cpu).Reg.R[PC])
+	//fmt.Printf("Running Jit PC %08X\n", pc)
 
 	block.F()
 	j.BlockCache.TouchBlock(block)

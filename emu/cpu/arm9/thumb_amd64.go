@@ -6,7 +6,7 @@ import (
 )
 
 func (j *Jit) EmitThumbBKPT(_ uint16) {
-	j.EmitException(arm7.VEC_PREFETCH, arm7.MODE_ABT)
+	j.EmitException(arm7.VEC_PRE, arm7.MODE_ABT)
 	j.ReloadState = arm7.RELOAD
 }
 
@@ -45,8 +45,6 @@ func (j *Jit) EmitThumbHiBx(op uint16) {
 	j.Movl(gojit.Eax, j.C.R[PC])
 
 	j.EmitToggleThumb()
-
-	j.Movb(gojit.Imm(0), j.C.Reload)
 	j.ReloadState = arm7.RELOAD
 }
 

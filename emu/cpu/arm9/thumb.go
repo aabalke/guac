@@ -79,11 +79,13 @@ func init() {
 func (c *Cpu) DecodeThumb(op32 uint32) {
 	op := uint16(op32)
 
+	//defer c.RunJitTest(op)()
+
 	switch decoder := arm7.Decoder(thumbLut[op>>8]); decoder {
 	case INST_THUMB_SVC:
 		c.Exception(arm7.VEC_SWI, arm7.MODE_SWI)
 	case INST_THUMB_BPT:
-		c.Exception(arm7.VEC_PREFETCH, arm7.MODE_ABT)
+		c.Exception(arm7.VEC_PRE, arm7.MODE_ABT)
 	case INST_THUMB_SHORT_BLX:
 		c.ThumbShortBlx(op)
 	case INST_THUMB_ADD:
@@ -99,11 +101,11 @@ func (c *Cpu) DecodeThumb(op32 uint32) {
 	case INST_THUMB_HI:
 		c.ThumbHi(op)
 	case INST_THUMB_SDTH:
-		c.ThumbLSHalf(op)
+		c.ThumbSdth(op)
 	case INST_THUMB_SDTI:
-		c.ThumbLSImm(op)
+		c.ThumbSdti(op)
 	case INST_THUMB_SDTR:
-		c.ThumbSdt(op)
+		c.ThumbSdtr(op)
 	case INST_THUMB_POPPC:
 		c.ThumbPopPc(op)
 	case INST_THUMB_PUS:
@@ -119,13 +121,13 @@ func (c *Cpu) DecodeThumb(op32 uint32) {
 	case INST_THUMB_BLK:
 		c.ThumbBlock(op)
 	case INST_THUMB_PCR:
-		c.ThumbLPC(op)
+		c.ThumbPCR(op)
 	case INST_THUMB_CBR:
 		c.ThumbJumpCalls(op)
 	case INST_THUMB_SP:
-		c.ThumbStack(op)
+		c.ThumbSP(op)
 	case INST_THUMB_SPR:
-		c.ThumbLSSP(op)
+		c.ThumbSPR(op)
 	case INST_THUMB_LDSH:
 		c.ThumbLDSH(op)
 	default:

@@ -51,6 +51,7 @@ func NewCp15(cpu *Cpu) *Cp15 {
 	return c
 }
 
+//go:nosplit
 func (c *Cp15) Read(idx uint32) uint32 {
 	switch idx {
 	case MAIN:
@@ -92,6 +93,7 @@ func (c *Cp15) Read(idx uint32) uint32 {
 	}
 }
 
+//go:nosplit
 func (c *Cp15) Write(idx uint32, v uint32) {
 	//fmt.Printf("ID %03X V %08X\n", idx, v)
 	switch idx {

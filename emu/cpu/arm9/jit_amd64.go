@@ -9,6 +9,10 @@ import (
 )
 
 func (j *Jit) CreateBlock(pc, w uint32) {
+	if w != 2 {
+		return
+	}
+
 	pageIdx := pc >> j.Config.PageShift
 	blockIdx := (pc & j.Config.PageMask) >> 1
 
@@ -38,27 +42,30 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 	j.MovAbs(uint64(uintptr(unsafe.Pointer(j))), arm7.JIT)
 	j.MovAbs(uint64(j.C.Cpu), arm7.CPU)
 
-	// offset for pipelining
-	realPc := (pc - (w * 2)) &^ (w - 1)
-	p := j.Mem.ReadPtr(realPc)
-	if p == nil {
+	data := &j.BlockData
+	data.Set(pc, w)
+
+	c := j.Cpu.(*Cpu)
+	bus := c.Mem
+	if c.Itcm.Readable(c.Reg.R[PC], w) {
+		bus = c.Itcm
+	}
+
+	data.Ptr = bus.ReadPtr(data.RealPc)
+	if data.Ptr == nil {
 		j.BlockCache.PushTail(block)
 		page.Blocks[blockIdx] = j.BlockCache.SkipBlock
 		return
 	}
 
-	var size int
-	for size < j.Config.MaxInstCnt {
-
-		//if reloaded := j.TryEmitOp(p, w, size); reloaded {
-		//	break
-		//}
-
-		size++
-		p = unsafe.Add(p, w)
+	for build := true; build; {
+		build = j.TryEmitOp(data)
+		data.Size++
+		data.BranchSize++
 	}
 
-	if size < j.Config.MinInstCnt {
+	if data.Size < j.Config.MinInstCnt {
+		//fmt.Printf("Rejecting Block Size: %d < %d\n", size, j.Config.MinInstCnt)
 		j.BlockCache.PushTail(block)
 		page.Blocks[blockIdx] = j.BlockCache.SkipBlock
 		return
@@ -71,7 +78,7 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 	}
 
 	block.InitPc = pc
-	block.Size = size
+	block.Size = data.Size
 	block.F = func() {
 		gojit.CallJit(uintptr(unsafe.Pointer(&block.Assembler.Buf[0])))
 	}
@@ -85,109 +92,254 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 	//}
 }
 
-func (j *Jit) EmitArm(op uint32) {
-	// this will have to be placed differently
-	if op>>28 == 0xF {
-		switch {
-		case IsBlx(op):
-			j.EmitBlx(op)
-			return
-		case IsPld(op):
-			panic("unsetup pld instruction")
+func (j *Jit) TryEmitOp(data *arm7.BlockData) (build bool) {
+	op := *(*uint32)(data.Ptr)
+
+	//if data.Pc == 0x0204B0BA {
+	//	fmt.Printf("%04X\n", uint16(op))
+	//}
+
+	irq := j.EmitStep()
+
+	if data.W == 4 {
+
+		conds := j.EmitCond(op >> 28)
+
+		j.EmitArm(op)
+		done := j.JmpForward()
+
+		for _, cond := range conds {
+			cond()
 		}
+
+		j.Movl(gojit.Imm(arm7.SEQ), j.C.Seq)
+
+		done()
+
+	} else {
+		j.EmitThumb(op)
 	}
 
-	switch {
-	case (op>>24)&0xF == 0xF:
-		j.EmitSWI(op)
-	case IsBkpt(op):
-		j.EmitBKPT(op)
-	case IsCoDataReg(op):
-		j.EmitCoDataReg(op)
-	case arm7.IsBranch(op):
-		j.EmitBranch(op)
-	case arm7.IsBranchExchange(op):
-		j.EmitBranchExchange(op)
-	case arm7.IsSdt(op):
-		j.EmitSdt(op)
-	case arm7.IsBlock(op):
-		j.EmitBlock(op)
-	case arm7.IsHalf(op):
-		j.EmitHalf(op)
-	case arm7.IsUndefined(op):
-		j.EmitUndefined(op)
-	case arm7.IsMrs(op):
-		j.EmitMrs(op)
-	case arm7.IsMsr(op):
-		j.EmitMsr(op)
-	case arm7.IsSwp(op):
-		j.EmitSwp(op)
-	case arm7.IsMul(op):
-		j.EmitMul(op)
-	case IsCLZ(op):
-		j.EmitClz(op)
-	case IsQAlu(op):
-		j.EmitQalu(op)
-	case IsExtMul(op):
-		j.EmitExtendedMul(op)
-	case arm7.IsAlu(op):
-		j.EmitAlu(op)
-	default:
-		panic(fmt.Sprintf("unemittable amd64 jit instruction ARM OP %08X", op))
+	// NOTE: condition branching instructions require ending the block
+	// but need to use c.Reload to find out if branch was taken
+	reloadState := j.ReloadState
+	j.ReloadState = arm7.NONE
+	switch reloadState {
+	case arm7.NONE:
+		j.EmitStepPc(data.W)
+		j.EmitPipelineUpdate(data.Ptr, data.W)
+
+		build = data.Size < j.Config.MaxInstCnt
+
+		data.Ptr = unsafe.Add(data.Ptr, data.W)
+
+	case arm7.RELOAD:
+		j.Mov(arm7.JIT, gojit.Rax)
+		j.CallFunc((*Jit).ReloadPipe)
+
+	case arm7.POSSIBLE:
+
+		j.Movb(j.C.Reload, gojit.Al)
+		j.Testb(gojit.Al, gojit.Al)
+
+		reload := j.JccForward(gojit.CC_NZ)
+
+		j.EmitStepPc(data.W)
+		j.EmitPipelineUpdate(data.Ptr, data.W)
+
+		notReload := j.JmpForward()
+		reload()
+
+		j.Mov(arm7.JIT, gojit.Rax)
+		j.CallFunc((*Jit).ReloadPipe)
+
+		notReload()
 	}
+
+	j.Mov(arm7.JIT, gojit.Rax)
+	j.CallFunc((*Jit).StepCleanup)
+
+	irq()
+
+	//if w == 2 {
+	//	fmt.Printf("emitOp PC %08X OP %04X END BLOCK %t\n", pc+(size*w), uint16(op), endBlock)
+	//} else {
+	//	fmt.Printf("emitOp PC %08X OP %08X END BLOCK %t\n", pc+(size*w), op, endBlock)
+	//}
+
+	return build
 }
 
-func (j *Jit) EmitThumb(op uint16) {
-	switch {
-	case IsThumbBkpt(op):
-		j.EmitThumbBKPT(op)
-	case arm7.IsThumbSWI(op):
-		j.EmitThumbSWI(op)
-	case arm7.IsThumbAddSub(op):
-		j.EmitThumbAddSub(op)
-	case arm7.IsThumbShift(op):
-		j.EmitThumbShifted(op)
-	case arm7.IsThumbImm(op):
-		j.EmitThumbImm(op)
-	case arm7.IsThumbAlu(op):
-		j.EmitThumbAlu(op)
-	case arm7.IsThumbHiBx(op):
-		j.EmitThumbHiBx(op)
-	case arm7.IsThumbHi(op):
-		j.EmitThumbHi(op)
-	case arm7.IsLSHalf(op):
-		j.EmitThumbLSHalf(op)
-	case arm7.IsThumbLDSH(op):
-		j.EmitThumbLDSH(op)
-	case arm7.IsThumbSdt(op):
-		j.EmitThumbSdt(op)
-	case arm7.IsLPC(op):
-		j.EmitThumbLPC(op)
-	case arm7.IsLSImm(op):
-		j.EmitThumbLSImm(op)
-	case arm7.IsPopPc(op):
-		j.EmitThumbPopPc(op)
-	case arm7.IsPushPop(op):
-		j.EmitThumbPushPop(op)
-	case arm7.IsRelative(op):
-		j.EmitThumbRelative(op)
-	case arm7.IsThumbBranch(op):
-		j.EmitThumbBranch(op)
-	case arm7.IsJumpCall(op):
-		j.EmitJumpCall(op)
-	case arm7.IsStack(op):
-		j.EmitThumbStack(op)
-	case arm7.IsLongBranch(op):
-		j.EmitLongBranch(op)
-	case arm7.IsShortLongBranch(op):
-		j.EmitShortLongBranch(op)
-	case IsThumbShortBlx(op):
-		j.EmitThumbShortBlx(op)
-	case arm7.IsLSSP(op):
-		j.EmitThumbLSSP(op)
-	case arm7.IsThumbBlock(op):
-		j.EmitThumbBlock(op)
-	default:
-		panic(fmt.Sprintf("unemittable amd64 jit instruction THUMB OP %04X", op))
+func (j *Jit) EmitArm(op uint32) {
+	for decoder, desc := range formatters {
+
+		if (op & desc.Mask) != desc.Match {
+			continue
+		}
+
+		switch arm7.Decoder(decoder) {
+		case INST_BLX:
+			j.EmitBlx(op)
+		case INST_PLD:
+			panic("unsetup pld instruction")
+		case INST_SVC:
+			j.EmitSWI(op)
+		case INST_BKP:
+			j.EmitBKPT(op)
+		case INST_CRT:
+			j.EmitCoDataReg(op)
+		case INST_BRA:
+			j.EmitBranch(op)
+		case INST_BRX:
+			j.EmitBranchExchange(op)
+		case INST_SDT_IMM, INST_SDT_REG:
+			j.EmitSdt(op)
+		case INST_BLK:
+			j.EmitBlock(op)
+		case INST_HAL:
+			j.EmitHalf(op)
+		case INST_UND:
+			j.EmitUndefined(op)
+		case INST_MRS:
+			j.EmitMrs(op)
+		case INST_MSR:
+			j.EmitMsr(op)
+		case INST_SWP:
+			j.EmitSwp(op)
+		case INST_MUL:
+			j.EmitMul(op)
+		case INST_CLZ:
+			j.EmitClz(op)
+		case INST_QAL:
+			j.EmitQalu(op)
+		case INST_HWM:
+			j.EmitExtendedMul(op)
+		case INST_ALU, INST_ALU_SHIFT_IMM, INST_ALU_SHIFT_REG:
+			j.EmitAlu(op)
+		}
+		return
 	}
+
+	panic(fmt.Sprintf("arm9: decode failed op %08X\n", op))
+}
+
+func (j *Jit) EmitThumb(op32 uint32) {
+	op := uint16(op32)
+
+	for decoder, desc := range thumbFormatters {
+
+		if (op32 & desc.Mask) != desc.Match {
+			continue
+		}
+
+		switch arm7.Decoder(decoder) {
+		case INST_THUMB_SVC:
+			j.EmitThumbSWI(op)
+		case INST_THUMB_BPT:
+			j.EmitThumbBKPT(op)
+		case INST_THUMB_SHORT_BLX:
+			j.EmitThumbShortBlx(op)
+		case INST_THUMB_ADD:
+			j.EmitThumbAddSub(op)
+		case INST_THUMB_SHI:
+			j.EmitThumbShifted(op)
+		case INST_THUMB_IMM:
+			j.EmitThumbImm(op)
+		case INST_THUMB_ALU:
+			j.EmitThumbAlu(op)
+		case INST_THUMB_HIBX:
+			j.EmitThumbHiBx(op)
+		case INST_THUMB_HI:
+			j.EmitThumbHi(op)
+		case INST_THUMB_SDTH:
+			j.EmitThumbSdth(op)
+		case INST_THUMB_SDTI:
+			j.EmitThumbSdti(op)
+		case INST_THUMB_SDTR:
+			j.EmitThumbSdtr(op)
+		case INST_THUMB_POPPC:
+			j.EmitThumbPopPc(op)
+		case INST_THUMB_PUS:
+			j.EmitThumbPushPop(op)
+		case INST_THUMB_REL:
+			j.EmitThumbRelative(op)
+		case INST_THUMB_BRA:
+			j.EmitThumbBranch(op)
+		case INST_THUMB_BL_SHORT:
+			j.EmitShortLongBranch(op)
+		case INST_THUMB_BL_LONG:
+			j.EmitLongBranch(op)
+		case INST_THUMB_BLK:
+			j.EmitThumbBlock(op)
+		case INST_THUMB_PCR:
+			j.EmitThumbPCR(op)
+		case INST_THUMB_CBR:
+			j.EmitJumpCall(op)
+		case INST_THUMB_SP:
+			j.EmitThumbSP(op)
+		case INST_THUMB_SPR:
+			j.EmitThumbSPR(op)
+		case INST_THUMB_LDSH:
+			j.EmitThumbLDSH(op)
+		}
+		return
+	}
+
+	panic(fmt.Sprintf("arm9: decode failed op %04X\n", op))
+}
+
+func (j *Jit) EmitStep() func() {
+	j.Movb(j.C.IrqLine, gojit.Al)
+
+	j.Testb(gojit.Al, gojit.Al)
+
+	irq := j.JccForward(gojit.CC_NZ)
+
+	j.Mov(arm7.JIT, gojit.Rax)
+	j.CallFunc((*Jit).StepKindaButNotReally)
+
+	return irq
+}
+
+//go:nosplit
+func (j *Jit) StepKindaButNotReally() {
+	c := j.Cpu.(*Cpu)
+
+	//inst := c.Op[0]
+
+	c.Seq = arm7.SEQ
+	//c.Op[0] = c.Op[1]
+
+	w := uint32(4)
+	if c.Reg.CPSR.T {
+		w = 2
+	}
+
+	//bus := c.Mem
+	//if c.Itcm.Readable(c.Reg.R[PC], w) {
+	//	bus = c.Itcm
+	//}
+
+	if w == 4 || c.Reg.R[PC]&2 == 0 {
+		c.Cycles(c.Reg.R[PC], w, 0, true)
+	}
+
+	//if c.PcPtr == nil {
+	//	if w == 4 {
+	//		c.Op[1] = bus.Read32(c.Reg.R[PC])
+	//	} else {
+	//		c.Op[1] = bus.Read16(c.Reg.R[PC])
+	//	}
+	//} else {
+	//	// 0xFFFF_FFFF uint32, 0xFFFF uint16
+	//	mask := uint32(0xFFFF_FFFF >> ((w & 2) * 8))
+	//	c.Op[1] = *(*uint32)(c.PcPtr) & mask
+	//}
+}
+
+//go:nosplit
+func (j *Jit) StepCleanup() {
+	c := j.Cpu.(*Cpu)
+	c.tick(max(c.InstCycles, c.DataCycles) + c.IdleCycles)
+	c.InstCycles, c.DataCycles, c.IdleCycles = 0, 0, 0
 }

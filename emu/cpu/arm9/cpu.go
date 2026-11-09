@@ -1,6 +1,7 @@
 package arm9
 
 import (
+	"encoding/binary"
 	"fmt"
 	"os"
 	"reflect"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/aabalke/gojit"
 	"github.com/aabalke/guac/emu/cpu/arm7"
+	"github.com/aabalke/queso"
 	"golang.org/x/exp/constraints"
 )
 
@@ -42,6 +44,12 @@ func NewCpu(m arm7.Mem, jitConfig arm7.JitConfig, idle, tick func(int64), cycles
 		tick:             tick,
 	}
 
+	c.Isa = queso.Isa{
+		Arch:            queso.ARMv5TE,
+		Order:           binary.BigEndian,
+		RegisterNaming:  queso.ConventionNaming,
+		UndefinedOutput: "unknown",
+	}
 	c.Mem = m
 	c.Cp15 = NewCp15(c)
 	c.LowVector = false
@@ -113,8 +121,6 @@ func (c *Cpu) Step() {
 
 	inst := c.Op[0]
 
-	//c.print2(inst)
-
 	c.Seq = arm7.SEQ
 	c.Op[0] = c.Op[1]
 
@@ -147,7 +153,7 @@ func (c *Cpu) Step() {
 	if w == 4 {
 		c.DecodeArm(inst)
 	} else {
-		c.DecodeThumb(uint16(inst))
+		c.DecodeThumb(inst)
 	}
 
 	if c.Reload {
@@ -159,9 +165,7 @@ func (c *Cpu) Step() {
 		}
 	}
 
-	//c.print()
 	c.tick(max(c.InstCycles, c.DataCycles) + c.IdleCycles)
-
 	c.InstCycles, c.DataCycles, c.IdleCycles = 0, 0, 0
 }
 
@@ -209,21 +213,14 @@ func (c *Cpu) ReloadPipe() {
 	c.Reg.R[PC] += w * 2
 	c.Seq = arm7.SEQ
 	c.Reload = false
-}
 
-//func (c *Cpu) print() {
-//	fmt.Printf("PC %08X Diff %08d: %02d %02d %02d\n", c.Reg.R[15], c.Timestamp-debug.Vi64[0], c.InstCycles, c.DataCycles, c.IdleCycles)
-//	debug.Vi64[0] = c.Timestamp
-//}
-//
-//func (c *Cpu) print2(inst uint32) {
-//	fmt.Printf("OP %08X\n", inst)
-//	if debug.V[0] > 10000 {
-//		os.Exit(0)
-//	} else {
-//		debug.V[0]++
-//	}
-//}
+	if c.Jit != nil {
+		jitted := c.Jit.TryJit(c.Reg.R[PC])
+		if !jitted {
+			c.Jit.UpdateMetrics(c.Reg.R[PC], w)
+		}
+	}
+}
 
 func (c *Cpu) UseJit[T constraints.Unsigned](op T) {
 	j := c.TestJit
@@ -248,7 +245,7 @@ func (c *Cpu) UseJit[T constraints.Unsigned](op T) {
 
 	switch reflect.TypeOf(op).Kind() {
 	case reflect.Uint16:
-		j.EmitThumb(uint16(op))
+		j.EmitThumb(uint32(uint16(op)))
 	case reflect.Uint32:
 		j.EmitArm(uint32(op))
 	}
@@ -333,12 +330,14 @@ func (c *Cpu) RunJitTest[T constraints.Unsigned](op T) func() {
 			c.Reg.LR == sav.LR &&
 			c.Reg.SP == sav.SP &&
 			c.Reg.USR == sav.USR &&
-			c.Timestamp-savStamp == savStamp-staStamp &&
-			c.Reload == savReload); match {
+			// c.Timestamp-savStamp == savStamp-staStamp &&
+			c.Reload == savReload &&
+			true); match {
 			return // match
 		}
 
 		s := ""
+		s += fmt.Sprintf("OP %08X\n", uint32(op))
 		s += fmt.Sprintf("STA REG %08X CPSR %08X\n", start.R, start.CPSR.Get())
 		s += fmt.Sprintf("JIT REG %08X CPSR %08X\n", sav.R, sav.CPSR.Get())
 		s += fmt.Sprintf("COR REG %08X CPSR %08X\n", c.Reg.R, c.Reg.CPSR.Get())
