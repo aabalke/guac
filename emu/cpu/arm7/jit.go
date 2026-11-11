@@ -34,14 +34,7 @@ type Jit struct {
 }
 
 type JittedCpu interface {
-	Read8(addr uint32) uint32
-	Read16(addr uint32) uint32
-	Read32(addr uint32) uint32
-	Read32Block(addr, seq uint32) uint32
-	Write8(addr uint32, v uint8)
-	Write16(addr uint32, v uint16)
-	Write32(addr, v uint32)
-	Write32Block(addr, v, seq uint32)
+	Bus
 
 	Idle(cycles int64)
 	Cycles(pc, w, seq uint32, inst bool)
@@ -122,9 +115,9 @@ func (j *Jit) InvalidatePage(addr uint32) {
 		return
 	}
 
-	//fmt.Printf("Invalidated Page %08X Addr %08X\n", addr>>j.Config.PageShift, addr)
-
 	page.Dead = true
+
+	//fmt.Printf("Invali: pageIdx %08X\n", pageIdx)
 
 	j.Pages[pageIdx] = nil
 	j.Metrics[pageIdx] = make([]uint32, (1<<j.Config.PageShift)>>1)
@@ -153,7 +146,8 @@ func (j *Jit) DeletePages() {
 
 func (j *Jit) UpdateMetrics(pc, w uint32) {
 	pageIdx := pc >> j.Config.PageShift
-	blockIdx := (pc & j.Config.PageMask) >> 1 // aligned to word for thumb
+	//blockIdx := (pc & j.Config.PageMask) >> 1 // aligned to word for thumb
+	blockIdx := (((pc - (w * 2)) &^ (w - 1)) & j.Config.PageMask) >> 1
 
 	if metrics := j.Metrics[pageIdx]; metrics == nil {
 		j.Metrics[pageIdx] = make([]uint32, (1<<j.Config.PageShift)>>1)
@@ -167,9 +161,10 @@ func (j *Jit) UpdateMetrics(pc, w uint32) {
 	j.CreateBlock(pc, w)
 }
 
-func (j *Jit) TryJit(pc uint32) bool {
+func (j *Jit) TryJit(pc, w uint32) bool {
 	pageIdx := pc >> j.Config.PageShift
-	blockIdx := (pc & j.Config.PageMask) >> 1
+	//blockIdx := (pc & j.Config.PageMask) >> 1
+	blockIdx := (((pc - (w * 2)) &^ (w - 1)) & j.Config.PageMask) >> 1
 
 	page := j.Pages[pageIdx]
 
@@ -183,14 +178,9 @@ func (j *Jit) TryJit(pc uint32) bool {
 		return false
 	}
 
-	//debug.Vi64[0]++
-	//fmt.Printf("Running Jit PC %08X\n", pc)
-
 	block.F()
 	j.BlockCache.TouchBlock(block)
 
-	//fmt.Printf("Running Jit AFTER PC %08X\n", j.Cpu.(*Cpu).Reg.R[PC]-8)
-	//debug.B[0] = true
 	return true
 }
 

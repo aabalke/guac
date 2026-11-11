@@ -32,17 +32,6 @@ type Cpu struct {
 	Leftover     int64
 }
 
-type Bus interface {
-	Read8(addr uint32) uint32
-	Read16(addr uint32) uint32
-	Read32(addr uint32) uint32
-	Read32Block(addr, seq uint32) uint32
-	Write8(addr uint32, v uint8)
-	Write16(addr uint32, v uint16)
-	Write32(addr, v uint32)
-	Write32Block(addr, v, seq uint32)
-}
-
 type Mem interface {
 	Read8(addr uint32) uint32
 	Read16(addr uint32) uint32
@@ -51,6 +40,13 @@ type Mem interface {
 	Write16(addr uint32, v uint16)
 	Write32(addr, v uint32)
 	ReadPtr(addr uint32) unsafe.Pointer
+	WritePtr(addr uint32) unsafe.Pointer
+}
+
+type Bus interface {
+	Mem
+	Read32Block(addr, seq uint32) uint32
+	Write32Block(addr, v, seq uint32)
 }
 
 type Reg struct {
@@ -365,6 +361,20 @@ func (c *Cpu) Step() {
 			c.PcPtr = unsafe.Add(c.PcPtr, w)
 		}
 	}
+
+	if w == 4 && (((inst>>27)&1 != 0) || (inst>>12)&0xF == 0xF) {
+		if c.Jit != nil {
+			w := uint32(4)
+			if c.Reg.CPSR.T {
+				w = 2
+			}
+
+			jitted := c.Jit.TryJit(c.Reg.R[PC], w)
+			if !jitted {
+				c.Jit.UpdateMetrics(c.Reg.R[PC], w)
+			}
+		}
+	}
 }
 
 func (c *Cpu) ReloadPipe() {
@@ -395,12 +405,16 @@ func (c *Cpu) ReloadPipe() {
 	c.Seq = SEQ
 	c.Reload = false
 
-	if c.Jit != nil {
-		jitted := c.Jit.TryJit(c.Reg.R[PC])
-		if !jitted {
-			c.Jit.UpdateMetrics(c.Reg.R[PC], w)
-		}
-	}
+	//if c.Jit != nil {
+	//	w := uint32(4)
+	//	if c.Reg.CPSR.T {
+	//		w = 2
+	//	}
+	//	jitted := c.Jit.TryJit(c.Reg.R[PC], w)
+	//	if !jitted {
+	//		c.Jit.UpdateMetrics(c.Reg.R[PC], w)
+	//	}
+	//}
 }
 
 func (c *Cpu) ReloadPipeSpecial() {
@@ -430,6 +444,15 @@ func (c *Cpu) ReloadPipeSpecial() {
 	c.Reg.R[PC] += w * 2
 	c.Seq = SEQ
 	c.Reload = false
+
+	//w2 := uint32(4)
+	//if c.Reg.CPSR.T {
+	//	w2 = 2
+	//}
+	//jitted := c.Jit.TryJit(c.Reg.R[PC], w2)
+	//if !jitted {
+	//	c.Jit.UpdateMetrics(c.Reg.R[PC], w2)
+	//}
 }
 
 func (c *Cpu) ToggleThumb() {
@@ -452,6 +475,8 @@ func (c *Cpu) Read8(addr uint32) uint32            { return c.Bus.Read8(addr) }
 func (c *Cpu) Read16(addr uint32) uint32           { return c.Bus.Read16(addr) }
 func (c *Cpu) Read32(addr uint32) uint32           { return c.Bus.Read32(addr) }
 func (c *Cpu) Read32Block(addr, seq uint32) uint32 { return c.Bus.Read32Block(addr, seq) }
+func (c *Cpu) ReadPtr(addr uint32) unsafe.Pointer  { panic("not possible") }
+func (c *Cpu) WritePtr(addr uint32) unsafe.Pointer { panic("not possible") }
 
 //go:nosplit
 func idleMul(rs uint32, sign bool) int64 {

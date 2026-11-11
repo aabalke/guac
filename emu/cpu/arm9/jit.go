@@ -44,8 +44,6 @@ func (j *Jit) UpdateMetrics(pc, w uint32) {
 // NOTE: Nosplit directive is not applied on inherited struct methods
 // all methods called by arm9 jit inherited from arm7 must be explicitly added
 
-// TODO: need to check Cond, cpu etc has proper explicit methods
-
 //go:nosplit
 func (j *Jit) Idle(cycles int64) { j.Cpu.Idle(cycles) }
 

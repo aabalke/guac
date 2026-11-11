@@ -63,16 +63,15 @@ type Nds struct {
 	Screen           *Screen
 	dma7             *dma.Dma
 	dma9             *dma.Dma
+	Timings7         *Timings
+	Timings9         *Timings
 	RegisteredEvents RegisteredEvents
 	CyclesPerSndGen  int64
 	Muted            bool
-
-	Timings7, Timings9 *Timings
 }
 
 func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 	pageShift := 16
-	jitEnabled := false
 	jitConfig7 := arm7.JitConfig{
 		AddressSpace:   0x1_0000_0000,
 		PageShift:      uint32(pageShift),
@@ -82,7 +81,7 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 		MaxInstCnt:     1024,
 		BlockCnt:       4096,
 		LoopThreshold:  255,
-		Enabled:        jitEnabled,
+		Enabled:        true,
 	}
 
 	jitConfig9 := arm7.JitConfig{
@@ -94,7 +93,7 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 		MaxInstCnt:     1024,
 		BlockCnt:       4096,
 		LoopThreshold:  255,
-		Enabled:        jitEnabled,
+		Enabled:        !true,
 	}
 
 	nds := &Nds{
@@ -210,6 +209,14 @@ func (nds *Nds) Run(ctx context.Context, eventBus *bus.EventBus) {
 	defer unSubPauseCh()
 	defer unSubSetFpsCh()
 	defer nds.Close()
+
+	if nds.arm7.Jit != nil {
+		defer nds.arm7.Jit.Close()
+	}
+
+	if nds.arm9.Jit != nil {
+		defer nds.arm9.Jit.Close()
+	}
 
 	if nds.mem.Snd.Ctx != nil {
 		nds.CyclesPerSndGen = int64(((float64(CPU_FREQ_HZ) / float64(nds.mem.Snd.Ctx.SampleRate())) * float64(config.Conf.General.TargetFps)) / FPS)

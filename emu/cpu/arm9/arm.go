@@ -38,29 +38,29 @@ const (
 
 // other coprocessor instructions are not necessary since cp15 is a control coprocessor not a data one
 var formatters = []arm7.Formatter{
-	INST_PLD:           {0xFD70_F000, 0xF550_F000},
-	INST_BLX:           {0xFE00_0000, 0xFA00_0000},
-	INST_NV:            {0xF000_0000, 0xF000_0000},
-	INST_BKP:           {0xFFF0_00F0, 0xE120_0070},
-	INST_SVC:           {0x0F00_0000, 0x0F00_0000},
-	INST_BRA:           {0x0E00_0000, 0x0A00_0000},
-	INST_BRX:           {0x0FFF_FF00, 0x012F_FF00},
-	INST_UND:           {0x0E00_0010, 0x0600_0010},
-	INST_MUL:           {0x0F00_00F0, 0x0000_0090},
-	INST_HWM:           {0x0F90_0090, 0x0100_0080},
-	INST_CLZ:           {0x0FFF_0FF0, 0x016F_0F10},
-	INST_QAL:           {0x0F90_0FF0, 0x0100_0050},
-	INST_SWP:           {0x0FB0_0FF0, 0x0100_0090},
-	INST_BLK:           {0x0E00_0000, 0x0800_0000},
-	INST_HAL:           {0x0E00_0090, 0x0000_0090},
-	INST_SDT_REG:       {0x0E00_0010, 0x0600_0000},
-	INST_SDT_IMM:       {0x0E00_0000, 0x0400_0000},
-	INST_ALU:           {0x0E00_0000, 0x0200_0000},
-	INST_ALU_SHIFT_REG: {0x0E00_0090, 0x0000_0010},
-	INST_ALU_SHIFT_IMM: {0x0E00_0010, 0x0000_0000},
-	INST_CRT:           {0x0F00_0010, 0x0E00_0010},
-	INST_MRS:           {0x0FBF_0FFF, 0x010F_0000},
-	INST_MSR:           {0x0DB0_F000, 0x0120_F000},
+	INST_PLD:           {Mask: 0xFD70_F000, Match: 0xF550_F000},
+	INST_BLX:           {Mask: 0xFE00_0000, Match: 0xFA00_0000},
+	INST_NV:            {Mask: 0xF000_0000, Match: 0xF000_0000},
+	INST_BKP:           {Mask: 0xFFF0_00F0, Match: 0xE120_0070},
+	INST_SVC:           {Mask: 0x0F00_0000, Match: 0x0F00_0000},
+	INST_BRA:           {Mask: 0x0E00_0000, Match: 0x0A00_0000},
+	INST_BRX:           {Mask: 0x0FFF_FF00, Match: 0x012F_FF00},
+	INST_UND:           {Mask: 0x0E00_0010, Match: 0x0600_0010},
+	INST_MUL:           {Mask: 0x0F00_00F0, Match: 0x0000_0090},
+	INST_HWM:           {Mask: 0x0F90_0090, Match: 0x0100_0080},
+	INST_CLZ:           {Mask: 0x0FFF_0FF0, Match: 0x016F_0F10},
+	INST_QAL:           {Mask: 0x0F90_0FF0, Match: 0x0100_0050},
+	INST_SWP:           {Mask: 0x0FB0_0FF0, Match: 0x0100_0090},
+	INST_BLK:           {Mask: 0x0E00_0000, Match: 0x0800_0000},
+	INST_HAL:           {Mask: 0x0E00_0090, Match: 0x0000_0090},
+	INST_SDT_REG:       {Mask: 0x0E00_0010, Match: 0x0600_0000},
+	INST_SDT_IMM:       {Mask: 0x0E00_0000, Match: 0x0400_0000},
+	INST_ALU:           {Mask: 0x0E00_0000, Match: 0x0200_0000},
+	INST_ALU_SHIFT_REG: {Mask: 0x0E00_0090, Match: 0x0000_0010},
+	INST_ALU_SHIFT_IMM: {Mask: 0x0E00_0010, Match: 0x0000_0000},
+	INST_CRT:           {Mask: 0x0F00_0010, Match: 0x0E00_0010},
+	INST_MRS:           {Mask: 0x0FBF_0FFF, Match: 0x010F_0000},
+	INST_MSR:           {Mask: 0x0DB0_F000, Match: 0x0120_F000},
 }
 
 func (c *Cpu) DecodeArm(op uint32) {
@@ -116,7 +116,6 @@ func (c *Cpu) DecodeArm(op uint32) {
 			c.Alu(op)
 		case INST_NV:
 			c.Seq = arm7.SEQ
-			return
 		}
 		return
 	}

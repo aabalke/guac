@@ -26,7 +26,7 @@ func (bd *BlockData) Set(pc, w uint32) {
 
 func (j *Jit) CreateBlock(pc, w uint32) {
 	pageIdx := pc >> j.Config.PageShift
-	blockIdx := (pc & j.Config.PageMask) >> 1
+	blockIdx := (((pc - (w * 2)) &^ (w - 1)) & j.Config.PageMask) >> 1
 
 	page := j.Pages[pageIdx]
 	if page == nil {
@@ -71,7 +71,6 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 	}
 
 	if data.Size < j.Config.MinInstCnt {
-		//fmt.Printf("Rejecting Block Size: %d < %d\n", size, j.Config.MinInstCnt)
 		j.BlockCache.PushTail(block)
 		page.Blocks[blockIdx] = j.BlockCache.SkipBlock
 		return
@@ -89,13 +88,9 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 		gojit.CallJit(uintptr(unsafe.Pointer(&block.Assembler.Buf[0])))
 	}
 
-	page.Blocks[blockIdx] = block
+	//fmt.Printf("Create: pageIdx %08X blockIdx %08X Size:%02d Pc:%08X W:%d\n", pageIdx, blockIdx, data.Size-1, data.RealPc, data.W)
 
-	//if w == 2 {
-	//	fmt.Printf("Block Created for Page %08X PC %08X END PC %08X SIZE %08d\n", pageIdx, pc, data.Pc, data.Size)
-	//} else {
-	//	fmt.Printf("Block Created for Page %08X PC %08X END PC %08X SIZE %08d\n", pageIdx, pc, data.Pc, data.Size)
-	//}
+	page.Blocks[blockIdx] = block
 }
 
 func (j *Jit) TryEmitOp(data *BlockData) (build bool) {
@@ -130,10 +125,9 @@ func (j *Jit) TryEmitOp(data *BlockData) (build bool) {
 	case NONE:
 		j.EmitStepPc(data.W)
 		j.EmitPipelineUpdate(data.Ptr, data.W)
+		data.Ptr = unsafe.Add(data.Ptr, data.W)
 
 		build = data.Size < j.Config.MaxInstCnt
-
-		data.Ptr = unsafe.Add(data.Ptr, data.W)
 
 	case RELOAD:
 		j.Mov(JIT, gojit.Rax)
@@ -148,6 +142,7 @@ func (j *Jit) TryEmitOp(data *BlockData) (build bool) {
 
 		j.EmitStepPc(data.W)
 		j.EmitPipelineUpdate(data.Ptr, data.W)
+		data.Ptr = unsafe.Add(data.Ptr, data.W)
 
 		notReload := j.JmpForward()
 		reload()
@@ -159,12 +154,6 @@ func (j *Jit) TryEmitOp(data *BlockData) (build bool) {
 	}
 
 	irq()
-
-	//if w == 2 {
-	//	fmt.Printf("emitOp PC %08X OP %04X END BLOCK %t\n", pc+(size*w), uint16(op), endBlock)
-	//} else {
-	//	fmt.Printf("emitOp PC %08X OP %08X END BLOCK %t\n", pc+(size*w), op, endBlock)
-	//}
 
 	return build
 }

@@ -1,5 +1,7 @@
 package arm7
 
+import "unsafe"
+
 type Bus7 struct {
 	c *Cpu
 }
@@ -59,3 +61,6 @@ func (b *Bus7) Read32Block(addr, seq uint32) uint32 {
 	b.c.LastWasDma = false
 	return v
 }
+
+func (b *Bus7) ReadPtr(addr uint32) unsafe.Pointer  { panic("not possible") }
+func (b *Bus7) WritePtr(addr uint32) unsafe.Pointer { panic("not possible") }

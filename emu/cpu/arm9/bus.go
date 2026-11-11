@@ -1,6 +1,8 @@
 package arm9
 
 import (
+	"unsafe"
+
 	"github.com/aabalke/guac/emu/cpu/arm7"
 )
 
@@ -138,3 +140,6 @@ func (b *Bus9) Read32Block(addr, seq uint32) uint32 {
 	b.c.Cycles(addr, 4, seq, false)
 	return b.c.Mem.Read32(addr)
 }
+
+func (b *Bus9) ReadPtr(addr uint32) unsafe.Pointer  { panic("not possible") }
+func (b *Bus9) WritePtr(addr uint32) unsafe.Pointer { panic("not possible") }

@@ -9,10 +9,6 @@ import (
 )
 
 func (j *Jit) CreateBlock(pc, w uint32) {
-	if w != 2 {
-		return
-	}
-
 	pageIdx := pc >> j.Config.PageShift
 	blockIdx := (pc & j.Config.PageMask) >> 1
 
@@ -65,7 +61,6 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 	}
 
 	if data.Size < j.Config.MinInstCnt {
-		//fmt.Printf("Rejecting Block Size: %d < %d\n", size, j.Config.MinInstCnt)
 		j.BlockCache.PushTail(block)
 		page.Blocks[blockIdx] = j.BlockCache.SkipBlock
 		return
@@ -84,20 +79,10 @@ func (j *Jit) CreateBlock(pc, w uint32) {
 	}
 
 	page.Blocks[blockIdx] = block
-
-	//if w == 2 {
-	//	fmt.Printf("Block Created for Page %08X PC %08X EXIT PC %08X OP %04X\n", pageIdx, pc, tempPc, uint16(op))
-	//} else {
-	//	fmt.Printf("Block Created for Page %08X PC %08X EXIT PC %08X OP %08X\n", pageIdx, pc, tempPc, op)
-	//}
 }
 
 func (j *Jit) TryEmitOp(data *arm7.BlockData) (build bool) {
 	op := *(*uint32)(data.Ptr)
-
-	//if data.Pc == 0x0204B0BA {
-	//	fmt.Printf("%04X\n", uint16(op))
-	//}
 
 	irq := j.EmitStep()
 
@@ -160,12 +145,6 @@ func (j *Jit) TryEmitOp(data *arm7.BlockData) (build bool) {
 	j.CallFunc((*Jit).StepCleanup)
 
 	irq()
-
-	//if w == 2 {
-	//	fmt.Printf("emitOp PC %08X OP %04X END BLOCK %t\n", pc+(size*w), uint16(op), endBlock)
-	//} else {
-	//	fmt.Printf("emitOp PC %08X OP %08X END BLOCK %t\n", pc+(size*w), op, endBlock)
-	//}
 
 	return build
 }
@@ -305,36 +284,16 @@ func (j *Jit) EmitStep() func() {
 func (j *Jit) StepKindaButNotReally() {
 	c := j.Cpu.(*Cpu)
 
-	//inst := c.Op[0]
-
 	c.Seq = arm7.SEQ
-	//c.Op[0] = c.Op[1]
 
 	w := uint32(4)
 	if c.Reg.CPSR.T {
 		w = 2
 	}
 
-	//bus := c.Mem
-	//if c.Itcm.Readable(c.Reg.R[PC], w) {
-	//	bus = c.Itcm
-	//}
-
 	if w == 4 || c.Reg.R[PC]&2 == 0 {
 		c.Cycles(c.Reg.R[PC], w, 0, true)
 	}
-
-	//if c.PcPtr == nil {
-	//	if w == 4 {
-	//		c.Op[1] = bus.Read32(c.Reg.R[PC])
-	//	} else {
-	//		c.Op[1] = bus.Read16(c.Reg.R[PC])
-	//	}
-	//} else {
-	//	// 0xFFFF_FFFF uint32, 0xFFFF uint16
-	//	mask := uint32(0xFFFF_FFFF >> ((w & 2) * 8))
-	//	c.Op[1] = *(*uint32)(c.PcPtr) & mask
-	//}
 }
 
 //go:nosplit

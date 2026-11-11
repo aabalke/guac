@@ -1068,10 +1068,6 @@ func (j *Jit) EmitBranch(op uint32) {
 	j.Add(gojit.Imm(int32(uint32((int32(op)<<8)>>6))), j.C.R[PC])
 
 	j.EmitCondReloadState(op >> 28)
-
-	if op>>28 == 0xE {
-		j.ReloadState = RELOAD
-	}
 }
 
 func (j *Jit) EmitBranchExchange(op uint32) {
@@ -1117,6 +1113,7 @@ func (j *Jit) EmitCondReloadState(cond uint32) {
 		j.ReloadState = NONE
 		j.Movb(gojit.Imm(0), j.C.Reload)
 	default:
+		// we know a reload is called since cond is handled separately
 		j.ReloadState = POSSIBLE
 		j.Movb(gojit.Imm(1), j.C.Reload)
 	}
