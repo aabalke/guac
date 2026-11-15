@@ -137,12 +137,9 @@ func (c *Cpu) DecodeThumb(op32 uint32) {
 
 func (c *Cpu) ThumbShortBlx(op uint16) {
 	r := &c.Reg.R
-
-	nn := uint32(op&0x7FF) << 1
-	tmp := (r[PC] - 2) | 1
-	r[PC] = r[LR] + nn
-	r[LR] = tmp
-
+	ret := (r[PC] - 2) | 1
+	r[PC] = r[LR] + (uint32(op&0x7FF) << 1)
+	r[LR] = ret
 	c.ToggleThumb()
 }
 

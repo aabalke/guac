@@ -54,7 +54,7 @@ func (b *Bus9) ReadIO(addr uint32) uint8 {
 	case 0x106D:
 		return mem.Ppu.EngineB.MasterBright.Read(1)
 
-	case 0x180, 0x81:
+	case 0x180, 0x181:
 		return mem.Ipc.ReadSync(uint8(addr&1), true)
 	case 0x184, 0x185, 0x186, 0x187:
 		return mem.Ipc.ReadCnt(uint8(addr&3), true)
@@ -263,7 +263,7 @@ func (b *Bus7) ReadIO(addr uint32) uint8 {
 	case 0x139, 0x13A, 0x13B:
 		return 0
 
-	case 0x180, 0x81:
+	case 0x180, 0x181:
 		return mem.Ipc.ReadSync(uint8(addr&1), false)
 	case 0x184, 0x185, 0x186, 0x187:
 		return mem.Ipc.ReadCnt(uint8(addr&3), false)

@@ -215,7 +215,7 @@ func (c *Cpu) ReloadPipe() {
 	c.Reload = false
 
 	if c.Jit != nil {
-		jitted := c.Jit.TryJit(c.Reg.R[PC])
+		jitted := c.Jit.TryJit(c.Reg.R[PC], w)
 		if !jitted {
 			c.Jit.UpdateMetrics(c.Reg.R[PC], w)
 		}
