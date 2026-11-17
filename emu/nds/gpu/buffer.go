@@ -1,4 +1,4 @@
-package rast
+package gpu
 
 type Buffers struct {
 	A, B         Buffer

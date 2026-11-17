@@ -1,7 +1,7 @@
-package rast
+package gpu
 
 import (
-	"github.com/aabalke/guac/emu/nds/rast/gl"
+	"github.com/aabalke/guac/emu/nds/gpu/gl"
 )
 
 type TextureCache map[key]*[]gl.Color

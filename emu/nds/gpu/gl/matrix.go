@@ -1,5 +1,7 @@
 package gl
 
+import "unsafe"
+
 type Matrix struct {
 	X00, X01, X02, X03 float32
 	X10, X11, X12, X13 float32
@@ -7,7 +9,9 @@ type Matrix struct {
 	X30, X31, X32, X33 float32
 }
 
-type MatrixArray [16]float32
+func AsArray(m *Matrix) *[16]float32 {
+	return (*[16]float32)(unsafe.Pointer(m))
+}
 
 func Identity() Matrix {
 	return Matrix{

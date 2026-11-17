@@ -284,7 +284,7 @@ func (nds *Nds) Update() {
 
 			nds.CheckGeoDmas()
 
-			if nds.ppu.Rasterizer.GeoEngine.GxStat.FifoIrq != 0 {
+			if nds.ppu.Rasterizer.GeoEngine.FifoIrq != 0 {
 				nds.irq9.SetIRQ(irq.IRQ_GEO_CMD_FIFO)
 			}
 		}

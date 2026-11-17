@@ -1,10 +1,9 @@
-package rast
+package gpu
 
 import (
 	"fmt"
-	"unsafe"
 
-	"github.com/aabalke/guac/emu/nds/rast/gl"
+	"github.com/aabalke/guac/emu/nds/gpu/gl"
 	"github.com/aabalke/guac/utils"
 )
 
@@ -34,8 +33,41 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
 	case 0x62, 0x63:
 		return 0
 
-	case 0x600, 0x601, 0x602, 0x603:
-		return r.GeoEngine.GxStat.Read(addr & 3)
+	case 0x600:
+		if r.GeoEngine.TestInView {
+			return 1 << 1
+		}
+		return 0
+
+	case 0x601:
+		v := uint8(*r.GeoEngine.MtxStacks.Stacks[1].ptr) & 0x1F
+		v |= uint8(*r.GeoEngine.MtxStacks.Stacks[0].ptr) << 5
+
+		if r.GeoEngine.StackOverflow {
+			v |= 1 << 7
+		}
+
+		return v
+
+	case 0x602:
+		v := uint8(r.GeoEngine.FifoEntries)
+		return v
+
+	case 0x603:
+
+		v := uint8(r.GeoEngine.FifoEntries >> 8)
+
+		if underHalf := r.GeoEngine.FifoEntries < 128; underHalf {
+			v |= 1 << 1
+		}
+
+		if empty := r.GeoEngine.FifoEntries == 0; empty {
+			v |= 1 << 2
+		}
+
+		v |= r.GeoEngine.FifoIrq << 5
+		return v
+
 	case 0x604:
 
 		buf := &r.GeoEngine.Buffers.A
@@ -102,13 +134,13 @@ func (r *Rasterizer) ReadVecTest(addr uint32) uint8 {
 }
 
 func (r *Rasterizer) ReadClipMtx(addr uint32) uint8 {
-	arr := (*gl.MatrixArray)(unsafe.Pointer(&r.GeoEngine.ClipMatrix))
+	arr := gl.AsArray(&r.GeoEngine.ClipMatrix)
 	i := addr - 0x680
 	return uint8(utils.ConvertFromFloat(arr[i/4], 12) >> (i & 3))
 }
 
 func (r *Rasterizer) ReadVecMtx(addr uint32) uint8 {
-	mtx := &r.GeoEngine.MtxStacks.Stacks[2].CurrMtx
+	mtx := &r.GeoEngine.MtxStacks.Stacks[2].Curr
 
 	switch addr &^ 3 {
 	case 0x680:
@@ -140,8 +172,12 @@ func (r *Rasterizer) Write(addr uint32, v uint8) {
 		r.RearPlane.Write(addr, v)
 		return
 	case addr >= 0x380 && addr < 0x3C0:
-		WriteToonTbl(&r.GeoEngine.ToonTbl, addr, v)
-		return
+		t := &r.GeoEngine.ToonTbl
+		addr -= 0x380
+		idx := addr / 2
+		hi := addr&1 != 0
+		t[idx] = Convert15BitByte(t[idx], v, hi)
+
 	case addr >= 0x358 && addr < 0x380:
 		r.WriteFog(addr, v)
 		return
@@ -165,8 +201,13 @@ func (r *Rasterizer) Write(addr uint32, v uint8) {
 
 	case 0x62, 0x63:
 		return
-	case 0x600, 0x601, 0x602, 0x603:
-		r.GeoEngine.GxStat.Write(v, uint8(addr&3))
+
+	case 0x602:
+		if errAck := v&0x80 != 0; errAck {
+			r.GeoEngine.StackOverflow = false
+		}
+	case 0x603:
+		r.GeoEngine.FifoIrq = v >> 6
 
 	case 0x610:
 		r.Disp1Dot.param = (r.Disp1Dot.param & 0xFF00) | uint16(v)

@@ -1,4 +1,4 @@
-package rast
+package gpu
 
 import "encoding/binary"
 

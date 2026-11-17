@@ -1,4 +1,4 @@
-package rast
+package gpu
 
 import (
 	"bufio"
@@ -11,7 +11,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/aabalke/guac/emu/nds/rast/gl"
+	"github.com/aabalke/guac/emu/nds/gpu/gl"
 )
 
 type Export struct {
@@ -48,8 +48,7 @@ func (e *Export) Export() {
 }
 
 func (e *Export) ExportObj(polys []Polygon) {
-
-	if err := os.MkdirAll(e.Directory, 0755); err != nil {
+	if err := os.MkdirAll(e.Directory, 0o755); err != nil {
 		panic(err)
 	}
 
@@ -76,7 +75,6 @@ func (e *Export) ExportObj(polys []Polygon) {
 }
 
 func (e *Export) exportPoly(p *Polygon) {
-
 	if len(p.Vertices) == 0 {
 		return
 	} else if shadow := p.Mode == 3; shadow && !e.ShadowPolys {
@@ -152,7 +150,6 @@ func (e *Export) exportPoly(p *Polygon) {
 }
 
 func (e *Export) exportVertex(vertex gl.Vertex, w, h float32) {
-
 	e.obj += "v "
 	e.obj += fmt.Sprintf("%f ", vertex.WorldPosition.X)
 	e.obj += fmt.Sprintf("%f ", vertex.WorldPosition.Y)
@@ -173,7 +170,6 @@ func (e *Export) exportVertex(vertex gl.Vertex, w, h float32) {
 }
 
 func (e *Export) exportTexture(vertex gl.Vertex) {
-
 	texture := vertex.NdsTexture
 
 	if texture == nil {
@@ -221,7 +217,6 @@ func (e *Export) exportMesh() {
 }
 
 func writeFile(path, s string) bool {
-
 	f, err := os.Create(path)
 	if err != nil {
 		return false

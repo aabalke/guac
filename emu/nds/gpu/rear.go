@@ -1,7 +1,7 @@
-package rast
+package gpu
 
 import (
-	"github.com/aabalke/guac/emu/nds/rast/gl"
+	"github.com/aabalke/guac/emu/nds/gpu/gl"
 )
 
 type RearPlane struct {
@@ -31,32 +31,22 @@ func (r *RearPlane) Write(addr uint32, v uint8) {
 
 	switch addr {
 	case 0x350:
-
 		r.ClearColor = Convert15BitByte(r.ClearColor, v, false)
-
 	case 0x351:
-
 		r.ClearColor = Convert15BitByte(r.ClearColor, v, true)
-		r.FogEnabled = (v>>7)&1 != 0
-
+		r.FogEnabled = v&0x80 != 0
 	case 0x352:
-
 		r.ClearColor.A = float32(v&0x1F) / 0x1F
-
 	case 0x353:
 		r.Id = uint32(v & 0b11_1111)
-
 	case 0x354:
 		r.ClearDepth &^= 0xFF
 		r.ClearDepth |= uint32(v)
-
 	case 0x355:
 		r.ClearDepth &^= 0xFF << 8
 		r.ClearDepth |= uint32(v&^0x80) << 8
-
 	case 0x356:
 		r.OffsetX = uint32(v)
-
 	case 0x357:
 		r.OffsetY = uint32(v)
 	}

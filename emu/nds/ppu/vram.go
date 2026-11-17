@@ -3,7 +3,7 @@ package ppu
 import (
 	"unsafe"
 
-	"github.com/aabalke/guac/emu/nds/rast"
+	"github.com/aabalke/guac/emu/nds/gpu"
 )
 
 const (
@@ -21,7 +21,7 @@ const (
 type VRAM struct {
 	engineA      *Engine
 	engineB      *Engine
-	TextureCache *rast.TextureCache
+	TextureCache *gpu.TextureCache
 
 	a [0x2_0000]uint8
 	b [0x2_0000]uint8
@@ -41,7 +41,7 @@ type VRAM struct {
 	TexPalSlots  [6]*[0x4000]uint8
 }
 
-func (v *VRAM) Init(t *rast.TextureCache, a, b *Engine) {
+func (v *VRAM) Init(t *gpu.TextureCache, a, b *Engine) {
 	v.engineA = a
 	v.engineB = b
 	v.TextureCache = t

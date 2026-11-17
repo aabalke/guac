@@ -1,7 +1,7 @@
 package ppu
 
 import (
-	"github.com/aabalke/guac/emu/nds/rast"
+	"github.com/aabalke/guac/emu/nds/gpu"
 )
 
 type Capture struct {
@@ -24,7 +24,7 @@ type Capture struct {
 	VramBlocks [4]*[0x2_0000]uint8
 
 	Pixels   *[]uint8
-	Pixels3d *rast.Pixels
+	Pixels3d *gpu.Pixels
 
 	arm7CBlock, arm7DBlock *bool
 
@@ -40,7 +40,7 @@ type ActiveData struct {
 	ReadOffsetV  uint8
 }
 
-func (c *Capture) Init(vram *VRAM, ppu *PPU, rdBlk *uint32, pixels *[]uint8, pixels3d *rast.Pixels) {
+func (c *Capture) Init(vram *VRAM, ppu *PPU, rdBlk *uint32, pixels *[]uint8, pixels3d *gpu.Pixels) {
 	c.VramBlocks[0] = &vram.a
 	c.VramBlocks[1] = &vram.b
 	c.VramBlocks[2] = &vram.c
@@ -53,7 +53,6 @@ func (c *Capture) Init(vram *VRAM, ppu *PPU, rdBlk *uint32, pixels *[]uint8, pix
 }
 
 func (c *Capture) Write(addr uint32, v uint8) {
-
 	addr &= 0xFF
 
 	switch addr {
@@ -80,7 +79,6 @@ func (c *Capture) Write(addr uint32, v uint8) {
 }
 
 func (c *Capture) Read(addr uint32) uint8 {
-
 	addr &= 0xFF
 
 	switch addr {
@@ -122,7 +120,6 @@ func (c *Capture) Read(addr uint32) uint8 {
 }
 
 func (c *Capture) TempLimiter() {
-
 	return
 
 	if c.EVA != 0 && c.EVA != 16 {
@@ -148,7 +145,6 @@ func (c *Capture) TempLimiter() {
 }
 
 func (c *Capture) StartCapture() {
-
 	//if !c.Enabled {
 	//    return
 	//}
@@ -170,7 +166,6 @@ func (c *Capture) StartCapture() {
 }
 
 func (c *Capture) CaptureLine(y uint32, isRenderingB bool) {
-
 	//return
 
 	//if !c.ActiveCapture {
@@ -235,5 +230,5 @@ func Convert24to15(r, g, b uint8) uint16 {
 	r5 := uint16(r >> 3)
 	g5 := uint16(g >> 3)
 	b5 := uint16(b >> 3)
-	return (r5) | (g5 << 5) | (b5 << 10)
+	return r5 | (g5 << 5) | (b5 << 10)
 }

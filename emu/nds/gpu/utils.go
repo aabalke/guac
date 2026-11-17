@@ -1,6 +1,6 @@
-package rast
+package gpu
 
-import "github.com/aabalke/guac/emu/nds/rast/gl"
+import "github.com/aabalke/guac/emu/nds/gpu/gl"
 
 func RGB24ToRGB15(r, g, b uint8) uint16 {
 	r5 := uint16(r >> 3)
@@ -17,8 +17,8 @@ func RGB15ToRGB24(r, g, b uint8) (uint8, uint8, uint8) {
 }
 
 func Convert15BitByte(c gl.Color, v uint8, hi bool) gl.Color {
-	//1111_1111|1111_1111
-	//abbb bbgg|gggr rrrr
+	// 1111_1111|1111_1111
+	// abbb bbgg|gggr rrrr
 
 	a := c.A
 

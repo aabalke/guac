@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math/bits"
 
-	"github.com/aabalke/guac/emu/nds/rast"
+	"github.com/aabalke/guac/emu/nds/gpu"
 	"github.com/aabalke/guac/utils"
 )
 
@@ -19,7 +19,7 @@ const (
 type PPU struct {
 	EngineA    Engine
 	EngineB    Engine
-	Rasterizer *rast.Rasterizer
+	Rasterizer *gpu.Rasterizer
 	Vram       VRAM
 	Capture    Capture
 
@@ -192,7 +192,7 @@ func NewPPU(irq Irq) *PPU {
 	p.EngineB.Pixels = make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)
 	p.EngineB.IsB = true
 
-	p.Rasterizer = rast.NewRasterizer(irq)
+	p.Rasterizer = gpu.NewRasterizer(irq)
 
 	texCache := &p.Rasterizer.GeoEngine.TextureCache
 	p.Vram.Init(texCache, &p.EngineA, &p.EngineB)

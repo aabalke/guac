@@ -1,11 +1,11 @@
-package rast
+package gpu
 
 import (
 	"fmt"
 	"math"
 	"sort"
 
-	"github.com/aabalke/guac/emu/nds/rast/gl"
+	"github.com/aabalke/guac/emu/nds/gpu/gl"
 )
 
 const (

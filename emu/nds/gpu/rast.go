@@ -1,15 +1,8 @@
-package rast
+package gpu
 
 import (
 	"github.com/aabalke/guac/config"
-	"github.com/aabalke/guac/emu/nds/rast/gl"
-)
-
-const (
-	MTX_PJT = iota
-	MTX_POS
-	MTX_SIM
-	MTX_TEX
+	"github.com/aabalke/guac/emu/nds/gpu/gl"
 )
 
 type Rasterizer struct {
@@ -104,103 +97,6 @@ func (d *Disp3dCnt) Write(v, b uint8) {
 
 type Viewport struct {
 	X1, Y1, X2, Y2 uint8
-}
-
-const (
-	IRQ_NEVER = 0
-	IRQ_UNDHF = 1
-	IRQ_EMPTY = 2
-	IRQ_RESVD = 3
-)
-
-type GXSTAT struct {
-	GeoEngine *GeoEngine
-	// TestBusy bool
-	TestInView bool
-
-	// StackBusy bool
-	FifoEntries uint16
-	// GXBusy bool
-
-	FifoIrq uint8
-}
-
-func (g *GXSTAT) Write(v, b uint8) {
-	switch b {
-	case 2:
-		if errAck := (v>>7)&1 != 0; errAck {
-			g.GeoEngine.MtxStacks.Overflow = false
-		}
-		return
-	case 3:
-
-		g.FifoIrq = v >> 6
-		return
-	}
-}
-
-func (g *GXSTAT) Read(b uint32) uint8 {
-	var v uint8
-
-	switch b {
-	case 0:
-
-		// never?
-		//if g.TestBusy {
-		//    v |= 1
-		//}
-
-		if g.TestInView {
-			v |= 1 << 1
-		}
-
-		return v
-
-	case 1:
-
-		v |= uint8(*g.GeoEngine.MtxStacks.Stacks[1].Pointer) & 0x1F
-		v |= uint8(*g.GeoEngine.MtxStacks.Stacks[0].Pointer) << 5
-
-		// never?
-		//if g.StackBusy {
-		//    v |= 1 << 6
-		//}
-
-		if g.GeoEngine.MtxStacks.Overflow {
-			v |= 1 << 7
-		}
-
-		return v
-
-	case 2:
-
-		v |= uint8(g.FifoEntries)
-		return v
-
-	case 3:
-
-		// I believe fifo entries always zero in emulated
-
-		v |= uint8(g.FifoEntries >> 8)
-
-		if underHalf := g.FifoEntries < 128; underHalf {
-			v |= 1 << 1
-		}
-
-		if empty := g.FifoEntries == 0; empty {
-			v |= 1 << 2
-		}
-
-		// never?
-		//if g.GXBusy {
-		//    v |= 1 << 3
-		//}
-
-		v |= g.FifoIrq << 5
-		return v
-	}
-
-	return 0
 }
 
 type Disp1Dot struct {
