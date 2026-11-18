@@ -202,7 +202,8 @@ func NewPPU(irq Irq) *PPU {
 		p,
 		&p.EngineA.Dispcnt.VramBlock,
 		&p.EngineA.Pixels,
-		&p.Rasterizer.Render.Pixels,
+		&p.Rasterizer.Render.Palettes,
+		&p.Rasterizer.Render.Alphas,
 	)
 
 	// screenoff optimization

@@ -36,12 +36,12 @@ func (ppu *PPU) buildFrame(y uint32) {
 	case 1:
 		ppu.standard(y, a)
 		if ppu.Capture.ActiveCapture {
-			ppu.Capture.CaptureLine(y, ppu.Rasterizer.Buffers.BisRendering)
+			ppu.Capture.CaptureLine(y)
 		}
 	case 2:
 		if ppu.Capture.ActiveCapture {
 			ppu.standard(y, a)
-			ppu.Capture.CaptureLine(y, ppu.Rasterizer.Buffers.BisRendering)
+			ppu.Capture.CaptureLine(y)
 		}
 
 		ppu.vramDisplay(y, a)

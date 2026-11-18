@@ -40,7 +40,7 @@ func NewExport(dir string, shadowPolys bool, rast *Rasterizer) *Export {
 func (e *Export) Export() {
 	fmt.Printf("Preparing Scene\n")
 
-	polys := e.Rasterizer.Buffers.GetBuffer().Polys
+	polys := e.Rasterizer.Buffers.bufRen.Polys
 
 	e.ExportObj(polys)
 

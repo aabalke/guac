@@ -6,17 +6,6 @@ import (
 	"github.com/aabalke/guac/emu/nds/gpu/gl"
 )
 
-const (
-	TEX_FMT_NONE = iota
-	TEX_FMT_A3I5
-	TEX_FMT_4_PAL
-	TEX_FMT_16_PAL
-	TEX_FMT_256_PAL
-	TEX_FMT_4X4
-	TEX_FMT_A5I3
-	TEX_FMT_DIRECT
-)
-
 var PARAM_LENGTH = [256]int{
 	/*0x00*/ 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	/*0x10*/ 1, 1, 1, 1, 1, 1, 16, 12, 16, 12, 9, 3, 3, 0, 0, 0,
@@ -33,7 +22,6 @@ type GeoEngine struct {
 	Buffers *Buffers
 	Data    []uint32
 
-	MtxStacks *MtxStacks
 	Viewport  Viewport
 	Disp3dCnt Disp3dCnt
 
@@ -68,6 +56,11 @@ type GeoEngine struct {
 	TestInView    bool
 	FifoIrq       uint8
 	FifoEntries   uint16
+
+	// mtx stacks
+	Stacks        [4]MtxStack
+	Mode          uint32
+	psp, csp, tsp int // ptrs
 }
 
 type Texture struct {
@@ -85,46 +78,25 @@ type Texture struct {
 	TransparentZero    bool
 }
 
-type MtxStacks struct {
-	Stacks        [4]MtxStack
-	Mode          uint32
-	psp, csp, tsp int
-}
-
 type MtxStack struct {
 	Curr gl.Matrix
 	Mtxs []gl.Matrix
-	ptr  *int
-	mask int
-}
-
-func (m *MtxStack) Init(size, mask int, ptr *int) {
-	m.Mtxs = make([]gl.Matrix, size)
-	m.mask = mask
-	m.ptr = ptr
-}
-
-func NewMtxStacks() *MtxStacks {
-	s := &MtxStacks{}
-	// csp is shared
-	s.Stacks[0].Init(1, 0, &s.psp)
-	s.Stacks[1].Init(31, 63, &s.csp)
-	s.Stacks[2].Init(31, 63, &s.csp)
-	s.Stacks[3].Init(1, 0, &s.tsp)
-
-	return s
 }
 
 func NewGeoEngine(buffers *Buffers, irq Irq, vram *Vram) *GeoEngine {
 	g := &GeoEngine{
-		Vram:      vram,
-		Irq:       irq,
-		Buffers:   buffers,
-		MtxStacks: NewMtxStacks(),
-		// Color: gl.Transparent,
+		Vram:         vram,
+		Irq:          irq,
+		Buffers:      buffers,
 		TextureCache: make(map[key]*[]gl.Color, 0),
 	}
+
 	g.Disp3dCnt.Fog = &g.Fog
+	g.Stacks[0].Mtxs = make([]gl.Matrix, 1)
+	g.Stacks[1].Mtxs = make([]gl.Matrix, 32)
+	g.Stacks[2].Mtxs = make([]gl.Matrix, 32)
+	g.Stacks[3].Mtxs = make([]gl.Matrix, 1)
+
 	return g
 }
 
@@ -205,8 +177,8 @@ func (g *GeoEngine) Cmd(fifo bool, data []uint32) {
 		// position is world space transform
 		// perspective is perspecitve space transform
 
-		pos := g.MtxStacks.Stacks[1].Curr
-		per := g.MtxStacks.Stacks[0].Curr
+		pos := g.Stacks[1].Curr
+		per := g.Stacks[0].Curr
 
 		g.ClipMatrix = pos.Mul(per)
 		g.WorldMatrix = pos

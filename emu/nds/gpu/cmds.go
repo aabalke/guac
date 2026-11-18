@@ -51,119 +51,121 @@ var commands = [0x100]func(g *GeoEngine, params []uint32){
 func NOP(g *GeoEngine, params []uint32) {}
 
 func MTX_MODE(g *GeoEngine, params []uint32) {
-	g.MtxStacks.Mode = params[0] & 3
+	g.Mode = params[0] & 3
 }
 
 func MTX_PUSH(g *GeoEngine, _ []uint32) {
-	m := g.MtxStacks
-	s := &m.Stacks[m.Mode]
-	idx := int(*s.ptr) % len(s.Mtxs)
+	switch g.Mode {
+	case 0:
+		if g.psp > 0 {
+			g.StackOverflow = true
+		}
 
-	switch m.Mode {
+		g.Stacks[0].Mtxs[0] = g.Stacks[0].Curr
+		g.psp = (g.psp + 1) & 1
+
 	case 1, 2:
-		s1 := &m.Stacks[1]
-		s2 := &m.Stacks[2]
-		s1.Mtxs[idx] = s1.Curr
-		s2.Mtxs[idx] = s2.Curr
-	default:
-		s.Mtxs[idx] = s.Curr
-	}
+		if g.csp > 30 {
+			g.StackOverflow = true
+		}
 
-	(*s.ptr) = (*s.ptr + 1) & s.mask
-	g.UpdateClipMtx = true
+		g.Stacks[1].Mtxs[g.csp&31] = g.Stacks[1].Curr
+		g.Stacks[2].Mtxs[g.csp&31] = g.Stacks[2].Curr
+		g.csp = (g.csp + 1) & 63
+
+	case 3:
+		if g.csp > 0 {
+			g.StackOverflow = true
+		}
+
+		g.Stacks[3].Mtxs[0] = g.Stacks[3].Curr
+		g.tsp = (g.tsp + 1) & 1
+	}
 }
 
 func MTX_POP(g *GeoEngine, params []uint32) {
-	m := g.MtxStacks
-	switch m.Mode {
+	switch g.Mode {
+	case 0:
+		if g.csp == 0 {
+			g.StackOverflow = true
+		}
+		g.Stacks[0].Curr = g.Stacks[0].Mtxs[0]
+		g.psp = (g.psp - 1) & 1
+		g.UpdateClipMtx = true
+
 	case 1, 2:
 
-		s := &m.Stacks[m.Mode]
-
-		offset := int8((params[0]&0x3F)<<2) >> 2
-		*s.ptr -= int(offset)
-
-		if *s.ptr >= len(s.Mtxs) {
+		g.csp = int(uint8(int8(g.csp)-(int8(params[0]<<2)>>2)) & 63)
+		if g.csp > 30 {
 			g.StackOverflow = true
 		}
 
-		if *s.ptr < 0 {
-			*s.ptr += len(s.Mtxs)
-		}
-
-		idx := int(*s.ptr) % len(s.Mtxs)
-
-		s1 := &m.Stacks[1]
-		s2 := &m.Stacks[2]
-		s1.Curr = s1.Mtxs[idx]
-		s2.Curr = s2.Mtxs[idx]
+		g.Stacks[1].Curr = g.Stacks[1].Mtxs[g.csp&31]
+		g.Stacks[2].Curr = g.Stacks[2].Mtxs[g.csp&31]
+		g.UpdateClipMtx = true
 
 	default:
-		s := &m.Stacks[m.Mode]
-
-		(*s.ptr) = (*s.ptr - 1) & s.mask
-
-		if *s.ptr >= len(s.Mtxs) {
+		if g.csp == 0 {
 			g.StackOverflow = true
 		}
-
-		s.Curr = s.Mtxs[0]
+		g.Stacks[3].Curr = g.Stacks[3].Mtxs[0]
+		g.tsp = (g.tsp - 1) & 1
 	}
-
-	g.UpdateClipMtx = true
 }
 
 func MTX_STORE(g *GeoEngine, params []uint32) {
-	m := g.MtxStacks
-	if m.Mode == 0 || m.Mode == 3 {
-		s := &m.Stacks[m.Mode]
-		s.Mtxs[0] = s.Curr
-		return
+	switch g.Mode {
+	case 0:
+		g.Stacks[0].Mtxs[0] = g.Stacks[0].Curr
+	case 1, 2:
+
+		idx := params[0] & 0x1F
+		if idx > 30 {
+			g.StackOverflow = true
+		}
+		g.Stacks[1].Mtxs[idx] = g.Stacks[1].Curr
+		g.Stacks[2].Mtxs[idx] = g.Stacks[2].Curr
+
+	case 3:
+		g.Stacks[3].Mtxs[0] = g.Stacks[3].Curr
 	}
-
-	idx := int(params[0] & 0x1F)
-
-	if idx >= len(m.Stacks[1].Mtxs) {
-		g.StackOverflow = true
-	}
-
-	m.Stacks[1].Mtxs[idx] = m.Stacks[1].Curr
-	m.Stacks[2].Mtxs[idx] = m.Stacks[2].Curr
-	g.UpdateClipMtx = true
 }
 
 func MTX_RESTORE(g *GeoEngine, params []uint32) {
-	m := g.MtxStacks
-	if m.Mode == 0 || m.Mode == 3 {
-		s := &m.Stacks[m.Mode]
-		s.Curr = s.Mtxs[0]
-		return
+	switch g.Mode {
+	case 0:
+		g.Stacks[0].Curr = g.Stacks[0].Mtxs[0]
+		g.UpdateClipMtx = true
+
+	case 1, 2:
+
+		idx := params[0] & 0x1F
+		if idx > 30 {
+			g.StackOverflow = true
+		}
+		g.Stacks[1].Curr = g.Stacks[1].Mtxs[idx]
+		g.Stacks[2].Curr = g.Stacks[2].Mtxs[idx]
+		g.UpdateClipMtx = true
+
+	case 3:
+		g.Stacks[3].Curr = g.Stacks[3].Mtxs[0]
 	}
-
-	idx := int(params[0] & 0x1F)
-
-	if idx >= len(m.Stacks[1].Mtxs) {
-		g.StackOverflow = true
-	}
-
-	m.Stacks[1].Curr = m.Stacks[1].Mtxs[idx]
-	m.Stacks[2].Curr = m.Stacks[2].Mtxs[idx]
-	g.UpdateClipMtx = true
 }
 
 func MTX_IDENTITY(g *GeoEngine, _ []uint32) {
-	mode := g.MtxStacks.Mode
+	mode := g.Mode
 
-	g.MtxStacks.Stacks[mode].Curr = gl.Identity()
+	g.Stacks[mode].Curr = gl.Identity()
 	if mode == 2 {
-		g.MtxStacks.Stacks[1].Curr = gl.Identity()
+		g.Stacks[1].Curr = gl.Identity()
 	}
-
-	g.UpdateClipMtx = true
+	if mode != 3 {
+		g.UpdateClipMtx = true
+	}
 }
 
 func MTX_LOAD_4x4(g *GeoEngine, params []uint32) {
-	mode := g.MtxStacks.Mode
+	mode := g.Mode
 	m := gl.Matrix{}
 	arr := gl.AsArray(&m)
 
@@ -171,16 +173,18 @@ func MTX_LOAD_4x4(g *GeoEngine, params []uint32) {
 		arr[i] = utils.ConvertToFloat(params[i], 12)
 	}
 
-	g.MtxStacks.Stacks[mode].Curr = m
+	g.Stacks[mode].Curr = m
 	if mode == 2 {
-		g.MtxStacks.Stacks[1].Curr = m
+		g.Stacks[1].Curr = m
 	}
 
-	g.UpdateClipMtx = true
+	if mode != 3 {
+		g.UpdateClipMtx = true
+	}
 }
 
 func MTX_LOAD_4x3(g *GeoEngine, params []uint32) {
-	mode := g.MtxStacks.Mode
+	mode := g.Mode
 	m := gl.Matrix{X33: 1}
 	arr := gl.AsArray(&m)
 
@@ -192,16 +196,18 @@ func MTX_LOAD_4x3(g *GeoEngine, params []uint32) {
 		}
 	}
 
-	g.MtxStacks.Stacks[mode].Curr = m
+	g.Stacks[mode].Curr = m
 	if mode == 2 {
-		g.MtxStacks.Stacks[1].Curr = m
+		g.Stacks[1].Curr = m
 	}
 
-	g.UpdateClipMtx = true
+	if mode != 3 {
+		g.UpdateClipMtx = true
+	}
 }
 
 func MTX_MULT_4x4(g *GeoEngine, params []uint32) {
-	mode := g.MtxStacks.Mode
+	mode := g.Mode
 	m := gl.Matrix{}
 	arr := gl.AsArray(&m)
 
@@ -209,18 +215,18 @@ func MTX_MULT_4x4(g *GeoEngine, params []uint32) {
 		arr[i] = utils.ConvertToFloat(params[i], 12)
 	}
 
-	g.MtxStacks.Stacks[mode].Curr = m.Mul(
-		g.MtxStacks.Stacks[mode].Curr)
+	g.Stacks[mode].Curr = m.Mul(g.Stacks[mode].Curr)
 	if mode == 2 {
-		g.MtxStacks.Stacks[1].Curr = m.Mul(
-			g.MtxStacks.Stacks[1].Curr)
+		g.Stacks[1].Curr = m.Mul(g.Stacks[1].Curr)
 	}
 
-	g.UpdateClipMtx = true
+	if mode != 3 {
+		g.UpdateClipMtx = true
+	}
 }
 
 func MTX_MULT_4x3(g *GeoEngine, params []uint32) {
-	mode := g.MtxStacks.Mode
+	mode := g.Mode
 	m := gl.Matrix{X33: 1}
 	arr := gl.AsArray(&m)
 
@@ -232,18 +238,18 @@ func MTX_MULT_4x3(g *GeoEngine, params []uint32) {
 		}
 	}
 
-	g.MtxStacks.Stacks[mode].Curr = m.Mul(
-		g.MtxStacks.Stacks[mode].Curr)
+	g.Stacks[mode].Curr = m.Mul(g.Stacks[mode].Curr)
 	if mode == 2 {
-		g.MtxStacks.Stacks[1].Curr = m.Mul(
-			g.MtxStacks.Stacks[1].Curr)
+		g.Stacks[1].Curr = m.Mul(g.Stacks[1].Curr)
 	}
 
-	g.UpdateClipMtx = true
+	if mode != 3 {
+		g.UpdateClipMtx = true
+	}
 }
 
 func MTX_MULT_3x3(g *GeoEngine, params []uint32) {
-	mode := g.MtxStacks.Mode
+	mode := g.Mode
 	m := gl.Matrix{X33: 1}
 	arr := gl.AsArray(&m)
 
@@ -255,18 +261,18 @@ func MTX_MULT_3x3(g *GeoEngine, params []uint32) {
 		}
 	}
 
-	g.MtxStacks.Stacks[mode].Curr = m.Mul(
-		g.MtxStacks.Stacks[mode].Curr)
+	g.Stacks[mode].Curr = m.Mul(g.Stacks[mode].Curr)
 	if mode == 2 {
-		g.MtxStacks.Stacks[1].Curr = m.Mul(
-			g.MtxStacks.Stacks[1].Curr)
+		g.Stacks[1].Curr = m.Mul(g.Stacks[1].Curr)
 	}
 
-	g.UpdateClipMtx = true
+	if mode != 3 {
+		g.UpdateClipMtx = true
+	}
 }
 
 func MTX_SCALE(g *GeoEngine, params []uint32) {
-	mode := g.MtxStacks.Mode
+	mode := g.Mode
 	v := gl.Vector{
 		X: utils.ConvertToFloat(params[0], 12),
 		Y: utils.ConvertToFloat(params[1], 12),
@@ -275,28 +281,32 @@ func MTX_SCALE(g *GeoEngine, params []uint32) {
 
 	// no effect on vector matrix - keeps light vector length intact
 	if mode == 2 {
-		g.MtxStacks.Stacks[1].Curr = g.MtxStacks.Stacks[1].Curr.Scale(v)
+		g.Stacks[1].Curr = g.Stacks[1].Curr.Scale(v)
 	} else {
-		g.MtxStacks.Stacks[mode].Curr = g.MtxStacks.Stacks[mode].Curr.Scale(v)
+		g.Stacks[mode].Curr = g.Stacks[mode].Curr.Scale(v)
 	}
 
-	g.UpdateClipMtx = true
+	if mode != 3 {
+		g.UpdateClipMtx = true
+	}
 }
 
 func MTX_TRANS(g *GeoEngine, params []uint32) {
-	mode := g.MtxStacks.Mode
+	mode := g.Mode
 	v := gl.Vector{
 		X: utils.ConvertToFloat(params[0], 12),
 		Y: utils.ConvertToFloat(params[1], 12),
 		Z: utils.ConvertToFloat(params[2], 12),
 	}
 
-	g.MtxStacks.Stacks[mode].Curr = g.MtxStacks.Stacks[mode].Curr.Translate(v)
+	g.Stacks[mode].Curr = g.Stacks[mode].Curr.Translate(v)
 	if mode == 2 {
-		g.MtxStacks.Stacks[1].Curr = g.MtxStacks.Stacks[1].Curr.Translate(v)
+		g.Stacks[1].Curr = g.Stacks[1].Curr.Translate(v)
 	}
 
-	g.UpdateClipMtx = true
+	if mode != 3 {
+		g.UpdateClipMtx = true
+	}
 }
 
 func COLOR(g *GeoEngine, params []uint32) {
@@ -304,21 +314,6 @@ func COLOR(g *GeoEngine, params []uint32) {
 }
 
 func NORMAL(g *GeoEngine, params []uint32) {
-	//IF TexCoordTransformMode=2 THEN TexCoord=NormalVector*Matrix (see TexCoord)
-	//NormalVector=NormalVector*DirectionalMatrix
-	//VertexColor = EmissionColor
-	//FOR i=0 to 3
-	//IF PolygonAttrLight[i]=enabled THEN
-	//DiffuseLevel = max(0,-(LightVector[i]*NormalVector))
-	//ShininessLevel = max(0,(-HalfVector[i])*(NormalVector))^2
-	//IF TableEnabled THEN ShininessLevel = ShininessTable[ShininessLevel]
-	//;note: below processed separately for the R,G,B color components...
-	//VertexColor = VertexColor + SpecularColor*LightColor[i]*ShininessLevel
-	//VertexColor = VertexColor + DiffuseColor*LightColor[i]*DiffuseLevel
-	//VertexColor = VertexColor + AmbientColor*LightColor[i]
-	//ENDIF
-	//NEXT i
-
 	x := utils.Convert10ToFloat(uint16(params[0]), 9)
 	y := utils.Convert10ToFloat(uint16(params[0]>>10), 9)
 	z := utils.Convert10ToFloat(uint16(params[0]>>20), 9)
@@ -333,12 +328,12 @@ func NORMAL(g *GeoEngine, params []uint32) {
 			Z: z / 16,
 		}
 
-		mtx := &g.MtxStacks.Stacks[3].Curr
+		mtx := &g.Stacks[3].Curr
 		tex.S = tex.Sv + vtx.Dot3(mtx.Col(0))
 		tex.T = tex.Tv + vtx.Dot3(mtx.Col(1))
 	}
 
-	directionalMtx := g.MtxStacks.Stacks[2].Curr
+	directionalMtx := g.Stacks[2].Curr
 	v := gl.Vector{
 		X: x,
 		Y: y,
@@ -403,7 +398,7 @@ func TEXCOORD(g *GeoEngine, params []uint32) {
 		W: 1.0 / 16,
 	}
 
-	mtx := &g.MtxStacks.Stacks[3].Curr
+	mtx := &g.Stacks[3].Curr
 	tex.S = textureVertex.Dot(mtx.Col(0))
 	tex.T = textureVertex.Dot(mtx.Col(1))
 }
@@ -498,7 +493,7 @@ func DIF_AMB(g *GeoEngine, params []uint32) {
 	g.LightData.DiffuseColor = Write15BitColor(params[0])
 	g.LightData.AmbientColor = Write15BitColor(params[0] >> 16)
 
-	if setVertex := params[0]*0x8000 != 0; setVertex {
+	if setVertex := params[0]&0x8000 != 0; setVertex {
 		g.Color = g.LightData.DiffuseColor
 	}
 }
@@ -510,16 +505,13 @@ func SPE_EMI(g *GeoEngine, params []uint32) {
 }
 
 func LIGHT_VECTOR(g *GeoEngine, params []uint32) {
-	v := gl.Vector{
+	idx := params[0] >> 30
+	light := &g.LightData.Lights[idx]
+	light.Vector = g.Stacks[2].Curr.VecMul3x3(gl.Vector{
 		X: utils.Convert10ToFloat(uint16(params[0]), 9),
 		Y: utils.Convert10ToFloat(uint16(params[0]>>10), 9),
 		Z: utils.Convert10ToFloat(uint16(params[0]>>20), 9),
-	}
-	directionalMtx := g.MtxStacks.Stacks[2].Curr
-
-	idx := params[0] >> 30
-	light := &g.LightData.Lights[idx]
-	light.Vector = directionalMtx.VecMul3x3(v)
+	})
 
 	// line of sight vector
 	light.HalfVector = light.Vector
@@ -530,8 +522,7 @@ func LIGHT_VECTOR(g *GeoEngine, params []uint32) {
 }
 
 func LIGHT_COLOR(g *GeoEngine, params []uint32) {
-	idx := params[0] >> 30
-	g.LightData.Lights[idx].Color = Write15BitColor(params[0])
+	g.LightData.Lights[params[0]>>30].Color = Write15BitColor(params[0])
 }
 
 func SHININESS(g *GeoEngine, params []uint32) {
@@ -552,7 +543,7 @@ func BEGIN_VTXS(g *GeoEngine, params []uint32) {
 		g.ActivePoly.Texture = g.Texture
 
 		if g.ActivePoly.Cull != 0 {
-			g.Buffers.Append(g.ActivePoly)
+			g.Buffers.bufGeo.Polys = append(g.Buffers.bufGeo.Polys, g.ActivePoly)
 		}
 		g.ActivePoly.Vertices = []gl.Vertex{}
 	}
@@ -592,7 +583,9 @@ func BEGIN_VTXS(g *GeoEngine, params []uint32) {
 func END_VTXS(g *GeoEngine, params []uint32) {}
 
 func SWAP_BUFFERS(g *GeoEngine, params []uint32) {
-	g.Buffers.SwapCmd(params[0])
+	g.Buffers.bufGeo.ManualSort = params[0]&1 != 0
+	g.Buffers.bufGeo.DepthBufferW = params[0]&(1<<1) != 0
+	g.Buffers.SwapSet = true
 }
 
 func VIEWPORT(g *GeoEngine, params []uint32) {
@@ -644,7 +637,7 @@ func POS_TEST(g *GeoEngine, params []uint32) {
 }
 
 func VEC_TEST(g *GeoEngine, params []uint32) {
-	v := g.MtxStacks.Stacks[2].Curr.VecMul3x3(gl.Vector{
+	v := g.Stacks[2].Curr.VecMul3x3(gl.Vector{
 		X: utils.Convert10ToFloat(uint16(params[0]), 9),
 		Y: utils.Convert10ToFloat(uint16(params[0]>>10), 9),
 		Z: utils.Convert10ToFloat(uint16(params[0]>>20), 9),

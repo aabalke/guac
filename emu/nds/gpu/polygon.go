@@ -50,7 +50,7 @@ func buildVertex(g *GeoEngine, x, y, z float32, mode uint8) gl.Vertex {
 			Z: z,
 		}
 
-		mtx := &g.MtxStacks.Stacks[3].Curr
+		mtx := &g.Stacks[3].Curr
 		t.S = t.Sv + vtx.Dot3(mtx.Col(0))
 		t.T = t.Tv + vtx.Dot3(mtx.Col(1))
 	}

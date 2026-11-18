@@ -8,7 +8,7 @@ import (
 type Rasterizer struct {
 	Viewport   Viewport
 	GeoEngine  *GeoEngine
-	Buffers    Buffers
+	Buffers    *Buffers
 	Render     *Render
 	ClearColor gl.Color
 	RearPlane  RearPlane
@@ -24,8 +24,9 @@ type Irq interface {
 
 func NewRasterizer(irq Irq) *Rasterizer {
 	r := &Rasterizer{}
-	r.GeoEngine = NewGeoEngine(&r.Buffers, irq, &r.Vram)
-	r.Render = NewRender(r, &r.Buffers, &r.RearPlane)
+	r.Buffers = NewBuffers()
+	r.GeoEngine = NewGeoEngine(r.Buffers, irq, &r.Vram)
+	r.Render = NewRender(r, r.Buffers, &r.RearPlane)
 	r.RearPlane.VRAM = &r.Vram
 
 	for i := range len(r.Edge.Color) {
@@ -61,35 +62,31 @@ func (d *Disp3dCnt) Read(b uint8) uint8 {
 
 func (d *Disp3dCnt) Write(v, b uint8) {
 	if b == 0 {
-
-		d.TextureMapping = (v>>0)&1 != 0
-		d.HighlightShading = (v>>1)&1 != 0
-		d.AlphaTesting = (v>>2)&1 != 0
-		d.AlphaBlending = (v>>3)&1 != 0
-		d.AntiAliasing = (v>>4)&1 != 0
-		d.EdgeMarking = (v>>5)&1 != 0
-		d.Fog.AlphaOnly = (v>>6)&1 != 0
-		d.Fog.Enabled = (v>>7)&1 != 0
-
-		d.v &^= 0xFF
-		d.v |= uint16(v)
+		d.TextureMapping = v&(1<<0) != 0
+		d.HighlightShading = v&(1<<1) != 0
+		d.AlphaTesting = v&(1<<2) != 0
+		d.AlphaBlending = v&(1<<3) != 0
+		d.AntiAliasing = v&(1<<4) != 0
+		d.EdgeMarking = v&(1<<5) != 0
+		d.Fog.AlphaOnly = v&(1<<6) != 0
+		d.Fog.Enabled = v&(1<<7) != 0
+		d.v = (d.v &^ 0xFF) | uint16(v)
 		return
 	}
 
-	d.v &^= 0b0100_1111 << 8
-	d.v |= (uint16(v&0b0100_1111) << 8)
+	d.v = (d.v &^ (0x4F << 8)) | (uint16(v&0x4F) << 8)
 
 	d.Fog.Step = 0x400 >> (v & 0xF)
 	d.Fog.UpdateBoundaries()
 
-	if (v>>4)&1 != 0 {
+	if v&(1<<4) != 0 {
 		d.ColorRdlinesOverflow = false
-		d.v &^= 0b1_0000 << 8
+		d.v &^= 1 << 12
 	}
 
-	if (v>>5)&1 != 0 {
+	if v&(1<<5) != 0 {
 		d.PolygonRamOverflow = false
-		d.v &^= 0b10_0000 << 8
+		d.v &^= 1 << 13
 	}
 
 	d.RearPlaneBitmapEnabled = (v>>6)&1 != 0
@@ -115,16 +112,7 @@ func (e *Edge) Write(addr uint32, v uint8) {
 	i := addr / 2
 	hi := addr&1 != 0
 
-	c := e.Color[i]
-
-	e.Color[i] = Convert15BitByte(c, v, hi)
-
-	//discard := color.RGBA{}
-
-	//if e.Color[i] != discard {
-	//    r, g, b, a := e.Color[i].RGBA()
-	//    fmt.Printf("%d COLOR %d %d %d %d\n", i, r, g, b, a)
-	//}
+	e.Color[i] = Convert15BitByte(e.Color[i], v, hi)
 
 	if hi {
 		e.V[i] = (e.V[i] & 0x00FF) | (uint16(v) << 8)
@@ -134,6 +122,5 @@ func (e *Edge) Write(addr uint32, v uint8) {
 }
 
 func (e *Edge) Read(addr uint32) uint8 {
-	addr -= 0x330
-	return uint8(e.V[addr/2] >> (addr & 1))
+	return uint8(e.V[(addr-0x330)/2] >> (addr & 1))
 }

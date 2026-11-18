@@ -1,8 +1,8 @@
 package gpu
 
 type Buffers struct {
-	A, B         Buffer
-	BisRendering bool
+	bufGeo *Buffer
+	bufRen *Buffer
 
 	// SwapBuffers isn't executed until next VBlank
 	SwapSet bool
@@ -14,45 +14,19 @@ type Buffer struct {
 	ManualSort   bool
 }
 
-func (b *Buffers) Append(p Polygon) {
-	if b.BisRendering {
-		b.A.Polys = append(b.A.Polys, p)
-		return
+func NewBuffers() *Buffers {
+	return &Buffers{
+		bufGeo: &Buffer{},
+		bufRen: &Buffer{},
 	}
-
-	b.B.Polys = append(b.B.Polys, p)
-}
-
-func (b *Buffers) GetBuffer() *Buffer {
-	if b.BisRendering {
-		return &b.B
-	}
-
-	return &b.A
 }
 
 func (b *Buffers) Swap() {
-	b.BisRendering = !b.BisRendering
-
-	buf := &b.B
-	if b.BisRendering {
-		buf = &b.A
-	}
-
-	buf.Polys = []Polygon{}
-
+	tmp := b.bufGeo
+	b.bufGeo = b.bufRen
+	b.bufRen = tmp
+	b.bufGeo.Polys = []Polygon{}
 	b.SwapSet = false
-}
-
-func (b *Buffers) SwapCmd(data uint32) {
-	buf := &b.B
-	if b.BisRendering {
-		buf = &b.A
-	}
-
-	buf.ManualSort = data&1 != 0
-	buf.DepthBufferW = (data>>1)&1 != 0
-	b.SwapSet = true
 }
 
 func (b *Buffer) GetCnts() (int, int) {

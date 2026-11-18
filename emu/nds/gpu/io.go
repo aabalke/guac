@@ -40,8 +40,8 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
 		return 0
 
 	case 0x601:
-		v := uint8(*r.GeoEngine.MtxStacks.Stacks[1].ptr) & 0x1F
-		v |= uint8(*r.GeoEngine.MtxStacks.Stacks[0].ptr) << 5
+		v := uint8(r.GeoEngine.csp) & 0x1F
+		v |= uint8(r.GeoEngine.psp) << 5
 
 		if r.GeoEngine.StackOverflow {
 			v |= 1 << 7
@@ -69,43 +69,19 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
 		return v
 
 	case 0x604:
-
-		buf := &r.GeoEngine.Buffers.A
-		if r.GeoEngine.Buffers.BisRendering {
-			buf = &r.GeoEngine.Buffers.B
-		}
-
-		poly, _ := buf.GetCnts()
+		poly, _ := r.GeoEngine.Buffers.bufGeo.GetCnts()
 		return uint8(poly)
 
 	case 0x605:
-
-		buf := &r.GeoEngine.Buffers.A
-		if r.GeoEngine.Buffers.BisRendering {
-			buf = &r.GeoEngine.Buffers.B
-		}
-
-		poly, _ := buf.GetCnts()
+		poly, _ := r.GeoEngine.Buffers.bufGeo.GetCnts()
 		return uint8(poly >> 8)
 
 	case 0x606:
-
-		buf := &r.GeoEngine.Buffers.A
-		if r.GeoEngine.Buffers.BisRendering {
-			buf = &r.GeoEngine.Buffers.B
-		}
-
-		_, vert := buf.GetCnts()
+		_, vert := r.GeoEngine.Buffers.bufGeo.GetCnts()
 		return uint8(vert)
 
 	case 0x607:
-
-		buf := &r.GeoEngine.Buffers.A
-		if r.GeoEngine.Buffers.BisRendering {
-			buf = &r.GeoEngine.Buffers.B
-		}
-
-		_, vert := buf.GetCnts()
+		_, vert := r.GeoEngine.Buffers.bufGeo.GetCnts()
 		return uint8(vert >> 8)
 	}
 
@@ -135,12 +111,11 @@ func (r *Rasterizer) ReadVecTest(addr uint32) uint8 {
 
 func (r *Rasterizer) ReadClipMtx(addr uint32) uint8 {
 	arr := gl.AsArray(&r.GeoEngine.ClipMatrix)
-	i := addr - 0x680
-	return uint8(utils.ConvertFromFloat(arr[i/4], 12) >> (i & 3))
+	return uint8(utils.ConvertFromFloat(arr[(addr-0x640)/4], 12) >> (addr & 3))
 }
 
 func (r *Rasterizer) ReadVecMtx(addr uint32) uint8 {
-	mtx := &r.GeoEngine.MtxStacks.Stacks[2].Curr
+	mtx := &r.GeoEngine.Stacks[2].Curr
 
 	switch addr &^ 3 {
 	case 0x680:

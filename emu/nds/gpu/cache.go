@@ -4,6 +4,17 @@ import (
 	"github.com/aabalke/guac/emu/nds/gpu/gl"
 )
 
+const (
+	TEX_FMT_NONE = iota
+	TEX_FMT_A3I5
+	TEX_FMT_4_PAL
+	TEX_FMT_16_PAL
+	TEX_FMT_256_PAL
+	TEX_FMT_4X4
+	TEX_FMT_A5I3
+	TEX_FMT_DIRECT
+)
+
 type TextureCache map[key]*[]gl.Color
 
 type key struct{ base, offset uint32 }

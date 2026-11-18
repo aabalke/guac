@@ -1,9 +1,5 @@
 package ppu
 
-import (
-	"github.com/aabalke/guac/emu/nds/gpu"
-)
-
 type Capture struct {
 	EVA, EVB uint8
 
@@ -23,10 +19,12 @@ type Capture struct {
 
 	VramBlocks [4]*[0x2_0000]uint8
 
-	Pixels   *[]uint8
-	Pixels3d *gpu.Pixels
+	Pixels *[]uint8
 
 	arm7CBlock, arm7DBlock *bool
+
+	palettes *[]uint32
+	alphas   *[]uint32
 
 	ActiveData ActiveData
 }
@@ -40,16 +38,17 @@ type ActiveData struct {
 	ReadOffsetV  uint8
 }
 
-func (c *Capture) Init(vram *VRAM, ppu *PPU, rdBlk *uint32, pixels *[]uint8, pixels3d *gpu.Pixels) {
+func (c *Capture) Init(vram *VRAM, ppu *PPU, rdBlk *uint32, pixels *[]uint8, palettes, alphas *[]uint32) {
 	c.VramBlocks[0] = &vram.a
 	c.VramBlocks[1] = &vram.b
 	c.VramBlocks[2] = &vram.c
 	c.VramBlocks[3] = &vram.d
 	c.ReadBlock = rdBlk
 	c.Pixels = pixels
-	c.Pixels3d = pixels3d
 	c.arm7CBlock = &vram.Cnt[C].arm7
 	c.arm7DBlock = &vram.Cnt[D].arm7
+	c.palettes = palettes
+	c.alphas = alphas
 }
 
 func (c *Capture) Write(addr uint32, v uint8) {
@@ -165,7 +164,7 @@ func (c *Capture) StartCapture() {
 	c.ActiveCapture = true
 }
 
-func (c *Capture) CaptureLine(y uint32, isRenderingB bool) {
+func (c *Capture) CaptureLine(y uint32) {
 	//return
 
 	//if !c.ActiveCapture {
@@ -190,12 +189,7 @@ func (c *Capture) CaptureLine(y uint32, isRenderingB bool) {
 		if c.SrcA3D {
 			i := (x + (y * SCREEN_WIDTH))
 			v, alpha := uint32(0), uint32(0)
-			pixels := c.Pixels3d
-			if isRenderingB {
-				v, alpha = pixels.PalettesA[i], pixels.AlphaA[i]
-			} else {
-				v, alpha = pixels.PalettesB[i], pixels.AlphaB[i]
-			}
+			v, alpha = (*c.palettes)[i], (*c.alphas)[i]
 
 			if alpha > 0 {
 				v |= 0x8000

@@ -15,24 +15,11 @@ const (
 
 type Render struct {
 	Rasterizer *Rasterizer
-	Pixels     Pixels
+	Palettes   []uint32
+	Alphas     []uint32
 	Context    *gl.Context
 	Buffers    *Buffers
 	RearPlane  *RearPlane
-}
-
-type Pixels struct {
-	PalettesA []uint32
-	PalettesB []uint32
-	AlphaA    []uint32
-	AlphaB    []uint32
-}
-
-func (p *Pixels) InitPixels() {
-	p.PalettesA = make([]uint32, WIDTH*HEIGHT)
-	p.PalettesB = make([]uint32, WIDTH*HEIGHT)
-	p.AlphaA = make([]uint32, WIDTH*HEIGHT)
-	p.AlphaB = make([]uint32, WIDTH*HEIGHT)
 }
 
 func NewRender(rast *Rasterizer, buffers *Buffers, rp *RearPlane) *Render {
@@ -41,9 +28,10 @@ func NewRender(rast *Rasterizer, buffers *Buffers, rp *RearPlane) *Render {
 		Buffers:    buffers,
 		Context:    gl.NewContext(WIDTH, HEIGHT),
 		RearPlane:  rp,
+		Palettes:   make([]uint32, WIDTH*HEIGHT),
+		Alphas:     make([]uint32, WIDTH*HEIGHT),
 	}
 
-	r.Pixels.InitPixels()
 	r.Context.Shader = gl.NewShader()
 
 	return r
@@ -123,7 +111,7 @@ func (r *Render) ClearBitmapPlane() {
 func (r *Render) UpdateRender() {
 	r.ResetRasterizer()
 
-	buffer := r.Buffers.GetBuffer()
+	buffer := r.Buffers.bufRen
 	polygons := buffer.Polys
 
 	r.Context.DepthW = buffer.DepthBufferW
@@ -372,13 +360,6 @@ func (r *Render) RenderPolygon(p *Polygon) {
 }
 
 func (r *Render) ImageToPixels(img []gl.Color) {
-	palettes := &r.Pixels.PalettesA
-	alphas := &r.Pixels.AlphaA
-	if r.Rasterizer.Buffers.BisRendering {
-		palettes = &r.Pixels.PalettesB
-		alphas = &r.Pixels.AlphaB
-	}
-
 	for y := range HEIGHT {
 		for x := range WIDTH {
 			i := x + y*WIDTH
@@ -386,8 +367,8 @@ func (r *Render) ImageToPixels(img []gl.Color) {
 			r5 := uint32(min(0x1F, max(0, c.R*0x1F)))
 			g5 := uint32(min(0x1F, max(0, c.G*0x1F)))
 			b5 := uint32(min(0x1F, max(0, c.B*0x1F)))
-			(*palettes)[i] = r5 | g5<<5 | b5<<10
-			(*alphas)[i] = uint32(min(0x1F, max(0, c.A*0x1F)))
+			r.Palettes[i] = r5 | g5<<5 | b5<<10
+			r.Alphas[i] = uint32(min(0x1F, max(0, c.A*0x1F)))
 		}
 	}
 }
