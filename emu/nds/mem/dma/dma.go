@@ -47,6 +47,8 @@ type Dma struct {
 
 	IsArm9 bool
 
+	IsGXFIFORequesting func() bool
+
 	// hades/dma-latch.gba / https://mgba.io/2020/01/25/infinite-loop-holy-grail/
 	LatchValue uint32
 
@@ -102,13 +104,14 @@ type Channel struct {
 	startEvent scheduler.EventIdx
 }
 
-func NewDma(mem Mem, sch Scheduler, irq Irq, tick func(int64), cycles func(addr, w, seq uint32)) *Dma {
+func NewDma(mem Mem, sch Scheduler, irq Irq, tick func(int64), cycles func(addr, w, seq uint32), IsGXFIFORequesting func() bool) *Dma {
 	d := &Dma{
-		Mem:       mem,
-		Scheduler: sch,
-		Irq:       irq,
-		Tick:      tick,
-		Cycles:    cycles,
+		Mem:                mem,
+		Scheduler:          sch,
+		Irq:                irq,
+		Tick:               tick,
+		Cycles:             cycles,
+		IsGXFIFORequesting: IsGXFIFORequesting,
 	}
 
 	for i := range 4 {
@@ -244,6 +247,10 @@ func (ch *Channel) Write(addr uint32, v uint8) {
 
 			if ch.Mode == DMA_MODE_IMM {
 				ch.dma.Scheduler.Schedule(ch.startEvent, 2, nil)
+			}
+
+			if ch.dma.IsArm9 && ch.Mode == ARM9_DMA_MODE_GEO && ch.dma.IsGXFIFORequesting() {
+				ch.GxTransfer(0, nil)
 			}
 
 			return

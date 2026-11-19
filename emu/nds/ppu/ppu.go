@@ -185,14 +185,14 @@ type Irq interface {
 	SetIRQ(irq uint32)
 }
 
-func NewPPU(irq Irq) *PPU {
+func NewPPU(irq Irq, doDmas func()) *PPU {
 	p := &PPU{}
 
 	p.EngineA.Pixels = make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)
 	p.EngineB.Pixels = make([]byte, SCREEN_WIDTH*SCREEN_HEIGHT*4)
 	p.EngineB.IsB = true
 
-	p.Rasterizer = gpu.NewRasterizer(irq)
+	p.Rasterizer = gpu.NewRasterizer(irq, doDmas)
 
 	texCache := &p.Rasterizer.GeoEngine.TextureCache
 	p.Vram.Init(texCache, &p.EngineA, &p.EngineB)

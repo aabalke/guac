@@ -12,6 +12,7 @@ import (
 	"github.com/aabalke/guac/emu/cpu/arm9"
 	"github.com/aabalke/guac/emu/gba/timer"
 	"github.com/aabalke/guac/emu/nds/cart"
+	"github.com/aabalke/guac/emu/nds/gpu"
 	"github.com/aabalke/guac/emu/nds/irq"
 	"github.com/aabalke/guac/emu/nds/mem"
 	"github.com/aabalke/guac/emu/nds/mem/dma"
@@ -108,7 +109,7 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 	nds.arm9 = arm9.NewCpu(&nds.mem.Bus9, jitConfig9, nds.Idle9, nds.Tick9, nds.Cycles9, nds.SetCyclesPerInst)
 	nds.irq7 = irq.NewIrq(nds.Scheduler, &nds.arm7.IrqLine)
 	nds.irq9 = irq.NewIrq(nds.Scheduler, &nds.arm9.IrqLine)
-	nds.ppu = ppu.NewPPU(nds.irq9)
+	nds.ppu = ppu.NewPPU(nds.irq9, nds.CheckGeoDmas)
 
 	nds.registerEvents()
 
@@ -123,8 +124,8 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 
 	}
 
-	nds.dma7 = dma.NewDma(&nds.mem.Bus7, nds.Scheduler, nds.irq7, nds.Tick7, nds.CyclesDma7)
-	nds.dma9 = dma.NewDma(&nds.mem.Bus9, nds.Scheduler, nds.irq9, nds.Tick9, nds.CyclesDma9)
+	nds.dma7 = dma.NewDma(&nds.mem.Bus7, nds.Scheduler, nds.irq7, nds.Tick7, nds.CyclesDma7, nds.IsGXFIFORequesting)
+	nds.dma9 = dma.NewDma(&nds.mem.Bus9, nds.Scheduler, nds.irq9, nds.Tick9, nds.CyclesDma9, nds.IsGXFIFORequesting)
 
 	nds.dma9.IsArm9 = true
 
@@ -189,6 +190,12 @@ func NewNds(ctx *audio.Context, path string, muted bool) *Nds {
 	}
 
 	nds.Scheduler.Schedule(nds.RegisteredEvents.ScanlineEnd, CYCLES_HBLANK, nil)
+
+	nds.ppu.Rasterizer.Vram.SyncTextures(
+
+		&nds.ppu.Vram.TextureSlots,
+		&nds.ppu.Vram.TexPalSlots,
+	)
 
 	return nds
 }
@@ -279,14 +286,9 @@ func (nds *Nds) Update() {
 			}
 
 		} else {
-
 			nds.arm9.Step()
 
-			nds.CheckGeoDmas()
-
-			if nds.ppu.Rasterizer.GeoEngine.FifoIrq != 0 {
-				nds.irq9.SetIRQ(irq.IRQ_GEO_CMD_FIFO)
-			}
+			nds.ppu.Rasterizer.GeoEngine.Step()
 		}
 	}
 }
@@ -383,4 +385,8 @@ func (nds *Nds) OnTimerOverflow(t *timer.Timer, late int64) {
 			next.OverflowHandle(late)
 		}
 	}
+}
+
+func (nds *Nds) IsGXFIFORequesting() bool {
+	return nds.ppu.Rasterizer.GeoEngine.Fifo.Length() < gpu.SIZE_FIFO/2
 }

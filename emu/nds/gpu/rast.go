@@ -22,10 +22,10 @@ type Irq interface {
 	SetIRQ(irq uint32)
 }
 
-func NewRasterizer(irq Irq) *Rasterizer {
+func NewRasterizer(irq Irq, doDmas func()) *Rasterizer {
 	r := &Rasterizer{}
 	r.Buffers = NewBuffers()
-	r.GeoEngine = NewGeoEngine(r.Buffers, irq, &r.Vram)
+	r.GeoEngine = NewGeoEngine(r.Buffers, irq, &r.Vram, doDmas)
 	r.Render = NewRender(r, r.Buffers, &r.RearPlane)
 	r.RearPlane.VRAM = &r.Vram
 

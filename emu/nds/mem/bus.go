@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"unsafe"
 
+	"github.com/aabalke/guac/emu/nds/gpu"
 	"github.com/aabalke/guac/emu/nds/irq"
 )
 
@@ -204,8 +205,6 @@ func (b *Bus7) WritePtr(addr uint32) unsafe.Pointer {
 	}
 }
 
-func (b *Bus7) WriteGXFIFO(v uint32) {}
-
 type Bus9 struct {
 	M   *Mem
 	Jit Jit
@@ -352,13 +351,14 @@ func (b *Bus9) Write32(addr, v uint32) {
 
 	if io := addr>>24 == 4; io {
 
-		if geo := addr >= 0x4000440 && addr < 0x4000600; geo {
-			b.M.Ppu.Rasterizer.GeoCmd(addr, v)
+		if geo := addr >= 0x4000440 && addr < 0x40005CC; geo {
+			v := gpu.FifoEntry{Cmd: (addr & 0x1FC) >> 2, Param: v}
+			b.M.Ppu.Rasterizer.GeoEngine.WriteGX(v)
 			return
 		}
 
 		if gxfifo := addr >= 0x400_0400 && addr < 0x4000440; gxfifo {
-			b.M.Ppu.Rasterizer.GeoEngine.Fifo(v)
+			b.M.Ppu.Rasterizer.GeoEngine.WriteFifo(v)
 			return
 		}
 
@@ -402,10 +402,6 @@ func (b *Bus9) WritePtr(addr uint32) unsafe.Pointer {
 	}
 
 	return nil
-}
-
-func (b *Bus9) WriteGXFIFO(v uint32) {
-	b.M.Ppu.Rasterizer.GeoEngine.Fifo(v)
 }
 
 //go:inline

@@ -26,7 +26,6 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
 		return r.ReadVecMtx(addr)
 	}
 
-	//if addr & 0b11 == 0 { fmt.Printf("R ADDR %08X\n", addr) }
 	switch addr {
 	case 0x60, 0x61:
 		return r.GeoEngine.Disp3dCnt.Read(uint8(addr & 1))
@@ -50,19 +49,24 @@ func (r *Rasterizer) Read(addr uint32) uint8 {
 		return v
 
 	case 0x602:
-		v := uint8(r.GeoEngine.FifoEntries)
-		return v
+		return uint8(r.GeoEngine.Fifo.Length())
 
 	case 0x603:
 
-		v := uint8(r.GeoEngine.FifoEntries >> 8)
+		fifoLen := r.GeoEngine.Fifo.Length()
 
-		if underHalf := r.GeoEngine.FifoEntries < 128; underHalf {
+		v := uint8(fifoLen >> 8)
+
+		if underHalf := fifoLen < SIZE_FIFO/2; underHalf {
 			v |= 1 << 1
 		}
 
-		if empty := r.GeoEngine.FifoEntries == 0; empty {
+		if empty := fifoLen == 0; empty {
 			v |= 1 << 2
+		}
+
+		if r.GeoEngine.Busy {
+			v |= 1 << 3
 		}
 
 		v |= r.GeoEngine.FifoIrq << 5
@@ -242,39 +246,4 @@ func (r *Rasterizer) ReadFog(addr uint32) uint8 {
 	}
 
 	return 0
-}
-
-type addrRange struct {
-	start, end, base uint32 // inclusive, addr steps by 4
-}
-
-var addrRanges = []addrRange{
-	{0x440, 0x470, 0x10},
-	{0x480, 0x4AC, 0x20},
-	{0x4C0, 0x4D0, 0x30},
-	{0x500, 0x504, 0x40},
-	{0x540, 0x540, 0x50},
-	{0x580, 0x580, 0x60},
-	{0x5C0, 0x5C8, 0x70},
-}
-
-func (r *Rasterizer) GeoCmd(addr, v uint32) {
-	d := &r.GeoEngine.Data
-
-	if len(*d) == 0 {
-
-		addr &= 0xFF_FFFF
-
-		for _, r := range addrRanges {
-			if addr >= r.start && addr <= r.end {
-				v := r.base + ((addr - r.start) / 4)
-				*d = append(*d, v)
-				break
-			}
-		}
-	}
-
-	(*d) = append(*d, v)
-
-	r.GeoEngine.Cmd(false, *d)
 }

@@ -96,10 +96,10 @@ func (nds *Nds) ScanlineEndEvent(late int64, arg any) {
 
 	case 215:
 		if nds.ppu.EngineA.Dispcnt.Is3D {
-			nds.ppu.Rasterizer.Vram.SyncTextures(
-				&nds.ppu.Vram.TextureSlots,
-				&nds.ppu.Vram.TexPalSlots,
-			)
+			//nds.ppu.Rasterizer.Vram.SyncTextures(
+			//	&nds.ppu.Vram.TextureSlots,
+			//	&nds.ppu.Vram.TexPalSlots,
+			//)
 			nds.ppu.Rasterizer.Render.UpdateRender()
 		}
 
