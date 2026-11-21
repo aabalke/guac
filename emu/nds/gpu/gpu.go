@@ -47,18 +47,17 @@ type GeoEngine struct {
 	params   [32]uint32
 	paramCnt int
 
-	ClipMatrix  gl.Matrix
-	WorldMatrix gl.Matrix // just for export
+	UpdateClipMtx bool
+	ClipMatrix    gl.Matrix
+	WorldMatrix   gl.Matrix // just for export
+
 	PosTestData [4]uint32
 	VecTestData [3]uint16
 	ToonTbl     [32]gl.Color
+	Fog         gl.Fog
 
 	TextureCache TextureCache
 	Vram         *Vram
-
-	Fog gl.Fog
-
-	UpdateClipMtx bool
 
 	// GxStat
 	StackOverflow bool
@@ -121,21 +120,31 @@ func NewGeoEngine(buffers *Buffers, irq Irq, vram *Vram, doDmas func()) *GeoEngi
 }
 
 func (g *GeoEngine) Step() {
-	if g.pipe.IsEmpty() {
-		return
-	}
+	//return
 
-	if !g.Stalled {
-		g.RunCommand()
-		return
-	}
-
-	for g.Stalled {
+	for !g.pipe.IsEmpty() {
 		g.RunCommand()
 	}
+
+	//if g.pipe.IsEmpty() {
+	//	return
+	//}
+
+	//if !g.Stalled {
+	//	g.RunCommand()
+	//	return
+	//}
+
+	//for g.Stalled {
+	//	g.RunCommand()
+	//}
 }
 
 func (g *GeoEngine) WriteGX(v FifoEntry) {
+	//fmt.Printf("write %08X: %02X: %08X PIPE %04d FIFO %04d FLOOD %d\n", debug.Vi64[0], v.Cmd, v.Param, g.pipe.Length(), g.Fifo.Length(), g.flood.Length())
+	//g.Execute(v)
+	//return
+
 	if g.Fifo.IsEmpty() && !g.pipe.IsFull() {
 		g.pipe.Enqueue(v)
 	} else {
@@ -153,6 +162,8 @@ func (g *GeoEngine) WriteGX(v FifoEntry) {
 func (g *GeoEngine) ReadGX() FifoEntry {
 	v := g.pipe.Dequeue()
 
+	//fmt.Printf("read  %08X: %02X: %08X PIPE %04d FIFO %04d FLOOD %d\n", debug.Vi64[0], v.Cmd, v.Param, g.pipe.Length(), g.Fifo.Length(), g.flood.Length())
+
 	if g.pipe.Length() <= (SIZE_PIPE / 2) {
 
 		for range SIZE_PIPE / 2 {
@@ -161,12 +172,16 @@ func (g *GeoEngine) ReadGX() FifoEntry {
 			}
 		}
 
-		for !g.flood.IsEmpty() {
-			if g.Fifo.IsFull() {
-				break
-			}
+		if !g.flood.IsEmpty() {
 
-			g.Fifo.Enqueue(g.flood.Dequeue())
+			for !g.flood.IsEmpty() {
+
+				if g.Fifo.IsFull() {
+					break
+				}
+
+				g.Fifo.Enqueue(g.flood.Dequeue())
+			}
 
 			if g.flood.IsEmpty() {
 				g.Stalled = false
@@ -186,6 +201,7 @@ func (g *GeoEngine) ReadGX() FifoEntry {
 func (g *GeoEngine) WriteFifo(v uint32) {
 	if packedParams := g.pendingCmdsCnt != 0; packedParams {
 		cmd := g.packedCmds & 0xFF
+
 		g.WriteGX(FifoEntry{cmd, v})
 
 		g.pendingParamCnt--
@@ -232,7 +248,6 @@ func (g *GeoEngine) unpack() {
 func (g *GeoEngine) RunCommand() {
 	v := g.ReadGX()
 	g.Execute(v)
-
 	g.Busy = !g.pipe.IsEmpty()
 }
 

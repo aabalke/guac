@@ -1,6 +1,8 @@
 package nds
 
-import "github.com/aabalke/guac/emu/cpu/arm7"
+import (
+	"github.com/aabalke/guac/emu/cpu/arm7"
+)
 
 type (
 	TimingAttr [4]uint8 // 0 n16, 1 s16, 2 n32, 3 s32
@@ -149,6 +151,7 @@ func (nds *Nds) CyclesDma7(addr, width, seq uint32) {
 func (nds *Nds) Tick9(cycles int64) {
 	// in 66mhz cycles
 	nds.arm9.Timestamp += cycles
+	nds.ppu.Rasterizer.GeoEngine.Step()
 
 	for nds.arm7.Timestamp < nds.arm9.Timestamp>>1 {
 		if nds.arm7.Halted {

@@ -287,8 +287,6 @@ func (nds *Nds) Update() {
 
 		} else {
 			nds.arm9.Step()
-
-			nds.ppu.Rasterizer.GeoEngine.Step()
 		}
 	}
 }
@@ -296,7 +294,7 @@ func (nds *Nds) Update() {
 func (nds *Nds) CheckGeoDmas() {
 	for i := range 4 {
 		if ch := &nds.dma9.Chs[i]; ch.Enabled && ch.Mode == dma.ARM9_DMA_MODE_GEO {
-			nds.dma9.Chs[i].GxTransfer(0, 0)
+			nds.dma9.Chs[i].GxTransfer(0, nil)
 		}
 	}
 }
